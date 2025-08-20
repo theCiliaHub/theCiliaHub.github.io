@@ -1,0 +1,1564 @@
+/* General Reset */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: Arial, sans-serif;
+}
+
+body {
+    background-color: #f5f5f5;
+    color: #333;
+    line-height: 1.6;
+}
+
+/* Navbar */
+.navbar {
+    background-color: #004080;
+    padding: 10px;
+    position: fixed;
+    width: 100%;
+    top: 0;
+    left: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 15px;
+    z-index: 1000;
+    height: 60px;
+}
+
+/* Navbar Links */
+.navbar a {
+    color: white;
+    text-decoration: none;
+    padding: 10px 15px;
+    font-weight: bold;
+}
+
+.navbar a:hover {
+    background-color: #002b5e;
+    border-radius: 5px;
+}
+
+/* Dropdown Menu */
+.dropdown {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+}
+
+.dropbtn {
+    color: white;
+    text-decoration: none;
+    padding: 10px 15px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.dropdown-content {
+    display: none;
+    position: absolute;
+    background-color: #f9f9f9;
+    min-width: 160px;
+    box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
+    z-index: 1001;
+    top: 100%;
+}
+
+.dropdown-content a {
+    color: #004080;
+    padding: 12px 16px;
+    text-decoration: none;
+    display: block;
+    font-weight: normal;
+}
+
+.dropdown-content a:hover {
+    background-color: #004080;
+    color: white;
+}
+
+.dropdown:hover .dropdown-content {
+    display: block;
+}
+
+.dropdown:hover .dropbtn {
+    background-color: #002b5e;
+    border-radius: 5px;
+}
+
+/* Container */
+.container {
+    width: 100%;
+    max-width: 1400px;
+    margin: 80px auto 20px;
+    padding: 20px;
+    background: white;
+    box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
+    border-radius: 8px;
+}
+
+/* New style container for the four sections */
+.compact-section > .container {
+    max-width: 900px;
+    margin: 50px auto 20px;
+    box-shadow: none;
+    padding: 15px;
+}
+
+/* Sections */
+.section {
+    display: none;
+}
+
+/* Image Styling */
+.fit-image {
+    width: 150px;
+    height: auto;
+    object-fit: contain;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.team-image {
+    width: 150px;
+    height: 150px;
+    object-fit: contain;
+    border-radius: 50%;
+}
+.figure-image {
+    width: 100%;            /* This is OK if the parent is constrained */
+    max-width: none;        /* Remove any overriding max */
+    height: auto;
+    object-fit: contain;
+    display: block;
+    margin: 0 auto 20px;
+    border-radius: 4px;
+}
+.overview-image {
+    width: 100%;
+    max-width: 860px;
+    height: auto;
+    object-fit: contain;
+    display: block;
+    margin: 15px auto;
+    border-radius: 4px;
+}
+
+.large-image {
+    width: 100%;
+    max-width: 700px;
+    height: auto;
+    display: block;
+    margin: 15px auto;
+    border-radius: 4px;
+}
+
+.crispr-image {
+    width: 100%;
+    max-width: 800px;
+    height: auto;
+    display: block;
+    margin: 15px auto;
+    border-radius: 4px;
+}
+
+/* Home Section Text Alignment with Full Width */
+#home {
+    max-width: 100%;
+    padding: 20px;
+}
+
+#home .container {
+    max-width: 100%;
+}
+
+#home .text-content {
+    width: 100%; /* Matches the full width of the section */
+    margin: 0 auto;
+    padding: 0 20px;
+}
+
+#home h1 {
+    color: #004080; /* Dark blue for "Welcome to Kaplan's Lab" */
+    margin-bottom: 20px;
+    text-align: center;
+}
+
+#home p,
+#home .mission-statement,
+#home .research-updates {
+    width: 100%; /* Ensures full width alignment */
+    margin: 0 auto 15px;
+}
+
+#home .research-grid {
+    width: 100%; /* Matches the full width */
+    margin: 0 auto;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+/* Full Width for Publications, News, and Resources on Homepage */
+#publications,
+#news,
+#resources {
+    width: 100%;
+    max-width: 100%; /* Spans full width */
+    padding: 20px;
+    margin: 0 auto;
+}
+
+#publications .research-grid,
+#news .research-grid,
+#resources .research-grid {
+    width: 100%;
+    margin: 0 auto;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+/* Research Updates (Home Page) */
+.research-updates {
+    margin-top: 20px;
+}
+
+.research-updates h2 {
+    background-color: #004080;
+    color: white;
+    padding: 10px;
+    border-radius: 5px;
+    text-align: center;
+    margin-bottom: 15px;
+}
+
+/* Generic Research Grid */
+.research-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    margin-top: 15px;
+}
+
+.research-item {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 15px;
+    background: #e6f2ff;
+    padding: 15px;
+    border-radius: 5px;
+    border-left: 4px solid #004080;
+    overflow: hidden;
+}
+
+.research-item img {
+    flex-shrink: 0;
+    margin-right: 15px;
+}
+
+.research-text {
+    flex-grow: 1;
+}
+
+.research-item p, .research-item ul {
+    margin: 0;
+}
+
+.research-item ul {
+    list-style: none;
+    padding-left: 0;
+    margin-top: 5px;
+}
+
+.research-item ul li {
+    margin-bottom: 3px;
+    font-size: 0.9em;
+}
+
+.research-item h3 {
+    width: 100%;
+    text-align: left;
+    background: none;
+    padding: 0;
+    margin-bottom: 10px;
+    color: #004080;
+    font-size: 1.1em;
+    border-bottom: 1px solid #ccc;
+    padding-bottom: 5px;
+}
+
+/* Research Overview Grid */
+.research-overview-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 20px;
+    margin-top: 20px;
+}
+
+.research-overview-item {
+    background: #e6f2ff;
+    padding: 15px;
+    border-radius: 5px;
+    border-left: 4px solid #004080;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+}
+
+.research-overview-item h2 {
+    font-size: 1.5em;
+    color: #004080;
+    margin: 10px 0;
+}
+
+.research-text {
+    font-size: 1em;
+    color: #333;
+    line-height: 1.5;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+}
+
+/* Read More Button */
+.read-more-btn {
+    margin-top: 10px;
+    padding: 8px 15px;
+    background-color: #004080;
+    color: white;
+    text-decoration: none;
+    border-radius: 4px;
+    font-weight: bold;
+}
+
+.read-more-btn:hover {
+    background-color: #002b5e;
+    text-decoration: none;
+}
+
+/* Team Section Styling */
+.team-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 20px;
+    margin-top: 20px;
+}
+
+.team-member {
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    background: #e6f2ff;
+    padding: 20px;
+    border-radius: 8px;
+    border-left: 4px solid #004080;
+    box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.team-member:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(0,0,0,0.15);
+}
+
+.team-photo {
+    flex-shrink: 0;
+    margin-right: 20px;
+}
+
+.team-info {
+    flex-grow: 1;
+}
+
+.team-name {
+    font-size: 1.4em;
+    font-weight: bold;
+    color: #004080;
+    margin-bottom: 5px;
+}
+
+.team-title {
+    font-size: 1.1em;
+    color: #555;
+    margin-bottom: 10px;
+}
+
+.team-member p, .team-member ul {
+    font-size: 1em;
+    margin-bottom: 10px;
+    line-height: 1.5;
+}
+
+.team-member ul {
+    list-style: none;
+    padding-left: 0;
+}
+
+/* Gallery Section */
+.gallery-section {
+    background: url('cilia_neuron.png') no-repeat center center;
+    background-size: cover;
+    padding: 40px 20px;
+    position: relative;
+}
+
+.gallery-section::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(255, 255, 255, 0.85);
+    z-index: 0;
+}
+
+.gallery-layout {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 40px;
+    position: relative;
+    z-index: 1;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.gallery-quote {
+    flex: 1;
+    min-width: 300px;
+    padding: 20px;
+    background: rgba(255, 255, 255, 0.9);
+    border-radius: 8px;
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
+}
+
+.gallery-quote h1 {
+    font-size: 2.5em;
+    color: #004080;
+    margin-bottom: 20px;
+}
+
+.gallery-quote p {
+    font-style: italic;
+    font-size: 1.2em;
+    color: #444;
+    line-height: 1.6;
+}
+
+.gallery-items {
+    flex: 2;
+    min-width: 300px;
+}
+
+.gallery-subsection {
+    margin-bottom: 40px;
+}
+
+.gallery-subsection h2 {
+    font-size: 1.8em;
+    color: #004080;
+    margin-bottom: 20px;
+    border-bottom: 2px solid #004080;
+    padding-bottom: 5px;
+}
+
+.gallery-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 30px;
+}
+
+.gallery-item {
+    overflow: hidden;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 20px;
+    background: rgba(255, 255, 255, 0.9);
+    padding: 25px;
+    border-radius: 8px;
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    min-height: 250px;
+}
+
+.gallery-item:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.15);
+}
+
+.gallery-media {
+    width: 100%;
+    max-width: 400px;
+    height: auto;
+    object-fit: contain;
+    border-radius: 4px;
+    border: 1px solid #ddd;
+}
+
+.gallery-text {
+    flex-grow: 1;
+    min-width: 0;
+    overflow: hidden;
+}
+
+.gallery-text h3 {
+    font-size: 1.2em;
+    color: #004080;
+    margin-bottom: 10px;
+}
+
+.gallery-text p {
+    font-size: 1em;
+    color: #555;
+    line-height: 1.5;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 4;
+    -webkit-box-orient: vertical;
+}
+
+/* Publications Search */
+.pub-search {
+    width: 100%;
+    max-width: 400px;
+    padding: 10px;
+    margin-bottom: 20px;
+    border: 1px solid #004080;
+    border-radius: 4px;
+    font-size: 1em;
+}
+
+/* Back to Top Button */
+#back-to-top {
+    display: none;
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    width: 50px;
+    height: 50px;
+    background-color: #004080;
+    color: white;
+    border: none;
+    border-radius: 50%;
+    font-size: 24px;
+    cursor: pointer;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+    transition: background-color 0.3s, transform 0.3s;
+    z-index: 1000;
+}
+
+#back-to-top:hover {
+    background-color: #002b5e;
+    transform: scale(1.1);
+}
+
+/* Night Mode */
+body.night-mode {
+    background-color: #1a1a1a;
+    color: #d9d9d9;
+}
+
+.night-mode .container {
+    background: #2b2b2b;
+    box-shadow: 0px 0px 10px rgba(255, 255, 255, 0.1);
+}
+
+.night-mode .navbar {
+    background: linear-gradient(90deg, #ff6f61, #6b5b95, #88b04b);
+}
+
+.night-mode .navbar a,
+.night-mode .dropbtn {
+    color: #e6e6e6;
+}
+
+.night-mode .navbar a:hover,
+.night-mode .dropdown:hover .dropbtn {
+    background-color: rgba(255, 255, 255, 0.2);
+}
+
+.night-mode .dropdown-content {
+    background-color: #333;
+}
+
+.night-mode .dropdown-content a {
+    color: #b3d9ff;
+}
+
+.night-mode .dropdown-content a:hover {
+    background-color: #004d99;
+    color: #fff;
+}
+
+.night-mode .section,
+.night-mode h1,
+.night-mode h2,
+.night-mode h3,
+.night-mode p {
+    color: #d9d9d9;
+}
+
+.night-mode .research-item,
+.night-mode .team-member,
+.night-mode .gallery-item {
+    background: #3d3d3d;
+    border-left: 4px solid #0066cc;
+}
+
+.night-mode .research-updates h2 {
+    background-color: #ff6f61;
+}
+
+.night-mode footer {
+    background-color: #003366;
+}
+
+.night-mode a {
+    color: #b3d9ff;
+}
+
+.night-mode a:hover {
+    color: #cce6ff;
+}
+
+.night-mode #back-to-top {
+    background-color: #0066cc;
+}
+
+.night-mode #back-to-top:hover {
+    background-color: #004d99;
+}
+
+/* Make all bold text steelblue */
+strong, b, [style*="font-weight: bold"] {
+    color: #004080;
+}
+
+.night-mode strong,
+.night-mode b,
+.night-mode [style*="font-weight: bold"] {
+    color: #b3d9ff;
+}
+
+/* Link Styling */
+a {
+    color: #004080;
+    text-decoration: none;
+    font-weight: bold;
+}
+
+a:hover {
+    text-decoration: underline;
+    color: #002b5e;
+}
+
+/* Footer */
+footer {
+    text-align: center;
+    margin-top: 30px;
+    padding: 20px;
+    background-color: #004080;
+    color: white;
+}
+
+.social-links {
+    margin-top: 10px;
+    display: flex;
+    justify-content: center;
+    gap: 20px;
+}
+
+.social-icon {
+    width: 30px;
+    height: 30px;
+    transition: transform 0.3s;
+}
+
+.social-icon:hover {
+    transform: scale(1.1);
+}
+
+/* Lightbox Styles */
+.lightbox {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.lightbox-content {
+    max-width: 90%;
+    max-height: 90vh;
+    object-fit: contain;
+    border-radius: 4px;
+}
+
+.lightbox-close {
+    position: absolute;
+    top: 20px;
+    right: 30px;
+    color: #fff;
+    font-size: 40px;
+    font-weight: bold;
+    cursor: pointer;
+    text-decoration: none;
+}
+
+.lightbox-close:hover {
+    color: #ccc;
+}
+
+.lightbox-link {
+    cursor: pointer;
+}
+
+.lightbox-link img {
+    transition: opacity 0.3s ease;
+}
+
+.lightbox-link:hover img {
+    opacity: 0.8;
+}
+
+/* NEW FEATURE 1: Statistics Dashboard Styles */
+.stats-dashboard {
+    background: #f0f8ff;
+    border: 2px solid #cce0f5;
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 30px;
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 20px;
+    margin-bottom: 30px;
+}
+
+.stat-card {
+    background: white;
+    padding: 20px;
+    border-radius: 8px;
+    text-align: center;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    transition: transform 0.2s;
+}
+
+.stat-card:hover {
+    transform: translateY(-2px);
+}
+
+.stat-number {
+    font-size: 2.5em;
+    font-weight: bold;
+    color: #203c78;
+    margin-bottom: 10px;
+}
+
+.stat-label {
+    font-size: 1.1em;
+    color: #666;
+    font-weight: 500;
+}
+
+.chart-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+    gap: 30px;
+    margin-top: 20px;
+}
+
+.chart-section {
+    background: white;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.chart-section h4 {
+    color: #203c78;
+    margin-bottom: 15px;
+    text-align: center;
+}
+
+.chart-section canvas {
+    max-height: 300px;
+}
+
+/* NEW FEATURE 2: Enhanced Search with Auto-suggestions */
+.search-container {
+    position: relative;
+    width: 100%;
+    max-width: 400px;
+}
+
+.search-suggestions {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: white;
+    border: 1px solid #cce0f5;
+    border-top: none;
+    border-radius: 0 0 5px 5px;
+    max-height: 200px;
+    overflow-y: auto;
+    z-index: 1000;
+    display: none;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+
+.suggestion-item {
+    padding: 10px 15px;
+    cursor: pointer;
+    border-bottom: 1px solid #f0f0f0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.suggestion-item:hover {
+    background-color: #f0f8ff;
+}
+
+.suggestion-type {
+    font-size: 0.8em;
+    color: #666;
+    background: #e6f2ff;
+    padding: 2px 6px;
+    border-radius: 3px;
+    text-transform: uppercase;
+}
+
+/* NEW FEATURE 3: Advanced Filtering System */
+.advanced-filters {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 10px;
+    margin: 15px 0;
+}
+
+.control-buttons {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin-top: 15px;
+}
+
+.results-counter {
+    text-align: center;
+    font-weight: bold;
+    color: #203c78;
+    padding: 10px;
+    background: #f0f8ff;
+    border-radius: 5px;
+    margin-bottom: 15px;
+    display: none;
+}
+
+/* CiliaHub Section */
+.ciliahub-controls {
+    background-color: #e6f2ff;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    margin-bottom: 20px;
+}
+
+#ciliahub-search, #ciliahub-filter, #omim-filter, #reference-filter, #synonym-filter,
+#ciliahub-reset, #download-ciliahub, #export-filtered {
+    padding: 10px 12px;
+    border: 2px solid #004080;
+    border-radius: 5px;
+    font-size: 1em;
+    background-color: white;
+    color: #333;
+    transition: border-color 0.3s, box-shadow 0.3s;
+}
+
+#ciliahub-search {
+    width: 100%;
+    max-width: 400px;
+}
+
+#ciliahub-filter, #omim-filter, #reference-filter {
+    cursor: pointer;
+}
+
+#synonym-filter {
+    width: 100%;
+    max-width: 200px;
+}
+
+#ciliahub-reset, #download-ciliahub, #export-filtered {
+    background-color: #203c78;
+    color: white;
+    cursor: pointer;
+    border: none;
+    font-weight: bold;
+    transition: background-color 0.3s, transform 0.2s;
+}
+
+#ciliahub-reset:hover, #download-ciliahub:hover, #export-filtered:hover {
+    background-color: #1a2f5f;
+    transform: translateY(-1px);
+}
+
+#ciliahub-search:focus, #ciliahub-filter:focus, #omim-filter:focus, 
+#reference-filter:focus, #synonym-filter:focus {
+    outline: none;
+    border-color: #203c78;
+    box-shadow: 0 0 0 3px rgba(32, 60, 120, 0.1);
+}
+
+.ciliahub-legend {
+    margin-bottom: 15px;
+    padding: 10px;
+    background-color: #f9f9f9;
+    border-radius: 4px;
+    font-size: 0.9em;
+    color: #333;
+}
+
+.ciliahub-legend span {
+    margin-right: 15px;
+}
+
+.ciliahub-legend .legend-axoneme::before {
+    content: '';
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    background-color: #f0faff;
+    border: 1px solid #004080;
+    margin-right: 5px;
+    vertical-align: middle;
+}
+
+.ciliahub-legend .legend-basal-body::before {
+    content: '';
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    background-color: #e6f2ff;
+    border: 1px solid #004080;
+    margin-right: 5px;
+    vertical-align: middle;
+}
+
+.ciliahub-legend .legend-transition-zone::before {
+    content: '';
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    background-color: #f5f5f5;
+    border: 1px solid #004080;
+    margin-right: 5px;
+    vertical-align: middle;
+}
+
+.ciliahub-table {
+    width: 100%;
+    max-width: 100%; /* Matches approximate width of provided text */
+    margin: 0 auto;
+    table-layout: fixed;
+    border-collapse: collapse;
+    background: #e6f2ff;
+    border-radius: 5px;
+    overflow: hidden;
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
+}
+
+.ciliahub-table th,
+.ciliahub-table td {
+    padding: 14px;
+    text-align: left;
+    border-bottom: 1px solid #ddd;
+    font-size: 0.9em;
+    vertical-align: top;
+}
+
+.ciliahub-table th {
+    background-color: #003366;
+    color: white;
+    font-weight: bold;
+    border-bottom: 2px solid #004080;
+}
+
+/* Ensure Ensembl ID column is fully visible and clickable */
+.ciliahub-table th:nth-child(2),
+.ciliahub-table td:nth-child(2) {
+    width: 30%; /* Increased width for Ensembl ID (~210px) */
+    white-space: normal; /* Allow wrapping */
+    overflow: visible; /* Ensure no content is hidden */
+    word-break: break-all; /* Break long IDs for readability */
+}
+
+/* Style for Ensembl ID links */
+.ciliahub-table td:nth-child(2) a {
+    color: #004080;
+    text-decoration: underline;
+    font-weight: normal;
+    display: inline-block;
+    width: 100%;
+}
+
+/* Ensure Synonym column is clear and properly formatted */
+.ciliahub-table th:nth-child(4),
+.ciliahub-table td:nth-child(4) {
+    width: 25%; /* Increased width for Synonym (~175px) */
+    white-space: normal; /* Allow wrapping */
+    overflow: visible; /* Ensure no content is hidden */
+    line-height: 1.5; /* Improve readability */
+}
+
+/* Style for other columns to fit within table */
+.ciliahub-table th:nth-child(1),
+.ciliahub-table td:nth-child(1) {
+    width: 10%; /* Gene (~70px) */
+}
+
+.ciliahub-table th:nth-child(3),
+.ciliahub-table td:nth-child(3) {
+    width: 20%; /* Gene Description (~140px) */
+}
+
+.ciliahub-table th:nth-child(5),
+.ciliahub-table td:nth-child(5) {
+    width: 10%; /* OMIM ID (~70px) */
+}
+
+.ciliahub-table th:nth-child(6),
+.ciliahub-table td:nth-child(6) {
+    width: 10%; /* Reference (~70px) */
+}
+
+.ciliahub-table th:nth-child(7),
+.ciliahub-table td:nth-child(7) {
+    width: 15%; /* Ciliary Localization (~105px) */
+}
+
+.ciliahub-table td:nth-child(2) a:hover,
+.ciliahub-table td:nth-child(5) a:hover,
+.ciliahub-table td:nth-child(6) a:hover {
+    color: #002b5e;
+    text-decoration: underline;
+}
+
+.ciliahub-table tr:nth-child(even) {
+    background-color: #f9f9f9;
+}
+
+.ciliahub-table tr.axoneme {
+    background-color: #f0faff;
+}
+
+.ciliahub-table tr.basal-body {
+    background-color: #e6f2ff;
+}
+
+.ciliahub-table tr.transition-zone {
+    background-color: #f5f5f5;
+}
+
+.ciliahub-table tr:hover {
+    background-color: #d9e6ff;
+}
+
+/* Specific styling for links in the Reference column */
+.ciliahub-table td a {
+    color: #004080;
+    text-decoration: underline;
+    font-weight: normal;
+    display: inline-block;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Tooltip for Reference column */
+.ciliahub-table td.reference {
+    position: relative;
+    cursor: help;
+}
+
+.ciliahub-table td.reference:hover::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    top: -45px;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: #004080;
+    color: #fff;
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    white-space: nowrap;
+    z-index: 1002;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+}
+
+/* Night Mode for CiliaHub */
+.night-mode .stats-dashboard {
+    background: #2e2e2e;
+    border-color: #555;
+}
+
+.night-mode .stat-card {
+    background: #3d3d3d;
+    color: #d9d9d9;
+}
+
+.night-mode .stat-number {
+    color: #b3d9ff;
+}
+
+.night-mode .chart-section {
+    background: #3d3d3d;
+}
+
+.night-mode .search-suggestions {
+    background: #2e2e2e;
+    border-color: #555;
+}
+
+.night-mode .suggestion-item:hover {
+    background-color: #4a4a4a;
+}
+
+.night-mode .suggestion-type {
+    background: #4a4a4a;
+    color: #b3d9ff;
+}
+
+.night-mode .results-counter {
+    background: #2e2e2e;
+    color: #b3d9ff;
+}
+
+.night-mode .ciliahub-controls {
+    background-color: #3d3d3d;
+}
+
+.night-mode #ciliahub-search, .night-mode #ciliahub-filter, .night-mode #omim-filter,
+.night-mode #reference-filter, .night-mode #synonym-filter {
+    background-color: #2e2e2e;
+    border: 2px solid #b3d9ff;
+    color: #d9d9d9;
+}
+
+.night-mode #ciliahub-reset, .night-mode #download-ciliahub, .night-mode #export-filtered {
+    background-color: #0066cc;
+}
+
+.night-mode #ciliahub-reset:hover, .night-mode #download-ciliahub:hover, .night-mode #export-filtered:hover {
+    background-color: #004d99;
+}
+
+.night-mode .ciliahub-legend {
+    background-color: #2e2e2e;
+    color: #d9d9d9;
+}
+
+.night-mode .ciliahub-legend .legend-axoneme::before {
+    background-color: #4a4a4a;
+    border: 1px solid #b3d9ff;
+}
+
+.night-mode .ciliahub-legend .legend-basal-body::before {
+    background-color: #3d3d3d;
+    border: 1px solid #b3d9ff;
+}
+
+.night-mode .ciliahub-legend .legend-transition-zone::before {
+    background-color: #2e2e2e;
+    border: 1px solid #b3d9ff;
+}
+
+.night-mode .ciliahub-table {
+    background: #3d3d3d;
+    box-shadow: 0 3px 10px rgba(255, 255, 255, 0.1);
+}
+
+.night-mode .ciliahub-table th {
+    background-color: #0066cc;
+    border-bottom: 2px solid #b3d9ff;
+}
+
+.night-mode .ciliahub-table tr:nth-child(even) {
+    background-color: #2e2e2e;
+}
+
+.night-mode .ciliahub-table tr.axoneme {
+    background-color: #4a4a4a;
+}
+
+.night-mode .ciliahub-table tr.basal-body {
+    background-color: #3d3d3d;
+}
+
+.night-mode .ciliahub-table tr.transition-zone {
+    background-color: #2e2e2e;
+}
+
+.night-mode .ciliahub-table tr:hover {
+    background-color: #4a4a4a;
+}
+
+.night-mode .ciliahub-table td,
+.night-mode .ciliahub-table th {
+    border-bottom: 1px solid #555;
+}
+
+.night-mode .ciliahub-table td a {
+    color: #b3d9ff;
+}
+
+.night-mode .ciliahub-table td a:hover {
+    color: #cce6ff;
+}
+
+.night-mode .ciliahub-table td.reference:hover::after {
+    background-color: #0066cc;
+    color: #d9d9d9;
+}
+
+.ciliahub-table tr.basal-body-cilia {
+    background-color: #e6f2ff;
+}
+
+.ciliahub-table tr.cilia-basal-body {
+    background-color: #e6f2ff;
+}
+
+.ciliahub-table tr.flagella-cilia {
+    background-color: #f0faff;
+}
+
+.ciliahub-table tr.flagella-cilia-basal-body {
+    background-color: #f0faff;
+}
+
+.ciliahub-table tr.ciliary-associated-gene {
+    background-color: #f5f5f5;
+}
+
+.night-mode .ciliahub-table tr.basal-body-cilia {
+    background-color: #3d3d3d;
+}
+
+.night-mode .ciliahub-table tr.cilia-basal-body {
+    background-color: #3d3d3d;
+}
+
+.night-mode .ciliahub-table tr.flagella-cilia {
+    background-color: #4a4a4a;
+}
+
+.night-mode .ciliahub-table tr.flagella-cilia-basal-body {
+    background-color: #4a4a4a;
+}
+
+.night-mode .ciliahub-table tr.ciliary-associated-gene {
+    background-color: #2e2e2e;
+}
+
+/* Responsive Adjustments */
+@media (max-width: 768px) {
+    .container {
+        max-width: 95%;
+        padding: 15px;
+    }
+    .navbar {
+        height: 60px;
+        justify-content: space-around;
+        gap: 5px;
+        padding: 10px 5px;
+    }
+    .navbar a, .dropbtn {
+        padding: 8px 10px;
+        font-size: 0.9em;
+    }
+    .research-item {
+        flex-direction: row;
+        align-items: center;
+    }
+    .research-item img {
+        width: 120px;
+        margin-right: 10px;
+    }
+    .team-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    .team-member {
+        flex-direction: column;
+        text-align: center;
+    }
+    .team-photo {
+        margin-right: 0;
+        margin-bottom: 15px;
+    }
+    .gallery-item {
+        flex-direction: column;
+        align-items: center;
+    }
+    .gallery-media {
+        max-width: 100%;
+    }
+    .figure-image, .overview-image, .crispr-image {
+        max-width: 90%;
+    }
+    .team-image {
+        width: 120px;
+        height: 120px;
+    }
+    .fit-image {
+        width: 120px;
+    }
+    .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 15px;
+    }
+    .chart-container {
+        grid-template-columns: 1fr;
+        gap: 20px;
+    }
+    .advanced-filters {
+        grid-template-columns: 1fr;
+        gap: 10px;
+    }
+    .control-buttons {
+        flex-direction: column;
+        align-items: center;
+    }
+    .ciliahub-table {
+        font-size: 0.8em;
+        max-width: 100%; /* Fit within container on smaller screens */
+        overflow-x: auto; /* Enable horizontal scrolling */
+    }
+    .ciliahub-table th,
+    .ciliahub-table td {
+        padding: 8px;
+        min-width: 80px; /* Ensure columns are wide enough */
+    }
+    .ciliahub-table th:nth-child(2),
+    .ciliahub-table td:nth-child(2) {
+        min-width: 100px; /* Adjusted for Ensembl ID visibility */
+        white-space: normal;
+        overflow: visible;
+        word-break: break-all;
+    }
+    .ciliahub-table th:nth-child(4),
+    .ciliahub-table td:nth-child(4) {
+        min-width: 100px; /* Adjusted for Synonym visibility */
+        white-space: normal;
+        overflow: visible;
+    }
+}
+
+@media (max-width: 480px) {
+    .navbar {
+        height: 60px;
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+    .navbar a, .dropbtn {
+        padding: 5px 8px;
+        font-size: 0.85em;
+    }
+    .research-item {
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+    }
+    .research-item img {
+        width: 100px;
+        margin-right: 0;
+        margin-bottom: 10px;
+    }
+    .team-grid {
+        grid-template-columns: 1fr;
+    }
+    .team-image {
+        width: 100px;
+        height: 100px;
+    }
+    .fit-image {
+        width: 100px;
+    }
+    .stats-grid {
+        grid-template-columns: 1fr;
+    }
+    .stat-number {
+        font-size: 2em;
+    }
+    .search-container {
+        max-width: 100%;
+    }
+    .ciliahub-table {
+        font-size: 0.75em;
+        max-width: 100%; /* Fit within container */
+    }
+    .ciliahub-table th,
+    .ciliahub-table td {
+        padding: 6px;
+        min-width: 60px; /* Adjusted for smaller screens */
+    }
+    .ciliahub-table th:nth-child(2),
+    .ciliahub-table td:nth-child(2) {
+        min-width: 80px; /* Ensure Ensembl ID remains visible */
+        white-space: normal;
+        overflow: visible;
+        word-break: break-all;
+    }
+    .ciliahub-table th:nth-child(4),
+    .ciliahub-table td:nth-child(4) {
+        min-width: 80px; /* Ensure Synonym remains visible */
+        white-space: normal;
+        overflow: visible;
+    }
+}
+
+/* Night Mode Toggle Button */
+#night-mode-toggle {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    width: 40px;
+    height: 40px;
+    background-color: #004080;
+    color: white;
+    border: none;
+    border-radius: 50%;
+    font-size: 20px;
+    cursor: pointer;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+    transition: background-color 0.3s, transform 0.3s;
+    z-index: 1001;
+}
+
+#night-mode-toggle:hover {
+    background-color: #002b5e;
+    transform: scale(1.1);
+}
+
+.night-mode #night-mode-toggle {
+    background-color: #0066cc;
+}
+
+.night-mode #night-mode-toggle:hover {
+    background-color: #004d99;
+}
+
+/* Functional Gene Groups */
+.functional-gene-groups {
+    max-width: 600px;
+    margin: 20px auto;
+    text-align: left;
+}
+
+.functional-gene-groups h3 {
+    color: #203c78;
+    font-size: 1.25rem;
+    font-weight: bold;
+    margin-bottom: 10px;
+}
+
+.functional-gene-groups p {
+    font-size: 0.9rem;
+    color: #666;
+    margin-bottom: 15px;
+}
+
+.group-item {
+    border: 1px solid #cce0f5;
+    border-radius: 5px;
+    margin-bottom: 8px;
+}
+
+.group-item summary {
+    padding: 10px 15px;
+    background-color: #f0f8ff;
+    color: #203c78;
+    font-weight: bold;
+    cursor: pointer;
+    outline: none;
+}
+
+.group-item summary:hover {
+    background-color: #e6f2ff;
+}
+
+.group-item details[open] .group-content {
+    padding: 10px 15px;
+    background-color: #fff;
+}
+
+.group-content {
+    font-size: 0.85rem;
+    color: #333;
+}
+
+/* Night Mode for Functional Gene Groups */
+.night-mode .functional-gene-groups h3 {
+    color: #b3d9ff;
+}
+
+.night-mode .functional-gene-groups p {
+    color: #d9d9d9;
+}
+
+.night-mode .group-item {
+    border-color: #555;
+}
+
+.night-mode .group-item summary {
+    background-color: #3d3d3d;
+    color: #b3d9ff;
+}
+
+.night-mode .group-item summary:hover {
+    background-color: #4a4a4a;
+}
+
+.night-mode .group-item details[open] .group-content {
+    background-color: #2e2e2e;
+    color: #d9d9d9;
+}
+
+/* Responsive Adjustments for Functional Gene Groups */
+@media (max-width: 768px) {
+    .functional-gene-groups {
+        max-width: 95%;
+        padding: 15px;
+    }
+}
+
+@media (max-width: 480px) {
+    .functional-gene-groups h3 {
+        font-size: 1.1rem;
+    }
+    .functional-gene-groups p {
+        font-size: 0.85rem;
+    }
+    .group-content {
+        font-size: 0.8rem;
+    }
+}
