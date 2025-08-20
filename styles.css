@@ -88,6 +88,24 @@ body {
     border-radius: 5px;
 }
 
+/* Breadcrumbs Styling */
+#breadcrumbs {
+    margin: 70px 20px 10px;
+    font-size: 0.9em;
+    color: #666;
+}
+
+#breadcrumbs a {
+    color: #004080;
+    text-decoration: none;
+    font-weight: bold;
+}
+
+#breadcrumbs a:hover {
+    color: #002b5e;
+    text-decoration: underline;
+}
+
 /* Container */
 .container {
     width: 100%;
@@ -112,6 +130,56 @@ body {
     display: none;
 }
 
+/* Gene Card Styling */
+#gene-card .card {
+    background: #f0f8ff;
+    border: 2px solid #cce0f5;
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    margin: 20px auto;
+    max-width: 800px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+}
+
+#gene-card .left-section,
+#gene-card .right-section {
+    flex: 1;
+    min-width: 300px;
+    padding: 10px;
+}
+
+#gene-card h2 {
+    color: #203c78;
+    font-size: 1.8em;
+    margin-bottom: 15px;
+}
+
+#gene-card p {
+    margin-bottom: 10px;
+    font-size: 1em;
+    color: #333;
+    line-height: 1.5;
+}
+
+#gene-card p strong {
+    color: #004080;
+    font-weight: bold;
+}
+
+#gene-card a {
+    color: #004080;
+    text-decoration: underline;
+    font-weight: normal;
+}
+
+#gene-card a:hover {
+    color: #002b5e;
+    text-decoration: underline;
+}
+
 /* Image Styling */
 .fit-image {
     width: 150px;
@@ -127,15 +195,17 @@ body {
     object-fit: contain;
     border-radius: 50%;
 }
+
 .figure-image {
-    width: 100%;            /* This is OK if the parent is constrained */
-    max-width: none;        /* Remove any overriding max */
+    width: 100%;
+    max-width: none;
     height: auto;
     object-fit: contain;
     display: block;
     margin: 0 auto 20px;
     border-radius: 4px;
 }
+
 .overview-image {
     width: 100%;
     max-width: 860px;
@@ -175,13 +245,13 @@ body {
 }
 
 #home .text-content {
-    width: 100%; /* Matches the full width of the section */
+    width: 100%;
     margin: 0 auto;
     padding: 0 20px;
 }
 
 #home h1 {
-    color: #004080; /* Dark blue for "Welcome to Kaplan's Lab" */
+    color: #004080;
     margin-bottom: 20px;
     text-align: center;
 }
@@ -189,12 +259,12 @@ body {
 #home p,
 #home .mission-statement,
 #home .research-updates {
-    width: 100%; /* Ensures full width alignment */
+    width: 100%;
     margin: 0 auto 15px;
 }
 
 #home .research-grid {
-    width: 100%; /* Matches the full width */
+    width: 100%;
     margin: 0 auto;
     display: flex;
     flex-wrap: wrap;
@@ -206,7 +276,7 @@ body {
 #news,
 #resources {
     width: 100%;
-    max-width: 100%; /* Spans full width */
+    max-width: 100%;
     padding: 20px;
     margin: 0 auto;
 }
@@ -606,6 +676,44 @@ body.night-mode {
     color: #d9d9d9;
 }
 
+.night-mode #breadcrumbs {
+    color: #d9d9d9;
+}
+
+.night-mode #breadcrumbs a {
+    color: #b3d9ff;
+}
+
+.night-mode #breadcrumbs a:hover {
+    color: #cce6ff;
+}
+
+.night-mode #gene-card .card {
+    background: #3d3d3d;
+    border-color: #555;
+    box-shadow: 0 2px 8px rgba(255, 255, 255, 0.1);
+}
+
+.night-mode #gene-card h2 {
+    color: #b3d9ff;
+}
+
+.night-mode #gene-card p {
+    color: #d9d9d9;
+}
+
+.night-mode #gene-card p strong {
+    color: #b3d9ff;
+}
+
+.night-mode #gene-card a {
+    color: #b3d9ff;
+}
+
+.night-mode #gene-card a:hover {
+    color: #cce6ff;
+}
+
 .night-mode .research-item,
 .night-mode .team-member,
 .night-mode .gallery-item {
@@ -734,7 +842,7 @@ footer {
     opacity: 0.8;
 }
 
-/* NEW FEATURE 1: Statistics Dashboard Styles */
+/* Statistics Dashboard Styles */
 .stats-dashboard {
     background: #f0f8ff;
     border: 2px solid #cce0f5;
@@ -800,7 +908,7 @@ footer {
     max-height: 300px;
 }
 
-/* NEW FEATURE 2: Enhanced Search with Auto-suggestions */
+/* Enhanced Search with Auto-suggestions */
 .search-container {
     position: relative;
     width: 100%;
@@ -845,7 +953,7 @@ footer {
     text-transform: uppercase;
 }
 
-/* NEW FEATURE 3: Advanced Filtering System */
+/* Advanced Filtering System */
 .advanced-filters {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -975,7 +1083,7 @@ footer {
 
 .ciliahub-table {
     width: 100%;
-    max-width: 100%; /* Matches approximate width of provided text */
+    max-width: 100%;
     margin: 0 auto;
     table-layout: fixed;
     border-collapse: collapse;
@@ -1001,91 +1109,51 @@ footer {
     border-bottom: 2px solid #004080;
 }
 
-/* Ensure Ensembl ID column is fully visible and clickable */
-.ciliahub-table th:nth-child(2),
-.ciliahub-table td:nth-child(2) {
-    width: 30%; /* Increased width for Ensembl ID (~210px) */
-    white-space: normal; /* Allow wrapping */
-    overflow: visible; /* Ensure no content is hidden */
-    word-break: break-all; /* Break long IDs for readability */
-}
-
-/* Style for Ensembl ID links */
-.ciliahub-table td:nth-child(2) a {
-    color: #004080;
-    text-decoration: underline;
-    font-weight: normal;
-    display: inline-block;
-    width: 100%;
-}
-
-/* Ensure Synonym column is clear and properly formatted */
-.ciliahub-table th:nth-child(4),
-.ciliahub-table td:nth-child(4) {
-    width: 25%; /* Increased width for Synonym (~175px) */
-    white-space: normal; /* Allow wrapping */
-    overflow: visible; /* Ensure no content is hidden */
-    line-height: 1.5; /* Improve readability */
-}
-
-/* Style for other columns to fit within table */
 .ciliahub-table th:nth-child(1),
 .ciliahub-table td:nth-child(1) {
-    width: 10%; /* Gene (~70px) */
+    width: 15%;
+}
+
+.ciliahub-table th:nth-child(2),
+.ciliahub-table td:nth-child(2) {
+    width: 25%;
+    white-space: normal;
+    overflow: visible;
+    word-break: break-all;
 }
 
 .ciliahub-table th:nth-child(3),
 .ciliahub-table td:nth-child(3) {
-    width: 20%; /* Gene Description (~140px) */
+    width: 25%;
+}
+
+.ciliahub-table th:nth-child(4),
+.ciliahub-table td:nth-child(4) {
+    width: 15%;
+    white-space: normal;
+    overflow: visible;
+    line-height: 1.5;
 }
 
 .ciliahub-table th:nth-child(5),
 .ciliahub-table td:nth-child(5) {
-    width: 10%; /* OMIM ID (~70px) */
+    width: 10%;
 }
 
 .ciliahub-table th:nth-child(6),
 .ciliahub-table td:nth-child(6) {
-    width: 10%; /* Reference (~70px) */
+    width: 15%;
 }
 
 .ciliahub-table th:nth-child(7),
 .ciliahub-table td:nth-child(7) {
-    width: 15%; /* Ciliary Localization (~105px) */
+    width: 15%;
 }
 
-.ciliahub-table td:nth-child(2) a:hover,
-.ciliahub-table td:nth-child(5) a:hover,
-.ciliahub-table td:nth-child(6) a:hover {
-    color: #002b5e;
-    text-decoration: underline;
-}
-
-.ciliahub-table tr:nth-child(even) {
-    background-color: #f9f9f9;
-}
-
-.ciliahub-table tr.axoneme {
-    background-color: #f0faff;
-}
-
-.ciliahub-table tr.basal-body {
-    background-color: #e6f2ff;
-}
-
-.ciliahub-table tr.transition-zone {
-    background-color: #f5f5f5;
-}
-
-.ciliahub-table tr:hover {
-    background-color: #d9e6ff;
-}
-
-/* Specific styling for links in the Reference column */
 .ciliahub-table td a {
     color: #004080;
     text-decoration: underline;
-    font-weight: normal;
+    font-weight: bold;
     display: inline-block;
     max-width: 100%;
     overflow: hidden;
@@ -1093,7 +1161,11 @@ footer {
     white-space: nowrap;
 }
 
-/* Tooltip for Reference column */
+.ciliahub-table td a:hover {
+    color: #002b5e;
+    text-decoration: underline;
+}
+
 .ciliahub-table td.reference {
     position: relative;
     cursor: help;
@@ -1113,6 +1185,95 @@ footer {
     white-space: nowrap;
     z-index: 1002;
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+}
+
+.ciliahub-table tr:nth-child(even) {
+    background-color: #f9f9f9;
+}
+
+.ciliahub-table tr.axoneme {
+    background-color: #f0faff;
+}
+
+.ciliahub-table tr.basal-body {
+    background-color: #e6f2ff;
+}
+
+.ciliahub-table tr.transition-zone {
+    background-color: #f5f5f5;
+}
+
+.ciliahub-table tr.basal-body-cilia {
+    background-color: #e6f2ff;
+}
+
+.ciliahub-table tr.cilia-basal-body {
+    background-color: #e6f2ff;
+}
+
+.ciliahub-table tr.flagella-cilia {
+    background-color: #f0faff;
+}
+
+.ciliahub-table tr.flagella-cilia-basal-body {
+    background-color: #f0faff;
+}
+
+.ciliahub-table tr.cilia-basal-body-transition-zone {
+    background-color: #e6f2ff;
+}
+
+.ciliahub-table tr.ciliary-associated-gene {
+    background-color: #f5f5f5;
+}
+
+.ciliahub-table tr:hover {
+    background-color: #d9e6ff;
+}
+
+/* Batch Query Results Table */
+#batchResults table {
+    width: 100%;
+    max-width: 100%;
+    border-collapse: collapse;
+    background: #e6f2ff;
+    border-radius: 5px;
+    overflow: hidden;
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
+}
+
+#batchResults th,
+#batchResults td {
+    padding: 14px;
+    text-align: left;
+    border-bottom: 1px solid #ddd;
+    font-size: 0.9em;
+    vertical-align: top;
+}
+
+#batchResults th {
+    background-color: #003366;
+    color: white;
+    font-weight: bold;
+    border-bottom: 2px solid #004080;
+}
+
+#batchResults tr:nth-child(even) {
+    background-color: #f9f9f9;
+}
+
+#batchResults tr:hover {
+    background-color: #d9e6ff;
+}
+
+#batchResults td a {
+    color: #004080;
+    text-decoration: underline;
+    font-weight: bold;
+}
+
+#batchResults td a:hover {
+    color: #002b5e;
 }
 
 /* Night Mode for CiliaHub */
@@ -1202,26 +1363,6 @@ footer {
     border-bottom: 2px solid #b3d9ff;
 }
 
-.night-mode .ciliahub-table tr:nth-child(even) {
-    background-color: #2e2e2e;
-}
-
-.night-mode .ciliahub-table tr.axoneme {
-    background-color: #4a4a4a;
-}
-
-.night-mode .ciliahub-table tr.basal-body {
-    background-color: #3d3d3d;
-}
-
-.night-mode .ciliahub-table tr.transition-zone {
-    background-color: #2e2e2e;
-}
-
-.night-mode .ciliahub-table tr:hover {
-    background-color: #4a4a4a;
-}
-
 .night-mode .ciliahub-table td,
 .night-mode .ciliahub-table th {
     border-bottom: 1px solid #555;
@@ -1240,24 +1381,20 @@ footer {
     color: #d9d9d9;
 }
 
-.ciliahub-table tr.basal-body-cilia {
-    background-color: #e6f2ff;
+.night-mode .ciliahub-table tr:nth-child(even) {
+    background-color: #2e2e2e;
 }
 
-.ciliahub-table tr.cilia-basal-body {
-    background-color: #e6f2ff;
+.night-mode .ciliahub-table tr.axoneme {
+    background-color: #4a4a4a;
 }
 
-.ciliahub-table tr.flagella-cilia {
-    background-color: #f0faff;
+.night-mode .ciliahub-table tr.basal-body {
+    background-color: #3d3d3d;
 }
 
-.ciliahub-table tr.flagella-cilia-basal-body {
-    background-color: #f0faff;
-}
-
-.ciliahub-table tr.ciliary-associated-gene {
-    background-color: #f5f5f5;
+.night-mode .ciliahub-table tr.transition-zone {
+    background-color: #2e2e2e;
 }
 
 .night-mode .ciliahub-table tr.basal-body-cilia {
@@ -1276,8 +1413,43 @@ footer {
     background-color: #4a4a4a;
 }
 
+.night-mode .ciliahub-table tr.cilia-basal-body-transition-zone {
+    background-color: #3d3d3d;
+}
+
 .night-mode .ciliahub-table tr.ciliary-associated-gene {
     background-color: #2e2e2e;
+}
+
+.night-mode #batchResults table {
+    background: #3d3d3d;
+    box-shadow: 0 3px 10px rgba(255, 255, 255, 0.1);
+}
+
+.night-mode #batchResults th {
+    background-color: #0066cc;
+    border-bottom: 2px solid #b3d9ff;
+}
+
+.night-mode #batchResults td,
+.night-mode #batchResults th {
+    border-bottom: 1px solid #555;
+}
+
+.night-mode #batchResults tr:nth-child(even) {
+    background-color: #2e2e2e;
+}
+
+.night-mode #batchResults tr:hover {
+    background-color: #4a4a4a;
+}
+
+.night-mode #batchResults td a {
+    color: #b3d9ff;
+}
+
+.night-mode #batchResults td a:hover {
+    color: #cce6ff;
 }
 
 /* Responsive Adjustments */
@@ -1350,26 +1522,41 @@ footer {
     }
     .ciliahub-table {
         font-size: 0.8em;
-        max-width: 100%; /* Fit within container on smaller screens */
-        overflow-x: auto; /* Enable horizontal scrolling */
+        max-width: 100%;
+        overflow-x: auto;
     }
     .ciliahub-table th,
     .ciliahub-table td {
         padding: 8px;
-        min-width: 80px; /* Ensure columns are wide enough */
+        min-width: 80px;
     }
     .ciliahub-table th:nth-child(2),
     .ciliahub-table td:nth-child(2) {
-        min-width: 100px; /* Adjusted for Ensembl ID visibility */
+        min-width: 100px;
         white-space: normal;
         overflow: visible;
         word-break: break-all;
     }
     .ciliahub-table th:nth-child(4),
     .ciliahub-table td:nth-child(4) {
-        min-width: 100px; /* Adjusted for Synonym visibility */
+        min-width: 100px;
         white-space: normal;
         overflow: visible;
+    }
+    #gene-card .card {
+        flex-direction: column;
+        max-width: 95%;
+    }
+    #gene-card .left-section,
+    #gene-card .right-section {
+        min-width: 100%;
+        padding: 10px 0;
+    }
+    #gene-card h2 {
+        font-size: 1.5em;
+    }
+    #gene-card p {
+        font-size: 0.9em;
     }
 }
 
@@ -1414,25 +1601,34 @@ footer {
     }
     .ciliahub-table {
         font-size: 0.75em;
-        max-width: 100%; /* Fit within container */
+        max-width: 100%;
     }
     .ciliahub-table th,
     .ciliahub-table td {
         padding: 6px;
-        min-width: 60px; /* Adjusted for smaller screens */
+        min-width: 60px;
     }
     .ciliahub-table th:nth-child(2),
     .ciliahub-table td:nth-child(2) {
-        min-width: 80px; /* Ensure Ensembl ID remains visible */
+        min-width: 80px;
         white-space: normal;
         overflow: visible;
         word-break: break-all;
     }
     .ciliahub-table th:nth-child(4),
     .ciliahub-table td:nth-child(4) {
-        min-width: 80px; /* Ensure Synonym remains visible */
+        min-width: 80px;
         white-space: normal;
         overflow: visible;
+    }
+    #gene-card .card {
+        padding: 15px;
+    }
+    #gene-card h2 {
+        font-size: 1.3em;
+    }
+    #gene-card p {
+        font-size: 0.85em;
     }
 }
 
@@ -1543,83 +1739,6 @@ footer {
     color: #d9d9d9;
 }
 
-/* Gene Card Styling */
-#gene-card .card {
-    background: #f0f8ff;
-    border: 2px solid #cce0f5;
-    border-radius: 8px;
-    padding: 20px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-    margin: 20px auto;
-    max-width: 800px;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 20px;
-}
-
-#gene-card .left-section,
-#gene-card .right-section {
-    flex: 1;
-    min-width: 300px;
-    padding: 10px;
-}
-
-#gene-card h2 {
-    color: #203c78;
-    font-size: 1.8em;
-    margin-bottom: 15px;
-}
-
-#gene-card p {
-    margin-bottom: 10px;
-    font-size: 1em;
-    color: #333;
-    line-height: 1.5;
-}
-
-#gene-card p strong {
-    color: #004080;
-    font-weight: bold;
-}
-
-#gene-card a {
-    color: #004080;
-    text-decoration: underline;
-    font-weight: normal;
-}
-
-#gene-card a:hover {
-    color: #002b5e;
-    text-decoration: underline;
-}
-
-/* Night Mode for Gene Card */
-.night-mode #gene-card .card {
-    background: #3d3d3d;
-    border-color: #555;
-    box-shadow: 0 2px 8px rgba(255, 255, 255, 0.1);
-}
-
-.night-mode #gene-card h2 {
-    color: #b3d9ff;
-}
-
-.night-mode #gene-card p {
-    color: #d9d9d9;
-}
-
-.night-mode #gene-card p strong {
-    color: #b3d9ff;
-}
-
-.night-mode #gene-card a {
-    color: #b3d9ff;
-}
-
-.night-mode #gene-card a:hover {
-    color: #cce6ff;
-}
-
 /* Responsive Adjustments for Functional Gene Groups */
 @media (max-width: 768px) {
     .functional-gene-groups {
@@ -1639,4 +1758,3 @@ footer {
         font-size: 0.8rem;
     }
 }
-
