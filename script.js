@@ -115,7 +115,7 @@ async function loadCiliaHubData() {
 
             const row = document.createElement('tr');
             row.innerHTML = `
-                <td><a href="#gene-card" onclick="showSection('gene-card', '${item.gene}')" target="_blank">${item.gene}</a></td>
+                <td><a href="#home/${item.gene}" onclick="showSection('gene-card', '${item.gene}')">${item.gene}</a></td>
                 <td><a href="https://www.ensembl.org/Homo_sapiens/Gene/Summary?g=${item.ensembl_id}" target="_blank">${item.ensembl_id}</a></td>
                 <td class="description" data-full-text="${item.description || ''}">${item.description || ''}</td>
                 <td>${synonyms}</td>
@@ -137,7 +137,7 @@ async function loadCiliaHubData() {
             .sort((a, b) => b[1] - a[1])
             .slice(0, 5);
         popularGenesList.innerHTML = sortedGenes.length
-            ? sortedGenes.map(([gene, count]) => `<li><a href="#gene-card" onclick="showSection('gene-card', '${gene}')">${gene}</a> (${count} searches)</li>`).join('')
+            ? sortedGenes.map(([gene, count]) => `<li><a href="#home/${gene}" onclick="showSection('gene-card', '${gene}')">${gene}</a> (${count} searches)</li>`).join('')
             : '<li>No searches yet.</li>';
     }
 
@@ -177,15 +177,25 @@ async function loadCiliaHubData() {
 
         if (suggestions.length > 0) {
             suggestionsDiv.innerHTML = suggestions.map(s =>
-                `<div class="suggestion-item" data-type="${s.type}">${s.text} <span class="suggestion-type">${s.type}</span></div>`
+                `<div class="suggestion-item" data-type="${s.type}" data-value="${s.text}">${s.text} <span class="suggestion-type">${s.type}</span></div>`
             ).join('');
             suggestionsDiv.style.display = 'block';
 
             suggestionsDiv.querySelectorAll('.suggestion-item').forEach(item => {
                 item.addEventListener('click', () => {
-                    searchInput.value = item.textContent.replace(/\s+(gene|synonym|ensembl)$/, '');
+                    const value = item.getAttribute('data-value');
+                    searchInput.value = value;
                     suggestionsDiv.style.display = 'none';
-                    applyFilters();
+                    const geneData = data.find(item => 
+                        item.gene.toLowerCase() === value.toLowerCase() ||
+                        item.ensembl_id.toLowerCase() === value.toLowerCase() ||
+                        (item.synonym && item.synonym.toLowerCase().includes(value.toLowerCase()))
+                    );
+                    if (geneData) {
+                        showSection('gene-card', geneData.gene);
+                    } else {
+                        applyFilters();
+                    }
                 });
             });
         } else {
@@ -254,8 +264,12 @@ async function loadCiliaHubData() {
 
             return textMatch && localizationMatch && omimMatch && referenceMatch && synonymMatch;
         });
-       
-        populateTable(filtered);
+
+        if (filtered.length === 1 && query) {
+            showSection('gene-card', filtered[0].gene);
+        } else {
+            populateTable(filtered);
+        }
     }
 
     function debounce(func, wait) {
@@ -600,7 +614,7 @@ async function loadCiliaHubData() {
                         const referenceLinks = formatReference(item.reference);
                         return `
                             <tr>
-                                <td style="padding: 10px; border-bottom: 1px solid #ddd;"><a href="#gene-card" onclick="showSection('gene-card', '${item.gene}')" target="_blank">${item.gene}</a></td>
+                                <td style="padding: 10px; border-bottom: 1px solid #ddd;"><a href="#home/${item.gene}" onclick="showSection('gene-card', '${item.gene}')">${item.gene}</a></td>
                                 <td style="padding: 10px; border-bottom: 1px solid #ddd;"><a href="https://www.ensembl.org/Homo_sapiens/Gene/Summary?g=${item.ensembl_id}" target="_blank">${item.ensembl_id}</a></td>
                                 <td style="padding: 10px; border-bottom: 1px solid #ddd;">${item.description || ''}</td>
                                 <td style="padding: 10px; border-bottom: 1px solid #ddd;">${item.synonym || ''}</td>
