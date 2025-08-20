@@ -1,98 +1,60 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CiliaHub</title>
-  <link rel="stylesheet" href="styles.css">
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <meta charset="UTF-8">
+    <meta name="ANNOTATIONS" content="Kaplan Lab, CiliaHub, Ciliary Gene Database">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CiliaHub: Ciliary Gene Database</title>
+    <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <nav class="navbar">
-    <a href="#home">Home</a>
-    <a href="#search">Search</a>
-  </nav>
-  <button id="night-mode-toggle">🌙</button>
-  <div class="container">
-    <div id="search" class="section">
-      <h1>Search Ciliary Genes</h1>
-      <div class="ciliahub-controls">
-        <div class="search-container">
-          <input id="ciliahub-search" type="text" placeholder="Search by gene, protein, or phenotype">
-          <div id="search-suggestions" class="search-suggestions"></div>
-        </div>
-        <div class="advanced-filters">
-          <select id="ciliahub-filter">
-            <option value="">All Localizations</option>
-            <option value="cilia">Cilia</option>
-            <option value="transition-zone">Transition Zone</option>
-            <option value="basal-body">Basal Body</option>
-            <option value="flagella">Flagella</option>
-            <option value="cilia-associated">Cilia Associated</option>
-          </select>
-          <select id="omim-filter">
-            <option value="">All OMIM</option>
-            <option value="has-omim">Has OMIM</option>
-            <option value="no-omim">No OMIM</option>
-          </select>
-          <select id="reference-filter">
-            <option value="">All References</option>
-            <option value="has-reference">Has Reference</option>
-            <option value="no-reference">No Reference</option>
-          </select>
-          <input id="synonym-filter" type="text" placeholder="Filter by synonym">
-        </div>
-        <div class="control-buttons">
-          <button id="ciliahub-reset">Reset</button>
-          <button id="download-ciliahub">Download All</button>
-          <button id="export-filtered">Export Filtered</button>
-        </div>
-      </div>
-      <div class="ciliahub-controls">
-        <textarea id="batchGenes" placeholder="Enter gene names or IDs (comma-separated or one per line)" rows="4"></textarea>
-        <div class="control-buttons">
-          <button id="batchQueryBtn">Search Batch</button>
-          <button id="clearBatchResults">Clear Results</button>
-        </div>
-        <div id="batchResultsContainer" style="display: none;">
-          <div id="batchResults"></div>
-        </div>
-      </div>
-      <div id="ciliahub-error" style="display: none;"></div>
-      <div id="ciliahub-loading">Loading CiliaHub data...</div>
-      <div id="results-counter" class="results-counter"></div>
-      <div class="table-wrapper">
-        <table class="ciliahub-table" style="display: none;">
-          <thead>
-            <tr>
-              <th>Gene</th>
-              <th>Ensembl ID</th>
-              <th>Description</th>
-              <th>Synonym</th>
-              <th>OMIM ID</th>
-              <th>Reference</th>
-              <th>Localization</th>
-            </tr>
-          </thead>
-          <tbody id="ciliahub-table-body"></tbody>
-        </table>
-      </div>
-      <div class="stats-dashboard">
-        <div class="stats-grid">
-          <div class="stat-card"><div class="stat-number" id="total-genes">0</div><div class="stat-label">Total Genes</div></div>
-          <div class="stat-card"><div class="stat-number" id="unique-localizations">0</div><div class="stat-label">Unique Localizations</div></div>
-          <div class="stat-card"><div class="stat-number" id="with-omim">0</div><div class="stat-label">With OMIM</div></div>
-          <div class="stat-card"><div class="stat-number" id="with-references">0</div><div class="stat-label">With References</div></div>
-        </div>
-        <div class="chart-container">
-          <div class="chart-section"><h4>Localization Distribution</h4><canvas id="localizationChart"></canvas></div>
-          <div class="chart-section"><h4>Database Growth</h4><canvas id="growthChart"></canvas></div>
-        </div>
-        <div><h4>Popular Genes</h4><ul id="popularGenesList" class="list-disc pl-5"></ul></div>
-      </div>
-    </div>
-  </div>
-  <footer>© 2025 GitHub, Inc.</footer>
-  <script src="script.js"></script>
+    <header>
+        <h1>CiliaHub: Ciliary Gene Database</h1>
+    </header>
+    <main>
+        <section id="ciliahub">
+            <p>CiliaHub is an updated and curated database of all experimentally confirmed ciliary genes — an evolution of the ciliary "Gold Standard" gene list. Through a combination of R-based text mining of the scientific literature and manual expert review, the database now includes over 2,002 genes, including 1300+ newly associated ciliary genes.</p>
+            <p>This user-friendly platform allows researchers to:</p>
+            <ul>
+                <li>✔️ Explore curated gene entries with descriptions and known synonyms</li>
+                <li>✔️ Access references linked to each gene</li>
+                <li>✔️ Navigate to external databases via direct hyperlinks</li>
+                <li>✔️ Download the full gene list for further analysis</li>
+            </ul>
+            <p>CiliaHub empowers both basic and clinical researchers in the fields of cell biology and genetics to explore the molecular basis of cilia-related functions and ciliopathies.</p>
+            <h2>📘 How to Use CiliaHub</h2>
+            <ul>
+                <li><strong>🔍 Search:</strong> Enter a gene name, Ensembl ID, OMIM ID, or synonym to find specific entries.</li>
+                <li><strong>🧭 Filter:</strong> Use the dropdown menu to display genes based on ciliary localization (e.g., Basal Body).</li>
+                <li><strong>♻️ Reset:</strong> Click Reset to clear search and filters, and reload all results.</li>
+                <li><strong>⬇️ Download:</strong> Export the full gene list as a CSV file for offline analysis or custom sorting.</li>
+                <li><strong>🔗 External Links:</strong> Gene names, Ensembl IDs, OMIM IDs, and references are hyperlinked to authoritative databases.</li>
+                <li><strong>🗂 Batch Query:</strong> Paste multiple genes or IDs below and click "Batch Query" to retrieve all matching entries at once.</li>
+            </ul>
+            <h2>🔥 Popular Genes This Session</h2>
+            <p>Loading data...</p>
+            <p><strong>Suggested citation:</strong> Yenisert F, Kaplan OI. Expanded Catalog of Ciliary Genes: Integration of Novel Ciliary Genes into the Ciliome. 2025. Available at: <a href="https://rarediseaselab.github.io/home/#ciliahub">CiliaHub</a></p>
+            <p><a href="#submit-feedback">Submit Feedback</a></p>
+        </section>
+        <section id="download">
+            <h2>Download</h2>
+            <p>Download the full CiliaHub gene list as a CSV file for offline analysis or custom sorting.</p>
+            <a href="#">Download CSV</a>
+        </section>
+        <section id="contact">
+            <h2>Contact</h2>
+            <p>For inquiries or feedback about CiliaHub, please contact the Kaplan Lab.</p>
+            <a href="mailto:info@rarediseaselab.org">Email Us</a>
+        </section>
+        <section id="cite">
+            <h2>Cite</h2>
+            <p>Please cite CiliaHub as follows:</p>
+            <p>Yenisert F, Kaplan OI. Expanded Catalog of Ciliary Genes: Integration of Novel Ciliary Genes into the Ciliome. 2025. Available at: <a href="https://rarediseaselab.github.io/home/#ciliahub">CiliaHub</a></p>
+        </section>
+    </main>
+    <footer>
+        <p>© 2025 Kaplan Lab</p>
+    </footer>
+    <script src="script.js"></script>
 </body>
 </html>
