@@ -1,142 +1,624 @@
 <!DOCTYPE html>
-  <html lang="en">
-    <head>
+<html lang="en">
+<head>
     <meta charset="UTF-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>The CiliaHub Project</title>
-        
-        <!-- Tailwind CSS -->
-        <script src="https://cdn.tailwindcss.com"></script>
-          
-          <!-- Google Fonts (Inter) -->
-          <link rel="preconnect" href="https://fonts.googleapis.com">
-            <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-              <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-                
-                <!-- Custom Tailwind Configuration -->
-                <script>
-                tailwind.config = {
-                  theme: {
-                    extend: {
-                      fontFamily: {
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The CiliaHub Project</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Google Fonts (Inter) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Chart.js for Statistics Dashboard -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- Custom Tailwind Configuration -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
                         sans: ['Inter', 'sans-serif'],
-                      },
-                      colors: {
+                    },
+                    colors: {
                         'primary': '#0A4D68',
                         'secondary': '#088395',
                         'accent': '#05BFDB',
                         'light': '#F0F8FF',
-                      }
                     }
-                  }
                 }
-                </script>
-                  
-                  <style>
-                  /* Simple animation for fade-in effect on load */
-                  body {
-                    animation: fadeIn 1s ease-in-out;
-                  }
-                @keyframes fadeIn {
-                  from { opacity: 0; }
-                  to { opacity: 1; }
-                }
-                </style>
-                  </head>
-                  <body class="bg-light font-sans text-gray-800">
+            }
+        }
+    </script>
+    
+    <style>
+        /* Simple animation for fade-in effect on load */
+        body {
+            animation: fadeIn 1s ease-in-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        /* Custom styles from user's CSS for CiliaHub search functionality */
+        .ciliahub-controls {
+            background-color: #e6f2ff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+
+        .search-container {
+            position: relative;
+            width: 100%;
+            max-width: 400px;
+            margin: 0 auto 15px;
+        }
+
+        .search-suggestions {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border: 1px solid #cce0f5;
+            border-top: none;
+            border-radius: 0 0 5px 5px;
+            max-height: 200px;
+            overflow-y: auto;
+            z-index: 1000;
+            display: none;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            text-align: left;
+        }
+
+        .suggestion-item {
+            padding: 10px 15px;
+            cursor: pointer;
+            border-bottom: 1px solid #f0f0f0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .suggestion-item:hover {
+            background-color: #f0f8ff;
+        }
+
+        .suggestion-type {
+            font-size: 0.8em;
+            color: #666;
+            background: #e6f2ff;
+            padding: 2px 6px;
+            border-radius: 3px;
+            text-transform: uppercase;
+        }
+        
+        .ciliahub-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        .ciliahub-table th, .ciliahub-table td {
+            padding: 12px;
+            border: 1px solid #ddd;
+            text-align: left;
+        }
+        .ciliahub-table th {
+            background-color: #0A4D68;
+            color: white;
+        }
+        .ciliahub-table tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        .ciliahub-table a {
+            color: #088395;
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body class="bg-light font-sans text-gray-800">
+
+    <!-- Header & Navigation -->
+    <header class="bg-white shadow-md sticky top-0 z-50">
+        <nav class="container mx-auto px-6 py-4 flex justify-between items-center">
+            <a href="#" class="text-2xl font-bold text-primary">The CiliaHub</a>
+            <div class="hidden md:flex space-x-6 items-center">
+                <a href="#about" class="text-gray-600 hover:text-secondary transition duration-300">About</a>
+                <a href="#research" class="text-gray-600 hover:text-secondary transition duration-300">Research</a>
+                <a href="#database" class="text-gray-600 hover:text-secondary transition duration-300">Database</a>
+                <a href="#contact" class="bg-secondary text-white px-4 py-2 rounded-full hover:bg-primary transition duration-300">Contact Us</a>
+            </div>
+            <!-- Mobile Menu Button -->
+            <button id="mobile-menu-button" class="md:hidden text-primary focus:outline-none">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7"></path></svg>
+            </button>
+        </nav>
+        <!-- Mobile Menu -->
+        <div id="mobile-menu" class="hidden md:hidden px-6 pb-4">
+            <a href="#about" class="block py-2 text-gray-600 hover:text-secondary">About</a>
+            <a href="#research" class="block py-2 text-gray-600 hover:text-secondary">Research</a>
+            <a href="#database" class="block py-2 text-gray-600 hover:text-secondary">Database</a>
+            <a href="#contact" class="block mt-2 bg-secondary text-white px-4 py-2 rounded-full hover:bg-primary">Contact Us</a>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main>
+        <!-- Hero Section -->
+        <section class="bg-primary text-white text-center py-20 px-6">
+            <div class="container mx-auto">
+                <h1 class="text-4xl md:text-6xl font-bold mb-4">Advancing the Science of Cilia</h1>
+                <p class="text-lg md:text-xl max-w-3xl mx-auto text-gray-200">A collaborative hub for researchers dedicated to understanding the structure, function, and role of cilia in health and disease.</p>
+                <a href="#about" class="mt-8 inline-block bg-accent text-white font-bold py-3 px-8 rounded-full hover:opacity-90 transition duration-300">Learn More</a>
+            </div>
+        </section>
+
+        <!-- About Section -->
+        <section id="about" class="py-20 px-6">
+            <div class="container mx-auto">
+                <h2 class="text-3xl font-bold text-center text-primary mb-12">About The CiliaHub</h2>
+                <div class="grid md:grid-cols-2 gap-12 items-center">
+                    <div>
+                        <img src="https://placehold.co/600x400/05BFDB/FFFFFF?text=Microscopy+Image" alt="Microscopy image of cilia" class="rounded-lg shadow-xl w-full h-auto">
+                    </div>
+                    <div class="text-gray-700 space-y-4">
+                        <p class="text-lg">The CiliaHub is a central resource for the scientific community, providing access to cutting-edge research, datasets, and collaborative tools.</p>
+                        <p>Our mission is to accelerate discoveries in ciliary biology by fostering an open and collaborative environment. We believe that by connecting researchers from diverse fields, we can solve the complex puzzles presented by these fascinating organelles.</p>
+                        <p>From fundamental biology to translational medicine, The CiliaHub supports all facets of ciliary research.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Research Focus Section -->
+        <section id="research" class="bg-white py-20 px-6">
+            <div class="container mx-auto text-center">
+                <h2 class="text-3xl font-bold text-primary mb-12">Our Research Focus</h2>
+                <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-8">
+                    <!-- Card 1 -->
+                    <div class="bg-light p-8 rounded-lg shadow-md hover:shadow-xl transition-shadow duration-300">
+                        <h3 class="text-xl font-bold text-secondary mb-4">Ciliopathies</h3>
+                        <p class="text-gray-600">Investigating the genetic and molecular basis of diseases caused by dysfunctional cilia, known as ciliopathies.</p>
+                    </div>
+                    <!-- Card 2 -->
+                    <div class="bg-light p-8 rounded-lg shadow-md hover:shadow-xl transition-shadow duration-300">
+                        <h3 class="text-xl font-bold text-secondary mb-4">Signal Transduction</h3>
+                        <p class="text-gray-600">Exploring the role of primary cilia as cellular antennas that sense and transduce extracellular signals.</p>
+                    </div>
+                    <!-- Card 3 -->
+                    <div class="bg-light p-8 rounded-lg shadow-md hover:shadow-xl transition-shadow duration-300">
+                        <h3 class="text-xl font-bold text-secondary mb-4">Structural Biology</h3>
+                        <p class="text-gray-600">Utilizing advanced imaging techniques to understand the intricate architecture of the ciliary axoneme and basal body.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- CiliaHub Database Section -->
+        <section id="database" class="py-20 px-6">
+            <div class="container mx-auto text-center">
+                <h2 class="text-3xl font-bold text-primary mb-4">CiliaHub Database</h2>
+                <p class="max-w-3xl mx-auto text-gray-600 mb-10">An updated and curated database of experimentally confirmed ciliary genes. Use the tools below to search, filter, and analyze the data.</p>
+                
+                <div id="ciliahub">
+                    <!-- Error Message -->
+                    <div id="ciliahub-error" style="display: none;" class="mb-4 p-4 text-red-700 bg-red-100 rounded-lg"></div>
+
+                    <!-- Statistics Dashboard -->
+                    <div id="statistics-dashboard" class="stats-dashboard mb-5 text-left">
+                        <h3 class="text-2xl font-bold text-primary text-center mb-6">📊 Cilia-Related Gene Statistics</h3>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                            <div class="stat-card bg-white p-4 rounded-lg shadow">
+                                <div id="total-genes" class="stat-number text-3xl font-bold text-primary">0</div>
+                                <div class="stat-label text-gray-500">Cilia-Related Genes</div>
+                            </div>
+                            <div class="stat-card bg-white p-4 rounded-lg shadow">
+                                <div id="unique-localizations" class="stat-number text-3xl font-bold text-primary">0</div>
+                                <div class="stat-label text-gray-500">Cilia Localizations</div>
+                            </div>
+                            <div class="stat-card bg-white p-4 rounded-lg shadow">
+                                <div id="with-omim" class="stat-number text-3xl font-bold text-primary">0</div>
+                                <div class="stat-label text-gray-500">With OMIM Entries</div>
+                            </div>
+                            <div class="stat-card bg-white p-4 rounded-lg shadow">
+                                <div id="with-references" class="stat-number text-3xl font-bold text-primary">0</div>
+                                <div class="stat-label text-gray-500">With References</div>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                            <div class="chart-section bg-white p-4 rounded-lg shadow">
+                                <h4 class="font-bold text-center text-primary mb-2">Distribution by Localization</h4>
+                                <canvas id="localizationChart" class="w-full h-64"></canvas>
+                            </div>
+                            <div class="chart-section bg-white p-4 rounded-lg shadow">
+                                <h4 class="font-bold text-center text-primary mb-2">Database Growth Over Time</h4>
+                                <canvas id="growthChart" class="w-full h-64"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Search and Filter Controls -->
+                    <div class="ciliahub-controls">
+                        <div class="search-container">
+                            <input type="text" id="ciliahub-search" placeholder="Search by Gene, Ensembl ID, or Synonym..." class="w-full p-2 border border-gray-300 rounded-md focus:ring-primary focus:border-primary" autocomplete="off">
+                            <div id="search-suggestions" class="search-suggestions"></div>
+                        </div>
+                        <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 my-4">
+                            <select id="ciliahub-filter" class="w-full p-2 border border-gray-300 rounded-md">
+                                <option value="">All Localizations</option>
+                                <option value="basal-body">Basal Body</option>
+                                <option value="transition-zone">Transition Zone</option>
+                                <option value="cilia">Cilia</option>
+                            </select>
+                            <select id="omim-filter" class="w-full p-2 border border-gray-300 rounded-md">
+                                <option value="">All OMIM Status</option>
+                                <option value="has-omim">Has OMIM ID</option>
+                                <option value="no-omim">No OMIM ID</option>
+                            </select>
+                            <select id="reference-filter" class="w-full p-2 border border-gray-300 rounded-md">
+                                <option value="">All Reference Status</option>
+                                <option value="has-reference">Has References</option>
+                                <option value="no-reference">No References</option>
+                            </select>
+                            <input type="text" id="synonym-filter" placeholder="Filter by synonym..." class="w-full p-2 border border-gray-300 rounded-md">
+                        </div>
+                        <div class="flex flex-wrap justify-center gap-4">
+                            <button id="ciliahub-reset" class="bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700">Reset All</button>
+                            <button id="download-ciliahub" class="bg-secondary text-white px-4 py-2 rounded-md hover:bg-primary">Download Data</button>
+                            <button id="export-filtered" class="bg-accent text-white px-4 py-2 rounded-md hover:opacity-90">Export Filtered</button>
+                        </div>
+                    </div>
                     
-                    <!-- Header & Navigation -->
-                    <header class="bg-white shadow-md sticky top-0 z-50">
-                      <nav class="container mx-auto px-6 py-4 flex justify-between items-center">
-                        <a href="#" class="text-2xl font-bold text-primary">The CiliaHub</a>
-                          <div class="hidden md:flex space-x-6 items-center">
-                            <a href="#about" class="text-gray-600 hover:text-secondary transition duration-300">About</a>
-                              <a href="#research" class="text-gray-600 hover:text-secondary transition duration-300">Research</a>
-                                <a href="#publications" class="text-gray-600 hover:text-secondary transition duration-300">Publications</a>
-                                  <a href="#contact" class="bg-secondary text-white px-4 py-2 rounded-full hover:bg-primary transition duration-300">Contact Us</a>
-                                    </div>
-                                    <!-- Mobile Menu Button -->
-                                    <button id="mobile-menu-button" class="md:hidden text-primary focus:outline-none">
-                                      <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7"></path></svg>
-                                        </button>
-                                        </nav>
-                                        <!-- Mobile Menu -->
-                                        <div id="mobile-menu" class="hidden md:hidden px-6 pb-4">
-                                          <a href="#about" class="block py-2 text-gray-600 hover:text-secondary">About</a>
-                                            <a href="#research" class="block py-2 text-gray-600 hover:text-secondary">Research</a>
-                                              <a href="#publications" class="block py-2 text-gray-600 hover:text-secondary">Publications</a>
-                                                <a href="#contact" class="block mt-2 bg-secondary text-white px-4 py-2 rounded-full hover:bg-primary">Contact Us</a>
-                                                  </div>
-                                                  </header>
-                                                  
-                                                  <!-- Main Content -->
-                                                  <main>
-                                                  <!-- Hero Section -->
-                                                  <section class="bg-primary text-white text-center py-20 px-6">
-                                                    <div class="container mx-auto">
-                                                      <h1 class="text-4xl md:text-6xl font-bold mb-4">Advancing the Science of Cilia</h1>
-                                                        <p class="text-lg md:text-xl max-w-3xl mx-auto text-gray-200">A collaborative hub for researchers dedicated to understanding the structure, function, and role of cilia in health and disease.</p>
-                                                          <a href="#about" class="mt-8 inline-block bg-accent text-white font-bold py-3 px-8 rounded-full hover:opacity-90 transition duration-300">Learn More</a>
-                                                            </div>
-                                                            </section>
-                                                            
-                                                            <!-- About Section -->
-                                                            <section id="about" class="py-20 px-6">
-                                                              <div class="container mx-auto">
-                                                                <h2 class="text-3xl font-bold text-center text-primary mb-12">About The CiliaHub</h2>
-                                                                  <div class="grid md:grid-cols-2 gap-12 items-center">
-                                                                    <div>
-                                                                    <img src="https://placehold.co/600x400/05BFDB/FFFFFF?text=Microscopy+Image" alt="Microscopy image of cilia" class="rounded-lg shadow-xl w-full h-auto">
-                                                                      </div>
-                                                                      <div class="text-gray-700 space-y-4">
-                                                                        <p class="text-lg">The CiliaHub is a central resource for the scientific community, providing access to cutting-edge research, datasets, and collaborative tools.</p>
-                                                                          <p>Our mission is to accelerate discoveries in ciliary biology by fostering an open and collaborative environment. We believe that by connecting researchers from diverse fields, we can solve the complex puzzles presented by these fascinating organelles.</p>
-                                                                          <p>From fundamental biology to translational medicine, The CiliaHub supports all facets of ciliary research.</p>
-                                                                          </div>
-                                                                          </div>
-                                                                          </div>
-                                                                          </section>
-                                                                          
-                                                                          <!-- Research Focus Section -->
-                                                                          <section id="research" class="bg-white py-20 px-6">
-                                                                            <div class="container mx-auto text-center">
-                                                                              <h2 class="text-3xl font-bold text-primary mb-12">Our Research Focus</h2>
-                                                                                <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-8">
-                                                                                  <!-- Card 1 -->
-                                                                                  <div class="bg-light p-8 rounded-lg shadow-md hover:shadow-xl transition-shadow duration-300">
-                                                                                    <h3 class="text-xl font-bold text-secondary mb-4">Ciliopathies</h3>
-                                                                                      <p class="text-gray-600">Investigating the genetic and molecular basis of diseases caused by dysfunctional cilia, known as ciliopathies.</p>
-                                                                                        </div>
-                                                                                        <!-- Card 2 -->
-                                                                                        <div class="bg-light p-8 rounded-lg shadow-md hover:shadow-xl transition-shadow duration-300">
-                                                                                          <h3 class="text-xl font-bold text-secondary mb-4">Signal Transduction</h3>
-                                                                                            <p class="text-gray-600">Exploring the role of primary cilia as cellular antennas that sense and transduce extracellular signals.</p>
-                                                                                              </div>
-                                                                                              <!-- Card 3 -->
-                                                                                              <div class="bg-light p-8 rounded-lg shadow-md hover:shadow-xl transition-shadow duration-300">
-                                                                                                <h3 class="text-xl font-bold text-secondary mb-4">Structural Biology</h3>
-                                                                                                  <p class="text-gray-600">Utilizing advanced imaging techniques to understand the intricate architecture of the ciliary axoneme and basal body.</p>
-                                                                                                    </div>
-                                                                                                    </div>
-                                                                                                    </div>
-                                                                                                    </section>
-                                                                                                    </main>
-                                                                                                    
-                                                                                                    <!-- Footer -->
-                                                                                                    <footer id="contact" class="bg-gray-800 text-white py-10 px-6">
-                                                                                                      <div class="container mx-auto text-center">
-                                                                                                        <p>&copy; 2025 The CiliaHub Project. All Rights Reserved.</p>
-                                                                                                        <p class="mt-2">Hosted with ❤️ on GitHub Pages.</p>
-                                                                                                          </div>
-                                                                                                          </footer>
-                                                                                                          
-                                                                                                          <!-- JavaScript for Mobile Menu -->
-                                                                                                          <script>
-                                                                                                          document.getElementById('mobile-menu-button').addEventListener('click', function() {
-                                                                                                            var menu = document.getElementById('mobile-menu');
-                                                                                                            menu.classList.toggle('hidden');
-                                                                                                          });
-                                                                                                        </script>
-                                                                                                          </body>
-                                                                                                          </html>
-                                                                                                          
+                    <!-- Results Counter -->
+                    <div id="results-counter" class="results-counter my-4 font-semibold text-primary"></div>
+
+                    <!-- Loading Message and Table -->
+                    <div id="ciliahub-loading" class="text-center p-5">Loading data...</div>
+                    <div class="overflow-x-auto">
+                        <table class="ciliahub-table w-full" style="display: none;">
+                            <thead>
+                                <tr>
+                                    <th>Gene</th>
+                                    <th>Ensembl ID</th>
+                                    <th>Gene Description</th>
+                                    <th>Synonym</th>
+                                    <th>OMIM ID</th>
+                                    <th>Reference</th>
+                                    <th>Ciliary Localization</th>
+                                </tr>
+                            </thead>
+                            <tbody id="ciliahub-table-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer id="contact" class="bg-gray-800 text-white py-10 px-6">
+        <div class="container mx-auto text-center">
+            <p>&copy; 2025 The CiliaHub Project. All Rights Reserved.</p>
+            <p class="mt-2">Hosted with ❤️ on GitHub Pages.</p>
+        </div>
+    </footer>
+
+    <!-- JavaScript for Mobile Menu & CiliaHub -->
+    <script>
+        // Mobile Menu Toggle
+        document.getElementById('mobile-menu-button').addEventListener('click', function() {
+            var menu = document.getElementById('mobile-menu');
+            menu.classList.toggle('hidden');
+        });
+
+        // CiliaHub Data Loading and Search Functionality
+        async function loadCiliaHubData() {
+            const tableBody = document.getElementById('ciliahub-table-body');
+            const searchInput = document.getElementById('ciliahub-search');
+            const filterSelect = document.getElementById('ciliahub-filter');
+            const omimFilter = document.getElementById('omim-filter');
+            const referenceFilter = document.getElementById('reference-filter');
+            const synonymFilter = document.getElementById('synonym-filter');
+            const resetBtn = document.getElementById('ciliahub-reset');
+            const downloadBtn = document.getElementById('download-ciliahub');
+            const exportFilteredBtn = document.getElementById('export-filtered');
+            const errorDiv = document.getElementById('ciliahub-error');
+            const loadingDiv = document.getElementById('ciliahub-loading');
+            const table = document.querySelector('.ciliahub-table');
+            const resultsCounter = document.getElementById('results-counter');
+            const suggestionsDiv = document.getElementById('search-suggestions');
+
+            let data = [];
+            let filteredData = [];
+            let debounceTimeout;
+            let allGeneNames = new Set();
+            let allSynonyms = new Set();
+            let allEnsemblIds = new Set();
+
+            let statsData = {
+                totalCiliaGenes: 0,
+                ciliaLocalizations: new Set(),
+                ciliaWithOMIM: 0,
+                ciliaWithReferences: 0,
+                ciliaLocalizationCounts: {}
+            };
+
+            const ciliaRelatedCategories = {
+                'cilia': ['cilia', 'cilium', 'ciliary'],
+                'transition zone': ['transition zone', 'transition-zone'],
+                'basal body': ['basal body', 'basal-body', 'centriole'],
+                'flagella': ['flagella', 'flagellum'],
+                'cilia associated': ['cilia associated', 'ciliary associated', 'cilia-associated', 'ciliary-associated']
+            };
+
+            function isCiliaRelated(localization) {
+                if (!localization) return false;
+                const locLower = localization.toLowerCase().trim();
+                for (const [category, keywords] of Object.entries(ciliaRelatedCategories)) {
+                    for (const keyword of keywords) {
+                        if (locLower.includes(keyword)) return category;
+                    }
+                }
+                return null;
+            }
+
+            function showError(message) {
+                errorDiv.textContent = message;
+                errorDiv.style.display = 'block';
+                loadingDiv.style.display = 'none';
+                if(table) table.style.display = 'none';
+            }
+
+            function hideError() {
+                errorDiv.style.display = 'none';
+            }
+
+            function formatReference(reference) {
+                if (!reference) return 'N/A';
+                const refs = reference.split(';').map(ref => ref.trim()).filter(ref => ref);
+                return refs.map(ref => {
+                    if (/^\d+$/.test(ref)) {
+                        return `<a href="https://pubmed.ncbi.nlm.nih.gov/${ref}/" target="_blank" class="hover:underline">${ref}</a>`;
+                    }
+                    return ref;
+                }).join(', ');
+            }
+
+            function updateResultsCounter(count) {
+                if (resultsCounter) {
+                    resultsCounter.textContent = `Showing ${count} genes`;
+                    resultsCounter.style.display = 'block';
+                }
+            }
+
+            function populateTable(dataToShow = []) {
+                tableBody.innerHTML = '';
+                filteredData = dataToShow;
+
+                if (dataToShow.length === 0) {
+                    loadingDiv.style.display = 'none';
+                    if(table) table.style.display = 'none';
+                    updateResultsCounter(0);
+                    return;
+                }
+
+                dataToShow.forEach(item => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td><a href="https://www.ncbi.nlm.nih.gov/gene/?term=${item.gene}" target="_blank">${item.gene || ''}</a></td>
+                        <td><a href="https://www.ensembl.org/Homo_sapiens/Gene/Summary?g=${item.ensembl_id}" target="_blank">${item.ensembl_id || ''}</a></td>
+                        <td>${item.description || ''}</td>
+                        <td>${(item.synonym || '').split(',').join('<br>')}</td>
+                        <td><a href="https://www.omim.org/entry/${item.omim_id}" target="_blank">${item.omim_id || ''}</a></td>
+                        <td>${formatReference(item.reference)}</td>
+                        <td>${item.localization || ''}</td>
+                    `;
+                    tableBody.appendChild(row);
+                });
+                
+                loadingDiv.style.display = 'none';
+                if(table) table.style.display = 'table';
+                updateResultsCounter(dataToShow.length);
+            }
+            
+            function showSearchPrompt() {
+                loadingDiv.innerHTML = 'Enter a search term to explore the CiliaHub database...';
+                loadingDiv.style.display = 'block';
+                if(table) table.style.display = 'none';
+                updateResultsCounter(0);
+            }
+
+            function showSuggestions(query) {
+                if (!query || query.length < 2) {
+                    suggestionsDiv.style.display = 'none';
+                    return;
+                }
+                const suggestions = [];
+                const queryLower = query.toLowerCase();
+                [...allGeneNames].forEach(gene => {
+                    if (gene.toLowerCase().includes(queryLower) && suggestions.length < 8) suggestions.push({ text: gene, type: 'gene' });
+                });
+                [...allSynonyms].forEach(synonym => {
+                    if (synonym.toLowerCase().includes(queryLower) && suggestions.length < 8) suggestions.push({ text: synonym, type: 'synonym' });
+                });
+                [...allEnsemblIds].forEach(id => {
+                    if (id.toLowerCase().includes(queryLower) && suggestions.length < 8) suggestions.push({ text: id, type: 'ensembl' });
+                });
+
+                if (suggestions.length > 0) {
+                    suggestionsDiv.innerHTML = suggestions.map(s => `<div class="suggestion-item" data-type="${s.type}">${s.text} <span class="suggestion-type">${s.type}</span></div>`).join('');
+                    suggestionsDiv.style.display = 'block';
+                    suggestionsDiv.querySelectorAll('.suggestion-item').forEach(item => {
+                        item.addEventListener('click', () => {
+                            searchInput.value = item.textContent.replace(/\s+(gene|synonym|ensembl)$/, '');
+                            suggestionsDiv.style.display = 'none';
+                            applyFilters();
+                        });
+                    });
+                } else {
+                    suggestionsDiv.style.display = 'none';
+                }
+            }
+            
+            document.addEventListener('click', (e) => {
+                if (!e.target.closest('.search-container')) {
+                    suggestionsDiv.style.display = 'none';
+                }
+            });
+
+            function applyFilters() {
+                hideError();
+                const query = searchInput.value.toLowerCase().trim();
+                const localizationFilter = filterSelect.value.toLowerCase();
+                const omimFilterValue = omimFilter.value;
+                const referenceFilterValue = referenceFilter.value;
+                const synonymFilterValue = synonymFilter.value.toLowerCase().trim();
+                
+                if (!query && !localizationFilter && !omimFilterValue && !referenceFilterValue && !synonymFilterValue) {
+                    showSearchPrompt();
+                    return;
+                }
+
+                let filtered = data.filter(item => {
+                    let textMatch = !query || (item.gene && item.gene.toLowerCase().includes(query)) || (item.ensembl_id && item.ensembl_id.toLowerCase().includes(query)) || (item.synonym && item.synonym.toLowerCase().includes(query));
+                    let localizationMatch = !localizationFilter || (item.localization || '').toLowerCase().replace(/[\s,]+/g, '-') === localizationFilter;
+                    let omimMatch = (omimFilterValue === 'has-omim' ? (item.omim_id && item.omim_id.trim() !== '') : omimFilterValue === 'no-omim' ? (!item.omim_id || item.omim_id.trim() === '') : true);
+                    let referenceMatch = (referenceFilterValue === 'has-reference' ? (item.reference && item.reference.trim() !== '') : referenceFilterValue === 'no-reference' ? (!item.reference || item.reference.trim() === '') : true);
+                    let synonymMatch = !synonymFilterValue || (item.synonym && item.synonym.toLowerCase().includes(synonymFilterValue));
+                    return textMatch && localizationMatch && omimMatch && referenceMatch && synonymMatch;
+                });
+                
+                populateTable(filtered);
+            }
+
+            function debounce(func, wait) {
+                return function (...args) {
+                    clearTimeout(debounceTimeout);
+                    debounceTimeout = setTimeout(() => func.apply(this, args), wait);
+                };
+            }
+            
+            function calculateStatistics() {
+                const ciliaRelatedGenes = data.filter(item => isCiliaRelated(item.localization));
+                statsData.totalCiliaGenes = ciliaRelatedGenes.length;
+                statsData.ciliaWithOMIM = ciliaRelatedGenes.filter(item => item.omim_id && item.omim_id.trim()).length;
+                statsData.ciliaWithReferences = ciliaRelatedGenes.filter(item => item.reference && item.reference.trim()).length;
+                
+                statsData.ciliaLocalizationCounts = {};
+                ciliaRelatedGenes.forEach(item => {
+                    const category = isCiliaRelated(item.localization);
+                    if (category) {
+                        statsData.ciliaLocalizations.add(category);
+                        statsData.ciliaLocalizationCounts[category] = (statsData.ciliaLocalizationCounts[category] || 0) + 1;
+                    }
+                });
+
+                document.getElementById('total-genes').textContent = statsData.totalCiliaGenes;
+                document.getElementById('unique-localizations').textContent = statsData.ciliaLocalizations.size;
+                document.getElementById('with-omim').textContent = statsData.ciliaWithOMIM;
+                document.getElementById('with-references').textContent = statsData.ciliaWithReferences;
+            }
+
+            function createCharts() {
+                const locCtx = document.getElementById('localizationChart');
+                if (locCtx) {
+                    const ciliaLocData = Object.entries(statsData.ciliaLocalizationCounts).sort((a, b) => b[1] - a[1]);
+                    new Chart(locCtx, {
+                        type: 'pie',
+                        data: {
+                            labels: ciliaLocData.map(([label]) => label.replace(/\b\w/g, l => l.toUpperCase())),
+                            datasets: [{ data: ciliaLocData.map(([, count]) => count), backgroundColor: ['#0A4D68', '#088395', '#05BFDB', '#90a7dd', '#b3c3f1'] }]
+                        },
+                        options: { responsive: true, maintainAspectRatio: false }
+                    });
+                }
+
+                const growthCtx = document.getElementById('growthChart');
+                if (growthCtx) {
+                    new Chart(growthCtx, {
+                        type: 'line',
+                        data: {
+                            labels: ['2020', '2021', '2022', '2023', '2024', '2025'],
+                            datasets: [{ label: 'Cilia-Related Genes', data: [300, 450, 700, 950, 1200, statsData.totalCiliaGenes], borderColor: '#0A4D68', fill: true, tension: 0.3 }]
+                        },
+                        options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true } } }
+                    });
+                }
+            }
+
+            try {
+                const response = await fetch('https://raw.githubusercontent.com/rarediseaselab/home/main/ciliahub_data.json');
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                data = await response.json();
+                
+                data.forEach(item => {
+                    if (item.gene) allGeneNames.add(item.gene);
+                    if (item.ensembl_id) allEnsemblIds.add(item.ensembl_id);
+                    if (item.synonym) item.synonym.split(',').forEach(syn => { if(syn.trim()) allSynonyms.add(syn.trim()) });
+                });
+
+                calculateStatistics();
+                createCharts();
+                showSearchPrompt();
+            } catch (error) {
+                console.error('Error loading CiliaHub data:', error);
+                showError('Failed to load CiliaHub data. Please check the data source or your network connection.');
+                return;
+            }
+            
+            searchInput.addEventListener('input', debounce(e => { showSuggestions(e.target.value); applyFilters(); }, 300));
+            filterSelect.addEventListener('change', applyFilters);
+            omimFilter.addEventListener('change', applyFilters);
+            referenceFilter.addEventListener('change', applyFilters);
+            synonymFilter.addEventListener('input', debounce(applyFilters, 300));
+
+            resetBtn.addEventListener('click', () => {
+                hideError();
+                searchInput.value = '';
+                filterSelect.value = '';
+                omimFilter.value = '';
+                referenceFilter.value = '';
+                synonymFilter.value = '';
+                suggestionsDiv.style.display = 'none';
+                showSearchPrompt();
+            });
+
+            const downloadCSV = (dataToExport, filename) => {
+                const csv = [
+                    ['Gene', 'Ensembl ID', 'Gene Description', 'Synonym', 'OMIM ID', 'Reference', 'Ciliary Localization'],
+                    ...dataToExport.map(item => [item.gene, item.ensembl_id, item.description, item.synonym, item.omim_id, item.reference, item.localization].map(cell => `"${(cell || '').replace(/"/g, '""')}"`))
+                ].map(row => row.join(',')).join('\n');
+                const blob = new Blob([csv], { type: 'text/csv' });
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                a.click();
+                window.URL.revokeObjectURL(url);
+            };
+
+            downloadBtn.addEventListener('click', () => downloadCSV(data, 'ciliahub_data.csv'));
+            exportFilteredBtn.addEventListener('click', () => {
+                if (filteredData.length === 0) {
+                    alert('No filtered data to export.');
+                    return;
+                }
+                downloadCSV(filteredData, `ciliahub_filtered_${new Date().toISOString().split('T')[0]}.csv`);
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            if (document.getElementById('ciliahub')) {
+                loadCiliaHubData();
+            }
+        });
+    </script>
+</body>
+</html>
