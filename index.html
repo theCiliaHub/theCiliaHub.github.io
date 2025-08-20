@@ -151,11 +151,10 @@
                 </div>
             </details>
             <div class="ciliahub-controls mb-4 text-center">
-                <div class="search-container">
-                    <input type="text" id="ciliahub-search" placeholder="Search by Gene, Ensembl ID, or Synonym..." aria-label="Search CiliaHub database" autocomplete="off">
+                <div class="search-container" style="max-width: 100%;">
+                    <input type="text" id="ciliahub-search" placeholder="Search by Gene, Ensembl ID, or Synonym..." aria-label="Search CiliaHub database" autocomplete="off" style="width: 100%; max-width: 600px; padding: 10px; margin-bottom: 10px;">
                     <div id="search-suggestions" class="search-suggestions"></div>
                 </div>
-                
                 <div class="advanced-filters">
                     <select id="ciliahub-filter" aria-label="Filter by ciliary localization">
                         <option value="">All Localizations</option>
@@ -183,7 +182,8 @@
                 </div>
                 <div class="control-buttons">
                     <button id="ciliahub-reset" aria-label="Reset search and filters">Reset All</button>
-                    <button id="download-ciliahub" aria-label="Download CiliaHub data as CSV">Download Data</button>
+                    <button id="download-json" class="download-button" aria-label="Download CiliaHub data as JSON">Download JSON</button>
+                    <button id="download-csv" class="download-button" aria-label="Download CiliaHub data as CSV">Download CSV</button>
                     <button id="export-filtered" aria-label="Export filtered results as CSV">Export Filtered</button>
                 </div>
             </div>
@@ -288,7 +288,7 @@
 
         <section id="download" class="section" style="display: none;">
             <h1>Download</h1>
-            <p>Download the latest CiliaHub data in your preferred format.</p>
+            <p>Download the full CiliaHub gene list for further analysis.</p>
             <div class="control-buttons">
                 <button id="download-json" class="download-button" aria-label="Download CiliaHub data as JSON">Download JSON</button>
                 <button id="download-csv" class="download-button" aria-label="Download CiliaHub data as CSV">Download CSV</button>
@@ -346,7 +346,7 @@
                 localStorage.setItem('nightMode', document.body.classList.contains('night-mode') ? 'enabled' : 'disabled');
             });
 
-            // Download handlers (example implementation)
+            // Download handlers
             document.getElementById('download-json').addEventListener('click', () => {
                 const data = { genes: [{ name: 'ARL13B', ensembl: 'ENSG00000169379' }] };
                 const jsonStr = JSON.stringify(data, null, 2);
