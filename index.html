@@ -29,6 +29,9 @@
                 console.log(sectionId + " section displayed");
                 if (sectionId === 'gene-card' && geneId) {
                     window.dispatchEvent(new CustomEvent('showGeneCard', { detail: { geneId } }));
+                    window.location.hash = `#home/${geneId}`;
+                } else if (sectionId === 'home' && !geneId) {
+                    window.location.hash = '#home';
                 }
             } else {
                 console.error("Section not found: " + sectionId);
@@ -49,7 +52,7 @@
             let path = ['<a href="#home" onclick="showSection(\'home\')">Home</a>'];
             if (sectionId !== 'home') {
                 if (sectionId === 'gene-card' && geneId) {
-                    path.push(`<a href="#${sectionId}" onclick="showSection('${sectionId}', '${geneId}')">${geneId}</a>`);
+                    path.push(`<a href="#home/${geneId}" onclick="showSection('gene-card', '${geneId}')">${geneId}</a>`);
                 } else {
                     const sectionTitle = document.getElementById(sectionId).querySelector('h1').textContent;
                     path.push(sectionTitle);
@@ -57,6 +60,17 @@
             }
             breadcrumbs.innerHTML = path.join(' > ');
         }
+
+        // Handle URL hash on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            const hash = window.location.hash;
+            if (hash.startsWith('#home/') && hash.length > 6) {
+                const geneId = hash.substring(6);
+                showSection('gene-card', geneId);
+            } else if (hash === '#home') {
+                showSection('home');
+            }
+        });
     </script>
 </head>
 <body onload="showSection('home')">
@@ -216,16 +230,22 @@
 
         <section id="gene-card" class="section" style="display: none;">
             <h1>Gene Details</h1>
-            <div id="gene-card-content" class="card" style="max-width: 600px; margin: 20px auto; padding: 20px; border: 1px solid #cce0f5; background: #f0f8ff; border-radius: 6px;">
-                <h2 id="gene-card-title" style="color: #203c78;"></h2>
-                <p><strong>Ensembl ID:</strong> <span id="gene-card-ensembl"></span></p>
-                <p><strong>Description:</strong> <span id="gene-card-description"></span></p>
-                <p><strong>Synonyms:</strong> <span id="gene-card-synonyms"></span></p>
-                <p><strong>OMIM ID:</strong> <span id="gene-card-omim"></span></p>
-                <p><strong>References:</strong> <span id="gene-card-references"></span></p>
-                <p><strong>Ciliary Localization:</strong> <span id="gene-card-localization"></span></p>
-                <a href="#home" onclick="showSection('home')" class="read-more-btn" style="background-color: #203c78; color: white; padding: 8px 16px; border-radius: 5px; text-decoration: none;" aria-label="Back to CiliaHub">Back to CiliaHub</a>
+            <div id="gene-card-content" class="card" style="max-width: 800px; margin: 20px auto; padding: 20px; border: 1px solid #cce0f5; background: #f0f8ff; border-radius: 6px; display: flex; flex-wrap: wrap;">
+                <div class="left-section" style="flex: 1; min-width: 300px; padding-right: 20px;">
+                    <h2 id="gene-card-title" style="color: #203c78;"></h2>
+                    <p><strong>Ensembl ID:</strong> <span id="gene-card-ensembl"></span></p>
+                </div>
+                <div class="right-section" style="flex: 1; min-width: 300px;">
+                    <p><strong>Description:</strong> <span id="gene-card-description"></span></p>
+                    <p><strong>Synonyms:</strong> <span id="gene-card-synonyms"></span></p>
+                    <p><strong>OMIM ID:</strong> <span id="gene-card-omim"></span></p>
+                    <p><strong>References:</strong> <span id="gene-card-references"></span></p>
+                    <p><strong>Ciliary Localization:</strong> <span id="gene-card-localization"></span></p>
+                </div>
             </div>
+            <p class="text-center">
+                <a href="#home" onclick="showSection('home')" class="read-more-btn" style="background-color: #203c78; color: white; padding: 8px 16px; border-radius: 5px; text-decoration: none;" aria-label="Back to CiliaHub">Back to CiliaHub</a>
+            </p>
         </section>
 
         <section id="download" class="section" style="display: none;">
