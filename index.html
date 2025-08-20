@@ -77,6 +77,8 @@
     <!-- Navbar -->
     <nav class="navbar">
         <a href="#home" onclick="showSection('home')">Home</a>
+        <a href="#educational-resources" onclick="showSection('educational-resources')">Educational Resources</a>
+        <a href="#blog-newsfeed" onclick="showSection('blog-newsfeed')">Blog/Newsfeed</a>
         <a href="#download" onclick="showSection('download')">Download</a>
         <a href="#cite" onclick="showSection('cite')">Cite</a>
         <a href="#contact" onclick="showSection('contact')">Contact</a>
@@ -85,7 +87,6 @@
     <!-- Breadcrumbs -->
     <div id="breadcrumbs"></div>
 
-    
     <div class="container">
         <section id="home" class="section">
             <img src="CiliaHub_Logo.png" alt="CiliaHub Logo" class="w-full mx-auto mb-4" style="max-width: 100%; height: auto;">
@@ -230,34 +231,68 @@
             </p>
         </section>
 
-     <section id="gene-card" class="section">
-  <div class="card">
-    <div class="left-section">
-      <h2>Gene Name: ARL13B</h2>
-      <p><strong>Ensembl ID:</strong> <a href="https://www.ensembl.org/id/ENSG00000169379">ENSG00000169379</a></p>
-      <p><strong>Synonyms:</strong> ARL2L1, DKFZP761H079, JBTS8</p>
-      <p><strong>Description:</strong> ADP ribosylation factor like GTPase 13B [Source:HGNC Symbol;Acc:HGNC:25419]</p>
-      <p><strong>OMIM ID:</strong> <a href="https://omim.org/entry/608922">608922</a></p>
-    </div>
-    <div class="right-section">
-      <p><strong>Ciliary Localization:</strong> basal body</p>
-      <p><strong>References:</strong></p>
-      <div class="references">
-        <a href="https://pubmed.ncbi.nlm.nih.gov/18674751">https://pubmed.ncbi.nlm.nih.gov/18674751</a>
-        <a href="https://pubmed.ncbi.nlm.nih.gov/20231383">https://pubmed.ncbi.nlm.nih.gov/20231383</a>
-        <a href="https://pubmed.ncbi.nlm.nih.gov/20530210">https://pubmed.ncbi.nlm.nih.gov/20530210</a>
-        <a href="https://pubmed.ncbi.nlm.nih.gov/21976698">https://pubmed.ncbi.nlm.nih.gov/21976698</a>
-        <a href="https://pubmed.ncbi.nlm.nih.gov/23150559">https://pubmed.ncbi.nlm.nih.gov/23150559</a>
-        <a href="https://pubmed.ncbi.nlm.nih.gov/22554696">https://pubmed.ncbi.nlm.nih.gov/22554696</a>
-      </div>
-    </div>
-  </div>
-</section>
+        <section id="gene-card" class="section">
+            <div class="card">
+                <div class="left-section">
+                    <h2>Gene Name: ARL13B</h2>
+                    <p><strong>Ensembl ID:</strong> <a href="https://www.ensembl.org/id/ENSG00000169379">ENSG00000169379</a></p>
+                    <p><strong>Synonyms:</strong> ARL2L1, DKFZP761H079, JBTS8</p>
+                    <p><strong>Description:</strong> ADP ribosylation factor like GTPase 13B [Source:HGNC Symbol;Acc:HGNC:25419]</p>
+                    <p><strong>OMIM ID:</strong> <a href="https://omim.org/entry/608922">608922</a></p>
+                </div>
+                <div class="right-section">
+                    <p><strong>Ciliary Localization:</strong> basal body</p>
+                    <p><strong>References:</strong></p>
+                    <div class="references">
+                        <a href="https://pubmed.ncbi.nlm.nih.gov/18674751">https://pubmed.ncbi.nlm.nih.gov/18674751</a>
+                        <a href="https://pubmed.ncbi.nlm.nih.gov/20231383">https://pubmed.ncbi.nlm.nih.gov/20231383</a>
+                        <a href="https://pubmed.ncbi.nlm.nih.gov/20530210">https://pubmed.ncbi.nlm.nih.gov/20530210</a>
+                        <a href="https://pubmed.ncbi.nlm.nih.gov/21976698">https://pubmed.ncbi.nlm.nih.gov/21976698</a>
+                        <a href="https://pubmed.ncbi.nlm.nih.gov/23150559">https://pubmed.ncbi.nlm.nih.gov/23150559</a>
+                        <a href="https://pubmed.ncbi.nlm.nih.gov/22554696">https://pubmed.ncbi.nlm.nih.gov/22554696</a>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="educational-resources" class="section" style="display: none;">
+            <h1>Educational Resources</h1>
+            <p>Explore tutorials, videos, and guides on ciliary biology and research techniques.</p>
+            <!-- Content can be expanded here -->
+        </section>
+
+        <section id="blog-newsfeed" class="section" style="display: none;">
+            <h1>Blog/Newsfeed</h1>
+            <p>Stay updated with the latest breakthroughs in cilia research, upcoming conferences, and workshops.</p>
+            <div class="research-grid">
+                <div class="research-item">
+                    <div class="research-text">
+                        <h3>Breakthrough: New Cilia Protein Discovered</h3>
+                        <p>Researchers have identified a novel protein critical to ciliary function, published on August 15, 2025.</p>
+                    </div>
+                </div>
+                <div class="research-item">
+                    <div class="research-text">
+                        <h3>Conference: Cilia 2025</h3>
+                        <p>Join us in Boston, September 10-12, 2025, for the latest in ciliary research.</p>
+                    </div>
+                </div>
+                <div class="research-item">
+                    <div class="research-text">
+                        <h3>Workshop: Ciliary Imaging Techniques</h3>
+                        <p>Online workshop scheduled for August 28, 2025, covering advanced imaging methods.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
 
         <section id="download" class="section" style="display: none;">
             <h1>Download</h1>
-            <p>Download the full CiliaHub gene list for further analysis.</p>
-            <button id="download-ciliahub" aria-label="Download CiliaHub data as CSV">Download Data</button>
+            <p>Download the latest CiliaHub data in your preferred format.</p>
+            <div class="control-buttons">
+                <button id="download-json" class="download-button" aria-label="Download CiliaHub data as JSON">Download JSON</button>
+                <button id="download-csv" class="download-button" aria-label="Download CiliaHub data as CSV">Download CSV</button>
+            </div>
         </section>
 
         <section id="cite" class="section" style="display: none;">
@@ -309,6 +344,30 @@
             nightModeToggle.addEventListener('click', function() {
                 document.body.classList.toggle('night-mode');
                 localStorage.setItem('nightMode', document.body.classList.contains('night-mode') ? 'enabled' : 'disabled');
+            });
+
+            // Download handlers (example implementation)
+            document.getElementById('download-json').addEventListener('click', () => {
+                const data = { genes: [{ name: 'ARL13B', ensembl: 'ENSG00000169379' }] };
+                const jsonStr = JSON.stringify(data, null, 2);
+                const blob = new Blob([jsonStr], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'ciliahub_data.json';
+                a.click();
+                URL.revokeObjectURL(url);
+            });
+
+            document.getElementById('download-csv').addEventListener('click', () => {
+                const data = 'Gene Name,Ensembl ID\nARL13B,ENSG00000169379';
+                const blob = new Blob([data], { type: 'text/csv' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'ciliahub_data.csv';
+                a.click();
+                URL.revokeObjectURL(url);
             });
         });
     </script>
