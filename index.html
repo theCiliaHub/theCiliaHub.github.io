@@ -9,11 +9,24 @@
 </head>
 <body>
     <header>
+        <nav>
+            <ul>
+                <li><a href="#ciliahub">Main</a></li>
+                <li><a href="#download">Download</a></li>
+                <li><a href="#cite">Cite</a></li>
+                <li><a href="#contact">Contact</a></li>
+            </ul>
+        </nav>
+        <div class="logo">
+            <img src="ciliahub_logo.png" alt="CiliaHub Logo">
+        </div>
         <h1>CiliaHub: Ciliary Gene Database</h1>
+        <p>A collaborative hub for researchers dedicated to understanding the structure, function, and role of cilia in health and disease.</p>
     </header>
     <main>
         <section id="ciliahub">
-            <p>CiliaHub is an updated and curated database of all experimentally confirmed ciliary genes — an evolution of the ciliary "Gold Standard" gene list. Through a combination of R-based text mining of the scientific literature and manual expert review, the database now includes over 2,002 genes, including 1300+ newly associated ciliary genes.</p>
+            <h2>About CiliaHub</h2>
+            <p>CiliaHub is an updated and curated database of all experimentally confirmed ciliary genes — an evolution of the ciliary "Gold Standard" gene list. Through a combination of R-based text mining of the scientific literature and manual expert review, the database now includes over 2,002 genes, including 1,300+ newly associated ciliary genes.</p>
             <p>This user-friendly platform allows researchers to:</p>
             <ul>
                 <li>✔️ Explore curated gene entries with descriptions and known synonyms</li>
@@ -22,24 +35,56 @@
                 <li>✔️ Download the full gene list for further analysis</li>
             </ul>
             <p>CiliaHub empowers both basic and clinical researchers in the fields of cell biology and genetics to explore the molecular basis of cilia-related functions and ciliopathies.</p>
-            <h2>📘 How to Use CiliaHub</h2>
+            <h2>CiliaHub Database</h2>
+            <p>An updated and curated database of experimentally confirmed ciliary genes. Use the tools below to search, filter, and analyze the data.</p>
+            <h3>📘 How to Use CiliaHub</h3>
             <ul>
                 <li><strong>🔍 Search:</strong> Enter a gene name, Ensembl ID, OMIM ID, or synonym to find specific entries.</li>
-                <li><strong>🧭 Filter:</strong> Use the dropdown menu to display genes based on ciliary localization (e.g., Basal Body).</li>
+                <li><strong>🧭 Filter:</strong> Use the dropdown menu to display genes based on ciliaryritta
+
+System: ciliary localization (e.g., Basal Body).</li>
                 <li><strong>♻️ Reset:</strong> Click Reset to clear search and filters, and reload all results.</li>
                 <li><strong>⬇️ Download:</strong> Export the full gene list as a CSV file for offline analysis or custom sorting.</li>
                 <li><strong>🔗 External Links:</strong> Gene names, Ensembl IDs, OMIM IDs, and references are hyperlinked to authoritative databases.</li>
                 <li><strong>🗂 Batch Query:</strong> Paste multiple genes or IDs below and click "Batch Query" to retrieve all matching entries at once.</li>
             </ul>
-            <h2>🔥 Popular Genes This Session</h2>
+            <div class="search-container">
+                <input type="text" id="searchInput" placeholder="Search by gene name, Ensembl ID, OMIM ID, or synonym...">
+                <select id="filterSelect">
+                    <option value="">Filter by ciliary localization</option>
+                    <option value="Basal Body">Basal Body</option>
+                    <option value="Cilium">Cilium</option>
+                    <!-- Additional filter options as per original site -->
+                </select>
+                <button id="resetButton">Reset</button>
+                <button id="batchQueryButton">Batch Query</button>
+            </div>
+            <textarea id="batchQueryInput" placeholder="Paste multiple genes or IDs here..."></textarea>
+            <h3>📊 Cilia-Related Gene Statistics</h3>
+            <p>2002 Cilia-Related Genes | 0 Cilia Localizations | 0 With OMIM Entries | 0 With References</p>
+            <table id="geneTable">
+                <thead>
+                    <tr>
+                        <th>Gene Name</th>
+                        <th>Ensembl ID</th>
+                        <th>OMIM ID</th>
+                        <th>Synonyms</th>
+                        <th>References</th>
+                    </tr>
+                </thead>
+                <tbody id="geneTableBody">
+                    <!-- Populated by script.js -->
+                </tbody>
+            </table>
+            <h3>🔥 Popular Genes This Session</h3>
             <p>Loading data...</p>
-            <p><strong>Suggested citation:</strong> Yenisert F, Kaplan OI. Expanded Catalog of Ciliary Genes: Integration of Novel Ciliary Genes into the Ciliome. 2025. Available at: <a href="https://rarediseaselab.github.io/home/#ciliahub">CiliaHub</a></p>
+            <p><strong>Suggested Citation:</strong> Yenisert F, Kaplan OI. Expanded Catalog of Ciliary Genes: Integration of Novel Ciliary Genes into the Ciliome. 2025. Available at: <a href="https://rarediseaselab.github.io/home/#ciliahub">CiliaHub</a></p>
             <p><a href="#submit-feedback">Submit Feedback</a></p>
         </section>
         <section id="download">
             <h2>Download</h2>
             <p>Download the full CiliaHub gene list as a CSV file for offline analysis or custom sorting.</p>
-            <a href="#">Download CSV</a>
+            <a href="#" id="downloadLink">Download CSV</a>
         </section>
         <section id="contact">
             <h2>Contact</h2>
