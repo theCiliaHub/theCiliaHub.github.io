@@ -85,6 +85,7 @@
     <!-- Breadcrumbs -->
     <div id="breadcrumbs"></div>
 
+    
     <div class="container">
         <section id="home" class="section">
             <img src="CiliaHub_Logo.png" alt="CiliaHub Logo" class="w-full mx-auto mb-4" style="max-width: 100%; height: auto;">
@@ -153,6 +154,7 @@
                     <input type="text" id="ciliahub-search" placeholder="Search by Gene, Ensembl ID, or Synonym..." aria-label="Search CiliaHub database" autocomplete="off">
                     <div id="search-suggestions" class="search-suggestions"></div>
                 </div>
+                
                 <div class="advanced-filters">
                     <select id="ciliahub-filter" aria-label="Filter by ciliary localization">
                         <option value="">All Localizations</option>
@@ -228,25 +230,29 @@
             </p>
         </section>
 
-        <section id="gene-card" class="section" style="display: none;">
-            <h1>Gene Details</h1>
-            <div id="gene-card-content" class="card" style="max-width: 800px; margin: 20px auto; padding: 20px; border: 1px solid #cce0f5; background: #f0f8ff; border-radius: 6px; display: flex; flex-wrap: wrap;">
-                <div class="left-section" style="flex: 1; min-width: 300px; padding-right: 20px;">
-                    <h2 id="gene-card-title" style="color: #203c78;"></h2>
-                    <p><strong>Ensembl ID:</strong> <span id="gene-card-ensembl"></span></p>
-                </div>
-                <div class="right-section" style="flex: 1; min-width: 300px;">
-                    <p><strong>Description:</strong> <span id="gene-card-description"></span></p>
-                    <p><strong>Synonyms:</strong> <span id="gene-card-synonyms"></span></p>
-                    <p><strong>OMIM ID:</strong> <span id="gene-card-omim"></span></p>
-                    <p><strong>References:</strong> <span id="gene-card-references"></span></p>
-                    <p><strong>Ciliary Localization:</strong> <span id="gene-card-localization"></span></p>
-                </div>
-            </div>
-            <p class="text-center">
-                <a href="#home" onclick="showSection('home')" class="read-more-btn" style="background-color: #203c78; color: white; padding: 8px 16px; border-radius: 5px; text-decoration: none;" aria-label="Back to CiliaHub">Back to CiliaHub</a>
-            </p>
-        </section>
+     <section id="gene-card" class="section">
+  <div class="card">
+    <div class="left-section">
+      <h2>Gene Name: ARL13B</h2>
+      <p><strong>Ensembl ID:</strong> <a href="https://www.ensembl.org/id/ENSG00000169379">ENSG00000169379</a></p>
+      <p><strong>Synonyms:</strong> ARL2L1, DKFZP761H079, JBTS8</p>
+      <p><strong>Description:</strong> ADP ribosylation factor like GTPase 13B [Source:HGNC Symbol;Acc:HGNC:25419]</p>
+      <p><strong>OMIM ID:</strong> <a href="https://omim.org/entry/608922">608922</a></p>
+    </div>
+    <div class="right-section">
+      <p><strong>Ciliary Localization:</strong> basal body</p>
+      <p><strong>References:</strong></p>
+      <div class="references">
+        <a href="https://pubmed.ncbi.nlm.nih.gov/18674751">https://pubmed.ncbi.nlm.nih.gov/18674751</a>
+        <a href="https://pubmed.ncbi.nlm.nih.gov/20231383">https://pubmed.ncbi.nlm.nih.gov/20231383</a>
+        <a href="https://pubmed.ncbi.nlm.nih.gov/20530210">https://pubmed.ncbi.nlm.nih.gov/20530210</a>
+        <a href="https://pubmed.ncbi.nlm.nih.gov/21976698">https://pubmed.ncbi.nlm.nih.gov/21976698</a>
+        <a href="https://pubmed.ncbi.nlm.nih.gov/23150559">https://pubmed.ncbi.nlm.nih.gov/23150559</a>
+        <a href="https://pubmed.ncbi.nlm.nih.gov/22554696">https://pubmed.ncbi.nlm.nih.gov/22554696</a>
+      </div>
+    </div>
+  </div>
+</section>
 
         <section id="download" class="section" style="display: none;">
             <h1>Download</h1>
