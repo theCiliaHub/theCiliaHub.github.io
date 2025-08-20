@@ -356,8 +356,8 @@ async function loadCiliaHubData() {
 
         const growthCtx = document.getElementById('growthChart');
         if (growthCtx) {
-            const years = ['2020', '2021', '2022', '2023', '2024', '2025'];
-            const ciliaGeneCounts = [300, 450, 700, 950, 1200, statsData.totalCiliaGenes];
+            const years = ['2013', '2021', '2025'];
+            const ciliaGeneCounts = [303, 388, 2011, statsData.totalCiliaGenes];
 
             new Chart(growthCtx, {
                 type: 'line',
@@ -414,7 +414,7 @@ async function loadCiliaHubData() {
                         },
                         title: {
                             display: true,
-                            text: 'CiliaHub Database Growth Over Time',
+                            text: 'Ciliary Genes Growth Over Time',
                             font: { size: 14, weight: 'bold' },
                             color: '#203c78'
                         }
