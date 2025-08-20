@@ -3,10 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="CiliaHub: A curated database of ciliary genes for researching ciliopathies and rare diseases.">
-    <meta name="keywords" content=" CiliaHub, ciliary genes, ciliopathies, bioinformatics, genomics, rare diseases">
+    <meta name="description" content="Kaplan's Lab CiliaHub: A curated database of ciliary genes for researching ciliopathies and rare diseases.">
+    <meta name="keywords" content="Kaplan's Lab, CiliaHub, ciliary genes, ciliopathies, bioinformatics, genomics, rare diseases">
     <meta name="author" content="Kaplan's Lab">
-    <title>CiliaHub</title>
+    <title>Kaplan's Lab</title>
     <link rel="stylesheet" href="styles.css">
     <link rel="icon" type="image/png" href="elegans2.png">
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-EKT3SLJ516"></script>
@@ -18,15 +18,18 @@
         gtag('config', 'G-EKT3SLJ516');
     </script>
     <script>
-        function showSection(sectionId) {
-            console.log("Showing section: " + sectionId);
+        function showSection(sectionId, geneId) {
+            console.log("Showing section: " + sectionId, geneId ? "Gene ID: " + geneId : "");
             document.querySelectorAll('.section').forEach(sec => sec.style.display = 'none');
             const section = document.getElementById(sectionId);
             if (section) {
                 section.style.display = 'block';
                 updateActiveNav(sectionId);
-                updateBreadcrumbs(sectionId);
+                updateBreadcrumbs(sectionId, geneId);
                 console.log(sectionId + " section displayed");
+                if (sectionId === 'gene-card' && geneId) {
+                    window.dispatchEvent(new CustomEvent('showGeneCard', { detail: { geneId } }));
+                }
             } else {
                 console.error("Section not found: " + sectionId);
             }
@@ -41,12 +44,16 @@
             });
         }
 
-        function updateBreadcrumbs(sectionId) {
+        function updateBreadcrumbs(sectionId, geneId) {
             const breadcrumbs = document.getElementById('breadcrumbs');
             let path = ['<a href="#home" onclick="showSection(\'home\')">Home</a>'];
             if (sectionId !== 'home') {
-                const sectionTitle = document.getElementById(sectionId).querySelector('h1').textContent;
-                path.push(sectionTitle);
+                if (sectionId === 'gene-card' && geneId) {
+                    path.push(`<a href="#${sectionId}" onclick="showSection('${sectionId}', '${geneId}')">${geneId}</a>`);
+                } else {
+                    const sectionTitle = document.getElementById(sectionId).querySelector('h1').textContent;
+                    path.push(sectionTitle);
+                }
             }
             breadcrumbs.innerHTML = path.join(' > ');
         }
@@ -205,6 +212,20 @@
                     Submit Feedback
                 </a>
             </p>
+        </section>
+
+        <section id="gene-card" class="section" style="display: none;">
+            <h1>Gene Details</h1>
+            <div id="gene-card-content" class="card" style="max-width: 600px; margin: 20px auto; padding: 20px; border: 1px solid #cce0f5; background: #f0f8ff; border-radius: 6px;">
+                <h2 id="gene-card-title" style="color: #203c78;"></h2>
+                <p><strong>Ensembl ID:</strong> <span id="gene-card-ensembl"></span></p>
+                <p><strong>Description:</strong> <span id="gene-card-description"></span></p>
+                <p><strong>Synonyms:</strong> <span id="gene-card-synonyms"></span></p>
+                <p><strong>OMIM ID:</strong> <span id="gene-card-omim"></span></p>
+                <p><strong>References:</strong> <span id="gene-card-references"></span></p>
+                <p><strong>Ciliary Localization:</strong> <span id="gene-card-localization"></span></p>
+                <a href="#home" onclick="showSection('home')" class="read-more-btn" style="background-color: #203c78; color: white; padding: 8px 16px; border-radius: 5px; text-decoration: none;" aria-label="Back to CiliaHub">Back to CiliaHub</a>
+            </div>
         </section>
 
         <section id="download" class="section" style="display: none;">
