@@ -27,7 +27,7 @@ async function loadCiliaHubData() {
     let allSynonyms = new Set();
     let allEnsemblIds = new Set();
 
-    // Statistics tracking - corrected to focus on cilia-related localizations
+    // Statistics tracking
     let statsData = {
         totalCiliaGenes: 0,
         ciliaLocalizations: new Set(),
@@ -36,7 +36,6 @@ async function loadCiliaHubData() {
         ciliaLocalizationCounts: {}
     };
 
-    // Define cilia-related localization categories
     const ciliaRelatedCategories = {
         'cilia': ['cilia', 'cilium', 'ciliary'],
         'transition zone': ['transition zone', 'transition-zone'],
@@ -116,7 +115,7 @@ async function loadCiliaHubData() {
 
             const row = document.createElement('tr');
             row.innerHTML = `
-                <td><a href="https://www.ncbi.nlm.nih.gov/gene/?term=${item.gene}" target="_blank">${item.gene}</a></td>
+                <td><a href="#gene-card" onclick="showSection('gene-card', '${item.gene}')" target="_blank">${item.gene}</a></td>
                 <td><a href="https://www.ensembl.org/Homo_sapiens/Gene/Summary?g=${item.ensembl_id}" target="_blank">${item.ensembl_id}</a></td>
                 <td class="description" data-full-text="${item.description || ''}">${item.description || ''}</td>
                 <td>${synonyms}</td>
@@ -138,7 +137,7 @@ async function loadCiliaHubData() {
             .sort((a, b) => b[1] - a[1])
             .slice(0, 5);
         popularGenesList.innerHTML = sortedGenes.length
-            ? sortedGenes.map(([gene, count]) => `<li>${gene} (${count} searches)</li>`).join('')
+            ? sortedGenes.map(([gene, count]) => `<li><a href="#gene-card" onclick="showSection('gene-card', '${gene}')">${gene}</a> (${count} searches)</li>`).join('')
             : '<li>No searches yet.</li>';
     }
 
@@ -356,8 +355,8 @@ async function loadCiliaHubData() {
 
         const growthCtx = document.getElementById('growthChart');
         if (growthCtx) {
-            const years = ['2013', '2021', '2025'];
-            const ciliaGeneCounts = [303, 388, 2011, statsData.totalCiliaGenes];
+            const years = ['2020', '2021', '2022', '2023', '2024', '2025'];
+            const ciliaGeneCounts = [300, 450, 700, 950, 1200, statsData.totalCiliaGenes];
 
             new Chart(growthCtx, {
                 type: 'line',
@@ -414,7 +413,7 @@ async function loadCiliaHubData() {
                         },
                         title: {
                             display: true,
-                            text: 'Ciliary Genes Growth Over Time',
+                            text: 'CiliaHub Database Growth Over Time',
                             font: { size: 14, weight: 'bold' },
                             color: '#203c78'
                         }
@@ -422,6 +421,29 @@ async function loadCiliaHubData() {
                 }
             });
         }
+    }
+
+    function showGeneCard(geneId) {
+        const geneData = data.find(item => item.gene === geneId);
+        if (!geneData) {
+            document.getElementById('gene-card-content').innerHTML = '<p>Gene not found.</p>';
+            return;
+        }
+
+        const referenceLinks = formatReference(geneData.reference);
+        const synonyms = geneData.synonym ? geneData.synonym.split(',').map(s => s.trim()).join(', ') : 'N/A';
+
+        document.getElementById('gene-card-title').textContent = geneData.gene || 'N/A';
+        document.getElementById('gene-card-ensembl').innerHTML = geneData.ensembl_id
+            ? `<a href="https://www.ensembl.org/Homo_sapiens/Gene/Summary?g=${geneData.ensembl_id}" target="_blank">${geneData.ensembl_id}</a>`
+            : 'N/A';
+        document.getElementById('gene-card-description').textContent = geneData.description || 'N/A';
+        document.getElementById('gene-card-synonyms').textContent = synonyms;
+        document.getElementById('gene-card-omim').innerHTML = geneData.omim_id
+            ? `<a href="https://www.omim.org/entry/${geneData.omim_id}" target="_blank">${geneData.omim_id}</a>`
+            : 'N/A';
+        document.getElementById('gene-card-references').innerHTML = referenceLinks;
+        document.getElementById('gene-card-localization').textContent = geneData.localization || 'N/A';
     }
 
     try {
@@ -447,6 +469,10 @@ async function loadCiliaHubData() {
         createCharts();
         showSearchPrompt();
         updatePopularGenes();
+
+        window.addEventListener('showGeneCard', (event) => {
+            showGeneCard(event.detail.geneId);
+        });
     } catch (error) {
         console.error('Error loading CiliaHub data:', error);
         showError('Failed to load CiliaHub data. Please check your network or contact support.');
@@ -574,7 +600,7 @@ async function loadCiliaHubData() {
                         const referenceLinks = formatReference(item.reference);
                         return `
                             <tr>
-                                <td style="padding: 10px; border-bottom: 1px solid #ddd;"><a href="https://www.ncbi.nlm.nih.gov/gene/?term=${item.gene}" target="_blank">${item.gene}</a></td>
+                                <td style="padding: 10px; border-bottom: 1px solid #ddd;"><a href="#gene-card" onclick="showSection('gene-card', '${item.gene}')" target="_blank">${item.gene}</a></td>
                                 <td style="padding: 10px; border-bottom: 1px solid #ddd;"><a href="https://www.ensembl.org/Homo_sapiens/Gene/Summary?g=${item.ensembl_id}" target="_blank">${item.ensembl_id}</a></td>
                                 <td style="padding: 10px; border-bottom: 1px solid #ddd;">${item.description || ''}</td>
                                 <td style="padding: 10px; border-bottom: 1px solid #ddd;">${item.synonym || ''}</td>
