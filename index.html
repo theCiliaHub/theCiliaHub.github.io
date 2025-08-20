@@ -3,10 +3,28 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="CiliaHub is an updated and curated database of experimentally confirmed ciliary genes, evolving from the ciliary 'Gold Standard' gene list.">
-    <meta name="keywords" content="CiliaHub, ciliary genes, ciliopathies, bioinformatics, gene database, Gold Standard, genomics, research">
-    <meta name="author" content="CiliaHub">
-    <title>CiliaHub</title>
+    
+    <!-- SEO Meta Tags -->
+    <title>CiliaHub: A Curated Database of Ciliary Genes</title>
+    <meta name="description" content="CiliaHub is an updated and curated database of over 2,000 experimentally confirmed ciliary genes. Explore, search, and download data on ciliopathies and ciliary biology.">
+    <meta name="keywords" content="CiliaHub, ciliary genes, ciliopathies, bioinformatics, gene database, Gold Standard, genomics, research, Joubert syndrome, Bardet-Biedl syndrome">
+    <meta name="author" content="CiliaHub Team">
+    <link rel="canonical" href="https://rarediseaselab.github.io/home/">
+
+    <!-- Open Graph Meta Tags (for social sharing) -->
+    <meta property="og:title" content="CiliaHub: A Curated Database of Ciliary Genes">
+    <meta property="og:description" content="An updated and curated database of experimentally confirmed ciliary genes to empower research in cell biology and genetics.">
+    <meta property="og:image" content="https://rarediseaselab.github.io/home/CiliaHub_Logo.png">
+    <meta property="og:url" content="https://rarediseaselab.github.io/home/">
+    <meta property="og:type" content="website">
+
+    <!-- Twitter Card Meta Tags -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="CiliaHub: A Curated Database of Ciliary Genes">
+    <meta name="twitter:description" content="Explore over 2,000 ciliary genes with CiliaHub, a comprehensive resource for ciliopathy research.">
+    <meta name="twitter:image" content="https://rarediseaselab.github.io/home/CiliaHub_Logo.png">
+
+    <!-- Styles and Scripts -->
     <link rel="stylesheet" href="styles.css">
     <link rel="icon" type="image/png" href="CiliaHub_Logo.png">
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-EKT3SLJ516"></script>
@@ -23,24 +41,81 @@
             const section = document.getElementById(sectionId);
             if (section) {
                 section.style.display = 'block';
+                // Update URL hash for better navigation history
+                window.location.hash = sectionId;
             }
         }
     </script>
+
+    <!-- JSON-LD Structured Data for SEO -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      "name": "CiliaHub",
+      "url": "https://rarediseaselab.github.io/home/",
+      "potentialAction": {
+        "@type": "SearchAction",
+        "target": "https://rarediseaselab.github.io/home/#home?q={search_term_string}",
+        "query-input": "required name=search_term_string"
+      },
+      "mainEntity": {
+        "@type": "Dataset",
+        "name": "CiliaHub Ciliary Gene Database",
+        "description": "An updated and curated database of all experimentally confirmed ciliary genes, evolving from the ciliary 'Gold Standard' gene list. The database includes over 2,011 genes, with detailed annotations, references, and links to external resources like Ensembl and OMIM.",
+        "url": "https://rarediseaselab.github.io/home/",
+        "keywords": [
+          "cilia",
+          "ciliopathy",
+          "genetics",
+          "bioinformatics",
+          "human genes",
+          "rare diseases"
+        ],
+        "creator": {
+          "@type": "Organization",
+          "name": "Kaplan Lab"
+        },
+        "license": "https://creativecommons.org/licenses/by/4.0/",
+        "citation": "Yenisert F, Kaplan OI. Expanded Catalog of Ciliary Genes: Integration of Novel Ciliary Genes into the Ciliome. 2025. Available at: https://rarediseaselab.github.io/home/",
+        "distribution": [
+          {
+            "@type": "DataDownload",
+            "encodingFormat": "CSV",
+            "contentUrl": "https://raw.githubusercontent.com/rarediseaselab/home/main/ciliahub_data.json"
+          },
+          {
+            "@type": "DataDownload",
+            "encodingFormat": "JSON",
+            "contentUrl": "https://raw.githubusercontent.com/rarediseaselab/home/main/ciliahub_data.json"
+          }
+        ]
+      }
+    }
+    </script>
+
 </head>
 <body onload="showSection('home')">
+    <!-- Navbar -->
     <nav class="navbar">
         <a href="#home" onclick="showSection('home')">Home</a>
-        <a href="#" id="navbar-download">Download</a>
+        <a href="#download" onclick="showSection('download')">Download</a>
+        <a href="#cite" onclick="showSection('cite')">Cite</a>
         <a href="#contact" onclick="showSection('contact')">Contact</a>
     </nav>
 
     <div class="container">
+        <!-- Home / CiliaHub Section -->
         <section id="home" class="section">
-            <div class="container">
+             <!-- Content remains the same as your CiliaHub section -->
+             <div class="container">
+                <!-- Error Message -->
                 <div id="ciliahub-error" style="display: none; color: red; text-align: center; margin-bottom: 20px;"></div>
 
+                <!-- Logo above title -->
                 <img src="CiliaHub_Logo.png" alt="CiliaHub Logo" class="w-full mx-auto mb-4" style="max-width: 100%; height: auto;">
 
+                <!-- Title -->
                 <h1 style="color: #203c78; text-align: justify; text-align-last: center;">CiliaHub: Ciliary Gene Database</h1>
                 <p class="mb-4" style="text-align: justify;">
                     <strong>CiliaHub</strong> is an updated and curated database of all experimentally confirmed ciliary genes — an evolution of the ciliary "Gold Standard" gene list. Through a combination of R-based text mining of the scientific literature and manual expert review, the database now includes over 2,002 genes, including <strong> 1300+ newly associated ciliary genes</strong>.
@@ -55,6 +130,7 @@
                     <strong>CiliaHub</strong> empowers both basic and clinical researchers in the fields of cell biology and genetics to explore the molecular basis of cilia-related functions and ciliopathies.
                 </p>
 
+                <!-- Interactive Statistics Dashboard -->
                 <div id="statistics-dashboard" class="stats-dashboard mb-5">
                     <h3 style="color: #203c78; text-align: center; margin-bottom: 20px;">📊 Cilia-Related Gene Statistics & Analysis</h3>
                     
@@ -83,7 +159,7 @@
                             <canvas id="localizationChart" width="400" height="200"></canvas>
                         </div>
                         <div class="chart-section">
-                            <h4>Database Growth Over Time</h4>
+                            <h4>Ciliary Gold Standard Genes Growth Over Time</h4>
                             <canvas id="growthChart" width="400" height="200"></canvas>
                         </div>
                     </div>
@@ -93,6 +169,7 @@
                     </div>
                 </div>
 
+                <!-- How to Use (collapsible box) -->
                 <details class="mb-4" style="background: #f5faff; border: 1px solid #cce0f5; padding: 15px; border-radius: 5px;">
                     <summary style="font-weight: bold; cursor: pointer;"> How to Use CiliaHub</summary>
                     <div style="margin-top: 10px;">
@@ -107,12 +184,14 @@
                     </div>
                 </details>
 
+                <!-- Enhanced Search with Auto-suggestions -->
                 <div class="ciliahub-controls mb-4 text-center">
                     <div class="search-container">
                         <input type="text" id="ciliahub-search" placeholder="Search by Gene, Ensembl ID, or Synonym..." aria-label="Search CiliaHub database" autocomplete="off">
                         <div id="search-suggestions" class="search-suggestions"></div>
                     </div>
                     
+                    <!-- Advanced Filtering System -->
                     <div class="advanced-filters">
                         <select id="ciliahub-filter" aria-label="Filter by ciliary localization">
                             <option value="">All Localizations</option>
@@ -144,29 +223,33 @@
 
                     <div class="control-buttons">
                         <button id="ciliahub-reset" aria-label="Reset search and filters">Reset All</button>
-                        <button id="download-ciliahub" aria-label="Download CiliaHub data as CSV">Download Data</button>
                         <button id="export-filtered" aria-label="Export filtered results as CSV">Export Filtered</button>
                     </div>
                 </div>
 
+                <!-- Results counter -->
                 <div id="results-counter" class="results-counter mb-3"></div>
 
+                <!-- Popular Genes Widget -->
                 <div id="popularGenesWidget" style="max-width: 600px; margin: 20px auto; padding: 15px; border: 1px solid #cce0f5; background: #f0f8ff; border-radius: 6px; color: #203c78;">
                     <h3 style="text-align:center; margin-top:0;"> Popular Genes This Session</h3>
                     <ul id="popularGenesList" style="list-style: none; padding-left: 10px;"></ul>
                 </div>
 
+                <!-- Batch Query UI -->
                 <div class="batch-query mb-5" style="max-width:600px; margin: 0 auto 30px; text-align: left;">
                     <label for="batchGenes" style="font-weight:bold;">Batch Query: Enter gene names or IDs (comma, space, or newline separated):</label><br>
                     <textarea id="batchGenes" rows="4" style="width: 100%; font-family: monospace;" placeholder="e.g. IFT88, BBS1, NPHP1" aria-label="Enter multiple gene names or IDs for batch query"></textarea><br>
                     <button id="batchQueryBtn" style="margin-top: 8px; padding: 8px 16px; background-color:#203c78; color:white; border:none; border-radius:5px; cursor:pointer;" aria-label="Submit batch query">Batch Query</button>
                 </div>
 
+                <!-- Batch Query Results -->
                 <div id="batchResultsContainer" class="mb-5" style="max-width:900px; margin: 0 auto; display:none;">
                     <h3 style="color: #203c78; text-align: center;">Batch Query Results</h3>
                     <div id="batchResults"></div>
                     <button id="clearBatchResults" style="margin-top:10px; padding: 6px 12px; background:#888; color:#fff; border:none; border-radius:4px; cursor:pointer;" aria-label="Clear batch query results">Clear Results</button>
                 </div>
+                <!-- Table wrapper -->
                 <div class="table-wrapper mb-5">
                     <div id="ciliahub-loading" style="text-align: center; padding: 20px;">Loading data...</div>
                     <table class="ciliahub-table" style="display: none;">
@@ -184,14 +267,38 @@
                         <tbody id="ciliahub-table-body"></tbody>
                     </table>
                 </div>
+            </div>
+        </section>
 
-                <div class="citation-box mt-5 mb-4 p-3 rounded" style="background-color: #e6f2ff; border-left: 4px solid #004080;">
-                    <strong>Suggested citation:</strong> Yenisert F, Kaplan OI. <em>Expanded Catalog of Ciliary Genes: Integration of Novel Ciliary Genes into the Ciliome</em>. 2025. Available at:
-                    <a href="https://rarediseaselab.github.io/home/#ciliahub" target="_blank">CiliaHub</a>
+        <!-- Download Section -->
+        <section id="download" class="section" style="display: none;">
+            <h1>Download CiliaHub Data</h1>
+            <p>The complete CiliaHub dataset is available for download. You can use this data for your own research, analysis, and integration into other tools. The data is provided under a Creative Commons Attribution 4.0 International License.</p>
+            <div class="download-options">
+                <div class="download-card">
+                    <h3>CSV Format</h3>
+                    <p>A comma-separated values file, suitable for spreadsheets (Excel, Google Sheets) and data analysis software (R, Python).</p>
+                    <button id="download-csv-button" class="download-btn" aria-label="Download CiliaHub data as CSV">Download .csv</button>
+                </div>
+                <div class="download-card">
+                    <h3>JSON Format</h3>
+                    <p>A JavaScript Object Notation file, ideal for web development and integration with other applications.</p>
+                    <button id="download-json-button" class="download-btn" aria-label="Download CiliaHub data as JSON">Download .json</button>
                 </div>
             </div>
         </section>
 
+        <!-- Cite Section -->
+        <section id="cite" class="section" style="display: none;">
+            <h1>How to Cite CiliaHub</h1>
+            <p>If you use CiliaHub in your research, please cite the following publication:</p>
+            <div class="citation-box mt-5 mb-4 p-3 rounded" style="background-color: #e6f2ff; border-left: 4px solid #004080;">
+                <strong>Suggested citation:</strong>
+                <p>Yenisert F, Kaplan OI. <em>Expanded Catalog of Ciliary Genes: Integration of Novel Ciliary Genes into the Ciliome</em>. 2025. Available at: <a href="https://rarediseaselab.github.io/home/" target="_blank">https://rarediseaselab.github.io/home/</a></p>
+            </div>
+        </section>
+
+        <!-- Contact Section -->
         <section id="contact" class="section" style="display: none;">
             <h1>Contact Us</h1>
             <p>We welcome your feedback, questions, and suggestions. Please feel free to reach out to us.</p>
@@ -205,17 +312,19 @@
                 </a>
             </p>
         </section>
-
     </div>
 
+    <!-- Back to Top Button -->
     <button id="back-to-top" title="Back to Top" aria-label="Scroll back to top">↑</button>
 
     <footer>
         <p>© 2025 CiliaHub</p>
     </footer>
 
+    <!-- JavaScript -->
     <script src="script.js"></script>
 
+    <!-- Night Mode Toggle -->
     <button id="night-mode-toggle" title="Toggle Night Mode" aria-label="Toggle night mode"></button>
 </body>
 </html>
