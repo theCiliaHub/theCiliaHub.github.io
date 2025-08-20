@@ -142,10 +142,10 @@ footer {
 
 /* Statistics Dashboard Styles */
 .stats-dashboard {
-    background: #f7f9fc;
-    border: 1px solid #e9edf2;
+    background: #f0f8ff;
+    border: 2px solid #cce0f5;
     border-radius: 10px;
-    padding: 25px;
+    padding: 20px;
     margin-bottom: 30px;
 }
 
@@ -161,8 +161,7 @@ footer {
     padding: 20px;
     border-radius: 8px;
     text-align: center;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
-    border: 1px solid #e9edf2;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
 }
 
 .stat-number {
@@ -187,19 +186,14 @@ footer {
 .chart-section {
     background: white;
     padding: 20px;
-    border-radius: 10px;
-    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
-    border: 1px solid #e9edf2;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
 }
 
 .chart-section h4 {
-    color: #334155;
-    margin-bottom: 20px;
-    text-align: left;
-    font-size: 1.15em;
-    font-weight: 600;
-    padding-bottom: 15px;
-    border-bottom: 1px solid #f0f0f0;
+    color: #203c78;
+    margin-bottom: 15px;
+    text-align: center;
 }
 
 /* Search and Filter Controls */
@@ -334,18 +328,9 @@ body.night-mode { background-color: #1a1a1a; color: #d9d9d9; }
 .night-mode .section h1 { color: #b3d9ff; }
 .night-mode .download-card { background: #2e2e2e; border-color: #555; }
 .night-mode .citation-box { background-color: #2e2e2e; border-left-color: #0066cc; }
-.night-mode .stats-dashboard, .night-mode .ciliahub-controls { background: #2c303a; border-color: #3a3f4b; }
-.night-mode .stat-card { background: #3d3d3d; border-color: #4a4a4a; }
-.night-mode .chart-section {
-    background: #252932;
-    border-color: #3a3f4b;
-    box-shadow: 0 5px 15px rgba(0,0,0,0.2);
-}
-.night-mode .stat-number, .night-mode h3 { color: #b3d9ff; }
-.night-mode .chart-section h4 {
-    color: #e2e8f0;
-    border-bottom-color: #3a3f4b;
-}
+.night-mode .stats-dashboard, .night-mode .ciliahub-controls { background: #2e2e2e; border-color: #555; }
+.night-mode .stat-card, .night-mode .chart-section { background: #3d3d3d; }
+.night-mode .stat-number, .night-mode h3, .night-mode h4 { color: #b3d9ff; }
 .night-mode .ciliahub-table { background: #3d3d3d; }
 .night-mode .ciliahub-table th { background-color: #0066cc; }
 .night-mode .ciliahub-table tr:nth-child(even) { background-color: #2e2e2e; }
