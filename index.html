@@ -3,116 +3,96 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CiliaHub - Search Ciliary Genes</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <title>CiliaHub</title>
   <link rel="stylesheet" href="styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
-<body class="bg-gray-100 font-sans">
-  <div class="container mx-auto p-4 max-w-7xl">
-    <header class="text-center mb-8">
-      <h1 class="text-4xl font-bold text-blue-800">CiliaHub</h1>
-      <p class="text-lg text-gray-600">Explore over 2,002 experimentally confirmed ciliary genes</p>
-    </header>
-
-    <!-- Search and Filters -->
-    <section class="bg-white shadow-lg rounded-lg p-6 mb-6">
-      <div class="flex flex-col md:flex-row gap-4 mb-4">
-        <div class="flex-1 relative">
-          <input
-            id="ciliahub-search"
-            type="text"
-            placeholder="Search by gene, protein, or phenotype"
-            class="w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            aria-label="Search ciliary genes"
-          >
-          <div id="search-suggestions" class="absolute w-full bg-white border rounded-lg mt-1 max-h-60 overflow-auto hidden"></div>
+<body>
+  <nav class="navbar">
+    <a href="#home">Home</a>
+    <a href="#search">Search</a>
+  </nav>
+  <button id="night-mode-toggle">🌙</button>
+  <div class="container">
+    <div id="search" class="section">
+      <h1>Search Ciliary Genes</h1>
+      <div class="ciliahub-controls">
+        <div class="search-container">
+          <input id="ciliahub-search" type="text" placeholder="Search by gene, protein, or phenotype">
+          <div id="search-suggestions" class="search-suggestions"></div>
         </div>
-        <select id="ciliahub-filter" class="p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-          <option value="">All Localizations</option>
-          <option value="cilia">Cilia</option>
-          <option value="transition-zone">Transition Zone</option>
-          <option value="basal-body">Basal Body</option>
-          <option value="flagella">Flagella</option>
-          <option value="cilia-associated">Cilia Associated</option>
-        </select>
-        <select id="omim-filter" class="p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-          <option value="">All OMIM</option>
-          <option value="has-omim">Has OMIM</option>
-          <option value="no-omim">No OMIM</option>
-        </select>
-        <input
-          id="synonym-filter"
-          type="text"
-          placeholder="Filter by synonym"
-          class="p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-        >
-      </div>
-      <div class="flex gap-4">
-        <button id="ciliahub-reset" class="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600">Reset</button>
-        <button id="download-ciliahub" class="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600">Download All</button>
-        <button id="export-filtered" class="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600">Export Filtered</button>
-      </div>
-    </section>
-
-    <!-- Batch Query -->
-    <section class="bg-white shadow-lg rounded-lg p-6 mb-6">
-      <h2 class="text-2xl font-semibold text-blue-800 mb-4">Batch Query</h2>
-      <textarea
-        id="batchGenes"
-        placeholder="Enter gene names or IDs (one per line or comma-separated)"
-        class="w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-        rows="4"
-      ></textarea>
-      <div class="flex gap-4 mt-4">
-        <button id="batchQueryBtn" class="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600">Search Batch</button>
-        <button id="clearBatchResults" class="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600">Clear Results</button>
-      </div>
-      <div id="batchResultsContainer" class="mt-4 hidden">
-        <div id="batchResults" class="overflow-auto"></div>
-      </div>
-    </section>
-
-    <!-- Results and Stats -->
-    <section class="bg-white shadow-lg rounded-lg p-6 mb-6">
-      <div id="ciliahub-error" class="text-red-500 mb-4 hidden"></div>
-      <div id="ciliahub-loading" class="text-gray-600 mb-4">Loading CiliaHub data...</div>
-      <p id="results-counter" class="text-gray-600 mb-4 hidden"></p>
-      <table class="ciliahub-table w-full border-collapse hidden">
-        <thead>
-          <tr class="bg-blue-800 text-white">
-            <th class="p-3">Gene</th>
-            <th class="p-3">Ensembl ID</th>
-            <th class="p-3">Description</th>
-            <th class="p-3">Synonym</th>
-            <th class="p-3">OMIM ID</th>
-            <th class="p-3">Reference</th>
-            <th class="p-3">Localization</th>
-          </tr>
-        </thead>
-        <tbody id="ciliahub-table-body"></tbody>
-      </table>
-    </section>
-
-    <!-- Analytics Dashboard -->
-    <section class="bg-white shadow-lg rounded-lg p-6">
-      <h2 class="text-2xl font-semibold text-blue-800 mb-4">Analytics Dashboard</h2>
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div>
-          <h3 class="text-lg font-semibold">Localization Distribution</h3>
-          <canvas id="localizationChart" class="max-h-80"></canvas>
+        <div class="advanced-filters">
+          <select id="ciliahub-filter">
+            <option value="">All Localizations</option>
+            <option value="cilia">Cilia</option>
+            <option value="transition-zone">Transition Zone</option>
+            <option value="basal-body">Basal Body</option>
+            <option value="flagella">Flagella</option>
+            <option value="cilia-associated">Cilia Associated</option>
+          </select>
+          <select id="omim-filter">
+            <option value="">All OMIM</option>
+            <option value="has-omim">Has OMIM</option>
+            <option value="no-omim">No OMIM</option>
+          </select>
+          <select id="reference-filter">
+            <option value="">All References</option>
+            <option value="has-reference">Has Reference</option>
+            <option value="no-reference">No Reference</option>
+          </select>
+          <input id="synonym-filter" type="text" placeholder="Filter by synonym">
         </div>
-        <div>
-          <h3 class="text-lg font-semibold">Functional Categories</h3>
-          <canvas id="functionalChart" class="max-h-80"></canvas>
+        <div class="control-buttons">
+          <button id="ciliahub-reset">Reset</button>
+          <button id="download-ciliahub">Download All</button>
+          <button id="export-filtered">Export Filtered</button>
         </div>
       </div>
-      <div class="mt-6">
-        <h3 class="text-lg font-semibold">Popular Genes</h3>
-        <ul id="popularGenesList" class="list-disc pl-5"></ul>
+      <div class="ciliahub-controls">
+        <textarea id="batchGenes" placeholder="Enter gene names or IDs (comma-separated or one per line)" rows="4"></textarea>
+        <div class="control-buttons">
+          <button id="batchQueryBtn">Search Batch</button>
+          <button id="clearBatchResults">Clear Results</button>
+        </div>
+        <div id="batchResultsContainer" style="display: none;">
+          <div id="batchResults"></div>
+        </div>
       </div>
-    </section>
+      <div id="ciliahub-error" style="display: none;"></div>
+      <div id="ciliahub-loading">Loading CiliaHub data...</div>
+      <div id="results-counter" class="results-counter"></div>
+      <div class="table-wrapper">
+        <table class="ciliahub-table" style="display: none;">
+          <thead>
+            <tr>
+              <th>Gene</th>
+              <th>Ensembl ID</th>
+              <th>Description</th>
+              <th>Synonym</th>
+              <th>OMIM ID</th>
+              <th>Reference</th>
+              <th>Localization</th>
+            </tr>
+          </thead>
+          <tbody id="ciliahub-table-body"></tbody>
+        </table>
+      </div>
+      <div class="stats-dashboard">
+        <div class="stats-grid">
+          <div class="stat-card"><div class="stat-number" id="total-genes">0</div><div class="stat-label">Total Genes</div></div>
+          <div class="stat-card"><div class="stat-number" id="unique-localizations">0</div><div class="stat-label">Unique Localizations</div></div>
+          <div class="stat-card"><div class="stat-number" id="with-omim">0</div><div class="stat-label">With OMIM</div></div>
+          <div class="stat-card"><div class="stat-number" id="with-references">0</div><div class="stat-label">With References</div></div>
+        </div>
+        <div class="chart-container">
+          <div class="chart-section"><h4>Localization Distribution</h4><canvas id="localizationChart"></canvas></div>
+          <div class="chart-section"><h4>Database Growth</h4><canvas id="growthChart"></canvas></div>
+        </div>
+        <div><h4>Popular Genes</h4><ul id="popularGenesList" class="list-disc pl-5"></ul></div>
+      </div>
+    </div>
   </div>
+  <footer>© 2025 GitHub, Inc.</footer>
   <script src="script.js"></script>
 </body>
 </html>
