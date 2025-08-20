@@ -3,13 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CiliaHub - Advancing Ciliary Biology Research</title>
+  <title>CiliaHub - Ciliary Gene Database</title>
   <meta name="description" content="CiliaHub is a curated database of over 2,002 experimentally confirmed ciliary genes, supporting research in ciliary biology and ciliopathies.">
   <meta name="keywords" content="cilia, ciliary biology, ciliopathies, gene database, CiliaHub, cell biology, genetics">
   <meta name="robots" content="index, follow">
   <meta name="author" content="CiliaHub Team">
   <!-- Open Graph Meta Tags for Social Sharing -->
-  <meta property="og:title" content="CiliaHub - Advancing Ciliary Biology Research">
+  <meta property="og:title" content="CiliaHub - Ciliary Gene Database">
   <meta property="og:description" content="CiliaHub offers a curated database of ciliary genes, research tools, and resources for studying cilia and ciliopathies.">
   <meta property="og:url" content="https://theciliahub.github.io/">
   <meta property="og:type" content="website">
@@ -87,15 +87,23 @@
       <h3>Ciliary Gold Standard Genes Growth Over Time</h3>
       <canvas id="geneGrowthChart"></canvas>
     </div>
-    <div class="popular-genes">
-      <h3>🔥 Popular Genes This Session</h3>
-      <p>Loading data...</p>
-    </div>
     <div class="citation">
       <h3>Suggested Citation</h3>
       <p>Yenisert F, Kaplan OI. Expanded Catalog of Ciliary Genes: Integration of Novel Ciliary Genes into the Ciliome. 2025. Available at: <a href="https://theciliahub.github.io/">CiliaHub</a></p>
     </div>
-    <a href="mailto:feedback@theciliahub.github.io" class="btn">Submit Feedback</a>
+    <a href="#contact" class="btn">Submit Feedback</a>
+  </section>
+
+  <section id="download">
+    <h2>Download</h2>
+    <p>Download the full CiliaHub gene list for offline analysis or custom sorting.</p>
+    <button onclick="downloadCSV()" class="btn">Download Gene List (CSV)</button>
+  </section>
+
+  <section id="contact">
+    <h2>Contact</h2>
+    <p>Have questions or feedback? Reach out to the CiliaHub team!</p>
+    <a href="mailto:feedback@theciliahub.github.io" class="btn">Contact Us</a>
   </section>
 
   <script src="script.js"></script>
