@@ -1543,6 +1543,83 @@ footer {
     color: #d9d9d9;
 }
 
+/* Gene Card Styling */
+#gene-card .card {
+    background: #f0f8ff;
+    border: 2px solid #cce0f5;
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    margin: 20px auto;
+    max-width: 800px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+}
+
+#gene-card .left-section,
+#gene-card .right-section {
+    flex: 1;
+    min-width: 300px;
+    padding: 10px;
+}
+
+#gene-card h2 {
+    color: #203c78;
+    font-size: 1.8em;
+    margin-bottom: 15px;
+}
+
+#gene-card p {
+    margin-bottom: 10px;
+    font-size: 1em;
+    color: #333;
+    line-height: 1.5;
+}
+
+#gene-card p strong {
+    color: #004080;
+    font-weight: bold;
+}
+
+#gene-card a {
+    color: #004080;
+    text-decoration: underline;
+    font-weight: normal;
+}
+
+#gene-card a:hover {
+    color: #002b5e;
+    text-decoration: underline;
+}
+
+/* Night Mode for Gene Card */
+.night-mode #gene-card .card {
+    background: #3d3d3d;
+    border-color: #555;
+    box-shadow: 0 2px 8px rgba(255, 255, 255, 0.1);
+}
+
+.night-mode #gene-card h2 {
+    color: #b3d9ff;
+}
+
+.night-mode #gene-card p {
+    color: #d9d9d9;
+}
+
+.night-mode #gene-card p strong {
+    color: #b3d9ff;
+}
+
+.night-mode #gene-card a {
+    color: #b3d9ff;
+}
+
+.night-mode #gene-card a:hover {
+    color: #cce6ff;
+}
+
 /* Responsive Adjustments for Functional Gene Groups */
 @media (max-width: 768px) {
     .functional-gene-groups {
@@ -1562,3 +1639,4 @@ footer {
         font-size: 0.8rem;
     }
 }
+
