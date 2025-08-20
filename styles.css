@@ -42,10 +42,40 @@ section h2 {
   color: #007bff;
 }
 
-.research-focus {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+.database-tools ul {
+  list-style: none;
+  padding: 0;
+}
+
+.database-tools li {
+  margin: 0.5rem 0;
+}
+
+.database-controls {
+  margin-top: 1rem;
+  display: flex;
+  flex-wrap: wrap;
   gap: 1rem;
+}
+
+.database-controls input, .database-controls select, .database-controls textarea {
+  padding: 0.5rem;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+}
+
+.database-controls textarea {
+  width: 100%;
+  height: 100px;
+}
+
+.database-controls button {
+  padding: 0.5rem 1rem;
+  background: #007bff;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
 }
 
 .stats-grid {
@@ -71,6 +101,10 @@ section h2 {
 .chart-container {
   margin-top: 2rem;
   max-width: 600px;
+}
+
+.citation, .popular-genes {
+  margin-top: 2rem;
 }
 
 img {
