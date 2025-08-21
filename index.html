@@ -185,7 +185,6 @@
                         }
                     });
                     console.log('ACE2 localization:', geneLocalizationData['ACE2']);
-                    console.log('CEP290 localization:', geneLocalizationData['CEP290']);
                     return;
                 } catch (error) {
                     console.error(`Failed to load from ${url}:`, error.message);
@@ -207,7 +206,7 @@
                 "axoneme": "axoneme",
                 "basal body": "basal-body",
                 "transition zone": "transition-zone",
-                "cilia": "ciliary-membrane" // Map "cilia" to ciliary-membrane for ACE2
+                "cilia": "ciliary-membrane"
             };
             return localization.split(', ').map(loc => mapping[loc.toLowerCase()] || loc.toLowerCase()).filter(id => allPartIds.includes(id));
         }
@@ -216,9 +215,10 @@
         async function handleRouteChange() {
             await loadGeneDatabase();
             const path = window.location.pathname.toLowerCase();
-            const geneName = path.split('/').pop().replace('.html', '').toUpperCase();
-            const gene = allGenes.find(g => g.gene && g.gene.toUpperCase() === geneName) || 
-                        defaultGenes.find(g => g.gene && g.gene.toUpperCase() === geneName);
+            // Fix the gene name extraction to handle case sensitivity properly
+            const geneName = path.split('/').pop().replace('.html', '');
+            const gene = allGenes.find(g => g.gene && g.gene.toLowerCase() === geneName.toLowerCase()) || 
+                        defaultGenes.find(g => g.gene && g.gene.toLowerCase() === geneName.toLowerCase());
 
             updateActiveNav(path);
 
@@ -303,9 +303,9 @@
                     <h2>Cite CiliaHub</h2>
                     <p style="font-size: 1rem; color: #555;">Please cite the following paper when using CiliaHub data in your research:</p>
                     <ul class="cite-list">
-                        <li><a href="https://theciliahub.github.io/" target="_blank">Ferhan Yenisert & Oktay I. Kaplan; Expanded Catalog of Gold Standard Ciliary Gene List: Integration of Novel Ciliary Genes into the Ciliome. 2025. Available at: https://theciliahub.github.io/</a></li>
+                        <li><strong>Ferhan Yenisert & Oktay I. Kaplan</strong>; "Expanded Catalog of Gold Standard Ciliary Gene List: Integration of Novel Ciliary Genes into the Ciliome"</li>
                     </ul>
-                    <p style="font-size: 0.9rem; color: #7f8c8d;">For additional references, check individual gene entries for linked publications.</p>
+                    <p style="font-size: 0.9rem; color: #7f8c8d; margin-top: 1rem;">This database represents a comprehensive collection of ciliary genes compiled through extensive literature review and functional annotation.</p>
                 </div>`;
         }
 
@@ -370,14 +370,18 @@
 
         // --- Search and UI Update Logic ---
         function performSingleSearch() {
-            const query = document.getElementById('single-gene-search').value.trim().toUpperCase();
+            const query = document.getElementById('single-gene-search').value.trim();
             const statusDiv = document.getElementById('status-message');
             if (!query) {
                 statusDiv.innerHTML = `<span class="error-message">Please enter a gene name.</span>`;
                 statusDiv.style.display = 'block';
                 return;
             }
-            const results = allGenes.filter(g => (g.gene && g.gene.toUpperCase().includes(query)) || (g.synonym && g.synonym.toUpperCase().includes(query)));
+            // Case-insensitive search
+            const results = allGenes.filter(g => 
+                (g.gene && g.gene.toLowerCase().includes(query.toLowerCase())) || 
+                (g.synonym && g.synonym.toLowerCase().includes(query.toLowerCase()))
+            );
             console.log('Search term:', query, 'Results:', results.map(g => g.gene));
             if (results.length === 1) {
                 navigateTo(null, `/${results[0].gene}`);
@@ -391,14 +395,18 @@
         }
 
         function performBatchSearch() {
-            const queries = document.getElementById('batch-genes-input').value.split(/[\s,\n]+/).filter(Boolean).map(q => q.trim().toUpperCase());
+            const queries = document.getElementById('batch-genes-input').value.split(/[\s,\n]+/).filter(Boolean).map(q => q.trim());
             const statusDiv = document.getElementById('status-message');
             if (queries.length === 0) {
                 statusDiv.innerHTML = `<span class="error-message">Please enter at least one gene name.</span>`;
                 statusDiv.style.display = 'block';
                 return;
             }
-            const results = allGenes.filter(g => queries.some(q => (g.gene && g.gene.toUpperCase().includes(q)) || (g.synonym && g.synonym.toUpperCase().includes(q))));
+            // Case-insensitive batch search
+            const results = allGenes.filter(g => queries.some(q => 
+                (g.gene && g.gene.toLowerCase().includes(q.toLowerCase())) || 
+                (g.synonym && g.synonym.toLowerCase().includes(q.toLowerCase()))
+            ));
             console.log('Batch search terms:', queries, 'Results:', results.map(g => g.gene));
             statusDiv.style.display = 'none';
             if (results.length > 0) {
@@ -440,7 +448,7 @@
             const genesToShow = genesToDisplay.filter(g => ['IFT88', 'CEP290', 'WDR31'].includes(g.gene) || searchResults.some(s => s.gene === g.gene)).slice(0, 10);
             genesToShow.forEach(gene => {
                 if (geneLocalizationData[gene.gene]) {
-                    const isSearch = searchResults.some(s => s.gene === g.gene);
+                    const isSearch = searchResults.some(s => s.gene === gene.gene);
                     const button = document.createElement('button');
                     button.className = `gene-btn ${isSearch ? 'search-gene' : 'default'}`;
                     button.textContent = gene.gene;
