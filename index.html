@@ -19,7 +19,7 @@
         gtag('config', 'G-EKT3SLJ516');
     </script>
     <style>
-        /* Gene Card and Cilia Diagram Styles from New Code */
+        /* Gene Card and Cilia Diagram Styles */
         .gene-card {
             background: white;
             border-radius: 15px;
@@ -222,6 +222,14 @@
             background-color: #ddd;
         }
 
+        .error-message {
+            color: #e74c3c;
+            font-size: 0.9rem;
+            text-align: center;
+            margin-top: 10px;
+            display: none;
+        }
+
         @media (max-width: 768px) {
             .container {
                 padding: 0 1rem;
@@ -268,7 +276,7 @@
         }
 
         function updateActiveNav(sectionId) {
-            document.querySelectorAll('.navbar a, .dropdown-content a').forEach(link => {
+            document.querySelectorAll('.navbar a').forEach(link => {
                 link.classList.remove('active');
                 if (link.getAttribute('href') === `#${sectionId}`) {
                     link.classList.add('active');
@@ -372,6 +380,7 @@
                 <div class="search-container" style="max-width: 100%;">
                     <input type="text" id="ciliahub-search" placeholder="Search by Gene, Ensembl ID, or Synonym..." aria-label="Search CiliaHub database" autocomplete="off" style="width: 100%; max-width: 600px; padding: 10px; margin-bottom: 10px;">
                     <div id="search-suggestions" class="search-suggestions"></div>
+                    <div id="search-error" class="error-message">Gene not found. Please try another search term.</div>
                 </div>
                 <div class="advanced-filters">
                     <select id="ciliahub-filter" aria-label="Filter by ciliary localization">
@@ -689,23 +698,44 @@
 
         document.addEventListener('DOMContentLoaded', () => {
             const searchInput = document.getElementById('ciliahub-search');
+            const searchError = document.getElementById('search-error');
+
+            // Handle search input
             searchInput.addEventListener('keypress', (e) => {
                 if (e.key === 'Enter') {
                     const geneId = searchInput.value.trim().toUpperCase();
-                    if (geneId) {
-                        showSection('gene-card', geneId);
+                    if (!geneId) {
+                        searchError.style.display = 'block';
+                        setTimeout(() => searchError.style.display = 'none', 3000);
+                        return;
+                    }
+
+                    const gene = geneData.find(g => g.symbol.toUpperCase() === geneId || g.ensemblId.toUpperCase() === geneId || g.omimId === geneId);
+                    if (gene) {
+                        searchError.style.display = 'none';
+                        showSection('gene-card', gene.symbol);
+                    } else {
+                        searchError.style.display = 'block';
+                        setTimeout(() => searchError.style.display = 'none', 3000);
                     }
                 }
             });
 
+            // Reset search error on input change
+            searchInput.addEventListener('input', () => {
+                searchError.style.display = 'none';
+            });
+
+            // Handle URL hash
             const hash = window.location.hash;
             if (hash.startsWith('#home/') && hash.length > 6) {
-                const geneId = hash.substring(6);
+                const geneId = hash.substring(6).toUpperCase();
                 showSection('gene-card', geneId);
             } else if (hash === '#home') {
                 showSection('home');
             }
 
+            // Handle gene card rendering
             window.addEventListener('showGeneCard', (e) => {
                 const geneId = e.detail.geneId.toUpperCase();
                 const gene = geneData.find(g => g.symbol.toUpperCase() === geneId);
