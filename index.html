@@ -456,6 +456,70 @@
             displayGenes(currentData, 'default');
         }
 
+        // Extended gene database (you can replace this with your actual data)
+        const geneDatabase = [
+            {
+                name: "WDR31",
+                description: "WD repeat domain 31. Involved in ciliary assembly and maintenance, required for proper ciliary structure.",
+                tags: ["Assembly", "WD Repeat", "Ciliopathy"],
+                localization: ["basal-body", "transition-zone"]
+            },
+            {
+                name: "TTC39C", 
+                description: "Tetratricopeptide repeat domain 39C. Component of ciliary axoneme involved in ciliary motility.",
+                tags: ["Axoneme", "TPR Domain", "Motility"],
+                localization: ["axoneme"]
+            },
+            {
+                name: "RPGRIP1L",
+                description: "RPGRIP1-like protein. Transition zone component essential for ciliary function and retinal development.",
+                tags: ["Transition Zone", "Ciliopathy", "Retinal"],
+                localization: ["transition-zone"]
+            },
+            {
+                name: "BBS1",
+                description: "Bardet-Biedl syndrome 1 protein. Part of the BBSome complex involved in ciliary trafficking.",
+                tags: ["BBSome", "Trafficking", "Ciliopathy"],
+                localization: ["basal-body"]
+            },
+            {
+                name: "TMEM67",
+                description: "Transmembrane protein 67. Transition zone protein associated with Meckel syndrome.",
+                tags: ["Membrane", "Transition Zone", "Ciliopathy"],
+                localization: ["transition-zone", "ciliary-membrane"]
+            },
+            {
+                name: "KIF3A",
+                description: "Kinesin family member 3A. Motor protein essential for anterograde intraflagellar transport.",
+                tags: ["Motor Protein", "IFT", "Transport"],
+                localization: ["axoneme"]
+            },
+            {
+                name: "DYNLRB2",
+                description: "Dynein light chain roadblock-type 2. Component of ciliary dynein complexes.",
+                tags: ["Dynein", "Motor Complex", "Motility"],
+                localization: ["axoneme", "ciliary-membrane"]
+            },
+            {
+                name: "NPHP1",
+                description: "Nephrocystin-1. Transition zone protein associated with nephronophthisis.",
+                tags: ["Transition Zone", "Nephronophthisis", "Ciliopathy"],
+                localization: ["transition-zone"]
+            },
+            {
+                name: "MKS1",
+                description: "Meckel syndrome type 1 protein. Critical component of the ciliary transition zone.",
+                tags: ["Transition Zone", "Meckel Syndrome", "Ciliopathy"],
+                localization: ["transition-zone"]
+            },
+            {
+                name: "INVS",
+                description: "Inversin. Ciliary protein involved in left-right axis determination.",
+                tags: ["Left-Right Patterning", "Development", "Ciliopathy"],
+                localization: ["axoneme", "basal-body"]
+            }
+        ];
+
         // Search for genes
         async function searchGene() {
             const searchTerm = document.getElementById('geneSearch').value.trim().toUpperCase();
@@ -468,70 +532,59 @@
             document.getElementById('loading').style.display = 'block';
             document.getElementById('noResults').style.display = 'none';
 
-            try {
-                // Simulate API call - replace with actual fetch to your JSON file
-                const response = await fetch('https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/ciliahub_data.json');
-                const data = await response.json();
-                
-                const results = data.filter(gene => 
-                    gene.name && gene.name.toUpperCase().includes(searchTerm)
-                );
+            // Simulate loading time
+            setTimeout(() => {
+                try {
+                    // Search in the local database
+                    const results = geneDatabase.filter(gene => 
+                        gene.name && gene.name.toUpperCase().includes(searchTerm)
+                    );
 
-                document.getElementById('loading').style.display = 'none';
+                    document.getElementById('loading').style.display = 'none';
 
-                if (results.length > 0) {
-                    searchResults = results;
-                    currentData = [...defaultGenes, ...results];
-                    displayGenes(currentData, 'mixed');
-                    document.getElementById('noResults').style.display = 'none';
-                } else {
-                    searchResults = [];
-                    currentData = [...defaultGenes];
-                    displayGenes(currentData, 'default');
+                    if (results.length > 0) {
+                        searchResults = results;
+                        currentData = [...defaultGenes, ...results];
+                        
+                        // Add search result genes to localization data
+                        results.forEach(gene => {
+                            if (gene.localization) {
+                                geneLocalizationData[gene.name] = gene.localization;
+                            }
+                        });
+                        
+                        displayGenes(currentData, 'mixed');
+                        document.getElementById('noResults').style.display = 'none';
+                    } else {
+                        searchResults = [];
+                        currentData = [...defaultGenes];
+                        displayGenes(currentData, 'default');
+                        document.getElementById('noResults').style.display = 'block';
+                    }
+
+                    updateGeneButtons();
+                } catch (error) {
+                    console.error('Error searching genes:', error);
+                    document.getElementById('loading').style.display = 'none';
                     document.getElementById('noResults').style.display = 'block';
                 }
-
-                updateGeneButtons();
-            } catch (error) {
-                console.error('Error searching genes:', error);
-                document.getElementById('loading').style.display = 'none';
-                
-                // Fallback to mock search results
-                const mockResults = mockSearch(searchTerm);
-                if (mockResults.length > 0) {
-                    searchResults = mockResults;
-                    currentData = [...defaultGenes, ...mockResults];
-                    displayGenes(currentData, 'mixed');
-                } else {
-                    document.getElementById('noResults').style.display = 'block';
-                }
-                updateGeneButtons();
-            }
+            }, 500); // Simulate network delay
         }
 
-        // Mock search function for demonstration
-        function mockSearch(searchTerm) {
-            const mockDatabase = [
-                {
-                    name: "WDR31",
-                    description: "WD repeat domain 31. Involved in ciliary assembly and maintenance.",
-                    tags: ["Assembly", "WD Repeat", "Ciliopathy"]
-                },
-                {
-                    name: "TTC39C",
-                    description: "Tetratricopeptide repeat domain 39C. Component of ciliary axoneme.",
-                    tags: ["Axoneme", "TPR Domain", "Motility"]
-                },
-                {
-                    name: "RPGRIP1L",
-                    description: "RPGRIP1-like protein. Transition zone component essential for ciliary function.",
-                    tags: ["Transition Zone", "Ciliopathy", "Retinal"]
-                }
-            ];
-
-            return mockDatabase.filter(gene => 
-                gene.name.toUpperCase().includes(searchTerm)
-            );
+        // Function to load genes from your JSON file (when available)
+        async function loadGenesFromJSON() {
+            try {
+                // For production, uncomment this and use your actual JSON URL
+                // const response = await fetch('https://theCiliaHub.github.io/ciliahub_data.json');
+                // const data = await response.json();
+                // return data;
+                
+                // For now, return the local database
+                return geneDatabase;
+            } catch (error) {
+                console.error('Error loading JSON data:', error);
+                return geneDatabase; // Fallback to local data
+            }
         }
 
         // Display genes in cards
