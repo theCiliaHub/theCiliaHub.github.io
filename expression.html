@@ -1,4 +1,4 @@
-<html lang="en">
+<html lang="en" style="overflow-x:hidden;" >
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
@@ -14,7 +14,7 @@
 
 
 </head>
-<body>
+<body style="overflow-x:hidden;">
 <header class="p-3">
     <div class="container">
         <header class="d-flex flex-wrap justify-content-center py-3 mb-4 border-bottom">
@@ -22,8 +22,36 @@
     </div>
 </header>
 
-<div class="container my-5">
-    <div class="row">
+<div style="padding:0px 0px ; max-width:1200px; margin:0 auto; text-align:center; background-color:#f9f9f9; border-radius:8px;">
+    <h2 style="margin-bottom:10px; font-size:24px;">Welcome to Tissue Expression of Ciliary Gene</h2>
+    <p style="font-size:16px; color:#555; margin:0;">
+        RNA tissue expression data were retrieved from the Human Protein Atlas (https://www.proteinatlas.org), specifically the Tissue Atlas project, which contains normalized expression values (NX) across multiple human organs and tissues.
+    </p>
+</div>
+
+<div style="display:flex; flex-wrap:nowrap; gap:5px; padding:0px 0px; max-width:100%; box-sizing:border-box;">
+      <div style="flex:1 1 35%; min-width:300px; border:1px solid #ccc; padding:20px; border-radius:8px; display:flex; flex-direction:column; background-color:white;">
+    
+    <h3 style="margin-bottom: 15px; font-size: 20px;">Search Gene</h3>
+    
+    <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+        <input type="text" id="gene-search" placeholder="Search gene name" 
+            style="flex:1; padding:10px; font-size:16px; border:1px solid #ccc; border-radius:4px;">
+        <button id="search-btn" 
+            style="padding:10px 15px; font-size:16px; background-color:#007BFF; color:white; border:none; border-radius:4px; cursor:pointer;">
+            Search
+        </button>
+    </div>
+    
+    <!-- Sabit yükseklikte scroll alan -->
+    <div id="search-results" 
+         style="flex:1; max-height:1200px; overflow-y:auto; overflow-x:auto;">
+    </div>
+
+</div>
+
+
+    <div style="flex:1 1 60%; min-width:400px; border:1px solid #ccc; padding:0px 0px; border-radius:8px; overflow-x:hidden; background-color:white;">
         <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="950" height="850" zoomAndPan="magnify"
              viewBox="0 0 637.5 974.999993"   preserveAspectRatio="xMidYMid meet" version="1.2">
             <defs>
@@ -370,11 +398,12 @@
         </svg>
 
         <div id="organ-info" style="display: none; border: 1px solid #ccc; padding: 20px; margin-top: 20px;">
-            <h3 id="organ-name"></h3>
-            <p id="organ-description"></p>
-            <button onclick="document.getElementById('organ-info').style.display='none'">Close</button>
+    <h3 id="organ-name"></h3>
+    <div id="organ-description"></div>
 
-        </div>
+    <button onclick="document.getElementById('organ-info').style.display='none'">Close</button>
+</div>
+
 
 
     </div>
@@ -395,132 +424,220 @@
     </footer>
 </div>
 
+
+
 <!-- Bootstrap core JS-->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
 <!-- Core theme JS-->
 <script src="static/js/scripts.js"></script>
 <script>
-    function showOrganInfo(name, description) {
-        const titleEl = document.getElementById('organ-name');
-        const bodyEl  = document.getElementById('organ-description'); // açıklama p'sini tablo için kullanıyoruz
-        const panel   = document.getElementById('organ-info');
+let TSV_DATA = []; // Global veri seti
 
-        if (titleEl) titleEl.innerText = name;
-        if (bodyEl)  bodyEl.innerHTML = '<em>Loading TSV…</em>';
-        if (panel)   panel.style.display = 'block';
-        if (panel)   panel.scrollIntoView({ behavior: 'smooth' });
+// Normalizasyon fonksiyonu
+const norm = s => (s||'').toLowerCase().trim();
 
-        const TSV_URL = 'rna_tissue_consensus.tsv';
-        const norm = s => (s||'').toLowerCase().trim();
+// Organ -> Tissue eşleştirme
+const MATCH = {
+    'brain': ['brain','amygdala','basal ganglia','cerebral cortex','cerebellum','hippocampus'],
+    'eye': ['retina','eye'],
+    'ear': ['ear'],
+    'nasopharynx': ['nasopharynx'],
+    'thyroid': ['thyroid'],
+    'lungs': ['lung','lungs'],
+    'thymus gland': ['thymus'],
+    'heart': ['heart','heart muscle'],
+    'liver': ['liver'],
+    'stomach': ['stomach'],
+    'kidney': ['kidney'],
+    'intestine': ['intestine','colon','small intestine','large intestine'],
+    'bladder': ['bladder','urinary bladder'],
+    'reproductive system': [
+        'uterus','vagina','penis','ovary','placenta','fallopian tube',
+        'cervix','endometrium','testis','epididymis','prostate','seminal vesicle'
+    ]
+};
 
-        // Organ -> Tissue keywords
-        const MATCH = {
-            'brain': ['brain','amygdala','basal ganglia','cerebral cortex','cerebellum','hippocampus'],
-            'eye': ['retina','eye'],
-            'ear': ['ear'],
-            'nasopharynx': ['nasopharynx'],
-            'thyroid': ['thyroid'],
-            'lungs': ['lung','lungs'],
-            'thymus gland': ['thymus'],
-            'heart': ['heart','heart muscle'],
-            'liver': ['liver'],
-            'stomach': ['stomach'],
-            'kidney': ['kidney'],
-            'intestine': ['intestine','colon','small intestine','large intestine'],
-            'bladder': ['bladder','urinary bladder'],
-            'reproductive system': [
-                'uterus','vagina','penis','ovary','placenta','fallopian tube',
-                'cervix','endometrium','testis','epididymis','prostate','seminal vesicle'
-            ]
+function resolveKeywords(organName){
+    const key = norm(organName);
+    if (MATCH[key]) return MATCH[key].map(norm);
+    if (key.endsWith('s') && MATCH[key.slice(0,-1)]) return MATCH[key.slice(0,-1)].map(norm);
+    return [key];
+}
+
+// TSV yükleme
+async function loadTSVData(url) {
+    const resp = await fetch(url);
+    if (!resp.ok) throw new Error('TSV fetch failed: ' + resp.status);
+    const text = await resp.text();
+    const lines = text.split(/\r?\n/);
+    const header = (lines.shift() || '').split('\t');
+
+    const iGene = header.indexOf('Gene');
+    const iGeneName = header.indexOf('Gene name');
+    const iTissue = header.indexOf('Tissue');
+    const iNTPM = header.indexOf('nTPM');
+
+    const all = [];
+    for (const line of lines) {
+        if (!line.trim()) continue;
+        const c = line.split('\t');
+        all.push({
+            gene: (c[iGene] || '').trim(),
+            geneName: (c[iGeneName] || '').trim(),
+            tissue: (c[iTissue] || '').trim(),
+            nTPM: c[iNTPM] ? Number(c[iNTPM]) : null
+        });
+    }
+    TSV_DATA = all; // Global değişkene ata
+    return all;
+}
+
+// Tablo oluşturma fonksiyonu
+function buildTable(rows) {
+    const table = document.createElement('table');
+    table.style.width = '100%';
+    table.style.maxWidth = '100%';
+    table.style.borderCollapse = 'collapse';
+    table.style.fontSize = '0.95em';
+    table.style.tableLayout = 'fixed';
+    table.style.minWidth = '600px';
+
+    const thead = document.createElement('thead');
+    const trh = document.createElement('tr');
+    ['Gene', 'Gene name', 'Tissue', 'nTPM'].forEach(h => {
+        const th = document.createElement('th');
+        th.textContent = h;
+        th.style.borderBottom = '1px solid #ddd';
+        th.style.textAlign = (h === 'nTPM') ? 'right' : 'left';
+        th.style.padding = '6px 8px';
+        th.style.textOverflow = 'ellipsis';
+        th.style.whiteSpace = 'nowrap';
+        trh.appendChild(th);
+    });
+    thead.appendChild(trh);
+    table.appendChild(thead);
+
+    const tbody = document.createElement('tbody');
+    rows.forEach(r => {
+        const tr = document.createElement('tr');
+        [r.gene, r.geneName, r.tissue, r.nTPM].forEach((val, idx) => {
+            const td = document.createElement('td');
+            td.textContent = (val ?? '') + '';
+            td.style.padding = '6px 8px';
+            td.style.overflow = 'hidden';
+            td.style.textOverflow = 'ellipsis';
+            td.style.whiteSpace = 'nowrap';
+            if (idx === 3) td.style.textAlign = 'right';
+            tr.appendChild(td);
+        });
+        tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    return table;
+}
+
+// Sağ panel: organ seçince çalışacak
+function showOrganInfo(name, description) {
+    const titleEl = document.getElementById('organ-name');
+    const bodyEl  = document.getElementById('organ-description');
+    const panel   = document.getElementById('organ-info');
+
+    if (titleEl) titleEl.innerText = name;
+    if (bodyEl)  bodyEl.innerHTML = '<em>Loading TSV…</em>';
+    if (panel)   panel.style.display = 'block';
+    if (panel)   panel.scrollIntoView({ behavior: 'smooth' });
+
+    const keys = resolveKeywords(name);
+    const filtered = TSV_DATA.filter(r => keys.some(k => norm(r.tissue).includes(k)));
+
+    // Pagination
+    let currentPage = 1;
+    const pageSize = 10;
+    const totalPages = Math.ceil(filtered.length / pageSize);
+
+    function renderPage() {
+        if (!bodyEl) return;
+        bodyEl.innerHTML = '';
+        if (filtered.length === 0) {
+            bodyEl.innerHTML = '<em>TSV’de eşleşen satır bulunamadı.</em>';
+            return;
+        }
+
+        const start = (currentPage - 1) * pageSize;
+        const end = start + pageSize;
+        const pageRows = filtered.slice(start, end);
+
+        bodyEl.appendChild(buildTable(pageRows));
+
+        const paginationDiv = document.createElement('div');
+        paginationDiv.style.marginTop = '10px';
+        paginationDiv.style.display = 'flex';
+        paginationDiv.style.justifyContent = 'center';
+        paginationDiv.style.gap = '10px';
+
+        const prevBtn = document.createElement('button');
+        prevBtn.textContent = '◀ Back';
+        prevBtn.disabled = currentPage === 1;
+        prevBtn.onclick = () => {
+            if (currentPage > 1) { currentPage--; renderPage(); }
         };
 
-        function resolveKeywords(organName){
-            const key = norm(organName);
-            if (MATCH[key]) return MATCH[key].map(norm);
-            if (key.endsWith('s') && MATCH[key.slice(0,-1)]) return MATCH[key.slice(0,-1)].map(norm);
-            return [key];
-        }
+        const nextBtn = document.createElement('button');
+        nextBtn.textContent = 'Next ▶';
+        nextBtn.disabled = currentPage === totalPages;
+        nextBtn.onclick = () => {
+            if (currentPage < totalPages) { currentPage++; renderPage(); }
+        };
 
-        function buildTable(rows){
-            const table = document.createElement('table');
-            table.style.width = '100%';
-            table.style.borderCollapse = 'collapse';
-            table.style.fontSize = '0.95em';
+        const pageInfo = document.createElement('span');
+        pageInfo.textContent = `Page ${currentPage} / ${totalPages}`;
 
-            const thead = document.createElement('thead');
-            const trh = document.createElement('tr');
-            ['Gene','Gene name','Tissue','nTPM'].forEach(h => {
-                const th = document.createElement('th');
-                th.textContent = h;
-                th.style.borderBottom = '1px solid #ddd';
-                th.style.textAlign = (h==='nTPM') ? 'right' : 'left';
-                th.style.padding = '6px 8px';
-                trh.appendChild(th);
-            });
-            thead.appendChild(trh);
-            table.appendChild(thead);
+        paginationDiv.appendChild(prevBtn);
+        paginationDiv.appendChild(pageInfo);
+        paginationDiv.appendChild(nextBtn);
 
-            const tbody = document.createElement('tbody');
-            rows.forEach(r => {
-                const tr = document.createElement('tr');
-                [r.gene, r.geneName, r.tissue, r.nTPM].forEach((val, idx) => {
-                    const td = document.createElement('td');
-                    td.textContent = (val ?? '') + '';
-                    td.style.padding = '6px 8px';
-                    if (idx === 3) td.style.textAlign = 'right';
-                    tr.appendChild(td);
-                });
-                tbody.appendChild(tr);
-            });
-            table.appendChild(tbody);
-            return table;
-        }
-
-        (async () => {
-            try {
-                const resp = await fetch(TSV_URL);
-                if (!resp.ok) throw new Error('TSV fetch failed: ' + resp.status);
-                const text = await resp.text();
-                const lines = text.split(/\r?\n/);
-                const header = (lines.shift()||'').split('\t');
-                const iGene     = header.indexOf('Gene');
-                const iGeneName = header.indexOf('Gene name');
-                const iTissue   = header.indexOf('Tissue');
-                const iNTPM     = header.indexOf('nTPM');
-                if ([iGene,iGeneName,iTissue,iNTPM].some(i=>i===-1)) throw new Error('TSV must contain: Gene, Gene name, Tissue, nTPM');
-
-                const all = [];
-                for (const line of lines){
-                    if (!line.trim()) continue;
-                    const c = line.split('\t');
-                    all.push({
-                        gene: (c[iGene]||'').trim(),
-                        geneName: (c[iGeneName]||'').trim(),
-                        tissue: (c[iTissue]||'').trim(),
-                        nTPM: c[iNTPM] ? Number(c[iNTPM]) : null
-                    });
-                }
-
-                const keys = resolveKeywords(name);
-                const filtered = all.filter(r => {
-                    const t = norm(r.tissue);
-                    return keys.some(k => t.includes(k));
-                });
-
-                if (bodyEl){
-                    bodyEl.innerHTML = '';
-                    if (filtered.length === 0){
-                        bodyEl.innerHTML = '<em>TSV’de eşleşen satır bulunamadı.</em>';
-                    } else {
-                        bodyEl.appendChild(buildTable(filtered));
-                    }
-                }
-            } catch (e){
-                console.error(e);
-                if (bodyEl) bodyEl.textContent = 'TSV yüklenemedi. (Yerel sunucudan açınız)';
-            }
-        })();
+        bodyEl.appendChild(paginationDiv);
     }
+
+    renderPage();
+}
+
+// Sol arama paneli
+function initGeneSearch() {
+    const input = document.getElementById('gene-search');
+    const btn = document.getElementById('search-btn');
+    const resultsDiv = document.getElementById('search-results');
+
+    function searchGenes() {
+        const query = input.value.trim().toLowerCase();
+        if (!query) {
+            resultsDiv.innerHTML = '<em>Lütfen bir gen adı girin.</em>';
+            return;
+        }
+
+        const queries = query.split(',').map(q => q.trim());
+        const filtered = TSV_DATA.filter(r =>
+            queries.some(q => r.gene.toLowerCase() === q || r.geneName.toLowerCase() === q)
+        );
+
+        resultsDiv.innerHTML = '';
+        if (filtered.length === 0) {
+            resultsDiv.innerHTML = '<em>Sonuç bulunamadı.</em>';
+        } else {
+            resultsDiv.appendChild(buildTable(filtered));
+        }
+    }
+
+    btn.addEventListener('click', searchGenes);
+    input.addEventListener('keypress', e => { if (e.key === 'Enter') searchGenes(); });
+}
+
+// Başlat
+(async () => {
+    await loadTSVData('rna_tissue_consensus.tsv');
+    initGeneSearch();
+})();
 </script>
+
 </body>
 </html>

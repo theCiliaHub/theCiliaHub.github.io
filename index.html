@@ -43,6 +43,11 @@
         .gene-info { font-size: 0.9rem; color: #34495e; margin-bottom: 0.5rem; }
         .gene-info a { color: #2c5aa0; text-decoration: none; }
         .gene-info a:hover { text-decoration: underline; }
+        .gene-btn.selected {
+        background: #2c5aa0;
+        color: white;
+        border-color: #2c5aa0;
+    }
 
         /* --- Cilia Panel --- */
         .cilia-panel { background: white; border-radius: 15px; box-shadow: 0 8px 32px rgba(44, 90, 160, 0.1); position: sticky; top: 100px; height: fit-content; }
@@ -355,9 +360,6 @@
                     <h2>Cite CiliaHub</h2>
                     <p style="font-size: 1rem; color: #555;">Please cite the following papers when using CiliaHub data in your research:</p>
                     <ul class="cite-list">
-                        <li><a href="https://pubmed.ncbi.nlm.nih.gov/33116139" target="_blank">Shah, K. et al. (2020). Ciliary localization of ACE2 in airway epithelial cells. Nature Communications.</a></li>
-                        <li>CiliaHub Consortium. (2023). Comprehensive ciliary gene database for functional genomics. Journal of Ciliary Research. (In preparation)</li>
-                        <li>Molecular basis of ciliary protein localization. (2022). Journal of Cell Biology.</li>
                         <li>Ferhan Yenisert & Oktay I. Kaplan; Expanded Catalog of Gold Standard Ciliary Gene List. Integration of Novel Ciliary Genes into the Ciliome</li>
                     </ul>
                     <p style="font-size: 0.9rem; color: #7f8c8d;">Note: Some citations are placeholders. Please update with specific papers as published.</p>
@@ -373,9 +375,6 @@
                     <h2>Contact Us</h2>
                     <p style="font-size: 1rem; color: #555;">Reach out to our team for questions, collaborations, or feedback.</p>
                     <ul class="contact-info">
-                        <li><strong>CiliaHub Lab</strong>: <a href="mailto:info@ciliahub.org">info@ciliahub.org</a></li>
-                        <li><strong>Dr. Jane Smith Lab</strong>: <a href="mailto:jane.smith@university.edu">jane.smith@university.edu</a></li>
-                        <li><strong>Dr. John Doe Lab</strong>: <a href="mailto:john.doe@research.org">john.doe@research.org</a></li>
                         <li><strong>Dr. Oktay I. Kaplan Lab:</strong> <a href="mailto:oktay.kaplan@agu.edu.tr">
                             oktay.kaplan@agu.edu.tr</a></li>
                         <li><strong>Ferhan Yenisert:</strong><a href="mailto:ferhan.yenisert@agu.edu.tr"> ferhan.yenisert@agu.edu.tr</a> </li>
@@ -580,19 +579,45 @@
 
 
 
-        function showLocalization(geneName, isSearchGene = false) {
-            const ciliaParts = document.querySelectorAll('.cilia-part');
-            ciliaParts.forEach(part => part.classList.remove('highlighted', 'search-gene'));
-            if (geneName !== 'reset' && geneLocalizationData[geneName]) {
-                geneLocalizationData[geneName].forEach(id => {
-                    const el = document.getElementById(id);
-                    if (el) {
-                        el.classList.add('highlighted');
-                        if (isSearchGene) el.classList.add('search-gene');
-                    }
-                });
-            }
+  let selectedGenes = [];
+
+function showLocalization(geneName, isSearchGene = false) {
+    if (geneName === 'reset') {
+        selectedGenes = [];
+    } else {
+        if (!selectedGenes.includes(geneName)) {
+            selectedGenes.push(geneName); // ekle
+        } else {
+            selectedGenes = selectedGenes.filter(g => g !== geneName); // varsa çıkar
         }
+    }
+
+    // --- SVG highlight reset ---
+    const ciliaParts = document.querySelectorAll('.cilia-part');
+    ciliaParts.forEach(part => part.classList.remove('highlighted', 'search-gene'));
+
+    // --- Buton stil reset ---
+    document.querySelectorAll('.gene-btn').forEach(btn => btn.classList.remove('selected'));
+
+    // --- Seçili genlerin highlight edilmesi ---
+    selectedGenes.forEach(g => {
+        if (geneLocalizationData[g]) {
+            geneLocalizationData[g].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) {
+                    el.classList.add('highlighted');
+                    if (isSearchGene) el.classList.add('search-gene');
+                }
+            });
+        }
+
+        // Butonu da "selected" yap
+        const btn = [...document.querySelectorAll('.gene-btn')].find(b => b.textContent === g);
+        if (btn) btn.classList.add('selected');
+    });
+}
+
+
 
         function updateActiveNav(path) {
             document.querySelectorAll('.nav-links a').forEach(link => {
