@@ -7,6 +7,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
+        /* [Your existing CSS styles remain unchanged] */
         * {
             margin: 0;
             padding: 0;
@@ -283,7 +284,7 @@
                 </button>
             </div>
             <div class="examples">
-                Examples: ACE2, IFT88, CEP290, DNAH5, FOXJ1, ARL13B, BBS1, CC2D2A
+                Examples: ACE2, IFT88, CEP290, WDR31, DNAH5, FOXJ1, ARL13B
             </div>
         </div>
         
@@ -348,10 +349,10 @@
                 </div>
                 
                 <div class="legend">
-                    <div class="legend-item"><div class="legend-color" style="background-color: #e8f5e8;"></div><span>Low (&lt;5)</span></div>
-                    <div class="legend-item"><div class="legend-color" style="background-color: #81c784;"></div><span>Medium (5-15)</span></div>
-                    <div class="legend-item"><div class="legend-color" style="background-color: #4caf50;"></div><span>High (15-30)</span></div>
-                    <div class="legend-item"><div class="legend-color" style="background-color: #2e7d32;"></div><span>Very High (&gt;30)</span></div>
+                    <div class="legend-item"><div class="legend-color" style="background-color: #e8f5e8;"></div><span>Low (&lt;5 nTPM)</span></div>
+                    <div class="legend-item"><div class="legend-color" style="background-color: #81c784;"></div><span>Medium (5-15 nTPM)</span></div>
+                    <div class="legend-item"><div class="legend-color" style="background-color: #4caf50;"></div><span>High (15-30 nTPM)</span></div>
+                    <div class="legend-item"><div class="legend-color" style="background-color: #2e7d32;"></div><span>Very High (&gt;30 nTPM)</span></div>
                 </div>
             </div>
         </div>
@@ -365,11 +366,19 @@
     <script>
         class GeneExpressionApp {
             constructor() {
+                // Singleton pattern to ensure data is fetched only once
+                if (GeneExpressionApp.instance) {
+                    return GeneExpressionApp.instance;
+                }
+
                 this.rnaData = null;
                 this.isLoading = false;
+                this.dataPromise = null;
                 this.initializeElements();
                 this.setupEventListeners();
                 this.createTissueMapping();
+
+                GeneExpressionApp.instance = this;
             }
             
             initializeElements() {
@@ -395,12 +404,13 @@
             }
 
             createTissueMapping() {
+                // This map connects tissue names from the JSON to SVG element IDs
                 this.tissueMapping = {
                     'adipose tissue': ['path-adipose'],
                     'adrenal gland': ['path-adrenal-gland-left', 'path-adrenal-gland-right'],
                     'bone marrow': ['path-bone-marrow'],
                     'brain': ['path-brain', 'path-cerebellum'],
-                    'cervix, uterine': ['path-cervix'],
+                    'cervix uterine': ['path-cervix'],
                     'colon': ['path-colon'],
                     'endometrium': ['path-endometrium'],
                     'epididymis': ['path-epididymis-left', 'path-epididymis-right'],
@@ -428,32 +438,42 @@
                 };
             }
             
-            async loadRNAData() {
-                if (this.rnaData) return this.rnaData;
-                
-                const dataUrl = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/rna_tissue_consensus.json.gz';
-                try {
-                    console.log('Loading RNA tissue consensus data from:', dataUrl);
-                    const response = await fetch(dataUrl);
-                    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-                    
-                    const compressedData = await response.arrayBuffer();
-                    const decompressedData = pako.ungzip(new Uint8Array(compressedData), { to: 'string' });
-                    this.rnaData = JSON.parse(decompressedData);
-                    console.log(`Loaded RNA data with ${Object.keys(this.rnaData).length} genes`);
-                    return this.rnaData;
-                    
-                } catch (error) {
-                    console.error('Error loading or processing RNA data:', error);
-                    throw error;
+            // Fetches and decompresses data only once
+            loadRNAData() {
+                if (!this.dataPromise) {
+                    this.dataPromise = new Promise(async (resolve, reject) => {
+                        const dataUrl = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/rna_tissue_consensus.json.gz';
+                        try {
+                            console.log('Fetching RNA tissue data from:', dataUrl);
+                            const response = await fetch(dataUrl);
+                            
+                            if (!response.ok) {
+                                throw new Error(`Network response was not ok. Status: ${response.status}`);
+                            }
+                            
+                            console.log('Data received, decompressing...');
+                            const compressedData = await response.arrayBuffer();
+                            const decompressedData = pako.ungzip(new Uint8Array(compressedData), { to: 'string' });
+                            
+                            console.log('Decompression complete, parsing JSON...');
+                            this.rnaData = JSON.parse(decompressedData);
+                            console.log(`Successfully loaded and parsed data for ${Object.keys(this.rnaData).length} genes.`);
+                            resolve(this.rnaData);
+                            
+                        } catch (error) {
+                            console.error('Fatal Error: Could not load or process RNA data.', error);
+                            reject(error);
+                        }
+                    });
                 }
+                return this.dataPromise;
             }
             
             async performSearch() {
                 const geneSymbol = this.geneInput.value.trim().toUpperCase();
                 
                 if (!geneSymbol) {
-                    this.showError('Please enter a gene symbol');
+                    this.showError('Please enter a gene symbol.');
                     return;
                 }
                 
@@ -474,14 +494,14 @@
                     }
                     
                 } catch (error) {
-                    this.showError(`Could not load expression data. Please check the console for details.`);
+                    this.showError(`Could not load expression database. This may be a network or CORS issue. Press F12 to see the console for details.`);
                 } finally {
                     this.isLoading = false;
                 }
             }
             
             showLoading(geneSymbol) {
-                this.resultsContent.innerHTML = `<div class="loading"><i class="fas fa-spinner"></i><p>Searching for ${geneSymbol}...</p></div>`;
+                this.resultsContent.innerHTML = `<div class="loading"><i class="fas fa-spinner fa-spin"></i><p>Loading expression data for ${geneSymbol}...</p></div>`;
                 this.resetOrgans();
             }
             
@@ -492,7 +512,7 @@
             }
             
             showNotFound(geneSymbol) {
-                this.resultsContent.innerHTML = `<div class="error"><i class="fas fa-search-minus"></i><h3>Gene "${geneSymbol}" not found</h3></div>`;
+                this.resultsContent.innerHTML = `<div class="error"><i class="fas fa-search-minus"></i><h3>Gene "${geneSymbol}" not found in the database.</h3><p>Please check the gene symbol and try again.</p></div>`;
                 this.resetOrgans();
             }
             
@@ -517,12 +537,12 @@
             
             generateTableRows(geneData) {
                 return Object.entries(geneData)
-                    .sort((a, b) => b[1] - a[1]) // Sort by nTPM descending
+                    .sort((a, b) => b[1] - a[1])
                     .map(([tissue, nTPM]) => `
                         <tr>
                             <td>${this.formatTissueName(tissue)}</td>
                             <td>${nTPM.toFixed(2)}</td>
-                            <td>${this.getExpressionLevel(nTPM)}</td>
+                            <td style="color: ${this.getColorForExpression(nTPM, true)};">${this.getExpressionLevel(nTPM)}</td>
                         </tr>
                     `).join('');
             }
@@ -538,11 +558,11 @@
                 return 'Very High';
             }
 
-            getColorForExpression(nTPM) {
-                if (nTPM < 5) return '#e8f5e8';
-                if (nTPM < 15) return '#81c784';
-                if (nTPM < 30) return '#4caf50';
-                return '#2e7d32';
+            getColorForExpression(nTPM, isText = false) {
+                if (nTPM < 5) return isText ? '#388e3c' : '#e8f5e8';
+                if (nTPM < 15) return isText ? '#689f38' : '#81c784';
+                if (nTPM < 30) return isText ? '#afb42b' : '#4caf50';
+                return isText ? '#f57c00' : '#2e7d32';
             }
             
             updateOrganVisualization(geneData) {
@@ -583,7 +603,7 @@
                 const nTPM = organ.getAttribute('data-ntpm');
                 
                 if (tissue && nTPM) {
-                    this.organTooltip.innerHTML = `<strong>${tissue}</strong><br>${nTPM} nTPM`;
+                    this.organTooltip.innerHTML = `<strong>${tissue}</strong><br>${nTPM} nTPM (${this.getExpressionLevel(parseFloat(nTPM))})`;
                     this.organTooltip.style.opacity = '1';
                     this.moveTooltip(event);
                 }
