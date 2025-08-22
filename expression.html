@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Gene Expression Search</title>
     <link rel="stylesheet" href="expression.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
 </head>
 <body>
     <div class="container">
@@ -27,8 +28,20 @@
             }
 
             try {
-                const response = await fetch('rna_tissue_consensus.json');
-                const data = await response.json();
+                // Fetch the compressed .gz file
+                const response = await fetch('rna_tissue_consensus.json.gz');
+                if (!response.ok) throw new Error('Failed to fetch data');
+
+                // Get the response as an array buffer
+                const buffer = await response.arrayBuffer();
+                
+                // Decompress the gzip file using pako
+                const decompressed = pako.inflate(new Uint8Array(buffer), { to: 'string' });
+                
+                // Parse the decompressed JSON
+                const data = JSON.parse(decompressed);
+                
+                // Filter data by gene name
                 const geneData = data.filter(entry => entry['Gene name'].toUpperCase() === geneName);
 
                 if (geneData.length === 0) {
@@ -36,6 +49,7 @@
                     return;
                 }
 
+                // Create table for results
                 const table = document.createElement('table');
                 const header = table.insertRow();
                 header.innerHTML = '<th>Tissue</th><th>nTPM</th>';
