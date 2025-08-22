@@ -8,30 +8,29 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Roboto', sans-serif; }
-        body { background: linear-gradient(135deg, #1a2a6c, #b21f1f, #fdbb2d); background-attachment: fixed; color: #333; min-height: 100vh; padding: 20px; }
+        body { background: linear-gradient(135deg, #1a2a6c, #b21f1f, #fdbb2d); color: #333; min-height: 100vh; padding: 20px; }
         .container { max-width: 1400px; margin: 0 auto; }
         header { text-align: center; padding: 30px 0; color: white; }
-        header h1 { font-size: 2.8rem; margin-bottom: 10px; text-shadow: 2px 2px 4px rgba(0,0,0,0.3); }
+        header h1 { font-size: 2.8rem; margin-bottom: 10px; }
         header p { font-size: 1.2rem; max-width: 800px; margin: 0 auto; opacity: 0.9; }
         .search-container { background: white; border-radius: 12px; padding: 30px; box-shadow: 0 10px 30px rgba(0,0,0,0.15); margin-bottom: 30px; }
         .search-box { display: flex; max-width: 700px; margin: 0 auto; }
-        .search-input { flex: 1; padding: 16px 20px; font-size: 1.1rem; border: 2px solid #ddd; border-radius: 8px 0 0 8px; outline: none; transition: border-color 0.3s; }
+        .search-input { flex: 1; padding: 16px 20px; font-size: 1.1rem; border: 2px solid #ddd; border-radius: 8px 0 0 8px; outline: none; }
         .search-input:focus { border-color: #4a86e8; }
-        .search-button { background: #4a86e8; color: white; border: none; padding: 0 25px; font-size: 1.1rem; font-weight: 500; border-radius: 0 8px 8px 0; cursor: pointer; transition: background 0.3s; }
+        .search-button { background: #4a86e8; color: white; border: none; padding: 0 25px; font-size: 1.1rem; border-radius: 0 8px 8px 0; cursor: pointer; }
         .search-button:hover { background: #3a76d8; }
         .examples { text-align: center; margin-top: 15px; font-size: 0.9rem; color: #666; }
-        .results-container { background: white; border-radius: 12px; padding: 30px; box-shadow: 0 10px 30px rgba(0,0,0,0.15); margin-bottom: 30px; display: flex; flex-wrap: wrap; gap: 30px; }
+        .results-container { background: white; border-radius: 12px; padding: 30px; box-shadow: 0 10px 30px rgba(0,0,0,0.15); display: none; flex-wrap: wrap; gap: 30px; }
         .expression-data { flex: 2; min-width: 400px; }
         .organ-visualization { flex: 1; min-width: 350px; display: flex; flex-direction: column; align-items: center; }
-        .results-header { margin-bottom: 25px; padding-bottom: 15px; border-bottom: 1px solid #eee; }
+        .results-header { margin-bottom: 25px; }
         .results-title { font-size: 1.5rem; color: #1a2a6c; }
         .results-count { color: #666; font-weight: 500; }
         .gene-name { font-size: 1.8rem; color: #1a2a6c; margin-bottom: 10px; }
-        .gene-description { color: #555; line-height: 1.6; margin-bottom: 20px; }
-        .data-table-container { max-height: 500px; overflow-y: auto; border: 1px solid #eee; border-radius: 8px; }
+        .data-table-container { max-height: 400px; overflow-y: auto; border: 1px solid #eee; border-radius: 8px; }
         .data-table { width: 100%; border-collapse: collapse; }
         .data-table th, .data-table td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #eee; }
-        .data-table th { background-color: #f8f9fa; font-weight: 500; color: #1a2a6c; position: sticky; top: 0; z-index: 10; }
+        .data-table th { background-color: #f8f9fa; font-weight: 500; color: #1a2a6c; position: sticky; top: 0; }
         .data-table tr:hover { background-color: #f9f9f9; }
         .loading, .error { text-align: center; padding: 40px; color: #666; }
         .loading i, .error i { font-size: 2rem; margin-bottom: 15px; }
@@ -42,22 +41,17 @@
         .human-svg { width: 100%; height: auto; }
         .organ { cursor: pointer; transition: all 0.3s ease; stroke: #333; stroke-width: 0.5; }
         .organ:hover { filter: brightness(1.2); stroke-width: 1.5; }
-        .organ-tooltip { position: absolute; background: rgba(0,0,0,0.9); color: white; padding: 8px 12px; border-radius: 4px; font-size: 12px; pointer-events: none; opacity: 0; transition: opacity 0.3s; z-index: 100; max-width: 250px; text-align: center; transform: translateX(-50%); }
+        .organ-tooltip { position: absolute; background: rgba(0,0,0,0.9); color: white; padding: 8px 12px; border-radius: 4px; font-size: 12px; pointer-events: none; opacity: 0; transition: opacity 0.3s; }
         .legend { display: flex; justify-content: center; margin-top: 20px; gap: 15px; flex-wrap: wrap; }
         .legend-item { display: flex; align-items: center; gap: 5px; font-size: 12px; }
         .legend-color { width: 20px; height: 20px; border-radius: 4px; border: 1px solid #ddd; }
         .data-source { background: #f8f9fa; padding: 15px; border-radius: 8px; margin-top: 20px; font-size: 0.9rem; color: #666; }
-        .stats-summary { display: flex; justify-content: space-around; margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px; }
-        .stat-item { text-align: center; }
-        .stat-value { font-size: 1.5rem; font-weight: bold; color: #1a2a6c; }
-        .stat-label { font-size: 0.9rem; color: #666; }
         footer { text-align: center; padding: 20px; color: white; font-size: 0.9rem; opacity: 0.8; }
         @media (max-width: 992px) { .results-container { flex-direction: column; } }
         @media (max-width: 768px) { 
             .search-box { flex-direction: column; } 
             .search-input { border-radius: 8px; margin-bottom: 10px; } 
             .search-button { border-radius: 8px; padding: 12px; }
-            .stats-summary { flex-direction: column; gap: 10px; }
         }
     </style>
 </head>
@@ -65,18 +59,18 @@
     <div class="container">
         <header>
             <h1>Gene Expression Visualization</h1>
-            <p>Explore gene expression data across human tissues and organs using RNA-seq consensus data</p>
+            <p>Explore gene expression data across human tissues and organs</p>
         </header>
         
         <div class="search-container">
             <div class="search-box">
-                <input type="text" class="search-input" id="geneInput" placeholder="Enter gene symbol (e.g., WDR31, IFT88)" value="">
+                <input type="text" class="search-input" id="geneInput" placeholder="Enter gene symbol (e.g., WDR31, IFT88)">
                 <button class="search-button" id="searchBtn"><i class="fas fa-search"></i> Search</button>
             </div>
             <div class="examples">Examples: WDR31, ACE2, IFT88, CEP290, DNAH5, FOXJ1, ARL13B</div>
         </div>
         
-        <div class="results-container" style="display: none;" id="resultsContainer">
+        <div class="results-container" id="resultsContainer">
             <div class="expression-data">
                 <div class="results-header">
                     <h2 class="results-title">Expression Results</h2>
@@ -87,9 +81,6 @@
                         <i class="fas fa-search" style="font-size: 3rem; margin-bottom: 20px; color: #ddd;"></i>
                         <h3>Search for Gene Expression Data</h3>
                         <p>Enter a gene symbol above to explore its expression across human tissues</p>
-                        <p style="margin-top: 15px; font-size: 0.9rem;">
-                            Try searching for ciliary genes like: WDR31, ACE2, IFT88, CEP290, DNAH5, FOXJ1, ARL13B
-                        </p>
                     </div>
                 </div>
             </div>
@@ -97,49 +88,49 @@
             <div class="organ-visualization">
                 <div class="results-header">
                     <h2 class="results-title">Tissue Expression Map</h2>
-                    <div class="results-count" id="visualizationHelp">Hover over tissues for details</div>
+                    <div class="results-count">Hover over tissues for details</div>
                 </div>
-                <div class="svg-container" id="svgContainer">
+                <div class="svg-container">
                     <svg id="humanSvg" class="human-svg" viewBox="0 0 453.54 815.12" xmlns="http://www.w3.org/2000/svg">
                         <g id="body-outline" fill="#f0f0f0" stroke="#cccccc" stroke-width="0.5">
                             <path d="M226.77,815.12C101.48,815.12,0,713.64,0,588.35c0-125.29,101.48-226.77,226.77-226.77s226.77,101.48,226.77,226.77C453.54,713.64,352.06,815.12,226.77,815.12ZM226.77,365.58c-122.99,0-222.77,99.78-222.77,222.77s99.78,222.77,222.77,222.77,222.77-99.78,222.77-222.77S349.76,365.58,226.77,365.58Z"/>
                         </g>
-                        <path id="path-colon" class="organ" fill="#E0E0E0" d="M294.57,489.28c-.46-1.15-1.03-2.24-1.6-3.34-19.1-37.58-52.68-62.85-92.41-62.85s-73.31,25.27-92.41,62.85c-.58,1.1-1.14,2.19-1.6,3.34H58.14c-1.49,0-2.69-1.2-2.69-2.69v-13.04c0-1.49,1.2-2.69,2.69-2.69h30.29c11.01-44.5,51.84-78.11,100.32-78.11s89.31,33.61,100.32,78.11h30.29c1.49,0,2.69,1.2,2.69,2.69v13.04c0,1.49-1.2,2.69-2.69,2.69h-22.1Z"/>
-                        <path id="path-stomach" class="organ" fill="#E0E0E0" d="m167.31,407.5c-20.14,4.24-34.93,17.43-34.93,33.15,0,19.33,26.43,35,59,35s59-15.67,59-35c0-14.16-11.45-26.31-28.52-31.67-12.78-3.99-28.32-6.28-44.56-1.48Z"/>
-                        <path id="path-small-intestine" class="organ" fill="#E0E0E0" d="M204.4,422.36c-20.44,0-37,16.56-37,37s16.56,37,37,37,37-16.56,37-37-16.56-37-37-37Z"/>
-                        <path id="path-pancreas" class="organ" fill="#E0E0E0" d="m223.59,428.18c-12.23,2.4-19.89,6.77-19.89,11.82s8.91,12.5,21.14,12.5,21.14-5.6,21.14-12.5-4.22-9.98-14.77-11.58c-4.73-.72-9.72-.94-17.62-.24Z"/>
+                        <path id="path-colon" class="organ" fill="#E0E0E0" d="M294.57,489.28c-.46-1.15-1.03-2.24-1.60-3.34-19.10-37.58-52.68-62.85-92.41-62.85s-73.31,25.27-92.41,62.85c-.58,1.10-1.14,2.19-1.60,3.34H58.14c-1.49,0-2.69-1.20-2.69-2.69v-13.04c0-1.49,1.20-2.69,2.69-2.69h30.29c11.01-44.50,51.84-78.11,100.32-78.11s89.31,33.61,100.32,78.11h30.29c1.49,0,2.69,1.20,2.69,2.69v13.04c0,1.49-1.20,2.69-2.69,2.69h-22.10Z"/>
+                        <path id="path-stomach" class="organ" fill="#E0E0E0" d="M167.31,407.50c-20.14,4.24-34.93,17.43-34.93,33.15,0,19.33,26.43,35,59,35s59-15.67,59-35c0-14.16-11.45-26.31-28.52-31.67-12.78-3.99-28.32-6.28-44.56-1.48Z"/>
+                        <path id="path-small-intestine" class="organ" fill="#E0E0E0" d="M204.40,422.36c-20.44,0-37,16.56-37,37s16.56,37,37,37,37-16.56,37-37-16.56-37-37-37Z"/>
+                        <path id="path-pancreas" class="organ" fill="#E0E0E0" d="M223.59,428.18c-12.23,2.40-19.89,6.77-19.89,11.82s8.91,12.50,21.14,12.50,21.14-5.60,21.14-12.50-4.22-9.98-14.77-11.58c-4.73-.72-9.72-.94-17.62-.24Z"/>
                         <path id="path-gall-bladder" class="organ" fill="#E0E0E0" d="M225.83,398.05c-4.99,0-9.04,4.05-9.04,9.04s4.05,9.04,9.04,9.04,9.04-4.05,9.04-9.04-4.05-9.04-9.04-9.04Z"/>
-                        <path id="path-liver" class="organ" fill="#E0E0E0" d="M282.02,408.08c-23.71,5.65-48.45,8.8-74.45,8.8s-50.75-3.15-74.45-8.8c-2.31-.55-4.57-1.12-6.75-1.72-13.84-3.79-24.8-13.8-24.8-28.92,0-16.57,13.43-30,30-30h149.2c16.57,0,30,13.43,30,30,0,15.12-10.96,25.13-24.8,28.92-2.18.6-4.44,1.17-6.75,1.72Z"/>
-                        <path id="path-spleen" class="organ" fill="#E0E0E0" d="m154.67,406.88c-10.15,2.14-17.55,8.76-17.55,16.67,0,9.72,13.28,17.6,29.65,17.6s29.65-7.88,29.65-17.6c0-7.07-5.74-13.13-14.33-15.91-6.42-2.08-14.23-3.15-22.38-.92-1.72.48-3.41,1.02-5.08,1.57Z"/>
-                        <path id="path-adrenal-gland-right" class="organ" fill="#E0E0E0" d="m278.47,403.95c.53-2.82,2.98-4.96,5.88-4.96,3.31,0,6,2.69,6,6,0,2.16-1.14,4.04-2.85,5.08-1.55.94-3.32,1.56-5.23,1.82l-3.8-.46Z"/>
-                        <path id="path-kidney-right" class="organ" fill="#E0E0E0" d="m281.33,407.97c-9.08,5.18-14.83,13.62-14.83,23.3,0,15.25,12.32,27.57,27.57,27.57s27.57-12.32,27.57-27.57c0-9.68-5.75-18.12-14.83-23.3h-25.49Z"/>
-                        <path id="path-adrenal-gland-left" class="organ" fill="#E0E0E0" d="M153.95,403.49c-.53-2.82-2.98-4.96-5.88-4.96-3.31,0-6,2.69-6,6,0,2.16,1.14,4.04,2.85,5.08,1.55.94,3.32,1.56,5.23,1.82l3.8-.46Z"/>
-                        <path id="path-kidney-left" class="organ" fill="#E0E0E0" d="m123.67,407.51c9.08,5.18,14.83,13.62,14.83,23.3,0,15.25,12.32,27.57,27.57,27.57s27.57-12.32,27.57-27.57c0-9.68-5.75-18.12-14.83-23.3H123.67Z"/>
-                        <path id="path-esophagus" class="organ" fill="#E0E0E0" d="m212.87,314.93c-4.42,0-8,12.13-8,27.1s3.58,27.1,8,27.1h21.01c4.42,0,8-12.13,8-27.1s-3.58-27.1-8-27.1h-21.01Z"/>
-                        <path id="path-trachea" class="organ" fill="#E0E0E0" d="M215.17,253.9c-2.76,0-5,11.24-5,25.1s2.24,25.1,5,25.1h16.44c2.76,0,5-11.24,5-25.1s-2.24-25.1-5-25.1h-16.44Z"/>
-                        <path id="path-heart" class="organ" fill="#E0E0E0" d="m239.54,345.54c-13.88,7.9-31.54,7.9-45.42,0-4.6-2.62-7.46-7.53-7.46-12.98,0-8.54,6.92-15.46,15.46-15.46h29.42c8.54,0,15.46,6.92,15.46,15.46,0,5.45-2.85,10.36-7.46,12.98Z"/>
-                        <path id="path-lung-right" class="organ" fill="#E0E0E0" d="m307.25,322.95c-19.49,15.18-45.89,24.8-74.88,24.8h-11.75c-2.47-5.96-5.46-12.44-8.87-19.14-10.23-19.98-22.3-43.58-22.3-69.65,0-36.29,19.24-66.96,48.09-84.34,3.7-2.23,7.99-3.8,12.69-4.83,23.33-5.11,46.12,4.8,55.9,23.1,12.23,22.9,10.63,50.48-1.5,72.19,3.87,5.55,6.7,11.96,8.44,18.84,1.86,7.41.93,15.2-2.07,21.99,1.07,2.23,1.96,4.55,2.67,6.96,1.4,4.78,1.4,9.79,0,14.57Z"/>
-                        <path id="path-lung-left" class="organ" fill="#E0E0E0" d="M146.29,322.95c19.49,15.18,45.89,24.8,74.88,24.8h11.75c2.47-5.96,5.46-12.44,8.87-19.14,10.23-19.98,22.3-43.58,22.3-69.65,0-36.29-19.24-66.96-48.09-84.34-3.7-2.23-7.99-3.8-12.69-4.83-23.33-5.11-46.12,4.8-55.9,23.1-12.23,22.9-10.63,50.48,1.5,72.19-3.87-5.55-6.7-11.96-8.44-18.84-1.86-7.41-.93-15.2,2.07-21.99-1.07-2.23-1.96-4.55-2.67-6.96-1.4-4.78-1.4-9.79,0-14.57Z"/>
-                        <path id="path-thyroid" class="organ" fill="#E0E0E0" d="m202.9,244.62c-3.15,1.7-5.41,4.92-5.41,8.65s2.26,6.95,5.41,8.65c3.15-1.7,5.41-4.92,5.41-8.65s-2.26-6.95-5.41-8.65Z"/>
+                        <path id="path-liver" class="organ" fill="#E0E0E0" d="M282.02,408.08c-23.71,5.65-48.45,8.80-74.45,8.80s-50.75-3.15-74.45-8.80c-2.31-.55-4.57-1.12-6.75-1.72-13.84-3.79-24.80-13.80-24.80-28.92,0-16.57,13.43-30,30-30h149.20c16.57,0,30,13.43,30,30,0,15.12-10.96,25.13-24.80,28.92-2.18.60-4.44,1.17-6.75,1.72Z"/>
+                        <path id="path-spleen" class="organ" fill="#E0E0E0" d="M154.67,406.88c-10.15,2.14-17.55,8.76-17.55,16.67,0,9.72,13.28,17.60,29.65,17.60s29.65-7.88,29.65-17.60c0-7.07-5.74-13.13-14.33-15.91-6.42-2.08-14.23-3.15-22.38-.92-1.72.48-3.41,1.02-5.08,1.57Z"/>
+                        <path id="path-adrenal-gland-right" class="organ" fill="#E0E0E0" d="M278.47,403.95c.53-2.82,2.98-4.96,5.88-4.96,3.31,0,6,2.69,6,6,0,2.16-1.14,4.04-2.85,5.08-1.55.94-3.32,1.56-5.23,1.82l-3.80-.46Z"/>
+                        <path id="path-kidney-right" class="organ" fill="#E0E0E0" d="M281.33,407.97c-9.08,5.18-14.83,13.62-14.83,23.30,0,15.25,12.32,27.57,27.57,27.57s27.57-12.32,27.57-27.57c0-9.68-5.75-18.12-14.83-23.30h-25.49Z"/>
+                        <path id="path-adrenal-gland-left" class="organ" fill="#E0E0E0" d="M153.95,403.49c-.53-2.82-2.98-4.96-5.88-4.96-3.31,0-6,2.69-6,6,0,2.16,1.14,4.04,2.85,5.08,1.55.94,3.32,1.56,5.23,1.82l3.80-.46Z"/>
+                        <path id="path-kidney-left" class="organ" fill="#E0E0E0" d="M123.67,407.51c9.08,5.18,14.83,13.62,14.83,23.30,0,15.25,12.32,27.57,27.57,27.57s27.57-12.32,27.57-27.57c0-9.68-5.75-18.12-14.83-23.30H123.67Z"/>
+                        <path id="path-esophagus" class="organ" fill="#E0E0E0" d="M212.87,314.93c-4.42,0-8,12.13-8,27.10s3.58,27.10,8,27.10h21.01c4.42,0,8-12.13,8-27.10s-3.58-27.10-8-27.10h-21.01Z"/>
+                        <path id="path-trachea" class="organ" fill="#E0E0E0" d="M215.17,253.90c-2.76,0-5,11.24-5,25.10s2.24,25.10,5,25.10h16.44c2.76,0,5-11.24,5-25.10s-2.24-25.10-5-25.10h-16.44Z"/>
+                        <path id="path-heart" class="organ" fill="#E0E0E0" d="M239.54,345.54c-13.88,7.90-31.54,7.90-45.42,0-4.60-2.62-7.46-7.53-7.46-12.98,0-8.54,6.92-15.46,15.46-15.46h29.42c8.54,0,15.46,6.92,15.46,15.46,0,5.45-2.85,10.36-7.46,12.98Z"/>
+                        <path id="path-lung-right" class="organ" fill="#E0E0E0" d="M307.25,322.95c-19.49,15.18-45.89,24.80-74.88,24.80h-11.75c-2.47-5.96-5.46-12.44-8.87-19.14-10.23-19.98-22.30-43.58-22.30-69.65,0-36.29,19.24-66.96,48.09-84.34,3.70-2.23,7.99-3.80,12.69-4.83,23.33-5.11,46.12,4.80,55.90,23.10,12.23,22.90,10.63,50.48-1.50,72.19,3.87,5.55,6.70,11.96,8.44,18.84,1.86,7.41.93,15.20-2.07,21.99,1.07,2.23,1.96,4.55,2.67,6.96,1.40,4.78,1.40,9.79,0,14.57Z"/>
+                        <path id="path-lung-left" class="organ" fill="#E0E0E0" d="M146.29,322.95c19.49,15.18,45.89,24.80,74.88,24.80h11.75c2.47-5.96,5.46-12.44,8.87-19.14,10.23-19.98,22.30-43.58,22.30-69.65,0-36.29-19.24-66.96-48.09-84.34-3.70-2.23-7.99-3.80-12.69-4.83-23.33-5.11-46.12,4.80-55.90,23.10-12.23,22.90-10.63,50.48,1.50,72.19-3.87-5.55-6.70-11.96-8.44-18.84-1.86-7.41-.93-15.20,2.07-21.99-1.07-2.23-1.96-4.55-2.67-6.96-1.40-4.78-1.40-9.79,0-14.57Z"/>
+                        <path id="path-thyroid" class="organ" fill="#E0E0E0" d="M202.90,244.62c-3.15,1.70-5.41,4.92-5.41,8.65s2.26,6.95,5.41,8.65c3.15-1.70,5.41-4.92,5.41-8.65s-2.26-6.95-5.41-8.65Z"/>
                         <path id="path-brain" class="organ" fill="#E0E0E0" d="M226.77,157.07c-44.18,0-80-35.82-80-80s35.82-80,80-80,80,35.82,80,80-35.82,80-80,80Z"/>
-                        <path id="path-cerebellum" class="organ" fill="#E0E0E0" d="m226.77,133.56c-17.67,0-32-14.33-32-32s14.33-32,32-32,32,14.33,32,32-14.33,32-32,32Z"/>
-                        <path id="path-endometrium" class="organ" fill="#E0E0E0" d="m204.99,521.13c-1.5,0-2.72-1.22-2.72-2.72v-13.62c0-1.5,1.22-2.72,2.72-2.72h33.57c1.5,0,2.72,1.22,2.72,2.72v13.62c0,1.5-1.22,2.72-2.72,2.72h-33.57Z"/>
-                        <path id="path-prostate" class="organ" fill="#E0E0E0" d="m208.57,515.22c-3.31,0-6,2.69-6,6s2.69,6,6,6h26.4c3.31,0,6-2.69,6-6s-2.69-6-6-6h-26.4Z"/>
-                        <path id="path-seminal-vesicle" class="organ" fill="#E0E0E0" d="m212.87,515.22c-1.11,0-2,1.79-2,4s.89,4,2,4h17.8c1.11,0,2-1.79,2-4s-.89-4-2-4h-17.8Z"/>
-                        <path id="path-testis-right" class="organ" fill="#E0E0E0" d="M242.06,536.43c-6.83,3.31-14.53,5.15-22.65,5.15-19.46,0-36.94-8.08-49.02-21.2-1.63-1.77-2.6-4.1-2.6-6.58,0-5.1,4.14-9.24,9.24-9.24h21.46c.39-4.88,2.3-9.5,5.3-13.38.7-.91,1.48-1.76,2.33-2.54,6.72-6.17,15.65-9.79,25.43-9.79,19.34,0,36.56,12.75,44.25,31.05,2.44,5.82,3.8,12.16,3.8,18.82,0,17.47-8.32,33.05-21.19,42.54Z"/>
-                        <path id="path-testis-left" class="organ" fill="#E0E0E0" d="m211.48,536.43c6.83,3.31,14.53,5.15,22.65,5.15,19.46,0,36.94-8.08,49.02-21.2,1.63-1.77,2.6-4.1,2.6-6.58,0-5.1-4.14-9.24-9.24-9.24h-21.46c-.39-4.88-2.3-9.5-5.3-13.38-.7-.91-1.48-1.76-2.33-2.54-6.72-6.17-15.65-9.79-25.43-9.79-19.34,0-36.56,12.75-44.25,31.05-2.44,5.82-3.8,12.16-3.8,18.82,0,17.47,8.32,33.05,21.19,42.54Z"/>
-                        <path id="path-epididymis-right" class="organ" fill="#E0E0E0" d="M244.75,528.89c-2.73,1.32-5.81,2.06-9.06,2.06-7.78,0-14.78-3.23-19.61-8.48-.65-.71-1.04-1.64-1.04-2.63,0-2.04,1.66-3.7,3.7-3.7h8.58c.16-1.95.92-3.8,2.12-5.35.28-.36.59-.7,1.04-1.22,2.69-2.47,6.26-3.92,10.17-3.92,7.74,0,14.62,5.1,17.7,12.42.98,2.33,1.52,4.86,1.52,7.53,0,6.99-3.33,13.22-8.48,17.02Z"/>
-                        <path id="path-epididymis-left" class="organ" fill="#E0E0E0" d="M208.79,528.89c2.73,1.32,5.81,2.06,9.06,2.06,7.78,0,14.78-3.23,19.61-8.48.65-.71,1.04-1.64,1.04-2.63,0-2.04-1.66-3.7-3.7-3.7h-8.58c-.16-1.95-.92-3.8-2.12-5.35-.28-.36-.59-.7-1.04-1.22-2.69-2.47,6.26-3.92,10.17-3.92-7.74,0-14.62,5.1-17.7,12.42-.98-2.33-1.52-4.86-1.52-7.53,0,6.99,3.33,13.22,8.48,17.02Z"/>
-                        <path id="path-fallopian-tube-right" class="organ" fill="#E0E0E0" d="M268.04,500.22c-1.39,3.15-2.26,6.58-2.26,10.2,0,11.05,8.95,20,20,20s20-8.95,20-20c0-3.62-.96-7.05-2.26-10.2h-35.48Z"/>
-                        <path id="path-ovary-right" class="organ" fill="#E0E0E0" d="m269.83,522.63c-3.31,0-6,2.69-6,6s2.69,6,6,6,6-2.69,6-6-2.69-6-6-6Z"/>
-                        <path id="path-fallopian-tube-left" class="organ" fill="#E0E0E0" d="M142.27,500.22c1.39,3.15,2.26,6.58,2.26,10.2,0,11.05-8.95,20-20,20s-20-8.95-20-20c0-3.62.96-7.05,2.26-10.2h35.48Z"/>
-                        <path id="path-ovary-left" class="organ" fill="#E0E0E0" d="M175.7,522.63c-3.31,0-6,2.69-6,6s2.69,6,6,6,6-2.69,6-6-2.69-6-6-6Z"/>
-                        <path id="path-placenta" class="organ" fill="#E0E0E0" d="m226.77,509.39c-22.09,0-40,17.91-40,40s17.91,40,40,40,40-17.91,40-40-17.91-40-40-40Z"/>
-                        <path id="path-cervix" class="organ" fill="#E0E0E0" d="M222.15,532.84c-1.5,0-2.72-1.22-2.72-2.72v-13.62c0-1.5,1.22-2.72,2.72-2.72h8.49c1.5,0,2.72,1.22,2.72,2.72v13.62c0,1.5-1.22,2.72-2.72,2.72h-8.49Z"/>
-                        <path id="path-bone-marrow" class="organ" fill="#E0E0E0" d="m226.77,654.49c-38.66,0-70-31.34-70-70s31.34-70,70-70,70,31.34,70,70-31.34,70-70,70Z"/>
-                        <path id="path-adipose" class="organ" fill="#E0E0E0" d="m109.95,453.79c-11.05,0-20,8.95-20,20s8.95,20,20,20,20-8.95,20-20-8.95-20-20-20Z"/>
+                        <path id="path-cerebellum" class="organ" fill="#E0E0E0" d="M226.77,133.56c-17.67,0-32-14.33-32-32s14.33-32,32-32,32,14.33,32,32-14.33,32-32,32Z"/>
+                        <path id="path-endometrium" class="organ" fill="#E0E0E0" d="M204.99,521.13c-1.50,0-2.72-1.22-2.72-2.72v-13.62c0-1.50,1.22-2.72,2.72-2.72h33.57c1.50,0,2.72,1.22,2.72,2.72v13.62c0,1.50-1.22,2.72-2.72,2.72h-33.57Z"/>
+                        <path id="path-prostate" class="organ" fill="#E0E0E0" d="M208.57,515.22c-3.31,0-6,2.69-6,6s2.69,6,6,6h26.40c3.31,0,6-2.69,6-6s-2.69-6-6-6h-26.40Z"/>
+                        <path id="path-seminal-vesicle" class="organ" fill="#E0E0E0" d="M212.87,515.22c-1.11,0-2,1.79-2,4s.89,4,2,4h17.80c1.11,0,2-1.79,2-4s-.89-4-2-4h-17.80Z"/>
+                        <path id="path-testis-right" class="organ" fill="#E0E0E0" d="M242.06,536.43c-6.83,3.31-14.53,5.15-22.65,5.15-19.46,0-36.94-8.08-49.02-21.20-1.63-1.77-2.60-4.10-2.60-6.58,0-5.10,4.14-9.24,9.24-9.24h21.46c.39-4.88,2.30-9.50,5.30-13.38.70-.91,1.48-1.76,2.33-2.54,6.72-6.17,15.65-9.79,25.43-9.79,19.34,0,36.56,12.75,44.25,31.05,2.44,5.82,3.80,12.16,3.80,18.82,0,17.47-8.32,33.05-21.19,42.54Z"/>
+                        <path id="path-testis-left" class="organ" fill="#E0E0E0" d="M211.48,536.43c6.83,3.31,14.53,5.15,22.65,5.15,19.46,0,36.94-8.08,49.02-21.20,1.63-1.77,2.60-4.10,2.60-6.58,0-5.10-4.14-9.24-9.24-9.24h-21.46c-.39-4.88-2.30-9.50-5.30-13.38-.70-.91-1.48-1.76-2.33-2.54-6.72-6.17-15.65-9.79-25.43-9.79-19.34,0-36.56,12.75-44.25,31.05-2.44,5.82-3.80,12.16-3.80,18.82,0,17.47,8.32,33.05,21.19,42.54Z"/>
+                        <path id="path-epididymis-right" class="organ" fill="#E0E0E0" d="M244.75,528.89c-2.73,1.32-5.81,2.06-9.06,2.06-7.78,0-14.78-3.23-19.61-8.48-.65-.71-1.04-1.64-1.04-2.63,0-2.04,1.66-3.70,3.70-3.70h8.58c.16-1.95.92-3.80,2.12-5.35.28-.36.59-.70,1.04-1.22,2.69-2.47,6.26-3.92,10.17-3.92,7.74,0,14.62,5.10,17.70,12.42.98,2.33,1.52,4.86,1.52,7.53,0,6.99-3.33,13.22-8.48,17.02Z"/>
+                        <path id="path-epididymis-left" class="organ" fill="#E0E0E0" d="M208.79,528.89c2.73,1.32,5.81,2.06,9.06,2.06,7.78,0,14.78-3.23,19.61-8.48.65-.71,1.04-1.64,1.04-2.63,0-2.04-1.66-3.70-3.70-3.70h-8.58c-.16-1.95-.92-3.80-2.12-5.35-.28-.36-.59-.70-1.04-1.22-2.69-2.47,6.26-3.92,10.17-3.92-7.74,0-14.62,5.10-17.70,12.42-.98-2.33-1.52-4.86-1.52-7.53,0,6.99,3.33,13.22,8.48,17.02Z"/>
+                        <path id="path-fallopian-tube-right" class="organ" fill="#E0E0E0" d="M268.04,500.22c-1.39,3.15-2.26,6.58-2.26,10.20,0,11.05,8.95,20,20,20s20-8.95,20-20c0-3.62-.96-7.05-2.26-10.20h-35.48Z"/>
+                        <path id="path-ovary-right" class="organ" fill="#E0E0E0" d="M269.83,522.63c-3.31,0-6,2.69-6,6s2.69,6,6,6,6-2.69,6-6-2.69-6-6-6Z"/>
+                        <path id="path-fallopian-tube-left" class="organ" fill="#E0E0E0" d="M142.27,500.22c1.39,3.15,2.26,6.58,2.26,10.20,0,11.05-8.95,20-20,20s-20-8.95-20-20c0-3.62.96-7.05,2.26-10.20h35.48Z"/>
+                        <path id="path-ovary-left" class="organ" fill="#E0E0E0" d="M175.70,522.63c-3.31,0-6,2.69-6,6s2.69,6,6,6,6-2.69,6-6-2.69-6-6-6Z"/>
+                        <path id="path-placenta" class="organ" fill="#E0E0E0" d="M226.77,509.39c-22.09,0-40,17.91-40,40s17.91,40,40,40,40-17.91,40-40-17.91-40-40-40Z"/>
+                        <path id="path-cervix" class="organ" fill="#E0E0E0" d="M222.15,532.84c-1.50,0-2.72-1.22-2.72-2.72v-13.62c0-1.50,1.22-2.72,2.72-2.72h8.49c1.50,0,2.72,1.22,2.72,2.72v13.62c0,1.50-1.22,2.72-2.72,2.72h-8.49Z"/>
+                        <path id="path-bone-marrow" class="organ" fill="#E0E0E0" d="M226.77,654.49c-38.66,0-70-31.34-70-70s31.34-70,70-70,70,31.34,70,70-31.34,70-70,70Z"/>
+                        <path id="path-adipose" class="organ" fill="#E0E0E0" d="M109.95,453.79c-11.05,0-20,8.95-20,20s8.95,20,20,20,20-8.95,20-20-8.95-20-20-20Z"/>
                         <path id="path-muscle" class="organ" fill="#E0E0E0" d="M343.59,453.79c-11.05,0-20,8.95-20,20s8.95,20,20,20,20-8.95,20-20-8.95-20-20-20Z"/>
-                        <path id="path-skin" class="organ" fill="#E0E0E0" d="m109.95,357.57c-11.05,0-20,8.95-20,20s8.95,20,20,20,20-8.95,20-20-8.95-20-20-20Z"/>
+                        <path id="path-skin" class="organ" fill="#E0E0E0" d="M109.95,357.57c-11.05,0-20,8.95-20,20s8.95,20,20,20,20-8.95,20-20-8.95-20-20-20Z"/>
                         <path id="path-smooth-muscle" class="organ" fill="#E0E0E0" d="M343.59,357.57c-11.05,0-20,8.95-20,20s8.95,20,20,20,20-8.95,20-20-8.95-20-20-20Z"/>
                     </svg>
                     <div class="organ-tooltip" id="organTooltip"></div>
@@ -155,14 +146,13 @@
         </div>
         
         <footer>
-            <p>© 2025 CiliaHub | Gene Expression Database | Data source: Human Protein Atlas RNA-seq tissue consensus</p>
+            <p>© 2025 CiliaHub | Gene Expression Database | Data source: Human Protein Atlas</p>
         </footer>
     </div>
 
     <script>
         class GeneExpressionApp {
             constructor() {
-                if (GeneExpressionApp.instance) { return GeneExpressionApp.instance; }
                 this.rnaData = null;
                 this.isLoading = false;
                 this.dataPromise = null;
@@ -170,7 +160,6 @@
                 this.setupEventListeners();
                 this.createTissueMapping();
                 this.loadInitialMessage();
-                GeneExpressionApp.instance = this;
             }
             
             initializeElements() {
@@ -229,27 +218,26 @@
             }
             
             loadInitialMessage() {
+                this.resultsContainer.style.display = 'flex';
                 this.resultsContent.innerHTML = `
                     <div style="text-align: center; padding: 40px; color: #666;">
                         <i class="fas fa-search" style="font-size: 3rem; margin-bottom: 20px; color: #ddd;"></i>
                         <h3>Search for Gene Expression Data</h3>
                         <p>Enter a gene symbol above to explore its expression across human tissues</p>
-                        <p style="margin-top: 15px; font-size: 0.9rem;">
-                            Try searching for ciliary genes like: WDR31, ACE2, IFT88, CEP290, DNAH5, FOXJ1, ARL13B
-                        </p>
                     </div>`;
+                this.resultCount.textContent = '';
             }
             
             loadRNAData() {
                 if (!this.dataPromise) {
                     this.dataPromise = new Promise(async (resolve, reject) => {
-                        const dataUrl = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/rna_tissue_consensus.json';
+                        const dataUrl = './rna_tissue_consensus.json'; // Adjust if JSON is in a different path
+                        console.log('Fetching RNA data from:', dataUrl);
                         try {
-                            console.log('Fetching RNA data from:', dataUrl);
-                            const response = await fetch(dataUrl, { mode: 'cors' });
-                            if (!response.ok) { throw new Error(`Network response error: ${response.status}`); }
+                            const response = await fetch(dataUrl);
+                            if (!response.ok) { throw new Error(`Network response error: ${response.status} ${response.statusText}`); }
                             this.rnaData = await response.json();
-                            console.log(`Successfully loaded data for ${Object.keys(this.rnaData).length} genes.`);
+                            console.log(`Loaded data for ${Object.keys(this.rnaData).length} genes`);
                             resolve(this.rnaData);
                         } catch (error) {
                             console.error('Error loading RNA data:', error);
@@ -263,7 +251,7 @@
             async performSearch() {
                 const geneSymbol = this.geneInput.value.trim().toUpperCase();
                 if (!geneSymbol) { 
-                    this.showError('Please enter a gene symbol.'); 
+                    this.showError('Please enter a gene symbol'); 
                     return; 
                 }
                 if (this.isLoading) return;
@@ -279,7 +267,8 @@
                         this.showNotFound(geneSymbol); 
                     }
                 } catch (error) {
-                    this.showError('Could not load expression database. Please try again later or check the console (F12) for details.');
+                    this.showError('Failed to load data. Please check the console (F12) for details');
+                    console.error('Search error:', error);
                 } finally {
                     this.isLoading = false;
                 }
@@ -289,15 +278,13 @@
                 this.resultsContent.innerHTML = `
                     <div class="loading">
                         <i class="fas fa-spinner fa-spin"></i>
-                        <p>Loading expression data for ${geneSymbol}...</p>
-                        <small>(Initial load may take a moment)</small>
+                        <p>Loading data for ${geneSymbol}...</p>
                     </div>`;
                 this.resultCount.textContent = 'Searching...';
                 this.resetOrgans();
             }
             
             showError(message) {
-                this.resultsContainer.style.display = 'flex';
                 this.resultsContent.innerHTML = `
                     <div class="error">
                         <i class="fas fa-exclamation-triangle"></i>
@@ -311,56 +298,23 @@
                 this.resultsContent.innerHTML = `
                     <div class="error">
                         <i class="fas fa-search-minus"></i>
-                        <h3>Gene "${geneSymbol}" not found.</h3>
-                        <p>Please check the gene symbol and try again.</p>
+                        <p>Gene "${geneSymbol}" not found</p>
                     </div>`;
                 this.resultCount.textContent = '0 genes found';
                 this.resetOrgans();
             }
             
             displayResults(geneSymbol, geneData) {
-                const tissues = Object.keys(geneData);
-                const expressions = Object.values(geneData);
-                const maxExpression = Math.max(...expressions);
-                const avgExpression = expressions.reduce((a, b) => a + b, 0) / expressions.length;
-                const nonZeroCount = expressions.filter(exp => exp > 0).length;
-                
                 this.resultsContent.innerHTML = `
-                    <div class="gene-info">
-                        <h3 class="gene-name">${geneSymbol}</h3>
-                        <p class="gene-description">
-                            Expression data from Human Protein Atlas RNA-seq tissue consensus dataset.
-                            Values represent normalized transcript abundance (nTPM).
-                        </p>
-                        <div class="stats-summary">
-                            <div class="stat-item">
-                                <div class="stat-value">${tissues.length}</div>
-                                <div class="stat-label">Tissues</div>
-                            </div>
-                            <div class="stat-item">
-                                <div class="stat-value">${nonZeroCount}</div>
-                                <div class="stat-label">Expressed</div>
-                            </div>
-                            <div class="stat-item">
-                                <div class="stat-value">${maxExpression.toFixed(1)}</div>
-                                <div class="stat-label">Max nTPM</div>
-                            </div>
-                            <div class="stat-item">
-                                <div class="stat-value">${avgExpression.toFixed(1)}</div>
-                                <div class="stat-label">Avg nTPM</div>
-                            </div>
-                        </div>
-                        <h4>Expression Levels (nTPM)</h4>
-                        <div class="data-table-container">
-                            <table class="data-table">
-                                <thead><tr><th>Tissue</th><th>nTPM</th><th>Expression Level</th></tr></thead>
-                                <tbody>${this.generateTableRows(geneData)}</tbody>
-                            </table>
-                        </div>
-                        <div class="data-source">
-                            <i class="fas fa-database"></i>
-                            <strong>Data Source:</strong> Human Protein Atlas RNA-seq tissue consensus data
-                        </div>
+                    <h3 class="gene-name">${geneSymbol}</h3>
+                    <div class="data-table-container">
+                        <table class="data-table">
+                            <thead><tr><th>Tissue</th><th>nTPM</th><th>Level</th></tr></thead>
+                            <tbody>${this.generateTableRows(geneData)}</tbody>
+                        </table>
+                    </div>
+                    <div class="data-source">
+                        <strong>Data Source:</strong> Human Protein Atlas RNA-seq tissue consensus
                     </div>`;
                 this.resultCount.textContent = `1 gene found`;
                 this.updateOrganVisualization(geneData);
@@ -377,22 +331,22 @@
                         </tr>`).join('');
             }
             
-            formatTissueName(tissue) { 
-                return tissue.replace(/,/g, '').replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()); 
+            formatTissueName(tissue) {
+                return tissue.replace(/,/g, '').replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
             }
             
-            getExpressionLevel(nTPM) { 
-                if (nTPM <= 5) return 'Low'; 
-                if (nTPM <= 15) return 'Medium'; 
-                if (nTPM <= 30) return 'High'; 
-                return 'Very High'; 
+            getExpressionLevel(nTPM) {
+                if (nTPM <= 5) return 'Low';
+                if (nTPM <= 15) return 'Medium';
+                if (nTPM <= 30) return 'High';
+                return 'Very High';
             }
             
-            getColorForExpression(nTPM) { 
-                if (nTPM <= 5) return '#c8e6c9'; 
-                if (nTPM <= 15) return '#81c784'; 
-                if (nTPM <= 30) return '#4caf50'; 
-                return '#2e7d32'; 
+            getColorForExpression(nTPM) {
+                if (nTPM <= 5) return '#c8e6c9';
+                if (nTPM <= 15) return '#81c784';
+                if (nTPM <= 30) return '#4caf50';
+                return '#2e7d32';
             }
             
             updateOrganVisualization(geneData) {
@@ -409,6 +363,8 @@
                                 organ.setAttribute('data-level', this.getExpressionLevel(nTPM));
                             }
                         });
+                    } else {
+                        console.warn(`No SVG path for tissue: ${tissue}`);
                     }
                 });
             }
@@ -429,29 +385,24 @@
                 const nTPM = organ.getAttribute('data-ntpm');
                 const level = organ.getAttribute('data-level');
                 if (tissue && nTPM) {
-                    this.organTooltip.innerHTML = `
-                        <strong>${tissue}</strong><br>
-                        ${nTPM} nTPM<br>
-                        <em>${level} Expression</em>`;
+                    this.organTooltip.innerHTML = `${tissue}: ${nTPM} nTPM (${level})`;
                     this.organTooltip.style.opacity = '1';
                     this.moveTooltip(event);
                 }
             }
             
-            hideTooltip() { 
-                this.organTooltip.style.opacity = '0'; 
+            hideTooltip() {
+                this.organTooltip.style.opacity = '0';
             }
             
             moveTooltip(event) {
-                const containerRect = document.getElementById('svgContainer').getBoundingClientRect();
+                const containerRect = document.querySelector('.svg-container').getBoundingClientRect();
                 this.organTooltip.style.left = `${event.clientX - containerRect.left}px`;
                 this.organTooltip.style.top = `${event.clientY - containerRect.top - 50}px`;
             }
         }
         
-        document.addEventListener('DOMContentLoaded', () => { 
-            window.geneApp = new GeneExpressionApp(); 
-        });
+        document.addEventListener('DOMContentLoaded', () => new GeneExpressionApp());
     </script>
 </body>
 </html>
