@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gene Expression Search - CiliaHub</title>
+    <title>Gene Expression Visualization - CiliaHub</title>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
@@ -157,6 +157,9 @@
             width: 100%;
             border-collapse: collapse;
             margin-top: 15px;
+            max-height: 400px;
+            overflow-y: auto;
+            display: block;
         }
         
         .data-table th, .data-table td {
@@ -169,6 +172,8 @@
             background-color: #f8f9fa;
             font-weight: 500;
             color: #1a2a6c;
+            position: sticky;
+            top: 0;
         }
         
         .data-table tr:hover {
@@ -198,53 +203,54 @@
             margin-bottom: 15px;
         }
         
-        .organ-container {
-            position: relative;
-            width: 100%;
-            max-width: 600px;
-            margin: 0 auto;
-        }
-        
         .human-figure {
             width: 100%;
-            height: 500px;
-            background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 400"><path d="M100 50 Q120 70 100 90 Q80 70 100 50" fill="%23f0f0f0" stroke="%23333" stroke-width="0.5"/><path d="M100 90 L100 180" stroke="%23333" stroke-width="1"/><path d="M100 180 Q70 200 100 250 Q130 200 100 180" fill="%23f0f0f0" stroke="%23333" stroke-width="0.5"/><path d="M100 250 L100 350" stroke="%23333" stroke-width="1"/><circle cx="100" cy="40" r="15" fill="%23f0f0f0" stroke="%23333" stroke-width="0.5"/><path d="M60 120 Q50 150 60 180" stroke="%23333" stroke-width="1" fill="none"/><path d="M140 120 Q150 150 140 180" stroke="%23333" stroke-width="1" fill="none"/><path d="M60 350 Q70 370 90 370 Q100 360 110 370 Q130 370 140 350" stroke="%23333" stroke-width="1" fill="none"/></svg>');
-            background-repeat: no-repeat;
-            background-position: center;
-            background-size: contain;
+            max-width: 500px;
+            margin: 0 auto;
+            position: relative;
+        }
+        
+        .organs-container {
+            position: relative;
+            width: 100%;
+            height: 600px;
         }
         
         .organ {
             position: absolute;
-            border-radius: 50%;
             cursor: pointer;
             transition: all 0.3s ease;
             display: flex;
             align-items: center;
             justify-content: center;
             color: white;
-            font-size: 10px;
             font-weight: bold;
             text-align: center;
             box-shadow: 0 3px 6px rgba(0,0,0,0.2);
+            border-radius: 50%;
+            font-size: 0;
+            z-index: 1;
         }
         
         .organ:hover {
             transform: scale(1.1);
             z-index: 10;
+            font-size: 10px;
         }
         
         .organ-tooltip {
             position: absolute;
             background: rgba(0,0,0,0.8);
             color: white;
-            padding: 5px 10px;
+            padding: 8px 12px;
             border-radius: 4px;
             font-size: 12px;
             pointer-events: none;
             opacity: 0;
             transition: opacity 0.3s;
             z-index: 100;
+            max-width: 200px;
+            text-align: center;
         }
         
         .legend {
@@ -265,6 +271,13 @@
             width: 20px;
             height: 20px;
             border-radius: 4px;
+        }
+        
+        .no-expression {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+            font-style: italic;
         }
         
         footer {
@@ -302,6 +315,10 @@
             .results-container {
                 flex-direction: column;
             }
+            
+            .organs-container {
+                height: 400px;
+            }
         }
     </style>
 </head>
@@ -309,7 +326,7 @@
     <div class="container">
         <header>
             <h1>Gene Expression Search</h1>
-            <p>Explore gene expression data related to cilia and flagella across multiple species and tissues</p>
+            <p>Explore gene expression data across human tissues and organs</p>
         </header>
         
         <div class="search-container">
@@ -356,14 +373,14 @@
             <div class="organ-visualization">
                 <div class="results-header">
                     <h2 class="results-title">Expression Visualization</h2>
-                    <div class="results-count" id="visualizationHelp">Click organs for details</div>
+                    <div class="results-count" id="visualizationHelp">Hover over organs for details</div>
                 </div>
                 
-                <div class="organ-container">
-                    <div class="human-figure" id="humanFigure">
+                <div class="human-figure">
+                    <div class="organs-container" id="organsContainer">
                         <!-- Organs will be added dynamically -->
+                        <div class="organ-tooltip" id="organTooltip"></div>
                     </div>
-                    <div class="organ-tooltip" id="organTooltip"></div>
                 </div>
                 
                 <div class="legend">
@@ -399,7 +416,7 @@
             const resultsContent = document.getElementById('resultsContent');
             const resultCount = document.getElementById('resultCount');
             const expressionTableBody = document.getElementById('expressionTableBody');
-            const humanFigure = document.getElementById('humanFigure');
+            const organsContainer = document.getElementById('organsContainer');
             const organTooltip = document.getElementById('organTooltip');
             
             // Sample gene data with nTPM values
@@ -410,37 +427,25 @@
                     expressions: [
                         { tissue: 'adipose tissue', nTPM: 28.6 },
                         { tissue: 'adrenal gland', nTPM: 17.6 },
-                        { tissue: 'amygdala', nTPM: 13.0 },
+                        { tissue: 'brain', nTPM: 13.0 },
                         { tissue: 'appendix', nTPM: 4.7 },
-                        { tissue: 'basal ganglia', nTPM: 12.4 },
                         { tissue: 'bone marrow', nTPM: 0.6 },
-                        { tissue: 'brain', nTPM: 3.2 },
                         { tissue: 'breast', nTPM: 8.9 },
-                        { tissue: 'bronchus', nTPM: 15.2 },
-                        { tissue: 'cardiac muscle', nTPM: 5.4 },
-                        { tissue: 'cerebellum', nTPM: 7.8 },
                         { tissue: 'colon', nTPM: 9.3 },
-                        { tissue: 'duodenum', nTPM: 6.7 },
-                        { tissue: 'endometrium', nTPM: 11.5 },
                         { tissue: 'esophagus', nTPM: 10.1 },
-                        { tissue: 'eye', nTPM: 2.3 },
                         { tissue: 'heart', nTPM: 6.2 },
                         { tissue: 'kidney', nTPM: 7.1 },
                         { tissue: 'liver', nTPM: 4.8 },
                         { tissue: 'lung', nTPM: 14.5 },
-                        { tissue: 'lymph node', nTPM: 3.9 },
-                        { tissue: 'nasopharynx', nTPM: 16.8 },
                         { tissue: 'ovary', nTPM: 9.7 },
                         { tissue: 'pancreas', nTPM: 5.1 },
                         { tissue: 'prostate', nTPM: 8.3 },
-                        { tissue: 'rectum', nTPM: 7.6 },
-                        { tissue: 'retina', nTPM: 1.5 },
                         { tissue: 'skin', nTPM: 5.9 },
                         { tissue: 'small intestine', nTPM: 8.2 },
                         { tissue: 'spleen', nTPM: 4.2 },
+                        { tissue: 'stomach', nTPM: 7.5 },
                         { tissue: 'testis', nTPM: 8.4 },
                         { tissue: 'thyroid', nTPM: 10.7 },
-                        { tissue: 'tonsil', nTPM: 5.3 },
                         { tissue: 'urinary bladder', nTPM: 6.8 }
                     ]
                 },
@@ -448,66 +453,78 @@
                     name: 'DNAH5 (Dynein Axonemal Heavy Chain 5)',
                     description: 'DNAH5 encodes a heavy chain component of axonemal dynein, which is involved in ciliary beating. Mutations in this gene are associated with primary ciliary dyskinesia.',
                     expressions: [
-                        { tissue: 'respiratory epithelium', nTPM: 18.2 },
-                        { tissue: 'fallopian tube', nTPM: 14.3 },
                         { tissue: 'brain', nTPM: 0.8 },
-                        { tissue: 'testis', nTPM: 12.7 },
+                        { tissue: 'fallopian tube', nTPM: 14.3 },
                         { tissue: 'kidney', nTPM: 3.2 },
-                        { tissue: 'lung', nTPM: 16.5 }
+                        { tissue: 'lung', nTPM: 16.5 },
+                        { tissue: 'respiratory epithelium', nTPM: 18.2 },
+                        { tissue: 'testis', nTPM: 12.7 }
                     ]
                 },
                 'IFT88': {
                     name: 'IFT88 (Intraflagellar Transport 88)',
                     description: 'IFT88 is a core component of the intraflagellar transport complex, essential for the assembly and maintenance of cilia. It is involved in trafficking of ciliary components.',
                     expressions: [
-                        { tissue: 'kidney', nTPM: 15.6 },
-                        { tissue: 'retina', nTPM: 13.2 },
-                        { tissue: 'liver', nTPM: 7.8 },
                         { tissue: 'brain', nTPM: 6.4 },
-                        { tissue: 'testis', nTPM: 11.3 },
-                        { tissue: 'lung', nTPM: 9.7 }
+                        { tissue: 'kidney', nTPM: 15.6 },
+                        { tissue: 'liver', nTPM: 7.8 },
+                        { tissue: 'lung', nTPM: 9.7 },
+                        { tissue: 'retina', nTPM: 13.2 },
+                        { tissue: 'testis', nTPM: 11.3 }
+                    ]
+                },
+                'FOXJ1': {
+                    name: 'FOXJ1 (Forkhead Box J1)',
+                    description: 'FOXJ1 is a transcription factor that regulates the formation of cilia and flagella. It is a master regulator of motile cilia formation.',
+                    expressions: [
+                        { tissue: 'brain', nTPM: 0.5 },
+                        { tissue: 'fallopian tube', nTPM: 22.4 },
+                        { tissue: 'lung', nTPM: 18.7 },
+                        { tissue: 'respiratory epithelium', nTPM: 25.3 },
+                        { tissue: 'testis', nTPM: 8.2 }
+                    ]
+                },
+                'ARL13B': {
+                    name: 'ARL13B (ADP Ribosylation Factor Like GTPase 13B)',
+                    description: 'ARL13B is a small GTPase that is essential for the formation and function of cilia. Mutations in this gene are associated with Joubert syndrome.',
+                    expressions: [
+                        { tissue: 'brain', nTPM: 8.7 },
+                        { tissue: 'kidney', nTPM: 12.3 },
+                        { tissue: 'liver', nTPM: 6.2 },
+                        { tissue: 'lung', nTPM: 9.8 },
+                        { tissue: 'retina', nTPM: 14.5 },
+                        { tissue: 'testis', nTPM: 7.4 }
                     ]
                 }
             };
             
-            // Organ positions and sizes
+            // Organ positions and sizes based on human anatomy
             const organPositions = {
-                'adipose tissue': { x: 50, y: 120, width: 25, height: 25 },
-                'adrenal gland': { x: 50, y: 200, width: 15, height: 20 },
-                'amygdala': { x: 100, y: 100, width: 15, height: 15 },
-                'appendix': { x: 60, y: 280, width: 10, height: 20 },
-                'basal ganglia': { x: 100, y: 110, width: 20, height: 15 },
-                'bone marrow': { x: 100, y: 180, width: 30, height: 150 },
-                'brain': { x: 100, y: 80, width: 40, height: 40 },
-                'breast': { x: 70, y: 150, width: 25, height: 15 },
-                'bronchus': { x: 100, y: 190, width: 20, height: 15 },
-                'cardiac muscle': { x: 100, y: 180, width: 25, height: 20 },
-                'cerebellum': { x: 100, y: 120, width: 25, height: 15 },
-                'colon': { x: 70, y: 270, width: 25, height: 15 },
-                'duodenum': { x: 80, y: 250, width: 15, height: 15 },
-                'endometrium': { x: 80, y: 230, width: 15, height: 10 },
-                'esophagus': { x: 100, y: 200, width: 15, height: 20 },
-                'eye': { x: 70, y: 90, width: 15, height: 10 },
-                'heart': { x: 100, y: 180, width: 25, height: 20 },
-                'kidney': { x: 65, y: 220, width: 20, height: 25 },
-                'liver': { x: 75, y: 200, width: 30, height: 25 },
-                'lung': { x: 100, y: 190, width: 30, height: 25 },
-                'lymph node': { x: 50, y: 180, width: 10, height: 10 },
-                'nasopharynx': { x: 100, y: 150, width: 15, height: 15 },
-                'ovary': { x: 70, y: 230, width: 15, height: 15 },
-                'pancreas': { x: 80, y: 220, width: 15, height: 15 },
-                'prostate': { x: 85, y: 290, width: 15, height: 15 },
-                'rectum': { x: 75, y: 290, width: 15, height: 10 },
-                'retina': { x: 70, y: 90, width: 10, height: 8 },
-                'skin': { x: 100, y: 50, width: 40, height: 150 },
-                'small intestine': { x: 80, y: 260, width: 20, height: 15 },
-                'spleen': { x: 60, y: 210, width: 15, height: 15 },
-                'testis': { x: 85, y: 310, width: 15, height: 15 },
-                'thyroid': { x: 100, y: 140, width: 15, height: 10 },
-                'tonsil': { x: 100, y: 130, width: 10, height: 10 },
-                'urinary bladder': { x: 80, y: 280, width: 15, height: 15 },
-                'respiratory epithelium': { x: 100, y: 190, width: 25, height: 15 },
-                'fallopian tube': { x: 70, y: 230, width: 10, height: 15 }
+                'adipose tissue': { x: 45, y: 180, width: 40, height: 40 },
+                'adrenal gland': { x: 40, y: 240, width: 20, height: 20 },
+                'appendix': { x: 55, y: 350, width: 15, height: 20 },
+                'bone marrow': { x: 50, y: 200, width: 100, height: 300 },
+                'brain': { x: 50, y: 70, width: 40, height: 40 },
+                'breast': { x: 50, y: 150, width: 30, height: 20 },
+                'colon': { x: 50, y: 320, width: 30, height: 25 },
+                'esophagus': { x: 50, y: 190, width: 10, height: 40 },
+                'fallopian tube': { x: 45, y: 270, width: 15, height: 15 },
+                'heart': { x: 50, y: 200, width: 30, height: 25 },
+                'kidney': { x: 45, y: 250, width: 25, height: 25 },
+                'liver': { x: 55, y: 220, width: 35, height: 30 },
+                'lung': { x: 50, y: 180, width: 40, height: 35 },
+                'ovary': { x: 45, y: 280, width: 20, height: 20 },
+                'pancreas': { x: 55, y: 240, width: 20, height: 15 },
+                'prostate': { x: 50, y: 320, width: 15, height: 15 },
+                'respiratory epithelium': { x: 50, y: 190, width: 35, height: 20 },
+                'retina': { x: 50, y: 90, width: 10, height: 10 },
+                'skin': { x: 50, y: 150, width: 100, height: 350 },
+                'small intestine': { x: 50, y: 300, width: 25, height: 30 },
+                'spleen': { x: 60, y: 230, width: 20, height: 20 },
+                'stomach': { x: 50, y: 220, width: 25, height: 20 },
+                'testis': { x: 50, y: 340, width: 20, height: 25 },
+                'thyroid': { x: 50, y: 140, width: 15, height: 15 },
+                'urinary bladder': { x: 50, y: 310, width: 20, height: 20 }
             };
             
             // Get color based on nTPM value
@@ -518,38 +535,66 @@
                 return '#1a7e1a'; // Dark green
             }
             
+            // Get expression level text
+            function getExpressionLevel(nTPM) {
+                if (nTPM <= 5) return 'Low';
+                if (nTPM <= 15) return 'Medium';
+                if (nTPM <= 30) return 'High';
+                return 'Very High';
+            }
+            
             // Create organ elements
             function createOrgans(expressions) {
-                humanFigure.innerHTML = '';
+                organsContainer.innerHTML = '';
+                
+                // Create a silhouette of human body
+                const humanSilhouette = document.createElement('div');
+                humanSilhouette.style.position = 'absolute';
+                humanSilhouette.style.width = '100%';
+                humanSilhouette.style.height = '100%';
+                humanSilhouette.style.backgroundImage = 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 100 400\'%3E%3Cpath d=\'M50 30 Q60 45 50 60 Q40 45 50 30\' fill=\'%23f5f5f5\' stroke=\'%23ddd\' stroke-width=\'0.5\'/%3E%3Cpath d=\'M50 60 L50 120\' stroke=\'%23ddd\' stroke-width=\'1\' fill=\'none\'/%3E%3Cpath d=\'M50 120 Q30 140 50 200 Q70 140 50 120\' fill=\'%23f5f5f5\' stroke=\'%23ddd\' stroke-width=\'0.5\'/%3E%3Cpath d=\'M50 200 L50 350\' stroke=\'%23ddd\' stroke-width=\'1\' fill=\'none\'/%3E%3Ccircle cx=\'50\' cy=\'25\' r=\'10\' fill=\'%23f5f5f5\' stroke=\'%23ddd\' stroke-width=\'0.5\'/%3E%3Cpath d=\'M30 80 Q25 100 30 120\' stroke=\'%23ddd\' stroke-width=\'1\' fill=\'none\'/%3E%3Cpath d=\'M70 80 Q75 100 70 120\' stroke=\'%23ddd\' stroke-width=\'1\' fill=\'none\'/%3E%3Cpath d=\'M30 350 Q35 370 45 370 Q50 365 55 370 Q65 370 70 350\' stroke=\'%23ddd\' stroke-width=\'1\' fill=\'none\'/%3E%3C/svg%3E")';
+                humanSilhouette.style.backgroundRepeat = 'no-repeat';
+                humanSilhouette.style.backgroundPosition = 'center';
+                humanSilhouette.style.backgroundSize = '40%';
+                humanSilhouette.style.opacity = '0.5';
+                organsContainer.appendChild(humanSilhouette);
+                
+                let hasExpressionData = false;
                 
                 expressions.forEach(exp => {
                     const position = organPositions[exp.tissue];
                     if (position) {
+                        hasExpressionData = true;
                         const organ = document.createElement('div');
                         organ.className = 'organ';
-                        organ.style.width = position.width + 'px';
+                        organ.style.width = position.width + '%';
                         organ.style.height = position.height + 'px';
-                        organ.style.left = `calc(50% - ${position.x}px)`;
-                        organ.style.top = `${position.y}px`;
+                        organ.style.left = position.x + '%';
+                        organ.style.top = position.y + 'px';
                         organ.style.backgroundColor = getColorForExpression(exp.nTPM);
                         organ.setAttribute('data-tissue', exp.tissue);
                         organ.setAttribute('data-nTPM', exp.nTPM);
                         
                         organ.addEventListener('mouseover', function(e) {
                             const rect = this.getBoundingClientRect();
-                            organTooltip.textContent = `${exp.tissue}: ${exp.nTPM} nTPM`;
+                            organTooltip.textContent = `${exp.tissue}: ${exp.nTPM} nTPM (${getExpressionLevel(exp.nTPM)})`;
                             organTooltip.style.left = (rect.left + rect.width/2) + 'px';
-                            organTooltip.style.top = (rect.top - 30) + 'px';
+                            organTooltip.style.top = (rect.top - 40) + 'px';
                             organTooltip.style.opacity = '1';
+                            organTooltip.style.transform = 'translateX(-50%)';
                         });
                         
                         organ.addEventListener('mouseout', function() {
                             organTooltip.style.opacity = '0';
                         });
                         
-                        humanFigure.appendChild(organ);
+                        organsContainer.appendChild(organ);
                     }
                 });
+                
+                if (!hasExpressionData) {
+                    organsContainer.innerHTML = '<div class="no-expression">No expression data available for visualization</div>';
+                }
             }
             
             // Perform search function
@@ -597,16 +642,10 @@
                         gene.expressions.forEach(exp => {
                             const row = document.createElement('tr');
                             
-                            let level = '';
-                            if (exp.nTPM <= 5) level = 'Low';
-                            else if (exp.nTPM <= 15) level = 'Medium';
-                            else if (exp.nTPM <= 30) level = 'High';
-                            else level = 'Very High';
-                            
                             row.innerHTML = `
                                 <td>${exp.tissue}</td>
                                 <td>${exp.nTPM}</td>
-                                <td>${level}</td>
+                                <td>${getExpressionLevel(exp.nTPM)}</td>
                             `;
                             tableBody.appendChild(row);
                         });
@@ -624,7 +663,7 @@
                             </div>
                         `;
                         
-                        humanFigure.innerHTML = '';
+                        organsContainer.innerHTML = '';
                         resultCount.textContent = `0 genes found`;
                     }
                 }, 1000);
