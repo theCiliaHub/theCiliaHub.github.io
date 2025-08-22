@@ -25,11 +25,14 @@
         .organ-visualization { flex: 1; min-width: 350px; display: flex; flex-direction: column; align-items: center; }
         .results-header { margin-bottom: 25px; padding-bottom: 15px; border-bottom: 1px solid #eee; }
         .results-title { font-size: 1.5rem; color: #1a2a6c; }
+        .results-count { color: #666; font-weight: 500; }
         .gene-name { font-size: 1.8rem; color: #1a2a6c; margin-bottom: 10px; }
+        .gene-description { color: #555; line-height: 1.6; margin-bottom: 20px; }
         .data-table-container { max-height: 500px; overflow-y: auto; border: 1px solid #eee; border-radius: 8px; }
         .data-table { width: 100%; border-collapse: collapse; }
         .data-table th, .data-table td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #eee; }
         .data-table th { background-color: #f8f9fa; font-weight: 500; color: #1a2a6c; position: sticky; top: 0; z-index: 10; }
+        .data-table tr:hover { background-color: #f9f9f9; }
         .loading, .error { text-align: center; padding: 40px; color: #666; }
         .loading i, .error i { font-size: 2rem; margin-bottom: 15px; }
         .loading i { color: #4a86e8; animation: spin 2s linear infinite; }
@@ -43,9 +46,19 @@
         .legend { display: flex; justify-content: center; margin-top: 20px; gap: 15px; flex-wrap: wrap; }
         .legend-item { display: flex; align-items: center; gap: 5px; font-size: 12px; }
         .legend-color { width: 20px; height: 20px; border-radius: 4px; border: 1px solid #ddd; }
+        .data-source { background: #f8f9fa; padding: 15px; border-radius: 8px; margin-top: 20px; font-size: 0.9rem; color: #666; }
+        .stats-summary { display: flex; justify-content: space-around; margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px; }
+        .stat-item { text-align: center; }
+        .stat-value { font-size: 1.5rem; font-weight: bold; color: #1a2a6c; }
+        .stat-label { font-size: 0.9rem; color: #666; }
         footer { text-align: center; padding: 20px; color: white; font-size: 0.9rem; opacity: 0.8; }
         @media (max-width: 992px) { .results-container { flex-direction: column; } }
-        @media (max-width: 768px) { .search-box { flex-direction: column; } .search-input { border-radius: 8px; margin-bottom: 10px; } .search-button { border-radius: 8px; padding: 12px; } }
+        @media (max-width: 768px) { 
+            .search-box { flex-direction: column; } 
+            .search-input { border-radius: 8px; margin-bottom: 10px; } 
+            .search-button { border-radius: 8px; padding: 12px; }
+            .stats-summary { flex-direction: column; gap: 10px; }
+        }
     </style>
 </head>
 <body>
@@ -65,15 +78,32 @@
         
         <div class="results-container" style="display: none;" id="resultsContainer">
             <div class="expression-data">
-                <div class="results-header"><h2 class="results-title">Expression Results</h2></div>
-                <div id="resultsContent"></div>
+                <div class="results-header">
+                    <h2 class="results-title">Expression Results</h2>
+                    <div class="results-count" id="resultCount"></div>
+                </div>
+                <div id="resultsContent">
+                    <div style="text-align: center; padding: 40px; color: #666;">
+                        <i class="fas fa-search" style="font-size: 3rem; margin-bottom: 20px; color: #ddd;"></i>
+                        <h3>Search for Gene Expression Data</h3>
+                        <p>Enter a gene symbol above to explore its expression across human tissues</p>
+                        <p style="margin-top: 15px; font-size: 0.9rem;">
+                            Try searching for ciliary genes like: WDR31, ACE2, IFT88, CEP290, DNAH5, FOXJ1, ARL13B
+                        </p>
+                    </div>
+                </div>
             </div>
             
             <div class="organ-visualization">
-                <div class="results-header"><h2 class="results-title">Tissue Expression Map</h2></div>
+                <div class="results-header">
+                    <h2 class="results-title">Tissue Expression Map</h2>
+                    <div class="results-count" id="visualizationHelp">Hover over tissues for details</div>
+                </div>
                 <div class="svg-container" id="svgContainer">
                     <svg id="humanSvg" class="human-svg" viewBox="0 0 453.54 815.12" xmlns="http://www.w3.org/2000/svg">
-                        <g id="body-outline" fill="#f0f0f0" stroke="#cccccc" stroke-width="0.5"><path d="M226.77,815.12C101.48,815.12,0,713.64,0,588.35c0-125.29,101.48-226.77,226.77-226.77s226.77,101.48,226.77,226.77C453.54,713.64,352.06,815.12,226.77,815.12ZM226.77,365.58c-122.99,0-222.77,99.78-222.77,222.77s99.78,222.77,222.77,222.77,222.77-99.78,222.77-222.77S349.76,365.58,226.77,365.58Z"/></g>
+                        <g id="body-outline" fill="#f0f0f0" stroke="#cccccc" stroke-width="0.5">
+                            <path d="M226.77,815.12C101.48,815.12,0,713.64,0,588.35c0-125.29,101.48-226.77,226.77-226.77s226.77,101.48,226.77,226.77C453.54,713.64,352.06,815.12,226.77,815.12ZM226.77,365.58c-122.99,0-222.77,99.78-222.77,222.77s99.78,222.77,222.77,222.77,222.77-99.78,222.77-222.77S349.76,365.58,226.77,365.58Z"/>
+                        </g>
                         <path id="path-colon" class="organ" fill="#E0E0E0" d="M294.57,489.28c-.46-1.15-1.03-2.24-1.6-3.34-19.1-37.58-52.68-62.85-92.41-62.85s-73.31,25.27-92.41,62.85c-.58,1.1-1.14,2.19-1.6,3.34H58.14c-1.49,0-2.69-1.2-2.69-2.69v-13.04c0-1.49,1.2-2.69,2.69-2.69h30.29c11.01-44.5,51.84-78.11,100.32-78.11s89.31,33.61,100.32,78.11h30.29c1.49,0,2.69,1.2,2.69,2.69v13.04c0,1.49-1.2,2.69-2.69,2.69h-22.1Z"/>
                         <path id="path-stomach" class="organ" fill="#E0E0E0" d="m167.31,407.5c-20.14,4.24-34.93,17.43-34.93,33.15,0,19.33,26.43,35,59,35s59-15.67,59-35c0-14.16-11.45-26.31-28.52-31.67-12.78-3.99-28.32-6.28-44.56-1.48Z"/>
                         <path id="path-small-intestine" class="organ" fill="#E0E0E0" d="M204.4,422.36c-20.44,0-37,16.56-37,37s16.56,37,37,37,37-16.56,37-37-16.56-37-37-37Z"/>
@@ -125,7 +155,7 @@
         </div>
         
         <footer>
-            <p>© 2024 CiliaHub | Gene Expression Database | Data source: Human Protein Atlas RNA-seq tissue consensus</p>
+            <p>© 2025 CiliaHub | Gene Expression Database | Data source: Human Protein Atlas RNA-seq tissue consensus</p>
         </footer>
     </div>
 
@@ -139,6 +169,7 @@
                 this.initializeElements();
                 this.setupEventListeners();
                 this.createTissueMapping();
+                this.loadInitialMessage();
                 GeneExpressionApp.instance = this;
             }
             
@@ -147,6 +178,7 @@
                 this.geneInput = document.getElementById('geneInput');
                 this.resultsContainer = document.getElementById('resultsContainer');
                 this.resultsContent = document.getElementById('resultsContent');
+                this.resultCount = document.getElementById('resultCount');
                 this.organTooltip = document.getElementById('organTooltip');
                 this.organs = document.querySelectorAll('.organ');
             }
@@ -163,18 +195,49 @@
 
             createTissueMapping() {
                 this.tissueMapping = {
-                    'adipose tissue': ['path-adipose'], 'adrenal gland': ['path-adrenal-gland-left', 'path-adrenal-gland-right'],
-                    'bone marrow': ['path-bone-marrow'], 'brain': ['path-brain', 'path-cerebellum'], 'cerebellum': ['path-cerebellum'],
-                    'cervix uterine': ['path-cervix'], 'colon': ['path-colon'], 'endometrium': ['path-endometrium'],
-                    'epididymis': ['path-epididymis-left', 'path-epididymis-right'], 'esophagus': ['path-esophagus'],
-                    'fallopian tube': ['path-fallopian-tube-left', 'path-fallopian-tube-right'], 'gallbladder': ['path-gall-bladder'],
-                    'heart muscle': ['path-heart'], 'kidney': ['path-kidney-left', 'path-kidney-right'], 'liver': ['path-liver'],
-                    'lung': ['path-lung-left', 'path-lung-right'], 'ovary': ['path-ovary-left', 'path-ovary-right'],
-                    'pancreas': ['path-pancreas'], 'placenta': ['path-placenta'], 'prostate': ['path-prostate'],
-                    'seminal vesicle': ['path-seminal-vesicle'], 'skeletal muscle': ['path-muscle'], 'skin': ['path-skin'],
-                    'small intestine': ['path-small-intestine'], 'smooth muscle': ['path-smooth-muscle'], 'spleen': ['path-spleen'],
-                    'stomach': ['path-stomach'], 'testis': ['path-testis-left', 'path-testis-right'], 'thyroid gland': ['path-thyroid'], 'trachea': ['path-trachea'],
+                    'adipose tissue': ['path-adipose'],
+                    'adrenal gland': ['path-adrenal-gland-left', 'path-adrenal-gland-right'],
+                    'bone marrow': ['path-bone-marrow'],
+                    'brain': ['path-brain', 'path-cerebellum'],
+                    'cerebellum': ['path-cerebellum'],
+                    'cervix, uterine': ['path-cervix'],
+                    'colon': ['path-colon'],
+                    'endometrium': ['path-endometrium'],
+                    'epididymis': ['path-epididymis-left', 'path-epididymis-right'],
+                    'esophagus': ['path-esophagus'],
+                    'fallopian tube': ['path-fallopian-tube-left', 'path-fallopian-tube-right'],
+                    'gallbladder': ['path-gall-bladder'],
+                    'heart muscle': ['path-heart'],
+                    'kidney': ['path-kidney-left', 'path-kidney-right'],
+                    'liver': ['path-liver'],
+                    'lung': ['path-lung-left', 'path-lung-right'],
+                    'ovary': ['path-ovary-left', 'path-ovary-right'],
+                    'pancreas': ['path-pancreas'],
+                    'placenta': ['path-placenta'],
+                    'prostate': ['path-prostate'],
+                    'seminal vesicle': ['path-seminal-vesicle'],
+                    'skeletal muscle': ['path-muscle'],
+                    'skin': ['path-skin'],
+                    'small intestine': ['path-small-intestine'],
+                    'smooth muscle': ['path-smooth-muscle'],
+                    'spleen': ['path-spleen'],
+                    'stomach': ['path-stomach'],
+                    'testis': ['path-testis-left', 'path-testis-right'],
+                    'thyroid gland': ['path-thyroid'],
+                    'trachea': ['path-trachea']
                 };
+            }
+            
+            loadInitialMessage() {
+                this.resultsContent.innerHTML = `
+                    <div style="text-align: center; padding: 40px; color: #666;">
+                        <i class="fas fa-search" style="font-size: 3rem; margin-bottom: 20px; color: #ddd;"></i>
+                        <h3>Search for Gene Expression Data</h3>
+                        <p>Enter a gene symbol above to explore its expression across human tissues</p>
+                        <p style="margin-top: 15px; font-size: 0.9rem;">
+                            Try searching for ciliary genes like: WDR31, ACE2, IFT88, CEP290, DNAH5, FOXJ1, ARL13B
+                        </p>
+                    </div>`;
             }
             
             loadRNAData() {
@@ -183,13 +246,13 @@
                         const dataUrl = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/rna_tissue_consensus.json';
                         try {
                             console.log('Fetching RNA data from:', dataUrl);
-                            const response = await fetch(dataUrl);
+                            const response = await fetch(dataUrl, { mode: 'cors' });
                             if (!response.ok) { throw new Error(`Network response error: ${response.status}`); }
                             this.rnaData = await response.json();
                             console.log(`Successfully loaded data for ${Object.keys(this.rnaData).length} genes.`);
                             resolve(this.rnaData);
                         } catch (error) {
-                            console.error('Fatal Error loading RNA data:', error);
+                            console.error('Error loading RNA data:', error);
                             reject(error);
                         }
                     });
@@ -199,7 +262,10 @@
             
             async performSearch() {
                 const geneSymbol = this.geneInput.value.trim().toUpperCase();
-                if (!geneSymbol) { this.showError('Please enter a gene symbol.'); return; }
+                if (!geneSymbol) { 
+                    this.showError('Please enter a gene symbol.'); 
+                    return; 
+                }
                 if (this.isLoading) return;
                 this.isLoading = true;
                 this.resultsContainer.style.display = 'flex';
@@ -207,50 +273,127 @@
                 try {
                     const rnaData = await this.loadRNAData();
                     const geneData = rnaData[geneSymbol];
-                    if (geneData) { this.displayResults(geneSymbol, geneData); } 
-                    else { this.showNotFound(geneSymbol); }
+                    if (geneData) { 
+                        this.displayResults(geneSymbol, geneData); 
+                    } else { 
+                        this.showNotFound(geneSymbol); 
+                    }
                 } catch (error) {
-                    this.showError(`Could not load expression database. Press F12 to see console for details.`);
+                    this.showError('Could not load expression database. Please try again later or check the console (F12) for details.');
                 } finally {
                     this.isLoading = false;
                 }
             }
             
             showLoading(geneSymbol) {
-                this.resultsContent.innerHTML = `<div class="loading"><i class="fas fa-spinner fa-spin"></i><p>Loading expression data for ${geneSymbol}...</p><small>(Initial load may take a moment)</small></div>`;
+                this.resultsContent.innerHTML = `
+                    <div class="loading">
+                        <i class="fas fa-spinner fa-spin"></i>
+                        <p>Loading expression data for ${geneSymbol}...</p>
+                        <small>(Initial load may take a moment)</small>
+                    </div>`;
+                this.resultCount.textContent = 'Searching...';
                 this.resetOrgans();
             }
             
             showError(message) {
                 this.resultsContainer.style.display = 'flex';
-                this.resultsContent.innerHTML = `<div class="error"><i class="fas fa-exclamation-triangle"></i><p>${message}</p></div>`;
+                this.resultsContent.innerHTML = `
+                    <div class="error">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <p>${message}</p>
+                    </div>`;
+                this.resultCount.textContent = 'Error';
                 this.resetOrgans();
             }
             
             showNotFound(geneSymbol) {
-                this.resultsContent.innerHTML = `<div class="error"><i class="fas fa-search-minus"></i><h3>Gene "${geneSymbol}" not found.</h3><p>Please check the gene symbol and try again.</p></div>`;
+                this.resultsContent.innerHTML = `
+                    <div class="error">
+                        <i class="fas fa-search-minus"></i>
+                        <h3>Gene "${geneSymbol}" not found.</h3>
+                        <p>Please check the gene symbol and try again.</p>
+                    </div>`;
+                this.resultCount.textContent = '0 genes found';
                 this.resetOrgans();
             }
             
             displayResults(geneSymbol, geneData) {
+                const tissues = Object.keys(geneData);
+                const expressions = Object.values(geneData);
+                const maxExpression = Math.max(...expressions);
+                const avgExpression = expressions.reduce((a, b) => a + b, 0) / expressions.length;
+                const nonZeroCount = expressions.filter(exp => exp > 0).length;
+                
                 this.resultsContent.innerHTML = `
-                    <div class="gene-info"><h3 class="gene-name">${geneSymbol}</h3>
-                        <div class="data-table-container"><table class="data-table">
-                            <thead><tr><th>Tissue</th><th>nTPM</th><th>Expression Level</th></tr></thead>
-                            <tbody>${this.generateTableRows(geneData)}</tbody>
-                        </table></div>
+                    <div class="gene-info">
+                        <h3 class="gene-name">${geneSymbol}</h3>
+                        <p class="gene-description">
+                            Expression data from Human Protein Atlas RNA-seq tissue consensus dataset.
+                            Values represent normalized transcript abundance (nTPM).
+                        </p>
+                        <div class="stats-summary">
+                            <div class="stat-item">
+                                <div class="stat-value">${tissues.length}</div>
+                                <div class="stat-label">Tissues</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-value">${nonZeroCount}</div>
+                                <div class="stat-label">Expressed</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-value">${maxExpression.toFixed(1)}</div>
+                                <div class="stat-label">Max nTPM</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-value">${avgExpression.toFixed(1)}</div>
+                                <div class="stat-label">Avg nTPM</div>
+                            </div>
+                        </div>
+                        <h4>Expression Levels (nTPM)</h4>
+                        <div class="data-table-container">
+                            <table class="data-table">
+                                <thead><tr><th>Tissue</th><th>nTPM</th><th>Expression Level</th></tr></thead>
+                                <tbody>${this.generateTableRows(geneData)}</tbody>
+                            </table>
+                        </div>
+                        <div class="data-source">
+                            <i class="fas fa-database"></i>
+                            <strong>Data Source:</strong> Human Protein Atlas RNA-seq tissue consensus data
+                        </div>
                     </div>`;
+                this.resultCount.textContent = `1 gene found`;
                 this.updateOrganVisualization(geneData);
             }
             
             generateTableRows(geneData) {
-                return Object.entries(geneData).sort((a, b) => b[1] - a[1])
-                    .map(([tissue, nTPM]) => `<tr><td>${this.formatTissueName(tissue)}</td><td>${nTPM.toFixed(2)}</td><td>${this.getExpressionLevel(nTPM)}</td></tr>`).join('');
+                return Object.entries(geneData)
+                    .sort((a, b) => b[1] - a[1])
+                    .map(([tissue, nTPM]) => `
+                        <tr>
+                            <td>${this.formatTissueName(tissue)}</td>
+                            <td>${nTPM.toFixed(2)}</td>
+                            <td>${this.getExpressionLevel(nTPM)}</td>
+                        </tr>`).join('');
             }
             
-            formatTissueName(tissue) { return tissue.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()); }
-            getExpressionLevel(nTPM) { if (nTPM <= 5) return 'Low'; if (nTPM <= 15) return 'Medium'; if (nTPM <= 30) return 'High'; return 'Very High'; }
-            getColorForExpression(nTPM) { if (nTPM <= 5) return '#c8e6c9'; if (nTPM <= 15) return '#81c784'; if (nTPM <= 30) return '#4caf50'; return '#2e7d32'; }
+            formatTissueName(tissue) { 
+                return tissue.replace(/,/g, '').replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()); 
+            }
+            
+            getExpressionLevel(nTPM) { 
+                if (nTPM <= 5) return 'Low'; 
+                if (nTPM <= 15) return 'Medium'; 
+                if (nTPM <= 30) return 'High'; 
+                return 'Very High'; 
+            }
+            
+            getColorForExpression(nTPM) { 
+                if (nTPM <= 5) return '#c8e6c9'; 
+                if (nTPM <= 15) return '#81c784'; 
+                if (nTPM <= 30) return '#4caf50'; 
+                return '#2e7d32'; 
+            }
             
             updateOrganVisualization(geneData) {
                 this.resetOrgans();
@@ -263,6 +406,7 @@
                                 organ.style.fill = this.getColorForExpression(nTPM);
                                 organ.setAttribute('data-tissue', this.formatTissueName(tissue));
                                 organ.setAttribute('data-ntpm', nTPM.toFixed(2));
+                                organ.setAttribute('data-level', this.getExpressionLevel(nTPM));
                             }
                         });
                     }
@@ -274,6 +418,7 @@
                     organ.style.fill = '#E0E0E0';
                     organ.removeAttribute('data-tissue');
                     organ.removeAttribute('data-ntpm');
+                    organ.removeAttribute('data-level');
                 });
             }
             
@@ -282,14 +427,20 @@
                 if (!organ) return;
                 const tissue = organ.getAttribute('data-tissue');
                 const nTPM = organ.getAttribute('data-ntpm');
+                const level = organ.getAttribute('data-level');
                 if (tissue && nTPM) {
-                    this.organTooltip.innerHTML = `<strong>${tissue}</strong><br>${nTPM} nTPM (${this.getExpressionLevel(parseFloat(nTPM))})`;
+                    this.organTooltip.innerHTML = `
+                        <strong>${tissue}</strong><br>
+                        ${nTPM} nTPM<br>
+                        <em>${level} Expression</em>`;
                     this.organTooltip.style.opacity = '1';
                     this.moveTooltip(event);
                 }
             }
             
-            hideTooltip() { this.organTooltip.style.opacity = '0'; }
+            hideTooltip() { 
+                this.organTooltip.style.opacity = '0'; 
+            }
             
             moveTooltip(event) {
                 const containerRect = document.getElementById('svgContainer').getBoundingClientRect();
@@ -298,7 +449,9 @@
             }
         }
         
-        document.addEventListener('DOMContentLoaded', () => { window.geneApp = new GeneExpressionApp(); });
+        document.addEventListener('DOMContentLoaded', () => { 
+            window.geneApp = new GeneExpressionApp(); 
+        });
     </script>
 </body>
 </html>
