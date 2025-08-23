@@ -226,7 +226,7 @@
     "synonym": "ARL2L1,DKFZP761H079,JBTS8",
     "omim_id": "608922",
     "functional_summary": "Mutated in Joubert Syndrome (type 8) OMIM 608922, 18674751. In proximal ciliary membrane PMID:20231383. Role in IFT and therefore ciliogenesis PMID:20530210. Necessary for normal Shh PMID:21976698 and INPP5E sig lling PMID:23150559 and normal expression of Nodal and Cerl2 PMID:22554696.",
-    "localization": "basal body",
+    "localization": "cilia",
     "reference": "https://pubmed.ncbi.nlm.nih.gov/18674751;https://pubmed.ncbi.nlm.nih.gov/20231383;https://pubmed.ncbi.nlm.nih.gov/20530210;https://pubmed.ncbi.nlm.nih.gov/21976698;https://pubmed.ncbi.nlm.nih.gov/23150559;https://pubmed.ncbi.nlm.nih.gov/22554696"
   },
   {
@@ -2476,7 +2476,11 @@
     "synonym": "CFAP80,FAP80,SPG,WDR10,WDR10P,WDR140",
     "omim_id": "606045",
     "functional_summary": "Negative regulator of the Shh pathway, controlling the ciliary localization of Shh pathway activators and repressors. Loss of IFT122 causes accumulation of Gli2 and Gli3 at cilia tips. Function in retrograde intraflagellar transport (ITF) that facilitates complex A stability (21209331). Required for transport of opsin, and the distal elongation of outer segments (27681595). IFT122 connects the core and peripheral subcomplexes of the IFT-A (29220510).",
+<<<<<<< HEAD
     "localization": "basal body,cilia",
+=======
+    "localization": "cilia, basal body",
+>>>>>>> 19cd5cbe433ee3c23bf70890019d6fd9123aff9f
     "reference": "https://pubmed.ncbi.nlm.nih.gov/23418020;https://pubmed.ncbi.nlm.nih.gov/29236364;https://pubmed.ncbi.nlm.nih.gov/24619649"
   },
   {
@@ -2486,7 +2490,11 @@
     "synonym": "GS114,KIAA0590,WDTC2",
     "omim_id": "614620",
     "functional_summary": "Component of IFT-A complex, mutated in skeletal ciliopathies with kidney disease (23418020). Associates with IFT122 and IFT144 to a stable IFT-A core subcomplex; indispensable for dynein proteins retrograde transport into the cytoplasm and flagellar assembly. Required for development and mainte nce of outer segments, ciliary/flagellar assembly and sig l transduction (29236364, 24619649).",
+<<<<<<< HEAD
     "localization": "basal body,cilia,cilia",
+=======
+    "localization": "cilia, basal body",
+>>>>>>> 19cd5cbe433ee3c23bf70890019d6fd9123aff9f
     "reference": "https://pubmed.ncbi.nlm.nih.gov/29659833;https://pubmed.ncbi.nlm.nih.gov/31850339;https://pubmed.ncbi.nlm.nih.gov/18930042;https://pubmed.ncbi.nlm.nih.gov/25168386"
   },
   {
@@ -2496,7 +2504,11 @@
     "synonym": "BBS20,NPHP17,OSM-1,SLB,WIM",
     "omim_id": "607386",
     "functional_summary": "Component of IFT complex B. Involved in the switching between the anterograde and retrograde transport (29659833). Essential for ciliary growth and mainte nce, and morphogenesis of the cerebral cortex. Mutation cause alterations in multiple intracellular sig ling pathways (31850339, 18930042). Mutations are associated with severe skeleto-re l disorders with reti l involvement (25168386).",
+<<<<<<< HEAD
     "localization": "basal body,cilia",
+=======
+    "localization": "cilia, basal body",
+>>>>>>> 19cd5cbe433ee3c23bf70890019d6fd9123aff9f
     "reference": "https://pubmed.ncbi.nlm.nih.gov/12821668;https://pubmed.ncbi.nlm.nih.gov/16775004;https://pubmed.ncbi.nlm.nih.gov/27682589"
   },
   {
@@ -2506,7 +2518,11 @@
     "synonym": "",
     "omim_id": "614394",
     "functional_summary": "Component of IFT complex B that functions as a link between IFT complex and kinesin II, binding to both IFT57 and KIF3B, making it essential for anterograde transport in cilia and flagella (12821668). Required for ciliary assembly and localisation of polycystin-2 and opsin to cilia (16775004). Essential for spermiogenesis and male fertility (27682589).",
+<<<<<<< HEAD
     "localization": "basal body,cilia,flagella",
+=======
+    "localization": "cilia, basal body, golgi",
+>>>>>>> 19cd5cbe433ee3c23bf70890019d6fd9123aff9f
     "reference": "https://pubmed.ncbi.nlm.nih.gov/30940671;https://pubmed.ncbi.nlm.nih.gov/31953262"
   },
   {
@@ -2576,7 +2592,7 @@
     "synonym": "DYF-13,DYF13,FLJ12571,TTC26",
     "omim_id": "617453",
     "functional_summary": "Also known as IFT56. Regulates normal levels and distribution of IFTB proteins in the cilia. Required for the accumulation of Gli2 and Gli3 at the distal tips of cilia; essential for normal microtubule architecture within the ciliary axoneme and trafficking of Shh sig ling proteins. IFT56 associates with motility factors, function results in impaired motility (28264835). Required for normal development and differentiation in reti  and pronephros (22718903). Role in transporting ciliary cargoes related to ciliary motility and for assembling cilia of full length (24596149). Forms a dimer with IFT46, responsible for the interaction of IFT-B with ARL13B (27927754).",
-    "localization": "cilia",
+    "localization": "cilia, basal body",
     "reference": "https://pubmed.ncbi.nlm.nih.gov/17981992;https://pubmed.ncbi.nlm.nih.gov/31735294"
   },
   {
@@ -2616,7 +2632,11 @@
     "synonym": "CCDC2,CMG-1,CMG1,FLJ22621",
     "omim_id": "608040",
     "functional_summary": "Component of IFT complex B. Interacts with IFT81 to stabilise IFT-B complex. This interaction is required for binding and transport of tubulin to regulate cilium length, required for ciliogenesis (23990561). Essential for normal mouse spermatogenesis and sperm flagella formation by transporting cargo proteins and modulating axoneme and microtubule assembly (31004481).",
+<<<<<<< HEAD
     "localization": "basal body,cilia",
+=======
+    "localization": "cilia, basal body",
+>>>>>>> 19cd5cbe433ee3c23bf70890019d6fd9123aff9f
     "reference": "https://pubmed.ncbi.nlm.nih.gov/22771375;https://pubmed.ncbi.nlm.nih.gov/29658880"
   },
   {
@@ -2626,7 +2646,11 @@
     "synonym": "CFAP167,FAP167,KIAA1374,WDR56",
     "omim_id": "611177",
     "functional_summary": "Component of IFT complex B. Role in cilia formation and osteogenesis through regulating Hedgehog/Gli sig l pathways. Silencing IFT80 led to either shortening or loss of cilia and the decrease of cilia marker protein Arl13b expression. Mutations cause Jeune asphyxiating thoracic dystrophy (JATD) and short rib polydactyly type III (SRPIII) (22771375). Required for IFT mediated recruitment and transport of ciliary cargo, as well as for initiation of the ciliary axoneme (29658880).",
+<<<<<<< HEAD
     "localization": "basal body,cilia",
+=======
+    "localization": "cilia, basal body",
+>>>>>>> 19cd5cbe433ee3c23bf70890019d6fd9123aff9f
     "reference": "https://pubmed.ncbi.nlm.nih.gov/27068536;https://pubmed.ncbi.nlm.nih.gov/23990561"
   },
   {
@@ -2636,7 +2660,11 @@
     "synonym": "CDV-1R,CDV1,MGC4027",
     "omim_id": "605489",
     "functional_summary": "Component of IFT complex B. Interacts with IFT74 to form a tubulin-binding module that is the main site of tubulin binding for IFT and is required for ciliogenesis. Both are essential for flagellar assembly and elongation (27068536, 23990561).",
+<<<<<<< HEAD
     "localization": "basal body,cilia",
+=======
+    "localization": "cilia, basal body",
+>>>>>>> 19cd5cbe433ee3c23bf70890019d6fd9123aff9f
     "reference": "https://pubmed.ncbi.nlm.nih.gov/11062270"
   },
   {
@@ -2646,8 +2674,8 @@
     "synonym": "D13S1056E,HTG737,MGC26259,TG737,TTC10",
     "omim_id": "600595",
     "functional_summary": "Component of IFT complex B. Required for ciliary and flagellar assembly and may play a role in the attachment of the IFT particle to its cargo or to the anterograde IFT motor FLA10-kinesin-II (11062270).",
-    "localization": "basal body",
-    "reference": "https://pubmed.ncbi.nlm.nih.gov/23954591;https://pubmed.ncbi.nlm.nih.gov/28050756"
+    "localization": "cilia, basal body",
+    "reference": "https://pubmed.ncbi.nlm.nih.gov/11916979"
   },
   {
     "gene": "IFTAP",
@@ -2780,7 +2808,7 @@
     "reference": "https://pubmed.ncbi.nlm.nih.gov/29211732"
   },
   {
-    "gene": "KAT L1",
+    "gene": "KATL1",
     "ensembl_id": "ENSG00000102781",
     "description": "katanin catalytic subunit A1 like 1 [Source:HGNC Symbol;Acc:HGNC:28361]",
     "synonym": "MGC2599",
@@ -2790,7 +2818,7 @@
     "reference": "https://pubmed.ncbi.nlm.nih.gov/30096282;https://pubmed.ncbi.nlm.nih.gov/26153462"
   },
   {
-    "gene": "KAT L2",
+    "gene": "KATL2",
     "ensembl_id": "ENSG00000167216",
     "description": "katanin catalytic subunit A1 like 2 [Source:HGNC Symbol;Acc:HGNC:25387]",
     "synonym": "DKFZP667C165,MGC33211",
@@ -7168,16 +7196,6 @@
     "functional_summary": "SEPTIN9 regulates RhoA sig ling at the base of cilia by binding and activating the RhoA guanine nucleotide exchange factor, ARHGEF18 (36912772).",
     "localization": "basal body,cilia",
     "reference": "https://pubmed.ncbi.nlm.nih.gov/36912772"
-  },
-  {
-    "gene": "ARL13A",
-    "ensembl_id": "ENSG00000174225",
-    "description": "ADP ribosylation factor like GTPase 13A [Source:HGNC Symbol;Acc:HGNC:31709]",
-    "synonym": "ARL13",
-    "omim_id": "",
-    "functional_summary": "Arl13a and Arl13b genes are widely expressed during early cell division and gastrulation and both localize to microtubules in ciliated and dividing cells of the early zebrafish embryo(30009987).",
-    "localization": "cilia",
-    "reference": "https://pubmed.ncbi.nlm.nih.gov/30009987"
   },
   {
     "gene": "ARL15",
