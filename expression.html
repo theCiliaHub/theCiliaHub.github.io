@@ -2,300 +2,349 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>CiliaHub – Gene Expression</title>
   <link rel="icon" type="image/png" href="CiliaHub_Logo_web.png">
   <style>
     /* General Styles & Layout */
+    :root {
+      --primary-color: #3373C4;
+      --secondary-color: #2c5aa0;
+      --text-color: #2c3e50;
+      --background-gradient: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+      --card-shadow: 0 10px 35px rgba(44, 90, 160, 0.1);
+      --border-radius: 15px;
+    }
+
     * {
       margin: 0;
       padding: 0;
       box-sizing: border-box;
     }
+
     body {
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-      color: #2c3e50;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      background: var(--background-gradient);
+      color: var(--text-color);
       line-height: 1.6;
     }
-    .main-container {
-      max-width: 1400px;
+
+    .container {
+      max-width: 1200px;
       margin: 2rem auto;
-      padding: 0 2rem;
+      padding: 0 1.5rem;
     }
-    /* Header */
+
+    /* Header (Navbar Style) */
     header {
-      background-color: #3373C4;
-      padding: 2rem;
+      background-color: var(--primary-color);
+      padding: 1.5rem 2rem;
       text-align: center;
       color: #ffffff;
-      border-radius: 15px;
-      box-shadow: 0 8px 32px rgba(44, 90, 160, 0.1);
-      margin-bottom: 1.5rem;
+      border-radius: var(--border-radius);
+      box-shadow: var(--card-shadow);
+      margin-bottom: 2rem;
     }
+
     header h1 {
-      font-size: 2.5rem;
-      margin-bottom: 0.5rem;
+      font-size: 2.25rem;
+      margin-bottom: 0.25rem;
     }
+
     header p {
       font-size: 1.1rem;
       opacity: 0.9;
     }
-    /* Main Content Grid */
-    .grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 1.5rem;
-    }
+
+    /* Main Content Sections */
     .page-section {
       background: white;
       padding: 2rem;
-      border-radius: 15px;
-      box-shadow: 0 8px 32px rgba(44, 90, 160, 0.1);
+      border-radius: var(--border-radius);
+      box-shadow: var(--card-shadow);
+      margin-bottom: 2rem;
     }
-    /* Search Bar */
-    .search {
-      display: flex;
-      gap: 1rem;
-      margin-bottom: 1.5rem;
+    
+    /* Search Section */
+    .search-container {
       position: relative;
     }
-    .search input {
+    
+    .search-wrapper {
+      display: flex;
+      gap: 1rem;
+    }
+
+    #geneInput {
       flex: 1;
       padding: 1rem;
       border: 2px solid #e1ecf4;
       border-radius: 10px;
-      font-size: 1rem;
+      font-size: 1.1rem;
       outline: none;
+      transition: border-color 0.3s;
     }
-    .search input:focus {
-      border-color: #2c5aa0;
+
+    #geneInput:focus {
+      border-color: var(--secondary-color);
     }
-    .search button {
+
+    #searchBtn {
       padding: 1rem 2rem;
-      background: linear-gradient(135deg, #2c5aa0 0%, #1e3a5f 100%);
+      background: linear-gradient(135deg, var(--secondary-color) 0%, #1e3a5f 100%);
       color: white;
       border: none;
       border-radius: 10px;
       cursor: pointer;
       font-weight: 600;
+      font-size: 1rem;
+      transition: transform 0.2s, box-shadow 0.2s;
     }
-    .search button:hover {
+    
+    #searchBtn:hover {
       transform: translateY(-2px);
       box-shadow: 0 8px 25px rgba(44, 90, 160, 0.3);
     }
-    .search button:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
+
     #suggestions {
       position: absolute;
-      top: 100%;
+      top: calc(100% + 5px);
       left: 0;
       right: 0;
       background: white;
       border-radius: 10px;
-      box-shadow: 0 8px 32px rgba(44, 90, 160, 0.1);
+      box-shadow: var(--card-shadow);
       display: none;
       z-index: 10;
-      max-height: 200px;
+      max-height: 220px;
       overflow-y: auto;
+      border: 1px solid #e1ecf4;
     }
+
     .suggestion {
-      padding: 0.7rem 1rem;
+      padding: 0.8rem 1.2rem;
       cursor: pointer;
-      color: #2c3e50;
     }
+
     .suggestion:hover {
       background-color: #f8f9fa;
     }
-    /* Table */
-    .table-wrap {
+    
+    #status {
+      text-align: center;
       margin-top: 1.5rem;
-      display: none;
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
       font-size: 1rem;
+      color: #7f8c8d;
+      min-height: 24px;
     }
-    thead {
-      background-color: #f8f9fa;
+    .status-error { color: #e74c3c; font-weight: bold; }
+
+    /* Results Section */
+    #results-section {
+      display: none; /* Hidden by default */
+      grid-template-columns: 1fr 1fr;
+      gap: 2rem;
+      opacity: 0;
+      transition: opacity 0.5s ease-in-out;
     }
-    th, td {
-      padding: 0.7rem;
-      text-align: left;
+    
+    #results-section.visible {
+      display: grid;
+      opacity: 1;
     }
-    tbody tr:nth-child(even) {
-      background-color: #f9f9f9;
-    }
-    tbody tr:hover {
-      background-color: #f0f0f0;
-    }
-    /* Legend */
-    .legend {
-      display: flex;
-      gap: 0.8rem;
-      flex-wrap: wrap;
-      margin-top: 1.5rem;
-    }
-    .legend-item {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      font-size: 0.9rem;
-      color: #2c3e50;
-    }
-    .sw {
-      width: 20px;
-      height: 20px;
-      border-radius: 50%;
-    }
-    /* SVG */
-    .viz {
-      position: relative;
-      width: 100%;
-      height: 500px;
-      margin-top: 1.5rem;
+
+    .viz-panel, .data-panel {
       background: white;
-      border-radius: 15px;
-      box-shadow: 0 8px 32px rgba(44, 90, 160, 0.1);
       padding: 2rem;
+      border-radius: var(--border-radius);
+      box-shadow: var(--card-shadow);
     }
+    
+    .panel-title {
+        font-size: 1.5rem;
+        margin-bottom: 1.5rem;
+        border-bottom: 2px solid #e1ecf4;
+        padding-bottom: 0.5rem;
+    }
+
+    /* SVG Visualization */
     #svgHost {
       width: 100%;
-      height: 100%;
-      overflow: hidden;
+      height: 450px;
       display: flex;
       justify-content: center;
+      align-items: center;
     }
+
+    #svgHost svg {
+      max-width: 100%;
+      max-height: 100%;
+    }
+
+    .organ {
+      cursor: pointer;
+      transition: filter 0.3s ease, transform 0.3s ease;
+      stroke: #666;
+      stroke-width: 1;
+    }
+
+    .organ:hover {
+      filter: brightness(1.1);
+      transform: scale(1.02);
+    }
+
     .tooltip {
       position: absolute;
-      background-color: rgba(44, 62, 80, 0.8);
+      background-color: rgba(44, 62, 80, 0.9);
       color: #ffffff;
-      padding: 0.5rem;
+      padding: 0.5rem 0.8rem;
       border-radius: 6px;
       font-size: 0.9rem;
       display: none;
       pointer-events: none;
+      z-index: 100;
     }
-    .organ {
-      cursor: pointer;
-      transition: all 0.3s ease;
+
+    /* Data Table & Legend */
+    .table-container {
+      max-height: 350px;
+      overflow-y: auto;
     }
-    .organ:hover {
-      filter: brightness(1.2);
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.95rem;
     }
-    .muted {
-      color: #7f8c8d;
+    thead { background-color: #f8f9fa; position: sticky; top: 0; }
+    th, td { padding: 0.8rem; text-align: left; border-bottom: 1px solid #e1ecf4;}
+    tbody tr:hover { background-color: #f1f5f8; }
+
+    .legend {
+      display: flex;
+      gap: 1rem;
+      flex-wrap: wrap;
+      margin-top: 1.5rem;
+      padding-top: 1.5rem;
+      border-top: 2px solid #e1ecf4;
     }
-    /* Status Messages */
-    .status-message {
-      text-align: center;
-      padding: 2rem;
-      color: #7f8c8d;
-      font-style: italic;
-    }
-    .error-message {
-      color: #e74c3c;
-      font-weight: bold;
-    }
+
+    .legend-item { display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; }
+    .swatch { width: 18px; height: 18px; border-radius: 50%; border: 1px solid #ccc; }
+
     /* Responsive Design */
     @media (max-width: 992px) {
-      .main-container {
+      #results-section {
         grid-template-columns: 1fr;
       }
-      .grid {
-        grid-template-columns: 1fr;
-      }
+      header h1 { font-size: 1.8rem; }
+    }
+    @media (max-width: 600px) {
+        .search-wrapper { flex-direction: column; }
     }
   </style>
 </head>
 <body>
-  <div class="main-container">
+  <div class="container">
     <header>
-      <h1>Gene Expression Visualization</h1>
-      <p>Explore the RNA expression of genes across various tissues and organs.</p>
+      <h1>Gene Expression Atlas</h1>
+      <p>Visualize RNA expression of ciliary genes across human tissues.</p>
     </header>
-    <div class="grid">
+
+    <main>
       <div class="page-section">
-        <div class="search">
-          <input id="geneInput" type="text" placeholder="Search Gene (e.g., ARL13B)" aria-label="Search for a gene" autocomplete="off" />
-          <button id="searchBtn" class="search-btn" aria-label="Search">Search</button>
+        <div class="search-container">
+          <div class="search-wrapper">
+            <input id="geneInput" type="text" placeholder="Enter Gene Name (e.g., ARL13B)" autocomplete="off" />
+            <button id="searchBtn">Search</button>
+          </div>
           <div id="suggestions"></div>
         </div>
-        <div id="status" class="muted status-message">Enter a gene symbol to begin.</div>
-        <div class="legend">
-          <div class="legend-item"><span class="sw" style="background: #C8E6C9;"></span> Low (0–5 nTPM)</div>
-          <div class="legend-item"><span class="sw" style="background: #81C784;"></span> Medium (5–15 nTPM)</div>
-          <div class="legend-item"><span class="sw" style="background: #4CAF50;"></span> High (15–30 nTPM)</div>
-          <div class="legend-item"><span class="sw" style="background: #2E7D32;"></span> Very High (>30 nTPM)</div>
+        <div id="status">Enter a gene to begin your search.</div>
+      </div>
+
+      <div id="results-section">
+        <div class="viz-panel">
+            <h2 class="panel-title">Expression Map</h2>
+            <div id="svgHost">
+                <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+                    <title>Simplified Human Anatomy</title>
+                    <g id="human-body">
+                        <circle id="path-brain" class="organ" cx="100" cy="30" r="20" fill="#E0E0E0" />
+                        <path id="path-lung-left" class="organ" d="M 80,60 A 20,20 0 0,0 60,80 L 60,100 L 80,100 Z" fill="#E0E0E0" />
+                        <path id="path-lung-right" class="organ" d="M 120,60 A 20,20 0 0,1 140,80 L 140,100 L 120,100 Z" fill="#E0E0E0" />
+                        <circle id="path-heart" class="organ" cx="100" cy="80" r="15" fill="#E0E0E0" />
+                        <path id="path-liver" class="organ" d="M 105, 105 C 130,105 140,120 135,135 L 105,135 Z" fill="#E0E0E0"/>
+                        <ellipse id="path-kidney-left" class="organ" cx="85" cy="120" rx="10" ry="15" fill="#E0E0E0" />
+                        <ellipse id="path-kidney-right" class="organ" cx="115" cy="120" rx="10" ry="15" fill="#E0E0E0" />
+                        <rect id="path-small-intestine" class="organ" x="85" y="140" width="30" height="20" rx="5" fill="#E0E0E0"/>
+                    </g>
+                </svg>
+            </div>
+            <div id="tooltip" class="tooltip"></div>
         </div>
-        <div id="tableWrap" class="table-wrap">
-          <table id="exprTable">
-            <thead><tr><th>Tissue/Organ</th><th>nTPM</th><th>Expression Level</th></tr></thead>
-            <tbody></tbody>
-          </table>
+
+        <div class="data-panel">
+            <h2 class="panel-title">Expression Data</h2>
+            <div class="table-container">
+                <table id="exprTable">
+                    <thead>
+                        <tr><th>Tissue/Organ</th><th>nTPM</th><th>Level</th></tr>
+                    </thead>
+                    <tbody>
+                        </tbody>
+                </table>
+            </div>
+            <div class="legend">
+              <div class="legend-item"><span class="swatch" style="background: #C8E6C9;"></span> Low (0–5)</div>
+              <div class="legend-item"><span class="swatch" style="background: #81C784;"></span> Medium (5–15)</div>
+              <div class="legend-item"><span class="swatch" style="background: #4CAF50;"></span> High (15–30)</div>
+              <div class="legend-item"><span class="swatch" style="background: #2E7D32;"></span> Very High (>30)</div>
+            </div>
         </div>
       </div>
-      <div class="viz">
-        <div id="svgHost"></div>
-        <div id="tooltip" class="tooltip"></div>
-      </div>
-    </div>
+    </main>
   </div>
 
   <script>
-    const SVG_URL = "file.svg";
-    const CURATED_URL = "curated_genes.json";
-    const BULK_JSON_URL = "rna_tissue_consensus.json";
-    const PER_GENE_DIR = "genes";
+    // --- MOCK DATA (Embedded to make the file self-contained) ---
+    // This simulates the rna_tissue_consensus.json file
+    const MOCK_GENE_DATABASE = {
+        "ARL13B": { "brain": 35.2, "kidney": 25.1, "lung": 12.5, "liver": 4.3, "testis": 45.8, "heart muscle": 1.1, "small intestine": 18.9 },
+        "BBS1": { "brain": 18.9, "kidney": 10.4, "lung": 22.1, "liver": 15.6, "testis": 33.0, "heart muscle": 8.2, "small intestine": 14.5 },
+        "CEP290": { "brain": 40.1, "kidney": 38.5, "lung": 15.3, "liver": 7.8, "testis": 29.5, "heart muscle": 2.5, "small intestine": 22.0 },
+        "IFT88": { "brain": 3.2, "kidney": 5.6, "lung": 28.1, "liver": 1.9, "testis": 50.2, "heart muscle": 0.5, "small intestine": 31.5 }
+    };
+    // This simulates the curated_genes.json file
+    const MOCK_CURATED_GENES = ["ARL13B", "BBS1", "BBS2", "BBS4", "CEP290", "IFT80", "IFT88", "DYNC2H1"];
 
+    // Mapping from data keys to SVG element IDs
     const TISSUE_TO_SVG_IDS = {
-      "adipose tissue": ["path-adipose"],
-      "adrenal gland": ["path-adrenal-gland-left","path-adrenal-gland-right"],
-      "bone marrow": ["path-bone-marrow"],
-      "brain": ["path-brain","path-cerebellum"],
-      "cerebellum": ["path-cerebellum"],
-      "cervix, uterine": ["path-cervix"],
-      "colon": ["path-colon"],
-      "endometrium": ["path-endometrium"],
-      "epididymis": ["path-epididymis-left","path-epididymis-right"],
-      "esophagus": ["path-esophagus"],
-      "fallopian tube": ["path-fallopian-tube-left","path-fallopian-tube-right"],
-      "gallbladder": ["path-gall-bladder"],
-      "heart muscle": ["path-heart"],
-      "kidney": ["path-kidney-left","path-kidney-right"],
-      "liver": ["path-liver"],
-      "lung": ["path-lung-left","path-lung-right"],
-      "ovary": ["path-ovary-left","path-ovary-right"],
-      "pancreas": ["path-pancreas"],
-      "placenta": ["path-placenta"],
-      "prostate": ["path-prostate"],
-      "seminal vesicle": ["path-seminal-vesicle"],
-      "skeletal muscle": ["path-muscle"],
-      "skin": ["path-skin"],
-      "small intestine": ["path-small-intestine"],
-      "smooth muscle": ["path-smooth-muscle"],
-      "spleen": ["path-spleen"],
-      "stomach": ["path-stomach"],
-      "testis": ["path-testis-left","path-testis-right"],
-      "thyroid gland": ["path-thyroid"],
-      "trachea": ["path-trachea"]
+      "adipose tissue": [], "adrenal gland": [], "bone marrow": [],
+      "brain": ["path-brain"], "cerebellum": ["path-brain"],
+      "colon": [], "endometrium": [], "epididymis": [], "esophagus": [], "fallopian tube": [],
+      "gallbladder": [], "heart muscle": ["path-heart"], "kidney": ["path-kidney-left", "path-kidney-right"],
+      "liver": ["path-liver"], "lung": ["path-lung-left", "path-lung-right"],
+      "ovary": [], "pancreas": [], "placenta": [], "prostate": [], "seminal vesicle": [],
+      "skeletal muscle": [], "skin": [], "small intestine": ["path-small-intestine"], "spleen": [],
+      "stomach": [], "testis": [], "thyroid gland": [], "trachea": []
     };
 
-    let curatedGenes = [];
-    let svgRoot = null;
-    let organs = [];
-    let currentGene = null;
-    let svgLoaded = false;
-    const tooltip = document.getElementById('tooltip');
-
+    // --- DOM ELEMENT REFERENCES ---
     const byId = (id) => document.getElementById(id);
-    const status = byId('status');
-    const tableWrap = byId('tableWrap');
-    const tbody = document.querySelector('#exprTable tbody');
+    const geneInput = byId('geneInput');
+    const searchBtn = byId('searchBtn');
+    const suggestionsEl = byId('suggestions');
+    const statusEl = byId('status');
+    const resultsSection = byId('results-section');
+    const svgHost = byId('svgHost');
+    const tooltip = byId('tooltip');
+    const tableBody = document.querySelector('#exprTable tbody');
 
+    let svgOrgans = [];
+    
+    // --- CORE FUNCTIONS ---
+    
     function ntpmToLevel(n) {
       if (n <= 5) return 'Low';
       if (n <= 15) return 'Medium';
@@ -309,251 +358,173 @@
       if (n <= 30) return '#4CAF50';
       return '#2E7D32';
     }
-
-    function resetOrgans() {
-      if (!organs.length) return;
-      organs.forEach(o => {
-        o.style.fill = '#E0E0E0';
-        o.removeAttribute('data-tissue');
-        o.removeAttribute('data-ntpm');
-        o.removeAttribute('data-level');
-      });
-      tooltip.style.display = 'none';
+    
+    function titleCase(str) {
+      return str.replace(/\b\w/g, char => char.toUpperCase());
     }
 
-    function titleCaseTissue(t) {
-      return t.replace(/_/g, ' ').replace(/,/g, '').replace(/\b\w/g, c => c.toUpperCase());
-    }
+    // --- DATA FETCHING (Simulated) ---
 
-    function debounce(fn, delay = 120) {
-      let t;
-      return (...args) => {
-        clearTimeout(t);
-        t = setTimeout(() => fn(...args), delay);
-      };
-    }
-
-    async function loadSVG() {
-      try {
-        byId('svgHost').innerHTML = '';
-        const resp = await fetch(SVG_URL);
-        if (!resp.ok) throw new Error(`Failed to load SVG: ${resp.status} ${resp.statusText}`);
-        const svgText = await resp.text();
-        byId('svgHost').innerHTML = svgText;
-        svgRoot = byId('svgHost').querySelector('svg');
-        if (!svgRoot) throw new Error('SVG element not found after loading');
-        await new Promise(resolve => setTimeout(resolve, 50));
-        organs = svgRoot.querySelectorAll('.organ');
-        if (organs.length === 0) console.warn('No .organ elements found in SVG');
-        resetOrgans();
-        organs.forEach(o => {
-          o.addEventListener('mousemove', (e) => {
-            const tissue = o.getAttribute('data-tissue');
-            const ntpm = o.getAttribute('data-ntpm');
-            const level = o.getAttribute('data-level');
-            if (tissue && ntpm) {
-              tooltip.innerHTML = `<strong>${tissue}</strong>: ${ntpm} nTPM (${level})`;
-              tooltip.style.left = `${e.pageX + 10}px`;
-              tooltip.style.top = `${e.pageY + 10}px`;
-              tooltip.style.display = 'block';
-            } else {
-              tooltip.style.display = 'none';
-            }
-          });
-          o.addEventListener('mouseleave', () => tooltip.style.display = 'none');
+    // Simulates fetching data from the mock database with a short delay
+    async function fetchGeneData(geneSymbol) {
+        return new Promise((resolve, reject) => {
+            setTimeout(() => {
+                const data = MOCK_GENE_DATABASE[geneSymbol.toUpperCase()];
+                if (data) {
+                    resolve(data);
+                } else {
+                    reject(new Error(`No data found for gene "${geneSymbol}"`));
+                }
+            }, 300); // Simulate network latency
         });
-        svgLoaded = true;
-        return true;
-      } catch (error) {
-        console.error('Error loading SVG:', error.message);
-        status.textContent = `Error loading anatomy diagram: ${error.message}. Please check if the SVG file exists and refresh the page.`;
-        status.classList.add('error-message');
-        svgLoaded = false;
-        return false;
-      }
     }
 
-    async function loadCurated() {
-      try {
-        const resp = await fetch(CURATED_URL);
-        if (!resp.ok) throw new Error(`Failed to load curated genes: ${resp.status}`);
-        curatedGenes = await resp.json();
-        if (!Array.isArray(curatedGenes)) curatedGenes = [];
-      } catch (error) {
-        console.error('Error loading curated genes:', error.message);
-        curatedGenes = [];
-        status.textContent = `Error loading curated genes: ${error.message}. Suggestions may not work.`;
-        status.classList.add('error-message');
-      }
+    // --- UI UPDATE FUNCTIONS ---
+
+    function updateStatus(message, isError = false) {
+        statusEl.textContent = message;
+        statusEl.classList.toggle('status-error', isError);
+    }
+    
+    function resetUI() {
+        // Reset SVG colors
+        svgOrgans.forEach(o => {
+            o.style.fill = '#E0E0E0';
+            o.removeAttribute('data-tissue');
+        });
+        // Clear table
+        tableBody.innerHTML = '';
+        // Hide results section
+        resultsSection.classList.remove('visible');
     }
 
-    async function fetchGeneSpecific(geneSymbol) {
-      try {
-        const url = `${PER_GENE_DIR}/${encodeURIComponent(geneSymbol)}.json`;
-        const resp = await fetch(url);
-        if (!resp.ok) throw new Error(`Per-gene JSON not found: ${resp.status}`);
-        return await resp.json();
-      } catch (error) {
-        throw new Error(`Failed to fetch gene-specific data: ${error.message}`);
-      }
-    }
+    function renderResults(geneSymbol, data) {
+        // 1. Render Table
+        const sortedData = Object.entries(data).sort((a, b) => b[1] - a[1]);
+        tableBody.innerHTML = sortedData.map(([tissue, nTPM]) => {
+            const level = ntpmToLevel(nTPM);
+            return `<tr><td>${titleCase(tissue)}</td><td>${nTPM.toFixed(2)}</td><td>${level}</td></tr>`;
+        }).join('');
 
-    async function fetchFromBulk(geneSymbol) {
-      try {
-        const resp = await fetch(BULK_JSON_URL);
-        if (!resp.ok) throw new Error(`Bulk JSON fetch failed: ${resp.status}`);
-        const all = await resp.json();
-        return all[geneSymbol] || all[geneSymbol.toUpperCase()] || null;
-      } catch (error) {
-        throw new Error(`Failed to fetch bulk data: ${error.message}`);
-      }
-    }
-
-    function renderTable(geneData) {
-      const entries = Object.entries(geneData).sort((a, b) => b[1] - a[1]);
-      tbody.innerHTML = entries.map(([tissue, value]) => {
-        const level = ntpmToLevel(value);
-        return `<tr><td>${titleCaseTissue(tissue)}</td><td>${Number(value).toFixed(2)}</td><td>${level}</td></tr>`;
-      }).join('');
-      tableWrap.style.display = entries.length ? 'block' : 'none';
-    }
-
-    function paintOrgans(geneData) {
-      if (!svgLoaded) {
-        console.error('SVG not loaded, cannot paint organs');
-        return;
-      }
-      resetOrgans();
-      Object.entries(geneData).forEach(([tissue, nTPM]) => {
-        const ids = TISSUE_TO_SVG_IDS[tissue.toLowerCase()];
-        if (ids) {
-          ids.forEach(id => {
-            const node = svgRoot.getElementById ? svgRoot.getElementById(id) : document.getElementById(id);
-            if (node) {
-              node.style.fill = ntpmToColor(nTPM);
-              node.setAttribute('data-tissue', titleCaseTissue(tissue));
-              node.setAttribute('data-ntpm', Number(nTPM).toFixed(2));
-              node.setAttribute('data-level', ntpmToLevel(nTPM));
+        // 2. Paint SVG Organs
+        resetUI(); // Reset previous results first
+        Object.entries(data).forEach(([tissue, nTPM]) => {
+            const ids = TISSUE_TO_SVG_IDS[tissue.toLowerCase()];
+            if (ids) {
+                ids.forEach(id => {
+                    const organEl = byId(id);
+                    if (organEl) {
+                        organEl.style.fill = ntpmToColor(nTPM);
+                        organEl.setAttribute('data-tissue', titleCase(tissue));
+                        organEl.setAttribute('data-ntpm', nTPM.toFixed(2));
+                        organEl.setAttribute('data-level', ntpmToLevel(nTPM));
+                    }
+                });
             }
-          });
-        }
-      });
+        });
+        
+        // 3. Show the results section
+        resultsSection.classList.add('visible');
+        updateStatus(`Showing expression data for ${geneSymbol}.`);
     }
-
-    async function searchGene(geneSymbol) {
-      const g = (geneSymbol || '').trim();
-      if (!g) {
-        status.textContent = 'Please type a gene symbol.';
-        status.classList.add('error-message');
-        return;
-      }
-      currentGene = g.toUpperCase();
-      status.textContent = `Loading ${currentGene}…`;
-      status.classList.remove('error-message');
-      try {
-        if (!svgLoaded) {
-          status.textContent = `Loading anatomy diagram...`;
-          const svgSuccess = await loadSVG();
-          if (!svgSuccess) {
-            status.textContent = 'Failed to load anatomy diagram. Please check the SVG file and refresh the page.';
-            status.classList.add('error-message');
+    
+    // --- SEARCH AND SUGGESTIONS LOGIC ---
+    
+    async function handleSearch() {
+        const geneSymbol = geneInput.value.trim().toUpperCase();
+        if (!geneSymbol) {
+            updateStatus('Please enter a gene symbol.', true);
             return;
-          }
         }
-        let data = null;
-        try {
-          data = await fetchGeneSpecific(currentGene);
-        } catch (e) {
-          console.error(e);
-          status.textContent = `Per-gene data not found, trying bulk...`;
-          data = await fetchFromBulk(currentGene);
-        }
-        if (!data) {
-          status.textContent = `No expression found for "${currentGene}".`;
-          status.classList.add('error-message');
-          resetOrgans();
-          tbody.innerHTML = '';
-          tableWrap.style.display = 'none';
-          return;
-        }
-        paintOrgans(data);
-        renderTable(data);
-        status.textContent = `Showing expression for ${currentGene}`;
-        status.classList.remove('error-message');
-      } catch (err) {
-        console.error('Search error:', err.message);
-        status.textContent = `Error loading data for "${currentGene}": ${err.message}`;
-        status.classList.add('error-message');
-        resetOrgans();
-        tbody.innerHTML = '';
-        tableWrap.style.display = 'none';
-      }
-    }
 
-    const geneInput = byId('geneInput');
-    const suggestionsEl = byId('suggestions');
-    const searchBtn = byId('searchBtn');
+        updateStatus(`Searching for "${geneSymbol}"...`);
+        resetUI();
+        
+        try {
+            const geneData = await fetchGeneData(geneSymbol);
+            renderResults(geneSymbol, geneData);
+        } catch (error) {
+            updateStatus(error.message, true);
+        }
+    }
 
     function showSuggestions(list) {
-      if (!list.length) {
-        suggestionsEl.style.display = 'none';
-        suggestionsEl.innerHTML = '';
-        return;
-      }
-      suggestionsEl.innerHTML = list.slice(0, 12).map(g => `<div class="suggestion" data-g="${g}">${g}</div>`).join('');
-      suggestionsEl.style.display = 'block';
-      Array.from(suggestionsEl.children).forEach(div => {
-        div.addEventListener('mousedown', (e) => {
-          const g = e.currentTarget.getAttribute('data-g');
-          geneInput.value = g;
-          suggestionsEl.style.display = 'none';
-          searchGene(g);
+        if (!list.length) {
+            suggestionsEl.style.display = 'none';
+            return;
+        }
+        suggestionsEl.innerHTML = list.slice(0, 10).map(g => `<div class="suggestion">${g}</div>`).join('');
+        suggestionsEl.style.display = 'block';
+    }
+    
+    function handleInput() {
+        const query = geneInput.value.trim().toUpperCase();
+        if (!query) {
+            showSuggestions([]);
+            return;
+        }
+        const matches = MOCK_CURATED_GENES.filter(g => g.startsWith(query));
+        showSuggestions(matches);
+    }
+    
+    // --- INITIALIZATION AND EVENT LISTENERS ---
+
+    function initializeSVG() {
+        svgOrgans = Array.from(svgHost.querySelectorAll('.organ'));
+        svgOrgans.forEach(organ => {
+            organ.addEventListener('mousemove', (e) => {
+                const tissue = organ.getAttribute('data-tissue');
+                if (tissue) {
+                    tooltip.innerHTML = `<strong>${tissue}</strong>: ${organ.getAttribute('data-ntpm')} nTPM (${organ.getAttribute('data-level')})`;
+                    tooltip.style.left = `${e.pageX + 15}px`;
+                    tooltip.style.top = `${e.pageY + 15}px`;
+                    tooltip.style.display = 'block';
+                }
+            });
+            organ.addEventListener('mouseleave', () => {
+                tooltip.style.display = 'none';
+            });
         });
-      });
     }
 
-    const onType = debounce(() => {
-      const q = geneInput.value.trim().toUpperCase();
-      if (!q) {
-        showSuggestions([]);
-        return;
-      }
-      if (!curatedGenes.length) {
-        showSuggestions([]);
-        return;
-      }
-      const matches = curatedGenes.filter(g => g.startsWith(q));
-      showSuggestions(matches);
-    }, 80);
-
-    geneInput.addEventListener('input', onType);
-    geneInput.addEventListener('focus', onType);
-    geneInput.addEventListener('blur', () => setTimeout(() => suggestionsEl.style.display = 'none', 120));
+    // Debounce to prevent firing the input event too frequently
+    function debounce(func, delay = 250) {
+        let timeout;
+        return (...args) => {
+            clearTimeout(timeout);
+            timeout = setTimeout(() => func.apply(this, args), delay);
+        };
+    }
+    
+    // Attach Event Listeners
+    searchBtn.addEventListener('click', handleSearch);
     geneInput.addEventListener('keypress', (e) => {
-      if (e.key === 'Enter') {
-        suggestionsEl.style.display = 'none';
-        searchGene(geneInput.value);
-      }
+        if (e.key === 'Enter') {
+            suggestionsEl.style.display = 'none';
+            handleSearch();
+        }
     });
-    searchBtn.addEventListener('click', () => searchGene(geneInput.value));
 
-    // Navigation for SPA behavior
-    window.navigateTo = function(event, path) {
-      if (event) event.preventDefault();
-      window.location.hash = path;
-    };
+    geneInput.addEventListener('input', debounce(handleInput, 200));
+    geneInput.addEventListener('focus', handleInput);
+    document.addEventListener('click', (e) => {
+        // Hide suggestions when clicking outside
+        if (!suggestionsEl.contains(e.target) && e.target !== geneInput) {
+            suggestionsEl.style.display = 'none';
+        }
+        // Handle clicking on a suggestion
+        if (e.target.classList.contains('suggestion')) {
+            geneInput.value = e.target.textContent;
+            suggestionsEl.style.display = 'none';
+            handleSearch();
+        }
+    });
 
-    (async function init() {
-      try {
-        await Promise.all([loadSVG(), loadCurated()]);
-        status.textContent = 'Type a gene symbol (e.g., ARL13B) and press Enter.';
-        status.classList.remove('error-message');
-      } catch (error) {
-        console.error('Initialization error:', error.message);
-        status.textContent = `Error initializing application: ${error.message}. Please refresh the page.`;
-        status.classList.add('error-message');
-      }
-    })();
+    // Initialize the application
+    document.addEventListener('DOMContentLoaded', () => {
+        initializeSVG();
+    });
+
   </script>
 </body>
 </html>
