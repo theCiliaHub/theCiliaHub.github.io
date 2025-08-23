@@ -291,7 +291,7 @@
                     <div id="gene-cards-container" class="gene-cards"></div>
                     <div id="status-message" class="status-message" style="display: none;"></div>
                 </div>`;
-                
+            
             document.getElementById('single-search-btn').onclick = performSingleSearch;
             
             // --- Autocomplete with Keyboard Navigation ---
@@ -404,6 +404,16 @@
                 Enter multiple gene names (comma, space, or newline separated) OR upload a CSV file.
             </p>
             
+            <div style="margin-bottom: 1rem;">
+                <label for="localization-filter" style="font-weight: 600;">Filter by Localization:</label>
+                <select id="localization-filter" aria-label="Filter by localization">
+                    <option value="">All Localizations</option>
+                    <option value="Axoneme">Axoneme</option>
+                    <option value="Basal Body">Basal Body</option>
+                    <option value="Transition Zone">Transition Zone</option>
+                    <option value="Ciliary Membrane">Ciliary Membrane</option>
+                </select>
+            </div>
             <label for="batch-genes-input" style="font-weight: 600;">Enter gene names:</label>
             <textarea id="batch-genes-input" placeholder="e.g., ACE2, IFT88, CEP290" aria-label="Enter multiple gene names"></textarea>
             
@@ -423,6 +433,7 @@
     document.getElementById('batch-search-btn').onclick = performBatchSearch;
     document.getElementById('batch-genes-input').onkeydown = e => { if (e.key === 'Enter' && e.ctrlKey) performBatchSearch(); };
     
+
     
 
     displayGeneCards(defaultGenes, []);
@@ -546,17 +557,21 @@
 
         function performBatchSearch() {
             const queries = document.getElementById('batch-genes-input').value.split(/[\s,\n]+/).filter(Boolean).map(q => q.trim().toUpperCase());
+            const localizationFilter = document.getElementById('localization-filter')?.value;
             const statusDiv = document.getElementById('status-message');
             if (queries.length === 0) {
                 statusDiv.innerHTML = `<span class="error-message">Please enter at least one gene name.</span>`;
                 statusDiv.style.display = 'block';
                 return;
             }
-            const results = allGenes.filter(g => queries.some(q => (g.gene && g.gene.toUpperCase().includes(q)) || (g.synonym && g.synonym.toUpperCase().includes(q))));
-            console.log('Batch search terms:', queries, 'Results:', results.map(g => g.gene));
+            let results = allGenes.filter(g => queries.some(q => (g.gene && g.gene.toUpperCase().includes(q)) || (g.synonym && g.synonym.toUpperCase().includes(q))));
+            if (localizationFilter) {
+                results = results.filter(g => g.localization && g.localization.includes(localizationFilter));
+            }
+            console.log('Batch search terms:', queries, 'Localization filter:', localizationFilter, 'Results:', results.map(g => g.gene));
             statusDiv.style.display = 'none';
             if (results.length > 0) {
-                displayGeneCards(defaultGenes,results);
+                displayGeneCards(defaultGenes, results);
             } else {
                 statusDiv.innerHTML = `<span class="error-message">No genes found matching your query.</span>`;
                 statusDiv.style.display = 'block';
@@ -673,7 +688,7 @@
 
 
 
-  let selectedGenes = [];
+ let selectedGenes = [];
 
 function showLocalization(geneName, isSearchGene = false) {
     if (geneName === 'reset') {
@@ -736,5 +751,3 @@ function showLocalization(geneName, isSearchGene = false) {
     </script>
 </body>
 </html>
-
-
