@@ -22,7 +22,6 @@
     body{
       margin:0; padding:24px;
       font-family:Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-      /* UPDATED: Changed background to match the CiliaHub theme */
       background: radial-gradient(circle at top, #1a2a6c, #0b1220), var(--bg);
       min-height:100vh;
     }
@@ -57,7 +56,7 @@
     }
     .search input{
       width:100%;
-      max-width: 300px; /* shorter bar */
+      max-width: 300px;
       padding:12px 14px;
       border-radius:10px;
       border:2px solid #e5e7eb;
@@ -153,13 +152,11 @@
 
   <script>
     // ---------- Config ----------
-    // Paths are absolute to repo root to avoid hash-router issues on GitHub Pages.
     const SVG_URL = "/file.svg";
-    const CURATED_URL = "/curated_genes.json"; // small array of ~2011 symbols
-    const BULK_JSON_URL = "/rna_tissue_consensus.json"; // fallback (big, but last resort)
-    const PER_GENE_DIR = "/genes"; // e.g., /genes/ARL13B.json
+    const CURATED_URL = "/curated_genes.json";
+    const BULK_JSON_URL = "/rna_tissue_consensus.json";
+    const PER_GENE_DIR = "/genes";
 
-    // Map Human Protein Atlas tissue names -> SVG path IDs (must match your file.svg).
     const TISSUE_TO_SVG_IDS = {
       "adipose tissue": ["path-adipose"],
       "adrenal gland": ["path-adrenal-gland-left","path-adrenal-gland-right"],
@@ -194,17 +191,14 @@
     };
 
     // ---------- State ----------
-    let curatedGenes = [];        // the ~2011 gene symbols for fast type-ahead
-    let svgRoot = null;           // injected SVG root node
-    let organs = [];              // NodeList of .organ paths (from SVG)
+    let curatedGenes = [];
+    let svgRoot = null;
+    let organs = [];
     let currentGene = null;
-    let svgLoaded = false;        // Track if SVG has been loaded
+    let svgLoaded = false;
     const tooltip = document.getElementById('tooltip');
-
-    // ---------- Helpers ----------
-    const byId = (id) => document.getElementById(id);
-    const status = byId('status');
-    const tableWrap = byId('tableWrap');
+    const status = document.getElementById('status');
+    const tableWrap = document.getElementById('tableWrap');
     const tbody = document.querySelector('#exprTable tbody');
 
     function ntpmToLevel(n){
@@ -213,12 +207,14 @@
       if (n <= 30) return 'High';
       return 'Very High';
     }
+
     function ntpmToColor(n){
       if (n <= 5) return getComputedStyle(document.documentElement).getPropertyValue('--green-low').trim();
       if (n <= 15) return getComputedStyle(document.documentElement).getPropertyValue('--green-med').trim();
       if (n <= 30) return getComputedStyle(document.documentElement).getPropertyValue('--green-high').trim();
       return getComputedStyle(document.documentElement).getPropertyValue('--green-vhigh').trim();
     }
+
     function resetOrgans(){
       if (!organs.length) return;
       organs.forEach(o=>{
@@ -229,47 +225,34 @@
       });
       tooltip.style.opacity = 0;
     }
+
     function titleCaseTissue(t){
       return t.replace(/_/g,' ').replace(/,/g,'').replace(/\b\w/g, c => c.toUpperCase());
     }
 
-    // Debounce for input (limits filter calls while typing)
     function debounce(fn, delay=120){
       let t; return (...args)=>{ clearTimeout(t); t=setTimeout(()=>fn(...args), delay); };
     }
 
-    // ---------- Load assets ----------
     async function loadSVG(){
       try {
-        // Clear previous SVG if exists
-        byId('svgHost').innerHTML = '';
-        
-        // Load SVG with cache busting
+        const svgHost = document.getElementById('svgHost');
+        svgHost.innerHTML = '';
+
         const timestamp = new Date().getTime();
         const resp = await fetch(`${SVG_URL}?t=${timestamp}`, { cache: 'no-cache' });
         if (!resp.ok) throw new Error(`Failed to load SVG: ${resp.status}`);
-        
+
         const svgText = await resp.text();
-        byId('svgHost').innerHTML = svgText;
-        
-        // Find .organ nodes inside injected SVG
-        svgRoot = byId('svgHost').querySelector('svg');
-        if (!svgRoot) {
-          throw new Error('SVG element not found after loading');
-        }
-        
-        // Wait a moment for the SVG to be fully parsed by the browser
-        await new Promise(resolve => setTimeout(resolve, 50));
-        
+        svgHost.innerHTML = svgText;
+
+        svgRoot = svgHost.querySelector('svg');
+        if (!svgRoot) throw new Error('SVG element not found after loading');
+
         organs = svgRoot.querySelectorAll('.organ');
-        if (organs.length === 0) {
-          console.warn('No .organ elements found in SVG');
-        }
-        
-        // Reset all organs to default state
+
         resetOrgans();
-        
-        // Events for tooltip on hover
+
         organs.forEach(o=>{
           o.addEventListener('mousemove', (e)=>{
             const tissue = o.getAttribute('data-tissue');
@@ -286,9 +269,10 @@
           });
           o.addEventListener('mouseleave', ()=> tooltip.style.opacity = 0);
         });
-        
+
         svgLoaded = true;
         return true;
+
       } catch (error) {
         console.error('Error loading SVG:', error);
         status.textContent = 'Error loading anatomy diagram. Please refresh the page.';
@@ -298,42 +282,35 @@
     }
 
     async function loadCurated(){
-      // curated_genes.json is recommended. If missing, fall back quietly to empty (no suggestions).
-      try{
+      try {
         const timestamp = new Date().getTime();
         const resp = await fetch(`${CURATED_URL}?t=${timestamp}`, { cache: 'no-cache' });
         if (!resp.ok) throw new Error('no curated list');
         curatedGenes = await resp.json();
         if (!Array.isArray(curatedGenes)) curatedGenes = [];
       }catch{
-        curatedGenes = []; // still usable; user can type full symbol and search
+        curatedGenes = [];
       }
     }
 
-    // ---------- Data fetchers ----------
     async function fetchGeneSpecific(geneSymbol){
-      // Try tiny file first: /genes/GENE.json
       const url = `${PER_GENE_DIR}/${encodeURIComponent(geneSymbol)}.json`;
       const resp = await fetch(url, { cache: 'no-store' });
       if (resp.ok){
-        return await resp.json(); // { tissue: nTPM, ... }
+        return await resp.json();
       }
       throw new Error('per-gene json not found');
     }
 
     async function fetchFromBulk(geneSymbol){
-      // Expect bulk JSON in the simple { GENE: {tissue:nTPM,...}, ... } format
       const timestamp = new Date().getTime();
       const resp = await fetch(`${BULK_JSON_URL}?t=${timestamp}`, { cache: 'no-cache' });
       if (!resp.ok) throw new Error('bulk json fetch failed');
       const all = await resp.json();
-      // Accept GENE in exact case; also try uppercased
       return all[geneSymbol] || all[geneSymbol.toUpperCase()] || null;
     }
 
-    // ---------- Rendering ----------
     function renderTable(geneData){
-      // geneData: { tissueName: nTPM, ... }
       const entries = Object.entries(geneData).sort((a,b)=> b[1]-a[1]);
       tbody.innerHTML = entries.map(([tissue, value])=>{
         const level = ntpmToLevel(value);
@@ -347,14 +324,13 @@
         console.error('SVG not loaded, cannot paint organs');
         return;
       }
-      
+
       resetOrgans();
-      // geneData keys must match HPA tissue names (mapping keys)
       Object.entries(geneData).forEach(([tissue, nTPM])=>{
         const ids = TISSUE_TO_SVG_IDS[tissue.toLowerCase()];
         if (ids){
           ids.forEach(id=>{
-            const node = svgRoot.getElementById ? svgRoot.getElementById(id) : document.getElementById(id);
+            const node = svgRoot.getElementById(id);
             if (node){
               node.style.fill = ntpmToColor(nTPM);
               node.setAttribute('data-tissue', titleCaseTissue(tissue));
@@ -371,25 +347,15 @@
       if (!g){ status.textContent = 'Please type a gene symbol.'; return; }
       currentGene = g.toUpperCase();
       status.textContent = `Loading ${currentGene}…`;
-      
+
       try{
-        // Ensure SVG is loaded before proceeding
-        if (!svgLoaded) {
-          status.textContent = `Loading anatomy diagram...`;
-          const svgSuccess = await loadSVG();
-          if (!svgSuccess) {
-            status.textContent = 'Failed to load anatomy diagram. Please refresh the page.';
-            return;
-          }
-        }
-        
-        // prefer tiny per-gene file for speed
+        // Force SVG reload for every search to avoid stale references
+        await loadSVG();
+
         let data = null;
-        try{
-          data = await fetchGeneSpecific(currentGene);
-        }catch{
-          data = await fetchFromBulk(currentGene);
-        }
+        try { data = await fetchGeneSpecific(currentGene); }
+        catch { data = await fetchFromBulk(currentGene); }
+
         if (!data){
           status.textContent = `No expression found for "${currentGene}".`;
           resetOrgans();
@@ -397,10 +363,12 @@
           tableWrap.style.display = 'none';
           return;
         }
+
         paintOrgans(data);
         renderTable(data);
         status.textContent = `Showing expression for ${currentGene}`;
-      }catch(err){
+
+      } catch(err){
         console.error(err);
         status.textContent = `Error loading data for "${currentGene}".`;
         resetOrgans();
@@ -410,9 +378,9 @@
     }
 
     // ---------- Type-ahead (startsWith among curated genes) ----------
-    const geneInput = byId('geneInput');
-    const suggestionsEl = byId('suggestions');
-    const searchBtn = byId('searchBtn');
+    const geneInput = document.getElementById('geneInput');
+    const suggestionsEl = document.getElementById('suggestions');
+    const searchBtn = document.getElementById('searchBtn');
 
     function showSuggestions(list){
       if (!list.length){ suggestionsEl.style.display = 'none'; suggestionsEl.innerHTML=''; return; }
@@ -431,7 +399,7 @@
     const onType = debounce(()=>{
       const q = geneInput.value.trim().toUpperCase();
       if (!q){ showSuggestions([]); return; }
-      if (!curatedGenes.length){ showSuggestions([]); return; } // no index available
+      if (!curatedGenes.length){ showSuggestions([]); return; }
       const matches = curatedGenes.filter(g=> g.startsWith(q));
       showSuggestions(matches);
     }, 80);
