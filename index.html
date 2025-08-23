@@ -3,8 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CiliaHub - Interactive Ciliary Gene Database</title>
+    <title>The CiliaHub: A Database of Genes with Ciliary Functions</title>
+    <meta name="description" content="The CiliaHub is a comprehensive bioinformatics database for genes with ciliary functions, providing resources for ciliopathy research, genome exploration, and gene search.">
+    <meta name="keywords" content="cilia gene, ciliopathy, database, search, genome, bioinformatics, ciliary function, ciliary genes">
     <link rel="icon" type="image/png" href="CiliaHub_Logo_web.png">
+    <script src="https://cdn.jsdelivr.net/npm/@panzoom/panzoom@4.5.1/dist/panzoom.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-XXXXXXXXXX');
+    </script>
     <style>
         /* --- General Styles & Layout --- */
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -34,10 +45,10 @@
         .gene-cards { display: grid; gap: 1.5rem; }
         .gene-card { background: white; padding: 1.5rem; border-radius: 15px; box-shadow: 0 8px 32px rgba(44, 90, 160, 0.1); transition: all 0.3s ease; border-left: 5px solid transparent; cursor: pointer; }
         .gene-card:hover { transform: translateY(-5px); }
-        .gene-card.default { border-left-color: #e74c3c; }
+        .gene-card.default { border-left-color: #2c5aa0; }
         .gene-card.search-result { border-left-color: #27ae60; }
         .gene-name { font-size: 1.3rem; font-weight: bold; margin-bottom: 0.5rem; }
-        .gene-card.default .gene-name { color: #c0392b; }
+        .gene-card.default .gene-name { color: #2c5aa0; }
         .gene-card.search-result .gene-name { color: #27ae60; }
         .gene-description { color: #7f8c8d; font-size: 0.95rem; }
         .gene-info { font-size: 0.9rem; color: #34495e; margin-bottom: 0.5rem; }
@@ -49,6 +60,33 @@
         border-color: #2c5aa0;
     }
 
+        /* --- Expression Search Styles --- */
+        .suggestion-item {
+            padding: 0.8rem 1rem;
+            cursor: pointer;
+            border-bottom: 1px solid #f0f0f0;
+            transition: background-color 0.2s;
+        }
+        
+        .suggestion-item:hover {
+            background-color: #f8f9fa;
+        }
+        
+        .suggestion-item:last-child {
+            border-bottom: none;
+        }
+        
+        .suggestion-gene {
+            font-weight: bold;
+            color: #2c5aa0;
+        }
+        
+        .suggestion-description {
+            font-size: 0.9rem;
+            color: #666;
+            margin-top: 0.3rem;
+        }
+
         /* --- Cilia Panel --- */
         .cilia-panel { background: white; border-radius: 15px; box-shadow: 0 8px 32px rgba(44, 90, 160, 0.1); position: sticky; top: 100px; height: fit-content; }
         .panel-header { background: linear-gradient(135deg, #2c5aa0 0%, #1e3a5f 100%); color: white; padding: 1.5rem; text-align: center; }
@@ -56,13 +94,14 @@
         .cilia-container { text-align: center; margin-bottom: 1.5rem; }
         .cilia-part { stroke: #2c3e50; stroke-width: 1.5; transition: all 0.3s ease-in-out; cursor: pointer; }
         .cilia-part:hover { stroke-width: 3; filter: brightness(1.1); }
-        .highlighted { fill: #e74c3c !important; opacity: 0.9 !important; animation: pulse 2s infinite; }
+        .highlighted { fill: #1e90ff !important; opacity: 0.9 !important; animation: pulse 2s infinite; }
         .highlighted.search-gene { fill: #27ae60 !important; }
+        .highlighted.cilia { fill: #006400 !important; opacity: 0.9 !important; }
         @keyframes pulse { 0%, 100% { opacity: 0.9; } 50% { opacity: 0.6; } }
         .controls { background: #f8f9fa; padding: 1rem; border-radius: 10px; margin-top: 1rem; }
         .gene-buttons { display: flex; flex-direction: column; gap: 0.5rem; }
         .gene-btn { padding: 0.7rem; border: 1px solid #e1ecf4; border-radius: 8px; background: white; cursor: pointer; font-weight: 600; font-size: 0.9rem; }
-        .gene-btn.default { color: #c0392b; }
+        .gene-btn.default { color: #2c5aa0; }
         .gene-btn.search-gene { background: #27ae60; color: white; border-color: #27ae60; }
         .gene-btn:hover { background: #2c5aa0; color: white; transform: translateX(3px); }
         .gene-btn.search-gene:hover { background: #219a52; }
@@ -79,7 +118,7 @@
 
         /* --- Status Messages --- */
         .status-message { text-align: center; padding: 3rem; color: #7f8c8d; font-style: italic; }
-        .error-message { color: #e74c3c; font-weight: bold; }
+        .error-message { color: #2c5aa0; font-weight: bold; }
 
         /* --- Gene Detail Page --- */
         .gene-detail-page { cursor: default; }
@@ -95,6 +134,103 @@
             .nav-container { flex-direction: column; gap: 1rem; }
             .nav-links { gap: 1rem; flex-wrap: wrap; justify-content: center; }
         }
+        
+        /* --- Enhanced Search and UI Styles --- */
+        .search-wrapper { position: relative; }
+        #search-suggestions {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 0 0 10px 10px;
+            z-index: 999;
+            max-height: 250px;
+            overflow-y: auto;
+        }
+        #search-suggestions ul { list-style: none; padding: 0; margin: 0; }
+        #search-suggestions li { padding: 0.75rem 1rem; cursor: pointer; border-bottom: 1px solid #eee; }
+        #search-suggestions li:last-child { border-bottom: none; }
+        #search-suggestions li:hover, #search-suggestions li.active { background-color: #f0f5fa; color: #2c5aa0; }
+        
+        .search-container.sticky {
+            position: sticky;
+            top: 80px;
+            background: white;
+            padding: 1rem;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(44, 90, 160, 0.1);
+            z-index: 500;
+        }
+        
+        .pagination { display: flex; justify-content: center; gap: 1rem; margin-top: 1rem; }
+        .pagination button { padding: 0.5rem 1rem; background: #2c5aa0; color: white; border: none; border-radius: 8px; cursor: pointer; }
+        .pagination button:disabled { background: #95a5a6; cursor: not-allowed; }
+        
+        .tooltip { position: relative; display: inline-block; cursor: pointer; }
+        .tooltip-icon { background: #2c5aa0; color: white; border-radius: 50%; width: 20px; height: 20px; text-align: center; line-height: 20px; }
+        .tooltip-text { visibility: hidden; position: absolute; background: #fff; border: 1px solid #ddd; padding: 1rem; border-radius: 8px; width: 200px; z-index: 10; }
+        .tooltip:hover .tooltip-text { visibility: visible; }
+        
+        .btn {
+            padding: 0.8rem 1.5rem;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #2c5aa0 0%, #1e3a5f 100%);
+            color: white;
+        }
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(44, 90, 160, 0.3);
+        }
+        .btn-secondary {
+            background: #95a5a6;
+            color: white;
+        }
+        .btn-secondary:hover {
+            background: #7f8c8d;
+        }
+        
+        .search-btn, .gene-btn, .reset-btn {
+            padding: 0.8rem 1.5rem;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            background: linear-gradient(135deg, #2c5aa0 0%, #1e3a5f 100%);
+            color: white;
+        }
+        .reset-btn {
+            background: #95a5a6 !important;
+            color: white !important;
+        }
+        .reset-btn:hover {
+            background: #7f8c8d !important;
+        }
+        .gene-btn.default { background: white; color: #1e90ff; border: 1px solid #e1ecf4; }
+        .gene-btn.search-gene { background: #27ae60; color: white; border-color: #27ae60; }
+        .gene-btn:hover { background: #2c5aa0; color: white; transform: translateX(3px); }
+        .gene-btn.search-gene:hover { background: #219a52; }
+        
+        #comparison-table th, #comparison-table td { border: 1px solid #ddd; padding: 0.5rem; text-align: left; }
+        #comparison-table th { background: #2c5aa0; color: white; }
+        #comparison-table a { color: #2c5aa0; text-decoration: none; }
+        #comparison-table a:hover { text-decoration: underline; }
+        
+        .filters { margin-bottom: 1rem; }
+        .filters label { display: block; margin-bottom: 0.5rem; font-weight: 600; }
+        .filters input, .filters select { width: 100%; padding: 0.8rem; border: 2px solid #e1ecf4; border-radius: 8px; font-size: 1rem; margin-bottom: 1rem; }
+        
+        .feedback-form { margin-top: 2rem; }
+        .feedback-form textarea { width: 100%; min-height: 150px; padding: 1rem; border: 2px solid #e1ecf4; border-radius: 10px; font-size: 1rem; margin-top: 0.5rem; }
+        .success-message { color: #27ae60; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -105,9 +241,9 @@
                 <li><a href="/" onclick="navigateTo(event, '/')" aria-label="Home">Home</a></li>
                 <li><a href="/batch-query" onclick="navigateTo(event, '/batch-query')" aria-label="Batch Query">Batch Query</a></li>
                 <li><a href="/expression" onclick="navigateTo(event, '/expression')" aria-label="Expression">Expression</a></li>
+                <li><a href="/compare" onclick="navigateTo(event, '/compare')" aria-label="Compare">Compare</a></li>
                 <li><a href="/download" onclick="navigateTo(event, '/download')" aria-label="Download">Download</a></li>
-                <li><a href="/cite" onclick="navigateTo(event, '/cite')" aria-label="Cite">Cite</a></li>
-                <li><a href="/contact" onclick="navigateTo(event, '/contact')" aria-label="Contact">Contact</a></li>
+                <li><a href="/contact" onclick="navigateTo(event, '/contact')" aria-label="Contact">Contact & Cite</a></li>
             </ul>
         </div>
     </nav>
@@ -120,14 +256,14 @@
                 <p style="font-size: 0.9rem; opacity: 0.9;">Click genes to see localization</p>
             </div>
             <div class="panel-content">
-                <div class="cilia-container">
-                    <svg viewBox="0 0 300 400" xmlns="http://www.w3.org/2000/svg" style="max-width: 250px; height: auto;">
-                        <path id="cell-body" class="cilia-part" fill="#a8dadc" d="M 50,380 C -20,300 20,200 150,200 C 280,200 320,300 250,380 Z" aria-label="Cell Body"/>
-                        <circle id="nucleus" class="cilia-part" fill="#457b9d" cx="150" cy="320" r="40" aria-label="Nucleus"/>
-                        <rect id="basal-body" class="cilia-part" fill="#1d3557" x="140" y="195" width="20" height="15" aria-label="Basal Body"/>
-                        <path id="transition-zone" class="cilia-part" fill="#f1faee" d="M 142,195 L 138,180 L 162,180 L 158,195 Z" aria-label="Transition Zone"/>
-                        <path id="ciliary-membrane" class="cilia-part" fill="#a8dadc" fill-opacity="0.5" d="M 138,180 L 145,10 L 155,10 L 162,180 Z" aria-label="Ciliary Membrane"/>
-                        <path id="axoneme" class="cilia-part" fill="#f1faee" d="M 145,180 L 148,15 L 152,15 L 155,180 Z" aria-label="Axoneme"/>
+                <div class="cilia-container interactive-cilium">
+                    <svg viewBox="0 0 300 400" xmlns="http://www.w3.org/2000/svg">
+                        <path id="cell-body" class="cilia-part" tabindex="0" fill="none" d="M 50,380 C -20,300 20,200 150,200 C 280,200 320,300 250,380 Z" aria-label="Cell Body"/>
+                        <circle id="nucleus" class="cilia-part" tabindex="0" fill="#A7C7E7" cx="150" cy="320" r="40" aria-label="Nucleus"/>
+                        <rect id="basal-body" class="cilia-part" tabindex="0" fill="#2F2F2F" x="140" y="195" width="20" height="15" aria-label="Basal Body"/>
+                        <path id="transition-zone" class="cilia-part" tabindex="0" fill="#9B59B6" d="M 142,195 L 138,180 L 162,180 L 158,195 Z" aria-label="Transition Zone"/>
+                        <path id="ciliary-membrane" class="cilia-part" tabindex="0" fill="none" fill-opacity="0.5" d="M 138,180 L 145,10 L 155,10 L 162,180 Z" aria-label="Ciliary Membrane"/>
+                        <path id="axoneme" class="cilia-part" tabindex="0" fill="none" d="M 145,180 L 148,15 L 152,15 L 155,180 Z" aria-label="Axoneme"/>
                     </svg>
                 </div>
                 <div class="controls">
@@ -207,6 +343,784 @@
             currentData = [...defaultGenes];
         }
 
+        // --- Expression Visualization System ---
+        let expressionData = {};
+        let availableGenes = new Set();
+        
+        async function initExpressionSystem() {
+            try {
+                // Load expression data first
+                await loadExpressionData();
+                
+                // Setup event listeners
+                setupExpressionEventListeners();
+                
+                // Load SVG file
+                loadSVGFile().then(() => {
+                    console.log('SVG file loaded successfully');
+                    prepareOrgansForExpression();
+                }).catch(error => {
+                    console.error('SVG loading error:', error);
+                });
+                
+                console.log('Expression system initialized successfully');
+            } catch (error) {
+                console.error('Failed to initialize expression system:', error);
+            }
+        }
+        
+        async function loadExpressionData() {
+            try {
+                const response = await fetch('rna_tissue_consensus.tsv');
+                if (!response.ok) throw new Error('Failed to load expression data');
+                
+                const tsvText = await response.text();
+                const rawData = parseTSV(tsvText);
+                expressionData = processExpressionData(rawData);
+                
+                // Build available genes set from TSV data
+                const geneSet = new Set();
+                Object.keys(expressionData).forEach(gene => {
+                    geneSet.add(gene.toUpperCase());
+                });
+                availableGenes = geneSet;
+                
+                console.log(`Loaded ${Object.keys(expressionData).length} genes with expression data from TSV`);
+                console.log(`Available genes count: ${availableGenes.size}`);
+                
+            } catch (error) {
+                console.error('Error loading expression data:', error);
+            }
+        }
+        
+        function parseTSV(tsvText) {
+            const lines = tsvText.split('\n').filter(line => line.trim());
+            if (lines.length === 0) return [];
+            
+            const headers = lines[0].split('\t');
+            const data = [];
+            
+            for (let i = 1; i < lines.length; i++) {
+                const values = lines[i].split('\t');
+                if (values.length === headers.length) {
+                    const row = {};
+                    headers.forEach((header, index) => {
+                        row[header.trim()] = values[index] ? values[index].trim() : '';
+                    });
+                    data.push(row);
+                }
+            }
+            
+            return data;
+        }
+        
+        // Process TSV data into a more usable format for organ expression
+        function processExpressionData(rawData) {
+            const processedData = {};
+            
+            rawData.forEach(row => {
+                const geneName = row['Gene name'] || row['Gene'];
+                const tissue = row['Tissue'];
+                const nTPM = parseFloat(row['nTPM']);
+                
+                if (geneName && tissue && !isNaN(nTPM)) {
+                    if (!processedData[geneName]) {
+                        processedData[geneName] = {};
+                    }
+                    processedData[geneName][tissue] = nTPM;
+                }
+            });
+            
+            // Build available genes set from TSV data (not from ciliahub_data.json)
+            const geneSet = new Set();
+            Object.keys(processedData).forEach(gene => {
+                geneSet.add(gene.toUpperCase());
+            });
+            availableGenes = geneSet;
+            
+            console.log(`Loaded ${Object.keys(processedData).length} genes with expression data from TSV`);
+            return processedData;
+        }
+        
+        function setupExpressionEventListeners() {
+            const searchInput = document.getElementById('gene-search');
+            const suggestionsDiv = document.getElementById('suggestions');
+            
+            if (!searchInput || !suggestionsDiv) return;
+            
+            // Search input events
+            searchInput.addEventListener('input', handleExpressionSearchInput);
+            searchInput.addEventListener('focus', () => showExpressionSuggestions());
+            searchInput.addEventListener('blur', () => {
+                setTimeout(() => suggestionsDiv.style.display = 'none', 200);
+            });
+            
+            // Click outside to hide suggestions
+            document.addEventListener('click', (e) => {
+                if (!searchInput.contains(e.target) && !suggestionsDiv.contains(e.target)) {
+                    suggestionsDiv.style.display = 'none';
+                }
+            });
+        }
+        
+        // Debounce search input for better performance
+        let searchTimeout;
+        function handleExpressionSearchInput(e) {
+            const query = e.target.value.trim().toUpperCase();
+            
+            if (query.length < 2) {
+                hideExpressionSuggestions();
+                return;
+            }
+            
+            // Clear previous timeout
+            clearTimeout(searchTimeout);
+            
+            // Debounce search to avoid excessive function calls
+            searchTimeout = setTimeout(() => {
+                const suggestions = getExpressionGeneSuggestions(query);
+                showExpressionSuggestions(suggestions);
+            }, 150); // 150ms delay
+        }
+        
+        // Gene suggestions function
+        function getExpressionGeneSuggestions(query) {
+            const suggestions = [];
+            const queryUpper = query.toUpperCase();
+            
+            // Search in available genes from TSV data
+            for (const gene of availableGenes) {
+                if (gene.startsWith(queryUpper)) {
+                    suggestions.push({
+                        gene: gene,
+                        description: `Gene expression data available in ${Object.keys(expressionData[gene] || {}).length} tissues`,
+                        ensembl_id: null
+                    });
+                    
+                    if (suggestions.length >= 10) break;
+                }
+            }
+            
+            return suggestions;
+        }
+        
+        function showExpressionSuggestions(suggestions = null) {
+            const suggestionsDiv = document.getElementById('suggestions');
+            if (!suggestionsDiv) return;
+            
+            if (!suggestions) {
+                suggestionsDiv.style.display = 'none';
+                return;
+            }
+            
+            if (suggestions.length === 0) {
+                suggestionsDiv.style.display = 'none';
+                return;
+            }
+            
+            suggestionsDiv.innerHTML = suggestions.map(suggestion => `
+                <div class="suggestion-item" onclick="selectExpressionGene('${suggestion.gene}')" style="padding: 0.8rem 1rem; cursor: pointer; border-bottom: 1px solid #f0f0f0; transition: background-color 0.2s;">
+                    <div style="font-weight: bold; color: #2c5aa0;">${suggestion.gene}</div>
+                    <div style="font-size: 0.9rem; color: #666; margin-top: 0.3rem;">${suggestion.description.substring(0, 80)}${suggestion.description.length > 80 ? '...' : ''}</div>
+                </div>
+            `).join('');
+            
+            suggestionsDiv.style.display = 'block';
+        }
+        
+        function hideExpressionSuggestions() {
+            const suggestionsDiv = document.getElementById('suggestions');
+            if (suggestionsDiv) suggestionsDiv.style.display = 'none';
+        }
+        
+        function selectExpressionGene(geneName) {
+            // Update UI
+            const searchInput = document.getElementById('gene-search');
+            if (searchInput) searchInput.value = geneName;
+            hideExpressionSuggestions();
+            
+            // Show gene info
+            showExpressionGeneInfo(geneName);
+            
+            // Update expression visualization
+            updateExpressionVisualization(geneName);
+            
+            // Update expression table
+            updateExpressionTable(geneName);
+        }
+        
+        function showExpressionGeneInfo(geneName) {
+            const geneDetailsDiv = document.getElementById('gene-details');
+            const selectedGeneInfoDiv = document.getElementById('selected-gene-info');
+            
+            if (geneDetailsDiv && selectedGeneInfoDiv) {
+                // Get expression data for this gene
+                const geneExpression = expressionData[geneName] || {};
+                const tissueCount = Object.keys(geneExpression).length;
+                
+                // Try to find additional info from allGenes if available
+                const geneInfo = allGenes.find(g => g.gene === geneName);
+                
+                geneDetailsDiv.innerHTML = `
+                    <div style="margin-bottom: 1rem;">
+                        <strong>Gene:</strong> ${geneName}
+                    </div>
+                    <div style="margin-bottom: 1rem;">
+                        <strong>Expression Data:</strong> Available in ${tissueCount} tissues
+                    </div>
+                    ${geneInfo && geneInfo.description ? `<div style="margin-bottom: 1rem;"><strong>Description:</strong> ${geneInfo.description}</div>` : ''}
+                    ${geneInfo && geneInfo.ensembl_id ? `<div style="margin-bottom: 1rem;"><strong>Ensembl ID:</strong> ${geneInfo.ensembl_id}</div>` : ''}
+                    ${geneInfo && geneInfo.localization ? `<div style="margin-bottom: 1rem;"><strong>Localization:</strong> ${geneInfo.localization}</div>` : ''}
+                `;
+                selectedGeneInfoDiv.style.display = 'block';
+            }
+        }
+        
+        function updateExpressionVisualization(geneName) {
+            console.log('Updating expression visualization for gene:', geneName);
+            
+            // Reset all organs to their original colors and restore clickability
+            const organs = document.querySelectorAll('.organ');
+            console.log('Found', organs.length, 'organs in SVG');
+            organs.forEach(organ => {
+                const originalColor = organ.getAttribute('data-original-color');
+                if (originalColor) {
+                    organ.setAttribute('fill', originalColor);
+                }
+                organ.setAttribute('title', '');
+                // Restore cursor and hover effects
+                organ.style.cursor = 'pointer';
+                organ.style.filter = 'brightness(1)';
+                // Keep stroke styling for clickability
+                organ.style.stroke = '#2c5aa0';
+                organ.style.strokeWidth = '2';
+            });
+            
+            // Find expression data for the gene
+            const geneExpression = findGeneExpression(geneName);
+            console.log('Gene expression data:', geneExpression);
+            
+            if (geneExpression) {
+                // Apply expression colors to organs using green color scheme
+                Object.entries(geneExpression).forEach(([tissue, nTPM]) => {
+                    console.log('Looking for organ:', tissue, 'with nTPM:', nTPM);
+                    const organElement = findOrganElement(tissue);
+                    if (organElement) {
+                        console.log('Found organ element for:', tissue);
+                        const color = getExpressionColor(nTPM);
+                        organElement.setAttribute('fill', color);
+                        
+                        // Add tooltip with exact nTPM value and description
+                        const description = organElement.getAttribute('data-description') || tissue;
+                        organElement.setAttribute('title', `${description}: ${nTPM} nTPM (${getExpressionLevel(nTPM)} expression)`);
+                        
+                        // Ensure hover effect is active
+                        organElement.style.cursor = 'pointer';
+                    } else {
+                        console.log('No organ element found for tissue:', tissue);
+                    }
+                });
+            }
+        }
+        
+        function findGeneExpression(geneName) {
+            if (!expressionData || Object.keys(expressionData).length === 0) return null;
+            
+            // Look for exact gene match in the processed data
+            const geneRecord = expressionData[geneName.toUpperCase()];
+            
+            if (geneRecord) {
+                return geneRecord;
+            }
+            
+            // Try to find by partial match
+            const matchingGene = Object.keys(expressionData).find(gene => 
+                gene.toUpperCase() === geneName.toUpperCase()
+            );
+            
+            if (matchingGene) {
+                return expressionData[matchingGene];
+            }
+            
+            return null;
+        }
+        
+        // Optimized organ finding with caching and flexible matching
+        const organCache = new Map();
+        function findOrganElement(tissueName) {
+            // Check cache first
+            if (organCache.has(tissueName)) {
+                return organCache.get(tissueName);
+            }
+            
+            // Look for organs by their data-tissue attribute
+            const organs = document.querySelectorAll('.organ');
+            const tissueLower = tissueName.toLowerCase();
+            
+            // First try exact match
+            for (let i = 0; i < organs.length; i++) {
+                const organ = organs[i];
+                const tissue = organ.getAttribute('data-tissue');
+                if (tissue && tissueLower === tissue.toLowerCase()) {
+                    organCache.set(tissueName, organ);
+                    return organ;
+                }
+            }
+            
+            // Then try partial match
+            for (let i = 0; i < organs.length; i++) {
+                const organ = organs[i];
+                const tissue = organ.getAttribute('data-tissue');
+                if (tissue && (tissueLower.includes(tissue.toLowerCase()) || tissue.toLowerCase().includes(tissueLower))) {
+                    // Cache the result
+                    organCache.set(tissueName, organ);
+                    
+                    // Limit cache size
+                    if (organCache.size > 50) {
+                        const firstKey = organCache.keys().next().value;
+                        organCache.delete(firstKey);
+                    }
+                    
+                    return organ;
+                }
+            }
+            
+            // Cache negative results too
+            organCache.set(tissueName, null);
+            return null;
+        }
+        
+        function getExpressionColor(nTPM) {
+            if (nTPM <= 5) return '#A8E6A1';      // Light green - Low expression (0-5 nTPM)
+            if (nTPM <= 15) return '#6CC96C';     // Medium green - Medium expression (5-15 nTPM)
+            if (nTPM <= 30) return '#3FAF3F';     // Green - High expression (15-30 nTPM)
+            return '#1E7B1E';                      // Dark green - Very high expression (>30 nTPM)
+        }
+        
+        // Optimized table rendering with virtual scrolling for large datasets
+        function updateExpressionTable(geneName) {
+            const tableWrapper = document.getElementById('expression-table-wrapper');
+            if (!tableWrapper) return;
+            
+            const geneExpression = findGeneExpression(geneName);
+            
+            if (!geneExpression || Object.keys(geneExpression).length === 0) {
+                tableWrapper.innerHTML = '<div style="text-align: center; padding: 2rem; color: #666; font-style: italic;">No expression data available for this gene</div>';
+                return;
+            }
+            
+            // Sort tissues by expression level (optimized)
+            const sortedTissues = Object.entries(geneExpression)
+                .sort(([,a], [,b]) => b - a);
+            
+            // Limit initial rendering for better performance
+            const initialTissues = sortedTissues.slice(0, 25);
+            const hasMore = sortedTissues.length > 25;
+            
+            const tableHTML = `
+                <div style="margin-bottom: 1rem;">
+                    <h5 style="color: #2c5aa0; margin-bottom: 0.5rem;">
+                        ${geneName} Expression Profile (${sortedTissues.length} tissues)
+                    </h5>
+                    <p style="font-size: 0.9rem; color: #666; margin-bottom: 1rem;">
+                        Expression levels across all available tissues
+                    </p>
+                </div>
+                <table style="width: 100%; border-collapse: collapse; margin-top: 1rem; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 16px rgba(0,0,0,0.1);">
+                    <thead>
+                        <tr>
+                            <th style="padding: 0.8rem; text-align: left; border-bottom: 1px solid #e1ecf4; background: #2c5aa0; color: white; font-weight: 600;">Tissue/Organ</th>
+                            <th style="padding: 0.8rem; text-align: left; border-bottom: 1px solid #e1ecf4; background: #2c5aa0; color: white; font-weight: 600;">nTPM Value</th>
+                            <th style="padding: 0.8rem; text-align: left; border-bottom: 1px solid #e1ecf4; background: #2c5aa0; color: white; font-weight: 600;">Expression Level</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${initialTissues.map(([tissue, nTPM]) => {
+                            const level = getExpressionLevel(nTPM);
+                            const levelClass = getExpressionLevelClass(nTPM);
+                            return `
+                                <tr style="transition: background-color 0.2s;">
+                                    <td style="padding: 0.8rem; text-align: left; border-bottom: 1px solid #e1ecf4;">${tissue}</td>
+                                    <td style="padding: 0.8rem; text-align: left; border-bottom: 1px solid #e1ecf4;">
+                                        ${nTPM.toFixed(2)}
+                                        <span style="font-size: 0.8rem; color: #666; margin-left: 0.5rem;">(${getExpressionColor(nTPM)})</span>
+                                    </td>
+                                    <td style="padding: 0.8rem; text-align: left; border-bottom: 1px solid #e1ecf4;"><span style="font-weight: 600; padding: 0.3rem 0.6rem; border-radius: 4px; text-align: center; min-width: 80px; ${levelClass}">${level}</span></td>
+                                </tr>
+                            `;
+                        }).join('')}
+                    </tbody>
+                </table>
+                ${hasMore ? `
+                    <div style="text-align: center; margin-top: 1rem;">
+                        <button onclick="loadMoreTissues('${geneName}', ${sortedTissues.length})" style="padding: 0.5rem 1rem; background: #2c5aa0; color: white; border: none; border-radius: 5px; cursor: pointer;">
+                            Load More Tissues (${sortedTissues.length - 25} remaining)
+                        </button>
+                    </div>
+                ` : ''}
+            `;
+            
+            tableWrapper.innerHTML = tableHTML;
+        }
+        
+        // Load more tissues for better performance
+        function loadMoreTissues(geneName, totalCount) {
+            const geneExpression = findGeneExpression(geneName);
+            if (!geneExpression) return;
+            
+            const sortedTissues = Object.entries(geneExpression)
+                .sort(([,a], [,b]) => b - a);
+            
+            const tableBody = document.querySelector('#expression-table-wrapper tbody');
+            if (!tableBody) return;
+            
+            // Add remaining tissues
+            for (let i = 25; i < sortedTissues.length; i++) {
+                const [tissue, nTPM] = sortedTissues[i];
+                const level = getExpressionLevel(nTPM);
+                const levelClass = getExpressionLevelClass(nTPM);
+                
+                const row = document.createElement('tr');
+                row.style.transition = 'background-color 0.2s';
+                row.innerHTML = `
+                    <td style="padding: 0.8rem; text-align: left; border-bottom: 1px solid #e1ecf4;">${tissue}</td>
+                    <td style="padding: 0.8rem; text-align: left; border-bottom: 1px solid #e1ecf4;">
+                        ${nTPM.toFixed(2)}
+                        <span style="font-size: 0.8rem; color: #666; margin-left: 0.5rem;">(${getExpressionColor(nTPM)})</span>
+                    </td>
+                    <td style="padding: 0.8rem; text-align: left; border-bottom: 1px solid #e1ecf4;"><span style="font-weight: 600; padding: 0.3rem 0.6rem; border-radius: 4px; text-align: center; min-width: 80px; ${levelClass}">${level}</span></td>
+                `;
+                
+                tableBody.appendChild(row);
+            }
+            
+            // Remove load more button
+            const loadMoreBtn = document.querySelector('#expression-table-wrapper button');
+            if (loadMoreBtn) loadMoreBtn.remove();
+        }
+        
+        function getExpressionLevel(nTPM) {
+            if (nTPM <= 5) return 'Low';
+            if (nTPM <= 15) return 'Medium';
+            if (nTPM <= 30) return 'High';
+            return 'Very High';
+        }
+        
+        function getExpressionLevelClass(nTPM) {
+            if (nTPM <= 5) return 'background-color: #A8E6A1; color: #1E7B1E;';
+            if (nTPM <= 15) return 'background-color: #6CC96C; color: #1E7B1E;';
+            if (nTPM <= 30) return 'background-color: #3FAF3F; color: white;';
+            return 'background-color: #1E7B1E; color: white;';
+        }
+        
+        // Handle organ click to filter expression data by tissue
+        function handleOrganClick(tissueName, description) {
+            // Highlight the clicked organ
+            highlightClickedOrgan(tissueName);
+            
+            // Filter and display expression data for this tissue
+            displayTissueExpressionData(tissueName, description);
+        }
+        
+        // Highlight the clicked organ
+        function highlightClickedOrgan(tissueName) {
+            const organs = document.querySelectorAll('.organ');
+            organs.forEach(organ => {
+                // Reset all organs to default state
+                organ.style.stroke = '#2c5aa0';
+                organ.style.strokeWidth = '2';
+                organ.style.filter = 'brightness(1)';
+                
+                // Highlight the clicked organ
+                if (organ.getAttribute('data-tissue') === tissueName) {
+                    organ.style.stroke = '#e74c3c'; // Red highlight for clicked organ
+                    organ.style.strokeWidth = '3';
+                    organ.style.filter = 'brightness(1.1)';
+                }
+            });
+        }
+        
+        // Display expression data filtered by tissue
+        function displayTissueExpressionData(tissueName, description) {
+            const tableWrapper = document.getElementById('expression-table-wrapper');
+            if (!tableWrapper) return;
+            
+            // Find all genes with expression data for this tissue
+            const tissueExpressionData = [];
+            
+            if (expressionData && Object.keys(expressionData).length > 0) {
+                Object.entries(expressionData).forEach(([geneName, tissueData]) => {
+                    if (tissueData[tissueName] && !isNaN(tissueData[tissueName])) {
+                        const nTPM = parseFloat(tissueData[tissueName]);
+                        
+                        tissueExpressionData.push({
+                            gene: geneName,
+                            tissue: tissueName,
+                            nTPM: nTPM,
+                            level: getExpressionLevel(nTPM)
+                        });
+                    }
+                });
+            }
+            
+            // Sort by expression level (highest first)
+            tissueExpressionData.sort((a, b) => b.nTPM - a.nTPM);
+            
+            if (tissueExpressionData.length === 0) {
+                tableWrapper.innerHTML = `
+                    <div style="text-align: center; padding: 2rem; color: #666; font-style: italic;">
+                        No expression data available for ${description}
+                    </div>`;
+                return;
+            }
+            
+            // Display the filtered data
+            const tableHTML = `
+                <div style="margin-bottom: 1rem;">
+                    <h5 style="color: #2c5aa0; margin-bottom: 0.5rem;">
+                        ${description} Expression Data (${tissueExpressionData.length} genes)
+                    </h5>
+                    <p style="font-size: 0.9rem; color: #666; margin-bottom: 1rem;">
+                        Click on a gene to see its full expression profile across all tissues
+                    </p>
+                </div>
+                <table style="width: 100%; border-collapse: collapse; margin-top: 1rem; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 16px rgba(0,0,0,0.1);">
+                    <thead>
+                        <tr>
+                            <th style="padding: 0.8rem; text-align: left; border-bottom: 1px solid #e1ecf4; background: #2c5aa0; color: white; font-weight: 600;">Gene</th>
+                            <th style="padding: 0.8rem; text-align: left; border-bottom: 1px solid #e1ecf4; background: #2c5aa0; color: white; font-weight: 600;">nTPM Value</th>
+                            <th style="padding: 0.8rem; text-align: left; border-bottom: 1px solid #e1ecf4; background: #2c5aa0; color: white; font-weight: 600;">Expression Level</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${tissueExpressionData.slice(0, 50).map((item, index) => {
+                            const levelClass = getExpressionLevelClass(item.nTPM);
+                            return `
+                                <tr style="transition: background-color 0.2s; cursor: pointer;" 
+                                    onclick="selectGeneFromTable('${item.gene}')" 
+                                    onmouseover="this.style.backgroundColor='#f8f9fa'" 
+                                    onmouseout="this.style.backgroundColor=''">
+                                    <td style="padding: 0.8rem; text-align: left; border-bottom: 1px solid #e1ecf4; font-weight: 600; color: #2c5aa0;">
+                                        ${item.gene}
+                                    </td>
+                                    <td style="padding: 0.8rem; text-align: left; border-bottom: 1px solid #e1ecf4;">
+                                        ${item.nTPM.toFixed(2)}
+                                        <span style="font-size: 0.8rem; color: #666; margin-left: 0.5rem;">(${getExpressionColor(nTPM)})</span>
+                                    </td>
+                                    <td style="padding: 0.8rem; text-align: left; border-bottom: 1px solid #e1ecf4;">
+                                        <span style="font-weight: 600; padding: 0.3rem 0.6rem; border-radius: 4px; text-align: center; min-width: 80px; ${levelClass}">
+                                            ${item.level}
+                                        </span>
+                                    </td>
+                                </tr>
+                            `;
+                        }).join('')}
+                    </tbody>
+                </table>
+                ${tissueExpressionData.length > 50 ? `
+                    <div style="text-align: center; margin-top: 1rem; color: #666; font-size: 0.9rem;">
+                        Showing top 50 genes. Total: ${tissueExpressionData.length} genes
+                    </div>
+                ` : ''}
+            `;
+            
+            tableWrapper.innerHTML = tableHTML;
+        }
+        
+        // Select gene from tissue expression table
+        function selectGeneFromTable(geneName) {
+            // Update search input
+            const searchInput = document.getElementById('gene-search');
+            if (searchInput) {
+                searchInput.value = geneName;
+            }
+            
+            // Show gene info
+            showExpressionGeneInfo(geneName);
+            
+            // Update expression visualization for this gene
+            updateExpressionVisualization(geneName);
+            
+            // Update the full expression table
+            updateExpressionTable(geneName);
+        }
+        
+        // Reset organ selection and restore default state
+        function resetOrganSelection() {
+            // Reset all organs to their original colors
+            const organs = document.querySelectorAll('.organ');
+            organs.forEach(organ => {
+                const originalColor = organ.getAttribute('data-original-color');
+                if (originalColor) {
+                    organ.setAttribute('fill', originalColor);
+                }
+                organ.setAttribute('title', '');
+                organ.style.stroke = '#2c5aa0';
+                organ.style.strokeWidth = '2';
+                organ.style.filter = 'brightness(1)';
+            });
+            
+            // Reset the expression table
+            const tableWrapper = document.getElementById('expression-table-wrapper');
+            if (tableWrapper) {
+                tableWrapper.innerHTML = `
+                    <div style="text-align: center; padding: 2rem; color: #666; font-style: italic;">
+                        Click on an organ to see its gene expression data, or search for a specific gene
+                    </div>`;
+            }
+            
+            // Clear selected gene info
+            const selectedGeneInfoDiv = document.getElementById('selected-gene-info');
+            if (selectedGeneInfoDiv) {
+                selectedGeneInfoDiv.style.display = 'none';
+            }
+            
+            // Clear search input
+            const searchInput = document.getElementById('gene-search');
+            if (searchInput) {
+                searchInput.value = '';
+            }
+        }
+        
+        // Load and prepare the SVG file for organ identification
+        async function loadSVGFile() {
+            try {
+                const response = await fetch('file.svg');
+                if (!response.ok) throw new Error('Failed to load SVG file');
+                
+                const svgText = await response.text();
+                const container = document.getElementById('svg-container');
+                if (!container) return;
+                
+                // Insert the SVG content
+                container.innerHTML = svgText;
+                
+                // Prepare organs for expression visualization
+                prepareOrgansForExpression();
+                
+                console.log('SVG file loaded successfully');
+            } catch (error) {
+                console.error('Error loading SVG file:', error);
+                const container = document.getElementById('svg-container');
+                if (container) {
+                    container.innerHTML = '<div style="text-align: center; padding: 2rem; color: #2c5aa0;">Error loading SVG file. Please check if file.svg exists.</div>';
+                }
+            }
+        }
+        
+                // Prepare organs in the SVG for expression visualization
+        function prepareOrgansForExpression() {
+            console.log('Preparing organs for expression visualization...');
+            
+            // Map tissue names from TSV to SVG path elements based on their colors
+            // Using exact tissue names from rna_tissue_consensus.tsv for perfect matching
+            const organMappings = [
+                // Brain regions - Dark Red (#BE0405)
+                { tissue: 'cerebral cortex', selector: 'path[fill="#BE0405"]', description: 'Cerebral Cortex', originalColor: '#BE0405' },
+                { tissue: 'cerebellum', selector: 'path[fill="#BE0405"]', description: 'Cerebellum', originalColor: '#BE0405' },
+                { tissue: 'amygdala', selector: 'path[fill="#BE0405"]', description: 'Amygdala', originalColor: '#BE0405' },
+                { tissue: 'hippocampal formation', selector: 'path[fill="#BE0405"]', description: 'Hippocampus', originalColor: '#BE0405' },
+                { tissue: 'hypothalamus', selector: 'path[fill="#BE0405"]', description: 'Hypothalamus', originalColor: '#BE0405' },
+                { tissue: 'midbrain', selector: 'path[fill="#BE0405"]', description: 'Midbrain', originalColor: '#BE0405' },
+                
+                // Heart - Red (#F07070)
+                { tissue: 'heart muscle', selector: 'path[fill="#F07070"]', description: 'Heart', originalColor: '#F07070' },
+                
+                // Lungs - Light Pink (#F6A2A0)
+                { tissue: 'lung', selector: 'path[fill="#F6A2A0"]', description: 'Lungs', originalColor: '#F6A2A0' },
+                
+                // Liver - Pink (#F8A19F)
+                { tissue: 'liver', selector: 'path[fill="#F8A19F"]', description: 'Liver', originalColor: '#F8A19F' },
+                
+                // Stomach - Yellow (#FDE098)
+                { tissue: 'stomach', selector: 'path[fill="#FDE098"]', description: 'Stomach', originalColor: '#FDE098' },
+                
+                // Kidneys - Light Red (#EA8F8E)
+                { tissue: 'kidney', selector: 'path[fill="#EA8F8E"]', description: 'Kidneys', originalColor: '#EA8F8E' },
+                
+                // Intestines - Brown (#C07F54)
+                { tissue: 'colon', selector: 'path[fill="#C07F54"]', description: 'Colon', originalColor: '#C07F54' },
+                { tissue: 'small intestine', selector: 'path[fill="#C07F54"]', description: 'Small Intestine', originalColor: '#C07F54' },
+                { tissue: 'duodenum', selector: 'path[fill="#C07F54"]', description: 'Duodenum', originalColor: '#C07F54' },
+                
+                // Reproductive organs - Purple (#E49BDC)
+                { tissue: 'testis', selector: 'path[fill="#E49BDC"]', description: 'Testis', originalColor: '#E49BDC' },
+                { tissue: 'ovary', selector: 'path[fill="#E49BDC"]', description: 'Ovary', originalColor: '#E49BDC' },
+                { tissue: 'epididymis', selector: 'path[fill="#E49BDC"]', description: 'Epididymis', originalColor: '#E49BDC' },
+                { tissue: 'fallopian tube', selector: 'path[fill="#E49BDC"]', description: 'Fallopian Tube', originalColor: '#E49BDC' },
+                { tissue: 'cervix', selector: 'path[fill="#E49BDC"]', description: 'Cervix', originalColor: '#E49BDC' },
+                { tissue: 'endometrium', selector: 'path[fill="#E49BDC"]', description: 'Endometrium', originalColor: '#E49BDC' },
+                
+                // Glands - Various colors
+                { tissue: 'adrenal gland', selector: 'path[fill="#F89794"]', description: 'Adrenal Gland', originalColor: '#F89794' },
+                { tissue: 'parathyroid gland', selector: 'path[fill="#F89794"]', description: 'Parathyroid Gland', originalColor: '#F89794' },
+                { tissue: 'pituitary gland', selector: 'path[fill="#F89794"]', description: 'Pituitary Gland', originalColor: '#F89794' },
+                { tissue: 'salivary gland', selector: 'path[fill="#F89794"]', description: 'Salivary Gland', originalColor: '#F89794' },
+                { tissue: 'thyroid gland', selector: 'path[fill="#F89794"]', description: 'Thyroid Gland', originalColor: '#F89794' },
+                
+                // Other organs
+                { tissue: 'breast', selector: 'path[fill="#FBD4E6"]', description: 'Breast', originalColor: '#FBD4E6' },
+                { tissue: 'pancreas', selector: 'path[fill="#F89794"]', description: 'Pancreas', originalColor: '#F89794' },
+                { tissue: 'spleen', selector: 'path[fill="#D77775"]', description: 'Spleen', originalColor: '#D77775' },
+                { tissue: 'gallbladder', selector: 'path[fill="#E37733"]', description: 'Gallbladder', originalColor: '#E37733' },
+                { tissue: 'appendix', selector: 'path[fill="#F0B18D"]', description: 'Appendix', originalColor: '#F0B18D' },
+                { tissue: 'urinary bladder', selector: 'path[fill="#AA1415"]', description: 'Bladder', originalColor: '#AA1415' },
+                { tissue: 'prostate', selector: 'path[fill="#853E10"]', description: 'Prostate', originalColor: '#853E10' },
+                
+                // Adipose tissue
+                { tissue: 'adipose tissue', selector: 'path[fill="#F6D3C3"]', description: 'Adipose Tissue', originalColor: '#F6D3C3' }
+            ];
+            
+            const svg = document.querySelector('#svg-container svg');
+            if (!svg) {
+                console.log('SVG element not found!');
+                return;
+            }
+            
+            console.log('SVG found, processing organ mappings...');
+            let totalOrgansFound = 0;
+            
+            // Apply organ class and prepare for expression visualization
+            organMappings.forEach((mapping, index) => {
+                const pathElements = svg.querySelectorAll(mapping.selector);
+                console.log(`Mapping ${mapping.tissue}: found ${pathElements.length} elements with selector ${mapping.selector}`);
+                
+                if (pathElements.length > 0) {
+                    pathElements.forEach((pathElement, pathIndex) => {
+                        // Add organ class and tissue identifier
+                        pathElement.classList.add('organ');
+                        pathElement.setAttribute('data-tissue', mapping.tissue);
+                        pathElement.setAttribute('data-description', mapping.description);
+                        pathElement.setAttribute('data-original-color', mapping.originalColor);
+                        
+                        // Set initial styling
+                        pathElement.style.cursor = 'pointer';
+                        pathElement.style.transition = 'all 0.3s ease';
+                        pathElement.style.stroke = '#2c5aa0';
+                        pathElement.style.strokeWidth = '2';
+                        
+                        // Add hover effects
+                        pathElement.addEventListener('mouseenter', () => {
+                            pathElement.style.filter = 'brightness(1.2)';
+                        });
+                        pathElement.addEventListener('mouseleave', () => {
+                            pathElement.style.filter = 'brightness(1)';
+                        });
+                        
+                        // Add click event for organ selection
+                        pathElement.addEventListener('click', () => {
+                            handleOrganClick(mapping.tissue, mapping.description);
+                        });
+                        
+                        totalOrgansFound++;
+                    });
+                }
+            });
+            
+            console.log(`Total organs prepared: ${totalOrgansFound}`);
+            console.log('Organs prepared for expression visualization with click functionality');
+        }
+
         function mapLocalizationToSVG(localization) {
             const mapping = {
                 "ciliary membrane": "ciliary-membrane",
@@ -230,15 +1144,15 @@
 
             if (path === '/' || path === '/index.html') {
                 displayHomePage();
+                setTimeout(displayLocalizationChart, 0);
             } else if (path === '/batch-query') {
                 displayBatchQueryTool();
             } else if(path === '/expression'){
                 displayExpression();
-            } 
-            else if (path === '/download') {
+            } else if (path === '/compare') {
+                displayComparePage();
+            } else if (path === '/download') {
                 displayDownloadPage();
-            } else if (path === '/cite') {
-                displayCitePage();
             } else if (path === '/contact') {
                 displayContactPage();
             } else if (gene) {
@@ -246,6 +1160,33 @@
             } else {
                 displayNotFoundPage();
             }
+            
+            window.addEventListener('scroll', handleStickySearch);
+            
+            // Add Panzoom functionality to cilia SVG
+            const ciliaSvg = document.querySelector('.interactive-cilium svg');
+            if (ciliaSvg) {
+                Panzoom(ciliaSvg, {
+                    maxZoom: 3,
+                    minZoom: 0.5,
+                    contain: 'outside'
+                });
+                ciliaSvg.parentElement.addEventListener('wheel', (e) => {
+                    e.preventDefault();
+                    const panzoom = Panzoom(ciliaSvg);
+                    panzoom.zoom(panzoom.getScale() * (e.deltaY > 0 ? 0.9 : 1.1));
+                });
+            }
+            
+            // Add keyboard navigation for cilia parts
+            document.querySelectorAll('.cilia-part').forEach(part => {
+                part.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        part.classList.toggle('highlighted');
+                    }
+                });
+            });
         }
 
         function displayHomePage() {
@@ -254,47 +1195,169 @@
             document.querySelector('.cilia-panel').style.display = 'block';
             contentArea.innerHTML = `
                 <div class="page-section">
-                    <h1>Welcome to CiliaHub</h1>
-                    <p style="font-size: 1.1rem; color: #555;">The central resource for interactive ciliary gene data. Search for a single gene below or use the Batch Query tool to analyze multiple genes.</p>
+                    <h1>The CiliaHub: An Updated Database of Gold Standard Genes with Ciliary Functions</h1>
+                    <p style="font-size: 1.1rem; color: #555;">CiliaHub is an advanced <strong>bioinformatics</strong> platform that hosts a detailed database of <strong>gold standard cilia genes</strong> and their role in various <strong>ciliopathies</strong>. Our comprehensive collection includes the most reliable and well-established genes linked to ciliary function, with reference papers also provided. With our user-friendly search tool, researchers can explore <strong>genome</strong>-wide data, focusing on both known and novel ciliary genes. Discover their contributions to the biology of cilia and the mechanisms behind ciliary-related disorders. Search for a single gene below or use the Batch Query tool to analyze multiple genes.</p>
                     <div class="search-container">
-                        <input type="text" id="single-gene-search" placeholder="Search for a single gene (e.g., ACE2, IFT88)" aria-label="Search for a single gene">
-                        <button id="single-search-btn" class="search-btn" aria-label="Search">Search</button>
+                        <div class="search-wrapper" style="flex: 1;">
+                            <input type="text" id="single-gene-search" placeholder="Search for a single gene (e.g., ACE2, IFT88)" aria-label="Search for a single gene" autocomplete="off">
+                            <div id="search-suggestions"></div>
+                        </div>
+                        <button id="single-search-btn" class="search-btn btn btn-primary" aria-label="Search for the entered gene name">Search</button>
                     </div>
                     <div id="gene-cards-container" class="gene-cards"></div>
                     <div id="status-message" class="status-message" style="display: none;"></div>
                 </div>`;
             document.getElementById('single-search-btn').onclick = performSingleSearch;
-            document.getElementById('single-gene-search').onkeydown = e => { if (e.key === 'Enter')performSingleSearch(); };
-            displayGeneCards(defaultGenes, []);
+            
+            // Add search suggestions functionality
+            const searchInput = document.getElementById('single-gene-search');
+            const suggestionsContainer = document.getElementById('search-suggestions');
+            searchInput.addEventListener('input', function() {
+                const query = this.value.trim().toUpperCase();
+                if (query.length < 1) {
+                    suggestionsContainer.innerHTML = '';
+                    return;
+                }
+                const filteredGenes = allGenes.filter(g => (g.gene && g.gene.toUpperCase().startsWith(query)) || (g.synonym && g.synonym.toUpperCase().includes(query))).slice(0, 10);
+                if (filteredGenes.length > 0) {
+                    suggestionsContainer.innerHTML = '<ul>' + filteredGenes.map(g => `<li>${g.gene}</li>`).join('') + '</ul>';
+                    suggestionsContainer.querySelectorAll('li').forEach(item => {
+                        item.addEventListener('click', function() {
+                            searchInput.value = this.textContent;
+                            suggestionsContainer.innerHTML = '';
+                            performSingleSearch();
+                        });
+                    });
+                } else {
+                    suggestionsContainer.innerHTML = '';
+                }
+            });
+            
+            searchInput.addEventListener('keydown', function(event) {
+                const suggestions = suggestionsContainer.querySelectorAll('li');
+                if (suggestions.length === 0 && event.key !== 'Enter') return;
+                if (event.key === 'Enter') {
+                    const activeElement = suggestionsContainer.querySelector('.active');
+                    if (activeElement) {
+                        event.preventDefault();
+                        searchInput.value = activeElement.textContent;
+                        suggestionsContainer.innerHTML = '';
+                    }
+                    performSingleSearch();
+                    return;
+                }
+                const activeElement = suggestionsContainer.querySelector('.active');
+                if (event.key === 'ArrowDown') {
+                    event.preventDefault();
+                    let nextElement = activeElement ? activeElement.nextElementSibling : suggestions[0];
+                    if (nextElement) {
+                        activeElement?.classList.remove('active');
+                        nextElement.classList.add('active');
+                    }
+                } else if (event.key === 'ArrowUp') {
+                    event.preventDefault();
+                    let prevElement = activeElement ? activeElement.previousElementSibling : suggestions[suggestions.length - 1];
+                    if (prevElement) {
+                        activeElement?.classList.remove('active');
+                        prevElement.classList.add('active');
+                    }
+                }
+            });
+            
+            document.addEventListener('click', function(event) {
+                if (!searchInput.contains(event.target)) {
+                    suggestionsContainer.innerHTML = '';
+                }
+            });
+            
+            document.getElementById('single-gene-search').onkeydown = e => { if (e.key === 'Enter') performSingleSearch(); };
+            displayGeneCards(defaultGenes, [], 1, 10);
         }
 
     
     function displayExpression() {
-    fetch("expression.html")
-        .then(res => res.text())
-        .then(html => {
-            const contentArea = document.querySelector('.content-area');
-            contentArea.innerHTML = html;
-            document.querySelector('.cilia-panel').style.display = 'none';
-
-            // scriptleri çalıştır
-            const temp = document.createElement("div");
-            temp.innerHTML = html;
-
-            temp.querySelectorAll("script").forEach(oldScript => {
-                const newScript = document.createElement("script");
-
-                if (oldScript.textContent) {
-                    newScript.textContent = oldScript.textContent;
-                }
-                if (oldScript.src) {
-                    newScript.src = oldScript.src;
-                }
-
-                contentArea.appendChild(newScript);
-            });
-        });
-}
+        const contentArea = document.querySelector('.content-area');
+        contentArea.className = 'content-area content-area-full';
+        document.querySelector('.cilia-panel').style.display = 'none';
+        
+        contentArea.innerHTML = `
+            <div class="page-section">
+                <div style="text-align: center; margin-bottom: 2rem;">
+                    <h1 style="color: #2c5aa0; margin-bottom: 1rem;">Gene Expression Visualization</h1>
+                    <p style="color: #555; font-size: 1.1rem;">Explore tissue-specific gene expression patterns across human organs and tissues</p>
+                </div>
+                
+                <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 2rem; align-items: start;">
+                    <!-- Left Panel: Search -->
+                    <div style="background: white; padding: 2rem; border-radius: 15px; box-shadow: 0 8px 32px rgba(44, 90, 160, 0.1); height: fit-content;">
+                        <h3 style="color: #2c5aa0; margin-bottom: 1.5rem; font-size: 1.3rem;">Gene Search</h3>
+                        <div style="margin-bottom: 1.5rem;">
+                            <input 
+                                type="text" 
+                                id="gene-search" 
+                                style="width: 100%; padding: 1rem; border: 2px solid #e1ecf4; border-radius: 10px; font-size: 1rem; margin-bottom: 1rem;"
+                                placeholder="Search for a gene (e.g., ARL13B, IFT88)"
+                                autocomplete="off"
+                            >
+                            <div id="suggestions" style="max-height: 300px; overflow-y: auto; border: 1px solid #e1ecf4; border-radius: 8px; background: white; display: none;"></div>
+                        </div>
+                        
+                        <div id="selected-gene-info" style="display: none;">
+                            <h4 style="color: #2c5aa0; margin-bottom: 1rem;">Selected Gene</h4>
+                            <div id="gene-details"></div>
+                        </div>
+                    </div>
+                    
+                    <!-- Right Panel: Expression Visualization -->
+                    <div style="background: white; padding: 2rem; border-radius: 15px; box-shadow: 0 8px 32px rgba(44, 90, 160, 0.1);">
+                        <h3 style="color: #2c5aa0; margin-bottom: 1.5rem; font-size: 1.3rem;">Expression Visualization</h3>
+                        
+                        <div style="text-align: center; margin-bottom: 2rem;">
+                            <div id="svg-container" style="max-width: 100%; height: auto;">
+                                <!-- SVG will be loaded here -->
+                                <div style="text-align: center; padding: 2rem; color: #666;">
+                                    <p>Loading human body visualization...</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div style="display: flex; justify-content: center; gap: 1rem; margin: 1.5rem 0; flex-wrap: wrap;">
+                            <div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem;">
+                                <div style="width: 20px; height: 20px; border-radius: 4px; border: 1px solid #ccc; background-color: #A8E6A1;"></div>
+                                <span>Low (0-5 nTPM)</span>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem;">
+                                <div style="width: 20px; height: 20px; border-radius: 4px; border: 1px solid #ccc; background-color: #6CC96C;"></div>
+                                <span>Medium (5-15 nTPM)</span>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem;">
+                                <div style="width: 20px; height: 20px; border-radius: 4px; border: 1px solid #ccc; background-color: #3FAF3F;"></div>
+                                <span>High (15-30 nTPM)</span>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem;">
+                                <div style="width: 20px; height: 20px; border-radius: 4px; border: 1px solid #ccc; background-color: #1E7B1E;"></div>
+                                <span>Very High (>30 nTPM)</span>
+                            </div>
+                        </div>
+                        
+                        <div style="margin-top: 2rem;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                                <h4 style="color: #2c5aa0; margin: 0;">Expression Data Table</h4>
+                                <button id="reset-organs-btn" style="padding: 0.5rem 1rem; background: #95a5a6; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 0.9rem;" onclick="resetOrganSelection()">
+                                    Reset Organ Selection
+                                </button>
+                            </div>
+                            <div id="expression-table-wrapper">
+                                <div style="text-align: center; padding: 2rem; color: #666; font-style: italic;">Click on an organ to see its gene expression data, or search for a specific gene</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+        
+        // Initialize expression visualization system
+        initExpressionSystem();
+    }
 
 
 
@@ -308,7 +1371,27 @@
             <h2>Batch Gene Query</h2>
             <p style="font-size: 1rem; color: #555;">
                 Enter multiple gene names (comma, space, or newline separated) OR upload a CSV file.
+                <span class="tooltip" aria-label="Help">
+                    <span class="tooltip-icon">?</span>
+                    <span class="tooltip-text">Enter gene names like: ACE2, IFT88, CEP290. For CSV, use a single column with gene names. <a href="/sample_genes.csv" download>Download sample CSV</a>.</span>
+                </span>
             </p>
+            
+            <div style="margin-bottom: 1rem;">
+                <label for="localization-filter" style="font-weight: 600;">Filter by Localization:</label>
+                <select id="localization-filter" aria-label="Filter by localization">
+                    <option value="">All Localizations</option>
+                    <option value="Axoneme">Axoneme</option>
+                    <option value="Basal Body">Basal Body</option>
+                    <option value="Transition Zone">Transition Zone</option>
+                    <option value="Ciliary Membrane">Ciliary Membrane</option>
+                </select>
+            </div>
+            
+            <div class="filters">
+                <label for="keyword-filter">Keyword Search:</label>
+                <input type="text" id="keyword-filter" placeholder="e.g., transport, ciliopathy" aria-label="Filter by keyword">
+            </div>
             
             <label for="batch-genes-input" style="font-weight: 600;">Enter gene names:</label>
             <textarea id="batch-genes-input" placeholder="e.g., ACE2, IFT88, CEP290" aria-label="Enter multiple gene names"></textarea>
@@ -318,7 +1401,8 @@
                 <input type="file" id="csv-upload" accept=".csv" />
             </div>
             
-            <button id="batch-search-btn" class="search-btn" aria-label="Search genes">Search Genes</button>
+            <button id="batch-search-btn" class="search-btn btn btn-primary" aria-label="Search genes">Search Genes</button>
+            <button id="export-results-btn" class="search-btn btn btn-primary" style="margin-left: 1rem;" aria-label="Export search results as CSV">Export Results</button>
             
             <div id="gene-cards-container" class="gene-cards"></div>
             <div id="status-message" class="status-message" style="display: none;"></div>
@@ -328,11 +1412,50 @@
     
     document.getElementById('batch-search-btn').onclick = performBatchSearch;
     document.getElementById('batch-genes-input').onkeydown = e => { if (e.key === 'Enter' && e.ctrlKey) performBatchSearch(); };
+    document.getElementById('export-results-btn').onclick = exportSearchResults;
     
-    
-
-    displayGeneCards(defaultGenes, []);
+    displayGeneCards(defaultGenes, [], 1, 10);
 }
+
+        function displayComparePage() {
+            const contentArea = document.querySelector('.content-area');
+            contentArea.className = 'content-area content-area-full';
+            document.querySelector('.cilia-panel').style.display = 'none';
+            contentArea.innerHTML = `
+                <div class="page-section">
+                    <h2>Compare Genes</h2>
+                    <select id="compare-genes" multiple aria-label="Select genes to compare">
+                        ${allGenes.map(g => `<option value="${g.gene}">${g.gene}</option>`).join('')}
+                    </select>
+                    <button id="compare-btn" class="search-btn btn btn-primary">Compare</button>
+                    <table id="comparison-table" style="margin-top: 1rem; width: 100%; border-collapse: collapse;"></table>
+                </div>`;
+            document.getElementById('compare-btn').onclick = () => {
+                const selectedGenes = Array.from(document.getElementById('compare-genes').selectedOptions).map(opt => opt.value);
+                const table = document.getElementById('comparison-table');
+                table.innerHTML = `
+                    <tr>
+                        <th>Gene</th>
+                        <th>Description</th>
+                        <th>Localization</th>
+                        <th>Ensembl ID</th>
+                        <th>OMIM ID</th>
+                        <th>Functional Summary</th>
+                    </tr>
+                    ${selectedGenes.map(gene => {
+                        const g = allGenes.find(g => g.gene === gene) || defaultGenes.find(g => g.gene === gene);
+                        return `<tr>
+                            <td><a href="/${g.gene}" onclick="navigateTo(event, '/${g.gene}')" aria-label="View details for ${g.gene}">${g.gene}</a></td>
+                            <td>${g.description || '-'}</td>
+                            <td>${g.localization || '-'}</td>
+                            <td>${g.ensembl_id ? `<a href="https://www.ensembl.org/Homo_sapiens/Gene/Summary?g=${g.ensembl_id}" target="_blank" aria-label="View Ensembl page for ${g.ensembl_id}">${g.ensembl_id}</a>` : '-'}</td>
+                            <td>${g.omim_id ? `<a href="https://www.omim.org/entry/${g.omim_id}" target="_blank" aria-label="View OMIM page for ${g.omim_id}">${g.omim_id}</a>` : '-'}</td>
+                            <td>${g.functional_summary || '-'}</td>
+                        </tr>`;
+                    }).join('')}
+                `;
+            };
+        }
 
 
         function displayDownloadPage() {
@@ -351,20 +1474,7 @@
                 </div>`;
         }
 
-        function displayCitePage() {
-            const contentArea = document.querySelector('.content-area');
-            contentArea.className = 'content-area content-area-full';
-            document.querySelector('.cilia-panel').style.display = 'none';
-            contentArea.innerHTML = `
-                <div class="page-section">
-                    <h2>Cite CiliaHub</h2>
-                    <p style="font-size: 1rem; color: #555;">Please cite the following papers when using CiliaHub data in your research:</p>
-                    <ul class="cite-list">
-                        <li>Ferhan Yenisert & Oktay I. Kaplan; Expanded Catalog of Gold Standard Ciliary Gene List. Integration of Novel Ciliary Genes into the Ciliome</li>
-                    </ul>
-                    <p style="font-size: 0.9rem; color: #7f8c8d;">Note: Some citations are placeholders. Please update with specific papers as published.</p>
-                </div>`;
-        }
+
 
         function displayContactPage() {
             const contentArea = document.querySelector('.content-area');
@@ -372,15 +1482,66 @@
             document.querySelector('.cilia-panel').style.display = 'none';
             contentArea.innerHTML = `
                 <div class="page-section">
-                    <h2>Contact Us</h2>
-                    <p style="font-size: 1rem; color: #555;">Reach out to our team for questions, collaborations, or feedback.</p>
-                    <ul class="contact-info">
-                        <li><strong>Dr. Oktay I. Kaplan Lab:</strong> <a href="mailto:oktay.kaplan@agu.edu.tr">
-                            oktay.kaplan@agu.edu.tr</a></li>
-                        <li><strong>Ferhan Yenisert:</strong><a href="mailto:ferhan.yenisert@agu.edu.tr"> ferhan.yenisert@agu.edu.tr</a> </li>
-                    </ul>
-                    <p style="font-size: 0.9rem; color: #7f8c8d;">We aim to respond within 48 hours. Please include your affiliation and query details.</p>
+                    <h2>Contact & Cite</h2>
+                    <div class="contact-info">
+                        <h3>Contact Us</h3>
+                        <p style="font-size: 1rem; color: #555; margin-bottom: 1rem;">Reach out to our team for questions, collaborations, or feedback.</p>
+                        <ul>
+                            <li><strong>Dr. Oktay I. Kaplan Lab:</strong> <a href="mailto:oktay.kaplan@agu.edu.tr">oktay.kaplan@agu.edu.tr</a></li>
+                            <li><strong>Ferhan Yenisert:</strong> <a href="mailto:ferhan.yenisert@agu.edu.tr">ferhan.yenisert@agu.edu.tr</a></li>
+                        </ul>
+                        <p style="font-size: 0.9rem; color: #7f8c8d; margin-top: 1rem;">We aim to respond within 48 hours. Please include your affiliation and query details.</p>
+                    </div>
+                    <div class="cite-list">
+                        <h3>Cite CiliaHub</h3>
+                        <p style="font-size: 1rem; color: #555; margin-bottom: 1rem;">Please cite the following papers when using CiliaHub data in your research:</p>
+                        <ul>
+                            <li>Ferhan Yenisert & Oktay I. Kaplan; Expanded Catalog of Gold Standard Ciliary Gene List. Integration of Novel Ciliary Genes into the Ciliome</li>
+                        </ul>
+                        <p style="font-size: 0.9rem; color: #7f8c8d; margin-top: 1rem;">Note: Some citations are placeholders. Please update with specific papers as published.</p>
+                    </div>
+                    <div class="feedback-form">
+                        <h3>Feedback</h3>
+                        <p style="font-size: 1rem; color: #555; margin-bottom: 1rem;">We value your input to improve CiliaHub.</p>
+                        <form id="feedback-form" action="https://formspree.io/f/{your_form_id}" method="POST">
+                            <input type="hidden" name="_to" value="oktaykaplan@gmail.com">
+                            <label for="feedback-text" style="font-weight: 600;">Your Feedback:</label>
+                            <textarea id="feedback-text" name="feedback" required aria-label="Enter your feedback"></textarea>
+                            <button type="submit" class="search-btn btn btn-primary" aria-label="Submit feedback">Submit Feedback</button>
+                        </form>
+                        <div id="feedback-status" class="status-message" style="display: none;"></div>
+                    </div>
                 </div>`;
+            
+            // Add feedback form functionality
+            document.getElementById('feedback-form').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const feedback = document.getElementById('feedback-text').value;
+                const statusDiv = document.getElementById('feedback-status');
+                statusDiv.style.display = 'block';
+                statusDiv.innerHTML = '<span>Loading...</span>';
+                try {
+                    const response = await fetch('https://formspree.io/f/{your_form_id}', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            feedback: feedback,
+                            _to: 'oktaykaplan@gmail.com'
+                        })
+                    });
+                    if (response.ok) {
+                        statusDiv.innerHTML = '<span class="success-message">Thank you for your feedback! It has been sent successfully.</span>';
+                        document.getElementById('feedback-text').value = '';
+                    } else {
+                        throw new Error('Failed to submit feedback');
+                    }
+                } catch (error) {
+                    statusDiv.innerHTML = `<span class="error-message">Error submitting feedback: ${error.message}. Please try again or contact us directly.</span>`;
+                }
+                setTimeout(() => { statusDiv.style.display = 'none'; }, 5000);
+            });
         }
 
         function displayIndividualGenePage(gene) {
@@ -432,13 +1593,26 @@
         function performSingleSearch() {
             const query = document.getElementById('single-gene-search').value.trim().toUpperCase();
             const statusDiv = document.getElementById('status-message');
+            statusDiv.innerHTML = '<span>Loading...</span>';
+            statusDiv.style.display = 'block';
+            
             if (!query) {
                 statusDiv.innerHTML = `<span class="error-message">Please enter a gene name.</span>`;
-                statusDiv.style.display = 'block';
                 return;
             }
-            const results = allGenes.filter(g => (g.gene && g.gene.toUpperCase().includes(query)) || (g.synonym && g.synonym.toUpperCase().includes(query)));
+            
+            const results = allGenes.filter(g => 
+                (g.gene && g.gene.toUpperCase().includes(query)) || 
+                (g.synonym && g.synonym.toUpperCase().includes(query))
+            );
+            
             console.log('Search term:', query, 'Results:', results.map(g => g.gene));
+            if (results.length === 0) {
+                const closeMatches = allGenes.filter(g => g.gene && g.gene.toUpperCase().startsWith(query.slice(0, 3))).slice(0, 3);
+                statusDiv.innerHTML = `<span class="error-message">No genes found for "${query}". Did you mean: ${closeMatches.map(g => g.gene).join(', ') || 'no close matches'}?</span>`;
+                return;
+            }
+            
             if (results.length === 1) {
                 navigateTo(null, `/${results[0].gene}`);
             } else {
@@ -452,90 +1626,134 @@
 
         function performBatchSearch() {
             const queries = document.getElementById('batch-genes-input').value.split(/[\s,\n]+/).filter(Boolean).map(q => q.trim().toUpperCase());
+            const localizationFilter = document.getElementById('localization-filter')?.value;
+            const keywordFilter = document.getElementById('keyword-filter')?.value.toLowerCase();
             const statusDiv = document.getElementById('status-message');
             if (queries.length === 0) {
                 statusDiv.innerHTML = `<span class="error-message">Please enter at least one gene name.</span>`;
                 statusDiv.style.display = 'block';
                 return;
             }
-            const results = allGenes.filter(g => queries.some(q => (g.gene && g.gene.toUpperCase().includes(q)) || (g.synonym && g.synonym.toUpperCase().includes(q))));
-            console.log('Batch search terms:', queries, 'Results:', results.map(g => g.gene));
+            
+            let results = allGenes.filter(g => 
+                queries.some(q => 
+                    (g.gene && g.gene.toUpperCase().includes(q)) || 
+                    (g.synonym && g.synonym.toUpperCase().includes(q))
+                )
+            );
+            
+            if (localizationFilter) {
+                results = results.filter(g => g.localization && g.localization.includes(localizationFilter));
+            }
+            if (keywordFilter) {
+                results = results.filter(g => g.functional_summary?.toLowerCase().includes(keywordFilter) || g.description?.toLowerCase().includes(keywordFilter));
+            }
+            
+            console.log('Batch search terms:', queries, 'Localization filter:', localizationFilter, 'Results:', results.map(g => g.gene));
             statusDiv.style.display = 'none';
+            searchResults = results;
             if (results.length > 0) {
-                displayGeneCards(defaultGenes,results);
+                displayGeneCards(defaultGenes, results, 1, 10);
             } else {
                 statusDiv.innerHTML = `<span class="error-message">No genes found matching your query.</span>`;
                 statusDiv.style.display = 'block';
-                displayGeneCards(defaultGenes, []);
+                displayGeneCards(defaultGenes, [], 1, 10);
             }
         }
         function handleCSVUpload(event) {
-    const file = event.target.files[0];
-    if (!file) return;
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const text = e.target.result;
+                const genes = text.split(/[\n,]+/).map(g => g.trim()).filter(Boolean);
+                const input = document.getElementById('batch-genes-input');
+                input.value += (input.value ? '\n' : '') + genes.join('\n');
+            };
+            reader.readAsText(file);
+        }
+        
+        function exportSearchResults() {
+            const results = searchResults;
+            const csv = ['Gene,Description,Localization,Ensembl ID,OMIM ID,Functional Summary']
+                .concat(results.map(g => `${g.gene},${g.description || ''},${g.localization || ''},${g.ensembl_id || ''},${g.omim_id || ''},${g.functional_summary || ''}`))
+                .join('\n');
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'ciliahub_results.csv';
+            a.click();
+            URL.revokeObjectURL(url);
+        }
 
-    const reader = new FileReader();
-    reader.onload = function(e) {
-        const text = e.target.result;
-        // Basit CSV parse → virgül ve satıra göre ayır
-        const genes = text.split(/[\n,]+/).map(g => g.trim()).filter(Boolean);
 
-        // Textarea'ya ekle (var olanları bozmadan)
-        const input = document.getElementById('batch-genes-input');
-        input.value += (input.value ? '\n' : '') + genes.join('\n');
-    };
-    reader.readAsText(file);
-}
-
-
-        function displayGeneCards(defaults, searchResults) {
-    const container = document.getElementById('gene-cards-container');
-    if (!container) return;
-
-    const uniqueDefaults = defaults.filter(d => !searchResults.some(s => s.gene === d.gene));
-    // ✅ Önce arama sonuçları, sonra default genler gelsin
-    const allGenesToDisplay = [...searchResults, ...uniqueDefaults];
-
-    container.innerHTML = allGenesToDisplay.map(gene => {
-        const isSearchResult = searchResults.some(s => s.gene === gene.gene);
-
-        return `
-            <div class="gene-card ${isSearchResult ? 'search-result' : 'default'}" 
-                 onclick="navigateTo(event, '/${gene.gene}')" 
-                 aria-label="View details for ${gene.gene}">
-                <div class="gene-name">${gene.gene}</div>
-                <div class="gene-description">${gene.description || 'No description available.'}</div>
-                
-                ${gene.localization ? `
-                    <div class="gene-info">
-                        <strong>Localization:</strong> 
-                        <span style="color: ${isSearchResult ? '#27ae60' : '#e74c3c'}; font-weight: 600;">
-                            ${gene.localization}
-                        </span>
-                    </div>` : ''}
-                
-                ${gene.ensembl_id ? `
-                    <div class="gene-info"><strong>Ensembl:</strong> 
-                        <a href="https://www.ensembl.org/Homo_sapiens/Gene/Summary?g=${gene.ensembl_id}" target="_blank">
-                            ${gene.ensembl_id}
-                        </a>
-                    </div>` : ''}
-                
-                ${gene.omim_id ? `
-                    <div class="gene-info"><strong>OMIM:</strong> 
-                        <a href="https://www.omim.org/entry/${gene.omim_id}" target="_blank">${gene.omim_id}</a>
-                    </div>` : ''}
-                
-                ${gene.synonym ? `<div class="gene-info"><strong>Synonym:</strong> ${gene.synonym}</div>` : ''}
-                
-                <div style="margin-top: 1rem; padding: 0.5rem; background: ${isSearchResult ? '#d5f4e6' : '#fadbd8'}; 
-                            border-radius: 5px; font-size: 0.9rem; color: ${isSearchResult ? '#27ae60' : '#e74c3c'};">
-                    Click to view detailed information →
-                </div>
-            </div>`;
-    }).join('');
-
-    updateGeneButtons(allGenesToDisplay, searchResults);
-}
+        function displayGeneCards(defaults, searchResults, page = 1, perPage = 10) {
+            const container = document.getElementById('gene-cards-container');
+            if (!container) return;
+            
+            const uniqueDefaults = defaults.filter(d => !searchResults.some(s => s.gene === d.gene));
+            const allGenesToDisplay = [...searchResults, ...uniqueDefaults];
+            const start = (page - 1) * perPage;
+            const end = start + perPage;
+            const paginatedGenes = allGenesToDisplay.slice(start, end);
+            
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        const gene = JSON.parse(entry.target.dataset.gene);
+                        const isSearchResult = searchResults.some(s => s.gene === gene.gene);
+                        entry.target.innerHTML = `
+                            <div class="gene-name">${gene.gene}</div>
+                            <div class="gene-description">${gene.description || 'No description available.'}</div>
+                            ${gene.localization ? `
+                                <div class="gene-info">
+                                    <strong>Localization:</strong> 
+                                    <span style="color: ${isSearchResult ? '#27ae60' : '#1e90ff'}; font-weight: 600;">
+                                        ${gene.localization}
+                                    </span>
+                                </div>` : ''}
+                            ${gene.ensembl_id ? `
+                                <div class="gene-info"><strong>Ensembl:</strong> 
+                                    <a href="https://www.ensembl.org/Homo_sapiens/Gene/Summary?g=${gene.ensembl_id}" target="_blank">
+                                        ${gene.ensembl_id}
+                                    </a>
+                                </div>` : ''}
+                            ${gene.omim_id ? `
+                                <div class="gene-info"><strong>OMIM:</strong> 
+                                    <a href="https://www.omim.org/entry/${gene.omim_id}" target="_blank">${gene.omim_id}</a>
+                                </div>` : ''}
+                            ${gene.synonym ? `<div class="gene-info"><strong>Synonym:</strong> ${gene.synonym}</div>` : ''}
+                            <div style="margin-top: 1rem; padding: 0.5rem; background: ${isSearchResult ? '#d5f4e6' : '#e8f4fd'}; 
+                                        border-radius: 5px; font-size: 0.9rem; color: ${isSearchResult ? '#27ae60' : '#1e90ff'};">
+                                Click to view detailed information →
+                            </div>
+                        `;
+                        entry.target.classList.add(isSearchResult ? 'search-result' : 'default');
+                        entry.target.onclick = () => navigateTo(event, `/${gene.gene}`);
+                        entry.target.setAttribute('aria-label', `View details for ${gene.gene}`);
+                        observer.unobserve(entry.target);
+                    }
+                });
+            }, { rootMargin: '100px' });
+            
+            container.innerHTML = paginatedGenes.map(gene => `
+                <div class="gene-card" data-gene='${JSON.stringify(gene)}'></div>
+            `).join('');
+            
+            container.querySelectorAll('.gene-card').forEach(card => observer.observe(card));
+            
+            const paginationDiv = document.createElement('div');
+            paginationDiv.className = 'pagination';
+            paginationDiv.innerHTML = `
+                <button onclick="displayGeneCards(${JSON.stringify(defaults)}, ${JSON.stringify(searchResults)}, ${page - 1}, ${perPage})" ${page === 1 ? 'disabled' : ''}>Previous</button>
+                <span>Page ${page} of ${Math.ceil(allGenesToDisplay.length / perPage)}</span>
+                <button onclick="displayGeneCards(${JSON.stringify(defaults)}, ${JSON.stringify(searchResults)}, ${page + 1}, ${perPage})" ${end >= allGenesToDisplay.length ? 'disabled' : ''}>Next</button>
+            `;
+            container.appendChild(paginationDiv);
+            
+            updateGeneButtons(allGenesToDisplay, searchResults);
+        }
 
 
    function updateGeneButtons(genesToDisplay, searchResults = []) {
@@ -586,32 +1804,32 @@ function showLocalization(geneName, isSearchGene = false) {
         selectedGenes = [];
     } else {
         if (!selectedGenes.includes(geneName)) {
-            selectedGenes.push(geneName); // ekle
+            selectedGenes.push(geneName);
         } else {
-            selectedGenes = selectedGenes.filter(g => g !== geneName); // varsa çıkar
+            selectedGenes = selectedGenes.filter(g => g !== geneName);
         }
     }
 
-    // --- SVG highlight reset ---
     const ciliaParts = document.querySelectorAll('.cilia-part');
-    ciliaParts.forEach(part => part.classList.remove('highlighted', 'search-gene'));
+    ciliaParts.forEach(part => part.classList.remove('highlighted', 'search-gene', 'cilia'));
 
-    // --- Buton stil reset ---
     document.querySelectorAll('.gene-btn').forEach(btn => btn.classList.remove('selected'));
 
-    // --- Seçili genlerin highlight edilmesi ---
     selectedGenes.forEach(g => {
         if (geneLocalizationData[g]) {
+            const isCiliary = geneLocalizationData[g].some(id => ['ciliary-membrane', 'axoneme'].includes(id));
             geneLocalizationData[g].forEach(id => {
                 const el = document.getElementById(id);
-                if (el) {
+                if (el && id !== 'cell-body') {
                     el.classList.add('highlighted');
-                    if (isSearchGene) el.classList.add('search-gene');
+                    if (isCiliary) {
+                        el.classList.add('cilia');
+                    } else if (isSearchGene) {
+                        el.classList.add('search-gene');
+                    }
                 }
             });
         }
-
-        // Butonu da "selected" yap
         const btn = [...document.querySelectorAll('.gene-btn')].find(b => b.textContent === g);
         if (btn) btn.classList.add('selected');
     });
@@ -623,8 +1841,81 @@ function showLocalization(geneName, isSearchGene = false) {
             document.querySelectorAll('.nav-links a').forEach(link => {
                 link.classList.remove('active');
                 const linkPath = link.getAttribute('href').toLowerCase();
-                if (linkPath === path || (path.startsWith('/') && path !== '/' && path !== '/index.html' && linkPath === '/batch-query' && !['/download', '/cite', '/contact'].includes(path))) {
+                if (linkPath === path || (path.startsWith('/') && path !== '/' && path !== '/index.html' && linkPath === '/batch-query' && !['/download', '/contact', '/compare'].includes(path))) {
                     link.classList.add('active');
+                }
+            });
+        }
+
+        // --- Sticky Search and Chart Functions ---
+        function handleStickySearch() {
+            const searchContainer = document.querySelector('.search-container');
+            if (searchContainer && window.scrollY > 100) {
+                searchContainer.classList.add('sticky');
+            } else if (searchContainer) {
+                searchContainer.classList.remove('sticky');
+            }
+        }
+        
+        function displayLocalizationChart() {
+            const categories = ['Cilia', 'Basal Body', 'Transition Zone', 'Flagella', 'Ciliary Associated Gene'];
+            const localizationCounts = categories.reduce((acc, category) => {
+                acc[category] = allGenes.filter(g => {
+                    if (!g.localization) return false;
+                    const localizations = g.localization.split(',').map(l => l.trim().toLowerCase());
+                    return localizations.includes(category.toLowerCase()) || 
+                           (category === 'Cilia' && localizations.includes('ciliary membrane')) ||
+                           (category === 'Flagella' && localizations.includes('axoneme')) ||
+                           (category === 'Ciliary Associated Gene' && localizations.includes('ciliary associated gene'));
+                }).length;
+                return acc;
+            }, {});
+            
+            console.log('Localization counts:', localizationCounts);
+            const chartContainer = document.createElement('div');
+            chartContainer.className = 'page-section';
+            chartContainer.innerHTML = `<h2>Gene Localization Distribution</h2><canvas id="locChart" style="max-height: 300px;"></canvas>`;
+            const contentArea = document.querySelector('.content-area');
+            const existingChart = contentArea.querySelector('#locChart');
+            if (existingChart) existingChart.parentElement.remove();
+            contentArea.appendChild(chartContainer);
+            
+            const ctx = document.getElementById('locChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: categories,
+                    datasets: [{
+                        label: 'Number of Genes',
+                        data: categories.map(category => localizationCounts[category] || 0),
+                        backgroundColor: ['#005566', '#66C2A5', '#D81B60', '#FF7F00', '#6BAED6'],
+                        borderColor: ['#005566', '#66C2A5', '#D81B60', '#FF7F00', '#6BAED6'],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: { 
+                            beginAtZero: true, 
+                            title: { display: true, text: 'Number of Genes' },
+                            ticks: { stepSize: 1 }
+                        },
+                        x: { 
+                            title: { display: true, text: 'Localization' }
+                        }
+                    },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return `${context.label}: ${context.raw} genes`;
+                                }
+                            }
+                        }
+                    }
                 }
             });
         }
