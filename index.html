@@ -29,7 +29,7 @@
         .page-section { background: white; padding: 2rem; border-radius: 15px; box-shadow: 0 8px 32px rgba(44, 90, 160, 0.1); }
         .search-container { display: flex; gap: 1rem; margin-top: 1rem; }
         #single-gene-search, #batch-genes-input { padding: 1rem; border: 2px solid #e1ecf4; border-radius: 10px; font-size: 1rem; }
-        #single-gene-search { flex: 1; }
+        #single-gene-search { flex: 1; width: 100%; /* Add this line */}
         #batch-genes-input { width: 100%; min-height: 100px; resize: vertical; margin-top: 1rem; margin-bottom: 1rem; }
         .search-btn { padding: 1rem 2rem; background: linear-gradient(135deg, #2c5aa0 0%, #1e3a5f 100%); color: white; border: none; border-radius: 10px; cursor: pointer; font-weight: 600; }
         .search-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(44, 90, 160, 0.3); }
@@ -279,8 +279,8 @@
             document.querySelector('.cilia-panel').style.display = 'block';
             contentArea.innerHTML = `
                 <div class="page-section">
-                    <h1>Welcome to CiliaHub</h1>
-                    <p style="font-size: 1.1rem; color: #555;">The central resource for interactive ciliary gene data. Search for a single gene below or use the Batch Query tool to analyze multiple genes.</p>
+                    <h1>The CiliaHub: A Database of Genes with Ciliary Functions</h1>
+                    <p style="font-size: 1.1rem; color: #555;">CiliaHub is an advanced <strong>bioinformatics</strong> platform that hosts a detailed database of <strong>cilia genes</strong> and their role in various <strong>ciliopathies</strong>. Our user-friendly search tool allows researchers to explore <strong>genome</strong>-wide data, focusing on the genetic foundations of cilia function and related disorders. Search for a single gene below or use the Batch Query tool to analyze multiple genes.</p>
                     <div class="search-container">
                         <div class="search-wrapper" style="flex: 1;">
                            <input type="text" id="single-gene-search" placeholder="Search for a single gene (e.g., ACE2, IFT88)" aria-label="Search for a single gene" autocomplete="off">
@@ -736,3 +736,4 @@ function showLocalization(geneName, isSearchGene = false) {
     </script>
 </body>
 </html>
+
