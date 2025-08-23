@@ -213,18 +213,18 @@
             displayGeneCards([], []); // Start with an empty card container
         }
 
-        // --- EXPRESSION PAGE: INTEGRATED ---
+        // --- EXPRESSION PAGE: CORRECTED AND INTEGRATED ---
         function displayExpressionPage() {
             const contentArea = document.querySelector('.content-area');
             contentArea.className = 'content-area content-area-full';
             document.querySelector('.cilia-panel').style.display = 'none';
             
-            // 1. Inject HTML Structure
+            // 1. Inject HTML Structure for the Expression Atlas
             contentArea.innerHTML = `
                 <style>
                     /* Styles specific to Expression Atlas */
                     :root { --expr-primary-500: #0066cc; --expr-primary-600: #0052a3; --expr-text-primary: #101828; --expr-border-secondary: #eaecf0; --expr-shadow-lg: 0 12px 16px -4px rgba(16, 24, 40, 0.08); --expr-radius-lg: 12px; --expr-radius-xl: 16px; }
-                    .expr-page-header { padding: 40px 0; text-align: center; background: linear-gradient(135deg, #e6f2ff 0%, white 100%); }
+                    .expr-page-header { padding: 40px 0; text-align: center; background: linear-gradient(135deg, #e6f2ff 0%, white 100%); border-radius: var(--expr-radius-xl); box-shadow: var(--expr-shadow-lg); }
                     .expr-page-title { font-size: 48px; font-weight: 700; background: linear-gradient(135deg, var(--expr-primary-600) 0%, #003d7a 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; margin-bottom: 16px; }
                     .expr-page-subtitle { font-size: 20px; color: #475467; max-width: 600px; margin: 0 auto; }
                     .expr-search-section { background: white; border-radius: var(--expr-radius-xl); box-shadow: var(--expr-shadow-lg); padding: 32px; margin: 32px 0; }
@@ -232,9 +232,6 @@
                     .expr-search-input-wrapper { flex: 1; position: relative; }
                     .expr-search-input { width: 100%; height: 52px; padding: 0 20px 0 52px; border: 2px solid var(--expr-border-secondary); border-radius: var(--expr-radius-lg); font-size: 16px; outline: none; }
                     .expr-search-icon { position: absolute; left: 18px; top: 50%; transform: translateY(-50%); width: 20px; height: 20px; color: #667085; }
-                    .expr-suggestions { position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid var(--expr-border-secondary); border-radius: var(--expr-radius-lg); box-shadow: var(--expr-shadow-lg); z-index: 100; max-height: 300px; overflow-y: auto; margin-top: 8px; display: none; }
-                    .expr-suggestion-item { padding: 12px 20px; cursor: pointer; border-bottom: 1px solid var(--expr-border-secondary); }
-                    .expr-suggestion-item.active, .expr-suggestion-item:hover { background: #f9fafb; }
                     .expr-status-message { text-align: center; padding: 24px; min-height: 32px; }
                     .expr-status-loading { display: flex; align-items: center; justify-content: center; gap: 12px; }
                     .expr-loading-spinner { width: 20px; height: 20px; border: 2px solid #eaecf0; border-top: 2px solid var(--expr-primary-500); border-radius: 50%; animation: expr-spin 1s linear infinite; }
@@ -250,14 +247,16 @@
                     .expr-organ:hover { transform: scale(1.05); filter: brightness(1.1); }
                     .expr-table-wrapper { max-height: 400px; overflow-y: auto; }
                     .expr-data-table { width: 100%; border-collapse: collapse; }
-                    .expr-legend { margin-top: 24px; }
-                    .expr-tooltip { position: absolute; background: #101828; color: white; padding: 8px 12px; border-radius: 6px; display: none; pointer-events: none; z-index: 1000; transform: translate(-50%, -110%); }
+                    .expr-legend-items { display: flex; gap: 1rem; flex-wrap: wrap; margin-top: 1rem; }
+                    .expr-legend-item { display: flex; align-items: center; gap: 0.5rem; }
+                    .expr-legend-swatch { width: 16px; height: 16px; border-radius: 4px; }
+                    .expr-tooltip { position: fixed; background: #101828; color: white; padding: 8px 12px; border-radius: 6px; display: none; pointer-events: none; z-index: 2000; transform: translate(-50%, -120%); }
                     @media (max-width: 1200px) { .expr-results-section.visible { grid-template-columns: 1fr; } }
                 </style>
                 <section class="expr-page-header">
                     <div>
                         <h1 class="expr-page-title">Gene Expression Atlas</h1>
-                        <p class="expr-page-subtitle">Visualize RNA expression of ciliary genes across human tissues.</p>
+                        <p class="expr-page-subtitle">Visualize RNA-seq expression of ciliary genes across human tissues.</p>
                     </div>
                 </section>
                 <section class="expr-search-section">
@@ -265,7 +264,6 @@
                         <div class="expr-search-input-wrapper">
                             <svg class="expr-search-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
                             <input id="exprGeneInput" type="text" class="expr-search-input" placeholder="Enter gene name (e.g., ARL13B)" autocomplete="off" />
-                            <div id="exprSuggestions" class="expr-suggestions"></div>
                         </div>
                         <button type="submit" class="search-btn">Search</button>
                     </form>
@@ -278,7 +276,14 @@
                             <div id="exprVizContainer" class="expr-viz-container">
                                 <svg viewBox="0 0 240 280" xmlns="http://www.w3.org/2000/svg"><g id="human-body"><ellipse id="organ-brain" class="expr-organ" cx="120" cy="40" rx="28" ry="24" fill="#e2e8f0"/><ellipse id="organ-lung-left" class="expr-organ" cx="95" cy="80" rx="18" ry="25" fill="#e2e8f0"/><ellipse id="organ-lung-right" class="expr-organ" cx="145" cy="80" rx="18" ry="25" fill="#e2e8f0"/><path id="organ-heart" class="expr-organ" d="M110,70 C110,65 115,60 120,65 C125,60 130,65 130,70 C130,80 120,90 120,90 C120,90 110,80 110,70 Z" fill="#e2e8f0"/><path id="organ-liver" class="expr-organ" d="M125,110 L165,110 C170,110 175,115 175,120 L175,140 C175,145 170,150 165,150 L125,150 Z" fill="#e2e8f0"/><ellipse id="organ-kidney-left" class="expr-organ" cx="95" cy="140" rx="12" ry="20" fill="#e2e8f0"/><ellipse id="organ-kidney-right" class="expr-organ" cx="145" cy="140" rx="12" ry="20" fill="#e2e8f0"/><rect id="organ-small-intestine" class="expr-organ" x="100" y="170" width="40" height="25" rx="8" fill="#e2e8f0"/><ellipse id="organ-pancreas" class="expr-organ" cx="85" cy="125" rx="20" ry="8" fill="#e2e8f0"/><circle id="organ-testis" class="expr-organ" cx="100" cy="210" r="8" fill="#e2e8f0"/><circle id="organ-ovary" class="expr-organ" cx="140" cy="210" r="8" fill="#e2e8f0"/></g></svg>
                             </div>
-                            <div class="expr-legend">... Legend items here ...</div>
+                            <div class="expr-legend">
+                                <div class="expr-legend-items">
+                                    <div class="expr-legend-item"><span class="expr-legend-swatch" style="background:#dcfce7;"></span> Low</div>
+                                    <div class="expr-legend-item"><span class="expr-legend-swatch" style="background:#fef3c7;"></span> Medium</div>
+                                    <div class="expr-legend-item"><span class="expr-legend-swatch" style="background:#fed7aa;"></span> High</div>
+                                    <div class="expr-legend-item"><span class="expr-legend-swatch" style="background:#fee2e2;"></span> Very High</div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                     <div class="expr-results-card">
@@ -295,14 +300,11 @@
 
         function initExpressionAtlas() {
             const API_URL = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/rna_tissue_consensus.json';
-            const DEBOUNCE_DELAY = 250;
             let geneDataCache = null;
-            const curatedGenes = ['ARL13B', 'BBS1', 'CEP290', 'IFT88', 'DYNC2H1', 'NPHP1'];
 
             const dom = {
                 form: document.getElementById('exprSearchForm'),
                 input: document.getElementById('exprGeneInput'),
-                suggestions: document.getElementById('exprSuggestions'),
                 status: document.getElementById('exprStatus'),
                 results: document.getElementById('exprResults'),
                 tableBody: document.getElementById('exprTableBody'),
@@ -402,10 +404,10 @@
             contentArea.innerHTML = `<div class="page-section"><h2>Download Data</h2><p>Download the complete ciliary gene database.</p><a href="https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/ciliahub_data.json" download="ciliahub_data.json" class="search-btn">Download JSON</a></div>`;
         }
 
-        function displayCitePage() { /* ... content ... */ }
-        function displayContactPage() { /* ... content ... */ }
-        function displayIndividualGenePage(gene) { /* ... content ... */ }
-        function displayNotFoundPage() { /* ... content ... */ }
+        function displayCitePage() { /* Placeholder */ }
+        function displayContactPage() { /* Placeholder */ }
+        function displayIndividualGenePage(gene) { /* Placeholder */ }
+        function displayNotFoundPage() { /* Placeholder */ }
         
         // --- Search and UI Logic for Batch/Home ---
         function performBatchSearch() {
@@ -475,8 +477,9 @@
         
         function updateActiveNav(path) {
             document.querySelectorAll('.nav-links a').forEach(link => {
-                const linkPath = link.getAttribute('href');
-                link.classList.toggle('active', linkPath === path || (linkPath === '/' && path === '/index.html'));
+                let linkPath = new URL(link.href).hash.replace('#', '').toLowerCase();
+                if (linkPath === '') linkPath = '/';
+                link.classList.toggle('active', linkPath === path);
             });
         }
 
