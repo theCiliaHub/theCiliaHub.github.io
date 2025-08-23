@@ -3,7 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CiliaHub - Interactive Ciliary Gene Database</title>
+    <title>The CiliaHub: A Database of Genes with Ciliary Functions</title>
+
+    <meta name="description" content="The CiliaHub is a comprehensive bioinformatics database for genes with ciliary functions, providing resources for ciliopathy research, genome exploration, and gene search.">
+    
+    <meta name="keywords" content="cilia gene, ciliopathy, database, search, genome, bioinformatics, ciliary function, ciliary genes">
     <link rel="icon" type="image/png" href="CiliaHub_Logo_web.png">
     <style>
         /* --- General Styles & Layout --- */
@@ -30,14 +34,33 @@
         .search-btn { padding: 1rem 2rem; background: linear-gradient(135deg, #2c5aa0 0%, #1e3a5f 100%); color: white; border: none; border-radius: 10px; cursor: pointer; font-weight: 600; }
         .search-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(44, 90, 160, 0.3); }
 
+        /* --- Autocomplete Styles --- */
+        .search-wrapper { position: relative; }
+        #search-suggestions {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 0 0 10px 10px;
+            z-index: 999;
+            max-height: 250px;
+            overflow-y: auto;
+        }
+        #search-suggestions ul { list-style: none; padding: 0; margin: 0; }
+        #search-suggestions li { padding: 0.75rem 1rem; cursor: pointer; border-bottom: 1px solid #eee; }
+        #search-suggestions li:last-child { border-bottom: none; }
+        #search-suggestions li:hover, #search-suggestions li.active { background-color: #f0f5fa; color: #2c5aa0; }
+
         /* --- Gene Cards --- */
         .gene-cards { display: grid; gap: 1.5rem; }
         .gene-card { background: white; padding: 1.5rem; border-radius: 15px; box-shadow: 0 8px 32px rgba(44, 90, 160, 0.1); transition: all 0.3s ease; border-left: 5px solid transparent; cursor: pointer; }
         .gene-card:hover { transform: translateY(-5px); }
-        .gene-card.default { border-left-color: #e74c3c; }
+        .gene-card.default { border-left-color: #1e90ff; } /* Blue shade */
         .gene-card.search-result { border-left-color: #27ae60; }
         .gene-name { font-size: 1.3rem; font-weight: bold; margin-bottom: 0.5rem; }
-        .gene-card.default .gene-name { color: #c0392b; }
+        .gene-card.default .gene-name { color: #1e90ff; } /* Blue shade */
         .gene-card.search-result .gene-name { color: #27ae60; }
         .gene-description { color: #7f8c8d; font-size: 0.95rem; }
         .gene-info { font-size: 0.9rem; color: #34495e; margin-bottom: 0.5rem; }
@@ -54,15 +77,17 @@
         .panel-header { background: linear-gradient(135deg, #2c5aa0 0%, #1e3a5f 100%); color: white; padding: 1.5rem; text-align: center; }
         .panel-content { padding: 1.5rem; }
         .cilia-container { text-align: center; margin-bottom: 1.5rem; }
+        /* Increase the size of the Interactive Cilium Section */
+        .interactive-cilium svg { width: 100%; height: 400px; }
         .cilia-part { stroke: #2c3e50; stroke-width: 1.5; transition: all 0.3s ease-in-out; cursor: pointer; }
         .cilia-part:hover { stroke-width: 3; filter: brightness(1.1); }
-        .highlighted { fill: #e74c3c !important; opacity: 0.9 !important; animation: pulse 2s infinite; }
+        .highlighted { fill: #1e90ff !important; opacity: 0.9 !important; animation: pulse 2s infinite; } /* Blue shade */
         .highlighted.search-gene { fill: #27ae60 !important; }
         @keyframes pulse { 0%, 100% { opacity: 0.9; } 50% { opacity: 0.6; } }
         .controls { background: #f8f9fa; padding: 1rem; border-radius: 10px; margin-top: 1rem; }
         .gene-buttons { display: flex; flex-direction: column; gap: 0.5rem; }
         .gene-btn { padding: 0.7rem; border: 1px solid #e1ecf4; border-radius: 8px; background: white; cursor: pointer; font-weight: 600; font-size: 0.9rem; }
-        .gene-btn.default { color: #c0392b; }
+        .gene-btn.default { color: #1e90ff; } /* Blue shade */
         .gene-btn.search-gene { background: #27ae60; color: white; border-color: #27ae60; }
         .gene-btn:hover { background: #2c5aa0; color: white; transform: translateX(3px); }
         .gene-btn.search-gene:hover { background: #219a52; }
@@ -120,8 +145,8 @@
                 <p style="font-size: 0.9rem; opacity: 0.9;">Click genes to see localization</p>
             </div>
             <div class="panel-content">
-                <div class="cilia-container">
-                    <svg viewBox="0 0 300 400" xmlns="http://www.w3.org/2000/svg" style="max-width: 250px; height: auto;">
+                <div class="cilia-container interactive-cilium">
+                    <svg viewBox="0 0 300 400" xmlns="http://www.w3.org/2000/svg">
                         <path id="cell-body" class="cilia-part" fill="#a8dadc" d="M 50,380 C -20,300 20,200 150,200 C 280,200 320,300 250,380 Z" aria-label="Cell Body"/>
                         <circle id="nucleus" class="cilia-part" fill="#457b9d" cx="150" cy="320" r="40" aria-label="Nucleus"/>
                         <rect id="basal-body" class="cilia-part" fill="#1d3557" x="140" y="195" width="20" height="15" aria-label="Basal Body"/>
@@ -160,7 +185,7 @@
             {
                 gene: "WDR31",
                 description: "WD repeat domain 31. Involved in ciliary assembly and maintenance.",
-                localization: "Basal Body, Transition Zone",
+                localization: "Axoneme",
                 ensembl_id: "ENSG00000106459",
                 functional_summary: "Required for proper ciliary structure and function."
             }
@@ -215,7 +240,7 @@
                 "transition zone": "transition-zone",
                 "cilia": "ciliary-membrane" // Map "cilia" to ciliary-membrane for ACE2
             };
-            return localization.split(',').map(loc => mapping[loc.toLowerCase()] || loc.toLowerCase()).filter(id => allPartIds.includes(id));
+            return localization.split(',').map(loc => mapping[loc.trim().toLowerCase()] || loc.trim().toLowerCase()).filter(id => allPartIds.includes(id));
         }
 
         // --- Routing and Page Rendering ---
@@ -224,7 +249,7 @@
             const path = window.location.hash.replace('#', '').toLowerCase() || '/';
             const geneName = path.split('/').pop().replace('.html', '').toUpperCase();
             const gene = allGenes.find(g => g.gene && g.gene.toUpperCase() === geneName) || 
-                        defaultGenes.find(g => g.gene && g.gene.toUpperCase() === geneName);
+                         defaultGenes.find(g => g.gene && g.gene.toUpperCase() === geneName);
 
             updateActiveNav(path);
 
@@ -257,14 +282,83 @@
                     <h1>Welcome to CiliaHub</h1>
                     <p style="font-size: 1.1rem; color: #555;">The central resource for interactive ciliary gene data. Search for a single gene below or use the Batch Query tool to analyze multiple genes.</p>
                     <div class="search-container">
-                        <input type="text" id="single-gene-search" placeholder="Search for a single gene (e.g., ACE2, IFT88)" aria-label="Search for a single gene">
+                        <div class="search-wrapper" style="flex: 1;">
+                           <input type="text" id="single-gene-search" placeholder="Search for a single gene (e.g., ACE2, IFT88)" aria-label="Search for a single gene" autocomplete="off">
+                           <div id="search-suggestions"></div>
+                        </div>
                         <button id="single-search-btn" class="search-btn" aria-label="Search">Search</button>
                     </div>
                     <div id="gene-cards-container" class="gene-cards"></div>
                     <div id="status-message" class="status-message" style="display: none;"></div>
                 </div>`;
+                
             document.getElementById('single-search-btn').onclick = performSingleSearch;
-            document.getElementById('single-gene-search').onkeydown = e => { if (e.key === 'Enter')performSingleSearch(); };
+            
+            // --- Autocomplete with Keyboard Navigation ---
+            const searchInput = document.getElementById('single-gene-search');
+            const suggestionsContainer = document.getElementById('search-suggestions');
+
+            searchInput.addEventListener('input', function() {
+                const query = this.value.trim().toUpperCase();
+                if (query.length < 1) {
+                    suggestionsContainer.innerHTML = '';
+                    return;
+                }
+                const filteredGenes = allGenes.filter(g => (g.gene && g.gene.toUpperCase().startsWith(query)) || (g.synonym && g.synonym.toUpperCase().includes(query))).slice(0, 10);
+                if (filteredGenes.length > 0) {
+                    suggestionsContainer.innerHTML = '<ul>' + filteredGenes.map(g => `<li>${g.gene}</li>`).join('') + '</ul>';
+                    suggestionsContainer.querySelectorAll('li').forEach(item => {
+                        item.addEventListener('click', function() {
+                            searchInput.value = this.textContent;
+                            suggestionsContainer.innerHTML = '';
+                            performSingleSearch();
+                        });
+                    });
+                } else {
+                    suggestionsContainer.innerHTML = '';
+                }
+            });
+
+            searchInput.addEventListener('keydown', function(event) {
+                const suggestions = suggestionsContainer.querySelectorAll('li');
+                if (suggestions.length === 0 && event.key !== 'Enter') return;
+                
+                if (event.key === 'Enter') {
+                    const activeElement = suggestionsContainer.querySelector('.active');
+                    if (activeElement) {
+                        event.preventDefault();
+                        searchInput.value = activeElement.textContent;
+                        suggestionsContainer.innerHTML = '';
+                    }
+                    performSingleSearch();
+                    return;
+                }
+
+                const activeElement = suggestionsContainer.querySelector('.active');
+                
+                if (event.key === 'ArrowDown') {
+                    event.preventDefault();
+                    let nextElement = activeElement ? activeElement.nextElementSibling : suggestions[0];
+                    if (nextElement) {
+                        activeElement?.classList.remove('active');
+                        nextElement.classList.add('active');
+                    }
+                } else if (event.key === 'ArrowUp') {
+                    event.preventDefault();
+                    let prevElement = activeElement ? activeElement.previousElementSibling : suggestions[suggestions.length - 1];
+                    if (prevElement) {
+                        activeElement?.classList.remove('active');
+                        prevElement.classList.add('active');
+                    }
+                }
+            });
+            
+            document.addEventListener('click', function(event) {
+                if (!searchInput.contains(event.target)) {
+                    suggestionsContainer.innerHTML = '';
+                }
+            });
+
             displayGeneCards(defaultGenes, []);
         }
 
@@ -299,7 +393,7 @@
 
 
 
-       function displayBatchQueryTool() {
+    function displayBatchQueryTool() {
     const contentArea = document.querySelector('.content-area');
     contentArea.className = 'content-area';
     document.querySelector('.cilia-panel').style.display = 'block';
@@ -508,7 +602,7 @@
                 ${gene.localization ? `
                     <div class="gene-info">
                         <strong>Localization:</strong> 
-                        <span style="color: ${isSearchResult ? '#27ae60' : '#e74c3c'}; font-weight: 600;">
+                        <span style="color: ${isSearchResult ? '#27ae60' : '#1e90ff'}; font-weight: 600;">
                             ${gene.localization}
                         </span>
                     </div>` : ''}
@@ -527,8 +621,8 @@
                 
                 ${gene.synonym ? `<div class="gene-info"><strong>Synonym:</strong> ${gene.synonym}</div>` : ''}
                 
-                <div style="margin-top: 1rem; padding: 0.5rem; background: ${isSearchResult ? '#d5f4e6' : '#fadbd8'}; 
-                            border-radius: 5px; font-size: 0.9rem; color: ${isSearchResult ? '#27ae60' : '#e74c3c'};">
+                <div style="margin-top: 1rem; padding: 0.5rem; background: ${isSearchResult ? '#d5f4e6' : '#e8f4fd'}; 
+                            border-radius: 5px; font-size: 0.9rem; color: ${isSearchResult ? '#27ae60' : '#1e90ff'};">
                     Click to view detailed information →
                 </div>
             </div>`;
