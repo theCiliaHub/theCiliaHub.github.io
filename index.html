@@ -279,9 +279,9 @@
             document.querySelector('.cilia-panel').style.display = 'block';
             contentArea.innerHTML = `
                 <div class="page-section">
-                    <h1>The CiliaHub: A Database of Genes with Ciliary Functions</h1>
-                    <p style="font-size: 1.1rem; color: #555;">CiliaHub is an advanced <strong>bioinformatics</strong> platform that hosts a detailed database of <strong>cilia genes</strong> and their role in various <strong>ciliopathies</strong>. Our user-friendly search tool allows researchers to explore <strong>genome</strong>-wide data, focusing on the genetic foundations of cilia function and related disorders. Search for a single gene below or use the Batch Query tool to analyze multiple genes.</p>
-                    <div class="search-container">
+                        <h1>The CiliaHub: An Updated Database of Gold Standard Genes with Ciliary Functions</h1>
+                        <p style="font-size: 1.1rem; color: #555;">CiliaHub is an advanced <strong>bioinformatics</strong> platform that hosts a detailed database of <strong>gold standard cilia genes</strong> and their role in various <strong>ciliopathies</strong>. Our comprehensive collection includes the most reliable and well-established genes linked to ciliary function, with reference papers also provided. With our user-friendly search tool, researchers can explore <strong>genome</strong>-wide data, focusing on both known and novel ciliary genes. Discover their contributions to the biology of cilia and the mechanisms behind ciliary-related disorders. Search for a single gene below or use the Batch Query tool to analyze multiple genes.</p>
+                        <div class="search-container">
                         <div class="search-wrapper" style="flex: 1;">
                            <input type="text" id="single-gene-search" placeholder="Search for a single gene (e.g., ACE2, IFT88)" aria-label="Search for a single gene" autocomplete="off">
                            <div id="search-suggestions"></div>
@@ -736,4 +736,5 @@ function showLocalization(geneName, isSearchGene = false) {
     </script>
 </body>
 </html>
+
 
