@@ -123,7 +123,7 @@
           <button id="searchBtn" class="btn">Search</button>
           <div id="suggestions" class="suggestions"></div>
         </div>
-        <div style="margin-top:8px" class="muted">Tip: start typing “AR” to see matches. Only curated (~2011) genes are suggested.</div>
+        <div style="margin-top:8px" class="muted">Tip: start typing "AR" to see matches. Only curated (~2011) genes are suggested.</div>
 
         <div class="legend">
           <div class="legend-item"><span class="sw" style="background:var(--green-low)"></span> Low (0–5 nTPM)</div>
@@ -144,7 +144,8 @@
 
       <div class="panel viz">
         <div id="svgHost">
-          </div>
+          <!-- SVG will be loaded here -->
+        </div>
         <div id="tooltip" class="tooltip"></div>
       </div>
     </div>
@@ -197,6 +198,7 @@
     let svgRoot = null;           // injected SVG root node
     let organs = [];              // NodeList of .organ paths (from SVG)
     let currentGene = null;
+    let svgLoaded = false;        // Track if SVG has been loaded
     const tooltip = document.getElementById('tooltip');
 
     // ---------- Helpers ----------
@@ -218,6 +220,7 @@
       return getComputedStyle(document.documentElement).getPropertyValue('--green-vhigh').trim();
     }
     function resetOrgans(){
+      if (!organs.length) return;
       organs.forEach(o=>{
         o.style.fill = getComputedStyle(document.documentElement).getPropertyValue('--no-data').trim();
         o.removeAttribute('data-tissue');
@@ -237,38 +240,68 @@
 
     // ---------- Load assets ----------
     async function loadSVG(){
-      // UPDATED: Added {cache: 'no-cache'} to prevent stale SVG file
-      const resp = await fetch(SVG_URL, { cache: 'no-cache' });
-      if (!resp.ok) throw new Error(`Failed to load SVG: ${resp.status}`);
-      const svgText = await resp.text();
-      byId('svgHost').innerHTML = svgText;
-      // Find .organ nodes inside injected SVG
-      svgRoot = byId('svgHost').querySelector('svg');
-      organs = svgRoot.querySelectorAll('.organ');
-      // Events for tooltip on hover
-      organs.forEach(o=>{
-        o.addEventListener('mousemove', (e)=>{
-          const tissue = o.getAttribute('data-tissue');
-          const ntpm = o.getAttribute('data-ntpm');
-          const level = o.getAttribute('data-level');
-          if (tissue && ntpm){
-            tooltip.innerHTML = `<strong>${tissue}</strong>: ${ntpm} nTPM (${level})`;
-            tooltip.style.left = e.pageX + 'px';
-            tooltip.style.top = e.pageY + 'px';
-            tooltip.style.opacity = 1;
-          } else {
-            tooltip.style.opacity = 0;
-          }
+      try {
+        // Clear previous SVG if exists
+        byId('svgHost').innerHTML = '';
+        
+        // Load SVG with cache busting
+        const timestamp = new Date().getTime();
+        const resp = await fetch(`${SVG_URL}?t=${timestamp}`, { cache: 'no-cache' });
+        if (!resp.ok) throw new Error(`Failed to load SVG: ${resp.status}`);
+        
+        const svgText = await resp.text();
+        byId('svgHost').innerHTML = svgText;
+        
+        // Find .organ nodes inside injected SVG
+        svgRoot = byId('svgHost').querySelector('svg');
+        if (!svgRoot) {
+          throw new Error('SVG element not found after loading');
+        }
+        
+        // Wait a moment for the SVG to be fully parsed by the browser
+        await new Promise(resolve => setTimeout(resolve, 50));
+        
+        organs = svgRoot.querySelectorAll('.organ');
+        if (organs.length === 0) {
+          console.warn('No .organ elements found in SVG');
+        }
+        
+        // Reset all organs to default state
+        resetOrgans();
+        
+        // Events for tooltip on hover
+        organs.forEach(o=>{
+          o.addEventListener('mousemove', (e)=>{
+            const tissue = o.getAttribute('data-tissue');
+            const ntpm = o.getAttribute('data-ntpm');
+            const level = o.getAttribute('data-level');
+            if (tissue && ntpm){
+              tooltip.innerHTML = `<strong>${tissue}</strong>: ${ntpm} nTPM (${level})`;
+              tooltip.style.left = e.pageX + 'px';
+              tooltip.style.top = e.pageY + 'px';
+              tooltip.style.opacity = 1;
+            } else {
+              tooltip.style.opacity = 0;
+            }
+          });
+          o.addEventListener('mouseleave', ()=> tooltip.style.opacity = 0);
         });
-        o.addEventListener('mouseleave', ()=> tooltip.style.opacity = 0);
-      });
+        
+        svgLoaded = true;
+        return true;
+      } catch (error) {
+        console.error('Error loading SVG:', error);
+        status.textContent = 'Error loading anatomy diagram. Please refresh the page.';
+        svgLoaded = false;
+        return false;
+      }
     }
 
     async function loadCurated(){
       // curated_genes.json is recommended. If missing, fall back quietly to empty (no suggestions).
       try{
-        // UPDATED: Added {cache: 'no-cache'} to ensure the gene list is fresh
-        const resp = await fetch(CURATED_URL, { cache: 'no-cache' });
+        const timestamp = new Date().getTime();
+        const resp = await fetch(`${CURATED_URL}?t=${timestamp}`, { cache: 'no-cache' });
         if (!resp.ok) throw new Error('no curated list');
         curatedGenes = await resp.json();
         if (!Array.isArray(curatedGenes)) curatedGenes = [];
@@ -281,7 +314,6 @@
     async function fetchGeneSpecific(geneSymbol){
       // Try tiny file first: /genes/GENE.json
       const url = `${PER_GENE_DIR}/${encodeURIComponent(geneSymbol)}.json`;
-      // This already had a good cache policy, so no change was needed here.
       const resp = await fetch(url, { cache: 'no-store' });
       if (resp.ok){
         return await resp.json(); // { tissue: nTPM, ... }
@@ -291,8 +323,8 @@
 
     async function fetchFromBulk(geneSymbol){
       // Expect bulk JSON in the simple { GENE: {tissue:nTPM,...}, ... } format
-      // UPDATED: Added {cache: 'no-cache'} to prevent stale bulk data file
-      const resp = await fetch(BULK_JSON_URL, { cache: 'no-cache' });
+      const timestamp = new Date().getTime();
+      const resp = await fetch(`${BULK_JSON_URL}?t=${timestamp}`, { cache: 'no-cache' });
       if (!resp.ok) throw new Error('bulk json fetch failed');
       const all = await resp.json();
       // Accept GENE in exact case; also try uppercased
@@ -311,6 +343,11 @@
     }
 
     function paintOrgans(geneData){
+      if (!svgLoaded) {
+        console.error('SVG not loaded, cannot paint organs');
+        return;
+      }
+      
       resetOrgans();
       // geneData keys must match HPA tissue names (mapping keys)
       Object.entries(geneData).forEach(([tissue, nTPM])=>{
@@ -334,7 +371,18 @@
       if (!g){ status.textContent = 'Please type a gene symbol.'; return; }
       currentGene = g.toUpperCase();
       status.textContent = `Loading ${currentGene}…`;
+      
       try{
+        // Ensure SVG is loaded before proceeding
+        if (!svgLoaded) {
+          status.textContent = `Loading anatomy diagram...`;
+          const svgSuccess = await loadSVG();
+          if (!svgSuccess) {
+            status.textContent = 'Failed to load anatomy diagram. Please refresh the page.';
+            return;
+          }
+        }
+        
         // prefer tiny per-gene file for speed
         let data = null;
         try{
@@ -396,10 +444,13 @@
 
     // ---------- Init ----------
     (async function init(){
-      await Promise.all([loadSVG(), loadCurated()]);
-      status.textContent = 'Type a gene symbol (e.g., ARL13B) and press Enter.';
-      // Optionally auto-show a default gene for demo:
-      // searchGene('WDR31');
+      try {
+        await Promise.all([loadSVG(), loadCurated()]);
+        status.textContent = 'Type a gene symbol (e.g., ARL13B) and press Enter.';
+      } catch (error) {
+        console.error('Initialization error:', error);
+        status.textContent = 'Error initializing application. Please refresh the page.';
+      }
     })();
   </script>
 </body>
