@@ -3,19 +3,54 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>CiliaHub – Gene Expression</title>
-  <link rel="icon" type="image/png" href="CiliaHub_Logo_web.png">
+  <title>Expression - CiliaHub</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <style>
-    /* General Styles & Layout */
+    /* Modern CSS Variables */
     :root {
-      --primary-color: #3373C4;
-      --secondary-color: #2c5aa0;
-      --text-color: #2c3e50;
-      --background-gradient: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-      --card-shadow: 0 10px 35px rgba(44, 90, 160, 0.1);
-      --border-radius: 15px;
+      --primary-500: #0066cc;
+      --primary-600: #0052a3;
+      --primary-700: #003d7a;
+      --primary-50: #e6f2ff;
+      --primary-100: #cce6ff;
+      
+      --secondary-500: #667085;
+      --secondary-600: #475467;
+      --secondary-700: #344054;
+      --secondary-50: #f9fafb;
+      --secondary-100: #f2f4f7;
+      
+      --success-500: #10b981;
+      --success-100: #dcfce7;
+      
+      --warning-500: #f59e0b;
+      --warning-100: #fef3c7;
+      
+      --error-500: #ef4444;
+      --error-100: #fee2e2;
+      
+      --text-primary: #101828;
+      --text-secondary: #475467;
+      --text-tertiary: #667085;
+      
+      --border-primary: #d0d5dd;
+      --border-secondary: #eaecf0;
+      
+      --shadow-xs: 0 1px 2px 0 rgba(16, 24, 40, 0.05);
+      --shadow-sm: 0 1px 3px 0 rgba(16, 24, 40, 0.1), 0 1px 2px 0 rgba(16, 24, 40, 0.06);
+      --shadow-md: 0 4px 8px -2px rgba(16, 24, 40, 0.1), 0 2px 4px -2px rgba(16, 24, 40, 0.06);
+      --shadow-lg: 0 12px 16px -4px rgba(16, 24, 40, 0.08), 0 4px 6px -2px rgba(16, 24, 40, 0.03);
+      --shadow-xl: 0 20px 24px -4px rgba(16, 24, 40, 0.08), 0 8px 8px -4px rgba(16, 24, 40, 0.03);
+      
+      --radius-sm: 6px;
+      --radius-md: 8px;
+      --radius-lg: 12px;
+      --radius-xl: 16px;
     }
 
+    /* Reset & Base Styles */
     * {
       margin: 0;
       padding: 0;
@@ -23,508 +58,787 @@
     }
 
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-      background: var(--background-gradient);
-      color: var(--text-color);
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       line-height: 1.6;
+      color: var(--text-primary);
+      background: linear-gradient(135deg, #fafbff 0%, #f0f4ff 100%);
+      min-height: 100vh;
+      overflow-x: hidden;
     }
 
+    /* Container & Layout */
     .container {
-      max-width: 1200px;
-      margin: 2rem auto;
-      padding: 0 1.5rem;
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 0 24px;
     }
 
-    /* Header (Navbar Style) */
-    header {
-      background-color: var(--primary-color);
-      padding: 1.5rem 2rem;
-      text-align: center;
-      color: #ffffff;
-      border-radius: var(--border-radius);
-      box-shadow: var(--card-shadow);
-      margin-bottom: 2rem;
-    }
-
-    header h1 {
-      font-size: 2.25rem;
-      margin-bottom: 0.25rem;
-    }
-
-    header p {
-      font-size: 1.1rem;
-      opacity: 0.9;
-    }
-
-    /* Main Content Sections */
-    .page-section {
+    /* Header */
+    .header {
       background: white;
-      padding: 2rem;
-      border-radius: var(--border-radius);
-      box-shadow: var(--card-shadow);
-      margin-bottom: 2rem;
+      border-bottom: 1px solid var(--border-secondary);
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      backdrop-filter: blur(8px);
+      background: rgba(255, 255, 255, 0.95);
     }
-    
-    /* Search Section */
-    .search-container {
+
+    .header-content {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 0;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 24px;
+      font-weight: 700;
+      color: var(--primary-600);
+      text-decoration: none;
+    }
+
+    .logo-icon {
+      width: 32px;
+      height: 32px;
+      background: linear-gradient(135deg, var(--primary-500) 0%, var(--primary-700) 100%);
+      border-radius: var(--radius-md);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: 600;
+      font-size: 16px;
+    }
+
+    .nav {
+      display: flex;
+      align-items: center;
+      gap: 32px;
+    }
+
+    .nav-link {
+      color: var(--text-secondary);
+      text-decoration: none;
+      font-weight: 500;
+      transition: color 0.2s ease;
       position: relative;
     }
-    
-    .search-wrapper {
+
+    .nav-link:hover,
+    .nav-link.active {
+      color: var(--primary-600);
+    }
+
+    .nav-link.active::after {
+      content: '';
+      position: absolute;
+      bottom: -20px;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: var(--primary-500);
+    }
+
+    /* Page Header */
+    .page-header {
+      padding: 48px 0;
+      text-align: center;
+      background: linear-gradient(135deg, var(--primary-50) 0%, white 100%);
+    }
+
+    .page-title {
+      font-size: 48px;
+      font-weight: 700;
+      background: linear-gradient(135deg, var(--primary-600) 0%, var(--primary-700) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 16px;
+    }
+
+    .page-subtitle {
+      font-size: 20px;
+      color: var(--text-secondary);
+      max-width: 600px;
+      margin: 0 auto;
+    }
+
+    /* Main Content */
+    .main-content {
+      padding: 48px 0 80px;
+    }
+
+    /* Search Section */
+    .search-section {
+      background: white;
+      border-radius: var(--radius-xl);
+      box-shadow: var(--shadow-lg);
+      padding: 32px;
+      margin-bottom: 32px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .search-section::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 4px;
+      background: linear-gradient(90deg, var(--primary-500), var(--primary-600), var(--primary-500));
+    }
+
+    .search-form {
       display: flex;
-      gap: 1rem;
+      gap: 16px;
+      position: relative;
     }
 
-    #geneInput {
+    .search-input-wrapper {
       flex: 1;
-      padding: 1rem;
-      border: 2px solid #e1ecf4;
-      border-radius: 10px;
-      font-size: 1.1rem;
+      position: relative;
+    }
+
+    .search-input {
+      width: 100%;
+      height: 52px;
+      padding: 0 20px 0 52px;
+      border: 2px solid var(--border-secondary);
+      border-radius: var(--radius-lg);
+      font-size: 16px;
+      font-weight: 500;
+      background: var(--secondary-50);
+      transition: all 0.2s ease;
       outline: none;
-      transition: border-color 0.3s;
     }
 
-    #geneInput:focus {
-      border-color: var(--secondary-color);
+    .search-input:focus {
+      border-color: var(--primary-500);
+      background: white;
+      box-shadow: 0 0 0 4px rgba(0, 102, 204, 0.1);
     }
 
-    #searchBtn {
-      padding: 1rem 2rem;
-      background: linear-gradient(135deg, var(--secondary-color) 0%, #1e3a5f 100%);
+    .search-icon {
+      position: absolute;
+      left: 18px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 20px;
+      height: 20px;
+      color: var(--text-tertiary);
+    }
+
+    .search-btn {
+      height: 52px;
+      padding: 0 24px;
+      background: linear-gradient(135deg, var(--primary-500) 0%, var(--primary-600) 100%);
       color: white;
       border: none;
-      border-radius: 10px;
-      cursor: pointer;
+      border-radius: var(--radius-lg);
       font-weight: 600;
-      font-size: 1rem;
-      transition: transform 0.2s, box-shadow 0.2s;
-    }
-    
-    #searchBtn:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 8px 25px rgba(44, 90, 160, 0.3);
+      font-size: 16px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      box-shadow: var(--shadow-sm);
     }
 
-    #suggestions {
+    .search-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-md);
+    }
+
+    .search-btn:active {
+      transform: translateY(0);
+    }
+
+    .suggestions {
       position: absolute;
-      top: calc(100% + 5px);
+      top: 100%;
       left: 0;
       right: 0;
       background: white;
-      border-radius: 10px;
-      box-shadow: var(--card-shadow);
-      display: none;
-      z-index: 10;
-      max-height: 220px;
+      border: 1px solid var(--border-secondary);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-lg);
+      z-index: 100;
+      max-height: 300px;
       overflow-y: auto;
-      border: 1px solid #e1ecf4;
+      margin-top: 8px;
+      display: none;
     }
 
-    .suggestion {
-      padding: 0.8rem 1.2rem;
+    .suggestion-item {
+      padding: 12px 20px;
       cursor: pointer;
+      border-bottom: 1px solid var(--border-secondary);
+      transition: background 0.1s ease;
+      font-weight: 500;
     }
 
-    .suggestion:hover {
-      background-color: #f8f9fa;
+    .suggestion-item:hover {
+      background: var(--secondary-50);
     }
-    
-    #status {
+
+    .suggestion-item:last-child {
+      border-bottom: none;
+    }
+
+    /* Status Message */
+    .status-message {
       text-align: center;
-      margin-top: 1.5rem;
-      font-size: 1rem;
-      color: #7f8c8d;
-      min-height: 24px;
+      padding: 24px;
+      font-size: 16px;
+      color: var(--text-secondary);
+      min-height: 32px;
     }
-    .status-error { color: #e74c3c; font-weight: bold; }
+
+    .status-error {
+      color: var(--error-500);
+      font-weight: 600;
+    }
+
+    .status-loading {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+    }
+
+    .loading-spinner {
+      width: 20px;
+      height: 20px;
+      border: 2px solid var(--border-secondary);
+      border-top: 2px solid var(--primary-500);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
 
     /* Results Section */
-    #results-section {
-      display: none; /* Hidden by default */
-      grid-template-columns: 1fr 1fr;
-      gap: 2rem;
+    .results-section {
+      display: none;
+      gap: 32px;
       opacity: 0;
-      transition: opacity 0.5s ease-in-out;
+      transition: opacity 0.5s ease;
     }
-    
-    #results-section.visible {
+
+    .results-section.visible {
       display: grid;
+      grid-template-columns: 1fr 400px;
       opacity: 1;
     }
 
-    .viz-panel, .data-panel {
+    .results-card {
       background: white;
-      padding: 2rem;
-      border-radius: var(--border-radius);
-      box-shadow: var(--card-shadow);
-    }
-    
-    .panel-title {
-        font-size: 1.5rem;
-        margin-bottom: 1.5rem;
-        border-bottom: 2px solid #e1ecf4;
-        padding-bottom: 0.5rem;
+      border-radius: var(--radius-xl);
+      box-shadow: var(--shadow-lg);
+      overflow: hidden;
+      border: 1px solid var(--border-secondary);
     }
 
-    /* SVG Visualization */
-    #svgHost {
+    .card-header {
+      padding: 24px;
+      border-bottom: 1px solid var(--border-secondary);
+      background: var(--secondary-50);
+    }
+
+    .card-title {
+      font-size: 20px;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin: 0;
+    }
+
+    .card-content {
+      padding: 24px;
+    }
+
+    /* Visualization Panel */
+    .viz-container {
       width: 100%;
-      height: 450px;
+      height: 500px;
       display: flex;
       justify-content: center;
       align-items: center;
+      border-radius: var(--radius-lg);
+      background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+      position: relative;
+      overflow: hidden;
     }
 
-    #svgHost svg {
+    .viz-container::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: radial-gradient(circle at 30% 20%, rgba(0, 102, 204, 0.05) 0%, transparent 50%),
+                  radial-gradient(circle at 70% 80%, rgba(0, 102, 204, 0.03) 0%, transparent 50%);
+    }
+
+    .viz-container svg {
       max-width: 100%;
       max-height: 100%;
+      z-index: 1;
     }
 
     .organ {
       cursor: pointer;
-      transition: filter 0.3s ease, transform 0.3s ease;
-      stroke: #666;
-      stroke-width: 1;
+      transition: all 0.3s ease;
+      stroke: #64748b;
+      stroke-width: 2;
+      filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
     }
 
     .organ:hover {
-      filter: brightness(1.1);
-      transform: scale(1.02);
+      transform: scale(1.05);
+      filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.2)) brightness(1.1);
     }
 
-    .tooltip {
-      position: absolute;
-      background-color: rgba(44, 62, 80, 0.9);
-      color: #ffffff;
-      padding: 0.5rem 0.8rem;
-      border-radius: 6px;
-      font-size: 0.9rem;
-      display: none;
-      pointer-events: none;
-      z-index: 100;
-    }
-
-    /* Data Table & Legend */
-    .table-container {
-      max-height: 350px;
+    /* Data Table */
+    .table-wrapper {
+      max-height: 400px;
       overflow-y: auto;
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--border-secondary);
     }
 
-    table {
+    .data-table {
       width: 100%;
       border-collapse: collapse;
-      font-size: 0.95rem;
+      font-size: 14px;
     }
-    thead { background-color: #f8f9fa; position: sticky; top: 0; }
-    th, td { padding: 0.8rem; text-align: left; border-bottom: 1px solid #e1ecf4;}
-    tbody tr:hover { background-color: #f1f5f8; }
 
+    .data-table thead {
+      background: var(--secondary-50);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    .data-table th {
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      color: var(--text-primary);
+      border-bottom: 1px solid var(--border-secondary);
+    }
+
+    .data-table td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border-secondary);
+    }
+
+    .data-table tbody tr:hover {
+      background: var(--secondary-50);
+    }
+
+    .expression-level {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .level-low { background: #dcfce7; color: #166534; }
+    .level-medium { background: #fef3c7; color: #92400e; }
+    .level-high { background: #fed7aa; color: #c2410c; }
+    .level-very-high { background: #fee2e2; color: #dc2626; }
+
+    /* Legend */
     .legend {
-      display: flex;
-      gap: 1rem;
-      flex-wrap: wrap;
-      margin-top: 1.5rem;
-      padding-top: 1.5rem;
-      border-top: 2px solid #e1ecf4;
+      margin-top: 24px;
+      padding-top: 20px;
+      border-top: 1px solid var(--border-secondary);
     }
 
-    .legend-item { display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; }
-    .swatch { width: 18px; height: 18px; border-radius: 50%; border: 1px solid #ccc; }
+    .legend-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 12px;
+    }
+
+    .legend-items {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 12px;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+
+    .legend-swatch {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      border: 1px solid rgba(0, 0, 0, 0.1);
+      flex-shrink: 0;
+    }
+
+    /* Tooltip */
+    .tooltip {
+      position: absolute;
+      background: var(--text-primary);
+      color: white;
+      padding: 8px 12px;
+      border-radius: var(--radius-sm);
+      font-size: 14px;
+      font-weight: 500;
+      display: none;
+      pointer-events: none;
+      z-index: 1000;
+      box-shadow: var(--shadow-md);
+      max-width: 200px;
+    }
+
+    .tooltip::before {
+      content: '';
+      position: absolute;
+      top: 100%;
+      left: 50%;
+      margin-left: -4px;
+      border: 4px solid transparent;
+      border-top-color: var(--text-primary);
+    }
+
+    /* Mobile Menu */
+    .mobile-menu-btn {
+      display: none;
+      flex-direction: column;
+      gap: 4px;
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 8px;
+    }
+
+    .mobile-menu-btn span {
+      width: 20px;
+      height: 2px;
+      background: var(--text-secondary);
+      transition: all 0.3s ease;
+    }
 
     /* Responsive Design */
-    @media (max-width: 992px) {
-      #results-section {
+    @media (max-width: 1200px) {
+      .results-section.visible {
         grid-template-columns: 1fr;
+        gap: 24px;
       }
-      header h1 { font-size: 1.8rem; }
     }
-    @media (max-width: 600px) {
-        .search-wrapper { flex-direction: column; }
+
+    @media (max-width: 768px) {
+      .container {
+        padding: 0 16px;
+      }
+
+      .page-title {
+        font-size: 36px;
+      }
+
+      .page-subtitle {
+        font-size: 18px;
+      }
+
+      .search-form {
+        flex-direction: column;
+      }
+
+      .search-section {
+        padding: 24px;
+      }
+
+      .nav {
+        display: none;
+      }
+
+      .mobile-menu-btn {
+        display: flex;
+      }
+
+      .viz-container {
+        height: 400px;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .page-title {
+        font-size: 28px;
+      }
+
+      .card-content {
+        padding: 16px;
+      }
+
+      .search-input {
+        height: 48px;
+        padding: 0 16px 0 48px;
+      }
+
+      .search-btn {
+        height: 48px;
+      }
     }
   </style>
 </head>
 <body>
-  <div class="container">
-    <header>
-      <h1>Gene Expression Atlas</h1>
-      <p>Visualize RNA expression of ciliary genes across human tissues.</p>
-    </header>
+  <!-- Header -->
+  <header class="header">
+    <div class="container">
+      <div class="header-content">
+        <a href="https://theciliahub.github.io/#/" class="logo">
+          <div class="logo-icon">C</div>
+          CiliaHub
+        </a>
+        <nav class="nav">
+          <a href="https://theciliahub.github.io/#/" class="nav-link">Home</a>
+          <a href="https://theciliahub.github.io/#/batch_query" class="nav-link">Batch Query</a>
+          <a href="https://theciliahub.github.io/#/expression" class="nav-link active">Expression</a>
+          <a href="https://theciliahub.github.io/#/download" class="nav-link">Download</a>
+          <a href="https://theciliahub.github.io/#/cite" class="nav-link">Cite</a>
+          <a href="https://theciliahub.github.io/#/contact" class="nav-link">Contact</a>
+        </nav>
+        <button class="mobile-menu-btn">
+          <span></span>
+          <span></span>
+          <span></span>
+        </button>
+      </div>
+    </div>
+  </header>
 
-    <main>
-      <div class="page-section">
-        <div class="search-container">
-          <div class="search-wrapper">
-            <input id="geneInput" type="text" placeholder="Enter Gene Name (e.g., ARL13B)" autocomplete="off" />
-            <button id="searchBtn">Search</button>
+  <!-- Page Header -->
+  <section class="page-header">
+    <div class="container">
+      <h1 class="page-title">Gene Expression Atlas</h1>
+      <p class="page-subtitle">
+        Visualize RNA expression patterns of ciliary genes across human tissues and organs
+      </p>
+    </div>
+  </section>
+
+  <!-- Main Content -->
+  <main class="main-content">
+    <div class="container">
+      <!-- Search Section -->
+      <section class="search-section">
+        <form class="search-form" id="searchForm">
+          <div class="search-input-wrapper">
+            <svg class="search-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+            </svg>
+            <input 
+              id="geneInput" 
+              type="text" 
+              class="search-input" 
+              placeholder="Enter gene symbol (e.g., ARL13B, BBS1, CEP290...)"
+              autocomplete="off"
+            />
+            <div id="suggestions" class="suggestions"></div>
           </div>
-          <div id="suggestions"></div>
+          <button type="submit" class="search-btn">
+            Search Expression
+          </button>
+        </form>
+        <div id="status" class="status-message">
+          Enter a gene symbol to explore its expression patterns across tissues
         </div>
-        <div id="status">Enter a gene to begin your search.</div>
-      </div>
+      </section>
 
-      <div id="results-section">
-        <div class="viz-panel">
-            <h2 class="panel-title">Expression Map</h2>
-            <div id="svgHost">
-                <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
-                    <title>Simplified Human Anatomy</title>
-                    <g id="human-body">
-                        <circle id="path-brain" class="organ" cx="100" cy="30" r="20" fill="#E0E0E0" />
-                        <path id="path-lung-left" class="organ" d="M 80,60 A 20,20 0 0,0 60,80 L 60,100 L 80,100 Z" fill="#E0E0E0" />
-                        <path id="path-lung-right" class="organ" d="M 120,60 A 20,20 0 0,1 140,80 L 140,100 L 120,100 Z" fill="#E0E0E0" />
-                        <circle id="path-heart" class="organ" cx="100" cy="80" r="15" fill="#E0E0E0" />
-                        <path id="path-liver" class="organ" d="M 105, 105 C 130,105 140,120 135,135 L 105,135 Z" fill="#E0E0E0"/>
-                        <ellipse id="path-kidney-left" class="organ" cx="85" cy="120" rx="10" ry="15" fill="#E0E0E0" />
-                        <ellipse id="path-kidney-right" class="organ" cx="115" cy="120" rx="10" ry="15" fill="#E0E0E0" />
-                        <rect id="path-small-intestine" class="organ" x="85" y="140" width="30" height="20" rx="5" fill="#E0E0E0"/>
-                    </g>
-                </svg>
+      <!-- Results Section -->
+      <section id="results" class="results-section">
+        <!-- Visualization Panel -->
+        <div class="results-card">
+          <div class="card-header">
+            <h2 class="card-title" id="vizTitle">Tissue Expression Map</h2>
+          </div>
+          <div class="card-content">
+            <div class="viz-container" id="vizContainer">
+              <svg viewBox="0 0 240 280" xmlns="http://www.w3.org/2000/svg">
+                <title>Human Body Expression Map</title>
+                <g id="human-body">
+                  <!-- Brain -->
+                  <ellipse id="organ-brain" class="organ" cx="120" cy="40" rx="28" ry="24" fill="#e2e8f0" />
+                  <text x="120" y="46" text-anchor="middle" font-size="10" font-weight="600" fill="#475569">Brain</text>
+                  
+                  <!-- Lungs -->
+                  <ellipse id="organ-lung-left" class="organ" cx="95" cy="80" rx="18" ry="25" fill="#e2e8f0" />
+                  <ellipse id="organ-lung-right" class="organ" cx="145" cy="80" rx="18" ry="25" fill="#e2e8f0" />
+                  <text x="95" y="85" text-anchor="middle" font-size="8" font-weight="600" fill="#475569">Lung</text>
+                  <text x="145" y="85" text-anchor="middle" font-size="8" font-weight="600" fill="#475569">Lung</text>
+                  
+                  <!-- Heart -->
+                  <path id="organ-heart" class="organ" d="M110,70 C110,65 115,60 120,65 C125,60 130,65 130,70 C130,80 120,90 120,90 C120,90 110,80 110,70 Z" fill="#e2e8f0" />
+                  <text x="120" y="78" text-anchor="middle" font-size="8" font-weight="600" fill="#475569">Heart</text>
+                  
+                  <!-- Liver -->
+                  <path id="organ-liver" class="organ" d="M125,110 L165,110 C170,110 175,115 175,120 L175,140 C175,145 170,150 165,150 L125,150 Z" fill="#e2e8f0" />
+                  <text x="150" y="135" text-anchor="middle" font-size="8" font-weight="600" fill="#475569">Liver</text>
+                  
+                  <!-- Kidneys -->
+                  <ellipse id="organ-kidney-left" class="organ" cx="95" cy="140" rx="12" ry="20" fill="#e2e8f0" />
+                  <ellipse id="organ-kidney-right" class="organ" cx="145" cy="140" rx="12" ry="20" fill="#e2e8f0" />
+                  <text x="95" y="145" text-anchor="middle" font-size="7" font-weight="600" fill="#475569">Kidney</text>
+                  <text x="145" y="145" text-anchor="middle" font-size="7" font-weight="600" fill="#475569">Kidney</text>
+                  
+                  <!-- Small Intestine -->
+                  <rect id="organ-small-intestine" class="organ" x="100" y="170" width="40" height="25" rx="8" fill="#e2e8f0" />
+                  <text x="120" y="185" text-anchor="middle" font-size="7" font-weight="600" fill="#475569">Intestine</text>
+                  
+                  <!-- Pancreas -->
+                  <ellipse id="organ-pancreas" class="organ" cx="85" cy="125" rx="20" ry="8" fill="#e2e8f0" />
+                  <text x="85" y="130" text-anchor="middle" font-size="7" font-weight="600" fill="#475569">Pancreas</text>
+                  
+                  <!-- Testis/Ovary -->
+                  <circle id="organ-testis" class="organ" cx="100" cy="210" r="8" fill="#e2e8f0" />
+                  <circle id="organ-ovary" class="organ" cx="140" cy="210" r="8" fill="#e2e8f0" />
+                  <text x="120" y="225" text-anchor="middle" font-size="7" font-weight="600" fill="#475569">Gonads</text>
+                </g>
+              </svg>
             </div>
-            <div id="tooltip" class="tooltip"></div>
-        </div>
-
-        <div class="data-panel">
-            <h2 class="panel-title">Expression Data</h2>
-            <div class="table-container">
-                <table id="exprTable">
-                    <thead>
-                        <tr><th>Tissue/Organ</th><th>nTPM</th><th>Level</th></tr>
-                    </thead>
-                    <tbody>
-                        </tbody>
-                </table>
-            </div>
+            
+            <!-- Legend -->
             <div class="legend">
-              <div class="legend-item"><span class="swatch" style="background: #C8E6C9;"></span> Low (0–5)</div>
-              <div class="legend-item"><span class="swatch" style="background: #81C784;"></span> Medium (5–15)</div>
-              <div class="legend-item"><span class="swatch" style="background: #4CAF50;"></span> High (15–30)</div>
-              <div class="legend-item"><span class="swatch" style="background: #2E7D32;"></span> Very High (>30)</div>
+              <div class="legend-title">Expression Levels (nTPM)</div>
+              <div class="legend-items">
+                <div class="legend-item">
+                  <div class="legend-swatch" style="background: #dcfce7;"></div>
+                  <span>Low (0-5)</span>
+                </div>
+                <div class="legend-item">
+                  <div class="legend-swatch" style="background: #fef3c7;"></div>
+                  <span>Medium (5-15)</span>
+                </div>
+                <div class="legend-item">
+                  <div class="legend-swatch" style="background: #fed7aa;"></div>
+                  <span>High (15-30)</span>
+                </div>
+                <div class="legend-item">
+                  <div class="legend-swatch" style="background: #fee2e2;"></div>
+                  <span>Very High (>30)</span>
+                </div>
+              </div>
             </div>
+          </div>
         </div>
-      </div>
-    </main>
-  </div>
+
+        <!-- Data Panel -->
+        <div class="results-card">
+          <div class="card-header">
+            <h2 class="card-title">Expression Data</h2>
+          </div>
+          <div class="card-content">
+            <div class="table-wrapper">
+              <table id="dataTable" class="data-table">
+                <thead>
+                  <tr>
+                    <th>Tissue/Organ</th>
+                    <th>nTPM</th>
+                    <th>Level</th>
+                  </tr>
+                </thead>
+                <tbody id="tableBody">
+                  <!-- Data will be populated here -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <!-- Tooltip -->
+  <div id="tooltip" class="tooltip"></div>
 
   <script>
-    // --- MOCK DATA (Embedded to make the file self-contained) ---
-    // This simulates the rna_tissue_consensus.json file
-    const MOCK_GENE_DATABASE = {
-        "ARL13B": { "brain": 35.2, "kidney": 25.1, "lung": 12.5, "liver": 4.3, "testis": 45.8, "heart muscle": 1.1, "small intestine": 18.9 },
-        "BBS1": { "brain": 18.9, "kidney": 10.4, "lung": 22.1, "liver": 15.6, "testis": 33.0, "heart muscle": 8.2, "small intestine": 14.5 },
-        "CEP290": { "brain": 40.1, "kidney": 38.5, "lung": 15.3, "liver": 7.8, "testis": 29.5, "heart muscle": 2.5, "small intestine": 22.0 },
-        "IFT88": { "brain": 3.2, "kidney": 5.6, "lung": 28.1, "liver": 1.9, "testis": 50.2, "heart muscle": 0.5, "small intestine": 31.5 }
+    // Configuration
+    const API_BASE_URL = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main';
+    const DEBOUNCE_DELAY = 250;
+
+    // State
+    let geneData = null;
+    let allGenes = [];
+    let isLoading = false;
+    let currentGene = '';
+
+    // DOM Elements
+    const elements = {
+      geneInput: document.getElementById('geneInput'),
+      suggestions: document.getElementById('suggestions'),
+      status: document.getElementById('status'),
+      results: document.getElementById('results'),
+      tableBody: document.getElementById('tableBody'),
+      tooltip: document.getElementById('tooltip'),
+      searchForm: document.getElementById('searchForm'),
+      vizTitle: document.getElementById('vizTitle')
     };
-    // This simulates the curated_genes.json file
-    const MOCK_CURATED_GENES = ["ARL13B", "BBS1", "BBS2", "BBS4", "CEP290", "IFT80", "IFT88", "DYNC2H1"];
 
-    // Mapping from data keys to SVG element IDs
-    const TISSUE_TO_SVG_IDS = {
-      "adipose tissue": [], "adrenal gland": [], "bone marrow": [],
-      "brain": ["path-brain"], "cerebellum": ["path-brain"],
-      "colon": [], "endometrium": [], "epididymis": [], "esophagus": [], "fallopian tube": [],
-      "gallbladder": [], "heart muscle": ["path-heart"], "kidney": ["path-kidney-left", "path-kidney-right"],
-      "liver": ["path-liver"], "lung": ["path-lung-left", "path-lung-right"],
-      "ovary": [], "pancreas": [], "placenta": [], "prostate": [], "seminal vesicle": [],
-      "skeletal muscle": [], "skin": [], "small intestine": ["path-small-intestine"], "spleen": [],
-      "stomach": [], "testis": [], "thyroid gland": [], "trachea": []
+    // Tissue mapping for SVG organs
+    const tissueMapping = {
+      'brain': ['organ-brain'],
+      'cerebellum': ['organ-brain'],
+      'cerebral cortex': ['organ-brain'],
+      'amygdala': ['organ-brain'],
+      'basal ganglia': ['organ-brain'],
+      'hippocampal formation': ['organ-brain'],
+      'hypothalamus': ['organ-brain'],
+      'midbrain': ['organ-brain'],
+      'spinal cord': ['organ-brain'],
+      'choroid plexus': ['organ-brain'],
+      'lung': ['organ-lung-left', 'organ-lung-right'],
+      'heart muscle': ['organ-heart'],
+      'liver': ['organ-liver'],
+      'kidney': ['organ-kidney-left', 'organ-kidney-right'],
+      'small intestine': ['organ-small-intestine'],
+      'pancreas': ['organ-pancreas'],
+      'testis': ['organ-testis'],
+      'ovary': ['organ-ovary']
     };
 
-    // --- DOM ELEMENT REFERENCES ---
-    const byId = (id) => document.getElementById(id);
-    const geneInput = byId('geneInput');
-    const searchBtn = byId('searchBtn');
-    const suggestionsEl = byId('suggestions');
-    const statusEl = byId('status');
-    const resultsSection = byId('results-section');
-    const svgHost = byId('svgHost');
-    const tooltip = byId('tooltip');
-    const tableBody = document.querySelector('#exprTable tbody');
+    // Utility Functions
+    const debounce = (func, delay) => {
+      let timeoutId;
+      return (...args) => {
+        clearTimeout(timeoutId);
+        timeoutId = setTimeout(() => func.apply(this, args), delay);
+      };
+    };
 
-    let svgOrgans = [];
-    
-    // --- CORE FUNCTIONS ---
-    
-    function ntpmToLevel(n) {
-      if (n <= 5) return 'Low';
-      if (n <= 15) return 'Medium';
-      if (n <= 30) return 'High';
-      return 'Very High';
-    }
+    const titleCase = str => str.replace(/\b\w/g, char => char.toUpperCase());
 
-    function ntpmToColor(n) {
-      if (n <= 5) return '#C8E6C9';
-      if (n <= 15) return '#81C784';
-      if (n <= 30) return '#4CAF50';
-      return '#2E7D32';
-    }
-    
-    function titleCase(str) {
-      return str.replace(/\b\w/g, char => char.toUpperCase());
-    }
+    const getExpressionLevel = (nTPM) => {
+      if (nTPM <= 5) return 'low';
+      if (nTPM <= 15) return 'medium';
+      if (nTPM <= 30) return 'high';
+      return 'very-high';
+    };
 
-    // --- DATA FETCHING (Simulated) ---
+    const getExpressionColor = (nTPM) => {
+      if (nTPM <= 5) return '#dcfce7';
+      if (nTPM <= 15) return '#fef3c7';
+      if (nTPM <= 30) return '#fed7aa';
+      return '#fee2e2';
+    };
 
-    // Simulates fetching data from the mock database with a short delay
-    async function fetchGeneData(geneSymbol) {
-        return new Promise((resolve, reject) => {
-            setTimeout(() => {
-                const data = MOCK_GENE_DATABASE[geneSymbol.toUpperCase()];
-                if (data) {
-                    resolve(data);
-                } else {
-                    reject(new Error(`No data found for gene "${geneSymbol}"`));
-                }
-            }, 300); // Simulate network latency
-        });
-    }
-
-    // --- UI UPDATE FUNCTIONS ---
-
-    function updateStatus(message, isError = false) {
-        statusEl.textContent = message;
-        statusEl.classList.toggle('status-error', isError);
-    }
-    
-    function resetUI() {
-        // Reset SVG colors
-        svgOrgans.forEach(o => {
-            o.style.fill = '#E0E0E0';
-            o.removeAttribute('data-tissue');
-        });
-        // Clear table
-        tableBody.innerHTML = '';
-        // Hide results section
-        resultsSection.classList.remove('visible');
-    }
-
-    function renderResults(geneSymbol, data) {
-        // 1. Render Table
-        const sortedData = Object.entries(data).sort((a, b) => b[1] - a[1]);
-        tableBody.innerHTML = sortedData.map(([tissue, nTPM]) => {
-            const level = ntpmToLevel(nTPM);
-            return `<tr><td>${titleCase(tissue)}</td><td>${nTPM.toFixed(2)}</td><td>${level}</td></tr>`;
-        }).join('');
-
-        // 2. Paint SVG Organs
-        resetUI(); // Reset previous results first
-        Object.entries(data).forEach(([tissue, nTPM]) => {
-            const ids = TISSUE_TO_SVG_IDS[tissue.toLowerCase()];
-            if (ids) {
-                ids.forEach(id => {
-                    const organEl = byId(id);
-                    if (organEl) {
-                        organEl.style.fill = ntpmToColor(nTPM);
-                        organEl.setAttribute('data-tissue', titleCase(tissue));
-                        organEl.setAttribute('data-ntpm', nTPM.toFixed(2));
-                        organEl.setAttribute('data-level', ntpmToLevel(nTPM));
-                    }
-                });
-            }
-        });
-        
-        // 3. Show the results section
-        resultsSection.classList.add('visible');
-        updateStatus(`Showing expression data for ${geneSymbol}.`);
-    }
-    
-    // --- SEARCH AND SUGGESTIONS LOGIC ---
-    
-    async function handleSearch() {
-        const geneSymbol = geneInput.value.trim().toUpperCase();
-        if (!geneSymbol) {
-            updateStatus('Please enter a gene symbol.', true);
-            return;
-        }
-
-        updateStatus(`Searching for "${geneSymbol}"...`);
-        resetUI();
-        
-        try {
-            const geneData = await fetchGeneData(geneSymbol);
-            renderResults(geneSymbol, geneData);
-        } catch (error) {
-            updateStatus(error.message, true);
-        }
-    }
-
-    function showSuggestions(list) {
-        if (!list.length) {
-            suggestionsEl.style.display = 'none';
-            return;
-        }
-        suggestionsEl.innerHTML = list.slice(0, 10).map(g => `<div class="suggestion">${g}</div>`).join('');
-        suggestionsEl.style.display = 'block';
-    }
-    
-    function handleInput() {
-        const query = geneInput.value.trim().toUpperCase();
-        if (!query) {
-            showSuggestions([]);
-            return;
-        }
-        const matches = MOCK_CURATED_GENES.filter(g => g.startsWith(query));
-        showSuggestions(matches);
-    }
-    
-    // --- INITIALIZATION AND EVENT LISTENERS ---
-
-    function initializeSVG() {
-        svgOrgans = Array.from(svgHost.querySelectorAll('.organ'));
-        svgOrgans.forEach(organ => {
-            organ.addEventListener('mousemove', (e) => {
-                const tissue = organ.getAttribute('data-tissue');
-                if (tissue) {
-                    tooltip.innerHTML = `<strong>${tissue}</strong>: ${organ.getAttribute('data-ntpm')} nTPM (${organ.getAttribute('data-level')})`;
-                    tooltip.style.left = `${e.pageX + 15}px`;
-                    tooltip.style.top = `${e.pageY + 15}px`;
-                    tooltip.style.display = 'block';
-                }
-            });
-            organ.addEventListener('mouseleave', () => {
-                tooltip.style.display = 'none';
-            });
-        });
-    }
-
-    // Debounce to prevent firing the input event too frequently
-    function debounce(func, delay = 250) {
-        let timeout;
-        return (...args) => {
-            clearTimeout(timeout);
-            timeout = setTimeout(() => func.apply(this, args), delay);
-        };
-    }
-    
-    // Attach Event Listeners
-    searchBtn.addEventListener('click', handleSearch);
-    geneInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') {
-            suggestionsEl.style.display = 'none';
-            handleSearch();
-        }
-    });
-
-    geneInput.addEventListener('input', debounce(handleInput, 200));
-    geneInput.addEventListener('focus', handleInput);
-    document.addEventListener('click', (e) => {
-        // Hide suggestions when clicking outside
-        if (!suggestionsEl.contains(e.target) && e.target !== geneInput) {
-            suggestionsEl.style.display = 'none';
-        }
-        // Handle clicking on a suggestion
-        if (e.target.classList.contains('suggestion')) {
-            geneInput.value = e.target.textContent;
-            suggestionsEl.style.display = 'none';
-            handleSearch();
-        }
-    });
-
-    // Initialize the application
-    document.addEventListener('DOMContentLoaded', () => {
-        initializeSVG();
-    });
-
-  </script>
-</body>
-</html>
+    const updateStatus = (message, isError = false, isLoading = false) => {
+      const statusEl
