@@ -1,881 +1,493 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Expression - CiliaHub</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <style>
-    /* Modern CSS Variables */
-    :root {
-      --primary-500: #0066cc;
-      --primary-600: #0052a3;
-      --primary-700: #003d7a;
-      --primary-50: #e6f2ff;
-      --primary-100: #cce6ff;
-      
-      --secondary-500: #667085;
-      --secondary-600: #475467;
-      --secondary-700: #344054;
-      --secondary-50: #f9fafb;
-      --secondary-100: #f2f4f7;
-      
-      --success-500: #10b981;
-      --success-100: #dcfce7;
-      
-      --warning-500: #f59e0b;
-      --warning-100: #fef3c7;
-      
-      --error-500: #ef4444;
-      --error-100: #fee2e2;
-      
-      --text-primary: #101828;
-      --text-secondary: #475467;
-      --text-tertiary: #667085;
-      
-      --border-primary: #d0d5dd;
-      --border-secondary: #eaecf0;
-      
-      --shadow-xs: 0 1px 2px 0 rgba(16, 24, 40, 0.05);
-      --shadow-sm: 0 1px 3px 0 rgba(16, 24, 40, 0.1), 0 1px 2px 0 rgba(16, 24, 40, 0.06);
-      --shadow-md: 0 4px 8px -2px rgba(16, 24, 40, 0.1), 0 2px 4px -2px rgba(16, 24, 40, 0.06);
-      --shadow-lg: 0 12px 16px -4px rgba(16, 24, 40, 0.08), 0 4px 6px -2px rgba(16, 24, 40, 0.03);
-      --shadow-xl: 0 20px 24px -4px rgba(16, 24, 40, 0.08), 0 8px 8px -4px rgba(16, 24, 40, 0.03);
-      
-      --radius-sm: 6px;
-      --radius-md: 8px;
-      --radius-lg: 12px;
-      --radius-xl: 16px;
-    }
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CiliaHub - Interactive Ciliary Gene Database</title>
+    <link rel="icon" type="image/png" href="CiliaHub_Logo_web.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* --- General Styles & Layout --- */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); color: #2c3e50; line-height: 1.6; }
+        .main-container { max-width: 1400px; margin: 2rem auto; padding: 0 2rem; display: grid; grid-template-columns: 1fr 350px; gap: 2rem; align-items: start; }
+        .content-area { display: flex; flex-direction: column; gap: 1.5rem; }
+        .content-area-full { grid-column: 1 / -1; }
 
-    /* Reset & Base Styles */
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
+        /* --- Navbar --- */
+        .navbar { background: linear-gradient(135deg, #2c5aa0 0%, #1e3a5f 100%); padding: 1rem 0; box-shadow: 0 4px 15px rgba(44, 90, 160, 0.3); position: sticky; top: 0; z-index: 1000; }
+        .nav-container { max-width: 1200px; margin: 0 auto; padding: 0 2rem; display: flex; justify-content: space-between; align-items: center; }
+        .logo { font-size: 2rem; font-weight: bold; color: #ffffff; text-decoration: none; }
+        .nav-links { display: flex; list-style: none; gap: 2rem; }
+        .nav-links a { color: #e8f4fd; text-decoration: none; padding: 0.5rem 1rem; border-radius: 25px; transition: all 0.3s ease; font-weight: 500; }
+        .nav-links a:hover, .nav-links a.active { background-color: rgba(255, 255, 255, 0.2); transform: translateY(-2px); }
 
-    body {
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      line-height: 1.6;
-      color: var(--text-primary);
-      background: linear-gradient(135deg, #fafbff 0%, #f0f4ff 100%);
-      min-height: 100vh;
-      overflow-x: hidden;
-    }
+        /* --- Page Sections & Inputs --- */
+        .page-section { background: white; padding: 2rem; border-radius: 15px; box-shadow: 0 8px 32px rgba(44, 90, 160, 0.1); }
+        .search-container { display: flex; gap: 1rem; margin-top: 1rem; }
+        #batch-genes-input { width: 100%; min-height: 100px; resize: vertical; margin-top: 1rem; margin-bottom: 1rem; padding: 1rem; border: 2px solid #e1ecf4; border-radius: 10px; font-size: 1rem; }
+        .search-btn { padding: 1rem 2rem; background: linear-gradient(135deg, #2c5aa0 0%, #1e3a5f 100%); color: white; border: none; border-radius: 10px; cursor: pointer; font-weight: 600; }
+        .search-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(44, 90, 160, 0.3); }
 
-    /* Container & Layout */
-    .container {
-      max-width: 1400px;
-      margin: 0 auto;
-      padding: 0 24px;
-    }
+        /* --- Gene Cards --- */
+        .gene-cards { display: grid; gap: 1.5rem; }
+        .gene-card { background: white; padding: 1.5rem; border-radius: 15px; box-shadow: 0 8px 32px rgba(44, 90, 160, 0.1); transition: all 0.3s ease; border-left: 5px solid transparent; cursor: pointer; }
+        .gene-card:hover { transform: translateY(-5px); }
+        .gene-card.default { border-left-color: #e74c3c; }
+        .gene-card.search-result { border-left-color: #27ae60; }
+        .gene-name { font-size: 1.3rem; font-weight: bold; margin-bottom: 0.5rem; }
+        .gene-description { color: #7f8c8d; font-size: 0.95rem; }
+        .gene-info { font-size: 0.9rem; color: #34495e; margin-bottom: 0.5rem; }
+        .gene-info a { color: #2c5aa0; text-decoration: none; }
+        .gene-info a:hover { text-decoration: underline; }
 
-    /* Page Header */
-    .page-header {
-      padding: 80px 0;
-      text-align: center;
-      background: linear-gradient(135deg, var(--primary-50) 0%, white 100%);
-      min-height: 50vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
+        /* --- Cilia Panel --- */
+        .cilia-panel { background: white; border-radius: 15px; box-shadow: 0 8px 32px rgba(44, 90, 160, 0.1); position: sticky; top: 100px; height: fit-content; }
+        .panel-header { background: linear-gradient(135deg, #2c5aa0 0%, #1e3a5f 100%); color: white; padding: 1.5rem; text-align: center; border-radius: 15px 15px 0 0;}
+        .panel-content { padding: 1.5rem; }
+        .cilia-container { text-align: center; margin-bottom: 1.5rem; }
+        .cilia-part { stroke: #2c3e50; stroke-width: 1.5; transition: all 0.3s ease-in-out; cursor: pointer; }
+        .cilia-part:hover { stroke-width: 3; filter: brightness(1.1); }
+        .highlighted { fill: #e74c3c !important; opacity: 0.9 !important; animation: pulse 2s infinite; }
+        .highlighted.search-gene { fill: #27ae60 !important; }
+        @keyframes pulse { 0%, 100% { opacity: 0.9; } 50% { opacity: 0.6; } }
+        .controls { background: #f8f9fa; padding: 1rem; border-radius: 10px; margin-top: 1rem; }
+        .gene-buttons { display: flex; flex-direction: column; gap: 0.5rem; }
+        .gene-btn { padding: 0.7rem; border: 1px solid #e1ecf4; border-radius: 8px; background: white; cursor: pointer; font-weight: 600; font-size: 0.9rem; transition: all 0.2s ease;}
+        .gene-btn.selected { background: #2c5aa0; color: white; border-color: #2c5aa0; }
+        .gene-btn.default { color: #c0392b; }
+        .gene-btn.search-gene { background: #27ae60; color: white; border-color: #27ae60; }
+        .gene-btn:hover { background: #2c5aa0; color: white; transform: translateX(3px); }
+        .reset-btn { background: #95a5a6 !important; color: white !important; margin-top: 0.5rem; }
 
-    .page-title {
-      font-size: 48px;
-      font-weight: 700;
-      background: linear-gradient(135deg, var(--primary-600) 0%, var(--primary-700) 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-      margin-bottom: 16px;
-    }
+        /* --- Status Messages --- */
+        .status-message { text-align: center; padding: 3rem; color: #7f8c8d; font-style: italic; }
+        .error-message { color: #e74c3c; font-weight: bold; }
 
-    .page-subtitle {
-      font-size: 20px;
-      color: var(--text-secondary);
-      max-width: 600px;
-      margin: 0 auto;
-    }
-
-    /* Main Content */
-    .main-content {
-      padding: 48px 0 80px;
-    }
-
-    /* Search Section */
-    .search-section {
-      background: white;
-      border-radius: var(--radius-xl);
-      box-shadow: var(--shadow-lg);
-      padding: 32px;
-      margin-bottom: 32px;
-      position: relative;
-      overflow: hidden;
-    }
-
-    .search-section::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      height: 4px;
-      background: linear-gradient(90deg, var(--primary-500), var(--primary-600), var(--primary-500));
-    }
-
-    .search-form {
-      display: flex;
-      gap: 16px;
-      position: relative;
-    }
-
-    .search-input-wrapper {
-      flex: 1;
-      position: relative;
-    }
-
-    .search-input {
-      width: 100%;
-      height: 52px;
-      padding: 0 20px 0 52px;
-      border: 2px solid var(--border-secondary);
-      border-radius: var(--radius-lg);
-      font-size: 16px;
-      font-weight: 500;
-      background: var(--secondary-50);
-      transition: all 0.2s ease;
-      outline: none;
-    }
-
-    .search-input:focus {
-      border-color: var(--primary-500);
-      background: white;
-      box-shadow: 0 0 0 4px rgba(0, 102, 204, 0.1);
-    }
-
-    .search-icon {
-      position: absolute;
-      left: 18px;
-      top: 50%;
-      transform: translateY(-50%);
-      width: 20px;
-      height: 20px;
-      color: var(--text-tertiary);
-    }
-
-    .search-btn {
-      height: 52px;
-      padding: 0 24px;
-      background: linear-gradient(135deg, var(--primary-500) 0%, var(--primary-600) 100%);
-      color: white;
-      border: none;
-      border-radius: var(--radius-lg);
-      font-weight: 600;
-      font-size: 16px;
-      cursor: pointer;
-      transition: all 0.2s ease;
-      box-shadow: var(--shadow-sm);
-    }
-
-    .search-btn:hover {
-      transform: translateY(-2px);
-      box-shadow: var(--shadow-md);
-    }
-
-    .search-btn:active {
-      transform: translateY(0);
-    }
-
-    .suggestions {
-      position: absolute;
-      top: 100%;
-      left: 0;
-      right: 0;
-      background: white;
-      border: 1px solid var(--border-secondary);
-      border-radius: var(--radius-lg);
-      box-shadow: var(--shadow-lg);
-      z-index: 100;
-      max-height: 300px;
-      overflow-y: auto;
-      margin-top: 8px;
-      display: none;
-    }
-
-    .suggestion-item {
-      padding: 12px 20px;
-      cursor: pointer;
-      border-bottom: 1px solid var(--border-secondary);
-      transition: background 0.1s ease;
-      font-weight: 500;
-    }
-    
-    .suggestion-item.active,
-    .suggestion-item:hover {
-      background: var(--secondary-50);
-    }
-
-    .suggestion-item:last-child {
-      border-bottom: none;
-    }
-
-    /* Status Message */
-    .status-message {
-      text-align: center;
-      padding: 24px;
-      font-size: 16px;
-      color: var(--text-secondary);
-      min-height: 32px;
-    }
-
-    .status-error {
-      color: var(--error-500);
-      font-weight: 600;
-    }
-
-    .status-loading {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 12px;
-    }
-
-    .loading-spinner {
-      width: 20px;
-      height: 20px;
-      border: 2px solid var(--border-secondary);
-      border-top: 2px solid var(--primary-500);
-      border-radius: 50%;
-      animation: spin 1s linear infinite;
-    }
-
-    @keyframes spin {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
-    }
-
-    /* Results Section */
-    .results-section {
-      display: none;
-      gap: 32px;
-      opacity: 0;
-      transition: opacity 0.5s ease;
-    }
-
-    .results-section.visible {
-      display: grid;
-      grid-template-columns: 1fr 400px;
-      opacity: 1;
-    }
-
-    .results-card {
-      background: white;
-      border-radius: var(--radius-xl);
-      box-shadow: var(--shadow-lg);
-      overflow: hidden;
-      border: 1px solid var(--border-secondary);
-    }
-
-    .card-header {
-      padding: 24px;
-      border-bottom: 1px solid var(--border-secondary);
-      background: var(--secondary-50);
-    }
-
-    .card-title {
-      font-size: 20px;
-      font-weight: 600;
-      color: var(--text-primary);
-      margin: 0;
-    }
-
-    .card-content {
-      padding: 24px;
-    }
-
-    /* Visualization Panel */
-    .viz-container {
-      width: 100%;
-      height: 500px;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      border-radius: var(--radius-lg);
-      background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
-      position: relative;
-      overflow: hidden;
-    }
-
-    .viz-container::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: radial-gradient(circle at 30% 20%, rgba(0, 102, 204, 0.05) 0%, transparent 50%),
-                  radial-gradient(circle at 70% 80%, rgba(0, 102, 204, 0.03) 0%, transparent 50%);
-    }
-
-    .viz-container svg {
-      max-width: 100%;
-      max-height: 100%;
-      z-index: 1;
-    }
-
-    .organ {
-      cursor: pointer;
-      transition: all 0.3s ease;
-      stroke: #64748b;
-      stroke-width: 2;
-      filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
-    }
-
-    .organ:hover {
-      transform: scale(1.05);
-      filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.2)) brightness(1.1);
-    }
-
-    /* Data Table */
-    .table-wrapper {
-      max-height: 400px;
-      overflow-y: auto;
-      border-radius: var(--radius-lg);
-      border: 1px solid var(--border-secondary);
-    }
-
-    .data-table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 14px;
-    }
-
-    .data-table thead {
-      background: var(--secondary-50);
-      position: sticky;
-      top: 0;
-      z-index: 10;
-    }
-
-    .data-table th {
-      padding: 12px 16px;
-      text-align: left;
-      font-weight: 600;
-      color: var(--text-primary);
-      border-bottom: 1px solid var(--border-secondary);
-    }
-
-    .data-table td {
-      padding: 12px 16px;
-      border-bottom: 1px solid var(--border-secondary);
-    }
-
-    .data-table tbody tr:hover {
-      background: var(--secondary-50);
-    }
-
-    .expression-level {
-      display: inline-block;
-      padding: 4px 8px;
-      border-radius: 12px;
-      font-size: 12px;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
-
-    .level-low { background: #dcfce7; color: #166534; }
-    .level-medium { background: #fef3c7; color: #92400e; }
-    .level-high { background: #fed7aa; color: #c2410c; }
-    .level-very-high { background: #fee2e2; color: #dc2626; }
-
-    /* Legend */
-    .legend {
-      margin-top: 24px;
-      padding-top: 20px;
-      border-top: 1px solid var(--border-secondary);
-    }
-
-    .legend-title {
-      font-size: 14px;
-      font-weight: 600;
-      color: var(--text-primary);
-      margin-bottom: 12px;
-    }
-
-    .legend-items {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-      gap: 12px;
-    }
-
-    .legend-item {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 12px;
-      color: var(--text-secondary);
-    }
-
-    .legend-swatch {
-      width: 16px;
-      height: 16px;
-      border-radius: 50%;
-      border: 1px solid rgba(0, 0, 0, 0.1);
-      flex-shrink: 0;
-    }
-
-    /* Tooltip */
-    .tooltip {
-      position: absolute;
-      background: var(--text-primary);
-      color: white;
-      padding: 8px 12px;
-      border-radius: var(--radius-sm);
-      font-size: 14px;
-      font-weight: 500;
-      display: none;
-      pointer-events: none;
-      z-index: 1000;
-      box-shadow: var(--shadow-md);
-      max-width: 200px;
-      transform: translate(-50%, -110%);
-    }
-
-    .tooltip::before {
-      content: '';
-      position: absolute;
-      top: 100%;
-      left: 50%;
-      margin-left: -4px;
-      border: 4px solid transparent;
-      border-top-color: var(--text-primary);
-    }
-
-    /* Responsive Design */
-    @media (max-width: 1200px) {
-      .results-section.visible {
-        grid-template-columns: 1fr;
-        gap: 24px;
-      }
-    }
-
-    @media (max-width: 768px) {
-      .container {
-        padding: 0 16px;
-      }
-
-      .page-title {
-        font-size: 36px;
-      }
-
-      .page-subtitle {
-        font-size: 18px;
-      }
-
-      .search-form {
-        flex-direction: column;
-      }
-
-      .search-section {
-        padding: 24px;
-      }
-
-      .viz-container {
-        height: 400px;
-      }
-    }
-
-    @media (max-width: 480px) {
-      .page-title {
-        font-size: 28px;
-      }
-
-      .card-content {
-        padding: 16px;
-      }
-
-      .search-input {
-        height: 48px;
-        padding: 0 16px 0 48px;
-      }
-
-      .search-btn {
-        height: 48px;
-      }
-    }
-  </style>
+        /* --- Responsive Design --- */
+        @media (max-width: 992px) {
+            .main-container { grid-template-columns: 1fr; }
+            .cilia-panel { position: relative; top: auto; }
+            .nav-container { flex-direction: column; gap: 1rem; }
+            .nav-links { gap: 1rem; flex-wrap: wrap; justify-content: center; }
+        }
+    </style>
 </head>
 <body>
-
-  <section class="page-header">
-    <div class="container">
-      <h1 class="page-title">Gene Expression Atlas</h1>
-      <p class="page-subtitle">
-        Visualize RNA expression patterns of ciliary genes across human tissues and organs
-      </p>
-    </div>
-  </section>
-
-  <main class="main-content">
-    <div class="container">
-      <section class="search-section">
-        <form class="search-form" id="searchForm" role="search">
-          <div class="search-input-wrapper">
-            <svg class="search-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
-            </svg>
-            <input 
-              id="geneInput" 
-              type="text" 
-              class="search-input" 
-              placeholder="Enter gene symbol (e.g., ARL13B, BBS1, CEP290...)"
-              autocomplete="off"
-              aria-label="Search for a gene"
-            />
-            <div id="suggestions" class="suggestions" role="listbox"></div>
-          </div>
-          <button type="submit" class="search-btn">
-            Search Expression
-          </button>
-        </form>
-        <div id="status" class="status-message" aria-live="polite">
-          Enter a gene symbol to explore its expression patterns across tissues
+    <nav class="navbar">
+        <div class="nav-container">
+            <a href="/" onclick="navigateTo(event, '/')" class="logo" aria-label="CiliaHub Home">CiliaHub</a>
+            <ul class="nav-links">
+                <li><a href="/" onclick="navigateTo(event, '/')">Home</a></li>
+                <li><a href="/batch-query" onclick="navigateTo(event, '/batch-query')">Batch Query</a></li>
+                <li><a href="/expression" onclick="navigateTo(event, '/expression')">Expression</a></li>
+                <li><a href="/download" onclick="navigateTo(event, '/download')">Download</a></li>
+                <li><a href="/cite" onclick="navigateTo(event, '/cite')">Cite</a></li>
+                <li><a href="/contact" onclick="navigateTo(event, '/contact')">Contact</a></li>
+            </ul>
         </div>
-      </section>
+    </nav>
 
-      <section id="results" class="results-section">
-        <div class="results-card">
-          <div class="card-header">
-            <h2 class="card-title" id="vizTitle">Tissue Expression Map</h2>
-          </div>
-          <div class="card-content">
-            <div class="viz-container" id="vizContainer">
-              <svg viewBox="0 0 240 280" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="vizDesc">
-                <title id="vizDesc">A diagram of human organs. Their colors change to show gene expression levels.</title>
-                <g id="human-body">
-                  <ellipse id="organ-brain" class="organ" cx="120" cy="40" rx="28" ry="24" fill="#e2e8f0" />
-                  <ellipse id="organ-lung-left" class="organ" cx="95" cy="80" rx="18" ry="25" fill="#e2e8f0" />
-                  <ellipse id="organ-lung-right" class="organ" cx="145" cy="80" rx="18" ry="25" fill="#e2e8f0" />
-                  <path id="organ-heart" class="organ" d="M110,70 C110,65 115,60 120,65 C125,60 130,65 130,70 C130,80 120,90 120,90 C120,90 110,80 110,70 Z" fill="#e2e8f0" />
-                  <path id="organ-liver" class="organ" d="M125,110 L165,110 C170,110 175,115 175,120 L175,140 C175,145 170,150 165,150 L125,150 Z" fill="#e2e8f0" />
-                  <ellipse id="organ-kidney-left" class="organ" cx="95" cy="140" rx="12" ry="20" fill="#e2e8f0" />
-                  <ellipse id="organ-kidney-right" class="organ" cx="145" cy="140" rx="12" ry="20" fill="#e2e8f0" />
-                  <rect id="organ-small-intestine" class="organ" x="100" y="170" width="40" height="25" rx="8" fill="#e2e8f0" />
-                  <ellipse id="organ-pancreas" class="organ" cx="85" cy="125" rx="20" ry="8" fill="#e2e8f0" />
-                  <circle id="organ-testis" class="organ" cx="100" cy="210" r="8" fill="#e2e8f0" />
-                  <circle id="organ-ovary" class="organ" cx="140" cy="210" r="8" fill="#e2e8f0" />
-                </g>
-              </svg>
+    <div class="main-container">
+        <div class="content-area"></div>
+        <aside class="cilia-panel">
+            <div class="panel-header">
+                <h3>Interactive Cilium</h3>
+                <p style="font-size: 0.9rem; opacity: 0.9;">Click genes to see localization</p>
             </div>
+            <div class="panel-content">
+                <div class="cilia-container">
+                    <svg viewBox="0 0 300 400" xmlns="http://www.w3.org/2000/svg" style="max-width: 250px; height: auto;">
+                        <path id="cell-body" class="cilia-part" fill="#a8dadc" d="M 50,380 C -20,300 20,200 150,200 C 280,200 320,300 250,380 Z" />
+                        <circle id="nucleus" class="cilia-part" fill="#457b9d" cx="150" cy="320" r="40" />
+                        <rect id="basal-body" class="cilia-part" fill="#1d3557" x="140" y="195" width="20" height="15" />
+                        <path id="transition-zone" class="cilia-part" fill="#f1faee" d="M 142,195 L 138,180 L 162,180 L 158,195 Z" />
+                        <path id="ciliary-membrane" class="cilia-part" fill="#a8dadc" fill-opacity="0.5" d="M 138,180 L 145,10 L 155,10 L 162,180 Z" />
+                        <path id="axoneme" class="cilia-part" fill="#f1faee" d="M 145,180 L 148,15 L 152,15 L 155,180 Z" />
+                    </svg>
+                </div>
+                <div class="controls">
+                    <h4>Gene Localization:</h4>
+                    <div id="geneButtons" class="gene-buttons"></div>
+                </div>
+            </div>
+        </aside>
+    </div>
+
+    <script>
+        // --- Application State ---
+        const geneLocalizationData = {};
+        const defaultGenes = [
+             { gene: "IFT88", description: "Intraflagellar transport protein 88. Key component of the IFT-B complex.", localization: "Axoneme, Basal Body", ensembl_id: "ENSG00000032742" },
+             { gene: "CEP290", description: "Centrosomal protein 290. Critical component of the ciliary transition zone.", localization: "Transition Zone", ensembl_id: "ENSG00000198707", omim_id: "610142" },
+             { gene: "WDR31", description: "WD repeat domain 31. Involved in ciliary assembly and maintenance.", localization: "Basal Body, Transition Zone", ensembl_id: "ENSG00000106459" }
+        ];
+        let allGenes = [];
+        const allPartIds = ["cell-body", "nucleus", "basal-body", "transition-zone", "axoneme", "ciliary-membrane"];
+
+        // --- Database and Utility Functions ---
+        async function loadGeneDatabase() {
+            if (allGenes.length > 0) return;
+            try {
+                const response = await fetch('https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/ciliahub_data.json');
+                if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+                const data = await response.json();
+                allGenes = data;
+                data.forEach(gene => {
+                    if (gene.localization && gene.gene) {
+                        geneLocalizationData[gene.gene] = mapLocalizationToSVG(gene.localization);
+                    }
+                });
+            } catch (error) {
+                console.error("Failed to load gene database:", error);
+                allGenes = [...defaultGenes]; // Fallback to default genes
+            }
+        }
+
+        function mapLocalizationToSVG(localization) {
+            const mapping = { "ciliary membrane": "ciliary-membrane", "axoneme": "axoneme", "basal body": "basal-body", "transition zone": "transition-zone", "cilia": "ciliary-membrane" };
+            return localization.split(',').map(loc => mapping[loc.trim().toLowerCase()] || loc.trim().toLowerCase()).filter(id => allPartIds.includes(id));
+        }
+
+        // --- Routing and Page Rendering ---
+        async function handleRouteChange() {
+            await loadGeneDatabase();
+            const path = window.location.hash.replace('#', '').toLowerCase() || '/';
+            const geneName = path.startsWith('/gene/') ? path.split('/').pop().toUpperCase() : null;
             
-            <div class="legend">
-              <div class="legend-title">Expression Levels (nTPM)</div>
-              <div class="legend-items">
-                <div class="legend-item"><div class="legend-swatch" style="background: #dcfce7;"></div><span>Low (0-5)</span></div>
-                <div class="legend-item"><div class="legend-swatch" style="background: #fef3c7;"></div><span>Medium (5-15)</span></div>
-                <div class="legend-item"><div class="legend-swatch" style="background: #fed7aa;"></div><span>High (15-30)</span></div>
-                <div class="legend-item"><div class="legend-swatch" style="background: #fee2e2;"></div><span>Very High (>30)</span></div>
-              </div>
-            </div>
-          </div>
-        </div>
+            updateActiveNav(path);
 
-        <div class="results-card">
-          <div class="card-header">
-            <h2 class="card-title">Expression Data</h2>
-          </div>
-          <div class="card-content">
-            <div class="table-wrapper">
-              <table id="dataTable" class="data-table">
-                <thead><tr><th>Tissue/Organ</th><th>nTPM</th><th>Level</th></tr></thead>
-                <tbody id="tableBody"></tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      </section>
-    </div>
-  </main>
+            if (geneName) {
+                const gene = allGenes.find(g => g.gene && g.gene.toUpperCase() === geneName);
+                if (gene) displayIndividualGenePage(gene);
+                else displayNotFoundPage();
+            } else if (path === '/' || path === '/index.html') {
+                displayHomePage();
+            } else if (path === '/batch-query') {
+                displayBatchQueryTool();
+            } else if (path === '/expression') {
+                displayExpressionPage(); // Corrected function call
+            } else if (path === '/download') {
+                displayDownloadPage();
+            } else if (path === '/cite') {
+                displayCitePage();
+            } else if (path === '/contact') {
+                displayContactPage();
+            } else {
+                displayHomePage();
+            }
+        }
 
-  <div id="tooltip" class="tooltip" role="tooltip"></div>
+        function displayHomePage() {
+            const contentArea = document.querySelector('.content-area');
+            contentArea.className = 'content-area';
+            document.querySelector('.cilia-panel').style.display = 'block';
+            contentArea.innerHTML = `
+                <div class="page-section">
+                    <h1>Welcome to CiliaHub</h1>
+                    <p style="font-size: 1.1rem; color: #555;">The central resource for interactive ciliary gene data. Explore curated gene information, analyze gene lists with our Batch Query tool, or visualize expression patterns with the Expression Atlas.</p>
+                </div>
+                <div class="page-section">
+                    <h2>Featured Genes</h2>
+                    <div id="gene-cards-container" class="gene-cards"></div>
+                </div>`;
+            displayGeneCards(defaultGenes, []);
+        }
 
-  <script>
-    // Configuration
-    const API_URL = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/rna_tissue_consensus.json';
-    const DEBOUNCE_DELAY = 250;
+        function displayBatchQueryTool() {
+            const contentArea = document.querySelector('.content-area');
+            contentArea.className = 'content-area';
+            document.querySelector('.cilia-panel').style.display = 'block';
+            contentArea.innerHTML = `
+                <div class="page-section">
+                    <h2>Batch Gene Query</h2>
+                    <p>Enter multiple gene names (comma, space, or newline separated) to retrieve their information.</p>
+                    <textarea id="batch-genes-input" placeholder="e.g., ACE2, IFT88, CEP290"></textarea>
+                    <button id="batch-search-btn" class="search-btn">Search Genes</button>
+                    <div id="status-message" class="status-message" style="display: none;"></div>
+                    <div id="gene-cards-container" class="gene-cards" style="margin-top: 1.5rem;"></div>
+                </div>`;
+            document.getElementById('batch-search-btn').onclick = performBatchSearch;
+            displayGeneCards([], []); // Start with an empty card container
+        }
 
-    // State
-    let geneDataCache = null;
-    let allGenes = [];
+        // --- EXPRESSION PAGE: INTEGRATED ---
+        function displayExpressionPage() {
+            const contentArea = document.querySelector('.content-area');
+            contentArea.className = 'content-area content-area-full';
+            document.querySelector('.cilia-panel').style.display = 'none';
+            
+            // 1. Inject HTML Structure
+            contentArea.innerHTML = `
+                <style>
+                    /* Styles specific to Expression Atlas */
+                    :root { --expr-primary-500: #0066cc; --expr-primary-600: #0052a3; --expr-text-primary: #101828; --expr-border-secondary: #eaecf0; --expr-shadow-lg: 0 12px 16px -4px rgba(16, 24, 40, 0.08); --expr-radius-lg: 12px; --expr-radius-xl: 16px; }
+                    .expr-page-header { padding: 40px 0; text-align: center; background: linear-gradient(135deg, #e6f2ff 0%, white 100%); }
+                    .expr-page-title { font-size: 48px; font-weight: 700; background: linear-gradient(135deg, var(--expr-primary-600) 0%, #003d7a 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; margin-bottom: 16px; }
+                    .expr-page-subtitle { font-size: 20px; color: #475467; max-width: 600px; margin: 0 auto; }
+                    .expr-search-section { background: white; border-radius: var(--expr-radius-xl); box-shadow: var(--expr-shadow-lg); padding: 32px; margin: 32px 0; }
+                    .expr-search-form { display: flex; gap: 16px; position: relative; }
+                    .expr-search-input-wrapper { flex: 1; position: relative; }
+                    .expr-search-input { width: 100%; height: 52px; padding: 0 20px 0 52px; border: 2px solid var(--expr-border-secondary); border-radius: var(--expr-radius-lg); font-size: 16px; outline: none; }
+                    .expr-search-icon { position: absolute; left: 18px; top: 50%; transform: translateY(-50%); width: 20px; height: 20px; color: #667085; }
+                    .expr-suggestions { position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid var(--expr-border-secondary); border-radius: var(--expr-radius-lg); box-shadow: var(--expr-shadow-lg); z-index: 100; max-height: 300px; overflow-y: auto; margin-top: 8px; display: none; }
+                    .expr-suggestion-item { padding: 12px 20px; cursor: pointer; border-bottom: 1px solid var(--expr-border-secondary); }
+                    .expr-suggestion-item.active, .expr-suggestion-item:hover { background: #f9fafb; }
+                    .expr-status-message { text-align: center; padding: 24px; min-height: 32px; }
+                    .expr-status-loading { display: flex; align-items: center; justify-content: center; gap: 12px; }
+                    .expr-loading-spinner { width: 20px; height: 20px; border: 2px solid #eaecf0; border-top: 2px solid var(--expr-primary-500); border-radius: 50%; animation: expr-spin 1s linear infinite; }
+                    @keyframes expr-spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+                    .expr-results-section { display: none; grid-template-columns: 1fr 400px; gap: 32px; opacity: 0; transition: opacity 0.5s ease; }
+                    .expr-results-section.visible { display: grid; opacity: 1; }
+                    .expr-results-card { background: white; border-radius: var(--expr-radius-xl); box-shadow: var(--expr-shadow-lg); border: 1px solid var(--expr-border-secondary); }
+                    .expr-card-header { padding: 24px; border-bottom: 1px solid var(--expr-border-secondary); }
+                    .expr-card-title { font-size: 20px; font-weight: 600; }
+                    .expr-card-content { padding: 24px; }
+                    .expr-viz-container { width: 100%; height: 500px; display: flex; justify-content: center; align-items: center; }
+                    .expr-organ { cursor: pointer; transition: all 0.3s ease; stroke: #64748b; stroke-width: 2; }
+                    .expr-organ:hover { transform: scale(1.05); filter: brightness(1.1); }
+                    .expr-table-wrapper { max-height: 400px; overflow-y: auto; }
+                    .expr-data-table { width: 100%; border-collapse: collapse; }
+                    .expr-legend { margin-top: 24px; }
+                    .expr-tooltip { position: absolute; background: #101828; color: white; padding: 8px 12px; border-radius: 6px; display: none; pointer-events: none; z-index: 1000; transform: translate(-50%, -110%); }
+                    @media (max-width: 1200px) { .expr-results-section.visible { grid-template-columns: 1fr; } }
+                </style>
+                <section class="expr-page-header">
+                    <div>
+                        <h1 class="expr-page-title">Gene Expression Atlas</h1>
+                        <p class="expr-page-subtitle">Visualize RNA expression of ciliary genes across human tissues.</p>
+                    </div>
+                </section>
+                <section class="expr-search-section">
+                    <form id="exprSearchForm" class="expr-search-form">
+                        <div class="expr-search-input-wrapper">
+                            <svg class="expr-search-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                            <input id="exprGeneInput" type="text" class="expr-search-input" placeholder="Enter gene name (e.g., ARL13B)" autocomplete="off" />
+                            <div id="exprSuggestions" class="expr-suggestions"></div>
+                        </div>
+                        <button type="submit" class="search-btn">Search</button>
+                    </form>
+                    <div id="exprStatus" class="expr-status-message">Enter a gene to begin.</div>
+                </section>
+                <section id="exprResults" class="expr-results-section">
+                    <div class="expr-results-card">
+                        <div class="expr-card-header"><h2 id="exprVizTitle" class="expr-card-title">Tissue Expression Map</h2></div>
+                        <div class="expr-card-content">
+                            <div id="exprVizContainer" class="expr-viz-container">
+                                <svg viewBox="0 0 240 280" xmlns="http://www.w3.org/2000/svg"><g id="human-body"><ellipse id="organ-brain" class="expr-organ" cx="120" cy="40" rx="28" ry="24" fill="#e2e8f0"/><ellipse id="organ-lung-left" class="expr-organ" cx="95" cy="80" rx="18" ry="25" fill="#e2e8f0"/><ellipse id="organ-lung-right" class="expr-organ" cx="145" cy="80" rx="18" ry="25" fill="#e2e8f0"/><path id="organ-heart" class="expr-organ" d="M110,70 C110,65 115,60 120,65 C125,60 130,65 130,70 C130,80 120,90 120,90 C120,90 110,80 110,70 Z" fill="#e2e8f0"/><path id="organ-liver" class="expr-organ" d="M125,110 L165,110 C170,110 175,115 175,120 L175,140 C175,145 170,150 165,150 L125,150 Z" fill="#e2e8f0"/><ellipse id="organ-kidney-left" class="expr-organ" cx="95" cy="140" rx="12" ry="20" fill="#e2e8f0"/><ellipse id="organ-kidney-right" class="expr-organ" cx="145" cy="140" rx="12" ry="20" fill="#e2e8f0"/><rect id="organ-small-intestine" class="expr-organ" x="100" y="170" width="40" height="25" rx="8" fill="#e2e8f0"/><ellipse id="organ-pancreas" class="expr-organ" cx="85" cy="125" rx="20" ry="8" fill="#e2e8f0"/><circle id="organ-testis" class="expr-organ" cx="100" cy="210" r="8" fill="#e2e8f0"/><circle id="organ-ovary" class="expr-organ" cx="140" cy="210" r="8" fill="#e2e8f0"/></g></svg>
+                            </div>
+                            <div class="expr-legend">... Legend items here ...</div>
+                        </div>
+                    </div>
+                    <div class="expr-results-card">
+                        <div class="expr-card-header"><h2 class="expr-card-title">Expression Data</h2></div>
+                        <div class="expr-card-content"><div class="expr-table-wrapper"><table id="exprDataTable" class="expr-data-table"><thead><tr><th>Tissue</th><th>nTPM</th><th>Level</th></tr></thead><tbody id="exprTableBody"></tbody></table></div></div>
+                    </div>
+                </section>
+                <div id="exprTooltip" class="expr-tooltip"></div>
+            `;
+            
+            // 2. Initialize the Atlas JavaScript logic
+            initExpressionAtlas();
+        }
 
-    // DOM Elements
-    const elements = {
-      geneInput: document.getElementById('geneInput'),
-      suggestions: document.getElementById('suggestions'),
-      status: document.getElementById('status'),
-      results: document.getElementById('results'),
-      tableBody: document.getElementById('tableBody'),
-      tooltip: document.getElementById('tooltip'),
-      searchForm: document.getElementById('searchForm'),
-      vizTitle: document.getElementById('vizTitle')
-    };
+        function initExpressionAtlas() {
+            const API_URL = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/rna_tissue_consensus.json';
+            const DEBOUNCE_DELAY = 250;
+            let geneDataCache = null;
+            const curatedGenes = ['ARL13B', 'BBS1', 'CEP290', 'IFT88', 'DYNC2H1', 'NPHP1'];
 
-    // Tissue mapping for SVG organs
-    const tissueMapping = {
-      'brain': ['organ-brain'], 'cerebellum': ['organ-brain'], 'cerebral cortex': ['organ-brain'], 'amygdala': ['organ-brain'], 'basal ganglia': ['organ-brain'], 'hippocampal formation': ['organ-brain'], 'hypothalamus': ['organ-brain'], 'midbrain': ['organ-brain'], 'spinal cord': ['organ-brain'], 'choroid plexus': ['organ-brain'],
-      'lung': ['organ-lung-left', 'organ-lung-right'],
-      'heart muscle': ['organ-heart'],
-      'liver': ['organ-liver'],
-      'kidney': ['organ-kidney-left', 'organ-kidney-right'],
-      'small intestine': ['organ-small-intestine'],
-      'pancreas': ['organ-pancreas'],
-      'testis': ['organ-testis'],
-      'ovary': ['organ-ovary']
-    };
+            const dom = {
+                form: document.getElementById('exprSearchForm'),
+                input: document.getElementById('exprGeneInput'),
+                suggestions: document.getElementById('exprSuggestions'),
+                status: document.getElementById('exprStatus'),
+                results: document.getElementById('exprResults'),
+                tableBody: document.getElementById('exprTableBody'),
+                tooltip: document.getElementById('exprTooltip'),
+                vizTitle: document.getElementById('exprVizTitle')
+            };
 
-    // --- UTILITY FUNCTIONS ---
-    const debounce = (func, delay) => {
-      let timeoutId;
-      return (...args) => {
-        clearTimeout(timeoutId);
-        timeoutId = setTimeout(() => func.apply(this, args), delay);
-      };
-    };
+            const tissueMapping = {
+                'brain': ['organ-brain'], 'lung': ['organ-lung-left', 'organ-lung-right'], 'heart muscle': ['organ-heart'], 'liver': ['organ-liver'],
+                'kidney': ['organ-kidney-left', 'organ-kidney-right'], 'small intestine': ['organ-small-intestine'], 'pancreas': ['organ-pancreas'],
+                'testis': ['organ-testis'], 'ovary': ['organ-ovary']
+            };
 
-    const titleCase = str => str.replace(/\b\w/g, char => char.toUpperCase());
+            const getLevel = (n) => { if (n <= 5) return 'Low'; if (n <= 15) return 'Medium'; if (n <= 30) return 'High'; return 'Very High'; };
+            const getColor = (n) => { if (n <= 5) return '#dcfce7'; if (n <= 15) return '#fef3c7'; if (n <= 30) return '#fed7aa'; return '#fee2e2'; };
+            const titleCase = str => str.replace(/\b\w/g, c => c.toUpperCase());
+            
+            const updateStatus = (msg, isLoading = false) => {
+                dom.status.className = 'expr-status-message';
+                if (isLoading) {
+                    dom.status.classList.add('expr-status-loading');
+                    dom.status.innerHTML = `<div class="expr-loading-spinner"></div><span>${msg}</span>`;
+                } else {
+                    dom.status.textContent = msg;
+                }
+            };
 
-    const getExpressionLevel = (nTPM) => {
-      if (nTPM <= 5) return 'low';
-      if (nTPM <= 15) return 'medium';
-      if (nTPM <= 30) return 'high';
-      return 'very-high';
-    };
+            const fetchGeneData = async () => {
+                if (geneDataCache) return geneDataCache;
+                updateStatus('Loading expression database...', true);
+                try {
+                    const res = await fetch(API_URL);
+                    if (!res.ok) throw new Error('Network error');
+                    geneDataCache = await res.json();
+                    updateStatus('Database loaded. Enter a gene.');
+                    return geneDataCache;
+                } catch (err) {
+                    updateStatus('Error loading database.', false);
+                    throw err;
+                }
+            };
 
-    const getExpressionColor = (nTPM) => {
-      if (nTPM <= 5) return '#dcfce7';
-      if (nTPM <= 15) return '#fef3c7';
-      if (nTPM <= 30) return '#fed7aa';
-      return '#fee2e2';
-    };
+            const searchGene = async (gene) => {
+                if (!gene) return;
+                const geneSymbol = gene.trim().toUpperCase();
+                updateStatus(`Searching for ${geneSymbol}...`, true);
+                document.querySelectorAll('.expr-organ').forEach(o => o.style.fill = '#e2e8f0');
+                dom.results.classList.remove('visible');
+                
+                try {
+                    const allData = await fetchGeneData();
+                    const data = allData[geneSymbol];
+                    if (!data) {
+                        updateStatus(`No data found for "${geneSymbol}".`, false);
+                        return;
+                    }
+                    dom.vizTitle.textContent = `${geneSymbol} Expression Map`;
+                    Object.entries(data).forEach(([tissue, nTPM]) => {
+                        (tissueMapping[tissue.toLowerCase()] || []).forEach(id => {
+                            const el = document.getElementById(id);
+                            if (el) {
+                                el.style.fill = getColor(nTPM);
+                                el.dataset.tissue = titleCase(tissue);
+                                el.dataset.ntpm = nTPM.toFixed(1);
+                            }
+                        });
+                    });
+                    dom.tableBody.innerHTML = Object.entries(data).sort((a,b) => b[1] - a[1]).map(([t, n]) => `<tr><td>${titleCase(t)}</td><td>${n.toFixed(1)}</td><td>${getLevel(n)}</td></tr>`).join('');
+                    dom.results.classList.add('visible');
+                    updateStatus(`Showing data for ${geneSymbol}.`);
+                } catch (err) {
+                    updateStatus('Search failed. Could not fetch data.', false);
+                }
+            };
+            
+            dom.form.addEventListener('submit', e => { e.preventDefault(); searchGene(dom.input.value); });
+            document.querySelectorAll('.expr-organ').forEach(organ => {
+                organ.addEventListener('mousemove', e => {
+                    if (e.target.dataset.tissue) {
+                        dom.tooltip.innerHTML = `<strong>${e.target.dataset.tissue}</strong><br>${e.target.dataset.ntpm} nTPM`;
+                        dom.tooltip.style.display = 'block';
+                        dom.tooltip.style.left = `${e.pageX}px`;
+                        dom.tooltip.style.top = `${e.pageY}px`;
+                    }
+                });
+                organ.addEventListener('mouseleave', () => dom.tooltip.style.display = 'none');
+            });
 
-    const updateStatus = (message, { isError = false, isLoading = false } = {}) => {
-      const { status } = elements;
-      status.className = 'status-message';
-      if (isLoading) {
-        status.classList.add('status-loading');
-        status.innerHTML = `<div class="loading-spinner"></div><span>${message}</span>`;
-      } else {
-        if (isError) status.classList.add('status-error');
-        status.textContent = message;
-      }
-    };
-
-    // --- DATA FETCHING ---
-    const fetchGeneData = async () => {
-      if (geneDataCache) return geneDataCache;
-      try {
-        const response = await fetch(API_URL);
-        if (!response.ok) throw new Error(`Network response was not ok (${response.status})`);
-        geneDataCache = await response.json();
-        return geneDataCache;
-      } catch (error) {
-        console.error('Error fetching gene data:', error);
-        updateStatus('Failed to load gene expression data. Please check your connection and try again.', { isError: true });
-        throw error;
-      }
-    };
-
-    // --- SUGGESTIONS & AUTOCOMPLETE ---
-    const initializeSuggestions = () => {
-      allGenes = [
-        'ARL13B', 'BBS1', 'BBS2', 'BBS4', 'BBS7', 'BBS9', 'CEP290', 'IFT80', 'IFT88', 'DYNC2H1', 'DNAH5', 'NPHP1', 'MKS1', 'RPGRIP1L', 'TMEM67'
-      ];
-    };
-
-    const showSuggestions = (query) => {
-      if (!query || query.length < 1) {
-        elements.suggestions.style.display = 'none';
-        return;
-      }
-      const matches = allGenes.filter(gene => gene.toLowerCase().startsWith(query.toLowerCase())).slice(0, 8);
-      if (matches.length === 0) {
-        elements.suggestions.style.display = 'none';
-        return;
-      }
-      elements.suggestions.innerHTML = matches.map(gene => `<div class="suggestion-item" role="option" data-gene="${gene}">${gene}</div>`).join('');
-      elements.suggestions.style.display = 'block';
-    };
-
-    const hideSuggestions = () => {
-        elements.suggestions.style.display = 'none';
-    };
-
-    // --- UI & VISUALIZATION ---
-    const resetVisualization = () => {
-      document.querySelectorAll('.organ').forEach(organ => {
-        organ.style.fill = '#e2e8f0';
-        organ.removeAttribute('data-tissue');
-      });
-      elements.results.classList.remove('visible');
-    };
-
-    const updateVisualization = (gene, data) => {
-      elements.vizTitle.textContent = `${gene} Expression Map`;
-      Object.entries(data).forEach(([tissue, nTPM]) => {
-        const organIds = tissueMapping[tissue.toLowerCase()] || [];
-        organIds.forEach(organId => {
-          const organ = document.getElementById(organId);
-          if (organ) {
-            organ.style.fill = getExpressionColor(nTPM);
-            organ.setAttribute('data-tissue', titleCase(tissue));
-            organ.setAttribute('data-ntpm', nTPM.toFixed(1));
-            organ.setAttribute('data-level', getExpressionLevel(nTPM));
-          }
-        });
-      });
-      elements.results.classList.add('visible');
-    };
-
-    const updateTable = (data) => {
-      const sortedData = Object.entries(data).sort((a, b) => b[1] - a[1]);
-      elements.tableBody.innerHTML = sortedData.map(([tissue, nTPM]) => {
-        const level = getExpressionLevel(nTPM);
-        return `
-          <tr>
-            <td>${titleCase(tissue)}</td>
-            <td>${nTPM.toFixed(1)}</td>
-            <td><span class="expression-level level-${level}">${level.replace('-', ' ').toUpperCase()}</span></td>
-          </tr>
-        `;
-      }).join('');
-    };
-
-    // --- CORE SEARCH LOGIC ---
-    const searchGene = async (gene) => {
-      if (!gene || gene.trim() === '') {
-        updateStatus('Please enter a gene symbol', { isError: true });
-        return;
-      }
-      const geneSymbol = gene.trim().toUpperCase();
-      
-      updateStatus(`Searching for ${geneSymbol}...`, { isLoading: true });
-      resetVisualization();
-
-      try {
-        const allData = await fetchGeneData();
-        const expressionData = allData[geneSymbol];
+            fetchGeneData(); // Pre-load data on page visit
+        }
         
-        if (!expressionData) {
-          updateStatus(`No expression data found for "${geneSymbol}". Try ARL13B, BBS1, or CEP290.`, { isError: true });
-          return;
+        // --- Other Pages ---
+        function displayDownloadPage() {
+            const contentArea = document.querySelector('.content-area');
+            contentArea.className = 'content-area content-area-full';
+            document.querySelector('.cilia-panel').style.display = 'none';
+            contentArea.innerHTML = `<div class="page-section"><h2>Download Data</h2><p>Download the complete ciliary gene database.</p><a href="https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/ciliahub_data.json" download="ciliahub_data.json" class="search-btn">Download JSON</a></div>`;
         }
 
-        const filteredData = Object.fromEntries(Object.entries(expressionData).filter(([, value]) => value > 0));
-        if (Object.keys(filteredData).length === 0) {
-          updateStatus(`Gene "${geneSymbol}" has no detectable expression in measured tissues.`, { isError: false });
-          return;
+        function displayCitePage() { /* ... content ... */ }
+        function displayContactPage() { /* ... content ... */ }
+        function displayIndividualGenePage(gene) { /* ... content ... */ }
+        function displayNotFoundPage() { /* ... content ... */ }
+        
+        // --- Search and UI Logic for Batch/Home ---
+        function performBatchSearch() {
+            const queries = document.getElementById('batch-genes-input').value.split(/[\s,\n]+/).filter(Boolean).map(q => q.trim().toUpperCase());
+            const statusDiv = document.getElementById('status-message');
+            if (queries.length === 0) {
+                statusDiv.innerHTML = `<span class="error-message">Please enter gene names.</span>`;
+                statusDiv.style.display = 'block';
+                return;
+            }
+            const results = allGenes.filter(g => queries.some(q => (g.gene && g.gene.toUpperCase() === q) || (g.synonym && g.synonym.toUpperCase().includes(q))));
+            if (results.length > 0) {
+                displayGeneCards([], results);
+                statusDiv.style.display = 'none';
+            } else {
+                statusDiv.innerHTML = `<span class="error-message">No matching genes found.</span>`;
+                statusDiv.style.display = 'block';
+                displayGeneCards([], []);
+            }
+        }
+        
+        function displayGeneCards(defaults, searchResults) {
+            const container = document.getElementById('gene-cards-container');
+            if (!container) return;
+            const uniqueDefaults = defaults.filter(d => !searchResults.some(s => s.gene === d.gene));
+            const allGenesToDisplay = [...searchResults, ...uniqueDefaults];
+            container.innerHTML = allGenesToDisplay.map(gene => {
+                const isSearchResult = searchResults.some(s => s.gene === gene.gene);
+                return `
+                    <div class="gene-card ${isSearchResult ? 'search-result' : 'default'}" onclick="navigateTo(event, '/gene/${gene.gene}')">
+                        <div class="gene-name">${gene.gene}</div>
+                        <p class="gene-description">${gene.description || ''}</p>
+                    </div>`;
+            }).join('');
+            updateGeneButtons(allGenesToDisplay, searchResults);
         }
 
-        updateVisualization(geneSymbol, filteredData);
-        updateTable(filteredData);
-        updateStatus(`Showing expression data for ${geneSymbol}.`);
-
-      } catch (error) {
-        // Error message is already handled in fetchGeneData
-      }
-    };
-
-    // --- INITIALIZATION ---
-    const initializeEventListeners = () => {
-      elements.searchForm.addEventListener('submit', (e) => {
-        e.preventDefault();
-        const gene = elements.geneInput.value;
-        if (gene) {
-          hideSuggestions();
-          searchGene(gene);
-        }
-      });
-
-      elements.geneInput.addEventListener('input', debounce(e => showSuggestions(e.target.value), DEBOUNCE_DELAY));
-      elements.geneInput.addEventListener('focus', e => showSuggestions(e.target.value));
-      document.addEventListener('click', (e) => {
-        if (!elements.searchForm.contains(e.target)) hideSuggestions();
-      });
-
-      elements.suggestions.addEventListener('mousedown', (e) => {
-        if (e.target.classList.contains('suggestion-item')) {
-          const gene = e.target.dataset.gene;
-          elements.geneInput.value = gene;
-          searchGene(gene);
-        }
-      });
-      
-      elements.geneInput.addEventListener('keydown', (e) => {
-        const { suggestions } = elements;
-        if (suggestions.style.display === 'none') return;
-
-        const items = suggestions.querySelectorAll('.suggestion-item');
-        let activeItem = suggestions.querySelector('.suggestion-item.active');
-        let index = activeItem ? Array.from(items).indexOf(activeItem) : -1;
-
-        if (e.key === 'ArrowDown') {
-          e.preventDefault();
-          index = (index + 1) % items.length;
-        } else if (e.key === 'ArrowUp') {
-          e.preventDefault();
-          index = (index - 1 + items.length) % items.length;
-        } else if (e.key === 'Enter') {
-          e.preventDefault();
-          if (activeItem) {
-            elements.geneInput.value = activeItem.dataset.gene;
-            hideSuggestions();
-            searchGene(activeItem.dataset.gene);
-          }
-        } else if (e.key === 'Escape') {
-          hideSuggestions();
+        function updateGeneButtons(genes, searchResults = []) {
+             const container = document.getElementById('geneButtons');
+             if (!container) return;
+             const uniqueGenes = [...new Map(genes.map(item => [item['gene'], item])).values()]; // Remove duplicates
+             container.innerHTML = uniqueGenes.map(gene => {
+                if (!geneLocalizationData[gene.gene]) return '';
+                const isSearch = searchResults.some(s => s.gene === gene.gene);
+                return `<button class="gene-btn ${isSearch ? 'search-gene' : 'default'}" onclick="toggleLocalization('${gene.gene}')">${gene.gene}</button>`;
+             }).join('') + '<button class="gene-btn reset-btn" onclick="toggleLocalization(\'reset\')">Reset Diagram</button>';
         }
 
-        if (activeItem) activeItem.classList.remove('active');
-        if (items[index]) items[index].classList.add('active');
-      });
-    };
+        let selectedGenes = [];
+        function toggleLocalization(geneName) {
+            if (geneName === 'reset') {
+                selectedGenes = [];
+            } else {
+                const index = selectedGenes.indexOf(geneName);
+                if (index > -1) selectedGenes.splice(index, 1);
+                else selectedGenes.push(geneName);
+            }
+            
+            document.querySelectorAll('.cilia-part').forEach(p => p.classList.remove('highlighted'));
+            document.querySelectorAll('.gene-btn').forEach(b => b.classList.remove('selected'));
+            
+            selectedGenes.forEach(g => {
+                (geneLocalizationData[g] || []).forEach(id => document.getElementById(id)?.classList.add('highlighted'));
+                document.querySelectorAll('.gene-btn').forEach(b => { if(b.textContent === g) b.classList.add('selected')});
+            });
+        }
+        
+        function updateActiveNav(path) {
+            document.querySelectorAll('.nav-links a').forEach(link => {
+                const linkPath = link.getAttribute('href');
+                link.classList.toggle('active', linkPath === path || (linkPath === '/' && path === '/index.html'));
+            });
+        }
 
-    const initializeTooltips = () => {
-      document.querySelectorAll('.organ').forEach(organ => {
-        organ.addEventListener('mousemove', (e) => {
-          const { tissue, ntpm, level } = organ.dataset;
-          if (tissue) {
-            elements.tooltip.innerHTML = `<strong>${tissue}</strong><br>${ntpm} nTPM<br><em>${level.replace('-', ' ')}</em>`;
-            elements.tooltip.style.left = `${e.pageX}px`;
-            elements.tooltip.style.top = `${e.pageY}px`;
-            elements.tooltip.style.display = 'block';
-          }
-        });
-        organ.addEventListener('mouseleave', () => {
-          elements.tooltip.style.display = 'none';
-        });
-      });
-    };
+        // --- Navigation Event Handling ---
+        window.navigateTo = function(event, path) {
+            if (event) event.preventDefault();
+            window.location.hash = path;
+        };
+        window.addEventListener('hashchange', handleRouteChange);
+        document.addEventListener('DOMContentLoaded', handleRouteChange);
 
-    const init = () => {
-      initializeSuggestions();
-      initializeEventListeners();
-      initializeTooltips();
-      
-      const urlParams = new URLSearchParams(window.location.search);
-      const geneParam = urlParams.get('gene');
-      if (geneParam) {
-        elements.geneInput.value = geneParam;
-        searchGene(geneParam);
-      }
-    };
-
-    document.addEventListener('DOMContentLoaded', init);
-  </script>
+    </script>
 </body>
 </html>
