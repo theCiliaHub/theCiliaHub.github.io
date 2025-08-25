@@ -2476,11 +2476,7 @@
     "synonym": "CFAP80,FAP80,SPG,WDR10,WDR10P,WDR140",
     "omim_id": "606045",
     "functional_summary": "Negative regulator of the Shh pathway, controlling the ciliary localization of Shh pathway activators and repressors. Loss of IFT122 causes accumulation of Gli2 and Gli3 at cilia tips. Function in retrograde intraflagellar transport (ITF) that facilitates complex A stability (21209331). Required for transport of opsin, and the distal elongation of outer segments (27681595). IFT122 connects the core and peripheral subcomplexes of the IFT-A (29220510).",
-<<<<<<< HEAD
-    "localization": "basal body,cilia",
-=======
     "localization": "cilia, basal body",
->>>>>>> 19cd5cbe433ee3c23bf70890019d6fd9123aff9f
     "reference": "https://pubmed.ncbi.nlm.nih.gov/23418020;https://pubmed.ncbi.nlm.nih.gov/29236364;https://pubmed.ncbi.nlm.nih.gov/24619649"
   },
   {
@@ -2490,11 +2486,7 @@
     "synonym": "GS114,KIAA0590,WDTC2",
     "omim_id": "614620",
     "functional_summary": "Component of IFT-A complex, mutated in skeletal ciliopathies with kidney disease (23418020). Associates with IFT122 and IFT144 to a stable IFT-A core subcomplex; indispensable for dynein proteins retrograde transport into the cytoplasm and flagellar assembly. Required for development and mainte nce of outer segments, ciliary/flagellar assembly and sig l transduction (29236364, 24619649).",
-<<<<<<< HEAD
-    "localization": "basal body,cilia,cilia",
-=======
     "localization": "cilia, basal body",
->>>>>>> 19cd5cbe433ee3c23bf70890019d6fd9123aff9f
     "reference": "https://pubmed.ncbi.nlm.nih.gov/29659833;https://pubmed.ncbi.nlm.nih.gov/31850339;https://pubmed.ncbi.nlm.nih.gov/18930042;https://pubmed.ncbi.nlm.nih.gov/25168386"
   },
   {
@@ -2504,11 +2496,7 @@
     "synonym": "BBS20,NPHP17,OSM-1,SLB,WIM",
     "omim_id": "607386",
     "functional_summary": "Component of IFT complex B. Involved in the switching between the anterograde and retrograde transport (29659833). Essential for ciliary growth and mainte nce, and morphogenesis of the cerebral cortex. Mutation cause alterations in multiple intracellular sig ling pathways (31850339, 18930042). Mutations are associated with severe skeleto-re l disorders with reti l involvement (25168386).",
-<<<<<<< HEAD
-    "localization": "basal body,cilia",
-=======
     "localization": "cilia, basal body",
->>>>>>> 19cd5cbe433ee3c23bf70890019d6fd9123aff9f
     "reference": "https://pubmed.ncbi.nlm.nih.gov/12821668;https://pubmed.ncbi.nlm.nih.gov/16775004;https://pubmed.ncbi.nlm.nih.gov/27682589"
   },
   {
@@ -2518,11 +2506,7 @@
     "synonym": "",
     "omim_id": "614394",
     "functional_summary": "Component of IFT complex B that functions as a link between IFT complex and kinesin II, binding to both IFT57 and KIF3B, making it essential for anterograde transport in cilia and flagella (12821668). Required for ciliary assembly and localisation of polycystin-2 and opsin to cilia (16775004). Essential for spermiogenesis and male fertility (27682589).",
-<<<<<<< HEAD
-    "localization": "basal body,cilia,flagella",
-=======
     "localization": "cilia, basal body, golgi",
->>>>>>> 19cd5cbe433ee3c23bf70890019d6fd9123aff9f
     "reference": "https://pubmed.ncbi.nlm.nih.gov/30940671;https://pubmed.ncbi.nlm.nih.gov/31953262"
   },
   {
@@ -2632,11 +2616,7 @@
     "synonym": "CCDC2,CMG-1,CMG1,FLJ22621",
     "omim_id": "608040",
     "functional_summary": "Component of IFT complex B. Interacts with IFT81 to stabilise IFT-B complex. This interaction is required for binding and transport of tubulin to regulate cilium length, required for ciliogenesis (23990561). Essential for normal mouse spermatogenesis and sperm flagella formation by transporting cargo proteins and modulating axoneme and microtubule assembly (31004481).",
-<<<<<<< HEAD
-    "localization": "basal body,cilia",
-=======
     "localization": "cilia, basal body",
->>>>>>> 19cd5cbe433ee3c23bf70890019d6fd9123aff9f
     "reference": "https://pubmed.ncbi.nlm.nih.gov/22771375;https://pubmed.ncbi.nlm.nih.gov/29658880"
   },
   {
@@ -2646,11 +2626,7 @@
     "synonym": "CFAP167,FAP167,KIAA1374,WDR56",
     "omim_id": "611177",
     "functional_summary": "Component of IFT complex B. Role in cilia formation and osteogenesis through regulating Hedgehog/Gli sig l pathways. Silencing IFT80 led to either shortening or loss of cilia and the decrease of cilia marker protein Arl13b expression. Mutations cause Jeune asphyxiating thoracic dystrophy (JATD) and short rib polydactyly type III (SRPIII) (22771375). Required for IFT mediated recruitment and transport of ciliary cargo, as well as for initiation of the ciliary axoneme (29658880).",
-<<<<<<< HEAD
-    "localization": "basal body,cilia",
-=======
     "localization": "cilia, basal body",
->>>>>>> 19cd5cbe433ee3c23bf70890019d6fd9123aff9f
     "reference": "https://pubmed.ncbi.nlm.nih.gov/27068536;https://pubmed.ncbi.nlm.nih.gov/23990561"
   },
   {
@@ -2660,11 +2636,7 @@
     "synonym": "CDV-1R,CDV1,MGC4027",
     "omim_id": "605489",
     "functional_summary": "Component of IFT complex B. Interacts with IFT74 to form a tubulin-binding module that is the main site of tubulin binding for IFT and is required for ciliogenesis. Both are essential for flagellar assembly and elongation (27068536, 23990561).",
-<<<<<<< HEAD
-    "localization": "basal body,cilia",
-=======
     "localization": "cilia, basal body",
->>>>>>> 19cd5cbe433ee3c23bf70890019d6fd9123aff9f
     "reference": "https://pubmed.ncbi.nlm.nih.gov/11062270"
   },
   {
