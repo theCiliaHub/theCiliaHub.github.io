@@ -203,7 +203,7 @@
                 <li><a href="/expression" onclick="navigateTo(event, '/expression')" aria-label="Expression">Expression</a></li>
                 <li><a href="/compare" onclick="navigateTo(event, '/compare')" aria-label="Compare">Compare</a></li>
                 <li><a href="/download" onclick="navigateTo(event, '/download')" aria-label="Download">Download</a></li>
-                <li><a href="/contact" onclick="navigateTo(event, '/contact')" aria-label="Contact">Contact & Cite</a></li>
+                <li><a href="/contact" onclick="navigateTo(event, '/contact')" aria-label="Contact & Cite">Contact & Cite</a></li>
             </ul>
         </div>
     </nav>
@@ -296,7 +296,6 @@
                             geneLocalizationData[gene.gene] = mapLocalizationToSVG(gene.localization);
                         }
                     });
-                    console.log('ACE2 localization:', geneLocalizationData['ACE2']);
                     localStorage.setItem(cacheKey, JSON.stringify(data));
                     localStorage.setItem(cacheTimeKey, Date.now());
                     return;
@@ -686,7 +685,6 @@
                 { tissue: 'kidney', selector: 'path[fill="#EA8F8E"]' },
                 { tissue: 'colon', selector: 'path[fill="#C07F54"]' },
                 { tissue: 'testis', selector: 'path[fill="#E49BDC"]' },
-                // Add more mappings as needed based on your SVG and data
             ];
             
             const svg = document.querySelector('#svg-container svg');
@@ -767,7 +765,7 @@
                     <div class="search-container">
                         <div class="search-wrapper" style="flex: 1;">
                             <input type="text" id="single-gene-search" placeholder="Search for a single gene (e.g., ACE2, IFT88)" aria-label="Search for a single gene" autocomplete="off">
-                            <div id="search-suggestions"></div>
+                            <div id="search-suggestions" style="display: none;"></div>
                         </div>
                         <button id="single-search-btn" class="search-btn btn btn-primary" aria-label="Search for the entered gene name">Search</button>
                     </div>
@@ -781,20 +779,24 @@
                 const query = this.value.trim().toUpperCase();
                 if (query.length < 1) {
                     suggestionsContainer.innerHTML = '';
+                    suggestionsContainer.style.display = 'none'; // FIX: Hide when empty
                     return;
                 }
                 const filteredGenes = allGenes.filter(g => (g.gene && g.gene.toUpperCase().startsWith(query)) || (g.synonym && g.synonym.toUpperCase().includes(query))).slice(0, 10);
                 if (filteredGenes.length > 0) {
                     suggestionsContainer.innerHTML = '<ul>' + filteredGenes.map(g => `<li>${g.gene}</li>`).join('') + '</ul>';
+                    suggestionsContainer.style.display = 'block'; // FIX: Show when there are suggestions
                     suggestionsContainer.querySelectorAll('li').forEach(item => {
                         item.addEventListener('click', function() {
                             searchInput.value = this.textContent;
                             suggestionsContainer.innerHTML = '';
+                            suggestionsContainer.style.display = 'none';
                             performSingleSearch();
                         });
                     });
                 } else {
                     suggestionsContainer.innerHTML = '';
+                    suggestionsContainer.style.display = 'none'; // FIX: Hide when no suggestions
                 }
             });
             searchInput.addEventListener('keydown', function(event) {
@@ -806,6 +808,7 @@
                         event.preventDefault();
                         searchInput.value = activeElement.textContent;
                         suggestionsContainer.innerHTML = '';
+                        suggestionsContainer.style.display = 'none';
                     }
                     performSingleSearch();
                     return;
@@ -830,6 +833,7 @@
             document.addEventListener('click', function(event) {
                 if (!searchInput.contains(event.target)) {
                     suggestionsContainer.innerHTML = '';
+                    suggestionsContainer.style.display = 'none';
                 }
             });
             displayGeneCards(defaultGenes, [], 1, 10);
@@ -912,7 +916,6 @@
                     </div>
                 </div>`;
             
-            // Initialize expression visualization system
             initExpressionSystem();
         }
         
@@ -985,36 +988,59 @@
             contentArea.innerHTML = `
                 <div class="page-section">
                     <h2>Compare Genes</h2>
-                    <select id="compare-genes" multiple aria-label="Select genes to compare">
-                        ${allGenes.map(g => `<option value="${g.gene}">${g.gene}</option>`).join('')}
-                    </select>
-                    <button id="compare-btn" class="search-btn btn btn-primary">Compare</button>
-                    <table id="comparison-table" style="margin-top: 1rem; width: 100%; border-collapse: collapse;"></table>
+                    <select id="compare-genes" multiple aria-label="Select genes to compare" style="min-height: 200px; width: 100%; border: 1px solid #ddd; border-radius: 8px; padding: 0.5rem;"></select>
+                    <button id="compare-btn" class="search-btn btn btn-primary" style="margin-top: 1rem;">Compare</button>
+                    <div id="comparison-table-container" style="margin-top: 1rem; overflow-x: auto;">
+                        <table id="comparison-table" style="width: 100%; border-collapse: collapse;"></table>
+                    </div>
                 </div>`;
+            
+            // FIX: Populate the select element after the page is rendered to ensure allGenes is loaded.
+            const selectElement = document.getElementById('compare-genes');
+            if (selectElement) {
+                selectElement.innerHTML = ''; // Clear existing options
+                const fragment = document.createDocumentFragment();
+                allGenes.forEach(g => {
+                    const option = document.createElement('option');
+                    option.value = g.gene;
+                    option.textContent = g.gene;
+                    fragment.appendChild(option);
+                });
+                selectElement.appendChild(fragment);
+            }
+
             document.getElementById('compare-btn').onclick = () => {
                 const selectedGenes = Array.from(document.getElementById('compare-genes').selectedOptions).map(opt => opt.value);
                 const table = document.getElementById('comparison-table');
-                table.innerHTML = `
-                    <tr>
-                        <th>Gene</th>
-                        <th>Description</th>
-                        <th>Localization</th>
-                        <th>Ensembl ID</th>
-                        <th>OMIM ID</th>
-                        <th>Functional Summary</th>
-                    </tr>
-                    ${selectedGenes.map(gene => {
-                        const g = allGenes.find(g => g.gene === gene) || defaultGenes.find(g => g.gene === gene);
-                        return `<tr>
-                            <td><a href="/${g.gene}" onclick="navigateTo(event, '/${g.gene}')" aria-label="View details for ${g.gene}">${g.gene}</a></td>
-                            <td>${g.description || '-'}</td>
-                            <td>${g.localization || '-'}</td>
-                            <td>${g.ensembl_id ? `<a href="https://www.ensembl.org/Homo_sapiens/Gene/Summary?g=${g.ensembl_id}" target="_blank" aria-label="View Ensembl page for ${g.ensembl_id}">${g.ensembl_id}</a>` : '-'}</td>
-                            <td>${g.omim_id ? `<a href="https://www.omim.org/entry/${g.omim_id}" target="_blank" aria-label="View OMIM page for ${g.omim_id}">${g.omim_id}</a>` : '-'}</td>
-                            <td>${g.functional_summary || '-'}</td>
-                        </tr>`;
-                    }).join('')}
-                `;
+                if (selectedGenes.length > 0) {
+                    table.innerHTML = `
+                        <thead>
+                            <tr>
+                                <th>Gene</th>
+                                <th>Description</th>
+                                <th>Localization</th>
+                                <th>Ensembl ID</th>
+                                <th>OMIM ID</th>
+                                <th>Functional Summary</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        ${selectedGenes.map(gene => {
+                            const g = allGenes.find(g => g.gene === gene) || defaultGenes.find(g => g.gene === gene);
+                            return g ? `<tr>
+                                <td><a href="/${g.gene}" onclick="navigateTo(event, '/${g.gene}')" aria-label="View details for ${g.gene}">${g.gene}</a></td>
+                                <td>${g.description || '-'}</td>
+                                <td>${g.localization || '-'}</td>
+                                <td>${g.ensembl_id ? `<a href="https://www.ensembl.org/Homo_sapiens/Gene/Summary?g=${g.ensembl_id}" target="_blank" aria-label="View Ensembl page for ${g.ensembl_id}">${g.ensembl_id}</a>` : '-'}</td>
+                                <td>${g.omim_id ? `<a href="https://www.omim.org/entry/${g.omim_id}" target="_blank" aria-label="View OMIM page for ${g.omim_id}">${g.omim_id}</a>` : '-'}</td>
+                                <td>${g.functional_summary || '-'}</td>
+                            </tr>` : '';
+                        }).join('')}
+                        </tbody>
+                    `;
+                } else {
+                    table.innerHTML = '';
+                }
             };
         }
         
@@ -1153,7 +1179,6 @@
                 return;
             }
             const results = allGenes.filter(g => (g.gene && g.gene.toUpperCase().includes(query)) || (g.synonym && g.synonym.toUpperCase().includes(query)));
-            console.log('Search term:', query, 'Results:', results.map(g => g.gene));
             if (results.length === 0) {
                 const closeMatches = allGenes.filter(g => g.gene && g.gene.toUpperCase().startsWith(query.slice(0, 3))).slice(0, 3);
                 statusDiv.innerHTML = `<span class="error-message">No genes found for "${query}". Did you mean: ${closeMatches.map(g => g.gene).join(', ') || 'no close matches'}?</span>`;
@@ -1187,7 +1212,6 @@
             if (keywordFilter) {
                 results = results.filter(g => g.functional_summary?.toLowerCase().includes(keywordFilter) || g.description?.toLowerCase().includes(keywordFilter));
             }
-            console.log('Batch search terms:', queries, 'Localization filter:', localizationFilter, 'Results:', results.map(g => g.gene));
             statusDiv.style.display = 'none';
             searchResults = results;
             if (results.length > 0) {
@@ -1341,10 +1365,13 @@
             document.querySelectorAll('.nav-links a').forEach(link => {
                 link.classList.remove('active');
                 const linkPath = link.getAttribute('href').toLowerCase();
-                if (linkPath === path || (path.startsWith('/') && path !== '/' && path !== '/index.html' && linkPath === '/batch-query' && !['/download', '/contact', '/compare'].includes(path))) {
+                if (linkPath === path || (path.startsWith('/') && path !== '/' && path !== '/index.html' && linkPath === '/batch-query' && !['/download', '/contact', '/compare', '/expression'].includes(path))) {
                     link.classList.add('active');
                 }
             });
+             // Add active class specifically for the current page
+            const activeLink = document.querySelector(`.nav-links a[href$="${path}"]`);
+            if(activeLink) activeLink.classList.add('active');
         }
         
         function handleStickySearch() {
@@ -1369,7 +1396,6 @@
                 }).length;
                 return acc;
             }, {});
-            console.log('Localization counts:', localizationCounts);
             const chartContainer = document.createElement('div');
             chartContainer.className = 'page-section';
             chartContainer.innerHTML = `<h2>Gene Localization Distribution</h2><canvas id="locChart" style="max-height: 300px;"></canvas>`;
