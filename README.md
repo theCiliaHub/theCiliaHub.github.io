@@ -1,4 +1,4 @@
-<<<<<<< HEAD
+
 # CiliaHub - Interactive Ciliary Gene Database
 
 ## Overview
