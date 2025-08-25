@@ -6,20 +6,20 @@ CiliaHub is a comprehensive, interactive database for ciliary gene research, fea
 
 ## New Features (Latest Update)
 
-### 🎯 Gene Expression Visualization System
+### Gene Expression Visualization System
 - **Interactive Human Body Visualization**: Right-side panel showing organ-specific gene expression
 - **Dynamic Gene Search**: Left-side search panel with real-time suggestions
 - **Expression Color Coding**: Visual representation of nTPM values across tissues
 - **Comprehensive Data Table**: Detailed expression data with categorization
 
-### 🚀 Performance Optimizations
+### Performance Optimizations
 - **Limited Gene Set**: Restricted to 2011 genes for optimal performance
 - **Dynamic Filtering**: Real-time search suggestions without dropdown delays
 - **Efficient Data Loading**: Optimized TSV parsing and memory management
 - **Reduced Reload Times**: Integrated visualization system eliminates file reloads
 - **SVG File Integration**: Uses existing `file.svg` without modification, only updates colors
 
-### 🔍 Enhanced Search Capabilities
+### Enhanced Search Capabilities
 - **Auto-suggestions**: Type "AR" to see all genes starting with "AR"
 - **Instant Results**: Real-time filtering as you type
 - **Smart Matching**: Searches gene names, synonyms, and Ensembl IDs
