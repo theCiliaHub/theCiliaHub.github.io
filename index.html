@@ -278,7 +278,7 @@
         // Load data from external JSON file
         async function loadGeneDatabase() {
             try {
-                const response = await fetch('https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/ciliahub_data.json');
+                const response = await fetch( 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/ciliahub_data.json' );
                 allGenes = await response.json();
                 
                 // Initialize gene localization data
