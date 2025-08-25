@@ -55,7 +55,6 @@
             z-index: 999;
             max-height: 250px;
             overflow-y: auto;
-            display: none;
         }
         #search-suggestions ul { list-style: none; padding: 0; margin: 0; }
         #search-suggestions li { padding: 0.75rem 1rem; cursor: pointer; border-bottom: 1px solid #eee; }
@@ -326,333 +325,384 @@
             return localization ? localization.split(',').flatMap(loc => mapping[loc.trim().toLowerCase()] || []).filter(id => allPartIds.includes(id)) : [];
         }
         // --- Expression Visualization System ---
-        let expressionData = {};
-        let availableGenes = new Set();
-        async function initExpressionSystem() {
-            try {
-                await loadExpressionData();
-                setupExpressionEventListeners();
-                loadSVGFile().then(() => {
-                    console.log('SVG file loaded successfully');
-                    prepareOrgansForExpression();
-                }).catch(error => {
-                    console.error('SVG loading error:', error);
-                });
-                console.log('Expression system initialized successfully');
-            } catch (error) {
-                console.error('Failed to initialize expression system:', error);
-            }
-        }
-        async function loadExpressionData() {
-            try {
-                const response = await fetch('rna_tissue_consensus.tsv');
-                if (!response.ok) throw new Error('Failed to load expression data');
-                const tsvText = await response.text();
-                const rawData = parseTSV(tsvText);
-                expressionData = processExpressionData(rawData);
-                const geneSet = new Set();
-                Object.keys(expressionData).forEach(gene => {
-                    geneSet.add(gene.toUpperCase());
-                });
-                availableGenes = geneSet;
-                console.log(`Loaded ${Object.keys(expressionData).length} genes with expression data from TSV`);
-            } catch (error) {
-                console.error('Error loading expression data:', error);
-            }
-        }
-        function parseTSV(tsvText) {
-            const lines = tsvText.split('\n').filter(line => line.trim());
-            if (lines.length === 0) return [];
-            const headers = lines[0].split('\t');
-            const data = [];
-            for (let i = 1; i < lines.length; i++) {
-                const values = lines[i].split('\t');
-                if (values.length === headers.length) {
-                    const row = {};
-                    headers.forEach((header, index) => {
-                        row[header.trim()] = values[index] ? values[index].trim() : '';
-                    });
-                    data.push(row);
-                }
-            }
-            return data;
-        }
-        function processExpressionData(rawData) {
-            const processedData = {};
-            rawData.forEach(row => {
-                const geneName = row['Gene name'] || row['Gene'];
-                const tissue = row['Tissue'];
-                const nTPM = parseFloat(row['nTPM']);
-                if (geneName && tissue && !isNaN(nTPM)) {
-                    if (!processedData[geneName]) {
-                        processedData[geneName] = {};
-                    }
-                    processedData[geneName][tissue] = nTPM;
-                }
+let expressionData = {};
+let availableGenes = new Set();
+
+async function initExpressionSystem() {
+    try {
+        await loadExpressionData();
+        setupExpressionEventListeners();
+        loadSVGFile().then(() => {
+            console.log('SVG file loaded successfully');
+            prepareOrgansForExpression();
+        }).catch(error => {
+            console.error('SVG loading error:', error);
+        });
+        console.log('Expression system initialized successfully');
+    } catch (error) {
+        console.error('Failed to initialize expression system:', error);
+    }
+}
+
+async function loadExpressionData() {
+    try {
+        const response = await fetch('rna_tissue_consensus.tsv');
+        if (!response.ok) throw new Error('Failed to load expression data');
+        
+        const tsvText = await response.text();
+        const rawData = parseTSV(tsvText);
+        expressionData = processExpressionData(rawData);
+        
+        const geneSet = new Set();
+        Object.keys(expressionData).forEach(gene => {
+            geneSet.add(gene.toUpperCase());
+        });
+        availableGenes = geneSet;
+        
+        console.log(`Loaded ${Object.keys(expressionData).length} genes with expression data from TSV`);
+        
+    } catch (error) {
+        console.error('Error loading expression data:', error);
+    }
+}
+
+function parseTSV(tsvText) {
+    const lines = tsvText.split('\n').filter(line => line.trim());
+    if (lines.length === 0) return [];
+    
+    const headers = lines[0].split('\t');
+    const data = [];
+    
+    for (let i = 1; i < lines.length; i++) {
+        const values = lines[i].split('\t');
+        if (values.length === headers.length) {
+            const row = {};
+            headers.forEach((header, index) => {
+                row[header.trim()] = values[index] ? values[index].trim() : '';
             });
-            return processedData;
+            data.push(row);
         }
-        function setupExpressionEventListeners() {
-            const searchInput = document.getElementById('gene-search');
-            const suggestionsDiv = document.getElementById('suggestions');
-            if (!searchInput || !suggestionsDiv) return;
-            searchInput.addEventListener('input', handleExpressionSearchInput);
-            searchInput.addEventListener('focus', () => showExpressionSuggestions());
-            searchInput.addEventListener('blur', () => {
-                setTimeout(() => suggestionsDiv.style.display = 'none', 200);
+    }
+    return data;
+}
+
+function processExpressionData(rawData) {
+    const processedData = {};
+    
+    rawData.forEach(row => {
+        const geneName = row['Gene name'] || row['Gene'];
+        const tissue = row['Tissue'];
+        const nTPM = parseFloat(row['nTPM']);
+        
+        if (geneName && tissue && !isNaN(nTPM)) {
+            if (!processedData[geneName]) {
+                processedData[geneName] = {};
+            }
+            processedData[geneName][tissue] = nTPM;
+        }
+    });
+    return processedData;
+}
+
+function setupExpressionEventListeners() {
+    const searchInput = document.getElementById('gene-search');
+    const suggestionsDiv = document.getElementById('suggestions');
+    
+    if (!searchInput || !suggestionsDiv) return;
+    
+    searchInput.addEventListener('input', handleExpressionSearchInput);
+    searchInput.addEventListener('focus', () => showExpressionSuggestions());
+    searchInput.addEventListener('blur', () => {
+        setTimeout(() => suggestionsDiv.style.display = 'none', 200);
+    });
+    
+    document.addEventListener('click', (e) => {
+        if (!searchInput.contains(e.target) && !suggestionsDiv.contains(e.target)) {
+            suggestionsDiv.style.display = 'none';
+        }
+    });
+}
+
+let searchTimeout;
+function handleExpressionSearchInput(e) {
+    const query = e.target.value.trim().toUpperCase();
+    if (query.length < 2) {
+        hideExpressionSuggestions();
+        return;
+    }
+    clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(() => {
+        const suggestions = getExpressionGeneSuggestions(query);
+        showExpressionSuggestions(suggestions);
+    }, 150);
+}
+
+function getExpressionGeneSuggestions(query) {
+    const suggestions = [];
+    const queryUpper = query.toUpperCase();
+    
+    for (const gene of availableGenes) {
+        if (gene.startsWith(queryUpper)) {
+            suggestions.push({
+                gene: gene,
+                description: `Expression data available in ${Object.keys(expressionData[gene] || {}).length} tissues`,
             });
-            document.addEventListener('click', (e) => {
-                if (!searchInput.contains(e.target) && !suggestionsDiv.contains(e.target)) {
-                    suggestionsDiv.style.display = 'none';
-                }
-            });
+            if (suggestions.length >= 10) break;
         }
-        let searchTimeout;
-        function handleExpressionSearchInput(e) {
-            const query = e.target.value.trim().toUpperCase();
-            if (query.length < 2) {
-                hideExpressionSuggestions();
-                return;
+    }
+    return suggestions;
+}
+
+function showExpressionSuggestions(suggestions = null) {
+    const suggestionsDiv = document.getElementById('suggestions');
+    if (!suggestionsDiv || !suggestions || suggestions.length === 0) {
+        if (suggestionsDiv) suggestionsDiv.style.display = 'none';
+        return;
+    }
+    
+    suggestionsDiv.innerHTML = suggestions.map(suggestion => `
+        <div class="suggestion-item" onclick="selectExpressionGene('${suggestion.gene}')">
+            <div class="suggestion-gene">${suggestion.gene}</div>
+            <div class="suggestion-description">${suggestion.description}</div>
+        </div>
+    `).join('');
+    suggestionsDiv.style.display = 'block';
+}
+
+function hideExpressionSuggestions() {
+    const suggestionsDiv = document.getElementById('suggestions');
+    if (suggestionsDiv) suggestionsDiv.style.display = 'none';
+}
+
+function selectExpressionGene(geneName) {
+    const searchInput = document.getElementById('gene-search');
+    if (searchInput) searchInput.value = geneName;
+    hideExpressionSuggestions();
+    showExpressionGeneInfo(geneName);
+    updateExpressionVisualization(geneName);
+    updateExpressionTable(geneName);
+}
+
+function showExpressionGeneInfo(geneName) {
+    const geneDetailsDiv = document.getElementById('gene-details');
+    const selectedGeneInfoDiv = document.getElementById('selected-gene-info');
+    
+    if (geneDetailsDiv && selectedGeneInfoDiv) {
+        const geneExpression = expressionData[geneName] || {};
+        const tissueCount = Object.keys(geneExpression).length;
+        const geneInfo = allGenes.find(g => g.gene === geneName);
+        
+        geneDetailsDiv.innerHTML = `
+            <div style="margin-bottom: 1rem;"><strong>Gene:</strong> ${geneName}</div>
+            <div style="margin-bottom: 1rem;"><strong>Expression Data:</strong> Available in ${tissueCount} tissues</div>
+            ${geneInfo?.description ? `<div style="margin-bottom: 1rem;"><strong>Description:</strong> ${geneInfo.description}</div>` : ''}
+        `;
+        selectedGeneInfoDiv.style.display = 'block';
+    }
+}
+
+function updateExpressionVisualization(geneName) {
+    const organs = document.querySelectorAll('.organ');
+    organs.forEach(organ => {
+        const originalColor = organ.getAttribute('data-original-color');
+        if (originalColor) organ.setAttribute('fill', originalColor);
+        organ.style.filter = 'brightness(1)';
+    });
+    
+    const geneExpression = findGeneExpression(geneName);
+    if (geneExpression) {
+        Object.entries(geneExpression).forEach(([tissue, nTPM]) => {
+            const organElement = findOrganElement(tissue);
+            if (organElement) {
+                organElement.setAttribute('fill', getExpressionColor(nTPM));
             }
-            clearTimeout(searchTimeout);
-            searchTimeout = setTimeout(() => {
-                const suggestions = getExpressionGeneSuggestions(query);
-                showExpressionSuggestions(suggestions);
-            }, 150);
+        });
+    }
+}
+
+function findGeneExpression(geneName) {
+    if (!expressionData) return null;
+    return expressionData[geneName.toUpperCase()] || null;
+}
+
+const organCache = new Map();
+function findOrganElement(tissueName) {
+    if (organCache.has(tissueName)) return organCache.get(tissueName);
+    
+    const organs = document.querySelectorAll('.organ');
+    const tissueLower = tissueName.toLowerCase();
+    
+    for (let organ of organs) {
+        const tissue = organ.getAttribute('data-tissue');
+        if (tissue && tissueLower === tissue.toLowerCase()) {
+            organCache.set(tissueName, organ);
+            return organ;
         }
-        function getExpressionGeneSuggestions(query) {
-            const suggestions = [];
-            const queryUpper = query.toUpperCase();
-            for (const gene of availableGenes) {
-                if (gene.startsWith(queryUpper)) {
-                    suggestions.push({
-                        gene: gene,
-                        description: `Expression data available in ${Object.keys(expressionData[gene] || {}).length} tissues`,
-                    });
-                    if (suggestions.length >= 10) break;
-                }
-            }
-            return suggestions;
+    }
+    organCache.set(tissueName, null);
+    return null;
+}
+
+function getExpressionColor(nTPM) {
+    if (nTPM <= 5) return '#A8E6A1';
+    if (nTPM <= 15) return '#6CC96C';
+    if (nTPM <= 30) return '#3FAF3F';
+    return '#1E7B1E';
+}
+
+function updateExpressionTable(geneName) {
+    const tableWrapper = document.getElementById('expression-table-wrapper');
+    if (!tableWrapper) return;
+    
+    const geneExpression = findGeneExpression(geneName);
+    if (!geneExpression || Object.keys(geneExpression).length === 0) {
+        tableWrapper.innerHTML = '<div style="text-align: center; padding: 2rem; color: #666; font-style: italic;">No expression data available for this gene</div>';
+        return;
+    }
+    
+    const sortedTissues = Object.entries(geneExpression).sort(([,a], [,b]) => b - a);
+    
+    const tableHTML = `
+        <table style="width: 100%; border-collapse: collapse; margin-top: 1rem;">
+            <thead>
+                <tr>
+                    <th style="padding: 0.8rem; text-align: left; border-bottom: 1px solid #e1ecf4; background: #2c5aa0; color: white;">Tissue</th>
+                    <th style="padding: 0.8rem; text-align: left; border-bottom: 1px solid #e1ecf4; background: #2c5aa0; color: white;">nTPM</th>
+                    <th style="padding: 0.8rem; text-align: left; border-bottom: 1px solid #e1ecf4; background: #2c5aa0; color: white;">Level</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${sortedTissues.map(([tissue, nTPM]) => `
+                    <tr>
+                        <td style="padding: 0.8rem; border-bottom: 1px solid #e1ecf4;">${tissue}</td>
+                        <td style="padding: 0.8rem; border-bottom: 1px solid #e1ecf4;">${nTPM.toFixed(2)}</td>
+                        <td style="padding: 0.8rem; border-bottom: 1px solid #e1ecf4;">${getExpressionLevel(nTPM)}</td>
+                    </tr>
+                `).join('')}
+            </tbody>
+        </table>`;
+    tableWrapper.innerHTML = tableHTML;
+}
+
+function getExpressionLevel(nTPM) {
+    if (nTPM <= 5) return 'Low';
+    if (nTPM <= 15) return 'Medium';
+    if (nTPM <= 30) return 'High';
+    return 'Very High';
+}
+
+function handleOrganClick(tissueName) {
+    highlightClickedOrgan(tissueName);
+    displayTissueExpressionData(tissueName);
+}
+
+function highlightClickedOrgan(tissueName) {
+    const organs = document.querySelectorAll('.organ');
+    organs.forEach(organ => {
+        organ.style.stroke = organ.getAttribute('data-tissue') === tissueName ? '#e74c3c' : '#2c5aa0';
+        organ.style.strokeWidth = organ.getAttribute('data-tissue') === tissueName ? '3' : '2';
+    });
+}
+
+function displayTissueExpressionData(tissueName) {
+    const tableWrapper = document.getElementById('expression-table-wrapper');
+    if (!tableWrapper) return;
+
+    const tissueExpressionData = [];
+    Object.entries(expressionData).forEach(([geneName, tissueData]) => {
+        if (tissueData[tissueName] !== undefined) {
+            tissueExpressionData.push({ gene: geneName, nTPM: tissueData[tissueName] });
         }
-        function showExpressionSuggestions(suggestions = null) {
-            const suggestionsDiv = document.getElementById('suggestions');
-            if (!suggestionsDiv || !suggestions || suggestions.length === 0) {
-                if (suggestionsDiv) suggestionsDiv.style.display = 'none';
-                return;
-            }
-            suggestionsDiv.innerHTML = suggestions.map(suggestion => `
-                <div class="suggestion-item" onclick="selectExpressionGene('${suggestion.gene}')">
-                    <div class="suggestion-gene">${suggestion.gene}</div>
-                    <div class="suggestion-description">${suggestion.description}</div>
-                </div>
-            `).join('');
-            suggestionsDiv.style.display = 'block';
-        }
-        function hideExpressionSuggestions() {
-            const suggestionsDiv = document.getElementById('suggestions');
-            if (suggestionsDiv) suggestionsDiv.style.display = 'none';
-        }
-        function selectExpressionGene(geneName) {
-            const searchInput = document.getElementById('gene-search');
-            if (searchInput) searchInput.value = geneName;
-            hideExpressionSuggestions();
-            showExpressionGeneInfo(geneName);
-            updateExpressionVisualization(geneName);
-            updateExpressionTable(geneName);
-        }
-        function showExpressionGeneInfo(geneName) {
-            const geneDetailsDiv = document.getElementById('gene-details');
-            const selectedGeneInfoDiv = document.getElementById('selected-gene-info');
-            if (geneDetailsDiv && selectedGeneInfoDiv) {
-                const geneExpression = expressionData[geneName] || {};
-                const tissueCount = Object.keys(geneExpression).length;
-                const geneInfo = allGenes.find(g => g.gene === geneName);
-                geneDetailsDiv.innerHTML = `
-                    <div style="margin-bottom: 1rem;"><strong>Gene:</strong> ${geneName}</div>
-                    <div style="margin-bottom: 1rem;"><strong>Expression Data:</strong> Available in ${tissueCount} tissues</div>
-                    ${geneInfo?.description ? `<div style="margin-bottom: 1rem;"><strong>Description:</strong> ${geneInfo.description}</div>` : ''}
-                `;
-                selectedGeneInfoDiv.style.display = 'block';
-            }
-        }
-        function updateExpressionVisualization(geneName) {
-            const organs = document.querySelectorAll('.organ');
-            organs.forEach(organ => {
-                const originalColor = organ.getAttribute('data-original-color');
-                if (originalColor) organ.setAttribute('fill', originalColor);
-                organ.style.filter = 'brightness(1)';
-            });
-            const geneExpression = findGeneExpression(geneName);
-            if (geneExpression) {
-                Object.entries(geneExpression).forEach(([tissue, nTPM]) => {
-                    const organElement = findOrganElement(tissue);
-                    if (organElement) {
-                        organElement.setAttribute('fill', getExpressionColor(nTPM));
-                    }
-                });
-            }
-        }
-        function findGeneExpression(geneName) {
-            if (!expressionData) return null;
-            return expressionData[geneName.toUpperCase()] || null;
-        }
-        const organCache = new Map();
-        function findOrganElement(tissueName) {
-            if (organCache.has(tissueName)) return organCache.get(tissueName);
-            const organs = document.querySelectorAll('.organ');
-            const tissueLower = tissueName.toLowerCase();
-            for (let organ of organs) {
-                const tissue = organ.getAttribute('data-tissue');
-                if (tissue && tissueLower === tissue.toLowerCase()) {
-                    organCache.set(tissueName, organ);
-                    return organ;
-                }
-            }
-            organCache.set(tissueName, null);
-            return null;
-        }
-        function getExpressionColor(nTPM) {
-            if (nTPM <= 5) return '#A8E6A1';
-            if (nTPM <= 15) return '#6CC96C';
-            if (nTPM <= 30) return '#3FAF3F';
-            return '#1E7B1E';
-        }
-        function updateExpressionTable(geneName) {
-            const tableWrapper = document.getElementById('expression-table-wrapper');
-            if (!tableWrapper) return;
-            const geneExpression = findGeneExpression(geneName);
-            if (!geneExpression || Object.keys(geneExpression).length === 0) {
-                tableWrapper.innerHTML = '<div style="text-align: center; padding: 2rem; color: #666; font-style: italic;">No expression data available for this gene</div>';
-                return;
-            }
-            const sortedTissues = Object.entries(geneExpression).sort(([,a], [,b]) => b - a);
-            const tableHTML = `
-                <table style="width: 100%; border-collapse: collapse; margin-top: 1rem;">
-                    <thead>
-                        <tr>
-                            <th style="padding: 0.8rem; text-align: left; border-bottom: 1px solid #e1ecf4; background: #2c5aa0; color: white;">Tissue</th>
-                            <th style="padding: 0.8rem; text-align: left; border-bottom: 1px solid #e1ecf4; background: #2c5aa0; color: white;">nTPM</th>
-                            <th style="padding: 0.8rem; text-align: left; border-bottom: 1px solid #e1ecf4; background: #2c5aa0; color: white;">Level</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${sortedTissues.map(([tissue, nTPM]) => `
-                            <tr>
-                                <td style="padding: 0.8rem; border-bottom: 1px solid #e1ecf4;">${tissue}</td>
-                                <td style="padding: 0.8rem; border-bottom: 1px solid #e1ecf4;">${nTPM.toFixed(2)}</td>
-                                <td style="padding: 0.8rem; border-bottom: 1px solid #e1ecf4;">${getExpressionLevel(nTPM)}</td>
-                            </tr>
-                        `).join('')}
-                    </tbody>
-                </table>`;
-            tableWrapper.innerHTML = tableHTML;
-        }
-        function getExpressionLevel(nTPM) {
-            if (nTPM <= 5) return 'Low';
-            if (nTPM <= 15) return 'Medium';
-            if (nTPM <= 30) return 'High';
-            return 'Very High';
-        }
-        function handleOrganClick(tissueName) {
-            highlightClickedOrgan(tissueName);
-            displayTissueExpressionData(tissueName);
-        }
-        function highlightClickedOrgan(tissueName) {
-            const organs = document.querySelectorAll('.organ');
-            organs.forEach(organ => {
-                organ.style.stroke = organ.getAttribute('data-tissue') === tissueName ? '#e74c3c' : '#2c5aa0';
-                organ.style.strokeWidth = organ.getAttribute('data-tissue') === tissueName ? '3' : '2';
-            });
-        }
-        function displayTissueExpressionData(tissueName) {
-            const tableWrapper = document.getElementById('expression-table-wrapper');
-            if (!tableWrapper) return;
-            const tissueExpressionData = [];
-            Object.entries(expressionData).forEach(([geneName, tissueData]) => {
-                if (tissueData[tissueName] !== undefined) {
-                    tissueExpressionData.push({ gene: geneName, nTPM: tissueData[tissueName] });
-                }
-            });
-            tissueExpressionData.sort((a, b) => b.nTPM - a.nTPM);
-            if (tissueExpressionData.length === 0) {
-                tableWrapper.innerHTML = `<div style="text-align: center; padding: 2rem; color: #666;">No expression data for ${tissueName}</div>`;
-                return;
-            }
-            const tableHTML = `
-                <h5 style="color: #2c5aa0; margin-bottom: 1rem;">Top Expressed Genes in ${tissueName}</h5>
-                <table style="width: 100%; border-collapse: collapse; margin-top: 1rem;">
-                    <thead>
-                        <tr>
-                            <th style="padding: 0.8rem; text-align: left; border-bottom: 1px solid #e1ecf4; background: #2c5aa0; color: white;">Gene</th>
-                            <th style="padding: 0.8rem; text-align: left; border-bottom: 1px solid #e1ecf4; background: #2c5aa0; color: white;">nTPM</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${tissueExpressionData.slice(0, 50).map(item => `
-                            <tr style="cursor: pointer;" onclick="selectExpressionGene('${item.gene}')">
-                                <td style="padding: 0.8rem; border-bottom: 1px solid #e1ecf4;">${item.gene}</td>
-                                <td style="padding: 0.8rem; border-bottom: 1px solid #e1ecf4;">${item.nTPM.toFixed(2)}</td>
-                            </tr>
-                        `).join('')}
-                    </tbody>
-                </table>`;
-            tableWrapper.innerHTML = tableHTML;
-        }
-        function resetOrganSelection() {
-            const organs = document.querySelectorAll('.organ');
-            organs.forEach(organ => {
-                const originalColor = organ.getAttribute('data-original-color');
-                if (originalColor) organ.setAttribute('fill', originalColor);
-                organ.style.stroke = '#2c5aa0';
-                organ.style.strokeWidth = '2';
-            });
-            const tableWrapper = document.getElementById('expression-table-wrapper');
-            if (tableWrapper) {
-                tableWrapper.innerHTML = `<div style="text-align: center; padding: 2rem; color: #666;">Click an organ or search for a gene.</div>`;
-            }
-            const selectedGeneInfoDiv = document.getElementById('selected-gene-info');
-            if (selectedGeneInfoDiv) selectedGeneInfoDiv.style.display = 'none';
-            const searchInput = document.getElementById('gene-search');
-            if (searchInput) searchInput.value = '';
-        }
-        async function loadSVGFile() {
-            try {
-                const response = await fetch('file.svg');
-                if (!response.ok) throw new Error('Failed to load SVG file');
-                const svgText = await response.text();
-                const container = document.getElementById('svg-container');
-                if (container) container.innerHTML = svgText;
-            } catch (error) {
-                console.error('Error loading SVG file:', error);
-            }
-        }
-        function prepareOrgansForExpression() {
-            const organMappings = [
-                { tissue: 'cerebral cortex', selector: 'path[fill="#BE0405"]' },
-                { tissue: 'heart muscle', selector: 'path[fill="#F07070"]' },
-                { tissue: 'lung', selector: 'path[fill="#F6A2A0"]' },
-                { tissue: 'liver', selector: 'path[fill="#F8A19F"]' },
-                { tissue: 'stomach', selector: 'path[fill="#FDE098"]' },
-                { tissue: 'kidney', selector: 'path[fill="#EA8F8E"]' },
-                { tissue: 'colon', selector: 'path[fill="#C07F54"]' },
-                { tissue: 'testis', selector: 'path[fill="#E49BDC"]' },
-            ];
-            const svg = document.querySelector('#svg-container svg');
-            if (!svg) return;
-            organMappings.forEach(mapping => {
-                const pathElements = svg.querySelectorAll(mapping.selector);
-                pathElements.forEach(path => {
-                    path.classList.add('organ');
-                    path.setAttribute('data-tissue', mapping.tissue);
-                    path.setAttribute('data-original-color', path.getAttribute('fill'));
-                    path.style.cursor = 'pointer';
-                    path.style.transition = 'all 0.3s ease';
-                    path.addEventListener('mouseenter', () => path.style.filter = 'brightness(1.2)');
-                    path.addEventListener('mouseleave', () => path.style.filter = 'brightness(1)');
-                    path.addEventListener('click', () => handleOrganClick(mapping.tissue));
-                });
-            });
-        }
+    });
+
+    tissueExpressionData.sort((a, b) => b.nTPM - a.nTPM);
+
+    if (tissueExpressionData.length === 0) {
+        tableWrapper.innerHTML = `<div style="text-align: center; padding: 2rem; color: #666;">No expression data for ${tissueName}</div>`;
+        return;
+    }
+    
+    const tableHTML = `
+        <h5 style="color: #2c5aa0; margin-bottom: 1rem;">Top Expressed Genes in ${tissueName}</h5>
+        <table style="width: 100%; border-collapse: collapse; margin-top: 1rem;">
+            <thead>
+                <tr>
+                    <th style="padding: 0.8rem; text-align: left; border-bottom: 1px solid #e1ecf4; background: #2c5aa0; color: white;">Gene</th>
+                    <th style="padding: 0.8rem; text-align: left; border-bottom: 1px solid #e1ecf4; background: #2c5aa0; color: white;">nTPM</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${tissueExpressionData.slice(0, 50).map(item => `
+                    <tr style="cursor: pointer;" onclick="selectExpressionGene('${item.gene}')">
+                        <td style="padding: 0.8rem; border-bottom: 1px solid #e1ecf4;">${item.gene}</td>
+                        <td style="padding: 0.8rem; border-bottom: 1px solid #e1ecf4;">${item.nTPM.toFixed(2)}</td>
+                    </tr>
+                `).join('')}
+            </tbody>
+        </table>`;
+    tableWrapper.innerHTML = tableHTML;
+}
+
+function resetOrganSelection() {
+    const organs = document.querySelectorAll('.organ');
+    organs.forEach(organ => {
+        const originalColor = organ.getAttribute('data-original-color');
+        if (originalColor) organ.setAttribute('fill', originalColor);
+        organ.style.stroke = '#2c5aa0';
+        organ.style.strokeWidth = '2';
+    });
+    const tableWrapper = document.getElementById('expression-table-wrapper');
+    if (tableWrapper) {
+        tableWrapper.innerHTML = `<div style="text-align: center; padding: 2rem; color: #666;">Click an organ or search for a gene.</div>`;
+    }
+    const selectedGeneInfoDiv = document.getElementById('selected-gene-info');
+    if (selectedGeneInfoDiv) selectedGeneInfoDiv.style.display = 'none';
+    const searchInput = document.getElementById('gene-search');
+    if (searchInput) searchInput.value = '';
+}
+
+async function loadSVGFile() {
+    try {
+        const response = await fetch('file.svg');
+        if (!response.ok) throw new Error('Failed to load SVG file');
+        const svgText = await response.text();
+        const container = document.getElementById('svg-container');
+        if (container) container.innerHTML = svgText;
+    } catch (error) {
+        console.error('Error loading SVG file:', error);
+    }
+}
+
+function prepareOrgansForExpression() {
+    const organMappings = [
+        { tissue: 'cerebral cortex', selector: 'path[fill="#BE0405"]' },
+        { tissue: 'heart muscle', selector: 'path[fill="#F07070"]' },
+        { tissue: 'lung', selector: 'path[fill="#F6A2A0"]' },
+        { tissue: 'liver', selector: 'path[fill="#F8A19F"]' },
+        { tissue: 'stomach', selector: 'path[fill="#FDE098"]' },
+        { tissue: 'kidney', selector: 'path[fill="#EA8F8E"]' },
+        { tissue: 'colon', selector: 'path[fill="#C07F54"]' },
+        { tissue: 'testis', selector: 'path[fill="#E49BDC"]' },
+        // Add more mappings as needed based on your SVG and data
+    ];
+    
+    const svg = document.querySelector('#svg-container svg');
+    if (!svg) return;
+
+    organMappings.forEach(mapping => {
+        const pathElements = svg.querySelectorAll(mapping.selector);
+        pathElements.forEach(path => {
+            path.classList.add('organ');
+            path.setAttribute('data-tissue', mapping.tissue);
+            path.setAttribute('data-original-color', path.getAttribute('fill'));
+            path.style.cursor = 'pointer';
+            path.style.transition = 'all 0.3s ease';
+            path.addEventListener('mouseenter', () => path.style.filter = 'brightness(1.2)');
+            path.addEventListener('mouseleave', () => path.style.filter = 'brightness(1)');
+            path.addEventListener('click', () => handleOrganClick(mapping.tissue));
+        });
+    });
+}
         async function handleRouteChange() {
             await loadGeneDatabase();
             const path = window.location.hash.replace('#', '').toLowerCase() || '/';
@@ -724,32 +774,23 @@
             const suggestionsContainer = document.getElementById('search-suggestions');
             searchInput.addEventListener('input', function() {
                 const query = this.value.trim().toUpperCase();
-                suggestionsContainer.innerHTML = '';
-                if (query.length === 0) {
-                    const defaultSuggestions = defaultGenes.slice(0, 5);
-                    suggestionsContainer.innerHTML = '<ul>' + defaultSuggestions.map(g => `<li>${g.gene}</li>`).join('') + '</ul>';
-                    suggestionsContainer.style.display = 'block';
-                } else {
-                    const filteredGenes = allGenes.filter(g => 
-                        (g.gene && g.gene.toUpperCase().startsWith(query)) || 
-                        (g.synonym && g.synonym.toUpperCase().includes(query))
-                    ).slice(0, 10);
-                    if (filteredGenes.length > 0) {
-                        suggestionsContainer.innerHTML = '<ul>' + filteredGenes.map(g => `<li>${g.gene}</li>`).join('') + '</ul>';
-                        suggestionsContainer.style.display = 'block';
-                    } else {
-                        suggestionsContainer.innerHTML = '<ul><li>No matching genes found</li></ul>';
-                        suggestionsContainer.style.display = 'block';
-                    }
+                if (query.length < 1) {
+                    suggestionsContainer.innerHTML = '';
+                    return;
                 }
-                suggestionsContainer.querySelectorAll('li').forEach(item => {
-                    item.addEventListener('click', function() {
-                        searchInput.value = this.textContent;
-                        suggestionsContainer.innerHTML = '';
-                        suggestionsContainer.style.display = 'none';
-                        performSingleSearch();
+                const filteredGenes = allGenes.filter(g => (g.gene && g.gene.toUpperCase().startsWith(query)) || (g.synonym && g.synonym.toUpperCase().includes(query))).slice(0, 10);
+                if (filteredGenes.length > 0) {
+                    suggestionsContainer.innerHTML = '<ul>' + filteredGenes.map(g => `<li>${g.gene}</li>`).join('') + '</ul>';
+                    suggestionsContainer.querySelectorAll('li').forEach(item => {
+                        item.addEventListener('click', function() {
+                            searchInput.value = this.textContent;
+                            suggestionsContainer.innerHTML = '';
+                            performSingleSearch();
+                        });
                     });
-                });
+                } else {
+                    suggestionsContainer.innerHTML = '';
+                }
             });
             searchInput.addEventListener('keydown', function(event) {
                 const suggestions = suggestionsContainer.querySelectorAll('li');
@@ -760,7 +801,6 @@
                         event.preventDefault();
                         searchInput.value = activeElement.textContent;
                         suggestionsContainer.innerHTML = '';
-                        suggestionsContainer.style.display = 'none';
                     }
                     performSingleSearch();
                     return;
@@ -783,84 +823,92 @@
                 }
             });
             document.addEventListener('click', function(event) {
-                if (!searchInput.contains(event.target) && !suggestionsContainer.contains(event.target)) {
+                if (!searchInput.contains(event.target)) {
                     suggestionsContainer.innerHTML = '';
-                    suggestionsContainer.style.display = 'none';
                 }
             });
             displayGeneCards(defaultGenes, [], 1, 10);
         }
         function displayExpression() {
-            const contentArea = document.querySelector('.content-area');
-            contentArea.className = 'content-area content-area-full';
-            document.querySelector('.cilia-panel').style.display = 'none';
-            contentArea.innerHTML = `
-                <div class="page-section">
+    const contentArea = document.querySelector('.content-area');
+    contentArea.className = 'content-area content-area-full';
+    document.querySelector('.cilia-panel').style.display = 'none';
+    
+    contentArea.innerHTML = `
+        <div class="page-section">
+            <div style="text-align: center; margin-bottom: 2rem;">
+                <h1 style="color: #2c5aa0; margin-bottom: 1rem;">Gene Expression Visualization</h1>
+                <p style="color: #555; font-size: 1.1rem;">Explore tissue-specific gene expression patterns across human organs and tissues.</p>
+            </div>
+            
+            <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 2rem; align-items: start;">
+                <div style="background: white; padding: 2rem; border-radius: 15px; box-shadow: 0 8px 32px rgba(44, 90, 160, 0.1); height: fit-content;">
+                    <h3 style="color: #2c5aa0; margin-bottom: 1.5rem; font-size: 1.3rem;">Gene Search</h3>
+                    <div style="margin-bottom: 1.5rem;">
+                        <input 
+                            type="text" 
+                            id="gene-search" 
+                            style="width: 100%; padding: 1rem; border: 2px solid #e1ecf4; border-radius: 10px; font-size: 1rem; margin-bottom: 1rem;"
+                            placeholder="Search for a gene (e.g., ARL13B, IFT88)"
+                            autocomplete="off"
+                        >
+                        <div id="suggestions" style="max-height: 300px; overflow-y: auto; border: 1px solid #e1ecf4; border-radius: 8px; background: white; display: none;"></div>
+                    </div>
+                    
+                    <div id="selected-gene-info" style="display: none;">
+                        <h4 style="color: #2c5aa0; margin-bottom: 1rem;">Selected Gene</h4>
+                        <div id="gene-details"></div>
+                    </div>
+                </div>
+                
+                <div style="background: white; padding: 2rem; border-radius: 15px; box-shadow: 0 8px 32px rgba(44, 90, 160, 0.1);">
+                    <h3 style="color: #2c5aa0; margin-bottom: 1.5rem; font-size: 1.3rem;">Expression Visualization</h3>
+                    
                     <div style="text-align: center; margin-bottom: 2rem;">
-                        <h1 style="color: #2c5aa0; margin-bottom: 1rem;">Gene Expression Visualization</h1>
-                        <p style="color: #555; font-size: 1.1rem;">Explore tissue-specific gene expression patterns across human organs and tissues.</p>
-                    </div>
-                    <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 2rem; align-items: start;">
-                        <div style="background: white; padding: 2rem; border-radius: 15px; box-shadow: 0 8px 32px rgba(44, 90, 160, 0.1); height: fit-content;">
-                            <h3 style="color: #2c5aa0; margin-bottom: 1.5rem; font-size: 1.3rem;">Gene Search</h3>
-                            <div style="margin-bottom: 1.5rem;">
-                                <input 
-                                    type="text" 
-                                    id="gene-search" 
-                                    style="width: 100%; padding: 1rem; border: 2px solid #e1ecf4; border-radius: 10px; font-size: 1rem; margin-bottom: 1rem;"
-                                    placeholder="Search for a gene (e.g., ARL13B, IFT88)"
-                                    autocomplete="off"
-                                >
-                                <div id="suggestions" style="max-height: 300px; overflow-y: auto; border: 1px solid #e1ecf4; border-radius: 8px; background: white; display: none;"></div>
-                            </div>
-                            <div id="selected-gene-info" style="display: none;">
-                                <h4 style="color: #2c5aa0; margin-bottom: 1rem;">Selected Gene</h4>
-                                <div id="gene-details"></div>
-                            </div>
-                        </div>
-                        <div style="background: white; padding: 2rem; border-radius: 15px; box-shadow: 0 8px 32px rgba(44, 90, 160, 0.1);">
-                            <h3 style="color: #2c5aa0; margin-bottom: 1.5rem; font-size: 1.3rem;">Expression Visualization</h3>
-                            <div style="text-align: center; margin-bottom: 2rem;">
-                                <div id="svg-container" style="max-width: 100%; height: auto;">
-                                    <div style="text-align: center; padding: 2rem; color: #666;">
-                                        <p>Loading human body visualization...</p>
-                                    </div>
-                                </div>
-                            </div>
-                            <div style="display: flex; justify-content: center; gap: 1rem; margin: 1.5rem 0; flex-wrap: wrap;">
-                                <div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem;">
-                                    <div style="width: 20px; height: 20px; border-radius: 4px; border: 1px solid #ccc; background-color: #A8E6A1;"></div>
-                                    <span>Low (0-5 nTPM)</span>
-                                </div>
-                                <div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem;">
-                                    <div style="width: 20px; height: 20px; border-radius: 4px; border: 1px solid #ccc; background-color: #6CC96C;"></div>
-                                    <span>Medium (5-15 nTPM)</span>
-                                </div>
-                                <div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem;">
-                                    <div style="width: 20px; height: 20px; border-radius: 4px; border: 1px solid #ccc; background-color: #3FAF3F;"></div>
-                                    <span>High (15-30 nTPM)</span>
-                                </div>
-                                <div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem;">
-                                    <div style="width: 20px; height: 20px; border-radius: 4px; border: 1px solid #ccc; background-color: #1E7B1E;"></div>
-                                    <span>Very High (>30 nTPM)</span>
-                                </div>
-                            </div>
-                            <div style="margin-top: 2rem;">
-                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                                    <h4 style="color: #2c5aa0; margin: 0;">Expression Data Table</h4>
-                                    <button id="reset-organs-btn" style="padding: 0.5rem 1rem; background: #95a5a6; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 0.9rem;" onclick="resetOrganSelection()">
-                                        Reset Organ Selection
-                                    </button>
-                                </div>
-                                <div id="expression-table-wrapper">
-                                    <div style="text-align: center; padding: 2rem; color: #666; font-style: italic;">Click on an organ to see its gene expression data, or search for a specific gene</div>
-                                </div>
+                        <div id="svg-container" style="max-width: 100%; height: auto;">
+                            <div style="text-align: center; padding: 2rem; color: #666;">
+                                <p>Loading human body visualization...</p>
                             </div>
                         </div>
                     </div>
-                </div>`;
-            initExpressionSystem();
-        }
+                    
+                    <div style="display: flex; justify-content: center; gap: 1rem; margin: 1.5rem 0; flex-wrap: wrap;">
+                        <div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem;">
+                            <div style="width: 20px; height: 20px; border-radius: 4px; border: 1px solid #ccc; background-color: #A8E6A1;"></div>
+                            <span>Low (0-5 nTPM)</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem;">
+                            <div style="width: 20px; height: 20px; border-radius: 4px; border: 1px solid #ccc; background-color: #6CC96C;"></div>
+                            <span>Medium (5-15 nTPM)</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem;">
+                            <div style="width: 20px; height: 20px; border-radius: 4px; border: 1px solid #ccc; background-color: #3FAF3F;"></div>
+                            <span>High (15-30 nTPM)</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem;">
+                            <div style="width: 20px; height: 20px; border-radius: 4px; border: 1px solid #ccc; background-color: #1E7B1E;"></div>
+                            <span>Very High (>30 nTPM)</span>
+                        </div>
+                    </div>
+                    
+                    <div style="margin-top: 2rem;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                            <h4 style="color: #2c5aa0; margin: 0;">Expression Data Table</h4>
+                            <button id="reset-organs-btn" style="padding: 0.5rem 1rem; background: #95a5a6; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 0.9rem;" onclick="resetOrganSelection()">
+                                Reset Organ Selection
+                            </button>
+                        </div>
+                        <div id="expression-table-wrapper">
+                            <div style="text-align: center; padding: 2rem; color: #666; font-style: italic;">Click on an organ to see its gene expression data, or search for a specific gene</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>`;
+    
+    // Initialize expression visualization system
+    initExpressionSystem();
+}
         function displayBatchQueryTool() {
             const contentArea = document.querySelector('.content-area');
             contentArea.className = 'content-area';
@@ -926,40 +974,14 @@
             contentArea.innerHTML = `
                 <div class="page-section">
                     <h2>Compare Genes</h2>
-                    <div style="margin-bottom: 1rem;">
-                        <label for="gene-filter" style="font-weight: 600;">Filter Genes:</label>
-                        <input type="text" id="gene-filter" placeholder="Type to filter genes (e.g., ACE2)" aria-label="Filter genes" style="width: 100%; padding: 0.8rem; border: 2px solid #e1ecf4; border-radius: 8px;">
-                    </div>
-                    <select id="compare-genes" multiple size="10" aria-label="Select genes to compare" style="width: 100%; padding: 0.8rem; border: 2px solid #e1ecf4; border-radius: 8px;">
+                    <select id="compare-genes" multiple aria-label="Select genes to compare">
                         ${allGenes.map(g => `<option value="${g.gene}">${g.gene}</option>`).join('')}
                     </select>
-                    <button id="compare-btn" class="search-btn btn btn-primary" style="margin-top: 1rem;">Compare</button>
-                    <div id="status-message" class="status-message" style="display: none;"></div>
+                    <button id="compare-btn" class="search-btn btn btn-primary">Compare</button>
                     <table id="comparison-table" style="margin-top: 1rem; width: 100%; border-collapse: collapse;"></table>
                 </div>`;
-            const geneFilterInput = document.getElementById('gene-filter');
-            const compareGenesSelect = document.getElementById('compare-genes');
-            geneFilterInput.addEventListener('input', function() {
-                const filter = this.value.trim().toUpperCase();
-                const options = allGenes
-                    .filter(g => g.gene.toUpperCase().includes(filter))
-                    .map(g => `<option value="${g.gene}">${g.gene}</option>`).join('');
-                compareGenesSelect.innerHTML = options;
-            });
             document.getElementById('compare-btn').onclick = () => {
                 const selectedGenes = Array.from(document.getElementById('compare-genes').selectedOptions).map(opt => opt.value);
-                const statusDiv = document.getElementById('status-message');
-                statusDiv.style.display = 'none';
-                if (selectedGenes.length === 0) {
-                    statusDiv.innerHTML = `<span class="error-message">Please select at least one gene to compare.</span>`;
-                    statusDiv.style.display = 'block';
-                    return;
-                }
-                if (selectedGenes.length > 10) {
-                    statusDiv.innerHTML = `<span class="error-message">Please select no more than 10 genes for comparison.</span>`;
-                    statusDiv.style.display = 'block';
-                    return;
-                }
                 const table = document.getElementById('comparison-table');
                 table.innerHTML = `
                     <tr>
@@ -1154,4 +1176,230 @@
             if (results.length > 0) {
                 displayGeneCards(defaultGenes, results, 1, 10);
             } else {
-                statusDiv.innerHTML = `<
+                statusDiv.innerHTML = `<span class="error-message">No genes found matching your query.</span>`;
+                statusDiv.style.display = 'block';
+                displayGeneCards(defaultGenes, [], 1, 10);
+            }
+        }
+        function handleCSVUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const text = e.target.result;
+                const genes = text.split(/[\n,]+/).map(g => g.trim()).filter(Boolean);
+                const input = document.getElementById('batch-genes-input');
+                input.value += (input.value ? '\n' : '') + genes.join('\n');
+            };
+            reader.readAsText(file);
+        }
+        function displayGeneCards(defaults, searchResults, page = 1, perPage = 10) {
+            const container = document.getElementById('gene-cards-container');
+            if (!container) return;
+            const uniqueDefaults = defaults.filter(d => !searchResults.some(s => s.gene === d.gene));
+            const allGenesToDisplay = [...searchResults, ...uniqueDefaults];
+            const start = (page - 1) * perPage;
+            const end = start + perPage;
+            const paginatedGenes = allGenesToDisplay.slice(start, end);
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        const gene = JSON.parse(entry.target.dataset.gene);
+                        const isSearchResult = searchResults.some(s => s.gene === gene.gene);
+                        entry.target.innerHTML = `
+                            <div class="gene-name">${gene.gene}</div>
+                            <div class="gene-description">${gene.description || 'No description available.'}</div>
+                            ${gene.localization ? `
+                                <div class="gene-info">
+                                    <strong>Localization:</strong> 
+                                    <span style="color: ${isSearchResult ? '#27ae60' : '#1e90ff'}; font-weight: 600;">
+                                        ${gene.localization}
+                                    </span>
+                                </div>` : ''}
+                            ${gene.ensembl_id ? `
+                                <div class="gene-info"><strong>Ensembl:</strong> 
+                                    <a href="https://www.ensembl.org/Homo_sapiens/Gene/Summary?g=${gene.ensembl_id}" target="_blank">
+                                        ${gene.ensembl_id}
+                                    </a>
+                                </div>` : ''}
+                            ${gene.omim_id ? `
+                                <div class="gene-info"><strong>OMIM:</strong> 
+                                    <a href="https://www.omim.org/entry/${gene.omim_id}" target="_blank">${gene.omim_id}</a>
+                                </div>` : ''}
+                            ${gene.synonym ? `<div class="gene-info"><strong>Synonym:</strong> ${gene.synonym}</div>` : ''}
+                            <div style="margin-top: 1rem; padding: 0.5rem; background: ${isSearchResult ? '#d5f4e6' : '#e8f4fd'}; 
+                                        border-radius: 5px; font-size: 0.9rem; color: ${isSearchResult ? '#27ae60' : '#1e90ff'};">
+                                Click to view detailed information →
+                            </div>
+                        `;
+                        entry.target.classList.add(isSearchResult ? 'search-result' : 'default');
+                        entry.target.onclick = () => navigateTo(event, `/${gene.gene}`);
+                        entry.target.setAttribute('aria-label', `View details for ${gene.gene}`);
+                        observer.unobserve(entry.target);
+                    }
+                });
+            }, { rootMargin: '100px' });
+            container.innerHTML = paginatedGenes.map(gene => `
+                <div class="gene-card" data-gene='${JSON.stringify(gene)}'></div>
+            `).join('');
+            container.querySelectorAll('.gene-card').forEach(card => observer.observe(card));
+            const paginationDiv = document.createElement('div');
+            paginationDiv.className = 'pagination';
+            paginationDiv.innerHTML = `
+                <button onclick="displayGeneCards(${JSON.stringify(defaults)}, ${JSON.stringify(searchResults)}, ${page - 1}, ${perPage})" ${page === 1 ? 'disabled' : ''}>Previous</button>
+                <span>Page ${page} of ${Math.ceil(allGenesToDisplay.length / perPage)}</span>
+                <button onclick="displayGeneCards(${JSON.stringify(defaults)}, ${JSON.stringify(searchResults)}, ${page + 1}, ${perPage})" ${end >= allGenesToDisplay.length ? 'disabled' : ''}>Next</button>
+            `;
+            container.appendChild(paginationDiv);
+            updateGeneButtons(allGenesToDisplay, searchResults);
+        }
+        function updateGeneButtons(genesToDisplay, searchResults = []) {
+            const container = document.getElementById('geneButtons');
+            if (!container) return;
+            container.innerHTML = '';
+            const defaultGenes = ['IFT88', 'CEP290', 'WDR31']
+                .map(geneName => genesToDisplay.find(g => g.gene === geneName))
+                .filter(Boolean);
+            const searchGenes = searchResults
+                .map(s => genesToDisplay.find(g => g.gene === s.gene))
+                .filter(g => g && !defaultGenes.some(d => d.gene === g.gene));
+            const genesToShow = [...defaultGenes, ...searchGenes].slice(0, 10);
+            genesToShow.forEach(gene => {
+                if (geneLocalizationData[gene.gene]) {
+                    const isSearch = searchResults.some(s => s.gene === gene.gene);
+                    const button = document.createElement('button');
+                    button.className = `gene-btn ${isSearch ? 'search-gene' : 'default'}`;
+                    button.textContent = gene.gene;
+                    button.setAttribute('aria-label', `Highlight localization of ${gene.gene} in the cilium diagram`);
+                    button.onclick = () => showLocalization(gene.gene, isSearch);
+                    container.appendChild(button);
+                }
+            });
+            const resetButton = document.createElement('button');
+            resetButton.className = 'gene-btn reset-btn';
+            resetButton.textContent = 'Reset Diagram';
+            resetButton.setAttribute('aria-label', 'Reset cilia diagram');
+            resetButton.onclick = () => showLocalization('reset');
+            container.appendChild(resetButton);
+        }
+        let selectedGenes = [];
+        function showLocalization(geneName, isSearchGene = false) {
+            if (geneName === 'reset') {
+                selectedGenes = [];
+            } else {
+                if (!selectedGenes.includes(geneName)) {
+                    selectedGenes.push(geneName);
+                } else {
+                    selectedGenes = selectedGenes.filter(g => g !== geneName);
+                }
+            }
+            const ciliaParts = document.querySelectorAll('.cilia-part');
+            ciliaParts.forEach(part => part.classList.remove('highlighted', 'search-gene', 'cilia'));
+            document.querySelectorAll('.gene-btn').forEach(btn => btn.classList.remove('selected'));
+            selectedGenes.forEach(g => {
+                if (geneLocalizationData[g]) {
+                    const isCiliary = geneLocalizationData[g].some(id => ['ciliary-membrane', 'axoneme'].includes(id));
+                    geneLocalizationData[g].forEach(id => {
+                        const el = document.getElementById(id);
+                        if (el && id !== 'cell-body') {
+                            el.classList.add('highlighted');
+                            if (isCiliary) {
+                                el.classList.add('cilia');
+                            } else if (isSearchGene) {
+                                el.classList.add('search-gene');
+                            }
+                        }
+                    });
+                }
+                const btn = [...document.querySelectorAll('.gene-btn')].find(b => b.textContent === g);
+                if (btn) btn.classList.add('selected');
+            });
+        }
+        function updateActiveNav(path) {
+            document.querySelectorAll('.nav-links a').forEach(link => {
+                link.classList.remove('active');
+                const linkPath = link.getAttribute('href').toLowerCase();
+                if (linkPath === path || (path.startsWith('/') && path !== '/' && path !== '/index.html' && linkPath === '/batch-query' && !['/download', '/contact', '/compare'].includes(path))) {
+                    link.classList.add('active');
+                }
+            });
+        }
+        function handleStickySearch() {
+            const searchContainer = document.querySelector('.search-container');
+            if (searchContainer && window.scrollY > 100) {
+                searchContainer.classList.add('sticky');
+            } else if (searchContainer) {
+                searchContainer.classList.remove('sticky');
+            }
+        }
+        function displayLocalizationChart() {
+            const categories = ['Cilia', 'Basal Body', 'Transition Zone', 'Flagella', 'Ciliary Associated Gene'];
+            const localizationCounts = categories.reduce((acc, category) => {
+                acc[category] = allGenes.filter(g => {
+                    if (!g.localization) return false;
+                    const localizations = g.localization.split(',').map(l => l.trim().toLowerCase());
+                    return localizations.includes(category.toLowerCase()) || 
+                           (category === 'Cilia' && localizations.includes('ciliary membrane')) ||
+                           (category === 'Flagella' && localizations.includes('axoneme')) ||
+                           (category === 'Ciliary Associated Gene' && localizations.includes('ciliary associated gene'));
+                }).length;
+                return acc;
+            }, {});
+            console.log('Localization counts:', localizationCounts);
+            const chartContainer = document.createElement('div');
+            chartContainer.className = 'page-section';
+            chartContainer.innerHTML = `<h2>Gene Localization Distribution</h2><canvas id="locChart" style="max-height: 300px;"></canvas>`;
+            const contentArea = document.querySelector('.content-area');
+            const existingChart = contentArea.querySelector('#locChart');
+            if (existingChart) existingChart.parentElement.remove();
+            contentArea.appendChild(chartContainer);
+            const ctx = document.getElementById('locChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: categories,
+                    datasets: [{
+                        label: 'Number of Genes',
+                        data: categories.map(category => localizationCounts[category] || 0),
+                        backgroundColor: ['#005566', '#66C2A5', '#D81B60', '#FF7F00', '#6BAED6'],
+                        borderColor: ['#005566', '#66C2A5', '#D81B60', '#FF7F00', '#6BAED6'],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: { 
+                            beginAtZero: true, 
+                            title: { display: true, text: 'Number of Genes' },
+                            ticks: { stepSize: 1 }
+                        },
+                        x: { 
+                            title: { display: true, text: 'Localization' }
+                        }
+                    },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return `${context.label}: ${context.raw} genes`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        window.navigateTo = function(event, path) {
+            if (event) event.preventDefault();
+            window.location.hash = path;
+            
+            handleRouteChange();
+        };
+        window.addEventListener('hashchange', handleRouteChange);
+        document.addEventListener('DOMContentLoaded', handleRouteChange);
+    </script>
+</body>
+</html>
