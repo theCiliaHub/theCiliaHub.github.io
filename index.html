@@ -588,30 +588,52 @@
             document.querySelector('.cilia-panel').style.display = 'none';
             contentArea.innerHTML = `
                 <div class="page-section">
-                    <h2>Compare Genes</h2>
-                    <div style="display: flex; gap: 1rem; margin-bottom: 1rem;">
-                        <select id="compare-gene1" aria-label="Select first gene to compare">
-                            <option value="">Select Gene 1</option>
-                            ${allGenes.map(g => `<option value="${g.gene}">${g.gene}</option>`).join('')}
-                        </select>
-                        <select id="compare-gene2" aria-label="Select second gene to compare">
-                            <option value="">Select Gene 2</option>
-                            ${allGenes.map(g => `<option value="${g.gene}">${g.gene}</option>`).join('')}
-                        </select>
+                    <h2>Advanced Gene Comparison Tool</h2>
+                    <p style="color: #666; margin-bottom: 2rem;">Compare multiple genes side-by-side with visual analysis and filtering options</p>
+                    
+                    <!-- Gene Selection Interface -->
+                    <div class="compare-controls" style="background: #f8f9fa; padding: 1.5rem; border-radius: 10px; margin-bottom: 2rem;">
+                        <div style="display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 1rem; align-items: end;">
+                            <div>
+                                <label for="gene-multiselect" style="font-weight: 600; margin-bottom: 0.5rem; display: block;">Select Genes to Compare:</label>
+                                <div class="multiselect-container" style="position: relative;">
+                                    <input type="text" id="gene-search-input" placeholder="Type to search genes..." 
+                                           style="width: 100%; padding: 0.8rem; border: 2px solid #e1ecf4; border-radius: 8px;">
+                                    <div id="gene-dropdown" class="gene-dropdown" style="display: none;"></div>
+                                </div>
+                            </div>
+                            <div>
+                                <label style="font-weight: 600; margin-bottom: 0.5rem; display: block;">Filter by:</label>
+                                <select id="localization-filter" style="width: 100%; padding: 0.8rem; border: 2px solid #e1ecf4; border-radius: 8px;">
+                                    <option value="">All Localizations</option>
+                                    <option value="Axoneme">Axoneme</option>
+                                    <option value="Basal Body">Basal Body</option>
+                                    <option value="Transition Zone">Transition Zone</option>
+                                    <option value="Ciliary Membrane">Ciliary Membrane</option>
+                                    <option value="Cilia">Cilia</option>
+                                </select>
+                            </div>
+                            <div>
+                                <button id="clear-selection-btn" class="btn btn-secondary" style="width: 100%;">Clear All</button>
+                            </div>
+                        </div>
+                        
+                        <!-- Selected Genes Display -->
+                        <div id="selected-genes" style="margin-top: 1rem;"></div>
                     </div>
-                    <button id="compare-btn" class="search-btn btn btn-primary">Compare</button>
-                    <div id="compare-results" style="margin-top: 2rem;"></div>
+
+                    <!-- Comparison View Tabs -->
+                    <div class="comparison-tabs" style="border-bottom: 2px solid #e1ecf4; margin-bottom: 2rem;">
+                        <button class="tab-btn active" data-tab="table-view" style="padding: 0.8rem 1.5rem; border: none; background: none; cursor: pointer; border-bottom: 3px solid transparent;">Table View</button>
+                        <button class="tab-btn" data-tab="visual-view" style="padding: 0.8rem 1.5rem; border: none; background: none; cursor: pointer; border-bottom: 3px solid transparent;">Visual Analysis</button>
+                        <button class="tab-btn" data-tab="pathway-view" style="padding: 0.8rem 1.5rem; border: none; background: none; cursor: pointer; border-bottom: 3px solid transparent;">Functional Comparison</button>
+                    </div>
+
+                    <!-- Results Container -->
+                    <div id="compare-results"></div>
                 </div>`;
             
-            document.getElementById('compare-btn').onclick = () => {
-                const gene1 = document.getElementById('compare-gene1').value.trim();
-                const gene2 = document.getElementById('compare-gene2').value.trim();
-                
-                const result1 = allGenes.find(item => item.gene === gene1);
-                const result2 = allGenes.find(item => item.gene === gene2);
-                
-                displayComparison(result1, result2);
-            };
+            initializeComparePageInteractions();
         }
 
         function displayComparison(gene1, gene2) {
