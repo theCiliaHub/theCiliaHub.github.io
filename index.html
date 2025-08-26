@@ -178,10 +178,80 @@
         .gene-btn.search-gene { background: #27ae60; color: white; border-color: #27ae60; }
         .gene-btn:hover { background: #2c5aa0; color: white; transform: translateX(3px); }
         .gene-btn.search-gene:hover { background: #219a52; }
-        #comparison-table th, #comparison-table td { border: 1px solid #ddd; padding: 0.5rem; text-align: left; }
-        #comparison-table th { background: #2c5aa0; color: white; }
+        
+        /* Compare Page Specific Styles */
+        .comparison-tool .search-wrapper { position: relative; }
+        #compare-gene-search { width: 100%; padding: 0.8rem; border: 2px solid #e1ecf4; border-radius: 10px; font-size: 1rem; }
+        #compare-search-suggestions { 
+            position: absolute; 
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white; 
+            border: 1px solid #ddd;
+            border-top: none; 
+            border-radius: 0 0 10px 10px;
+            z-index: 1001; 
+            max-height: 250px; 
+            overflow-y: auto; 
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        #compare-search-suggestions div { padding: 0.75rem 1rem; cursor: pointer; border-bottom: 1px solid #eee; }
+        #compare-search-suggestions div:last-child { border-bottom: none; }
+        #compare-search-suggestions div:hover { background-color: #f0f5fa; color: #2c5aa0; }
+
+        .gene-tags-container { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 1rem; padding: 0.5rem 0; }
+        .gene-tag { 
+            background: #2c5aa0; 
+            color: white; 
+            padding: 0.4rem 0.8rem; 
+            border-radius: 16px; 
+            display: inline-flex; 
+            align-items: center; 
+            gap: 0.5rem; 
+            font-size: 0.9rem;
+            animation: popIn 0.3s ease;
+        }
+        @keyframes popIn { from { transform: scale(0.5); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        .remove-tag { 
+            cursor: pointer; 
+            font-weight: bold; 
+            font-size: 1.2rem;
+            line-height: 1;
+            transition: transform 0.2s;
+        }
+        .remove-tag:hover { transform: scale(1.2); color: #ffdddd; }
+
+        .comparison-controls { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #e1ecf4; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem; }
+        .tabs { display: flex; gap: 0.5rem; }
+        .tab-link { 
+            background: none; 
+            border: none; 
+            padding: 0.8rem 1.2rem; 
+            font-size: 1.05rem; 
+            cursor: pointer; 
+            color: #7f8c8d; 
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s ease;
+        }
+        .tab-link:hover { color: #2c3e50; }
+        .tab-link.active { color: #2c5aa0; font-weight: 600; border-bottom-color: #2c5aa0; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; animation: fadeIn 0.5s; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        #comparison-table-wrapper { overflow-x: auto; }
+        #comparison-table { width: 100%; border-collapse: collapse; }
+        #comparison-table th, #comparison-table td { padding: 1rem; border: 1px solid #e1ecf4; text-align: left; vertical-align: top; word-wrap: break-word; }
+        #comparison-table th { background: #2c5aa0; color: white; font-weight: 600; }
+        #comparison-table td:first-child { font-weight: bold; background: #f8f9fa; min-width: 180px; }
         #comparison-table a { color: #2c5aa0; text-decoration: none; }
         #comparison-table a:hover { text-decoration: underline; }
+
+        .functional-comparison-grid { display: grid; gap: 1.5rem; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); }
+        .function-card { background: white; padding: 1.5rem; border-radius: 10px; box-shadow: 0 4px 15px rgba(44,90,160,0.08); border-left: 5px solid #1e90ff; }
+        .function-card h4 { margin: 0 0 0.75rem; color: #2c3e50; font-size: 1.2rem; }
+        .function-card p { color: #555; }
         
         /* Additional styles for data integration */
         .result-item {
@@ -210,12 +280,6 @@
         }
         th {
             background-color: #f2f2f2;
-        }
-        .comparison {
-            margin: 20px 0;
-        }
-        .gene-comparison table {
-            width: 100%;
         }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/@panzoom/panzoom@4.5.1/dist/panzoom.min.js"></script>
@@ -272,6 +336,7 @@
         let allGenes = [];
         let currentData = [];
         let searchResults = [];
+        let localizationChartInstance; // For Chart.js instance management
         const allPartIds = ["cell-body", "nucleus", "basal-body", "transition-zone", "axoneme", "ciliary-membrane"];
         const defaultGenesNames = ["ACE2", "ADAMTS20", "ADAMTS9", "IFT88", "CEP290", "WDR31", "ARL13B", "BBS1"];
 
@@ -588,58 +653,237 @@
             document.querySelector('.cilia-panel').style.display = 'none';
             contentArea.innerHTML = `
                 <div class="page-section">
-                    <h2>Compare Genes</h2>
-                    <div style="display: flex; gap: 1rem; margin-bottom: 1rem;">
-                        <select id="compare-gene1" aria-label="Select first gene to compare">
-                            <option value="">Select Gene 1</option>
-                            ${allGenes.map(g => `<option value="${g.gene}">${g.gene}</option>`).join('')}
-                        </select>
-                        <select id="compare-gene2" aria-label="Select second gene to compare">
-                            <option value="">Select Gene 2</option>
-                            ${allGenes.map(g => `<option value="${g.gene}">${g.gene}</option>`).join('')}
-                        </select>
+                    <h2>Gene Comparison Tool</h2>
+                    <p>Search for and select up to 10 genes to generate a side-by-side comparison of their properties, functions, and localizations.</p>
+                    
+                    <div class="comparison-tool">
+                        <div class="gene-selector">
+                            <div class="search-wrapper">
+                                <input type="text" id="compare-gene-search" placeholder="Search for a gene (e.g., IFT88)" autocomplete="off">
+                                <div id="compare-search-suggestions"></div>
+                            </div>
+                            <div id="selected-genes-tags" class="gene-tags-container"></div>
+                            <div id="gene-limit-message" class="error-message" style="display: none; margin-top: 0.5rem;">Maximum 10 genes can be compared.</div>
+                        </div>
+                        
+                        <div id="comparison-output" style="display:none; margin-top: 2rem;">
+                            <div class="comparison-controls">
+                                <div class="tabs">
+                                    <button class="tab-link active" data-tab="table-view">Table View</button>
+                                    <button class="tab-link" data-tab="visual-analysis">Visual Analysis</button>
+                                    <button class="tab-link" data-tab="functional-comparison">Functional Comparison</button>
+                                </div>
+                                <button id="clear-comparison-btn" class="btn btn-secondary">Clear All</button>
+                            </div>
+
+                            <div id="table-view" class="tab-content active">
+                                <div id="comparison-table-wrapper"></div>
+                            </div>
+                            <div id="visual-analysis" class="tab-content">
+                                <div class="chart-container" style="position: relative; height:400px; width:100%;">
+                                    <canvas id="localization-chart"></canvas>
+                                </div>
+                            </div>
+                            <div id="functional-comparison" class="tab-content">
+                                <div id="functional-cards-grid" class="functional-comparison-grid"></div>
+                            </div>
+                        </div>
+                        <div id="comparison-placeholder" class="status-message">
+                            <p>Add genes to begin comparison.</p>
+                        </div>
                     </div>
-                    <button id="compare-btn" class="search-btn btn btn-primary">Compare</button>
-                    <div id="compare-results" style="margin-top: 2rem;"></div>
                 </div>`;
             
-            document.getElementById('compare-btn').onclick = () => {
-                const gene1 = document.getElementById('compare-gene1').value.trim();
-                const gene2 = document.getElementById('compare-gene2').value.trim();
-                
-                const result1 = allGenes.find(item => item.gene === gene1);
-                const result2 = allGenes.find(item => item.gene === gene2);
-                
-                displayComparison(result1, result2);
-            };
-        }
+            let selectedCompareGenes = [];
+            const MAX_GENES = 10;
+            const searchInput = document.getElementById('compare-gene-search');
+            const suggestionsContainer = document.getElementById('compare-search-suggestions');
+            const tagsContainer = document.getElementById('selected-genes-tags');
+            const outputContainer = document.getElementById('comparison-output');
+            const placeholder = document.getElementById('comparison-placeholder');
+            const limitMessage = document.getElementById('gene-limit-message');
+            const clearButton = document.getElementById('clear-comparison-btn');
 
-        function displayComparison(gene1, gene2) {
-            const compareResults = document.getElementById('compare-results');
-            if (compareResults) {
-                if (!gene1 || !gene2) {
-                    compareResults.innerHTML = '<p class="error-message">Please select both genes to compare.</p>';
+            searchInput.addEventListener('input', handleSearchInput);
+            clearButton.addEventListener('click', clearComparison);
+            document.addEventListener('click', (e) => {
+                if (!searchInput.contains(e.target)) {
+                    suggestionsContainer.style.display = 'none';
+                }
+            });
+
+            function handleSearchInput() {
+                const query = searchInput.value.trim().toLowerCase();
+                if (query.length < 1) {
+                    suggestionsContainer.style.display = 'none';
                     return;
                 }
+
+                const filteredGenes = allGenes.filter(g =>
+                    g.gene.toLowerCase().includes(query) &&
+                    !selectedCompareGenes.some(sg => sg.gene === g.gene)
+                ).slice(0, 10);
                 
-                compareResults.innerHTML = `
-                    <div class="comparison">
-                        <h3>${gene1.gene} vs ${gene2.gene}</h3>
-                        <table>
-                            <tr><th>Feature</th><th>${gene1.gene}</th><th>${gene2.gene}</th></tr>
-                            <tr><td>Description</td><td>${gene1.description || '-'}</td><td>${gene2.description || '-'}</td></tr>
-                            <tr><td>Ensembl ID</td><td>${gene1.ensembl_id ? `<a href="https://www.ensembl.org/Homo_sapiens/Gene/Summary?g=${gene1.ensembl_id}" target="_blank">${gene1.ensembl_id}</a>` : '-'}</td><td>${gene2.ensembl_id ? `<a href="https://www.ensembl.org/Homo_sapiens/Gene/Summary?g=${gene2.ensembl_id}" target="_blank">${gene2.ensembl_id}</a>` : '-'}</td></tr>
-                            <tr><td>OMIM ID</td><td>${gene1.omim_id ? `<a href="https://www.omim.org/entry/${gene1.omim_id}" target="_blank">${gene1.omim_id}</a>` : '-'}</td><td>${gene2.omim_id ? `<a href="https://www.omim.org/entry/${gene2.omim_id}" target="_blank">${gene2.omim_id}</a>` : '-'}</td></tr>
-                            <tr><td>Synonym</td><td>${gene1.synonym || '-'}</td><td>${gene2.synonym || '-'}</td></tr>
-                            <tr><td>Localization</td><td>${gene1.localization || '-'}</td><td>${gene2.localization || '-'}</td></tr>
-                            <tr><td>Functional Summary</td><td>${gene1.functional_summary || '-'}</td><td>${gene2.functional_summary || '-'}</td></tr>
-                            <tr><td>Reference</td><td>${gene1.reference ? `<a href="${gene1.reference}" target="_blank">View Reference</a>` : '-'}</td><td>${gene2.reference ? `<a href="${gene2.reference}" target="_blank">View Reference</a>` : '-'}</td></tr>
-                        </table>
-                    </div>
-                `;
+                if (filteredGenes.length > 0) {
+                    suggestionsContainer.innerHTML = filteredGenes.map(g => `<div data-gene="${g.gene}">${g.gene}</div>`).join('');
+                    suggestionsContainer.style.display = 'block';
+                    suggestionsContainer.querySelectorAll('div').forEach(item => {
+                        item.addEventListener('click', () => addGeneToComparison(item.dataset.gene));
+                    });
+                } else {
+                    suggestionsContainer.style.display = 'none';
+                }
+            }
+
+            function addGeneToComparison(geneName) {
+                if (selectedCompareGenes.length >= MAX_GENES) {
+                    limitMessage.style.display = 'block';
+                    setTimeout(() => { limitMessage.style.display = 'none'; }, 3000);
+                    return;
+                }
+                const geneToAdd = allGenes.find(g => g.gene === geneName);
+                if (geneToAdd && !selectedCompareGenes.some(sg => sg.gene === geneName)) {
+                    selectedCompareGenes.push(geneToAdd);
+                    searchInput.value = '';
+                    suggestionsContainer.style.display = 'none';
+                    renderComparison();
+                }
+            }
+
+            function removeGeneFromComparison(geneName) {
+                selectedCompareGenes = selectedCompareGenes.filter(g => g.gene !== geneName);
+                renderComparison();
+            }
+
+            function clearComparison() {
+                selectedCompareGenes = [];
+                renderComparison();
+            }
+
+            function renderComparison() {
+                renderTags();
+                if (selectedCompareGenes.length > 0) {
+                    outputContainer.style.display = 'block';
+                    placeholder.style.display = 'none';
+                    renderComparisonTable();
+                    renderFunctionalSummaries();
+                    renderLocalizationChart();
+                    setupTabSwitching();
+                } else {
+                    outputContainer.style.display = 'none';
+                    placeholder.style.display = 'block';
+                }
+            }
+
+            function renderTags() {
+                tagsContainer.innerHTML = selectedCompareGenes.map(g => `
+                    <div class="gene-tag">
+                        ${g.gene}
+                        <span class="remove-tag" data-gene="${g.gene}" title="Remove ${g.gene}">&times;</span>
+                    </div>`).join('');
+                tagsContainer.querySelectorAll('.remove-tag').forEach(tag => {
+                    tag.addEventListener('click', (e) => removeGeneFromComparison(e.target.dataset.gene));
+                });
+            }
+            
+            function renderComparisonTable() {
+                const container = document.getElementById('comparison-table-wrapper');
+                const features = ['Description', 'Ensembl ID', 'OMIM ID', 'Synonym', 'Localization', 'Functional Summary', 'Reference'];
+                let tableHTML = '<table id="comparison-table"><thead><tr><th>Feature</th>';
+                selectedCompareGenes.forEach(g => {
+                    tableHTML += `<th><a href="/${g.gene}" onclick="navigateTo(event, '/${g.gene}')">${g.gene}</a></th>`;
+                });
+                tableHTML += '</tr></thead><tbody>';
+                
+                features.forEach(feature => {
+                    tableHTML += `<tr><td>${feature}</td>`;
+                    selectedCompareGenes.forEach(gene => {
+                        let value = '-';
+                        switch(feature) {
+                            case 'Description': value = gene.description || '-'; break;
+                            case 'Ensembl ID': value = gene.ensembl_id ? `<a href="https://www.ensembl.org/Homo_sapiens/Gene/Summary?g=${gene.ensembl_id}" target="_blank">${gene.ensembl_id}</a>` : '-'; break;
+                            case 'OMIM ID': value = gene.omim_id ? `<a href="https://www.omim.org/entry/${gene.omim_id}" target="_blank">${gene.omim_id}</a>` : '-'; break;
+                            case 'Synonym': value = gene.synonym || '-'; break;
+                            case 'Localization': value = gene.localization || '-'; break;
+                            case 'Functional Summary': value = gene.functional_summary || '-'; break;
+                            case 'Reference': value = gene.reference ? `<a href="${gene.reference}" target="_blank">View Reference</a>` : '-'; break;
+                        }
+                        tableHTML += `<td>${value}</td>`;
+                    });
+                    tableHTML += '</tr>';
+                });
+                tableHTML += '</tbody></table>';
+                container.innerHTML = tableHTML;
+            }
+            
+            function renderFunctionalSummaries() {
+                const container = document.getElementById('functional-cards-grid');
+                container.innerHTML = selectedCompareGenes.map(g => `
+                    <div class="function-card">
+                        <h4>${g.gene}</h4>
+                        <p>${g.functional_summary || 'No functional summary available.'}</p>
+                    </div>`).join('');
+            }
+            
+            function renderLocalizationChart() {
+                const ctx = document.getElementById('localization-chart').getContext('2d');
+                const localizationCounts = {};
+                selectedCompareGenes.forEach(gene => {
+                    if (gene.localization) {
+                        gene.localization.split(',').forEach(loc => {
+                            const term = loc.trim();
+                            if (term) {
+                                localizationCounts[term] = (localizationCounts[term] || 0) + 1;
+                            }
+                        });
+                    }
+                });
+                
+                const labels = Object.keys(localizationCounts);
+                const data = Object.values(localizationCounts);
+
+                if (localizationChartInstance) {
+                    localizationChartInstance.destroy();
+                }
+
+                localizationChartInstance = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: 'Number of Genes',
+                            data: data,
+                            backgroundColor: 'rgba(44, 90, 160, 0.7)',
+                            borderColor: 'rgba(44, 90, 160, 1)',
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } },
+                        plugins: { legend: { display: false }, title: { display: true, text: 'Localization Distribution of Selected Genes' } }
+                    }
+                });
+            }
+
+            function setupTabSwitching() {
+                const tabLinks = document.querySelectorAll('.tab-link');
+                const tabContents = document.querySelectorAll('.tab-content');
+                tabLinks.forEach(link => {
+                    link.addEventListener('click', () => {
+                        tabLinks.forEach(l => l.classList.remove('active'));
+                        tabContents.forEach(c => c.classList.remove('active'));
+                        link.classList.add('active');
+                        document.getElementById(link.dataset.tab).classList.add('active');
+                        if (link.dataset.tab === 'visual-analysis') {
+                            renderLocalizationChart();
+                        }
+                    });
+                });
             }
         }
-
+        
         function displayDownloadPage() {
             const contentArea = document.querySelector('.content-area');
             contentArea.className = 'content-area content-area-full';
@@ -688,8 +932,7 @@
                     <div class="cite-list">
                         <h3>Cite CiliaHub</h3>
                         <p style="font-size: 1rem; color: #555; margin-bottom: 1rem;">Please cite the following papers when using CiliaHub data in your research:</p>
-                       <!-- Simple accessible link -->
-<ul>
+                        <ul>
   <li>
     Ferhan Yenisert &amp; Oktay I. Kaplan; 
     <strong>Expanded Catalog of Gold Standard Ciliary Gene List. Integration of Novel Ciliary Genes into the Ciliome.</strong>
@@ -939,7 +1182,7 @@
                                 </div>` : ''}
                             ${gene.synonym ? `<div class="gene-info"><strong>Synonym:</strong> ${gene.synonym}</div>` : ''}
                             <div style="margin-top: 1rem; padding: 0.5rem; background: ${isSearchResult ? '#d5f4e6' : '#e8f4fd'}; 
-                                        border-radius: 5px; font-size: 0.9rem; color: ${isSearchResult ? '#27ae60' : '#1e90ff'};">
+                                    border-radius: 5px; font-size: 0.9rem; color: ${isSearchResult ? '#27ae60' : '#1e90ff'};">
                                 Click to view detailed information →
                             </div>
                         `;
