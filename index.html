@@ -38,8 +38,8 @@
         }
         .page-section { background: white; padding: 2rem; border-radius: 15px; box-shadow: 0 8px 32px rgba(44, 90, 160, 0.1); }
         .search-container { display: flex; gap: 1rem; margin-top: 1rem; }
-        #single-gene-search, #batch-genes-input { padding: 1rem; border: 2px solid #e1ecf4; border-radius: 10px; font-size: 1rem; }
-        #single-gene-search { flex: 1; width: 100%; }
+        #single-gene-search, #batch-genes-input, #co-localize-search { padding: 1rem; border: 2px solid #e1ecf4; border-radius: 10px; font-size: 1rem; }
+        #single-gene-search, #co-localize-search { flex: 1; width: 100%; }
         #batch-genes-input { width: 100%; min-height: 100px; resize: vertical; margin-top: 1rem; margin-bottom: 1rem; }
         .search-btn { padding: 1rem 2rem; background: linear-gradient(135deg, #2c5aa0 0%, #1e3a5f 100%); color: white; border: none; border-radius: 10px; cursor: pointer; font-weight: 600; }
         .search-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(44, 90, 160, 0.3); }
@@ -253,6 +253,25 @@
         .function-card h4 { margin: 0 0 0.75rem; color: #2c3e50; font-size: 1.2rem; }
         .function-card p { color: #555; }
         
+        /* Co-localization Results Styles */
+        .result-card {
+            padding: 1.5rem;
+            border-radius: 10px;
+            margin-top: 1rem;
+            border-left: 5px solid;
+        }
+        .result-card.success { background-color: #e9f7ef; border-color: #27ae60; }
+        .result-card.info { background-color: #e8f4fd; border-color: #1e90ff; }
+        .result-card.error { background-color: #fbeae9; border-color: #e74c3c; }
+        .result-card h4 { margin-top: 0; margin-bottom: 0.5rem; }
+        .result-card .detail-box { 
+            background: white; 
+            padding: 1rem; 
+            border-radius: 8px; 
+            margin-top: 1rem; 
+            border: 1px solid #e1ecf4;
+        }
+        
         /* Additional styles for data integration */
         .result-item {
             border: 1px solid #ddd;
@@ -334,6 +353,7 @@
         // Global variables for data management
         const geneLocalizationData = {};
         let allGenes = [];
+        let mitoLysoGenes = []; // For the new co-localization feature
         let currentData = [];
         let searchResults = [];
         let localizationChartInstance; // For Chart.js instance management
@@ -356,14 +376,31 @@
                 // Set current data to default genes
                 currentData = allGenes.filter(g => defaultGenesNames.includes(g.gene));
                 
-                console.log('Data loaded successfully:', allGenes.length, 'entries');
+                console.log('CiliaHub data loaded successfully:', allGenes.length, 'entries');
                 return true;
             } catch (error) {
-                console.error('Error loading gene database:', error);
+                console.error('Error loading CiliaHub gene database:', error);
                 // Fallback to default data if loading fails
                 allGenes = [...getDefaultGenes()];
                 currentData = [...allGenes];
                 return false;
+            }
+        }
+
+        // Load the new mitochondria/lysosome gene data
+        async function loadMitoLysoDatabase() {
+            try {
+                // IMPORTANT: Make sure the 'mitochondria_lysosome_genes.json' file is in the same directory as your HTML file,
+                // or update the path here.
+                const response = await fetch('mitochondria_lysosome_genes.json');
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                mitoLysoGenes = await response.json();
+                console.log('Mitochondria/Lysosome data loaded successfully:', mitoLysoGenes.length, 'entries');
+            } catch (error) {
+                console.error('Error loading Mitochondria/Lysosome database:', error);
+                // This feature will be gracefully disabled if the file is not found.
             }
         }
 
@@ -440,10 +477,11 @@
         }
 
         async function handleRouteChange() {
-            const dataLoaded = await loadGeneDatabase();
+            await loadGeneDatabase();
+            await loadMitoLysoDatabase(); // Load the new dataset
             const path = window.location.hash.replace('#', '').toLowerCase() || '/';
             const geneName = path.split('/').pop().replace('.html', '').toUpperCase();
-            const gene = allGenes.find(g => g.gene && g.gene.toUpperCase() === geneName);
+            const gene = allGenes.find(g => (g.gene || g.Gene)?.toUpperCase() === geneName);
             
             updateActiveNav(path);
             
@@ -496,6 +534,7 @@
             contentArea.innerHTML = `
                 <div class="page-section">
                     <h1>The CiliaHub: An Updated Database of Gold Standard Genes with Ciliary Functions</h1>
+                    <p style="color: #7f8c8d; font-weight: 600; margin-top: 0.5rem; font-size: 1.1rem;">CiliaHub v1.1.0</p>
                     <p style="font-size: 1.1rem; color: #555;">CiliaHub is an advanced <strong>bioinformatics</strong> platform that hosts a detailed database of <strong>gold standard cilia genes</strong> and their role in various <strong>ciliopathies</strong>. Our comprehensive collection includes the most reliable and well-established genes linked to ciliary function, with reference papers also provided. With our user-friendly search tool, researchers can explore <strong>genome</strong>-wide data, focusing on both known and novel ciliary genes. Discover their contributions to the biology of cilia and the mechanisms behind ciliary-related disorders. Search for a single gene below or use the Batch Query tool to analyze multiple genes.</p>
                     <div class="search-container">
                         <div class="search-wrapper" style="flex: 1;">
@@ -506,9 +545,24 @@
                     </div>
                     <div id="gene-cards-container" class="gene-cards"></div>
                     <div id="status-message" class="status-message" style="display: none;"></div>
-                </div>`;
+                </div>
+
+                <div class="page-section">
+                    <h2>Find Co-localization in Two Organelles</h2>
+                    <p>Search for a gene to check if it has known functions in both cilia and mitochondria/lysosomes.</p>
+                    <div class="search-container">
+                        <input type="text" id="co-localize-search" placeholder="Enter a gene symbol (e.g., CCDC39)" aria-label="Search for a co-localized gene">
+                        <button id="co-localize-btn" class="search-btn">Check Gene</button>
+                    </div>
+                    <div id="co-localize-results" style="margin-top: 1.5rem;"></div>
+                </div>
+            `;
             
+            // Event listeners for the original search
             document.getElementById('single-search-btn').onclick = performSingleSearch;
+            // Event listener for the new co-localization search
+            document.getElementById('co-localize-btn').onclick = performCoLocalizationSearch;
+
             const searchInput = document.getElementById('single-gene-search');
             const suggestionsContainer = document.getElementById('search-suggestions');
             
@@ -518,20 +572,17 @@
                     suggestionsContainer.innerHTML = '';
                     return;
                 }
-                
                 const filteredGenes = allGenes.filter(g => 
                     (g.gene && g.gene.toUpperCase().startsWith(query)) || 
                     (g.synonym && g.synonym.toUpperCase().includes(query))
                 ).slice(0, 10);
-                
                 if (filteredGenes.length > 0) {
                     suggestionsContainer.innerHTML = '<ul>' + 
                         filteredGenes.map(g => `<li>${g.gene}${g.synonym ? ` (${g.synonym})` : ''}</li>`).join('') + 
                         '</ul>';
-                    
                     suggestionsContainer.querySelectorAll('li').forEach(item => {
                         item.addEventListener('click', function() {
-                            searchInput.value = this.textContent.split(' ')[0]; // Get just the gene name
+                            searchInput.value = this.textContent.split(' ')[0];
                             suggestionsContainer.innerHTML = '';
                             performSingleSearch();
                         });
@@ -540,7 +591,7 @@
                     suggestionsContainer.innerHTML = '';
                 }
             });
-            
+
             searchInput.addEventListener('keydown', function(event) {
                 const suggestions = suggestionsContainer.querySelectorAll('li');
                 if (suggestions.length === 0 && event.key !== 'Enter') return;
@@ -549,7 +600,7 @@
                     const activeElement = suggestionsContainer.querySelector('.active');
                     if (activeElement) {
                         event.preventDefault();
-                        searchInput.value = activeElement.textContent.split(' ')[0]; // Get just the gene name
+                        searchInput.value = activeElement.textContent.split(' ')[0];
                         suggestionsContainer.innerHTML = '';
                     }
                     performSingleSearch();
@@ -582,6 +633,59 @@
             
             displayGeneCards(currentData, [], 1, 10);
         }
+
+        function performCoLocalizationSearch() {
+            const query = document.getElementById('co-localize-search').value.trim().toUpperCase();
+            const resultsContainer = document.getElementById('co-localize-results');
+            
+            if (!query) {
+                resultsContainer.innerHTML = '<p class="error-message">Please enter a gene symbol.</p>';
+                return;
+            }
+
+            // Robust search for gene symbol under 'gene' or 'Gene' key
+            const ciliaGene = allGenes.find(g => (g.gene || g.Gene)?.toUpperCase() === query);
+            const mitoLysoGene = mitoLysoGenes.find(g => (g.gene || g.Gene)?.toUpperCase() === query);
+
+            resultsContainer.innerHTML = ''; // Clear previous results
+
+            if (ciliaGene && mitoLysoGene) {
+                resultsContainer.innerHTML = `
+                    <div class="result-card success">
+                        <h4>🎉 Candidate for Co-localization!</h4>
+                        <p><strong>${query}</strong> was found in both the CiliaHub and Mitochondria/Lysosome databases.</p>
+                        <div class="detail-box">
+                            <strong>CiliaHub Info:</strong>
+                            <span><strong>Localization:</strong> ${ciliaGene.localization || 'N/A'}</span><br>
+                            <span><strong>Summary:</strong> ${ciliaGene.functional_summary || 'N/A'}</span>
+                        </div>
+                        <div class="detail-box">
+                            <strong>Mito/Lyso Info:</strong>
+                            <span><strong>Localization:</strong> ${mitoLysoGene.localization || 'N/A'}</span>
+                        </div>
+                    </div>`;
+            } else if (ciliaGene) {
+                resultsContainer.innerHTML = `
+                    <div class="result-card info">
+                        <h4>Found in CiliaHub Only</h4>
+                        <p><strong>${query}</strong> is a known ciliary gene but was not found in our Mitochondria/Lysosome list.</p>
+                    </div>`;
+            } else if (mitoLysoGene) {
+                resultsContainer.innerHTML = `
+                     <div class="result-card info">
+                        <h4>Found in Mito/Lyso Database Only</h4>
+                        <p><strong>${query}</strong> was found in the Mitochondria/Lysosome list but is not in the CiliaHub database.</p>
+                    </div>`;
+            } else {
+                resultsContainer.innerHTML = `
+                     <div class="result-card error">
+                        <h4>Gene Not Found</h4>
+                        <p><strong>${query}</strong> was not found in either the CiliaHub or Mitochondria/Lysosome databases.</p>
+                    </div>`;
+            }
+        }
+        
+        // --- ALL OTHER FUNCTIONS ARE FULLY INCLUDED BELOW ---
 
         function displayBatchQueryTool() {
             const contentArea = document.querySelector('.content-area');
@@ -933,18 +1037,17 @@
                         <h3>Cite CiliaHub</h3>
                         <p style="font-size: 1rem; color: #555; margin-bottom: 1rem;">Please cite the following papers when using CiliaHub data in your research:</p>
                         <ul>
-  <li>
-    Ferhan Yenisert &amp; Oktay I. Kaplan; 
-    <strong>Expanded Catalog of Gold Standard Ciliary Gene List. Integration of Novel Ciliary Genes into the Ciliome.</strong>
-    bioRxiv preprint:
-    <a href="https://www.biorxiv.org/content/10.1101/2025.08.22.671678v1"
-       target="_blank" rel="noopener noreferrer"
-       aria-label="Open bioRxiv preprint in a new tab">
-      https://www.biorxiv.org/content/10.1101/2025.08.22.671678v1
-    </a>
-  </li>
-</ul>
-
+                          <li>
+                            Ferhan Yenisert &amp; Oktay I. Kaplan; 
+                            <strong>Expanded Catalog of Gold Standard Ciliary Gene List. Integration of Novel Ciliary Genes into the Ciliome.</strong>
+                            bioRxiv preprint:
+                            <a href="https://www.biorxiv.org/content/10.1101/2025.08.22.671678v1"
+                               target="_blank" rel="noopener noreferrer"
+                               aria-label="Open bioRxiv preprint in a new tab">
+                              https://www.biorxiv.org/content/10.1101/2025.08.22.671678v1
+                            </a>
+                          </li>
+                        </ul>
                         <p style="font-size: 0.9rem; color: #7f8c8d; margin-top: 1rem;">The reference related to ciliary function of genes can be found on the gene specific page.</p>
                     </div>
                     <div class="feedback-form">
@@ -1198,8 +1301,6 @@
             container.innerHTML = paginatedGenes.map(gene => `
                 <div class="gene-card" data-gene='${JSON.stringify(gene)}'></div>
             `).join('');
-            
-            container.querySelectorAll('.gene-card').forEach(card => observer.observe(card));
             
             const paginationDiv = document.createElement('div');
             paginationDiv.className = 'pagination';
