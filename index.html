@@ -647,6 +647,7 @@
             URL.revokeObjectURL(url);
         }
 
+        // START OF NEW CODE
         function displayComparePage() {
             const contentArea = document.querySelector('.content-area');
             contentArea.className = 'content-area content-area-full';
@@ -671,7 +672,7 @@
                                 <div class="tabs">
                                     <button class="tab-link active" data-tab="table-view">Table View</button>
                                     <button class="tab-link" data-tab="visual-analysis">Visual Analysis</button>
-                                    <button class="tab-link" data-tab="functional-comparison">Functional Comparison</button>
+                                     <button class="tab-link" data-tab="functional-comparison">Functional Comparison without Expression</button>
                                 </div>
                                 <button id="clear-comparison-btn" class="btn btn-secondary">Clear All</button>
                             </div>
@@ -883,6 +884,7 @@
                 });
             }
         }
+        // END OF NEW CODE
         
         function displayDownloadPage() {
             const contentArea = document.querySelector('.content-area');
@@ -932,19 +934,14 @@
                     <div class="cite-list">
                         <h3>Cite CiliaHub</h3>
                         <p style="font-size: 1rem; color: #555; margin-bottom: 1rem;">Please cite the following papers when using CiliaHub data in your research:</p>
+                        
                         <ul>
-  <li>
-    Ferhan Yenisert &amp; Oktay I. Kaplan; 
-    <strong>Expanded Catalog of Gold Standard Ciliary Gene List. Integration of Novel Ciliary Genes into the Ciliome.</strong>
-    bioRxiv preprint:
-    <a href="https://www.biorxiv.org/content/10.1101/2025.08.22.671678v1"
-       target="_blank" rel="noopener noreferrer"
-       aria-label="Open bioRxiv preprint in a new tab">
-      https://www.biorxiv.org/content/10.1101/2025.08.22.671678v1
-    </a>
-  </li>
+    <li>
+        Yenisert, F., & Kaplan, O. I. (2024). 
+        <strong>CiliaHub: an updated database of gold standard genes with ciliary functions.</strong> 
+        <em>(Manuscript in preparation for submission).</em>
+    </li>
 </ul>
-
                         <p style="font-size: 0.9rem; color: #7f8c8d; margin-top: 1rem;">The reference related to ciliary function of genes can be found on the gene specific page.</p>
                     </div>
                     <div class="feedback-form">
