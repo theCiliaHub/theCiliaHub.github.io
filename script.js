@@ -653,7 +653,7 @@ function generateAnalysisPlots() {
         statusDiv.style.display = 'block';
     }
 
-    // Dot Plot (Bubble Chart)
+ // Dot Plot (Bubble Chart)
     const dotPlotCtx = document.getElementById('analysis-dot-plot').getContext('2d');
     analysisDotPlotInstance = new Chart(dotPlotCtx, {
         type: 'bubble',
@@ -684,8 +684,8 @@ function generateAnalysisPlots() {
                 y: {
                     type: 'category',
                     labels: yCategories,
-                    title: { display: true, text: 'Localization', font: { size: 14, weight: 'bold' } },
-                     offset: true
+                    title: { display: true, text: 'Localization', font: { size: 14, weight: 'bold' } }
+                    /* The problematic 'offset: true' line has been removed here */
                 }
             }
         }
