@@ -1442,6 +1442,7 @@
         // --- Expression Visualization System ---
         let expressionData = {};
         let availableGenes = new Set();
+        const organCache = new Map();
 
         async function initExpressionSystem() {
             try {
@@ -1503,7 +1504,7 @@
             rawData.forEach(row => {
                 const geneName = row['Gene name'] || row['Gene'];
                 if (geneName) {
-                    const upperGeneName = geneName.toUpperCase(); // <-- FIX: Standardize to uppercase
+                    const upperGeneName = geneName.toUpperCase(); // Standardize to uppercase
                     const tissue = row['Tissue'];
                     const nTPM = parseFloat(row['nTPM']);
 
@@ -1635,11 +1636,9 @@
 
         function findGeneExpression(geneName) {
             if (!expressionData || !geneName) return null;
-            // Keys are now uppercase, and geneName from search is also uppercase
             return expressionData[geneName] || null;
         }
 
-        const organCache = new Map();
         function findOrganElement(tissueName) {
             if (organCache.has(tissueName)) return organCache.get(tissueName);
 
@@ -1788,6 +1787,7 @@
         }
 
         function prepareOrgansForExpression() {
+            organCache.clear(); // <-- THE FIX: Clear stale cache before setting up the SVG.
             const organMappings = [
                 { tissue: 'cerebral cortex', selector: 'path[fill="#BE0405"]' },
                 { tissue: 'heart muscle', selector: 'path[fill="#F07070"]' },
