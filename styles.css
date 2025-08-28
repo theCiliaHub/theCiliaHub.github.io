@@ -70,17 +70,19 @@ body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background:
 .logo { font-size: 2rem; font-weight: bold; color: #ffffff; text-decoration: none; transition: transform 0.3s ease; margin-right: 2rem; }
 .logo:hover { transform: scale(1.05); }
 .nav-links { display: flex; list-style: none; gap: 0.8rem; flex-wrap: wrap; }
+/* Replace the existing .nav-links a rule with this one */
 .nav-links a { 
     color: #e8f4fd; 
     text-decoration: none; 
-    padding: 0.8rem 1.2rem; /* CHANGED FROM 1.5rem */
+    padding: 0.7rem 1rem; /* Reduced padding */
     border-radius: 25px; 
     transition: all 0.3s ease; 
     font-weight: 600; 
+    font-size: 0.95rem; /* Slightly smaller font */
     background: rgba(255, 255, 255, 0.1); 
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2); 
-    min-width: 120px; 
     text-align: center; 
+    /* The min-width property has been removed to allow links to shrink */
 }
 .nav-links a:hover, .nav-links a.active { 
     background: #ffffff; 
