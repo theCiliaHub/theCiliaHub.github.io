@@ -74,15 +74,14 @@ body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background:
 .nav-links a { 
     color: #e8f4fd; 
     text-decoration: none; 
-    padding: 0.7rem 1rem; /* Reduced padding */
+    padding: 0.8rem 1.2rem;
     border-radius: 25px; 
     transition: all 0.3s ease; 
     font-weight: 600; 
-    font-size: 0.95rem; /* Slightly smaller font */
     background: rgba(255, 255, 255, 0.1); 
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2); 
     text-align: center; 
-    /* The min-width property has been removed to allow links to shrink */
+    /* The rigid min-width property is removed */
 }
 .nav-links a:hover, .nav-links a.active { 
     background: #ffffff; 
