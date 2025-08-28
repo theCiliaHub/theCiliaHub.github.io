@@ -1468,7 +1468,7 @@
 
                 const geneSet = new Set();
                 Object.keys(expressionData).forEach(gene => {
-                    geneSet.add(gene.toUpperCase());
+                    geneSet.add(gene); // Gene names are now already uppercase
                 });
                 availableGenes = geneSet;
 
@@ -1502,14 +1502,17 @@
             const processedData = {};
             rawData.forEach(row => {
                 const geneName = row['Gene name'] || row['Gene'];
-                const tissue = row['Tissue'];
-                const nTPM = parseFloat(row['nTPM']);
+                if (geneName) {
+                    const upperGeneName = geneName.toUpperCase(); // <-- FIX: Standardize to uppercase
+                    const tissue = row['Tissue'];
+                    const nTPM = parseFloat(row['nTPM']);
 
-                if (geneName && tissue && !isNaN(nTPM)) {
-                    if (!processedData[geneName]) {
-                        processedData[geneName] = {};
+                    if (tissue && !isNaN(nTPM)) {
+                        if (!processedData[upperGeneName]) {
+                            processedData[upperGeneName] = {};
+                        }
+                        processedData[upperGeneName][tissue] = nTPM;
                     }
-                    processedData[geneName][tissue] = nTPM;
                 }
             });
             return processedData;
@@ -1631,8 +1634,9 @@
         }
 
         function findGeneExpression(geneName) {
-            if (!expressionData) return null;
-            return expressionData[geneName.toUpperCase()] || null;
+            if (!expressionData || !geneName) return null;
+            // Keys are now uppercase, and geneName from search is also uppercase
+            return expressionData[geneName] || null;
         }
 
         const organCache = new Map();
