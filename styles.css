@@ -1,654 +1,281 @@
-body {
-    margin: 0;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
-    background: #f4f8fb;
-    color: #333;
-    line-height: 1.6;
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #ffffff; color: #2c3e50; line-height: 1.6; }
+.main-container { max-width: 1400px; margin: 2rem auto; padding: 0 2rem; display: grid; grid-template-columns: 1fr 350px; gap: 2rem; align-items: start; }
+.content-area { display: flex; flex-direction: column; gap: 1.5rem; }
+.content-area-full { grid-column: 1 / -1; }
+.navbar { background: linear-gradient(135deg, #2c5aa0 0%, #1e3a5f 100%); padding: 1rem 0; box-shadow: 0 4px 15px rgba(44, 90, 160, 0.3); position: sticky; top: 0; z-index: 1000; }
+.nav-container { max-width: 1200px; margin: 0 auto; padding: 0 2rem; display: flex; justify-content: space-between; align-items: center; }
+.logo { font-size: 2rem; font-weight: bold; color: #ffffff; text-decoration: none; transition: transform 0.3s ease; margin-right: 2rem; }
+.logo:hover { transform: scale(1.05); }
+.nav-links { display: flex; list-style: none; gap: 1rem; flex-wrap: wrap; }
+.nav-links a { 
+    color: #e8f4fd; 
+    text-decoration: none; 
+    padding: 0.8rem 1.5rem; 
+    border-radius: 25px; 
+    transition: all 0.3s ease; 
+    font-weight: 600; 
+    background: rgba(255, 255, 255, 0.1); 
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2); 
+    min-width: 120px; 
+    text-align: center; 
 }
-
-.navbar {
-    background: linear-gradient(90deg, #2c5aa0, #4a89dc);
-    color: white;
-    padding: 1.5rem 0;
-    position: sticky;
-    top: 0;
-    z-index: 1000;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-    border-bottom: 2px solid #66c2a5;
+.nav-links a:hover, .nav-links a.active { 
+    background: #ffffff; 
+    color: #2c5aa0; 
+    transform: translateY(-2px); 
+    box-shadow: 0 4px 15px rgba(44, 90, 160, 0.4); 
 }
-
-.nav-container {
-    max-width: 1400px;
-    margin: 0 auto;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0 2.5rem;
-}
-
-.logo {
-    font-size: 2.2rem;
-    font-weight: 800;
-    text-decoration: none;
-    color: white;
-    letter-spacing: 1px;
-    transition: transform 0.3s ease;
-}
-
-.logo:hover {
-    transform: scale(1.05);
-    text-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
-}
-
-.nav-links {
-    list-style: none;
-    display: flex;
-    gap: 2rem;
-    margin: 0;
-    padding: 0;
-}
-
-.nav-links li a {
-    color: white;
-    text-decoration: none;
-    font-size: 1.2rem;
-    font-weight: 500;
-    padding: 0.5rem 1rem;
-    border-radius: 5px;
-    transition: all 0.3s ease;
-}
-
-.nav-links li a:hover, .nav-links li a.active {
-    background: rgba(255, 255, 255, 0.2);
-    color: #66c2a5;
-    transform: translateY(-2px);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-}
-
-.main-container {
-    display: flex;
-    max-width: 1400px;
-    margin: 0 auto;
-    padding: 2rem;
-    gap: 2rem;
-}
-
-.cilia-panel {
-    width: 300px;
-    background: white;
-    padding: 2rem;
-    border-radius: 15px;
-    box-shadow: 0 8px 32px rgba(44, 90, 160, 0.1);
-    position: sticky;
-    top: 100px;
-}
-
-.cilia-panel h2 {
-    font-size: 1.3rem;
-    color: #2c3e50;
-    margin-bottom: 1.5rem;
-}
-
-.cilia-diagram {
-    margin-bottom: 1.5rem;
-}
-
-.cilia-diagram img {
-    max-width: 100%;
-    height: auto;
-}
-
-.cilia-part {
-    fill: #4a89dc;
-    transition: fill 0.3s, stroke 0.3s;
-}
-
-.cilia-part.cilia {
-    fill: #66c2a5;
-}
-
-.cilia-part.search-gene {
-    fill: #27ae60;
-}
-
-.cilia-part.highlighted {
-    stroke: #e74c3c;
-    stroke-width: 2px;
-}
-
-#cell-body {
-    fill: #d3d3d3;
-}
-
-#nucleus {
-    fill: #d3d3d3;
-}
-
-#geneButtons {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-}
-
-.gene-btn {
-    padding: 0.5rem;
-    background: #e1ecf4;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
-    font-size: 0.9rem;
-    transition: background 0.3s, color 0.3s;
-}
-
-.gene-btn:hover, .gene-btn.search-gene {
-    background: #27ae60;
-    color: white;
-}
-
-.gene-btn.default {
-    background: #4a89dc;
-    color: white;
-}
-
-.gene-btn.reset-btn {
-    background: #95a5a6;
-    color: white;
-}
-
-.content-area {
-    flex: 1;
-    background: white;
-    padding: 2rem;
-    border-radius: 15px;
-    box-shadow: 0 8px 32px rgba(44, 90, 160, 0.1);
-}
-
-.content-area-full {
-    max-width: 100%;
-}
-
-.page-section {
-    max-width: 100%;
-}
-
-.page-section h1 {
-    font-size: 2rem;
-    color: #2c3e50;
-    margin-bottom: 1rem;
-}
-
-.page-section h2 {
-    font-size: 1.5rem;
-    color: #2c3e50;
-    margin-bottom: 1rem;
-}
-
-.search-container {
-    display: flex;
-    gap: 1rem;
-    margin-bottom: 2rem;
-    position: relative;
-}
-
-.search-container.sticky {
-    position: fixed;
-    top: 80px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 80%;
-    max-width: 800px;
-    background: white;
-    padding: 1rem;
-    border-radius: 10px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-    z-index: 999;
-}
-
-.search-wrapper {
-    position: relative;
-    flex: 1;
-}
-
-.search-wrapper input {
-    width: 100%;
-    padding: 0.8rem;
-    border: 2px solid #e1ecf4;
-    border-radius: 10px;
-    font-size: 1rem;
-}
-
-.search-btn {
-    padding: 0.8rem 1.5rem;
-    background: #2c5aa0;
-    color: white;
-    border: none;
-    border-radius: 10px;
-    cursor: pointer;
-    font-size: 1rem;
-    transition: background 0.3s;
-}
-
-.search-btn:hover {
-    background: #4a89dc;
-}
-
-#search-suggestions, #compare-search-suggestions, #suggestions {
+.page-section { background: white; padding: 2rem; border-radius: 15px; box-shadow: 0 8px 32px rgba(44, 90, 160, 0.1); }
+.search-container { display: flex; gap: 1rem; margin-top: 1rem; }
+#single-gene-search, #batch-genes-input { padding: 1rem; border: 2px solid #e1ecf4; border-radius: 10px; font-size: 1rem; }
+#single-gene-search { flex: 1; width: 100%; }
+#batch-genes-input { width: 100%; min-height: 100px; resize: vertical; margin-top: 1rem; margin-bottom: 1rem; }
+.search-btn { padding: 1rem 2rem; background: linear-gradient(135deg, #2c5aa0 0%, #1e3a5f 100%); color: white; border: none; border-radius: 10px; cursor: pointer; font-weight: 600; }
+.search-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(44, 90, 160, 0.3); }
+.search-wrapper { position: relative; }
+#search-suggestions {
     position: absolute;
     top: 100%;
     left: 0;
     right: 0;
     background: white;
-    border: 1px solid #e1ecf4;
-    border-radius: 5px;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-    z-index: 1000;
-    max-height: 200px;
+    border: 1px solid #ddd;
+    border-radius: 0 0 10px 10px;
+    z-index: 999;
+    max-height: 250px;
     overflow-y: auto;
-    display: none;
 }
-
-#search-suggestions ul, #compare-search-suggestions div, #suggestions div {
-    margin: 0;
-    padding: 0;
-    list-style: none;
+#search-suggestions ul { list-style: none; padding: 0; margin: 0; }
+#search-suggestions li { padding: 0.75rem 1rem; cursor: pointer; border-bottom: 1px solid #eee; }
+#search-suggestions li:last-child { border-bottom: none; }
+#search-suggestions li:hover, #search-suggestions li.active { background-color: #f0f5fa; color: #2c5aa0; }
+.gene-cards { display: grid; gap: 1.5rem; }
+.gene-card { background: white; padding: 1.5rem; border-radius: 15px; box-shadow: 0 8px 32px rgba(44, 90, 160, 0.1); transition: all 0.3s ease; border-left: 5px solid transparent; cursor: pointer; }
+.gene-card:hover { transform: translateY(-5px); }
+.gene-card.default { border-left-color: #1e90ff; }
+.gene-card.search-result { border-left-color: #27ae60; }
+.gene-name { font-size: 1.3rem; font-weight: bold; margin-bottom: 0.5rem; }
+.gene-card.default .gene-name { color: #1e90ff; }
+.gene-card.search-result .gene-name { color: #27ae60; }
+.gene-description { color: #7f8c8d; font-size: 0.95rem; }
+.gene-info { font-size: 0.9rem; color: #34495e; margin-bottom: 0.5rem; }
+.gene-info a { color: #2c5aa0; text-decoration: none; }
+.gene-info a:hover { text-decoration: underline; }
+.gene-btn.selected { background: #2c5aa0; color: white; border-color: #2c5aa0; }
+.cilia-panel { background: white; border-radius: 15px; box-shadow: 0 8px 32px rgba(44, 90, 160, 0.1); position: sticky; top: 100px; height: fit-content; }
+.panel-header { background: linear-gradient(135deg, #2c5aa0 0%, #1e3a5f 100%); color: white; padding: 1.5rem; text-align: center; }
+.panel-content { padding: 1.5rem; }
+.cilia-container { text-align: center; margin-bottom: 1.5rem; }
+.interactive-cilium svg { width: 100%; height: 400px; }
+.cilia-part { stroke: #2c3e50; stroke-width: 1.5; transition: all 0.3s ease-in-out; cursor: pointer; }
+.cilia-part:hover { stroke-width: 3; filter: brightness(1.1); }
+.highlighted { fill: #1e90ff !important; opacity: 0.9 !important; animation: pulse 2s infinite; }
+.highlighted.search-gene { fill: #27ae60 !important; }
+.highlighted.cilia { fill: #006400 !important; opacity: 0.9 !important; }
+@keyframes pulse { 0%, 100% { opacity: 0.9; } 50% { opacity: 0.6; } }
+.controls { background: #f8f9fa; padding: 1rem; border-radius: 10px; margin-top: 1rem; }
+.gene-buttons { display: flex; flex-direction: column; gap: 0.5rem; }
+.gene-btn { padding: 0.7rem; border: 1px solid #e1ecf4; border-radius: 8px; background: white; cursor: pointer; font-weight: 600; font-size: 0.9rem; }
+.gene-btn.default { color: #1e90ff; }
+.gene-btn.search-gene { background: #27ae60; color: white; border-color: #27ae60; }
+.gene-btn:hover { background: #2c5aa0; color: white; transform: translateX(3px); }
+.gene-btn.search-gene:hover { background: #219a52; }
+.reset-btn { background: #95a5a6 !important; color: white !important; margin-top: 0.5rem; }
+.reset-btn:hover { background: #7f8c8d !important; }
+.download-options, .contact-info, .cite-list { margin-top: 1rem; }
+.download-options a { display: inline-block; padding: 0.8rem 1.5rem; background: #2c5aa0; color: white; text-decoration: none; border-radius: 8px; margin-right: 1rem; margin-bottom: 1rem; }
+.download-options a:hover { background: #1e3a5f; transform: translateY(-2px); }
+.contact-info, .cite-list { background: #f8f9fa; padding: 1.5rem; border-radius: 10px; }
+.contact-info h3, .cite-list h3 { margin-bottom: 1rem; color: #2c3e50; }
+.contact-info li, .cite-list li { margin-bottom: 0.8rem; font-size: 1rem; }
+.contact-info a { color: #2c5aa0; text-decoration: none; }
+.contact-info a:hover { text-decoration: underline; }
+.feedback-form { margin-top: 2rem; }
+.feedback-form textarea { width: 100%; min-height: 150px; padding: 1rem; border: 2px solid #e1ecf4; border-radius: 10px; font-size: 1rem; margin-top: 0.5rem; }
+.status-message { text-align: center; padding: 3rem; color: #7f8c8d; font-style: italic; }
+.error-message { color: #e74c3c; font-weight: bold; }
+.success-message { color: #27ae60; font-weight: bold; }
+.gene-detail-page { cursor: default; }
+.gene-detail-page h1 { font-size: 2.5rem; margin-top: 1rem; color: #27ae60; }
+.gene-detail-page .gene-description { font-size: 1.1rem; }
+.breadcrumb a { color: #2c5aa0; text-decoration: none; }
+.breadcrumb a:hover { text-decoration: underline; }
+@media (max-width: 992px) {
+    .main-container { grid-template-columns: 1fr; }
+    .cilia-panel { position: relative; top: auto; }
+    .nav-container { flex-direction: column; gap: 1rem; align-items: flex-start; }
+    .nav-links { gap: 1rem; justify-content: flex-start; }
+    .nav-links a { min-width: 100px; }
 }
-
-#search-suggestions li, #compare-search-suggestions div, #suggestions div {
-    padding: 0.8rem;
-    cursor: pointer;
-    transition: background 0.2s;
-}
-
-#search-suggestions li:hover, #search-suggestions li.active, #compare-search-suggestions div:hover, #suggestions div:hover {
-    background: #e1ecf4;
-    color: #2c5aa0;
-}
-
-.filters {
-    display: flex;
-    gap: 1rem;
-    margin-bottom: 1rem;
-}
-
-.filters label {
-    font-weight: 600;
-}
-
-.filters input, .filters select {
-    padding: 0.5rem;
-    border: 2px solid #e1ecf4;
-    border-radius: 5px;
-    font-size: 0.9rem;
-}
-
-#batch-genes-input, #feedback-text {
-    width: 100%;
-    min-height: 100px;
-    padding: 0.8rem;
-    border: 2px solid #e1ecf4;
-    border-radius: 10px;
-    font-size: 1rem;
-    resize: vertical;
-}
-
-#csv-upload {
-    margin: 1rem 0;
-}
-
-#batch-results table, #comparison-table {
-    width: 100%;
-    border-collapse: collapse;
-    margin-top: 1rem;
-}
-
-#batch-results th, #batch-results td, #comparison-table th, #comparison-table td {
-    padding: 0.8rem;
-    border-bottom: 1px solid #e1ecf4;
-    text-align: left;
-}
-
-#batch-results th, #comparison-table th {
-    background: #2c5aa0;
-    color: white;
-}
-
-#batch-results a, #comparison-table a {
-    color: #2c5aa0;
-    text-decoration: none;
-}
-
-#batch-results a:hover, #comparison-table a:hover {
-    text-decoration: underline;
-}
-
-.comparison-tool {
-    background: #f8f9fa;
-    padding: 1.5rem;
-    border-radius: 10px;
-}
-
-.comparison-controls {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 1rem;
-}
-
-.tabs {
-    display: flex;
-    gap: 0.5rem;
-}
-
-.tab-link {
-    padding: 0.5rem 1rem;
-    background: #e1ecf4;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
-    font-size: 0.9rem;
-    transition: background 0.3s;
-}
-
-.tab-link.active, .tab-link:hover {
-    background: #2c5aa0;
-    color: white;
-}
-
-.tab-content {
-    display: none;
-}
-
-.tab-content.active {
-    display: block;
-}
-
-.chart-container {
-    position: relative;
-    margin: auto;
-}
-
-.functional-comparison-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-    gap: 1rem;
-}
-
-.function-card {
-    background: #f8f9fa;
+.search-container.sticky {
+    position: sticky;
+    top: 80px;
+    background: white;
     padding: 1rem;
     border-radius: 10px;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 4px 15px rgba(44, 90, 160, 0.1);
+    z-index: 500;
 }
-
-.function-card h4 {
-    margin: 0 0 0.5rem;
-    color: #2c3e50;
-}
-
-.gene-tags-container {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-    margin-top: 1rem;
-}
-
-.gene-tag {
-    background: #e1ecf4;
-    padding: 0.5rem 1rem;
-    border-radius: 15px;
-    font-size: 0.9rem;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-
-.remove-tag {
-    cursor: pointer;
-    font-weight: bold;
-}
-
-.remove-tag:hover {
-    color: #e74c3c;
-}
-
-.error-message {
-    color: #e74c3c;
-    font-size: 0.9rem;
-}
-
-.status-message {
-    text-align: center;
-    padding: 2rem;
-    color: #666;
-}
-
-.success-message {
-    color: #27ae60;
-}
-
-.gene-cards {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-    gap: 1rem;
-    margin-top: 2rem;
-}
-
-.gene-card {
-    background: #f8f9fa;
-    padding: 1.5rem;
-    border-radius: 10px;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-    cursor: pointer;
-    transition: transform 0.3s, box-shadow 0.3s;
-}
-
-.gene-card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
-}
-
-.gene-card.search-result {
-    background: #d5f4e6;
-}
-
-.gene-card.default {
-    background: #e8f4fd;
-}
-
-.gene-name {
-    font-size: 1.2rem;
-    font-weight: 600;
-    color: #2c3e50;
-    margin-bottom: 0.5rem;
-}
-
-.gene-description {
-    font-size: 0.9rem;
-    color: #555;
-    margin-bottom: 0.5rem;
-}
-
-.gene-info {
-    font-size: 0.9rem;
-    margin-bottom: 0.3rem;
-}
-
-.pagination {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    gap: 1rem;
-    margin-top: 2rem;
-}
-
-.pagination button {
-    padding: 0.5rem 1rem;
-    background: #2c5aa0;
-    color: white;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
-}
-
-.pagination button:disabled {
-    background: #95a5a6;
-    cursor: not-allowed;
-}
-
-.download-options {
-    display: flex;
-    gap: 1rem;
-    margin-top: 1rem;
-}
-
-.download-options a, .download-options button {
-    padding: 0.8rem 1.5rem;
-    background: #2c5aa0;
-    color: white;
-    text-decoration: none;
-    border-radius: 10px;
-    font-size: 1rem;
-}
-
-.download-options a:hover, .download-options button:hover {
-    background: #4a89dc;
-}
-
-.contact-info, .cite-list, .feedback-form {
-    margin-bottom: 2rem;
-}
-
-.contact-info ul, .cite-list ul {
-    list-style: none;
-    padding: 0;
-}
-
-.contact-info li, .cite-list li {
-    margin-bottom: 0.5rem;
-}
-
-.contact-info a, .cite-list a {
-    color: #2c5aa0;
-    text-decoration: none;
-}
-
-.contact-info a:hover, .cite-list a:hover {
-    text-decoration: underline;
-}
-
+.pagination { display: flex; justify-content: center; gap: 1rem; margin-top: 1rem; }
+.pagination button { padding: 0.5rem 1rem; background: #2c5aa0; color: white; border: none; border-radius: 8px; cursor: pointer; }
+.pagination button:disabled { background: #95a5a6; cursor: not-allowed; }
+.tooltip { position: relative; display: inline-block; cursor: pointer; }
+.tooltip-icon { background: #2c5aa0; color: white; border-radius: 50%; width: 20px; height: 20px; text-align: center; line-height: 20px; }
+.tooltip-text { visibility: hidden; position: absolute; background: #fff; border: 1px solid #ddd; padding: 1rem; border-radius: 8px; width: 200px; z-index: 10; }
+.tooltip:hover .tooltip-text { visibility: visible; }
 .btn {
-    cursor: pointer;
-    transition: background 0.3s;
-}
-
-.btn-primary {
-    background: #2c5aa0;
-    color: white;
-    border: none;
     padding: 0.8rem 1.5rem;
-    border-radius: 10px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: all 0.3s ease;
 }
-
+.btn-primary {
+    background: linear-gradient(135deg, #2c5aa0 0%, #1e3a5f 100%);
+    color: white;
+}
 .btn-primary:hover {
-    background: #4a89dc;
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(44, 90, 160, 0.3);
 }
-
 .btn-secondary {
     background: #95a5a6;
     color: white;
-    border: none;
-    padding: 0.5rem 1rem;
-    border-radius: 5px;
 }
-
 .btn-secondary:hover {
     background: #7f8c8d;
 }
-
-.tooltip {
-    position: relative;
-    display: inline-block;
-}
-
-.tooltip-icon {
-    background: #2c5aa0;
+.search-btn, .gene-btn, .reset-btn {
+    padding: 0.8rem 1.5rem;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    background: linear-gradient(135deg, #2c5aa0 0%, #1e3a5f 100%);
     color: white;
-    border-radius: 50%;
-    width: 16px;
-    height: 16px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 0.8rem;
-    cursor: help;
 }
+.reset-btn {
+    background: #95a5a6 !important;
+    color: white !important;
+}
+.reset-btn:hover {
+    background: #7f8c8d !important;
+}
+.gene-btn.default { background: white; color: #1e90ff; border: 1px solid #e1ecf4; }
+.gene-btn.search-gene { background: #27ae60; color: white; border-color: #27ae60; }
+.gene-btn:hover { background: #2c5aa0; color: white; transform: translateX(3px); }
+.gene-btn.search-gene:hover { background: #219a52; }
 
-.tooltip-text {
-    visibility: hidden;
-    width: 200px;
-    background: #2c3e50;
-    color: white;
-    text-align: center;
-    padding: 0.5rem;
-    border-radius: 5px;
+/* Compare Page Specific Styles */
+.comparison-tool .search-wrapper { position: relative; }
+#compare-gene-search { width: 100%; padding: 0.8rem; border: 2px solid #e1ecf4; border-radius: 10px; font-size: 1rem; }
+#compare-search-suggestions { 
+    position: absolute; 
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: white; 
+    border: 1px solid #ddd;
+    border-top: none; 
+    border-radius: 0 0 10px 10px;
+    z-index: 1001; 
+    max-height: 250px; 
+    overflow-y: auto; 
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+}
+#compare-search-suggestions div { padding: 0.75rem 1rem; cursor: pointer; border-bottom: 1px solid #eee; }
+#compare-search-suggestions div:last-child { border-bottom: none; }
+#compare-search-suggestions div:hover { background-color: #f0f5fa; color: #2c5aa0; }
+
+.gene-tags-container { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 1rem; padding: 0.5rem 0; }
+.gene-tag { 
+    background: #2c5aa0; 
+    color: white; 
+    padding: 0.4rem 0.8rem; 
+    border-radius: 16px; 
+    display: inline-flex; 
+    align-items: center; 
+    gap: 0.5rem; 
+    font-size: 0.9rem;
+    animation: popIn 0.3s ease;
+}
+@keyframes popIn { from { transform: scale(0.5); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+.remove-tag { 
+    cursor: pointer; 
+    font-weight: bold; 
+    font-size: 1.2rem;
+    line-height: 1;
+    transition: transform 0.2s;
+}
+.remove-tag:hover { transform: scale(1.2); color: #ffdddd; }
+
+.comparison-controls { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #e1ecf4; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem; }
+.tabs { display: flex; gap: 0.5rem; }
+.tab-link { 
+    background: none; 
+    border: none; 
+    padding: 0.8rem 1.2rem; 
+    font-size: 1.05rem; 
+    cursor: pointer; 
+    color: #7f8c8d; 
+    border-bottom: 3px solid transparent;
+    transition: all 0.3s ease;
+}
+.tab-link:hover { color: #2c3e50; }
+.tab-link.active { color: #2c5aa0; font-weight: 600; border-bottom-color: #2c5aa0; }
+.tab-content { display: none; }
+.tab-content.active { display: block; animation: fadeIn 0.5s; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+#comparison-table-wrapper { overflow-x: auto; }
+#comparison-table { width: 100%; border-collapse: collapse; }
+#comparison-table th, #comparison-table td { padding: 1rem; border: 1px solid #e1ecf4; text-align: left; vertical-align: top; word-wrap: break-word; }
+#comparison-table th { background: #2c5aa0; color: white; font-weight: 600; }
+#comparison-table td:first-child { font-weight: bold; background: #f8f9fa; min-width: 180px; }
+#comparison-table a { color: #2c5aa0; text-decoration: none; }
+#comparison-table a:hover { text-decoration: underline; }
+
+.functional-comparison-grid { display: grid; gap: 1.5rem; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); }
+.function-card { background: white; padding: 1.5rem; border-radius: 10px; box-shadow: 0 4px 15px rgba(44,90,160,0.08); border-left: 5px solid #1e90ff; }
+.function-card h4 { margin: 0 0 0.75rem; color: #2c3e50; font-size: 1.2rem; }
+.function-card p { color: #555; }
+
+/* Expression Page Specific Styles */
+#suggestions {
     position: absolute;
-    z-index: 1;
-    bottom: 125%;
-    left: 50%;
-    transform: translateX(-50%);
-    font-size: 0.8rem;
+    background: white;
+    border: 1px solid #ddd;
+    border-top: none;
+    border-radius: 0 0 8px 8px;
+    z-index: 1000;
+    max-height: 250px;
+    overflow-y: auto;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
 }
-
-.tooltip:hover .tooltip-text {
-    visibility: visible;
+.suggestion-item {
+    padding: 0.75rem 1rem;
+    cursor: pointer;
+    border-bottom: 1px solid #eee;
 }
+.suggestion-item:last-child { border-bottom: none; }
+.suggestion-item:hover { background-color: #f0f5fa; }
+.suggestion-gene { font-weight: 600; color: #2c5aa0; }
+.suggestion-description { font-size: 0.85rem; color: #7f8c8d; }
 
-@media (max-width: 768px) {
-    .navbar {
-        padding: 1rem 0;
-    }
-
-    .nav-container {
-        flex-direction: column;
-        gap: 1.5rem;
-        padding: 0 1.5rem;
-    }
-
-    .logo {
-        font-size: 1.8rem;
-    }
-
-    .nav-links {
-        flex-direction: column;
-        align-items: center;
-        gap: 1rem;
-    }
-
-    .nav-links li a {
-        font-size: 1rem;
-        padding: 0.4rem 0.8rem;
-    }
-
-    .main-container {
-        flex-direction: column;
-        padding: 1rem;
-    }
-
-    .cilia-panel {
-        position: static;
-    }
-
-    .search-container.sticky {
-        position: static;
-        transform: none;
-        width: 100%;
-    }
-
-    .gene-cards {
-        grid-template-columns: 1fr;
-    }
-
-    .functional-comparison-grid {
-        grid-template-columns: 1fr;
-    }
+/* Additional styles for data integration (Batch Query) */
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 10px 0;
+}
+th, td {
+    border: 1px solid #ddd;
+    padding: 8px;
+    text-align: left;
+}
+th {
+    background-color: #f2f2f2;
 }
