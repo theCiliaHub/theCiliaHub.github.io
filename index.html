@@ -602,16 +602,16 @@
             document.querySelector('.cilia-panel').style.display = 'block';
             contentArea.innerHTML = `
                 <div class="page-section">
-                    <h2>Batch Gene Query</h2>
+                    <h2>Batch Gene Query & Analysis</h2>
                     <p style="font-size: 1rem; color: #555;">
-                        Enter multiple gene names (comma, space, or newline separated) OR upload a CSV file.
+                        Enter a list of gene names to find matching genes in CiliaHub and visualize their biological categories.
                         <span class="tooltip" aria-label="Help">
                             <span class="tooltip-icon">?</span>
-                            <span class="tooltip-text">Enter gene names like: ACE2, IFT88, CEP290. For CSV, use a single column with gene names. <a href="/sample_genes.csv" download>Download sample CSV</a>.</span>
+                            <span class="tooltip-text">Enter gene names separated by commas, spaces, or new lines.</span>
                         </span>
                     </p>
                     <div style="margin-bottom: 1rem;">
-                        <label for="localization-filter" style="font-weight: 600;">Filter by Localization:</label>
+                        <label for="localization-filter" style="font-weight: 600;">Filter Table by Localization:</label>
                         <select id="localization-filter" aria-label="Filter by localization">
                             <option value="">All Localizations</option>
                             <option value="Axoneme">Axoneme</option>
@@ -621,29 +621,21 @@
                             <option value="Cilia">Cilia</option>
                         </select>
                     </div>
-                    <div class="filters">
-                        <label for="keyword-filter">Keyword Search:</label>
-                        <input type="text" id="keyword-filter" placeholder="e.g., transport, ciliopathy" aria-label="Filter by keyword">
-                    </div>
                     <label for="batch-genes-input" style="font-weight: 600;">Enter gene names:</label>
                     <textarea id="batch-genes-input" placeholder="e.g., ACE2, IFT88, CEP290" aria-label="Enter multiple gene names"></textarea>
                     <div style="margin-top: 1rem;">
-                        <label for="csv-upload" style="font-weight: 600;">Or upload CSV file:</label>
-                        <input type="file" id="csv-upload" accept=".csv" />
+                        <button id="batch-search-btn" class="search-btn btn btn-primary" aria-label="Search and Analyze">Analyze Gene List</button>
+                        <button id="export-results-btn" class="search-btn btn-secondary" style="margin-left: 1rem;" aria-label="Export search results as CSV">Export Table Results</button>
                     </div>
-                    <button id="batch-search-btn" class="search-btn btn btn-primary" aria-label="Search genes">Search Genes</button>
-                    <button id="export-results-btn" class="search-btn btn btn-primary" style="margin-left: 1rem;" aria-label="Export search results as CSV">Export Results</button>
+                    <div id="analysis-results" style="min-height: 400px; margin-top: 2rem;"></div>
                     <div id="batch-results"></div>
-                    <div id="gene-cards-container" class="gene-cards"></div>
+                    <div id="gene-cards-container" class="gene-cards" style="display:none;"></div>
                     <div id="status-message" class="status-message" style="display: none;"></div>
                 </div>`;
             
-            document.getElementById('csv-upload').addEventListener('change', handleCSVUpload);
             document.getElementById('batch-search-btn').onclick = performBatchSearch;
             document.getElementById('batch-genes-input').onkeydown = e => { if (e.key === 'Enter' && e.ctrlKey) performBatchSearch(); };
             document.getElementById('export-results-btn').onclick = exportSearchResults;
-            
-            displayGeneCards(currentData, [], 1, 10);
         }
 
         function exportSearchResults() {
@@ -1122,9 +1114,9 @@
         }
 
         function performBatchSearch() {
-            const queries = document.getElementById('batch-genes-input').value.split(/[\s,\n]+/).filter(Boolean).map(q => q.trim().toUpperCase());
+            const userInput = document.getElementById('batch-genes-input').value;
+            const queries = userInput.split(/[\s,\n]+/).filter(Boolean).map(q => q.trim().toUpperCase());
             const localizationFilter = document.getElementById('localization-filter')?.value;
-            const keywordFilter = document.getElementById('keyword-filter')?.value.toLowerCase();
             const statusDiv = document.getElementById('status-message');
             
             if (queries.length === 0) {
@@ -1135,7 +1127,7 @@
             
             let results = allGenes.filter(g => 
                 queries.some(q => 
-                    (g.gene && g.gene.toUpperCase().includes(q)) || 
+                    (g.gene && g.gene.toUpperCase() === q) || 
                     (g.synonym && g.synonym.toUpperCase().includes(q))
                 )
             );
@@ -1144,23 +1136,19 @@
                 results = results.filter(g => g.localization && g.localization.includes(localizationFilter));
             }
             
-            if (keywordFilter) {
-                results = results.filter(g => 
-                    (g.functional_summary && g.functional_summary.toLowerCase().includes(keywordFilter)) || 
-                    (g.description && g.description.toLowerCase().includes(keywordFilter))
-                );
-            }
-            
             statusDiv.style.display = 'none';
             searchResults = results;
             
+            // --- NEW ANALYSIS CALL ---
+            const userGeneList = userInput.split(/[\s,\n]+/).filter(Boolean);
+            const analysisData = analyzeGeneList(userGeneList);
+            displayAnalysisResults(analysisData);
+            // -------------------------
+
             if (results.length > 0) {
                 displayBatchResults(results);
-                displayGeneCards(currentData, results, 1, 10);
             } else {
-                statusDiv.innerHTML = `<span class="error-message">No genes found matching your query.</span>`;
-                statusDiv.style.display = 'block';
-                displayGeneCards(currentData, [], 1, 10);
+                document.getElementById('batch-results').innerHTML = '<p>No matching genes found in the table based on your filters.</p>';
             }
         }
 
@@ -1169,12 +1157,12 @@
             if (!batchResults) return;
             
             if (results.length === 0) {
-                batchResults.innerHTML = '<p class="error-message">No matching genes found</p>';
+                batchResults.innerHTML = '';
                 return;
             }
             
             let html = `
-                <h3>Search Results (${results.length} genes found)</h3>
+                <h3 style="margin-top: 2rem;">Matched Genes in CiliaHub</h3>
                 <table>
                     <tr>
                         <th>Gene</th>
@@ -1185,7 +1173,7 @@
             
             results.forEach(item => {
                 html += `<tr>
-                    <td><a href="/${item.gene}" onclick="navigateTo(event, '/${item.gene}')">${item.gene}</a></td>
+                    <td><a href="/#/${item.gene}" onclick="navigateTo(event, '/${item.gene}')">${item.gene}</a></td>
                     <td>${item.ensembl_id || '-'}</td>
                     <td>${item.localization || '-'}</td>
                     <td>${item.functional_summary ? item.functional_summary.substring(0, 100) + '...' : '-'}</td>
@@ -1375,6 +1363,104 @@
                 searchContainer.classList.remove('sticky');
             }
         }
+        
+        // --- Gene List Analysis and Visualization Functions ---
+
+        let analysisLocalizationChart;
+
+        function analyzeGeneList(userGeneList) {
+            const upperUserGeneList = userGeneList.map(g => g.toUpperCase());
+            
+            const matchedGenes = allGenes.filter(hubGene => 
+                upperUserGeneList.includes(hubGene.gene.toUpperCase())
+            );
+
+            const localizationCounts = {};
+
+            matchedGenes.forEach(gene => {
+                if (gene.localization) {
+                    const locations = gene.localization.split(',').map(loc => loc.trim());
+                    locations.forEach(loc => {
+                        localizationCounts[loc] = (localizationCounts[loc] || 0) + 1;
+                    });
+                } else {
+                    localizationCounts['Unspecified'] = (localizationCounts['Unspecified'] || 0) + 1;
+                }
+            });
+
+            return {
+                submittedCount: userGeneList.length,
+                matchedCount: matchedGenes.length,
+                localizationCounts: localizationCounts,
+            };
+        }
+
+        function displayAnalysisResults(analysisData) {
+            const container = document.getElementById('analysis-results');
+            if (!container) return;
+
+            container.innerHTML = ''; 
+            if (analysisLocalizationChart) analysisLocalizationChart.destroy();
+
+            if (analysisData.matchedCount === 0) {
+                container.innerHTML = `<h3 style="margin-top: 2.5rem; border-bottom: 2px solid #e1ecf4; padding-bottom: 0.5rem;">Analysis of Your Gene List</h3><p>No genes from your list were found in the CiliaHub database.</p>`;
+                return;
+            }
+
+            const percentage = analysisData.submittedCount > 0 ? 
+                ((analysisData.matchedCount / analysisData.submittedCount) * 100).toFixed(1) : 0;
+            
+            const summaryHTML = `
+                <h3 style="margin-top: 2.5rem; border-bottom: 2px solid #e1ecf4; padding-bottom: 0.5rem;">Analysis of Your Gene List</h3>
+                <p>
+                    You submitted <strong>${analysisData.submittedCount}</strong> unique genes. 
+                    Of those, <strong>${analysisData.matchedCount}</strong> (${percentage}%) were found in the CiliaHub database.
+                </p>
+            `;
+            container.innerHTML = summaryHTML;
+
+            const locLabels = Object.keys(analysisData.localizationCounts);
+            const locData = Object.values(analysisData.localizationCounts);
+
+            if (locLabels.length > 0) {
+                const canvas = document.createElement('canvas');
+                container.appendChild(canvas);
+
+                analysisLocalizationChart = new Chart(canvas, {
+                    type: 'bar',
+                    data: {
+                        labels: locLabels,
+                        datasets: [{
+                            label: '# of Genes',
+                            data: locData,
+                            backgroundColor: 'rgba(44, 90, 160, 0.7)',
+                            borderColor: 'rgba(44, 90, 160, 1)',
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        indexAxis: 'y',
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false },
+                            title: {
+                                display: true,
+                                text: 'Localization of Your Matched Genes',
+                                font: { size: 16 }
+                            }
+                        },
+                        scales: {
+                            x: {
+                                ticks: {
+                                    stepSize: 1
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+        }
 
         function displayLocalizationChart() {
             const categories = ['Cilia', 'Basal Body', 'Transition Zone', 'Flagella', 'Ciliary Associated Gene'];
@@ -1439,6 +1525,7 @@
                 }
             });
         }
+        
         // --- Expression Visualization System ---
         let expressionData = {};
         let availableGenes = new Set();
@@ -1469,7 +1556,7 @@
 
                 const geneSet = new Set();
                 Object.keys(expressionData).forEach(gene => {
-                    geneSet.add(gene); // Gene names are now already uppercase
+                    geneSet.add(gene);
                 });
                 availableGenes = geneSet;
 
@@ -1504,7 +1591,7 @@
             rawData.forEach(row => {
                 const geneName = row['Gene name'] || row['Gene'];
                 if (geneName) {
-                    const upperGeneName = geneName.toUpperCase(); // Standardize to uppercase
+                    const upperGeneName = geneName.toUpperCase();
                     const tissue = row['Tissue'];
                     const nTPM = parseFloat(row['nTPM']);
 
@@ -1787,7 +1874,7 @@
         }
 
         function prepareOrgansForExpression() {
-            organCache.clear(); // <-- THE FIX: Clear stale cache before setting up the SVG.
+            organCache.clear();
             const organMappings = [
                 { tissue: 'cerebral cortex', selector: 'path[fill="#BE0405"]' },
                 { tissue: 'heart muscle', selector: 'path[fill="#F07070"]' },
