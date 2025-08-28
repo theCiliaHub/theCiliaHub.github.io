@@ -170,63 +170,71 @@ function displayHomePage() {
     const suggestionsContainer = document.getElementById('search-suggestions');
     if (searchInput && suggestionsContainer) {
         searchInput.addEventListener('input', function() {
-            const query = this.value.trim().toUpperCase();
+            const query = this.value.trim();
             if (query.length < 1) {
+                suggestionsContainer.style.display = 'none';
                 suggestionsContainer.innerHTML = '';
                 return;
             }
             const filteredGenes = allGenes.filter(g => 
-                (g.gene && g.gene.toUpperCase().startsWith(query)) || 
-                (g.synonym && g.synonym.toUpperCase().includes(query))
+                (g.gene && g.gene.toLowerCase().startsWith(query.toLowerCase())) || 
+                (g.synonym && g.synonym.toLowerCase().includes(query.toLowerCase()))
             ).slice(0, 10);
-            if (filteredGenes.length > 0) {
-                suggestionsContainer.innerHTML = '<ul>' + 
-                    filteredGenes.map(g => `<li>${g.gene}${g.synonym ? ` (${g.synonym})` : ''}</li>`).join('') + 
-                    '</ul>';
-                suggestionsContainer.querySelectorAll('li').forEach(item => {
-                    item.addEventListener('click', function() {
-                        searchInput.value = this.textContent.split(' ')[0];
-                        suggestionsContainer.innerHTML = '';
-                        performSingleSearch();
-                    });
+            suggestionsContainer.innerHTML = filteredGenes.length > 0
+                ? '<ul>' + filteredGenes.map(g => `<li data-gene="${g.gene}">${g.gene}${g.synonym ? ` (${g.synonym})` : ''}</li>`).join('') + '</ul>'
+                : '<div style="padding: 0.8rem; color: #666;">No matches found</div>';
+            suggestionsContainer.style.display = filteredGenes.length > 0 ? 'block' : 'none';
+            suggestionsContainer.querySelectorAll('li').forEach((item, index) => {
+                item.addEventListener('click', () => {
+                    searchInput.value = item.dataset.gene;
+                    suggestionsContainer.style.display = 'none';
+                    performSingleSearch();
                 });
-            } else {
-                suggestionsContainer.innerHTML = '';
-            }
+                item.addEventListener('mouseover', () => {
+                    suggestionsContainer.querySelectorAll('li').forEach(i => i.classList.remove('active'));
+                    item.classList.add('active');
+                });
+            });
         });
         searchInput.addEventListener('keydown', function(event) {
             const suggestions = suggestionsContainer.querySelectorAll('li');
-            if (suggestions.length === 0 && event.key !== 'Enter') return;
+            if (suggestions.length === 0) return;
+            let activeIndex = Array.from(suggestions).findIndex(item => item.classList.contains('active'));
             if (event.key === 'Enter') {
-                const activeElement = suggestionsContainer.querySelector('.active');
-                if (activeElement) {
-                    event.preventDefault();
-                    searchInput.value = activeElement.textContent.split(' ')[0];
-                    suggestionsContainer.innerHTML = '';
-                }
-                performSingleSearch();
-                return;
-            }
-            const activeElement = suggestionsContainer.querySelector('.active');
-            if (event.key === 'ArrowDown') {
                 event.preventDefault();
-                let nextElement = activeElement ? activeElement.nextElementSibling : suggestions[0];
-                if (nextElement) {
-                    activeElement?.classList.remove('active');
-                    nextElement.classList.add('active');
+                if (activeIndex >= 0) {
+                    searchInput.value = suggestions[activeIndex].dataset.gene;
+                    suggestionsContainer.style.display = 'none';
+                    performSingleSearch();
+                }
+            } else if (event.key === 'ArrowDown') {
+                event.preventDefault();
+                if (activeIndex < suggestions.length - 1) {
+                    suggestions[activeIndex]?.classList.remove('active');
+                    suggestions[activeIndex + 1].classList.add('active');
+                } else {
+                    suggestions[activeIndex]?.classList.remove('active');
+                    suggestions[0].classList.add('active');
                 }
             } else if (event.key === 'ArrowUp') {
                 event.preventDefault();
-                let prevElement = activeElement ? activeElement.previousElementSibling : suggestions[suggestions.length - 1];
-                if (prevElement) {
-                    activeElement?.classList.remove('active');
-                    prevElement.classList.add('active');
+                if (activeIndex > 0) {
+                    suggestions[activeIndex]?.classList.remove('active');
+                    suggestions[activeIndex - 1].classList.add('active');
+                } else {
+                    suggestions[activeIndex]?.classList.remove('active');
+                    suggestions[suggestions.length - 1].classList.add('active');
                 }
             }
         });
+        searchInput.addEventListener('focus', () => {
+            if (searchInput.value.trim().length > 0) {
+                searchInput.dispatchEvent(new Event('input'));
+            }
+        });
         document.addEventListener('click', function(event) {
-            if (!searchInput.contains(event.target)) {
-                suggestionsContainer.innerHTML = '';
+            if (!searchInput.contains(event.target) && !suggestionsContainer.contains(event.target)) {
+                suggestionsContainer.style.display = 'none';
             }
         });
     } else {
@@ -235,65 +243,70 @@ function displayHomePage() {
     displayGeneCards(currentData, [], 1, 10);
 }
 
-// ... (rest of the functions remain the same as in the previous version until displayExpressionPage)
-
-function displayExpressionPage() {
-    const contentArea = document.querySelector('.content-area');
-    contentArea.className = 'content-area content-area-full';
-    document.querySelector('.cilia-panel').style.display = 'none';
-    contentArea.innerHTML = `
-        <div class="page-section">
-            <div style="text-align: center; margin-bottom: 2rem;">
-                <h1 style="color: #2c5aa0; margin-bottom: 1rem;">Gene Expression Visualization</h1>
-                <p style="color: #555; font-size: 1.1rem;">Explore tissue-specific gene expression patterns across human organs and tissues.</p>
-            </div>
-            <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 2rem; align-items: start;">
-                <div style="background: white; padding: 2rem; border-radius: 15px; box-shadow: 0 8px 32px rgba(44, 90, 160, 0.1); height: fit-content; position: relative;">
-                    <h3 style="color: #2c5aa0; margin-bottom: 1.5rem; font-size: 1.3rem;">Gene Search</h3>
-                    <div style="margin-bottom: 1.5rem;">
-                        <input type="text" id="gene-search" style="width: 100%; padding: 1rem; border: 2px solid #e1ecf4; border-radius: 10px; font-size: 1rem; margin-bottom: 1rem;" placeholder="Search for a gene (e.g., ARL13B, IFT88)" autocomplete="off">
-                        <div id="suggestions"></div>
-                    </div>
-                    <div id="selected-gene-info" style="display: none;">
-                        <h4 style="color: #2c5aa0; margin-bottom: 1rem;">Selected Gene</h4>
-                        <div id="gene-details"></div>
-                    </div>
-                </div>
-                <div style="background: white; padding: 2rem; border-radius: 15px; box-shadow: 0 8px 32px rgba(44, 90, 160, 0.1);">
-                    <h3 style="color: #2c5aa0; margin-bottom: 1.5rem; font-size: 1.3rem;">Expression Visualization</h3>
-                    <div style="text-align: center; margin-bottom: 2rem;">
-                        <div id="svg-container" style="max-width: 100%; height: auto;">
-                            <div style="text-align: center; padding: 2rem; color: #666;">
-                                <p>Loading human body visualization...</p>
-                            </div>
-                        </div>
-                    </div>
-                    <div style="display: flex; justify-content: center; gap: 1rem; margin: 1.5rem 0; flex-wrap: wrap;">
-                        <div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem;"><div style="width: 20px; height: 20px; border-radius: 4px; border: 1px solid #ccc; background-color: #A8E6A1;"></div><span>Low (0-5 nTPM)</span></div>
-                        <div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem;"><div style="width: 20px; height: 20px; border-radius: 4px; border: 1px solid #ccc; background-color: #6CC96C;"></div><span>Medium (5-15 nTPM)</span></div>
-                        <div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem;"><div style="width: 20px; height: 20px; border-radius: 4px; border: 1px solid #ccc; background-color: #3FAF3F;"></div><span>High (15-30 nTPM)</span></div>
-                        <div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem;"><div style="width: 20px; height: 20px; border-radius: 4px; border: 1px solid #ccc; background-color: #1E7B1E;"></div><span>Very High (>30 nTPM)</span></div>
-                    </div>
-                    <div style="margin-top: 2rem;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                            <h4 style="color: #2c5aa0; margin: 0;">Expression Data Table</h4>
-                            <button id="reset-organs-btn" style="padding: 0.5rem 1rem; background: #95a5a6; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 0.9rem;">Reset Organ Selection</button>
-                        </div>
-                        <div id="expression-table-wrapper">
-                            <div style="text-align: center; padding: 2rem; color: #666; font-style: italic;">Click on an organ to see its gene expression data, or search for a specific gene</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>`;
-    initExpressionSystem();
+function performSingleSearch() {
+    const query = document.getElementById('single-gene-search').value.trim().toUpperCase();
+    const statusDiv = document.getElementById('status-message');
+    statusDiv.innerHTML = '<span>Loading...</span>';
+    statusDiv.style.display = 'block';
+    if (!query) {
+        statusDiv.innerHTML = `<span class="error-message">Please enter a gene name.</span>`;
+        return;
+    }
+    const results = allGenes.filter(g => 
+        (g.gene && g.gene.toUpperCase().includes(query)) || 
+        (g.synonym && g.synonym.toUpperCase().includes(query))
+    );
+    if (results.length === 0) {
+        const closeMatches = allGenes.filter(g => 
+            g.gene && g.gene.toUpperCase().startsWith(query.slice(0, 3))
+        ).slice(0, 3);
+        statusDiv.innerHTML = `<span class="error-message">No genes found for "${query}". ${closeMatches.length > 0 ? 'Did you mean: ' + closeMatches.map(g => g.gene).join(', ') + '?' : 'No close matches found.'}</span>`;
+        return;
+    }
+    if (results.length === 1) {
+        navigateTo(null, `/${results[0].gene}`);
+    } else {
+        navigateTo(null, '/batch-query');
+        setTimeout(() => {
+            document.getElementById('batch-genes-input').value = results.map(r => r.gene).join('\n');
+            performBatchSearch();
+        }, 100);
+    }
 }
 
-// ... (all other functions remain unchanged until loadExpressionData and loadSVGFile)
+// ... (all other functions from previous script.js remain unchanged until updateExpressionVisualization)
 
-async function loadExpressionData() {
+function updateExpressionVisualization(geneName) {
+    console.log('Updating visualization for gene:', geneName);
+    const organs = document.querySelectorAll('.organ');
+    organs.forEach(organ => {
+        const originalColor = organ.getAttribute('data-original-color') || '#D3D3D3';
+        organ.setAttribute('fill', originalColor);
+        organ.style.filter = 'brightness(1)';
+    });
+    const geneExpression = findGeneExpression(geneName);
+    if (geneExpression) {
+        console.log('Expression data found:', geneExpression);
+        Object.entries(geneExpression).forEach(([tissue, nTPM]) => {
+            const organElement = findOrganElement(tissue);
+            if (organElement) {
+                const color = getExpressionColor(nTPM);
+                console.log(`Applying color ${color} to tissue ${tissue} (nTPM: ${nTPM})`);
+                organElement.setAttribute('fill', color);
+            } else {
+                console.warn(`No organ element found for tissue: ${tissue}`);
+            }
+        });
+    } else {
+        console.warn('No expression data for gene:', geneName);
+    }
+}
+
+// ... (rest of the functions remain unchanged)
+
+function loadExpressionData() {
     try {
-        // Updated to a public GTEx-like sample TSV from GitHub raw (real data subset for demo)
+        // Using sample GTEx-like TSV
         const response = await fetch('https://raw.githubusercontent.com/xai-org/grok-sample-data/main/gtex_sample_tissue_expression.tsv');
         if (!response.ok) throw new Error('Failed to load expression data');
         const tsvText = await response.text();
@@ -307,12 +320,11 @@ async function loadExpressionData() {
         console.log(`Loaded ${Object.keys(expressionData).length} genes with expression data from TSV`);
     } catch (error) {
         console.error('Error loading expression data:', error);
-        // Fallback to sample data if fetch fails
+        // Fallback data
         expressionData = {
-            'IFT88': { 'lung': 12.5, 'heart': 3.2, 'liver': 1.1, 'kidney': 8.7 },
-            'CEP290': { 'lung': 25.3, 'heart': 5.1, 'liver': 2.0, 'kidney': 15.4 },
-            'ARL13B': { 'lung': 18.9, 'heart': 4.5, 'liver': 0.8, 'kidney': 22.1 },
-            // Add more sample genes as needed
+            'IFT88': { 'lung': 12.5, 'heart muscle': 3.2, 'liver': 1.1, 'kidney': 8.7, 'cerebral cortex': 5.0 },
+            'CEP290': { 'lung': 25.3, 'heart muscle': 5.1, 'liver': 2.0, 'kidney': 15.4, 'cerebral cortex': 10.0 },
+            'ARL13B': { 'lung': 18.9, 'heart muscle': 4.5, 'liver': 0.8, 'kidney': 22.1, 'cerebral cortex': 7.5 },
         };
         availableGenes = new Set(Object.keys(expressionData));
         console.log('Using fallback expression data');
@@ -321,15 +333,12 @@ async function loadExpressionData() {
 
 async function loadSVGFile() {
     try {
-        // Updated to a public human body SVG from Wikimedia (simple outline with organs)
         const response = await fetch('https://upload.wikimedia.org/wikipedia/commons/5/54/220px-Human_body_silhouette.svg');
         if (!response.ok) throw new Error('Failed to load SVG file');
         let svgText = await response.text();
-        // Enhance SVG with organ paths and data-tissue attributes for compatibility
         svgText = svgText.replace('<svg xmlns="http://www.w3.org/2000/svg" width="220" height="330">', 
             '<svg xmlns="http://www.w3.org/2000/svg" width="400" height="600" viewBox="0 0 220 330">'
         );
-        // Add sample organ paths (brain, heart, lung, liver, kidney, etc.) with data-tissue
         svgText += `
             <!-- Brain -->
             <path class="organ" data-tissue="cerebral cortex" fill="#BE0405" d="M50 20 L170 20 L150 60 L70 60 Z" data-original-color="#BE0405"/>
@@ -345,27 +354,24 @@ async function loadSVGFile() {
             <path class="organ" data-tissue="stomach" fill="#FDE098" d="M100 250 L130 270 L130 290 L100 270 Z" data-original-color="#FDE098"/>
             <!-- Colon -->
             <path class="organ" data-tissue="colon" fill="#C07F54" d="M120 300 L150 320 L150 340 L120 320 Z" data-original-color="#C07F54"/>
-            <!-- Testis (simplified) -->
+            <!-- Testis -->
             <path class="organ" data-tissue="testis" fill="#E49BDC" d="M100 310 L110 320 L110 330 L100 320 Z" data-original-color="#E49BDC"/>
         `;
         svgText += '</svg>';
         const container = document.getElementById('svg-container');
         if (container) {
             container.innerHTML = svgText;
-            // Prepare organs after loading
             setTimeout(prepareOrgansForExpression, 100);
         }
     } catch (error) {
         console.error('Error loading SVG file:', error);
         const container = document.getElementById('svg-container');
         if (container) {
-            container.innerHTML = `<div style="text-align: center; padding: 2rem; color: #666;">Failed to load visualization. Using fallback. Please check console for details.</div>`;
-            // Fallback simple SVG
+            container.innerHTML = `<div style="text-align: center; padding: 2rem; color: #666;">Failed to load visualization. Using fallback.</div>`;
             container.innerHTML += `
                 <svg width="400" height="600" viewBox="0 0 220 330">
                     <rect x="80" y="20" width="60" height="40" fill="#BE0405" class="organ" data-tissue="cerebral cortex" data-original-color="#BE0405"/>
                     <rect x="90" y="100" width="40" height="40" fill="#F07070" class="organ" data-tissue="heart muscle" data-original-color="#F07070"/>
-                    <!-- Add more fallback paths as needed -->
                 </svg>
             `;
             prepareOrgansForExpression();
@@ -393,7 +399,6 @@ function prepareOrgansForExpression() {
 
 // ... (rest of the functions remain unchanged)
 
-// Expose functions for onclick in HTML (for table clicks, etc.)
 window.selectExpressionGene = selectExpressionGene;
 window.handleOrganClick = handleOrganClick;
 
@@ -402,7 +407,6 @@ function navigateTo(event, path) {
     window.location.hash = path;
 }
 
-// Initialize the application
 window.addEventListener('hashchange', handleRouteChange);
 window.addEventListener('load', () => {
     initGlobalEventListeners();
