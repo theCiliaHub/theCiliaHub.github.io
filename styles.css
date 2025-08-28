@@ -265,6 +265,28 @@ body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background:
 .suggestion-gene { font-weight: 600; color: #2c5aa0; }
 .suggestion-description { font-size: 0.85rem; color: #7f8c8d; }
 
+/* Analysis Page Specific Styles */
+#analysis-plot-container {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 10px;
+    box-shadow: 0 4px 15px rgba(44,90,160,0.08);
+    margin-top: 2rem;
+}
+#analysis-controls {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    margin-top: 1rem;
+    flex-wrap: wrap;
+}
+#analysis-plot-wrapper {
+    position: relative;
+    width: 100%;
+    height: 600px;
+}
+
+
 /* Additional styles for data integration (Batch Query) */
 table {
     width: 100%;
