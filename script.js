@@ -4,6 +4,8 @@ let allGenes = [];
 let currentData = [];
 let searchResults = [];
 let localizationChartInstance; // For Chart.js instance management
+let analysisDotPlotInstance; // For Analysis page dot plot
+let analysisBarChartInstance; // For Analysis page bar chart
 const allPartIds = ["cell-body", "nucleus", "basal-body", "transition-zone", "axoneme", "ciliary-membrane"];
 const defaultGenesNames = ["ACE2", "ADAMTS20", "ADAMTS9", "IFT88", "CEP290", "WDR31", "ARL13B", "BBS1"];
 
@@ -123,6 +125,8 @@ async function handleRouteChange() {
         displayComparePage();
     } else if (path === '/expression') {
         displayExpressionPage();
+    } else if (path === '/analysis') {
+        displayAnalysisPage();
     } else if (path === '/download') {
         displayDownloadPage();
     } else if (path === '/contact') {
@@ -555,6 +559,191 @@ function displayComparePage() {
     }
 }
 
+function displayAnalysisPage() {
+    const contentArea = document.querySelector('.content-area');
+    contentArea.className = 'content-area content-area-full';
+    document.querySelector('.cilia-panel').style.display = 'none';
+    contentArea.innerHTML = `
+        <div class="page-section">
+            <h2>Gene Localization Analysis</h2>
+            <p>Paste a list of human gene names (comma, space, or newline separated) to visualize their ciliary localizations.</p>
+            <textarea id="analysis-genes-input" placeholder="e.g., ACE2, IFT88, CEP290, BBS1" style="width: 100%; min-height: 150px; padding: 1rem; border: 2px solid #e1ecf4; border-radius: 10px; font-size: 1rem; margin-top: 1rem; resize: vertical;"></textarea>
+            <div id="analysis-controls">
+                 <button id="generate-plot-btn" class="btn btn-primary">Generate Plots</button>
+                 <button id="download-plot-btn" class="btn btn-secondary" style="display:none;">Download Dot Plot (PNG)</button>
+            </div>
+            <div id="analysis-status" class="status-message" style="display: none; padding: 1rem;"></div>
+            <div id="analysis-plot-container" style="display:none;">
+                <h3 style="margin-bottom: 1.5rem;">Localization Dot Plot</h3>
+                <div id="analysis-plot-wrapper">
+                    <canvas id="analysis-dot-plot"></canvas>
+                </div>
+                <hr style="margin: 2rem 0;">
+                <h3 style="margin-bottom: 1.5rem;">Localization Summary</h3>
+                 <div style="position: relative; width: 100%; height: 400px;">
+                    <canvas id="analysis-bar-chart"></canvas>
+                </div>
+            </div>
+        </div>
+    `;
+
+    document.getElementById('generate-plot-btn').addEventListener('click', generateAnalysisPlots);
+    document.getElementById('download-plot-btn').addEventListener('click', downloadAnalysisPlot);
+}
+
+function generateAnalysisPlots() {
+    const input = document.getElementById('analysis-genes-input').value;
+    const statusDiv = document.getElementById('analysis-status');
+    const plotContainer = document.getElementById('analysis-plot-container');
+    const downloadBtn = document.getElementById('download-plot-btn');
+
+    // Reset previous state
+    plotContainer.style.display = 'none';
+    downloadBtn.style.display = 'none';
+    statusDiv.style.display = 'none';
+    if (analysisDotPlotInstance) analysisDotPlotInstance.destroy();
+    if (analysisBarChartInstance) analysisBarChartInstance.destroy();
+
+    const geneNames = input.split(/[\s,;\n]+/).map(g => g.trim().toUpperCase()).filter(Boolean);
+
+    if (geneNames.length === 0) {
+        statusDiv.innerHTML = '<span class="error-message">Please enter at least one gene name.</span>';
+        statusDiv.style.display = 'block';
+        return;
+    }
+
+    const foundGenes = allGenes.filter(g => geneNames.includes(g.gene.toUpperCase()));
+    const notFoundGenes = geneNames.filter(name => !foundGenes.some(g => g.gene.toUpperCase() === name));
+
+    if (foundGenes.length === 0) {
+        statusDiv.innerHTML = `<span class="error-message">None of the entered genes were found. Not found: ${notFoundGenes.join(', ')}</span>`;
+        statusDiv.style.display = 'block';
+        return;
+    }
+
+    // --- Data processing ---
+    const yCategories = ['Cilia', 'Ciliary Membrane', 'Axoneme', 'Transition Zone', 'Basal Body', 'Flagella', 'Ciliary Associated Gene'];
+    const xLabels = foundGenes.map(g => g.gene).sort();
+    const dotPlotData = [];
+    const barChartCounts = yCategories.reduce((acc, cat) => ({...acc, [cat]: 0 }), {});
+
+    foundGenes.forEach(gene => {
+        if (gene.localization) {
+            const geneLocalizations = gene.localization.split(',').map(l => l.trim());
+            geneLocalizations.forEach(loc => {
+                if (yCategories.includes(loc)) {
+                    dotPlotData.push({ x: gene.gene, y: loc, r: 8 });
+                    barChartCounts[loc]++;
+                }
+            });
+        }
+    });
+    
+    if(dotPlotData.length === 0) {
+         statusDiv.innerHTML = `<span class="error-message">Found ${foundGenes.length} gene(s), but none have localization data for the plotted categories.</span>`;
+         statusDiv.style.display = 'block';
+         return;
+    }
+
+    // --- Render Plots ---
+    plotContainer.style.display = 'block';
+    downloadBtn.style.display = 'inline-block';
+    if (notFoundGenes.length > 0) {
+        statusDiv.innerHTML = `<span class="success-message">Showing results for ${foundGenes.length} found gene(s). Not found: ${notFoundGenes.join(', ')}</span>`;
+        statusDiv.style.display = 'block';
+    }
+
+    // Dot Plot (Bubble Chart)
+    const dotPlotCtx = document.getElementById('analysis-dot-plot').getContext('2d');
+    analysisDotPlotInstance = new Chart(dotPlotCtx, {
+        type: 'bubble',
+        data: {
+            datasets: [{
+                label: 'Gene Localization',
+                data: dotPlotData,
+                backgroundColor: '#2c5aa0',
+                borderColor: 'rgba(0,0,0,0)',
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: { label: context => `${context.raw.x} - ${context.raw.y}` }
+                }
+            },
+            scales: {
+                x: {
+                    type: 'category',
+                    labels: xLabels,
+                    title: { display: true, text: 'Genes', font: { size: 14, weight: 'bold' } },
+                    ticks: { autoSkip: false, maxRotation: 90, minRotation: 45 }
+                },
+                y: {
+                    type: 'category',
+                    labels: yCategories,
+                    title: { display: true, text: 'Localization', font: { size: 14, weight: 'bold' } },
+                     offset: true
+                }
+            }
+        }
+    });
+
+    // Bar Chart
+    const barChartCtx = document.getElementById('analysis-bar-chart').getContext('2d');
+    analysisBarChartInstance = new Chart(barChartCtx, {
+        type: 'bar',
+        data: {
+            labels: yCategories,
+            datasets: [{
+                label: 'Number of Genes',
+                data: yCategories.map(cat => barChartCounts[cat]),
+                backgroundColor: 'rgba(44, 90, 160, 0.7)',
+                borderColor: 'rgba(44, 90, 160, 1)',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            indexAxis: 'y',
+            scales: {
+                x: {
+                    beginAtZero: true,
+                    title: { display: true, text: 'Number of Genes' },
+                    ticks: { stepSize: 1 }
+                }
+            },
+            plugins: {
+                legend: { display: false },
+                title: { display: true, text: 'Localization Summary for Input Genes' }
+            }
+        }
+    });
+}
+
+function downloadAnalysisPlot() {
+    const canvas = document.getElementById('analysis-dot-plot');
+    if (!canvas || !analysisDotPlotInstance) return;
+
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width = canvas.width;
+    tempCanvas.height = canvas.height;
+    const tempCtx = tempCanvas.getContext('2d');
+    tempCtx.fillStyle = 'white';
+    tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+    tempCtx.drawImage(canvas, 0, 0);
+
+    const a = document.createElement('a');
+    a.href = tempCanvas.toDataURL('image/png');
+    a.download = 'CiliaHub_Localization_Plot.png';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+}
+
 function displayDownloadPage() {
     const contentArea = document.querySelector('.content-area');
     contentArea.className = 'content-area content-area-full';
@@ -965,7 +1154,7 @@ function updateActiveNav(path) {
         
         if (linkPath === path || 
             (path.startsWith('/') && path !== '/' && path !== '/index.html' && 
-             linkPath === '/batch-query' && !['/download', '/contact', '/compare', '/expression'].includes(path))) {
+             linkPath === '/batch-query' && !['/download', '/contact', '/compare', '/expression', '/analysis'].includes(path))) {
             link.classList.add('active');
         }
     });
