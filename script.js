@@ -941,11 +941,10 @@ function performBatchSearch() {
         return;
     }
 
-    // --- FIX STARTS HERE ---
     let results = allGenes.filter(g =>
         queries.some(q => {
-            // Check for a match in the gene name (allowing partial matches)
-            if (g.gene && g.gene.toUpperCase().includes(q)) {
+            // --- ✨ FIX: Changed from .includes(q) to an exact match === q ---
+            if (g.gene && g.gene.toUpperCase() === q) {
                 return true;
             }
             // Check for an EXACT match in the synonyms list
@@ -958,7 +957,6 @@ function performBatchSearch() {
             return false;
         })
     );
-    // --- FIX ENDS HERE ---
 
     if (localizationFilter) {
         results = results.filter(g => g.localization && g.localization.includes(localizationFilter));
@@ -983,6 +981,7 @@ function performBatchSearch() {
         displayGeneCards(currentData, [], 1, 10);
     }
 }
+
 function displayBatchResults(results) {
     const batchResults = document.getElementById('batch-results');
     if (!batchResults) return;
