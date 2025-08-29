@@ -9,6 +9,19 @@ let analysisBarChartInstance; // For Analysis page bar chart
 const allPartIds = ["cell-body", "nucleus", "basal-body", "transition-zone", "axoneme", "ciliary-membrane"];
 const defaultGenesNames = ["ACE2", "ADAMTS20", "ADAMTS9", "IFT88", "CEP290", "WDR31", "ARL13B", "BBS1"];
 
+// ✨ THE NEW PLUGIN CODE RIGHT HERE for PLOT ✨
+Chart.register({
+  id: 'customCanvasBackgroundColor',
+  beforeDraw: (chart, args, options) => {
+    const {ctx} = chart;
+    ctx.save();
+    ctx.globalCompositeOperation = 'destination-over';
+    ctx.fillStyle = options.color || '#ffffff'; // White background
+    ctx.fillRect(0, 0, chart.width, chart.height);
+    ctx.restore();
+  }
+});
+
 // Load data from external JSON file
 async function loadGeneDatabase() {
     try {
@@ -733,24 +746,31 @@ function generateAnalysisPlots() {
     });
 }
 
-function downloadAnalysisPlot() {
+async function downloadAnalysisPlot() {
     const canvas = document.getElementById('analysis-dot-plot');
     if (!canvas || !analysisDotPlotInstance) return;
 
-    const tempCanvas = document.createElement('canvas');
-    tempCanvas.width = canvas.width;
-    tempCanvas.height = canvas.height;
-    const tempCtx = tempCanvas.getContext('2d');
-    tempCtx.fillStyle = 'white';
-    tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
-    tempCtx.drawImage(canvas, 0, 0);
+    const originalPixelRatio = analysisDotPlotInstance.options.devicePixelRatio;
+    const downloadPixelRatio = 4; // Increase resolution for download
 
-    const a = document.createElement('a');
-    a.href = tempCanvas.toDataURL('image/png');
-    a.download = 'CiliaHub_Localization_Plot.png';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+    try {
+        // Temporarily increase resolution
+        analysisDotPlotInstance.options.devicePixelRatio = downloadPixelRatio;
+        analysisDotPlotInstance.update();
+
+        // Create download link from the high-resolution render
+        const a = document.createElement('a');
+        a.href = analysisDotPlotInstance.toBase64Image('image/png', 1.0);
+        a.download = 'CiliaHub_Localization_Plot.png';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+
+    } finally {
+        // IMPORTANT: Restore original resolution for on-screen display
+        analysisDotPlotInstance.options.devicePixelRatio = originalPixelRatio;
+        analysisDotPlotInstance.update();
+    }
 }
 
 function displayDownloadPage() {
