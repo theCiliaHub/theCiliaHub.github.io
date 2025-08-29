@@ -621,32 +621,30 @@ function generateAnalysisPlots() {
         return;
     }
 
- // --- Data processing ---
-const yCategories = ['Cilia', 'Ciliary Membrane', 'Axoneme', 'Transition Zone', 'Basal Body', 'Flagella', 'Ciliary Associated Gene'];
-const xLabels = foundGenes.map(g => g.gene).sort();
-const dotPlotData = [];
-const barChartCounts = yCategories.reduce((acc, cat) => ({...acc, [cat]: 0 }), {});
+    // --- Data processing ---
+    const yCategories = ['Cilia', 'Ciliary Membrane', 'Axoneme', 'Transition Zone', 'Basal Body', 'Flagella', 'Ciliary Associated Gene'];
+    const xLabels = foundGenes.map(g => g.gene).sort();
+    const dotPlotData = [];
+    const barChartCounts = yCategories.reduce((acc, cat) => ({...acc, [cat]: 0 }), {});
 
-foundGenes.forEach(gene => {
-    if (gene.localization) {
-        const geneLocalizations = gene.localization.split(',').map(l => l.trim());
-        
-        // --- FIX STARTS HERE ---
-        geneLocalizations.forEach(loc => {
-            // Find a matching category, ignoring case
-            const matchingCategory = yCategories.find(cat => cat.toLowerCase() === loc.toLowerCase());
+    foundGenes.forEach(gene => {
+        if (gene.localization) {
+            const geneLocalizations = gene.localization.split(',').map(l => l.trim());
             
-            // If a match is found, use the canonical category name from yCategories
-            if (matchingCategory) {
-                dotPlotData.push({ x: gene.gene, y: matchingCategory, r: 8 });
-                barChartCounts[matchingCategory]++;
-            }
-        });
-    
+            geneLocalizations.forEach(loc => {
+                const matchingCategory = yCategories.find(cat => cat.toLowerCase() === loc.toLowerCase());
+                if (matchingCategory) {
+                    dotPlotData.push({ x: gene.gene, y: matchingCategory, r: 8 });
+                    barChartCounts[matchingCategory]++;
+                }
+            });
+        }
+    }); // <<<< ✨ FIX: ADDED THE MISSING CLOSING BRACES HERE
+
     if(dotPlotData.length === 0) {
-         statusDiv.innerHTML = `<span class="error-message">Found ${foundGenes.length} gene(s), but none have localization data for the plotted categories.</span>`;
-         statusDiv.style.display = 'block';
-         return;
+        statusDiv.innerHTML = `<span class="error-message">Found ${foundGenes.length} gene(s), but none have localization data for the plotted categories.</span>`;
+        statusDiv.style.display = 'block';
+        return;
     }
 
     // --- Render Plots ---
@@ -657,7 +655,7 @@ foundGenes.forEach(gene => {
         statusDiv.style.display = 'block';
     }
 
- // Dot Plot (Bubble Chart)
+    // Dot Plot (Bubble Chart)
     const dotPlotCtx = document.getElementById('analysis-dot-plot').getContext('2d');
     analysisDotPlotInstance = new Chart(dotPlotCtx, {
         type: 'bubble',
@@ -689,7 +687,6 @@ foundGenes.forEach(gene => {
                     type: 'category',
                     labels: yCategories,
                     title: { display: true, text: 'Localization', font: { size: 14, weight: 'bold' } }
-                    /* The problematic 'offset: true' line has been removed here */
                 }
             }
         }
