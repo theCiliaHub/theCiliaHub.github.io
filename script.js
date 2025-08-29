@@ -15,10 +15,9 @@ async function loadGeneDatabase() {
         const response = await fetch('https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/ciliahub_data.json');
         let rawGenes = await response.json();
 
-        // --- ✨ THE DEFINITIVE FIX: Sanitize all gene names on load ---
+        // Sanitize all gene names on load (unchanged, already correct)
         allGenes = rawGenes.map(gene => {
             if (gene.gene) {
-                // This removes all whitespace, including spaces, tabs, and newlines
                 gene.gene = gene.gene.trim().replace(/(\r\n|\n|\r)/gm, "");
             }
             return gene;
@@ -38,13 +37,11 @@ async function loadGeneDatabase() {
         return true;
     } catch (error) {
         console.error('Error loading gene database:', error);
-        // Fallback to default data if loading fails
         allGenes = [...getDefaultGenes()];
         currentData = [...allGenes];
         return false;
     }
 }
-
 // Default genes as fallback
 function getDefaultGenes() {
     return [
@@ -901,13 +898,11 @@ function performSingleSearch() {
         return;
     }
 
-    // --- FIX STARTS HERE ---
     const results = allGenes.filter(g => {
-        // Check for a match in the gene name (allowing partial matches)
+        // Use sanitized gene field directly, no need for replace(/\s/g, '')
         if (g.gene && g.gene.toUpperCase().includes(query)) {
             return true;
         }
-        // Check for an EXACT match in the synonyms list
         if (g.synonym) {
             const synonyms = g.synonym.toUpperCase().split(',').map(s => s.trim());
             if (synonyms.includes(query)) {
@@ -916,7 +911,6 @@ function performSingleSearch() {
         }
         return false;
     });
-    // --- FIX ENDS HERE ---
 
     if (results.length === 0) {
         const closeMatches = allGenes.filter(g =>
@@ -927,7 +921,7 @@ function performSingleSearch() {
         return;
     }
 
-    if (results.length === 1) {
+    if (results.length === 1 && results[0].gene.toUpperCase() === query) {
         navigateTo(null, `/${results[0].gene}`);
     } else {
         navigateTo(null, '/batch-query');
@@ -939,7 +933,10 @@ function performSingleSearch() {
 }
 
 function performBatchSearch() {
-    const queries = document.getElementById('batch-genes-input').value.split(/[\s,\n]+/).filter(Boolean).map(q => q.trim().toUpperCase());
+    const queries = document.getElementById('batch-genes-input').value
+        .split(/[\s,\n]+/)
+        .filter(Boolean)
+        .map(q => q.trim().toUpperCase());
     const localizationFilter = document.getElementById('localization-filter')?.value;
     const keywordFilter = document.getElementById('keyword-filter')?.value.toLowerCase();
     const statusDiv = document.getElementById('status-message');
@@ -952,8 +949,8 @@ function performBatchSearch() {
 
     let results = allGenes.filter(g =>
         queries.some(q => {
-            // --- ✨ THE DEFINITIVE FIX: Sanitize the gene name from the database before comparing ---
-            if (g.gene && g.gene.replace(/\s/g, '').toUpperCase() === q) {
+            // Use sanitized gene field directly, no need for replace(/\s/g, '')
+            if (g.gene && g.gene.toUpperCase() === q) {
                 return true;
             }
             if (g.synonym) {
