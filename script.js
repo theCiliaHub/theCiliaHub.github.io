@@ -925,153 +925,135 @@ function generateLocalizationDotPlot(genesInput) {
 }
 
 /**
- * Generates a publication-quality bubble matrix plot for gene localization analysis.
- * This function replaces the old generateAnalysisPlots.
- */
-/**
- * ✨ MODIFIED: Generate analysis plots (dot plot + bar chart) using JSON localizations
- * This function is async because it waits for the JSON to be loaded.
+ * Generates a publication-quality Y-axis-only bubble plot for gene localization.
+ * Each bubble color reflects the number of genes in that organelle.
  */
 async function generateAnalysisPlots() {
-  await ciliaDataLoaded; // ensure data is ready
+    await ciliaDataLoaded; // ensure your allGenes JSON is ready
 
-  const input = document.getElementById('analysis-genes-input').value || '';
-  const statusDiv = document.getElementById('analysis-status');
-  const plotContainer = document.getElementById('analysis-plot-container');
-  const downloadBtn = document.getElementById('download-plot-btn');
+    const statusDiv = document.getElementById('analysis-status');
+    const plotContainer = document.getElementById('analysis-plot-container');
+    const downloadBtn = document.getElementById('download-plot-btn');
 
-  // reset UI
-  if (plotContainer) plotContainer.style.display = 'none';
-  if (downloadBtn) downloadBtn.style.display = 'none';
-  if (statusDiv) statusDiv.style.display = 'none';
-  if (window.analysisDotPlotInstance) try { window.analysisDotPlotInstance.destroy(); } catch(e){}
-  if (window.analysisBarChartInstance) try { window.analysisBarChartInstance.destroy(); } catch(e){}
+    // Reset UI
+    if (plotContainer) plotContainer.style.display = 'none';
+    if (downloadBtn) downloadBtn.style.display = 'none';
+    if (statusDiv) statusDiv.style.display = 'none';
+    if (window.analysisDotPlotInstance) try { window.analysisDotPlotInstance.destroy(); } catch(e){}
 
-  const geneNames = input.split(/[\s,;\n]+/).map(g => g.trim()).filter(Boolean);
-  if (geneNames.length === 0) {
-    if (statusDiv) {
-      statusDiv.innerHTML = '<span class="error-message">Please enter at least one gene name.</span>';
-      statusDiv.style.display = 'block';
+    const input = document.getElementById('analysis-genes-input').value || '';
+    const geneNames = input.split(/[\s,;\n]+/).map(g => g.trim().toUpperCase()).filter(Boolean);
+
+    if (geneNames.length === 0) {
+        if (statusDiv) {
+            statusDiv.innerHTML = '<span class="error-message">Please enter at least one gene name.</span>';
+            statusDiv.style.display = 'block';
+        }
+        return;
     }
-    return;
-  }
 
-  // find gene entries (supports synonyms)
-  const foundGenes = [];
-  const notFoundGenes = [];
-  geneNames.forEach(name => {
-    const entry = findGeneEntryByQuery(name);
-    if (entry) foundGenes.push(entry);
-    else notFoundGenes.push(name);
-  });
-
-  if (foundGenes.length === 0) {
-    if (statusDiv) {
-      statusDiv.innerHTML = `<span class="error-message">None of the entered genes were found. Not found: ${notFoundGenes.join(', ')}</span>`;
-      statusDiv.style.display = 'block';
-    }
-    return;
-  }
-
-  // Localization categories to display in bar chart (you can extend this list)
-  const yCategories = ['Cilia', 'Ciliary Membrane', 'Axoneme', 'Transition Zone', 'Basal Body', 'Flagella', 'Ciliary Associated Gene', 'Golgi', 'Nucleus', 'Cytoplasm', 'Mitochondria', 'ER', 'Peroxisome'];
-  const barChartCounts = yCategories.reduce((acc, cat) => (acc[cat] = 0, acc), {});
-
-  // count localizations using the parsed arrays (entry._localizations)
-  foundGenes.forEach(entry => {
-    const locs = (entry._localizations && entry._localizations.length) ? entry._localizations : parseLocalizations(entry.localization || '');
-    locs.forEach(loc => {
-      const match = yCategories.find(cat => cat.toLowerCase() === loc.toLowerCase());
-      if (match) barChartCounts[match] += 1;
-      else {
-        // optional: count unknown / add new categories if needed
-        // skip for now
-      }
+    // Find genes (supports synonyms)
+    const foundGenes = [];
+    const notFoundGenes = [];
+    geneNames.forEach(name => {
+        const entry = findGeneEntryByQuery(name); // your helper function
+        if (entry) foundGenes.push(entry);
+        else notFoundGenes.push(name);
     });
-  });
 
-  const hasLocalizationData = Object.values(barChartCounts).some(v => v > 0);
-  if (!hasLocalizationData) {
-    if (statusDiv) {
-      statusDiv.innerHTML = `<span class="error-message">Found ${foundGenes.length} gene(s), but none have localization data for the plotted categories.</span>`;
-      statusDiv.style.display = 'block';
+    if (foundGenes.length === 0) {
+        if (statusDiv) {
+            statusDiv.innerHTML = `<span class="error-message">None of the entered genes were found. Not found: ${notFoundGenes.join(', ')}</span>`;
+            statusDiv.style.display = 'block';
+        }
+        return;
     }
-    return;
-  }
 
-  // show UI and status
-  if (plotContainer) plotContainer.style.display = 'block';
-  if (downloadBtn) downloadBtn.style.display = 'inline-block';
-  if (statusDiv && notFoundGenes.length > 0) {
-    statusDiv.innerHTML = `<span class="success-message">Showing results for ${foundGenes.length} found gene(s). Not found: ${notFoundGenes.join(', ')}</span>`;
-    statusDiv.style.display = 'block';
-  }
+    // Y-axis organelles
+    const yCategories = [
+        'Cilia','Basal body','Transition zone','Lysosome','Peroxisome','Plasma Membrane',
+        'Cytoplasm','Nucleus','Endoplasmic Reticulum','Mitochondria','Ribosome','Golgi',
+        'Microbodies','Cytoskeleton','Centrosome','Centrioles','Vacuoles'
+    ];
 
-  // Generate Dot Plot (pass original input string to preserve user ordering)
-  await generateLocalizationDotPlot(input);
+    // Count genes per organelle
+    const localizationCounts = {};
+    foundGenes.forEach(g => {
+        if (g.localization) {
+            g.localization.split(',').forEach(loc => {
+                const locTrim = loc.trim();
+                localizationCounts[locTrim] = (localizationCounts[locTrim] || 0) + 1;
+            });
+        }
+    });
 
-  // Render Bar Chart
-  const barCtxEl = document.getElementById('analysis-bar-chart');
-  if (!barCtxEl) return;
-  const barChartCtx = barCtxEl.getContext('2d');
+    const maxCount = Math.max(...Object.values(localizationCounts), 1);
 
-  window.analysisBarChartInstance = new Chart(barChartCtx, {
-    type: 'bar',
-    data: {
-      labels: yCategories,
-      datasets: [{
-        label: 'Number of Genes',
-        data: yCategories.map(cat => barChartCounts[cat]),
-        backgroundColor: 'rgba(44, 90, 160, 0.8)',
-        borderColor: 'rgba(44, 90, 160, 1)',
-        borderWidth: 1
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      indexAxis: 'y',
-      scales: {
-        x: { beginAtZero: true, title: { display: true, text: 'Number of Genes', font: { size: 13, weight: 'bold' } }, ticks: { stepSize: 1 } },
-        y: { title: { display: true, text: 'Localization', font: { size: 13, weight: 'bold' } } }
-      },
-      plugins: {
-        legend: { display: false },
-        title: { display: true, text: 'Localization Summary for Input Genes', font: { size: 16, weight: 'bold' } }
-      }
-    }
-  });
-}
-
-
-function displayDownloadPage() {
-    const contentArea = document.querySelector('.content-area');
-    contentArea.className = 'content-area content-area-full';
-    document.querySelector('.cilia-panel').style.display = 'none';
-    contentArea.innerHTML = `
-        <div class="page-section">
-            <h2>Download CiliaHub Data</h2>
-            <p style="font-size: 1rem; color: #555;">Download the complete ciliary gene database in your preferred format.</p>
-            <div class="download-options">
-                <a href="https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/ciliahub_data.json" download="ciliahub_data.json" aria-label="Download JSON file">Download JSON</a>
-                <button id="download-csv" class="search-btn btn btn-primary" aria-label="Download CSV file">Download CSV</button>
-            </div>
-            <p style="font-size: 0.9rem; color: #7f8c8d;">The JSON file contains the full dataset with all fields. The CSV file includes gene names, Ensembl IDs, descriptions, localizations, and functional summaries.</p>
-        </div>`;
-    
-    document.getElementById('download-csv').onclick = () => {
-        const csv = ['Gene,Ensembl ID,Description,Synonym,OMIM ID,Functional Summary,Localization,Reference']
-            .concat(allGenes.map(g => `"${g.gene}","${g.ensembl_id || ''}","${g.description || ''}","${g.synonym || ''}","${g.omim_id || ''}","${g.functional_summary || ''}","${g.localization || ''}","${g.reference || ''}"`))
-            .join('\n');
-        const blob = new Blob([csv], { type: 'text/csv' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'ciliahub_data.csv';
-        a.click();
-        URL.revokeObjectURL(url);
+    // Define color palette (gradient)
+    const colorPalette = ['#edf8fb','#b2e2e2','#66c2a4','#2ca25f','#006d2c'];
+    const getColor = count => {
+        const idx = Math.min(Math.floor((count / maxCount) * (colorPalette.length - 1)), colorPalette.length - 1);
+        return colorPalette[idx];
     };
+
+    // Prepare datasets
+    const datasets = yCategories.map((loc, index) => {
+        const count = localizationCounts[loc] || 0;
+        return {
+            label: loc,
+            data: [{ x: 1, y: loc, r: 12 }], // x fixed, y = organelle
+            backgroundColor: getColor(count)
+        };
+    });
+
+    // Show plot container
+    if (plotContainer) plotContainer.style.display = 'block';
+    if (downloadBtn) downloadBtn.style.display = 'inline-block';
+    if (statusDiv && notFoundGenes.length > 0) {
+        statusDiv.innerHTML = `<span class="success-message">Showing results for ${foundGenes.length} found gene(s). Not found: ${notFoundGenes.join(', ')}</span>`;
+        statusDiv.style.display = 'block';
+    }
+
+    const ctx = document.getElementById('analysis-dot-plot').getContext('2d');
+    window.analysisDotPlotInstance = new Chart(ctx, {
+        type: 'bubble',
+        data: { datasets },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: context => {
+                            const loc = context.dataset.label;
+                            const count = localizationCounts[loc] || 0;
+                            return `${loc}: ${count} gene(s)`;
+                        }
+                    }
+                },
+                title: { display: true, text: 'Gene Localization per Organelle', font: { size: 16, weight: 'bold' } }
+            },
+            scales: {
+                x: {
+                    display: false,
+                    min: 0,
+                    max: 2
+                },
+                y: {
+                    type: 'category',
+                    labels: yCategories,
+                    title: { display: true, text: 'Organelle', font: { size: 16, weight: 'bold' } },
+                    ticks: { font: { size: 12, weight: 'bold' } },
+                    grid: { color: 'transparent' }
+                }
+            },
+            layout: { padding: 20 },
+            backgroundColor: 'transparent'
+        }
+    });
 }
+
 
 function displayContactPage() {
     const contentArea = document.querySelector('.content-area');
