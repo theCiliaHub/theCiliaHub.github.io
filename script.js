@@ -55,6 +55,106 @@ async function loadGeneDatabase() {
         return false;
     }
 }
+
+function performSingleSearch() {
+    const query = document.getElementById('single-gene-search').value.trim().toUpperCase();
+    const statusDiv = document.getElementById('status-message');
+    statusDiv.innerHTML = '<span>Loading...</span>';
+    statusDiv.style.display = 'block';
+
+    if (!query) {
+        statusDiv.innerHTML = `<span class="error-message">Please enter a gene name.</span>`;
+        return;
+    }
+
+    const results = allGenes.filter(g => {
+        // Use sanitized gene field directly, no need for replace(/\s/g, '')
+        if (g.gene && g.gene.toUpperCase().includes(query)) {
+            return true;
+        }
+        if (g.synonym) {
+            const synonyms = g.synonym.toUpperCase().split(',').map(s => s.trim());
+            if (synonyms.includes(query)) {
+                return true;
+            }
+        }
+        return false;
+    });
+
+    if (results.length === 0) {
+        const closeMatches = allGenes.filter(g =>
+            g.gene && g.gene.toUpperCase().startsWith(query.slice(0, 3))
+        ).slice(0, 3);
+
+        statusDiv.innerHTML = `<span class="error-message">No genes found for "${query}". ${closeMatches.length > 0 ? 'Did you mean: ' + closeMatches.map(g => g.gene).join(', ') + '?' : 'No close matches found.'}</span>`;
+        return;
+    }
+
+    if (results.length === 1 && results[0].gene.toUpperCase() === query) {
+        navigateTo(null, `/${results[0].gene}`);
+    } else {
+        navigateTo(null, '/batch-query');
+        setTimeout(() => {
+            document.getElementById('batch-genes-input').value = results.map(r => r.gene).join('\n');
+            performBatchSearch();
+        }, 100);
+    }
+}
+
+function performBatchSearch() {
+    const queries = document.getElementById('batch-genes-input').value
+        .split(/[\s,\n]+/)
+        .filter(Boolean)
+        .map(q => q.trim().toUpperCase());
+    const localizationFilter = document.getElementById('localization-filter')?.value;
+    const keywordFilter = document.getElementById('keyword-filter')?.value.toLowerCase();
+    const statusDiv = document.getElementById('status-message');
+
+    if (queries.length === 0) {
+        statusDiv.innerHTML = `<span class="error-message">Please enter at least one gene name.</span>`;
+        statusDiv.style.display = 'block';
+        return;
+    }
+
+    let results = allGenes.filter(g =>
+        queries.some(q => {
+            // Use sanitized gene field directly, no need for replace(/\s/g, '')
+            if (g.gene && g.gene.toUpperCase() === q) {
+                return true;
+            }
+            if (g.synonym) {
+                const synonyms = g.synonym.toUpperCase().split(',').map(s => s.trim());
+                if (synonyms.includes(q)) {
+                    return true;
+                }
+            }
+            return false;
+        })
+    );
+
+    if (localizationFilter) {
+        results = results.filter(g => g.localization && g.localization.includes(localizationFilter));
+    }
+
+    if (keywordFilter) {
+        results = results.filter(g =>
+            (g.functional_summary && g.functional_summary.toLowerCase().includes(keywordFilter)) ||
+            (g.description && g.description.toLowerCase().includes(keywordFilter))
+        );
+    }
+
+    statusDiv.style.display = 'none';
+    searchResults = results;
+
+    if (results.length > 0) {
+        displayBatchResults(results);
+        displayGeneCards(currentData, results, 1, 10);
+    } else {
+        statusDiv.innerHTML = `<span class="error-message">No genes found matching your query.</span>`;
+        statusDiv.style.display = 'block';
+        displayGeneCards(currentData, [], 1, 10);
+    }
+}
 // Default genes as fallback
 function getDefaultGenes() {
     return [
