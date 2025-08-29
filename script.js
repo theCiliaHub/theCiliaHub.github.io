@@ -630,8 +630,8 @@ function generateLocalizationDotPlot(genesInput) {
 
   // Define subcellular compartments (X-axis)
   const compartments = [
-    'Nucleus', 'ER', 'Golgi', 'Peroxisome', 'Mitochondria', 'Cilia', 
-    'Cytoplasm', 'Basal Body', 'Transition Zone'
+    'Nucleus', 'ER', 'Golgi', 'Peroxisome', 'Mitochondria',
+    'Cilia', 'Cytoplasm', 'Basal Body', 'Transition Zone'
   ];
 
   // Process input genes (from batch input or single gene)
@@ -639,11 +639,14 @@ function generateLocalizationDotPlot(genesInput) {
     ? genesInput.split(/[\s,\n]+/).filter(Boolean).map(q => q.trim().toUpperCase())
     : genesInput.map(q => q.trim().toUpperCase());
 
-  // Filter valid genes from allGenes
-  const validGenes = allGenes.filter(g =>
-    queries.includes(g.gene.toUpperCase()) ||
-    (g.synonym && g.synonym.toUpperCase().split(',').map(s => s.trim()).some(s => queries.includes(s)))
-  );
+  // 🔑 Normalize gene name and synonyms before matching
+  const validGenes = allGenes.filter(g => {
+    const geneName = g.gene.trim().toUpperCase();
+    const synonyms = g.synonym
+      ? g.synonym.split(/[,;|]/).map(s => s.trim().toUpperCase())
+      : [];
+    return queries.includes(geneName) || synonyms.some(s => queries.includes(s));
+  });
 
   if (validGenes.length === 0) {
     document.getElementById('analysis-status').innerHTML =
@@ -666,17 +669,15 @@ function generateLocalizationDotPlot(genesInput) {
     let localizations = [];
     let confidences = [];
 
-    // Check for structured confidence data
     if (gene.confidence && Array.isArray(gene.confidence)) {
       localizations = gene.confidence.map(c => c.compartment);
       confidences = gene.confidence;
     } else {
-      // Fallback: Parse localization field and assign default values
       localizations = gene.localization ? gene.localization.split(',').map(l => l.trim()) : [];
       confidences = localizations.map(loc => ({
         compartment: loc,
-        score: 0.5, // Default confidence
-        evidence: 'unknown' // Default evidence type
+        score: 0.5,
+        evidence: 'unknown'
       }));
     }
 
@@ -686,7 +687,7 @@ function generateLocalizationDotPlot(genesInput) {
         dataPoints.push({
           x: compartments.indexOf(compartment),
           y: index,
-          r: Math.max(5, Math.min(20, conf.score * 20)), // Dot size: 5-20px
+          r: Math.max(5, Math.min(20, conf.score * 20)),
           evidence: conf.evidence,
           reference: gene.reference || 'No reference available'
         });
@@ -702,46 +703,44 @@ function generateLocalizationDotPlot(genesInput) {
     });
   });
 
-  // Create Chart.js scatter plot
+  // ✅ Create publication-quality Chart.js bubble plot
   window.analysisDotPlotInstance = new Chart(canvas, {
-    type: 'scatter',
-    data: {
-      datasets: datasets
-    },
+    type: 'bubble',
+    data: { datasets },
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      devicePixelRatio: 2, // High-res for on-screen
+      devicePixelRatio: 3, // High DPI for export
       plugins: {
         legend: {
           display: true,
           position: 'top',
           labels: {
             font: { size: 14, family: 'Arial', weight: 'bold' },
-            color: '#333333' // Dark text for contrast
+            color: '#000'
           }
         },
         tooltip: {
           enabled: true,
-          backgroundColor: 'rgba(0, 0, 0, 0.8)',
+          backgroundColor: 'rgba(0,0,0,0.85)',
           titleFont: { size: 14, family: 'Arial' },
           bodyFont: { size: 12, family: 'Arial' },
           callbacks: {
             label: function(context) {
               const point = context.raw;
               const gene = validGenes[context.datasetIndex].gene;
+              let ref = point.reference && point.reference.length > 80 
+                        ? point.reference.substring(0, 80) + "..." 
+                        : point.reference;
               return [
                 `Gene: ${gene}`,
                 `Compartment: ${compartments[point.x]}`,
                 `Confidence: ${(point.r / 20).toFixed(2)}`,
                 `Evidence: ${point.evidence}`,
-                `Reference: ${point.reference}`
+                `Ref: ${ref || 'N/A'}`
               ];
             }
           }
-        },
-        customCanvasBackgroundColor: {
-          color: '#ffffff' // White background for publication quality
         }
       },
       scales: {
@@ -751,19 +750,16 @@ function generateLocalizationDotPlot(genesInput) {
           title: {
             display: true,
             text: 'Subcellular Compartment',
-            font: { size: 16, family: 'Arial', weight: 'bold' },
-            color: '#333333'
+            font: { size: 16, family: 'Arial', weight: 'bold' }
           },
           ticks: {
             font: { size: 12, family: 'Arial' },
-            color: '#333333',
+            color: '#000',
             autoSkip: false,
             maxRotation: 45,
             minRotation: 45
           },
-          grid: {
-            display: false // Clean look
-          }
+          grid: { display: false }
         },
         y: {
           type: 'category',
@@ -771,23 +767,21 @@ function generateLocalizationDotPlot(genesInput) {
           title: {
             display: true,
             text: 'Genes',
-            font: { size: 16, family: 'Arial', weight: 'bold' },
-            color: '#333333'
+            font: { size: 16, family: 'Arial', weight: 'bold' }
           },
           ticks: {
             font: { size: 12, family: 'Arial' },
-            color: '#333333'
+            color: '#000'
           },
           grid: {
             display: true,
-            color: 'rgba(0, 0, 0, 0.1)' // Subtle grid lines
+            color: 'rgba(0,0,0,0.1)'
           }
         }
       }
     }
   });
 
-  // Hide status message on successful plot
   document.getElementById('analysis-status').style.display = 'none';
 }
 
@@ -800,7 +794,6 @@ function generateAnalysisPlots() {
   const plotContainer = document.getElementById('analysis-plot-container');
   const downloadBtn = document.getElementById('download-plot-btn');
 
-  // Reset previous state
   plotContainer.style.display = 'none';
   downloadBtn.style.display = 'none';
   statusDiv.style.display = 'none';
@@ -815,8 +808,21 @@ function generateAnalysisPlots() {
     return;
   }
 
-  const foundGenes = allGenes.filter(g => geneNames.includes(g.gene.toUpperCase()));
-  const notFoundGenes = geneNames.filter(name => !foundGenes.some(g => g.gene.toUpperCase() === name));
+  // 🔑 Match both gene names and synonyms
+  const foundGenes = allGenes.filter(g => {
+    const geneName = g.gene.trim().toUpperCase();
+    const synonyms = g.synonym
+      ? g.synonym.split(/[,;|]/).map(s => s.trim().toUpperCase())
+      : [];
+    return geneNames.includes(geneName) || synonyms.some(s => geneNames.includes(s));
+  });
+
+  const notFoundGenes = geneNames.filter(name =>
+    !foundGenes.some(g =>
+      g.gene.trim().toUpperCase() === name ||
+      (g.synonym && g.synonym.split(/[,;|]/).map(s => s.trim().toUpperCase()).includes(name))
+    )
+  );
 
   if (foundGenes.length === 0) {
     statusDiv.innerHTML = `<span class="error-message">None of the entered genes were found. Not found: ${notFoundGenes.join(', ')}</span>`;
@@ -833,14 +839,11 @@ function generateAnalysisPlots() {
       const geneLocalizations = gene.localization.split(',').map(l => l.trim());
       geneLocalizations.forEach(loc => {
         const matchingCategory = yCategories.find(cat => cat.toLowerCase() === loc.toLowerCase());
-        if (matchingCategory) {
-          barChartCounts[matchingCategory]++;
-        }
+        if (matchingCategory) barChartCounts[matchingCategory]++;
       });
     }
   });
 
-  // Check for valid localization data
   const hasLocalizationData = Object.values(barChartCounts).some(count => count > 0);
   if (!hasLocalizationData) {
     statusDiv.innerHTML = `<span class="error-message">Found ${foundGenes.length} gene(s), but none have localization data for the plotted categories.</span>`;
@@ -848,7 +851,6 @@ function generateAnalysisPlots() {
     return;
   }
 
-  // --- Render Plots ---
   plotContainer.style.display = 'block';
   downloadBtn.style.display = 'inline-block';
   if (notFoundGenes.length > 0) {
@@ -894,6 +896,7 @@ function generateAnalysisPlots() {
     }
   });
 }
+
 async function downloadAnalysisPlot() {
     const canvas = document.getElementById('analysis-dot-plot');
     if (!canvas || !analysisDotPlotInstance) return;
