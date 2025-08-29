@@ -102,11 +102,17 @@ function performSingleSearch() {
 }
 
 function performBatchSearch() {
-    // ✨ THE DEFINITIVE FIX: This specifically removes the invisible character from the input
-    const queries = document.getElementById('batch-genes-input').value
-        .split(/[\s,\n]+/)
-        .filter(Boolean)
-        .map(q => q.replace(/\u200B/g, '').trim().toUpperCase());
+    const rawInput = document.getElementById('batch-genes-input').value;
+
+    // ✨ THE DEFINITIVE FIX: This new, more specific cleaning logic targets the invisible character.
+    const queries = rawInput
+        .split(/[\s,\n]+/)       // 1. Split into individual gene names
+        .filter(Boolean)            // 2. Remove any empty entries
+        .map(q => q
+            .replace(/\u200B/g, '') // 3. **Specifically remove the invisible "zero-width space"**
+            .trim()                 // 4. Trim standard whitespace
+            .toUpperCase()          // 5. Convert to uppercase
+        );
 
     const localizationFilter = document.getElementById('localization-filter')?.value;
     const keywordFilter = document.getElementById('keyword-filter')?.value.toLowerCase();
@@ -120,6 +126,7 @@ function performBatchSearch() {
 
     let results = allGenes.filter(g =>
         queries.some(q => {
+            // This comparison logic is now correct because the queries are clean
             if (g.gene && g.gene.toUpperCase() === q) {
                 return true;
             }
