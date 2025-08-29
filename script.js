@@ -715,9 +715,8 @@ function displayComparePage() {
         });
     }
 }
-
 // =============================================================================
-// FINAL & CORRECTED: ANALYSIS PAGE PLOTTING & DOWNLOAD
+// ANALYSIS PAGE PLOTTING & DOWNLOAD (Add this entire block)
 // =============================================================================
 
 function displayAnalysisPage() {
@@ -727,183 +726,195 @@ function displayAnalysisPage() {
     contentArea.innerHTML = `
         <div class="page-section">
             <h2>Gene Localization Analysis</h2>
-            <p>Paste a list of human gene names to visualize their localization enrichment.</p>
+            <p>Paste a list of human gene names to visualize their localization enrichment and overlaps.</p>
             <textarea id="analysis-genes-input" placeholder="e.g., TMEM107, TMEM17, WDR31, IFT20, NEK10, IFT88" style="width: 100%; min-height: 150px; padding: 1rem; border: 2px solid #e1ecf4; border-radius: 10px; font-size: 1rem; margin-top: 1rem; resize: vertical;"></textarea>
-            <div id="analysis-controls">
-                 <button id="generate-plot-btn" class="btn btn-primary">Generate Plot</button>
-                 <button id="download-plot-btn" class="btn btn-secondary" style="display:none;">Download Plot (PNG)</button>
+            
+            <div id="analysis-controls" style="margin-top: 1rem; display: flex; align-items: center; gap: 20px;">
+                <div>
+                    <input type="radio" id="plot-bubble" name="plot-type" value="bubble" checked>
+                    <label for="plot-bubble">Localization Matrix</label>
+                    <input type="radio" id="plot-upset" name="plot-type" value="upset">
+                    <label for="plot-upset">Set Overlaps (Upset Plot)</label>
+                </div>
+                <button id="generate-plot-btn" class="btn btn-primary">Generate Plot</button>
+                <button id="download-plot-btn" class="btn btn-secondary" style="display:none;">Download Plot</button>
             </div>
+
             <div id="analysis-status" class="status-message" style="display: none; padding: 1rem;"></div>
             
-            <div id="analysis-plot-container" style="display:none; display: flex; align-items: flex-start; gap: 20px; margin-top: 2rem;">
-                 <div id="analysis-plot-wrapper" style="position: relative; height: 600px; flex-grow: 1;">
-                     <canvas id="analysis-dot-plot"></canvas>
-                 </div>
-                 <div id="plot-legend-container" style="flex-shrink: 0; width: 150px; padding-top: 50px;">
-                     </div>
+            <div id="bubble-plot-container" style="display:none; margin-top: 2rem;">
+                 <h3 style="margin-bottom: 1.5rem;">Gene Localization Matrix</h3>
+                 <div id="bubble-plot-wrapper" style="position: relative; height: 600px;"><canvas id="analysis-bubble-plot"></canvas></div>
+            </div>
+            <div id="upset-plot-container" style="display:none; margin-top: 2rem;">
+                 <h3 style="margin-bottom: 1.5rem;">Localization Set Overlaps</h3>
+                 <div id="upset-plot-wrapper"></div>
             </div>
         </div>
     `;
 
     document.getElementById('generate-plot-btn').addEventListener('click', generateAnalysisPlots);
-    document.getElementById('download-plot-btn').addEventListener('click', downloadAnalysisPlot);
+    document.getElementById('download-plot-btn').addEventListener('click', downloadPlot);
 }
 
-/**
- * Generates and updates a publication-quality Y-axis-only bubble plot and its custom legends.
- */
-async function generateAnalysisPlots() {
-    // This function now correctly uses the globally available 'allGenes' array
-    // and the sanitization logic from your working search functions.
-    
-    const statusDiv = document.getElementById('analysis-status');
-    const plotContainer = document.getElementById('analysis-plot-container');
-    const downloadBtn = document.getElementById('download-plot-btn');
-    const legendContainer = document.getElementById('plot-legend-container');
 
-    // Reset UI
-    if (plotContainer) plotContainer.style.display = 'none';
-    if (downloadBtn) downloadBtn.style.display = 'none';
-    if (statusDiv) statusDiv.style.display = 'none';
-    if (legendContainer) legendContainer.innerHTML = '';
-    if (window.analysisDotPlotInstance) {
-        try { window.analysisDotPlotInstance.destroy(); } catch (e) {}
-    }
+function generateAnalysisPlots() {
+    document.getElementById('bubble-plot-container').style.display = 'none';
+    document.getElementById('upset-plot-container').style.display = 'none';
+    document.getElementById('download-plot-btn').style.display = 'none';
 
     const input = document.getElementById('analysis-genes-input').value || '';
-    const geneNames = input.split(/[\s,;\n\r\t]+/)
-                           .map(q => q.replace(/[\u200B-\u200D\u2060\uFEFF]/g, '').trim().toUpperCase())
-                           .filter(Boolean);
-
+    const geneNames = input.split(/[\s,;\n]+/).map(q => q.replace(/[\u200B-\u200D\u2060\uFEFF]/g, '').trim().toUpperCase()).filter(Boolean);
+    
     if (geneNames.length === 0) {
-        if (statusDiv) {
-            statusDiv.innerHTML = '<span class="error-message">Please enter at least one gene name.</span>';
-            statusDiv.style.display = 'block';
-        }
-        return;
+        return; 
     }
 
     const foundGenes = allGenes.filter(g => geneNames.includes(g.gene.toUpperCase()));
-    const notFoundGenes = geneNames.filter(name => !foundGenes.some(g => g.gene.toUpperCase() === name));
-
+    
     if (foundGenes.length === 0) {
-        if (statusDiv) {
-            statusDiv.innerHTML = `<span class="error-message">None of the entered genes were found. Not found: ${notFoundGenes.join(', ')}</span>`;
-            statusDiv.style.display = 'block';
-        }
         return;
     }
-
-    const yCategories = [ 'Cilia', 'Basal Body', 'Transition Zone', 'Axoneme', 'Ciliary Membrane', 'Lysosome', 'Peroxisome', 'Plasma Membrane', 'Cytoplasm', 'Nucleus', 'Endoplasmic Reticulum', 'Mitochondria', 'Ribosome', 'Golgi', 'Microbodies', 'Cytoskeleton', 'Centrosome', 'Centrioles', 'Vacuoles' ];
     
-    const localizationCounts = {};
-    foundGenes.forEach(gene => {
+    const selectedPlot = document.querySelector('input[name="plot-type"]:checked').value;
+    if (selectedPlot === 'bubble') {
+        renderBubbleMatrix(foundGenes);
+    } else if (selectedPlot === 'upset') {
+        renderUpsetPlot(foundGenes);
+    }
+    
+    document.getElementById('download-plot-btn').style.display = 'inline-block';
+}
+
+
+function renderBubbleMatrix(foundGenes) {
+    document.getElementById('bubble-plot-container').style.display = 'block';
+    if (window.analysisDotPlotInstance) window.analysisDotPlotInstance.destroy();
+
+    const yCategories = ['Basal Body', 'Transition Zone', 'Axoneme', 'Ciliary Membrane', 'Cilia', 'Golgi'];
+    const xLabels = [...new Set(foundGenes.map(g => g.gene))].sort();
+    const colorPalette = ['#377eb8', '#ff7f00', '#4daf4a', '#f781bf', '#a65628', '#984ea3', '#999999', '#e41a1c', '#dede00'];
+    
+    const datasets = foundGenes.map((gene, index) => {
+        const dataPoints = [];
         if (gene.localization) {
-            gene.localization.split(',').forEach(loc => {
-                const locTrimLower = loc.trim().toLowerCase();
-                const matchingCategory = yCategories.find(cat => cat.toLowerCase() === locTrimLower);
-                if (matchingCategory) {
-                    localizationCounts[matchingCategory] = (localizationCounts[matchingCategory] || 0) + 1;
-                }
+            gene.localization.split(',').forEach(locString => {
+                const matchingCategory = yCategories.find(cat => cat.toLowerCase() === locString.trim().toLowerCase());
+                if (matchingCategory) dataPoints.push({ x: gene.gene, y: matchingCategory, r: 10 });
             });
         }
+        return { label: gene.gene, data: dataPoints, backgroundColor: colorPalette[index % colorPalette.length] };
     });
 
-    const categoriesWithData = yCategories.filter(cat => localizationCounts[cat] > 0);
-    if (categoriesWithData.length === 0) {
-        if (statusDiv) {
-            statusDiv.innerHTML = `<span class="error-message">Found ${foundGenes.length} gene(s), but none have localization data for the plotted categories.</span>`;
-            statusDiv.style.display = 'block';
-        }
-        return;
-    }
-
-    const maxCount = Math.max(...Object.values(localizationCounts), 1);
-    const colorPalette = ['#edf8fb', '#b2e2e2', '#66c2a4', '#2ca25f', '#006d2c'];
-    const getColor = count => {
-        if (count === 0) return '#f0f0f0';
-        const ratio = maxCount > 1 ? (count - 1) / (maxCount - 1) : 1;
-        const index = Math.min(Math.floor(ratio * (colorPalette.length - 1)), colorPalette.length - 1);
-        return colorPalette[index];
-    };
-    const getRadius = count => 10 + (count / maxCount) * 15;
-
-    const dataset = {
-        label: 'Gene Localizations',
-        data: categoriesWithData.map(loc => ({
-            x: 0,
-            y: loc,
-            r: getRadius(localizationCounts[loc]),
-            count: localizationCounts[loc]
-        })),
-        backgroundColor: categoriesWithData.map(loc => getColor(localizationCounts[loc]))
-    };
-
-    if (plotContainer) plotContainer.style.display = 'flex';
-    if (downloadBtn) downloadBtn.style.display = 'inline-block';
-    if (statusDiv && notFoundGenes.length > 0) {
-        statusDiv.innerHTML = `<span class="success-message">Showing results for ${foundGenes.length} found gene(s). Not found: ${notFoundGenes.join(', ')}</span>`;
-        statusDiv.style.display = 'block';
-    }
-
-    if (legendContainer) {
-        const midCount = Math.ceil(maxCount / 2);
-        const sizeLegendHTML = `
-            <div style="font-family: Arial, sans-serif;">
-                <h4 style="margin: 0 0 10px 0; font-size: 14px; font-weight: bold;">Gene Count</h4>
-                <div style="display: flex; align-items: center; margin-bottom: 10px;">
-                    <div style="width: ${getRadius(maxCount)*2}px; height: ${getRadius(maxCount)*2}px; background-color: #ccc; border-radius: 50%; margin-right: 10px;"></div>
-                    <span>${maxCount}</span>
-                </div>
-                ${ midCount > 1 && midCount < maxCount ? `
-                <div style="display: flex; align-items: center; margin-bottom: 10px;">
-                    <div style="width: ${getRadius(midCount)*2}px; height: ${getRadius(midCount)*2}px; background-color: #ccc; border-radius: 50%; margin-right: 10px;"></div>
-                    <span>${midCount}</span>
-                </div>` : '' }
-                <div style="display: flex; align-items: center; margin-bottom: 25px;">
-                    <div style="width: ${getRadius(1)*2}px; height: ${getRadius(1)*2}px; background-color: #ccc; border-radius: 50%; margin-right: 10px;"></div>
-                    <span>1</span>
-                </div>
-                <h4 style="margin: 0 0 10px 0; font-size: 14px; font-weight: bold;">Enrichment</h4>
-                <div style="width: 100%; height: 20px; background: linear-gradient(to right, ${colorPalette.join(', ')}); border: 1px solid #ccc;"></div>
-                <div style="display: flex; justify-content: space-between; font-size: 12px;">
-                    <span>Low</span>
-                    <span>High</span>
-                </div>
-            </div>
-        `;
-        legendContainer.innerHTML = sizeLegendHTML;
-    }
-    
-    const ctx = document.getElementById('analysis-dot-plot').getContext('2d');
+    const ctx = document.getElementById('analysis-bubble-plot').getContext('2d');
     window.analysisDotPlotInstance = new Chart(ctx, {
         type: 'bubble',
-        data: { datasets: [dataset] },
+        data: { datasets },
         options: {
             responsive: true,
             maintainAspectRatio: false,
             plugins: {
-                legend: { display: false },
-                tooltip: {
-                    callbacks: {
-                        label: context => `${context.raw.y}: ${context.raw.count} gene(s)`
-                    }
-                },
-                title: { display: true, text: 'Gene Localization Enrichment', font: { size: 18, weight: 'bold', family: 'Arial' } }
+                legend: { display: true, position: 'right', labels: { font: { family: 'Arial', size: 12 } } },
+                tooltip: { callbacks: { label: (context) => `${context.dataset.label} - ${context.raw.y}` } },
             },
             scales: {
-                x: { display: false },
+                x: {
+                    type: 'category',
+                    labels: xLabels,
+                    title: { display: true, text: 'Genes', font: { family: 'Arial', size: 16, weight: 'bold' } },
+                    ticks: { font: { family: 'Arial', size: 12, weight: 'bold' }, autoSkip: false, maxRotation: 90, minRotation: 45 },
+                    grid: { color: '#e0e0e0' }
+                },
                 y: {
                     type: 'category',
-                    labels: categoriesWithData,
-                    offset: false, // Make bubbles closer to axis
-                    grid: { display: false, drawBorder: false },
-                    ticks: { font: { size: 14, weight: 'bold', family: 'Arial' } }
+                    labels: yCategories,
+                    title: { display: true, text: 'Ciliary Localization', font: { family: 'Arial', size: 16, weight: 'bold' } },
+                    ticks: { font: { family: 'Arial', size: 12, weight: 'bold' } },
+                    grid: { color: '#e0e0e0' }
                 }
-            },
-            layout: { padding: { top: 20, bottom: 20, left: 10, right: 10 } }
+            }
         }
     });
+}
+
+
+function renderUpsetPlot(foundGenes) {
+    document.getElementById('upset-plot-container').style.display = 'block';
+    const wrapper = document.getElementById('upset-plot-wrapper');
+    wrapper.innerHTML = '';
+
+    const sets = [];
+    const uniqueLocalizations = new Set();
+    foundGenes.forEach(gene => {
+        if (gene.localization) {
+            const localizations = gene.localization.split(',').map(l => l.trim());
+            sets.push({ name: gene.gene, sets: localizations });
+            localizations.forEach(loc => uniqueLocalizations.add(loc));
+        }
+    });
+
+    const setDefinitions = Array.from(uniqueLocalizations).map(name => ({ name, elems: [] }));
+    sets.forEach(elem => {
+        setDefinitions.forEach(set => {
+            if (elem.sets.includes(set.name)) {
+                set.elems.push(elem.name);
+            }
+        });
+    });
+
+    if (UpsetJS) {
+        const upset = UpsetJS.fromExpression(setDefinitions);
+        UpsetJS.render(wrapper, upset);
+    } else {
+        wrapper.innerHTML = '<p class="error-message">Upset.js library not loaded.</p>';
+    }
+}
+
+
+function downloadPlot() {
+    const selectedPlot = document.querySelector('input[name="plot-type"]:checked').value;
+
+    if (selectedPlot === 'bubble' && window.analysisDotPlotInstance) {
+        const canvas = window.analysisDotPlotInstance.canvas;
+        const tempCanvas = document.createElement('canvas');
+        const tempCtx = tempCanvas.getContext('2d');
+        const scaleFactor = 4;
+        tempCanvas.width = canvas.width * scaleFactor;
+        tempCanvas.height = canvas.height * scaleFactor;
+        tempCtx.fillStyle = 'white';
+        tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+        tempCtx.scale(scaleFactor, scaleFactor);
+        tempCtx.drawImage(canvas, 0, 0);
+
+        const a = document.createElement('a');
+        a.href = tempCanvas.toDataURL('image/png', 1.0);
+        a.download = 'CiliaHub_Localization_Matrix.png';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+
+    } else if (selectedPlot === 'upset') {
+        const svgElement = document.querySelector('#upset-plot-wrapper svg');
+        if (!svgElement) {
+            alert("Could not find the Upset plot to download.");
+            return;
+        }
+        
+        const serializer = new XMLSerializer();
+        let source = serializer.serializeToString(svgElement);
+        if(!source.match(/^<svg[^>]+xmlns="http\:\/\/www\.w3\.org\/2000\/svg"/)){
+            source = source.replace(/^<svg/, '<svg xmlns="http://www.w3.org/2000/svg"');
+        }
+        const blob = new Blob([source], {type: "image/svg+xml;charset=utf-8"});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'CiliaHub_Upset_Plot.svg';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
 }
 
 /**
