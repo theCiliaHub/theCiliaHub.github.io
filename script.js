@@ -941,7 +941,6 @@ function generateAnalysisPlots() {
     if (analysisDotPlotInstance) {
         analysisDotPlotInstance.destroy();
     }
-    // Note: The bar chart is now removed to focus on the primary figure
     if (analysisBarChartInstance) {
         analysisBarChartInstance.destroy();
     }
@@ -1032,7 +1031,7 @@ function generateAnalysisPlots() {
                         label: (context) => `${context.dataset.label} - ${context.raw.y}`
                     }
                 },
-                customCanvasBackgroundColor: {} // Activate white background
+                // Removed customCanvasBackgroundColor to ensure transparent background
             },
             scales: {
                 x: {
@@ -1044,7 +1043,7 @@ function generateAnalysisPlots() {
                         font: { family: 'Arial', size: 16, weight: 'bold' }
                     },
                     ticks: {
-                        font: { family: 'Arial', size: 12 },
+                        font: { family: 'Arial', size: 12, weight: 'bold' }, // Added weight: 'bold'
                         autoSkip: false,
                         maxRotation: 90,
                         minRotation: 45
@@ -1059,7 +1058,7 @@ function generateAnalysisPlots() {
                         text: 'Ciliary Localization',
                         font: { family: 'Arial', size: 16, weight: 'bold' }
                     },
-                    ticks: { font: { family: 'Arial', size: 12 } },
+                    ticks: { font: { family: 'Arial', size: 12, weight: 'bold' } }, // Added weight: 'bold'
                     grid: { color: '#e0e0e0' } // Subtle grid lines
                 }
             }
