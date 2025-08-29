@@ -929,136 +929,170 @@ function generateLocalizationDotPlot(genesInput) {
   document.getElementById('analysis-status').style.display = 'none';
 }
 
-/**
- * ✨ MODIFIED FUNCTION: Generate analysis plots (dot plot + bar chart)
- */
 function generateAnalysisPlots() {
-  const input = document.getElementById('analysis-genes-input').value;
-  const statusDiv = document.getElementById('analysis-status');
-  const plotContainer = document.getElementById('analysis-plot-container');
-  const downloadBtn = document.getElementById('download-plot-btn');
+    const input = document.getElementById('analysis-genes-input').value;
+    const statusDiv = document.getElementById('analysis-status');
+    const plotContainer = document.getElementById('analysis-plot-container');
+    const downloadBtn = document.getElementById('download-plot-btn');
 
-  // Reset previous state
-  plotContainer.style.display = 'none';
-  downloadBtn.style.display = 'none';
-  statusDiv.style.display = 'none';
-  if (analysisDotPlotInstance) analysisDotPlotInstance.destroy();
-  if (analysisBarChartInstance) analysisBarChartInstance.destroy();
+    // Reset previous state
+    plotContainer.style.display = 'none';
+    downloadBtn.style.display = 'none';
+    statusDiv.style.display = 'none';
+    if (analysisDotPlotInstance) analysisDotPlotInstance.destroy();
+    if (analysisBarChartInstance) analysisBarChartInstance.destroy();
 
-  const geneNames = input.split(/[\s,;\n]+/).map(g => g.trim().toUpperCase()).filter(Boolean);
+    // Sanitize the input using the robust function we created
+    const geneNames = input.split(/[\s,;\n\r\t]+/).map(q => q.replace(/[\u200B-\u200D\u2060\uFEFF]/g, '').trim().toUpperCase()).filter(Boolean);
 
-  if (geneNames.length === 0) {
-    statusDiv.innerHTML = '<span class="error-message">Please enter at least one gene name.</span>';
-    statusDiv.style.display = 'block';
-    return;
-  }
-
-  const foundGenes = allGenes.filter(g => geneNames.includes(g.gene.toUpperCase()));
-  const notFoundGenes = geneNames.filter(name => !foundGenes.some(g => g.gene.toUpperCase() === name));
-
-  if (foundGenes.length === 0) {
-    statusDiv.innerHTML = `<span class="error-message">None of the entered genes were found. Not found: ${notFoundGenes.join(', ')}</span>`;
-    statusDiv.style.display = 'block';
-    return;
-  }
-
-  // --- Data processing for bar chart ---
-  const yCategories = ['Cilia', 'Ciliary Membrane', 'Axoneme', 'Transition Zone', 'Basal Body', 'Flagella', 'Ciliary Associated Gene'];
-  const barChartCounts = yCategories.reduce((acc, cat) => ({...acc, [cat]: 0 }), {});
-
-  foundGenes.forEach(gene => {
-    if (gene.localization) {
-      const geneLocalizations = gene.localization.split(',').map(l => l.trim());
-      geneLocalizations.forEach(loc => {
-        const matchingCategory = yCategories.find(cat => cat.toLowerCase() === loc.toLowerCase());
-        if (matchingCategory) {
-          barChartCounts[matchingCategory]++;
-        }
-      });
+    if (geneNames.length === 0) {
+        statusDiv.innerHTML = '<span class="error-message">Please enter at least one gene name.</span>';
+        statusDiv.style.display = 'block';
+        return;
     }
-  });
 
-  // Check for valid localization data
-  const hasLocalizationData = Object.values(barChartCounts).some(count => count > 0);
-  if (!hasLocalizationData) {
-    statusDiv.innerHTML = `<span class="error-message">Found ${foundGenes.length} gene(s), but none have localization data for the plotted categories.</span>`;
-    statusDiv.style.display = 'block';
-    return;
-  }
+    const foundGenes = allGenes.filter(g => geneNames.includes(g.gene.toUpperCase()));
+    const notFoundGenes = geneNames.filter(name => !foundGenes.some(g => g.gene.toUpperCase() === name));
 
-  // --- Render Plots ---
-  plotContainer.style.display = 'block';
-  downloadBtn.style.display = 'inline-block';
-  if (notFoundGenes.length > 0) {
-    statusDiv.innerHTML = `<span class="success-message">Showing results for ${foundGenes.length} found gene(s). Not found: ${notFoundGenes.join(', ')}</span>`;
-    statusDiv.style.display = 'block';
-  }
+    if (foundGenes.length === 0) {
+        statusDiv.innerHTML = `<span class="error-message">None of the entered genes were found. Not found: ${notFoundGenes.join(', ')}</span>`;
+        statusDiv.style.display = 'block';
+        return;
+    }
 
-  // Generate Dot Plot
-  generateLocalizationDotPlot(input);
+    // --- ✨ CORRECTED DATA PROCESSING LOGIC STARTS HERE ---
 
-  // Bar Chart
-  const barChartCtx = document.getElementById('analysis-bar-chart').getContext('2d');
-  analysisBarChartInstance = new Chart(barChartCtx, {
-    type: 'bar',
-    data: {
-      labels: yCategories,
-      datasets: [{
-        label: 'Number of Genes',
-        data: yCategories.map(cat => barChartCounts[cat]),
-        backgroundColor: 'rgba(44, 90, 160, 0.7)',
-        borderColor: 'rgba(44, 90, 160, 1)',
-        borderWidth: 1
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      indexAxis: 'y',
-      scales: {
-        x: {
-          beginAtZero: true,
-          title: { display: true, text: 'Number of Genes', font: { size: 14, weight: 'bold' } },
-          ticks: { stepSize: 1 }
+    const yCategories = ['Cilia', 'Ciliary Membrane', 'Axoneme', 'Transition Zone', 'Basal Body', 'Flagella', 'Ciliary Associated Gene', 'Golgi'];
+    const xLabels = [...new Set(foundGenes.map(g => g.gene))].sort(); // Unique, sorted gene names for the X-axis
+    const dotPlotData = [];
+    const barChartCounts = yCategories.reduce((acc, cat) => ({ ...acc, [cat]: 0 }), {});
+
+    foundGenes.forEach(gene => {
+        if (gene.localization) {
+            const geneLocalizations = gene.localization.split(',').map(l => l.trim().toLowerCase());
+            
+            geneLocalizations.forEach(locString => {
+                // Find the correctly capitalized category name (e.g., "basal body" -> "Basal Body")
+                const matchingCategory = yCategories.find(cat => cat.toLowerCase() === locString);
+                
+                if (matchingCategory) {
+                    // Create a data point with the gene on the X-axis and the category on the Y-axis
+                    dotPlotData.push({
+                        x: gene.gene,
+                        y: matchingCategory,
+                        r: 8 // Dot radius
+                    });
+                    barChartCounts[matchingCategory]++;
+                }
+            });
+        }
+    });
+    
+    // --- CORRECTED DATA PROCESSING LOGIC ENDS HERE ---
+
+    if (dotPlotData.length === 0) {
+        statusDiv.innerHTML = `<span class="error-message">Found ${foundGenes.length} gene(s), but none have localization data for the plotted categories.</span>`;
+        statusDiv.style.display = 'block';
+        return;
+    }
+
+    // --- Render Plots ---
+    plotContainer.style.display = 'block';
+    downloadBtn.style.display = 'inline-block';
+    if (notFoundGenes.length > 0) {
+        statusDiv.innerHTML = `<span class="success-message">Showing results for ${foundGenes.length} found gene(s). Not found: ${notFoundGenes.join(', ')}</span>`;
+        statusDiv.style.display = 'block';
+    }
+
+    // Dot Plot (Bubble Chart) - This uses the corrected data structure
+    const dotPlotCtx = document.getElementById('analysis-dot-plot').getContext('2d');
+    analysisDotPlotInstance = new Chart(dotPlotCtx, {
+        type: 'bubble',
+        data: {
+            datasets: [{
+                label: 'Gene Localization',
+                data: dotPlotData,
+                backgroundColor: '#003366',
+                borderColor: 'rgba(0,0,0,0)',
+            }]
         },
-        y: {
-          title: { display: true, text: 'Localization', font: { size: 14, weight: 'bold' } }
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: { label: context => `${context.raw.x} - ${context.raw.y}` }
+                },
+                customCanvasBackgroundColor: {}
+            },
+            scales: {
+                x: {
+                    type: 'category',
+                    labels: xLabels, // Use gene names as X-axis labels
+                    title: {
+                        display: true,
+                        text: 'Genes',
+                        font: { family: 'Arial, sans-serif', size: 14, weight: 'bold' }
+                    },
+                    ticks: {
+                        font: { family: 'Arial, sans-serif', size: 12 },
+                        autoSkip: false,
+                        maxRotation: 90,
+                        minRotation: 45
+                    }
+                },
+                y: {
+                    type: 'category',
+                    labels: yCategories, // Use localization categories as Y-axis labels
+                    title: {
+                        display: true,
+                        text: 'Localization',
+                        font: { family: 'Arial, sans-serif', size: 14, weight: 'bold' }
+                    },
+                    ticks: {
+                        font: { family: 'Arial, sans-serif', size: 12 }
+                    }
+                }
+            }
         }
-      },
-      plugins: {
-        legend: { display: false },
-        title: { display: true, text: 'Localization Summary for Input Genes', font: { size: 16, weight: 'bold' } }
-      }
-    }
-  });
+    });
+
+    // Bar Chart
+    const barChartCtx = document.getElementById('analysis-bar-chart').getContext('2d');
+    analysisBarChartInstance = new Chart(barChartCtx, {
+        type: 'bar',
+        data: {
+            labels: yCategories,
+            datasets: [{
+                label: 'Number of Genes',
+                data: yCategories.map(cat => barChartCounts[cat]),
+                backgroundColor: 'rgba(44, 90, 160, 0.7)',
+                borderWidth: 0
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            indexAxis: 'y',
+            plugins: {
+                legend: { display: false },
+                title: { display: true, text: 'Localization Summary', font: { family: 'Arial, sans-serif', size: 16 } },
+                customCanvasBackgroundColor: {}
+            },
+            scales: {
+                x: {
+                    beginAtZero: true,
+                    title: { display: true, text: 'Number of Genes', font: { family: 'Arial, sans-serif', size: 14, weight: 'bold' } },
+                    ticks: { stepSize: 1 }
+                },
+                y: {
+                    ticks: { font: { family: 'Arial, sans-serif', size: 12 } }
+                }
+            }
+        }
+    });
 }
-async function downloadAnalysisPlot() {
-    const canvas = document.getElementById('analysis-dot-plot');
-    if (!canvas || !analysisDotPlotInstance) return;
-
-    const originalPixelRatio = analysisDotPlotInstance.options.devicePixelRatio;
-    const downloadPixelRatio = 4; // Increase resolution for download
-
-    try {
-        // Temporarily increase resolution
-        analysisDotPlotInstance.options.devicePixelRatio = downloadPixelRatio;
-        analysisDotPlotInstance.update();
-
-        // Create download link from the high-resolution render
-        const a = document.createElement('a');
-        a.href = analysisDotPlotInstance.toBase64Image('image/png', 1.0);
-        a.download = 'CiliaHub_Localization_Plot.png';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-
-    } finally {
-        // IMPORTANT: Restore original resolution for on-screen display
-        analysisDotPlotInstance.options.devicePixelRatio = originalPixelRatio;
-        analysisDotPlotInstance.update();
-    }
-}
-
 function displayDownloadPage() {
     const contentArea = document.querySelector('.content-area');
     contentArea.className = 'content-area content-area-full';
