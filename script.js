@@ -102,10 +102,12 @@ function performSingleSearch() {
 }
 
 function performBatchSearch() {
+    // ✨ FIX IS HERE: The .map() now includes a .replace() to strip invisible characters
     const queries = document.getElementById('batch-genes-input').value
         .split(/[\s,\n]+/)
         .filter(Boolean)
-        .map(q => q.trim().toUpperCase());
+        .map(q => q.trim().replace(/[^\w-]/g, '').toUpperCase());
+
     const localizationFilter = document.getElementById('localization-filter')?.value;
     const keywordFilter = document.getElementById('keyword-filter')?.value.toLowerCase();
     const statusDiv = document.getElementById('status-message');
@@ -118,7 +120,6 @@ function performBatchSearch() {
 
     let results = allGenes.filter(g =>
         queries.some(q => {
-            // Use sanitized gene field directly, no need for replace(/\s/g, '')
             if (g.gene && g.gene.toUpperCase() === q) {
                 return true;
             }
