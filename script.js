@@ -621,23 +621,27 @@ function generateAnalysisPlots() {
         return;
     }
 
-    // --- Data processing ---
-    const yCategories = ['Cilia', 'Ciliary Membrane', 'Axoneme', 'Transition Zone', 'Basal Body', 'Flagella', 'Ciliary Associated Gene'];
-    const xLabels = foundGenes.map(g => g.gene).sort();
-    const dotPlotData = [];
-    const barChartCounts = yCategories.reduce((acc, cat) => ({...acc, [cat]: 0 }), {});
+ // --- Data processing ---
+const yCategories = ['Cilia', 'Ciliary Membrane', 'Axoneme', 'Transition Zone', 'Basal Body', 'Flagella', 'Ciliary Associated Gene'];
+const xLabels = foundGenes.map(g => g.gene).sort();
+const dotPlotData = [];
+const barChartCounts = yCategories.reduce((acc, cat) => ({...acc, [cat]: 0 }), {});
 
-    foundGenes.forEach(gene => {
-        if (gene.localization) {
-            const geneLocalizations = gene.localization.split(',').map(l => l.trim());
-            geneLocalizations.forEach(loc => {
-                if (yCategories.includes(loc)) {
-                    dotPlotData.push({ x: gene.gene, y: loc, r: 8 });
-                    barChartCounts[loc]++;
-                }
-            });
-        }
-    });
+foundGenes.forEach(gene => {
+    if (gene.localization) {
+        const geneLocalizations = gene.localization.split(',').map(l => l.trim());
+        
+        // --- FIX STARTS HERE ---
+        geneLocalizations.forEach(loc => {
+            // Find a matching category, ignoring case
+            const matchingCategory = yCategories.find(cat => cat.toLowerCase() === loc.toLowerCase());
+            
+            // If a match is found, use the canonical category name from yCategories
+            if (matchingCategory) {
+                dotPlotData.push({ x: gene.gene, y: matchingCategory, r: 8 });
+                barChartCounts[matchingCategory]++;
+            }
+        });
     
     if(dotPlotData.length === 0) {
          statusDiv.innerHTML = `<span class="error-message">Found ${foundGenes.length} gene(s), but none have localization data for the plotted categories.</span>`;
