@@ -104,6 +104,56 @@ function findGenes(queries) {
 /**
  * New function to handle the UI for the Batch Gene Query page.
  */
+// =============================================================================
+// CORRECTED AND UNIFIED SEARCH FUNCTIONS
+// =============================================================================
+
+function performSingleSearch() {
+    const query = sanitize(document.getElementById('single-gene-search')?.value || '');
+    const statusDiv = document.getElementById('status-message');
+    if (!statusDiv) return;
+    
+    statusDiv.style.display = 'block';
+    if (!query) {
+        statusDiv.innerHTML = `<span class="error-message">Please enter a gene name.</span>`;
+        return;
+    }
+    statusDiv.innerHTML = '<span>Searching...</span>';
+
+    const { foundGenes } = findGenes([query]);
+
+    if (foundGenes.length === 1) {
+        navigateTo(null, `/${foundGenes[0].gene}`);
+    } else if (foundGenes.length > 1) {
+        navigateTo(null, '/batch-query');
+        setTimeout(() => {
+            const batchInput = document.getElementById('batch-genes-input');
+            if (batchInput) {
+                batchInput.value = foundGenes.map(r => r.gene).join('\n');
+                performBatchSearch();
+            }
+        }, 100);
+    } else {
+        // Fallback to partial match if no exact match is found
+        const partialMatches = allGenes.filter(g => 
+            (g.gene && g.gene.toUpperCase().includes(query))
+        );
+
+        if (partialMatches.length === 0) {
+            statusDiv.innerHTML = `<span class="error-message">No gene found matching "${query}".</span>`;
+        } else {
+            navigateTo(null, '/batch-query');
+            setTimeout(() => {
+                const batchInput = document.getElementById('batch-genes-input');
+                if (batchInput) {
+                    batchInput.value = partialMatches.map(r => r.gene).join('\n');
+                    performBatchSearch();
+                }
+            }, 100);
+        }
+    }
+}
+
 function performBatchSearch() {
     const inputElement = document.getElementById('batch-genes-input');
     const resultDiv = document.getElementById('batch-results');
@@ -679,6 +729,200 @@ function displayComparePage() {
         });
     }
 }
+
+// =============================================================================
+// ANALYSIS PAGE PLOTTING & DOWNLOAD (Add this entire block)
+// =============================================================================
+
+function displayAnalysisPage() {
+    const contentArea = document.querySelector('.content-area');
+    contentArea.className = 'content-area content-area-full';
+    document.querySelector('.cilia-panel').style.display = 'none';
+    contentArea.innerHTML = `
+        <div class="page-section">
+            <h2>Gene Localization Analysis</h2>
+            <p>Paste a list of human gene names to visualize their localization enrichment and overlaps.</p>
+            <textarea id="analysis-genes-input" placeholder="e.g., TMEM107, TMEM17, WDR31, IFT20, NEK10, IFT88" style="width: 100%; min-height: 150px; padding: 1rem; border: 2px solid #e1ecf4; border-radius: 10px; font-size: 1rem; margin-top: 1rem; resize: vertical;"></textarea>
+            
+            <div id="analysis-controls" style="margin-top: 1rem; display: flex; align-items: center; gap: 20px;">
+                <div>
+                    <input type="radio" id="plot-bubble" name="plot-type" value="bubble" checked>
+                    <label for="plot-bubble">Localization Matrix</label>
+                    <input type="radio" id="plot-upset" name="plot-type" value="upset">
+                    <label for="plot-upset">Set Overlaps (Upset Plot)</label>
+                </div>
+                <button id="generate-plot-btn" class="btn btn-primary">Generate Plot</button>
+                <button id="download-plot-btn" class="btn btn-secondary" style="display:none;">Download Plot</button>
+            </div>
+
+            <div id="analysis-status" class="status-message" style="display: none; padding: 1rem;"></div>
+            
+            <div id="bubble-plot-container" style="display:none; margin-top: 2rem;">
+                 <h3 style="margin-bottom: 1.5rem;">Gene Localization Matrix</h3>
+                 <div id="bubble-plot-wrapper" style="position: relative; height: 600px;"><canvas id="analysis-bubble-plot"></canvas></div>
+            </div>
+            <div id="upset-plot-container" style="display:none; margin-top: 2rem;">
+                 <h3 style="margin-bottom: 1.5rem;">Localization Set Overlaps</h3>
+                 <div id="upset-plot-wrapper"></div>
+            </div>
+        </div>
+    `;
+
+    document.getElementById('generate-plot-btn').addEventListener('click', generateAnalysisPlots);
+    document.getElementById('download-plot-btn').addEventListener('click', downloadPlot);
+}
+
+function generateAnalysisPlots() {
+    document.getElementById('bubble-plot-container').style.display = 'none';
+    document.getElementById('upset-plot-container').style.display = 'none';
+    document.getElementById('download-plot-btn').style.display = 'none';
+
+    const input = document.getElementById('analysis-genes-input').value || '';
+    const geneNames = input.split(/[\s,;\n]+/).map(sanitize).filter(Boolean);
+    if (geneNames.length === 0) { return; }
+
+    const { foundGenes } = findGenes(geneNames);
+    if (foundGenes.length === 0) { return; }
+    
+    const selectedPlot = document.querySelector('input[name="plot-type"]:checked').value;
+    if (selectedPlot === 'bubble') {
+        renderBubbleMatrix(foundGenes);
+    } else if (selectedPlot === 'upset') {
+        renderUpsetPlot(foundGenes);
+    }
+    
+    document.getElementById('download-plot-btn').style.display = 'inline-block';
+}
+
+function renderBubbleMatrix(foundGenes) {
+    document.getElementById('bubble-plot-container').style.display = 'block';
+    if (window.analysisDotPlotInstance) window.analysisDotPlotInstance.destroy();
+
+    const yCategories = ['Basal Body', 'Transition Zone', 'Axoneme', 'Ciliary Membrane', 'Cilia', 'Golgi'];
+    const xLabels = [...new Set(foundGenes.map(g => g.gene))].sort();
+    const colorPalette = ['#377eb8', '#ff7f00', '#4daf4a', '#f781bf', '#a65628', '#984ea3', '#999999', '#e41a1c', '#dede00'];
+    
+    const datasets = foundGenes.map((gene, index) => {
+        const dataPoints = [];
+        if (gene.localization) {
+            gene.localization.split(',').forEach(locString => {
+                const matchingCategory = yCategories.find(cat => cat.toLowerCase() === locString.trim().toLowerCase());
+                if (matchingCategory) dataPoints.push({ x: gene.gene, y: matchingCategory, r: 10 });
+            });
+        }
+        return { label: gene.gene, data: dataPoints, backgroundColor: colorPalette[index % colorPalette.length] };
+    });
+
+    const ctx = document.getElementById('analysis-bubble-plot').getContext('2d');
+    window.analysisDotPlotInstance = new Chart(ctx, {
+        type: 'bubble',
+        data: { datasets },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: true, position: 'right', labels: { font: { family: 'Arial', size: 12 } } },
+                tooltip: { callbacks: { label: (context) => `${context.dataset.label} - ${context.raw.y}` } }
+            },
+            scales: {
+                x: {
+                    type: 'category',
+                    labels: xLabels,
+                    title: { display: true, text: 'Genes', font: { family: 'Arial', size: 16, weight: 'bold' } },
+                    ticks: { font: { family: 'Arial', size: 12, weight: 'bold' }, autoSkip: false, maxRotation: 90, minRotation: 45 },
+                    grid: { color: '#e0e0e0' }
+                },
+                y: {
+                    type: 'category',
+                    labels: yCategories,
+                    title: { display: true, text: 'Ciliary Localization', font: { family: 'Arial', size: 16, weight: 'bold' } },
+                    ticks: { font: { family: 'Arial', size: 12, weight: 'bold' } },
+                    grid: { color: '#e0e0e0' }
+                }
+            }
+        }
+    });
+}
+
+function renderUpsetPlot(foundGenes) {
+    document.getElementById('upset-plot-container').style.display = 'block';
+    const wrapper = document.getElementById('upset-plot-wrapper');
+    wrapper.innerHTML = '';
+
+    const sets = [];
+    const uniqueLocalizations = new Set();
+    foundGenes.forEach(gene => {
+        if (gene.localization) {
+            const localizations = gene.localization.split(',').map(l => l.trim());
+            sets.push({ name: gene.gene, sets: localizations });
+            localizations.forEach(loc => uniqueLocalizations.add(loc));
+        }
+    });
+
+    const setDefinitions = Array.from(uniqueLocalizations).map(name => ({ name, elems: [] }));
+    sets.forEach(elem => {
+        setDefinitions.forEach(set => {
+            if (elem.sets.includes(set.name)) {
+                set.elems.push(elem.name);
+            }
+        });
+    });
+
+    if (typeof UpsetJS !== 'undefined') {
+        const upset = UpsetJS.fromExpression(setDefinitions);
+        UpsetJS.render(wrapper, upset);
+    } else {
+        wrapper.innerHTML = '<p class="error-message">Upset.js library not loaded. Please check index.html.</p>';
+    }
+}
+
+function downloadPlot() {
+    const selectedPlot = document.querySelector('input[name="plot-type"]:checked').value;
+
+    if (selectedPlot === 'bubble' && window.analysisDotPlotInstance) {
+        const canvas = window.analysisDotPlotInstance.canvas;
+        const tempCanvas = document.createElement('canvas');
+        const tempCtx = tempCanvas.getContext('2d');
+        const scaleFactor = 4;
+        tempCanvas.width = canvas.width * scaleFactor;
+        tempCanvas.height = canvas.height * scaleFactor;
+        tempCtx.fillStyle = 'white';
+        tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+        tempCtx.scale(scaleFactor, scaleFactor);
+        tempCtx.drawImage(canvas, 0, 0);
+
+        const a = document.createElement('a');
+        a.href = tempCanvas.toDataURL('image/png', 1.0);
+        a.download = 'CiliaHub_Localization_Matrix.png';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+
+    } else if (selectedPlot === 'upset') {
+        const svgElement = document.querySelector('#upset-plot-wrapper svg');
+        if (!svgElement) {
+            alert("Could not find the Upset plot to download.");
+            return;
+        }
+        
+        const serializer = new XMLSerializer();
+        let source = serializer.serializeToString(svgElement);
+        if(!source.match(/^<svg[^>]+xmlns="http\:\/\/www\.w3\.org\/2000\/svg"/)){
+            source = source.replace(/^<svg/, '<svg xmlns="http://www.w3.org/2000/svg"');
+        }
+        const blob = new Blob([source], {type: "image/svg+xml;charset=utf-8"});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'CiliaHub_Upset_Plot.svg';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
+}
+
+
 // Add this entire block of code for the Analysis page
 
 function displayAnalysisPage() {
@@ -1003,51 +1247,6 @@ function displayNotFoundPage() {
             <p style="font-size: 1rem; color: #555;">The requested gene was not found in our database.</p>
             <a href="/" onclick="navigateTo(event, '/')" style="display: inline-block; padding: 1rem 2rem; background: #2c5aa0; color: white; text-decoration: none; border-radius: 10px; margin-top: 1rem;" aria-label="Back to Home">Back to Home</a>
         </div>`;
-}
-
-function performSingleSearch() {
-    const query = document.getElementById('single-gene-search').value.trim().toUpperCase();
-    const statusDiv = document.getElementById('status-message');
-    statusDiv.innerHTML = '<span>Loading...</span>';
-    statusDiv.style.display = 'block';
-
-    if (!query) {
-        statusDiv.innerHTML = `<span class="error-message">Please enter a gene name.</span>`;
-        return;
-    }
-
-    const results = allGenes.filter(g => {
-        // Use sanitized gene field directly, no need for replace(/\s/g, '')
-        if (g.gene && g.gene.toUpperCase().includes(query)) {
-            return true;
-        }
-        if (g.synonym) {
-            const synonyms = g.synonym.toUpperCase().split(',').map(s => s.trim());
-            if (synonyms.includes(query)) {
-                return true;
-            }
-        }
-        return false;
-    });
-
-    if (results.length === 0) {
-        const closeMatches = allGenes.filter(g =>
-            g.gene && g.gene.toUpperCase().startsWith(query.slice(0, 3))
-        ).slice(0, 3);
-
-        statusDiv.innerHTML = `<span class="error-message">No genes found for "${query}". ${closeMatches.length > 0 ? 'Did you mean: ' + closeMatches.map(g => g.gene).join(', ') + '?' : 'No close matches found.'}</span>`;
-        return;
-    }
-
-    if (results.length === 1 && results[0].gene.toUpperCase() === query) {
-        navigateTo(null, `/${results[0].gene}`);
-    } else {
-        navigateTo(null, '/batch-query');
-        setTimeout(() => {
-            document.getElementById('batch-genes-input').value = results.map(r => r.gene).join('\n');
-            performBatchSearch();
-        }, 100);
-    }
 }
 
 
