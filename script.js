@@ -724,23 +724,18 @@ function displayAnalysisPage() {
         <div class="page-section">
             <h2>Gene Localization Analysis</h2>
             <p>Paste a list of human gene names (comma, space, or newline separated) to visualize their ciliary localizations.</p>
-            <textarea id="analysis-genes-input" placeholder="e.g., ACE2, IFT88, CEP290, BBS1" style="width: 100%; min-height: 150px; padding: 1rem; border: 2px solid #e1ecf4; border-radius: 10px; font-size: 1rem; margin-top: 1rem; resize: vertical;"></textarea>
+            <textarea id="analysis-genes-input" placeholder="e.g., TMEM107, TMEM17, WDR31, IFT20, NEK10, IFT88" style="width: 100%; min-height: 150px; padding: 1rem; border: 2px solid #e1ecf4; border-radius: 10px; font-size: 1rem; margin-top: 1rem; resize: vertical;"></textarea>
             <div id="analysis-controls">
-                 <button id="generate-plot-btn" class="btn btn-primary">Generate Plots</button>
-                 <button id="download-plot-btn" class="btn btn-secondary" style="display:none;">Download Dot Plot (PNG)</button>
+                 <button id="generate-plot-btn" class="btn btn-primary">Generate Plot</button>
+                 <button id="download-plot-btn" class="btn btn-secondary" style="display:none;">Download Plot (PNG)</button>
             </div>
             <div id="analysis-status" class="status-message" style="display: none; padding: 1rem;"></div>
             <div id="analysis-plot-container" style="display:none;">
-                <h3 style="margin-bottom: 1.5rem;">Localization Dot Plot</h3>
-                <div id="analysis-plot-wrapper">
-                    <canvas id="analysis-dot-plot"></canvas>
-                </div>
-                <hr style="margin: 2rem 0;">
-                <h3 style="margin-bottom: 1.5rem;">Localization Summary</h3>
-                 <div style="position: relative; width: 100%; height: 400px;">
-                    <canvas id="analysis-bar-chart"></canvas>
-                </div>
-            </div>
+                 <h3 style="margin-bottom: 1.5rem;">Gene Localization Matrix</h3>
+                 <div id="analysis-plot-wrapper" style="position: relative; height: 600px;">
+                     <canvas id="analysis-dot-plot"></canvas>
+                 </div>
+                 </div>
         </div>
     `;
 
@@ -929,21 +924,36 @@ function generateLocalizationDotPlot(genesInput) {
   document.getElementById('analysis-status').style.display = 'none';
 }
 
+/**
+ * Generates a publication-quality bubble matrix plot for gene localization analysis.
+ * This function replaces the old generateAnalysisPlots.
+ */
 function generateAnalysisPlots() {
     const input = document.getElementById('analysis-genes-input').value;
     const statusDiv = document.getElementById('analysis-status');
     const plotContainer = document.getElementById('analysis-plot-container');
     const downloadBtn = document.getElementById('download-plot-btn');
 
-    // Reset previous state
+    // 1. Reset the UI
     plotContainer.style.display = 'none';
     downloadBtn.style.display = 'none';
     statusDiv.style.display = 'none';
-    if (analysisDotPlotInstance) analysisDotPlotInstance.destroy();
-    if (analysisBarChartInstance) analysisBarChartInstance.destroy();
+    if (analysisDotPlotInstance) {
+        analysisDotPlotInstance.destroy();
+    }
+    // Note: The bar chart is now removed to focus on the primary figure
+    if (analysisBarChartInstance) {
+        analysisBarChartInstance.destroy();
+    }
+     // Hide the bar chart's container if it exists
+    const barChartWrapper = document.getElementById('analysis-bar-chart-wrapper');
+    if(barChartWrapper) barChartWrapper.style.display = 'none';
 
-    // Sanitize the input using the robust function we created
-    const geneNames = input.split(/[\s,;\n\r\t]+/).map(q => q.replace(/[\u200B-\u200D\u2060\uFEFF]/g, '').trim().toUpperCase()).filter(Boolean);
+
+    // 2. Sanitize Input using the robust function
+    const geneNames = input.split(/[\s,;\n\r\t]+/)
+                           .map(q => q.replace(/[\u200B-\u200D\u2060\uFEFF]/g, '').trim().toUpperCase())
+                           .filter(Boolean);
 
     if (geneNames.length === 0) {
         statusDiv.innerHTML = '<span class="error-message">Please enter at least one gene name.</span>';
@@ -960,43 +970,43 @@ function generateAnalysisPlots() {
         return;
     }
 
-    // --- ✨ CORRECTED DATA PROCESSING LOGIC STARTS HERE ---
+    // 3. Prepare Data for the Plot
+    const yCategories = ['Basal Body', 'Transition Zone', 'Axoneme', 'Ciliary Membrane', 'Cilia', 'Golgi'];
+    const xLabels = [...new Set(foundGenes.map(g => g.gene))].sort(); // Unique genes for X-axis
 
-    const yCategories = ['Cilia', 'Ciliary Membrane', 'Axoneme', 'Transition Zone', 'Basal Body', 'Flagella', 'Ciliary Associated Gene', 'Golgi'];
-    const xLabels = [...new Set(foundGenes.map(g => g.gene))].sort(); // Unique, sorted gene names for the X-axis
-    const dotPlotData = [];
-    const barChartCounts = yCategories.reduce((acc, cat) => ({ ...acc, [cat]: 0 }), {});
-
-    foundGenes.forEach(gene => {
+    // A professional, color-blind friendly palette
+    const colorPalette = ['#377eb8', '#ff7f00', '#4daf4a', '#f781bf', '#a65628', '#984ea3', '#999999', '#e41a1c', '#dede00'];
+    
+    const datasets = foundGenes.map((gene, index) => {
+        const dataPoints = [];
         if (gene.localization) {
             const geneLocalizations = gene.localization.split(',').map(l => l.trim().toLowerCase());
-            
             geneLocalizations.forEach(locString => {
-                // Find the correctly capitalized category name (e.g., "basal body" -> "Basal Body")
                 const matchingCategory = yCategories.find(cat => cat.toLowerCase() === locString);
-                
                 if (matchingCategory) {
-                    // Create a data point with the gene on the X-axis and the category on the Y-axis
-                    dotPlotData.push({
+                    dataPoints.push({
                         x: gene.gene,
                         y: matchingCategory,
-                        r: 8 // Dot radius
+                        r: 10 // Fixed radius for a clean grid look
                     });
-                    barChartCounts[matchingCategory]++;
                 }
             });
         }
+        return {
+            label: gene.gene,
+            data: dataPoints,
+            backgroundColor: colorPalette[index % colorPalette.length] // Assign a unique color to each gene
+        };
     });
-    
-    // --- CORRECTED DATA PROCESSING LOGIC ENDS HERE ---
 
-    if (dotPlotData.length === 0) {
+    const hasData = datasets.some(ds => ds.data.length > 0);
+    if (!hasData) {
         statusDiv.innerHTML = `<span class="error-message">Found ${foundGenes.length} gene(s), but none have localization data for the plotted categories.</span>`;
         statusDiv.style.display = 'block';
         return;
     }
 
-    // --- Render Plots ---
+    // 4. Render the Plot
     plotContainer.style.display = 'block';
     downloadBtn.style.display = 'inline-block';
     if (notFoundGenes.length > 0) {
@@ -1004,95 +1014,59 @@ function generateAnalysisPlots() {
         statusDiv.style.display = 'block';
     }
 
-    // Dot Plot (Bubble Chart) - This uses the corrected data structure
     const dotPlotCtx = document.getElementById('analysis-dot-plot').getContext('2d');
     analysisDotPlotInstance = new Chart(dotPlotCtx, {
         type: 'bubble',
-        data: {
-            datasets: [{
-                label: 'Gene Localization',
-                data: dotPlotData,
-                backgroundColor: '#003366',
-                borderColor: 'rgba(0,0,0,0)',
-            }]
-        },
+        data: { datasets },
         options: {
             responsive: true,
             maintainAspectRatio: false,
             plugins: {
-                legend: { display: false },
-                tooltip: {
-                    callbacks: { label: context => `${context.raw.x} - ${context.raw.y}` }
+                legend: {
+                    display: true,
+                    position: 'right',
+                    labels: { font: { family: 'Arial', size: 12 } }
                 },
-                customCanvasBackgroundColor: {}
+                tooltip: {
+                    callbacks: {
+                        label: (context) => `${context.dataset.label} - ${context.raw.y}`
+                    }
+                },
+                customCanvasBackgroundColor: {} // Activate white background
             },
             scales: {
                 x: {
                     type: 'category',
-                    labels: xLabels, // Use gene names as X-axis labels
+                    labels: xLabels,
                     title: {
                         display: true,
                         text: 'Genes',
-                        font: { family: 'Arial, sans-serif', size: 14, weight: 'bold' }
+                        font: { family: 'Arial', size: 16, weight: 'bold' }
                     },
                     ticks: {
-                        font: { family: 'Arial, sans-serif', size: 12 },
+                        font: { family: 'Arial', size: 12 },
                         autoSkip: false,
                         maxRotation: 90,
                         minRotation: 45
-                    }
+                    },
+                    grid: { color: '#e0e0e0' } // Subtle grid lines
                 },
                 y: {
                     type: 'category',
-                    labels: yCategories, // Use localization categories as Y-axis labels
+                    labels: yCategories,
                     title: {
                         display: true,
-                        text: 'Localization',
-                        font: { family: 'Arial, sans-serif', size: 14, weight: 'bold' }
+                        text: 'Ciliary Localization',
+                        font: { family: 'Arial', size: 16, weight: 'bold' }
                     },
-                    ticks: {
-                        font: { family: 'Arial, sans-serif', size: 12 }
-                    }
-                }
-            }
-        }
-    });
-
-    // Bar Chart
-    const barChartCtx = document.getElementById('analysis-bar-chart').getContext('2d');
-    analysisBarChartInstance = new Chart(barChartCtx, {
-        type: 'bar',
-        data: {
-            labels: yCategories,
-            datasets: [{
-                label: 'Number of Genes',
-                data: yCategories.map(cat => barChartCounts[cat]),
-                backgroundColor: 'rgba(44, 90, 160, 0.7)',
-                borderWidth: 0
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            indexAxis: 'y',
-            plugins: {
-                legend: { display: false },
-                title: { display: true, text: 'Localization Summary', font: { family: 'Arial, sans-serif', size: 16 } },
-                customCanvasBackgroundColor: {}
-            },
-            scales: {
-                x: {
-                    beginAtZero: true,
-                    title: { display: true, text: 'Number of Genes', font: { family: 'Arial, sans-serif', size: 14, weight: 'bold' } },
-                    ticks: { stepSize: 1 }
-                },
-                y: {
-                    ticks: { font: { family: 'Arial, sans-serif', size: 12 } }
+                    ticks: { font: { family: 'Arial', size: 12 } },
+                    grid: { color: '#e0e0e0' } // Subtle grid lines
                 }
             }
         }
     });
 }
+
 function displayDownloadPage() {
     const contentArea = document.querySelector('.content-area');
     contentArea.className = 'content-area content-area-full';
