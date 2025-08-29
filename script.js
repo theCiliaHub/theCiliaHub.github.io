@@ -102,11 +102,11 @@ function performSingleSearch() {
 }
 
 function performBatchSearch() {
-    // ✨ FIX IS HERE: The .map() now includes a .replace() to strip invisible characters
+    // ✨ THE DEFINITIVE FIX: This specifically removes the invisible character from the input
     const queries = document.getElementById('batch-genes-input').value
         .split(/[\s,\n]+/)
         .filter(Boolean)
-        .map(q => q.trim().replace(/[^\w-]/g, '').toUpperCase());
+        .map(q => q.replace(/\u200B/g, '').trim().toUpperCase());
 
     const localizationFilter = document.getElementById('localization-filter')?.value;
     const keywordFilter = document.getElementById('keyword-filter')?.value.toLowerCase();
