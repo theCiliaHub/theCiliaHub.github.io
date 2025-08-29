@@ -926,10 +926,11 @@ function generateLocalizationDotPlot(genesInput) {
 
 /**
  * Generates a publication-quality Y-axis-only bubble plot for gene localization.
- * Each bubble color reflects the number of genes in that organelle.
+ * Each bubble's color and size reflects the number of genes in that organelle.
  */
 async function generateAnalysisPlots() {
-    await ciliaDataLoaded; // ensure your allGenes JSON is ready
+    // FIX: Use the correct data loader from your script
+    await loadAndPrepareDatabase();
 
     const statusDiv = document.getElementById('analysis-status');
     const plotContainer = document.getElementById('analysis-plot-container');
@@ -939,10 +940,16 @@ async function generateAnalysisPlots() {
     if (plotContainer) plotContainer.style.display = 'none';
     if (downloadBtn) downloadBtn.style.display = 'none';
     if (statusDiv) statusDiv.style.display = 'none';
-    if (window.analysisDotPlotInstance) try { window.analysisDotPlotInstance.destroy(); } catch(e){}
+    if (window.analysisDotPlotInstance) {
+        try { window.analysisDotPlotInstance.destroy(); } catch(e){}
+    }
+     // Hide the bar chart's container if it exists
+    const barChartWrapper = document.getElementById('analysis-bar-chart-wrapper');
+    if(barChartWrapper) barChartWrapper.style.display = 'none';
 
     const input = document.getElementById('analysis-genes-input').value || '';
-    const geneNames = input.split(/[\s,;\n]+/).map(g => g.trim().toUpperCase()).filter(Boolean);
+    // FIX: Use the robust sanitizer from your script
+    const geneNames = input.split(/[\s,;\n]+/).map(sanitize).filter(Boolean);
 
     if (geneNames.length === 0) {
         if (statusDiv) {
@@ -952,16 +959,21 @@ async function generateAnalysisPlots() {
         return;
     }
 
-    // Find genes (supports synonyms)
-    const foundGenes = [];
+    // FIX: Use the efficient geneMapCache from your script for lookups
+    const foundGenes = new Set();
     const notFoundGenes = [];
     geneNames.forEach(name => {
-        const entry = findGeneEntryByQuery(name); // your helper function
-        if (entry) foundGenes.push(entry);
-        else notFoundGenes.push(name);
+        const entry = geneMapCache.get(name);
+        if (entry) {
+            foundGenes.add(entry);
+        } else {
+            notFoundGenes.push(name);
+        }
     });
 
-    if (foundGenes.length === 0) {
+    const uniqueFoundGenes = Array.from(foundGenes);
+
+    if (uniqueFoundGenes.length === 0) {
         if (statusDiv) {
             statusDiv.innerHTML = `<span class="error-message">None of the entered genes were found. Not found: ${notFoundGenes.join(', ')}</span>`;
             statusDiv.style.display = 'block';
@@ -969,55 +981,73 @@ async function generateAnalysisPlots() {
         return;
     }
 
-    // Y-axis organelles
+    // Y-axis organelles with consistent capitalization
     const yCategories = [
-        'Cilia','Basal body','Transition zone','Lysosome','Peroxisome','Plasma Membrane',
-        'Cytoplasm','Nucleus','Endoplasmic Reticulum','Mitochondria','Ribosome','Golgi',
-        'Microbodies','Cytoskeleton','Centrosome','Centrioles','Vacuoles'
+        'Cilia', 'Basal Body', 'Transition Zone', 'Lysosome', 'Peroxisome', 'Plasma Membrane',
+        'Cytoplasm', 'Nucleus', 'Endoplasmic Reticulum', 'Mitochondria', 'Ribosome', 'Golgi',
+        'Microbodies', 'Cytoskeleton', 'Centrosome', 'Centrioles', 'Vacuoles'
     ];
 
-    // Count genes per organelle
+    // Count genes per organelle (case-insensitive)
     const localizationCounts = {};
-    foundGenes.forEach(g => {
-        if (g.localization) {
-            g.localization.split(',').forEach(loc => {
-                const locTrim = loc.trim();
-                localizationCounts[locTrim] = (localizationCounts[locTrim] || 0) + 1;
+    uniqueFoundGenes.forEach(gene => {
+        if (gene.localization) {
+            gene.localization.split(',').forEach(loc => {
+                const locTrimLower = loc.trim().toLowerCase();
+                // FIX: Find the correctly capitalized category to ensure counts are grouped properly
+                const matchingCategory = yCategories.find(cat => cat.toLowerCase() === locTrimLower);
+                if (matchingCategory) {
+                    localizationCounts[matchingCategory] = (localizationCounts[matchingCategory] || 0) + 1;
+                }
             });
         }
     });
 
+    // IMPROVEMENT: Filter to only show organelles that have results
+    const categoriesWithData = yCategories.filter(cat => localizationCounts[cat] > 0);
+    if (categoriesWithData.length === 0) {
+        if (statusDiv) {
+            statusDiv.innerHTML = `<span class="error-message">Found ${uniqueFoundGenes.length} gene(s), but none have localization data for the plotted categories.</span>`;
+            statusDiv.style.display = 'block';
+        }
+        return;
+    }
+
     const maxCount = Math.max(...Object.values(localizationCounts), 1);
 
-    // Define color palette (gradient)
-    const colorPalette = ['#edf8fb','#b2e2e2','#66c2a4','#2ca25f','#006d2c'];
+    // Define color palette (gradient from light green to dark green)
+    const colorPalette = ['#edf8fb', '#b2e2e2', '#66c2a4', '#2ca25f', '#006d2c'];
     const getColor = count => {
-        const idx = Math.min(Math.floor((count / maxCount) * (colorPalette.length - 1)), colorPalette.length - 1);
-        return colorPalette[idx];
+        if (count === 0) return '#f0f0f0'; // Light grey for zero count
+        const ratio = (count - 1) / Math.max(1, maxCount - 1);
+        const index = Math.min(Math.floor(ratio * (colorPalette.length - 1)), colorPalette.length - 1);
+        return colorPalette[index];
     };
-
-    // Prepare datasets
-    const datasets = yCategories.map((loc, index) => {
-        const count = localizationCounts[loc] || 0;
-        return {
-            label: loc,
-            data: [{ x: 1, y: loc, r: 12 }], // x fixed, y = organelle
-            backgroundColor: getColor(count)
-        };
-    });
+    
+    // Prepare one dataset containing all bubbles
+    const dataset = {
+        label: 'Gene Localizations',
+        data: categoriesWithData.map(loc => ({
+            x: 1, // All bubbles aligned on the same invisible X-position
+            y: loc,
+            r: 10 + (localizationCounts[loc] / maxCount) * 15, // Bubble size based on count (radius 10-25)
+            count: localizationCounts[loc]
+        })),
+        backgroundColor: categoriesWithData.map(loc => getColor(localizationCounts[loc]))
+    };
 
     // Show plot container
     if (plotContainer) plotContainer.style.display = 'block';
     if (downloadBtn) downloadBtn.style.display = 'inline-block';
     if (statusDiv && notFoundGenes.length > 0) {
-        statusDiv.innerHTML = `<span class="success-message">Showing results for ${foundGenes.length} found gene(s). Not found: ${notFoundGenes.join(', ')}</span>`;
+        statusDiv.innerHTML = `<span class="success-message">Showing results for ${uniqueFoundGenes.length} found gene(s). Not found: ${notFoundGenes.join(', ')}</span>`;
         statusDiv.style.display = 'block';
     }
 
     const ctx = document.getElementById('analysis-dot-plot').getContext('2d');
     window.analysisDotPlotInstance = new Chart(ctx, {
         type: 'bubble',
-        data: { datasets },
+        data: { datasets: [dataset] },
         options: {
             responsive: true,
             maintainAspectRatio: false,
@@ -1026,34 +1056,32 @@ async function generateAnalysisPlots() {
                 tooltip: {
                     callbacks: {
                         label: context => {
-                            const loc = context.dataset.label;
-                            const count = localizationCounts[loc] || 0;
-                            return `${loc}: ${count} gene(s)`;
+                            const dataPoint = context.raw;
+                            return `${dataPoint.y}: ${dataPoint.count} gene(s)`;
                         }
                     }
                 },
-                title: { display: true, text: 'Gene Localization per Organelle', font: { size: 16, weight: 'bold' } }
+                title: { display: true, text: 'Gene Localization Enrichment', font: { size: 18, weight: 'bold', family: 'Arial' } }
             },
             scales: {
                 x: {
-                    display: false,
+                    display: false, // Hide X-axis
                     min: 0,
                     max: 2
                 },
                 y: {
                     type: 'category',
-                    labels: yCategories,
-                    title: { display: true, text: 'Organelle', font: { size: 16, weight: 'bold' } },
-                    ticks: { font: { size: 12, weight: 'bold' } },
-                    grid: { color: 'transparent' }
+                    labels: categoriesWithData, // Only show categories with data
+                    offset: true,
+                    title: { display: false },
+                    ticks: { font: { size: 14, weight: 'bold', family: 'Arial' } },
+                    grid: { display: false, drawBorder: false }
                 }
             },
-            layout: { padding: 20 },
-            backgroundColor: 'transparent'
+            layout: { padding: { top: 20, bottom: 20, left: 10, right: 10 } }
         }
     });
 }
-
 
 function displayContactPage() {
     const contentArea = document.querySelector('.content-area');
