@@ -9,148 +9,11 @@ let analysisBarChartInstance; // For Analysis page bar chart
 const allPartIds = ["cell-body", "nucleus", "basal-body", "transition-zone", "axoneme", "ciliary-membrane"];
 const defaultGenesNames = ["ACE2", "ADAMTS20", "ADAMTS9", "IFT88", "CEP290", "WDR31", "ARL13B", "BBS1"];
 
-// ✨ THE NEW PLUGIN CODE RIGHT HERE for PLOT ✨
-Chart.register({
-  id: 'customCanvasBackgroundColor',
-  beforeDraw: (chart, args, options) => {
-    const {ctx} = chart;
-    ctx.save();
-    ctx.globalCompositeOperation = 'destination-over';
-    ctx.fillStyle = options.color || '#ffffff'; // White background
-    ctx.fillRect(0, 0, chart.width, chart.height);
-    ctx.restore();
-  }
-});
-
-// --- Dynamic loader: read ciliahub_data.json and build gene lookup + parsed localizations ---
-let ciliaHubData = [];        // raw array of entries
-const geneIndex = {};         // map: UPPERCASE gene -> entry
-let ciliaDataLoaded = null;   // Promise that resolves when data loaded
-
-// canonical mapping for common synonyms -> standard compartment name
-const _compartmentMap = {
-  'nucleus': 'Nucleus',
-  'nuclear': 'Nucleus',
-  'er': 'ER',
-  'endoplasmic reticulum': 'ER',
-  'golgi': 'Golgi',
-  'golgi apparatus': 'Golgi',
-  'peroxisome': 'Peroxisome',
-  'mitochondria': 'Mitochondria',
-  'mitochondrion': 'Mitochondria',
-  'cilia': 'Cilia',
-  'cilium': 'Cilia',
-  'cytoplasm': 'Cytoplasm',
-  'basal body': 'Basal Body',
-  'transition zone': 'Transition Zone',
-  'axoneme': 'Axoneme',
-  'flagella': 'Flagella',
-  'flagellum': 'Flagella',
-  'ciliary membrane': 'Ciliary Membrane',
-  'ciliary membrane?': 'Ciliary Membrane',
-  'plasma membrane': 'Plasma Membrane'
-};
-
-// helper: parse a raw localization string into an array of canonical compartments
-function parseLocalizations(localizationString) {
-  if (!localizationString) return [];
-  // split by comma/semicolon/pipe/slash, trim
-  const parts = localizationString.split(/[,;\/|]+/).map(s => s.trim()).filter(Boolean);
-  const seen = new Set();
-  const out = [];
-  parts.forEach(p => {
-    const key = p.toLowerCase();
-    // direct match
-    let canonical = _compartmentMap[key];
-    if (!canonical) {
-      // fuzzy match: find a known token contained in the string
-      const matchedKey = Object.keys(_compartmentMap).find(k => key.includes(k));
-      if (matchedKey) canonical = _compartmentMap[matchedKey];
-    }
-    if (!canonical) {
-      // fallback: title-case the original token
-      canonical = p.split(/\s+/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
-    }
-    if (!seen.has(canonical)) {
-      seen.add(canonical);
-      out.push(canonical);
-    }
-  });
-  return out;
-}
-
-// find entry by gene symbol or synonyms (case-insensitive)
-function findGeneEntryByQuery(query) {
-  const key = (query || '').trim().toUpperCase();
-  if (geneIndex[key]) return geneIndex[key];
-
-  // linear search fallback (synonym search)
-  for (const entry of ciliaHubData) {
-    if (!entry) continue;
-    if (entry.gene && entry.gene.trim().toUpperCase() === key) return entry;
-    if (entry.synonym) {
-      const syns = entry.synonym.split(/[,;|]+/).map(s => s.trim().toUpperCase());
-      if (syns.includes(key)) return entry;
-    }
-  }
-  return null;
-}
-
-// Immediately start loading the JSON; store a promise to wait on if needed
-ciliaDataLoaded = (async function loadCiliaData() {
-  try {
-    const resp = await fetch('ciliahub_data.json');
-    if (!resp.ok) throw new Error(`Failed to fetch ciliahub_data.json (${resp.status})`);
-    const json = await resp.json();
-    const entries = Array.isArray(json) ? json : Object.values(json || {});
-    ciliaHubData = entries;
-
-    entries.forEach(entry => {
-      if (!entry || !entry.gene) return;
-      const geneKey = entry.gene.trim().toUpperCase();
-      // attach parsed localizations for fast access
-      entry._localizations = parseLocalizations(entry.localization || '');
-      // attach default confidence array if not present (so plotting code can consume a consistent shape)
-      if (!Array.isArray(entry.confidence)) {
-        entry.confidence = entry._localizations.map(loc => ({
-          compartment: loc,
-          score: 0.7,          // default confidence (0..1)
-          evidence: entry.reference ? 'literature' : 'unknown'
-        }));
-      } else {
-        // ensure every confidence entry has keys we expect
-        entry.confidence = entry.confidence.map(c => ({
-          compartment: c.compartment || '',
-          score: (typeof c.score === 'number') ? c.score : 0.7,
-          evidence: c.evidence || (entry.reference ? 'literature' : 'unknown')
-        }));
-      }
-      geneIndex[geneKey] = entry;
-    });
-
-    console.log(`ciliaHubData loaded: ${entries.length} records`);
-    return true;
-  } catch (err) {
-    console.error('Error loading ciliahub_data.json:', err);
-    return false;
-  }
-})();
-
-
-
 // Load data from external JSON file
 async function loadGeneDatabase() {
     try {
-        const response = await fetch('https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/ciliahub_data.json');
-        let rawGenes = await response.json();
-
-        // Sanitize all gene names on load (unchanged, already correct)
-        allGenes = rawGenes.map(gene => {
-            if (gene.gene) {
-                gene.gene = gene.gene.trim().replace(/(\r\n|\n|\r)/gm, "");
-            }
-            return gene;
-        });
+        const response = await fetch( 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/ciliahub_data.json' );
+        allGenes = await response.json();
         
         // Initialize gene localization data
         allGenes.forEach(gene => {
@@ -158,19 +21,21 @@ async function loadGeneDatabase() {
                 geneLocalizationData[gene.gene] = mapLocalizationToSVG(gene.localization);
             }
         });
-
+        
         // Set current data to default genes
         currentData = allGenes.filter(g => defaultGenesNames.includes(g.gene));
-
-        console.log('Data loaded and sanitized successfully:', allGenes.length, 'entries');
+        
+        console.log('Data loaded successfully:', allGenes.length, 'entries');
         return true;
     } catch (error) {
         console.error('Error loading gene database:', error);
+        // Fallback to default data if loading fails
         allGenes = [...getDefaultGenes()];
         currentData = [...allGenes];
         return false;
     }
 }
+
 // Default genes as fallback
 function getDefaultGenes() {
     return [
@@ -726,327 +591,160 @@ function displayAnalysisPage() {
     document.getElementById('download-plot-btn').addEventListener('click', downloadAnalysisPlot);
 }
 
-/**
- * ✨ NEW: Generate publication-quality dot plot using ciliahub_data.json localizations
- * Accepts a string (comma/newline separated) or array of gene names.
- */
-async function generateLocalizationDotPlot(genesInput) {
-  // ensure JSON data loaded
-  await ciliaDataLoaded;
+function generateAnalysisPlots() {
+    const input = document.getElementById('analysis-genes-input').value;
+    const statusDiv = document.getElementById('analysis-status');
+    const plotContainer = document.getElementById('analysis-plot-container');
+    const downloadBtn = document.getElementById('download-plot-btn');
 
-  const canvas = document.getElementById('analysis-dot-plot');
-  if (!canvas) {
-    console.error('Canvas element #analysis-dot-plot not found');
-    document.getElementById('analysis-status').innerHTML =
-      `<span class="error-message">Unable to generate plot: Canvas not found.</span>`;
-    document.getElementById('analysis-status').style.display = 'block';
-    return;
-  }
+    // Reset previous state
+    plotContainer.style.display = 'none';
+    downloadBtn.style.display = 'none';
+    statusDiv.style.display = 'none';
+    if (analysisDotPlotInstance) analysisDotPlotInstance.destroy();
+    if (analysisBarChartInstance) analysisBarChartInstance.destroy();
 
-  // destroy existing chart instance if present
-  if (window.analysisDotPlotInstance) {
-    try { window.analysisDotPlotInstance.destroy(); } catch (e) { /* ignore */ }
-  }
+    const geneNames = input.split(/[\s,;\n]+/).map(g => g.trim().toUpperCase()).filter(Boolean);
 
-  // base compartments (adds more dynamically below if needed)
-  const baseCompartments = [
-    'Nucleus', 'ER', 'Golgi', 'Peroxisome', 'Mitochondria',
-    'Cilia', 'Cytoplasm', 'Basal Body', 'Transition Zone',
-    'Ciliary Membrane', 'Axoneme', 'Flagella', 'Plasma Membrane'
-  ];
-
-  // build queries
-  const queries = typeof genesInput === 'string'
-    ? genesInput.split(/[\s,;\n]+/).map(q => q.trim()).filter(Boolean)
-    : Array.isArray(genesInput) ? genesInput.map(q => (q||'').trim()).filter(Boolean) : [];
-
-  // find entries for each query (preserves order)
-  const foundEntries = [];
-  const notFound = [];
-  queries.forEach(q => {
-    const entry = findGeneEntryByQuery(q);
-    if (entry) foundEntries.push(entry);
-    else notFound.push(q);
-  });
-
-  if (foundEntries.length === 0) {
-    document.getElementById('analysis-status').innerHTML =
-      `<span class="error-message">No valid genes found for plotting. Not found: ${notFound.join(', ')}</span>`;
-    document.getElementById('analysis-status').style.display = 'block';
-    return;
-  }
-
-  // Create final compartments list = base + any new compartments from found genes
-  const compartmentsSet = new Set(baseCompartments);
-  foundEntries.forEach(e => {
-    const locs = (e._localizations && Array.isArray(e._localizations)) ? e._localizations : parseLocalizations(e.localization || '');
-    locs.forEach(l => compartmentsSet.add(l));
-  });
-  const compartments = Array.from(compartmentsSet);
-
-  // evidence color map
-  const evidenceColors = {
-    microscopy: 'rgba(75, 192, 192, 0.9)',
-    proteomics: 'rgba(255, 99, 132, 0.9)',
-    prediction: 'rgba(54, 162, 235, 0.9)',
-    literature: 'rgba(102, 102, 102, 0.9)',
-    unknown: 'rgba(170,170,170,0.9)'
-  };
-
-  // build datasets (one dataset per gene; each point: x=index of compartment, y=index of gene)
-  const datasets = foundEntries.map((entry, gIndex) => {
-    // prefer structured confidence array if present (we ensured entry.confidence exists during load)
-    const confArr = Array.isArray(entry.confidence) ? entry.confidence : [];
-    const dataPoints = [];
-
-    // If confidence array present, use it; else fallback on parsed localizations
-    if (confArr.length > 0) {
-      confArr.forEach(conf => {
-        const compCanonicalList = parseLocalizations(conf.compartment || conf.compartment === '' ? conf.compartment : conf.compartment);
-        // conf.compartment may be a canonical name or a free text; take first parsed token
-        const comp = compCanonicalList.length ? compCanonicalList[0] : (conf.compartment || '').trim();
-        const xIdx = compartments.indexOf(comp);
-        if (xIdx >= 0) {
-          const score = (typeof conf.score === 'number') ? conf.score : 0.7;
-          dataPoints.push({
-            x: xIdx,
-            y: gIndex,
-            r: Math.max(4, Math.min(24, score * 24)),
-            evidence: conf.evidence || (entry.reference ? 'literature' : 'unknown'),
-            reference: entry.reference || ''
-          });
-        }
-      });
-    } else {
-      // fallback
-      const locs = entry._localizations.length ? entry._localizations : parseLocalizations(entry.localization || '');
-      locs.forEach(loc => {
-        const xIdx = compartments.indexOf(loc);
-        if (xIdx >= 0) {
-          dataPoints.push({
-            x: xIdx,
-            y: gIndex,
-            r: 10, // default mid-size
-            evidence: entry.reference ? 'literature' : 'unknown',
-            reference: entry.reference || ''
-          });
-        }
-      });
+    if (geneNames.length === 0) {
+        statusDiv.innerHTML = '<span class="error-message">Please enter at least one gene name.</span>';
+        statusDiv.style.display = 'block';
+        return;
     }
 
-    return {
-      label: entry.gene,
-      data: dataPoints,
-      backgroundColor: dataPoints.map(p => evidenceColors[p.evidence] || evidenceColors.unknown),
-      borderColor: dataPoints.map(p => evidenceColors[p.evidence] || evidenceColors.unknown),
-      borderWidth: 1
-    };
-  });
+    const foundGenes = allGenes.filter(g => geneNames.includes(g.gene.toUpperCase()));
+    const notFoundGenes = geneNames.filter(name => !foundGenes.some(g => g.gene.toUpperCase() === name));
 
-  // create Chart.js bubble plot
-  window.analysisDotPlotInstance = new Chart(canvas, {
-    type: 'bubble',
-    data: { datasets },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      devicePixelRatio: 3,
-      plugins: {
-        legend: {
-          display: true,
-          position: 'top',
-          labels: { font: { size: 13, family: 'Arial', weight: 'bold' }, color: '#000' }
+    if (foundGenes.length === 0) {
+        statusDiv.innerHTML = `<span class="error-message">None of the entered genes were found. Not found: ${notFoundGenes.join(', ')}</span>`;
+        statusDiv.style.display = 'block';
+        return;
+    }
+
+    // --- Data processing ---
+    const yCategories = ['Cilia', 'Ciliary Membrane', 'Axoneme', 'Transition Zone', 'Basal Body', 'Flagella', 'Ciliary Associated Gene'];
+    const xLabels = foundGenes.map(g => g.gene).sort();
+    const dotPlotData = [];
+    const barChartCounts = yCategories.reduce((acc, cat) => ({...acc, [cat]: 0 }), {});
+
+    // 1. THIS LOOP MUST COMPLETE FOR ALL GENES FIRST
+    foundGenes.forEach(gene => {
+        if (gene.localization) {
+            const geneLocalizations = gene.localization.split(',').map(l => l.trim());
+            
+            geneLocalizations.forEach(loc => {
+                const matchingCategory = yCategories.find(cat => cat.toLowerCase() === loc.toLowerCase());
+                if (matchingCategory) {
+                    dotPlotData.push({ x: gene.gene, y: matchingCategory, r: 8 });
+                    barChartCounts[matchingCategory]++;
+                }
+            });
+        }
+    });
+
+    // 2. ✨ FIX: THE CHECK NOW HAPPENS *AFTER* THE LOOP IS FINISHED
+    if (dotPlotData.length === 0) {
+        statusDiv.innerHTML = `<span class="error-message">Found ${foundGenes.length} gene(s), but none have localization data for the plotted categories.</span>`;
+        statusDiv.style.display = 'block';
+        return;
+    }
+
+    // --- Render Plots ---
+    plotContainer.style.display = 'block';
+    downloadBtn.style.display = 'inline-block';
+    if (notFoundGenes.length > 0) {
+        statusDiv.innerHTML = `<span class="success-message">Showing results for ${foundGenes.length} found gene(s). Not found: ${notFoundGenes.join(', ')}</span>`;
+        statusDiv.style.display = 'block';
+    }
+
+    // Dot Plot (Bubble Chart)
+    const dotPlotCtx = document.getElementById('analysis-dot-plot').getContext('2d');
+    analysisDotPlotInstance = new Chart(dotPlotCtx, {
+        type: 'bubble',
+        data: {
+            datasets: [{
+                label: 'Gene Localization',
+                data: dotPlotData,
+                backgroundColor: '#2c5aa0',
+                borderColor: 'rgba(0,0,0,0)',
+            }]
         },
-        tooltip: {
-          enabled: true,
-          backgroundColor: 'rgba(0,0,0,0.85)',
-          titleFont: { size: 13, family: 'Arial' },
-          bodyFont: { size: 12, family: 'Arial' },
-          callbacks: {
-            label: function(context) {
-              const p = context.raw || context;
-              const geneLabel = context.dataset && context.dataset.label ? context.dataset.label : '';
-              const compartmentName = compartments[p.x] || p.x;
-              const confidence = (p.r / 24).toFixed(2);
-              const evidence = p.evidence || 'unknown';
-              const ref = p.reference ? (p.reference.length > 120 ? p.reference.substring(0, 120) + "..." : p.reference) : 'N/A';
-              return [
-                `Gene: ${geneLabel}`,
-                `Compartment: ${compartmentName}`,
-                `Confidence (est.): ${confidence}`,
-                `Evidence: ${evidence}`,
-                `Reference: ${ref}`
-              ];
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: { label: context => `${context.raw.x} - ${context.raw.y}` }
+                }
+            },
+            scales: {
+                x: {
+                    type: 'category',
+                    labels: xLabels,
+                    title: { display: true, text: 'Genes', font: { size: 14, weight: 'bold' } },
+                    ticks: { autoSkip: false, maxRotation: 90, minRotation: 45 }
+                },
+                y: {
+                    type: 'category',
+                    labels: yCategories,
+                    title: { display: true, text: 'Localization', font: { size: 14, weight: 'bold' } }
+                }
             }
-          }
         }
-      },
-      scales: {
-        x: {
-          type: 'category',
-          labels: compartments,
-          title: { display: true, text: 'Subcellular Compartment', font: { size: 15, weight: 'bold' } },
-          ticks: { autoSkip: false, maxRotation: 45, minRotation: 45, font: { size: 11 } },
-          grid: { display: false }
-        },
-        y: {
-          type: 'category',
-          labels: foundEntries.map(e => e.gene),
-          title: { display: true, text: 'Genes', font: { size: 15, weight: 'bold' } },
-          ticks: { font: { size: 11 } },
-          grid: { display: true, color: 'rgba(0,0,0,0.08)' }
-        }
-      },
-      layout: { padding: { top: 8, right: 12, bottom: 12, left: 12 } }
-    }
-  });
+    });
 
-  // hide status on success
-  const st = document.getElementById('analysis-status');
-  if (st) st.style.display = 'none';
+    // Bar Chart
+    const barChartCtx = document.getElementById('analysis-bar-chart').getContext('2d');
+    analysisBarChartInstance = new Chart(barChartCtx, {
+        type: 'bar',
+        data: {
+            labels: yCategories,
+            datasets: [{
+                label: 'Number of Genes',
+                data: yCategories.map(cat => barChartCounts[cat]),
+                backgroundColor: 'rgba(44, 90, 160, 0.7)',
+                borderColor: 'rgba(44, 90, 160, 1)',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            indexAxis: 'y',
+            scales: {
+                x: {
+                    beginAtZero: true,
+                    title: { display: true, text: 'Number of Genes' },
+                    ticks: { stepSize: 1 }
+                }
+            },
+            plugins: {
+                legend: { display: false },
+                title: { display: true, text: 'Localization Summary for Input Genes' }
+            }
+        }
+    });
 }
 
-
-async function downloadAnalysisPlot() {
+function downloadAnalysisPlot() {
     const canvas = document.getElementById('analysis-dot-plot');
     if (!canvas || !analysisDotPlotInstance) return;
 
-    const originalPixelRatio = analysisDotPlotInstance.options.devicePixelRatio;
-    const downloadPixelRatio = 4; // Increase resolution for download
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width = canvas.width;
+    tempCanvas.height = canvas.height;
+    const tempCtx = tempCanvas.getContext('2d');
+    tempCtx.fillStyle = 'white';
+    tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+    tempCtx.drawImage(canvas, 0, 0);
 
-    try {
-        // Temporarily increase resolution
-        analysisDotPlotInstance.options.devicePixelRatio = downloadPixelRatio;
-        analysisDotPlotInstance.update();
-
-        // Create download link from the high-resolution render
-        const a = document.createElement('a');
-        a.href = analysisDotPlotInstance.toBase64Image('image/png', 1.0);
-        a.download = 'CiliaHub_Localization_Plot.png';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-
-    } finally {
-        // IMPORTANT: Restore original resolution for on-screen display
-        analysisDotPlotInstance.options.devicePixelRatio = originalPixelRatio;
-        analysisDotPlotInstance.update();
-    }
-}
-
-/**
- * ✨ MODIFIED: Generate analysis plots (dot plot + bar chart) using JSON localizations
- * This function is async because it waits for the JSON to be loaded.
- */
-async function generateAnalysisPlots() {
-  await ciliaDataLoaded; // ensure data is ready
-
-  const input = document.getElementById('analysis-genes-input').value || '';
-  const statusDiv = document.getElementById('analysis-status');
-  const plotContainer = document.getElementById('analysis-plot-container');
-  const downloadBtn = document.getElementById('download-plot-btn');
-
-  // reset UI
-  if (plotContainer) plotContainer.style.display = 'none';
-  if (downloadBtn) downloadBtn.style.display = 'none';
-  if (statusDiv) statusDiv.style.display = 'none';
-  if (window.analysisDotPlotInstance) try { window.analysisDotPlotInstance.destroy(); } catch(e){}
-  if (window.analysisBarChartInstance) try { window.analysisBarChartInstance.destroy(); } catch(e){}
-
-  const geneNames = input.split(/[\s,;\n]+/).map(g => g.trim()).filter(Boolean);
-  if (geneNames.length === 0) {
-    if (statusDiv) {
-      statusDiv.innerHTML = '<span class="error-message">Please enter at least one gene name.</span>';
-      statusDiv.style.display = 'block';
-    }
-    return;
-  }
-
-  // find gene entries (supports synonyms)
-  const foundGenes = [];
-  const notFoundGenes = [];
-  geneNames.forEach(name => {
-    const entry = findGeneEntryByQuery(name);
-    if (entry) foundGenes.push(entry);
-    else notFoundGenes.push(name);
-  });
-
-  if (foundGenes.length === 0) {
-    if (statusDiv) {
-      statusDiv.innerHTML = `<span class="error-message">None of the entered genes were found. Not found: ${notFoundGenes.join(', ')}</span>`;
-      statusDiv.style.display = 'block';
-    }
-    return;
-  }
-
-  // Localization categories to display in bar chart (you can extend this list)
-  const yCategories = ['Cilia', 'Ciliary Membrane', 'Axoneme', 'Transition Zone', 'Basal Body', 'Flagella', 'Ciliary Associated Gene', 'Golgi', 'Nucleus', 'Cytoplasm', 'Mitochondria', 'ER', 'Peroxisome'];
-  const barChartCounts = yCategories.reduce((acc, cat) => (acc[cat] = 0, acc), {});
-
-  // count localizations using the parsed arrays (entry._localizations)
-  foundGenes.forEach(entry => {
-    const locs = (entry._localizations && entry._localizations.length) ? entry._localizations : parseLocalizations(entry.localization || '');
-    locs.forEach(loc => {
-      const match = yCategories.find(cat => cat.toLowerCase() === loc.toLowerCase());
-      if (match) barChartCounts[match] += 1;
-      else {
-        // optional: count unknown / add new categories if needed
-        // skip for now
-      }
-    });
-  });
-
-  const hasLocalizationData = Object.values(barChartCounts).some(v => v > 0);
-  if (!hasLocalizationData) {
-    if (statusDiv) {
-      statusDiv.innerHTML = `<span class="error-message">Found ${foundGenes.length} gene(s), but none have localization data for the plotted categories.</span>`;
-      statusDiv.style.display = 'block';
-    }
-    return;
-  }
-
-  // show UI and status
-  if (plotContainer) plotContainer.style.display = 'block';
-  if (downloadBtn) downloadBtn.style.display = 'inline-block';
-  if (statusDiv && notFoundGenes.length > 0) {
-    statusDiv.innerHTML = `<span class="success-message">Showing results for ${foundGenes.length} found gene(s). Not found: ${notFoundGenes.join(', ')}</span>`;
-    statusDiv.style.display = 'block';
-  }
-
-  // Generate Dot Plot (pass original input string to preserve user ordering)
-  await generateLocalizationDotPlot(input);
-
-  // Render Bar Chart
-  const barCtxEl = document.getElementById('analysis-bar-chart');
-  if (!barCtxEl) return;
-  const barChartCtx = barCtxEl.getContext('2d');
-
-  window.analysisBarChartInstance = new Chart(barChartCtx, {
-    type: 'bar',
-    data: {
-      labels: yCategories,
-      datasets: [{
-        label: 'Number of Genes',
-        data: yCategories.map(cat => barChartCounts[cat]),
-        backgroundColor: 'rgba(44, 90, 160, 0.8)',
-        borderColor: 'rgba(44, 90, 160, 1)',
-        borderWidth: 1
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      indexAxis: 'y',
-      scales: {
-        x: { beginAtZero: true, title: { display: true, text: 'Number of Genes', font: { size: 13, weight: 'bold' } }, ticks: { stepSize: 1 } },
-        y: { title: { display: true, text: 'Localization', font: { size: 13, weight: 'bold' } } }
-      },
-      plugins: {
-        legend: { display: false },
-        title: { display: true, text: 'Localization Summary for Input Genes', font: { size: 16, weight: 'bold' } }
-      }
-    }
-  });
+    const a = document.createElement('a');
+    a.href = tempCanvas.toDataURL('image/png');
+    a.download = 'CiliaHub_Localization_Plot.png';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
 }
 
 function displayDownloadPage() {
@@ -1194,11 +892,13 @@ function performSingleSearch() {
         return;
     }
 
+    // --- FIX STARTS HERE ---
     const results = allGenes.filter(g => {
-        // Use sanitized gene field directly, no need for replace(/\s/g, '')
+        // Check for a match in the gene name (allowing partial matches)
         if (g.gene && g.gene.toUpperCase().includes(query)) {
             return true;
         }
+        // Check for an EXACT match in the synonyms list
         if (g.synonym) {
             const synonyms = g.synonym.toUpperCase().split(',').map(s => s.trim());
             if (synonyms.includes(query)) {
@@ -1207,6 +907,7 @@ function performSingleSearch() {
         }
         return false;
     });
+    // --- FIX ENDS HERE ---
 
     if (results.length === 0) {
         const closeMatches = allGenes.filter(g =>
@@ -1217,7 +918,7 @@ function performSingleSearch() {
         return;
     }
 
-    if (results.length === 1 && results[0].gene.toUpperCase() === query) {
+    if (results.length === 1) {
         navigateTo(null, `/${results[0].gene}`);
     } else {
         navigateTo(null, '/batch-query');
@@ -1229,10 +930,7 @@ function performSingleSearch() {
 }
 
 function performBatchSearch() {
-    const queries = document.getElementById('batch-genes-input').value
-        .split(/[\s,\n]+/)
-        .filter(Boolean)
-        .map(q => q.trim().toUpperCase());
+    const queries = document.getElementById('batch-genes-input').value.split(/[\s,\n]+/).filter(Boolean).map(q => q.trim().toUpperCase());
     const localizationFilter = document.getElementById('localization-filter')?.value;
     const keywordFilter = document.getElementById('keyword-filter')?.value.toLowerCase();
     const statusDiv = document.getElementById('status-message');
@@ -1245,8 +943,8 @@ function performBatchSearch() {
 
     let results = allGenes.filter(g =>
         queries.some(q => {
-            // Use sanitized gene field directly, no need for replace(/\s/g, '')
-            if (g.gene && g.gene.toUpperCase() === q) {
+            // --- ✨ THE DEFINITIVE FIX: Sanitize the gene name from the database before comparing ---
+            if (g.gene && g.gene.replace(/\s/g, '').toUpperCase() === q) {
                 return true;
             }
             if (g.synonym) {
