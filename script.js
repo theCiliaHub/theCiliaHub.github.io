@@ -928,30 +928,26 @@ function generateLocalizationDotPlot(genesInput) {
 }
 
 /**
- * Generates a publication-quality Y-axis-only bubble plot for gene localization.
- * Each bubble's color and size reflects the number of genes in that organelle.
+ * Generates and updates a publication-quality Y-axis-only bubble plot and its custom legends.
  */
 async function generateAnalysisPlots() {
-    // FIX: Use the correct data loader from your script
     await loadAndPrepareDatabase();
 
     const statusDiv = document.getElementById('analysis-status');
     const plotContainer = document.getElementById('analysis-plot-container');
     const downloadBtn = document.getElementById('download-plot-btn');
+    const legendContainer = document.getElementById('plot-legend-container');
 
     // Reset UI
     if (plotContainer) plotContainer.style.display = 'none';
     if (downloadBtn) downloadBtn.style.display = 'none';
     if (statusDiv) statusDiv.style.display = 'none';
+    if (legendContainer) legendContainer.innerHTML = ''; // Clear old legend
     if (window.analysisDotPlotInstance) {
-        try { window.analysisDotPlotInstance.destroy(); } catch(e){}
+        try { window.analysisDotPlotInstance.destroy(); } catch (e) {}
     }
-     // Hide the bar chart's container if it exists
-    const barChartWrapper = document.getElementById('analysis-bar-chart-wrapper');
-    if(barChartWrapper) barChartWrapper.style.display = 'none';
 
     const input = document.getElementById('analysis-genes-input').value || '';
-    // FIX: Use the robust sanitizer from your script
     const geneNames = input.split(/[\s,;\n]+/).map(sanitize).filter(Boolean);
 
     if (geneNames.length === 0) {
@@ -962,21 +958,9 @@ async function generateAnalysisPlots() {
         return;
     }
 
-    // FIX: Use the efficient geneMapCache from your script for lookups
-    const foundGenes = new Set();
-    const notFoundGenes = [];
-    geneNames.forEach(name => {
-        const entry = geneMapCache.get(name);
-        if (entry) {
-            foundGenes.add(entry);
-        } else {
-            notFoundGenes.push(name);
-        }
-    });
+    const { foundGenes, notFoundGenes } = findGenes(geneNames);
 
-    const uniqueFoundGenes = Array.from(foundGenes);
-
-    if (uniqueFoundGenes.length === 0) {
+    if (foundGenes.length === 0) {
         if (statusDiv) {
             statusDiv.innerHTML = `<span class="error-message">None of the entered genes were found. Not found: ${notFoundGenes.join(', ')}</span>`;
             statusDiv.style.display = 'block';
@@ -984,20 +968,17 @@ async function generateAnalysisPlots() {
         return;
     }
 
-    // Y-axis organelles with consistent capitalization
     const yCategories = [
         'Cilia', 'Basal Body', 'Transition Zone', 'Lysosome', 'Peroxisome', 'Plasma Membrane',
         'Cytoplasm', 'Nucleus', 'Endoplasmic Reticulum', 'Mitochondria', 'Ribosome', 'Golgi',
         'Microbodies', 'Cytoskeleton', 'Centrosome', 'Centrioles', 'Vacuoles'
     ];
 
-    // Count genes per organelle (case-insensitive)
     const localizationCounts = {};
-    uniqueFoundGenes.forEach(gene => {
+    foundGenes.forEach(gene => {
         if (gene.localization) {
             gene.localization.split(',').forEach(loc => {
                 const locTrimLower = loc.trim().toLowerCase();
-                // FIX: Find the correctly capitalized category to ensure counts are grouped properly
                 const matchingCategory = yCategories.find(cat => cat.toLowerCase() === locTrimLower);
                 if (matchingCategory) {
                     localizationCounts[matchingCategory] = (localizationCounts[matchingCategory] || 0) + 1;
@@ -1006,47 +987,72 @@ async function generateAnalysisPlots() {
         }
     });
 
-    // IMPROVEMENT: Filter to only show organelles that have results
     const categoriesWithData = yCategories.filter(cat => localizationCounts[cat] > 0);
     if (categoriesWithData.length === 0) {
         if (statusDiv) {
-            statusDiv.innerHTML = `<span class="error-message">Found ${uniqueFoundGenes.length} gene(s), but none have localization data for the plotted categories.</span>`;
+            statusDiv.innerHTML = `<span class="error-message">Found ${foundGenes.length} gene(s), but none have localization data for the plotted categories.</span>`;
             statusDiv.style.display = 'block';
         }
         return;
     }
 
     const maxCount = Math.max(...Object.values(localizationCounts), 1);
-
-    // Define color palette (gradient from light green to dark green)
     const colorPalette = ['#edf8fb', '#b2e2e2', '#66c2a4', '#2ca25f', '#006d2c'];
     const getColor = count => {
-        if (count === 0) return '#f0f0f0'; // Light grey for zero count
-        const ratio = (count - 1) / Math.max(1, maxCount - 1);
+        if (count === 0) return '#f0f0f0';
+        const ratio = maxCount > 1 ? (count - 1) / (maxCount - 1) : 1;
         const index = Math.min(Math.floor(ratio * (colorPalette.length - 1)), colorPalette.length - 1);
         return colorPalette[index];
     };
-    
-    // Prepare one dataset containing all bubbles
+    const getRadius = count => 10 + (count / maxCount) * 15; // Bubble radius 10-25px
+
     const dataset = {
         label: 'Gene Localizations',
         data: categoriesWithData.map(loc => ({
-            x: 1, // All bubbles aligned on the same invisible X-position
+            x: 0, // Keep all bubbles on a single vertical line
             y: loc,
-            r: 10 + (localizationCounts[loc] / maxCount) * 15, // Bubble size based on count (radius 10-25)
+            r: getRadius(localizationCounts[loc]),
             count: localizationCounts[loc]
         })),
         backgroundColor: categoriesWithData.map(loc => getColor(localizationCounts[loc]))
     };
 
-    // Show plot container
-    if (plotContainer) plotContainer.style.display = 'block';
+    if (plotContainer) plotContainer.style.display = 'flex';
     if (downloadBtn) downloadBtn.style.display = 'inline-block';
     if (statusDiv && notFoundGenes.length > 0) {
-        statusDiv.innerHTML = `<span class="success-message">Showing results for ${uniqueFoundGenes.length} found gene(s). Not found: ${notFoundGenes.join(', ')}</span>`;
+        statusDiv.innerHTML = `<span class="success-message">Showing results for ${foundGenes.length} found gene(s). Not found: ${notFoundGenes.join(', ')}</span>`;
         statusDiv.style.display = 'block';
     }
 
+    // ✨ NEW: Generate the custom HTML legend
+    if (legendContainer) {
+        const midCount = Math.ceil(maxCount / 2);
+        const sizeLegendHTML = `
+            <div style="font-family: Arial, sans-serif;">
+                <h4 style="margin: 0 0 10px 0; font-size: 14px; font-weight: bold;">Gene Count</h4>
+                <div style="display: flex; align-items: center; margin-bottom: 10px;">
+                    <div style="width: ${getRadius(maxCount)*2}px; height: ${getRadius(maxCount)*2}px; background-color: #ccc; border-radius: 50%; margin-right: 10px;"></div>
+                    <span>${maxCount}</span>
+                </div>
+                <div style="display: flex; align-items: center; margin-bottom: 10px;">
+                    <div style="width: ${getRadius(midCount)*2}px; height: ${getRadius(midCount)*2}px; background-color: #ccc; border-radius: 50%; margin-right: 10px;"></div>
+                    <span>${midCount}</span>
+                </div>
+                <div style="display: flex; align-items: center; margin-bottom: 25px;">
+                    <div style="width: ${getRadius(1)*2}px; height: ${getRadius(1)*2}px; background-color: #ccc; border-radius: 50%; margin-right: 10px;"></div>
+                    <span>1</span>
+                </div>
+                <h4 style="margin: 0 0 10px 0; font-size: 14px; font-weight: bold;">Enrichment</h4>
+                <div style="width: 100%; height: 20px; background: linear-gradient(to right, ${colorPalette.join(', ')}); border: 1px solid #ccc;"></div>
+                <div style="display: flex; justify-content: space-between; font-size: 12px;">
+                    <span>Low</span>
+                    <span>High</span>
+                </div>
+            </div>
+        `;
+        legendContainer.innerHTML = sizeLegendHTML;
+    }
+    
     const ctx = document.getElementById('analysis-dot-plot').getContext('2d');
     window.analysisDotPlotInstance = new Chart(ctx, {
         type: 'bubble',
@@ -1058,30 +1064,21 @@ async function generateAnalysisPlots() {
                 legend: { display: false },
                 tooltip: {
                     callbacks: {
-                        label: context => {
-                            const dataPoint = context.raw;
-                            return `${dataPoint.y}: ${dataPoint.count} gene(s)`;
-                        }
+                        label: context => `${context.raw.y}: ${context.raw.count} gene(s)`
                     }
-                },
-                title: { display: true, text: 'Gene Localization Enrichment', font: { size: 18, weight: 'bold', family: 'Arial' } }
-            },
-            scales: {
-                x: {
-                    display: false, // Hide X-axis
-                    min: 0,
-                    max: 2
-                },
-                y: {
-                    type: 'category',
-                    labels: categoriesWithData, // Only show categories with data
-                    offset: true,
-                    title: { display: false },
-                    ticks: { font: { size: 14, weight: 'bold', family: 'Arial' } },
-                    grid: { display: false, drawBorder: false }
                 }
             },
-            layout: { padding: { top: 20, bottom: 20, left: 10, right: 10 } }
+            scales: {
+                x: { display: false },
+                y: {
+                    type: 'category',
+                    labels: categoriesWithData,
+                    offset: true, // Adds padding so bubbles aren't cut off
+                    grid: { display: false, drawBorder: false },
+                    ticks: { font: { size: 14, weight: 'bold', family: 'Arial' } }
+                }
+            },
+            layout: { padding: { top: 20, bottom: 20 } }
         }
     });
 }
