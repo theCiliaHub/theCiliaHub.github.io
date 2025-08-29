@@ -943,11 +943,10 @@ function performBatchSearch() {
 
     let results = allGenes.filter(g =>
         queries.some(q => {
-            // --- ✨ FIX: Changed from .includes(q) to an exact match === q ---
-            if (g.gene && g.gene.toUpperCase() === q) {
+            // --- ✨ THE DEFINITIVE FIX: Sanitize the gene name from the database before comparing ---
+            if (g.gene && g.gene.replace(/\s/g, '').toUpperCase() === q) {
                 return true;
             }
-            // Check for an EXACT match in the synonyms list
             if (g.synonym) {
                 const synonyms = g.synonym.toUpperCase().split(',').map(s => s.trim());
                 if (synonyms.includes(q)) {
