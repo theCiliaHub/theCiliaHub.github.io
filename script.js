@@ -12,8 +12,17 @@ const defaultGenesNames = ["ACE2", "ADAMTS20", "ADAMTS9", "IFT88", "CEP290", "WD
 // Load data from external JSON file
 async function loadGeneDatabase() {
     try {
-        const response = await fetch( 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/ciliahub_data.json' );
-        allGenes = await response.json();
+        const response = await fetch('https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/ciliahub_data.json');
+        let rawGenes = await response.json();
+
+        // --- ✨ THE DEFINITIVE FIX: Sanitize all gene names on load ---
+        allGenes = rawGenes.map(gene => {
+            if (gene.gene) {
+                // This removes all whitespace, including spaces, tabs, and newlines
+                gene.gene = gene.gene.trim().replace(/(\r\n|\n|\r)/gm, "");
+            }
+            return gene;
+        });
         
         // Initialize gene localization data
         allGenes.forEach(gene => {
@@ -21,11 +30,11 @@ async function loadGeneDatabase() {
                 geneLocalizationData[gene.gene] = mapLocalizationToSVG(gene.localization);
             }
         });
-        
+
         // Set current data to default genes
         currentData = allGenes.filter(g => defaultGenesNames.includes(g.gene));
-        
-        console.log('Data loaded successfully:', allGenes.length, 'entries');
+
+        console.log('Data loaded and sanitized successfully:', allGenes.length, 'entries');
         return true;
     } catch (error) {
         console.error('Error loading gene database:', error);
