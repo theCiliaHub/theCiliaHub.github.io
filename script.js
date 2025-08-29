@@ -723,19 +723,22 @@ function displayAnalysisPage() {
     contentArea.innerHTML = `
         <div class="page-section">
             <h2>Gene Localization Analysis</h2>
-            <p>Paste a list of human gene names (comma, space, or newline separated) to visualize their ciliary localizations.</p>
+            <p>Paste a list of human gene names to visualize their localization enrichment.</p>
             <textarea id="analysis-genes-input" placeholder="e.g., TMEM107, TMEM17, WDR31, IFT20, NEK10, IFT88" style="width: 100%; min-height: 150px; padding: 1rem; border: 2px solid #e1ecf4; border-radius: 10px; font-size: 1rem; margin-top: 1rem; resize: vertical;"></textarea>
             <div id="analysis-controls">
                  <button id="generate-plot-btn" class="btn btn-primary">Generate Plot</button>
                  <button id="download-plot-btn" class="btn btn-secondary" style="display:none;">Download Plot (PNG)</button>
             </div>
             <div id="analysis-status" class="status-message" style="display: none; padding: 1rem;"></div>
-            <div id="analysis-plot-container" style="display:none;">
-                 <h3 style="margin-bottom: 1.5rem;">Gene Localization Matrix</h3>
-                 <div id="analysis-plot-wrapper" style="position: relative; height: 600px;">
+            
+            <div id="analysis-plot-container" style="display:none; display: flex; align-items: flex-start; gap: 20px; margin-top: 2rem;">
+                 <div id="analysis-plot-wrapper" style="position: relative; height: 600px; flex-grow: 1;">
                      <canvas id="analysis-dot-plot"></canvas>
                  </div>
-                 </div>
+                 
+                 <div id="plot-legend-container" style="flex-shrink: 0; width: 150px; padding-top: 50px;">
+                     </div>
+            </div>
         </div>
     `;
 
