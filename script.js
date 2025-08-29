@@ -886,26 +886,38 @@ function performSingleSearch() {
     const statusDiv = document.getElementById('status-message');
     statusDiv.innerHTML = '<span>Loading...</span>';
     statusDiv.style.display = 'block';
-    
+
     if (!query) {
         statusDiv.innerHTML = `<span class="error-message">Please enter a gene name.</span>`;
         return;
     }
-    
-    const results = allGenes.filter(g => 
-        (g.gene && g.gene.toUpperCase().includes(query)) || 
-        (g.synonym && g.synonym.toUpperCase().includes(query))
-    );
-    
+
+    // --- FIX STARTS HERE ---
+    const results = allGenes.filter(g => {
+        // Check for a match in the gene name (allowing partial matches)
+        if (g.gene && g.gene.toUpperCase().includes(query)) {
+            return true;
+        }
+        // Check for an EXACT match in the synonyms list
+        if (g.synonym) {
+            const synonyms = g.synonym.toUpperCase().split(',').map(s => s.trim());
+            if (synonyms.includes(query)) {
+                return true;
+            }
+        }
+        return false;
+    });
+    // --- FIX ENDS HERE ---
+
     if (results.length === 0) {
-        const closeMatches = allGenes.filter(g => 
+        const closeMatches = allGenes.filter(g =>
             g.gene && g.gene.toUpperCase().startsWith(query.slice(0, 3))
         ).slice(0, 3);
-        
+
         statusDiv.innerHTML = `<span class="error-message">No genes found for "${query}". ${closeMatches.length > 0 ? 'Did you mean: ' + closeMatches.map(g => g.gene).join(', ') + '?' : 'No close matches found.'}</span>`;
         return;
     }
-    
+
     if (results.length === 1) {
         navigateTo(null, `/${results[0].gene}`);
     } else {
@@ -922,34 +934,46 @@ function performBatchSearch() {
     const localizationFilter = document.getElementById('localization-filter')?.value;
     const keywordFilter = document.getElementById('keyword-filter')?.value.toLowerCase();
     const statusDiv = document.getElementById('status-message');
-    
+
     if (queries.length === 0) {
         statusDiv.innerHTML = `<span class="error-message">Please enter at least one gene name.</span>`;
         statusDiv.style.display = 'block';
         return;
     }
-    
-    let results = allGenes.filter(g => 
-        queries.some(q => 
-            (g.gene && g.gene.toUpperCase().includes(q)) || 
-            (g.synonym && g.synonym.toUpperCase().includes(q))
-        )
+
+    // --- FIX STARTS HERE ---
+    let results = allGenes.filter(g =>
+        queries.some(q => {
+            // Check for a match in the gene name (allowing partial matches)
+            if (g.gene && g.gene.toUpperCase().includes(q)) {
+                return true;
+            }
+            // Check for an EXACT match in the synonyms list
+            if (g.synonym) {
+                const synonyms = g.synonym.toUpperCase().split(',').map(s => s.trim());
+                if (synonyms.includes(q)) {
+                    return true;
+                }
+            }
+            return false;
+        })
     );
-    
+    // --- FIX ENDS HERE ---
+
     if (localizationFilter) {
         results = results.filter(g => g.localization && g.localization.includes(localizationFilter));
     }
-    
+
     if (keywordFilter) {
-        results = results.filter(g => 
-            (g.functional_summary && g.functional_summary.toLowerCase().includes(keywordFilter)) || 
+        results = results.filter(g =>
+            (g.functional_summary && g.functional_summary.toLowerCase().includes(keywordFilter)) ||
             (g.description && g.description.toLowerCase().includes(keywordFilter))
         );
     }
-    
+
     statusDiv.style.display = 'none';
     searchResults = results;
-    
+
     if (results.length > 0) {
         displayBatchResults(results);
         displayGeneCards(currentData, results, 1, 10);
@@ -959,7 +983,6 @@ function performBatchSearch() {
         displayGeneCards(currentData, [], 1, 10);
     }
 }
-
 function displayBatchResults(results) {
     const batchResults = document.getElementById('batch-results');
     if (!batchResults) return;
