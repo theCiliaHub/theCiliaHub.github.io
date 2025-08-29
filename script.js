@@ -627,6 +627,7 @@ function generateAnalysisPlots() {
     const dotPlotData = [];
     const barChartCounts = yCategories.reduce((acc, cat) => ({...acc, [cat]: 0 }), {});
 
+    // 1. THIS LOOP MUST COMPLETE FOR ALL GENES FIRST
     foundGenes.forEach(gene => {
         if (gene.localization) {
             const geneLocalizations = gene.localization.split(',').map(l => l.trim());
@@ -639,9 +640,10 @@ function generateAnalysisPlots() {
                 }
             });
         }
-    }); // <<<< ✨ FIX: ADDED THE MISSING CLOSING BRACES HERE
+    });
 
-    if(dotPlotData.length === 0) {
+    // 2. ✨ FIX: THE CHECK NOW HAPPENS *AFTER* THE LOOP IS FINISHED
+    if (dotPlotData.length === 0) {
         statusDiv.innerHTML = `<span class="error-message">Found ${foundGenes.length} gene(s), but none have localization data for the plotted categories.</span>`;
         statusDiv.style.display = 'block';
         return;
