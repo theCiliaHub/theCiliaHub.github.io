@@ -1,58 +1,111 @@
-/**
- * plots.js
- * This file contains all logic for generating, rendering, and downloading
- * plots for the Gene Localization Analysis page in CiliaHub.
- * This is the complete, corrected, and final version.
- */
+// =================================================================================
+// SECTION 1: APPLICATION INITIALIZATION & DATA LOADING
+// =================================================================================
+
+// This event listener ensures that the data loading starts once the HTML page is ready.
+document.addEventListener('DOMContentLoaded', () => {
+    // This is the main function that loads your JSON database
+    loadCiliaHubData();
+});
 
 /**
- * Retrieves user-defined settings for plot styling from the DOM.
- * @returns {object} An object containing various plot style settings.
+ * Fetches the main CiliaHub JSON database, stores it globally,
+ * and enables the analysis tools once the data is ready.
  */
-function getPlotSettings() {
-    return {
-        fontFamily: document.getElementById('setting-font-family')?.value || 'Arial',
-        fontSize: parseInt(document.getElementById('setting-font-size')?.value, 10) || 12,
-        fontWeight: document.getElementById('setting-font-weight')?.value || 'bold',
-        textColor: document.getElementById('setting-text-color')?.value || '#000000',
-        axisColor: document.getElementById('setting-axis-color')?.value || '#000000',
-        yAxisTitle: document.getElementById('setting-y-axis-title')?.value || 'Localization',
-        enrichmentColors: [
-            document.getElementById('setting-enrichment-color1')?.value || '#edf8fb',
-            document.getElementById('setting-enrichment-color2')?.value || '#b2e2e2',
-            document.getElementById('setting-enrichment-color3')?.value || '#66c2a4',
-            document.getElementById('setting-enrichment-color4')?.value || '#2ca25f',
-            document.getElementById('setting-enrichment-color5')?.value || '#006d2c'
-        ]
-    };
+async function loadCiliaHubData() {
+    // Get references to the UI elements on the Analysis page
+    const generateBtn = document.getElementById('generate-plot-btn');
+    const geneInput = document.getElementById('analysis-genes-input');
+    const statusDiv = document.getElementById('analysis-status');
+
+    // 1. Disable controls and show a loading message while fetching data
+    if (generateBtn) generateBtn.disabled = true;
+    if (geneInput) geneInput.placeholder = 'Loading CiliaHub database, please wait...';
+    
+    try {
+        // Fetch the main JSON data file
+        const url = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/ciliahub_data.json';
+        const response = await fetch(url);
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        // Store the data globally where all other functions can access it
+        window.CILIAHUB_DATA = data;
+
+        // 2. On success, enable the analysis tools
+        console.log("CiliaHub data loaded successfully.");
+        if (generateBtn) generateBtn.disabled = false;
+        if (geneInput) geneInput.placeholder = 'e.g., TMEM17, IFT88, WDR31...';
+
+    } catch (error) {
+        // 3. On failure, show a permanent error message
+        console.error("Failed to load CiliaHub data:", error);
+        if (statusDiv) {
+            statusDiv.innerHTML = `<span class="error-message">Critical Error: Could not load the CiliaHub database. Please refresh the page.</span>`;
+            statusDiv.style.display = 'block';
+        }
+        if (geneInput) geneInput.placeholder = 'Error loading data.';
+    }
 }
 
 
 // =================================================================================
-// STATISTICAL HELPER FUNCTIONS
+// SECTION 2: CORE HELPER FUNCTIONS
 // =================================================================================
+
+/**
+ * Sanitizes gene names by converting to uppercase and removing whitespace.
+ * @param {string} name - The gene name to sanitize.
+ * @returns {string} The sanitized gene name.
+ */
+function sanitize(name) {
+    return name.trim().toUpperCase();
+}
+
+/**
+ * Finds genes from a user's list within the main CiliaHub database.
+ * @param {Array<string>} geneNames - An array of sanitized gene names from user input.
+ * @param {Array<object>} allCiliaHubGenes - The complete list of genes from CILIAHUB_DATA.
+ * @returns {object} An object containing arrays of found and not-found genes.
+ */
+function findGenes(geneNames, allCiliaHubGenes) {
+    const foundGenes = [];
+    const notFoundGenes = [];
+    const geneMap = new Map(allCiliaHubGenes.map(gene => [gene.gene, gene]));
+
+    geneNames.forEach(name => {
+        if (geneMap.has(name)) {
+            foundGenes.push(geneMap.get(name));
+        } else {
+            notFoundGenes.push(name);
+        }
+    });
+    return { foundGenes, notFoundGenes };
+}
+
+
+// =================================================================================
+// SECTION 3: PLOT GENERATION & ANALYSIS LOGIC
+// =================================================================================
+
+// This section contains all the plotting functions you provided.
 
 /**
  * Performs a Fisher's Exact Test on a 2x2 contingency table.
  * NOTE: This is a simplified example. For production, consider a robust statistics library.
- * @param {number} a - In list AND in category
- * @param {number} b - In list, NOT in category
- * @param {number} c - NOT in list, in category
- * @param {number} d - NOT in list, NOT in category
- * @returns {object} An object containing the pValue and oddsRatio.
  */
 function runFishersExactTest(a, b, c, d) {
     const oddsRatio = (a * d) / (b * c) || 0;
-    // Placeholder for a complex p-value calculation.
     const pValue = Math.exp(-0.5 * a) / (1 + oddsRatio);
     return { pValue, oddsRatio };
 }
 
 /**
  * Calculates enrichment statistics for a user's gene list against predefined categories.
- * @param {Array<object>} userGenes - The list of gene objects from the user's input.
- * @param {Array<object>} backgroundGenes - The entire set of genes in the CiliaHub database.
- * @returns {Array<object>} A sorted array of enrichment results for each category.
  */
 function calculateEnrichment(userGenes, backgroundGenes) {
     const categories = ['Cilia', 'Basal Body', 'Transition Zone', 'Axoneme', 'Ciliary Membrane', 'Lysosome', 'Peroxisome', 'Plasma Membrane', 'Cytoplasm', 'Nucleus', 'Endoplasmic Reticulum', 'Mitochondria', 'Ribosome', 'Golgi'];
@@ -94,22 +147,15 @@ function calculateEnrichment(userGenes, backgroundGenes) {
     return results.sort((x, y) => x.pValue - y.pValue);
 }
 
-
-// =================================================================================
-// MAIN ANALYSIS AND PLOT RENDERING FUNCTIONS
-// =================================================================================
-
 /**
  * Main function to orchestrate the analysis and plotting process.
  */
 function generateAnalysisPlots() {
-    // FIX: Check if the main CiliaHub gene data is loaded before running.
     if (!window.CILIAHUB_DATA || !window.CILIAHUB_DATA.genes || window.CILIAHUB_DATA.genes.length === 0) {
         alert("Gene data is still loading or failed to load. Please try again in a moment.");
         return;
     }
 
-    // Hide previous results
     ['bubble-enrichment-container', 'matrix-plot-container', 'upset-plot-container'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.style.display = 'none';
@@ -119,7 +165,6 @@ function generateAnalysisPlots() {
     const statusDiv = document.getElementById('analysis-status');
     if (statusDiv) statusDiv.style.display = 'none';
 
-    // Process user input
     const input = document.getElementById('analysis-genes-input').value || '';
     const geneNames = input.split(/[\s,;\n]+/).map(sanitize).filter(Boolean);
     if (geneNames.length === 0) return;
@@ -137,7 +182,6 @@ function generateAnalysisPlots() {
     
     document.getElementById('plot-container').style.display = 'block';
     
-    // Call the correct rendering function based on user selection
     const selectedPlot = document.querySelector('input[name="plot-type"]:checked').value;
     if (selectedPlot === 'bubble') {
         renderEnrichmentBubblePlot(foundGenes, allCiliaHubGenes);
@@ -147,7 +191,6 @@ function generateAnalysisPlots() {
         renderUpsetPlot(foundGenes);
     }
     
-    // Show download controls if a plot was successfully rendered
     const isPlotVisible = document.getElementById('bubble-enrichment-container').style.display !== 'none' ||
                           document.getElementById('matrix-plot-container').style.display !== 'none' ||
                           document.getElementById('upset-plot-container').style.display !== 'none';
@@ -158,8 +201,6 @@ function generateAnalysisPlots() {
 
 /**
  * Renders a statistical enrichment bubble plot using Chart.js.
- * @param {Array<object>} foundGenes - The user's genes found in the database.
- * @param {Array<object>} allCiliaHubGenes - The entire gene database for background stats.
  */
 function renderEnrichmentBubblePlot(foundGenes, allCiliaHubGenes) {
     document.getElementById('bubble-enrichment-container').style.display = 'flex';
@@ -291,7 +332,6 @@ function renderEnrichmentBubblePlot(foundGenes, allCiliaHubGenes) {
 
 /**
  * Renders a bubble matrix plot showing gene presence in localization categories.
- * @param {Array<object>} foundGenes - The user's genes found in the database.
  */
 function renderBubbleMatrix(foundGenes) {
     document.getElementById('matrix-plot-container').style.display = 'block';
@@ -397,7 +437,6 @@ function renderBubbleMatrix(foundGenes) {
 
 /**
  * Renders an Upset plot to show intersections of gene sets.
- * @param {Array<object>} foundGenes - The user's genes found in the database.
  */
 function renderUpsetPlot(foundGenes) {
     document.getElementById('upset-plot-container').style.display = 'block';
@@ -443,8 +482,29 @@ function renderUpsetPlot(foundGenes) {
 
 
 // =================================================================================
-// PLOT DOWNLOAD UTILITY
+// SECTION 4: PLOT CUSTOMIZATION & DOWNLOAD UTILITIES
 // =================================================================================
+
+/**
+ * Retrieves user-defined settings for plot styling from the DOM.
+ */
+function getPlotSettings() {
+    return {
+        fontFamily: document.getElementById('setting-font-family')?.value || 'Arial',
+        fontSize: parseInt(document.getElementById('setting-font-size')?.value, 10) || 12,
+        fontWeight: document.getElementById('setting-font-weight')?.value || 'bold',
+        textColor: document.getElementById('setting-text-color')?.value || '#000000',
+        axisColor: document.getElementById('setting-axis-color')?.value || '#000000',
+        yAxisTitle: document.getElementById('setting-y-axis-title')?.value || 'Localization',
+        enrichmentColors: [
+            document.getElementById('setting-enrichment-color1')?.value || '#edf8fb',
+            document.getElementById('setting-enrichment-color2')?.value || '#b2e2e2',
+            document.getElementById('setting-enrichment-color3')?.value || '#66c2a4',
+            document.getElementById('setting-enrichment-color4')?.value || '#2ca25f',
+            document.getElementById('setting-enrichment-color5')?.value || '#006d2c'
+        ]
+    };
+}
 
 /**
  * Handles the downloading of the currently visible plot in various formats.
