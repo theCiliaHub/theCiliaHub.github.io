@@ -741,8 +741,9 @@ function displayAnalysisPage() {
                 <button id="download-plot-btn" class="btn btn-secondary" style="display:none;">Download Plot</button>
             </div>
 
-            <details style="margin-top: 20px; border: 1px solid #e1ecf4; border-radius: 5px; padding: 10px;">
-                <summary style="font-weight: bold; cursor: pointer;">Plot Customization</summary>
+            <div style="margin-top: 20px; border: 1px solid #e1ecf4; border-radius: 5px; padding: 10px;">
+                <h3 style="font-weight: bold; margin-bottom: 10px;">Plot Customization</h3>
+                <p style="font-size: 0.9rem; color: #555;">Please click "Generate Plot" after making changes to apply them.</p>
                 <div id="plot-settings-panel" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-top: 10px;">
                     <div>
                         <label for="setting-font-family" style="display: block; margin-bottom: 5px;">Font Family</label>
@@ -754,7 +755,7 @@ function displayAnalysisPage() {
                             <option value="Verdana">Verdana</option>
                         </select>
                     </div>
-                    <div
+                    <div>
                         <label for="setting-font-size" style="display: block; margin-bottom: 5px;">Label Font Size</label>
                         <input type="number" id="setting-font-size" value="12" min="8" max="20" style="width: 60px;">
                     </div>
@@ -770,8 +771,28 @@ function displayAnalysisPage() {
                         <label for="setting-text-color" style="display: block; margin-bottom: 5px;">Text Color</label>
                         <input type="color" id="setting-text-color" value="#000000">
                     </div>
+                    <div>
+                        <label for="setting-enrichment-color1" style="display: block; margin-bottom: 5px;">Enrichment Color 1 (Low)</label>
+                        <input type="color" id="setting-enrichment-color1" value="#edf8fb">
+                    </div>
+                    <div>
+                        <label for="setting-enrichment-color2" style="display: block; margin-bottom: 5px;">Enrichment Color 2</label>
+                        <input type="color" id="setting-enrichment-color2" value="#b2e2e2">
+                    </div>
+                    <div>
+                        <label for="setting-enrichment-color3" style="display: block; margin-bottom: 5px;">Enrichment Color 3</label>
+                        <input type="color" id="setting-enrichment-color3" value="#66c2a4">
+                    </div>
+                    <div>
+                        <label for="setting-enrichment-color4" style="display: block; margin-bottom: 5px;">Enrichment Color 4</label>
+                        <input type="color" id="setting-enrichment-color4" value="#2ca25f">
+                    </div>
+                    <div>
+                        <label for="setting-enrichment-color5" style="display: block; margin-bottom: 5px;">Enrichment Color 5 (High)</label>
+                        <input type="color" id="setting-enrichment-color5" value="#006d2c">
+                    </div>
                 </div>
-            </details>
+            </div>
 
             <div id="analysis-status" class="status-message" style="display: none; padding: 1rem;"></div>
             
@@ -793,6 +814,7 @@ function displayAnalysisPage() {
     document.getElementById('generate-plot-btn').addEventListener('click', generateAnalysisPlots);
     document.getElementById('download-plot-btn').addEventListener('click', downloadPlot);
 }
+
 function displayDownloadPage() {
     const contentArea = document.querySelector('.content-area');
     contentArea.className = 'content-area content-area-full';
