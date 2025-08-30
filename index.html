@@ -12,7 +12,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@panzoom/panzoom@4.5.1/dist/panzoom.min.js"></script>
     <script src="https://unpkg.com/@upsetjs/bundle"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX"></script>
@@ -20,8 +20,7 @@
       window.dataLayer = window.dataLayer || [];
       function gtag(){dataLayer.push(arguments);}
       gtag('js', new Date());
-      // ✨ Remember to replace G-XXXXXXXXXX with your real ID ✨
-      gtag('config', 'G-XXXXXXXXXX');
+      gtag('config', 'G-XXXXXXXXXX'); // ✨ Replace with your real Google Analytics ID
     </script>
 </head>
 <body>
@@ -40,8 +39,64 @@
         </div>
     </nav>
 
-    <div class="main-container">
-        <div class="content-area">
+    <fowl class="main-container">
+        <div class="content-area" id="content-area">
+            <!-- Analysis Page Template -->
+            <div id="analysis-page" style="display: none;">
+                <h2>Gene Enrichment Analysis</h2>
+                <div class="analysis-input">
+                    <label for="analysis-genes-input">Enter Gene List (one per line or comma-separated):</label>
+                    <textarea id="analysis-genes-input" rows="5" placeholder="e.g., BBS1, BBS2, ARL6"></textarea>
+                </div>
+                <div class="plot-type-selection">
+                    <h3>Select Plot Type:</h3>
+                    <label><input type="radio" name="plot-type" value="robust" checked> Bubble Enrichment Plot</label>
+                    <label><input type="radio" name="plot-type" value="matrix"> Matrix Plot</label>
+                    <label><input type="radio" name="plot-type" value="upset"> Upset Plot</label>
+                    <label><input type="radio" name="plot-type" value="statistical"> Statistical Enrichment Plot</label>
+                </div>
+                <div class="plot-settings">
+                    <h3>Plot Settings</h3>
+                    <label>Font Family: <input type="text" id="setting-font-family" value="Arial"></label>
+                    <label>Font Size: <input type="number" id="setting-font-size" value="20"></label>
+                    <label>Font Weight: <input type="text" id="setting-font-weight" value="bold"></label>
+                    <label>Text Color: <input type="color" id="setting-text-color" value="#000000"></label>
+                    <label>Axis Color: <input type="color" id="setting-axis-color" value="#000000"></label>
+                    <label>Y-Axis Title: <input type="text" id="setting-y-axis-title" value="Localization"></label>
+                    <label>Enrichment Color 1: <input type="color" id="setting-enrichment-color1" value="#edf8fb"></label>
+                    <label>Enrichment Color 2: <input type="color" id="setting-enrichment-color2" value="#b2e2e2"></label>
+                    <label>Enrichment Color 3: <input type="color" id="setting-enrichment-color3" value="#66c2a4"></label>
+                    <label>Enrichment Color 4: <input type="color" id="setting-enrichment-color4" value="#2ca25f"></label>
+                    <label>Enrichment Color 5: <input type="color" id="setting-enrichment-color5" value="#006d2c"></label>
+                </div>
+                <button onclick="generateAnalysisPlots()">Generate Plot</button>
+                <div id="analysis-status" style="display: none;"></div>
+                <div id="plot-container" style="display: none;">
+                    <div id="bubble-enrichment-container" style="display: none;">
+                        <canvas id="analysis-bubble-plot"></canvas>
+                        <div id="legend-container"></div>
+                    </div>
+                    <div id="matrix-plot-container" style="display: none;">
+                        <canvas id="analysis-matrix-plot"></canvas>
+                    </div>
+                    <div id="upset-plot-container" style="display: none;">
+                        <div id="upset-plot-wrapper"></div>
+                    </div>
+                    <div id="statistical-enrichment-container" style="display: none;">
+                        <canvas id="analysis-statistical-plot"></canvas>
+                        <div id="statistical-legend-container"></div>
+                    </div>
+                </div>
+                <div class="download-section" style="display: none;">
+                    <label for="download-format">Download Format:</label>
+                    <select id="download-format">
+                        <option value="png">PNG</option>
+                        <option value="pdf">PDF</option>
+                        <option value="svg" id="upset-svg-option">SVG</option>
+                    </select>
+                    <button id="download-plot-btn" onclick="downloadPlot()" style="display: none;">Download Plot</button>
+                </div>
+            </div>
         </div>
         <aside class="cilia-panel">
             <div class="panel-header">
