@@ -1131,6 +1131,34 @@ function downloadPlot() {
         URL.revokeObjectURL(url);
     }
 }
+function displayDownloadPage() {
+    const contentArea = document.querySelector('.content-area');
+    contentArea.className = 'content-area content-area-full';
+    document.querySelector('.cilia-panel').style.display = 'none';
+    contentArea.innerHTML = `
+        <div class="page-section">
+            <h2>Download CiliaHub Data</h2>
+            <p style="font-size: 1rem; color: #555;">Download the complete ciliary gene database in your preferred format.</p>
+            <div class="download-options">
+                <a href="https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/ciliahub_data.json" download="ciliahub_data.json" aria-label="Download JSON file">Download JSON</a>
+                <button id="download-csv" class="search-btn btn btn-primary" aria-label="Download CSV file">Download CSV</button>
+            </div>
+            <p style="font-size: 0.9rem; color: #7f8c8d;">The JSON file contains the full dataset with all fields. The CSV file includes gene names, Ensembl IDs, descriptions, localizations, and functional summaries.</p>
+        </div>`;
+    
+    document.getElementById('download-csv').onclick = () => {
+        const csv = ['Gene,Ensembl ID,Description,Synonym,OMIM ID,Functional Summary,Localization,Reference']
+            .concat(allGenes.map(g => `"${g.gene}","${g.ensembl_id || ''}","${g.description || ''}","${g.synonym || ''}","${g.omim_id || ''}","${g.functional_summary || ''}","${g.localization || ''}","${g.reference || ''}"`))
+            .join('\n');
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'ciliahub_data.csv';
+        a.click();
+        URL.revokeObjectURL(url);
+    };
+}
 
 function displayContactPage() {
     const contentArea = document.querySelector('.content-area');
