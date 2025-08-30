@@ -1,9 +1,11 @@
 function getPlotSettings() {
     return {
         fontFamily: document.getElementById('setting-font-family')?.value || 'Arial',
-        fontSize: parseInt(document.getElementById('setting-font-size')?.value, 10) || 12,
+        fontSize: parseInt(document.getElementById('setting-font-size')?.value, 10) || 20,
         fontWeight: document.getElementById('setting-font-weight')?.value || 'bold',
         textColor: document.getElementById('setting-text-color')?.value || '#000000',
+        axisColor: document.getElementById('setting-axis-color')?.value || '#000000',
+        yAxisTitle: document.getElementById('setting-y-axis-title')?.value || 'Localization',
         enrichmentColors: [
             document.getElementById('setting-enrichment-color1')?.value || '#edf8fb',
             document.getElementById('setting-enrichment-color2')?.value || '#b2e2e2',
@@ -121,7 +123,7 @@ function renderEnrichmentBubblePlot(foundGenes) {
             maintainAspectRatio: false,
             layout: {
                 padding: {
-                    left: 10,
+                    left: 0,
                     right: 10,
                     top: 20,
                     bottom: 20
@@ -137,11 +139,33 @@ function renderEnrichmentBubblePlot(foundGenes) {
             },
             scales: {
                 x: { 
-                    display: false 
+                    display: true,
+                    title: {
+                        display: true,
+                        text: 'Enrichment',
+                        color: settings.axisColor,
+                        font: {
+                            family: settings.fontFamily,
+                            size: settings.fontSize,
+                            weight: settings.fontWeight
+                        }
+                    },
+                    ticks: { display: false },
+                    grid: { display: false }
                 },
                 y: {
                     type: 'category', 
                     labels: categoriesWithData,
+                    title: {
+                        display: true,
+                        text: settings.yAxisTitle,
+                        color: settings.axisColor,
+                        font: {
+                            family: settings.fontFamily,
+                            size: settings.fontSize,
+                            weight: settings.fontWeight
+                        }
+                    },
                     grid: { 
                         display: false, 
                         drawBorder: false 
@@ -153,7 +177,7 @@ function renderEnrichmentBubblePlot(foundGenes) {
                             family: settings.fontFamily 
                         },
                         color: settings.textColor,
-                        padding: 5
+                        padding: 2
                     },
                     offset: false,
                     position: 'left'
@@ -218,7 +242,7 @@ function renderBubbleMatrix(foundGenes) {
                             size: 16, 
                             weight: 'bold' 
                         },
-                        color: settings.textColor
+                        color: settings.axisColor
                     },
                     ticks: { 
                         font: { 
@@ -246,7 +270,7 @@ function renderBubbleMatrix(foundGenes) {
                             size: 16, 
                             weight: 'bold' 
                         },
-                        color: settings.textColor
+                        color: settings.axisColor
                     },
                     ticks: { 
                         font: { 
@@ -270,14 +294,13 @@ function renderUpsetPlot(foundGenes) {
     const wrapper = document.getElementById('upset-plot-wrapper');
     wrapper.innerHTML = '';
     
-    const settings = getPlotSettings();
     const sets = [];
     const uniqueLocalizations = new Set();
     foundGenes.forEach(gene => {
         if (gene.localization) {
             const localizations = gene.localization.split(',').map(l => l.trim()).filter(l => l);
             if (localizations.length > 0) {
-                sets.push({ name: gene.gene, set: localizations });
+                sets.push({ name: gene.gene, elems: localizations });
                 localizations.forEach(loc => uniqueLocalizations.add(loc));
             }
         }
@@ -288,20 +311,20 @@ function renderUpsetPlot(foundGenes) {
         return;
     }
 
-    const setDefinitions = Array.from(uniqueLocalizations).map(name => ({ name, set: [] }));
+    const setDefinitions = Array.from(uniqueLocalizations).map(name => ({ name, elems: [] }));
     sets.forEach(elem => {
         setDefinitions.forEach(set => {
-            if (elem.set.includes(set.name)) set.set.push(elem.name);
+            if (elem.elems.includes(set.name)) set.elems.push(elem.name);
         });
     });
 
     try {
-        const upset = window.upsetjs().sets(setDefinitions);
-        upset.fontFamily(settings.fontFamily)
-            .fontSize(settings.fontSize)
-            .fontWeight(settings.fontWeight)
-            .textColor(settings.textColor)
-            .render(wrapper);
+        window.UpSetJS.render(wrapper, {
+            sets: setDefinitions,
+            combinations: window.UpSetJS.generateIntersections(setDefinitions),
+            width: 800,
+            height: 400
+        });
     } catch (error) {
         console.error('Error rendering Upset plot:', error);
         wrapper.innerHTML = '<p class="error-message">Failed to render Upset plot. Please try again or check console for details.</p>';
@@ -310,109 +333,52 @@ function renderUpsetPlot(foundGenes) {
 
 function downloadPlot() {
     const selectedPlot = document.querySelector('input[name="plot-type"]:checked').value;
-    let canvas, fileName, chartInstance;
+    const format = document.getElementById('download-format')?.value || 'png';
+    let fileName;
 
     if (selectedPlot === 'bubble') {
-        chartInstance = window.analysisDotPlotInstance;
-        fileName = 'CiliaHub_Enrichment_Plot.png';
-        
-        const mainCanvas = chartInstance.canvas;
-        const legendContainer = document.getElementById('legend-container');
-        const legendWidth = 150;
-        const padding = 10;
-        
-        // Create temporary canvas for combined plot and legend
-        const tempCanvas = document.createElement('canvas');
-        tempCanvas.width = mainCanvas.width + legendWidth + padding;
-        tempCanvas.height = Math.max(mainCanvas.height, 300);
-        const tempCtx = tempCanvas.getContext('2d');
-        
-        // Draw white background
-        tempCtx.fillStyle = 'white';
-        tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
-        
-        // Draw main chart
-        tempCtx.drawImage(mainCanvas, 0, 0);
-        
-        // Draw legend
-        const settings = getPlotSettings();
-        tempCtx.font = `14px ${settings.fontFamily}`;
-        tempCtx.fillStyle = settings.textColor;
-        tempCtx.textAlign = 'left';
-        const legendX = mainCanvas.width + padding;
-        let currentY = 20;
-        
-        // Gene Count title
-        tempCtx.fillText('Gene Count', legendX, currentY);
-        currentY += 20;
-        
-        // Draw size legend
-        const maxCount = Math.max(...Object.values(chartInstance.data.datasets[0].data.map(d => d.count)), 1);
-        const midCount = Math.ceil(maxCount / 2);
-        const getRadius = count => 8 + (count / maxCount) * 12;
-        
-        // Max count circle
-        tempCtx.beginPath();
-        tempCtx.arc(legendX + getRadius(maxCount), currentY + getRadius(maxCount), getRadius(maxCount), 0, 2 * Math.PI);
-        tempCtx.fillStyle = '#ccc';
-        tempCtx.fill();
-        tempCtx.fillStyle = settings.textColor;
-        tempCtx.fillText(maxCount.toString(), legendX + getRadius(maxCount) * 2 + 10, currentY + getRadius(maxCount));
-        currentY += getRadius(maxCount) * 2 + 15;
-        
-        // Mid count circle (if applicable)
-        if (midCount > 1 && midCount < maxCount) {
-            tempCtx.beginPath();
-            tempCtx.arc(legendX + getRadius(midCount), currentY + getRadius(midCount), getRadius(midCount), 0, 2 * Math.PI);
-            tempCtx.fillStyle = '#ccc';
-            tempCtx.fill();
-            tempCtx.fillStyle = settings.textColor;
-            tempCtx.fillText(midCount.toString(), legendX + getRadius(midCount) * 2 + 10, currentY + getRadius(midCount));
-            currentY += getRadius(midCount) * 2 + 15;
-        }
-        
-        // Minimum count circle
-        tempCtx.beginPath();
-        tempCtx.arc(legendX + getRadius(1), currentY + getRadius(1), getRadius(1), 0, 2 * Math.PI);
-        tempCtx.fillStyle = '#ccc';
-        tempCtx.fill();
-        tempCtx.fillStyle = settings.textColor;
-        tempCtx.fillText('1', legendX + getRadius(1) * 2 + 10, currentY + getRadius(1));
-        currentY += getRadius(1) * 2 + 25;
-        
-        // Enrichment title
-        tempCtx.fillText('Enrichment', legendX, currentY);
-        currentY += 20;
-        
-        // Draw gradient
-        const gradient = tempCtx.createLinearGradient(legendX, currentY, legendX + 100, currentY);
-        settings.enrichmentColors.forEach((color, index) => {
-            gradient.addColorStop(index / (settings.enrichmentColors.length - 1), color);
+        fileName = 'CiliaHub_Enrichment_Plot';
+        const container = document.getElementById('bubble-enrichment-container');
+        html2canvas(container, { backgroundColor: 'white', scale: 2 }).then(canvas => {
+            if (format === 'png') {
+                const a = document.createElement('a');
+                a.href = canvas.toDataURL('image/png');
+                a.download = `${fileName}.png`;
+                a.click();
+            } else if (format === 'pdf') {
+                const pdf = new jspdf.jsPDF({
+                    orientation: canvas.width > canvas.height ? 'l' : 'p',
+                    unit: 'px',
+                    format: [canvas.width, canvas.height]
+                });
+                pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, canvas.width, canvas.height);
+                pdf.save(`${fileName}.pdf`);
+            }
+        }).catch(error => {
+            console.error('Error downloading plot:', error);
+            alert('Failed to download the plot.');
         });
-        tempCtx.fillStyle = gradient;
-        tempCtx.fillRect(legendX, currentY, 100, 20);
-        tempCtx.strokeStyle = '#ccc';
-        tempCtx.strokeRect(legendX, currentY, 100, 20);
-        currentY += 25;
-        
-        // Low/High labels
-        tempCtx.fillStyle = settings.textColor;
-        tempCtx.fillText('Low', legendX, currentY);
-        tempCtx.fillText('High', legendX + 80, currentY);
-        
-        // Download combined image
-        const a = document.createElement('a');
-        a.href = tempCanvas.toDataURL('image/png', 1.0);
-        a.download = fileName;
-        a.click();
         
     } else if (selectedPlot === 'matrix') {
-        chartInstance = window.analysisBarChartInstance;
-        fileName = 'CiliaHub_Matrix_Plot.png';
-        const a = document.createElement('a');
-        a.href = chartInstance.toBase64Image('image/png', 1.0);
-        a.download = fileName;
-        a.click();
+        const chartInstance = window.analysisBarChartInstance;
+        fileName = 'CiliaHub_Matrix_Plot';
+        const canvas = chartInstance.canvas;
+        if (format === 'png') {
+            const a = document.createElement('a');
+            a.href = chartInstance.toBase64Image('image/png', 1.0);
+            a.download = `${fileName}.png`;
+            a.click();
+        } else if (format === 'pdf') {
+            html2canvas(canvas, { backgroundColor: 'white', scale: 2 }).then(imgCanvas => {
+                const pdf = new jspdf.jsPDF({
+                    orientation: imgCanvas.width > imgCanvas.height ? 'l' : 'p',
+                    unit: 'px',
+                    format: [imgCanvas.width, imgCanvas.height]
+                });
+                pdf.addImage(imgCanvas.toDataURL('image/png'), 'PNG', 0, 0, imgCanvas.width, imgCanvas.height);
+                pdf.save(`${fileName}.pdf`);
+            });
+        }
 
     } else if (selectedPlot === 'upset') {
         const svgElement = document.querySelector('#upset-plot-wrapper svg');
@@ -420,24 +386,33 @@ function downloadPlot() {
             alert("Could not find the Upset plot to download."); 
             return; 
         }
-        
+        fileName = 'CiliaHub_Upset_Plot';
         const svgClone = svgElement.cloneNode(true);
         const serializer = new XMLSerializer();
         let source = serializer.serializeToString(svgClone);
         if(!source.match(/^<svg[^>]+xmlns="http\:\/\/www\.w3\.org\/2000\/svg"/)){
             source = source.replace(/^<svg/, '<svg xmlns="http://www.w3.org/2000/svg"');
         }
-        // Add font styling to SVG
-        const settings = getPlotSettings();
-        source = source.replace('<svg', `<svg style="font-family: ${settings.fontFamily}; font-size: ${settings.fontSize}px; font-weight: ${settings.fontWeight}; fill: ${settings.textColor}"`);
-        const blob = new Blob([source], {type: "image/svg+xml;charset=utf-8"});
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'CiliaHub_Upset_Plot.svg';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
+        if (format === 'svg') {
+            const blob = new Blob([source], {type: "image/svg+xml;charset=utf-8"});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${fileName}.svg`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        } else if (format === 'pdf') {
+            html2canvas(svgElement, { backgroundColor: 'white', scale: 2 }).then(canvas => {
+                const pdf = new jspdf.jsPDF({
+                    orientation: canvas.width > canvas.height ? 'l' : 'p',
+                    unit: 'px',
+                    format: [canvas.width, canvas.height]
+                });
+                pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, canvas.width, canvas.height);
+                pdf.save(`${fileName}.pdf`);
+            });
+        }
     }
 }
