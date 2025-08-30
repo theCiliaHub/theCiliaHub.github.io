@@ -738,6 +738,10 @@ function displayAnalysisPage() {
                     <label for="plot-upset">Set Overlaps (Upset)</label>
                 </div>
                 <button id="generate-plot-btn" class="btn btn-primary">Generate Plot</button>
+                <select id="download-format">
+                    <option value="png">PNG</option>
+                    <option value="pdf">PDF</option>
+                </select>
                 <button id="download-plot-btn" class="btn btn-secondary" style="display:none;">Download Plot</button>
             </div>
 
@@ -757,7 +761,7 @@ function displayAnalysisPage() {
                     </div>
                     <div>
                         <label for="setting-font-size" style="display: block; margin-bottom: 5px;">Label Font Size</label>
-                        <input type="number" id="setting-font-size" value="12" min="8" max="20" style="width: 60px;">
+                        <input type="number" id="setting-font-size" value="20" min="8" max="30" style="width: 60px;">
                     </div>
                     <div>
                         <label for="setting-font-weight" style="display: block; margin-bottom: 5px;">Label Weight</label>
@@ -770,6 +774,14 @@ function displayAnalysisPage() {
                     <div>
                         <label for="setting-text-color" style="display: block; margin-bottom: 5px;">Text Color</label>
                         <input type="color" id="setting-text-color" value="#000000">
+                    </div>
+                    <div>
+                        <label for="setting-axis-color" style="display: block; margin-bottom: 5px;">Axis Color</label>
+                        <input type="color" id="setting-axis-color" value="#000000">
+                    </div>
+                    <div>
+                        <label for="setting-y-axis-title" style="display: block; margin-bottom: 5px;">Y Axis Title</label>
+                        <input type="text" id="setting-y-axis-title" value="Localization">
                     </div>
                     <div>
                         <label for="setting-enrichment-color1" style="display: block; margin-bottom: 5px;">Enrichment Color 1 (Low)</label>
@@ -797,9 +809,9 @@ function displayAnalysisPage() {
             <div id="analysis-status" class="status-message" style="display: none; padding: 1rem;"></div>
             
             <div id="plot-container" style="display:none; margin-top: 2rem;">
-                <div id="bubble-enrichment-container" style="display: none; align-items: flex-start; gap: 10px;">
+                <div id="bubble-enrichment-container" style="display: none; align-items: flex-start; gap: 0px;">
                     <div class="plot-wrapper" style="position: relative; height: 600px; flex-grow: 1;"><canvas id="analysis-bubble-plot"></canvas></div>
-                    <div id="legend-container" style="flex-shrink: 0; width: 150px; padding-top: 20px;"></div>
+                    <div id="legend-container" style="flex-shrink: 0; width: 150px; padding-top: 20px; padding-left: 5px;"></div>
                 </div>
                 <div id="matrix-plot-container" style="display: none;">
                      <div class="plot-wrapper" style="position: relative; height: 600px;"><canvas id="analysis-matrix-plot"></canvas></div>
@@ -814,6 +826,7 @@ function displayAnalysisPage() {
     document.getElementById('generate-plot-btn').addEventListener('click', generateAnalysisPlots);
     document.getElementById('download-plot-btn').addEventListener('click', downloadPlot);
 }
+
 
 function displayDownloadPage() {
     const contentArea = document.querySelector('.content-area');
