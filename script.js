@@ -756,21 +756,13 @@ function displayAnalysisPage() {
                         <label for="setting-font-weight" style="display: block; margin-bottom: 5px;">Label Weight</label>
                         <select id="setting-font-weight"><option value="normal">Normal</option><option value="bold" selected>Bold</option></select>
                     </div>
-                    <div>
-                        <label for="setting-bubble-color" style="display: block; margin-bottom: 5px;">Matrix Plot Color</label>
-                        <input type="color" id="setting-bubble-color" value="#377eb8">
-                    </div>
-                     <div>
-                        <label for="setting-upset-color" style="display: block; margin-bottom: 5px;">Upset Plot Color</label>
-                        <input type="color" id="setting-upset-color" value="#2c5aa0">
-                    </div>
                 </div>
             </details>
 
             <div id="analysis-status" class="status-message" style="display: none; padding: 1rem;"></div>
             
             <div id="plot-container" style="display:none; margin-top: 2rem;">
-                <div id="bubble-enrichment-container" style="display: flex; align-items: flex-start; gap: 20px;">
+                <div id="bubble-enrichment-container" style="display: none; align-items: flex-start; gap: 20px;">
                     <div class="plot-wrapper" style="position: relative; height: 600px; flex-grow: 1;"><canvas id="analysis-bubble-plot"></canvas></div>
                     <div id="legend-container" style="flex-shrink: 0; width: 150px; padding-top: 50px;"></div>
                 </div>
@@ -784,6 +776,7 @@ function displayAnalysisPage() {
         </div>
     `;
 
+    // These event listeners will now call the functions located in plots.js
     document.getElementById('generate-plot-btn').addEventListener('click', generateAnalysisPlots);
     document.getElementById('download-plot-btn').addEventListener('click', downloadPlot);
 }
