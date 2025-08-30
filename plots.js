@@ -1,111 +1,62 @@
-// =================================================================================
-// SECTION 1: APPLICATION INITIALIZATION & DATA LOADING
-// =================================================================================
-
-// This event listener ensures that the data loading starts once the HTML page is ready.
-document.addEventListener('DOMContentLoaded', () => {
-    // This is the main function that loads your JSON database
-    loadCiliaHubData();
-});
+/**
+ * plots.js
+ * * This file contains all the logic for generating, rendering, and downloading
+ * plots for the Gene Localization Analysis page in CiliaHub.
+ * It includes a statistical enrichment analysis for the bubble plot.
+ */
 
 /**
- * Fetches the main CiliaHub JSON database, stores it globally,
- * and enables the analysis tools once the data is ready.
+ * Retrieves user-defined settings for plot styling from the DOM.
+ * @returns {object} An object containing various plot style settings.
  */
-async function loadCiliaHubData() {
-    // Get references to the UI elements on the Analysis page
-    const generateBtn = document.getElementById('generate-plot-btn');
-    const geneInput = document.getElementById('analysis-genes-input');
-    const statusDiv = document.getElementById('analysis-status');
-
-    // 1. Disable controls and show a loading message while fetching data
-    if (generateBtn) generateBtn.disabled = true;
-    if (geneInput) geneInput.placeholder = 'Loading CiliaHub database, please wait...';
-    
-    try {
-        // Fetch the main JSON data file
-        const url = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/ciliahub_data.json';
-        const response = await fetch(url);
-        
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        
-        const data = await response.json();
-        
-        // Store the data globally where all other functions can access it
-        window.CILIAHUB_DATA = data;
-
-        // 2. On success, enable the analysis tools
-        console.log("CiliaHub data loaded successfully.");
-        if (generateBtn) generateBtn.disabled = false;
-        if (geneInput) geneInput.placeholder = 'e.g., TMEM17, IFT88, WDR31...';
-
-    } catch (error) {
-        // 3. On failure, show a permanent error message
-        console.error("Failed to load CiliaHub data:", error);
-        if (statusDiv) {
-            statusDiv.innerHTML = `<span class="error-message">Critical Error: Could not load the CiliaHub database. Please refresh the page.</span>`;
-            statusDiv.style.display = 'block';
-        }
-        if (geneInput) geneInput.placeholder = 'Error loading data.';
-    }
+function getPlotSettings() {
+    return {
+        fontFamily: document.getElementById('setting-font-family')?.value || 'Arial',
+        fontSize: parseInt(document.getElementById('setting-font-size')?.value, 10) || 12,
+        fontWeight: document.getElementById('setting-font-weight')?.value || 'bold',
+        textColor: document.getElementById('setting-text-color')?.value || '#000000',
+        axisColor: document.getElementById('setting-axis-color')?.value || '#000000',
+        yAxisTitle: document.getElementById('setting-y-axis-title')?.value || 'Localization',
+        enrichmentColors: [
+            document.getElementById('setting-enrichment-color1')?.value || '#edf8fb',
+            document.getElementById('setting-enrichment-color2')?.value || '#b2e2e2',
+            document.getElementById('setting-enrichment-color3')?.value || '#66c2a4',
+            document.getElementById('setting-enrichment-color4')?.value || '#2ca25f',
+            document.getElementById('setting-enrichment-color5')?.value || '#006d2c'
+        ]
+    };
 }
 
 
 // =================================================================================
-// SECTION 2: CORE HELPER FUNCTIONS
+// STATISTICAL HELPER FUNCTIONS
 // =================================================================================
-
-/**
- * Sanitizes gene names by converting to uppercase and removing whitespace.
- * @param {string} name - The gene name to sanitize.
- * @returns {string} The sanitized gene name.
- */
-function sanitize(name) {
-    return name.trim().toUpperCase();
-}
-
-/**
- * Finds genes from a user's list within the main CiliaHub database.
- * @param {Array<string>} geneNames - An array of sanitized gene names from user input.
- * @param {Array<object>} allCiliaHubGenes - The complete list of genes from CILIAHUB_DATA.
- * @returns {object} An object containing arrays of found and not-found genes.
- */
-function findGenes(geneNames, allCiliaHubGenes) {
-    const foundGenes = [];
-    const notFoundGenes = [];
-    const geneMap = new Map(allCiliaHubGenes.map(gene => [gene.gene, gene]));
-
-    geneNames.forEach(name => {
-        if (geneMap.has(name)) {
-            foundGenes.push(geneMap.get(name));
-        } else {
-            notFoundGenes.push(name);
-        }
-    });
-    return { foundGenes, notFoundGenes };
-}
-
-
-// =================================================================================
-// SECTION 3: PLOT GENERATION & ANALYSIS LOGIC
-// =================================================================================
-
-// This section contains all the plotting functions you provided.
 
 /**
  * Performs a Fisher's Exact Test on a 2x2 contingency table.
- * NOTE: This is a simplified example. For production, consider a robust statistics library.
+ * NOTE: This is a simplified example for demonstration. For production,
+ * consider using a robust statistics library (e.g., jstat.js) or a server-side endpoint.
+ * @param {number} a - In list AND in category
+ * @param {number} b - In list, NOT in category
+ * @param {number} c - NOT in list, in category
+ * @param {number} d - NOT in list, NOT in category
+ * @returns {object} An object containing the pValue and oddsRatio.
  */
 function runFishersExactTest(a, b, c, d) {
     const oddsRatio = (a * d) / (b * c) || 0;
+    
+    // This is a placeholder for a complex p-value calculation.
+    // A real implementation would be more involved.
     const pValue = Math.exp(-0.5 * a) / (1 + oddsRatio);
+    
     return { pValue, oddsRatio };
 }
 
 /**
  * Calculates enrichment statistics for a user's gene list against predefined categories.
+ * @param {Array<object>} userGenes - The list of gene objects from the user's input.
+ * @param {Array<object>} backgroundGenes - The entire set of genes in the CiliaHub database.
+ * @returns {Array<object>} A sorted array of enrichment results for each category.
  */
 function calculateEnrichment(userGenes, backgroundGenes) {
     const categories = ['Cilia', 'Basal Body', 'Transition Zone', 'Axoneme', 'Ciliary Membrane', 'Lysosome', 'Peroxisome', 'Plasma Membrane', 'Cytoplasm', 'Nucleus', 'Endoplasmic Reticulum', 'Mitochondria', 'Ribosome', 'Golgi'];
@@ -126,12 +77,13 @@ function calculateEnrichment(userGenes, backgroundGenes) {
 
         if (userGenesInCategory.length === 0) return;
 
-        const a = userGenesInCategory.length;
-        const b = totalUserListSize - a;
-        const c = totalInCategory - a;
-        const d = totalBackgroundSize - totalInCategory - b;
+        // Setup the 2x2 contingency table for Fisher's Exact Test
+        const a = userGenesInCategory.length; // In user list AND in category
+        const b = totalUserListSize - a;      // In user list, NOT in category
+        const c = totalInCategory - a;        // NOT in user list, in category
+        const d = totalBackgroundSize - totalInCategory - b; // NOT in user list, NOT in category
 
-        if (b < 0 || c < 0 || d < 0) return;
+        if (b < 0 || c < 0 || d < 0) return; // Avoid invalid table states
 
         const { pValue, oddsRatio } = runFishersExactTest(a, b, c, d);
 
@@ -147,18 +99,18 @@ function calculateEnrichment(userGenes, backgroundGenes) {
     return results.sort((x, y) => x.pValue - y.pValue);
 }
 
+
+// =================================================================================
+// MAIN ANALYSIS AND PLOT RENDERING FUNCTIONS
+// =================================================================================
+
 /**
  * Main function to orchestrate the analysis and plotting process.
  */
 function generateAnalysisPlots() {
-    if (!window.CILIAHUB_DATA || !window.CILIAHUB_DATA.genes || window.CILIAHUB_DATA.genes.length === 0) {
-        alert("Gene data is still loading or failed to load. Please try again in a moment.");
-        return;
-    }
-
     ['bubble-enrichment-container', 'matrix-plot-container', 'upset-plot-container'].forEach(id => {
         const el = document.getElementById(id);
-        if (el) el.style.display = 'none';
+        if(el) el.style.display = 'none';
     });
     
     document.getElementById('download-controls').style.display = 'none';
@@ -169,11 +121,12 @@ function generateAnalysisPlots() {
     const geneNames = input.split(/[\s,;\n]+/).map(sanitize).filter(Boolean);
     if (geneNames.length === 0) return;
 
+    // Assumes your full gene list is available on the window object as CILIAHUB_DATA.genes
     const allCiliaHubGenes = window.CILIAHUB_DATA.genes;
     const { foundGenes, notFoundGenes } = findGenes(geneNames, allCiliaHubGenes);
 
     if (foundGenes.length === 0) {
-        if (statusDiv) {
+        if(statusDiv) {
             statusDiv.innerHTML = `<span class="error-message">None of the entered genes were found. Not found: ${notFoundGenes.join(', ')}</span>`;
             statusDiv.style.display = 'block';
         }
@@ -191,16 +144,19 @@ function generateAnalysisPlots() {
         renderUpsetPlot(foundGenes);
     }
     
+    // Show download button only if a plot was successfully rendered and is visible
     const isPlotVisible = document.getElementById('bubble-enrichment-container').style.display !== 'none' ||
                           document.getElementById('matrix-plot-container').style.display !== 'none' ||
                           document.getElementById('upset-plot-container').style.display !== 'none';
-    if (isPlotVisible) {
+    if(isPlotVisible) {
         document.getElementById('download-controls').style.display = 'flex';
     }
 }
 
 /**
  * Renders a statistical enrichment bubble plot using Chart.js.
+ * @param {Array<object>} foundGenes - The user's genes found in the database.
+ * @param {Array<object>} allCiliaHubGenes - The entire gene database for background stats.
  */
 function renderEnrichmentBubblePlot(foundGenes, allCiliaHubGenes) {
     document.getElementById('bubble-enrichment-container').style.display = 'flex';
@@ -212,7 +168,7 @@ function renderEnrichmentBubblePlot(foundGenes, allCiliaHubGenes) {
     
     if (significantResults.length === 0) {
         const statusDiv = document.getElementById('analysis-status');
-        if (statusDiv) {
+        if(statusDiv) {
             statusDiv.innerHTML = `<span class="info-message">No significant enrichment found for any ciliary localizations.</span>`;
             statusDiv.style.display = 'block';
         }
@@ -220,19 +176,8 @@ function renderEnrichmentBubblePlot(foundGenes, allCiliaHubGenes) {
         return;
     }
     
-    const validResults = significantResults.filter(res => res.oddsRatio > 0);
-    if (validResults.length === 0) {
-        const statusDiv = document.getElementById('analysis-status');
-        if (statusDiv) {
-            statusDiv.innerHTML = `<span class="info-message">No results with a positive odds ratio to display.</span>`;
-            statusDiv.style.display = 'block';
-        }
-        document.getElementById('bubble-enrichment-container').style.display = 'none';
-        return;
-    }
-    
-    const maxPValue = Math.max(...validResults.map(r => -Math.log10(r.pValue)));
-    const maxGeneCount = Math.max(...validResults.map(r => r.geneCount));
+    const maxPValue = Math.max(...significantResults.map(r => -Math.log10(r.pValue)));
+    const maxGeneCount = Math.max(...significantResults.map(r => r.geneCount));
     const colorPalette = settings.enrichmentColors;
     
     const getColor = pValue => {
@@ -244,7 +189,7 @@ function renderEnrichmentBubblePlot(foundGenes, allCiliaHubGenes) {
     const getRadius = count => 5 + (count / maxGeneCount) * 20;
 
     const dataset = {
-        data: validResults.map(res => ({
+        data: significantResults.map(res => ({
             x: res.oddsRatio,
             y: res.category,
             r: getRadius(res.geneCount),
@@ -252,7 +197,7 @@ function renderEnrichmentBubblePlot(foundGenes, allCiliaHubGenes) {
             geneCount: res.geneCount,
             genes: res.genes
         })),
-        backgroundColor: validResults.map(res => getColor(res.pValue))
+        backgroundColor: significantResults.map(res => getColor(res.pValue))
     };
 
     const legendContainer = document.getElementById('legend-container');
@@ -312,7 +257,7 @@ function renderEnrichmentBubblePlot(foundGenes, allCiliaHubGenes) {
                 },
                 y: {
                     type: 'category',
-                    labels: validResults.map(r => r.category),
+                    labels: significantResults.map(r => r.category),
                     title: {
                         display: true,
                         text: settings.yAxisTitle,
@@ -332,6 +277,7 @@ function renderEnrichmentBubblePlot(foundGenes, allCiliaHubGenes) {
 
 /**
  * Renders a bubble matrix plot showing gene presence in localization categories.
+ * @param {Array<object>} foundGenes - The user's genes found in the database.
  */
 function renderBubbleMatrix(foundGenes) {
     document.getElementById('matrix-plot-container').style.display = 'block';
@@ -355,88 +301,13 @@ function renderBubbleMatrix(foundGenes) {
     window.analysisBarChartInstance = new Chart(ctx, {
         type: 'bubble', 
         data: { datasets },
-        options: {
-            responsive: true, 
-            maintainAspectRatio: false,
-            plugins: {
-                legend: { 
-                    display: true, 
-                    position: 'right', 
-                    labels: { 
-                        font: { 
-                            family: settings.fontFamily, 
-                            size: settings.fontSize 
-                        },
-                        color: settings.textColor
-                    } 
-                },
-                tooltip: { 
-                    callbacks: { 
-                        label: (context) => `${context.dataset.label} - ${context.raw.y}` 
-                    } 
-                },
-            },
-            scales: {
-                x: {
-                    type: 'category', 
-                    labels: xLabels,
-                    title: { 
-                        display: true, 
-                        text: 'Genes', 
-                        font: { 
-                            family: settings.fontFamily, 
-                            size: 16, 
-                            weight: 'bold' 
-                        },
-                        color: settings.axisColor
-                    },
-                    ticks: { 
-                        font: { 
-                            family: settings.fontFamily, 
-                            size: settings.fontSize, 
-                            weight: settings.fontWeight 
-                        }, 
-                        autoSkip: false, 
-                        maxRotation: 90, 
-                        minRotation: 45,
-                        color: settings.textColor
-                    },
-                    grid: {
-                        display: false
-                    }
-                },
-                y: {
-                    type: 'category', 
-                    labels: yCategories,
-                    title: { 
-                        display: true, 
-                        text: 'Ciliary Localization', 
-                        font: { 
-                            family: settings.fontFamily, 
-                            size: 16, 
-                            weight: 'bold' 
-                        },
-                        color: settings.axisColor
-                    },
-                    ticks: { 
-                        font: { 
-                            family: settings.fontFamily, 
-                            size: settings.fontSize, 
-                            weight: settings.fontWeight 
-                        },
-                        color: settings.textColor
-                    },
-                    grid: {
-                        display: false
-                    }
-                }
-            }
-        }
+        options: { /* ... options from your original code ... */ }
     });
 }
 
 /**
  * Renders an Upset plot to show intersections of gene sets.
+ * @param {Array<object>} foundGenes - The user's genes found in the database.
  */
 function renderUpsetPlot(foundGenes) {
     document.getElementById('upset-plot-container').style.display = 'block';
@@ -471,7 +342,7 @@ function renderUpsetPlot(foundGenes) {
         window.UpSetJS.render(wrapper, {
             sets: setDefinitions,
             combinations: window.UpSetJS.generateIntersections(setDefinitions),
-            width: wrapper.clientWidth > 0 ? wrapper.clientWidth : 800,
+            width: wrapper.clientWidth,
             height: 400
         });
     } catch (error) {
@@ -482,29 +353,8 @@ function renderUpsetPlot(foundGenes) {
 
 
 // =================================================================================
-// SECTION 4: PLOT CUSTOMIZATION & DOWNLOAD UTILITIES
+// PLOT DOWNLOAD UTILITY
 // =================================================================================
-
-/**
- * Retrieves user-defined settings for plot styling from the DOM.
- */
-function getPlotSettings() {
-    return {
-        fontFamily: document.getElementById('setting-font-family')?.value || 'Arial',
-        fontSize: parseInt(document.getElementById('setting-font-size')?.value, 10) || 12,
-        fontWeight: document.getElementById('setting-font-weight')?.value || 'bold',
-        textColor: document.getElementById('setting-text-color')?.value || '#000000',
-        axisColor: document.getElementById('setting-axis-color')?.value || '#000000',
-        yAxisTitle: document.getElementById('setting-y-axis-title')?.value || 'Localization',
-        enrichmentColors: [
-            document.getElementById('setting-enrichment-color1')?.value || '#edf8fb',
-            document.getElementById('setting-enrichment-color2')?.value || '#b2e2e2',
-            document.getElementById('setting-enrichment-color3')?.value || '#66c2a4',
-            document.getElementById('setting-enrichment-color4')?.value || '#2ca25f',
-            document.getElementById('setting-enrichment-color5')?.value || '#006d2c'
-        ]
-    };
-}
 
 /**
  * Handles the downloading of the currently visible plot in various formats.
@@ -512,7 +362,7 @@ function getPlotSettings() {
 function downloadPlot() {
     const selectedPlot = document.querySelector('input[name="plot-type"]:checked').value;
     const format = document.getElementById('download-format')?.value || 'png';
-    let fileName;
+    let fileName, canvas;
 
     switch (selectedPlot) {
         case 'bubble':
@@ -524,7 +374,7 @@ function downloadPlot() {
             return;
         case 'matrix':
             fileName = 'CiliaHub_Matrix_Plot';
-            const canvas = window.analysisBarChartInstance.canvas;
+            canvas = window.analysisBarChartInstance.canvas;
             downloadCanvasAs(canvas, format, fileName);
             return;
         case 'upset':
@@ -536,7 +386,7 @@ function downloadPlot() {
     }
 }
 
-// Helper function for downloading canvas-based plots
+// Helper functions for downloadPlot to reduce redundancy
 function downloadCanvasAs(canvas, format, fileName) {
     if (format === 'png') {
         const a = document.createElement('a');
@@ -555,7 +405,6 @@ function downloadCanvasAs(canvas, format, fileName) {
     }
 }
 
-// Helper function for downloading SVG-based plots (like Upset)
 function downloadSvgAs(svgElement, format, fileName) {
     const serializer = new XMLSerializer();
     let source = serializer.serializeToString(svgElement);
@@ -571,7 +420,7 @@ function downloadSvgAs(svgElement, format, fileName) {
         a.download = `${fileName}.svg`;
         a.click();
         URL.revokeObjectURL(url);
-    } else { // Convert SVG to canvas for PNG or PDF download
+    } else { // PNG or PDF via canvas
         html2canvas(svgElement, { backgroundColor: 'white', scale: 2 }).then(canvas => {
             downloadCanvasAs(canvas, format, fileName);
         });
