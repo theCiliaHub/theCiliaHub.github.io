@@ -724,7 +724,7 @@ function displayAnalysisPage() {
     contentArea.innerHTML = `
         <div class="page-section">
             <h2>Gene Localization Analysis</h2>
-            <p>Paste a list of human gene names to visualize their localization data and enrichment.</p>
+            <p>Paste a list of human gene names to visualize their localization data.</p>
             <textarea id="analysis-genes-input" placeholder="e.g., TMEM17, IFT88, WDR31..." style="width: 100%; min-height: 150px; padding: 1rem; border: 2px solid #e1ecf4; border-radius: 10px; font-size: 1rem; margin-top: 1rem; resize: vertical;"></textarea>
             
             <div id="analysis-controls" style="margin-top: 1rem; display: flex; align-items: center; gap: 20px; flex-wrap: wrap;">
@@ -738,55 +738,92 @@ function displayAnalysisPage() {
                     <label for="plot-upset">Set Overlaps (Upset)</label>
                 </div>
                 <button id="generate-plot-btn" class="btn btn-primary">Generate Plot</button>
-                
-                <div id="download-controls" style="display:none; align-items: center; gap: 10px;">
-                    <select id="download-format" class="btn">
-                        <option value="png">PNG</option>
-                        <option value="pdf">PDF</option>
-                        <option value="svg">SVG (Upset Only)</option>
-                    </select>
-                    <button id="download-plot-btn" class="btn btn-secondary">Download Plot</button>
-                </div>
+                <select id="download-format">
+                    <option value="png">PNG</option>
+                    <option value="pdf">PDF</option>
+                </select>
+                <button id="download-plot-btn" class="btn btn-secondary" style="display:none;">Download Plot</button>
             </div>
 
-            <details style="margin-top: 20px; border: 1px solid #e1ecf4; border-radius: 5px; padding: 10px;">
-                <summary style="font-weight: bold; cursor: pointer;">Plot Customization</summary>
+            <div style="margin-top: 20px; border: 1px solid #e1ecf4; border-radius: 5px; padding: 10px;">
+                <h3 style="font-weight: bold; margin-bottom: 10px;">Plot Customization</h3>
+                <p style="font-size: 0.9rem; color: #555;">Please click "Generate Plot" after making changes to apply them.</p>
                 <div id="plot-settings-panel" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-top: 10px;">
+                    <div>
+                        <label for="setting-font-family" style="display: block; margin-bottom: 5px;">Font Family</label>
+                        <select id="setting-font-family">
+                            <option value="Arial">Arial</option>
+                            <option value="Tahoma">Tahoma</option>
+                            <option value="Times New Roman">Times New Roman</option>
+                            <option value="Helvetica">Helvetica</option>
+                            <option value="Verdana">Verdana</option>
+                        </select>
                     </div>
-            </details>
+                    <div>
+                        <label for="setting-font-size" style="display: block; margin-bottom: 5px;">Label Font Size</label>
+                        <input type="number" id="setting-font-size" value="20" min="8" max="30" style="width: 60px;">
+                    </div>
+                    <div>
+                        <label for="setting-font-weight" style="display: block; margin-bottom: 5px;">Label Weight</label>
+                        <select id="setting-font-weight">
+                            <option value="normal">Normal</option>
+                            <option value="bold" selected>Bold</option>
+                            <option value="lighter">Lighter</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="setting-text-color" style="display: block; margin-bottom: 5px;">Text Color</label>
+                        <input type="color" id="setting-text-color" value="#000000">
+                    </div>
+                    <div>
+                        <label for="setting-axis-color" style="display: block; margin-bottom: 5px;">Axis Color</label>
+                        <input type="color" id="setting-axis-color" value="#000000">
+                    </div>
+                    <div>
+                        <label for="setting-y-axis-title" style="display: block; margin-bottom: 5px;">Y Axis Title</label>
+                        <input type="text" id="setting-y-axis-title" value="Localization">
+                    </div>
+                    <div>
+                        <label for="setting-enrichment-color1" style="display: block; margin-bottom: 5px;">Enrichment Color 1 (Low)</label>
+                        <input type="color" id="setting-enrichment-color1" value="#edf8fb">
+                    </div>
+                    <div>
+                        <label for="setting-enrichment-color2" style="display: block; margin-bottom: 5px;">Enrichment Color 2</label>
+                        <input type="color" id="setting-enrichment-color2" value="#b2e2e2">
+                    </div>
+                    <div>
+                        <label for="setting-enrichment-color3" style="display: block; margin-bottom: 5px;">Enrichment Color 3</label>
+                        <input type="color" id="setting-enrichment-color3" value="#66c2a4">
+                    </div>
+                    <div>
+                        <label for="setting-enrichment-color4" style="display: block; margin-bottom: 5px;">Enrichment Color 4</label>
+                        <input type="color" id="setting-enrichment-color4" value="#2ca25f">
+                    </div>
+                    <div>
+                        <label for="setting-enrichment-color5" style="display: block; margin-bottom: 5px;">Enrichment Color 5 (High)</label>
+                        <input type="color" id="setting-enrichment-color5" value="#006d2c">
+                    </div>
+                </div>
+            </div>
 
             <div id="analysis-status" class="status-message" style="display: none; padding: 1rem;"></div>
             
             <div id="plot-container" style="display:none; margin-top: 2rem;">
-                <div id="bubble-enrichment-container" style="display: none; align-items: flex-start; gap: 20px;">
+                <div id="bubble-enrichment-container" style="display: none; align-items: flex-start; gap: 0px;">
                     <div class="plot-wrapper" style="position: relative; height: 600px; flex-grow: 1;"><canvas id="analysis-bubble-plot"></canvas></div>
-                    <div id="legend-container" style="flex-shrink: 0; width: 150px; padding-top: 50px;"></div>
+                    <div id="legend-container" style="flex-shrink: 0; width: 150px; padding-top: 20px; padding-left: 5px;"></div>
                 </div>
-                <div id="matrix-plot-container" style="display: none;"><div class="plot-wrapper" style="position: relative; height: 600px;"><canvas id="analysis-matrix-plot"></canvas></div></div>
-                <div id="upset-plot-container" style="display: none;"><div id="upset-plot-wrapper"></div></div>
+                <div id="matrix-plot-container" style="display: none;">
+                     <div class="plot-wrapper" style="position: relative; height: 600px;"><canvas id="analysis-matrix-plot"></canvas></div>
+                </div>
+                <div id="upset-plot-container" style="display: none;">
+                     <div id="upset-plot-wrapper"></div>
+                </div>
             </div>
         </div>
     `;
 
-    // --- NEW ROBUST LOGIC ---
-    // This code runs every time the analysis page is displayed.
-    const generateBtn = document.getElementById('generate-plot-btn');
-    const geneInput = document.getElementById('analysis-genes-input');
-
-    // Check if the global data is ready
-    if (window.CILIAHUB_DATA && window.CILIAHUB_DATA.genes && window.CILIAHUB_DATA.genes.length > 0) {
-        // If data is ready, make sure the button is enabled.
-        generateBtn.disabled = false;
-        geneInput.placeholder = 'e.g., TMEM17, IFT88, WDR31...';
-    } else {
-        // If data is NOT ready, disable the button and show a loading state.
-        generateBtn.disabled = true;
-        geneInput.placeholder = 'Loading CiliaHub database, please wait...';
-        // You could also show a message in the status div.
-    }
-    
-    // Attach event listeners
-    generateBtn.addEventListener('click', generateAnalysisPlots);
+    document.getElementById('generate-plot-btn').addEventListener('click', generateAnalysisPlots);
     document.getElementById('download-plot-btn').addEventListener('click', downloadPlot);
 }
 
