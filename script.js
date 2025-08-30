@@ -746,15 +746,29 @@ function displayAnalysisPage() {
                 <div id="plot-settings-panel" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-top: 10px;">
                     <div>
                         <label for="setting-font-family" style="display: block; margin-bottom: 5px;">Font Family</label>
-                        <select id="setting-font-family"><option value="Arial">Arial</option><option value="Tahoma">Tahoma</option><option value="Times New Roman">Times New Roman</option></select>
+                        <select id="setting-font-family">
+                            <option value="Arial">Arial</option>
+                            <option value="Tahoma">Tahoma</option>
+                            <option value="Times New Roman">Times New Roman</option>
+                            <option value="Helvetica">Helvetica</option>
+                            <option value="Verdana">Verdana</option>
+                        </select>
                     </div>
-                    <div>
+                    <div
                         <label for="setting-font-size" style="display: block; margin-bottom: 5px;">Label Font Size</label>
                         <input type="number" id="setting-font-size" value="12" min="8" max="20" style="width: 60px;">
                     </div>
                     <div>
                         <label for="setting-font-weight" style="display: block; margin-bottom: 5px;">Label Weight</label>
-                        <select id="setting-font-weight"><option value="normal">Normal</option><option value="bold" selected>Bold</option></select>
+                        <select id="setting-font-weight">
+                            <option value="normal">Normal</option>
+                            <option value="bold" selected>Bold</option>
+                            <option value="lighter">Lighter</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="setting-text-color" style="display: block; margin-bottom: 5px;">Text Color</label>
+                        <input type="color" id="setting-text-color" value="#000000">
                     </div>
                 </div>
             </details>
@@ -762,9 +776,9 @@ function displayAnalysisPage() {
             <div id="analysis-status" class="status-message" style="display: none; padding: 1rem;"></div>
             
             <div id="plot-container" style="display:none; margin-top: 2rem;">
-                <div id="bubble-enrichment-container" style="display: none; align-items: flex-start; gap: 20px;">
+                <div id="bubble-enrichment-container" style="display: none; align-items: flex-start; gap: 10px;">
                     <div class="plot-wrapper" style="position: relative; height: 600px; flex-grow: 1;"><canvas id="analysis-bubble-plot"></canvas></div>
-                    <div id="legend-container" style="flex-shrink: 0; width: 150px; padding-top: 50px;"></div>
+                    <div id="legend-container" style="flex-shrink: 0; width: 150px; padding-top: 20px;"></div>
                 </div>
                 <div id="matrix-plot-container" style="display: none;">
                      <div class="plot-wrapper" style="position: relative; height: 600px;"><canvas id="analysis-matrix-plot"></canvas></div>
@@ -776,11 +790,9 @@ function displayAnalysisPage() {
         </div>
     `;
 
-    // These event listeners will now call the functions located in plots.js
     document.getElementById('generate-plot-btn').addEventListener('click', generateAnalysisPlots);
     document.getElementById('download-plot-btn').addEventListener('click', downloadPlot);
 }
-
 function displayDownloadPage() {
     const contentArea = document.querySelector('.content-area');
     contentArea.className = 'content-area content-area-full';
