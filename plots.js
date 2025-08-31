@@ -421,7 +421,6 @@ function downloadPlot() {
     }
 }
 
-// --- NEW FUNCTION START ---
 /**
  * Renders a table summarizing which of the user-inputted genes were found or not found.
  * @param {Array<Object>} foundGenes - An array of gene objects that were found in the database.
@@ -434,23 +433,19 @@ function renderGeneTable(foundGenes, notFoundGenes) {
         return;
     }
 
-    // Combine found and not-found genes into a single list for rendering
     const allGenes = [
         ...foundGenes.map(gene => ({ name: gene.gene, status: 'Found' })),
         ...notFoundGenes.map(geneName => ({ name: geneName, status: 'Not Found' }))
     ];
 
-    // Sort genes alphabetically by name
     allGenes.sort((a, b) => a.name.localeCompare(b.name));
     
-    // Check if there are any genes to display
     if (allGenes.length === 0) {
         container.innerHTML = '';
         container.style.display = 'none';
         return;
     }
 
-    // Build the HTML for the table
     let tableHTML = `
         <h3 style="text-align: left; margin-top: 40px; margin-bottom: 10px;">Gene Input Summary</h3>
         <table class="gene-summary-table">
@@ -464,7 +459,6 @@ function renderGeneTable(foundGenes, notFoundGenes) {
     `;
 
     allGenes.forEach(gene => {
-        // Apply different classes for styling based on status
         const statusClass = gene.status === 'Found' ? 'status-found' : 'status-not-found';
         tableHTML += `
             <tr>
@@ -479,9 +473,9 @@ function renderGeneTable(foundGenes, notFoundGenes) {
         </table>
     `;
 
-    // Render the table and make the container visible
     container.innerHTML = tableHTML;
-    container.style.display = 'block';
+    // ** THIS LINE IS UPDATED to ensure the table is displayed **
+    container.style.setProperty('display', 'block', 'important');
 }
 // --- NEW FUNCTION END ---
 
