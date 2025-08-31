@@ -1,59 +1,69 @@
-/**
- * ===================================================================
- * SECTION 1: CILIOME ANALYSIS (Formerly Enrichment)
- * - Visualization of gene localization within cellular compartments.
- * ===================================================================
- */
+function getPlotSettings() {
+    return {
+        fontFamily: document.getElementById('setting-font-family')?.value || 'Arial',
+        fontSize: parseInt(document.getElementById('setting-font-size')?.value, 10) || 20,
+        fontWeight: document.getElementById('setting-font-weight')?.value || 'bold',
+        textColor: document.getElementById('setting-text-color')?.value || '#000000',
+        axisColor: document.getElementById('setting-axis-color')?.value || '#000000',
+        yAxisTitle: document.getElementById('setting-y-axis-title')?.value || 'Localization',
+        enrichmentColors: [
+            document.getElementById('setting-enrichment-color1')?.value || '#edf8fb',
+            document.getElementById('setting-enrichment-color2')?.value || '#b2e2e2',
+            document.getElementById('setting-enrichment-color3')?.value || '#66c2a4',
+            document.getElementById('setting-enrichment-color4')?.value || '#2ca25f',
+            document.getElementById('setting-enrichment-color5')?.value || '#006d2c'
+        ]
+    };
+}
 
-function generateCiliomePlots() {
-    // Hide previous plots and results
-    ['ciliome-bubble-container', 'ciliome-matrix-container', 'ciliome-table-container'].forEach(id => {
+// RENAMED FUNCTION: generateAnalysisPlots() → generateEnrichmentPlots()
+function generateEnrichmentPlots() {
+    ['bubble-enrichment-container', 'matrix-plot-container', 'upset-plot-container'].forEach(id => {
         const el = document.getElementById(id);
-        if (el) el.style.display = 'none';
+        if(el) el.style.display = 'none';
     });
-    document.getElementById('download-ciliome-plot-btn').style.display = 'none';
-    document.getElementById('download-ciliome-table-btn').style.display = 'none';
-
-    const statusDiv = document.getElementById('ciliome-status');
+    document.getElementById('download-plot-btn').style.display = 'none';
+    
+    // UPDATED ID: analysis-status → enrichment-status
+    const statusDiv = document.getElementById('enrichment-status');
     if (statusDiv) statusDiv.style.display = 'none';
 
-    // Get and process gene list from textarea or file upload
-    const input = document.getElementById('ciliome-genes-input').value || '';
-    const geneNames = input.split(/[\s,;\n]+/).map(s => s.trim().toUpperCase()).filter(Boolean);
+    // UPDATED ID: analysis-genes-input → enrichment-genes-input
+    const input = document.getElementById('enrichment-genes-input').value || '';
+    const geneNames = input.split(/[\s,;\n]+/).map(sanitize).filter(Boolean);
     if (geneNames.length === 0) return;
 
-    // Assumes a global findGenes() function exists
-    const { foundGenes, notFoundGenes } = findGenes(geneNames); 
+    const { foundGenes, notFoundGenes } = findGenes(geneNames);
     if (foundGenes.length === 0) {
-        if (statusDiv) {
+        if(statusDiv) {
             statusDiv.innerHTML = `<span class="error-message">None of the entered genes were found. Not found: ${notFoundGenes.join(', ')}</span>`;
             statusDiv.style.display = 'block';
         }
         return;
     }
-
-    // Display the plot container and render the selected plot
-    document.getElementById('ciliome-plot-container').style.display = 'block';
-    const selectedPlot = document.querySelector('input[name="ciliome-plot-type"]:checked').value;
-
+    
+    document.getElementById('plot-container').style.display = 'block';
+    
+    const selectedPlot = document.querySelector('input[name="plot-type"]:checked').value;
     if (selectedPlot === 'bubble') {
-        renderCiliomeBubblePlot(foundGenes);
+        renderEnrichmentBubblePlot(foundGenes);
     } else if (selectedPlot === 'matrix') {
-        renderCiliomeMatrix(foundGenes);
+        renderBubbleMatrix(foundGenes);
+    } else if (selectedPlot === 'upset') {
+        renderUpsetPlot(foundGenes);
     }
     
-    // Display the results table and download buttons
-    renderCiliomeTable(foundGenes);
-    document.getElementById('download-ciliome-plot-btn').style.display = 'inline-block';
-    document.getElementById('download-ciliome-table-btn').style.display = 'inline-block';
+    document.getElementById('download-plot-btn').style.display = 'inline-block';
 }
 
-function renderCiliomeBubblePlot(foundGenes) {
-    document.getElementById('ciliome-bubble-container').style.display = 'flex';
-    if (window.ciliomeDotPlotInstance) window.ciliomeDotPlotInstance.destroy();
-
+function renderEnrichmentBubblePlot(foundGenes) {
+    document.getElementById('bubble-enrichment-container').style.display = 'flex';
+    
+    // UPDATED VARIABLE NAME: analysisDotPlotInstance → enrichmentDotPlotInstance
+    if (window.enrichmentDotPlotInstance) window.enrichmentDotPlotInstance.destroy();
+    
     const settings = getPlotSettings();
-    const yCategories = ['Cilia', 'Basal Body', 'Transition Zone', 'Axoneme', 'Ciliary Membrane', 'Lysosome', 'Peroxisome', 'Plasma Membrane', 'Cytoplasm', 'Nucleus', 'Endoplasmic Reticulum', 'Mitochondria', 'Ribosome', 'Golgi'];
+    const yCategories = [ 'Cilia', 'Basal Body', 'Transition Zone', 'Axoneme', 'Ciliary Membrane', 'Lysosome', 'Peroxisome', 'Plasma Membrane', 'Cytoplasm', 'Nucleus', 'Endoplasmic Reticulum', 'Mitochondria', 'Ribosome', 'Golgi' ];
     const localizationCounts = {};
     foundGenes.forEach(gene => {
         (gene.localization || '').split(',').forEach(loc => {
@@ -65,7 +75,7 @@ function renderCiliomeBubblePlot(foundGenes) {
     });
 
     const categoriesWithData = yCategories.filter(cat => localizationCounts[cat] > 0);
-    if (categoriesWithData.length === 0) return;
+    if (categoriesWithData.length === 0) { return; }
 
     const maxCount = Math.max(...Object.values(localizationCounts), 1);
     const colorPalette = settings.enrichmentColors;
@@ -81,8 +91,8 @@ function renderCiliomeBubblePlot(foundGenes) {
         data: categoriesWithData.map(loc => ({ x: 0, y: loc, r: getRadius(localizationCounts[loc]), count: localizationCounts[loc] })),
         backgroundColor: categoriesWithData.map(loc => getColor(localizationCounts[loc]))
     };
-
-    const legendContainer = document.getElementById('ciliome-legend-container');
+    
+    const legendContainer = document.getElementById('legend-container');
     if (legendContainer) {
         const midCount = Math.ceil(maxCount / 2);
         const sizeLegendHTML = `
@@ -110,17 +120,31 @@ function renderCiliomeBubblePlot(foundGenes) {
         legendContainer.innerHTML = sizeLegendHTML;
     }
     
-    const ctx = document.getElementById('ciliome-bubble-plot').getContext('2d');
-    window.ciliomeDotPlotInstance = new Chart(ctx, {
+    // UPDATED CANVAS ID: analysis-bubble-plot → enrichment-bubble-plot
+    const ctx = document.getElementById('enrichment-bubble-plot').getContext('2d');
+    
+    // UPDATED VARIABLE NAME: analysisDotPlotInstance → enrichmentDotPlotInstance
+    window.enrichmentDotPlotInstance = new Chart(ctx, {
         type: 'bubble', 
         data: { datasets: [dataset] },
         options: {
             responsive: true, 
             maintainAspectRatio: false,
-            layout: { padding: { left: 0, right: 10, top: 20, bottom: 20 } },
+            layout: {
+                padding: {
+                    left: 0,
+                    right: 10,
+                    top: 20,
+                    bottom: 20
+                }
+            },
             plugins: {
                 legend: { display: false },
-                tooltip: { callbacks: { label: c => `${c.raw.y}: ${c.raw.count} gene(s)` } }
+                tooltip: { 
+                    callbacks: { 
+                        label: c => `${c.raw.y}: ${c.raw.count} gene(s)` 
+                    } 
+                }
             },
             scales: {
                 x: { 
@@ -129,7 +153,11 @@ function renderCiliomeBubblePlot(foundGenes) {
                         display: true,
                         text: 'Enrichment',
                         color: settings.axisColor,
-                        font: { family: settings.fontFamily, size: settings.fontSize, weight: settings.fontWeight }
+                        font: {
+                            family: settings.fontFamily,
+                            size: settings.fontSize,
+                            weight: settings.fontWeight
+                        }
                     },
                     ticks: { display: false },
                     grid: { display: false }
@@ -141,11 +169,22 @@ function renderCiliomeBubblePlot(foundGenes) {
                         display: true,
                         text: settings.yAxisTitle,
                         color: settings.axisColor,
-                        font: { family: settings.fontFamily, size: settings.fontSize, weight: settings.fontWeight }
+                        font: {
+                            family: settings.fontFamily,
+                            size: settings.fontSize,
+                            weight: settings.fontWeight
+                        }
                     },
-                    grid: { display: false, drawBorder: false },
+                    grid: { 
+                        display: false, 
+                        drawBorder: false 
+                    },
                     ticks: { 
-                        font: { size: settings.fontSize, weight: settings.fontWeight, family: settings.fontFamily },
+                        font: { 
+                            size: settings.fontSize, 
+                            weight: settings.fontWeight, 
+                            family: settings.fontFamily 
+                        },
                         color: settings.textColor,
                         padding: 2
                     },
@@ -157,9 +196,11 @@ function renderCiliomeBubblePlot(foundGenes) {
     });
 }
 
-function renderCiliomeMatrix(foundGenes) {
-    document.getElementById('ciliome-matrix-container').style.display = 'block';
-    if (window.ciliomeBarChartInstance) window.ciliomeBarChartInstance.destroy();
+function renderBubbleMatrix(foundGenes) {
+    document.getElementById('matrix-plot-container').style.display = 'block';
+    
+    // UPDATED VARIABLE NAME: analysisBarChartInstance → enrichmentBarChartInstance
+    if (window.enrichmentBarChartInstance) window.enrichmentBarChartInstance.destroy();
 
     const settings = getPlotSettings();
     const yCategories = ['Basal Body', 'Transition Zone', 'Axoneme', 'Ciliary Membrane', 'Cilia', 'Golgi'];
@@ -175,8 +216,11 @@ function renderCiliomeMatrix(foundGenes) {
         backgroundColor: colorPalette[index % colorPalette.length]
     }));
 
-    const ctx = document.getElementById('ciliome-matrix-plot').getContext('2d');
-    window.ciliomeBarChartInstance = new Chart(ctx, {
+    // UPDATED CANVAS ID: analysis-matrix-plot → enrichment-matrix-plot
+    const ctx = document.getElementById('enrichment-matrix-plot').getContext('2d');
+    
+    // UPDATED VARIABLE NAME: analysisBarChartInstance → enrichmentBarChartInstance
+    window.enrichmentBarChartInstance = new Chart(ctx, {
         type: 'bubble', 
         data: { datasets },
         options: {
@@ -187,11 +231,18 @@ function renderCiliomeMatrix(foundGenes) {
                     display: true, 
                     position: 'right', 
                     labels: { 
-                        font: { family: settings.fontFamily, size: settings.fontSize },
+                        font: { 
+                            family: settings.fontFamily, 
+                            size: settings.fontSize 
+                        },
                         color: settings.textColor
                     } 
                 },
-                tooltip: { callbacks: { label: (context) => `${context.dataset.label} - ${context.raw.y}` } },
+                tooltip: { 
+                    callbacks: { 
+                        label: (context) => `${context.dataset.label} - ${context.raw.y}` 
+                    } 
+                },
             },
             scales: {
                 x: {
@@ -200,17 +251,27 @@ function renderCiliomeMatrix(foundGenes) {
                     title: { 
                         display: true, 
                         text: 'Genes', 
-                        font: { family: settings.fontFamily, size: 16, weight: 'bold' },
+                        font: { 
+                            family: settings.fontFamily, 
+                            size: 16, 
+                            weight: 'bold' 
+                        },
                         color: settings.axisColor
                     },
                     ticks: { 
-                        font: { family: settings.fontFamily, size: settings.fontSize, weight: settings.fontWeight }, 
+                        font: { 
+                            family: settings.fontFamily, 
+                            size: settings.fontSize, 
+                            weight: settings.fontWeight 
+                        }, 
                         autoSkip: false, 
                         maxRotation: 90, 
                         minRotation: 45,
                         color: settings.textColor
                     },
-                    grid: { display: false }
+                    grid: {
+                        display: false
+                    }
                 },
                 y: {
                     type: 'category', 
@@ -218,258 +279,155 @@ function renderCiliomeMatrix(foundGenes) {
                     title: { 
                         display: true, 
                         text: 'Ciliary Localization', 
-                        font: { family: settings.fontFamily, size: 16, weight: 'bold' },
+                        font: { 
+                            family: settings.fontFamily, 
+                            size: 16, 
+                            weight: 'bold' 
+                        },
                         color: settings.axisColor
                     },
                     ticks: { 
-                        font: { family: settings.fontFamily, size: settings.fontSize, weight: settings.fontWeight },
+                        font: { 
+                            family: settings.fontFamily, 
+                            size: settings.fontSize, 
+                            weight: settings.fontWeight 
+                        },
                         color: settings.textColor
                     },
-                    grid: { display: false }
+                    grid: {
+                        display: false
+                    }
                 }
             }
         }
     });
 }
 
-function renderCiliomeTable(foundGenes) {
-    const container = document.getElementById('ciliome-table-container');
-    container.dataset.ciliomeData = JSON.stringify(foundGenes); // Store data for download
+function renderUpsetPlot(foundGenes) {
+    document.getElementById('upset-plot-container').style.display = 'block';
+    const wrapper = document.getElementById('upset-plot-wrapper');
+    wrapper.innerHTML = '';
+    
+    const sets = [];
+    const uniqueLocalizations = new Set();
+    foundGenes.forEach(gene => {
+        if (gene.localization) {
+            const localizations = gene.localization.split(',').map(l => l.trim()).filter(l => l);
+            if (localizations.length > 0) {
+                sets.push({ name: gene.gene, elems: localizations });
+                localizations.forEach(loc => uniqueLocalizations.add(loc));
+            }
+        }
+    });
 
-    const tableHTML = `
-        <table id="ciliome-results-table">
-            <thead>
-                <tr><th>Gene</th><th>Localization</th></tr>
-            </thead>
-            <tbody>
-                ${foundGenes.map(g => `<tr><td>${g.gene}</td><td>${g.localization || 'N/A'}</td></tr>`).join('')}
-            </tbody>
-        </table>`;
-    container.innerHTML = tableHTML;
-    container.style.display = 'block';
-}
-
-function downloadCiliomePlot() {
-    const selectedPlot = document.querySelector('input[name="ciliome-plot-type"]:checked').value;
-    const format = document.getElementById('download-format')?.value || 'png';
-    let fileName;
-    let container;
-
-    if (selectedPlot === 'bubble') {
-        fileName = 'CiliaHub_Ciliome_Plot';
-        container = document.getElementById('ciliome-bubble-container');
-    } else if (selectedPlot === 'matrix') {
-        fileName = 'CiliaHub_Matrix_Plot';
-        container = window.ciliomeBarChartInstance.canvas;
-    } else {
-        return; // No other plot types
+    if (sets.length === 0) {
+        wrapper.innerHTML = '<p class="error-message">No valid localization data found for the provided genes.</p>';
+        return;
     }
 
-    html2canvas(container, { backgroundColor: 'white', scale: 2 }).then(canvas => {
+    const setDefinitions = Array.from(uniqueLocalizations).map(name => ({ name, elems: [] }));
+    sets.forEach(elem => {
+        setDefinitions.forEach(set => {
+            if (elem.elems.includes(set.name)) set.elems.push(elem.name);
+        });
+    });
+
+    try {
+        window.UpSetJS.render(wrapper, {
+            sets: setDefinitions,
+            combinations: window.UpSetJS.generateIntersections(setDefinitions),
+            width: 800,
+            height: 400
+        });
+    } catch (error) {
+        console.error('Error rendering Upset plot:', error);
+        wrapper.innerHTML = '<p class="error-message">Failed to render Upset plot. Please try again or check console for details.</p>';
+    }
+}
+
+function downloadPlot() {
+    const selectedPlot = document.querySelector('input[name="plot-type"]:checked').value;
+    const format = document.getElementById('download-format')?.value || 'png';
+    let fileName;
+
+    if (selectedPlot === 'bubble') {
+        fileName = 'CiliaHub_Enrichment_Plot';
+        const container = document.getElementById('bubble-enrichment-container');
+        html2canvas(container, { backgroundColor: 'white', scale: 2 }).then(canvas => {
+            if (format === 'png') {
+                const a = document.createElement('a');
+                a.href = canvas.toDataURL('image/png');
+                a.download = `${fileName}.png`;
+                a.click();
+            } else if (format === 'pdf') {
+                const pdf = new jspdf.jsPDF({
+                    orientation: canvas.width > canvas.height ? 'l' : 'p',
+                    unit: 'px',
+                    format: [canvas.width, canvas.height]
+                });
+                pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, canvas.width, canvas.height);
+                pdf.save(`${fileName}.pdf`);
+            }
+        }).catch(error => {
+            console.error('Error downloading plot:', error);
+            alert('Failed to download the plot.');
+        });
+        
+    } else if (selectedPlot === 'matrix') {
+        // UPDATED VARIABLE NAME: analysisBarChartInstance → enrichmentBarChartInstance
+        const chartInstance = window.enrichmentBarChartInstance;
+        fileName = 'CiliaHub_Matrix_Plot';
+        const canvas = chartInstance.canvas;
         if (format === 'png') {
             const a = document.createElement('a');
-            a.href = canvas.toDataURL('image/png');
+            a.href = chartInstance.toBase64Image('image/png', 1.0);
             a.download = `${fileName}.png`;
             a.click();
         } else if (format === 'pdf') {
-            const { jsPDF } = window.jspdf;
-            const pdf = new jsPDF({
-                orientation: canvas.width > canvas.height ? 'l' : 'p',
-                unit: 'px',
-                format: [canvas.width, canvas.height]
+            html2canvas(canvas, { backgroundColor: 'white', scale: 2 }).then(imgCanvas => {
+                const pdf = new jspdf.jsPDF({
+                    orientation: imgCanvas.width > imgCanvas.height ? 'l' : 'p',
+                    unit: 'px',
+                    format: [imgCanvas.width, imgCanvas.height]
+                });
+                pdf.addImage(imgCanvas.toDataURL('image/png'), 'PNG', 0, 0, imgCanvas.width, imgCanvas.height);
+                pdf.save(`${fileName}.pdf`);
             });
-            pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, canvas.width, canvas.height);
-            pdf.save(`${fileName}.pdf`);
         }
-    }).catch(error => {
-        console.error('Error downloading plot:', error);
-        alert('Failed to download the plot.');
-    });
-}
 
-function getPlotSettings() {
-    return {
-        fontFamily: document.getElementById('setting-font-family')?.value || 'Arial',
-        fontSize: parseInt(document.getElementById('setting-font-size')?.value, 10) || 12,
-        fontWeight: document.getElementById('setting-font-weight')?.value || 'bold',
-        textColor: document.getElementById('setting-text-color')?.value || '#000000',
-        axisColor: document.getElementById('setting-axis-color')?.value || '#000000',
-        yAxisTitle: document.getElementById('setting-y-axis-title')?.value || 'Localization',
-        enrichmentColors: [
-            document.getElementById('setting-enrichment-color1')?.value || '#edf8fb',
-            document.getElementById('setting-enrichment-color2')?.value || '#b2e2e2',
-            document.getElementById('setting-enrichment-color3')?.value || '#66c2a4',
-            document.getElementById('setting-enrichment-color4')?.value || '#2ca25f',
-            document.getElementById('setting-enrichment-color5')?.value || '#006d2c'
-        ]
-    };
-}
-
-// ---
-// END OF CILIOME ANALYSIS CODE
-// ---
-
-/**
- * ===================================================================
- * SECTION 2: NEW ENRICHMENT ANALYSIS
- * - Calculates statistical enrichment of a gene list for ciliary genes.
- * ===================================================================
- */
-
-async function performEnrichmentAnalysis() {
-    const resultsContainer = document.getElementById('enrichment-results-container');
-    resultsContainer.innerHTML = 'Calculating...'; 
-
-    const CILIOME_SIZE = 2000;
-    const GENOME_SIZE = 20000;
-
-    const input = document.getElementById('enrichment-genes-input').value || '';
-    const userGeneList = new Set(input.split(/[\s,;\n]+/).map(s => s.trim().toUpperCase()).filter(Boolean));
-    const k = userGeneList.size;
-
-    if (k === 0) {
-        resultsContainer.innerHTML = '';
-        return;
-    }
-
-    const ciliomeGeneSet = new Set(allGenes.map(g => g.gene.toUpperCase()));
-    
-    const overlapGenes = [...userGeneList].filter(gene => ciliomeGeneSet.has(gene));
-    const a = overlapGenes.length;
-
-    if (a === 0) {
-        resultsContainer.innerHTML = '<p class="error-message">No known ciliary genes found in your list.</p>';
-        return;
-    }
-
-    const foldEnrichment = (a / k) / (CILIOME_SIZE / GENOME_SIZE);
-    const pValue = hypergeometricTest(a, k, CILIOME_SIZE, GENOME_SIZE);
-
-    const enrichmentData = {
-        stats: [
-            { parameter: 'Genes in your list (k)', value: k },
-            { parameter: 'Ciliary genes in your list (a)', value: a },
-            { parameter: 'Fold Enrichment', value: foldEnrichment.toFixed(2) },
-            { parameter: 'p-value', value: pValue.toExponential(3) }
-        ],
-        genes: overlapGenes.map(gene => ({ gene }))
-    };
-
-    resultsContainer.dataset.enrichmentData = JSON.stringify(enrichmentData);
-    
-    resultsContainer.innerHTML = `
-        <h3>Enrichment Results</h3>
-        <table id="enrichment-stats-table">
-            <tbody>
-                ${enrichmentData.stats.map(row => `<tr><td>${row.parameter}</td><td>${row.value}</td></tr>`).join('')}
-            </tbody>
-        </table>
-        <h4>Overlapping Ciliary Genes (${a})</h4>
-        <div class="gene-list-box">
-            ${overlapGenes.join(', ')}
-        </div>
-        <button id="download-enrichment-table-btn" class="btn btn-secondary" onclick="downloadEnrichmentData()">Download Results</button>
-    `;
-}
-
-function hypergeometricTest(a, k, M, N) {
-    let pValue = 0;
-    for (let i = a; i <= Math.min(k, M); i++) {
-        const logProb = logCombinations(M, i) + logCombinations(N - M, k - i) - logCombinations(N, k);
-        pValue += Math.exp(logProb);
-    }
-    return pValue;
-}
-
-function logFactorial(n) {
-    if (n < 0) return NaN;
-    if (n === 0 || n === 1) return 0;
-    let result = 0;
-    for (let i = 2; i <= n; i++) {
-        result += Math.log(i);
-    }
-    return result;
-}
-
-function logCombinations(n, k) {
-    if (k < 0 || k > n) return -Infinity;
-    return logFactorial(n) - logFactorial(k) - logFactorial(n - k);
-}
-
-// ---
-// END OF ENRICHMENT ANALYSIS CODE
-// ---
-
-/**
- * ===================================================================
- * SECTION 3: NEW UTILITY FUNCTIONS (UPLOAD, DOWNLOAD)
- * ===================================================================
- */
-
-function handleFileUpload(event, targetTextareaId) {
-    const file = event.target.files[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = function(e) {
-        const content = e.target.result;
-        document.getElementById(targetTextareaId).value = content;
-    };
-    reader.readAsText(file);
-}
- 
-function exportDataToCSV(data, filename) {
-    if (!data || data.length === 0) return;
-    const headers = Object.keys(data[0]);
-    const csvRows = [
-        headers.join(','),
-        ...data.map(row => 
-            headers.map(header => {
-                let cell = row[header] === null || row[header] === undefined ? '' : String(row[header]);
-                cell = cell.includes(',') ? `"${cell}"` : cell;
-                return cell;
-            }).join(',')
-        )
-    ];
-    const csvString = csvRows.join('\n');
-    const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
-    
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', filename);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-}
-
-function downloadCiliomeData() {
-    const dataString = document.getElementById('ciliome-table-container').dataset.ciliomeData;
-    if (dataString) {
-        const data = JSON.parse(dataString);
-        exportDataToCSV(data, 'ciliome_analysis_results.csv');
+    } else if (selectedPlot === 'upset') {
+        const svgElement = document.querySelector('#upset-plot-wrapper svg');
+        if (!svgElement) { 
+            alert("Could not find the Upset plot to download."); 
+            return; 
+        }
+        fileName = 'CiliaHub_Upset_Plot';
+        const svgClone = svgElement.cloneNode(true);
+        const serializer = new XMLSerializer();
+        let source = serializer.serializeToString(svgClone);
+        if(!source.match(/^<svg[^>]+xmlns="http\:\/\/www\.w3\.org\/2000\/svg"/)){
+            source = source.replace(/^<svg/, '<svg xmlns="http://www.w3.org/2000/svg"');
+        }
+        if (format === 'svg') {
+            const blob = new Blob([source], {type: "image/svg+xml;charset=utf-8"});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${fileName}.svg`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        } else if (format === 'pdf') {
+            html2canvas(svgElement, { backgroundColor: 'white', scale: 2 }).then(canvas => {
+                const pdf = new jspdf.jsPDF({
+                    orientation: canvas.width > canvas.height ? 'l' : 'p',
+                    unit: 'px',
+                    format: [canvas.width, canvas.height]
+                });
+                pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, canvas.width, canvas.height);
+                pdf.save(`${fileName}.pdf`);
+            });
+        }
     }
 }
-
-function downloadEnrichmentData() {
-    const container = document.getElementById('enrichment-results-container');
-    const dataString = container ? container.dataset.enrichmentData : null;
-    
-    if (dataString) {
-        const data = JSON.parse(dataString);
-        const combinedData = [
-            ...data.stats,
-            { parameter: '', value: '' },
-            { parameter: 'Overlapping Genes', value: '' },
-            ...data.genes.map(g => ({ parameter: g.gene, value: ''}))
-        ];
-        exportDataToCSV(combinedData, 'enrichment_analysis_results.csv');
-    } else {
-        console.error("No enrichment data found to download.");
-    }
-}
-
-// ---
-// END OF UTILITY FUNCTIONS
-// ---
