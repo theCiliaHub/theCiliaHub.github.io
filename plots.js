@@ -446,8 +446,9 @@ function renderGeneTable(foundGenes, notFoundGenes) {
         return;
     }
 
+    // ** UPDATED THE H3 HEADING TEXT **
     let tableHTML = `
-        <h3 style="text-align: left; margin-top: 40px; margin-bottom: 10px;">Gene Input Summary</h3>
+        <h3 style="text-align: left; margin-top: 40px; margin-bottom: 10px;">Gene Input Table</h3>
         <table class="gene-summary-table">
             <thead>
                 <tr>
@@ -474,7 +475,6 @@ function renderGeneTable(foundGenes, notFoundGenes) {
     `;
 
     container.innerHTML = tableHTML;
-    // ** THIS LINE IS UPDATED to ensure the table is displayed **
     container.style.setProperty('display', 'block', 'important');
 }
 // --- NEW FUNCTION END ---
