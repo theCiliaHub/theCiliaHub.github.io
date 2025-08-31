@@ -343,11 +343,17 @@ function displayHomePage() {
     document.getElementById('single-search-btn').onclick = performSingleSearch;
     const searchInput = document.getElementById('single-gene-search');
     const suggestionsContainer = document.getElementById('search-suggestions');
+
+    // --- HELPER FUNCTION to hide suggestions ---
+    const hideSuggestions = () => {
+        suggestionsContainer.innerHTML = '';
+        suggestionsContainer.style.display = 'none'; // ADDED: Ensure it's hidden
+    };
     
     searchInput.addEventListener('input', function() {
         const query = this.value.trim().toUpperCase();
         if (query.length < 1) {
-            suggestionsContainer.innerHTML = '';
+            hideSuggestions();
             return;
         }
         
@@ -361,15 +367,18 @@ function displayHomePage() {
                 filteredGenes.map(g => `<li>${g.gene}${g.synonym ? ` (${g.synonym})` : ''}</li>`).join('') + 
                 '</ul>';
             
-            suggestionsContainer.querySelectorAll('li').forEach(item => {
-                item.addEventListener('click', function() {
-                    searchInput.value = this.textContent.split(' ')[0]; // Get just the gene name
-                    suggestionsContainer.innerHTML = '';
+            // CHANGE: Use event delegation for better performance
+            suggestionsContainer.querySelector('ul').addEventListener('click', function(event) {
+                if (event.target && event.target.nodeName === "LI") {
+                    searchInput.value = event.target.textContent.split(' ')[0]; // Get just the gene name
+                    hideSuggestions();
                     performSingleSearch();
-                });
+                }
             });
+
+            suggestionsContainer.style.display = 'block'; // ADDED: Make suggestions visible
         } else {
-            suggestionsContainer.innerHTML = '';
+            hideSuggestions();
         }
     });
     
@@ -377,18 +386,18 @@ function displayHomePage() {
         const suggestions = suggestionsContainer.querySelectorAll('li');
         if (suggestions.length === 0 && event.key !== 'Enter') return;
         
+        let activeElement = suggestionsContainer.querySelector('.active');
+
         if (event.key === 'Enter') {
-            const activeElement = suggestionsContainer.querySelector('.active');
+            event.preventDefault(); // Prevent form submission
             if (activeElement) {
-                event.preventDefault();
-                searchInput.value = activeElement.textContent.split(' ')[0]; // Get just the gene name
-                suggestionsContainer.innerHTML = '';
+                searchInput.value = activeElement.textContent.split(' ')[0];
             }
+            hideSuggestions();
             performSingleSearch();
             return;
         }
         
-        const activeElement = suggestionsContainer.querySelector('.active');
         if (event.key === 'ArrowDown') {
             event.preventDefault();
             let nextElement = activeElement ? activeElement.nextElementSibling : suggestions[0];
@@ -407,8 +416,9 @@ function displayHomePage() {
     });
     
     document.addEventListener('click', function(event) {
-        if (!searchInput.contains(event.target)) {
-            suggestionsContainer.innerHTML = '';
+        // CHANGE: Also check if the click is inside the suggestions container
+        if (!searchInput.contains(event.target) && !suggestionsContainer.contains(event.target)) {
+            hideSuggestions();
         }
     });
     
