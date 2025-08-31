@@ -26,9 +26,16 @@
     
     <style>
         #home-page { text-align: center; padding: 40px 20px; }
-        .call-to-action { margin-top: 30px; }
+        .call-to-action { margin-top: 30px; margin-bottom: 60px; }
         .cta-button { display: inline-block; background-color: #007bff; color: white; padding: 12px 24px; border-radius: 5px; text-decoration: none; font-size: 1.1em; font-weight: bold; transition: background-color 0.3s ease; }
         .cta-button:hover { background-color: #0056b3; }
+        
+        /* Styles for the new features section */
+        .features-section { display: flex; justify-content: space-around; flex-wrap: wrap; gap: 20px; text-align: left; }
+        .feature-box { background-color: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; padding: 25px; width: 30%; min-width: 280px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .feature-box h3 { font-size: 1.5em; margin-top: 0; }
+        .feature-box h3 span { margin-right: 10px; } /* For emoji icon */
+
         .gene-summary-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-family: Arial, sans-serif; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
         .gene-summary-table th, .gene-summary-table td { border: 1px solid #ddd; padding: 10px 12px; text-align: left; }
         .gene-summary-table th { background-color: #f8f8f8; font-weight: bold; }
@@ -61,13 +68,31 @@
                 <div class="call-to-action">
                     <a href="/#/enrichment" onclick="navigateTo(event, '/enrichment')" class="cta-button">Perform Gene Enrichment Analysis</a>
                 </div>
+
+                <hr>
+                
+                <h2 style="margin-top: 60px;">Key Features</h2>
+                <div class="features-section">
+                    <div class="feature-box">
+                        <h3><span>🔎</span>Gene Search</h3>
+                        <p>Quickly search for genes and access detailed information about their function, localization, and associated diseases.</p>
+                    </div>
+                    <div class="feature-box">
+                        <h3><span>📊</span>Data Visualization</h3>
+                        <p>Use our enrichment tools to generate publication-ready plots, including bubble charts and matrix plots, from your gene lists.</p>
+                    </div>
+                    <div class="feature-box">
+                        <h3><span>🧬</span>Batch Query</h3>
+                        <p>Analyze large sets of genes simultaneously to identify trends and shared characteristics within your data.</p>
+                    </div>
+                </div>
             </div>
 
             <div id="enrichment-page" style="display: none;">
                 <h2>Gene Enrichment Analysis</h2>
-                <div class="enrichment-input">
-                    <label for="enrichment-genes-input">Enter Gene List (one per line or comma-separated):</label>
-                    <textarea id="enrichment-genes-input" rows="5" placeholder="e.g., BBS1, BBS2, ARL6"></textarea>
+                <div class="analysis-input">
+                    <label for="analysis-genes-input">Enter Gene List (one per line or comma-separated):</label>
+                    <textarea id="analysis-genes-input" rows="5" placeholder="e.g., BBS1, BBS2, ARL6"></textarea>
                 </div>
                 <div class="plot-type-selection">
                     <h3>Select Plot Type:</h3>
@@ -90,14 +115,14 @@
                     <label>Enrichment Color 5: <input type="color" id="setting-enrichment-color5" value="#006d2c"></label>
                 </div>
                 <button onclick="generateAnalysisPlots()">Generate Plot</button>
-                <div id="enrichment-status" style="display: none;"></div>
+                <div id="analysis-status" style="display: none;"></div>
                 <div id="plot-container" style="display: none;">
                     <div id="bubble-enrichment-container" style="display: flex; width: 100%; height: 500px;">
-                        <canvas id="enrichment-bubble-plot" style="flex-grow: 1;"></canvas>
+                        <canvas id="analysis-bubble-plot" style="flex-grow: 1;"></canvas>
                         <div id="legend-container" style="min-width: 150px; padding-left: 20px;"></div>
                     </div>
                     <div id="matrix-plot-container" style="display: none; width: 100%; height: 500px;">
-                        <canvas id="enrichment-matrix-plot"></canvas>
+                        <canvas id="analysis-matrix-plot"></canvas>
                     </div>
                     <div id="upset-plot-container" style="display: none;">
                         <div id="upset-plot-wrapper"></div>
