@@ -364,3 +364,38 @@ th, td {
 th {
     background-color: #f2f2f2;
 }
+/* Suggested CSS for the gene summary table */
+.gene-summary-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 10px;
+    font-family: Arial, sans-serif;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.gene-summary-table th,
+.gene-summary-table td {
+    border: 1px solid #ddd;
+    padding: 10px 12px;
+    text-align: left;
+}
+
+.gene-summary-table th {
+    background-color: #f8f8f8;
+    font-weight: bold;
+    color: #333;
+}
+
+.gene-summary-table tbody tr:nth-child(even) {
+    background-color: #fdfdfd;
+}
+
+.gene-summary-table .status-found {
+    color: #28a745; /* Green */
+    font-weight: bold;
+}
+
+.gene-summary-table .status-not-found {
+    color: #dc3545; /* Red */
+    font-weight: bold;
+}
