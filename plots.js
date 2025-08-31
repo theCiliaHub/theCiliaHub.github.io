@@ -427,9 +427,12 @@ function downloadPlot() {
  * @param {Array<string>} notFoundGenes - An array of gene names that were not found.
  */
 function renderGeneTable(foundGenes, notFoundGenes) {
+    // Diagnostic message to confirm the function is running
+    console.log("Attempting to render the Gene Input Table...");
+
     const container = document.getElementById('gene-table-container');
     if (!container) {
-        console.error('The element with ID "gene-table-container" was not found.');
+        console.error('❌ Could not find the "gene-table-container" div in the HTML.');
         return;
     }
 
@@ -446,7 +449,7 @@ function renderGeneTable(foundGenes, notFoundGenes) {
         return;
     }
 
-    // ** UPDATED THE H3 HEADING TEXT **
+    // Updated H3 heading text
     let tableHTML = `
         <h3 style="text-align: left; margin-top: 40px; margin-bottom: 10px;">Gene Input Table</h3>
         <table class="gene-summary-table">
@@ -476,6 +479,7 @@ function renderGeneTable(foundGenes, notFoundGenes) {
 
     container.innerHTML = tableHTML;
     container.style.setProperty('display', 'block', 'important');
+    console.log("✅ Successfully rendered the Gene Input Table.");
 }
 // --- NEW FUNCTION END ---
 
