@@ -723,28 +723,44 @@ function displayEnrichmentPage() {
     document.querySelector('.cilia-panel').style.display = 'none';
     contentArea.innerHTML = `
         <div class="page-section">
-            <h2>Ciliary Gene Enrichment Analysis</h2>
-            <p>Paste a list of human gene names to visualize their localization data.</p>
-            <textarea id="enrichment-genes-input" placeholder="e.g., TMEM17, IFT88, WDR31..." style="width: 100%; min-height: 150px; padding: 1rem; border: 2px solid #e1ecf4; border-radius: 10px; font-size: 1rem; margin-top: 1rem; resize: vertical;"></textarea>
-            
-            <div id="enrichment-controls" style="margin-top: 1rem; display: flex; align-items: center; gap: 20px; flex-wrap: wrap;">
-                <div>
-                    <strong>Plot Type:</strong>
-                    <input type="radio" id="plot-bubble" name="plot-type" value="bubble" checked>
-                    <label for="plot-bubble" style="margin-right: 10px;">Enrichment</label>
-                    <input type="radio" id="plot-matrix" name="plot-type" value="matrix">
-                    <label for="plot-matrix" style="margin-right: 10px;">Gene Matrix</label>
-                    <input type="radio" id="plot-upset" name="plot-type" value="upset">
-                    <label for="plot-upset">Set Overlaps (Upset)</label>
-                </div>
-                <button id="generate-plot-btn" class="btn btn-primary">Generate Plot</button>
-                <select id="download-format">
-                    <option value="png">PNG</option>
-                    <option value="pdf">PDF</option>
-                </select>
-                <button id="download-plot-btn" class="btn btn-secondary" style="display:none;">Download Plot</button>
-            </div>
+    <h2>Ciliary Gene Enrichment Analysis</h2>
+    
+    <p><strong>One-Click Enrichment Analysis &amp; Visualization</strong></p>
+    <p>
+        Upload or paste your list of genes (e.g., from a differential expression analysis or a CRISPR screen), 
+        and CiliaHub will calculate how enriched your list is for known ciliary genes.
+    </p>
 
+    <h3>How it works:</h3>
+    <ol>
+        <li>User pastes or uploads their gene list.</li>
+        <li>The tool compares it to the full ciliome (~2,000 genes) and a background set (e.g., all human genes).</li>
+        <li>Results are visualized in interactive plots and downloadable tables.</li>
+    </ol>
+
+    <textarea id="enrichment-genes-input" 
+        placeholder="e.g., TMEM17, IFT88, WDR31..." 
+        style="width: 100%; min-height: 150px; padding: 1rem; border: 2px solid #e1ecf4; border-radius: 10px; font-size: 1rem; margin-top: 1rem; resize: vertical;">
+    </textarea>
+    
+    <div id="enrichment-controls" style="margin-top: 1rem; display: flex; align-items: center; gap: 20px; flex-wrap: wrap;">
+        <div>
+            <strong>Plot Type:</strong>
+            <input type="radio" id="plot-bubble" name="plot-type" value="bubble" checked>
+            <label for="plot-bubble" style="margin-right: 10px;">Enrichment</label>
+            <input type="radio" id="plot-matrix" name="plot-type" value="matrix">
+            <label for="plot-matrix" style="margin-right: 10px;">Gene Matrix</label>
+            <input type="radio" id="plot-upset" name="plot-type" value="upset">
+            <label for="plot-upset">Set Overlaps (Upset)</label>
+        </div>
+        <button id="generate-plot-btn" class="btn btn-primary">Generate Plot</button>
+        <select id="download-format">
+            <option value="png">PNG</option>
+            <option value="pdf">PDF</option>
+        </select>
+        <button id="download-plot-btn" class="btn btn-secondary" style="display:none;">Download Plot</button>
+    </div>
+</div>
             <div style="margin-top: 20px; border: 1px solid #e1ecf4; border-radius: 5px; padding: 10px;">
                 <h3 style="font-weight: bold; margin-bottom: 10px;">Plot Customization</h3>
                 <p style="font-size: 0.9rem; color: #555;">Please click "Generate Plot" after making changes to apply them.</p>
