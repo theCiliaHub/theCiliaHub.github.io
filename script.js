@@ -275,12 +275,12 @@ async function handleRouteChange() {
         setTimeout(displayLocalizationChart, 0);
     } else if (path === '/batch-query') {
         displayBatchQueryTool();
+    } else if (path === '/enrichment') {
+        displayEnrichmentPage();
     } else if (path === '/compare') {
         displayComparePage();
     } else if (path === '/expression') {
         displayExpressionPage();
-    } else if (path === '/analysis') {
-        displayAnalysisPage();
     } else if (path === '/download') {
         displayDownloadPage();
     } else if (path === '/contact') {
@@ -716,18 +716,18 @@ function displayComparePage() {
     }
 }
 
-// In script.js, REPLACE this function
-function displayAnalysisPage() {
+// REPLACE displayAnalysisPage() with this function
+function displayEnrichmentPage() {
     const contentArea = document.querySelector('.content-area');
     contentArea.className = 'content-area content-area-full';
     document.querySelector('.cilia-panel').style.display = 'none';
     contentArea.innerHTML = `
         <div class="page-section">
-            <h2>Gene Localization Analysis</h2>
+            <h2>Ciliary Gene Enrichment Analysis</h2>
             <p>Paste a list of human gene names to visualize their localization data.</p>
-            <textarea id="analysis-genes-input" placeholder="e.g., TMEM17, IFT88, WDR31..." style="width: 100%; min-height: 150px; padding: 1rem; border: 2px solid #e1ecf4; border-radius: 10px; font-size: 1rem; margin-top: 1rem; resize: vertical;"></textarea>
+            <textarea id="enrichment-genes-input" placeholder="e.g., TMEM17, IFT88, WDR31..." style="width: 100%; min-height: 150px; padding: 1rem; border: 2px solid #e1ecf4; border-radius: 10px; font-size: 1rem; margin-top: 1rem; resize: vertical;"></textarea>
             
-            <div id="analysis-controls" style="margin-top: 1rem; display: flex; align-items: center; gap: 20px; flex-wrap: wrap;">
+            <div id="enrichment-controls" style="margin-top: 1rem; display: flex; align-items: center; gap: 20px; flex-wrap: wrap;">
                 <div>
                     <strong>Plot Type:</strong>
                     <input type="radio" id="plot-bubble" name="plot-type" value="bubble" checked>
@@ -806,15 +806,15 @@ function displayAnalysisPage() {
                 </div>
             </div>
 
-            <div id="analysis-status" class="status-message" style="display: none; padding: 1rem;"></div>
+            <div id="enrichment-status" class="status-message" style="display: none; padding: 1rem;"></div>
             
             <div id="plot-container" style="display:none; margin-top: 2rem;">
                 <div id="bubble-enrichment-container" style="display: none; align-items: flex-start; gap: 0px;">
-                    <div class="plot-wrapper" style="position: relative; height: 600px; flex-grow: 1;"><canvas id="analysis-bubble-plot"></canvas></div>
+                    <div class="plot-wrapper" style="position: relative; height: 600px; flex-grow: 1;"><canvas id="enrichment-bubble-plot"></canvas></div>
                     <div id="legend-container" style="flex-shrink: 0; width: 150px; padding-top: 20px; padding-left: 5px;"></div>
                 </div>
                 <div id="matrix-plot-container" style="display: none;">
-                     <div class="plot-wrapper" style="position: relative; height: 600px;"><canvas id="analysis-matrix-plot"></canvas></div>
+                     <div class="plot-wrapper" style="position: relative; height: 600px;"><canvas id="enrichment-matrix-plot"></canvas></div>
                 </div>
                 <div id="upset-plot-container" style="display: none;">
                      <div id="upset-plot-wrapper"></div>
@@ -823,7 +823,7 @@ function displayAnalysisPage() {
         </div>
     `;
 
-    document.getElementById('generate-plot-btn').addEventListener('click', generateAnalysisPlots);
+    document.getElementById('generate-plot-btn').addEventListener('click', generateEnrichmentPlots);
     document.getElementById('download-plot-btn').addEventListener('click', downloadPlot);
 }
 
@@ -1259,7 +1259,7 @@ function updateActiveNav(path) {
         
         if (linkPath === path || 
             (path.startsWith('/') && path !== '/' && path !== '/index.html' && 
-             linkPath === '/batch-query' && !['/download', '/contact', '/compare', '/expression', '/analysis'].includes(path))) {
+             linkPath === '/batch-query' && !['/download', '/contact', '/compare', '/expression', '/enrichment'].includes(path))) {
             link.classList.add('active');
         }
     });
