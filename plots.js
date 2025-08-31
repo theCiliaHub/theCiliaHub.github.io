@@ -34,75 +34,115 @@ function getPlotSettings() {
 
 
 
+// Wrap plots + table in one container for export
 function generateAnalysisPlots() {
-
     ['bubble-enrichment-container', 'matrix-plot-container', 'upset-plot-container'].forEach(id => {
-
         const el = document.getElementById(id);
-
-        if(el) el.style.display = 'none';
-
+        if (el) el.style.display = 'none';
     });
 
     document.getElementById('download-plot-btn').style.display = 'none';
 
     const statusDiv = document.getElementById('analysis-status');
-
     if (statusDiv) statusDiv.style.display = 'none';
 
-
-
     const input = document.getElementById('analysis-genes-input').value || '';
-
     const geneNames = input.split(/[\s,;\n]+/).map(sanitize).filter(Boolean);
-
     if (geneNames.length === 0) return;
-
-
 
     const { foundGenes, notFoundGenes } = findGenes(geneNames);
 
-    if (foundGenes.length === 0) {
-
-        if(statusDiv) {
-
+    if (foundGenes.length === 0 && notFoundGenes.length > 0) {
+        if (statusDiv) {
             statusDiv.innerHTML = `<span class="error-message">None of the entered genes were found. Not found: ${notFoundGenes.join(', ')}</span>`;
-
             statusDiv.style.display = 'block';
-
         }
-
+        renderGeneTable(foundGenes, notFoundGenes);
         return;
-
     }
-
-    
 
     document.getElementById('plot-container').style.display = 'block';
 
-    
-
     const selectedPlot = document.querySelector('input[name="plot-type"]:checked').value;
-
     if (selectedPlot === 'bubble') {
-
         renderEnrichmentBubblePlot(foundGenes);
-
     } else if (selectedPlot === 'matrix') {
-
         renderBubbleMatrix(foundGenes);
-
     } else if (selectedPlot === 'upset') {
-
         renderUpsetPlot(foundGenes);
-
     }
 
-    
+    // ✅ Always render gene table
+    renderGeneTable(foundGenes, notFoundGenes);
 
     document.getElementById('download-plot-btn').style.display = 'inline-block';
-
 }
+
+
+// ✅ Show all genes in a table below the plot
+function renderGeneTable(foundGenes, notFoundGenes) {
+    let container = document.getElementById('plot-with-table-container');
+
+    // If container doesn’t exist yet, create it
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'plot-with-table-container';
+        container.style.marginTop = '20px';
+        document.getElementById('plot-container').appendChild(container);
+    }
+
+    // Clear old contents
+    container.innerHTML = '';
+
+    // Move plot containers inside this wrapper if not already there
+    const bubble = document.getElementById('bubble-enrichment-container');
+    const matrix = document.getElementById('matrix-plot-container');
+    const upset = document.getElementById('upset-plot-container');
+
+    [bubble, matrix, upset].forEach(el => {
+        if (el && !container.contains(el)) container.appendChild(el);
+    });
+
+    // Build gene table
+    const allRows = [];
+    foundGenes.forEach(gene => {
+        allRows.push(`
+            <tr>
+                <td>${gene.gene}</td>
+                <td>${gene.localization || '—'}</td>
+                <td style="color:green;">Found</td>
+            </tr>
+        `);
+    });
+    notFoundGenes.forEach(gene => {
+        allRows.push(`
+            <tr>
+                <td>${gene}</td>
+                <td>—</td>
+                <td style="color:red;">Not Found</td>
+            </tr>
+        `);
+    });
+
+    if (allRows.length > 0) {
+        container.innerHTML += `
+            <h3 style="margin:15px 0 10px 0;">Gene List</h3>
+            <table border="1" cellpadding="5" cellspacing="0" style="border-collapse:collapse; width:100%; font-family:Arial; font-size:14px;">
+                <thead style="background:#f0f0f0;">
+                    <tr>
+                        <th>Gene</th>
+                        <th>Localization</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${allRows.join('')}
+                </tbody>
+            </table>
+        `;
+    }
+}
+
 
 
 
@@ -664,172 +704,44 @@ function renderUpsetPlot(foundGenes) {
 
 
 
+// ✅ Modified download function: include plots + gene table
 function downloadPlot() {
-
     const selectedPlot = document.querySelector('input[name="plot-type"]:checked').value;
-
     const format = document.getElementById('download-format')?.value || 'png';
-
     let fileName;
 
+    fileName =
+        selectedPlot === 'bubble' ? 'CiliaHub_Enrichment_Plot' :
+        selectedPlot === 'matrix' ? 'CiliaHub_Matrix_Plot' :
+        selectedPlot === 'upset'  ? 'CiliaHub_Upset_Plot' :
+        'CiliaHub_Plot';
 
+    const container = document.getElementById('plot-with-table-container');
+    if (!container) {
+        alert("Nothing to download.");
+        return;
+    }
 
-    if (selectedPlot === 'bubble') {
-
-        fileName = 'CiliaHub_Enrichment_Plot';
-
-        const container = document.getElementById('bubble-enrichment-container');
-
-        html2canvas(container, { backgroundColor: 'white', scale: 2 }).then(canvas => {
-
-            if (format === 'png') {
-
-                const a = document.createElement('a');
-
-                a.href = canvas.toDataURL('image/png');
-
-                a.download = `${fileName}.png`;
-
-                a.click();
-
-            } else if (format === 'pdf') {
-
-                const pdf = new jspdf.jsPDF({
-
-                    orientation: canvas.width > canvas.height ? 'l' : 'p',
-
-                    unit: 'px',
-
-                    format: [canvas.width, canvas.height]
-
-                });
-
-                pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, canvas.width, canvas.height);
-
-                pdf.save(`${fileName}.pdf`);
-
-            }
-
-        }).catch(error => {
-
-            console.error('Error downloading plot:', error);
-
-            alert('Failed to download the plot.');
-
-        });
-
-        
-
-    } else if (selectedPlot === 'matrix') {
-
-        const chartInstance = window.analysisBarChartInstance;
-
-        fileName = 'CiliaHub_Matrix_Plot';
-
-        const canvas = chartInstance.canvas;
-
+    html2canvas(container, { backgroundColor: 'white', scale: 2 }).then(canvas => {
         if (format === 'png') {
-
             const a = document.createElement('a');
-
-            a.href = chartInstance.toBase64Image('image/png', 1.0);
-
+            a.href = canvas.toDataURL('image/png');
             a.download = `${fileName}.png`;
-
             a.click();
-
         } else if (format === 'pdf') {
-
-            html2canvas(canvas, { backgroundColor: 'white', scale: 2 }).then(imgCanvas => {
-
-                const pdf = new jspdf.jsPDF({
-
-                    orientation: imgCanvas.width > imgCanvas.height ? 'l' : 'p',
-
-                    unit: 'px',
-
-                    format: [imgCanvas.width, imgCanvas.height]
-
-                });
-
-                pdf.addImage(imgCanvas.toDataURL('image/png'), 'PNG', 0, 0, imgCanvas.width, imgCanvas.height);
-
-                pdf.save(`${fileName}.pdf`);
-
+            const pdf = new jspdf.jsPDF({
+                orientation: canvas.width > canvas.height ? 'l' : 'p',
+                unit: 'px',
+                format: [canvas.width, canvas.height]
             });
-
+            pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, canvas.width, canvas.height);
+            pdf.save(`${fileName}.pdf`);
         }
-
-
-
-    } else if (selectedPlot === 'upset') {
-
-        const svgElement = document.querySelector('#upset-plot-wrapper svg');
-
-        if (!svgElement) { 
-
-            alert("Could not find the Upset plot to download."); 
-
-            return; 
-
-        }
-
-        fileName = 'CiliaHub_Upset_Plot';
-
-        const svgClone = svgElement.cloneNode(true);
-
-        const serializer = new XMLSerializer();
-
-        let source = serializer.serializeToString(svgClone);
-
-        if(!source.match(/^<svg[^>]+xmlns="http\:\/\/www\.w3\.org\/2000\/svg"/)){
-
-            source = source.replace(/^<svg/, '<svg xmlns="http://www.w3.org/2000/svg"');
-
-        }
-
-        if (format === 'svg') {
-
-            const blob = new Blob([source], {type: "image/svg+xml;charset=utf-8"});
-
-            const url = URL.createObjectURL(blob);
-
-            const a = document.createElement('a');
-
-            a.href = url;
-
-            a.download = `${fileName}.svg`;
-
-            document.body.appendChild(a);
-
-            a.click();
-
-            document.body.removeChild(a);
-
-            URL.revokeObjectURL(url);
-
-        } else if (format === 'pdf') {
-
-            html2canvas(svgElement, { backgroundColor: 'white', scale: 2 }).then(canvas => {
-
-                const pdf = new jspdf.jsPDF({
-
-                    orientation: canvas.width > canvas.height ? 'l' : 'p',
-
-                    unit: 'px',
-
-                    format: [canvas.width, canvas.height]
-
-                });
-
-                pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, canvas.width, canvas.height);
-
-                pdf.save(`${fileName}.pdf`);
-
-            });
-
-        }
-
+    }).catch(error => {
+        console.error('Error downloading plot + table:', error);
+        alert('Failed to download.');
+    });
+}
     }
 
 }
