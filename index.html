@@ -22,6 +22,58 @@
       gtag('js', new Date());
       gtag('config', 'G-XXXXXXXXXX'); // ✨ Replace with your real Google Analytics ID
     </script>
+    
+    <style>
+        /* Home Page & Call-to-Action Button Styles */
+        #home-page {
+            text-align: center;
+            padding: 40px 20px;
+        }
+        .call-to-action {
+            margin-top: 30px;
+        }
+        .cta-button {
+            display: inline-block;
+            background-color: #007bff;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 5px;
+            text-decoration: none;
+            font-size: 1.1em;
+            font-weight: bold;
+            transition: background-color 0.3s ease;
+        }
+        .cta-button:hover {
+            background-color: #0056b3;
+        }
+
+        /* Gene Summary Table Styles */
+        .gene-summary-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+            font-family: Arial, sans-serif;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        .gene-summary-table th,
+        .gene-summary-table td {
+            border: 1px solid #ddd;
+            padding: 10px 12px;
+            text-align: left;
+        }
+        .gene-summary-table th {
+            background-color: #f8f8f8;
+            font-weight: bold;
+        }
+        .gene-summary-table .status-found {
+            color: #28a745; /* Green */
+            font-weight: bold;
+        }
+        .gene-summary-table .status-not-found {
+            color: #dc3545; /* Red */
+            font-weight: bold;
+        }
+    </style>
 </head>
 <body>
     <nav class="navbar">
@@ -29,13 +81,8 @@
             <a href="/#" onclick="navigateTo(event, '/')" class="logo" aria-label="CiliaHub Home">CiliaHub</a>
             <ul class="nav-links">
                 <li><a href="/#" onclick="navigateTo(event, '/')" aria-label="Home">Home</a></li>
-                <li><a href="/#/batch-query" onclick="navigateTo(event, '/batch-query')" aria-label="Batch Query">Batch Query</a></li>
-                <li><a href="/#/compare" onclick="navigateTo(event, '/compare')" aria-label="Compare">Compare</a></li>
-                <li><a href="/#/expression" onclick="navigateTo(event, '/expression')" aria-label="Expression">Expression</a></li>
                 <li><a href="/#/analysis" onclick="navigateTo(event, '/analysis')" aria-label="Analysis">Analysis</a></li>
-                <li><a href="/#/download" onclick="navigateTo(event, '/download')" aria-label="Download">Download</a></li>
-                <li><a href="/#/contact" onclick="navigateTo(event, '/contact')" aria-label="Contact">Contact</a></li>
-            </ul>
+                </ul>
         </div>
     </nav>
 
@@ -69,14 +116,7 @@
                     <label>Font Size: <input type="number" id="setting-font-size" value="16"></label>
                     <label>Font Weight: <input type="text" id="setting-font-weight" value="bold"></label>
                     <label>Text Color: <input type="color" id="setting-text-color" value="#000000"></label>
-                    <label>Axis Color: <input type="color" id="setting-axis-color" value="#000000"></label>
-                    <label>Y-Axis Title: <input type="text" id="setting-y-axis-title" value="Localization"></label>
-                    <label>Enrichment Color 1: <input type="color" id="setting-enrichment-color1" value="#edf8fb"></label>
-                    <label>Enrichment Color 2: <input type="color" id="setting-enrichment-color2" value="#b2e2e2"></label>
-                    <label>Enrichment Color 3: <input type="color" id="setting-enrichment-color3" value="#66c2a4"></label>
-                    <label>Enrichment Color 4: <input type="color" id="setting-enrichment-color4" value="#2ca25f"></label>
-                    <label>Enrichment Color 5: <input type="color" id="setting-enrichment-color5" value="#006d2c"></label>
-                </div>
+                    </div>
                 <button onclick="generateAnalysisPlots()">Generate Plot</button>
                 <div id="analysis-status" style="display: none;"></div>
                 <div id="plot-container" style="display: none;">
@@ -106,27 +146,7 @@
         </div>
         
         <aside class="cilia-panel">
-            <div class="panel-header">
-                <h3>Interactive Cilium</h3>
-                <p style="font-size: 0.9rem; opacity: 0.9;">Click genes to see localization</p>
-            </div>
-            <div class="panel-content">
-                <div class="cilia-container interactive-cilium">
-                    <svg viewBox="0 0 300 400" xmlns="http://www.w3.org/2000/svg">
-                        <path id="cell-body" class="cilia-part" tabindex="0" fill="none" d="M 50,380 C -20,300 20,200 150,200 C 280,200 320,300 250,380 Z" aria-label="Cell Body"/>
-                        <circle id="nucleus" class="cilia-part" tabindex="0" fill="#A7C7E7" cx="150" cy="320" r="40" aria-label="Nucleus"/>
-                        <rect id="basal-body" class="cilia-part" tabindex="0" fill="#2F2F2F" x="140" y="195" width="20" height="15" aria-label="Basal Body"/>
-                        <path id="transition-zone" class="cilia-part" tabindex="0" fill="#9B59B6" d="M 142,195 L 138,180 L 162,180 L 158,195 Z" aria-label="Transition Zone"/>
-                        <path id="ciliary-membrane" class="cilia-part" tabindex="0" fill="none" fill-opacity="0.5" d="M 138,180 L 145,10 L 155,10 L 162,180 Z" aria-label="Ciliary Membrane"/>
-                        <path id="axoneme" class="cilia-part" tabindex="0" fill="none" d="M 145,180 L 148,15 L 152,15 L 155,180 Z" aria-label="Axoneme"/>
-                    </svg>
-                </div>
-                <div class="controls">
-                    <h4>Gene Localization:</h4>
-                    <div id="geneButtons" class="gene-buttons"></div>
-                </div>
-            </div>
-        </aside>
+            </aside>
     </main>
 
     <footer class="footer">
