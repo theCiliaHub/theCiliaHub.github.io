@@ -1,369 +1,683 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>The CiliaHub: A Database of Genes with Ciliary Functions</title>
-    <meta name="description" content="The CiliaHub is a comprehensive bioinformatics database for genes with ciliary functions, providing resources for ciliopathy research, genome exploration, and gene search.">
-    <meta name="keywords" content="cilia gene, ciliopathy, database, search, genome, bioinformatics, ciliary function, ciliary genes">
-    <link rel="icon" type="image/png" href="CiliaHub_Logo_web.png">
-    <link rel="stylesheet" href="styles.css">
-    <script src="https://cdn.jsdelivr.net/npm/@panzoom/panzoom@4.5.1/dist/panzoom.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX"></script>
-    <script>
-      window.dataLayer = window.dataLayer || [];
-      function gtag(){dataLayer.push(arguments);}
-      gtag('js', new Date());
-      gtag('config', 'G-XXXXXXXXXX');
-    </script>
-</head>
-<body>
-    <nav class="navbar">
-        <div class="nav-container">
-            <a href="/" onclick="navigateTo(event, '/')" class="logo" aria-label="CiliaHub Home">CiliaHub</a>
-            <ul class="nav-links">
-                <li><a href="/" onclick="navigateTo(event, '/')" aria-label="Home">Home</a></li>
-                <li><a href="/batch-query" onclick="navigateTo(event, '/batch-query')" aria-label="Batch Query">Batch Query</a></li>
-                <li><a href="/compare" onclick="navigateTo(event, '/compare')" aria-label="Compare">Compare</a></li>
-                <li><a href="/expression" onclick="navigateTo(event, '/expression')" aria-label="Expression">Expression</a></li>
-                <li><a href="/analysis" onclick="navigateTo(event, '/analysis')" aria-label="Analysis">Analysis</a></li>
-                <li><a href="/download" onclick="navigateTo(event, '/download')" aria-label="Download">Download</a></li>
-                <li><a href="/contact" onclick="navigateTo(event, '/contact')" aria-label="Contact & Cite">Contact & Cite</a></li>
-            </ul>
-        </div>
-    </nav>
-    <div class="main-container">
-        <div class="content-area"></div>
-        <aside class="cilia-panel">
-            <div class="panel-header">
-                <h3>Interactive Cilium</h3>
-                <p style="font-size: 0.9rem; opacity: 0.9;">Click genes to see localization</p>
-            </div>
-            <div class="panel-content">
-                <div class="cilia-container interactive-cilium">
-                    <svg viewBox="0 0 300 400" xmlns="http://www.w3.org/2000/svg">
-                        <path id="cell-body" class="cilia-part" tabindex="0" fill="none" d="M 50,380 C -20,300 20,200 150,200 C 280,200 320,300 250,380 Z" aria-label="Cell Body"/>
-                        <circle id="nucleus" class="cilia-part" tabindex="0" fill="#A7C7E7" cx="150" cy="320" r="40" aria-label="Nucleus"/>
-                        <rect id="basal-body" class="cilia-part" tabindex="0" fill="#2F2F2F" x="140" y="195" width="20" height="15" aria-label="Basal Body"/>
-                        <path id="transition-zone" class="cilia-part" tabindex="0" fill="#9B59B6" d="M 142,195 L 138,180 L 162,180 L 158,195 Z" aria-label="Transition Zone"/>
-                        <path id="ciliary-membrane" class="cilia-part" tabindex="0" fill="none" fill-opacity="0.5" d="M 138,180 L 145,10 L 155,10 L 162,180 Z" aria-label="Ciliary Membrane"/>
-                        <path id="axoneme" class="cilia-part" tabindex="0" fill="none" d="M 145,180 L 148,15 L 152,15 L 155,180 Z" aria-label="Axoneme"/>
-                    </svg>
-                </div>
-                <div class="controls">
-                    <h4>Gene Localization:</h4>
-                    <div id="geneButtons" class="gene-buttons"></div>
-                </div>
-            </div>
-        </aside>
-    </div>
-    <script src="script.js"></script>
-</body>
-</html>* { margin: 0; padding: 0; box-sizing: border-box; }
-body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #ffffff; color: #2c3e50; line-height: 1.6; }
-.main-container { max-width: 1400px; margin: 2rem auto; padding: 0 2rem; display: grid; grid-template-columns: 1fr 350px; gap: 2rem; align-items: start; }
-.content-area { display: flex; flex-direction: column; gap: 1.5rem; }
-.content-area-full { grid-column: 1 / -1; }
-.navbar { background: linear-gradient(135deg, #2c5aa0 0%, #1e3a5f 100%); padding: 1rem 0; box-shadow: 0 4px 15px rgba(44, 90, 160, 0.3); position: sticky; top: 0; z-index: 1000; }
-.nav-container { max-width: 1200px; margin: 0 auto; padding: 0 2rem; display: flex; justify-content: space-between; align-items: center; }
-.logo { font-size: 2rem; font-weight: bold; color: #ffffff; text-decoration: none; transition: transform 0.3s ease; margin-right: 2rem; }
-.logo:hover { transform: scale(1.05); }
-.nav-links { display: flex; list-style: none; gap: 0.8rem; flex-wrap: wrap; }
-/* Replace the existing .nav-links a rule with this one */
-.nav-links a { 
-    color: #e8f4fd; 
-    text-decoration: none; 
-    padding: 0.8rem 1.2rem;
-    border-radius: 25px; 
-    transition: all 0.3s ease; 
-    font-weight: 600; 
-    background: rgba(255, 255, 255, 0.1); 
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2); 
-    text-align: center; 
-    /* The rigid min-width property is removed */
+:root {
+  /* Colors */
+  --primary-dark: #2c3e50;
+  --primary-blue: #2c5aa0;
+  --primary-blue-light: #4a89dc;
+  --accent-green-1: #66c2a5;
+  --accent-green-2: #27ae60;
+  --accent-red: #e74c3c;
+  --neutral-bg: #f4f8fb;
+  --neutral-bg-alt: #f8f9fa;
+  --panel-bg: #ffffff;
+  --text-dark: #333;
+  --text-light: #ffffff;
+  --border-color: #e1ecf4;
+  --gray-medium: #95a5a6;
+  --gray-dark: #7f8c8d;
+  --gray-light: #d3d3d3;
+
+  /* Spacing & Borders */
+  --border-radius-sm: 5px;
+  --border-radius-md: 10px;
+  --border-radius-lg: 15px;
 }
-.nav-links a:hover, .nav-links a.active { 
-    background: #ffffff; 
-    color: #2c5aa0; 
-    transform: translateY(-2px); 
-    box-shadow: 0 4px 15px rgba(44, 90, 160, 0.4); 
+
+body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+    background: var(--neutral-bg);
+    color: var(--text-dark);
+    line-height: 1.6;
 }
-.page-section { background: white; padding: 2rem; border-radius: 15px; box-shadow: 0 8px 32px rgba(44, 90, 160, 0.1); }
-.search-container { display: flex; gap: 1rem; margin-top: 1rem; }
-#single-gene-search, #batch-genes-input { padding: 1rem; border: 2px solid #e1ecf4; border-radius: 10px; font-size: 1rem; }
-#single-gene-search { flex: 1; width: 100%; }
-#batch-genes-input { width: 100%; min-height: 100px; resize: vertical; margin-top: 1rem; margin-bottom: 1rem; }
-.search-btn { padding: 1rem 2rem; background: linear-gradient(135deg, #2c5aa0 0%, #1e3a5f 100%); color: white; border: none; border-radius: 10px; cursor: pointer; font-weight: 600; }
-.search-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(44, 90, 160, 0.3); }
-.search-wrapper { position: relative; }
-#search-suggestions {
-    position: absolute;
-    top: 100%;
-    left: 0;
-    right: 0;
-    background: white;
-    border: 1px solid #ddd;
-    border-radius: 0 0 10px 10px;
-    z-index: 999;
-    max-height: 250px;
-    overflow-y: auto;
-}
-#search-suggestions ul { list-style: none; padding: 0; margin: 0; }
-#search-suggestions li { padding: 0.75rem 1rem; cursor: pointer; border-bottom: 1px solid #eee; }
-#search-suggestions li:last-child { border-bottom: none; }
-#search-suggestions li:hover, #search-suggestions li.active { background-color: #f0f5fa; color: #2c5aa0; }
-.gene-cards { display: grid; gap: 1.5rem; }
-.gene-card { background: white; padding: 1.5rem; border-radius: 15px; box-shadow: 0 8px 32px rgba(44, 90, 160, 0.1); transition: all 0.3s ease; border-left: 5px solid transparent; cursor: pointer; }
-.gene-card:hover { transform: translateY(-5px); }
-.gene-card.default { border-left-color: #1e90ff; }
-.gene-card.search-result { border-left-color: #27ae60; }
-.gene-name { font-size: 1.3rem; font-weight: bold; margin-bottom: 0.5rem; }
-.gene-card.default .gene-name { color: #1e90ff; }
-.gene-card.search-result .gene-name { color: #27ae60; }
-.gene-description { color: #7f8c8d; font-size: 0.95rem; }
-.gene-info { font-size: 0.9rem; color: #34495e; margin-bottom: 0.5rem; }
-.gene-info a { color: #2c5aa0; text-decoration: none; }
-.gene-info a:hover { text-decoration: underline; }
-.gene-btn.selected { background: #2c5aa0; color: white; border-color: #2c5aa0; }
-.cilia-panel { background: white; border-radius: 15px; box-shadow: 0 8px 32px rgba(44, 90, 160, 0.1); position: sticky; top: 100px; height: fit-content; }
-.panel-header { background: linear-gradient(135deg, #2c5aa0 0%, #1e3a5f 100%); color: white; padding: 1.5rem; text-align: center; }
-.panel-content { padding: 1.5rem; }
-.cilia-container { text-align: center; margin-bottom: 1.5rem; }
-.interactive-cilium svg { width: 100%; height: 400px; }
-.cilia-part { stroke: #2c3e50; stroke-width: 1.5; transition: all 0.3s ease-in-out; cursor: pointer; }
-.cilia-part:hover { stroke-width: 3; filter: brightness(1.1); }
-.highlighted { fill: #1e90ff !important; opacity: 0.9 !important; animation: pulse 2s infinite; }
-.highlighted.search-gene { fill: #27ae60 !important; }
-.highlighted.cilia { fill: #006400 !important; opacity: 0.9 !important; }
-@keyframes pulse { 0%, 100% { opacity: 0.9; } 50% { opacity: 0.6; } }
-.controls { background: #f8f9fa; padding: 1rem; border-radius: 10px; margin-top: 1rem; }
-.gene-buttons { display: flex; flex-direction: column; gap: 0.5rem; }
-.gene-btn { padding: 0.7rem; border: 1px solid #e1ecf4; border-radius: 8px; background: white; cursor: pointer; font-weight: 600; font-size: 0.9rem; }
-.gene-btn.default { color: #1e90ff; }
-.gene-btn.search-gene { background: #27ae60; color: white; border-color: #27ae60; }
-.gene-btn:hover { background: #2c5aa0; color: white; transform: translateX(3px); }
-.gene-btn.search-gene:hover { background: #219a52; }
-.reset-btn { background: #95a5a6 !important; color: white !important; margin-top: 0.5rem; }
-.reset-btn:hover { background: #7f8c8d !important; }
-.download-options, .contact-info, .cite-list { margin-top: 1rem; }
-.download-options a { display: inline-block; padding: 0.8rem 1.5rem; background: #2c5aa0; color: white; text-decoration: none; border-radius: 8px; margin-right: 1rem; margin-bottom: 1rem; }
-.download-options a:hover { background: #1e3a5f; transform: translateY(-2px); }
-.contact-info, .cite-list { background: #f8f9fa; padding: 1.5rem; border-radius: 10px; }
-.contact-info h3, .cite-list h3 { margin-bottom: 1rem; color: #2c3e50; }
-.contact-info li, .cite-list li { margin-bottom: 0.8rem; font-size: 1rem; }
-.contact-info a { color: #2c5aa0; text-decoration: none; }
-.contact-info a:hover { text-decoration: underline; }
-.feedback-form { margin-top: 2rem; }
-.feedback-form textarea { width: 100%; min-height: 150px; padding: 1rem; border: 2px solid #e1ecf4; border-radius: 10px; font-size: 1rem; margin-top: 0.5rem; }
-.status-message { text-align: center; padding: 3rem; color: #7f8c8d; font-style: italic; }
-.error-message { color: #e74c3c; font-weight: bold; }
-.success-message { color: #27ae60; font-weight: bold; }
-.gene-detail-page { cursor: default; }
-.gene-detail-page h1 { font-size: 2.5rem; margin-top: 1rem; color: #27ae60; }
-.gene-detail-page .gene-description { font-size: 1.1rem; }
-.breadcrumb a { color: #2c5aa0; text-decoration: none; }
-.breadcrumb a:hover { text-decoration: underline; }
-@media (max-width: 992px) {
-    .main-container { grid-template-columns: 1fr; }
-    .cilia-panel { position: relative; top: auto; }
-    .nav-container { flex-direction: column; gap: 1rem; align-items: flex-start; }
-    .nav-links { gap: 1rem; justify-content: flex-start; }
-    .nav-links a { min-width: 100px; }
-}
-.search-container.sticky {
+
+.navbar {
+    background: linear-gradient(90deg, var(--primary-blue), var(--primary-blue-light));
+    color: var(--text-light);
+    padding: 1.5rem 0;
     position: sticky;
-    top: 80px;
-    background: white;
-    padding: 1rem;
-    border-radius: 10px;
-    box-shadow: 0 4px 15px rgba(44, 90, 160, 0.1);
-    z-index: 500;
-}
-.pagination { display: flex; justify-content: center; gap: 1rem; margin-top: 1rem; }
-.pagination button { padding: 0.5rem 1rem; background: #2c5aa0; color: white; border: none; border-radius: 8px; cursor: pointer; }
-.pagination button:disabled { background: #95a5a6; cursor: not-allowed; }
-.tooltip { position: relative; display: inline-block; cursor: pointer; }
-.tooltip-icon { background: #2c5aa0; color: white; border-radius: 50%; width: 20px; height: 20px; text-align: center; line-height: 20px; }
-.tooltip-text { visibility: hidden; position: absolute; background: #fff; border: 1px solid #ddd; padding: 1rem; border-radius: 8px; width: 200px; z-index: 10; }
-.tooltip:hover .tooltip-text { visibility: visible; }
-.btn {
-    padding: 0.8rem 1.5rem;
-    border: none;
-    border-radius: 8px;
-    cursor: pointer;
-    font-weight: 600;
-    transition: all 0.3s ease;
-}
-.btn-primary {
-    background: linear-gradient(135deg, #2c5aa0 0%, #1e3a5f 100%);
-    color: white;
-}
-.btn-primary:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 25px rgba(44, 90, 160, 0.3);
-}
-.btn-secondary {
-    background: #95a5a6;
-    color: white;
-}
-.btn-secondary:hover {
-    background: #7f8c8d;
-}
-.search-btn, .gene-btn, .reset-btn {
-    padding: 0.8rem 1.5rem;
-    border: none;
-    border-radius: 8px;
-    cursor: pointer;
-    font-weight: 600;
-    transition: all 0.3s ease;
-    background: linear-gradient(135deg, #2c5aa0 0%, #1e3a5f 100%);
-    color: white;
-}
-.reset-btn {
-    background: #95a5a6 !important;
-    color: white !important;
-}
-.reset-btn:hover {
-    background: #7f8c8d !important;
-}
-.gene-btn.default { background: white; color: #1e90ff; border: 1px solid #e1ecf4; }
-.gene-btn.search-gene { background: #27ae60; color: white; border-color: #27ae60; }
-.gene-btn:hover { background: #2c5aa0; color: white; transform: translateX(3px); }
-.gene-btn.search-gene:hover { background: #219a52; }
-
-/* Compare Page Specific Styles */
-.comparison-tool .search-wrapper { position: relative; }
-#compare-gene-search { width: 100%; padding: 0.8rem; border: 2px solid #e1ecf4; border-radius: 10px; font-size: 1rem; }
-#compare-search-suggestions { 
-    position: absolute; 
-    top: 100%;
-    left: 0;
-    right: 0;
-    background: white; 
-    border: 1px solid #ddd;
-    border-top: none; 
-    border-radius: 0 0 10px 10px;
-    z-index: 1001; 
-    max-height: 250px; 
-    overflow-y: auto; 
-    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-}
-#compare-search-suggestions div { padding: 0.75rem 1rem; cursor: pointer; border-bottom: 1px solid #eee; }
-#compare-search-suggestions div:last-child { border-bottom: none; }
-#compare-search-suggestions div:hover { background-color: #f0f5fa; color: #2c5aa0; }
-
-.gene-tags-container { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 1rem; padding: 0.5rem 0; }
-.gene-tag { 
-    background: #2c5aa0; 
-    color: white; 
-    padding: 0.4rem 0.8rem; 
-    border-radius: 16px; 
-    display: inline-flex; 
-    align-items: center; 
-    gap: 0.5rem; 
-    font-size: 0.9rem;
-    animation: popIn 0.3s ease;
-}
-@keyframes popIn { from { transform: scale(0.5); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-.remove-tag { 
-    cursor: pointer; 
-    font-weight: bold; 
-    font-size: 1.2rem;
-    line-height: 1;
-    transition: transform 0.2s;
-}
-.remove-tag:hover { transform: scale(1.2); color: #ffdddd; }
-
-.comparison-controls { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #e1ecf4; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem; }
-.tabs { display: flex; gap: 0.5rem; }
-.tab-link { 
-    background: none; 
-    border: none; 
-    padding: 0.8rem 1.2rem; 
-    font-size: 1.05rem; 
-    cursor: pointer; 
-    color: #7f8c8d; 
-    border-bottom: 3px solid transparent;
-    transition: all 0.3s ease;
-}
-.tab-link:hover { color: #2c3e50; }
-.tab-link.active { color: #2c5aa0; font-weight: 600; border-bottom-color: #2c5aa0; }
-.tab-content { display: none; }
-.tab-content.active { display: block; animation: fadeIn 0.5s; }
-@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-
-#comparison-table-wrapper { overflow-x: auto; }
-#comparison-table { width: 100%; border-collapse: collapse; }
-#comparison-table th, #comparison-table td { padding: 1rem; border: 1px solid #e1ecf4; text-align: left; vertical-align: top; word-wrap: break-word; }
-#comparison-table th { background: #2c5aa0; color: white; font-weight: 600; }
-#comparison-table td:first-child { font-weight: bold; background: #f8f9fa; min-width: 180px; }
-#comparison-table a { color: #2c5aa0; text-decoration: none; }
-#comparison-table a:hover { text-decoration: underline; }
-
-.functional-comparison-grid { display: grid; gap: 1.5rem; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); }
-.function-card { background: white; padding: 1.5rem; border-radius: 10px; box-shadow: 0 4px 15px rgba(44,90,160,0.08); border-left: 5px solid #1e90ff; }
-.function-card h4 { margin: 0 0 0.75rem; color: #2c3e50; font-size: 1.2rem; }
-.function-card p { color: #555; }
-
-/* Expression Page Specific Styles */
-#suggestions {
-    position: absolute;
-    background: white;
-    border: 1px solid #ddd;
-    border-top: none;
-    border-radius: 0 0 8px 8px;
+    top: 0;
     z-index: 1000;
-    max-height: 250px;
-    overflow-y: auto;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    border-bottom: 2px solid var(--accent-green-1);
 }
-.suggestion-item {
-    padding: 0.75rem 1rem;
-    cursor: pointer;
-    border-bottom: 1px solid #eee;
-}
-.suggestion-item:last-child { border-bottom: none; }
-.suggestion-item:hover { background-color: #f0f5fa; }
-.suggestion-gene { font-weight: 600; color: #2c5aa0; }
-.suggestion-description { font-size: 0.85rem; color: #7f8c8d; }
 
-/* Analysis Page Specific Styles */
-#analysis-plot-container {
-    background: white;
-    padding: 1.5rem;
-    border-radius: 10px;
-    box-shadow: 0 4px 15px rgba(44,90,160,0.08);
-    margin-top: 2rem;
+.nav-container {
+    max-width: 1400px;
+    margin: 0 auto;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 2.5rem;
 }
-#analysis-controls {
+
+.logo {
+    font-size: 2.2rem;
+    font-weight: 800;
+    text-decoration: none;
+    color: var(--text-light);
+    letter-spacing: 1px;
+    transition: transform 0.3s ease;
+}
+
+.logo:hover {
+    transform: scale(1.05);
+    text-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
+}
+
+.nav-links {
+    list-style: none;
+    display: flex;
+    gap: 2rem;
+    margin: 0;
+    padding: 0;
+}
+
+.nav-links li a {
+    color: var(--text-light);
+    text-decoration: none;
+    font-size: 1.2rem;
+    font-weight: 500;
+    padding: 0.5rem 1rem;
+    border-radius: var(--border-radius-sm);
+    transition: all 0.3s ease;
+}
+
+.nav-links li a:hover, .nav-links li a:focus-visible, .nav-links li a.active {
+    background: rgba(255, 255, 255, 0.2);
+    color: var(--accent-green-1);
+    transform: translateY(-2px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    outline: none;
+}
+
+.main-container {
+    display: flex;
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 2rem;
+    gap: 2rem;
+}
+
+.cilia-panel {
+    width: 300px;
+    background: var(--panel-bg);
+    padding: 2rem;
+    border-radius: var(--border-radius-lg);
+    box-shadow: 0 8px 32px rgba(44, 90, 160, 0.1);
+    position: sticky;
+    top: 100px;
+}
+
+.cilia-panel h2 {
+    font-size: 1.3rem;
+    color: var(--primary-dark);
+    margin-bottom: 1.5rem;
+}
+
+.cilia-diagram {
+    margin-bottom: 1.5rem;
+}
+
+.cilia-diagram img {
+    max-width: 100%;
+    height: auto;
+}
+
+.cilia-part {
+    fill: var(--primary-blue-light);
+    transition: fill 0.3s, stroke 0.3s;
+}
+
+.cilia-part.cilia {
+    fill: var(--accent-green-1);
+}
+
+.cilia-part.search-gene {
+    fill: var(--accent-green-2);
+}
+
+.cilia-part.highlighted {
+    stroke: var(--accent-red);
+    stroke-width: 2px;
+}
+
+#cell-body, #nucleus {
+    fill: var(--gray-light);
+}
+
+#geneButtons {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.gene-btn {
+    padding: 0.5rem;
+    background: var(--border-color);
+    border: none;
+    border-radius: var(--border-radius-sm);
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: background 0.3s, color 0.3s;
+}
+
+.gene-btn:hover, .gene-btn:focus-visible, .gene-btn.search-gene {
+    background: var(--accent-green-2);
+    color: var(--text-light);
+    outline: none;
+}
+
+.gene-btn.default {
+    background: var(--primary-blue-light);
+    color: var(--text-light);
+}
+
+.gene-btn.reset-btn {
+    background: var(--gray-medium);
+    color: var(--text-light);
+}
+
+.content-area {
+    flex: 1;
+    background: var(--panel-bg);
+    padding: 2rem;
+    border-radius: var(--border-radius-lg);
+    box-shadow: 0 8px 32px rgba(44, 90, 160, 0.1);
+}
+
+.content-area-full {
+    max-width: 100%;
+}
+
+.page-section h1, .page-section h2 {
+    color: var(--primary-dark);
+    margin-bottom: 1rem;
+}
+
+.page-section h1 {
+    font-size: 2rem;
+}
+
+.page-section h2 {
+    font-size: 1.5rem;
+}
+
+.search-container {
     display: flex;
     gap: 1rem;
-    align-items: center;
-    margin-top: 1rem;
-    flex-wrap: wrap;
-}
-#analysis-plot-wrapper {
+    margin-bottom: 2rem;
     position: relative;
-    width: 100%;
-    height: 600px;
 }
 
+.search-container.sticky {
+    position: fixed;
+    top: 80px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 80%;
+    max-width: 800px;
+    background: var(--panel-bg);
+    padding: 1rem;
+    border-radius: var(--border-radius-md);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    z-index: 999;
+}
 
-/* Additional styles for data integration (Batch Query) */
-table {
+.search-wrapper {
+    position: relative;
+    flex: 1;
+}
+
+.search-wrapper input {
+    width: 100%;
+    padding: 0.8rem;
+    border: 2px solid var(--border-color);
+    border-radius: var(--border-radius-md);
+    font-size: 1rem;
+}
+
+.search-btn {
+    padding: 0.8rem 1.5rem;
+    background: var(--primary-blue);
+    color: var(--text-light);
+    border: none;
+    border-radius: var(--border-radius-md);
+    cursor: pointer;
+    font-size: 1rem;
+    transition: background 0.3s;
+}
+
+.search-btn:hover, .search-btn:focus-visible {
+    background: var(--primary-blue-light);
+    outline: none;
+}
+
+#search-suggestions, #compare-search-suggestions, #suggestions {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: var(--panel-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-sm);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    z-index: 1000;
+    max-height: 200px;
+    overflow-y: auto;
+    display: none;
+}
+
+#search-suggestions ul, #compare-search-suggestions div, #suggestions div {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+#search-suggestions li, #compare-search-suggestions div, #suggestions div {
+    padding: 0.8rem;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+#search-suggestions li:hover, #search-suggestions li.active, #compare-search-suggestions div:hover, #suggestions div:hover {
+    background: var(--border-color);
+    color: var(--primary-blue);
+}
+
+.filters {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.filters label {
+    font-weight: 600;
+}
+
+.filters input, .filters select {
+    padding: 0.5rem;
+    border: 2px solid var(--border-color);
+    border-radius: var(--border-radius-sm);
+    font-size: 0.9rem;
+}
+
+#batch-genes-input, #feedback-text {
+    width: 100%;
+    min-height: 100px;
+    padding: 0.8rem;
+    border: 2px solid var(--border-color);
+    border-radius: var(--border-radius-md);
+    font-size: 1rem;
+    resize: vertical;
+}
+
+#csv-upload {
+    margin: 1rem 0;
+}
+
+#batch-results table, #comparison-table {
     width: 100%;
     border-collapse: collapse;
-    margin: 10px 0;
+    margin-top: 1rem;
 }
-th, td {
-    border: 1px solid #ddd;
-    padding: 8px;
+
+#batch-results th, #batch-results td, #comparison-table th, #comparison-table td {
+    padding: 0.8rem;
+    border-bottom: 1px solid var(--border-color);
     text-align: left;
 }
-th {
-    background-color: #f2f2f2;
+
+#batch-results th, #comparison-table th {
+    background: var(--primary-blue);
+    color: var(--text-light);
 }
+
+#batch-results a, #comparison-table a {
+    color: var(--primary-blue);
+    text-decoration: none;
+}
+
+#batch-results a:hover, #batch-results a:focus-visible, #comparison-table a:hover, #comparison-table a:focus-visible {
+    text-decoration: underline;
+    outline: none;
+}
+
+.comparison-tool {
+    background: var(--neutral-bg-alt);
+    padding: 1.5rem;
+    border-radius: var(--border-radius-md);
+}
+
+.comparison-controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.tabs {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.tab-link {
+    padding: 0.5rem 1rem;
+    background: var(--border-color);
+    border: none;
+    border-radius: var(--border-radius-sm);
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: background 0.3s;
+}
+
+.tab-link.active, .tab-link:hover, .tab-link:focus-visible {
+    background: var(--primary-blue);
+    color: var(--text-light);
+    outline: none;
+}
+
+.tab-content {
+    display: none;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+.chart-container {
+    position: relative;
+    margin: auto;
+}
+
+.functional-comparison-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1rem;
+}
+
+.function-card {
+    background: var(--neutral-bg-alt);
+    padding: 1rem;
+    border-radius: var(--border-radius-md);
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+.function-card h4 {
+    margin: 0 0 0.5rem;
+    color: var(--primary-dark);
+}
+
+.gene-tags-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 1rem;
+}
+
+.gene-tag {
+    background: var(--border-color);
+    padding: 0.5rem 1rem;
+    border-radius: 15px;
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.remove-tag {
+    cursor: pointer;
+    font-weight: bold;
+}
+
+.remove-tag:hover, .remove-tag:focus-visible {
+    color: var(--accent-red);
+    outline: none;
+}
+
+.error-message {
+    color: var(--accent-red);
+    font-size: 0.9rem;
+}
+
+.status-message {
+    text-align: center;
+    padding: 2rem;
+    color: #666;
+}
+
+.success-message {
+    color: var(--accent-green-2);
+}
+
+.gene-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1rem;
+    margin-top: 2rem;
+}
+
+.gene-card {
+    background: var(--neutral-bg-alt);
+    padding: 1.5rem;
+    border-radius: var(--border-radius-md);
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    cursor: pointer;
+    transition: transform 0.3s, box-shadow 0.3s;
+}
+
+.gene-card:hover, .gene-card:focus-visible {
+    transform: translateY(-5px);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+    outline: 2px solid var(--primary-blue);
+    outline-offset: 2px;
+}
+
+.gene-card.search-result {
+    background: #d5f4e6;
+}
+
+.gene-card.default {
+    background: #e8f4fd;
+}
+
+.gene-name {
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: var(--primary-dark);
+    margin-bottom: 0.5rem;
+}
+
+.gene-description {
+    font-size: 0.9rem;
+    color: #555;
+    margin-bottom: 0.5rem;
+}
+
+.gene-info {
+    font-size: 0.9rem;
+    margin-bottom: 0.3rem;
+}
+
+.pagination {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 1rem;
+    margin-top: 2rem;
+}
+
+.pagination button {
+    padding: 0.5rem 1rem;
+    background: var(--primary-blue);
+    color: var(--text-light);
+    border: none;
+    border-radius: var(--border-radius-sm);
+    cursor: pointer;
+}
+
+.pagination button:disabled {
+    background: var(--gray-medium);
+    cursor: not-allowed;
+}
+
+.download-options {
+    display: flex;
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.download-options a, .download-options button {
+    padding: 0.8rem 1.5rem;
+    background: var(--primary-blue);
+    color: var(--text-light);
+    text-decoration: none;
+    border-radius: var(--border-radius-md);
+    font-size: 1rem;
+}
+
+.download-options a:hover, .download-options a:focus-visible, .download-options button:hover, .download-options button:focus-visible {
+    background: var(--primary-blue-light);
+    outline: none;
+}
+
+.contact-info, .cite-list, .feedback-form {
+    margin-bottom: 2rem;
+}
+
+.contact-info ul, .cite-list ul {
+    list-style: none;
+    padding: 0;
+}
+
+.contact-info li, .cite-list li {
+    margin-bottom: 0.5rem;
+}
+
+.contact-info a, .cite-list a {
+    color: var(--primary-blue);
+    text-decoration: none;
+}
+
+.contact-info a:hover, .contact-info a:focus-visible, .cite-list a:hover, .cite-list a:focus-visible {
+    text-decoration: underline;
+    outline: none;
+}
+
+.btn {
+    cursor: pointer;
+    transition: background 0.3s;
+}
+
+.btn-primary {
+    background: var(--primary-blue);
+    color: var(--text-light);
+    border: none;
+    padding: 0.8rem 1.5rem;
+    border-radius: var(--border-radius-md);
+}
+
+.btn-primary:hover, .btn-primary:focus-visible {
+    background: var(--primary-blue-light);
+    outline: none;
+}
+
+.btn-secondary {
+    background: var(--gray-medium);
+    color: var(--text-light);
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: var(--border-radius-sm);
+}
+
+.btn-secondary:hover, .btn-secondary:focus-visible {
+    background: var(--gray-dark);
+    outline: none;
+}
+
+.tooltip {
+    position: relative;
+    display: inline-block;
+}
+
+.tooltip-icon {
+    background: var(--primary-blue);
+    color: var(--text-light);
+    border-radius: 50%;
+    width: 16px;
+    height: 16px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.8rem;
+    cursor: help;
+}
+
+.tooltip-text {
+    visibility: hidden;
+    width: 200px;
+    background: var(--primary-dark);
+    color: var(--text-light);
+    text-align: center;
+    padding: 0.5rem;
+    border-radius: var(--border-radius-sm);
+    position: absolute;
+    z-index: 1;
+    bottom: 125%;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 0.8rem;
+}
+
+.tooltip:hover .tooltip-text {
+    visibility: visible;
+}
+
+@media (max-width: 768px) {
+    .navbar {
+        padding: 1rem 0;
+    }
+
+    .nav-container {
+        flex-direction: column;
+        gap: 1.5rem;
+        padding: 0 1.5rem;
+    }
+
+    .logo {
+        font-size: 1.8rem;
+    }
+
+    .nav-links {
+        flex-direction: column;
+        align-items: center;
+        gap: 1rem;
+    }
+
+    .nav-links li a {
+        font-size: 1rem;
+        padding: 0.4rem 0.8rem;
+    }
+
+    .main-container {
+        flex-direction: column;
+        padding: 1rem;
+    }
+
+    .cilia-panel {
+        position: static;
+    }
+
+    .search-container.sticky {
+        position: static;
+        transform: none;
+        width: 100%;
+    }
+
+    .gene-cards, .functional-comparison-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
 /* Suggested CSS for the gene summary table */
 .gene-summary-table {
     width: 100%;
@@ -381,9 +695,9 @@ th {
 }
 
 .gene-summary-table th {
-    background-color: #f8f8f8;
+    background-color: var(--neutral-bg-alt);
     font-weight: bold;
-    color: #333;
+    color: var(--text-dark);
 }
 
 .gene-summary-table tbody tr:nth-child(even) {
@@ -391,11 +705,11 @@ th {
 }
 
 .gene-summary-table .status-found {
-    color: #28a745; /* Green */
+    color: var(--accent-green-2); /* Green */
     font-weight: bold;
 }
 
 .gene-summary-table .status-not-found {
-    color: #dc3545; /* Red */
+    color: var(--accent-red); /* Red */
     font-weight: bold;
 }
