@@ -273,14 +273,14 @@ async function handleRouteChange() {
     if (path === '/' || path === '/index.html') {
         displayHomePage();
         setTimeout(displayLocalizationChart, 0);
-       } else if (path === '/expression') {
-        displayAnalysisPage();
     } else if (path === '/batch-query') {
         displayBatchQueryTool();
     } else if (path === '/compare') {
         displayComparePage();
     } else if (path === '/expression') {
         displayExpressionPage();
+    } else if (path === '/analysis') {
+        displayAnalysisPage();
     } else if (path === '/download') {
         displayDownloadPage();
     } else if (path === '/contact') {
@@ -723,7 +723,7 @@ function displayAnalysisPage() {
     document.querySelector('.cilia-panel').style.display = 'none';
     contentArea.innerHTML = `
         <div class="page-section">
-            <h2>Gene Enrichment Analysis</h2>
+            <h2>Gene Localization Analysis</h2>
             <p>Paste a list of human gene names to visualize their localization data.</p>
             <textarea id="analysis-genes-input" placeholder="e.g., TMEM17, IFT88, WDR31..." style="width: 100%; min-height: 150px; padding: 1rem; border: 2px solid #e1ecf4; border-radius: 10px; font-size: 1rem; margin-top: 1rem; resize: vertical;"></textarea>
             
@@ -1259,7 +1259,7 @@ function updateActiveNav(path) {
         
         if (linkPath === path || 
             (path.startsWith('/') && path !== '/' && path !== '/index.html' && 
-             linkPath === '/batch-query' && !['/download', '/contact', '/compare', '/expression', '/enrichment'].includes(path))) {
+             linkPath === '/batch-query' && !['/download', '/contact', '/compare', '/expression', '/analysis'].includes(path))) {
             link.classList.add('active');
         }
     });
