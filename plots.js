@@ -5,7 +5,6 @@
  * ===================================================================
  */
 
-// --- Main function to generate Ciliome plots ---
 function generateCiliomePlots() {
     // Hide previous plots and results
     ['ciliome-bubble-container', 'ciliome-matrix-container', 'ciliome-table-container'].forEach(id => {
@@ -49,7 +48,6 @@ function generateCiliomePlots() {
     document.getElementById('download-ciliome-table-btn').style.display = 'inline-block';
 }
 
-// --- Renders the Ciliome Bubble Plot ---
 function renderCiliomeBubblePlot(foundGenes) {
     document.getElementById('ciliome-bubble-container').style.display = 'flex';
     if (window.ciliomeDotPlotInstance) window.ciliomeDotPlotInstance.destroy();
@@ -159,7 +157,6 @@ function renderCiliomeBubblePlot(foundGenes) {
     });
 }
 
-// --- Renders the Ciliome Matrix Plot ---
 function renderCiliomeMatrix(foundGenes) {
     document.getElementById('ciliome-matrix-container').style.display = 'block';
     if (window.ciliomeBarChartInstance) window.ciliomeBarChartInstance.destroy();
@@ -235,7 +232,6 @@ function renderCiliomeMatrix(foundGenes) {
     });
 }
 
-// --- Renders a downloadable table for Ciliome results ---
 function renderCiliomeTable(foundGenes) {
     const container = document.getElementById('ciliome-table-container');
     container.dataset.ciliomeData = JSON.stringify(foundGenes); // Store data for download
@@ -253,178 +249,7 @@ function renderCiliomeTable(foundGenes) {
     container.style.display = 'block';
 }
 
-
-/**
- * ===================================================================
- * SECTION 2: ENRICHMENT ANALYSIS (NEW)
- * - Calculates statistical enrichment of a gene list for ciliary genes.
- * ===================================================================
- */
-
-// --- Main function to perform enrichment analysis ---
-async function performEnrichmentAnalysis() {
-    const resultsContainer = document.getElementById('enrichment-results-container');
-    resultsContainer.innerHTML = 'Calculating...'; // Show loading state
-
-    // These values should be constants for your application
-    const CILIOME_SIZE = 2000; // M: Total number of ciliary genes in the database
-    const GENOME_SIZE = 20000; // N: Total number of genes in the background set (e.g., human genome)
-
-    const input = document.getElementById('enrichment-genes-input').value || '';
-    const userGeneList = new Set(input.split(/[\s,;\n]+/).map(s => s.trim().toUpperCase()).filter(Boolean));
-    const k = userGeneList.size; // k: Number of genes in the user's list
-
-    if (k === 0) {
-        resultsContainer.innerHTML = '';
-        return;
-    }
-
-    // Assume `allGenes` is your global array of ciliary gene objects
-    const ciliomeGeneSet = new Set(allGenes.map(g => g.gene.toUpperCase()));
-    
-    // Find the overlap
-    const overlapGenes = [...userGeneList].filter(gene => ciliomeGeneSet.has(gene));
-    const a = overlapGenes.length; // a: Number of ciliary genes in the user's list
-
-    if (a === 0) {
-        resultsContainer.innerHTML = '<p class="error-message">No known ciliary genes found in your list.</p>';
-        return;
-    }
-
-    // Calculate Fold Enrichment and p-value
-    const foldEnrichment = (a / k) / (CILIOME_SIZE / GENOME_SIZE);
-    const pValue = hypergeometricTest(a, k, CILIOME_SIZE, GENOME_SIZE);
-
-    // Prepare data for display and download
-    const enrichmentData = {
-        stats: [
-            { parameter: 'Genes in your list (k)', value: k },
-            { parameter: 'Ciliary genes in your list (a)', value: a },
-            { parameter: 'Fold Enrichment', value: foldEnrichment.toFixed(2) },
-            { parameter: 'p-value', value: pValue.toExponential(3) }
-        ],
-        genes: overlapGenes.map(gene => ({ gene }))
-    };
-
-    resultsContainer.dataset.enrichmentData = JSON.stringify(enrichmentData); // Store data for download
-    
-    // Display results in a table
-    resultsContainer.innerHTML = `
-        <h3>Enrichment Results</h3>
-        <table id="enrichment-stats-table">
-            <tbody>
-                ${enrichmentData.stats.map(row => `<tr><td>${row.parameter}</td><td>${row.value}</td></tr>`).join('')}
-            </tbody>
-        </table>
-        <h4>Overlapping Ciliary Genes (${a})</h4>
-        <div class="gene-list-box">
-            ${overlapGenes.join(', ')}
-        </div>
-        <button id="download-enrichment-table-btn" class="btn btn-secondary" onclick="downloadEnrichmentData()">Download Results</button>
-    `;
-}
-
-// --- Hypergeometric Test Calculation ---
-function hypergeometricTest(a, k, M, N) {
-    let pValue = 0;
-    // Sum probabilities from a to min(k, M)
-    for (let i = a; i <= Math.min(k, M); i++) {
-        const logProb = logCombinations(M, i) + logCombinations(N - M, k - i) - logCombinations(N, k);
-        pValue += Math.exp(logProb);
-    }
-    return pValue;
-}
-
-// Helper functions for hypergeometric test to avoid large number overflow
-function logFactorial(n) {
-    if (n < 0) return NaN;
-    if (n === 0 || n === 1) return 0;
-    let result = 0;
-    for (let i = 2; i <= n; i++) {
-        result += Math.log(i);
-    }
-    return result;
-}
-
-function logCombinations(n, k) {
-    if (k < 0 || k > n) return -Infinity; // log(0)
-    return logFactorial(n) - logFactorial(k) - logFactorial(n - k);
-}
-
-
-/**
- * ===================================================================
- * SECTION 3: UTILITY FUNCTIONS (UPLOAD, DOWNLOAD, SETTINGS)
- * ===================================================================
- */
-
-// --- NEW: Handles file upload for a given textarea ---
-function handleFileUpload(event, targetTextareaId) {
-    const file = event.target.files[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = function(e) {
-        const content = e.target.result;
-        document.getElementById(targetTextareaId).value = content;
-    };
-    reader.readAsText(file);
-}
- 
-// --- NEW: Generic function to export data to CSV ---
-function exportDataToCSV(data, filename) {
-    if (!data || data.length === 0) return;
-    const headers = Object.keys(data[0]);
-    const csvRows = [
-        headers.join(','), // Header row
-        ...data.map(row => 
-            headers.map(header => {
-                let cell = row[header] === null || row[header] === undefined ? '' : String(row[header]);
-                cell = cell.includes(',') ? `"${cell}"` : cell; // Escape commas
-                return cell;
-            }).join(',')
-        )
-    ];
-    const csvString = csvRows.join('\n');
-    const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
-    
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', filename);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-}
-
-// --- NEW: Download wrapper for Ciliome table ---
-function downloadCiliomeData() {
-    const dataString = document.getElementById('ciliome-table-container').dataset.ciliomeData;
-    if (dataString) {
-        const data = JSON.parse(dataString);
-        exportDataToCSV(data, 'ciliome_analysis_results.csv');
-    }
-}
-
-// --- NEW: Download wrapper for Enrichment results ---
-function downloadEnrichmentData() {
-    const dataString = document.getElementById('enrichment-results-container').dataset.enrichmentData;
-    if(dataString) {
-        const data = JSON.parse(dataString);
-        // Combine stats and genes into one CSV for convenience
-        const combinedData = [
-            ...data.stats,
-            { parameter: '', value: '' }, // Spacer row
-            { parameter: 'Overlapping Genes', value: '' },
-            ...data.genes.map(g => ({ parameter: g.gene, value: ''}))
-        ];
-        exportDataToCSV(combinedData, 'enrichment_analysis_results.csv');
-    }
-}
-
-// --- Downloads the visible plot ---
-function downloadPlot() {
+function downloadCiliomePlot() {
     const selectedPlot = document.querySelector('input[name="ciliome-plot-type"]:checked').value;
     const format = document.getElementById('download-format')?.value || 'png';
     let fileName;
@@ -462,8 +287,6 @@ function downloadPlot() {
     });
 }
 
-
-// --- Gets plot settings from the UI (UNCHANGED) ---
 function getPlotSettings() {
     return {
         fontFamily: document.getElementById('setting-font-family')?.value || 'Arial',
@@ -481,3 +304,172 @@ function getPlotSettings() {
         ]
     };
 }
+
+// ---
+// END OF CILIOME ANALYSIS CODE
+// ---
+
+/**
+ * ===================================================================
+ * SECTION 2: NEW ENRICHMENT ANALYSIS
+ * - Calculates statistical enrichment of a gene list for ciliary genes.
+ * ===================================================================
+ */
+
+async function performEnrichmentAnalysis() {
+    const resultsContainer = document.getElementById('enrichment-results-container');
+    resultsContainer.innerHTML = 'Calculating...'; 
+
+    const CILIOME_SIZE = 2000;
+    const GENOME_SIZE = 20000;
+
+    const input = document.getElementById('enrichment-genes-input').value || '';
+    const userGeneList = new Set(input.split(/[\s,;\n]+/).map(s => s.trim().toUpperCase()).filter(Boolean));
+    const k = userGeneList.size;
+
+    if (k === 0) {
+        resultsContainer.innerHTML = '';
+        return;
+    }
+
+    const ciliomeGeneSet = new Set(allGenes.map(g => g.gene.toUpperCase()));
+    
+    const overlapGenes = [...userGeneList].filter(gene => ciliomeGeneSet.has(gene));
+    const a = overlapGenes.length;
+
+    if (a === 0) {
+        resultsContainer.innerHTML = '<p class="error-message">No known ciliary genes found in your list.</p>';
+        return;
+    }
+
+    const foldEnrichment = (a / k) / (CILIOME_SIZE / GENOME_SIZE);
+    const pValue = hypergeometricTest(a, k, CILIOME_SIZE, GENOME_SIZE);
+
+    const enrichmentData = {
+        stats: [
+            { parameter: 'Genes in your list (k)', value: k },
+            { parameter: 'Ciliary genes in your list (a)', value: a },
+            { parameter: 'Fold Enrichment', value: foldEnrichment.toFixed(2) },
+            { parameter: 'p-value', value: pValue.toExponential(3) }
+        ],
+        genes: overlapGenes.map(gene => ({ gene }))
+    };
+
+    resultsContainer.dataset.enrichmentData = JSON.stringify(enrichmentData);
+    
+    resultsContainer.innerHTML = `
+        <h3>Enrichment Results</h3>
+        <table id="enrichment-stats-table">
+            <tbody>
+                ${enrichmentData.stats.map(row => `<tr><td>${row.parameter}</td><td>${row.value}</td></tr>`).join('')}
+            </tbody>
+        </table>
+        <h4>Overlapping Ciliary Genes (${a})</h4>
+        <div class="gene-list-box">
+            ${overlapGenes.join(', ')}
+        </div>
+        <button id="download-enrichment-table-btn" class="btn btn-secondary" onclick="downloadEnrichmentData()">Download Results</button>
+    `;
+}
+
+function hypergeometricTest(a, k, M, N) {
+    let pValue = 0;
+    for (let i = a; i <= Math.min(k, M); i++) {
+        const logProb = logCombinations(M, i) + logCombinations(N - M, k - i) - logCombinations(N, k);
+        pValue += Math.exp(logProb);
+    }
+    return pValue;
+}
+
+function logFactorial(n) {
+    if (n < 0) return NaN;
+    if (n === 0 || n === 1) return 0;
+    let result = 0;
+    for (let i = 2; i <= n; i++) {
+        result += Math.log(i);
+    }
+    return result;
+}
+
+function logCombinations(n, k) {
+    if (k < 0 || k > n) return -Infinity;
+    return logFactorial(n) - logFactorial(k) - logFactorial(n - k);
+}
+
+// ---
+// END OF ENRICHMENT ANALYSIS CODE
+// ---
+
+/**
+ * ===================================================================
+ * SECTION 3: NEW UTILITY FUNCTIONS (UPLOAD, DOWNLOAD)
+ * ===================================================================
+ */
+
+function handleFileUpload(event, targetTextareaId) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const content = e.target.result;
+        document.getElementById(targetTextareaId).value = content;
+    };
+    reader.readAsText(file);
+}
+ 
+function exportDataToCSV(data, filename) {
+    if (!data || data.length === 0) return;
+    const headers = Object.keys(data[0]);
+    const csvRows = [
+        headers.join(','),
+        ...data.map(row => 
+            headers.map(header => {
+                let cell = row[header] === null || row[header] === undefined ? '' : String(row[header]);
+                cell = cell.includes(',') ? `"${cell}"` : cell;
+                return cell;
+            }).join(',')
+        )
+    ];
+    const csvString = csvRows.join('\n');
+    const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+    
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', filename);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
+function downloadCiliomeData() {
+    const dataString = document.getElementById('ciliome-table-container').dataset.ciliomeData;
+    if (dataString) {
+        const data = JSON.parse(dataString);
+        exportDataToCSV(data, 'ciliome_analysis_results.csv');
+    }
+}
+
+function downloadEnrichmentData() {
+    const container = document.getElementById('enrichment-results-container');
+    const dataString = container ? container.dataset.enrichmentData : null;
+    
+    if (dataString) {
+        const data = JSON.parse(dataString);
+        const combinedData = [
+            ...data.stats,
+            { parameter: '', value: '' },
+            { parameter: 'Overlapping Genes', value: '' },
+            ...data.genes.map(g => ({ parameter: g.gene, value: ''}))
+        ];
+        exportDataToCSV(combinedData, 'enrichment_analysis_results.csv');
+    } else {
+        console.error("No enrichment data found to download.");
+    }
+}
+
+// ---
+// END OF UTILITY FUNCTIONS
+// ---
