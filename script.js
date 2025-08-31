@@ -1,166 +1,26 @@
-// ===================================================================
-// GLOBAL VARIABLES & INITIALIZATION
-// ===================================================================
-
 // Global variables for data management
 const geneLocalizationData = {};
 let allGenes = [];
 let currentData = [];
 let searchResults = [];
-let localizationChartInstance; // For Compare page Chart.js instance
-let ciliomeDotPlotInstance;    // For Ciliome Analysis page bubble plot
-let ciliomeBarChartInstance;   // For Ciliome Analysis page matrix plot
+let localizationChartInstance; // For Chart.js instance management
+let analysisDotPlotInstance; // For Analysis page dot plot
+let analysisBarChartInstance; // For Analysis page bar chart
 const allPartIds = ["cell-body", "nucleus", "basal-body", "transition-zone", "axoneme", "ciliary-membrane"];
 const defaultGenesNames = ["ACE2", "ADAMTS20", "ADAMTS9", "IFT88", "CEP290", "WDR31", "ARL13B", "BBS1"];
-let geneDataCache = null;
-let geneMapCache = null;
 
-// Chart.js plugin for white background on download
+// ✨ THE NEW PLUGIN CODE RIGHT HERE for PLOT ✨
 Chart.register({
   id: 'customCanvasBackgroundColor',
   beforeDraw: (chart, args, options) => {
     const {ctx} = chart;
     ctx.save();
     ctx.globalCompositeOperation = 'destination-over';
-    ctx.fillStyle = options.color || '#ffffff';
+    ctx.fillStyle = options.color || '#ffffff'; // White background
     ctx.fillRect(0, 0, chart.width, chart.height);
     ctx.restore();
   }
 });
-
-// Main app listeners
-document.addEventListener('DOMContentLoaded', () => {
-    initGlobalEventListeners();
-    handleRouteChange(); // Initial route handling
-});
-window.addEventListener('hashchange', handleRouteChange);
-
-
-// ===================================================================
-// DATA LOADING & SEARCH SYSTEM
-// ===================================================================
-
-/**
- * Sanitizes any string by removing invisible characters and normalizing it.
- */
-function sanitize(input) {
-    if (typeof input !== 'string') return '';
-    return input.replace(/[\u200B-\u200D\u2060\uFEFF]/g, '').trim().toUpperCase();
-}
-
-/**
- * Loads, sanitizes, and prepares the gene database into an efficient lookup map.
- */
-async function loadAndPrepareDatabase() {
-    if (geneDataCache) return true;
-    try {
-        const response = await fetch('https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/ciliahub_data.json');
-        if (!response.ok) throw new Error(`HTTP Error: ${response.status}`);
-        
-        const rawGenes = await response.json();
-        geneDataCache = rawGenes;
-        allGenes = rawGenes;
-
-        const map = new Map();
-        allGenes.forEach(gene => {
-            const saneGene = sanitize(gene.gene);
-            if (saneGene) map.set(saneGene, gene);
-            if (gene.synonym) {
-                gene.synonym.split(',').forEach(syn => {
-                    const saneSyn = sanitize(syn);
-                    if (saneSyn && !map.has(saneSyn)) map.set(saneSyn, gene);
-                });
-            }
-        });
-        geneMapCache = map;
-
-        allGenes.forEach(gene => {
-            if (gene.localization && gene.gene) {
-                geneLocalizationData[gene.gene] = mapLocalizationToSVG(gene.localization);
-            }
-        });
-        currentData = allGenes.filter(g => defaultGenesNames.includes(g.gene));
-        return true;
-    } catch (error) {
-        console.error("Failed to load and prepare gene database:", error);
-        allGenes = [...getDefaultGenes()];
-        currentData = [...allGenes];
-        return false;
-    }
-}
-
-/**
- * The central search function using the prepared map.
- */
-function findGenes(queries) {
-    const foundGenes = new Set();
-    const notFound = [];
-    queries.forEach(query => {
-        const result = geneMapCache.get(query);
-        if (result) {
-            foundGenes.add(result);
-        } else {
-            notFound.push(query);
-        }
-    });
-    return { foundGenes: Array.from(foundGenes), notFoundGenes: notFound };
-}
-
-
-// ===================================================================
-// ROUTING & NAVIGATION
-// ===================================================================
-
-// ===================================================================
-// ROUTING & NAVIGATION
-// ===================================================================
-
-async function handleRouteChange() {
-    await loadAndPrepareDatabase();
-    const path = window.location.hash.replace('#', '').toLowerCase() || '/';
-    const geneName = sanitize(path.split('/').pop());
-    const gene = geneMapCache.get(geneName);
-    
-    updateActiveNav(path);
-    
-    if (path === '/' || path === '/index.html') {
-        displayHomePage();
-    } else if (path === '/batch-query') {
-        displayBatchQueryTool();
-    } else if (path === '/enrichment') {
-        displayAnalysisPage(); // ✨ THIS IS THE NEW INTEGRATED PAGE
-    } else if (path === '/compare') {
-        displayComparePage();
-    } else if (path === '/expression') {
-        displayExpressionPage();
-    } else if (path === '/download') {
-        displayDownloadPage();
-    } else if (path === '/contact') {
-        displayContactPage();
-    } else if (gene) {
-        displayIndividualGenePage(gene);
-    } else {
-        if (path !== '/' && path !== '/index.html') {
-            displayNotFoundPage();
-        }
-    }
-}
-
-window.navigateTo = function(event, path) {
-    if (event) event.preventDefault();
-    window.location.hash = path;
-};
-
-function updateActiveNav(path) {
-    document.querySelectorAll('.nav-links a').forEach(link => {
-        link.classList.remove('active');
-        const linkPath = new URL(link.href).hash.slice(1);
-        if (linkPath === path) {
-            link.classList.add('active');
-        }
-    });
-}
-
 
 // =============================================================================
 // NEW & IMPROVED: DATA AND SEARCH SYSTEM (Add this entire block)
