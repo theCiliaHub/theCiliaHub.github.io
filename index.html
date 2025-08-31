@@ -10,6 +10,7 @@
     <link rel="stylesheet" href="styles.css">
     
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@panzoom/panzoom@4.5.1/dist/panzoom.min.js"></script>
     <script src="https://unpkg.com/@upsetjs/bundle"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -24,55 +25,15 @@
     </script>
     
     <style>
-        /* Home Page & Call-to-Action Button Styles */
-        #home-page {
-            text-align: center;
-            padding: 40px 20px;
-        }
-        .call-to-action {
-            margin-top: 30px;
-        }
-        .cta-button {
-            display: inline-block;
-            background-color: #007bff;
-            color: white;
-            padding: 12px 24px;
-            border-radius: 5px;
-            text-decoration: none;
-            font-size: 1.1em;
-            font-weight: bold;
-            transition: background-color 0.3s ease;
-        }
-        .cta-button:hover {
-            background-color: #0056b3;
-        }
-
-        /* Gene Summary Table Styles */
-        .gene-summary-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 10px;
-            font-family: Arial, sans-serif;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-        }
-        .gene-summary-table th,
-        .gene-summary-table td {
-            border: 1px solid #ddd;
-            padding: 10px 12px;
-            text-align: left;
-        }
-        .gene-summary-table th {
-            background-color: #f8f8f8;
-            font-weight: bold;
-        }
-        .gene-summary-table .status-found {
-            color: #28a745; /* Green */
-            font-weight: bold;
-        }
-        .gene-summary-table .status-not-found {
-            color: #dc3545; /* Red */
-            font-weight: bold;
-        }
+        #home-page { text-align: center; padding: 40px 20px; }
+        .call-to-action { margin-top: 30px; }
+        .cta-button { display: inline-block; background-color: #007bff; color: white; padding: 12px 24px; border-radius: 5px; text-decoration: none; font-size: 1.1em; font-weight: bold; transition: background-color 0.3s ease; }
+        .cta-button:hover { background-color: #0056b3; }
+        .gene-summary-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-family: Arial, sans-serif; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .gene-summary-table th, .gene-summary-table td { border: 1px solid #ddd; padding: 10px 12px; text-align: left; }
+        .gene-summary-table th { background-color: #f8f8f8; font-weight: bold; }
+        .gene-summary-table .status-found { color: #28a745; font-weight: bold; }
+        .gene-summary-table .status-not-found { color: #dc3545; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -96,10 +57,10 @@
             
             <div id="home-page">
                 <h1>Welcome to CiliaHub 🔬</h1>
-                <p>Your comprehensive resource for genes with ciliary functions. Explore our database, compare genes, and visualize expression data.</p>
+                <p>Your comprehensive resource for genes with ciliary functions. Explore our database, compare genes, or <a href="/#/analysis" onclick="navigateTo(event, '/analysis')">Perform Gene Enrichment Analysis</a> with your own gene list.</p>
                 <div class="call-to-action">
                     <p>Get started by analyzing your gene list to discover ciliary localization patterns.</p>
-                    <a href="/#/analysis" onclick="navigateTo(event, '/analysis')" class="cta-button">Perform Gene Enrichment Analysis</a>
+                    <a href="/#/analysis" onclick="navigateTo(event, '/analysis')" class="cta-button">Analyze Your Genes</a>
                 </div>
             </div>
 
