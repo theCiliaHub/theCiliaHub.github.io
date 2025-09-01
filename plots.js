@@ -42,127 +42,189 @@ function hypergeometricPValue(k, n, M, N) {
 }
 
 async function generateEnrichmentPlots() {
-    const inputEl = document.getElementById('enrichment-genes-input');
-    const statusEl = document.getElementById('enrichment-status');
+    const input = document.getElementById('enrichment-genes-input').value.trim();
     const plotType = document.querySelector('input[name="plot-type"]:checked').value;
+    const statusDiv = document.getElementById('enrichment-status');
+    const bubbleContainer = document.getElementById('bubble-enrichment-container');
+    const matrixContainer = document.getElementById('matrix-plot-container');
+    const ciliomeContainer = document.getElementById('ciliome-plot-container');
 
-    if (!inputEl || !statusEl) return;
+    // Hide all plots initially
+    bubbleContainer.style.display = 'none';
+    matrixContainer.style.display = 'none';
+    ciliomeContainer.style.display = 'none';
+    statusDiv.style.display = 'none';
+    statusDiv.textContent = '';
 
-    const rawInput = inputEl.value.trim();
-    if (!rawInput) {
-        statusEl.style.display = 'block';
-        statusEl.textContent = 'Please enter at least one gene name.';
+    if (!input) {
+        statusDiv.style.display = 'block';
+        statusDiv.textContent = 'Please enter at least one gene.';
         return;
     }
 
-    // Split user input into gene names
-    const userGenes = rawInput
-        .split(/[\s,;]+/)
-        .map(s => s.toUpperCase().trim())
-        .filter(Boolean);
+    // Split genes by comma or newline
+    const queryGenes = input.split(/[\n,]+/).map(g => g.trim()).filter(Boolean).map(g => g.toUpperCase());
 
-    // Find matching gene objects using geneMapCache
-    const matchedGenes = [];
-    const notFoundGenes = [];
-    userGenes.forEach(uGene => {
-        // Try direct gene match
-        const geneObj = geneMapCache.get(sanitize(uGene));
-        if (geneObj) {
-            matchedGenes.push(geneObj);
-        } else {
-            // Try synonyms
-            const matchBySynonym = allGenes.find(g =>
-                g.synonym && g.synonym.split(',').some(s => sanitize(s) === sanitize(uGene))
-            );
-            if (matchBySynonym) matchedGenes.push(matchBySynonym);
-            else notFoundGenes.push(uGene);
-        }
+    // Find genes in database
+    const { foundGenes, notFoundGenes } = findGenes(queryGenes);
+
+    if (foundGenes.length === 0) {
+        statusDiv.style.display = 'block';
+        statusDiv.textContent = 'No matching genes found in database.';
+        return;
+    }
+
+    statusDiv.style.display = 'block';
+    statusDiv.textContent = `${foundGenes.length} gene${foundGenes.length > 1 ? 's' : ''} matched. ${notFoundGenes.length > 0 ? `${notFoundGenes.length} not found.` : ''}`;
+
+    // --- Bubble Plot: Gene vs Localization ---
+    if (plotType === 'bubble') {
+        bubbleContainer.style.display = 'flex';
+        drawBubblePlot(foundGenes);
+    }
+
+    // --- Gene Matrix Plot ---
+    if (plotType === 'matrix') {
+        matrixContainer.style.display = 'block';
+        drawGeneMatrix(foundGenes);
+    }
+
+    // --- Ciliome Enrichment Plot ---
+    if (plotType === 'ciliome') {
+        ciliomeContainer.style.display = 'block';
+        drawCiliomeEnrichment(foundGenes);
+    }
+}
+
+// ------------------------
+// Bubble Plot Function
+// ------------------------
+function drawBubblePlot(genes) {
+    const canvas = document.getElementById('enrichment-bubble-plot');
+    const ctx = canvas.getContext('2d');
+    canvas.width = canvas.parentElement.offsetWidth;
+    canvas.height = 600;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Extract all localizations
+    const allLocalizations = Array.from(new Set(genes.flatMap(g => g.localization || [])));
+    const padding = 60;
+
+    // Map genes to y-axis
+    const geneNames = genes.map(g => g.gene);
+    const yStep = (canvas.height - 2 * padding) / geneNames.length;
+    const xStep = (canvas.width - 2 * padding) / allLocalizations.length;
+
+    ctx.font = '14px Arial';
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
+
+    // Draw y-axis (genes)
+    geneNames.forEach((gene, i) => {
+        ctx.fillStyle = '#000';
+        ctx.fillText(gene, padding - 10, padding + i * yStep + yStep / 2);
     });
 
-    if (matchedGenes.length === 0) {
-        statusEl.style.display = 'block';
-        statusEl.textContent = 'No matching genes found in database.';
-        return;
-    } else {
-        statusEl.style.display = 'block';
-        statusEl.textContent = notFoundGenes.length > 0
-            ? `Some genes were not found: ${notFoundGenes.join(', ')}`
-            : `${matchedGenes.length} genes matched.`;
-    }
+    // Draw x-axis (localizations)
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    allLocalizations.forEach((loc, i) => {
+        ctx.fillText(loc, padding + i * xStep + xStep / 2, canvas.height - padding + 5);
+    });
 
-    // Prepare data for plots
-    const plotData = matchedGenes.map(g => ({
-        gene: g.gene,
-        localization: Array.isArray(g.localization) ? g.localization : (g.localization ? [g.localization] : []),
-        functional_category: g.functional_category || '',
-        ciliopathy: g.ciliopathy || ''
-    }));
-
-    // Clear previous plots
-    document.getElementById('bubble-enrichment-container').style.display = 'none';
-    document.getElementById('matrix-plot-container').style.display = 'none';
-    document.getElementById('ciliome-plot-container').style.display = 'none';
-
-    if (plotType === 'bubble') {
-        drawBubblePlot(plotData);
-    } else if (plotType === 'matrix') {
-        drawGeneMatrix(plotData);
-    } else if (plotType === 'ciliome') {
-        drawCiliomeEnrichment(plotData);
-    }
-
-    // Show plot container
-    document.getElementById('plot-container').style.display = 'block';
+    // Draw bubbles
+    genes.forEach((g, i) => {
+        (g.localization || []).forEach(loc => {
+            const x = padding + allLocalizations.indexOf(loc) * xStep + xStep / 2;
+            const y = padding + i * yStep + yStep / 2;
+            ctx.beginPath();
+            ctx.arc(x, y, 10, 0, 2 * Math.PI);
+            ctx.fillStyle = '#27ae60';
+            ctx.fill();
+        });
+    });
 }
 
-// Utility: sanitize gene names consistently
-function sanitize(str) {
-    return str ? str.toLowerCase().replace(/\s+/g, '') : '';
+// ------------------------
+// Gene Matrix Plot Function
+// ------------------------
+function drawGeneMatrix(genes) {
+    const canvas = document.getElementById('enrichment-matrix-plot');
+    const ctx = canvas.getContext('2d');
+    canvas.width = canvas.parentElement.offsetWidth;
+    canvas.height = 600;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Collect unique functional categories
+    const categories = Array.from(new Set(genes.flatMap(g => (g.functional_category || '').split(',').map(s => s.trim()).filter(Boolean))));
+    const geneNames = genes.map(g => g.gene);
+    const padding = 60;
+    const yStep = (canvas.height - 2 * padding) / geneNames.length;
+    const xStep = (canvas.width - 2 * padding) / categories.length;
+
+    ctx.font = '12px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+
+    // Draw x-axis (categories)
+    categories.forEach((cat, i) => {
+        ctx.fillStyle = '#000';
+        ctx.fillText(cat, padding + i * xStep + xStep / 2, canvas.height - padding + 5);
+    });
+
+    // Draw y-axis (genes)
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
+    geneNames.forEach((gene, i) => {
+        ctx.fillStyle = '#000';
+        ctx.fillText(gene, padding - 10, padding + i * yStep + yStep / 2);
+    });
+
+    // Draw matrix cells
+    genes.forEach((g, i) => {
+        const gCategories = (g.functional_category || '').split(',').map(s => s.trim());
+        gCategories.forEach(cat => {
+            const x = padding + categories.indexOf(cat) * xStep;
+            const y = padding + i * yStep;
+            ctx.fillStyle = '#2ca25f';
+            ctx.fillRect(x + 1, y + 1, xStep - 2, yStep - 2);
+        });
+    });
 }
 
-// --- Example: drawing a simple bubble plot ---
-function drawBubblePlot(data) {
-    const container = document.getElementById('bubble-enrichment-container');
-    container.style.display = 'flex';
+// ------------------------
+// Ciliome Enrichment Plot Function
+// ------------------------
+function drawCiliomeEnrichment(genes) {
+    const container = document.getElementById('ciliome-plot-container');
+    container.innerHTML = ''; // Clear previous
 
-    const ctx = document.getElementById('enrichment-bubble-plot').getContext('2d');
-
-    // Prepare chart.js data
-    const labels = [];
-    const datasets = [];
-    const colorPalette = ['#edf8fb', '#b2e2e2', '#66c2a4', '#2ca25f', '#006d2c'];
-
-    data.forEach((g, i) => {
-        g.localization.forEach(loc => {
-            labels.push(loc);
-            datasets.push({
-                x: loc,
-                y: g.gene,
-                r: 10, // bubble size
-                backgroundColor: colorPalette[i % colorPalette.length]
-            });
+    // Count genes per functional category
+    const counts = {};
+    genes.forEach(g => {
+        (g.functional_category || '').split(',').map(s => s.trim()).filter(Boolean).forEach(cat => {
+            counts[cat] = (counts[cat] || 0) + 1;
         });
     });
 
-    new Chart(ctx, {
-        type: 'bubble',
-        data: { datasets },
-        options: {
-            responsive: true,
-            plugins: { legend: { display: false } },
-            scales: {
-                x: { title: { display: true, text: 'Localization' } },
-                y: { title: { display: true, text: 'Gene' } }
-            }
-        }
-    });
-}
+    const sortedCats = Object.keys(counts).sort((a, b) => counts[b] - counts[a]);
+    const maxCount = Math.max(...Object.values(counts));
 
-// --- Placeholder functions for matrix and ciliome plots ---
-function drawGeneMatrix(data) {
-    const container = document.getElementById('matrix-plot-container');
-    container.style.display = 'block';
-    container.innerHTML = `<p style="text-align:center; color: #555;">Gene Matrix plot will be implemented here.</p>`;
+    // Simple bar chart
+    sortedCats.forEach(cat => {
+        const bar = document.createElement('div');
+        bar.style.background = '#2ca25f';
+        bar.style.height = '30px';
+        bar.style.width = `${(counts[cat] / maxCount) * 100}%`;
+        bar.style.margin = '5px 0';
+        bar.style.color = '#fff';
+        bar.style.fontWeight = 'bold';
+        bar.style.display = 'flex';
+        bar.style.alignItems = 'center';
+        bar.style.paddingLeft = '10px';
+        bar.textContent = `${cat} (${counts[cat]})`;
+        container.appendChild(bar);
+    });
 }
 
 function drawCiliomeEnrichment(data) {
