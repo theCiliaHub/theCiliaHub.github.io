@@ -404,15 +404,24 @@ function renderCiliomeEnrichment(foundGenes, notFoundGenes) {
     // Do not try to render the chart if there's no data
     if (k === 0) return;
 
-    // --- Part 3: Render the new bar chart ---
-   // --- Part 3: Render the new bar chart ---
+// --- Part 3: Render the new bar chart ---
 const ctx = document.getElementById('ciliome-bar-chart').getContext('2d');
 
-// Make background transparent
+// Remove any background fill
 ctx.canvas.style.backgroundColor = 'transparent';
 
-// Higher resolution for publication quality
-ctx.canvas.style.imageRendering = 'crisp-edges';
+// Define modifiable style settings
+const chartStyles = {
+    barColor: '#1b7837',         // bar fill color
+    barBorder: '#00441b',        // bar border color
+    titleColor: '#000000',       // title text color
+    axisLabelColor: '#000000',   // axis label color
+    tickColor: '#000000',        // tick text color
+    titleSize: 18,
+    axisLabelSize: 14,
+    tickSize: 12,
+    barThickness: 22
+};
 
 window.ciliomeChartInstance = new Chart(ctx, {
     type: 'bar',
@@ -421,10 +430,10 @@ window.ciliomeChartInstance = new Chart(ctx, {
         datasets: [{
             label: 'Gene Count',
             data: chartData.counts,
-            backgroundColor: '#1b7837',  // dark green
-            borderColor: '#00441b',
+            backgroundColor: chartStyles.barColor,
+            borderColor: chartStyles.barBorder,
             borderWidth: 1.5,
-            barThickness: 22
+            barThickness: chartStyles.barThickness
         }]
     },
     options: {
@@ -436,8 +445,8 @@ window.ciliomeChartInstance = new Chart(ctx, {
             title: {
                 display: true,
                 text: 'Localization of Found Ciliary Genes',
-                font: { size: 18, weight: 'bold' },
-                color: '#000'
+                font: { size: chartStyles.titleSize, weight: 'bold' },
+                color: chartStyles.titleColor
             }
         },
         scales: {
@@ -446,30 +455,32 @@ window.ciliomeChartInstance = new Chart(ctx, {
                 title: {
                     display: true,
                     text: 'Number of Genes',
-                    font: { size: 14, weight: 'bold' },
-                    color: '#000'
+                    font: { size: chartStyles.axisLabelSize, weight: 'bold' },
+                    color: chartStyles.axisLabelColor
                 },
                 ticks: {
                     stepSize: 1,
-                    color: '#000',
-                    font: { size: 12 }
+                    color: chartStyles.tickColor,
+                    font: { size: chartStyles.tickSize }
                 },
                 grid: {
-                    color: '#e0e0e0',  // light grey grid
-                    drawBorder: false
+                    color: '#e0e0e0',
+                    drawBorder: true,     // ensure axis line is visible
+                    borderColor: '#000',  // axis line color
+                    borderWidth: 1
                 }
             },
             y: {
-                title: {
-                    display: false
-                },
+                title: { display: false },
                 ticks: {
-                    color: '#000',
-                    font: { size: 12 }
+                    color: chartStyles.tickColor,
+                    font: { size: chartStyles.tickSize }
                 },
                 grid: {
-                    color: '#f5f5f5',  // subtle horizontal grid
-                    drawBorder: false
+                    color: '#f5f5f5',
+                    drawBorder: true,     // ensure Y axis line is visible
+                    borderColor: '#000',  // axis line color
+                    borderWidth: 1
                 }
             }
         }
@@ -489,25 +500,31 @@ function downloadPlot() {
         // ... matrix download logic (unchanged) ...
     // --- ADDED: Download logic for the new Ciliome plot ---
     } else if (selectedPlot === 'ciliome') {
-        fileName = 'CiliaHub_Ciliome_Enrichment';
-        const container = document.getElementById('ciliome-plot-container');
-        html2canvas(container, { backgroundColor: 'white', scale: 2 }).then(canvas => {
-            if (format === 'png') {
-                const a = document.createElement('a');
-                a.href = canvas.toDataURL('image/png');
-                a.download = `${fileName}.png`;
-                a.click();
-            } else if (format === 'pdf') {
-                const { jsPDF } = window.jspdf;
-                const pdf = new jsPDF({
-                    orientation: canvas.width > canvas.height ? 'l' : 'p',
-                    unit: 'px',
-                    format: [canvas.width, canvas.height]
-                });
-                pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, canvas.width, canvas.height);
-                pdf.save(`${fileName}.pdf`);
-            }
-        });
-    // --- REMOVED: Download logic for the Upset plot ---
-    }
+    fileName = 'CiliaHub_Ciliome_Enrichment';
+    const chartCanvas = document.getElementById('ciliome-bar-chart');
+
+    // Scale factor for 300 DPI (≈3.125 × screen DPI of 96)
+    const scaleFactor = 300 / 96;
+
+    html2canvas(chartCanvas, {
+        backgroundColor: 'white',
+        scale: scaleFactor,  // ensures 300 dpi equivalent
+        useCORS: true
+    }).then(canvas => {
+        if (format === 'png') {
+            const a = document.createElement('a');
+            a.href = canvas.toDataURL('image/png', 1.0); // full quality
+            a.download = `${fileName}.png`;
+            a.click();
+        } else if (format === 'pdf') {
+            const { jsPDF } = window.jspdf;
+            const pdf = new jsPDF({
+                orientation: canvas.width > canvas.height ? 'l' : 'p',
+                unit: 'px',
+                format: [canvas.width, canvas.height]
+            });
+            pdf.addImage(canvas.toDataURL('image/png', 1.0), 'PNG', 0, 0, canvas.width, canvas.height);
+            pdf.save(`${fileName}.pdf`);
+        }
+    });
 }
