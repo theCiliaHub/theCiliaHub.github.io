@@ -489,31 +489,25 @@ function downloadPlot() {
         // ... matrix download logic (unchanged) ...
     // --- ADDED: Download logic for the new Ciliome plot ---
     } else if (selectedPlot === 'ciliome') {
-    fileName = 'CiliaHub_Ciliome_Enrichment';
-    const chartCanvas = document.getElementById('ciliome-bar-chart');
-
-    // Scale factor for 300 DPI (≈3.125 × screen DPI of 96)
-    const scaleFactor = 300 / 96;
-
-    html2canvas(chartCanvas, {
-        backgroundColor: 'white',
-        scale: scaleFactor,  // ensures 300 dpi equivalent
-        useCORS: true
-    }).then(canvas => {
-        if (format === 'png') {
-            const a = document.createElement('a');
-            a.href = canvas.toDataURL('image/png', 1.0); // full quality
-            a.download = `${fileName}.png`;
-            a.click();
-        } else if (format === 'pdf') {
-            const { jsPDF } = window.jspdf;
-            const pdf = new jsPDF({
-                orientation: canvas.width > canvas.height ? 'l' : 'p',
-                unit: 'px',
-                format: [canvas.width, canvas.height]
-            });
-            pdf.addImage(canvas.toDataURL('image/png', 1.0), 'PNG', 0, 0, canvas.width, canvas.height);
-            pdf.save(`${fileName}.pdf`);
-        }
-    });
+        fileName = 'CiliaHub_Ciliome_Enrichment';
+        const container = document.getElementById('ciliome-plot-container');
+        html2canvas(container, { backgroundColor: 'white', scale: 2 }).then(canvas => {
+            if (format === 'png') {
+                const a = document.createElement('a');
+                a.href = canvas.toDataURL('image/png');
+                a.download = `${fileName}.png`;
+                a.click();
+            } else if (format === 'pdf') {
+                const { jsPDF } = window.jspdf;
+                const pdf = new jsPDF({
+                    orientation: canvas.width > canvas.height ? 'l' : 'p',
+                    unit: 'px',
+                    format: [canvas.width, canvas.height]
+                });
+                pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, canvas.width, canvas.height);
+                pdf.save(`${fileName}.pdf`);
+            }
+        });
+    // --- REMOVED: Download logic for the Upset plot ---
+    }
 }
