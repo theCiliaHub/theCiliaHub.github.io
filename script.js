@@ -3,9 +3,9 @@ const geneLocalizationData = {};
 let allGenes = [];
 let currentData = [];
 let searchResults = [];
-let localizationChartInstance; // For Chart.js instance management
-let analysisDotPlotInstance; // For Analysis page dot plot
-let analysisBarChartInstance; // For Analysis page bar chart
+let localizationChartInstance;
+let analysisDotPlotInstance;
+let analysisBarChartInstance;
 const allPartIds = ["cell-body", "nucleus", "basal-body", "transition-zone", "axoneme", "ciliary-membrane"];
 const defaultGenesNames = ["ACE2", "ADAMTS20", "ADAMTS9", "IFT88", "CEP290", "WDR31", "ARL13B", "BBS1"];
 
@@ -57,6 +57,7 @@ function sanitize(input) {
  */
 async function loadAndPrepareDatabase() {
     if (geneDataCache) return true;
+    
     try {
         const response = await fetch('https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/ciliahub_data.json');
         if (!response.ok) throw new Error(`HTTP Error: ${response.status}`);
@@ -65,28 +66,12 @@ async function loadAndPrepareDatabase() {
         geneDataCache = rawGenes;
         allGenes = rawGenes;
 
-        const map = new Map();
-        allGenes.forEach(gene => {
-            const saneGene = sanitize(gene.gene);
-            if (saneGene) map.set(saneGene, gene);
-            const saneEnsemblId = sanitize(gene.ensembl_id);
-            if (saneEnsemblId && !map.has(saneEnsemblId)) {
-                map.set(saneEnsemblId, gene);
-            }
-            if (gene.synonym) {
-                gene.synonym.split(',').forEach(syn => {
-                    const saneSyn = sanitize(syn);
-                    if (saneSyn && !map.has(saneSyn)) map.set(saneSyn, gene);
-                });
-            }
-        });
-        geneMapCache = map;
-
-        allGenes.forEach(gene => {
-            if (gene.localization && gene.gene) {
-                geneLocalizationData[gene.gene] = mapLocalizationToSVG(gene.localization);
-            }
-        });
+        // Build search index
+        buildGeneMapCache(allGenes);
+        
+        // Process localization data
+        processLocalizationData(allGenes);
+        
         currentData = allGenes.filter(g => defaultGenesNames.includes(g.gene));
 
         console.log('Data loaded and sanitized successfully.');
@@ -97,26 +82,53 @@ async function loadAndPrepareDatabase() {
         // Show a visible error message to the user.
         showGlobalError("⚠️ Database Load Error: The main gene database could not be loaded. Search functionality is limited to a small set of default genes. Please check your internet connection and refresh the page.");
 
-        // Fallback to default genes
-        allGenes = [...getDefaultGenes()];
-        currentData = [...allGenes];
+        // Fallback to default genes - CRITICAL FIX: Use proper default genes
+        const fallbackGenes = getDefaultGenes();
+        allGenes = [...fallbackGenes];
+        currentData = [...fallbackGenes];
 
-        // CRITICAL FIX: Rebuild the search map from the default gene list to prevent crashes.
-        const map = new Map();
-        allGenes.forEach(gene => {
-            const saneGene = sanitize(gene.gene);
-            if (saneGene) map.set(saneGene, gene);
-            if (gene.synonym) {
-                gene.synonym.split(',').forEach(syn => {
-                    const saneSyn = sanitize(syn);
-                    if (saneSyn && !map.has(saneSyn)) map.set(saneSyn, gene);
-                });
-            }
-        });
-        geneMapCache = map; // This ensures the app doesn't crash on search.
+        // Rebuild the search map from the default gene list
+        buildGeneMapCache(allGenes);
+        processLocalizationData(allGenes);
 
         return false;
     }
+}
+
+/**
+ * Helper function to build gene map cache
+ */
+function buildGeneMapCache(genes) {
+    geneMapCache = new Map();
+    genes.forEach(gene => {
+        const saneGene = sanitize(gene.gene);
+        if (saneGene) geneMapCache.set(saneGene, gene);
+        
+        const saneEnsemblId = sanitize(gene.ensembl_id);
+        if (saneEnsemblId && !geneMapCache.has(saneEnsemblId)) {
+            geneMapCache.set(saneEnsemblId, gene);
+        }
+        
+        if (gene.synonym) {
+            gene.synonym.split(',').forEach(syn => {
+                const saneSyn = sanitize(syn);
+                if (saneSyn && !geneMapCache.has(saneSyn)) {
+                    geneMapCache.set(saneSyn, gene);
+                }
+            });
+        }
+    });
+}
+
+/**
+ * Helper function to process localization data
+ */
+function processLocalizationData(genes) {
+    genes.forEach(gene => {
+        if (gene.localization && gene.gene) {
+            geneLocalizationData[gene.gene] = mapLocalizationToSVG(gene.localization);
+        }
+    });
 }
 
 
@@ -218,20 +230,67 @@ function displayBatchResults(foundGenes, notFoundGenes) {
     if (cardsContainer) cardsContainer.innerHTML = '';
 }
 
+**
+ * ✅ FIXED: Return proper default genes with all required fields
+ */
 function getDefaultGenes() {
-    return [{
+    return [
+        {
             gene: "IFT88",
+            ensembl_id: "ENSG00000032742",
             description: "Intraflagellar transport protein 88.",
+            synonym: "",
+            omim_id: "",
+            functional_summary: "Key component of intraflagellar transport complex.",
             localization: "Axoneme, Basal Body",
-            ensembl_id: "ENSG00000032742"
+            reference: "",
+            protein_complexes: "",
+            gene_annotation: "",
+            functional_category: "Ciliary assembly/disassembly",
+            ciliopathy: ""
         },
         {
             gene: "CEP290",
+            ensembl_id: "ENSG00000198707",
             description: "Centrosomal protein 290.",
+            synonym: "",
+            omim_id: "",
+            functional_summary: "Transition zone protein involved in ciliogenesis.",
             localization: "Transition Zone",
-            ensembl_id: "ENSG00000198707"
+            reference: "",
+            protein_complexes: "",
+            gene_annotation: "",
+            functional_category: "Transition zone",
+            ciliopathy: ""
         },
-        // Add other default genes if needed
+        {
+            gene: "ARL13B",
+            ensembl_id: "ENSG00000173193",
+            description: "ADP ribosylation factor like GTPase 13B.",
+            synonym: "",
+            omim_id: "",
+            functional_summary: "Regulates ciliary protein trafficking.",
+            localization: "Ciliary Membrane",
+            reference: "",
+            protein_complexes: "",
+            gene_annotation: "",
+            functional_category: "Ciliary membrane",
+            ciliopathy: ""
+        },
+        {
+            gene: "BBS1",
+            ensembl_id: "ENSG00000174483",
+            description: "Bardet-Biedl syndrome 1 protein.",
+            synonym: "",
+            omim_id: "",
+            functional_summary: "Component of the BBSome complex.",
+            localization: "Basal Body, Ciliary Membrane",
+            reference: "",
+            protein_complexes: "",
+            gene_annotation: "",
+            functional_category: "Ciliary assembly/disassembly",
+            ciliopathy: "Bardet-Biedl syndrome"
+        }
     ];
 }
 
