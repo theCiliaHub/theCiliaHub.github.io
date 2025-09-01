@@ -405,76 +405,47 @@ function renderCiliomeEnrichment(foundGenes, notFoundGenes) {
     if (k === 0) return;
 
     // --- Part 3: Render the new bar chart ---
-   // --- Part 3: Render the new bar chart ---
-const ctx = document.getElementById('ciliome-bar-chart').getContext('2d');
-
-// Make background transparent
-ctx.canvas.style.backgroundColor = 'transparent';
-
-// Higher resolution for publication quality
-ctx.canvas.style.imageRendering = 'crisp-edges';
-
-window.ciliomeChartInstance = new Chart(ctx, {
-    type: 'bar',
-    data: {
-        labels: chartData.labels,
-        datasets: [{
-            label: 'Gene Count',
-            data: chartData.counts,
-            backgroundColor: '#1b7837',  // dark green
-            borderColor: '#00441b',
-            borderWidth: 1.5,
-            barThickness: 22
-        }]
-    },
-    options: {
-        indexAxis: 'y',
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-            legend: { display: false },
-            title: {
-                display: true,
-                text: 'Localization of Found Ciliary Genes',
-                font: { size: 18, weight: 'bold' },
-                color: '#000'
-            }
+    const ctx = document.getElementById('ciliome-bar-chart').getContext('2d');
+    window.ciliomeChartInstance = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: chartData.labels,
+            datasets: [{
+                label: 'Gene Count',
+                data: chartData.counts,
+                backgroundColor: '#2ca25f',
+                borderColor: '#006d2c',
+                borderWidth: 1
+            }]
         },
-        scales: {
-            x: {
-                beginAtZero: true,
+        options: {
+            indexAxis: 'y', // This makes the bar chart horizontal
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false // The single bar is self-explanatory
+                },
                 title: {
                     display: true,
-                    text: 'Number of Genes',
-                    font: { size: 14, weight: 'bold' },
-                    color: '#000'
-                },
-                ticks: {
-                    stepSize: 1,
-                    color: '#000',
-                    font: { size: 12 }
-                },
-                grid: {
-                    color: '#e0e0e0',  // light grey grid
-                    drawBorder: false
+                    text: 'Localization of Found Ciliary Genes',
+                    font: { size: 16 }
                 }
             },
-            y: {
-                title: {
-                    display: false
-                },
-                ticks: {
-                    color: '#000',
-                    font: { size: 12 }
-                },
-                grid: {
-                    color: '#f5f5f5',  // subtle horizontal grid
-                    drawBorder: false
+            scales: {
+                x: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: 'Number of Genes'
+                    },
+                    ticks: {
+                        stepSize: 1 // Ensure whole numbers for gene counts
+                    }
                 }
             }
         }
-    }
-});
+    });
 }
 
 
