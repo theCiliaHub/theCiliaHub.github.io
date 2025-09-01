@@ -43,46 +43,43 @@ function sanitize(input) {
  * Loads, sanitizes, and prepares the gene database into an efficient lookup map.
  * This runs only once. Replaces the old `loadGeneDatabase`.
  */
+// =============================================================================
+// DATA LOADING
+// =============================================================================
 async function loadAndPrepareDatabase() {
-    if (geneDataCache) return true; // Prevent re-loading
+    if (geneDataCache) return true;
     try {
-        const response = await fetch('https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/ciliahub_data.json');
-        if (!response.ok) throw new Error(`HTTP Error: ${response.status}`);
-        
-        const rawGenes = await response.json();
+        const resp = await fetch('https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/ciliahub_data.json');
+        if (!resp.ok) throw new Error(`HTTP Error ${resp.status}`);
+        const rawGenes = await resp.json();
         geneDataCache = rawGenes;
-        allGenes = rawGenes; // Keep for other parts of the app that need the array
-
-        const map = new Map();
-        allGenes.forEach(gene => {
-            const saneGene = sanitize(gene.gene);
-            if (saneGene) map.set(saneGene, gene);
-            if (gene.synonym) {
-                gene.synonym.split(',').forEach(syn => {
-                    const saneSyn = sanitize(syn);
-                    if (saneSyn && !map.has(saneSyn)) map.set(saneSyn, gene);
+        allGenes = rawGenes;
+        geneMapCache = new Map();
+        allGenes.forEach(g => {
+            const nameKey = sanitize(g.gene);
+            if (nameKey) geneMapCache.set(nameKey, g);
+            if (g.synonym) {
+                g.synonym.split(',').forEach(syn => {
+                    const key = sanitize(syn);
+                    if (key && !geneMapCache.has(key)) geneMapCache.set(key, g);
                 });
             }
-        });
-        geneMapCache = map;
-
-        // Populate data for other parts of the site (e.g., cilium diagram)
-        allGenes.forEach(gene => {
-            if (gene.localization && gene.gene) {
-                geneLocalizationData[gene.gene] = mapLocalizationToSVG(gene.localization);
+            if (g.localization) {
+                geneLocalizationData[g.gene] = mapLocalizationToSVG(g.localization);
             }
         });
         currentData = allGenes.filter(g => defaultGenesNames.includes(g.gene));
-
-        console.log('Data loaded and sanitized successfully.');
         return true;
-    } catch (error) {
-        console.error("Failed to load and prepare gene database:", error);
-        allGenes = [...getDefaultGenes()];
-        currentData = [...allGenes];
+    } catch (e) {
+        console.error('Data load error', e);
+        allGenes = getDefaultGenes();
+        currentData = allGenes;
+        geneMapCache = new Map();
+        allGenes.forEach(g => geneMapCache.set(sanitize(g.gene), g));
         return false;
     }
 }
+
 
 /**
  * The new central search function. Replaces old search logic.
@@ -190,58 +187,112 @@ function displayBatchResults(foundGenes, notFoundGenes) {
 }
 
 
-// Default genes as fallback
+// Default gene set as fallback if loading fails
 function getDefaultGenes() {
     return [
         {
             gene: "IFT88",
-            description: "Intraflagellar transport protein 88. Key component of the IFT-B complex.",
-            localization: "Axoneme, Basal Body",
             ensembl_id: "ENSG00000032742",
-            functional_summary: "Essential for intraflagellar transport and ciliary assembly."
+            description: "Intraflagellar transport protein 88. Key component of the IFT-B complex.",
+            synonym: "BBS20, D13S840E, TG737, TTC10",
+            omim_id: "605484",
+            functional_summary: "Essential for intraflagellar transport and ciliary assembly. It is a component of the IFT complex B and is required for cilium biogenesis.",
+            localization: ["axoneme", "basal body"],
+            reference: ["https://pubmed.ncbi.nlm.nih.gov/9724754/"],
+            protein_complexes: "IFT-B",
+            gene_annotation: "",
+            functional_category: ["Intraflagellar transport", "Ciliary assembly/disassembly"],
+            ciliopathy: "Bardet-Biedl syndrome 20"
         },
         {
             gene: "CEP290",
-            description: "Centrosomal protein 290. Critical component of the ciliary transition zone.",
-            localization: "Transition Zone",
             ensembl_id: "ENSG00000198707",
+            description: "Centrosomal protein 290. Critical component of the ciliary transition zone.",
+            synonym: "BBS14, JBTS5, MKS4, NPHP6, SLSN6",
             omim_id: "610142",
-            functional_summary: "Regulates ciliary gating and ciliopathy-related pathways."
+            functional_summary: "Regulates ciliary gating and ciliopathy-related pathways. Acts as a gatekeeper for proteins entering and exiting the cilium.",
+            localization: ["transition zone"],
+            reference: ["https://pubmed.ncbi.nlm.nih.gov/16971477/"],
+            protein_complexes: "NPHP-MKS-JBTS complex",
+            gene_annotation: "",
+            functional_category: ["Transition zone", "Ciliary gating"],
+            ciliopathy: "Joubert syndrome 5, Meckel syndrome 4, Bardet-Biedl syndrome 14, Leber congenital amaurosis 10"
         },
         {
             gene: "WDR31",
-            description: "WD repeat domain 31. Involved in ciliary assembly and maintenance.",
-            localization: "Axoneme",
             ensembl_id: "ENSG00000106459",
-            functional_summary: "Required for proper ciliary structure and function."
+            description: "WD repeat domain 31. Involved in ciliary assembly and maintenance.",
+            synonym: "C14orf148",
+            omim_id: "",
+            functional_summary: "Required for proper ciliary structure and function. It is thought to be involved in the regulation of ciliogenesis.",
+            localization: ["axoneme"],
+            reference: ["https://pubmed.ncbi.nlm.nih.gov/22114125/"],
+            protein_complexes: "",
+            gene_annotation: "",
+            functional_category: ["Ciliary assembly/disassembly"],
+            ciliopathy: ""
         },
         {
             gene: "ARL13B",
-            description: "ADP-ribosylation factor-like protein 13B. Involved in ciliary membrane biogenesis.",
-            localization: "Ciliary Membrane",
             ensembl_id: "ENSG00000169379",
-            functional_summary: "Critical for ciliary signaling and membrane trafficking."
+            description: "ADP-ribosylation factor-like protein 13B. Involved in ciliary membrane biogenesis.",
+            synonym: "ARL2L2, JBTS8",
+            omim_id: "608922",
+            functional_summary: "Critical for ciliary signaling and membrane trafficking. It is a small G protein that localizes to the ciliary membrane and regulates the traffic of ciliary proteins.",
+            localization: ["ciliary membrane"],
+            reference: ["https://pubmed.ncbi.nlm.nih.gov/19732862/"],
+            protein_complexes: "",
+            gene_annotation: "",
+            functional_category: ["Ciliary membrane", "Signal transduction"],
+            ciliopathy: "Joubert syndrome 8"
         },
         {
             gene: "BBS1",
-            description: "Bardet-Biedl syndrome 1 protein. Part of the BBSome complex.",
-            localization: "Basal Body, Ciliary Membrane",
             ensembl_id: "ENSG00000166246",
+            description: "Bardet-Biedl syndrome 1 protein. Part of the BBSome complex.",
+            synonym: "BBS",
             omim_id: "209901",
-            functional_summary: "Involved in ciliary trafficking and BBSome assembly."
+            functional_summary: "Involved in ciliary trafficking and BBSome assembly. The BBSome complex is a key regulator of protein trafficking to and from the cilium.",
+            localization: ["basal body", "ciliary membrane"],
+            reference: ["https://pubmed.ncbi.nlm.nih.gov/11058628/"],
+            protein_complexes: "BBSome",
+            gene_annotation: "",
+            functional_category: ["Ciliary trafficking", "BBSome complex"],
+            ciliopathy: "Bardet-Biedl syndrome 1"
         },
         {
             gene: "ACE2",
-            description: "Angiotensin-converting enzyme 2. Serves as the entry point for SARS-CoV-2.",
-            localization: "Cilia",
             ensembl_id: "ENSG00000130234",
+            description: "Angiotensin-converting enzyme 2. Serves as the entry point for SARS-CoV-2.",
+            synonym: "ACEH",
             omim_id: "300335",
-            functional_summary: "Regulates blood pressure and acts as receptor for coronaviruses in respiratory cilia."
+            functional_summary: "Regulates blood pressure and acts as a receptor for coronaviruses in respiratory cilia. Its expression on ciliated cells is a key factor in COVID-19 infection.",
+            localization: ["cilia"],
+            reference: ["https://pubmed.ncbi.nlm.nih.gov/32142651/"],
+            protein_complexes: "",
+            gene_annotation: "",
+            functional_category: ["Cell surface receptor", "Ciliary membrane"],
+            ciliopathy: ""
+        },
+        {
+            gene: "PKD2",
+            ensembl_id: "ENSG00000118762",
+            description: "Polycystin-2, a calcium-permeable ion channel.",
+            synonym: "TRPP2",
+            omim_id: "173910",
+            functional_summary: "Ion channel important for mechanosensation in primary cilia.",
+            localization: ["axoneme", "endoplasmic reticulum"],
+            reference: ["https://pubmed.ncbi.nlm.nih.gov/11285250/"],
+            protein_complexes: ["Polycystin complex"],
+            gene_annotation: "",
+            functional_category: ["Ion transport", "Ciliary signaling"],
+            ciliopathy: "Autosomal dominant polycystic kidney disease"
         }
     ];
 }
 
-function mapLocalizationToSVG(localization) {
+
+function mapLocalizationToSVG(localizationArray) {
     const mapping = {
         "ciliary membrane": ["ciliary-membrane", "axoneme"],
         "axoneme": ["ciliary-membrane", "axoneme"],
@@ -251,15 +302,11 @@ function mapLocalizationToSVG(localization) {
         "flagella": ["ciliary-membrane", "axoneme"],
         "ciliary associated gene": ["ciliary-membrane", "axoneme"]
     };
-    
-    if (!localization) return [];
-    
-    return localization.split(',')
-        .flatMap(loc => {
-            const trimmedLoc = loc.trim().toLowerCase();
-            return mapping[trimmedLoc] || [];
-        })
-        .filter(id => allPartIds.includes(id));
+    if (!Array.isArray(localizationArray)) return [];
+    return localizationArray.flatMap(loc => {
+        const normalized = loc.trim().toLowerCase().replace(/[-_]/g, ' ');
+        return mapping[normalized] || [];
+    }).filter(id => allPartIds.includes(id));
 }
 
 async function handleRouteChange() {
