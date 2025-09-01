@@ -41,47 +41,141 @@ function hypergeometricPValue(k, n, M, N) {
     return p;
 }
 
-// --- generateEnrichmentPlots function (Unchanged) ---
-function generateEnrichmentPlots() {
-    ['bubble-enrichment-container', 'matrix-plot-container', 'ciliome-plot-container'].forEach(id => {
-        const el = document.getElementById(id);
-        if (el) el.style.display = 'none';
-    });
-    document.getElementById('download-plot-btn').style.display = 'none';
-
+async function generateEnrichmentPlots() {
     const statusDiv = document.getElementById('enrichment-status');
-    if (statusDiv) statusDiv.style.display = 'none';
+    const plotContainer = document.getElementById('plot-container');
+    statusDiv.style.display = 'block';
+    statusDiv.textContent = 'Processing...';
+    plotContainer.style.display = 'none';
 
-    const input = document.getElementById('enrichment-genes-input').value || '';
-    const geneNames = input.split(/[\s,;\n]+/).map(sanitize).filter(Boolean);
-    if (geneNames.length === 0) return;
-
-    const {
-        foundGenes,
-        notFoundGenes
-    } = findGenes(geneNames);
-    const selectedPlot = document.querySelector('input[name="plot-type"]:checked').value;
-
-    if (selectedPlot !== 'ciliome' && foundGenes.length === 0) {
-        if (statusDiv) {
-            statusDiv.innerHTML = `<span class="error-message">None of the entered genes were found. Not found: ${notFoundGenes.join(', ')}</span>`;
-            statusDiv.style.display = 'block';
+    // Ensure database is loaded
+    if (!window.geneMapCache || !window.allGenes) {
+        const success = await loadAndPrepareDatabase();
+        if (!success) {
+            statusDiv.textContent = 'Failed to load gene database.';
+            return;
         }
+    }
+
+    // Get user input genes
+    const userInput = document.getElementById('enrichment-genes-input').value;
+    if (!userInput.trim()) {
+        statusDiv.textContent = 'Please enter at least one gene.';
         return;
     }
 
-    document.getElementById('plot-container').style.display = 'block';
+    const userGenes = userInput
+        .split(',')
+        .map(g => sanitize(g))
+        .filter(g => g.length > 0);
 
-    if (selectedPlot === 'bubble') {
-        renderEnrichmentBubblePlot(foundGenes);
-    } else if (selectedPlot === 'matrix') {
-        renderBubbleMatrix(foundGenes);
-    } else if (selectedPlot === 'ciliome') {
-        renderCiliomeEnrichment(foundGenes, notFoundGenes);
+    // Map to gene objects
+    const geneObjects = userGenes
+        .map(g => geneMapCache.get(g))
+        .filter(g => g);
+
+    if (geneObjects.length === 0) {
+        statusDiv.textContent = 'No matching genes found in database.';
+        return;
     }
 
-    document.getElementById('download-plot-btn').style.display = 'inline-block';
+    // Calculate enrichment: simple count of localization occurrences
+    const localizationCounts = {};
+    const totalGenes = allGenes.length;
+
+    geneObjects.forEach(gene => {
+        if (Array.isArray(gene.localization)) {
+            gene.localization.forEach(loc => {
+                loc = loc.toLowerCase();
+                localizationCounts[loc] = (localizationCounts[loc] || 0) + 1;
+            });
+        } else if (gene.localization) {
+            const loc = gene.localization.toLowerCase();
+            localizationCounts[loc] = (localizationCounts[loc] || 0) + 1;
+        }
+    });
+
+    // Prepare data for plotting
+    const labels = Object.keys(localizationCounts);
+    const values = Object.values(localizationCounts);
+
+    // Get selected plot type
+    const plotType = document.querySelector('input[name="plot-type"]:checked').value;
+
+    // Clear previous plots
+    document.getElementById('bubble-enrichment-container').style.display = 'none';
+    document.getElementById('matrix-plot-container').style.display = 'none';
+    document.getElementById('ciliome-plot-container').style.display = 'none';
+
+    // Bubble plot
+    if (plotType === 'bubble') {
+        const ctx = document.getElementById('enrichment-bubble-plot').getContext('2d');
+        if (window.enrichmentBubbleChart) window.enrichmentBubbleChart.destroy();
+
+        const data = labels.map((label, i) => ({
+            x: i + 1,
+            y: values[i],
+            r: Math.max(5, values[i] * 5),
+        }));
+
+        window.enrichmentBubbleChart = new Chart(ctx, {
+            type: 'bubble',
+            data: {
+                datasets: [{
+                    label: 'Localization Enrichment',
+                    data: data,
+                    backgroundColor: '#66c2a4',
+                }]
+            },
+            options: {
+                plugins: {
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return `${labels[context.dataIndex]}: ${values[context.dataIndex]} genes`;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: { title: { display: true, text: 'Localization Categories' } },
+                    y: { title: { display: true, text: 'Gene Count' } }
+                }
+            }
+        });
+
+        document.getElementById('bubble-enrichment-container').style.display = 'flex';
+    }
+
+    // Matrix plot (simple table)
+    else if (plotType === 'matrix') {
+        const container = document.getElementById('matrix-plot-container');
+        container.innerHTML = `<table style="width:100%; border-collapse: collapse;">
+            <tr>
+                <th style="border:1px solid #ccc; padding:5px;">Localization</th>
+                <th style="border:1px solid #ccc; padding:5px;">Gene Count</th>
+            </tr>
+            ${labels.map((loc, i) => `
+                <tr>
+                    <td style="border:1px solid #ccc; padding:5px;">${loc}</td>
+                    <td style="border:1px solid #ccc; padding:5px;">${values[i]}</td>
+                </tr>`).join('')}
+        </table>`;
+        container.style.display = 'block';
+    }
+
+    // Ciliome enrichment summary
+    else if (plotType === 'ciliome') {
+        const container = document.getElementById('ciliome-plot-container');
+        const enrichedGenes = geneObjects.filter(g => g.localization && g.localization.length > 0);
+        container.innerHTML = `<p>${enrichedGenes.length} of ${geneObjects.length} genes are known ciliary genes.</p>`;
+        container.style.display = 'block';
+    }
+
+    plotContainer.style.display = 'block';
+    statusDiv.style.display = 'none';
 }
+
 
 function renderEnrichmentBubblePlot(foundGenes) {
     document.getElementById('bubble-enrichment-container').style.display = 'flex';
