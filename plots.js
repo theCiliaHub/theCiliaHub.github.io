@@ -329,9 +329,10 @@ function renderBubbleMatrix(foundGenes) {
 }
 
 // --- ADDED: New function to render Ciliome Enrichment plot ---
+// --- UPDATED function to render a Bar Chart instead of a Pie Chart ---
 function renderCiliomeEnrichment(foundGenes, notFoundGenes) {
     document.getElementById('ciliome-plot-container').style.display = 'block';
-    
+
     if (window.ciliomeChartInstance) {
         window.ciliomeChartInstance.destroy();
     }
@@ -349,8 +350,8 @@ function renderCiliomeEnrichment(foundGenes, notFoundGenes) {
     const pValue = hypergeometricPValue(k, n_input, M, N);
     const enrichmentScore = n_input > 0 && M > 0 ? (k / n_input) / (M / N) : 0;
 
-    const container = document.getElementById('ciliome-plot-container');
-    container.innerHTML = `
+    // --- Part 1: Keep the statistical summary (it's still very useful) ---
+    const summaryHTML = `
         <div id="ciliome-results-summary" style="margin-bottom: 2rem; font-size: 1.1rem; max-width: 600px; margin-left: auto; margin-right: auto;">
             <h3>Enrichment Analysis Results</h3>
             <p>From your list of <strong>${n_input}</strong> unique gene(s), <strong>${k}</strong> were found in the CiliaHub database of <strong>${M}</strong> ciliary genes.</p>
@@ -360,29 +361,88 @@ function renderCiliomeEnrichment(foundGenes, notFoundGenes) {
                 <p><strong>P-value (Hypergeometric Test):</strong> ${pValue.toExponential(3)}</p>
             </div>
         </div>
-        <div style="position: relative; width: 300px; height: 300px; margin: auto;">
-            <canvas id="ciliome-pie-chart"></canvas>
-        </div>
     `;
 
-    const ctx = document.getElementById('ciliome-pie-chart').getContext('2d');
+    // --- Part 2: Prepare data for the new bar chart ---
+    const localizationCounts = {};
+    const localizationOrder = ['Basal Body', 'Transition Zone', 'Axoneme', 'Ciliary Membrane', 'Cilia'];
+    
+    foundGenes.forEach(gene => {
+        if (gene.localization) {
+            gene.localization.split(',').forEach(loc => {
+                const term = loc.trim();
+                if(term) {
+                   localizationCounts[term] = (localizationCounts[term] || 0) + 1;
+                }
+            });
+        }
+    });
+
+    const chartData = {
+        labels: [],
+        counts: []
+    };
+    
+    // Sort the data for a cleaner plot
+    Object.entries(localizationCounts)
+        .sort(([, a], [, b]) => b - a)
+        .forEach(([label, count]) => {
+            chartData.labels.push(label);
+            chartData.counts.push(count);
+        });
+        
+    const barChartHTML = `
+        <div style="position: relative; width: 100%; max-width: 700px; height: ${30 + chartData.labels.length * 40}px; margin: auto;">
+            <canvas id="ciliome-bar-chart"></canvas>
+        </div>
+    `;
+    
+    const container = document.getElementById('ciliome-plot-container');
+    // Combine the summary text with the new bar chart canvas
+    container.innerHTML = summaryHTML + (k > 0 ? barChartHTML : '<p>No ciliary genes were found in your list to plot localizations.</p>');
+    
+    // Do not try to render the chart if there's no data
+    if (k === 0) return;
+
+    // --- Part 3: Render the new bar chart ---
+    const ctx = document.getElementById('ciliome-bar-chart').getContext('2d');
     window.ciliomeChartInstance = new Chart(ctx, {
-        type: 'doughnut',
+        type: 'bar',
         data: {
-            labels: ['Genes in Ciliome', 'Genes Not in Ciliome'],
+            labels: chartData.labels,
             datasets: [{
-                data: [k, n_input - k],
-                backgroundColor: ['#2ca25f', '#cccccc'],
-                borderColor: ['#ffffff', '#ffffff'],
-                borderWidth: 2
+                label: 'Gene Count',
+                data: chartData.counts,
+                backgroundColor: '#2ca25f',
+                borderColor: '#006d2c',
+                borderWidth: 1
             }]
         },
         options: {
+            indexAxis: 'y', // This makes the bar chart horizontal
             responsive: true,
             maintainAspectRatio: false,
             plugins: {
-                legend: { position: 'top' },
-                title: { display: true, text: 'Composition of Your Gene List' }
+                legend: {
+                    display: false // The single bar is self-explanatory
+                },
+                title: {
+                    display: true,
+                    text: 'Localization of Found Ciliary Genes',
+                    font: { size: 16 }
+                }
+            },
+            scales: {
+                x: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: 'Number of Genes'
+                    },
+                    ticks: {
+                        stepSize: 1 // Ensure whole numbers for gene counts
+                    }
+                }
             }
         }
     });
