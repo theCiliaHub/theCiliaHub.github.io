@@ -195,48 +195,87 @@ function getDefaultGenes() {
     return [
         {
             gene: "IFT88",
-            description: "Intraflagellar transport protein 88. Key component of the IFT-B complex.",
-            localization: "Axoneme, Basal Body",
             ensembl_id: "ENSG00000032742",
-            functional_summary: "Essential for intraflagellar transport and ciliary assembly."
+            description: "Intraflagellar transport protein 88. Key component of the IFT-B complex.",
+            synonym: "BBS20, D13S840E, TG737, TTC10",
+            omim_id: "605484",
+            functional_summary: "Essential for intraflagellar transport and ciliary assembly. It is a component of the IFT complex B and is required for cilium biogenesis.",
+            localization: "Axoneme, Basal Body",
+            reference: "https://pubmed.ncbi.nlm.nih.gov/9724754/",
+            protein_complexes: "IFT-B",
+            gene_annotation: "",
+            functional_category: "Intraflagellar transport, Ciliary assembly/disassembly",
+            ciliopathy: "Bardet-Biedl syndrome 20"
         },
         {
             gene: "CEP290",
-            description: "Centrosomal protein 290. Critical component of the ciliary transition zone.",
-            localization: "Transition Zone",
             ensembl_id: "ENSG00000198707",
+            description: "Centrosomal protein 290. Critical component of the ciliary transition zone.",
+            synonym: "BBS14, JBTS5, MKS4, NPHP6, SLSN6",
             omim_id: "610142",
-            functional_summary: "Regulates ciliary gating and ciliopathy-related pathways."
+            functional_summary: "Regulates ciliary gating and ciliopathy-related pathways. Acts as a gatekeeper for proteins entering and exiting the cilium.",
+            localization: "Transition Zone",
+            reference: "https://pubmed.ncbi.nlm.nih.gov/16971477/",
+            protein_complexes: "NPHP-MKS-JBTS complex",
+            gene_annotation: "",
+            functional_category: "Transition zone, Ciliary gating",
+            ciliopathy: "Joubert syndrome 5, Meckel syndrome 4, Bardet-Biedl syndrome 14, Leber congenital amaurosis 10"
         },
         {
             gene: "WDR31",
-            description: "WD repeat domain 31. Involved in ciliary assembly and maintenance.",
-            localization: "Axoneme",
             ensembl_id: "ENSG00000106459",
-            functional_summary: "Required for proper ciliary structure and function."
+            description: "WD repeat domain 31. Involved in ciliary assembly and maintenance.",
+            synonym: "C14orf148",
+            omim_id: "",
+            functional_summary: "Required for proper ciliary structure and function. It is thought to be involved in the regulation of ciliogenesis.",
+            localization: "Axoneme",
+            reference: "https://pubmed.ncbi.nlm.nih.gov/22114125/",
+            protein_complexes: "",
+            gene_annotation: "",
+            functional_category: "Ciliary assembly/disassembly",
+            ciliopathy: ""
         },
         {
             gene: "ARL13B",
-            description: "ADP-ribosylation factor-like protein 13B. Involved in ciliary membrane biogenesis.",
-            localization: "Ciliary Membrane",
             ensembl_id: "ENSG00000169379",
-            functional_summary: "Critical for ciliary signaling and membrane trafficking."
+            description: "ADP-ribosylation factor-like protein 13B. Involved in ciliary membrane biogenesis.",
+            synonym: "ARL2L2, JBTS8",
+            omim_id: "608922",
+            functional_summary: "Critical for ciliary signaling and membrane trafficking. It is a small G protein that localizes to the ciliary membrane and regulates the traffic of ciliary proteins.",
+            localization: "Ciliary Membrane",
+            reference: "https://pubmed.ncbi.nlm.nih.gov/19732862/",
+            protein_complexes: "",
+            gene_annotation: "",
+            functional_category: "Ciliary membrane, Signal transduction",
+            ciliopathy: "Joubert syndrome 8"
         },
         {
             gene: "BBS1",
-            description: "Bardet-Biedl syndrome 1 protein. Part of the BBSome complex.",
-            localization: "Basal Body, Ciliary Membrane",
             ensembl_id: "ENSG00000166246",
+            description: "Bardet-Biedl syndrome 1 protein. Part of the BBSome complex.",
+            synonym: "BBS",
             omim_id: "209901",
-            functional_summary: "Involved in ciliary trafficking and BBSome assembly."
+            functional_summary: "Involved in ciliary trafficking and BBSome assembly. The BBSome complex is a key regulator of protein trafficking to and from the cilium.",
+            localization: "Basal Body, Ciliary Membrane",
+            reference: "https://pubmed.ncbi.nlm.nih.gov/11058628/",
+            protein_complexes: "BBSome",
+            gene_annotation: "",
+            functional_category: "Ciliary trafficking, BBSome complex",
+            ciliopathy: "Bardet-Biedl syndrome 1"
         },
         {
             gene: "ACE2",
-            description: "Angiotensin-converting enzyme 2. Serves as the entry point for SARS-CoV-2.",
-            localization: "Cilia",
             ensembl_id: "ENSG00000130234",
+            description: "Angiotensin-converting enzyme 2. Serves as the entry point for SARS-CoV-2.",
+            synonym: "ACEH",
             omim_id: "300335",
-            functional_summary: "Regulates blood pressure and acts as receptor for coronaviruses in respiratory cilia."
+            functional_summary: "Regulates blood pressure and acts as a receptor for coronaviruses in respiratory cilia. Its expression on ciliated cells is a key factor in COVID-19 infection.",
+            localization: "Cilia",
+            reference: "https://pubmed.ncbi.nlm.nih.gov/32142651/",
+            protein_complexes: "",
+            gene_annotation: "",
+            functional_category: "Cell surface receptor, Ciliary membrane",
+            ciliopathy: ""
         }
     ];
 }
@@ -987,152 +1026,6 @@ function displayNotFoundPage() {
         </div>`;
 }
 
-function performSingleSearch() {
-    const query = document.getElementById('single-gene-search').value.trim().toUpperCase();
-    const statusDiv = document.getElementById('status-message');
-    statusDiv.innerHTML = '<span>Loading...</span>';
-    statusDiv.style.display = 'block';
-
-    if (!query) {
-        statusDiv.innerHTML = `<span class="error-message">Please enter a gene name.</span>`;
-        return;
-    }
-
-    const results = allGenes.filter(g => {
-        // Use sanitized gene field directly, no need for replace(/\s/g, '')
-        if (g.gene && g.gene.toUpperCase().includes(query)) {
-            return true;
-        }
-        if (g.synonym) {
-            const synonyms = g.synonym.toUpperCase().split(',').map(s => s.trim());
-            if (synonyms.includes(query)) {
-                return true;
-            }
-        }
-        return false;
-    });
-
-    if (results.length === 0) {
-        const closeMatches = allGenes.filter(g =>
-            g.gene && g.gene.toUpperCase().startsWith(query.slice(0, 3))
-        ).slice(0, 3);
-
-        statusDiv.innerHTML = `<span class="error-message">No genes found for "${query}". ${closeMatches.length > 0 ? 'Did you mean: ' + closeMatches.map(g => g.gene).join(', ') + '?' : 'No close matches found.'}</span>`;
-        return;
-    }
-
-    if (results.length === 1 && results[0].gene.toUpperCase() === query) {
-        navigateTo(null, `/${results[0].gene}`);
-    } else {
-        navigateTo(null, '/batch-query');
-        setTimeout(() => {
-            document.getElementById('batch-genes-input').value = results.map(r => r.gene).join('\n');
-            performBatchSearch();
-        }, 100);
-    }
-}
-
-function performBatchSearch() {
-    const queries = document.getElementById('batch-genes-input').value
-        .split(/[\s,\n]+/)
-        .filter(Boolean)
-        .map(q => q.trim().toUpperCase());
-    const localizationFilter = document.getElementById('localization-filter')?.value;
-    const keywordFilter = document.getElementById('keyword-filter')?.value.toLowerCase();
-    const statusDiv = document.getElementById('status-message');
-
-    if (queries.length === 0) {
-        statusDiv.innerHTML = `<span class="error-message">Please enter at least one gene name.</span>`;
-        statusDiv.style.display = 'block';
-        return;
-    }
-
-    let results = allGenes.filter(g =>
-        queries.some(q => {
-            // Use sanitized gene field directly, no need for replace(/\s/g, '')
-            if (g.gene && g.gene.toUpperCase() === q) {
-                return true;
-            }
-            if (g.synonym) {
-                const synonyms = g.synonym.toUpperCase().split(',').map(s => s.trim());
-                if (synonyms.includes(q)) {
-                    return true;
-                }
-            }
-            return false;
-        })
-    );
-
-    if (localizationFilter) {
-        results = results.filter(g => g.localization && g.localization.includes(localizationFilter));
-    }
-
-    if (keywordFilter) {
-        results = results.filter(g =>
-            (g.functional_summary && g.functional_summary.toLowerCase().includes(keywordFilter)) ||
-            (g.description && g.description.toLowerCase().includes(keywordFilter))
-        );
-    }
-
-    statusDiv.style.display = 'none';
-    searchResults = results;
-
-    if (results.length > 0) {
-        displayBatchResults(results);
-        displayGeneCards(currentData, results, 1, 10);
-    } else {
-        statusDiv.innerHTML = `<span class="error-message">No genes found matching your query.</span>`;
-        statusDiv.style.display = 'block';
-        displayGeneCards(currentData, [], 1, 10);
-    }
-}
-
-function displayBatchResults(results) {
-    const batchResults = document.getElementById('batch-results');
-    if (!batchResults) return;
-    
-    if (results.length === 0) {
-        batchResults.innerHTML = '<p class="error-message">No matching genes found</p>';
-        return;
-    }
-    
-    let html = `
-        <h3>Search Results (${results.length} genes found)</h3>
-        <table>
-            <tr>
-                <th>Gene</th>
-                <th>Ensembl ID</th>
-                <th>Localization</th>
-                <th>Function Summary</th>
-            </tr>`;
-    
-    results.forEach(item => {
-        html += `<tr>
-            <td><a href="/${item.gene}" onclick="navigateTo(event, '/${item.gene}')">${item.gene}</a></td>
-            <td>${item.ensembl_id || '-'}</td>
-            <td>${item.localization || '-'}</td>
-            <td>${item.functional_summary ? item.functional_summary.substring(0, 100) + '...' : '-'}</td>
-        </tr>`;
-    });
-    
-    html += '</table>';
-    batchResults.innerHTML = html;
-}
-
-function handleCSVUpload(event) {
-    const file = event.target.files[0];
-    if (!file) return;
-    
-    const reader = new FileReader();
-    reader.onload = function(e) {
-        const text = e.target.result;
-        const genes = text.split(/[\n,]+/).map(g => g.trim()).filter(Boolean);
-        const input = document.getElementById('batch-genes-input');
-        input.value += (input.value ? '\n' : '') + genes.join('\n');
-    };
-    reader.readAsText(file);
-}
-
 function displayGeneCards(defaults, searchResults, page = 1, perPage = 10) {
     const container = document.getElementById('gene-cards-container');
     if (!container) return;
@@ -1806,4 +1699,50 @@ document.addEventListener('DOMContentLoaded', () => {
     initGlobalEventListeners();
     handleRouteChange();
 });
+
+" code between  and  in the most up-to-date Canvas "CiliaHub Main Script" document above and am asking a query about/based on this code below.
+Instructions to follow:
+  * Don't output/edit the document if the query is Direct/Simple. For example, if the query asks for a simple explanation, output a direct answer.
+  * Make sure to **edit** the document if the query shows the intent of editing the document, in which case output the entire edited document, **not just that section or the edits**.
+    * Don't output the same document/empty document and say that you have edited it.
+    * Don't change unrelated code in the document.
+  * Don't output  and  in your final response.
+  * Any references like "this" or "selected code" refers to the code between  and  tags.
+  * Just acknowledge my request in the introduction.
+  * Make sure to refer to the document as "Canvas" in your response.
+
+No connection to the real data was made. 
+
+For default genes, should you not include other data as shown in the json file as well  for each gene? 
+
+Here is the data format in json file:
+
+{
+    "gene": "FBF1",
+    "ensembl_id": "ENSG00000188878",
+    "description": "Fas binding factor 1 [Source:HGNC Symbol,Acc:HGNC:24674]",
+    "synonym": "ALB, FBF-1, FLJ00103, KIAA1863",
+    "omim_id": "616807",
+    "functional_summary": "Transition fiber protein required for ciliogenesis and the ciliary import of assembled intraflagellar transport particles at the cilia base (24231678). Functions in centriole duplication by recruiting",
+    "localization": "cilia",
+    "reference": "https://pubmed.ncbi.nlm.nih.gov/30782830;https://pubmed.ncbi.nlm.nih.gov/29040558;https://pubmed.ncbi.nlm.nih.gov/29360984",
+    "protein_complexes": "Distal appendage",
+    "gene_annotation": "",
+    "functional_category": "Axoneme, Ciliary assembly/disassembly, Ciliary assembly/disassembly",
+    "ciliopathy": ""
+  },
+  {
+    "gene": "WDPCP",
+    "ensembl_id": "ENSG00000143951",
+    "description": "WD repeat containing pla r cell polarity effector [Source:HGNC Symbol,Acc:HGNC:28027]",
+    "synonym": "BBS15, C2ORF86, CPLANE5, FRITZ, HFRTZ",
+    "omim_id": "613580",
+    "functional_summary": "MIM: 613580. Also known as C2ORF86, BBS15 or FRITZ. Regulates pla r cell polarity through the modulation of the actin cytoskeleton. Required for recruitment of proteins essential for ciliogenesis to the transition zone, including Sept2, Nphp1, and Mks1, and facilitates the assembly of multiprotein complexes. Mutations have been associated with Bardet-Biedl and and Meckel-Gruber syndromes (24302887, 32055034). Knockdown leads to fewer and shorter cilia and decreses the expression of Septin7 in human  sal epithelium, indication that Septin7 could be a target of WDPCP (28001338). Regulates cilia function and beating through activation of MAPK/ERK pathway in the mitochondria of sino sal epithelial cells (33598458).",
+    "localization": "cilia",
+    "reference": "https://pubmed.ncbi.nlm.nih.gov/29263200",
+    "protein_complexes": "",
+    "gene_annotation": "",
+    "functional_category": "Axoneme, Ciliary assembly/disassembly, Cytoskeleton/adhesion links, Actin & cytoskeleton regulation, Cell migration & adhesion, Motile cilium, Non-motile cilium / primary cilium, Ciliary assembly/disassembly, Cytoskeleton/adhesion links",
+    "ciliopathy": ""
+  },
 
