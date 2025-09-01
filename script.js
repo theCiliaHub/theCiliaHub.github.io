@@ -799,7 +799,7 @@ function displayEnrichmentPage() {
                 <li>Results are visualized in interactive plots and downloadable tables.</li>
             </ol>
             <textarea id="enrichment-genes-input" 
-                placeholder="e.g., TMEM17, IFT88, WDR31..." 
+                placeholder="Enter gene names, synonyms, or Ensembl IDs (e.g., IFT88, ENSG00000198707)..." 
                 style="width: 100%; min-height: 150px; padding: 1rem; border: 2px solid #e1ecf4; border-radius: 10px; font-size: 1rem; margin-top: 1rem; resize: vertical;">
             </textarea>
             <div id="enrichment-controls" style="margin-top: 1rem; display: flex; align-items: center; gap: 20px; flex-wrap: wrap;">
