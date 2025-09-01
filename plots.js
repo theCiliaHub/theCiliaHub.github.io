@@ -397,9 +397,9 @@ function renderCiliomeEnrichment(foundGenes, notFoundGenes) {
             chartData.counts.push(count);
         });
 
-    // ✅ Requirement: Make the plot bigger for the Ciliome section
+    // ✅ Requirement: Standardize plot size to match Gene Matrix plot
     const barChartHTML = `
-        <div style="position: relative; width: 100%; max-width: 700px; height: 700px; margin: auto;">
+        <div style="position: relative; width: 100%; max-width: 700px; height: 600px; margin: auto;">
             <canvas id="ciliome-bar-chart"></canvas>
         </div>
     `;
@@ -444,8 +444,8 @@ function renderCiliomeEnrichment(foundGenes, notFoundGenes) {
                     beginAtZero: true,
                     title: {
                         display: true,
-                        text: settings.xAxisTitle,
-                        font: {
+                        text: settings.xAxisTitle, // ✅ X-axis title is now customizable
+                        font: { // ✅ Axis title size is now customizable
                             family: settings.fontFamily,
                             size: settings.fontSize,
                             weight: settings.fontWeight
@@ -463,7 +463,7 @@ function renderCiliomeEnrichment(foundGenes, notFoundGenes) {
                     }
                 },
                 y: {
-                    ticks: {
+                    ticks: { // ✅ Axis tick size is now customizable
                         font: {
                             family: settings.fontFamily,
                             size: settings.fontSize,
