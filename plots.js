@@ -410,18 +410,26 @@ const ctx = document.getElementById('ciliome-bar-chart').getContext('2d');
 // Remove any background fill
 ctx.canvas.style.backgroundColor = 'transparent';
 
-// Define modifiable style settings
+// Style config
 const chartStyles = {
-    barColor: '#1b7837',         // bar fill color
-    barBorder: '#00441b',        // bar border color
-    titleColor: '#000000',       // title text color
-    axisLabelColor: '#000000',   // axis label color
-    tickColor: '#000000',        // tick text color
+    barColor: '#1b7837',
+    barBorder: '#00441b',
+    titleColor: '#000',
+    axisLabelColor: '#000',
+    tickColor: '#000',
     titleSize: 18,
     axisLabelSize: 14,
     tickSize: 12,
     barThickness: 22
 };
+
+// Guard clause if no localization data
+if (chartData.labels.length === 0) {
+    ctx.fillStyle = "black";
+    ctx.font = "14px sans-serif";
+    ctx.fillText("No localization data available", 20, 20);
+    return;
+}
 
 window.ciliomeChartInstance = new Chart(ctx, {
     type: 'bar',
@@ -445,8 +453,8 @@ window.ciliomeChartInstance = new Chart(ctx, {
             title: {
                 display: true,
                 text: 'Localization of Found Ciliary Genes',
-                font: { size: chartStyles.titleSize, weight: 'bold' },
-                color: chartStyles.titleColor
+                color: chartStyles.titleColor,
+                font: { size: chartStyles.titleSize, weight: 'bold' }
             }
         },
         scales: {
@@ -455,8 +463,8 @@ window.ciliomeChartInstance = new Chart(ctx, {
                 title: {
                     display: true,
                     text: 'Number of Genes',
-                    font: { size: chartStyles.axisLabelSize, weight: 'bold' },
-                    color: chartStyles.axisLabelColor
+                    color: chartStyles.axisLabelColor,
+                    font: { size: chartStyles.axisLabelSize, weight: 'bold' }
                 },
                 ticks: {
                     stepSize: 1,
@@ -465,8 +473,8 @@ window.ciliomeChartInstance = new Chart(ctx, {
                 },
                 grid: {
                     color: '#e0e0e0',
-                    drawBorder: true,     // ensure axis line is visible
-                    borderColor: '#000',  // axis line color
+                    drawBorder: true,
+                    borderColor: '#000',
                     borderWidth: 1
                 }
             },
@@ -478,8 +486,8 @@ window.ciliomeChartInstance = new Chart(ctx, {
                 },
                 grid: {
                     color: '#f5f5f5',
-                    drawBorder: true,     // ensure Y axis line is visible
-                    borderColor: '#000',  // axis line color
+                    drawBorder: true,
+                    borderColor: '#000',
                     borderWidth: 1
                 }
             }
