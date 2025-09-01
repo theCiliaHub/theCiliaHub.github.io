@@ -1179,13 +1179,15 @@ function handleCSVUpload(event) {
     };
     reader.readAsText(file);
 }
-
 function displayGeneCards(defaults, searchResults, page = 1, perPage = 10) {
     const container = document.getElementById('gene-cards-container');
     if (!container) return;
 
+    // Merge search results with defaults, avoiding duplicates
     const uniqueDefaults = defaults.filter(d => !searchResults.some(s => s.gene === d.gene));
     const allGenesToDisplay = [...searchResults, ...uniqueDefaults];
+
+    // Pagination
     const start = (page - 1) * perPage;
     const end = start + perPage;
     const paginatedGenes = allGenesToDisplay.slice(start, end);
@@ -1196,27 +1198,34 @@ function displayGeneCards(defaults, searchResults, page = 1, perPage = 10) {
                 const gene = JSON.parse(entry.target.dataset.gene);
                 const isSearchResult = searchResults.some(s => s.gene === gene.gene);
 
+                // Convert arrays to comma-separated strings if necessary
+                const localization = gene.localization ? (Array.isArray(gene.localization) ? gene.localization.join(', ') : gene.localization) : '';
+                const functionalCategory = gene.functional_category ? (Array.isArray(gene.functional_category) ? gene.functional_category.join(', ') : gene.functional_category) : '';
+                const proteinComplexes = gene.protein_complexes ? (Array.isArray(gene.protein_complexes) ? gene.protein_complexes.join(', ') : gene.protein_complexes) : '';
+
                 entry.target.innerHTML = `
                     <div class="gene-name">${gene.gene}</div>
                     <div class="gene-description">${gene.description || 'No description available.'}</div>
-                    ${gene.functional_summary ? `<div class="gene-info"><strong>Summary:</strong> ${gene.functional_summary}</div>` : ''}
-                    ${gene.localization && gene.localization.length ? `
-                        <div class="gene-info"><strong>Localization:</strong> 
-                            ${gene.localization.map(loc => `<span style="color: ${isSearchResult ? '#27ae60' : '#1e90ff'}; font-weight: 600;">${loc}</span>`).join(', ')}
+                    ${localization ? `
+                        <div class="gene-info">
+                            <strong>Localization:</strong> 
+                            <span style="color: ${isSearchResult ? '#27ae60' : '#1e90ff'}; font-weight: 600;">
+                                ${localization}
+                            </span>
                         </div>` : ''}
+                    ${functionalCategory ? `<div class="gene-info"><strong>Functional Category:</strong> ${functionalCategory}</div>` : ''}
+                    ${proteinComplexes ? `<div class="gene-info"><strong>Protein Complexes:</strong> ${proteinComplexes}</div>` : ''}
                     ${gene.ensembl_id ? `
                         <div class="gene-info"><strong>Ensembl:</strong> 
-                            <a href="https://www.ensembl.org/Homo_sapiens/Gene/Summary?g=${gene.ensembl_id}" target="_blank">${gene.ensembl_id}</a>
+                            <a href="https://www.ensembl.org/Homo_sapiens/Gene/Summary?g=${gene.ensembl_id}" target="_blank">
+                                ${gene.ensembl_id}
+                            </a>
                         </div>` : ''}
                     ${gene.omim_id ? `
                         <div class="gene-info"><strong>OMIM:</strong> 
                             <a href="https://www.omim.org/entry/${gene.omim_id}" target="_blank">${gene.omim_id}</a>
                         </div>` : ''}
                     ${gene.synonym ? `<div class="gene-info"><strong>Synonym:</strong> ${gene.synonym}</div>` : ''}
-                    ${gene.functional_category ? `<div class="gene-info"><strong>Functional Category:</strong> ${gene.functional_category}</div>` : ''}
-                    ${gene.protein_complexes ? `<div class="gene-info"><strong>Protein Complexes:</strong> ${gene.protein_complexes}</div>` : ''}
-                    ${gene.gene_annotation ? `<div class="gene-info"><strong>Gene Annotation:</strong> ${gene.gene_annotation}</div>` : ''}
-                    ${gene.ciliopathy ? `<div class="gene-info"><strong>Ciliopathy:</strong> ${gene.ciliopathy}</div>` : ''}
                     ${gene.reference ? `<div class="gene-info"><strong>Reference:</strong> <a href="${gene.reference}" target="_blank">${gene.reference}</a></div>` : ''}
                     <div style="margin-top: 1rem; padding: 0.5rem; background: ${isSearchResult ? '#d5f4e6' : '#e8f4fd'}; 
                             border-radius: 5px; font-size: 0.9rem; color: ${isSearchResult ? '#27ae60' : '#1e90ff'};">
@@ -1232,13 +1241,14 @@ function displayGeneCards(defaults, searchResults, page = 1, perPage = 10) {
         });
     }, { rootMargin: '100px' });
 
+    // Render paginated gene cards
     container.innerHTML = paginatedGenes.map(gene => `
         <div class="gene-card" data-gene='${JSON.stringify(gene)}'></div>
     `).join('');
 
     container.querySelectorAll('.gene-card').forEach(card => observer.observe(card));
 
-    // Pagination
+    // Pagination controls
     const paginationDiv = document.createElement('div');
     paginationDiv.className = 'pagination';
     paginationDiv.innerHTML = `
@@ -1250,6 +1260,7 @@ function displayGeneCards(defaults, searchResults, page = 1, perPage = 10) {
 
     updateGeneButtons(allGenesToDisplay, searchResults);
 }
+
 
 function updateGeneButtons(genesToDisplay, searchResults = []) {
     const container = document.getElementById('geneButtons');
