@@ -6,18 +6,16 @@ function getPlotSettings() {
         textColor: document.getElementById('setting-text-color')?.value || '#000000',
         axisColor: document.getElementById('setting-axis-color')?.value || '#000000',
         yAxisTitle: document.getElementById('setting-y-axis-title')?.value || 'Localization',
+        // --- ADDED: Customizable color for the bar chart ---
+        // Note: You will need to add a color input to your HTML with id 'setting-bar-color'.
+        barChartColor: document.getElementById('setting-bar-color')?.value || '#2ca25f',
         enrichmentColors: [
             document.getElementById('setting-enrichment-color1')?.value || '#edf8fb',
             document.getElementById('setting-enrichment-color2')?.value || '#b2e2e2',
             document.getElementById('setting-enrichment-color3')?.value || '#66c2a4',
             document.getElementById('setting-enrichment-color4')?.value || '#2ca25f',
             document.getElementById('setting-enrichment-color5')?.value || '#006d2c'
-        ],
-        // --- ADDED: Customizable colors for the new Ciliome Scatter Plot ---
-        // Note: You will need to add corresponding color input elements to your HTML
-        // with ids 'setting-ciliome-gene-color' and 'setting-user-gene-color'.
-        ciliomeGeneColor: document.getElementById('setting-ciliome-gene-color')?.value || '#cccccc',
-        userGeneColor: document.getElementById('setting-user-gene-color')?.value || '#006d2c',
+        ]
     };
 }
 
@@ -35,6 +33,7 @@ function logCombination(n, k) {
 
 function hypergeometricPValue(k, n, M, N) {
     let p = 0;
+    // Calculate P(X >= k) by summing probabilities from k to min(n, M)
     for (let i = k; i <= n && i <= M; i++) {
         let logP = logCombination(M, i) + logCombination(N - M, n - i) - logCombination(N, n);
         p += Math.exp(logP);
@@ -348,7 +347,7 @@ function renderBubbleMatrix(foundGenes) {
     });
 }
 
-// --- REPLACED: This function now renders a scatter plot with the requested styling ---
+// --- UPDATED: Reverted to Bar Chart and applied all styling enhancements ---
 function renderCiliomeEnrichment(foundGenes, notFoundGenes) {
     document.getElementById('ciliome-plot-container').style.display = 'block';
 
@@ -369,7 +368,6 @@ function renderCiliomeEnrichment(foundGenes, notFoundGenes) {
     const pValue = hypergeometricPValue(k, n_input, M, N);
     const enrichmentScore = n_input > 0 && M > 0 ? (k / n_input) / (M / N) : 0;
 
-    // Part 1: Preserve the statistical summary
     const summaryHTML = `
         <div id="ciliome-results-summary" style="margin-bottom: 2rem; font-size: 1.1rem; max-width: 600px; margin-left: auto; margin-right: auto;">
             <h3>Enrichment Analysis Results</h3>
@@ -382,109 +380,110 @@ function renderCiliomeEnrichment(foundGenes, notFoundGenes) {
         </div>
     `;
 
-    // Part 2: Prepare data for the new scatter plot
-    const allCiliaryGenes = window.allGenes || [];
-    const userGeneSet = new Set(foundGenes.map(g => g.gene));
+    const localizationCounts = {};
+    foundGenes.forEach(gene => {
+        if (gene.localization) {
+            gene.localization.split(',').forEach(loc => {
+                const term = loc.trim();
+                if (term) {
+                    localizationCounts[term] = (localizationCounts[term] || 0) + 1;
+                }
+            });
+        }
+    });
 
-    const backgroundPoints = allCiliaryGenes
-        .filter(gene => !userGeneSet.has(gene.gene))
-        .map(gene => ({
-            x: Math.random(),
-            y: Math.random(),
-            geneName: gene.gene
-        }));
+    const chartData = {
+        labels: [],
+        counts: []
+    };
 
-    const userPoints = foundGenes.map(gene => ({
-        x: Math.random(),
-        y: Math.random(),
-        geneName: gene.gene
-    }));
+    Object.entries(localizationCounts)
+        .sort(([, a], [, b]) => b - a)
+        .forEach(([label, count]) => {
+            chartData.labels.push(label);
+            chartData.counts.push(count);
+        });
 
-    const scatterPlotHTML = `
-        <div style="position: relative; width: 100%; max-width: 700px; height: 500px; margin: auto;">
-            <canvas id="ciliome-scatter-chart"></canvas>
+    const barChartHTML = `
+        <div style="position: relative; width: 100%; max-width: 700px; height: ${30 + chartData.labels.length * 40}px; margin: auto;">
+            <canvas id="ciliome-bar-chart"></canvas>
         </div>
     `;
 
     const container = document.getElementById('ciliome-plot-container');
-    container.innerHTML = summaryHTML + scatterPlotHTML;
+    container.innerHTML = summaryHTML + (k > 0 ? barChartHTML : '<p>No ciliary genes were found in your list to plot localizations.</p>');
 
-    // Part 3: Render the new scatter plot with enhanced styling
+    if (k === 0) return;
+
     const settings = getPlotSettings();
-    const ctx = document.getElementById('ciliome-scatter-chart').getContext('2d');
-
+    const ctx = document.getElementById('ciliome-bar-chart').getContext('2d');
     window.ciliomeChartInstance = new Chart(ctx, {
-        type: 'scatter',
+        type: 'bar',
         data: {
+            labels: chartData.labels,
             datasets: [{
-                label: `Other Ciliary Genes (${backgroundPoints.length})`,
-                data: backgroundPoints,
-                backgroundColor: settings.ciliomeGeneColor, // Customizable point color
-            }, {
-                label: `Your Genes (${userPoints.length})`,
-                data: userPoints,
-                backgroundColor: settings.userGeneColor, // Customizable point color
+                label: 'Gene Count',
+                data: chartData.counts,
+                backgroundColor: settings.barChartColor, // Requirement: Customizable color
+                borderWidth: 1
             }]
         },
         options: {
+            indexAxis: 'y',
             responsive: true,
             maintainAspectRatio: false,
             plugins: {
                 legend: {
-                    position: 'top',
-                    labels: {
-                        color: settings.textColor,
-                        font: {
-                            family: settings.fontFamily
-                        }
-                    }
-                },
-                tooltip: {
-                    callbacks: {
-                        label: (context) => context.raw.geneName
-                    }
+                    display: false
                 },
                 title: {
                     display: true,
-                    text: 'Ciliome Gene Enrichment',
-                    color: settings.textColor,
+                    text: 'Localization of Found Ciliary Genes',
                     font: {
                         family: settings.fontFamily,
                         size: settings.fontSize,
                         weight: settings.fontWeight
-                    }
+                    },
+                    color: settings.textColor
                 }
             },
             scales: {
                 x: {
-                    grid: {
-                        display: false, // Requirement: Remove background grid
-                        drawBorder: true, // Requirement: Add axes lines
-                        borderColor: settings.axisColor,
-                    },
-                    ticks: {
-                        display: false
-                    }, // Ticks are meaningless for random distribution
+                    beginAtZero: true,
                     title: {
                         display: true,
-                        text: 'Ciliome Gene Space',
-                        color: settings.axisColor, // Requirement: Customizable axis text
-                        font: {
+                        text: 'Number of Genes',
+                        font: { // Requirement: Customizable axis text
                             family: settings.fontFamily,
                             size: settings.fontSize,
                             weight: settings.fontWeight
-                        }
+                        },
+                        color: settings.axisColor
+                    },
+                    ticks: {
+                        stepSize: 1,
+                        color: settings.textColor
+                    },
+                    grid: { // Requirement: Remove background, add axis line
+                        display: false,
+                        drawBorder: true,
+                        borderColor: settings.axisColor
                     }
                 },
                 y: {
-                    grid: {
-                        display: false, // Requirement: Remove background grid
-                        drawBorder: true, // Requirement: Add axes lines
-                        borderColor: settings.axisColor,
+                    ticks: { // Requirement: Customizable axis text
+                        font: {
+                            family: settings.fontFamily,
+                            size: Math.max(12, settings.fontSize - 4),
+                            weight: settings.fontWeight
+                        },
+                        color: settings.textColor
                     },
-                    ticks: {
-                        display: false
-                    }, // Ticks are meaningless for random distribution
+                    grid: { // Requirement: Remove background, add axis line
+                        display: false,
+                        drawBorder: true,
+                        borderColor: settings.axisColor
+                    }
                 }
             }
         }
@@ -492,40 +491,60 @@ function renderCiliomeEnrichment(foundGenes, notFoundGenes) {
 }
 
 
-// --- downloadPlot function (Unchanged) ---
+// --- UPDATED: Download function now targets canvas only and uses higher resolution ---
 function downloadPlot() {
     const selectedPlot = document.querySelector('input[name="plot-type"]:checked').value;
     const format = document.getElementById('download-format')?.value || 'png';
-    let fileName;
+    let canvas = null;
+    let fileName = 'CiliaHub_Plot';
 
     if (selectedPlot === 'bubble') {
-        // ... bubble download logic (unchanged) ...
+        canvas = document.getElementById('enrichment-bubble-plot');
+        fileName = 'CiliaHub_Localization_Plot';
     } else if (selectedPlot === 'matrix') {
-        // ... matrix download logic (unchanged) ...
+        canvas = document.getElementById('enrichment-matrix-plot');
+        fileName = 'CiliaHub_Gene_Matrix_Plot';
     } else if (selectedPlot === 'ciliome') {
+        // Requirement: Target only the plot canvas, not the summary text.
+        canvas = document.getElementById('ciliome-bar-chart');
         fileName = 'CiliaHub_Ciliome_Enrichment';
-        const container = document.getElementById('ciliome-plot-container');
-        html2canvas(container, {
-            backgroundColor: 'white',
-            scale: 2
-        }).then(canvas => {
-            if (format === 'png') {
-                const a = document.createElement('a');
-                a.href = canvas.toDataURL('image/png');
-                a.download = `${fileName}.png`;
-                a.click();
-            } else if (format === 'pdf') {
-                const {
-                    jsPDF
-                } = window.jspdf;
-                const pdf = new jsPDF({
-                    orientation: canvas.width > canvas.height ? 'l' : 'p',
-                    unit: 'px',
-                    format: [canvas.width, canvas.height]
-                });
-                pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, canvas.width, canvas.height);
-                pdf.save(`${fileName}.pdf`);
-            }
+    }
+
+    if (!canvas) {
+        console.error("Could not find the canvas element to download.");
+        return;
+    }
+
+    // Use a temporary canvas to draw at a higher resolution
+    const tempCanvas = document.createElement('canvas');
+    const tempCtx = tempCanvas.getContext('2d');
+    
+    // Requirement: Higher DPI for publication-ready output (scale factor of 4 is approx 300 DPI)
+    const scale = 4;
+    tempCanvas.width = canvas.width * scale;
+    tempCanvas.height = canvas.height * scale;
+
+    // Set a white background to avoid transparency issues
+    tempCtx.fillStyle = 'white';
+    tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+    
+    tempCtx.drawImage(canvas, 0, 0, tempCanvas.width, tempCanvas.height);
+
+    if (format === 'png') {
+        const a = document.createElement('a');
+        a.href = tempCanvas.toDataURL('image/png');
+        a.download = `${fileName}.png`;
+        a.click();
+    } else if (format === 'pdf') {
+        const {
+            jsPDF
+        } = window.jspdf;
+        const pdf = new jsPDF({
+            orientation: tempCanvas.width > tempCanvas.height ? 'l' : 'p',
+            unit: 'px',
+            format: [tempCanvas.width, tempCanvas.height]
         });
+        pdf.addImage(tempCanvas.toDataURL('image/png'), 'PNG', 0, 0, tempCanvas.width, tempCanvas.height);
+        pdf.save(`${fileName}.pdf`);
     }
 }
