@@ -6,8 +6,9 @@ function getPlotSettings() {
         textColor: document.getElementById('setting-text-color')?.value || '#000000',
         axisColor: document.getElementById('setting-axis-color')?.value || '#000000',
         yAxisTitle: document.getElementById('setting-y-axis-title')?.value || 'Localization',
-        // ✅ Requirement: Make plot colors customizable. This is for the bar chart.
-        // Note: Please add a color input to your HTML with id="setting-bar-color"
+        // ✅ Requirement: Allow users to modify X Axis Title.
+        // Note: Please add a text input to your HTML with id="setting-x-axis-title"
+        xAxisTitle: document.getElementById('setting-x-axis-title')?.value || 'Enrichment',
         barChartColor: document.getElementById('setting-bar-color')?.value || '#2ca25f',
         enrichmentColors: [
             document.getElementById('setting-enrichment-color1')?.value || '#edf8fb',
@@ -82,7 +83,6 @@ function generateEnrichmentPlots() {
     document.getElementById('download-plot-btn').style.display = 'inline-block';
 }
 
-// --- renderEnrichmentBubblePlot function (Unchanged) ---
 function renderEnrichmentBubblePlot(foundGenes) {
     document.getElementById('bubble-enrichment-container').style.display = 'flex';
 
@@ -186,9 +186,9 @@ function renderEnrichmentBubblePlot(foundGenes) {
                     display: true,
                     title: {
                         display: true,
-                        text: 'Enrichment',
+                        text: settings.xAxisTitle, // ✅ X-axis title is now customizable
                         color: settings.axisColor,
-                        font: {
+                        font: { // ✅ Axis title size is now customizable
                             family: settings.fontFamily,
                             size: settings.fontSize,
                             weight: settings.fontWeight
@@ -208,7 +208,7 @@ function renderEnrichmentBubblePlot(foundGenes) {
                         display: true,
                         text: settings.yAxisTitle,
                         color: settings.axisColor,
-                        font: {
+                        font: { // ✅ Axis title size is now customizable
                             family: settings.fontFamily,
                             size: settings.fontSize,
                             weight: settings.fontWeight
@@ -219,7 +219,7 @@ function renderEnrichmentBubblePlot(foundGenes) {
                         drawBorder: false
                     },
                     ticks: {
-                        font: {
+                        font: { // ✅ Axis tick size is now customizable
                             size: settings.fontSize,
                             weight: settings.fontWeight,
                             family: settings.fontFamily
@@ -235,7 +235,6 @@ function renderEnrichmentBubblePlot(foundGenes) {
     });
 }
 
-// --- renderBubbleMatrix function (Unchanged) ---
 function renderBubbleMatrix(foundGenes) {
     document.getElementById('matrix-plot-container').style.display = 'block';
 
@@ -293,16 +292,16 @@ function renderBubbleMatrix(foundGenes) {
                     labels: xLabels,
                     title: {
                         display: true,
-                        text: 'Genes',
-                        font: {
+                        text: settings.xAxisTitle, // ✅ X-axis title is now customizable
+                        font: { // ✅ Axis title size is now customizable
                             family: settings.fontFamily,
-                            size: 16,
+                            size: settings.fontSize,
                             weight: 'bold'
                         },
                         color: settings.axisColor
                     },
                     ticks: {
-                        font: {
+                        font: { // ✅ Axis tick size is now customizable
                             family: settings.fontFamily,
                             size: settings.fontSize,
                             weight: settings.fontWeight
@@ -322,15 +321,15 @@ function renderBubbleMatrix(foundGenes) {
                     title: {
                         display: true,
                         text: 'Ciliary Localization',
-                        font: {
+                        font: { // ✅ Axis title size is now customizable
                             family: settings.fontFamily,
-                            size: 16,
+                            size: settings.fontSize,
                             weight: 'bold'
                         },
                         color: settings.axisColor
                     },
                     ticks: {
-                        font: {
+                        font: { // ✅ Axis tick size is now customizable
                             family: settings.fontFamily,
                             size: settings.fontSize,
                             weight: settings.fontWeight
@@ -346,7 +345,6 @@ function renderBubbleMatrix(foundGenes) {
     });
 }
 
-// ✅ Requirement 1: Reverted to the original bar chart implementation
 function renderCiliomeEnrichment(foundGenes, notFoundGenes) {
     document.getElementById('ciliome-plot-container').style.display = 'block';
 
@@ -399,8 +397,9 @@ function renderCiliomeEnrichment(foundGenes, notFoundGenes) {
             chartData.counts.push(count);
         });
 
+    // ✅ Requirement: Standardize plot size to match Gene Matrix plot
     const barChartHTML = `
-        <div style="position: relative; width: 100%; max-width: 700px; height: ${30 + chartData.labels.length * 40}px; margin: auto;">
+        <div style="position: relative; width: 100%; max-width: 700px; height: 600px; margin: auto;">
             <canvas id="ciliome-bar-chart"></canvas>
         </div>
     `;
@@ -419,7 +418,7 @@ function renderCiliomeEnrichment(foundGenes, notFoundGenes) {
             datasets: [{
                 label: 'Gene Count',
                 data: chartData.counts,
-                backgroundColor: settings.barChartColor, // ✅ Color is now customizable
+                backgroundColor: settings.barChartColor,
                 borderWidth: 1
             }]
         },
@@ -432,7 +431,7 @@ function renderCiliomeEnrichment(foundGenes, notFoundGenes) {
                 title: {
                     display: true,
                     text: 'Localization of Found Ciliary Genes',
-                    font: { // ✅ Title text is now customizable
+                    font: {
                         family: settings.fontFamily,
                         size: settings.fontSize,
                         weight: settings.fontWeight
@@ -445,8 +444,8 @@ function renderCiliomeEnrichment(foundGenes, notFoundGenes) {
                     beginAtZero: true,
                     title: {
                         display: true,
-                        text: 'Number of Genes',
-                        font: { // ✅ Axis label text is now customizable
+                        text: settings.xAxisTitle, // ✅ X-axis title is now customizable
+                        font: { // ✅ Axis title size is now customizable
                             family: settings.fontFamily,
                             size: settings.fontSize,
                             weight: settings.fontWeight
@@ -455,24 +454,24 @@ function renderCiliomeEnrichment(foundGenes, notFoundGenes) {
                     },
                     ticks: {
                         stepSize: 1,
-                        color: settings.textColor // ✅ Tick color is now customizable
+                        color: settings.textColor
                     },
-                    grid: { // ✅ Requirement: Remove background, add axis line
+                    grid: {
                         display: false,
                         drawBorder: true,
                         borderColor: settings.axisColor
                     }
                 },
                 y: {
-                    ticks: { // ✅ Axis tick text is now customizable
+                    ticks: { // ✅ Axis tick size is now customizable
                         font: {
                             family: settings.fontFamily,
-                            size: Math.max(12, settings.fontSize - 4),
+                            size: settings.fontSize,
                             weight: settings.fontWeight
                         },
                         color: settings.textColor
                     },
-                    grid: { // ✅ Requirement: Remove background, add axis line
+                    grid: {
                         display: false,
                         drawBorder: true,
                         borderColor: settings.axisColor
@@ -483,8 +482,6 @@ function renderCiliomeEnrichment(foundGenes, notFoundGenes) {
     });
 }
 
-
-// ✅ Requirement 4 & 5: Updated download function
 function downloadPlot() {
     const selectedPlot = document.querySelector('input[name="plot-type"]:checked').value;
     const format = document.getElementById('download-format')?.value || 'png';
@@ -498,7 +495,6 @@ function downloadPlot() {
         canvas = document.getElementById('enrichment-matrix-plot');
         fileName = 'CiliaHub_Gene_Matrix_Plot';
     } else if (selectedPlot === 'ciliome') {
-        // ✅ Captures the plot canvas only, not the summary text
         canvas = document.getElementById('ciliome-bar-chart');
         fileName = 'CiliaHub_Ciliome_Enrichment';
     }
@@ -508,20 +504,16 @@ function downloadPlot() {
         return;
     }
     
-    // Create a temporary canvas to render the high-resolution image
     const tempCanvas = document.createElement('canvas');
     const tempCtx = tempCanvas.getContext('2d');
     
-    // ✅ PNG/PDF downloads at ~300 DPI equivalent resolution
     const scale = 4;
     tempCanvas.width = canvas.width * scale;
     tempCanvas.height = canvas.height * scale;
 
-    // Draw a white background on the temporary canvas to prevent transparency
     tempCtx.fillStyle = 'white';
     tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
     
-    // Draw the original chart onto the temporary canvas at the scaled size
     tempCtx.drawImage(canvas, 0, 0, tempCanvas.width, tempCanvas.height);
 
     if (format === 'png') {
