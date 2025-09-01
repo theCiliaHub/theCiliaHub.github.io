@@ -24,55 +24,56 @@
 </head>
 <body>
     <nav class="navbar">
-            </nav>
+        <div class="nav-container">
+            <a href="/#" onclick="navigateTo(event, '/')" class="logo" aria-label="CiliaHub Home">CiliaHub</a>
+            <ul class="nav-links">
+                <li><a href="/#" onclick="navigateTo(event, '/')" aria-label="Home">Home</a></li>
+                <li><a href="/#/enrichment" onclick="navigateTo(event, '/enrichment')" aria-label="Enrichment">Enrichment</a></li>
+                <li><a href="/#/batch-query" onclick="navigateTo(event, '/batch-query')" aria-label="Batch Query">Batch Query</a></li>
+                <li><a href="/#/compare" onclick="navigateTo(event, '/compare')" aria-label="Compare">Compare</a></li>
+                <li><a href="/#/expression" onclick="navigateTo(event, '/expression')" aria-label="Expression">Expression</a></li>
+                <li><a href="/#/download" onclick="navigateTo(event, '/download')" aria-label="Download">Download</a></li>
+                <li><a href="/#/contact" onclick="navigateTo(event, '/contact')" aria-label="Contact">Contact</a></li>
+            </ul>
+        </div>
+    </nav>
 
     <main class="main-container">
         <div class="content-area" id="content-area">
             
-            <div id="home-page">
-                            </div>
+                        <div id="home-page">
+                <h1>Welcome to CiliaHub 🔬</h1>
+                <p>Your comprehensive resource for genes with ciliary functions. Explore our database, compare genes, and visualize expression data.</p>
+                <div class="call-to-action">
+                    <p>Get started by analyzing your gene list to discover ciliary localization patterns.</p>
+                    <a href="/#/enrichment" onclick="navigateTo(event, '/enrichment')" class="cta-button">Perform Gene Enrichment Analysis</a>
+                </div>
+         D   </div>
 
-            <div id="analysis-page" style="display: none;">
-                <h2>Gene Enrichment Analysis</h2>
-                <div class="analysis-input">
-                    <label for="analysis-genes-input">Enter Gene List (one per line or comma-separated):</label>
-                    <textarea id="analysis-genes-input" rows="5" placeholder="e.g., BBS1, BBS2, ARL6"></textarea>
-                </div>
-                <div class="plot-type-selection">
-                    <h3>Select Plot Type:</h3>
-                    <label><input type="radio" name="plot-type" value="bubble" checked> Bubble Enrichment Plot</label>
-                    <label><input type="radio" name="plot-type" value="matrix"> Matrix Plot</label>
-                                        <label><input type="radio" name="plot-type" value="ciliome"> Ciliome Enrichment</label>
-                </div>
-                <div class="plot-settings">
-                                </div>
-                <button onclick="generateAnalysisPlots()">Generate Plot</button>
-                <div id="analysis-status" style="display: none;"></div>
-                <div id="plot-container" style="display: none;">
-                    <div id="bubble-enrichment-container" style="display: flex; width: 100%; height: 500px;">
-                        <canvas id="analysis-bubble-plot" style="flex-grow: 1;"></canvas>
-                        <div id="legend-container" style="min-width: 150px; padding-left: 20px;"></div>
-                    </div>
-                    <div id="matrix-plot-container" style="display: none; width: 100%; height: 500px;">
-                        <canvas id="analysis-matrix-plot"></canvas>
-                    </div>
-                                                            <div id="ciliome-plot-container" style="display: none; padding: 20px; text-align: center;"></div>
-                </div>
-                
-                <div id="gene-table-container" style="display: none; width: 80%; margin: 40px auto 0;"></div>
-
-                <div class="download-section">
-                     <button id="download-plot-btn" onclick="downloadPlot()" style="display: none; margin-right: 10px;">Download Plot</button>
-                     <select id="download-format">
-                         <option value="png">PNG</option>
-                         <option value="pdf">PDF</option>
-                                              </select>
-                </div>
-            </div>
         </div>
         
         <aside class="cilia-panel">
-                    </aside>
+            <div class="panel-header">
+                <h3>Interactive Cilium</h3>
+                <p style="font-size: 0.9rem; opacity: 0.9;">Click genes to see localization</p>
+            </div>
+            <div class="panel-content">
+                <div class="cilia-container interactive-cilium">
+                    <svg viewBox="0 0 300 400" xmlns="http://www.w3.org/2000/svg">
+                        <path id="cell-body" class="cilia-part" tabindex="0" fill="none" d="M 50,380 C -20,300 20,200 150,200 C 280,200 320,300 250,380 Z" aria-label="Cell Body"/>
+                        <circle id="nucleus" class="cilia-part" tabindex="0" fill="#A7C7E7" cx="150" cy="320" r="40" aria-label="Nucleus"/>
+                        <rect id="basal-body" class="cilia-part" tabindex="0" fill="#2F2F2F" x="140" y="195" width="20" height="15" aria-label="Basal Body"/>
+                        <path id="transition-zone" class="cilia-part" tabindex="0" fill="#9B59B6" d="M 142,195 L 138,180 L 162,180 L 158,195 Z" aria-label="Transition Zone"/>
+                        <path id="ciliary-membrane" class="cilia-part" tabindex="0" fill="none" fill-opacity="0.5" d="M 138,180 L 145,10 L 155,10 L 162,180 Z" aria-label="Ciliary Membrane"/>
+                        <path id="axoneme" class="cilia-part" tabindex="0" fill="none" d="M 145,180 L 148,15 L 152,15 L 155,180 Z" aria-label="Axoneme"/>
+                    </svg>
+                </div>
+                <div class="controls">
+                    <h4>Gene Localization:</h4>
+                    <div id="geneButtons" class="gene-buttons"></div>
+                </div>
+            </div>
+        </aside>
     </main>
 
     <footer class="footer">
