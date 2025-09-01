@@ -755,14 +755,14 @@ function displayEnrichmentPage() {
     
     <div id="enrichment-controls" style="margin-top: 1rem; display: flex; align-items: center; gap: 20px; flex-wrap: wrap;">
         <div>
-            <strong>Plot Type:</strong>
-            <input type="radio" id="plot-bubble" name="plot-type" value="bubble" checked>
-            <label for="plot-bubble" style="margin-right: 10px;">Enrichment</label>
-            <input type="radio" id="plot-matrix" name="plot-type" value="matrix">
-            <label for="plot-matrix" style="margin-right: 10px;">Gene Matrix</label>
-            <input type="radio" id="plot-upset" name="plot-type" value="upset">
-            <label for="plot-upset">Set Overlaps (Upset)</label>
-        </div>
+           <strong>Plot Type:</strong>
+            <input type="radio" id="plot-bubble" name="plot-type" value="bubble" checked>
+            <label for="plot-bubble" style="margin-right: 10px;">Localization</label>
+            <input type="radio" id="plot-matrix" name="plot-type" value="matrix">
+            <label for="plot-matrix" style="margin-right: 10px;">Gene Matrix</label>
+                        <input type="radio" id="plot-ciliome" name="plot-type" value="ciliome">
+            <label for="plot-ciliome">Ciliome Enrichment</label>
+        </div>
         <button id="generate-plot-btn" class="btn btn-primary">Generate Plot</button>
         <select id="download-format">
             <option value="png">PNG</option>
@@ -840,11 +840,10 @@ function displayEnrichmentPage() {
                     <div id="legend-container" style="flex-shrink: 0; width: 150px; padding-top: 20px; padding-left: 5px;"></div>
                 </div>
                 <div id="matrix-plot-container" style="display: none;">
-                     <div class="plot-wrapper" style="position: relative; height: 600px;"><canvas id="enrichment-matrix-plot"></canvas></div>
-                </div>
-                <div id="upset-plot-container" style="display: none;">
-                     <div id="upset-plot-wrapper"></div>
-                </div>
+                     <div class="plot-wrapper" style="position: relative; height: 600px;"><canvas id="enrichment-matrix-plot"></canvas></div>
+                </div>
+                                                <div id="ciliome-plot-container" style="display: none; padding: 20px; text-align: center;"></div>
+            </div>
             </div>
         </div>
     `;
