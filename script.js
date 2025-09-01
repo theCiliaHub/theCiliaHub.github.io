@@ -1,15 +1,19 @@
-// Global variables for data management
+// ============================================================================
+// GLOBAL VARIABLES
+// ============================================================================
 const geneLocalizationData = {};
 let allGenes = [];
 let currentData = [];
 let searchResults = [];
-let localizationChartInstance; // For Chart.js instance management
-let analysisDotPlotInstance; // For Analysis page dot plot
-let analysisBarChartInstance; // For Analysis page bar chart
+let localizationChartInstance; 
+let analysisDotPlotInstance;  
+let analysisBarChartInstance; 
 const allPartIds = ["cell-body", "nucleus", "basal-body", "transition-zone", "axoneme", "ciliary-membrane"];
 const defaultGenesNames = ["ACE2", "ADAMTS20", "ADAMTS9", "IFT88", "CEP290", "WDR31", "ARL13B", "BBS1"];
 
-// ✨ THE NEW PLUGIN CODE RIGHT HERE for PLOT ✨
+// ============================================================================
+// CHART BACKGROUND PLUGIN
+// ============================================================================
 Chart.register({
   id: 'customCanvasBackgroundColor',
   beforeDraw: (chart, args, options) => {
@@ -22,135 +26,68 @@ Chart.register({
   }
 });
 
-// =============================================================================
-// NEW & IMPROVED: DATA AND SEARCH SYSTEM (Add this entire block)
-// =============================================================================
-
+// ============================================================================
+// DATA LOADING + SANITIZATION
+// ============================================================================
 let geneDataCache = null;
 let geneMapCache = null;
 
 /**
- * Sanitizes any string by removing invisible characters and normalizing it.
- * This is the core of the bug fix.
+ * Sanitize: remove invisible chars & normalize.
  */
 function sanitize(input) {
-    if (typeof input !== 'string') return '';
-    // Removes zero-width spaces, trims standard spaces, and uppercases.
-    return input.replace(/[\u200B-\u200D\u2060\uFEFF]/g, '').trim().toUpperCase();
+  if (typeof input !== 'string') return '';
+  return input.replace(/[\u200B-\u200D\u2060\uFEFF]/g, '').trim().toUpperCase();
 }
 
 /**
- * Loads, sanitizes, and prepares the gene database into an efficient lookup map.
- * This runs only once. Replaces the old `loadGeneDatabase`.
+ * Load and prepare gene database
  */
 async function loadAndPrepareDatabase() {
-    if (geneDataCache) return true; // Prevent re-loading
-    try {
-        const response = await fetch('https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/ciliahub_data.json');
-        if (!response.ok) throw new Error(`HTTP Error: ${response.status}`);
-        
-        const rawGenes = await response.json();
-        geneDataCache = rawGenes;
-        allGenes = rawGenes; // Keep for other parts of the app that need the array
+  if (geneDataCache) return true;
+  try {
+    const response = await fetch(
+      'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/ciliahub_data.json'
+    );
+    if (!response.ok) throw new Error(`HTTP Error: ${response.status}`);
 
-        const map = new Map();
-        allGenes.forEach(gene => {
-            const saneGene = sanitize(gene.gene);
-            if (saneGene) map.set(saneGene, gene);
-            if (gene.synonym) {
-                gene.synonym.split(',').forEach(syn => {
-                    const saneSyn = sanitize(syn);
-                    if (saneSyn && !map.has(saneSyn)) map.set(saneSyn, gene);
-                });
-            }
+    const rawGenes = await response.json();
+    geneDataCache = rawGenes;
+    allGenes = rawGenes;
+
+    // Build synonym + gene lookup
+    const map = new Map();
+    allGenes.forEach(gene => {
+      const saneGene = sanitize(gene.gene);
+      if (saneGene) map.set(saneGene, gene);
+
+      if (gene.synonym) {
+        gene.synonym.split(',').forEach(syn => {
+          const saneSyn = sanitize(syn);
+          if (saneSyn && !map.has(saneSyn)) map.set(saneSyn, gene);
         });
-        geneMapCache = map;
-
-        // Populate data for other parts of the site (e.g., cilium diagram)
-        allGenes.forEach(gene => {
-            if (gene.localization && gene.gene) {
-                geneLocalizationData[gene.gene] = mapLocalizationToSVG(gene.localization);
-            }
-        });
-        currentData = allGenes.filter(g => defaultGenesNames.includes(g.gene));
-
-        console.log('Data loaded and sanitized successfully.');
-        return true;
-    } catch (error) {
-        console.error("Failed to load and prepare gene database:", error);
-        allGenes = [...getDefaultGenes()];
-        currentData = [...allGenes];
-        return false;
-    }
-}
-
-/**
- * The new central search function. Replaces old search logic.
- */
-function findGenes(queries) {
-    const foundGenes = new Set();
-    const notFound = [];
-    queries.forEach(query => {
-        const result = geneMapCache.get(query);
-        if (result) {
-            foundGenes.add(result);
-        } else {
-            notFound.push(query);
-        }
+      }
     });
-    return { foundGenes: Array.from(foundGenes), notFoundGenes: notFound };
-}
+    geneMapCache = map;
 
-/**
- * New function to handle the UI for the Batch Gene Query page.
- */
-function performBatchSearch() {
-    const inputElement = document.getElementById('batch-genes-input');
-    const resultDiv = document.getElementById('batch-results');
-    if (!inputElement || !resultDiv) return;
+    // Prepare localization data for diagrams
+    allGenes.forEach(gene => {
+      if (gene.localization && gene.gene) {
+        geneLocalizationData[gene.gene] = mapLocalizationToSVG(gene.localization);
+      }
+    });
 
-    const queries = inputElement.value.split(/[\s,;\n\r\t]+/).map(sanitize).filter(Boolean);
-    if (queries.length === 0) {
-        resultDiv.innerHTML = '<p class="status-message error-message">Please enter one or more gene names.</p>';
-        return;
-    }
+    // Default data for UI
+    currentData = allGenes.filter(g => defaultGenesNames.includes(g.gene));
 
-    const { foundGenes, notFoundGenes } = findGenes(queries);
-    displayBatchResults(foundGenes, notFoundGenes);
-}
-
-/**
- * New function to handle the UI for the Single Gene Search on the Home page.
- */
-function performSingleSearch() {
-    const query = sanitize(document.getElementById('single-gene-search')?.value || '');
-    const statusDiv = document.getElementById('status-message');
-    if (!statusDiv) return;
-    
-    statusDiv.style.display = 'block';
-    if (!query) {
-        statusDiv.innerHTML = `<span class="error-message">Please enter a gene name.</span>`;
-        return;
-    }
-    statusDiv.innerHTML = '<span>Searching...</span>';
-
-    const { foundGenes } = findGenes([query]);
-
-    if (foundGenes.length === 1) {
-        navigateTo(null, `/${foundGenes[0].gene}`);
-    } else if (foundGenes.length > 1) {
-        // This can happen if a query matches a synonym shared by multiple genes
-        navigateTo(null, '/batch-query');
-        setTimeout(() => {
-            const batchInput = document.getElementById('batch-genes-input');
-            if (batchInput) {
-                batchInput.value = foundGenes.map(r => r.gene).join('\n');
-                performBatchSearch();
-            }
-        }, 100);
-    } else {
-        statusDiv.innerHTML = `<span class="error-message">No exact match found for "${query}".</span>`;
-    }
+    console.log('✅ Data loaded and sanitized successfully');
+    return true;
+  } catch (error) {
+    console.error("❌ Failed to load and prepare gene database:", error);
+    allGenes = [];
+    currentData = [];
+    return false;
+  }
 }
 
 /**
@@ -189,8 +126,9 @@ function displayBatchResults(foundGenes, notFoundGenes) {
     if (cardsContainer) cardsContainer.innerHTML = '';
 }
 
-
+// ===============================
 // Default genes as fallback
+// ===============================
 function getDefaultGenes() {
     return [
         {
@@ -200,11 +138,11 @@ function getDefaultGenes() {
             synonym: "BBS20, D13S840E, TG737, TTC10",
             omim_id: "605484",
             functional_summary: "Essential for intraflagellar transport and ciliary assembly. It is a component of the IFT complex B and is required for cilium biogenesis.",
-            localization: "Axoneme, Basal Body",
-            reference: "https://pubmed.ncbi.nlm.nih.gov/9724754/",
+            localization: ["axoneme", "basal body"],
+            reference: ["https://pubmed.ncbi.nlm.nih.gov/9724754/"],
             protein_complexes: "IFT-B",
             gene_annotation: "",
-            functional_category: "Intraflagellar transport, Ciliary assembly/disassembly",
+            functional_category: ["Intraflagellar transport", "Ciliary assembly/disassembly"],
             ciliopathy: "Bardet-Biedl syndrome 20"
         },
         {
@@ -214,11 +152,11 @@ function getDefaultGenes() {
             synonym: "BBS14, JBTS5, MKS4, NPHP6, SLSN6",
             omim_id: "610142",
             functional_summary: "Regulates ciliary gating and ciliopathy-related pathways. Acts as a gatekeeper for proteins entering and exiting the cilium.",
-            localization: "Transition Zone",
-            reference: "https://pubmed.ncbi.nlm.nih.gov/16971477/",
+            localization: ["transition zone"],
+            reference: ["https://pubmed.ncbi.nlm.nih.gov/16971477/"],
             protein_complexes: "NPHP-MKS-JBTS complex",
             gene_annotation: "",
-            functional_category: "Transition zone, Ciliary gating",
+            functional_category: ["Transition zone", "Ciliary gating"],
             ciliopathy: "Joubert syndrome 5, Meckel syndrome 4, Bardet-Biedl syndrome 14, Leber congenital amaurosis 10"
         },
         {
@@ -228,11 +166,11 @@ function getDefaultGenes() {
             synonym: "C14orf148",
             omim_id: "",
             functional_summary: "Required for proper ciliary structure and function. It is thought to be involved in the regulation of ciliogenesis.",
-            localization: "Axoneme",
-            reference: "https://pubmed.ncbi.nlm.nih.gov/22114125/",
+            localization: ["axoneme"],
+            reference: ["https://pubmed.ncbi.nlm.nih.gov/22114125/"],
             protein_complexes: "",
             gene_annotation: "",
-            functional_category: "Ciliary assembly/disassembly",
+            functional_category: ["Ciliary assembly/disassembly"],
             ciliopathy: ""
         },
         {
@@ -242,11 +180,11 @@ function getDefaultGenes() {
             synonym: "ARL2L2, JBTS8",
             omim_id: "608922",
             functional_summary: "Critical for ciliary signaling and membrane trafficking. It is a small G protein that localizes to the ciliary membrane and regulates the traffic of ciliary proteins.",
-            localization: "Ciliary Membrane",
-            reference: "https://pubmed.ncbi.nlm.nih.gov/19732862/",
+            localization: ["ciliary membrane"],
+            reference: ["https://pubmed.ncbi.nlm.nih.gov/19732862/"],
             protein_complexes: "",
             gene_annotation: "",
-            functional_category: "Ciliary membrane, Signal transduction",
+            functional_category: ["Ciliary membrane", "Signal transduction"],
             ciliopathy: "Joubert syndrome 8"
         },
         {
@@ -256,11 +194,11 @@ function getDefaultGenes() {
             synonym: "BBS",
             omim_id: "209901",
             functional_summary: "Involved in ciliary trafficking and BBSome assembly. The BBSome complex is a key regulator of protein trafficking to and from the cilium.",
-            localization: "Basal Body, Ciliary Membrane",
-            reference: "https://pubmed.ncbi.nlm.nih.gov/11058628/",
+            localization: ["basal body", "ciliary membrane"],
+            reference: ["https://pubmed.ncbi.nlm.nih.gov/11058628/"],
             protein_complexes: "BBSome",
             gene_annotation: "",
-            functional_category: "Ciliary trafficking, BBSome complex",
+            functional_category: ["Ciliary trafficking", "BBSome complex"],
             ciliopathy: "Bardet-Biedl syndrome 1"
         },
         {
@@ -270,16 +208,33 @@ function getDefaultGenes() {
             synonym: "ACEH",
             omim_id: "300335",
             functional_summary: "Regulates blood pressure and acts as a receptor for coronaviruses in respiratory cilia. Its expression on ciliated cells is a key factor in COVID-19 infection.",
-            localization: "Cilia",
-            reference: "https://pubmed.ncbi.nlm.nih.gov/32142651/",
+            localization: ["cilia"],
+            reference: ["https://pubmed.ncbi.nlm.nih.gov/32142651/"],
             protein_complexes: "",
             gene_annotation: "",
-            functional_category: "Cell surface receptor, Ciliary membrane",
+            functional_category: ["Cell surface receptor", "Ciliary membrane"],
             ciliopathy: ""
+        },
+        {
+            gene: "PKD2",
+            ensembl_id: "ENSG00000118762",
+            description: "Polycystin-2, a calcium-permeable ion channel.",
+            synonym: "TRPP2",
+            omim_id: "173910",
+            functional_summary: "Ion channel important for mechanosensation in primary cilia.",
+            localization: ["axoneme", "endoplasmic reticulum"],
+            reference: ["https://pubmed.ncbi.nlm.nih.gov/11285250/"],
+            protein_complexes: ["Polycystin complex"],
+            gene_annotation: "",
+            functional_category: ["Ion transport", "Ciliary signaling"],
+            ciliopathy: "Autosomal dominant polycystic kidney disease"
         }
     ];
 }
 
+// ===============================
+// Map localization terms to SVG IDs
+// ===============================
 function mapLocalizationToSVG(localization) {
     const mapping = {
         "ciliary membrane": ["ciliary-membrane", "axoneme"],
@@ -290,25 +245,94 @@ function mapLocalizationToSVG(localization) {
         "flagella": ["ciliary-membrane", "axoneme"],
         "ciliary associated gene": ["ciliary-membrane", "axoneme"]
     };
-    
+
     if (!localization) return [];
-    
-    return localization.split(',')
-        .flatMap(loc => {
-            const trimmedLoc = loc.trim().toLowerCase();
-            return mapping[trimmedLoc] || [];
-        })
-        .filter(id => allPartIds.includes(id));
+
+    return localization.flatMap(loc => {
+        const trimmedLoc = loc.trim().toLowerCase();
+        return mapping[trimmedLoc] || [];
+    }).filter(id => allPartIds.includes(id));
 }
 
+// ===============================
+// Central search
+// ===============================
+function findGenes(queries) {
+    const foundGenes = new Set();
+    const notFound = [];
+    queries.forEach(query => {
+        const result = geneMapCache.get(query);
+        if (result) {
+            foundGenes.add(result);
+        } else {
+            notFound.push(query);
+        }
+    });
+    return { foundGenes: Array.from(foundGenes), notFoundGenes: notFound };
+}
+
+// ===============================
+// Batch search UI
+// ===============================
+function performBatchSearch() {
+    const inputElement = document.getElementById('batch-genes-input');
+    const resultDiv = document.getElementById('batch-results');
+    if (!inputElement || !resultDiv) return;
+
+    const queries = inputElement.value.split(/[\s,;\n\r\t]+/).map(sanitize).filter(Boolean);
+    if (queries.length === 0) {
+        resultDiv.innerHTML = '<p class="status-message error-message">Please enter one or more gene names.</p>';
+        return;
+    }
+
+    const { foundGenes, notFoundGenes } = findGenes(queries);
+    displayBatchResults(foundGenes, notFoundGenes);
+}
+
+// ===============================
+// Single search UI
+// ===============================
+function performSingleSearch() {
+    const query = sanitize(document.getElementById('single-gene-search')?.value || '');
+    const statusDiv = document.getElementById('status-message');
+    if (!statusDiv) return;
+
+    statusDiv.style.display = 'block';
+    if (!query) {
+        statusDiv.innerHTML = `<span class="error-message">Please enter a gene name.</span>`;
+        return;
+    }
+    statusDiv.innerHTML = '<span>Searching...</span>';
+
+    const { foundGenes } = findGenes([query]);
+
+    if (foundGenes.length === 1) {
+        navigateTo(null, `/${foundGenes[0].gene}`);
+    } else if (foundGenes.length > 1) {
+        navigateTo(null, '/batch-query');
+        setTimeout(() => {
+            const batchInput = document.getElementById('batch-genes-input');
+            if (batchInput) {
+                batchInput.value = foundGenes.map(r => r.gene).join('\n');
+                performBatchSearch();
+            }
+        }, 100);
+    } else {
+        statusDiv.innerHTML = `<span class="error-message">No exact match found for "${query}".</span>`;
+    }
+}
+
+// ===============================
+// Routing
+// ===============================
 async function handleRouteChange() {
-    await loadAndPrepareDatabase(); // Use the new, efficient data loader
+    await loadAndPrepareDatabase();
     const path = window.location.hash.replace('#', '').toLowerCase() || '/';
     const geneName = sanitize(path.split('/').pop().replace('.html', ''));
     const gene = geneMapCache.get(geneName);
-    
+
     updateActiveNav(path);
-    
+
     if (path === '/' || path === '/index.html') {
         displayHomePage();
         setTimeout(displayLocalizationChart, 0);
@@ -327,13 +351,15 @@ async function handleRouteChange() {
     } else if (gene) {
         displayIndividualGenePage(gene);
     } else {
-        // Don't show "not found" for the homepage
         if (path !== '/' && path !== '/index.html') {
             displayNotFoundPage();
         }
     }
 }
-    
+
+// ===============================
+// Global listeners
+// ===============================
 function initGlobalEventListeners() {
     window.addEventListener('scroll', handleStickySearch);
     document.querySelectorAll('.cilia-part').forEach(part => {
@@ -344,7 +370,7 @@ function initGlobalEventListeners() {
             }
         });
     });
-    
+
     const ciliaSvg = document.querySelector('.interactive-cilium svg');
     if (ciliaSvg) {
         Panzoom(ciliaSvg, {
@@ -359,6 +385,7 @@ function initGlobalEventListeners() {
         });
     }
 }
+
 
 function displayHomePage() {
     const contentArea = document.querySelector('.content-area');
