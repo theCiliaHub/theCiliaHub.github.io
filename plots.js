@@ -1,3 +1,5 @@
+// --- Main Plotting Control and Settings ---
+
 function getPlotSettings() {
     return {
         fontFamily: document.getElementById('setting-font-family')?.value || 'Arial',
@@ -6,8 +8,6 @@ function getPlotSettings() {
         textColor: document.getElementById('setting-text-color')?.value || '#000000',
         axisColor: document.getElementById('setting-axis-color')?.value || '#000000',
         yAxisTitle: document.getElementById('setting-y-axis-title')?.value || 'Localization',
-        // ✅ Requirement: Allow users to modify X Axis Title.
-        // Note: Please add a text input to your HTML with id="setting-x-axis-title"
         xAxisTitle: document.getElementById('setting-x-axis-title')?.value || 'Enrichment',
         barChartColor: document.getElementById('setting-bar-color')?.value || '#2ca25f',
         enrichmentColors: [
@@ -18,27 +18,6 @@ function getPlotSettings() {
             document.getElementById('setting-enrichment-color5')?.value || '#006d2c'
         ]
     };
-}
-
-// --- Helper functions for Hypergeometric Test (Unchanged) ---
-function logGamma(x) {
-    let tmp = (x - 0.5) * Math.log(x + 4.5) - (x + 4.5);
-    let ser = 1.0 + 76.18009173 / (x + 0) - 86.50532033 / (x + 1) + 24.01409822 / (x + 2) - 1.231739516 / (x + 3) + 0.00120858003 / (x + 4) - 0.00000536382 / (x + 5);
-    return tmp + Math.log(ser * Math.sqrt(2 * Math.PI));
-}
-
-function logCombination(n, k) {
-    if (k < 0 || k > n) return -Infinity;
-    return logGamma(n + 1) - logGamma(k + 1) - logGamma(n - k + 1);
-}
-
-function hypergeometricPValue(k, n, M, N) {
-    let p = 0;
-    for (let i = k; i <= n && i <= M; i++) {
-        let logP = logCombination(M, i) + logCombination(N - M, n - i) - logCombination(N, n);
-        p += Math.exp(logP);
-    }
-    return p;
 }
 
 async function generateEnrichmentPlots() {
@@ -79,162 +58,48 @@ async function generateEnrichmentPlots() {
 
     // --- Bubble Plot: Gene vs Localization ---
     if (plotType === 'bubble') {
-        bubbleContainer.style.display = 'flex';
-        drawBubblePlot(foundGenes);
+        // ✅ CORRECTED: Called the 'render' function
+        renderEnrichmentBubblePlot(foundGenes);
     }
 
     // --- Gene Matrix Plot ---
     if (plotType === 'matrix') {
-        matrixContainer.style.display = 'block';
-        drawGeneMatrix(foundGenes);
+        // ✅ CORRECTED: Called the 'render' function
+        renderBubbleMatrix(foundGenes);
     }
 
     // --- Ciliome Enrichment Plot ---
     if (plotType === 'ciliome') {
-        ciliomeContainer.style.display = 'block';
-        drawCiliomeEnrichment(foundGenes);
+        // ✅ CORRECTED: Called the 'render' function and passed notFoundGenes
+        renderCiliomeEnrichment(foundGenes, notFoundGenes);
     }
 }
 
-// ------------------------
-// Bubble Plot Function
-// ------------------------
-function drawBubblePlot(genes) {
-    const canvas = document.getElementById('enrichment-bubble-plot');
-    const ctx = canvas.getContext('2d');
-    canvas.width = canvas.parentElement.offsetWidth;
-    canvas.height = 600;
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    // Extract all localizations
-    const allLocalizations = Array.from(new Set(genes.flatMap(g => g.localization || [])));
-    const padding = 60;
-
-    // Map genes to y-axis
-    const geneNames = genes.map(g => g.gene);
-    const yStep = (canvas.height - 2 * padding) / geneNames.length;
-    const xStep = (canvas.width - 2 * padding) / allLocalizations.length;
-
-    ctx.font = '14px Arial';
-    ctx.textAlign = 'right';
-    ctx.textBaseline = 'middle';
-
-    // Draw y-axis (genes)
-    geneNames.forEach((gene, i) => {
-        ctx.fillStyle = '#000';
-        ctx.fillText(gene, padding - 10, padding + i * yStep + yStep / 2);
-    });
-
-    // Draw x-axis (localizations)
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'top';
-    allLocalizations.forEach((loc, i) => {
-        ctx.fillText(loc, padding + i * xStep + xStep / 2, canvas.height - padding + 5);
-    });
-
-    // Draw bubbles
-    genes.forEach((g, i) => {
-        (g.localization || []).forEach(loc => {
-            const x = padding + allLocalizations.indexOf(loc) * xStep + xStep / 2;
-            const y = padding + i * yStep + yStep / 2;
-            ctx.beginPath();
-            ctx.arc(x, y, 10, 0, 2 * Math.PI);
-            ctx.fillStyle = '#27ae60';
-            ctx.fill();
-        });
-    });
+// --- Helper functions for Hypergeometric Test (Unchanged) ---
+function logGamma(x) {
+    let tmp = (x - 0.5) * Math.log(x + 4.5) - (x + 4.5);
+    let ser = 1.0 + 76.18009173 / (x + 0) - 86.50532033 / (x + 1) + 24.01409822 / (x + 2) - 1.231739516 / (x + 3) + 0.00120858003 / (x + 4) - 0.00000536382 / (x + 5);
+    return tmp + Math.log(ser * Math.sqrt(2 * Math.PI));
 }
 
-// ------------------------
-// Gene Matrix Plot Function
-// ------------------------
-function drawGeneMatrix(genes) {
-    const canvas = document.getElementById('enrichment-matrix-plot');
-    const ctx = canvas.getContext('2d');
-    canvas.width = canvas.parentElement.offsetWidth;
-    canvas.height = 600;
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    // Collect unique functional categories
-    const categories = Array.from(new Set(genes.flatMap(g => (g.functional_category || '').split(',').map(s => s.trim()).filter(Boolean))));
-    const geneNames = genes.map(g => g.gene);
-    const padding = 60;
-    const yStep = (canvas.height - 2 * padding) / geneNames.length;
-    const xStep = (canvas.width - 2 * padding) / categories.length;
-
-    ctx.font = '12px Arial';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'top';
-
-    // Draw x-axis (categories)
-    categories.forEach((cat, i) => {
-        ctx.fillStyle = '#000';
-        ctx.fillText(cat, padding + i * xStep + xStep / 2, canvas.height - padding + 5);
-    });
-
-    // Draw y-axis (genes)
-    ctx.textAlign = 'right';
-    ctx.textBaseline = 'middle';
-    geneNames.forEach((gene, i) => {
-        ctx.fillStyle = '#000';
-        ctx.fillText(gene, padding - 10, padding + i * yStep + yStep / 2);
-    });
-
-    // Draw matrix cells
-    genes.forEach((g, i) => {
-        const gCategories = (g.functional_category || '').split(',').map(s => s.trim());
-        gCategories.forEach(cat => {
-            const x = padding + categories.indexOf(cat) * xStep;
-            const y = padding + i * yStep;
-            ctx.fillStyle = '#2ca25f';
-            ctx.fillRect(x + 1, y + 1, xStep - 2, yStep - 2);
-        });
-    });
+function logCombination(n, k) {
+    if (k < 0 || k > n) return -Infinity;
+    return logGamma(n + 1) - logGamma(k + 1) - logGamma(n - k + 1);
 }
 
-// ------------------------
-// Ciliome Enrichment Plot Function
-// ------------------------
-function drawCiliomeEnrichment(genes) {
-    const container = document.getElementById('ciliome-plot-container');
-    container.innerHTML = ''; // Clear previous
-
-    // Count genes per functional category
-    const counts = {};
-    genes.forEach(g => {
-        (g.functional_category || '').split(',').map(s => s.trim()).filter(Boolean).forEach(cat => {
-            counts[cat] = (counts[cat] || 0) + 1;
-        });
-    });
-
-    const sortedCats = Object.keys(counts).sort((a, b) => counts[b] - counts[a]);
-    const maxCount = Math.max(...Object.values(counts));
-
-    // Simple bar chart
-    sortedCats.forEach(cat => {
-        const bar = document.createElement('div');
-        bar.style.background = '#2ca25f';
-        bar.style.height = '30px';
-        bar.style.width = `${(counts[cat] / maxCount) * 100}%`;
-        bar.style.margin = '5px 0';
-        bar.style.color = '#fff';
-        bar.style.fontWeight = 'bold';
-        bar.style.display = 'flex';
-        bar.style.alignItems = 'center';
-        bar.style.paddingLeft = '10px';
-        bar.textContent = `${cat} (${counts[cat]})`;
-        container.appendChild(bar);
-    });
-}
-
-function drawCiliomeEnrichment(data) {
-    const container = document.getElementById('ciliome-plot-container');
-    container.style.display = 'block';
-    container.innerHTML = `<p style="text-align:center; color: #555;">Ciliome Enrichment plot will be implemented here.</p>`;
+function hypergeometricPValue(k, n, M, N) {
+    let p = 0;
+    for (let i = k; i <= n && i <= M; i++) {
+        let logP = logCombination(M, i) + logCombination(N - M, n - i) - logCombination(N, n);
+        p += Math.exp(logP);
+    }
+    return p;
 }
 
 
-
+// ------------------------
+// Bubble Plot Function (Using Chart.js)
+// ------------------------
 function renderEnrichmentBubblePlot(foundGenes) {
     document.getElementById('bubble-enrichment-container').style.display = 'flex';
 
@@ -254,6 +119,7 @@ function renderEnrichmentBubblePlot(foundGenes) {
 
     const categoriesWithData = yCategories.filter(cat => localizationCounts[cat] > 0);
     if (categoriesWithData.length === 0) {
+        document.getElementById('bubble-enrichment-container').innerHTML = '<p class="status-message">No localizations found for the given genes in the selected categories.</p>';
         return;
     }
 
@@ -316,17 +182,10 @@ function renderEnrichmentBubblePlot(foundGenes) {
             responsive: true,
             maintainAspectRatio: false,
             layout: {
-                padding: {
-                    left: 0,
-                    right: 10,
-                    top: 20,
-                    bottom: 20
-                }
+                padding: { left: 0, right: 10, top: 20, bottom: 20 }
             },
             plugins: {
-                legend: {
-                    display: false
-                },
+                legend: { display: false },
                 tooltip: {
                     callbacks: {
                         label: c => `${c.raw.y}: ${c.raw.count} gene(s)`
@@ -338,20 +197,16 @@ function renderEnrichmentBubblePlot(foundGenes) {
                     display: true,
                     title: {
                         display: true,
-                        text: settings.xAxisTitle, // ✅ X-axis title is now customizable
+                        text: settings.xAxisTitle,
                         color: settings.axisColor,
-                        font: { // ✅ Axis title size is now customizable
+                        font: {
                             family: settings.fontFamily,
                             size: settings.fontSize,
                             weight: settings.fontWeight
                         }
                     },
-                    ticks: {
-                        display: false
-                    },
-                    grid: {
-                        display: false
-                    }
+                    ticks: { display: false },
+                    grid: { display: false }
                 },
                 y: {
                     type: 'category',
@@ -360,18 +215,15 @@ function renderEnrichmentBubblePlot(foundGenes) {
                         display: true,
                         text: settings.yAxisTitle,
                         color: settings.axisColor,
-                        font: { // ✅ Axis title size is now customizable
+                        font: {
                             family: settings.fontFamily,
                             size: settings.fontSize,
                             weight: settings.fontWeight
                         }
                     },
-                    grid: {
-                        display: false,
-                        drawBorder: false
-                    },
+                    grid: { display: false, drawBorder: false },
                     ticks: {
-                        font: { // ✅ Axis tick size is now customizable
+                        font: {
                             size: settings.fontSize,
                             weight: settings.fontWeight,
                             family: settings.fontFamily
@@ -387,6 +239,9 @@ function renderEnrichmentBubblePlot(foundGenes) {
     });
 }
 
+// ------------------------
+// Gene Matrix Plot Function (Using Chart.js)
+// ------------------------
 function renderBubbleMatrix(foundGenes) {
     document.getElementById('matrix-plot-container').style.display = 'block';
 
@@ -401,11 +256,7 @@ function renderBubbleMatrix(foundGenes) {
         label: gene.gene,
         data: (gene.localization || '').split(',').map(locString => {
             const matchingCategory = yCategories.find(cat => cat.toLowerCase() === locString.trim().toLowerCase());
-            return matchingCategory ? {
-                x: gene.gene,
-                y: matchingCategory,
-                r: 10
-            } : null;
+            return matchingCategory ? { x: gene.gene, y: matchingCategory, r: 10 } : null;
         }).filter(Boolean),
         backgroundColor: colorPalette[index % colorPalette.length]
     }));
@@ -414,9 +265,7 @@ function renderBubbleMatrix(foundGenes) {
 
     window.enrichmentBarChartInstance = new Chart(ctx, {
         type: 'bubble',
-        data: {
-            datasets
-        },
+        data: { datasets },
         options: {
             responsive: true,
             maintainAspectRatio: false,
@@ -444,8 +293,8 @@ function renderBubbleMatrix(foundGenes) {
                     labels: xLabels,
                     title: {
                         display: true,
-                        text: settings.xAxisTitle, // ✅ X-axis title is now customizable
-                        font: { // ✅ Axis title size is now customizable
+                        text: settings.xAxisTitle,
+                        font: {
                             family: settings.fontFamily,
                             size: settings.fontSize,
                             weight: 'bold'
@@ -453,7 +302,7 @@ function renderBubbleMatrix(foundGenes) {
                         color: settings.axisColor
                     },
                     ticks: {
-                        font: { // ✅ Axis tick size is now customizable
+                        font: {
                             family: settings.fontFamily,
                             size: settings.fontSize,
                             weight: settings.fontWeight
@@ -463,9 +312,7 @@ function renderBubbleMatrix(foundGenes) {
                         minRotation: 45,
                         color: settings.textColor
                     },
-                    grid: {
-                        display: false
-                    }
+                    grid: { display: false }
                 },
                 y: {
                     type: 'category',
@@ -473,7 +320,7 @@ function renderBubbleMatrix(foundGenes) {
                     title: {
                         display: true,
                         text: 'Ciliary Localization',
-                        font: { // ✅ Axis title size is now customizable
+                        font: {
                             family: settings.fontFamily,
                             size: settings.fontSize,
                             weight: 'bold'
@@ -481,22 +328,24 @@ function renderBubbleMatrix(foundGenes) {
                         color: settings.axisColor
                     },
                     ticks: {
-                        font: { // ✅ Axis tick size is now customizable
+                        font: {
                             family: settings.fontFamily,
                             size: settings.fontSize,
                             weight: settings.fontWeight
                         },
                         color: settings.textColor
                     },
-                    grid: {
-                        display: false
-                    }
+                    grid: { display: false }
                 }
             }
         }
     });
 }
 
+
+// ------------------------
+// Ciliome Enrichment Plot Function (Using Chart.js)
+// ------------------------
 function renderCiliomeEnrichment(foundGenes, notFoundGenes) {
     document.getElementById('ciliome-plot-container').style.display = 'block';
 
@@ -506,8 +355,8 @@ function renderCiliomeEnrichment(foundGenes, notFoundGenes) {
 
     const k = foundGenes.length;
     const n_input = k + notFoundGenes.length;
-    const M = window.allGenes ? window.allGenes.length : 2000;
-    const N = 20000;
+    const M = window.allGenes ? window.allGenes.length : 2000; // Total ciliary genes in database
+    const N = 20000; // Total genes in background genome
 
     if (n_input === 0) {
         document.getElementById('ciliome-plot-container').innerHTML = '<p class="status-message">Please enter a gene list to analyze.</p>';
@@ -549,7 +398,6 @@ function renderCiliomeEnrichment(foundGenes, notFoundGenes) {
             chartData.counts.push(count);
         });
 
-    // ✅ Requirement: Standardize plot size to match Gene Matrix plot
     const barChartHTML = `
         <div style="position: relative; width: 100%; max-width: 700px; height: 600px; margin: auto;">
             <canvas id="ciliome-bar-chart"></canvas>
@@ -596,8 +444,8 @@ function renderCiliomeEnrichment(foundGenes, notFoundGenes) {
                     beginAtZero: true,
                     title: {
                         display: true,
-                        text: settings.xAxisTitle, // ✅ X-axis title is now customizable
-                        font: { // ✅ Axis title size is now customizable
+                        text: settings.xAxisTitle,
+                        font: {
                             family: settings.fontFamily,
                             size: settings.fontSize,
                             weight: settings.fontWeight
@@ -615,7 +463,7 @@ function renderCiliomeEnrichment(foundGenes, notFoundGenes) {
                     }
                 },
                 y: {
-                    ticks: { // ✅ Axis tick size is now customizable
+                    ticks: {
                         font: {
                             family: settings.fontFamily,
                             size: settings.fontSize,
@@ -633,6 +481,8 @@ function renderCiliomeEnrichment(foundGenes, notFoundGenes) {
         }
     });
 }
+
+// --- Download Functionality ---
 
 function downloadPlot() {
     const selectedPlot = document.querySelector('input[name="plot-type"]:checked').value;
@@ -659,13 +509,16 @@ function downloadPlot() {
     const tempCanvas = document.createElement('canvas');
     const tempCtx = tempCanvas.getContext('2d');
     
+    // Increase resolution for better quality download
     const scale = 4;
     tempCanvas.width = canvas.width * scale;
     tempCanvas.height = canvas.height * scale;
 
+    // Fill background with white
     tempCtx.fillStyle = 'white';
     tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
     
+    // Draw the original canvas onto the high-res temporary canvas
     tempCtx.drawImage(canvas, 0, 0, tempCanvas.width, tempCanvas.height);
 
     if (format === 'png') {
