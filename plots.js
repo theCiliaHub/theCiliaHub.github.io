@@ -404,32 +404,15 @@ function renderCiliomeEnrichment(foundGenes, notFoundGenes) {
     // Do not try to render the chart if there's no data
     if (k === 0) return;
 
-// --- Part 3: Render the new bar chart ---
+    // --- Part 3: Render the new bar chart ---
+   // --- Part 3: Render the new bar chart ---
 const ctx = document.getElementById('ciliome-bar-chart').getContext('2d');
 
-// Remove any background fill
+// Make background transparent
 ctx.canvas.style.backgroundColor = 'transparent';
 
-// Style config
-const chartStyles = {
-    barColor: '#1b7837',
-    barBorder: '#00441b',
-    titleColor: '#000',
-    axisLabelColor: '#000',
-    tickColor: '#000',
-    titleSize: 18,
-    axisLabelSize: 14,
-    tickSize: 12,
-    barThickness: 22
-};
-
-// Guard clause if no localization data
-if (chartData.labels.length === 0) {
-    ctx.fillStyle = "black";
-    ctx.font = "14px sans-serif";
-    ctx.fillText("No localization data available", 20, 20);
-    return;
-}
+// Higher resolution for publication quality
+ctx.canvas.style.imageRendering = 'crisp-edges';
 
 window.ciliomeChartInstance = new Chart(ctx, {
     type: 'bar',
@@ -438,10 +421,10 @@ window.ciliomeChartInstance = new Chart(ctx, {
         datasets: [{
             label: 'Gene Count',
             data: chartData.counts,
-            backgroundColor: chartStyles.barColor,
-            borderColor: chartStyles.barBorder,
+            backgroundColor: '#1b7837',  // dark green
+            borderColor: '#00441b',
             borderWidth: 1.5,
-            barThickness: chartStyles.barThickness
+            barThickness: 22
         }]
     },
     options: {
@@ -453,8 +436,8 @@ window.ciliomeChartInstance = new Chart(ctx, {
             title: {
                 display: true,
                 text: 'Localization of Found Ciliary Genes',
-                color: chartStyles.titleColor,
-                font: { size: chartStyles.titleSize, weight: 'bold' }
+                font: { size: 18, weight: 'bold' },
+                color: '#000'
             }
         },
         scales: {
@@ -463,32 +446,30 @@ window.ciliomeChartInstance = new Chart(ctx, {
                 title: {
                     display: true,
                     text: 'Number of Genes',
-                    color: chartStyles.axisLabelColor,
-                    font: { size: chartStyles.axisLabelSize, weight: 'bold' }
+                    font: { size: 14, weight: 'bold' },
+                    color: '#000'
                 },
                 ticks: {
                     stepSize: 1,
-                    color: chartStyles.tickColor,
-                    font: { size: chartStyles.tickSize }
+                    color: '#000',
+                    font: { size: 12 }
                 },
                 grid: {
-                    color: '#e0e0e0',
-                    drawBorder: true,
-                    borderColor: '#000',
-                    borderWidth: 1
+                    color: '#e0e0e0',  // light grey grid
+                    drawBorder: false
                 }
             },
             y: {
-                title: { display: false },
+                title: {
+                    display: false
+                },
                 ticks: {
-                    color: chartStyles.tickColor,
-                    font: { size: chartStyles.tickSize }
+                    color: '#000',
+                    font: { size: 12 }
                 },
                 grid: {
-                    color: '#f5f5f5',
-                    drawBorder: true,
-                    borderColor: '#000',
-                    borderWidth: 1
+                    color: '#f5f5f5',  // subtle horizontal grid
+                    drawBorder: false
                 }
             }
         }
