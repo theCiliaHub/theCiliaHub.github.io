@@ -34,8 +34,11 @@ let geneMapCache = null;
  */
 function sanitize(input) {
     if (typeof input !== 'string') return '';
-    // Removes zero-width spaces, trims standard spaces, and uppercases.
-    return input.replace(/[\u200B-\u200D\u2060\uFEFF]/g, '').trim().toUpperCase();
+    // Removes zero-width spaces, non-printable characters, trims, and normalizes case
+    return input.replace(/[\u200B-\u200D\u2060\uFEFF]/g, '')
+                .replace(/[^\x20-\x7E]/g, '') // Remove non-printable ASCII
+                .trim()
+                .toUpperCase();
 }
 
 /**
@@ -48,16 +51,26 @@ async function loadAndPrepareDatabase() {
         if (!resp.ok) throw new Error(`HTTP Error ${resp.status}`);
         const rawGenes = await resp.json();
         
+        // Validate the data structure
+        if (!Array.isArray(rawGenes)) {
+            throw new Error('Invalid data format: expected array');
+        }
+        
         geneDataCache = rawGenes;
         allGenes = rawGenes;
         geneMapCache = new Map();
 
         allGenes.forEach(g => {
+            // Ensure gene name exists and is a string
+            if (!g.gene || typeof g.gene !== 'string') {
+                console.warn('Skipping entry with invalid gene name:', g);
+                return;
+            }
+            
             const nameKey = sanitize(g.gene);
             if (nameKey) geneMapCache.set(nameKey, g);
             
             if (g.synonym) {
-                // Ensure synonym is treated as a string before splitting
                 const synonyms = String(g.synonym).split(',');
                 synonyms.forEach(syn => {
                     const key = sanitize(syn);
@@ -70,14 +83,16 @@ async function loadAndPrepareDatabase() {
             }
         });
 
-        currentData = allGenes.filter(g => defaultGenesNames.includes(g.gene));
+        console.log(`Loaded ${allGenes.length} genes into database`);
         return true;
     } catch (e) {
         console.error('Data load error', e);
         allGenes = getDefaultGenes();
         currentData = allGenes;
         geneMapCache = new Map();
-        allGenes.forEach(g => geneMapCache.set(sanitize(g.gene), g));
+        allGenes.forEach(g => {
+            if (g.gene) geneMapCache.set(sanitize(g.gene), g);
+        });
         return false;
     }
 }
@@ -88,15 +103,48 @@ async function loadAndPrepareDatabase() {
 function findGenes(queries) {
     const foundGenes = new Set();
     const notFound = [];
+    
     queries.forEach(query => {
-        const result = geneMapCache.get(query);
+        // Convert query to uppercase for consistent comparison
+        const upperQuery = query.toUpperCase();
+        let result = null;
+        
+        // First try exact match with uppercase
+        result = geneMapCache.get(upperQuery);
+        
+        // If not found, try case-insensitive search
+        if (!result) {
+            for (let [key, value] of geneMapCache) {
+                if (key.toUpperCase() === upperQuery) {
+                    result = value;
+                    break;
+                }
+            }
+        }
+        
         if (result) {
             foundGenes.add(result);
         } else {
             notFound.push(query);
         }
     });
+    
     return { foundGenes: Array.from(foundGenes), notFoundGenes: notFound };
+}
+
+// Add this function to help with debugging
+function debugSearch(query) {
+    console.log("Searching for:", query);
+    console.log("Cache has key?", geneMapCache.has(query));
+    
+    if (!geneMapCache.has(query)) {
+        console.log("Available keys matching query:");
+        for (let key of geneMapCache.keys()) {
+            if (key.includes(query) || query.includes(key)) {
+                console.log(`- ${key}`);
+            }
+        }
+    }
 }
 
 /**
