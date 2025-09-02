@@ -345,29 +345,59 @@ function mapLocalizationToSVG(localizationArray) {
     }).filter(id => allPartIds.includes(id));
 }
 
+// -----------------------------
+// Navigation Helper
+// -----------------------------
+window.navigateTo = function(event, path) {
+    if (event) event.preventDefault();
+    // Ensure hash format
+    if (!path.startsWith('#')) path = '#' + path;
+    window.location.hash = path;
+};
+
+// -----------------------------
+// Router
+// -----------------------------
 async function handleRouteChange() {
-    try {
-        await loadAndPrepareDatabase();
-    } catch (err) {
-        console.error("Database loading failed:", err);
-        console.log("DEBUG hash:", window.location.hash);
-        console.log("DEBUG path:", path);
-
-    }
-
+    // Normalize the path first
     let path = window.location.hash.replace(/^#/, '').toLowerCase().trim();
     if (!path || path === '/' || path === '/index.html') {
         path = '/';
     }
 
-    const geneName = sanitize(path.split('/').pop().replace('.html', ''));
-    const gene = geneMapCache.get(geneName);
+    // Load database if not loaded
+    try {
+        await loadAndPrepareDatabase(); // should initialize geneMapCache, geneDataCache
+    } catch (err) {
+        console.error("Database loading failed:", err);
+        console.log("DEBUG hash:", window.location.hash);
+        console.log("DEBUG path:", path);
+    }
 
-    console.log("DEBUG hash:", window.location.hash);
-    console.log("DEBUG path:", path);
+    // Safely get gene if applicable
+    let gene = null;
+    if (geneMapCache) {
+        const geneName = sanitize(path.split('/').pop().replace('.html', ''));
+        gene = geneMapCache.get(geneName);
+    } else {
+        console.warn("geneMapCache is not initialized yet.");
+    }
 
+    // Update active nav
     updateActiveNav(path);
 
+    // Hide all main content pages first
+    const pages = [
+        '#home-page', '#analysis-page', '#batch-query-page',
+        '#enrichment-page', '#compare-page', '#expression-page',
+        '#download-page', '#contact-page', '#notfound-page'
+    ];
+    pages.forEach(id => {
+        const el = document.querySelector(id);
+        if (el) el.style.display = 'none';
+    });
+
+    // Show the right page
     switch (path) {
         case '/':
             displayHomePage();
@@ -377,6 +407,7 @@ async function handleRouteChange() {
             displayBatchQueryTool();
             break;
         case '/enrichment':
+        case '/analysis': // if you use both
             displayEnrichmentPage();
             break;
         case '/compare':
@@ -399,7 +430,20 @@ async function handleRouteChange() {
             }
             break;
     }
+
+    console.log("Routing completed. Path:", path, "Gene:", gene ? gene.name : "N/A");
 }
+
+// -----------------------------
+// Event Listeners
+// -----------------------------
+window.addEventListener("load", handleRouteChange);
+window.addEventListener("hashchange", handleRouteChange);
+
+// Initialize UI helpers
+document.addEventListener('DOMContentLoaded', () => {
+    initGlobalEventListeners();
+});
 
 
 function initGlobalEventListeners() {
@@ -1913,17 +1957,6 @@ function displayExpressionPage() {
     initExpressionSystem();
 }
 
-// Navigation helper
-window.navigateTo = function(event, path) {
-    if (event) event.preventDefault();
-    // Always include # at the start
-    if (!path.startsWith('#')) path = '#' + path;
-    window.location.hash = path;
-};
-
-// Router listeners
-window.addEventListener("load", handleRouteChange);
-window.addEventListener("hashchange", handleRouteChange);
 
 // Init UI helpers (sticky nav, panzoom, etc.)
 document.addEventListener('DOMContentLoaded', () => {
