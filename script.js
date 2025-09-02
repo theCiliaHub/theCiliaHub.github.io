@@ -362,29 +362,25 @@ function mapLocalizationToSVG(localizationArray) {
 }
 
 async function handleRouteChange() {
-    // Make sure the database is loaded before rendering
     try {
         await loadAndPrepareDatabase();
     } catch (err) {
         console.error("Database loading failed:", err);
     }
 
-    // Normalize the hash path
     let path = window.location.hash.replace(/^#/, '').toLowerCase().trim();
     if (!path || path === '/' || path === '/index.html') {
         path = '/';
     }
 
-    // Extract gene name if applicable
     const geneName = sanitize(path.split('/').pop().replace('.html', ''));
     const gene = geneMapCache.get(geneName);
 
-    console.log("Routing to:", path); // Debug log
+    console.log("DEBUG hash:", window.location.hash);
+    console.log("DEBUG path:", path);
 
-    // Update navigation highlighting (should not call display functions)
     updateActiveNav(path);
 
-    // Route handling
     switch (path) {
         case '/':
             displayHomePage();
@@ -417,6 +413,7 @@ async function handleRouteChange() {
             break;
     }
 }
+
 
 function initGlobalEventListeners() {
     window.addEventListener('scroll', handleStickySearch);
