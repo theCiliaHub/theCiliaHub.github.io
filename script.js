@@ -1410,28 +1410,40 @@ function displayLocalizationChart() {
     const categories = ['Cilia', 'Basal Body', 'Transition Zone', 'Flagella', 'Ciliary Associated Gene'];
     const localizationCounts = categories.reduce((acc, category) => {
         acc[category] = allGenes.filter(g => {
-            // ✨ FIX: Check if g.localization is an array before processing
-            if (!Array.isArray(g.localization)) return false;
-            
-            const localizations = g.localization.map(l => l.trim().toLowerCase());
+            // First, ensure the localization property exists and is an array
+            if (!Array.isArray(g.localization)) {
+                return false;
+            }
+
+            // ✨ FIX: Safely process the array, handling potential null/undefined values
+            const localizations = g.localization
+                .map(l => l?.trim().toLowerCase()) // Use optional chaining (?.)
+                .filter(Boolean); // Remove any null/undefined entries after trimming
+
+            if (localizations.length === 0) {
+                return false;
+            }
+
             return localizations.includes(category.toLowerCase()) ||
-                  (category === 'Cilia' && localizations.includes('ciliary membrane')) ||
-                  (category === 'Flagella' && localizations.includes('axoneme')) ||
-                  (category === 'Ciliary Associated Gene' && localizations.includes('ciliary associated gene'));
+                (category === 'Cilia' && localizations.includes('ciliary membrane')) ||
+                (category === 'Flagella' && localizations.includes('axoneme')) ||
+                (category === 'Ciliary Associated Gene' && localizations.includes('ciliary associated gene'));
         }).length;
         return acc;
     }, {});
-    
+
     const chartContainer = document.createElement('div');
     chartContainer.className = 'page-section';
     chartContainer.innerHTML = `<h2>Gene Localization Distribution</h2><canvas id="locChart" style="max-height: 300px;"></canvas>`;
-    
+
     const contentArea = document.querySelector('.content-area');
     const existingChart = contentArea.querySelector('#locChart');
-    if (existingChart) existingChart.parentElement.remove();
-    
+    if (existingChart) {
+        existingChart.parentElement.remove();
+    }
+
     contentArea.appendChild(chartContainer);
-    
+
     const ctx = document.getElementById('locChart').getContext('2d');
     new Chart(ctx, {
         type: 'bar',
@@ -1449,12 +1461,12 @@ function displayLocalizationChart() {
             responsive: true,
             maintainAspectRatio: false,
             scales: {
-                y: { 
-                    beginAtZero: true, 
+                y: {
+                    beginAtZero: true,
                     title: { display: true, text: 'Number of Genes' },
                     ticks: { stepSize: 1 }
                 },
-                x: { 
+                x: {
                     title: { display: true, text: 'Localization' }
                 }
             },
