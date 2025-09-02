@@ -63,18 +63,97 @@
                     <label><input type="radio" name="plot-type" value="matrix"> Matrix Plot</label>
                 </div>
                 <div class="plot-settings">
-                    <h3>Plot Settings</h3>
-                    <label>Font Family: <input type="text" id="setting-font-family" value="Arial"></label>
-                    <label>Font Size: <input type="number" id="setting-font-size" value="16"></label>
-                    <label>Font Weight: <input type="text" id="setting-font-weight" value="bold"></label>
-                    <label>Text Color: <input type="color" id="setting-text-color" value="#000000"></label>
-                    <label>Axis Color: <input type="color" id="setting-axis-color" value="#000000"></label>
-                    <label>Y-Axis Title: <input type="text" id="setting-y-axis-title" value="Localization"></label>
-                    <label>Enrichment Color 1: <input type="color" id="setting-enrichment-color1" value="#edf8fb"></label>
-                    <label>Enrichment Color 2: <input type="color" id="setting-enrichment-color2" value="#b2e2e2"></label>
-                    <label>Enrichment Color 3: <input type="color" id="setting-enrichment-color3" value="#66c2a4"></label>
-                    <label>Enrichment Color 4: <input type="color" id="setting-enrichment-color4" value="#2ca25f"></label>
-                    <label>Enrichment Color 5: <input type="color" id="setting-enrichment-color5" value="#006d2c"></label>
+                    <h3>Plot Customization</h3>
+                    <p style="font-size: 0.9rem; color: #555; margin-bottom: 15px;">Customize the plot appearance and click "Generate Plot" to apply changes.</p>
+                    
+                    <!-- Font Settings -->
+                    <details open style="margin-bottom: 15px;">
+                        <summary style="font-weight: bold; cursor: pointer; padding: 8px; background-color: #e1ecf4; border-radius: 4px;">Font Settings</summary>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; padding: 10px;">
+                            <div>
+                                <label for="setting-font-family">Font Family</label>
+                                <select id="setting-font-family" aria-label="Select plot font family">
+                                    <option value="Arial" selected>Arial</option>
+                                    <option value="Tahoma">Tahoma</option>
+                                    <option value="Helvetica">Helvetica</option>
+                                    <option value="Verdana">Verdana</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label for="setting-font-size">Font Size (px)</label>
+                                <input type="number" id="setting-font-size" value="14" min="8" max="30" step="1" aria-label="Set plot font size">
+                            </div>
+                            <div>
+                                <label for="setting-font-weight">Font Weight</label>
+                                <select id="setting-font-weight" aria-label="Select plot font weight">
+                                    <option value="normal">Normal</option>
+                                    <option value="bold" selected>Bold</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label for="setting-text-color">Text Color</label>
+                                <input type="color" id="setting-text-color" value="#000000" aria-label="Select plot text color">
+                            </div>
+                        </div>
+                    </details>
+
+                    <!-- Axis Settings -->
+                    <details open style="margin-bottom: 15px;">
+                        <summary style="font-weight: bold; cursor: pointer; padding: 8px; background-color: #e1ecf4; border-radius: 4px;">Axis Settings</summary>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; padding: 10px;">
+                            <div>
+                                <label for="setting-axis-color">Axis Color</label>
+                                <input type="color" id="setting-axis-color" value="#000000" aria-label="Select axis color">
+                            </div>
+                            <div>
+                                <label for="setting-x-axis-title">X-Axis Title</label>
+                                <input type="text" id="setting-x-axis-title" value="Enrichment" aria-label="Set X-axis title">
+                            </div>
+                            <div>
+                                <label for="setting-y-axis-title">Y-Axis Title</label>
+                                <input type="text" id="setting-y-axis-title" value="Localization" aria-label="Set Y-axis title">
+                            </div>
+                            <div>
+                                <label for="setting-x-axis-size">X-Axis Tick Size (px)</label>
+                                <input type="number" id="setting-x-axis-size" value="12" min="8" max="24" step="1" aria-label="Set X-axis tick font size">
+                            </div>
+                            <div>
+                                <label for="setting-y-axis-size">Y-Axis Tick Size (px)</label>
+                                <input type="number" id="setting-y-axis-size" value="12" min="8" max="24" step="1" aria-label="Set Y-axis tick font size">
+                            </div>
+                        </div>
+                    </details>
+
+                    <!-- Color Settings -->
+                    <details open style="margin-bottom: 15px;">
+                        <summary style="font-weight: bold; cursor: pointer; padding: 8px; background-color: #e1ecf4; border-radius: 4px;">Color Settings</summary>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; padding: 10px;">
+                            <div>
+                                <label for="setting-bar-color">Bar Color</label>
+                                <input type="color" id="setting-bar-color" value="#2ca25f" aria-label="Select bar color for ciliome plot">
+                            </div>
+                            <div>
+                                <label for="setting-enrichment-color1">Enrichment Color 1 (Low)</label>
+                                <input type="color" id="setting-enrichment-color1" value="#edf8fb" aria-label="Select low enrichment color">
+                            </div>
+                            <div>
+                                <label for="setting-enrichment-color2">Enrichment Color 2</label>
+                                <input type="color" id="setting-enrichment-color2" value="#b2e2e2" aria-label="Select enrichment color 2">
+                            </div>
+                            <div>
+                                <label for="setting-enrichment-color3">Enrichment Color 3</label>
+                                <input type="color" id="setting-enrichment-color3" value="#66c2a4" aria-label="Select enrichment color 3">
+                            </div>
+                            <div>
+                                <label for="setting-enrichment-color4">Enrichment Color 4</label>
+                                <input type="color" id="setting-enrichment-color4" value="#2ca25f" aria-label="Select enrichment color 4">
+                            </div>
+                            <div>
+                                <label for="setting-enrichment-color5">Enrichment Color 5 (High)</label>
+                                <input type="color" id="setting-enrichment-color5" value="#006d2c" aria-label="Select high enrichment color">
+                            </div>
+                        </div>
+                    </details>
                 </div>
                 <button onclick="generateAnalysisPlots()">Generate Plot</button>
                 <div id="analysis-status" style="display: none;"></div>
