@@ -1251,9 +1251,16 @@ function handleCSVUpload(event) {
 function displayGeneCards(defaults, searchResults, page = 1, perPage = 10) {
     const container = document.getElementById('gene-cards-container');
     if (!container) return;
-    
-    const uniqueDefaults = defaults.filter(d => !searchResults.some(s => s.gene === d.gene));
-    const allGenesToDisplay = [...searchResults, ...uniqueDefaults];
+
+    let uniqueDefaults = defaults.filter(d => !searchResults.some(s => s.gene === d.gene));
+    let allGenesToDisplay = [...searchResults, ...uniqueDefaults];
+
+    // ✨ FIX IS HERE: If no genes are provided for the homepage, proactively get the default set.
+    if (allGenesToDisplay.length === 0 && searchResults.length === 0) {
+        allGenesToDisplay = allGenes.filter(g => defaultGenesNames.includes(g.gene));
+    }
+    // End of fix
+
     const start = (page - 1) * perPage;
     const end = start + perPage;
     const paginatedGenes = allGenesToDisplay.slice(start, end);
@@ -1263,15 +1270,16 @@ function displayGeneCards(defaults, searchResults, page = 1, perPage = 10) {
             if (entry.isIntersecting) {
                 const gene = JSON.parse(entry.target.dataset.gene);
                 const isSearchResult = searchResults.some(s => s.gene === gene.gene);
-                
+                const localizationText = Array.isArray(gene.localization) ? gene.localization.join(', ') : (gene.localization || '');
+
                 entry.target.innerHTML = `
                     <div class="gene-name">${gene.gene}</div>
                     <div class="gene-description">${gene.description || 'No description available.'}</div>
-                    ${gene.localization ? `
+                    ${localizationText ? `
                         <div class="gene-info">
                             <strong>Localization:</strong> 
                             <span style="color: ${isSearchResult ? '#27ae60' : '#1e90ff'}; font-weight: 600;">
-                                ${gene.localization}
+                                ${localizationText}
                             </span>
                         </div>` : ''}
                     ${gene.ensembl_id ? `
@@ -1292,7 +1300,7 @@ function displayGeneCards(defaults, searchResults, page = 1, perPage = 10) {
                 `;
                 
                 entry.target.classList.add(isSearchResult ? 'search-result' : 'default');
-                entry.target.onclick = () => navigateTo(event, `/${gene.gene}`);
+                entry.target.onclick = (e) => navigateTo(e, `/${gene.gene}`);
                 entry.target.setAttribute('aria-label', `View details for ${gene.gene}`);
                 observer.unobserve(entry.target);
             }
@@ -1307,12 +1315,19 @@ function displayGeneCards(defaults, searchResults, page = 1, perPage = 10) {
     
     const paginationDiv = document.createElement('div');
     paginationDiv.className = 'pagination';
+    
+    // Stringify the data once to prevent issues in the onclick attribute
+    const defaultsStr = JSON.stringify(defaults);
+    const searchResultsStr = JSON.stringify(searchResults);
+    
     paginationDiv.innerHTML = `
-        <button onclick="displayGeneCards(${JSON.stringify(defaults)}, ${JSON.stringify(searchResults)}, ${page - 1}, ${perPage})" ${page === 1 ? 'disabled' : ''}>Previous</button>
+        <button onclick='displayGeneCards(${defaultsStr}, ${searchResultsStr}, ${page - 1}, ${perPage})' ${page === 1 ? 'disabled' : ''}>Previous</button>
         <span>Page ${page} of ${Math.ceil(allGenesToDisplay.length / perPage)}</span>
-        <button onclick="displayGeneCards(${JSON.stringify(defaults)}, ${JSON.stringify(searchResults)}, ${page + 1}, ${perPage})" ${end >= allGenesToDisplay.length ? 'disabled' : ''}>Next</button>
+        <button onclick='displayGeneCards(${defaultsStr}, ${searchResultsStr}, ${page + 1}, ${perPage})' ${end >= allGenesToDisplay.length ? 'disabled' : ''}>Next</button>
     `;
-    container.appendChild(paginationDiv);
+    if (allGenesToDisplay.length > perPage) {
+        container.appendChild(paginationDiv);
+    }
     
     updateGeneButtons(allGenesToDisplay, searchResults);
 }
