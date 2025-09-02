@@ -110,12 +110,10 @@ function findGenes(queries) {
 function getPlotSettings() {
     return {
         fontFamily: document.getElementById('setting-font-family')?.value || 'Arial',
-        fontSize: parseInt(document.getElementById('setting-font-size')?.value, 10) || 14,
+        fontSize: parseInt(document.getElementById('setting-font-size')?.value, 10) || 20,
         fontWeight: document.getElementById('setting-font-weight')?.value || 'bold',
         textColor: document.getElementById('setting-text-color')?.value || '#000000',
         axisColor: document.getElementById('setting-axis-color')?.value || '#000000',
-        xAxisSize: parseInt(document.getElementById('setting-x-axis-size')?.value, 10) || 12,
-        yAxisSize: parseInt(document.getElementById('setting-y-axis-size')?.value, 10) || 12,
         yAxisTitle: document.getElementById('setting-y-axis-title')?.value || 'Localization',
         xAxisTitle: document.getElementById('setting-x-axis-title')?.value || 'Enrichment',
         barChartColor: document.getElementById('setting-bar-color')?.value || '#2ca25f',
@@ -162,6 +160,7 @@ function renderEnrichmentBubblePlot(foundGenes) {
     if (window.enrichmentDotPlotInstance) window.enrichmentDotPlotInstance.destroy();
 
     const settings = getPlotSettings();
+    // ✨ FIX: Using the complete list of 20 unique localization terms from your database.
     const yCategories = [
         'Cilia', 'Basal Body', 'Transition Zone', 'Axoneme', 'Ciliary Membrane',
         'Ciliary Pocket', 'Ciliary Tip', 'Flagella', 'Centrosome', 'Cytoskeleton',
@@ -184,15 +183,15 @@ function renderEnrichmentBubblePlot(foundGenes) {
         });
     });
 
-    const categoriesWithData = yCategories.filter(cat => localizationCounts[cat] > 0).sort();
+    const categoriesWithData = yCategories.filter(cat => localizationCounts[cat] > 0).sort(); // Sort alphabetically
     if (categoriesWithData.length === 0) {
         document.getElementById('bubble-enrichment-container').innerHTML = '<p class="status-message">No matching localizations found for the given genes.</p>';
-        document.getElementById('download-plot-btn').style.display = 'none';
         return;
     }
 
+    // Clear placeholder message if data is found
     document.getElementById('bubble-enrichment-container').innerHTML = `
-        <div class="plot-wrapper" style="position: relative; height: 500px; flex-grow: 1;"><canvas id="analysis-bubble-plot"></canvas></div>
+        <div class="plot-wrapper" style="position: relative; height: 600px; flex-grow: 1;"><canvas id="enrichment-bubble-plot"></canvas></div>
         <div id="legend-container" style="flex-shrink: 0; width: 150px; padding-top: 20px; padding-left: 5px;"></div>
     `;
 
@@ -243,7 +242,7 @@ function renderEnrichmentBubblePlot(foundGenes) {
             </div>`;
     }
 
-    const ctx = document.getElementById('analysis-bubble-plot').getContext('2d');
+    const ctx = document.getElementById('enrichment-bubble-plot').getContext('2d');
     currentPlot = new Chart(ctx, {
         type: 'bubble',
         data: { datasets: [dataset] },
@@ -256,31 +255,16 @@ function renderEnrichmentBubblePlot(foundGenes) {
             },
             scales: {
                 x: {
-                    title: { 
-                        display: true, 
-                        text: settings.xAxisTitle, 
-                        color: settings.axisColor, 
-                        font: { family: settings.fontFamily, size: settings.fontSize, weight: settings.fontWeight } 
-                    },
-                    ticks: { 
-                        display: false 
-                    },
+                    title: { display: true, text: settings.xAxisTitle, color: settings.axisColor, font: { family: settings.fontFamily, size: settings.fontSize, weight: settings.fontWeight } },
+                    ticks: { display: false },
                     grid: { display: false }
                 },
                 y: {
                     type: 'category',
                     labels: categoriesWithData,
-                    title: { 
-                        display: true, 
-                        text: settings.yAxisTitle, 
-                        color: settings.axisColor, 
-                        font: { family: settings.fontFamily, size: settings.fontSize, weight郊: settings.fontWeight } 
-                    },
+                    title: { display: true, text: settings.yAxisTitle, color: settings.axisColor, font: { family: settings.fontFamily, size: settings.fontSize, weight: settings.fontWeight } },
                     grid: { display: false, drawBorder: false },
-                    ticks: { 
-                        font: { size: settings.yAxisSize, weight: settings.fontWeight, family: settings.fontFamily }, 
-                        color: settings.textColor 
-                    }
+                    ticks: { font: { size: settings.fontSize, weight: settings.fontWeight, family: settings.fontFamily }, color: settings.textColor }
                 }
             }
         }
@@ -311,7 +295,7 @@ function renderBubbleMatrix(foundGenes) {
         backgroundColor: colorPalette[index % colorPalette.length]
     }));
 
-    const ctx = document.getElementById('analysis-matrix-plot').getContext('2d');
+    const ctx = document.getElementById('enrichment-matrix-plot').getContext('2d');
     currentPlot = new Chart(ctx, {
         type: 'bubble',
         data: { datasets },
@@ -319,54 +303,28 @@ function renderBubbleMatrix(foundGenes) {
             responsive: true,
             maintainAspectRatio: false,
             plugins: {
-                legend: { 
-                   
-
- display: true, 
-                    position: 'right', 
-                    labels: { font: { family: settings.fontFamily, size: settings.fontSize }, color: settings.textColor } 
-                },
+                legend: { display: true, position: 'right', labels: { font: { family: settings.fontFamily, size: settings.fontSize }, color: settings.textColor } },
                 tooltip: { callbacks: { label: (context) => `${context.dataset.label} - ${context.raw.y}` } },
             },
             scales: {
                 x: {
                     type: 'category',
                     labels: xLabels,
-                    title: { 
-                        display: true, 
-                        text: "Gene", 
-                        font: { family: settings.fontFamily, size: settings.fontSize, weight: settings.fontWeight }, 
-                        color: settings.axisColor 
-                    },
-                    ticks: { 
-                        font: { family: settings.fontFamily, size: settings.xAxisSize, weight: settings.fontWeight }, 
-                        autoSkip: false, 
-                        maxRotation: 90, 
-                        minRotation: 45, 
-                        color: settings.textColor 
-                    },
+                    title: { display: true, text: "Gene", font: { family: settings.fontFamily, size: settings.fontSize, weight: 'bold' }, color: settings.axisColor },
+                    ticks: { font: { family: settings.fontFamily, size: settings.fontSize, weight: settings.fontWeight }, autoSkip: false, maxRotation: 90, minRotation: 45, color: settings.textColor },
                     grid: { display: false }
                 },
                 y: {
                     type: 'category',
                     labels: yCategories,
-                    title: { 
-                        display: true, 
-                        text: 'Ciliary Localization', 
-                        font: { family: settings.fontFamily, size: settings.fontSize, weight: settings.fontWeight }, 
-                        color: settings.axisColor 
-                    },
-                    ticks: { 
-                        font: { family: settings.fontFamily, size: settings.yAxisSize, weight: settings.fontWeight }, 
-                        color: settings.textColor 
-                    },
+                    title: { display: true, text: 'Ciliary Localization', font: { family: settings.fontFamily, size: settings.fontSize, weight: 'bold' }, color: settings.axisColor },
+                    ticks: { font: { family: settings.fontFamily, size: settings.fontSize, weight: settings.fontWeight }, color: settings.textColor },
                     grid: { display: false }
                 }
             }
         }
     });
 }
-
 
 /**
  * Renders the Ciliome enrichment bar chart and statistics.
