@@ -349,12 +349,28 @@ function mapLocalizationToSVG(localizationArray) {
         "transition zone": ["transition-zone"],
         "cilia": ["ciliary-membrane", "axoneme"],
         "flagella": ["ciliary-membrane", "axoneme"],
-        "ciliary associated gene": ["ciliary-membrane", "axoneme"]
+        "ciliary associated gene": ["ciliary-membrane", "axoneme"],
+        "nucleus": ["nucleus"],
+        "centrosome": ["basal-body"],
+        "cytosol": ["cell-body"],
+        "mitochondrion": ["cell-body"],
+        "endoplasmic reticulum": ["cell-body"],
+        "golgi apparatus": ["cell-body"],
+        "lysosome": ["cell-body"],             // ✨ NEW
+        "microbody": ["cell-body"],             // ✨ NEW
+        "peroxisome": ["cell-body"],            // ✨ NEW
+        "microtubules": ["cell-body"],          // ✨ NEW
+        "autophagosomes": ["cell-body"]         // ✨ NEW
     };
     if (!Array.isArray(localizationArray)) return [];
+
     return localizationArray.flatMap(loc => {
+        // If 'loc' is not a string (e.g., it's null), skip it.
+        if (typeof loc !== 'string') return []; 
+
         const normalized = loc.trim().toLowerCase().replace(/[-_]/g, ' ');
         return mapping[normalized] || [];
+
     }).filter(id => allPartIds.includes(id));
 }
 
