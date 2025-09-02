@@ -98,39 +98,65 @@ async function loadAndPrepareDatabase() {
 }
 
 /**
- * The central search function.
+ * Enhanced search function supporting:
+ * - Gene names (e.g., ACE2)
+ * - Ensembl IDs (e.g., ENSG00000130234)
+ * - Synonyms (e.g., ACEH)
+ * - Localization terms (e.g., cilia, mitochondria)
  */
 function findGenes(queries) {
     const foundGenes = new Set();
     const notFound = [];
-    
+
     queries.forEach(query => {
-        // Convert query to uppercase for consistent comparison
-        const upperQuery = query.toUpperCase();
-        let result = null;
-        
-        // First try exact match with uppercase
-        result = geneMapCache.get(upperQuery);
-        
-        // If not found, try case-insensitive search
-        if (!result) {
-            for (let [key, value] of geneMapCache) {
-                if (key.toUpperCase() === upperQuery) {
-                    result = value;
+        const upperQuery = query.toUpperCase().trim();
+        let matched = false;
+
+        // Iterate through all genes in cache
+        for (let [key, gene] of geneMapCache) {
+            // 1. Match by gene name
+            if (gene.gene && gene.gene.toUpperCase() === upperQuery) {
+                foundGenes.add(gene);
+                matched = true;
+                break;
+            }
+
+            // 2. Match by Ensembl ID
+            if (gene.ensembl_id && gene.ensembl_id.toUpperCase() === upperQuery) {
+                foundGenes.add(gene);
+                matched = true;
+                break;
+            }
+
+            // 3. Match by synonyms (split by comma/space/semicolon)
+            if (gene.synonym) {
+                const synonyms = gene.synonym.split(/[,; ]+/).map(s => s.trim().toUpperCase());
+                if (synonyms.includes(upperQuery)) {
+                    foundGenes.add(gene);
+                    matched = true;
                     break;
                 }
             }
+
+            // 4. Match by localization terms
+            if (gene.localization && Array.isArray(gene.localization)) {
+                const localizationMatch = gene.localization.some(loc => loc.toUpperCase() === upperQuery);
+                if (localizationMatch) {
+                    foundGenes.add(gene);
+                    matched = true;
+                    // ⚠️ Don't break here: one localization query might match multiple genes
+                }
+            }
         }
-        
-        if (result) {
-            foundGenes.add(result);
-        } else {
+
+        if (!matched) {
             notFound.push(query);
         }
     });
-    
+
     return { foundGenes: Array.from(foundGenes), notFoundGenes: notFound };
 }
+
 
 // Add this function to help with debugging
 function debugSearch(query) {
