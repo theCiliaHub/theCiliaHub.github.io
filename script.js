@@ -718,15 +718,16 @@ function displayComparePage() {
         const ctx = document.getElementById('localization-chart').getContext('2d');
         const localizationCounts = {};
         selectedCompareGenes.forEach(gene => {
-            if (gene.localization) {
-                gene.localization.split(',').forEach(loc => {
-                    const term = loc.trim();
-                    if (term) {
-                        localizationCounts[term] = (localizationCounts[term] || 0) + 1;
-                    }
-                });
-            }
-        });
+        // ✨ CHANGE IS HERE ✨
+        if (Array.isArray(gene.localization)) { // Check if it's an array
+            gene.localization.forEach(loc => {     // Loop directly over the array
+                const term = loc.trim();
+                if (term) {
+                    localizationCounts[term] = (localizationCounts[term] || 0) + 1;
+                }
+            });
+        }
+    });
         
         const labels = Object.keys(localizationCounts);
         const data = Object.values(localizationCounts);
