@@ -1116,24 +1116,25 @@ function displayIndividualGenePage(gene) {
             </div>
             
             <header class="gene-header">
-                <h1 class="gene-name">${gene.gene}</h1>
-                <p class="gene-description">${gene.description || 'No description available.'}</p>
-            </header>
+    <h1 class="gene-name">${gene.gene}</h1>
+    <p class="gene-description">${gene.description || 'No description available.'}</p>
+</header>
 
-            <div class="gene-details-grid">
-                <!-- Left Column -->
-                <div class="details-column">
-                    <div class="detail-card">
-                        <h3 class="card-title">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
-                            Identifiers
-                        </h3>
-                        <div class="info-grid">
-                            ${gene.ensembl_id ? `<div class="info-item"><strong>Ensembl ID:</strong> <a href="https://www.ensembl.org/Homo_sapiens/Gene/Summary?g=${gene.ensembl_id}" target="_blank">${gene.ensembl_id}</a></div>` : ''}
-                            ${gene.omim_id ? `<div class="info-item"><strong>OMIM ID:</strong> <a href="https://www.omim.org/entry/${gene.omim_id}" target="_blank">${gene.omim_id}</a></div>` : ''}
-                            ${gene.synonym ? `<div class="info-item"><strong>Synonym(s):</strong> ${gene.synonym}</div>` : ''}
-                        </div>
-                    </div>
+<div class="gene-details-grid">
+    <!-- Example of improved card -->
+    <div class="detail-card">
+        <h3 class="card-title">
+            <svg class="icon" ...></svg>
+            Identifiers
+        </h3>
+        <div class="info-grid">
+            ${gene.ensembl_id ? `<div class="info-item"><span class="label">Ensembl:</span> <a href="https://www.ensembl.org/Homo_sapiens/Gene/Summary?g=${gene.ensembl_id}" target="_blank">${gene.ensembl_id}</a></div>` : ''}
+            ${gene.omim_id ? `<div class="info-item"><span class="label">OMIM:</span> <a href="https://www.omim.org/entry/${gene.omim_id}" target="_blank">${gene.omim_id}</a></div>` : ''}
+            ${gene.synonym ? `<div class="info-item"><span class="label">Synonyms:</span> ${gene.synonym}</div>` : ''}
+        </div>
+    </div>
+</div>
+
 
                     <div class="detail-card">
                         <h3 class="card-title">
