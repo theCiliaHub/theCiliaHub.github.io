@@ -97,65 +97,6 @@ async function loadAndPrepareDatabase() {
     }
 }
 
-/**
- * Enhanced search function supporting:
- * - Gene names (e.g., ACE2)
- * - Ensembl IDs (e.g., ENSG00000130234)
- * - Synonyms (e.g., ACEH)
- * - Localization terms (e.g., cilia, mitochondria)
- */
-function findGenes(queries) {
-    const foundGenes = new Set();
-    const notFound = [];
-
-    queries.forEach(query => {
-        const upperQuery = query.toUpperCase().trim();
-        let matched = false;
-
-        // Iterate through all genes in cache
-        for (let [key, gene] of geneMapCache) {
-            // 1. Match by gene name
-            if (gene.gene && gene.gene.toUpperCase() === upperQuery) {
-                foundGenes.add(gene);
-                matched = true;
-                break;
-            }
-// 2. Match by Ensembl ID (supports autocomplete)
-if (gene.ensembl_id && gene.ensembl_id.toUpperCase().includes(upperQuery)) {
-    foundGenes.add(gene);
-    matched = true;
-    break;
-}
-
-            // 3. Match by synonyms (split by comma/space/semicolon)
-            if (gene.synonym) {
-                const synonyms = gene.synonym.split(/[,; ]+/).map(s => s.trim().toUpperCase());
-                if (synonyms.includes(upperQuery)) {
-                    foundGenes.add(gene);
-                    matched = true;
-                    break;
-                }
-            }
-
-            // 4. Match by localization terms
-            if (gene.localization && Array.isArray(gene.localization)) {
-                const localizationMatch = gene.localization.some(loc => loc.toUpperCase() === upperQuery);
-                if (localizationMatch) {
-                    foundGenes.add(gene);
-                    matched = true;
-                    // ⚠️ Don't break here: one localization query might match multiple genes
-                }
-            }
-        }
-
-        if (!matched) {
-            notFound.push(query);
-        }
-    });
-
-    return { foundGenes: Array.from(foundGenes), notFoundGenes: notFound };
-}
-
 
 // Add this function to help with debugging
 function debugSearch(query) {
@@ -172,9 +113,101 @@ function debugSearch(query) {
     }
 }
 
-/**
- * Handles the UI for the Batch Gene Query page.
- */
+// --- Gene Cache ---
+const geneMapCache = new Map(); // Maps all gene identifiers to gene objects
+const geneList = getDefaultGenes(); // Or your loaded data
+
+function populateGeneCache(genes) {
+    genes.forEach(gene => {
+        if (gene.gene) geneMapCache.set(gene.gene.toUpperCase(), gene);
+
+        if (gene.synonym) {
+            gene.synonym.split(/[,;]/).map(s => s.trim()).forEach(s => {
+                if (s) geneMapCache.set(s.toUpperCase(), gene);
+            });
+        }
+
+        if (gene.ensembl_id) geneMapCache.set(gene.ensembl_id.toUpperCase(), gene);
+    });
+}
+
+populateGeneCache(geneList);
+
+// --- Search Function ---
+function findGenes(queries) {
+    const foundGenes = new Set();
+    const notFound = [];
+    
+    queries.forEach(query => {
+        const upperQuery = query.toUpperCase();
+        let matched = false;
+
+        // 1. Exact match
+        const gene = geneMapCache.get(upperQuery);
+        if (gene) {
+            foundGenes.add(gene);
+            matched = true;
+        }
+
+        // 2. Partial match (autocomplete)
+        if (!matched) {
+            const suggestions = [];
+            for (let [key, value] of geneMapCache) {
+                if (key.includes(upperQuery)) {
+                    suggestions.push(value);
+                }
+            }
+            if (suggestions.length === 1) {
+                foundGenes.add(suggestions[0]);
+                matched = true;
+            } else if (suggestions.length > 1) {
+                // Add all suggestions if multiple partial matches
+                suggestions.forEach(s => foundGenes.add(s));
+                matched = true;
+            }
+        }
+
+        // 3. If no match, add to notFound
+        if (!matched) notFound.push(query);
+    });
+
+    return { foundGenes: Array.from(foundGenes), notFoundGenes: notFound };
+}
+
+// --- Single Gene Search (Home Page) ---
+function performSingleSearch() {
+    const query = sanitize(document.getElementById('single-gene-search')?.value || '');
+    const statusDiv = document.getElementById('status-message');
+    if (!statusDiv) return;
+
+    statusDiv.style.display = 'block';
+    if (!query) {
+        statusDiv.innerHTML = `<span class="error-message">Please enter a gene name.</span>`;
+        return;
+    }
+    statusDiv.innerHTML = '<span>Searching...</span>';
+
+    const { foundGenes, notFoundGenes } = findGenes([query]);
+
+    if (foundGenes.length === 1) {
+        navigateTo(null, `/${foundGenes[0].gene}`);
+    } else if (foundGenes.length > 1) {
+        // Multiple partial matches → go to batch query
+        navigateTo(null, '/batch-query');
+        setTimeout(() => {
+            const batchInput = document.getElementById('batch-genes-input');
+            if (batchInput) {
+                batchInput.value = foundGenes.map(r => r.gene).join('\n');
+                performBatchSearch();
+            }
+        }, 100);
+    } else {
+        // No matches
+        statusDiv.innerHTML = `<span class="error-message">No genes found for "${query}".</span>`;
+    }
+}
+
+// --- Batch Gene Search ---
 function performBatchSearch() {
     const inputElement = document.getElementById('batch-genes-input');
     const resultDiv = document.getElementById('batch-results');
@@ -190,42 +223,7 @@ function performBatchSearch() {
     displayBatchResults(foundGenes, notFoundGenes);
 }
 
-/**
- * Handles the UI for the Single Gene Search on the Home page.
- */
-function performSingleSearch() {
-    const query = sanitize(document.getElementById('single-gene-search')?.value || '');
-    const statusDiv = document.getElementById('status-message');
-    if (!statusDiv) return;
-    
-    statusDiv.style.display = 'block';
-    if (!query) {
-        statusDiv.innerHTML = `<span class="error-message">Please enter a gene name.</span>`;
-        return;
-    }
-    statusDiv.innerHTML = '<span>Searching...</span>';
-
-    const { foundGenes } = findGenes([query]);
-
-    if (foundGenes.length === 1) {
-        navigateTo(null, `/${foundGenes[0].gene}`);
-    } else if (foundGenes.length > 1) {
-        navigateTo(null, '/batch-query');
-        setTimeout(() => {
-            const batchInput = document.getElementById('batch-genes-input');
-            if (batchInput) {
-                batchInput.value = foundGenes.map(r => r.gene).join('\n');
-                performBatchSearch();
-            }
-        }, 100);
-    } else {
-        statusDiv.innerHTML = `<span class="error-message">No exact match found for "${query}".</span>`;
-    }
-}
-
-/**
- * Displays batch results.
- */
+// --- Batch Results Display ---
 function displayBatchResults(foundGenes, notFoundGenes) {
     const resultDiv = document.getElementById('batch-results');
     if (!resultDiv) return;
@@ -235,7 +233,6 @@ function displayBatchResults(foundGenes, notFoundGenes) {
     if (foundGenes.length > 0) {
         html += '<table><thead><tr><th>Gene</th><th>Ensembl ID</th><th>Localization</th><th>Function Summary</th></tr></thead><tbody>';
         foundGenes.forEach(item => {
-            // Join localization array for display
             const localizationText = Array.isArray(item.localization) ? item.localization.join(', ') : (item.localization || '-');
             html += `<tr>
                 <td><a href="/${item.gene}" onclick="navigateTo(event, '/${item.gene}')">${item.gene}</a></td>
@@ -255,10 +252,8 @@ function displayBatchResults(foundGenes, notFoundGenes) {
             </div>
         `;
     }
-    
+
     resultDiv.innerHTML = html;
-    const cardsContainer = document.getElementById('gene-cards-container');
-    if (cardsContainer) cardsContainer.innerHTML = '';
 }
 
 // Default gene set as fallback if loading fails
