@@ -713,3 +713,170 @@ body {
     color: var(--accent-red); /* Red */
     font-weight: bold;
 }
+
+
+/* ---------- CiliaHub: Gene detail page tweaks (Medium Persian Blue) ---------- */
+/* Paste at the end of styles.css */
+
+/* Central color tokens */
+:root {
+  --mpb: #0067A5;         /* Medium Persian Blue */
+  --mpb-light: #e6f0f7;   /* light background */
+  --mpb-border: #c2d9e6;  /* border */
+}
+
+/* Scope everything to the gene detail page to avoid site-wide side effects */
+.gene-detail-page,
+.gene-detail-page * {
+  box-sizing: border-box;
+}
+
+/* Breadcrumb & header background */
+.gene-detail-page .breadcrumb,
+.gene-detail-page .gene-header {
+  background: var(--mpb-light) !important;
+  border-color: var(--mpb-border) !important;
+}
+
+/* Gene name and description */
+.gene-detail-page .gene-name {
+  color: var(--mpb) !important;
+  font-weight: 700;
+  font-size: 2rem;
+  margin: 0 0 0.25rem 0;
+}
+.gene-detail-page .gene-description {
+  color: var(--mpb) !important;
+  opacity: 0.95;
+  margin: 0;
+}
+
+/* Cards (visual treatment) */
+.gene-detail-page .detail-card {
+  background: #fff !important;
+  border: 1px solid var(--mpb-border) !important;
+  border-radius: 0.6rem !important;
+  padding: 1rem !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04) !important;
+}
+
+/* Card title styling (applies to Identifiers, Subcellular Localization, Complex Info,
+   Functional Information, References, etc.) */
+.gene-detail-page .card-title {
+  color: var(--mpb) !important;
+  font-size: 1.05rem !important;
+  font-weight: 600 !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.5rem !important;
+  margin: 0 0 0.75rem 0 !important;
+  padding-bottom: 0.45rem !important;
+  border-bottom: 1px solid var(--mpb-border) !important;
+}
+
+/* Ensure SVG/icons also follow the blue */
+.gene-detail-page .card-title svg,
+.gene-detail-page .detail-card svg {
+  stroke: var(--mpb) !important;
+  fill: none !important;
+}
+
+/* Strong/labels in info items */
+.gene-detail-page .info-item strong,
+.gene-detail-page .info-item .label {
+  color: var(--mpb) !important;
+  font-weight: 600 !important;
+}
+
+/* Generic paragraph and small text inside gene page */
+.gene-detail-page .info-item p,
+.gene-detail-page .info-item span,
+.gene-detail-page .info-item div {
+  color: var(--mpb) !important;
+  line-height: 1.35 !important;
+}
+
+/* Tag pills (localization, functional category, etc.) */
+.gene-detail-page .tag,
+.gene-detail-page .tags-container .tag {
+  display: inline-block !important;
+  padding: 0.22rem 0.6rem !important;
+  margin: 0.12rem 0.28rem !important;
+  border-radius: 999px !important;
+  background: var(--mpb-light) !important;
+  color: var(--mpb) !important;
+  font-weight: 500 !important;
+  font-size: 0.85rem !important;
+  vertical-align: middle !important;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.03) !important;
+}
+
+/* References list */
+.gene-detail-page .reference-list {
+  color: var(--mpb) !important;
+}
+.gene-detail-page .reference-list li {
+  margin-bottom: 0.4rem;
+  color: var(--mpb) !important;
+}
+.gene-detail-page .reference-list a {
+  color: var(--mpb) !important;
+  text-decoration: none !important;
+}
+.gene-detail-page .reference-list a:hover {
+  text-decoration: underline !important;
+}
+
+/* Links inside the gene page — keep them consistent */
+.gene-detail-page a {
+  color: var(--mpb) !important;
+}
+
+/* Force card borders and accent where something else tries to override */
+.gene-detail-page .detail-card,
+.gene-detail-page .card-title,
+.gene-detail-page .info-item strong {
+  outline: none !important;
+}
+
+/* ---------- Layout: ensure left column = Functional Info + References,
+   right column = Identifiers + Localization + Complex Info ---------- */
+
+/* Standard two-column grid (desktop) */
+.gene-details-grid {
+  display: grid !important;
+  grid-template-columns: 1fr 1fr !important;
+  gap: 1.5rem !important;
+  align-items: start !important;
+}
+
+/* Rely on the order the page injects the columns — usually the first .details-column is left.
+   If your JS prints the columns in different order, prefer adding classes (see note below). */
+.gene-details-grid > .details-column:first-child {
+  grid-column: 1 / 2 !important;    /* left */
+}
+.gene-details-grid > .details-column:last-child {
+  grid-column: 2 / 3 !important;    /* right */
+}
+
+/* Mobile: stack single column */
+@media (max-width: 899px) {
+  .gene-details-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* ---------- Utility overrides for Tailwind-style arbitrary classes that may not exist
+   (these selectors escape the bracket syntax so they match when Tailwind classes are in HTML) */
+.text-\\[\\#0067A5\\],
+.text-\\[\\#0067A5\\] {
+  color: var(--mpb) !important;
+}
+.bg-\\[\\#e6f0f7\\],
+.bg-\\[\\#e6f0f7\\] {
+  background: var(--mpb-light) !important;
+}
+
+/* ---------- Helpful debugging outline (comment out if not needed) ----------
+.gene-detail-page .detail-card { outline: 1px dashed rgba(0,103,165,0.15) !important; }
+---------------------------------------------------------------------------- */
