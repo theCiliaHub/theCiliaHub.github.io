@@ -1062,33 +1062,68 @@ function displayIndividualGenePage(gene) {
     const contentArea = document.querySelector('.content-area');
     contentArea.className = 'content-area';
     document.querySelector('.cilia-panel').style.display = 'block';
+
+    // Helper function to join array data into a clean, readable string
+    const formatArray = (data) => Array.isArray(data) && data.length > 0 ? data.join(', ') : (data || '');
+
+    // Prepare text for display
+    const localizationText = formatArray(gene.localization);
+    const functionalCategoryText = formatArray(gene.functional_category);
+    const referenceText = formatArray(gene.reference);
+
     contentArea.innerHTML = `
         <div class="page-section gene-detail-page">
             <div class="breadcrumb" style="margin-bottom: 2rem;">
                 <a href="/" onclick="navigateTo(event, '/')" aria-label="Back to Home">← Back to Home</a>
             </div>
+            
             <h1 class="gene-name">${gene.gene}</h1>
             <p class="gene-description">${gene.description || 'No description available.'}</p>
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1rem; margin-top: 2rem;">
+
+            <div class="gene-info-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem; margin-top: 2rem; background: #f8f9fa; padding: 1.5rem; border-radius: 10px;">
                 ${gene.ensembl_id ? `<div class="gene-info"><strong>Ensembl ID:</strong> <a href="https://www.ensembl.org/Homo_sapiens/Gene/Summary?g=${gene.ensembl_id}" target="_blank">${gene.ensembl_id}</a></div>` : ''}
                 ${gene.omim_id ? `<div class="gene-info"><strong>OMIM ID:</strong> <a href="https://www.omim.org/entry/${gene.omim_id}" target="_blank">${gene.omim_id}</a></div>` : ''}
-                ${gene.synonym ? `<div class="gene-info"><strong>Synonym:</strong> ${gene.synonym}</div>` : ''}
-                ${gene.localization ? `<div class="gene-info"><strong>Localization:</strong> <span style="color: #27ae60; font-weight: 600;">${gene.localization}</span></div>` : ''}
+                ${gene.synonym ? `<div class="gene-info"><strong>Synonym(s):</strong> ${gene.synonym}</div>` : ''}
+                ${localizationText ? `<div class="gene-info"><strong>Subcellular Localization:</strong> <span style="color: #27ae60; font-weight: 600;">${localizationText}</span></div>` : ''}
+                ${functionalCategoryText ? `<div class="gene-info"><strong>Functional Category:</strong> ${functionalCategoryText}</div>` : ''}
+                ${gene.ciliopathy ? `<div class="gene-info"><strong>Associated Ciliopathy:</strong> ${gene.ciliopathy}</div>` : ''}
+                ${gene.gene_annotation ? `<div class="gene-info"><strong>Gene Annotation:</strong> ${gene.gene_annotation}</div>` : ''}
             </div>
-            <div class="functional-summary" style="margin-top: 2rem;">
+
+            <div class="details-section" style="margin-top: 2.5rem;">
                 <h2 style="color: #2c3e50; margin-bottom: 1rem;">Functional Summary</h2>
                 <p style="line-height: 1.7; color: #34495e;">${gene.functional_summary || 'No functional summary available.'}</p>
-                ${gene.reference ? `
-                    <div style="margin-top: 2rem; padding: 1rem; background: #f8f9fa; border-radius: 10px;">
-                        <strong>Reference:</strong> <a href="${gene.reference}" target="_blank" style="word-break: break-all;">${gene.reference}</a>
-                    </div>
-                ` : ''}
             </div>
+
+            ${gene.complex_names ? `
+            <div class="details-section" style="margin-top: 2.5rem;">
+                <h2 style="color: #2c3e50; margin-bottom: 1rem;">
+                    Protein Interactions 
+                    <a href="https://mips.helmholtz-muenchen.de/corum/" target="_blank" style="font-size: 0.9rem; font-weight: normal; margin-left: 10px;">(Source: CORUM)</a>
+                </h2>
+                <div class="gene-info" style="margin-bottom: 1rem;">
+                    <strong>Complex Names:</strong>
+                    <p style="margin-top: 0.5rem; line-height: 1.6;">${gene.complex_names.replace(/; /g, '<br>')}</p>
+                </div>
+                <div class="gene-info">
+                    <strong>Complex Components:</strong>
+                    <p style="margin-top: 0.5rem; line-height: 1.6;">${gene.complex_components.replace(/ \| /g, '<br>')}</p>
+                </div>
+            </div>
+            ` : ''}
+
+            ${referenceText ? `
+            <div class="details-section" style="margin-top: 2.5rem; padding-top: 1.5rem; border-top: 1px solid #e1ecf4;">
+                <strong>Reference(s):</strong> 
+                <p style="margin-top: 0.5rem; line-height: 1.6; word-break: break-all;">${referenceText}</p>
+            </div>
+            ` : ''}
         </div>`;
     
-    updateGeneButtons([...currentData, gene], [gene]);  
+    updateGeneButtons([gene], [gene]);
     showLocalization(gene.gene, true);
 }
+
 
 function displayNotFoundPage() {
     const contentArea = document.querySelector('.content-area');
