@@ -1940,4 +1940,3 @@ window.addEventListener("hashchange", handleRouteChange);
 document.addEventListener('DOMContentLoaded', () => {
     initGlobalEventListeners();
 });
-});
