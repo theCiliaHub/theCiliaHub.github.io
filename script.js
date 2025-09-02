@@ -32,6 +32,10 @@ function sanitize(input) {
     return input.replace(/[\u200B-\u200D\u2060\uFEFF]/g, '').trim().toUpperCase();
 }
 
+/**
+ * Loads the database and builds an efficient, multi-identifier search map.
+ * This new version indexes genes by Name, Synonyms, and Ensembl ID.
+ */
 async function loadAndPrepareDatabase() {
     if (geneDataCache) return true;
     try {
@@ -48,11 +52,16 @@ async function loadAndPrepareDatabase() {
 
             const geneObject = g;
 
-            // ✨ NEW: Add Gene, Synonyms, and Ensembl ID to the search map
-            const identifiers = [g.gene, ...(String(g.synonym || '').split(',')), g.ensembl_id];
+            // ✨ NEW: Create a comprehensive list of all identifiers for a gene
+            const identifiers = [
+                g.gene,
+                g.ensembl_id,
+                ...(String(g.synonym || '').split(','))
+            ];
             
             identifiers.forEach(id => {
                 const key = sanitize(id);
+                // Ensure key is valid and not already pointing to a different gene
                 if (key && !geneMapCache.has(key)) {
                     geneMapCache.set(key, geneObject);
                 }
@@ -75,6 +84,9 @@ async function loadAndPrepareDatabase() {
     }
 }
 
+/**
+ * Central search function for exact matches (used by search buttons).
+ */
 function findGenes(queries) {
     const foundGenes = new Set();
     const notFound = [];
@@ -89,7 +101,26 @@ function findGenes(queries) {
     return { foundGenes: Array.from(foundGenes), notFoundGenes: notFound };
 }
 
+/**
+ * ✨ NEW: Autocomplete search function for partial matches.
+ * Finds genes where any identifier starts with the user's query.
+ */
+function findGenesAutocomplete(query) {
+    if (query.length < 2) return [];
 
+    const sanitizedQuery = sanitize(query);
+    const suggestions = new Set();
+    
+    // Iterate through the search map keys for partial matches
+    for (const key of geneMapCache.keys()) {
+        if (key.startsWith(sanitizedQuery)) {
+            suggestions.add(geneMapCache.get(key));
+            if (suggestions.size >= 10) break; // Limit to 10 suggestions
+        }
+    }
+    
+    return Array.from(suggestions);
+}
 // Add this function to help with debugging
 function debugSearch(query) {
     console.log("Searching for:", query);
