@@ -23,7 +23,7 @@ Chart.register({
 });
 
 // =============================================================================
-// NEW & IMPROVED: DATA AND SEARCH SYSTEM (Add this entire block)
+// DATA AND SEARCH SYSTEM (Correct Version)
 // =============================================================================
 
 let geneDataCache = null;
@@ -31,7 +31,6 @@ let geneMapCache = null;
 
 /**
  * Sanitizes any string by removing invisible characters and normalizing it.
- * This is the core of the bug fix.
  */
 function sanitize(input) {
     if (typeof input !== 'string') return '';
@@ -41,33 +40,36 @@ function sanitize(input) {
 
 /**
  * Loads, sanitizes, and prepares the gene database into an efficient lookup map.
- * This runs only once. Replaces the old `loadGeneDatabase`.
  */
-// =============================================================================
-// DATA LOADING
-// =============================================================================
 async function loadAndPrepareDatabase() {
     if (geneDataCache) return true;
     try {
         const resp = await fetch('https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/ciliahub_data.json');
         if (!resp.ok) throw new Error(`HTTP Error ${resp.status}`);
         const rawGenes = await resp.json();
+        
         geneDataCache = rawGenes;
         allGenes = rawGenes;
         geneMapCache = new Map();
+
         allGenes.forEach(g => {
             const nameKey = sanitize(g.gene);
             if (nameKey) geneMapCache.set(nameKey, g);
+            
             if (g.synonym) {
-                g.synonym.split(',').forEach(syn => {
+                // Ensure synonym is treated as a string before splitting
+                const synonyms = String(g.synonym).split(',');
+                synonyms.forEach(syn => {
                     const key = sanitize(syn);
                     if (key && !geneMapCache.has(key)) geneMapCache.set(key, g);
                 });
             }
+            
             if (g.localization) {
                 geneLocalizationData[g.gene] = mapLocalizationToSVG(g.localization);
             }
         });
+
         currentData = allGenes.filter(g => defaultGenesNames.includes(g.gene));
         return true;
     } catch (e) {
@@ -80,9 +82,8 @@ async function loadAndPrepareDatabase() {
     }
 }
 
-
 /**
- * The new central search function. Replaces old search logic.
+ * The central search function.
  */
 function findGenes(queries) {
     const foundGenes = new Set();
@@ -99,7 +100,7 @@ function findGenes(queries) {
 }
 
 /**
- * New function to handle the UI for the Batch Gene Query page.
+ * Handles the UI for the Batch Gene Query page.
  */
 function performBatchSearch() {
     const inputElement = document.getElementById('batch-genes-input');
@@ -117,7 +118,7 @@ function performBatchSearch() {
 }
 
 /**
- * New function to handle the UI for the Single Gene Search on the Home page.
+ * Handles the UI for the Single Gene Search on the Home page.
  */
 function performSingleSearch() {
     const query = sanitize(document.getElementById('single-gene-search')?.value || '');
@@ -136,7 +137,6 @@ function performSingleSearch() {
     if (foundGenes.length === 1) {
         navigateTo(null, `/${foundGenes[0].gene}`);
     } else if (foundGenes.length > 1) {
-        // This can happen if a query matches a synonym shared by multiple genes
         navigateTo(null, '/batch-query');
         setTimeout(() => {
             const batchInput = document.getElementById('batch-genes-input');
@@ -151,7 +151,7 @@ function performSingleSearch() {
 }
 
 /**
- * New function to display batch results. Replaces the old version.
+ * Displays batch results.
  */
 function displayBatchResults(foundGenes, notFoundGenes) {
     const resultDiv = document.getElementById('batch-results');
@@ -162,10 +162,12 @@ function displayBatchResults(foundGenes, notFoundGenes) {
     if (foundGenes.length > 0) {
         html += '<table><thead><tr><th>Gene</th><th>Ensembl ID</th><th>Localization</th><th>Function Summary</th></tr></thead><tbody>';
         foundGenes.forEach(item => {
+            // Join localization array for display
+            const localizationText = Array.isArray(item.localization) ? item.localization.join(', ') : (item.localization || '-');
             html += `<tr>
                 <td><a href="/${item.gene}" onclick="navigateTo(event, '/${item.gene}')">${item.gene}</a></td>
                 <td>${item.ensembl_id || '-'}</td>
-                <td>${item.localization || '-'}</td>
+                <td>${localizationText}</td>
                 <td>${item.functional_summary ? item.functional_summary.substring(0, 100) + '...' : '-'}</td>
             </tr>`;
         });
@@ -185,7 +187,6 @@ function displayBatchResults(foundGenes, notFoundGenes) {
     const cardsContainer = document.getElementById('gene-cards-container');
     if (cardsContainer) cardsContainer.innerHTML = '';
 }
-
 
 // Default gene set as fallback if loading fails
 function getDefaultGenes() {
