@@ -524,8 +524,9 @@ function displayBatchQueryTool() {
 
 function exportSearchResults() {
     const results = searchResults.length > 0 ? searchResults : currentData;
+    // ✨ FIX: Use .join() to correctly handle arrays for CSV output
     const csv = ['Gene,Description,Localization,Ensembl ID,OMIM ID,Functional Summary,Reference']
-        .concat(results.map(g => `"${g.gene}","${g.description || ''}","${g.localization || ''}","${g.ensembl_id || ''}","${g.omim_id || ''}","${g.functional_summary || ''}","${g.reference || ''}"`))
+        .concat(results.map(g => `"${g.gene}","${g.description || ''}","${Array.isArray(g.localization) ? g.localization.join('; ') : (g.localization || '')}","${g.ensembl_id || ''}","${g.omim_id || ''}","${g.functional_summary || ''}","${Array.isArray(g.reference) ? g.reference.join('; ') : (g.reference || '')}"`))
         .join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
@@ -917,8 +918,9 @@ function displayDownloadPage() {
         </div>`;
     
     document.getElementById('download-csv').onclick = () => {
+        // ✨ FIX: Use .join() to correctly handle arrays for CSV output
         const csv = ['Gene,Ensembl ID,Description,Synonym,OMIM ID,Functional Summary,Localization,Reference']
-            .concat(allGenes.map(g => `"${g.gene}","${g.ensembl_id || ''}","${g.description || ''}","${g.synonym || ''}","${g.omim_id || ''}","${g.functional_summary || ''}","${g.localization || ''}","${g.reference || ''}"`))
+            .concat(allGenes.map(g => `"${g.gene}","${g.ensembl_id || ''}","${g.description || ''}","${g.synonym || ''}","${g.omim_id || ''}","${g.functional_summary || ''}","${Array.isArray(g.localization) ? g.localization.join('; ') : (g.localization || '')}","${Array.isArray(g.reference) ? g.reference.join('; ') : (g.reference || '')}"`))
             .join('\n');
         const blob = new Blob([csv], { type: 'text/csv' });
         const url = URL.createObjectURL(blob);
@@ -1351,12 +1353,14 @@ function displayLocalizationChart() {
     const categories = ['Cilia', 'Basal Body', 'Transition Zone', 'Flagella', 'Ciliary Associated Gene'];
     const localizationCounts = categories.reduce((acc, category) => {
         acc[category] = allGenes.filter(g => {
-            if (!g.localization) return false;
-            const localizations = g.localization.split(',').map(l => l.trim().toLowerCase());
-            return localizations.includes(category.toLowerCase()) || 
-                   (category === 'Cilia' && localizations.includes('ciliary membrane')) ||
-                   (category === 'Flagella' && localizations.includes('axoneme')) ||
-                   (category === 'Ciliary Associated Gene' && localizations.includes('ciliary associated gene'));
+            // ✨ FIX: Check if g.localization is an array before processing
+            if (!Array.isArray(g.localization)) return false;
+            
+            const localizations = g.localization.map(l => l.trim().toLowerCase());
+            return localizations.includes(category.toLowerCase()) ||
+                  (category === 'Cilia' && localizations.includes('ciliary membrane')) ||
+                  (category === 'Flagella' && localizations.includes('axoneme')) ||
+                  (category === 'Ciliary Associated Gene' && localizations.includes('ciliary associated gene'));
         }).length;
         return acc;
     }, {});
