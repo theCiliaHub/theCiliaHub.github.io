@@ -1058,97 +1058,142 @@ function displayContactPage() {
     });
 }
 
+/**
+ * Displays a visually appealing and detailed page for a single gene.
+ * This function has been completely redesigned for better UI/UX and data presentation.
+ */
 function displayIndividualGenePage(gene) {
     const contentArea = document.querySelector('.content-area');
     contentArea.className = 'content-area';
     document.querySelector('.cilia-panel').style.display = 'block';
 
-    // Helper function to join array data into a clean, readable string
-    const formatArrayForDisplay = (data) => Array.isArray(data) && data.length > 0 ? data.join(', ') : '';
+    // --- Helper Functions for Formatting ---
 
-    // ✨ NEW: Helper function to format different reference types into links
+    // 1. Formats array data into a series of styled "tag" elements
+    const formatAsTags = (data, className = 'tag-default') => {
+        if (!Array.isArray(data) || data.length === 0) return 'Not available';
+        return data.map(item => `<span class="tag ${className}">${item}</span>`).join('');
+    };
+
+    // 2. NEW & IMPROVED: Formats all reference types into correct hyperlinks
     const formatReferences = (gene) => {
         if (!gene.reference || !Array.isArray(gene.reference) || gene.reference.length === 0) {
-            return 'No reference information available.';
+            return '<li>No reference information available.</li>';
         }
+        
+        // This handles cases where one array element might be "id1, id2" or a full URL
+        const allRefs = gene.reference
+            .flatMap(item => String(item).split(',')) // Split comma-separated IDs
+            .map(s => s.trim())
+            .filter(Boolean); // Remove any empty entries
 
-        // This handles cases where one array element might be "id1, id2"
-        const allRefs = gene.reference.flatMap(item => String(item).split(','))
-                                     .map(s => s.trim())
-                                     .filter(Boolean);
-
-        if (allRefs.length === 0) return 'No reference information available.';
+        if (allRefs.length === 0) return '<li>No reference information available.</li>';
 
         return allRefs.map(ref => {
             if (/^\d+$/.test(ref)) { // If it's a numeric ID, link to PubMed
-                return `<a href="https://pubmed.ncbi.nlm.nih.gov/${ref}" target="_blank">PMID: ${ref}</a>`;
+                return `<li><a href="https://pubmed.ncbi.nlm.nih.gov/${ref}" target="_blank">PMID: ${ref}</a></li>`;
             }
-            if (ref.toLowerCase().startsWith('http')) { // If it's a full link
-                return `<a href="${ref}" target="_blank">View Paper</a>`;
+            if (ref.toLowerCase().includes('proteinatlas.org')) { // If it's the Protein Atlas
+                return `<li><a href="https://www.proteinatlas.org/${gene.ensembl_id}" target="_blank">Human Protein Atlas</a></li>`;
             }
-            if (ref.toLowerCase() === 'protein atlas') { // If it's the Protein Atlas
-                return `<a href="https://www.proteinatlas.org/${gene.ensembl_id}" target="_blank">Human Protein Atlas</a>`;
+            if (ref.toLowerCase().startsWith('http')) { // If it's any other full link
+                return `<li><a href="${ref}" target="_blank">${ref}</a></li>`;
             }
-            return ref; // Otherwise, just display the text
-        }).join('<br>');
+            return `<li>${ref}</li>`; // Otherwise, just display the text
+        }).join('');
     };
 
-    // Prepare text for display
-    const localizationText = formatArrayForDisplay(gene.localization);
-    const functionalCategoryText = formatArrayForDisplay(gene.functional_category);
+    // Prepare data for display using the helpers
+    const localizationTags = formatAsTags(gene.localization, 'tag-localization');
+    const functionalCategoryTags = formatAsTags(gene.functional_category, 'tag-category');
     const referenceHTML = formatReferences(gene);
 
+    // --- Main HTML Template for the Gene Page ---
     contentArea.innerHTML = `
         <div class="page-section gene-detail-page">
-            <div class="breadcrumb" style="margin-bottom: 2rem;">
+            <div class="breadcrumb">
                 <a href="/" onclick="navigateTo(event, '/')" aria-label="Back to Home">← Back to Home</a>
             </div>
             
-            <h1 class="gene-name">${gene.gene}</h1>
-            <p class="gene-description">${gene.description || 'No description available.'}</p>
+            <header class="gene-header">
+                <h1 class="gene-name">${gene.gene}</h1>
+                <p class="gene-description">${gene.description || 'No description available.'}</p>
+            </header>
 
-            <div class="gene-info-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem; margin-top: 2rem; background: #f8f9fa; padding: 1.5rem; border-radius: 10px;">
-                ${gene.ensembl_id ? `<div class="gene-info"><strong>Ensembl ID:</strong> <a href="https://www.ensembl.org/Homo_sapiens/Gene/Summary?g=${gene.ensembl_id}" target="_blank">${gene.ensembl_id}</a></div>` : ''}
-                ${gene.omim_id ? `<div class="gene-info"><strong>OMIM ID:</strong> <a href="https://www.omim.org/entry/${gene.omim_id}" target="_blank">${gene.omim_id}</a></div>` : ''}
-                ${gene.synonym ? `<div class="gene-info"><strong>Synonym(s):</strong> ${gene.synonym}</div>` : ''}
-                ${localizationText ? `<div class="gene-info"><strong>Subcellular Localization:</strong> <span style="color: #27ae60; font-weight: 600;">${localizationText}</span></div>` : ''}
-                ${functionalCategoryText ? `<div class="gene-info"><strong>Functional Category:</strong> ${functionalCategoryText}</div>` : ''}
-                ${gene.ciliopathy ? `<div class="gene-info"><strong>Associated Ciliopathy:</strong> ${gene.ciliopathy}</div>` : ''}
-                ${gene.gene_annotation ? `<div class="gene-info"><strong>Gene Annotation:</strong> ${gene.gene_annotation}</div>` : ''}
-            </div>
+            <div class="gene-details-grid">
+                <!-- Left Column -->
+                <div class="details-column">
+                    <div class="detail-card">
+                        <h3 class="card-title">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+                            Identifiers
+                        </h3>
+                        <div class="info-grid">
+                            ${gene.ensembl_id ? `<div class="info-item"><strong>Ensembl ID:</strong> <a href="https://www.ensembl.org/Homo_sapiens/Gene/Summary?g=${gene.ensembl_id}" target="_blank">${gene.ensembl_id}</a></div>` : ''}
+                            ${gene.omim_id ? `<div class="info-item"><strong>OMIM ID:</strong> <a href="https://www.omim.org/entry/${gene.omim_id}" target="_blank">${gene.omim_id}</a></div>` : ''}
+                            ${gene.synonym ? `<div class="info-item"><strong>Synonym(s):</strong> ${gene.synonym}</div>` : ''}
+                        </div>
+                    </div>
 
-            <div class="details-section" style="margin-top: 2.5rem;">
-                <h2 style="color: #2c3e50; margin-bottom: 1rem;">Functional Summary</h2>
-                <p style="line-height: 1.7; color: #34495e;">${gene.functional_summary || 'No functional summary available.'}</p>
-            </div>
-
-            ${gene.complex_names ? `
-            <div class="details-section" style="margin-top: 2.5rem;">
-                <h2 style="color: #2c3e50; margin-bottom: 1rem;">
-                    Protein Interactions 
-                    <a href="https://mips.helmholtz-muenchen.de/corum/" target="_blank" style="font-size: 0.9rem; font-weight: normal; margin-left: 10px;">(Source: CORUM)</a>
-                </h2>
-                <div class="gene-info" style="margin-bottom: 1rem;">
-                    <strong>Complex Names:</strong>
-                    <p style="margin-top: 0.5rem; line-height: 1.6;">${gene.complex_names.replace(/; /g, '<br>')}</p>
+                    <div class="detail-card">
+                        <h3 class="card-title">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"></path><circle cx="12" cy="10" r="3"></circle></svg>
+                            Subcellular Localization
+                        </h3>
+                        <div class="tags-container">${localizationTags}</div>
+                    </div>
+                    
+                    ${gene.complex_names ? `
+                    <div class="detail-card">
+                        <h3 class="card-title">
+                             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a10 10 0 1 0 10 10"></path><path d="M12 18a10 10 0 1 0 0-20"></path><path d="M12 10a10 10 0 1 0-10-10"></path><path d="M12 10a10 10 0 1 0 10 10"></path></svg>
+                            Protein Interactions
+                            <a href="https://mips.helmholtz-muenchen.de/corum/" target="_blank">(Source: CORUM)</a>
+                        </h3>
+                        <div class="info-item">
+                            <strong>Complex Names:</strong>
+                            <p>${gene.complex_names.replace(/; /g, '<br>')}</p>
+                        </div>
+                        <div class="info-item">
+                            <strong>Complex Components:</strong>
+                            <p>${gene.complex_components.replace(/ \| /g, '<br>')}</p>
+                        </div>
+                    </div>` : ''}
                 </div>
-                <div class="gene-info">
-                    <strong>Complex Components:</strong>
-                    <p style="margin-top: 0.5rem; line-height: 1.6;">${gene.complex_components.replace(/ \| /g, '<br>')}</p>
-                </div>
-            </div>
-            ` : ''}
 
-            <div class="details-section" style="margin-top: 2.5rem; padding-top: 1.5rem; border-top: 1px solid #e1ecf4;">
-                <strong>Reference(s):</strong> 
-                <p style="margin-top: 0.5rem; line-height: 1.6; word-break: break-all;">${referenceHTML}</p>
+                <!-- Right Column -->
+                <div class="details-column">
+                    <div class="detail-card">
+                        <h3 class="card-title">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+                            Functional Information
+                        </h3>
+                        <div class="info-item">
+                            <strong>Functional Summary:</strong>
+                            <p>${gene.functional_summary || 'Not available.'}</p>
+                        </div>
+                         <div class="info-item">
+                            <strong>Functional Category:</strong>
+                            <div class="tags-container">${functionalCategoryTags}</div>
+                        </div>
+                        ${gene.ciliopathy ? `<div class="info-item"><strong>Associated Ciliopathy:</strong> <p>${gene.ciliopathy}</p></div>` : ''}
+                        ${gene.gene_annotation ? `<div class="info-item"><strong>Gene Annotation:</strong> <p>${gene.gene_annotation}</p></div>` : ''}
+                    </div>
+
+                    <div class="detail-card">
+                        <h3 class="card-title">
+                           <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5a2.5 2.5 0 0 1 0-5 .5.5 0 0 0 0-1 .5.5 0 0 0 0-1 2.5 2.5 0 0 1 0-5 .5.5 0 0 0 0-1 .5.5 0 0 0 0-1 2.5 2.5 0 0 1 5 0 .5.5 0 0 0 1 0 .5.5 0 0 0 1 0 2.5 2.5 0 0 1 5 0 .5.5 0 0 0 1 0 .5.5 0 0 0 1 0 2.5 2.5 0 0 1 0 5 .5.5 0 0 0 0 1 .5.5 0 0 0 0 1 2.5 2.5 0 0 1 0 5 .5.5 0 0 0 0 1 .5.5 0 0 0 0 1 2.5 2.5 0 0 1-5 0 .5.5 0 0 0-1 0 .5.5 0 0 0-1 0 2.5 2.5 0 0 1-5 0 .5.5 0 0 0-1 0 .5.5 0 0 0-1 0Z"></path></svg>
+                            References
+                        </h3>
+                        <ul class="reference-list">${referenceHTML}</ul>
+                    </div>
+                </div>
             </div>
         </div>`;
     
     updateGeneButtons([gene], [gene]);
     showLocalization(gene.gene, true);
 }
-
 
 function displayNotFoundPage() {
     const contentArea = document.querySelector('.content-area');
