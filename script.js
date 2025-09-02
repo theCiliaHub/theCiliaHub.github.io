@@ -604,17 +604,17 @@ function displayComparePage() {
     });
 
     function handleSearchInput() {
-        const query = searchInput.value.trim().toLowerCase();
-        if (query.length < 1) {
-            suggestionsContainer.style.display = 'none';
-            return;
-        }
+         const query = searchInput.value.trim().toUpperCase(); // ✨ FIX: Changed to toUpperCase()
+    if (query.length < 1) {
+        suggestionsContainer.style.display = 'none';
+        return;
+    }
 
         const filteredGenes = allGenes.filter(g =>
-            g.gene.toLowerCase().includes(query) &&
-            !selectedCompareGenes.some(sg => sg.gene === g.gene)
-        ).slice(0, 10);
-        
+        g.gene.toUpperCase().startsWith(query) && // ✨ FIX: Use startsWith for better performance
+        !selectedCompareGenes.some(sg => sg.gene === g.gene)
+    ).slice(0, 10);
+    
         if (filteredGenes.length > 0) {
             suggestionsContainer.innerHTML = filteredGenes.map(g => `<div data-gene="${g.gene}">${g.gene}</div>`).join('');
             suggestionsContainer.style.display = 'block';
