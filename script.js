@@ -1064,12 +1064,39 @@ function displayIndividualGenePage(gene) {
     document.querySelector('.cilia-panel').style.display = 'block';
 
     // Helper function to join array data into a clean, readable string
-    const formatArray = (data) => Array.isArray(data) && data.length > 0 ? data.join(', ') : (data || '');
+    const formatArrayForDisplay = (data) => Array.isArray(data) && data.length > 0 ? data.join(', ') : '';
+
+    // ✨ NEW: Helper function to format different reference types into links
+    const formatReferences = (gene) => {
+        if (!gene.reference || !Array.isArray(gene.reference) || gene.reference.length === 0) {
+            return 'No reference information available.';
+        }
+
+        // This handles cases where one array element might be "id1, id2"
+        const allRefs = gene.reference.flatMap(item => String(item).split(','))
+                                     .map(s => s.trim())
+                                     .filter(Boolean);
+
+        if (allRefs.length === 0) return 'No reference information available.';
+
+        return allRefs.map(ref => {
+            if (/^\d+$/.test(ref)) { // If it's a numeric ID, link to PubMed
+                return `<a href="https://pubmed.ncbi.nlm.nih.gov/${ref}" target="_blank">PMID: ${ref}</a>`;
+            }
+            if (ref.toLowerCase().startsWith('http')) { // If it's a full link
+                return `<a href="${ref}" target="_blank">View Paper</a>`;
+            }
+            if (ref.toLowerCase() === 'protein atlas') { // If it's the Protein Atlas
+                return `<a href="https://www.proteinatlas.org/${gene.ensembl_id}" target="_blank">Human Protein Atlas</a>`;
+            }
+            return ref; // Otherwise, just display the text
+        }).join('<br>');
+    };
 
     // Prepare text for display
-    const localizationText = formatArray(gene.localization);
-    const functionalCategoryText = formatArray(gene.functional_category);
-    const referenceText = formatArray(gene.reference);
+    const localizationText = formatArrayForDisplay(gene.localization);
+    const functionalCategoryText = formatArrayForDisplay(gene.functional_category);
+    const referenceHTML = formatReferences(gene);
 
     contentArea.innerHTML = `
         <div class="page-section gene-detail-page">
@@ -1112,12 +1139,10 @@ function displayIndividualGenePage(gene) {
             </div>
             ` : ''}
 
-            ${referenceText ? `
             <div class="details-section" style="margin-top: 2.5rem; padding-top: 1.5rem; border-top: 1px solid #e1ecf4;">
                 <strong>Reference(s):</strong> 
-                <p style="margin-top: 0.5rem; line-height: 1.6; word-break: break-all;">${referenceText}</p>
+                <p style="margin-top: 0.5rem; line-height: 1.6; word-break: break-all;">${referenceHTML}</p>
             </div>
-            ` : ''}
         </div>`;
     
     updateGeneButtons([gene], [gene]);
