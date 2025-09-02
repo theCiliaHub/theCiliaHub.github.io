@@ -11,8 +11,10 @@
     
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@panzoom/panzoom@4.5.1/dist/panzoom.min.js"></script>
+    <script src="https://unpkg.com/@upsetjs/bundle"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    
+    <script src="https://cdn.jsdelivr.net/npm/jstat@latest/dist/jstat.min.js"></script>
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX"></script>
     <script>
       window.dataLayer = window.dataLayer || [];
@@ -27,99 +29,106 @@
             <a href="/#" onclick="navigateTo(event, '/')" class="logo" aria-label="CiliaHub Home">CiliaHub</a>
             <ul class="nav-links">
                 <li><a href="/#" onclick="navigateTo(event, '/')" aria-label="Home">Home</a></li>
-                <li><a href="/#/enrichment" onclick="navigateTo(event, '/#/enrichment')" aria-label="Enrichment">Enrichment</a></li>
-                </ul>
+                <li><a href="/#/enrichment" onclick="navigateTo(event, '/enrichment')" aria-label="Enrichment">Enrichment</a></li>
+                <li><a href="/#/batch-query" onclick="navigateTo(event, '/batch-query')" aria-label="Batch Query">Batch Query</a></li>
+                <li><a href="/#/compare" onclick="navigateTo(event, '/compare')" aria-label="Compare">Compare</a></li>
+                <li><a href="/#/expression" onclick="navigateTo(event, '/expression')" aria-label="Expression">Expression</a></li>
+                <li><a href="/#/download" onclick="navigateTo(event, '/download')" aria-label="Download">Download</a></li>
+                <li><a href="/#/contact" onclick="navigateTo(event, '/contact')" aria-label="Contact">Contact</a></li>
+            </ul>
         </div>
     </nav>
 
     <main class="main-container">
         <div class="content-area" id="content-area">
             
-            <div id="home-page" class="page-content">
+            <div id="home-page">
                 <h1>Welcome to CiliaHub 🔬</h1>
                 <p>Your comprehensive resource for genes with ciliary functions. Explore our database, compare genes, and visualize expression data.</p>
                 <div class="call-to-action">
                     <p>Get started by analyzing your gene list to discover ciliary localization patterns.</p>
-                    <a href="/#/enrichment" onclick="navigateTo(event, '/#/enrichment')" class="cta-button">Perform Gene Enrichment Analysis</a>
+                    <a href="/#/analysis" onclick="navigateTo(event, '/analysis')" class="cta-button">Perform Gene Enrichment Analysis</a>
                 </div>
             </div>
 
-            <div id="enrichment-page" class="page-content" style="display: none;">
-                <h2>Ciliary Gene Enrichment Analysis</h2>
-                <p>Paste your list of genes and CiliaHub will calculate how enriched your list is for known ciliary genes.</p>
-                <textarea id="enrichment-genes-input" placeholder="e.g., TMEM17, IFT88, WDR31..." style="width: 100%; min-height: 150px; padding: 1rem; border: 2px solid #e1ecf4; border-radius: 10px; font-size: 1rem; margin-top: 1rem; resize: vertical;"></textarea>
+            <div id="analysis-page" style="display: none;">
+                <h2>Gene Enrichment Analysis</h2>
+                <div class="analysis-input">
+                    <label for="analysis-genes-input">Enter Gene List (one per line or comma-separated):</label>
+                    <textarea id="analysis-genes-input" rows="5" placeholder="e.g., BBS1, BBS2, ARL6"></textarea>
+                </div>
+                <div class="plot-type-selection">
+                    <h3>Select Plot Type:</h3>
+                    <label><input type="radio" name="plot-type" value="bubble" checked> Bubble Enrichment Plot</label>
+                    <label><input type="radio" name="plot-type" value="matrix"> Matrix Plot</label>
+                </div>
+                <div class="plot-settings">
+                    <h3>Plot Settings</h3>
+                    <label>Font Family: <input type="text" id="setting-font-family" value="Arial"></label>
+                    <label>Font Size: <input type="number" id="setting-font-size" value="16"></label>
+                    <label>Font Weight: <input type="text" id="setting-font-weight" value="bold"></label>
+                    <label>Text Color: <input type="color" id="setting-text-color" value="#000000"></label>
+                    <label>Axis Color: <input type="color" id="setting-axis-color" value="#000000"></label>
+                    <label>Y-Axis Title: <input type="text" id="setting-y-axis-title" value="Localization"></label>
+                    <label>Enrichment Color 1: <input type="color" id="setting-enrichment-color1" value="#edf8fb"></label>
+                    <label>Enrichment Color 2: <input type="color" id="setting-enrichment-color2" value="#b2e2e2"></label>
+                    <label>Enrichment Color 3: <input type="color" id="setting-enrichment-color3" value="#66c2a4"></label>
+                    <label>Enrichment Color 4: <input type="color" id="setting-enrichment-color4" value="#2ca25f"></label>
+                    <label>Enrichment Color 5: <input type="color" id="setting-enrichment-color5" value="#006d2c"></label>
+                </div>
+                <button onclick="generateAnalysisPlots()">Generate Plot</button>
+                <div id="analysis-status" style="display: none;"></div>
+                <div id="plot-container" style="display: none;">
+                    <div id="bubble-enrichment-container" style="display: flex; width: 100%; height: 500px;">
+                        <canvas id="analysis-bubble-plot" style="flex-grow: 1;"></canvas>
+                        <div id="legend-container" style="min-width: 150px; padding-left: 20px;"></div>
+                    </div>
+                    <div id="matrix-plot-container" style="display: none; width: 100%; height: 500px;">
+                        <canvas id="analysis-matrix-plot"></canvas>
+                    </div>
+                </div>
                 
-                <div id="enrichment-controls" style="margin-top: 1rem; display: flex; align-items: center; gap: 20px; flex-wrap: wrap;">
-                    <div>
-                        <strong>Plot Type:</strong>
-                        <input type="radio" id="plot-bubble" name="plot-type" value="bubble" checked>
-                        <label for="plot-bubble" style="margin-right: 10px;">Localization</label>
-                        <input type="radio" id="plot-matrix" name="plot-type" value="matrix">
-                        <label for="plot-matrix" style="margin-right: 10px;">Gene Matrix</label>
-                        <input type="radio" id="plot-ciliome" name="plot-type" value="ciliome">
-                        <label for="plot-ciliome" style="margin-right: 10px;">Ciliome Enrichment</label>
-                    </div>
-                    <button id="generate-plot-btn" class="btn btn-primary" onclick="generateEnrichmentPlots()">Generate Plot</button>
-                    <select id="download-format">
-                        <option value="png">PNG</option>
-                        <option value="pdf">PDF</option>
-                    </select>
-                    <button id="download-plot-btn" class="btn btn-secondary" style="display:none;" onclick="downloadPlot()">Download Plot</button>
-                </div>
+                <div id="gene-table-container" style="display: none; width: 80%; margin: 40px auto 0;"></div>
 
-                <div class="customization-panel" style="margin-top: 20px; border: 1px solid #e1ecf4; border-radius: 8px; padding: 20px;">
-                    <h3 style="font-weight: bold; margin-bottom: 5px; font-size: 1.2rem;">Plot Customization</h3>
-                    <p style="font-size: 0.9rem; color: #555; margin-top: 0; margin-bottom: 20px;">Click "Generate Plot" after making changes to apply them.</p>
-                    <style>
-                        .customization-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 25px; }
-                        .settings-group { display: flex; flex-direction: column; gap: 15px; }
-                        .settings-group h4 { margin: 0 0 5px 0; font-size: 1rem; color: #333; border-bottom: 1px solid #eee; padding-bottom: 5px; }
-                        .setting-item { display: flex; flex-direction: column; gap: 5px; }
-                        .setting-item label { font-weight: 500; font-size: 0.9rem; color: #444; }
-                        .setting-item input, .setting-item select { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
-                    </style>
-                    <div id="plot-settings-panel" class="customization-grid">
-                        <div class="settings-group">
-                            <h4>Typography</h4>
-                            <div class="setting-item"><label for="setting-font-family">Font Family</label><select id="setting-font-family"><option>Arial</option><option>Tahoma</option><option>Verdana</option></select></div>
-                            <div class="setting-item"><label for="setting-font-size">Label Font Size (Ticks)</label><input type="number" id="setting-font-size" value="14" min="8" max="30"></div>
-                            <div class="setting-item"><label for="setting-font-weight">Font Weight</label><select id="setting-font-weight"><option value="normal">Normal</option><option value="bold" selected>Bold</option></select></div>
-                            <div class="setting-item"><label for="setting-text-color">Text Color</label><input type="color" id="setting-text-color" value="#000000" style="padding: 2px; height: 35px;"></div>
-                        </div>
-                        <div class="settings-group">
-                            <h4>Axes</h4>
-                            <div class="setting-item"><label for="setting-axis-size">Axis Font Size (Titles)</label><input type="number" id="setting-axis-size" value="16" min="8" max="40"></div>
-                            <div class="setting-item"><label for="setting-axis-color">Axis Color</label><input type="color" id="setting-axis-color" value="#000000" style="padding: 2px; height: 35px;"></div>
-                            <div class="setting-item"><label for="setting-y-axis-title">Y-Axis Title</label><input type="text" id="setting-y-axis-title" value="Localization"></div>
-                            <div class="setting-item"><label for="setting-x-axis-title">X-Axis Title</label><input type="text" id="setting-x-axis-title" value="Enrichment"></div>
-                        </div>
-                        <div class="settings-group">
-                            <h4>Colors</h4>
-                            <div class="setting-item"><label for="setting-bar-color">Bar Color (Ciliome Plot)</label><input type="color" id="setting-bar-color" value="#2ca25f" style="padding: 2px; height: 35px;"></div>
-                            <div class="setting-item"><label for="setting-enrichment-color1">Enrichment Color (Low)</label><input type="color" id="setting-enrichment-color1" value="#edf8fb" style="padding: 2px; height: 35px;"></div>
-                            <div class="setting-item"><label for="setting-enrichment-color5">Enrichment Color (High)</label><input type="color" id="setting-enrichment-color5" value="#006d2c" style="padding: 2px; height: 35px;"></div>
-                        </div>
-                    </div>
-                </div>
-
-                <div id="plot-container" style="display:none; margin-top: 2rem;">
-                    <div id="bubble-enrichment-container" style="display: none; align-items: flex-start; gap: 0px;"></div>
-                    <div id="matrix-plot-container" style="display: none;"></div>
-                    <div id="ciliome-plot-container" style="display: none;"></div>
+                <div class="download-section">
+                     <button id="download-plot-btn" onclick="downloadPlot()" style="display: none; margin-right: 10px;">Download Plot</button>
+                     <select id="download-format">
+                         <option value="png">PNG</option>
+                         <option value="pdf">PDF</option>
+                     </select>
                 </div>
             </div>
-
-            </div>
+        </div>
         
         <aside class="cilia-panel">
-            </aside>
+            <div class="panel-header">
+                <h3>Interactive Cilium</h3>
+                <p style="font-size: 0.9rem; opacity: 0.9;">Click genes to see localization</p>
+            </div>
+            <div class="panel-content">
+                <div class="cilia-container interactive-cilium">
+                    <svg viewBox="0 0 300 400" xmlns="http://www.w3.org/2000/svg">
+                        <path id="cell-body" class="cilia-part" tabindex="0" fill="none" d="M 50,380 C -20,300 20,200 150,200 C 280,200 320,300 250,380 Z" aria-label="Cell Body"/>
+                        <circle id="nucleus" class="cilia-part" tabindex="0" fill="#A7C7E7" cx="150" cy="320" r="40" aria-label="Nucleus"/>
+                        <rect id="basal-body" class="cilia-part" tabindex="0" fill="#2F2F2F" x="140" y="195" width="20" height="15" aria-label="Basal Body"/>
+                        <path id="transition-zone" class="cilia-part" tabindex="0" fill="#9B59B6" d="M 142,195 L 138,180 L 162,180 L 158,195 Z" aria-label="Transition Zone"/>
+                        <path id="ciliary-membrane" class="cilia-part" tabindex="0" fill="none" fill-opacity="0.5" d="M 138,180 L 145,10 L 155,10 L 162,180 Z" aria-label="Ciliary Membrane"/>
+                        <path id="axoneme" class="cilia-part" tabindex="0" fill="none" d="M 145,180 L 148,15 L 152,15 L 155,180 Z" aria-label="Axoneme"/>
+                    </svg>
+                </div>
+                <div class="controls">
+                    <h4>Gene Localization:</h4>
+                    <div id="geneButtons" class="gene-buttons"></div>
+                </div>
+            </div>
+        </aside>
     </main>
 
     <footer class="footer">
         <p>&copy; 2025 CiliaHub. All rights reserved.</p>
     </footer>
 
-    <script src="script.js"></script>
     <script src="plots.js"></script>
+    <script src="script.js"></script>
 </body>
 </html>
