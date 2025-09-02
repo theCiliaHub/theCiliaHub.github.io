@@ -113,9 +113,8 @@ function debugSearch(query) {
     }
 }
 
-// --- Gene Cache ---
-const geneMapCache = new Map(); // Maps all gene identifiers to gene objects
-const geneList = getDefaultGenes(); // Or your loaded data
+const geneMapCache = new Map();
+const geneList = getDefaultGenes(); // Load your gene dataset
 
 function populateGeneCache(genes) {
     genes.forEach(gene => {
@@ -133,23 +132,23 @@ function populateGeneCache(genes) {
 
 populateGeneCache(geneList);
 
-// --- Search Function ---
+
 function findGenes(queries) {
     const foundGenes = new Set();
     const notFound = [];
-    
+
     queries.forEach(query => {
         const upperQuery = query.toUpperCase();
         let matched = false;
 
-        // 1. Exact match
+        // Exact match
         const gene = geneMapCache.get(upperQuery);
         if (gene) {
             foundGenes.add(gene);
             matched = true;
         }
 
-        // 2. Partial match (autocomplete)
+        // Partial / autocomplete match
         if (!matched) {
             const suggestions = [];
             for (let [key, value] of geneMapCache) {
@@ -161,20 +160,18 @@ function findGenes(queries) {
                 foundGenes.add(suggestions[0]);
                 matched = true;
             } else if (suggestions.length > 1) {
-                // Add all suggestions if multiple partial matches
                 suggestions.forEach(s => foundGenes.add(s));
                 matched = true;
             }
         }
 
-        // 3. If no match, add to notFound
         if (!matched) notFound.push(query);
     });
 
     return { foundGenes: Array.from(foundGenes), notFoundGenes: notFound };
 }
 
-// --- Single Gene Search (Home Page) ---
+
 function performSingleSearch() {
     const query = sanitize(document.getElementById('single-gene-search')?.value || '');
     const statusDiv = document.getElementById('status-message');
@@ -192,7 +189,7 @@ function performSingleSearch() {
     if (foundGenes.length === 1) {
         navigateTo(null, `/${foundGenes[0].gene}`);
     } else if (foundGenes.length > 1) {
-        // Multiple partial matches → go to batch query
+        // Multiple matches → batch query
         navigateTo(null, '/batch-query');
         setTimeout(() => {
             const batchInput = document.getElementById('batch-genes-input');
@@ -202,12 +199,11 @@ function performSingleSearch() {
             }
         }, 100);
     } else {
-        // No matches
+        // No match
         statusDiv.innerHTML = `<span class="error-message">No genes found for "${query}".</span>`;
     }
 }
 
-// --- Batch Gene Search ---
 function performBatchSearch() {
     const inputElement = document.getElementById('batch-genes-input');
     const resultDiv = document.getElementById('batch-results');
@@ -223,7 +219,6 @@ function performBatchSearch() {
     displayBatchResults(foundGenes, notFoundGenes);
 }
 
-// --- Batch Results Display ---
 function displayBatchResults(foundGenes, notFoundGenes) {
     const resultDiv = document.getElementById('batch-results');
     if (!resultDiv) return;
@@ -244,7 +239,7 @@ function displayBatchResults(foundGenes, notFoundGenes) {
         html += '</tbody></table>';
     }
 
-    if (notFoundGenes && notFoundGenes.length > 0) {
+    if (notFoundGenes.length > 0) {
         html += `
             <div style="margin-top: 20px; padding: 10px; border: 1px solid #ddd; border-radius: 4px;">
                 <h4>Genes Not Found (${notFoundGenes.length}):</h4>
@@ -255,6 +250,7 @@ function displayBatchResults(foundGenes, notFoundGenes) {
 
     resultDiv.innerHTML = html;
 }
+
 
 // Default gene set as fallback if loading fails
 function getDefaultGenes() {
