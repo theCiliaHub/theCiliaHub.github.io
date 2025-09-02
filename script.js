@@ -1,13 +1,3 @@
-// Global variables for data management
-const geneLocalizationData = {};
-let allGenes = [];
-let currentData = [];
-let searchResults = [];
-let localizationChartInstance; // For Chart.js instance management
-let analysisDotPlotInstance; // For Analysis page dot plot
-let analysisBarChartInstance; // For Analysis page bar chart
-const allPartIds = ["cell-body", "nucleus", "basal-body", "transition-zone", "axoneme", "ciliary-membrane"];
-const defaultGenesNames = ["ACE2", "ADAMTS20", "ADAMTS9", "IFT88", "CEP290", "WDR31", "ARL13B", "BBS1"];
 
 // ✨ THE NEW PLUGIN CODE RIGHT HERE for PLOT ✨
 Chart.register({
@@ -22,12 +12,6 @@ Chart.register({
   }
 });
 
-// =============================================================================
-// DATA AND SEARCH SYSTEM (Correct Version)
-// =============================================================================
-
-let geneDataCache = null;
-let geneMapCache = null;
 
 /**
  * Sanitizes any string by removing invisible characters and normalizing it.
