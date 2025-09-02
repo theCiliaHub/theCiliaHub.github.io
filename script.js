@@ -120,13 +120,12 @@ function findGenes(queries) {
                 matched = true;
                 break;
             }
-
-            // 2. Match by Ensembl ID
-            if (gene.ensembl_id && gene.ensembl_id.toUpperCase() === upperQuery) {
-                foundGenes.add(gene);
-                matched = true;
-                break;
-            }
+// 2. Match by Ensembl ID (supports autocomplete)
+if (gene.ensembl_id && gene.ensembl_id.toUpperCase().includes(upperQuery)) {
+    foundGenes.add(gene);
+    matched = true;
+    break;
+}
 
             // 3. Match by synonyms (split by comma/space/semicolon)
             if (gene.synonym) {
