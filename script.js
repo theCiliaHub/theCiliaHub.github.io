@@ -105,22 +105,9 @@ function findGenes(queries) {
     const notFound = [];
     
     queries.forEach(query => {
-        // Convert query to uppercase for consistent comparison
-        const upperQuery = query.toUpperCase();
-        let result = null;
-        
-        // First try exact match with uppercase
-        result = geneMapCache.get(upperQuery);
-        
-        // If not found, try case-insensitive search
-        if (!result) {
-            for (let [key, value] of geneMapCache) {
-                if (key.toUpperCase() === upperQuery) {
-                    result = value;
-                    break;
-                }
-            }
-        }
+        // The sanitize function already converts the query to uppercase
+        const sanitizedQuery = sanitize(query); 
+        const result = geneMapCache.get(sanitizedQuery);
         
         if (result) {
             foundGenes.add(result);
@@ -786,12 +773,14 @@ function displayComparePage() {
         selectedCompareGenes.forEach(gene => {
         // ✨ CHANGE IS HERE ✨
         if (Array.isArray(gene.localization)) { // Check if it's an array
-            gene.localization.forEach(loc => {     // Loop directly over the array
-                const term = loc.trim();
-                if (term) {
-                    localizationCounts[term] = (localizationCounts[term] || 0) + 1;
-                }
-            });
+            gene.localization.forEach(loc => {
+          const term = loc.trim().toLowerCase(); // ✨ FIX: Convert to lowercase
+            if (term) {
+        // Capitalize the first letter for consistent chart labels
+        const capitalizedTerm = term.charAt(0).toUpperCase() + term.slice(1);
+        localizationCounts[capitalizedTerm] = (localizationCounts[capitalizedTerm] || 0) + 1;
+    }
+});
         }
     });
         
