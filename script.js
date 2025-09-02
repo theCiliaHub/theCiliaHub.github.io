@@ -362,35 +362,32 @@ function mapLocalizationToSVG(localizationArray) {
 }
 
 async function handleRouteChange() {
-    await loadAndPrepareDatabase(); // Use the new, efficient data loader
-    const path = window.location.hash.replace('#', '').toLowerCase() || '/';
-    const geneName = sanitize(path.split('/').pop().replace('.html', ''));
-    const gene = geneMapCache.get(geneName);
+    // Ensure the database is loaded before any page is shown
+    await loadAndPrepareDatabase();
     
-    updateActiveNav(path);
-    
-    if (path === '/' || path === '/index.html') {
-        displayHomePage();
-        setTimeout(displayLocalizationChart, 0);
-    } else if (path === '/batch-query') {
-        displayBatchQueryTool();
-    } else if (path === '/enrichment') {
-        displayEnrichmentPage();
-    } else if (path === '/compare') {
-        displayComparePage();
-    } else if (path === '/expression') {
-        displayExpressionPage();
-    } else if (path === '/download') {
-        displayDownloadPage();
-    } else if (path === '/contact') {
-        displayContactPage();
-    } else if (gene) {
-        displayIndividualGenePage(gene);
+    // Read the path from the URL hash
+    const path = window.location.hash;
+
+    // First, hide all the page content divs
+    const allPages = document.querySelectorAll('.page-content');
+    allPages.forEach(page => page.style.display = 'none');
+
+    // Use an 'if/else if' chain to show the correct page div
+    if (path === '#/enrichment') {
+        document.getElementById('enrichment-page').style.display = 'block';
+    } else if (path === '#/batch-query') {
+        document.getElementById('batch-query-page').style.display = 'block';
+    } else if (path === '#/compare') {
+        document.getElementById('compare-page').style.display = 'block';
+    } else if (path === '#/expression') {
+        document.getElementById('expression-page').style.display = 'block';
+    } else if (path === '#/download') {
+        document.getElementById('download-page').style.display = 'block';
+    } else if (path === '#/contact') {
+        document.getElementById('contact-page').style.display = 'block';
     } else {
-        // Don't show "not found" for the homepage
-        if (path !== '/' && path !== '/index.html') {
-            displayNotFoundPage();
-        }
+        // For any other path (including '#' or '/'), default to the home page
+        document.getElementById('home-page').style.display = 'block';
     }
 }
     
