@@ -1916,6 +1916,8 @@ function displayExpressionPage() {
 // Navigation helper
 window.navigateTo = function(event, path) {
     if (event) event.preventDefault();
+    // Always include # at the start
+    if (!path.startsWith('#')) path = '#' + path;
     window.location.hash = path;
 };
 
