@@ -366,6 +366,9 @@ async function handleRouteChange() {
         await loadAndPrepareDatabase();
     } catch (err) {
         console.error("Database loading failed:", err);
+        console.log("DEBUG hash:", window.location.hash);
+        console.log("DEBUG path:", path);
+
     }
 
     let path = window.location.hash.replace(/^#/, '').toLowerCase().trim();
