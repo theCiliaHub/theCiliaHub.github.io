@@ -1060,7 +1060,7 @@ function displayContactPage() {
 
 /**
  * Displays a visually appealing and detailed page for a single gene.
- * This function has been redesigned for improved UI/UX, responsiveness, and consistency with CiliaHub's design.
+ * Updated to use Navbar-consistent blue color scheme, separate localization tags with commas, and handle both comma and semicolon separators in references.
  */
 function displayIndividualGenePage(gene) {
   const contentArea = document.querySelector('.content-area');
@@ -1068,22 +1068,22 @@ function displayIndividualGenePage(gene) {
   document.querySelector('.cilia-panel').style.display = 'block';
 
   // --- Helper Functions for Formatting ---
-  // 1. Formats array data into a series of styled "tag" elements
+  // 1. Formats array data into a series of styled "tag" elements with comma separation
   const formatAsTags = (data, className = 'tag-default') => {
     if (!Array.isArray(data) || data.length === 0) return 'Not available';
-    return data.map(item => `<span class="tag ${className} inline-block bg-gray-100 text-gray-800 text-sm font-medium px-2.5 py-0.5 rounded-full mr-2 mb-2">${item}</span>`).join('');
+    return data.map(item => `<span class="tag ${className} inline-block bg-blue-50 text-blue-700 text-sm font-medium px-2.5 py-0.5 rounded-full mr-2 mb-2">${item}</span>`).join(', ');
   };
 
-  // 2. Formats all reference types into correct hyperlinks
+  // 2. Formats all reference types into correct hyperlinks, handling both comma and semicolon separators
   const formatReferences = (gene) => {
     if (!gene.reference || !Array.isArray(gene.reference) || gene.reference.length === 0) {
-      return '<li class="text-gray-500">No reference information available.</li>';
+      return '<li class="text-blue-600">No reference information available.</li>';
     }
     const allRefs = gene.reference
-      .flatMap(item => String(item).split(',')) // Split comma-separated IDs
+      .flatMap(item => String(item).split(/[,;]\s*/)) // Split by comma or semicolon with optional whitespace
       .map(s => s.trim())
       .filter(Boolean); // Remove any empty entries
-    if (allRefs.length === 0) return '<li class="text-gray-500">No reference information available.</li>';
+    if (allRefs.length === 0) return '<li class="text-blue-600">No reference information available.</li>';
     return allRefs.map(ref => {
       if (/^\d+$/.test(ref)) { // Numeric ID for PubMed
         return `<li><a href="https://pubmed.ncbi.nlm.nih.gov/${ref}" target="_blank" class="text-blue-600 hover:underline">PMID: ${ref}</a></li>`;
@@ -1094,27 +1094,27 @@ function displayIndividualGenePage(gene) {
       if (ref.toLowerCase().startsWith('http')) { // Other full links
         return `<li><a href="${ref}" target="_blank" class="text-blue-600 hover:underline">${ref}</a></li>`;
       }
-      return `<li>${ref}</li>`; // Fallback for plain text
+      return `<li class="text-blue-600">${ref}</li>`; // Fallback for plain text
     }).join('');
   };
 
   // Prepare data for display using the helpers
-  const localizationTags = formatAsTags(gene.localization, 'tag-localization bg-blue-100 text-blue-800');
-  const functionalCategoryTags = formatAsTags(gene.functional_category, 'tag-category bg-green-100 text-green-800');
+  const localizationTags = formatAsTags(gene.localization, 'tag-localization bg-blue-50 text-blue-700');
+  const functionalCategoryTags = formatAsTags(gene.functional_category, 'tag-category bg-blue-50 text-blue-700');
   const referenceHTML = formatReferences(gene);
 
   // --- Main HTML Template for the Gene Page ---
   contentArea.innerHTML = `
     <div class="page-section gene-detail-page bg-white shadow-lg rounded-lg overflow-hidden">
       <!-- Breadcrumb -->
-      <div class="breadcrumb px-6 py-4 bg-gray-50 border-b border-gray-200">
+      <div class="breadcrumb px-6 py-4 bg-blue-50 border-b border-blue-200">
         <a href="/" onclick="navigateTo(event, '/')" aria-label="Back to Home" class="text-blue-600 hover:underline text-sm font-medium">← Back to Home</a>
       </div>
 
       <!-- Header -->
       <header class="gene-header px-6 py-8 bg-gradient-to-r from-blue-50 to-white">
-        <h1 class="gene-name text-3xl font-bold text-gray-900 mb-2">${gene.gene}</h1>
-        <p class="gene-description text-gray-600 text-lg">${gene.description || 'No description available.'}</p>
+        <h1 class="gene-name text-3xl font-bold text-blue-900 mb-2">${gene.gene}</h1>
+        <p class="gene-description text-blue-700 text-lg">${gene.description || 'No description available.'}</p>
       </header>
 
       <!-- Gene Details Grid -->
@@ -1122,38 +1122,38 @@ function displayIndividualGenePage(gene) {
         <!-- Left Column -->
         <div class="details-column space-y-6">
           <!-- Identifiers Card -->
-          <div class="detail-card bg-white border border-gray-200 rounded-lg p-6 shadow-sm hover:shadow-md transition-shadow">
-            <h3 class="card-title flex items-center text-xl font-semibold text-gray-900 mb-4">
-              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-2 text-blue-600">
+          <div class="detail-card bg-white border border-blue-200 rounded-lg p-6 shadow-sm hover:shadow-md transition-shadow">
+            <h3 class="card-title flex items-center text-xl font-semibold text-blue-900 mb-4">
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-2">
                 <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path>
                 <polyline points="14 2 14 8 20 8"></polyline>
               </svg>
               Identifiers
             </h3>
             <div class="info-grid space-y-3">
-              ${gene.ensembl_id ? `<div class="info-item"><strong class="font-medium">Ensembl ID:</strong> <a href="https://www.ensembl.org/Homo_sapiens/Gene/Summary?g=${gene.ensembl_id}" target="_blank" class="text-blue-600 hover:underline">${gene.ensembl_id}</a></div>` : ''}
-              ${gene.omim_id ? `<div class="info-item"><strong class="font-medium">OMIM ID:</strong> <a href="https://www.omim.org/entry/${gene.omim_id}" target="_blank" class="text-blue-600 hover:underline">${gene.omim_id}</a></div>` : ''}
-              ${gene.synonym ? `<div class="info-item"><strong class="font-medium">Synonym(s):</strong> <span class="text-gray-700">${gene.synonym}</span></div>` : ''}
+              ${gene.ensembl_id ? `<div class="info-item"><strong class="font-medium text-blue-900">Ensembl ID:</strong> <a href="https://www.ensembl.org/Homo_sapiens/Gene/Summary?g=${gene.ensembl_id}" target="_blank" class="text-blue-600 hover:underline">${gene.ensembl_id}</a></div>` : ''}
+              ${gene.omim_id ? `<div class="info-item"><strong class="font-medium text-blue-900">OMIM ID:</strong> <a href="https://www.omim.org/entry/${gene.omim_id}" target="_blank" class="text-blue-600 hover:underline">${gene.omim_id}</a></div>` : ''}
+              ${gene.synonym ? `<div class="info-item"><strong class="font-medium text-blue-900">Synonym(s):</strong> <span class="text-blue-700">${gene.synonym}</span></div>` : ''}
             </div>
           </div>
 
           <!-- Subcellular Localization Card -->
-          <div class="detail-card bg-white border border-gray-200 rounded-lg p-6 shadow-sm hover:shadow-md transition-shadow">
-            <h3 class="card-title flex items-center text-xl font-semibold text-gray-900 mb-4">
-              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-2 text-blue-600">
+          <div class="detail-card bg-white border border-blue-200 rounded-lg p-6 shadow-sm hover:shadow-md transition-shadow">
+            <h3 class="card-title flex items-center text-xl font-semibold text-blue-900 mb-4">
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-2">
                 <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"></path>
                 <circle cx="12" cy="10" r="3"></circle>
               </svg>
               Subcellular Localization
             </h3>
-            <div class="tags-container">${localizationTags}</div>
+            <div class="tags-container text-blue-700">${localizationTags}</div>
           </div>
 
           <!-- Protein Interactions Card -->
           ${gene.complex_names ? `
-            <div class="detail-card bg-white border border-gray-200 rounded-lg p-6 shadow-sm hover:shadow-md transition-shadow">
-              <h3 class="card-title flex items-center text-xl font-semibold text-gray-900 mb-4">
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-2 text-blue-600">
+            <div class="detail-card bg-white border border-blue-200 rounded-lg p-6 shadow-sm hover:shadow-md transition-shadow">
+              <h3 class="card-title flex items-center text-xl font-semibold text-blue-900 mb-4">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-2">
                   <path d="M12 2a10 10 0 1 0 10 10"></path>
                   <path d="M12 18a10 10 0 1 0 0-20"></path>
                   <path d="M12 10a10 10 0 1 0-10-10"></path>
@@ -1163,12 +1163,12 @@ function displayIndividualGenePage(gene) {
                 <a href="https://mips.helmholtz-muenchen.de/corum/" target="_blank" class="ml-2 text-blue-600 hover:underline text-sm">(Source: CORUM)</a>
               </h3>
               <div class="info-item mb-3">
-                <strong class="font-medium">Complex Names:</strong>
-                <p class="text-gray-700">${gene.complex_names.replace(/; /g, '<br>')}</p>
+                <strong class="font-medium text-blue-900">Complex Names:</strong>
+                <p class="text-blue-700">${gene.complex_names.replace(/; /g, '<br>')}</p>
               </div>
               <div class="info-item">
-                <strong class="font-medium">Complex Components:</strong>
-                <p class="text-gray-700">${gene.complex_components.replace(/ \| /g, '<br>')}</p>
+                <strong class="font-medium text-blue-900">Complex Components:</strong>
+                <p class="text-blue-700">${gene.complex_components.replace(/ \| /g, '<br>')}</p>
               </div>
             </div>
           ` : ''}
@@ -1177,34 +1177,34 @@ function displayIndividualGenePage(gene) {
         <!-- Right Column -->
         <div class="details-column space-y-6">
           <!-- Functional Information Card -->
-          <div class="detail-card bg-white border border-gray-200 rounded-lg p-6 shadow-sm hover:shadow-md transition-shadow">
-            <h3 class="card-title flex items-center text-xl font-semibold text-gray-900 mb-4">
-              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-2 text-blue-600">
+          <div class="detail-card bg-white border border-blue-200 rounded-lg p-6 shadow-sm hover:shadow-md transition-shadow">
+            <h3 class="card-title flex items-center text-xl font-semibold text-blue-900 mb-4">
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-2">
                 <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
               </svg>
               Functional Information
             </h3>
             <div class="info-item mb-3">
-              <strong class="font-medium">Functional Summary:</strong>
-              <p class="text-gray-700">${gene.functional_summary || 'Not available.'}</p>
+              <strong class="font-medium text-blue-900">Functional Summary:</strong>
+              <p class="text-blue-700">${gene.functional_summary || 'Not available.'}</p>
             </div>
             <div class="info-item mb-3">
-              <strong class="font-medium">Functional Category:</strong>
-              <div class="tags-container">${functionalCategoryTags}</div>
+              <strong class="font-medium text-blue-900">Functional Category:</strong>
+              <div class="tags-container text-blue-700">${functionalCategoryTags}</div>
             </div>
-            ${gene.ciliopathy ? `<div class="info-item"><strong class="font-medium">Associated Ciliopathy:</strong> <p class="text-gray-700">${gene.ciliopathy}</p></div>` : ''}
-            ${gene.gene_annotation ? `<div class="info-item"><strong class="font-medium">Gene Annotation:</strong> <p class="text-gray-700">${gene.gene_annotation}</p></div>` : ''}
+            ${gene.ciliopathy ? `<div class="info-item"><strong class="font-medium text-blue-900">Associated Ciliopathy:</strong> <p class="text-blue-700">${gene.ciliopathy}</p></div>` : ''}
+            ${gene.gene_annotation ? `<div class="info-item"><strong class="font-medium text-blue-900">Gene Annotation:</strong> <p class="text-blue-700">${gene.gene_annotation}</p></div>` : ''}
           </div>
 
           <!-- References Card -->
-          <div class="detail-card bg-white border border-gray-200 rounded-lg p-6 shadow-sm hover:shadow-md transition-shadow">
-            <h3 class="card-title flex items-center text-xl font-semibold text-gray-900 mb-4">
-              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-2 text-blue-600">
+          <div class="detail-card bg-white border border-blue-200 rounded-lg p-6 shadow-sm hover:shadow-md transition-shadow">
+            <h3 class="card-title flex items-center text-xl font-semibold text-blue-900 mb-4">
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-2">
                 <path d="M4 19.5a2.5 2.5 0 0 1 0-5 .5.5 0 0 0 0-1 .5.5 0 0 0 0-1 2.5 2.5 0 0 1 0-5 .5.5 0 0 0 0-1 .5.5 0 0 0 0-1 2.5 2.5 0 0 1 5 0 .5.5 0 0 0 1 0 .5.5 0 0 0 1 0 2.5 2.5 0 0 1 5 0 .5.5 0 0 0 1 0 .5.5 0 0 0 1 0 2.5 2.5 0 0 1 0 5 .5.5 0 0 0 0 1 .5.5 0 0 0 0 1 2.5 2.5 0 0 1 0 5 .5.5 0 0 0 0 1 .5.5 0 0 0 0 1 2.5 2.5 0 0 1-5 0 .5.5 0 0 0-1 0 .5.5 0 0 0-1 0 2.5 2.5 0 0 1-5 0 .5.5 0 0 0-1 0 .5.5 0 0 0-1 0Z"></path>
               </svg>
               References
             </h3>
-            <ul class="reference-list list-disc pl-5 text-gray-700">${referenceHTML}</ul>
+            <ul class="reference-list list-disc pl-5 text-blue-700">${referenceHTML}</ul>
           </div>
         </div>
       </div>
@@ -1214,6 +1214,8 @@ function displayIndividualGenePage(gene) {
   updateGeneButtons([gene], [gene]);
   showLocalization(gene.gene, true);
 }
+
+
 
 function displayNotFoundPage() {
     const contentArea = document.querySelector('.content-area');
