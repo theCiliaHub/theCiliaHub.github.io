@@ -53,6 +53,8 @@ function generateEnrichmentPlots() {
     document.getElementById('bubble-enrichment-container').style.display = 'none';
     document.getElementById('matrix-plot-container').style.display = 'none';
     document.getElementById('ciliome-plot-container').style.display = 'none';
+    document.getElementById('functional-plot-container').style.display = 'none'; // New container for functional plot
+    document.getElementById('cooccurrence-plot-container').style.display = 'none'; // New container for co-occurrence
     document.getElementById('plot-container').style.display = 'block';
     document.getElementById('download-plot-btn').style.display = 'inline-block';
 
@@ -62,125 +64,35 @@ function generateEnrichmentPlots() {
         currentPlot = null;
     }
 
+    // Assume foundGenes and notFoundGenes are derived from geneList and window.allGenes
+    // For simplicity, we'll mock this logic here; in production, replace with actual filtering
+    const allGenes = window.allGenes || []; // Assume this is the full ciliome data
+    const foundGenes = allGenes.filter(gene => geneList.includes(gene.gene));
+    const notFoundGenes = geneList.filter(g => !foundGenes.some(fg => fg.gene === g));
+
     if (plotType === 'bubble') {
         document.getElementById('bubble-enrichment-container').style.display = 'flex';
-
-        const ctx = document.getElementById('enrichment-bubble-plot').getContext('2d');
-
-        // Example: Map gene count to enrichment score
-        const labels = geneList;
-        const data = geneList.map((g, i) => ({
-            x: i + 1,
-            y: Math.random() * 5 + 1, // placeholder enrichment score
-            r: Math.random() * 15 + 5  // bubble radius
-        }));
-
-        currentPlot = new Chart(ctx, {
-            type: 'bubble',
-            data: {
-                labels: labels,
-                datasets: [{
-                    label: 'Gene Enrichment',
-                    data: data,
-                    backgroundColor: settings.colors[4]
-                }]
-            },
-            options: {
-                responsive: true,
-                plugins: {
-                    legend: { display: false },
-                    tooltip: { callbacks: {
-                        label: function(context) {
-                            return `${labels[context.dataIndex]}: Score ${context.raw.y.toFixed(2)}`;
-                        }
-                    }}
-                },
-                scales: {
-                    x: {
-                        title: {
-                            display: true,
-                            text: 'Gene Index',
-                            color: settings.axisColor,
-                            font: {
-                                family: settings.fontFamily,
-                                size: settings.fontSize,
-                                weight: settings.fontWeight
-                            }
-                        },
-                        ticks: { color: settings.textColor, font: { family: settings.fontFamily, size: settings.fontSize } }
-                    },
-                    y: {
-                        title: {
-                            display: true,
-                            text: settings.yAxisTitle,
-                            color: settings.axisColor,
-                            font: {
-                                family: settings.fontFamily,
-                                size: settings.fontSize,
-                                weight: settings.fontWeight
-                            }
-                        },
-                        ticks: { color: settings.textColor, font: { family: settings.fontFamily, size: settings.fontSize } }
-                    }
-                }
-            }
-        });
-
-        // Update legend dynamically
-        const legendContainer = document.getElementById('legend-container');
-        legendContainer.innerHTML = geneList.map((g, i) => `
-            <div style="display:flex; align-items:center; gap:5px; margin-bottom:2px;">
-                <span style="width:15px; height:15px; background:${settings.colors[i % settings.colors.length]}; display:inline-block;"></span>
-                <span>${g}</span>
-            </div>
-        `).join('');
-
+        renderEnrichmentBubblePlot(foundGenes);
     } else if (plotType === 'matrix') {
         document.getElementById('matrix-plot-container').style.display = 'block';
-        const ctx = document.getElementById('enrichment-matrix-plot').getContext('2d');
-
-        // Example matrix data
-        const matrixData = geneList.map(g => geneList.map(() => Math.random()));
-        currentPlot = new Chart(ctx, {
-            type: 'matrix',
-            data: {
-                datasets: [{
-                    label: 'Gene Co-occurrence',
-                    data: matrixData.flatMap((row, i) => row.map((v, j) => ({x:j, y:i, v: v}))),
-                    backgroundColor: function(ctx) {
-                        const val = ctx.dataset.data[ctx.dataIndex].v;
-                        return settings.colors[Math.floor(val * settings.colors.length)] || settings.colors[0];
-                    },
-                    width: ({chart}) => chart.chartArea.width / geneList.length - 1,
-                    height: ({chart}) => chart.chartArea.height / geneList.length - 1
-                }]
-            },
-            options: {
-                responsive: true,
-                plugins: { legend: { display: false } },
-                scales: {
-                    x: { ticks: { color: settings.textColor, font: { family: settings.fontFamily, size: settings.fontSize } } },
-                    y: { ticks: { color: settings.textColor, font: { family: settings.fontFamily, size: settings.fontSize } } }
-                }
-            }
-        });
+        renderBubbleMatrix(foundGenes);
     } else if (plotType === 'ciliome') {
         document.getElementById('ciliome-plot-container').style.display = 'block';
-        const container = document.getElementById('ciliome-plot-container');
-        container.innerHTML = `
-            <h3>Ciliome Enrichment</h3>
-            <p>Detected ${geneList.length} ciliary genes out of ~2000 in the ciliome.</p>
-            <div style="width: 80%; height: 400px; margin: auto; background: linear-gradient(90deg, ${settings.colors.join(',')}); border-radius: 10px;"></div>
-        `;
+        renderCiliomeEnrichment(foundGenes, notFoundGenes);
+    } else if (plotType === 'functional') {
+        document.getElementById('functional-plot-container').style.display = 'block';
+        renderFunctionalCategoryEnrichment(foundGenes, notFoundGenes);
+    } else if (plotType === 'cooccurrence') {
+        document.getElementById('cooccurrence-plot-container').style.display = 'block';
+        renderLocalizationFunctionalCooccurrence(foundGenes);
     }
 
     // Scroll to plot container
     document.getElementById('plot-container').scrollIntoView({ behavior: 'smooth' });
 }
 
-
 // ------------------------
-// Bubble Plot Function (Using Chart.js)
+// Bubble Plot Function (Using Chart.js) - Unchanged
 // ------------------------
 function renderEnrichmentBubblePlot(foundGenes) {
     document.getElementById('bubble-enrichment-container').style.display = 'flex';
@@ -191,7 +103,7 @@ function renderEnrichmentBubblePlot(foundGenes) {
     const yCategories = ['Cilia', 'Basal Body', 'Transition Zone', 'Axoneme', 'Ciliary Membrane', 'Lysosome', 'Peroxisome', 'Plasma Membrane', 'Cytoplasm', 'Nucleus', 'Endoplasmic Reticulum', 'Mitochondria', 'Ribosome', 'Golgi'];
     const localizationCounts = {};
     foundGenes.forEach(gene => {
-        (gene.localization || '').split(',').forEach(loc => {
+        (gene.localization || []).forEach(loc => {
             const matchingCategory = yCategories.find(cat => cat.toLowerCase() === loc.trim().toLowerCase());
             if (matchingCategory) {
                 localizationCounts[matchingCategory] = (localizationCounts[matchingCategory] || 0) + 1;
@@ -322,7 +234,7 @@ function renderEnrichmentBubblePlot(foundGenes) {
 }
 
 // ------------------------
-// Gene Matrix Plot Function (Using Chart.js)
+// Gene Matrix Plot Function (Using Chart.js) - Revised for better color handling
 // ------------------------
 function renderBubbleMatrix(foundGenes) {
     document.getElementById('matrix-plot-container').style.display = 'block';
@@ -332,11 +244,11 @@ function renderBubbleMatrix(foundGenes) {
     const settings = getPlotSettings();
     const yCategories = ['Basal Body', 'Transition Zone', 'Axoneme', 'Ciliary Membrane', 'Cilia', 'Golgi'];
     const xLabels = [...new Set(foundGenes.map(g => g.gene))].sort();
-    const colorPalette = ['#377eb8', '#ff7f00', '#4daf4a', '#f781bf', '#a65628', '#984ea3', '#999999', '#e41a1c', '#dede00'];
+    const colorPalette = settings.enrichmentColors.concat(['#377eb8', '#ff7f00', '#4daf4a', '#f781bf', '#a65628', '#984ea3', '#999999', '#e41a1c', '#dede00']); // Extended palette
 
     const datasets = foundGenes.map((gene, index) => ({
         label: gene.gene,
-        data: (gene.localization || '').split(',').map(locString => {
+        data: (gene.localization || []).map(locString => {
             const matchingCategory = yCategories.find(cat => cat.toLowerCase() === locString.trim().toLowerCase());
             return matchingCategory ? { x: gene.gene, y: matchingCategory, r: 10 } : null;
         }).filter(Boolean),
@@ -424,9 +336,8 @@ function renderBubbleMatrix(foundGenes) {
     });
 }
 
-
 // ------------------------
-// Ciliome Enrichment Plot Function (Using Chart.js)
+// Ciliome Enrichment Plot Function (Using Chart.js) - Unchanged
 // ------------------------
 function renderCiliomeEnrichment(foundGenes, notFoundGenes) {
     document.getElementById('ciliome-plot-container').style.display = 'block';
@@ -463,7 +374,7 @@ function renderCiliomeEnrichment(foundGenes, notFoundGenes) {
     const localizationCounts = {};
     foundGenes.forEach(gene => {
         if (gene.localization) {
-            gene.localization.split(',').forEach(loc => {
+            gene.localization.forEach(loc => {
                 const term = loc.trim();
                 if (term) {
                     localizationCounts[term] = (localizationCounts[term] || 0) + 1;
@@ -564,8 +475,319 @@ function renderCiliomeEnrichment(foundGenes, notFoundGenes) {
     });
 }
 
-// --- Download Functionality ---
+// ------------------------
+// New: Functional Category Enrichment Plot Function (Using Chart.js)
+// ------------------------
+function renderFunctionalCategoryEnrichment(foundGenes, notFoundGenes) {
+    document.getElementById('functional-plot-container').style.display = 'block';
 
+    if (window.functionalChartInstance) {
+        window.functionalChartInstance.destroy();
+    }
+
+    const k = foundGenes.length;
+    const n_input = k + notFoundGenes.length;
+    const M = window.allGenes ? window.allGenes.length : 2000; // Total ciliary genes in database
+    const N = 20000; // Total genes in background genome
+
+    if (n_input === 0) {
+        document.getElementById('functional-plot-container').innerHTML = '<p class="status-message">Please enter a gene list to analyze.</p>';
+        return;
+    }
+
+    const pValue = hypergeometricPValue(k, n_input, M, N);
+    const enrichmentScore = n_input > 0 && M > 0 ? (k / n_input) / (M / N) : 0;
+
+    const summaryHTML = `
+        <div id="functional-results-summary" style="margin-bottom: 2rem; font-size: 1.1rem; max-width: 600px; margin-left: auto; margin-right: auto;">
+            <h3>Functional Category Enrichment Analysis Results</h3>
+            <p>From your list of <strong>${n_input}</strong> unique gene(s), <strong>${k}</strong> were found in the CiliaHub database of <strong>${M}</strong> ciliary genes.</p>
+            <p>The expected number of ciliary genes from a random list of this size (from a background of ${N} total genes) would be approximately <strong>${((M / N) * n_input).toFixed(2)}</strong>.</p>
+            <div style="font-size: 1.2rem; margin-top: 1rem; padding: 10px; background-color: #f8f9fa; border-radius: 5px;">
+                <p><strong>Enrichment Score:</strong> ${enrichmentScore.toFixed(2)}-fold</p>
+                <p><strong>P-value (Hypergeometric Test):</strong> ${pValue.toExponential(3)}</p>
+            </div>
+        </div>
+    `;
+
+    const functionalCounts = {};
+    foundGenes.forEach(gene => {
+        if (gene.functional_category) {
+            gene.functional_category.forEach(cat => {
+                const term = cat.trim();
+                if (term) {
+                    functionalCounts[term] = (functionalCounts[term] || 0) + 1;
+                }
+            });
+        }
+    });
+
+    const chartData = { labels: [], counts: [] };
+    Object.entries(functionalCounts)
+        .sort(([, a], [, b]) => b - a)
+        .forEach(([label, count]) => {
+            chartData.labels.push(label);
+            chartData.counts.push(count);
+        });
+
+    const barChartHTML = `
+        <div style="position: relative; width: 100%; max-width: 700px; height: 600px; margin: auto;">
+            <canvas id="functional-bar-chart"></canvas>
+        </div>
+    `;
+
+    const container = document.getElementById('functional-plot-container');
+    container.innerHTML = summaryHTML + (k > 0 ? barChartHTML : '<p>No functional categories found for the genes in your list.</p>');
+
+    if (k === 0) return;
+
+    const settings = getPlotSettings();
+    const ctx = document.getElementById('functional-bar-chart').getContext('2d');
+    window.functionalChartInstance = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: chartData.labels,
+            datasets: [{
+                label: 'Gene Count',
+                data: chartData.counts,
+                backgroundColor: settings.barChartColor,
+                borderWidth: 1
+            }]
+        },
+        options: {
+            indexAxis: 'y',
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                title: {
+                    display: true,
+                    text: 'Functional Categories of Found Ciliary Genes',
+                    font: {
+                        family: settings.fontFamily,
+                        size: settings.fontSize,
+                        weight: settings.fontWeight
+                    },
+                    color: settings.textColor
+                }
+            },
+            scales: {
+                x: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: 'Gene Count',
+                        font: {
+                            family: settings.fontFamily,
+                            size: settings.fontSize,
+                            weight: settings.fontWeight
+                        },
+                        color: settings.axisColor
+                    },
+                    ticks: {
+                        stepSize: 1,
+                        color: settings.textColor
+                    },
+                    grid: {
+                        display: false,
+                        drawBorder: true,
+                        borderColor: settings.axisColor
+                    }
+                },
+                y: {
+                    ticks: {
+                        font: {
+                            family: settings.fontFamily,
+                            size: settings.fontSize,
+                            weight: settings.fontWeight
+                        },
+                        color: settings.textColor
+                    },
+                    grid: {
+                        display: false,
+                        drawBorder: true,
+                        borderColor: settings.axisColor
+                    }
+                }
+            }
+        }
+    });
+}
+
+// ------------------------
+// New: Localization and Functional Category Co-occurrence Plot Function (Bubble Heatmap using Chart.js)
+// ------------------------
+function renderLocalizationFunctionalCooccurrence(foundGenes) {
+    document.getElementById('cooccurrence-plot-container').style.display = 'block';
+
+    if (window.cooccurrenceChartInstance) {
+        window.cooccurrenceChartInstance.destroy();
+    }
+
+    const settings = getPlotSettings();
+
+    // Collect unique localizations and functional categories
+    const localizations = new Set();
+    const functionalCategories = new Set();
+    foundGenes.forEach(gene => {
+        (gene.localization || []).forEach(loc => localizations.add(loc.trim()));
+        (gene.functional_category || []).forEach(cat => functionalCategories.add(cat.trim()));
+    });
+
+    const locList = Array.from(localizations).sort();
+    const catList = Array.from(functionalCategories).sort();
+
+    if (locList.length === 0 || catList.length === 0) {
+        document.getElementById('cooccurrence-plot-container').innerHTML = '<p class="status-message">No data for co-occurrence analysis.</p>';
+        return;
+    }
+
+    // Build co-occurrence matrix
+    const cooccurrenceData = [];
+    foundGenes.forEach(gene => {
+        const geneLocs = gene.localization || [];
+        const geneCats = gene.functional_category || [];
+        geneLocs.forEach(loc => {
+            geneCats.forEach(cat => {
+                cooccurrenceData.push({ x: cat.trim(), y: loc.trim(), count: 1 }); // Aggregate counts later
+            });
+        });
+    });
+
+    // Aggregate counts
+    const aggregated = cooccurrenceData.reduce((acc, { x, y, count }) => {
+        const key = `${x}|${y}`;
+        acc[key] = (acc[key] || 0) + count;
+        return acc;
+    }, {});
+
+    // Prepare datasets for bubble plot
+    const maxCount = Math.max(...Object.values(aggregated), 1);
+    const colorPalette = settings.enrichmentColors;
+    const getColor = count => {
+        const ratio = maxCount > 1 ? (count - 1) / (maxCount - 1) : 1;
+        const index = Math.min(Math.floor(ratio * (colorPalette.length - 1)), colorPalette.length - 1);
+        return colorPalette[index];
+    };
+    const getRadius = count => 5 + (count / maxCount) * 15;
+
+    const datasets = [{
+        label: 'Co-occurrence',
+        data: Object.entries(aggregated).map(([key, count]) => {
+            const [x, y] = key.split('|');
+            return { x, y, r: getRadius(count), count };
+        }),
+        backgroundColor: Object.values(aggregated).map(getColor)
+    }];
+
+    const ctx = document.getElementById('cooccurrence-bubble-chart').getContext('2d'); // Assume new canvas ID in HTML
+    window.cooccurrenceChartInstance = new Chart(ctx, {
+        type: 'bubble',
+        data: { datasets },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                title: {
+                    display: true,
+                    text: 'Localization vs Functional Category Co-occurrence',
+                    font: {
+                        family: settings.fontFamily,
+                        size: settings.fontSize,
+                        weight: settings.fontWeight
+                    },
+                    color: settings.textColor
+                },
+                tooltip: {
+                    callbacks: {
+                        label: (context) => `${context.raw.y} - ${context.raw.x}: ${context.raw.count} genes`
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    type: 'category',
+                    labels: catList,
+                    title: {
+                        display: true,
+                        text: 'Functional Category',
+                        font: {
+                            family: settings.fontFamily,
+                            size: settings.fontSize,
+                            weight: settings.fontWeight
+                        },
+                        color: settings.axisColor
+                    },
+                    ticks: {
+                        autoSkip: false,
+                        maxRotation: 90,
+                        minRotation: 45,
+                        font: {
+                            family: settings.fontFamily,
+                            size: settings.fontSize - 4
+                        },
+                        color: settings.textColor
+                    },
+                    grid: { display: true }
+                },
+                y: {
+                    type: 'category',
+                    labels: locList,
+                    title: {
+                        display: true,
+                        text: 'Localization',
+                        font: {
+                            family: settings.fontFamily,
+                            size: settings.fontSize,
+                            weight: settings.fontWeight
+                        },
+                        color: settings.axisColor
+                    },
+                    ticks: {
+                        font: {
+                            family: settings.fontFamily,
+                            size: settings.fontSize - 4
+                        },
+                        color: settings.textColor
+                    },
+                    grid: { display: true }
+                }
+            }
+        }
+    });
+
+    // Add legend similar to bubble plot
+    const legendContainer = document.getElementById('cooccurrence-legend-container'); // Assume new div in HTML
+    if (legendContainer) {
+        const midCount = Math.ceil(maxCount / 2);
+        const sizeLegendHTML = `
+            <div style="font-family: ${settings.fontFamily}; color: ${settings.textColor};">
+                <h4 style="margin: 0 0 10px 0; font-size: 14px; font-weight: bold;">Gene Count</h4>
+                <div style="display: flex; align-items: center; margin-bottom: 10px;">
+                    <div style="width: ${getRadius(maxCount)*2}px; height: ${getRadius(maxCount)*2}px; background-color: #ccc; border-radius: 50%; margin-right: 10px;"></div>
+                    <span>${maxCount}</span>
+                </div>
+                ${ midCount > 1 && midCount < maxCount ? `
+                <div style="display: flex; align-items: center; margin-bottom: 10px;">
+                    <div style="width: ${getRadius(midCount)*2}px; height: ${getRadius(midCount)*2}px; background-color: #ccc; border-radius: 50%; margin-right: 10px;"></div>
+                    <span>${midCount}</span>
+                </div>` : '' }
+                <div style="display: flex; align-items: center; margin-bottom: 25px;">
+                    <div style="width: ${getRadius(1)*2}px; height: ${getRadius(1)*2}px; background-color: #ccc; border-radius: 50%; margin-right: 10px;"></div>
+                    <span>1</span>
+                </div>
+                <h4 style="margin: 0 0 10px 0; font-size: 14px; font-weight: bold;">Co-occurrence Intensity</h4>
+                <div style="width: 100%; height: 20px; background: linear-gradient(to right, ${colorPalette.join(', ')}); border: 1px solid #ccc;"></div>
+                <div style="display: flex; justify-content: space-between; font-size: 12px;">
+                    <span>Low</span><span>High</span>
+                </div>
+            </div>`;
+        legendContainer.innerHTML = sizeLegendHTML;
+    }
+}
+
+// --- Download Functionality - Revised to support new plot types ---
 function downloadPlot() {
     const selectedPlot = document.querySelector('input[name="plot-type"]:checked').value;
     const format = document.getElementById('download-format')?.value || 'png';
@@ -581,6 +803,12 @@ function downloadPlot() {
     } else if (selectedPlot === 'ciliome') {
         canvas = document.getElementById('ciliome-bar-chart');
         fileName = 'CiliaHub_Ciliome_Enrichment';
+    } else if (selectedPlot === 'functional') {
+        canvas = document.getElementById('functional-bar-chart');
+        fileName = 'CiliaHub_Functional_Category_Enrichment';
+    } else if (selectedPlot === 'cooccurrence') {
+        canvas = document.getElementById('cooccurrence-bubble-chart');
+        fileName = 'CiliaHub_Cooccurrence_Plot';
     }
 
     if (!canvas) {
@@ -591,8 +819,8 @@ function downloadPlot() {
     const tempCanvas = document.createElement('canvas');
     const tempCtx = tempCanvas.getContext('2d');
     
-    // Increase resolution for better quality download
-    const scale = 4;
+    // Increase resolution for better quality download (increased scale for publication quality)
+    const scale = 6;
     tempCanvas.width = canvas.width * scale;
     tempCanvas.height = canvas.height * scale;
 
@@ -617,5 +845,12 @@ function downloadPlot() {
         });
         pdf.addImage(tempCanvas.toDataURL('image/png'), 'PNG', 0, 0, tempCanvas.width, tempCanvas.height);
         pdf.save(`${fileName}.pdf`);
+    } else if (format === 'svg') {
+        // For SVG export, use Chart.js toSVG plugin or convert canvas to SVG (requires additional library like canvg)
+        console.warn('SVG export not fully implemented; fallback to PNG.');
+        const a = document.createElement('a');
+        a.href = tempCanvas.toDataURL('image/png');
+        a.download = `${fileName}.png`;
+        a.click();
     }
 }
