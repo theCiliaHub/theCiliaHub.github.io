@@ -362,38 +362,62 @@ function mapLocalizationToSVG(localizationArray) {
 }
 
 async function handleRouteChange() {
-    await loadAndPrepareDatabase(); // Use the new, efficient data loader
-    const path = window.location.hash.replace('#', '').toLowerCase() || '/';
+    // Make sure the database is loaded before rendering
+    try {
+        await loadAndPrepareDatabase();
+    } catch (err) {
+        console.error("Database loading failed:", err);
+    }
+
+    // Normalize the hash path
+    let path = window.location.hash.replace(/^#/, '').toLowerCase().trim();
+    if (!path || path === '/' || path === '/index.html') {
+        path = '/';
+    }
+
+    // Extract gene name if applicable
     const geneName = sanitize(path.split('/').pop().replace('.html', ''));
     const gene = geneMapCache.get(geneName);
-    
+
+    console.log("Routing to:", path); // Debug log
+
+    // Update navigation highlighting (should not call display functions)
     updateActiveNav(path);
-    
-    if (path === '/' || path === '/index.html') {
-        displayHomePage();
-        setTimeout(displayLocalizationChart, 0);
-    } else if (path === '/batch-query') {
-        displayBatchQueryTool();
-    } else if (path === '/enrichment') {
-        displayEnrichmentPage();
-    } else if (path === '/compare') {
-        displayComparePage();
-    } else if (path === '/expression') {
-        displayExpressionPage();
-    } else if (path === '/download') {
-        displayDownloadPage();
-    } else if (path === '/contact') {
-        displayContactPage();
-    } else if (gene) {
-        displayIndividualGenePage(gene);
-    } else {
-        // Don't show "not found" for the homepage
-        if (path !== '/' && path !== '/index.html') {
-            displayNotFoundPage();
-        }
+
+    // Route handling
+    switch (path) {
+        case '/':
+            displayHomePage();
+            setTimeout(displayLocalizationChart, 0);
+            break;
+        case '/batch-query':
+            displayBatchQueryTool();
+            break;
+        case '/enrichment':
+            displayEnrichmentPage();
+            break;
+        case '/compare':
+            displayComparePage();
+            break;
+        case '/expression':
+            displayExpressionPage();
+            break;
+        case '/download':
+            displayDownloadPage();
+            break;
+        case '/contact':
+            displayContactPage();
+            break;
+        default:
+            if (gene) {
+                displayIndividualGenePage(gene);
+            } else {
+                displayNotFoundPage();
+            }
+            break;
     }
 }
-    
+
 function initGlobalEventListeners() {
     window.addEventListener('scroll', handleStickySearch);
     document.querySelectorAll('.cilia-part').forEach(part => {
@@ -1905,14 +1929,18 @@ function displayExpressionPage() {
     initExpressionSystem();
 }
 
+// Navigation helper
 window.navigateTo = function(event, path) {
     if (event) event.preventDefault();
     window.location.hash = path;
-    handleRouteChange();
 };
 
-window.addEventListener('hashchange', handleRouteChange);
+// Router listeners
+window.addEventListener("load", handleRouteChange);
+window.addEventListener("hashchange", handleRouteChange);
+
+// Init UI helpers (sticky nav, panzoom, etc.)
 document.addEventListener('DOMContentLoaded', () => {
     initGlobalEventListeners();
-    handleRouteChange();
+});
 });
