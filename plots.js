@@ -1,5 +1,3 @@
-
-
 // Chart.js Background Plugin
 Chart.register({
     id: 'customCanvasBackgroundColor',
@@ -14,6 +12,17 @@ Chart.register({
 });
 
 // =============================================================================
+// GLOBAL VARIABLES
+// =============================================================================
+let geneDataCache = null;
+let allGenes = [];
+let currentData = [];
+let geneMapCache = new Map();
+let geneLocalizationData = {};
+let currentPlot = null; // Used for Enrichment plots
+let localizationChartInstance = null; // Used for Compare page plot
+
+// =============================================================================
 // DATA LOADING AND SEARCH SYSTEM
 // =============================================================================
 
@@ -22,9 +31,7 @@ Chart.register({
  */
 function sanitize(input) {
     if (typeof input !== 'string') return '';
-    return input.replace(/[\u200B-\u200D\u2060\uFEFF]/g, '')
-        .trim()
-        .toUpperCase();
+    return input.replace(/[\u200B-\u200D\u2060\uFEFF]/g, '').trim().toUpperCase();
 }
 
 /**
@@ -43,18 +50,28 @@ async function loadAndPrepareDatabase() {
 
         geneDataCache = rawGenes;
         allGenes = rawGenes;
+        currentData = allGenes; // FIX: Ensures data is available for the homepage
         geneMapCache = new Map();
 
         allGenes.forEach(g => {
-            if (!g.gene || typeof g.gene !== 'string') return;
+            if (!g.gene || typeof g.gene !== 'string') {
+                console.warn('Skipping entry with invalid gene name:', g);
+                return;
+            }
 
+            // Index by primary gene name, synonyms, and Ensembl IDs
             const nameKey = sanitize(g.gene);
             if (nameKey) geneMapCache.set(nameKey, g);
 
             if (g.synonym) {
-                // Handle synonyms separated by commas or semicolons
                 String(g.synonym).split(/[,;]/).forEach(syn => {
                     const key = sanitize(syn);
+                    if (key && !geneMapCache.has(key)) geneMapCache.set(key, g);
+                });
+            }
+            if (g.ensembl_id) {
+                String(g.ensembl_id).split(/[,;]/).forEach(id => {
+                    const key = sanitize(id);
                     if (key && !geneMapCache.has(key)) geneMapCache.set(key, g);
                 });
             }
@@ -74,24 +91,20 @@ async function loadAndPrepareDatabase() {
 function findGenes(queries) {
     const foundGenes = new Set();
     const notFound = [];
-
     queries.forEach(query => {
         const sanitizedQuery = sanitize(query);
         const result = geneMapCache.get(sanitizedQuery);
-
         if (result) {
             foundGenes.add(result);
         } else {
             notFound.push(query);
         }
     });
-
     return { foundGenes: Array.from(foundGenes), notFoundGenes: notFound };
 }
 
-
 // =============================================================================
-// PLOTTING AND ENRICHMENT ANALYSIS
+// ENRICHMENT PLOTTING & HELPERS
 // =============================================================================
 
 /**
@@ -109,9 +122,7 @@ function getPlotSettings() {
         barChartColor: document.getElementById('setting-bar-color')?.value || '#2ca25f',
         enrichmentColors: [
             document.getElementById('setting-enrichment-color1')?.value || '#edf8fb',
-            document.getElementById('setting-enrichment-color2')?.value || '#b2e2e2',
-            document.getElementById('setting-enrichment-color3')?.value || '#66c2a4',
-            document.getElementById('setting-enrichment-color4')?.value || '#2ca25f',
+            '#b2e2e2', '#66c2a4', '#2ca25f',
             document.getElementById('setting-enrichment-color5')?.value || '#006d2c'
         ]
     };
@@ -121,81 +132,123 @@ function getPlotSettings() {
  * Calculates the p-value using the hypergeometric test.
  */
 function hypergeometricPValue(k, n, K, N) {
-    function logFactorial(num) {
-        let result = 0;
-        for (let i = 2; i <= num; i++) {
-            result += Math.log(i);
-        }
-        return result;
+    // Using jstat library if available for a more robust calculation
+    if (typeof jStat !== 'undefined') {
+        // P(X >= k) = 1 - P(X < k) = 1 - CDF(k-1)
+        return 1 - jStat.hypgeom.cdf(k - 1, N, K, n);
     }
-    function logCombination(n, k) {
-        if (k > n || k < 0) return -Infinity;
-        if (k === 0 || k === n) return 0;
-        return logFactorial(n) - logFactorial(k) - logFactorial(n - k);
-    }
-    let pValue = 0;
-    const maxK = Math.min(n, K);
-    for (let i = k; i <= maxK; i++) {
-        const logProb = logCombination(K, i) + logCombination(N - K, n - i) - logCombination(N, n);
-        pValue += Math.exp(logProb);
-    }
+    // Fallback to a simpler approximation if jstat is not loaded
+    const pValue = Math.exp(
+        (jStat.gammaln(K + 1) - jStat.gammaln(k + 1) - jStat.gammaln(K - k + 1)) +
+        (jStat.gammaln(N - K + 1) - jStat.gammaln(n - k + 1) - jStat.gammaln(N - K - n + k + 1)) -
+        (jStat.gammaln(N + 1) - jStat.gammaln(n + 1) - jStat.gammaln(N - n + 1))
+    );
     return Math.min(pValue, 1.0);
 }
 
+/**
+ * Creates the results summary and tables at the bottom of the page.
+ */
+function createEnrichmentResultsTable(foundGenes, notFoundGenes, stats = null) {
+    const container = document.getElementById('enrichment-results-container');
+    if (!container) return;
+
+    let summaryHTML = '';
+    if (stats) {
+        summaryHTML = `
+            <div id="ciliome-results-summary">
+                <h3>Enrichment Analysis Results 🔬</h3>
+                <p>From your list of <strong>${stats.n_input}</strong> unique gene(s), <strong>${stats.k}</strong> were found in the CiliaHub database of <strong>${stats.M}</strong> ciliary genes.</p>
+                <p>Of these hits, <strong>${stats.sharedHitsCount}</strong> are associated with known ciliopathies or protein complexes.</p>
+                <div class="stats-box">
+                    <p><strong>Enrichment Score:</strong> ${stats.enrichmentScore.toFixed(2)}-fold</p>
+                    <p><strong>P-value:</strong> ${stats.pValue.toExponential(3)}</p>
+                </div>
+            </div>
+        `;
+    }
+
+    let tableHTML = '';
+    if (foundGenes.length > 0) {
+        tableHTML = `
+            <h3>Search Results (${foundGenes.length} gene${foundGenes.length !== 1 ? 's' : ''} found)</h3>
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Gene</th>
+                            <th>Ensembl ID</th>
+                            <th>Localization</th>
+                            <th>Function Summary</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${foundGenes.map(item => `
+                            <tr>
+                                <td><a href="/${item.gene}" onclick="navigateTo(event, '/${item.gene}')">${item.gene}</a></td>
+                                <td>${item.ensembl_id || '—'}</td>
+                                <td>${Array.isArray(item.localization) ? item.localization.join(', ') : (item.localization || '—')}</td>
+                                <td>${item.functional_summary ? item.functional_summary.substring(0, 100) + '...' : '—'}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </div>
+        `;
+    }
+
+    let notFoundHTML = '';
+    if (notFoundGenes.length > 0) {
+        notFoundHTML = `
+            <div class="not-found-section">
+                <h4>Genes Not Found (${notFoundGenes.length}):</h4>
+                <p>${notFoundGenes.sort().join(', ')}</p>
+            </div>
+        `;
+    }
+
+    container.innerHTML = summaryHTML + tableHTML + notFoundHTML;
+}
 
 /**
- * Renders the enrichment bubble plot (Localization plot) with updated font size.
+ * Renders the Localization bubble plot.
  */
 function renderEnrichmentBubblePlot(foundGenes) {
     const plotContainer = document.getElementById('bubble-enrichment-container');
     plotContainer.style.display = 'block';
-
-    // This is a safety check to clear any old chart instances
-    if (window.enrichmentDotPlotInstance) window.enrichmentDotPlotInstance.destroy();
+    createEnrichmentResultsTable(foundGenes, []);
 
     if (foundGenes.length === 0) {
         plotContainer.innerHTML = '<p class="status-message">No ciliary genes were found to plot.</p>';
         return;
     }
 
-    // Add the canvas for the plot to the container
     plotContainer.innerHTML = `<canvas id="enrichment-chart-canvas"></canvas>`;
     const ctx = document.getElementById('enrichment-chart-canvas').getContext('2d');
     const settings = getPlotSettings();
-
-    // Using the complete list of localization terms from your database
-    const yCategories = [
-        'Autophagosomes', 'Axoneme', 'Basal Body', 'Centrosome', 'Cilia', 
-        'Ciliary Associated Gene', 'Ciliary Membrane', 'Cytosol', 'Endoplasmic Reticulum', 
-        'Flagella', 'Golgi Apparatus', 'Lysosome', 'Microbody', 'Microtubules', 
-        'Mitochondria', 'Nucleoplasm', 'Peroxisome', 'Transition Zone'
-    ].sort();
-
-    // 1. Process Data: Count genes for each localization category
+    const yCategories = ['Cilia', 'Basal Body', 'Transition Zone', 'Axoneme', 'Ciliary Membrane', 'Centrosome'].sort();
     const localizationCounts = {};
     foundGenes.forEach(gene => {
-        const localizations = Array.isArray(gene.localization) ? gene.localization : (gene.localization || '').split(/[,;]/);
-        localizations.forEach(loc => {
-            if (typeof loc !== 'string' || !loc) return;
-            const trimmedLoc = loc.trim().toLowerCase();
-            const matchingCategory = yCategories.find(cat => cat.toLowerCase() === trimmedLoc);
-            if (matchingCategory) {
-                localizationCounts[matchingCategory] = (localizationCounts[matchingCategory] || 0) + 1;
+        (Array.isArray(gene.localization) ? gene.localization : []).forEach(loc => {
+            if (loc) {
+                const trimmedLoc = loc.trim().toLowerCase();
+                const matchingCategory = yCategories.find(cat => cat.toLowerCase() === trimmedLoc);
+                if (matchingCategory) {
+                    localizationCounts[matchingCategory] = (localizationCounts[matchingCategory] || 0) + 1;
+                }
             }
         });
     });
 
     const categoriesWithData = yCategories.filter(cat => localizationCounts[cat] > 0);
     if (categoriesWithData.length === 0) {
-        plotContainer.innerHTML = '<p class="status-message">No matching localizations found for the given genes.</p>';
+        plotContainer.innerHTML = '<p class="status-message">No matching localizations found.</p>';
         return;
     }
 
-    // 2. Prepare Data for Chart.js
     const maxCount = Math.max(...Object.values(localizationCounts), 1);
     const colorPalette = settings.enrichmentColors;
     const getColor = count => {
-        if (count === 0) return '#f0f0f0';
         const ratio = maxCount > 1 ? (count - 1) / (maxCount - 1) : 1;
         const index = Math.min(Math.floor(ratio * (colorPalette.length - 1)), colorPalette.length - 1);
         return colorPalette[index];
@@ -204,49 +257,29 @@ function renderEnrichmentBubblePlot(foundGenes) {
 
     const dataset = {
         data: categoriesWithData.map(loc => ({
-            x: localizationCounts[loc], // Use count for the x-axis to show enrichment
-            y: loc,
-            r: getRadius(localizationCounts[loc]),
-            count: localizationCounts[loc]
+            x: localizationCounts[loc], y: loc, r: getRadius(localizationCounts[loc]), count: localizationCounts[loc]
         })),
         backgroundColor: categoriesWithData.map(loc => getColor(localizationCounts[loc]))
     };
 
-    // 3. Create the Chart
     currentPlot = new Chart(ctx, {
         type: 'bubble',
         data: { datasets: [dataset] },
         options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            layout: {
-                padding: { left: 50 } // Ensures long Y-axis labels are visible
-            },
+            responsive: true, maintainAspectRatio: false, layout: { padding: { left: 50 } },
             plugins: {
                 legend: { display: false },
-                title: {
-                    display: true,
-                    text: 'Gene Count by Ciliary Localization',
-                    font: { size: 20, weight: 'bold' },
-                    color: settings.textColor
-                },
-                tooltip: { 
-                    titleFont: { size: 20 },
-                    bodyFont: { size: 20 },
-                    callbacks: { label: c => `${c.raw.y}: ${c.raw.count} gene(s)` } 
-                }
+                title: { display: true, text: 'Gene Count by Ciliary Localization', font: { size: 20, weight: 'bold' }, color: settings.textColor },
+                tooltip: { titleFont: { size: 20 }, bodyFont: { size: 20 }, callbacks: { label: c => `${c.raw.y}: ${c.raw.count} gene(s)` } }
             },
             scales: {
                 x: {
-                    title: { display: true, text: 'Number of Genes in List', color: settings.axisColor, font: { size: 20, weight: 'bold' } },
-                    grid: { display: true },
+                    title: { display: true, text: 'Number of Genes', font: { size: 20, weight: 'bold' }, color: settings.axisColor },
                     ticks: { font: { size: 20 }, color: settings.textColor, precision: 0 }
                 },
                 y: {
-                    type: 'category',
-                    labels: categoriesWithData,
-                    title: { display: true, text: 'Localization', color: settings.axisColor, font: { size: 20, weight: 'bold' } },
-                    grid: { display: false },
+                    type: 'category', labels: categoriesWithData,
+                    title: { display: true, text: 'Localization', font: { size: 20, weight: 'bold' }, color: settings.axisColor },
                     ticks: { font: { size: 20 }, color: settings.textColor }
                 }
             }
@@ -254,15 +287,12 @@ function renderEnrichmentBubblePlot(foundGenes) {
     });
 }
 
-
 /**
- * Renders the definitive, corrected gene matrix plot.
+ * Renders the Gene Matrix bubble plot.
  */
 function renderBubbleMatrix(foundGenes) {
     const plotContainer = document.getElementById('matrix-plot-container');
     plotContainer.style.display = 'block';
-
-    // This displays the detailed results table at the bottom of the page
     createEnrichmentResultsTable(foundGenes, []);
 
     if (foundGenes.length === 0) {
@@ -270,17 +300,14 @@ function renderBubbleMatrix(foundGenes) {
         return;
     }
     
-    // ✨ FIX: Wrapper div makes the plot much taller
     plotContainer.innerHTML = `<div style="position: relative; width: 100%; min-height: 800px;"><canvas id="enrichment-chart-canvas"></canvas></div>`;
     const ctx = document.getElementById('enrichment-chart-canvas').getContext('2d');
     const settings = getPlotSettings();
     
-    // ✨ FIX: Using the complete, sorted list of 18 organelles and locations for the Y-axis
     const yCategories = [
-        'Autophagosomes', 'Axoneme', 'Basal Body', 'Centrosome', 'Cilia', 
-        'Ciliary Associated Gene', 'Ciliary Membrane', 'Cytosol', 'Endoplasmic Reticulum', 
-        'Flagella', 'Golgi Apparatus', 'Lysosome', 'Microtubules', 
-        'Mitochondrio', 'Nucleoplasm', 'Peroxisome', 'Transition Zone'
+        'Autophagosomes', 'Axoneme', 'Basal Body', 'Centrosome', 'Cilia', 'Ciliary Associated Gene', 
+        'Ciliary Membrane', 'Cytosol', 'Endoplasmic Reticulum', 'Flagella', 'Golgi Apparatus', 
+        'Lysosome', 'Microbody', 'Microtubules', 'Mitochondrion', 'Nucleus', 'Peroxisome', 'Transition Zone'
     ].sort();
     
     const xLabels = [...new Set(foundGenes.map(g => g.gene))].sort();
@@ -302,40 +329,24 @@ function renderBubbleMatrix(foundGenes) {
         type: 'bubble',
         data: { datasets },
         options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            // ✨ FIX: Increased padding to ensure Y-axis labels are fully visible
-            layout: {
-                padding: {
-                    left: 100 
-                }
-            },
+            responsive: true, maintainAspectRatio: false, layout: { padding: { left: 100 } },
             plugins: {
-                // ✨ FIX: This line definitively removes the color labels (legend)
                 legend: { display: false }, 
                 tooltip: { 
-                    // ✨ FIX: Font size set to 20
-                    titleFont: { size: 20 },
-                    bodyFont: { size: 20 },
-                    callbacks: { 
-                        label: (context) => `${context.dataset.label} - ${context.raw.y}` 
-                    } 
+                    titleFont: { size: 20 }, bodyFont: { size: 20 },
+                    callbacks: { label: (context) => `${context.dataset.label} - ${context.raw.y}` } 
                 },
             },
             scales: {
                 x: {
-                    type: 'category',
-                    labels: xLabels,
+                    type: 'category', labels: xLabels,
                     title: { display: true, text: "Gene", font: { size: 20, weight: 'bold' }, color: settings.axisColor },
-                    // ✨ FIX: Font size set to 20
                     ticks: { font: { size: 20 }, autoSkip: false, maxRotation: 90, minRotation: 45, color: settings.textColor },
                     grid: { display: false }
                 },
                 y: {
-                    type: 'category',
-                    labels: yCategories,
+                    type: 'category', labels: yCategories,
                     title: { display: true, text: 'Ciliary Localization', font: { size: 20, weight: 'bold' }, color: settings.axisColor },
-                    // ✨ FIX: Font size set to 20
                     ticks: { font: { size: 20 }, color: settings.textColor },
                     grid: { display: true, color: '#f0f0f0' }
                 }
@@ -344,25 +355,17 @@ function renderBubbleMatrix(foundGenes) {
     });
 }
 
-
 /**
- * Renders the Ciliome enrichment summary/table in the results area
- * and the localization bar chart in the plot panel.
+ * Renders the Ciliome enrichment bar chart.
  */
 function renderCiliomeEnrichment(foundGenes, notFoundGenes) {
     const plotContainer = document.getElementById('ciliome-plot-container');
-    const resultsContainer = document.getElementById('enrichment-results-container');
-    
-    // Ensure containers are visible and cleared for new results
     plotContainer.style.display = 'block';
     plotContainer.innerHTML = ''; 
-    resultsContainer.innerHTML = '';
 
     const k = foundGenes.length;
     const n_input = k + notFoundGenes.length;
-
-    // --- 1. Render Text and Table Results ---
-    // This part runs first and displays the summary and detailed gene table.
+    
     if (n_input > 0) {
         const M = allGenes ? allGenes.length : 2000;
         const N = 20000;
@@ -370,29 +373,23 @@ function renderCiliomeEnrichment(foundGenes, notFoundGenes) {
         const enrichmentScore = (k / n_input) / (M / N) || 0;
         const sharedHitsCount = foundGenes.filter(g => g.ciliopathy || g.complex_names).length;
         
-        // Use the central function to generate the tidy results table at the bottom
         createEnrichmentResultsTable(foundGenes, notFoundGenes, {
             k, n_input, M, pValue, enrichmentScore, sharedHitsCount
         });
     } else {
-        resultsContainer.innerHTML = '<p class="status-message">Please enter a gene list to analyze.</p>';
-        plotContainer.innerHTML = ''; // Keep plot area empty
+        createEnrichmentResultsTable([], []);
+        plotContainer.innerHTML = '<p class="status-message">Please enter a gene list to analyze.</p>';
         return;
     }
 
-    // --- 2. Render the Plot ---
-    // This part now runs independently to generate the chart.
     if (k === 0) {
         plotContainer.innerHTML = '<p class="status-message">No ciliary genes were found to plot.</p>';
         return;
     }
 
-    // Add the canvas to the plot container
     plotContainer.innerHTML = `<canvas id="enrichment-chart-canvas"></canvas>`;
     const ctx = document.getElementById('enrichment-chart-canvas').getContext('2d');
     const settings = getPlotSettings();
-
-    // Process data for the bar chart
     const localizationCounts = {};
     foundGenes.forEach(gene => {
         (Array.isArray(gene.localization) ? gene.localization : []).forEach(loc => {
@@ -412,7 +409,6 @@ function renderCiliomeEnrichment(foundGenes, notFoundGenes) {
             return acc;
         }, { labels: [], counts: [] });
 
-    // Create the new chart instance
     currentPlot = new Chart(ctx, {
         type: 'bar',
         data: {
@@ -424,26 +420,11 @@ function renderCiliomeEnrichment(foundGenes, notFoundGenes) {
             }]
         },
         options: {
-            indexAxis: 'y',
-            responsive: true,
-            maintainAspectRatio: false,
-            layout: {
-                padding: {
-                    left: 50 // Ensures long Y-axis labels are visible
-                }
-            },
+            indexAxis: 'y', responsive: true, maintainAspectRatio: false, layout: { padding: { left: 50 } },
             plugins: {
                 legend: { display: false },
-                title: { 
-                    display: true, 
-                    text: 'Localization of Found Ciliary Genes', 
-                    font: { size: 20, weight: 'bold' }, 
-                    color: settings.textColor 
-                },
-                tooltip: {
-                    titleFont: { size: 20 },
-                    bodyFont: { size: 20 }
-                }
+                title: { display: true, text: 'Localization of Found Ciliary Genes', font: { size: 20, weight: 'bold' }, color: settings.textColor },
+                tooltip: { titleFont: { size: 20 }, bodyFont: { size: 20 } }
             },
             scales: {
                 x: {
@@ -458,59 +439,9 @@ function renderCiliomeEnrichment(foundGenes, notFoundGenes) {
         }
     });
 }
-/**
- * Handles downloading the current plot as a PNG or PDF.
- */
-function downloadPlot() {
-    const selectedPlot = document.querySelector('input[name="plot-type"]:checked').value;
-    const format = document.getElementById('download-format')?.value || 'png';
-    let canvas = null;
-    let fileName = 'CiliaHub_Plot';
-
-    if (selectedPlot === 'bubble') {
-        canvas = document.getElementById('enrichment-bubble-plot');
-        fileName = 'CiliaHub_Localization_Plot';
-    } else if (selectedPlot === 'matrix') {
-        canvas = document.getElementById('enrichment-matrix-plot');
-        fileName = 'CiliaHub_Gene_Matrix_Plot';
-    } else if (selectedPlot === 'ciliome') {
-        canvas = document.getElementById('ciliome-bar-chart');
-        fileName = 'CiliaHub_Ciliome_Enrichment';
-    }
-
-    if (!canvas || !currentPlot) {
-        console.error("Canvas or plot instance not found.");
-        alert("Plot not available for download. Please generate a plot first.");
-        return;
-    }
-    
-    // Use the Chart.js API to render a high-quality image
-    const url = currentPlot.toBase64Image('image/png', 1.0);
-    
-    if (format === 'png') {
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `${fileName}.png`;
-        a.click();
-    } else if (format === 'pdf') {
-        const { jsPDF } = window.jspdf;
-        const pdf = new jsPDF({
-            orientation: canvas.width > canvas.height ? 'landscape' : 'portrait',
-            unit: 'px',
-            format: [canvas.width, canvas.height]
-        });
-        pdf.addImage(url, 'PNG', 0, 0, canvas.width, canvas.height);
-        pdf.save(`${fileName}.pdf`);
-    }
-}
-
-
 
 /**
- * Main controller for generating enrichment plots and the status table.
- */
-/**
- * Main controller for generating enrichment plots and the results table.
+ * Main controller for generating enrichment plots.
  */
 function generateEnrichmentPlots() {
     const genesInput = document.getElementById('enrichment-genes-input').value.trim();
@@ -518,14 +449,12 @@ function generateEnrichmentPlots() {
         alert('Please enter a gene list.');
         return;
     }
-
     const geneList = genesInput.split(/[\s,;\n\r\t]+/).filter(Boolean);
     const plotType = document.querySelector('input[name="plot-type"]:checked').value;
 
     const { foundGenes, notFoundGenes } = findGenes(geneList);
     const sortedFoundGenes = Array.from(foundGenes).sort((a, b) => a.gene.localeCompare(b.gene));
 
-    // --- Plot generation logic (remains the same) ---
     document.getElementById('plot-placeholder').style.display = 'none';
     document.getElementById('download-controls').style.display = 'flex';
     document.querySelectorAll('.plot-area').forEach(el => el.style.display = 'none');
@@ -535,7 +464,7 @@ function generateEnrichmentPlots() {
         currentPlot.destroy();
         currentPlot = null;
     }
-    
+   
     switch (plotType) {
         case 'bubble':
             renderEnrichmentBubblePlot(sortedFoundGenes);
@@ -547,18 +476,48 @@ function generateEnrichmentPlots() {
             renderCiliomeEnrichment(sortedFoundGenes, notFoundGenes);
             break;
     }
-
-    // ✨ MODIFIED: Call the new, more detailed table function ✨
-    createEnrichmentResultsTable(sortedFoundGenes, notFoundGenes);
-
-    // Scroll down to the generated plot
     document.getElementById('plot-container').scrollIntoView({ behavior: 'smooth' });
+}
+
+/**
+ * Handles downloading the current plot.
+ */
+function downloadPlot() {
+    const format = document.getElementById('download-format')?.value || 'png';
+    const canvas = document.getElementById('enrichment-chart-canvas');
+    const selectedPlot = document.querySelector('input[name="plot-type"]:checked').value;
+    const fileName = `CiliaHub_${selectedPlot}_Plot`;
+
+    if (!canvas || !currentPlot) {
+        alert("Plot not available for download. Please generate a plot first.");
+        return;
+    }
+   
+    const url = currentPlot.toBase64Image('image/png', 1.0);
+   
+    if (format === 'png') {
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${fileName}.png`;
+        a.click();
+    } else if (format === 'pdf') {
+        if (typeof jspdf === 'undefined') {
+            return alert('PDF library not loaded. Please try again or download as PNG.');
+        }
+        const { jsPDF } = window.jspdf;
+        const pdf = new jsPDF({
+            orientation: canvas.width > canvas.height ? 'landscape' : 'portrait',
+            unit: 'px',
+            format: [canvas.width, canvas.height]
+        });
+        pdf.addImage(url, 'PNG', 0, 0, canvas.width, canvas.height);
+        pdf.save(`${fileName}.pdf`);
+    }
 }
 
 // =============================================================================
 // PAGE RENDERING
 // =============================================================================
-
 
 function displayEnrichmentPage() {
     const contentArea = document.querySelector('.content-area');
@@ -573,7 +532,6 @@ function displayEnrichmentPage() {
                 <h2>Ciliary Gene Enrichment Analysis</h2>
                 <p>Paste your list of genes and CiliaHub will calculate how enriched your list is for known ciliary genes.</p>
             </div>
-
             <div class="enrichment-layout">
                 <div class="enrichment-controls-panel">
                     <label for="enrichment-genes-input" style="font-weight: 600; margin-bottom: 0.5rem; display: block;">Enter Gene List:</label>
@@ -626,72 +584,4 @@ function displayEnrichmentPage() {
 
     document.getElementById('generate-plot-btn').addEventListener('click', generateEnrichmentPlots);
     document.getElementById('download-plot-btn').addEventListener('click', downloadPlot);
-}
-
-/**
- * Creates the results summary and tables at the bottom of the page.
- * This is now the central function for displaying all textual/tabular results.
- */
-function createEnrichmentResultsTable(foundGenes, notFoundGenes, stats = null) {
-    const container = document.getElementById('enrichment-results-container');
-    if (!container) return;
-
-    let summaryHTML = '';
-    // If stats are provided (for Ciliome Enrichment), create the summary box
-    if (stats) {
-        summaryHTML = `
-            <div id="ciliome-results-summary">
-                <h3>Enrichment Analysis Results 🔬</h3>
-                <p>From your list of <strong>${stats.n_input}</strong> unique gene(s), <strong>${stats.k}</strong> were found in the CiliaHub database of <strong>${stats.M}</strong> ciliary genes.</p>
-                <p>Of these hits, <strong>${stats.sharedHitsCount}</strong> are associated with known ciliopathies or protein complexes.</p>
-                <div class="stats-box">
-                    <p><strong>Enrichment Score:</strong> ${stats.enrichmentScore.toFixed(2)}-fold</p>
-                    <p><strong>P-value:</strong> ${stats.pValue.toExponential(3)}</p>
-                </div>
-            </div>
-        `;
-    }
-
-    // Create the detailed table for found genes
-    let tableHTML = '';
-    if (foundGenes.length > 0) {
-        tableHTML = `
-            <h3>Search Results (${foundGenes.length} gene${foundGenes.length !== 1 ? 's' : ''} found)</h3>
-            <div class="table-wrapper">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Gene</th>
-                            <th>Ensembl ID</th>
-                            <th>Localization</th>
-                            <th>Function Summary</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${foundGenes.map(item => `
-                            <tr>
-                                <td><a href="/${item.gene}" onclick="navigateTo(event, '/${item.gene}')">${item.gene}</a></td>
-                                <td>${item.ensembl_id || '—'}</td>
-                                <td>${Array.isArray(item.localization) ? item.localization.join(', ') : (item.localization || '—')}</td>
-                                <td>${item.functional_summary ? item.functional_summary.substring(0, 100) + '...' : '—'}</td>
-                            </tr>
-                        `).join('')}
-                    </tbody>
-                </table>
-            </div>
-        `;
-    }
-
-    // Create the section for not-found genes
-    let notFoundHTML = '';
-    if (notFoundGenes.length > 0) {
-        notFoundHTML = `
-            <div class="not-found-section">
-                <h4>Genes Not Found (${notFoundGenes.length}):</h4>
-                <p>${notFoundGenes.sort().join(', ')}</p>
-            </div>
-        `;
-    }
-
-    container.innerHTML = summaryHTML + tableHTML + notFoundHTML;
 }
