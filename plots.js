@@ -317,95 +317,118 @@ function renderBubbleMatrix(foundGenes) {
 }
 
 /**
- * Renders the Ciliome enrichment bar chart and statistics.
+ * Renders the gene matrix plot in the plot panel and a detailed results table below.
  */
+function renderBubbleMatrix(foundGenes) {
+    const plotContainer = document.getElementById('matrix-plot-container');
+    plotContainer.style.display = 'block';
+    if (window.enrichmentBarChartInstance) window.enrichmentBarChartInstance.destroy();
+
+    // 1. Display the detailed results table at the bottom of the page
+    createEnrichmentResultsTable(foundGenes, []);
+
+    // 2. Render only the plot in the plot panel
+    if (foundGenes.length === 0) {
+        plotContainer.innerHTML = '<p class="status-message">No genes to display in the matrix plot.</p>';
+        return;
+    }
+    
+    plotContainer.innerHTML = `<canvas id="enrichment-chart-canvas"></canvas>`;
+    const ctx = document.getElementById('enrichment-chart-canvas').getContext('2d');
+    const settings = getPlotSettings();
+    const yCategories = ['Basal Body', 'Transition Zone', 'Axoneme', 'Ciliary Membrane', 'Cilia', 'Golgi'];
+    const xLabels = [...new Set(foundGenes.map(g => g.gene))].sort();
+    const colorPalette = ['#377eb8', '#ff7f00', '#4daf4a', '#f781bf', '#a65628', '#984ea3', '#999999', '#e41a1c', '#dede00'];
+
+    const datasets = foundGenes.map((gene, index) => ({
+        label: gene.gene,
+        data: (Array.isArray(gene.localization) ? gene.localization : (gene.localization || '').split(','))
+            .map(locString => {
+                const trimmedLoc = locString?.trim().toLowerCase();
+                if (!trimmedLoc) return null;
+                const matchingCategory = yCategories.find(cat => cat.toLowerCase() === trimmedLoc);
+                return matchingCategory ? { x: gene.gene, y: matchingCategory, r: 10 } : null;
+            }).filter(Boolean),
+        backgroundColor: colorPalette[index % colorPalette.length]
+    }));
+
+    currentPlot = new Chart(ctx, {
+        type: 'bubble',
+        data: { datasets },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: true, position: 'right', labels: { font: { family: settings.fontFamily, size: settings.fontSize }, color: settings.textColor } },
+                tooltip: { callbacks: { label: (context) => `${context.dataset.label} - ${context.raw.y}` } },
+            },
+            scales: {
+                x: {
+                    type: 'category',
+                    labels: xLabels,
+                    title: { display: true, text: "Gene", font: { family: settings.fontFamily, size: settings.fontSize, weight: 'bold' }, color: settings.axisColor },
+                    ticks: { font: { family: settings.fontFamily, size: settings.fontSize, weight: settings.fontWeight }, autoSkip: false, maxRotation: 90, minRotation: 45, color: settings.textColor },
+                    grid: { display: false }
+                },
+                y: {
+                    type: 'category',
+                    labels: yCategories,
+                    title: { display: true, text: 'Ciliary Localization', font: { family: settings.fontFamily, size: settings.fontSize, weight: 'bold' }, color: settings.axisColor },
+                    ticks: { font: { family: settings.fontFamily, size: settings.fontSize, weight: settings.fontWeight }, color: settings.textColor },
+                    grid: { display: false }
+                }
+            }
+        }
+    });
+}
+
 /**
- * Renders the Ciliome enrichment summary, a detailed hits table, and a localization bar chart.
+ * Renders the Ciliome enrichment plot and sends its stats to the results table function.
  */
 function renderCiliomeEnrichment(foundGenes, notFoundGenes) {
-    const container = document.getElementById('ciliome-plot-container');
-    container.style.display = 'block';
+    const plotContainer = document.getElementById('ciliome-plot-container');
+    plotContainer.style.display = 'block';
     if (window.ciliomeChartInstance) window.ciliomeChartInstance.destroy();
 
     const k = foundGenes.length;
     const n_input = k + notFoundGenes.length;
-    const M = allGenes ? allGenes.length : 2000; // Total ciliary genes in database
-    const N = 20000; // Total genes in background genome
-
+    
     if (n_input === 0) {
-        container.innerHTML = '<p class="status-message">Please enter a gene list to analyze.</p>';
+        createEnrichmentResultsTable([], []);
+        plotContainer.innerHTML = '<p class="status-message">Please enter a gene list to analyze.</p>';
         return;
     }
 
-    // --- 1. Calculate Statistics & Shared Hits ---
+    // 1. Calculate statistics
+    const M = allGenes ? allGenes.length : 2000;
+    const N = 20000;
     const pValue = hypergeometricPValue(k, n_input, M, N);
-    const enrichmentScore = n_input > 0 && M > 0 ? (k / n_input) / (M / N) : 0;
-    
-    let sharedHitsCount = 0;
-    const hitsDetails = foundGenes.map(gene => {
-        const hasCiliopathy = !!gene.ciliopathy;
-        const hasComplex = !!gene.complex_names;
-        if (hasCiliopathy || hasComplex) {
-            sharedHitsCount++;
-        }
-        return {
-            name: gene.gene,
-            ciliopathy: gene.ciliopathy || '—',
-            complex: gene.complex_names ? gene.complex_names.replace(/;/g, ',') : '—'
-        };
-    }).sort((a, b) => a.name.localeCompare(b.name)); // Sort genes alphabetically
+    const enrichmentScore = (k / n_input) / (M / N) || 0;
+    const sharedHitsCount = foundGenes.filter(g => g.ciliopathy || g.complex_names).length;
 
-    // --- 2. Generate Summary HTML ---
-    const summaryHTML = `
-        <div id="ciliome-results-summary">
-            <h3>Enrichment Analysis Results 🔬</h3>
-            <p>From your list of <strong>${n_input}</strong> unique gene(s), <strong>${k}</strong> were found in the CiliaHub database of <strong>${M}</strong> ciliary genes.</p>
-            <p>Of these hits, <strong>${sharedHitsCount}</strong> are associated with known ciliopathies or protein complexes.</p>
-            <div class="stats-box">
-                <p><strong>Enrichment Score:</strong> ${enrichmentScore.toFixed(2)}-fold</p>
-                <p><strong>P-value:</strong> ${pValue.toExponential(3)}</p>
-            </div>
-        </div>
-    `;
+    // 2. Display the stats and detailed tables at the bottom of the page
+    createEnrichmentResultsTable(foundGenes, notFoundGenes, {
+        k, n_input, M, pValue, enrichmentScore, sharedHitsCount
+    });
 
-    // --- 3. Generate Detailed Hits Table HTML ---
-    const hitsTableHTML = `
-        <details class="enrichment-details">
-            <summary>View Found Ciliary Genes (${k})</summary>
-            <div class="table-wrapper">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Gene</th>
-                            <th>Associated Ciliopathy</th>
-                            <th>Protein Complex(es)</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${hitsDetails.map(g => `
-                            <tr>
-                                <td><a href="/${g.name}" onclick="navigateTo(event, '/${g.name}')">${g.name}</a></td>
-                                <td>${g.ciliopathy}</td>
-                                <td>${g.complex}</td>
-                            </tr>
-                        `).join('')}
-                    </tbody>
-                </table>
-            </div>
-        </details>
-    `;
+    // 3. Render only the plot in the plot panel
+    if (k === 0) {
+        plotContainer.innerHTML = '<p class="status-message">No ciliary genes were found to plot.</p>';
+        return;
+    }
 
-    // --- 4. Prepare Data for Localization Chart ---
+    plotContainer.innerHTML = `<canvas id="enrichment-chart-canvas"></canvas>`;
+    const ctx = document.getElementById('enrichment-chart-canvas').getContext('2d');
+    const settings = getPlotSettings();
     const localizationCounts = {};
     foundGenes.forEach(gene => {
-        (Array.isArray(gene.localization) ? gene.localization : [])
-            .forEach(loc => {
-                if (loc) {
-                    const term = loc.trim();
-                    const capitalizedTerm = term.charAt(0).toUpperCase() + term.slice(1).toLowerCase();
-                    localizationCounts[capitalizedTerm] = (localizationCounts[capitalizedTerm] || 0) + 1;
-                }
-            });
+        (Array.isArray(gene.localization) ? gene.localization : []).forEach(loc => {
+            if (loc) {
+                const term = loc.trim();
+                const capitalizedTerm = term.charAt(0).toUpperCase() + term.slice(1).toLowerCase();
+                localizationCounts[capitalizedTerm] = (localizationCounts[capitalizedTerm] || 0) + 1;
+            }
+        });
     });
 
     const chartData = Object.entries(localizationCounts)
@@ -416,16 +439,6 @@ function renderCiliomeEnrichment(foundGenes, notFoundGenes) {
             return acc;
         }, { labels: [], counts: [] });
 
-    const barChartHTML = `<div class="chart-wrapper"><canvas id="ciliome-bar-chart"></canvas></div>`;
-
-    // --- 5. Assemble and Render Final HTML ---
-    container.innerHTML = summaryHTML + (k > 0 ? hitsTableHTML + barChartHTML : '<p class="status-message">No ciliary genes were found in your list to plot.</p>');
-
-    if (k === 0) return;
-
-    // --- 6. Render the Localization Bar Chart ---
-    const settings = getPlotSettings();
-    const ctx = document.getElementById('ciliome-bar-chart').getContext('2d');
     currentPlot = new Chart(ctx, {
         type: 'bar',
         data: {
@@ -630,22 +643,35 @@ function displayEnrichmentPage() {
 
 /**
  * Creates and displays a detailed results table for found genes and a list of not-found genes.
+ * Can also display an optional statistics summary at the top.
  * @param {Array} foundGenes - Array of gene objects found in the database.
  * @param {Array} notFoundGenes - Array of query strings not found.
+ * @param {object|null} stats - Optional object with stats like pValue and enrichmentScore.
  */
-function createEnrichmentResultsTable(foundGenes, notFoundGenes) {
+function createEnrichmentResultsTable(foundGenes, notFoundGenes, stats = null) {
     const container = document.getElementById('enrichment-results-container');
     if (!container) return;
 
-    // Clear previous results
-    container.innerHTML = '';
-    if (foundGenes.length === 0 && notFoundGenes.length === 0) return;
+    let summaryHTML = '';
+    // If stats are provided, create the summary box
+    if (stats) {
+        summaryHTML = `
+            <div id="ciliome-results-summary">
+                <h3>Enrichment Analysis Results 🔬</h3>
+                <p>From your list of <strong>${stats.n_input}</strong> unique gene(s), <strong>${stats.k}</strong> were found in the CiliaHub database of <strong>${stats.M}</strong> ciliary genes.</p>
+                <p>Of these hits, <strong>${stats.sharedHitsCount}</strong> are associated with known ciliopathies or protein complexes.</p>
+                <div class="stats-box">
+                    <p><strong>Enrichment Score:</strong> ${stats.enrichmentScore.toFixed(2)}-fold</p>
+                    <p><strong>P-value:</strong> ${stats.pValue.toExponential(3)}</p>
+                </div>
+            </div>
+        `;
+    }
 
-    let html = '';
-
+    let tableHTML = '';
     // Create the detailed table for found genes
     if (foundGenes.length > 0) {
-        html += `
+        tableHTML = `
             <h3>Search Results (${foundGenes.length} gene${foundGenes.length !== 1 ? 's' : ''} found)</h3>
             <div class="table-wrapper">
                 <table>
@@ -672,9 +698,10 @@ function createEnrichmentResultsTable(foundGenes, notFoundGenes) {
         `;
     }
 
+    let notFoundHTML = '';
     // Create the section for not-found genes
     if (notFoundGenes.length > 0) {
-        html += `
+        notFoundHTML = `
             <div class="not-found-section">
                 <h4>Genes Not Found (${notFoundGenes.length}):</h4>
                 <p>${notFoundGenes.sort().join(', ')}</p>
@@ -682,5 +709,6 @@ function createEnrichmentResultsTable(foundGenes, notFoundGenes) {
         `;
     }
 
-    container.innerHTML = html;
+    // Assemble the final HTML and render it
+    container.innerHTML = summaryHTML + tableHTML + notFoundHTML;
 }
