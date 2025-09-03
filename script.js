@@ -72,6 +72,11 @@ async function loadAndPrepareDatabase() {
             // 4. Prepare localization data for SVG mapping
             if (g.localization) {
                 geneLocalizationData[g.gene] = mapLocalizationToSVG(g.localization);
+                // Debug ACTN2 specifically
+                if (g.gene === 'ACTN2') {
+                    console.log('ACTN2 Raw localization:', g.localization);
+                    console.log('ACTN2 Mapped localization:', geneLocalizationData[g.gene]);
+                }
             }
         });
 
@@ -89,7 +94,6 @@ async function loadAndPrepareDatabase() {
         return false;
     }
 }
-
 /**
  * The central search function.
  */
@@ -1927,31 +1931,3 @@ document.addEventListener('DOMContentLoaded', () => {
     initGlobalEventListeners();
 });
 
-function displayGenePage(geneName) {
-    const contentArea = document.querySelector('.content-area');
-    const gene = geneMapCache.get(sanitize(geneName));
-    if (!gene) {
-        contentArea.innerHTML = '<p>Gene not found.</p>';
-        return;
-    }
-
-    // Strictly use localization field, avoid inferring from functional_category
-    let localization = Array.isArray(gene.localization) 
-        ? gene.localization.map(loc => loc.trim()).join(', ') 
-        : (gene.localization || '—');
-
-    console.log('Localization for', geneName, ':', localization); // Debug log
-
-    contentArea.innerHTML = `
-        <div class="gene-page">
-            <h2>${gene.gene}</h2>
-            <div class="gene-details">
-                <p><strong>Localization:</strong> ${localization}</p>
-                <p><strong>Ensembl ID:</strong> ${gene.ensembl_id || '—'}</p>
-                <p><strong>Description:</strong> ${gene.description || '—'}</p>
-                <p><strong>Functional Summary:</strong> ${gene.functional_summary || '—'}</p>
-                <p><strong>Reference:</strong> <a href="${gene.reference || '#'}" target="_blank">${gene.reference || '—'}</a></p>
-            </div>
-        </div>
-    `;
-}
