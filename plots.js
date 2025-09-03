@@ -262,14 +262,14 @@ function renderEnrichmentBubblePlot(foundGenes) {
 }
 
 /**
- * Renders an improved gene matrix plot.
+ * Renders an improved and much larger gene matrix plot.
  */
 function renderBubbleMatrix(foundGenes) {
     const plotContainer = document.getElementById('matrix-plot-container');
     plotContainer.style.display = 'block';
     if (window.enrichmentBarChartInstance) window.enrichmentBarChartInstance.destroy();
 
-    // Display the detailed results table at the bottom of the page
+    // This function still displays the detailed results table at the bottom of the page
     createEnrichmentResultsTable(foundGenes, []);
 
     if (foundGenes.length === 0) {
@@ -277,30 +277,29 @@ function renderBubbleMatrix(foundGenes) {
         return;
     }
     
-    plotContainer.innerHTML = `<canvas id="enrichment-chart-canvas"></canvas>`;
+    // ✨ FIX: Wrapper div makes the plot much taller for better readability
+    plotContainer.innerHTML = `<div style="position: relative; width: 100%; min-height: 800px;"><canvas id="enrichment-chart-canvas"></canvas></div>`;
     const ctx = document.getElementById('enrichment-chart-canvas').getContext('2d');
     const settings = getPlotSettings();
     
-    // ✨ FIX: Using the complete list of 20 unique localization terms.
+    // ✨ FIX: Using the complete, sorted list of 18 organelles and locations for the Y-axis
     const yCategories = [
-        'Cilia', 'Basal Body', 'Transition Zone', 'Axoneme', 'Ciliary Membrane',
-        'Ciliary Pocket', 'Ciliary Tip', 'Flagella', 'Centrosome', 'Cytoskeleton',
-        'Cytoplasm', 'Nucleus', 'Endoplasmic Reticulum', 'Mitochondria', 'Ribosome',
-        'Golgi', 'Lysosome', 'Peroxisome', 'Plasma Membrane', 'Extracellular Vesicles'
-    ];
+        'Autophagosomes', 'Axoneme', 'Basal Body', 'Centrosome', 'Cilia', 
+        'Ciliary Associated Gene', 'Ciliary Membrane', 'Cytosol', 'Endoplasmic Reticulum', 
+        'Flagella', 'Golgi Apparatus', 'Lysosome', 'Microtubules', 
+        'Mitochondria', 'Nucleus', 'Peroxisome', 'Transition Zone'
+    ].sort(); // Sort alphabetically
     
     const xLabels = [...new Set(foundGenes.map(g => g.gene))].sort();
     const colorPalette = ['#377eb8', '#ff7f00', '#4daf4a', '#f781bf', '#a65628', '#984ea3', '#999999', '#e41a1c', '#dede00'];
 
     const datasets = foundGenes.map((gene, index) => ({
         label: gene.gene,
-        data: (Array.isArray(gene.localization) ? gene.localization : (gene.localization || '').split(','))
+        data: (Array.isArray(gene.localization) ? gene.localization : (gene.localization || '').split(/[,;]/))
             .map(locString => {
-                const trimmedLoc = locString?.trim().toLowerCase();
+                const trimmedLoc = locString?.trim();
                 if (!trimmedLoc) return null;
-                // Match against the comprehensive list
-                const matchingCategory = yCategories.find(cat => cat.toLowerCase() === trimmedLoc);
-                // ✨ FIX: Increased bubble size for better visibility
+                const matchingCategory = yCategories.find(cat => cat.toLowerCase() === trimmedLoc.toLowerCase());
                 return matchingCategory ? { x: gene.gene, y: matchingCategory, r: 12 } : null;
             }).filter(Boolean),
         backgroundColor: colorPalette[index % colorPalette.length]
@@ -313,24 +312,33 @@ function renderBubbleMatrix(foundGenes) {
             responsive: true,
             maintainAspectRatio: false,
             plugins: {
-                // ✨ FIX: Legend removed as requested
+                // ✨ FIX: Legend is removed as requested
                 legend: { display: false }, 
-                tooltip: { callbacks: { label: (context) => `${context.dataset.label} - ${context.raw.y}` } },
+                tooltip: { 
+                    // ✨ FIX: Font size updated to 20
+                    titleFont: { size: 20 },
+                    bodyFont: { size: 20 },
+                    callbacks: { 
+                        label: (context) => `${context.dataset.label} - ${context.raw.y}` 
+                    } 
+                },
             },
             scales: {
                 x: {
                     type: 'category',
                     labels: xLabels,
-                    title: { display: true, text: "Gene", font: { family: settings.fontFamily, size: settings.fontSize, weight: 'bold' }, color: settings.axisColor },
-                    ticks: { font: { family: settings.fontFamily, size: settings.fontSize, weight: settings.fontWeight }, autoSkip: false, maxRotation: 90, minRotation: 45, color: settings.textColor },
+                    title: { display: true, text: "Gene", font: { size: 20, weight: 'bold' }, color: settings.axisColor },
+                    // ✨ FIX: Font size updated to 20 for visibility
+                    ticks: { font: { size: 20 }, autoSkip: false, maxRotation: 90, minRotation: 45, color: settings.textColor },
                     grid: { display: false }
                 },
                 y: {
                     type: 'category',
                     labels: yCategories,
-                    title: { display: true, text: 'Ciliary Localization', font: { family: settings.fontFamily, size: settings.fontSize, weight: 'bold' }, color: settings.axisColor },
-                    ticks: { font: { family: settings.fontFamily, size: settings.fontSize, weight: settings.fontWeight }, color: settings.textColor },
-                    grid: { display: false }
+                    title: { display: true, text: 'Ciliary Localization', font: { size: 20, weight: 'bold' }, color: settings.axisColor },
+                    // ✨ FIX: Font size updated to 20 for visibility
+                    ticks: { font: { size: 20 }, color: settings.textColor },
+                    grid: { display: true, color: '#f0f0f0' } // Light gridlines for readability
                 }
             }
         }
