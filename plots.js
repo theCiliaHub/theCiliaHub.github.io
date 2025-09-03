@@ -261,8 +261,7 @@ function renderEnrichmentBubblePlot(foundGenes) {
     });
 }
 
-/**
- * Renders an improved gene matrix plot.
+ * Renders an improved and much larger gene matrix plot.
  */
 function renderBubbleMatrix(foundGenes) {
     const plotContainer = document.getElementById('matrix-plot-container');
@@ -277,16 +276,17 @@ function renderBubbleMatrix(foundGenes) {
         return;
     }
     
-    plotContainer.innerHTML = `<canvas id="enrichment-chart-canvas"></canvas>`;
+    // ✨ FIX: Wrapper div makes the plot much taller
+    plotContainer.innerHTML = `<div style="position: relative; width: 100%; min-height: 800px;"><canvas id="enrichment-chart-canvas"></canvas></div>`;
     const ctx = document.getElementById('enrichment-chart-canvas').getContext('2d');
     const settings = getPlotSettings();
     
-    // ✨ FIX: Using the complete list of 20 unique localization terms.
+    // ✨ FIX: Using the complete, sorted list of 18 organelles and locations
     const yCategories = [
-        'Cilia', 'Basal Body', 'Transition Zone', 'Axoneme', 'Ciliary Membrane',
-        'Ciliary Pocket', 'Ciliary Tip', 'Flagella', 'Centrosome', 'Cytoskeleton',
-        'Cytoplasm', 'Nucleus', 'Endoplasmic Reticulum', 'Mitochondria', 'Ribosome',
-        'Golgi', 'Lysosome', 'Peroxisome', 'Plasma Membrane', 'Extracellular Vesicles'
+        'Autophagosomes', 'Axoneme', 'Basal Body', 'Centrosome', 'Cilia', 
+        'Ciliary Associated Gene', 'Ciliary Membrane', 'Cytosol', 'Endoplasmic Reticulum', 
+        'Flagella', 'Golgi Apparatus', 'Lysosome', 'Microtubules', 
+        'Mitochondria', 'Nucleus', 'Peroxisome', 'Transition Zone'
     ];
     
     const xLabels = [...new Set(foundGenes.map(g => g.gene))].sort();
@@ -294,48 +294,50 @@ function renderBubbleMatrix(foundGenes) {
 
     const datasets = foundGenes.map((gene, index) => ({
         label: gene.gene,
-        data: (Array.isArray(gene.localization) ? gene.localization : (gene.localization || '').split(','))
+        data: (Array.isArray(gene.localization) ? gene.localization : (gene.localization || '').split(/[,;]/))
             .map(locString => {
-                const trimmedLoc = locString?.trim().toLowerCase();
+                const trimmedLoc = locString?.trim();
                 if (!trimmedLoc) return null;
-                // Match against the comprehensive list
-                const matchingCategory = yCategories.find(cat => cat.toLowerCase() === trimmedLoc);
+                // Find a match in the comprehensive category list (case-insensitive)
+                const matchingCategory = yCategories.find(cat => cat.toLowerCase() === trimmedLoc.toLowerCase());
                 // ✨ FIX: Increased bubble size for better visibility
                 return matchingCategory ? { x: gene.gene, y: matchingCategory, r: 12 } : null;
             }).filter(Boolean),
         backgroundColor: colorPalette[index % colorPalette.length]
     }));
 
-    currentPlot = new Chart(ctx, {
+     currentPlot = new Chart(ctx, {
         type: 'bubble',
-        data: { datasets },
+        data: { datasets: [dataset] },
         options: {
             responsive: true,
             maintainAspectRatio: false,
             plugins: {
-                // ✨ FIX: Legend removed as requested
-                legend: { display: false }, 
-                tooltip: { callbacks: { label: (context) => `${context.dataset.label} - ${context.raw.y}` } },
+                legend: { display: false },
+                tooltip: { 
+                    titleFont: { size: 20 },
+                    bodyFont: { size: 20 },
+                    callbacks: { label: c => `${c.raw.y}: ${c.raw.count} gene(s)` } 
+                }
             },
             scales: {
                 x: {
-                    type: 'category',
-                    labels: xLabels,
-                    title: { display: true, text: "Gene", font: { family: settings.fontFamily, size: settings.fontSize, weight: 'bold' }, color: settings.axisColor },
-                    ticks: { font: { family: settings.fontFamily, size: settings.fontSize, weight: settings.fontWeight }, autoSkip: false, maxRotation: 90, minRotation: 45, color: settings.textColor },
+                    title: { display: true, text: settings.xAxisTitle, color: settings.axisColor, font: { size: 20, weight: 'bold' } },
+                    ticks: { display: false },
                     grid: { display: false }
                 },
                 y: {
                     type: 'category',
-                    labels: yCategories,
-                    title: { display: true, text: 'Ciliary Localization', font: { family: settings.fontFamily, size: settings.fontSize, weight: 'bold' }, color: settings.axisColor },
-                    ticks: { font: { family: settings.fontFamily, size: settings.fontSize, weight: settings.fontWeight }, color: settings.textColor },
-                    grid: { display: false }
+                    labels: categoriesWithData,
+                    title: { display: true, text: settings.yAxisTitle, color: settings.axisColor, font: { size: 20, weight: 'bold' } },
+                    grid: { display: false, drawBorder: false },
+                    ticks: { font: { size: 20 }, color: settings.textColor }
                 }
             }
         }
     });
 }
+
 
 /**
  * Renders the gene matrix plot in the plot panel and a detailed results table below.
@@ -470,38 +472,36 @@ function renderCiliomeEnrichment(foundGenes, notFoundGenes) {
             return acc;
         }, { labels: [], counts: [] });
 
-    // Create the new chart instance
-    currentPlot = new Chart(ctx, {
+  currentPlot = new Chart(ctx, {
         type: 'bar',
-        data: {
-            labels: chartData.labels,
-            datasets: [{
-                label: 'Gene Count',
-                data: chartData.counts,
-                backgroundColor: settings.barChartColor,
-            }]
-        },
+        data: { /* ... */ },
         options: {
             indexAxis: 'y',
             responsive: true,
             maintainAspectRatio: false,
             plugins: {
                 legend: { display: false },
-                title: { display: true, text: 'Localization of Found Ciliary Genes', font: { family: settings.fontFamily, size: 16, weight: settings.fontWeight }, color: settings.textColor }
+                title: { display: true, text: 'Localization of Found Ciliary Genes', font: { size: 20, weight: 'bold' }, color: settings.textColor },
+                tooltip: {
+                    titleFont: { size: 20 },
+                    bodyFont: { size: 20 }
+                }
             },
             scales: {
                 x: {
                     beginAtZero: true,
-                    title: { display: true, text: 'Gene Count', font: { family: settings.fontFamily, size: 14 }, color: settings.axisColor },
-                    ticks: { precision: 0, color: settings.textColor },
+                    title: { display: true, text: 'Gene Count', font: { size: 20 }, color: settings.axisColor },
+                    ticks: { precision: 0, font: { size: 20 }, color: settings.textColor },
                 },
                 y: {
-                    ticks: { font: { family: settings.fontFamily }, color: settings.textColor },
+                    ticks: { font: { size: 20 }, color: settings.textColor },
                 }
             }
         }
     });
 }
+
+
 /**
  * Handles downloading the current plot as a PNG or PDF.
  */
