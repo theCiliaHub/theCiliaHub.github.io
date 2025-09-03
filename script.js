@@ -69,13 +69,25 @@ async function loadAndPrepareDatabase() {
                 });
             }
             
-            // 4. Prepare localization data for SVG mapping
+            // 4. Prepare localization data for SVG mapping - MODIFIED: Sanitize input to filter non-ciliary terms and add debug logging for ACTN2
             if (g.localization) {
-                geneLocalizationData[g.gene] = mapLocalizationToSVG(g.localization);
-                // Debug ACTN2 specifically
+                // Sanitize: Only pass valid ciliary localizations to mapLocalizationToSVG to prevent additions like "Cytosol"
+                const validCiliaryLocalizations = ['transition zone', 'cilia', 'basal body', 'axoneme', 'ciliary membrane', 'centrosome', 'autophagosomes', 'endoplasmic reticulum', 'flagella', 'golgi apparatus', 'lysosome', 'microbody', 'microtubules', 'mitochondrion', 'nucleus', 'peroxisome']; // Expanded list based on common terms in plots.js
+                let sanitizedLocalization = Array.isArray(g.localization) 
+                    ? g.localization.map(loc => loc ? loc.trim().toLowerCase() : '').filter(loc => loc && validCiliaryLocalizations.includes(loc))
+                    : (g.localization ? g.localization.split(/[,;]/).map(loc => loc ? loc.trim().toLowerCase() : '').filter(loc => loc && validCiliaryLocalizations.includes(loc)) : []);
+                
+                // Debug logging for ACTN2
                 if (g.gene === 'ACTN2') {
-                    console.log('ACTN2 Raw localization:', g.localization);
-                    console.log('ACTN2 Mapped localization:', geneLocalizationData[g.gene]);
+                    console.log('ACTN2 Raw localization from JSON:', g.localization);
+                    console.log('ACTN2 Sanitized localization before mapping:', sanitizedLocalization);
+                }
+                
+                geneLocalizationData[g.gene] = mapLocalizationToSVG(sanitizedLocalization); // Use sanitized input
+                
+                // Additional debug for mapped output
+                if (g.gene === 'ACTN2') {
+                    console.log('ACTN2 Mapped localization from mapLocalizationToSVG:', geneLocalizationData[g.gene]);
                 }
             }
         });
@@ -94,6 +106,7 @@ async function loadAndPrepareDatabase() {
         return false;
     }
 }
+
 /**
  * The central search function.
  */
