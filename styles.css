@@ -880,3 +880,50 @@ body {
 /* ---------- Helpful debugging outline (comment out if not needed) ----------
 .gene-detail-page .detail-card { outline: 1px dashed rgba(0,103,165,0.15) !important; }
 ---------------------------------------------------------------------------- */
+
+/* Plot Customization Styling */
+details {
+    border: 1px solid #e1ecf4;
+    border-radius: 4px;
+    margin-bottom: 15px;
+}
+
+summary {
+    padding: 8px;
+    background-color: #e1ecf4;
+    cursor: pointer;
+    font-weight: bold;
+    border-radius: 4px;
+}
+
+details[open] summary {
+    border-bottom: 1px solid #d1dbe4;
+}
+
+label {
+    display: block;
+    font-size: 0.9rem;
+    margin-bottom: 5px;
+    color: #333;
+}
+
+input[type="text"],
+input[type="number"],
+select,
+input[type="color"] {
+    width: 100%;
+    padding: 6px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 0.9rem;
+}
+
+input[type="color"] {
+    padding: 2px;
+    height: 30px;
+}
+
+.plot-wrapper {
+    position: relative;
+    width: 100%;
+}
