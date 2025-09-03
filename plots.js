@@ -560,9 +560,6 @@ function generateEnrichmentPlots() {
 // =============================================================================
 
 
-/**
- * Renders the HTML and sets up event listeners for the Enrichment page.
- */
 function displayEnrichmentPage() {
     const contentArea = document.querySelector('.content-area');
     contentArea.className = 'content-area content-area-full';
@@ -581,7 +578,6 @@ function displayEnrichmentPage() {
                 <div class="enrichment-controls-panel">
                     <label for="enrichment-genes-input" style="font-weight: 600; margin-bottom: 0.5rem; display: block;">Enter Gene List:</label>
                     <textarea id="enrichment-genes-input" placeholder="e.g., IFT88, ACEH, ENSG00000198707..."></textarea>
-                    
                     <div id="enrichment-actions">
                          <div class="plot-type-selection">
                             <strong>Plot Type:</strong>
@@ -597,7 +593,6 @@ function displayEnrichmentPage() {
                             </div>
                         </div>
                     </div>
-                    
                     <details id="plot-customization-details">
                         <summary>Plot Customization</summary>
                         <div id="plot-settings-panel">
