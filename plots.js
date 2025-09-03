@@ -1,14 +1,4 @@
-// =============================================================================
-// GLOBAL VARIABLES & CONFIGURATION
-// =============================================================================
 
-// Data Management
-let allGenes = [];
-let geneDataCache = null;
-let geneMapCache = null;
-
-// Plotting
-let currentPlot = null;
 
 // Chart.js Background Plugin
 Chart.register({
