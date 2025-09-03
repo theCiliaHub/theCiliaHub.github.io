@@ -34,42 +34,42 @@ async function loadAndPrepareDatabase() {
         const resp = await fetch('https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/ciliahub_data.json');
         if (!resp.ok) throw new Error(`HTTP Error ${resp.status}`);
         const rawGenes = await resp.json();
-       
-        // Validate the data structure
+
         if (!Array.isArray(rawGenes)) {
             throw new Error('Invalid data format: expected array');
         }
-       
+
         geneDataCache = rawGenes;
         allGenes = rawGenes;
         geneMapCache = new Map();
 
         allGenes.forEach(g => {
-            // Ensure gene name exists and is a string
             if (!g.gene || typeof g.gene !== 'string') {
                 console.warn('Skipping entry with invalid gene name:', g);
                 return;
             }
-           
+
+            // 1. Index by the primary gene name
             const nameKey = sanitize(g.gene);
             if (nameKey) geneMapCache.set(nameKey, g);
-           
+
+            // 2. Index by all synonyms (handles comma or semicolon separators)
             if (g.synonym) {
-                const synonyms = String(g.synonym).split(',');
-                synonyms.forEach(syn => {
+                String(g.synonym).split(/[,;]/).forEach(syn => {
                     const key = sanitize(syn);
                     if (key && !geneMapCache.has(key)) geneMapCache.set(key, g);
                 });
             }
 
-            // ✨ ADDED: Map Ensembl ID to the gene object for searching
-            if (g.ensembl_id && typeof g.ensembl_id === 'string') {
-                const ensemblKey = sanitize(g.ensembl_id);
-                if (ensemblKey && !geneMapCache.has(ensemblKey)) {
-                    geneMapCache.set(ensemblKey, g);
-                }
+            // 3. Index by all Ensembl IDs (handles comma or semicolon separators)
+            if (g.ensembl_id) {
+                String(g.ensembl_id).split(/[,;]/).forEach(id => {
+                    const key = sanitize(id);
+                    if (key && !geneMapCache.has(key)) geneMapCache.set(key, g);
+                });
             }
-           
+            
+            // 4. Prepare localization data for SVG mapping
             if (g.localization) {
                 geneLocalizationData[g.gene] = mapLocalizationToSVG(g.localization);
             }
@@ -78,7 +78,8 @@ async function loadAndPrepareDatabase() {
         console.log(`Loaded ${allGenes.length} genes into database`);
         return true;
     } catch (e) {
-        console.error('Data load error', e);
+        console.error('Data load error:', e);
+        // Fallback logic remains the same
         allGenes = getDefaultGenes();
         currentData = allGenes;
         geneMapCache = new Map();
