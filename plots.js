@@ -508,6 +508,9 @@ function downloadPlot() {
 /**
  * Main controller for generating enrichment plots.
  */
+/**
+ * Main controller for generating enrichment plots and the status table.
+ */
 function generateEnrichmentPlots() {
     const genesInput = document.getElementById('enrichment-genes-input').value.trim();
     if (!genesInput) {
@@ -518,36 +521,34 @@ function generateEnrichmentPlots() {
     const geneList = genesInput.split(/[\s,;\n\r\t]+/).filter(Boolean);
     const plotType = document.querySelector('input[name="plot-type"]:checked').value;
 
-    // ✨ FIX: Using the efficient, correct search function.
     const { foundGenes, notFoundGenes } = findGenes(geneList);
 
-    // Hide all plot containers
-    document.getElementById('bubble-enrichment-container').style.display = 'none';
-    document.getElementById('matrix-plot-container').style.display = 'none';
-    document.getElementById('ciliome-plot-container').style.display = 'none';
-    // ✨ Add these two lines to manage the placeholder visibility
+    // --- Plot generation logic (remains the same) ---
     document.getElementById('plot-placeholder').style.display = 'none';
-    document.getElementById('download-controls').style.display = 'flex'; // Show download controls
-
+    document.getElementById('download-controls').style.display = 'flex';
+    document.querySelectorAll('.plot-area').forEach(el => el.style.display = 'none');
     document.getElementById('plot-container').style.display = 'block';
-    document.getElementById('download-plot-btn').style.display = 'inline-block';
 
     if (currentPlot) {
         currentPlot.destroy();
         currentPlot = null;
     }
-
+    
     switch (plotType) {
         case 'bubble':
             renderEnrichmentBubblePlot(Array.from(foundGenes));
             break;
         case 'matrix':
-             renderBubbleMatrix(Array.from(foundGenes));
+            renderBubbleMatrix(Array.from(foundGenes));
             break;
         case 'ciliome':
             renderCiliomeEnrichment(Array.from(foundGenes), notFoundGenes);
             break;
     }
+
+    // ✨ ADDED: Call the function to create the status table ✨
+    createGeneStatusTable(Array.from(foundGenes), notFoundGenes);
+
     document.getElementById('plot-container').scrollIntoView({ behavior: 'smooth' });
 }
 
@@ -561,6 +562,9 @@ function generateEnrichmentPlots() {
 /**
  * Renders the HTML and sets up event listeners for the Enrichment page.
  */
+/**
+ * Renders the HTML and sets up event listeners for the Enrichment page.
+ */
 function displayEnrichmentPage() {
     const contentArea = document.querySelector('.content-area');
     contentArea.className = 'content-area content-area-full';
@@ -568,7 +572,7 @@ function displayEnrichmentPage() {
         document.querySelector('.cilia-panel').style.display = 'none';
     }
 
-    // ✨ New HTML structure with a two-column layout
+    // HTML structure with a two-column layout
     contentArea.innerHTML = `
         <div class="page-section enrichment-page">
             <div class="enrichment-header">
@@ -580,7 +584,7 @@ function displayEnrichmentPage() {
                 <div class="enrichment-controls-panel">
                     <label for="enrichment-genes-input" style="font-weight: 600; margin-bottom: 0.5rem; display: block;">Enter Gene List:</label>
                    <textarea id="enrichment-genes-input" placeholder="e.g., IFT88, ACEH, ENSG00000198707..."></textarea>
-                    
+                   
                     <div id="enrichment-actions">
                         <div class="plot-type-selection">
                             <strong>Plot Type:</strong>
@@ -599,7 +603,7 @@ function displayEnrichmentPage() {
                             </div>
                         </div>
                     </div>
-                    
+                   
                     <details id="plot-customization-details">
                         <summary>Plot Customization</summary>
                         <div id="plot-settings-panel">
@@ -626,6 +630,8 @@ function displayEnrichmentPage() {
                     <div id="plot-placeholder" class="status-message">
                         <p>Your generated plot will appear here.</p>
                     </div>
+                    
+                    <div id="gene-status-table-container"></div>
                 </div>
             </div>
         </div>
@@ -633,4 +639,39 @@ function displayEnrichmentPage() {
 
     document.getElementById('generate-plot-btn').addEventListener('click', generateEnrichmentPlots);
     document.getElementById('download-plot-btn').addEventListener('click', downloadPlot);
+}
+
+/**
+ * Creates and displays a two-column table for found and not-found genes.
+ * @param {Array} foundGenes - Array of gene objects found in the database.
+ * @param {Array} notFoundGenes - Array of query strings not found.
+ */
+function createGeneStatusTable(foundGenes, notFoundGenes) {
+    const container = document.getElementById('gene-status-table-container');
+    if (!container) return;
+
+    // Do not show the table if there was no input
+    if (foundGenes.length === 0 && notFoundGenes.length === 0) {
+        container.innerHTML = '';
+        return;
+    }
+
+    const foundGeneNames = foundGenes.map(g => g.gene).sort();
+
+    container.innerHTML = `
+        <div class="gene-status-wrapper">
+            <div class="gene-status-column">
+                <h4>✅ Genes Found in CiliaHub (${foundGeneNames.length})</h4>
+                <div class="gene-list">
+                    ${foundGeneNames.length > 0 ? foundGeneNames.join(', ') : 'None'}
+                </div>
+            </div>
+            <div class="gene-status-column">
+                <h4>❌ Genes Not Found (${notFoundGenes.length})</h4>
+                <div class="gene-list">
+                    ${notFoundGenes.length > 0 ? notFoundGenes.sort().join(', ') : 'None'}
+                </div>
+            </div>
+        </div>
+    `;
 }
