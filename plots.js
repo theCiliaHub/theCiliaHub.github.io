@@ -596,8 +596,22 @@ function displayEnrichmentPage() {
                             </div>
                         </div>
                     </div>
+                    
                     <details id="plot-customization-details">
-                        </details>
+                        <summary>Plot Customization</summary>
+                        <div id="plot-settings-panel">
+                            <div><label>Font Family <select id="setting-font-family"><option>Arial</option><option>Tahoma</option></select></label></div>
+                            <div><label>Font Size <input type="number" id="setting-font-size" value="14" min="8" max="30"></label></div>
+                            <div><label>Font Weight <select id="setting-font-weight"><option value="normal">Normal</option><option value="bold" selected>Bold</option></select></label></div>
+                            <div><label>Text Color <input type="color" id="setting-text-color" value="#000000"></label></div>
+                            <div><label>Axis Color <input type="color" id="setting-axis-color" value="#000000"></label></div>
+                            <div><label>Y-Axis Title <input type="text" id="setting-y-axis-title" value="Localization"></label></div>
+                            <div><label>X-Axis Title <input type="text" id="setting-x-axis-title" value="Enrichment"></label></div>
+                            <div><label>Bar Color <input type="color" id="setting-bar-color" value="#2ca25f"></label></div>
+                            <div><label>Enrichment Color 1 (Low) <input type="color" id="setting-enrichment-color1" value="#edf8fb"></label></div>
+                            <div><label>Enrichment Color 5 (High) <input type="color" id="setting-enrichment-color5" value="#006d2c"></label></div>
+                        </div>
+                    </details>
                 </div>
 
                 <div class="enrichment-plot-panel">
@@ -607,17 +621,15 @@ function displayEnrichmentPage() {
                         <div id="ciliome-plot-container" class="plot-area" style="display: none;"></div>
                     </div>
                     <div id="plot-placeholder" class="status-message"></div>
+                    <div id="enrichment-results-container" class="results-section"></div>
                 </div>
             </div>
-
-            <div id="enrichment-results-container" class="results-section"></div>
         </div>
     `;
 
     document.getElementById('generate-plot-btn').addEventListener('click', generateEnrichmentPlots);
     document.getElementById('download-plot-btn').addEventListener('click', downloadPlot);
 }
-
 
 /**
  * Creates and displays a detailed results table for found genes and a list of not-found genes.
