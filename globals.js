@@ -10,6 +10,9 @@ let currentData = [];
 let searchResults = [];
 const geneLocalizationData = {};
 
+// Plotting
+let currentPlot = null;
+
 // Chart instances
 let localizationChartInstance;
 let analysisDotPlotInstance;
