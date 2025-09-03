@@ -319,8 +319,12 @@ function renderBubbleMatrix(foundGenes) {
 /**
  * Renders the Ciliome enrichment bar chart and statistics.
  */
+/**
+ * Renders the Ciliome enrichment summary, a detailed hits table, and a localization bar chart.
+ */
 function renderCiliomeEnrichment(foundGenes, notFoundGenes) {
-    document.getElementById('ciliome-plot-container').style.display = 'block';
+    const container = document.getElementById('ciliome-plot-container');
+    container.style.display = 'block';
     if (window.ciliomeChartInstance) window.ciliomeChartInstance.destroy();
 
     const k = foundGenes.length;
@@ -329,52 +333,97 @@ function renderCiliomeEnrichment(foundGenes, notFoundGenes) {
     const N = 20000; // Total genes in background genome
 
     if (n_input === 0) {
-        document.getElementById('ciliome-plot-container').innerHTML = '<p class="status-message">Please enter a gene list to analyze.</p>';
+        container.innerHTML = '<p class="status-message">Please enter a gene list to analyze.</p>';
         return;
     }
 
+    // --- 1. Calculate Statistics & Shared Hits ---
     const pValue = hypergeometricPValue(k, n_input, M, N);
     const enrichmentScore = n_input > 0 && M > 0 ? (k / n_input) / (M / N) : 0;
+    
+    let sharedHitsCount = 0;
+    const hitsDetails = foundGenes.map(gene => {
+        const hasCiliopathy = !!gene.ciliopathy;
+        const hasComplex = !!gene.complex_names;
+        if (hasCiliopathy || hasComplex) {
+            sharedHitsCount++;
+        }
+        return {
+            name: gene.gene,
+            ciliopathy: gene.ciliopathy || '—',
+            complex: gene.complex_names ? gene.complex_names.replace(/;/g, ',') : '—'
+        };
+    }).sort((a, b) => a.name.localeCompare(b.name)); // Sort genes alphabetically
 
+    // --- 2. Generate Summary HTML ---
     const summaryHTML = `
-        <div id="ciliome-results-summary" style="margin-bottom: 2rem; font-size: 1.1rem; max-width: 600px; margin-left: auto; margin-right: auto; text-align: center;">
-            <h3>Enrichment Analysis Results</h3>
+        <div id="ciliome-results-summary">
+            <h3>Enrichment Analysis Results 🔬</h3>
             <p>From your list of <strong>${n_input}</strong> unique gene(s), <strong>${k}</strong> were found in the CiliaHub database of <strong>${M}</strong> ciliary genes.</p>
-            <p>The expected number of ciliary genes would be approximately <strong>${((M / N) * n_input).toFixed(2)}</strong>.</p>
-            <div style="font-size: 1.2rem; margin-top: 1rem; padding: 10px; background-color: #f8f9fa; border-radius: 5px;">
+            <p>Of these hits, <strong>${sharedHitsCount}</strong> are associated with known ciliopathies or protein complexes.</p>
+            <div class="stats-box">
                 <p><strong>Enrichment Score:</strong> ${enrichmentScore.toFixed(2)}-fold</p>
-                <p><strong>P-value (Hypergeometric Test):</strong> ${pValue.toExponential(3)}</p>
+                <p><strong>P-value:</strong> ${pValue.toExponential(3)}</p>
             </div>
         </div>
     `;
 
+    // --- 3. Generate Detailed Hits Table HTML ---
+    const hitsTableHTML = `
+        <details class="enrichment-details">
+            <summary>View Found Ciliary Genes (${k})</summary>
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Gene</th>
+                            <th>Associated Ciliopathy</th>
+                            <th>Protein Complex(es)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${hitsDetails.map(g => `
+                            <tr>
+                                <td><a href="/${g.name}" onclick="navigateTo(event, '/${g.name}')">${g.name}</a></td>
+                                <td>${g.ciliopathy}</td>
+                                <td>${g.complex}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </div>
+        </details>
+    `;
+
+    // --- 4. Prepare Data for Localization Chart ---
     const localizationCounts = {};
     foundGenes.forEach(gene => {
-        const localizations = Array.isArray(gene.localization) ? gene.localization : (gene.localization || '').split(',');
-        localizations.forEach(loc => {
-            if (typeof loc !== 'string' || !loc) return;
-            const term = loc.trim();
-            if (term) {
-                 const capitalizedTerm = term.charAt(0).toUpperCase() + term.slice(1).toLowerCase();
-                 localizationCounts[capitalizedTerm] = (localizationCounts[capitalizedTerm] || 0) + 1;
-            }
-        });
+        (Array.isArray(gene.localization) ? gene.localization : [])
+            .forEach(loc => {
+                if (loc) {
+                    const term = loc.trim();
+                    const capitalizedTerm = term.charAt(0).toUpperCase() + term.slice(1).toLowerCase();
+                    localizationCounts[capitalizedTerm] = (localizationCounts[capitalizedTerm] || 0) + 1;
+                }
+            });
     });
 
-    const chartData = { labels: [], counts: [] };
-    Object.entries(localizationCounts)
+    const chartData = Object.entries(localizationCounts)
         .sort(([, a], [, b]) => b - a)
-        .forEach(([label, count]) => {
-            chartData.labels.push(label);
-            chartData.counts.push(count);
-        });
+        .reduce((acc, [label, count]) => {
+            acc.labels.push(label);
+            acc.counts.push(count);
+            return acc;
+        }, { labels: [], counts: [] });
 
-    const barChartHTML = `<div style="position: relative; width: 100%; max-width: 700px; height: 600px; margin: auto;"><canvas id="ciliome-bar-chart"></canvas></div>`;
-    const container = document.getElementById('ciliome-plot-container');
-    container.innerHTML = summaryHTML + (k > 0 ? barChartHTML : '<p class="status-message">No ciliary genes were found in your list to plot.</p>');
+    const barChartHTML = `<div class="chart-wrapper"><canvas id="ciliome-bar-chart"></canvas></div>`;
+
+    // --- 5. Assemble and Render Final HTML ---
+    container.innerHTML = summaryHTML + (k > 0 ? hitsTableHTML + barChartHTML : '<p class="status-message">No ciliary genes were found in your list to plot.</p>');
 
     if (k === 0) return;
 
+    // --- 6. Render the Localization Bar Chart ---
     const settings = getPlotSettings();
     const ctx = document.getElementById('ciliome-bar-chart').getContext('2d');
     currentPlot = new Chart(ctx, {
@@ -385,7 +434,6 @@ function renderCiliomeEnrichment(foundGenes, notFoundGenes) {
                 label: 'Gene Count',
                 data: chartData.counts,
                 backgroundColor: settings.barChartColor,
-                borderWidth: 1
             }]
         },
         options: {
@@ -394,18 +442,16 @@ function renderCiliomeEnrichment(foundGenes, notFoundGenes) {
             maintainAspectRatio: false,
             plugins: {
                 legend: { display: false },
-                title: { display: true, text: 'Localization of Found Ciliary Genes', font: { family: settings.fontFamily, size: settings.fontSize, weight: settings.fontWeight }, color: settings.textColor }
+                title: { display: true, text: 'Localization of Found Ciliary Genes', font: { family: settings.fontFamily, size: 16, weight: settings.fontWeight }, color: settings.textColor }
             },
             scales: {
                 x: {
                     beginAtZero: true,
-                    title: { display: true, text: 'Gene Count', font: { family: settings.fontFamily, size: settings.fontSize, weight: settings.fontWeight }, color: settings.axisColor },
-                    ticks: { stepSize: 1, color: settings.textColor },
-                    grid: { display: false }
+                    title: { display: true, text: 'Gene Count', font: { family: settings.fontFamily, size: 14 }, color: settings.axisColor },
+                    ticks: { precision: 0, color: settings.textColor },
                 },
                 y: {
-                    ticks: { font: { family: settings.fontFamily, size: settings.fontSize, weight: settings.fontWeight }, color: settings.textColor },
-                    grid: { display: false }
+                    ticks: { font: { family: settings.fontFamily }, color: settings.textColor },
                 }
             }
         }
