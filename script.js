@@ -538,19 +538,19 @@ function displayComparePage() {
     document.querySelector('.cilia-panel').style.display = 'none';
     contentArea.innerHTML = `
         <div class="page-section">
-            <h2>Gene Comparison Tool</h2>
+            <h2>Gene Comparison Tool ⚖️</h2>
             <p>Search for and select up to 10 genes to generate a side-by-side comparison of their properties, functions, and localizations.</p>
-            
+           
             <div class="comparison-tool">
                 <div class="gene-selector">
                     <div class="search-wrapper">
-                        <input type="text" id="compare-gene-search" placeholder="Search for a gene (e.g., IFT88)" autocomplete="off">
+                        <input type="text" id="compare-gene-search" placeholder="Search by Gene, Synonym, or Ensembl ID" autocomplete="off">
                         <div id="compare-search-suggestions"></div>
                     </div>
                     <div id="selected-genes-tags" class="gene-tags-container"></div>
                     <div id="gene-limit-message" class="error-message" style="display: none; margin-top: 0.5rem;">Maximum 10 genes can be compared.</div>
                 </div>
-                
+               
                 <div id="comparison-output" style="display:none; margin-top: 2rem;">
                     <div class="comparison-controls">
                         <div class="tabs">
@@ -578,7 +578,7 @@ function displayComparePage() {
                 </div>
             </div>
         </div>`;
-    
+   
     let selectedCompareGenes = [];
     const MAX_GENES = 10;
     const searchInput = document.getElementById('compare-gene-search');
@@ -597,20 +597,33 @@ function displayComparePage() {
         }
     });
 
+    // ✨ THIS FUNCTION IS NOW UPDATED ✨
     function handleSearchInput() {
-         const query = searchInput.value.trim().toUpperCase(); // ✨ FIX: Changed to toUpperCase()
-    if (query.length < 1) {
-        suggestionsContainer.style.display = 'none';
-        return;
-    }
+        const query = searchInput.value.trim().toUpperCase();
+        if (query.length < 1) {
+            suggestionsContainer.style.display = 'none';
+            return;
+        }
 
-        const filteredGenes = allGenes.filter(g =>
-        g.gene.toUpperCase().startsWith(query) && // ✨ FIX: Use startsWith for better performance
-        !selectedCompareGenes.some(sg => sg.gene === g.gene)
-    ).slice(0, 10);
-    
+        const filteredGenes = allGenes.filter(g => {
+            // Do not suggest genes that are already selected
+            if (selectedCompareGenes.some(sg => sg.gene === g.gene)) {
+                return false;
+            }
+            // Check for a match in the gene name, synonyms, or Ensembl ID
+            const geneMatch = g.gene && g.gene.toUpperCase().startsWith(query);
+            const synonymMatch = g.synonym && g.synonym.toUpperCase().includes(query);
+            const ensemblMatch = g.ensembl_id && g.ensembl_id.toUpperCase().startsWith(query);
+            return geneMatch || synonymMatch || ensemblMatch;
+        }).slice(0, 10);
+       
         if (filteredGenes.length > 0) {
-            suggestionsContainer.innerHTML = filteredGenes.map(g => `<div data-gene="${g.gene}">${g.gene}</div>`).join('');
+            // Update suggestion display to be more informative
+            suggestionsContainer.innerHTML = filteredGenes.map(g => {
+                const details = [g.ensembl_id, g.synonym].filter(Boolean).join(', ');
+                return `<div data-gene="${g.gene}">${g.gene}${details ? ` (${details})` : ''}</div>`;
+            }).join('');
+
             suggestionsContainer.style.display = 'block';
             suggestionsContainer.querySelectorAll('div').forEach(item => {
                 item.addEventListener('click', () => addGeneToComparison(item.dataset.gene));
@@ -670,7 +683,7 @@ function displayComparePage() {
             tag.addEventListener('click', (e) => removeGeneFromComparison(e.target.dataset.gene));
         });
     }
-    
+   
     function renderComparisonTable() {
         const container = document.getElementById('comparison-table-wrapper');
         const features = ['Description', 'Ensembl ID', 'OMIM ID', 'Synonym', 'Localization', 'Functional Summary', 'Reference'];
@@ -679,7 +692,7 @@ function displayComparePage() {
             tableHTML += `<th><a href="/${g.gene}" onclick="navigateTo(event, '/${g.gene}')">${g.gene}</a></th>`;
         });
         tableHTML += '</tr></thead><tbody>';
-        
+       
         features.forEach(feature => {
             tableHTML += `<tr><td>${feature}</td>`;
             selectedCompareGenes.forEach(gene => {
@@ -689,9 +702,15 @@ function displayComparePage() {
                     case 'Ensembl ID': value = gene.ensembl_id ? `<a href="https://www.ensembl.org/Homo_sapiens/Gene/Summary?g=${gene.ensembl_id}" target="_blank">${gene.ensembl_id}</a>` : '-'; break;
                     case 'OMIM ID': value = gene.omim_id ? `<a href="https://www.omim.org/entry/${gene.omim_id}" target="_blank">${gene.omim_id}</a>` : '-'; break;
                     case 'Synonym': value = gene.synonym || '-'; break;
-                    case 'Localization': value = gene.localization || '-'; break;
+                    case 'Localization': value = Array.isArray(gene.localization) ? gene.localization.join(', ') : (gene.localization || '-'); break;
                     case 'Functional Summary': value = gene.functional_summary || '-'; break;
-                    case 'Reference': value = gene.reference ? `<a href="${gene.reference}" target="_blank">View Reference</a>` : '-'; break;
+                    case 'Reference': 
+                        if (Array.isArray(gene.reference)) {
+                            value = gene.reference.map(ref => `<a href="https://pubmed.ncbi.nlm.nih.gov/${ref}" target="_blank">PMID:${ref}</a>`).join('<br>');
+                        } else {
+                            value = gene.reference ? `<a href="https://pubmed.ncbi.nlm.nih.gov/${gene.reference}" target="_blank">PMID:${gene.reference}</a>` : '-';
+                        }
+                        break;
                 }
                 tableHTML += `<td>${value}</td>`;
             });
@@ -700,7 +719,7 @@ function displayComparePage() {
         tableHTML += '</tbody></table>';
         container.innerHTML = tableHTML;
     }
-    
+   
     function renderFunctionalSummaries() {
         const container = document.getElementById('functional-cards-grid');
         container.innerHTML = selectedCompareGenes.map(g => `
@@ -709,24 +728,22 @@ function displayComparePage() {
                 <p>${g.functional_summary || 'No functional summary available.'}</p>
             </div>`).join('');
     }
-    
+   
     function renderLocalizationChart() {
         const ctx = document.getElementById('localization-chart').getContext('2d');
         const localizationCounts = {};
         selectedCompareGenes.forEach(gene => {
-        // ✨ CHANGE IS HERE ✨
-        if (Array.isArray(gene.localization)) { // Check if it's an array
-            gene.localization.forEach(loc => {
-          const term = loc.trim().toLowerCase(); // ✨ FIX: Convert to lowercase
-            if (term) {
-        // Capitalize the first letter for consistent chart labels
-        const capitalizedTerm = term.charAt(0).toUpperCase() + term.slice(1);
-        localizationCounts[capitalizedTerm] = (localizationCounts[capitalizedTerm] || 0) + 1;
-    }
-});
-        }
-    });
-        
+            if (Array.isArray(gene.localization)) {
+                gene.localization.forEach(loc => {
+                    const term = loc.trim();
+                    if (term) {
+                        const capitalizedTerm = term.charAt(0).toUpperCase() + term.slice(1);
+                        localizationCounts[capitalizedTerm] = (localizationCounts[capitalizedTerm] || 0) + 1;
+                    }
+                });
+            }
+        });
+       
         const labels = Object.keys(localizationCounts);
         const data = Object.values(localizationCounts);
 
@@ -750,7 +767,11 @@ function displayComparePage() {
                 responsive: true,
                 maintainAspectRatio: false,
                 scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } },
-                plugins: { legend: { display: false }, title: { display: true, text: 'Localization Distribution of Selected Genes' } }
+                plugins: { 
+                    legend: { display: false }, 
+                    title: { display: true, text: 'Localization Distribution of Selected Genes' },
+                    customCanvasBackgroundColor: { color: '#ffffff' }
+                }
             }
         });
     }
