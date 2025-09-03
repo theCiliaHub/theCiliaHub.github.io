@@ -1018,13 +1018,18 @@ input[type="color"] {
 
 .enrichment-plot-panel {
     display: flex;
-    align-items: center;
-    justify-content: center;
+    /* ✨ ADDED: Stack plot and table vertically */
+    flex-direction: column;
+    /* ✨ CHANGED: Allow content to scroll */
+    overflow-y: auto;
+    /* ✨ CHANGED: Align content to the top */
+    justify-content: flex-start;
+    
     border: 2px dashed var(--border-color);
     border-radius: var(--border-radius-lg);
     background-color: var(--neutral-bg-alt);
     height: 100%;
-    overflow: hidden;
+    padding: 1rem; /* Added padding for better spacing */
 }
 
 .plot-area, .plot-wrapper {
@@ -1040,3 +1045,4 @@ input[type="color"] {
     margin: auto;
     color: var(--gray-dark);
 }
+
