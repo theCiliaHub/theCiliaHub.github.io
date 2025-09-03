@@ -1326,20 +1326,17 @@ function displayLocalizationChart() {
     const categories = ['Cilia', 'Basal Body', 'Transition Zone', 'Flagella', 'Ciliary Associated Gene'];
     const localizationCounts = categories.reduce((acc, category) => {
         acc[category] = allGenes.filter(g => {
-            // First, ensure the localization property exists and is an array
             if (!Array.isArray(g.localization)) {
                 return false;
             }
-
-            // ✨ FIX: Safely process the array, handling potential null/undefined values
             const localizations = g.localization
-                .map(l => l?.trim().toLowerCase()) // Use optional chaining (?.)
-                .filter(Boolean); // Remove any null/undefined entries after trimming
+                .map(l => l?.trim().toLowerCase())
+                .filter(Boolean);
 
             if (localizations.length === 0) {
                 return false;
             }
-
+            // Logic to count genes remains the same
             return localizations.includes(category.toLowerCase()) ||
                 (category === 'Cilia' && localizations.includes('ciliary membrane')) ||
                 (category === 'Flagella' && localizations.includes('axoneme')) ||
@@ -1348,50 +1345,104 @@ function displayLocalizationChart() {
         return acc;
     }, {});
 
+    // ✨ Change: Sort data to show the most frequent category on top
+    const sortedCategories = categories.sort((a, b) => localizationCounts[b] - localizationCounts[a]);
+
     const chartContainer = document.createElement('div');
     chartContainer.className = 'page-section';
-    chartContainer.innerHTML = `<h2>Gene Localization Distribution</h2><canvas id="locChart" style="max-height: 300px;"></canvas>`;
+    // ✨ Change: Updated the title for a cleaner look
+    chartContainer.innerHTML = `<h2>Localization in Ciliary Genes</h2><div style="position: relative; height:350px; width:100%;"><canvas id="locChart"></canvas></div>`;
 
     const contentArea = document.querySelector('.content-area');
     const existingChart = contentArea.querySelector('#locChart');
     if (existingChart) {
-        existingChart.parentElement.remove();
+        existingChart.closest('.page-section').remove();
     }
 
     contentArea.appendChild(chartContainer);
 
     const ctx = document.getElementById('locChart').getContext('2d');
+    
+    // ✨ Change: Using gradients for a more modern "fancy" look
+    const createGradient = (color1, color2) => {
+        const gradient = ctx.createLinearGradient(0, 0, 800, 0); // Horizontal gradient
+        gradient.addColorStop(0, color1);
+        gradient.addColorStop(1, color2);
+        return gradient;
+    };
+
+    const backgroundColors = [
+        createGradient('rgba(0, 85, 102, 0.8)', 'rgba(0, 128, 153, 0.8)'),
+        createGradient('rgba(102, 194, 165, 0.8)', 'rgba(140, 212, 194, 0.8)'),
+        createGradient('rgba(216, 27, 96, 0.8)', 'rgba(230, 64, 129, 0.8)'),
+        createGradient('rgba(255, 127, 0, 0.8)', 'rgba(255, 159, 64, 0.8)'),
+        createGradient('rgba(107, 174, 214, 0.8)', 'rgba(141, 190, 223, 0.8)')
+    ];
+    
     new Chart(ctx, {
+        // ✨ Change: Switched to a horizontal bar chart
         type: 'bar',
         data: {
-            labels: categories,
+            labels: sortedCategories,
             datasets: [{
                 label: 'Number of Genes',
-                data: categories.map(category => localizationCounts[category] || 0),
-                backgroundColor: ['#005566', '#66C2A5', '#D81B60', '#FF7F00', '#6BAED6'],
-                borderColor: ['#005566', '#66C2A5', '#D81B60', '#FF7F00', '#6BAED6'],
-                borderWidth: 1
+                data: sortedCategories.map(category => localizationCounts[category] || 0),
+                backgroundColor: backgroundColors,
+                // ✨ Change: Added rounded corners to the bars
+                borderRadius: 5,
+                borderWidth: 0, // No border for a flatter look
             }]
         },
         options: {
+            // ✨ Change: Set to horizontal bar chart
+            indexAxis: 'y',
             responsive: true,
             maintainAspectRatio: false,
             scales: {
                 y: {
                     beginAtZero: true,
-                    title: { display: true, text: 'Number of Genes' },
-                    ticks: { stepSize: 1 }
+                    // ✨ Change: Cleaner look by removing grid lines
+                    grid: {
+                        display: false,
+                        drawBorder: false,
+                    },
+                    ticks: {
+                        color: '#333', // Darker font for better readability
+                        font: {
+                            size: 14,
+                            family: "'Helvetica Neue', 'Helvetica', 'Arial', sans-serif"
+                        }
+                    }
                 },
                 x: {
-                    title: { display: true, text: 'Localization' }
+                    grid: {
+                        display: false,
+                        drawBorder: false,
+                    },
+                    ticks: {
+                        display: false // Hide x-axis labels, as count is in the tooltip
+                    }
                 }
             },
             plugins: {
-                legend: { display: false },
+                // ✨ Fix: This ensures a transparent background for the plot
+                customCanvasBackgroundColor: {
+                    color: 'transparent',
+                },
+                legend: {
+                    display: false // Legend is not needed for a single dataset
+                },
+                title: {
+                    display: false // Title is now in the HTML h2 tag
+                },
                 tooltip: {
+                    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                    titleFont: { size: 16 },
+                    bodyFont: { size: 14 },
+                    displayColors: false, // Hides the little color box in the tooltip
                     callbacks: {
                         label: function(context) {
-                            return `${context.label}: ${context.raw} genes`;
+                            return ` ${context.raw} genes`;
                         }
                     }
                 }
