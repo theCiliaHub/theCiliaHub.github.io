@@ -53,16 +53,28 @@ async function loadAndPrepareDatabase() {
             
             const nameKey = sanitize(g.gene);
             if (nameKey) geneMapCache.set(nameKey, g);
+
+            // Index by Ensembl ID
+            if (g.ensembl_id) {
+                const ensemblKey = sanitize(g.ensembl_id);
+                if (ensemblKey && !geneMapCache.has(ensemblKey)) geneMapCache.set(ensemblKey, g);
+            }
             
+            // Index by synonyms (split on comma, trim spaces)
             if (g.synonym) {
                 const synonyms = String(g.synonym).split(',');
                 synonyms.forEach(syn => {
-                    const key = sanitize(syn);
+                    const key = sanitize(syn.trim());
                     if (key && !geneMapCache.has(key)) geneMapCache.set(key, g);
                 });
             }
             
-            if (g.localization) {
+            // Index by localization entries
+            if (Array.isArray(g.localization)) {
+                g.localization.forEach(loc => {
+                    const key = sanitize(loc);
+                    if (key && !geneMapCache.has(key)) geneMapCache.set(key, g);
+                });
                 geneLocalizationData[g.gene] = mapLocalizationToSVG(g.localization);
             }
         });
@@ -82,14 +94,13 @@ async function loadAndPrepareDatabase() {
 }
 
 /**
- * The central search function.
+ * The central search function supporting gene, Ensembl ID, synonym, and localization
  */
 function findGenes(queries) {
     const foundGenes = new Set();
     const notFound = [];
     
     queries.forEach(query => {
-        // The sanitize function already converts the query to uppercase
         const sanitizedQuery = sanitize(query); 
         const result = geneMapCache.get(sanitizedQuery);
         
@@ -103,15 +114,18 @@ function findGenes(queries) {
     return { foundGenes: Array.from(foundGenes), notFoundGenes: notFound };
 }
 
-// Add this function to help with debugging
+/**
+ * Debugging function to inspect search behavior
+ */
 function debugSearch(query) {
-    console.log("Searching for:", query);
-    console.log("Cache has key?", geneMapCache.has(query));
+    const sanitizedQuery = sanitize(query);
+    console.log("Searching for:", sanitizedQuery);
+    console.log("Cache has key?", geneMapCache.has(sanitizedQuery));
     
-    if (!geneMapCache.has(query)) {
+    if (!geneMapCache.has(sanitizedQuery)) {
         console.log("Available keys matching query:");
         for (let key of geneMapCache.keys()) {
-            if (key.includes(query) || query.includes(key)) {
+            if (key.includes(sanitizedQuery) || sanitizedQuery.includes(key)) {
                 console.log(`- ${key}`);
             }
         }
