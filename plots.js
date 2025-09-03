@@ -404,37 +404,53 @@ function renderBubbleMatrix(foundGenes) {
 }
 
 /**
- * Renders the Ciliome enrichment plot and sends its stats to the results table function.
+ * Renders the Ciliome enrichment summary/table in the results area
+ * and the localization bar chart in the plot panel.
  */
 function renderCiliomeEnrichment(foundGenes, notFoundGenes) {
     const plotContainer = document.getElementById('ciliome-plot-container');
+    const resultsContainer = document.getElementById('enrichment-results-container');
+    
+    // Ensure containers are visible and cleared for new results
     plotContainer.style.display = 'block';
-    if (window.ciliomeChartInstance) window.ciliomeChartInstance.destroy();
+    plotContainer.innerHTML = ''; 
+    resultsContainer.innerHTML = '';
 
     const k = foundGenes.length;
     const n_input = k + notFoundGenes.length;
-    
-    // 1. Calculate statistics
-    const M = allGenes ? allGenes.length : 2000;
-    const N = 20000;
-    const pValue = hypergeometricPValue(k, n_input, M, N);
-    const enrichmentScore = (k / n_input) / (M / N) || 0;
-    const sharedHitsCount = foundGenes.filter(g => g.ciliopathy || g.complex_names).length;
 
-    // 2. Display all text/tables at the bottom of the page
-    createEnrichmentResultsTable(foundGenes, notFoundGenes, {
-        k, n_input, M, pValue, enrichmentScore, sharedHitsCount
-    });
+    // --- 1. Render Text and Table Results ---
+    // This part runs first and displays the summary and detailed gene table.
+    if (n_input > 0) {
+        const M = allGenes ? allGenes.length : 2000;
+        const N = 20000;
+        const pValue = hypergeometricPValue(k, n_input, M, N);
+        const enrichmentScore = (k / n_input) / (M / N) || 0;
+        const sharedHitsCount = foundGenes.filter(g => g.ciliopathy || g.complex_names).length;
+        
+        // Use the central function to generate the tidy results table at the bottom
+        createEnrichmentResultsTable(foundGenes, notFoundGenes, {
+            k, n_input, M, pValue, enrichmentScore, sharedHitsCount
+        });
+    } else {
+        resultsContainer.innerHTML = '<p class="status-message">Please enter a gene list to analyze.</p>';
+        plotContainer.innerHTML = ''; // Keep plot area empty
+        return;
+    }
 
-    // 3. Render only the plot in the plot panel
+    // --- 2. Render the Plot ---
+    // This part now runs independently to generate the chart.
     if (k === 0) {
         plotContainer.innerHTML = '<p class="status-message">No ciliary genes were found to plot.</p>';
         return;
     }
 
+    // Add the canvas to the plot container
     plotContainer.innerHTML = `<canvas id="enrichment-chart-canvas"></canvas>`;
     const ctx = document.getElementById('enrichment-chart-canvas').getContext('2d');
     const settings = getPlotSettings();
+
+    // Process data for the bar chart
     const localizationCounts = {};
     foundGenes.forEach(gene => {
         (Array.isArray(gene.localization) ? gene.localization : []).forEach(loc => {
@@ -454,6 +470,7 @@ function renderCiliomeEnrichment(foundGenes, notFoundGenes) {
             return acc;
         }, { labels: [], counts: [] });
 
+    // Create the new chart instance
     currentPlot = new Chart(ctx, {
         type: 'bar',
         data: {
@@ -485,7 +502,6 @@ function renderCiliomeEnrichment(foundGenes, notFoundGenes) {
         }
     });
 }
-
 /**
  * Handles downloading the current plot as a PNG or PDF.
  */
