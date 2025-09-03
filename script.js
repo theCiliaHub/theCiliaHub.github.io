@@ -34,12 +34,12 @@ async function loadAndPrepareDatabase() {
         const resp = await fetch('https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/ciliahub_data.json');
         if (!resp.ok) throw new Error(`HTTP Error ${resp.status}`);
         const rawGenes = await resp.json();
-        
+       
         // Validate the data structure
         if (!Array.isArray(rawGenes)) {
             throw new Error('Invalid data format: expected array');
         }
-        
+       
         geneDataCache = rawGenes;
         allGenes = rawGenes;
         geneMapCache = new Map();
@@ -50,10 +50,10 @@ async function loadAndPrepareDatabase() {
                 console.warn('Skipping entry with invalid gene name:', g);
                 return;
             }
-            
+           
             const nameKey = sanitize(g.gene);
             if (nameKey) geneMapCache.set(nameKey, g);
-            
+           
             if (g.synonym) {
                 const synonyms = String(g.synonym).split(',');
                 synonyms.forEach(syn => {
@@ -61,7 +61,15 @@ async function loadAndPrepareDatabase() {
                     if (key && !geneMapCache.has(key)) geneMapCache.set(key, g);
                 });
             }
-            
+
+            // ✨ ADDED: Map Ensembl ID to the gene object for searching
+            if (g.ensembl_id && typeof g.ensembl_id === 'string') {
+                const ensemblKey = sanitize(g.ensembl_id);
+                if (ensemblKey && !geneMapCache.has(ensemblKey)) {
+                    geneMapCache.set(ensemblKey, g);
+                }
+            }
+           
             if (g.localization) {
                 geneLocalizationData[g.gene] = mapLocalizationToSVG(g.localization);
             }
@@ -376,24 +384,32 @@ function displayHomePage() {
         suggestionsContainer.style.display = 'none'; // ADDED: Ensure it's hidden
     };
     
+    // Inside the displayHomePage function...
+
     searchInput.addEventListener('input', function() {
         const query = this.value.trim().toUpperCase();
         if (query.length < 1) {
             hideSuggestions();
             return;
         }
-        
+       
+        // ✨ UPDATED: Added a check for ensembl_id in the filter
         const filteredGenes = allGenes.filter(g => 
             (g.gene && g.gene.toUpperCase().startsWith(query)) || 
-            (g.synonym && g.synonym.toUpperCase().includes(query))
+            (g.synonym && g.synonym.toUpperCase().includes(query)) ||
+            (g.ensembl_id && g.ensembl_id.toUpperCase().startsWith(query))
         ).slice(0, 10);
-        
+       
         if (filteredGenes.length > 0) {
+            // ✨ UPDATED: Improved suggestion display to include ensembl_id and synonym
             suggestionsContainer.innerHTML = '<ul>' + 
-                filteredGenes.map(g => `<li>${g.gene}${g.synonym ? ` (${g.synonym})` : ''}</li>`).join('') + 
+                filteredGenes.map(g => {
+                    const details = [g.ensembl_id, g.synonym].filter(Boolean).join(', ');
+                    return `<li>${g.gene}${details ? ` (${details})` : ''}</li>`;
+                }).join('') + 
                 '</ul>';
-            
-            // CHANGE: Use event delegation for better performance
+           
+            // Event delegation for click handling remains the same
             suggestionsContainer.querySelector('ul').addEventListener('click', function(event) {
                 if (event.target && event.target.nodeName === "LI") {
                     searchInput.value = event.target.textContent.split(' ')[0]; // Get just the gene name
@@ -402,7 +418,7 @@ function displayHomePage() {
                 }
             });
 
-            suggestionsContainer.style.display = 'block'; // ADDED: Make suggestions visible
+            suggestionsContainer.style.display = 'block';
         } else {
             hideSuggestions();
         }
