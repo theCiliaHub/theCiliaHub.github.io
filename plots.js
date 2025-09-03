@@ -556,12 +556,7 @@ function generateEnrichmentPlots() {
 // PAGE RENDERING
 // =============================================================================
 
-/**
- * Renders the HTML and sets up event listeners for the Enrichment page.
- */
-/**
- * Renders the HTML and sets up event listeners for the Enrichment page.
- */
+
 /**
  * Renders the HTML and sets up event listeners for the Enrichment page.
  */
@@ -572,7 +567,6 @@ function displayEnrichmentPage() {
         document.querySelector('.cilia-panel').style.display = 'none';
     }
 
-    // HTML structure with a two-column layout
     contentArea.innerHTML = `
         <div class="page-section enrichment-page">
             <div class="enrichment-header">
@@ -583,10 +577,9 @@ function displayEnrichmentPage() {
             <div class="enrichment-layout">
                 <div class="enrichment-controls-panel">
                     <label for="enrichment-genes-input" style="font-weight: 600; margin-bottom: 0.5rem; display: block;">Enter Gene List:</label>
-                   <textarea id="enrichment-genes-input" placeholder="e.g., IFT88, ACEH, ENSG00000198707..."></textarea>
-                   
+                    <textarea id="enrichment-genes-input" placeholder="e.g., IFT88, ACEH, ENSG00000198707..."></textarea>
                     <div id="enrichment-actions">
-                        <div class="plot-type-selection">
+                         <div class="plot-type-selection">
                             <strong>Plot Type:</strong>
                             <label><input type="radio" name="plot-type" value="bubble" checked> Localization</label>
                             <label><input type="radio" name="plot-type" value="matrix"> Gene Matrix</label>
@@ -595,30 +588,13 @@ function displayEnrichmentPage() {
                         <div class="action-buttons">
                             <button id="generate-plot-btn" class="btn btn-primary">Generate Plot</button>
                             <div id="download-controls" style="display:none;">
-                                <select id="download-format">
-                                    <option value="png">PNG</option>
-                                    <option value="pdf">PDF</option>
-                                </select>
+                                <select id="download-format"><option value="png">PNG</option><option value="pdf">PDF</option></select>
                                 <button id="download-plot-btn" class="btn btn-secondary">Download</button>
                             </div>
                         </div>
                     </div>
-                   
                     <details id="plot-customization-details">
-                        <summary>Plot Customization</summary>
-                        <div id="plot-settings-panel">
-                            <div><label>Font Family <select id="setting-font-family"><option>Arial</option><option>Tahoma</option></select></label></div>
-                            <div><label>Font Size <input type="number" id="setting-font-size" value="14" min="8" max="30"></label></div>
-                            <div><label>Font Weight <select id="setting-font-weight"><option value="normal">Normal</option><option value="bold" selected>Bold</option></select></label></div>
-                            <div><label>Text Color <input type="color" id="setting-text-color" value="#000000"></label></div>
-                            <div><label>Axis Color <input type="color" id="setting-axis-color" value="#000000"></label></div>
-                            <div><label>Y-Axis Title <input type="text" id="setting-y-axis-title" value="Localization"></label></div>
-                            <div><label>X-Axis Title <input type="text" id="setting-x-axis-title" value="Enrichment"></label></div>
-                            <div><label>Bar Color <input type="color" id="setting-bar-color" value="#2ca25f"></label></div>
-                            <div><label>Enrichment Color 1 (Low) <input type="color" id="setting-enrichment-color1" value="#edf8fb"></label></div>
-                            <div><label>Enrichment Color 5 (High) <input type="color" id="setting-enrichment-color5" value="#006d2c"></label></div>
-                        </div>
-                    </details>
+                        </details>
                 </div>
 
                 <div class="enrichment-plot-panel">
@@ -627,13 +603,11 @@ function displayEnrichmentPage() {
                         <div id="matrix-plot-container" class="plot-area" style="display: none;"></div>
                         <div id="ciliome-plot-container" class="plot-area" style="display: none;"></div>
                     </div>
-                    <div id="plot-placeholder" class="status-message">
-                        <p>Your generated plot will appear here.</p>
-                    </div>
-                    
-                    <div id="gene-status-table-container"></div>
+                    <div id="plot-placeholder" class="status-message"></div>
                 </div>
             </div>
+
+            <div id="enrichment-results-container" class="results-section"></div>
         </div>
     `;
 
@@ -641,37 +615,60 @@ function displayEnrichmentPage() {
     document.getElementById('download-plot-btn').addEventListener('click', downloadPlot);
 }
 
+
 /**
- * Creates and displays a two-column table for found and not-found genes.
+ * Creates and displays a detailed results table for found genes and a list of not-found genes.
  * @param {Array} foundGenes - Array of gene objects found in the database.
  * @param {Array} notFoundGenes - Array of query strings not found.
  */
-function createGeneStatusTable(foundGenes, notFoundGenes) {
-    const container = document.getElementById('gene-status-table-container');
+function createEnrichmentResultsTable(foundGenes, notFoundGenes) {
+    const container = document.getElementById('enrichment-results-container');
     if (!container) return;
 
-    // Do not show the table if there was no input
-    if (foundGenes.length === 0 && notFoundGenes.length === 0) {
-        container.innerHTML = '';
-        return;
+    // Clear previous results
+    container.innerHTML = '';
+    if (foundGenes.length === 0 && notFoundGenes.length === 0) return;
+
+    let html = '';
+
+    // Create the detailed table for found genes
+    if (foundGenes.length > 0) {
+        html += `
+            <h3>Search Results (${foundGenes.length} gene${foundGenes.length !== 1 ? 's' : ''} found)</h3>
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Gene</th>
+                            <th>Ensembl ID</th>
+                            <th>Localization</th>
+                            <th>Function Summary</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${foundGenes.map(item => `
+                            <tr>
+                                <td><a href="/${item.gene}" onclick="navigateTo(event, '/${item.gene}')">${item.gene}</a></td>
+                                <td>${item.ensembl_id || '—'}</td>
+                                <td>${Array.isArray(item.localization) ? item.localization.join(', ') : (item.localization || '—')}</td>
+                                <td>${item.functional_summary ? item.functional_summary.substring(0, 100) + '...' : '—'}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </div>
+        `;
     }
 
-    const foundGeneNames = foundGenes.map(g => g.gene).sort();
+    // Create the section for not-found genes
+    if (notFoundGenes.length > 0) {
+        html += `
+            <div class="not-found-section">
+                <h4>Genes Not Found (${notFoundGenes.length}):</h4>
+                <p>${notFoundGenes.sort().join(', ')}</p>
+            </div>
+        `;
+    }
 
-    container.innerHTML = `
-        <div class="gene-status-wrapper">
-            <div class="gene-status-column">
-                <h4>✅ Genes Found in CiliaHub (${foundGeneNames.length})</h4>
-                <div class="gene-list">
-                    ${foundGeneNames.length > 0 ? foundGeneNames.join(', ') : 'None'}
-                </div>
-            </div>
-            <div class="gene-status-column">
-                <h4>❌ Genes Not Found (${notFoundGenes.length})</h4>
-                <div class="gene-list">
-                    ${notFoundGenes.length > 0 ? notFoundGenes.sort().join(', ') : 'None'}
-                </div>
-            </div>
-        </div>
-    `;
+    container.innerHTML = html;
 }
