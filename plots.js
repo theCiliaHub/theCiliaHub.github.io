@@ -533,7 +533,7 @@ function displayEnrichmentPage() {
             <div class="enrichment-layout">
                 <div class="enrichment-controls-panel">
                     <label for="enrichment-genes-input" style="font-weight: 600; margin-bottom: 0.5rem; display: block;">Enter Gene List:</label>
-                    <textarea id="enrichment-genes-input" placeholder="e.g., TMEM17, IFT88, WDR31..."></textarea>
+                   <textarea id="enrichment-genes-input" placeholder="e.g., IFT88, ACEH, ENSG00000198707..."></textarea>
                     
                     <div id="enrichment-actions">
                         <div class="plot-type-selection">
