@@ -142,30 +142,42 @@ function hypergeometricPValue(k, n, K, N) {
     return Math.min(pValue, 1.0);
 }
 
+
 /**
- * Renders the enrichment bubble plot (Localization plot).
+ * Renders the enrichment bubble plot (Localization plot) with updated font size.
  */
 function renderEnrichmentBubblePlot(foundGenes) {
-    document.getElementById('bubble-enrichment-container').style.display = 'flex';
+    const plotContainer = document.getElementById('bubble-enrichment-container');
+    plotContainer.style.display = 'block';
+
+    // This is a safety check to clear any old chart instances
     if (window.enrichmentDotPlotInstance) window.enrichmentDotPlotInstance.destroy();
 
-    const settings = getPlotSettings();
-    // ✨ FIX: Using the complete list of 20 unique localization terms from your database.
-    const yCategories = [
-        'Cilia', 'Basal Body', 'Transition Zone', 'Axoneme', 'Ciliary Membrane',
-        'Ciliary Pocket', 'Ciliary Tip', 'Flagella', 'Centrosome', 'Cytoskeleton',
-        'Cytoplasm', 'Nucleus', 'Endoplasmic Reticulum', 'Mitochondria', 'Ribosome',
-        'Golgi', 'Lysosome', 'Peroxisome', 'Plasma Membrane', 'Extracellular Vesicles'
-    ];
-    const localizationCounts = {};
+    if (foundGenes.length === 0) {
+        plotContainer.innerHTML = '<p class="status-message">No ciliary genes were found to plot.</p>';
+        return;
+    }
 
+    // Add the canvas for the plot to the container
+    plotContainer.innerHTML = `<canvas id="enrichment-chart-canvas"></canvas>`;
+    const ctx = document.getElementById('enrichment-chart-canvas').getContext('2d');
+    const settings = getPlotSettings();
+
+    // Using the complete list of localization terms from your database
+    const yCategories = [
+        'Autophagosomes', 'Axoneme', 'Basal Body', 'Centrosome', 'Cilia', 
+        'Ciliary Associated Gene', 'Ciliary Membrane', 'Cytosol', 'Endoplasmic Reticulum', 
+        'Flagella', 'Golgi Apparatus', 'Lysosome', 'Microbody', 'Microtubules', 
+        'Mitochondria', 'Nucleoplasm', 'Peroxisome', 'Transition Zone'
+    ].sort();
+
+    // 1. Process Data: Count genes for each localization category
+    const localizationCounts = {};
     foundGenes.forEach(gene => {
-        const localizations = Array.isArray(gene.localization) ? gene.localization : (gene.localization || '').split(',');
+        const localizations = Array.isArray(gene.localization) ? gene.localization : (gene.localization || '').split(/[,;]/);
         localizations.forEach(loc => {
             if (typeof loc !== 'string' || !loc) return;
             const trimmedLoc = loc.trim().toLowerCase();
-            if (!trimmedLoc) return;
-            
             const matchingCategory = yCategories.find(cat => cat.toLowerCase() === trimmedLoc);
             if (matchingCategory) {
                 localizationCounts[matchingCategory] = (localizationCounts[matchingCategory] || 0) + 1;
@@ -173,18 +185,13 @@ function renderEnrichmentBubblePlot(foundGenes) {
         });
     });
 
-    const categoriesWithData = yCategories.filter(cat => localizationCounts[cat] > 0).sort(); // Sort alphabetically
+    const categoriesWithData = yCategories.filter(cat => localizationCounts[cat] > 0);
     if (categoriesWithData.length === 0) {
-        document.getElementById('bubble-enrichment-container').innerHTML = '<p class="status-message">No matching localizations found for the given genes.</p>';
+        plotContainer.innerHTML = '<p class="status-message">No matching localizations found for the given genes.</p>';
         return;
     }
 
-    // Clear placeholder message if data is found
-    document.getElementById('bubble-enrichment-container').innerHTML = `
-        <div class="plot-wrapper" style="position: relative; height: 600px; flex-grow: 1;"><canvas id="enrichment-bubble-plot"></canvas></div>
-        <div id="legend-container" style="flex-shrink: 0; width: 150px; padding-top: 20px; padding-left: 5px;"></div>
-    `;
-
+    // 2. Prepare Data for Chart.js
     const maxCount = Math.max(...Object.values(localizationCounts), 1);
     const colorPalette = settings.enrichmentColors;
     const getColor = count => {
@@ -197,7 +204,7 @@ function renderEnrichmentBubblePlot(foundGenes) {
 
     const dataset = {
         data: categoriesWithData.map(loc => ({
-            x: 0,
+            x: localizationCounts[loc], // Use count for the x-axis to show enrichment
             y: loc,
             r: getRadius(localizationCounts[loc]),
             count: localizationCounts[loc]
@@ -205,61 +212,48 @@ function renderEnrichmentBubblePlot(foundGenes) {
         backgroundColor: categoriesWithData.map(loc => getColor(localizationCounts[loc]))
     };
 
-    const legendContainer = document.getElementById('legend-container');
-    if (legendContainer) {
-        const midCount = Math.ceil(maxCount / 2);
-        legendContainer.innerHTML = `
-            <div style="font-family: ${settings.fontFamily}; color: ${settings.textColor};">
-                <h4 style="margin: 0 0 10px 0; font-size: 14px; font-weight: bold;">Gene Count</h4>
-                <div style="display: flex; align-items: center; margin-bottom: 10px;">
-                    <div style="width: ${getRadius(maxCount)*2}px; height: ${getRadius(maxCount)*2}px; background-color: #ccc; border-radius: 50%; margin-right: 10px;"></div>
-                    <span>${maxCount}</span>
-                </div>
-                ${ midCount > 1 && midCount < maxCount ? `
-                <div style="display: flex; align-items: center; margin-bottom: 10px;">
-                    <div style="width: ${getRadius(midCount)*2}px; height: ${getRadius(midCount)*2}px; background-color: #ccc; border-radius: 50%; margin-right: 10px;"></div>
-                    <span>${midCount}</span>
-                </div>` : '' }
-                <div style="display: flex; align-items: center; margin-bottom: 25px;">
-                    <div style="width: ${getRadius(1)*2}px; height: ${getRadius(1)*2}px; background-color: #ccc; border-radius: 50%; margin-right: 10px;"></div>
-                    <span>1</span>
-                </div>
-                <h4 style="margin: 0 0 10px 0; font-size: 14px; font-weight: bold;">Enrichment</h4>
-                <div style="width: 100%; height: 20px; background: linear-gradient(to right, ${colorPalette.join(', ')}); border: 1px solid #ccc;"></div>
-                <div style="display: flex; justify-content: space-between; font-size: 12px;">
-                    <span>Low</span><span>High</span>
-                </div>
-            </div>`;
-    }
-
-    const ctx = document.getElementById('enrichment-bubble-plot').getContext('2d');
+    // 3. Create the Chart
     currentPlot = new Chart(ctx, {
         type: 'bubble',
         data: { datasets: [dataset] },
         options: {
             responsive: true,
             maintainAspectRatio: false,
+            layout: {
+                padding: { left: 50 } // Ensures long Y-axis labels are visible
+            },
             plugins: {
                 legend: { display: false },
-                tooltip: { callbacks: { label: c => `${c.raw.y}: ${c.raw.count} gene(s)` } }
+                title: {
+                    display: true,
+                    text: 'Gene Count by Ciliary Localization',
+                    font: { size: 20, weight: 'bold' },
+                    color: settings.textColor
+                },
+                tooltip: { 
+                    titleFont: { size: 20 },
+                    bodyFont: { size: 20 },
+                    callbacks: { label: c => `${c.raw.y}: ${c.raw.count} gene(s)` } 
+                }
             },
             scales: {
                 x: {
-                    title: { display: true, text: settings.xAxisTitle, color: settings.axisColor, font: { family: settings.fontFamily, size: settings.fontSize, weight: settings.fontWeight } },
-                    ticks: { display: false },
-                    grid: { display: false }
+                    title: { display: true, text: 'Number of Genes in List', color: settings.axisColor, font: { size: 20, weight: 'bold' } },
+                    grid: { display: true },
+                    ticks: { font: { size: 20 }, color: settings.textColor, precision: 0 }
                 },
                 y: {
                     type: 'category',
                     labels: categoriesWithData,
-                    title: { display: true, text: settings.yAxisTitle, color: settings.axisColor, font: { family: settings.fontFamily, size: settings.fontSize, weight: settings.fontWeight } },
-                    grid: { display: false, drawBorder: false },
-                    ticks: { font: { size: settings.fontSize, weight: settings.fontWeight, family: settings.fontFamily }, color: settings.textColor }
+                    title: { display: true, text: 'Localization', color: settings.axisColor, font: { size: 20, weight: 'bold' } },
+                    grid: { display: false },
+                    ticks: { font: { size: 20 }, color: settings.textColor }
                 }
             }
         }
     });
 }
+
 
 /**
  * Renders the definitive, corrected gene matrix plot.
@@ -267,11 +261,8 @@ function renderEnrichmentBubblePlot(foundGenes) {
 function renderBubbleMatrix(foundGenes) {
     const plotContainer = document.getElementById('matrix-plot-container');
     plotContainer.style.display = 'block';
-    
-    // This is a safety check to clear any old chart instances.
-    if (window.enrichmentBarChartInstance) window.enrichmentBarChartInstance.destroy();
 
-    // Display the detailed results table at the bottom of the page
+    // This displays the detailed results table at the bottom of the page
     createEnrichmentResultsTable(foundGenes, []);
 
     if (foundGenes.length === 0) {
@@ -279,17 +270,17 @@ function renderBubbleMatrix(foundGenes) {
         return;
     }
     
-    // Wrapper div makes the plot much taller for better readability
+    // ✨ FIX: Wrapper div makes the plot much taller
     plotContainer.innerHTML = `<div style="position: relative; width: 100%; min-height: 800px;"><canvas id="enrichment-chart-canvas"></canvas></div>`;
     const ctx = document.getElementById('enrichment-chart-canvas').getContext('2d');
     const settings = getPlotSettings();
     
-    // Using the complete, sorted list of 18 organelles and locations for the Y-axis
+    // ✨ FIX: Using the complete, sorted list of 18 organelles and locations for the Y-axis
     const yCategories = [
         'Autophagosomes', 'Axoneme', 'Basal Body', 'Centrosome', 'Cilia', 
         'Ciliary Associated Gene', 'Ciliary Membrane', 'Cytosol', 'Endoplasmic Reticulum', 
         'Flagella', 'Golgi Apparatus', 'Lysosome', 'Microtubules', 
-        'Mitochondria', 'Ncleoplasm', 'Peroxisome', 'Transition Zone'
+        'Mitochondrio', 'Nucleoplasm', 'Peroxisome', 'Transition Zone'
     ].sort();
     
     const xLabels = [...new Set(foundGenes.map(g => g.gene))].sort();
@@ -313,17 +304,17 @@ function renderBubbleMatrix(foundGenes) {
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            // ✨ FIX 1: Increased padding to ensure Y-axis labels are fully visible
+            // ✨ FIX: Increased padding to ensure Y-axis labels are fully visible
             layout: {
                 padding: {
                     left: 100 
                 }
             },
             plugins: {
-                // ✨ FIX 2: This line definitively removes the color labels (legend)
+                // ✨ FIX: This line definitively removes the color labels (legend)
                 legend: { display: false }, 
                 tooltip: { 
-                    // ✨ FIX 3: Font size set to 20
+                    // ✨ FIX: Font size set to 20
                     titleFont: { size: 20 },
                     bodyFont: { size: 20 },
                     callbacks: { 
@@ -336,7 +327,7 @@ function renderBubbleMatrix(foundGenes) {
                     type: 'category',
                     labels: xLabels,
                     title: { display: true, text: "Gene", font: { size: 20, weight: 'bold' }, color: settings.axisColor },
-                    // ✨ FIX 3: Font size set to 20
+                    // ✨ FIX: Font size set to 20
                     ticks: { font: { size: 20 }, autoSkip: false, maxRotation: 90, minRotation: 45, color: settings.textColor },
                     grid: { display: false }
                 },
@@ -344,7 +335,7 @@ function renderBubbleMatrix(foundGenes) {
                     type: 'category',
                     labels: yCategories,
                     title: { display: true, text: 'Ciliary Localization', font: { size: 20, weight: 'bold' }, color: settings.axisColor },
-                    // ✨ FIX 3: Font size set to 20
+                    // ✨ FIX: Font size set to 20
                     ticks: { font: { size: 20 }, color: settings.textColor },
                     grid: { display: true, color: '#f0f0f0' }
                 }
@@ -353,71 +344,6 @@ function renderBubbleMatrix(foundGenes) {
     });
 }
 
-/**
- * Renders the gene matrix plot in the plot panel and a detailed results table below.
- */
-function renderBubbleMatrix(foundGenes) {
-    const plotContainer = document.getElementById('matrix-plot-container');
-    plotContainer.style.display = 'block';
-    if (window.enrichmentBarChartInstance) window.enrichmentBarChartInstance.destroy();
-
-    // 1. Display the detailed results table at the bottom of the page
-    createEnrichmentResultsTable(foundGenes, []);
-
-    // 2. Render only the plot in the plot panel
-    if (foundGenes.length === 0) {
-        plotContainer.innerHTML = '<p class="status-message">No genes to display in the matrix plot.</p>';
-        return;
-    }
-    
-    plotContainer.innerHTML = `<canvas id="enrichment-chart-canvas"></canvas>`;
-    const ctx = document.getElementById('enrichment-chart-canvas').getContext('2d');
-    const settings = getPlotSettings();
-    const yCategories = ['Basal Body', 'Transition Zone', 'Axoneme', 'Ciliary Membrane', 'Cilia', 'Golgi'];
-    const xLabels = [...new Set(foundGenes.map(g => g.gene))].sort();
-    const colorPalette = ['#377eb8', '#ff7f00', '#4daf4a', '#f781bf', '#a65628', '#984ea3', '#999999', '#e41a1c', '#dede00'];
-
-    const datasets = foundGenes.map((gene, index) => ({
-        label: gene.gene,
-        data: (Array.isArray(gene.localization) ? gene.localization : (gene.localization || '').split(','))
-            .map(locString => {
-                const trimmedLoc = locString?.trim().toLowerCase();
-                if (!trimmedLoc) return null;
-                const matchingCategory = yCategories.find(cat => cat.toLowerCase() === trimmedLoc);
-                return matchingCategory ? { x: gene.gene, y: matchingCategory, r: 10 } : null;
-            }).filter(Boolean),
-        backgroundColor: colorPalette[index % colorPalette.length]
-    }));
-
-    currentPlot = new Chart(ctx, {
-        type: 'bubble',
-        data: { datasets },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: { display: true, position: 'right', labels: { font: { family: settings.fontFamily, size: settings.fontSize }, color: settings.textColor } },
-                tooltip: { callbacks: { label: (context) => `${context.dataset.label} - ${context.raw.y}` } },
-            },
-            scales: {
-                x: {
-                    type: 'category',
-                    labels: xLabels,
-                    title: { display: true, text: "Gene", font: { family: settings.fontFamily, size: settings.fontSize, weight: 'bold' }, color: settings.axisColor },
-                    ticks: { font: { family: settings.fontFamily, size: settings.fontSize, weight: settings.fontWeight }, autoSkip: false, maxRotation: 90, minRotation: 45, color: settings.textColor },
-                    grid: { display: false }
-                },
-                y: {
-                    type: 'category',
-                    labels: yCategories,
-                    title: { display: true, text: 'Ciliary Localization', font: { family: settings.fontFamily, size: settings.fontSize, weight: 'bold' }, color: settings.axisColor },
-                    ticks: { font: { family: settings.fontFamily, size: settings.fontSize, weight: settings.fontWeight }, color: settings.textColor },
-                    grid: { display: false }
-                }
-            }
-        }
-    });
-}
 
 /**
  * Renders the Ciliome enrichment summary/table in the results area
@@ -501,18 +427,32 @@ function renderCiliomeEnrichment(foundGenes, notFoundGenes) {
             indexAxis: 'y',
             responsive: true,
             maintainAspectRatio: false,
+            layout: {
+                padding: {
+                    left: 50 // Ensures long Y-axis labels are visible
+                }
+            },
             plugins: {
                 legend: { display: false },
-                title: { display: true, text: 'Localization of Found Ciliary Genes', font: { family: settings.fontFamily, size: 16, weight: settings.fontWeight }, color: settings.textColor }
+                title: { 
+                    display: true, 
+                    text: 'Localization of Found Ciliary Genes', 
+                    font: { size: 20, weight: 'bold' }, 
+                    color: settings.textColor 
+                },
+                tooltip: {
+                    titleFont: { size: 20 },
+                    bodyFont: { size: 20 }
+                }
             },
             scales: {
                 x: {
                     beginAtZero: true,
-                    title: { display: true, text: 'Gene Count', font: { family: settings.fontFamily, size: 14 }, color: settings.axisColor },
-                    ticks: { precision: 0, color: settings.textColor },
+                    title: { display: true, text: 'Gene Count', font: { size: 20 }, color: settings.axisColor },
+                    ticks: { precision: 0, font: { size: 20 }, color: settings.textColor },
                 },
                 y: {
-                    ticks: { font: { family: settings.fontFamily }, color: settings.textColor },
+                    ticks: { font: { size: 20 }, color: settings.textColor },
                 }
             }
         }
