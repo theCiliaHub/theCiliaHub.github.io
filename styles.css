@@ -935,9 +935,7 @@ input[type="color"] {
 .enrichment-page {
     display: flex;
     flex-direction: column;
-    /* Use viewport height minus navbar height (approx) to fit page */
-    height: calc(100vh - 120px); 
-    min-height: 700px; /* Minimum height for usability */
+    /* ✨ FIX: The fixed height properties have been removed to allow the page to grow. */
 }
 
 .enrichment-header {
