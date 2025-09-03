@@ -505,11 +505,12 @@ function downloadPlot() {
 }
 
 
-/**
- * Main controller for generating enrichment plots.
- */
+
 /**
  * Main controller for generating enrichment plots and the status table.
+ */
+/**
+ * Main controller for generating enrichment plots and the results table.
  */
 function generateEnrichmentPlots() {
     const genesInput = document.getElementById('enrichment-genes-input').value.trim();
@@ -522,6 +523,7 @@ function generateEnrichmentPlots() {
     const plotType = document.querySelector('input[name="plot-type"]:checked').value;
 
     const { foundGenes, notFoundGenes } = findGenes(geneList);
+    const sortedFoundGenes = Array.from(foundGenes).sort((a, b) => a.gene.localeCompare(b.gene));
 
     // --- Plot generation logic (remains the same) ---
     document.getElementById('plot-placeholder').style.display = 'none';
@@ -536,19 +538,20 @@ function generateEnrichmentPlots() {
     
     switch (plotType) {
         case 'bubble':
-            renderEnrichmentBubblePlot(Array.from(foundGenes));
+            renderEnrichmentBubblePlot(sortedFoundGenes);
             break;
         case 'matrix':
-            renderBubbleMatrix(Array.from(foundGenes));
+            renderBubbleMatrix(sortedFoundGenes);
             break;
         case 'ciliome':
-            renderCiliomeEnrichment(Array.from(foundGenes), notFoundGenes);
+            renderCiliomeEnrichment(sortedFoundGenes, notFoundGenes);
             break;
     }
 
-    // ✨ ADDED: Call the function to create the status table ✨
-    createGeneStatusTable(Array.from(foundGenes), notFoundGenes);
+    // ✨ MODIFIED: Call the new, more detailed table function ✨
+    createEnrichmentResultsTable(sortedFoundGenes, notFoundGenes);
 
+    // Scroll down to the generated plot
     document.getElementById('plot-container').scrollIntoView({ behavior: 'smooth' });
 }
 
