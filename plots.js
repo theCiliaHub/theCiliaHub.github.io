@@ -462,35 +462,29 @@ function renderEnrichmentBubblePlot(foundGenes) {
 
 
 
-/**
- * Handles downloading the current plot as a PNG or PDF.
- */
 function downloadPlot() {
     const selectedPlot = document.querySelector('input[name="plot-type"]:checked').value;
     const format = document.getElementById('download-format')?.value || 'png';
-    let canvas = null;
+    const canvas = document.getElementById('enrichment-chart-canvas');  // Now always this ID
     let fileName = 'CiliaHub_Plot';
-
-    if (selectedPlot === 'bubble') {
-        canvas = document.getElementById('enrichment-bubble-plot');
-        fileName = 'CiliaHub_Localization_Plot';
-    } else if (selectedPlot === 'matrix') {
-        canvas = document.getElementById('enrichment-matrix-plot');
-        fileName = 'CiliaHub_Gene_Matrix_Plot';
-    } else if (selectedPlot === 'ciliome') {
-        canvas = document.getElementById('ciliome-bar-chart');
-        fileName = 'CiliaHub_Ciliome_Enrichment';
-    }
 
     if (!canvas || !currentPlot) {
         console.error("Canvas or plot instance not found.");
         alert("Plot not available for download. Please generate a plot first.");
         return;
     }
-    
+
+    if (selectedPlot === 'bubble') {
+        fileName = 'CiliaHub_Localization_Plot';
+    } else if (selectedPlot === 'matrix') {
+        fileName = 'CiliaHub_Gene_Matrix_Plot';
+    } else if (selectedPlot === 'ciliome') {
+        fileName = 'CiliaHub_Ciliome_Enrichment';
+    }
+
     // Use the Chart.js API to render a high-quality image
     const url = currentPlot.toBase64Image('image/png', 1.0);
-    
+
     if (format === 'png') {
         const a = document.createElement('a');
         a.href = url;
@@ -508,11 +502,6 @@ function downloadPlot() {
     }
 }
 
-
-
-/**
- * Main controller for generating enrichment plots and the status table.
- */
 /**
  * Main controller for generating enrichment plots and the results table.
  */
@@ -532,7 +521,10 @@ function generateEnrichmentPlots() {
     // --- Plot generation logic (remains the same) ---
     document.getElementById('plot-placeholder').style.display = 'none';
     document.getElementById('download-controls').style.display = 'flex';
-    document.querySelectorAll('.plot-area').forEach(el => el.style.display = 'none');
+    document.querySelectorAll('.plot-area').forEach(el => {
+    el.style.display = 'none';
+    el.innerHTML = '';  // Add this line to clear old canvases
+});
     document.getElementById('plot-container').style.display = 'block';
 
     if (currentPlot) {
@@ -558,11 +550,9 @@ function generateEnrichmentPlots() {
     // Scroll down to the generated plot
     document.getElementById('plot-container').scrollIntoView({ behavior: 'smooth' });
 }
-
 // =============================================================================
 // PAGE RENDERING
 // =============================================================================
-
 
 function displayEnrichmentPage() {
     const contentArea = document.querySelector('.content-area');
