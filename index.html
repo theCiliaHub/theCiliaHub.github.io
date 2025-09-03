@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-     <meta charset="UTF-8">
+    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>The CiliaHub: A Database of Genes with Ciliary Functions</title>
     <meta name="description" content="The CiliaHub is a comprehensive bioinformatics database for genes with ciliary functions.">
@@ -37,7 +37,7 @@
     <main class="main-container">
         <div class="content-area" id="content-area">
             <!-- Home page -->
-            <div id="home-page" class="page-content">
+            <div id="home-page">
                 <h1>Welcome to CiliaHub 🔬</h1>
                 <p>Your comprehensive resource for genes with ciliary functions. Explore our database, compare genes, and visualize expression data.</p>
                 <div class="call-to-action">
@@ -45,41 +45,36 @@
                 </div>
             </div>
 
-            <!-- Enrichment page -->
-            <div id="enrichment-page" class="page-content" style="display: none;">
+            <!-- Analysis / Enrichment page -->
+            <div id="analysis-page" style="display: none;">
                 <h2>Gene Enrichment Analysis</h2>
-                <textarea id="enrichment-genes-input" rows="5" placeholder="Enter gene list here..."></textarea>
+                <textarea id="analysis-genes-input" rows="5" placeholder="Enter gene list here..."></textarea>
                 <div class="plot-type-selection">
                     <label><input type="radio" name="plot-type" value="bubble" checked> Bubble Plot</label>
                     <label><input type="radio" name="plot-type" value="matrix"> Matrix Plot</label>
                 </div>
                 <div class="plot-settings">
-                    <div class="settings-column">
-                        <label>Font Family: <input type="text" id="setting-font-family" value="Arial"></label>
-                        <label>Font Size: <input type="number" id="setting-font-size" value="16"></label>
-                        <label>Axis Font Size: <input type="number" id="setting-axis-font-size" value="14"></label>
-                        <label>Font Weight: <input type="text" id="setting-font-weight" value="bold"></label>
-                    </div>
-                    <div class="settings-column">
-                        <label>Text Color: <input type="color" id="setting-text-color" value="#000000"></label>
-                        <label>Y-Axis Title: <input type="text" id="setting-y-axis-title" value="Localization"></label>
-                        <label>Enrichment Color 1: <input type="color" id="setting-enrichment-color1" value="#edf8fb"></label>
-                        <label>Enrichment Color 2: <input type="color" id="setting-enrichment-color2" value="#b2e2e2"></label>
-                    </div>
+                    <label>Font Family: <input type="text" id="setting-font-family" value="Arial"></label>
+                    <label>Font Size: <input type="number" id="setting-font-size" value="16"></label>
+                    <label>Font Weight: <input type="text" id="setting-font-weight" value="bold"></label>
+                    <label>Text Color: <input type="color" id="setting-text-color" value="#000000"></label>
+                    <label>Y-Axis Title: <input type="text" id="setting-y-axis-title" value="Localization"></label>
+                    <label>Enrichment Color 1: <input type="color" id="setting-enrichment-color1" value="#edf8fb"></label>
+                    <label>Enrichment Color 2: <input type="color" id="setting-enrichment-color2" value="#b2e2e2"></label>
                 </div>
-                <button onclick="generateEnrichmentPlots()">Generate Plot</button>
+                <button onclick="generateAnalysisPlots()">Generate Plot</button>
                 <div id="plot-container" style="display: none;">
-                    <canvas id="enrichment-bubble-plot"></canvas>
-                    <canvas id="enrichment-matrix-plot" style="display: none;"></canvas>
+                    <canvas id="analysis-bubble-plot"></canvas>
+                    <canvas id="analysis-matrix-plot" style="display: none;"></canvas>
                 </div>
             </div>
 
             <!-- Other pages -->
-            <div id="batch-query-page" class="page-content" style="display: none;"></div>
-            <div id="compare-page" class="page-content" style="display: none;"></div>
-            <div id="expression-page" class="page-content" style="display: none;"></div>
-            <div id="download-page" class="page-content" style="display: none;"></div>
-            <div id="contact-page" class="page-content" style="display: none;"></div>
+            <div id="compare-page" style="display: none;"></div>
+            <div id="batch-query-page" style="display: none;"></div>
+            <div id="expression-page" style="display: none;"></div>
+            <div id="download-page" style="display: none;"></div>
+            <div id="contact-page" style="display: none;"></div>
         </div>
 
         <!-- Sidebar / Cilium Panel -->
@@ -112,11 +107,10 @@
     </footer>
 
     <!-- Scripts -->
-    <!-- Corrected loading order: script.js first, then plots.js -->
-    <script src="script.js"></script>
-    <script src="plots.js"></script>
-    <script defer src="globals.js">
+    <!-- plots.js declares globals like allGenes only once -->
+    <script defer src="globals.js"></script>
+    <script defer src="script.js"></script>
+     <script defer src="plots.js"></script>
+    
 </body>
 </html>
-
-
