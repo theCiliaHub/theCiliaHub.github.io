@@ -32,6 +32,22 @@ const defaultGenesNames = [
 let geneDataCache = null;
 let geneMapCache = null;
 
+
+/**
+ * Handles SPA navigation by updating the URL hash.
+ * This triggers the 'hashchange' event listener, which calls handleRouteChange.
+ * @param {Event | null} event - The click event, used to prevent default link behavior.
+ * @param {string} path - The new path to navigate to (e.g., '/', '/ACE2').
+ */
+function navigateTo(event, path) {
+    if (event) {
+        event.preventDefault(); // Prevents the browser from reloading the page
+    }
+    // Set the new hash, which will be detected by the 'hashchange' event listener
+    window.location.hash = path;
+}
+
+
 // =============================================================================
 // ROUTER
 // =============================================================================
