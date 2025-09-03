@@ -944,11 +944,10 @@ input[type="color"] {
 
 .enrichment-layout {
     display: grid;
-    /* Left column for controls, right column for the plot */
-    grid-template-columns: 420px 1fr; 
+    grid-template-columns: 380px 1fr; /* Gives more space to the plot */
     gap: 2rem;
-    flex-grow: 1; /* Allows the layout to fill available vertical space */
-    overflow: hidden; /* Prevents internal scrolling */
+    flex-grow: 1;
+    overflow: hidden;
 }
 
 .enrichment-controls-panel {
