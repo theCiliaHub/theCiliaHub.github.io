@@ -586,32 +586,3 @@ function displayEnrichmentPage() {
     document.getElementById('generate-plot-btn').addEventListener('click', generateEnrichmentPlots);
     document.getElementById('download-plot-btn').addEventListener('click', downloadPlot);
 }
-
-
-// =============================================================================
-// MAIN APP ROUTER AND INITIALIZATION
-// =============================================================================
-
-/**
- * Handles routing and calls the appropriate display function based on the URL hash.
- */
-async function handleRouteChange() {
-    await loadAndPrepareDatabase();
-    const path = window.location.hash.replace('#', '').toLowerCase() || '/';
-    
-    // Simple router
-    if (path === '/enrichment') {
-        displayEnrichmentPage();
-    } else {
-        // You can add other pages here, for now, it defaults to the enrichment page if the hash is empty or unknown
-        displayEnrichmentPage();
-        // For a multi-page app, you would have a more extensive router:
-        // if (path === '/') displayHomePage();
-        // else if (path === '/batch-query') displayBatchQueryPage();
-        // etc.
-    }
-}
-
-// Initialize the app
-document.addEventListener('DOMContentLoaded', handleRouteChange);
-window.addEventListener('hashchange', handleRouteChange);
