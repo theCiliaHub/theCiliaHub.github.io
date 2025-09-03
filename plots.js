@@ -262,14 +262,33 @@ function renderEnrichmentBubblePlot(foundGenes) {
 }
 
 /**
- * Renders the gene matrix plot.
+ * Renders an improved gene matrix plot.
  */
 function renderBubbleMatrix(foundGenes) {
-    document.getElementById('matrix-plot-container').style.display = 'block';
+    const plotContainer = document.getElementById('matrix-plot-container');
+    plotContainer.style.display = 'block';
     if (window.enrichmentBarChartInstance) window.enrichmentBarChartInstance.destroy();
 
+    // Display the detailed results table at the bottom of the page
+    createEnrichmentResultsTable(foundGenes, []);
+
+    if (foundGenes.length === 0) {
+        plotContainer.innerHTML = '<p class="status-message">No genes to display in the matrix plot.</p>';
+        return;
+    }
+    
+    plotContainer.innerHTML = `<canvas id="enrichment-chart-canvas"></canvas>`;
+    const ctx = document.getElementById('enrichment-chart-canvas').getContext('2d');
     const settings = getPlotSettings();
-    const yCategories = ['Basal Body', 'Transition Zone', 'Axoneme', 'Ciliary Membrane', 'Cilia', 'Golgi'];
+    
+    // ✨ FIX: Using the complete list of 20 unique localization terms.
+    const yCategories = [
+        'Cilia', 'Basal Body', 'Transition Zone', 'Axoneme', 'Ciliary Membrane',
+        'Ciliary Pocket', 'Ciliary Tip', 'Flagella', 'Centrosome', 'Cytoskeleton',
+        'Cytoplasm', 'Nucleus', 'Endoplasmic Reticulum', 'Mitochondria', 'Ribosome',
+        'Golgi', 'Lysosome', 'Peroxisome', 'Plasma Membrane', 'Extracellular Vesicles'
+    ];
+    
     const xLabels = [...new Set(foundGenes.map(g => g.gene))].sort();
     const colorPalette = ['#377eb8', '#ff7f00', '#4daf4a', '#f781bf', '#a65628', '#984ea3', '#999999', '#e41a1c', '#dede00'];
 
@@ -279,13 +298,14 @@ function renderBubbleMatrix(foundGenes) {
             .map(locString => {
                 const trimmedLoc = locString?.trim().toLowerCase();
                 if (!trimmedLoc) return null;
+                // Match against the comprehensive list
                 const matchingCategory = yCategories.find(cat => cat.toLowerCase() === trimmedLoc);
-                return matchingCategory ? { x: gene.gene, y: matchingCategory, r: 10 } : null;
+                // ✨ FIX: Increased bubble size for better visibility
+                return matchingCategory ? { x: gene.gene, y: matchingCategory, r: 12 } : null;
             }).filter(Boolean),
         backgroundColor: colorPalette[index % colorPalette.length]
     }));
 
-    const ctx = document.getElementById('enrichment-matrix-plot').getContext('2d');
     currentPlot = new Chart(ctx, {
         type: 'bubble',
         data: { datasets },
@@ -293,7 +313,8 @@ function renderBubbleMatrix(foundGenes) {
             responsive: true,
             maintainAspectRatio: false,
             plugins: {
-                legend: { display: true, position: 'right', labels: { font: { family: settings.fontFamily, size: settings.fontSize }, color: settings.textColor } },
+                // ✨ FIX: Legend removed as requested
+                legend: { display: false }, 
                 tooltip: { callbacks: { label: (context) => `${context.dataset.label} - ${context.raw.y}` } },
             },
             scales: {
@@ -393,12 +414,6 @@ function renderCiliomeEnrichment(foundGenes, notFoundGenes) {
     const k = foundGenes.length;
     const n_input = k + notFoundGenes.length;
     
-    if (n_input === 0) {
-        createEnrichmentResultsTable([], []);
-        plotContainer.innerHTML = '<p class="status-message">Please enter a gene list to analyze.</p>';
-        return;
-    }
-
     // 1. Calculate statistics
     const M = allGenes ? allGenes.length : 2000;
     const N = 20000;
@@ -406,7 +421,7 @@ function renderCiliomeEnrichment(foundGenes, notFoundGenes) {
     const enrichmentScore = (k / n_input) / (M / N) || 0;
     const sharedHitsCount = foundGenes.filter(g => g.ciliopathy || g.complex_names).length;
 
-    // 2. Display the stats and detailed tables at the bottom of the page
+    // 2. Display all text/tables at the bottom of the page
     createEnrichmentResultsTable(foundGenes, notFoundGenes, {
         k, n_input, M, pValue, enrichmentScore, sharedHitsCount
     });
@@ -642,18 +657,15 @@ function displayEnrichmentPage() {
 }
 
 /**
- * Creates and displays a detailed results table for found genes and a list of not-found genes.
- * Can also display an optional statistics summary at the top.
- * @param {Array} foundGenes - Array of gene objects found in the database.
- * @param {Array} notFoundGenes - Array of query strings not found.
- * @param {object|null} stats - Optional object with stats like pValue and enrichmentScore.
+ * Creates the results summary and tables at the bottom of the page.
+ * This is now the central function for displaying all textual/tabular results.
  */
 function createEnrichmentResultsTable(foundGenes, notFoundGenes, stats = null) {
     const container = document.getElementById('enrichment-results-container');
     if (!container) return;
 
     let summaryHTML = '';
-    // If stats are provided, create the summary box
+    // If stats are provided (for Ciliome Enrichment), create the summary box
     if (stats) {
         summaryHTML = `
             <div id="ciliome-results-summary">
@@ -668,8 +680,8 @@ function createEnrichmentResultsTable(foundGenes, notFoundGenes, stats = null) {
         `;
     }
 
-    let tableHTML = '';
     // Create the detailed table for found genes
+    let tableHTML = '';
     if (foundGenes.length > 0) {
         tableHTML = `
             <h3>Search Results (${foundGenes.length} gene${foundGenes.length !== 1 ? 's' : ''} found)</h3>
@@ -698,8 +710,8 @@ function createEnrichmentResultsTable(foundGenes, notFoundGenes, stats = null) {
         `;
     }
 
-    let notFoundHTML = '';
     // Create the section for not-found genes
+    let notFoundHTML = '';
     if (notFoundGenes.length > 0) {
         notFoundHTML = `
             <div class="not-found-section">
@@ -709,6 +721,5 @@ function createEnrichmentResultsTable(foundGenes, notFoundGenes, stats = null) {
         `;
     }
 
-    // Assemble the final HTML and render it
     container.innerHTML = summaryHTML + tableHTML + notFoundHTML;
 }
