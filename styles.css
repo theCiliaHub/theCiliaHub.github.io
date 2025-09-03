@@ -315,29 +315,49 @@ body {
     margin: 1rem 0;
 }
 
-#batch-results table, #comparison-table {
+/* ✨ This rule now styles the tables on all three pages ✨ */
+#batch-results table, 
+#comparison-table, 
+#enrichment-results-container table {
     width: 100%;
     border-collapse: collapse;
     margin-top: 1rem;
 }
 
-#batch-results th, #batch-results td, #comparison-table th, #comparison-table td {
+/* ✨ This rule now styles the cells on all three pages ✨ */
+#batch-results th, 
+#batch-results td, 
+#comparison-table th, 
+#comparison-table td,
+#enrichment-results-container th,
+#enrichment-results-container td {
     padding: 0.8rem;
     border-bottom: 1px solid var(--border-color);
     text-align: left;
 }
 
-#batch-results th, #comparison-table th {
+/* ✨ This rule now styles the headers on all three pages ✨ */
+#batch-results th, 
+#comparison-table th,
+#enrichment-results-container th {
     background: var(--primary-blue);
     color: var(--text-light);
 }
 
-#batch-results a, #comparison-table a {
+/* ✨ These rules now style the links on all three pages ✨ */
+#batch-results a, 
+#comparison-table a,
+#enrichment-results-container a {
     color: var(--primary-blue);
     text-decoration: none;
 }
 
-#batch-results a:hover, #batch-results a:focus-visible, #comparison-table a:hover, #comparison-table a:focus-visible {
+#batch-results a:hover, 
+#batch-results a:focus-visible, 
+#comparison-table a:hover, 
+#comparison-table a:focus-visible,
+#enrichment-results-container a:hover,
+#enrichment-results-container a:focus-visible {
     text-decoration: underline;
     outline: none;
 }
