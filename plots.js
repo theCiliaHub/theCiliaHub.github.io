@@ -479,6 +479,9 @@ function generateEnrichmentPlots() {
     document.getElementById('bubble-enrichment-container').style.display = 'none';
     document.getElementById('matrix-plot-container').style.display = 'none';
     document.getElementById('ciliome-plot-container').style.display = 'none';
+    // ✨ Add these two lines to manage the placeholder visibility
+    document.getElementById('plot-placeholder').style.display = 'none';
+    document.getElementById('download-controls').style.display = 'flex'; // Show download controls
 
     document.getElementById('plot-container').style.display = 'block';
     document.getElementById('download-plot-btn').style.display = 'inline-block';
@@ -509,6 +512,9 @@ function generateEnrichmentPlots() {
 /**
  * Renders the HTML and sets up event listeners for the Enrichment page.
  */
+/**
+ * Renders the HTML and sets up event listeners for the Enrichment page.
+ */
 function displayEnrichmentPage() {
     const contentArea = document.querySelector('.content-area');
     contentArea.className = 'content-area content-area-full';
@@ -516,59 +522,65 @@ function displayEnrichmentPage() {
         document.querySelector('.cilia-panel').style.display = 'none';
     }
 
+    // ✨ New HTML structure with a two-column layout
     contentArea.innerHTML = `
-        <div class="page-section">
-            <h2>Ciliary Gene Enrichment Analysis</h2>
-            <p>Paste your list of genes and CiliaHub will calculate how enriched your list is for known ciliary genes.</p>
-            <textarea id="enrichment-genes-input" placeholder="e.g., TMEM17, IFT88, WDR31..." style="width: 100%; min-height: 150px; padding: 1rem; border: 2px solid #e1ecf4; border-radius: 10px; font-size: 1rem; margin-top: 1rem; resize: vertical;"></textarea>
-            
-            <div id="enrichment-controls" style="margin-top: 1rem; display: flex; align-items: center; gap: 20px; flex-wrap: wrap;">
-                <div>
-                    <strong>Plot Type:</strong>
-                    <input type="radio" id="plot-bubble" name="plot-type" value="bubble" checked>
-                    <label for="plot-bubble" style="margin-right: 10px;">Localization</label>
-                    <input type="radio" id="plot-matrix" name="plot-type" value="matrix">
-                    <label for="plot-matrix" style="margin-right: 10px;">Gene Matrix</label>
-                    <input type="radio" id="plot-ciliome" name="plot-type" value="ciliome">
-                    <label for="plot-ciliome" style="margin-right: 10px;">Ciliome Enrichment</label>
-                </div>
-                <button id="generate-plot-btn" class="btn btn-primary">Generate Plot</button>
-                <select id="download-format">
-                    <option value="png">PNG</option>
-                    <option value="pdf">PDF</option>
-                </select>
-                <button id="download-plot-btn" class="btn btn-secondary" style="display:none;">Download Plot</button>
-            </div>
-            
-            <div style="margin-top: 20px; border: 1px solid #e1ecf4; border-radius: 5px; padding: 10px;">
-                <h3 style="font-weight: bold; margin-bottom: 10px;">Plot Customization</h3>
-                <p style="font-size: 0.9rem; color: #555;">Click "Generate Plot" after making changes to apply them.</p>
-                <div id="plot-settings-panel" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-top: 10px;">
-                    <div><label>Font Family <select id="setting-font-family"><option>Arial</option><option>Tahoma</option></select></label></div>
-                    <div><label>Font Size <input type="number" id="setting-font-size" value="14" min="8" max="30"></label></div>
-                    <div><label>Font Weight <select id="setting-font-weight"><option value="normal">Normal</option><option value="bold" selected>Bold</option></select></label></div>
-                    <div><label>Text Color <input type="color" id="setting-text-color" value="#000000"></label></div>
-                    <div><label>Axis Color <input type="color" id="setting-axis-color" value="#000000"></label></div>
-                    <div><label>Y-Axis Title <input type="text" id="setting-y-axis-title" value="Localization"></label></div>
-                    <div><label>X-Axis Title <input type="text" id="setting-x-axis-title" value="Enrichment"></label></div>
-                    <div><label>Bar Color <input type="color" id="setting-bar-color" value="#2ca25f"></label></div>
-                    <div><label>Enrichment Color 1 (Low) <input type="color" id="setting-enrichment-color1" value="#edf8fb"></label></div>
-                    <div><label>Enrichment Color 2 <input type="color" id="setting-enrichment-color2" value="#b2e2e2" disabled></label></div>
-                    <div><label>Enrichment Color 3 <input type="color" id="setting-enrichment-color3" value="#66c2a4" disabled></label></div>
-                    <div><label>Enrichment Color 4 <input type="color" id="setting-enrichment-color4" value="#2ca25f" disabled></label></div>
-                    <div><label>Enrichment Color 5 (High) <input type="color" id="setting-enrichment-color5" value="#006d2c"></label></div>
-                </div>
+        <div class="page-section enrichment-page">
+            <div class="enrichment-header">
+                <h2>Ciliary Gene Enrichment Analysis</h2>
+                <p>Paste your list of genes and CiliaHub will calculate how enriched your list is for known ciliary genes.</p>
             </div>
 
-            <div id="plot-container" style="display:none; margin-top: 2rem;">
-                <div id="bubble-enrichment-container" style="display: none; align-items: flex-start; gap: 0px;">
-                     <div class="plot-wrapper" style="position: relative; height: 600px; flex-grow: 1;"><canvas id="enrichment-bubble-plot"></canvas></div>
-                     <div id="legend-container" style="flex-shrink: 0; width: 150px; padding-top: 20px; padding-left: 5px;"></div>
+            <div class="enrichment-layout">
+                <div class="enrichment-controls-panel">
+                    <label for="enrichment-genes-input" style="font-weight: 600; margin-bottom: 0.5rem; display: block;">Enter Gene List:</label>
+                    <textarea id="enrichment-genes-input" placeholder="e.g., TMEM17, IFT88, WDR31..."></textarea>
+                    
+                    <div id="enrichment-actions">
+                        <div class="plot-type-selection">
+                            <strong>Plot Type:</strong>
+                            <label><input type="radio" name="plot-type" value="bubble" checked> Localization</label>
+                            <label><input type="radio" name="plot-type" value="matrix"> Gene Matrix</label>
+                            <label><input type="radio" name="plot-type" value="ciliome"> Ciliome Enrichment</label>
+                        </div>
+                        <div class="action-buttons">
+                            <button id="generate-plot-btn" class="btn btn-primary">Generate Plot</button>
+                            <div id="download-controls" style="display:none;">
+                                <select id="download-format">
+                                    <option value="png">PNG</option>
+                                    <option value="pdf">PDF</option>
+                                </select>
+                                <button id="download-plot-btn" class="btn btn-secondary">Download</button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <details id="plot-customization-details">
+                        <summary>Plot Customization</summary>
+                        <div id="plot-settings-panel">
+                            <div><label>Font Family <select id="setting-font-family"><option>Arial</option><option>Tahoma</option></select></label></div>
+                            <div><label>Font Size <input type="number" id="setting-font-size" value="14" min="8" max="30"></label></div>
+                            <div><label>Font Weight <select id="setting-font-weight"><option value="normal">Normal</option><option value="bold" selected>Bold</option></select></label></div>
+                            <div><label>Text Color <input type="color" id="setting-text-color" value="#000000"></label></div>
+                            <div><label>Axis Color <input type="color" id="setting-axis-color" value="#000000"></label></div>
+                            <div><label>Y-Axis Title <input type="text" id="setting-y-axis-title" value="Localization"></label></div>
+                            <div><label>X-Axis Title <input type="text" id="setting-x-axis-title" value="Enrichment"></label></div>
+                            <div><label>Bar Color <input type="color" id="setting-bar-color" value="#2ca25f"></label></div>
+                            <div><label>Enrichment Color 1 (Low) <input type="color" id="setting-enrichment-color1" value="#edf8fb"></label></div>
+                            <div><label>Enrichment Color 5 (High) <input type="color" id="setting-enrichment-color5" value="#006d2c"></label></div>
+                        </div>
+                    </details>
                 </div>
-                <div id="matrix-plot-container" style="display: none;">
-                     <div class="plot-wrapper" style="position: relative; height: 600px;"><canvas id="enrichment-matrix-plot"></canvas></div>
+
+                <div class="enrichment-plot-panel">
+                    <div id="plot-container" style="display:none;">
+                        <div id="bubble-enrichment-container" class="plot-area" style="display: none;"></div>
+                        <div id="matrix-plot-container" class="plot-area" style="display: none;"></div>
+                        <div id="ciliome-plot-container" class="plot-area" style="display: none;"></div>
+                    </div>
+                    <div id="plot-placeholder" class="status-message">
+                        <p>Your generated plot will appear here.</p>
+                    </div>
                 </div>
-                <div id="ciliome-plot-container" style="display: none; padding: 20px; text-align: center;"></div>
             </div>
         </div>
     `;
