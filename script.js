@@ -79,7 +79,7 @@ async function loadAndPrepareDatabase() {
         return true;
     } catch (e) {
         console.error('Data load error:', e);
-        // Fallback logic remains the same
+        // Fallback logic
         allGenes = getDefaultGenes();
         currentData = allGenes;
         geneMapCache = new Map();
@@ -387,12 +387,12 @@ function displayHomePage() {
     
     // Inside the displayHomePage function...
 
-    searchInput.addEventListener('input', function() {
-        const query = this.value.trim().toUpperCase();
-        if (query.length < 1) {
-            hideSuggestions();
-            return;
-        }
+    // Inside the searchInput.addEventListener('input', ...) in displayHomePage
+const filteredGenes = allGenes.filter(g => 
+    (g.gene && g.gene.toUpperCase().startsWith(query)) || 
+    (g.synonym && g.synonym.toUpperCase().includes(query)) ||
+    (g.ensembl_id && String(g.ensembl_id).toUpperCase().includes(query)) // Ensure it checks all IDs
+).slice(0, 10);
        
         // ✨ UPDATED: Added a check for ensembl_id in the filter
         const filteredGenes = allGenes.filter(g => 
