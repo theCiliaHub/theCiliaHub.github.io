@@ -262,14 +262,14 @@ function renderEnrichmentBubblePlot(foundGenes) {
 }
 
 /**
- * Renders an improved and much larger gene matrix plot.
+ * Renders an improved and much larger gene matrix plot with all corrections.
  */
 function renderBubbleMatrix(foundGenes) {
     const plotContainer = document.getElementById('matrix-plot-container');
     plotContainer.style.display = 'block';
     if (window.enrichmentBarChartInstance) window.enrichmentBarChartInstance.destroy();
 
-    // This function still displays the detailed results table at the bottom of the page
+    // This displays the detailed results table at the bottom of the page
     createEnrichmentResultsTable(foundGenes, []);
 
     if (foundGenes.length === 0) {
@@ -277,18 +277,18 @@ function renderBubbleMatrix(foundGenes) {
         return;
     }
     
-    // ✨ FIX: Wrapper div makes the plot much taller for better readability
+    // Wrapper div makes the plot much taller for better readability
     plotContainer.innerHTML = `<div style="position: relative; width: 100%; min-height: 800px;"><canvas id="enrichment-chart-canvas"></canvas></div>`;
     const ctx = document.getElementById('enrichment-chart-canvas').getContext('2d');
     const settings = getPlotSettings();
     
-    // ✨ FIX: Using the complete, sorted list of 18 organelles and locations for the Y-axis
+    // Using the complete, sorted list of 18 organelles and locations for the Y-axis
     const yCategories = [
         'Autophagosomes', 'Axoneme', 'Basal Body', 'Centrosome', 'Cilia', 
         'Ciliary Associated Gene', 'Ciliary Membrane', 'Cytosol', 'Endoplasmic Reticulum', 
         'Flagella', 'Golgi Apparatus', 'Lysosome', 'Microtubules', 
-        'Mitochondria', 'Nucleus', 'Peroxisome', 'Transition Zone'
-    ].sort(); // Sort alphabetically
+        'Mitochondria', 'Ncleoplasm', 'Peroxisome', 'Transition Zone'
+    ].sort();
     
     const xLabels = [...new Set(foundGenes.map(g => g.gene))].sort();
     const colorPalette = ['#377eb8', '#ff7f00', '#4daf4a', '#f781bf', '#a65628', '#984ea3', '#999999', '#e41a1c', '#dede00'];
@@ -311,11 +311,17 @@ function renderBubbleMatrix(foundGenes) {
         options: {
             responsive: true,
             maintainAspectRatio: false,
+            // ✨ FIX 1: Adds padding to the left to ensure Y-axis labels are fully visible
+            layout: {
+                padding: {
+                    left: 50 
+                }
+            },
             plugins: {
-                // ✨ FIX: Legend is removed as requested
+                // ✨ FIX 2: Legend (color labels) is now completely removed
                 legend: { display: false }, 
                 tooltip: { 
-                    // ✨ FIX: Font size updated to 20
+                    // ✨ FIX 3: Font size updated to 20
                     titleFont: { size: 20 },
                     bodyFont: { size: 20 },
                     callbacks: { 
@@ -328,7 +334,7 @@ function renderBubbleMatrix(foundGenes) {
                     type: 'category',
                     labels: xLabels,
                     title: { display: true, text: "Gene", font: { size: 20, weight: 'bold' }, color: settings.axisColor },
-                    // ✨ FIX: Font size updated to 20 for visibility
+                    // ✨ FIX 3: Font size updated to 20 for visibility
                     ticks: { font: { size: 20 }, autoSkip: false, maxRotation: 90, minRotation: 45, color: settings.textColor },
                     grid: { display: false }
                 },
@@ -336,14 +342,15 @@ function renderBubbleMatrix(foundGenes) {
                     type: 'category',
                     labels: yCategories,
                     title: { display: true, text: 'Ciliary Localization', font: { size: 20, weight: 'bold' }, color: settings.axisColor },
-                    // ✨ FIX: Font size updated to 20 for visibility
+                    // ✨ FIX 3: Font size updated to 20 for visibility
                     ticks: { font: { size: 20 }, color: settings.textColor },
-                    grid: { display: true, color: '#f0f0f0' } // Light gridlines for readability
+                    grid: { display: true, color: '#f0f0f0' }
                 }
             }
         }
     });
 }
+
 
 /**
  * Renders the gene matrix plot in the plot panel and a detailed results table below.
