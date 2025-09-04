@@ -165,7 +165,7 @@ function createEnrichmentResultsTable(foundGenes, notFoundGenes, stats = null) {
     }
 
     // Create the detailed table for found genes
-    let tableHTML = '';
+     let tableHTML = '';
     if (foundGenes.length > 0) {
         tableHTML = `
             <h3>Search Results (${foundGenes.length} gene${foundGenes.length !== 1 ? 's' : ''} found)</h3>
@@ -184,14 +184,14 @@ function createEnrichmentResultsTable(foundGenes, notFoundGenes, stats = null) {
                             <tr>
                                 <td><a href="/${item.gene}" onclick="navigateTo(event, '/${item.gene}')">${item.gene}</a></td>
                                 <td>${item.ensembl_id || '—'}</td>
-                                <td>${Array.isArray(item.localization) ? item.localization.join(', ') : (item.localization || '—')}</td>
+                                <td>${renderLocalization(item)}</td>
                                 <td>${item.functional_summary ? item.functional_summary.substring(0, 100) + '...' : '—'}</td>
                             </tr>
                         `).join('')}
                     </tbody>
                 </table>
-            </div>
-        `;
+            </div>       `
+       `;
     }
 
     // Create the section for not-found genes
