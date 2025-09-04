@@ -321,10 +321,10 @@ function mapLocalizationToSVG(localizationArray) {
         "cilia": ["ciliary-membrane", "axoneme"],
         "flagella": ["ciliary-membrane", "axoneme"],
         "ciliary associated gene": ["ciliary-membrane", "axoneme"],
-        "nucleus": ["nucleus"],
+        "nucleoplasm": ["nucleus"],
         "centrosome": ["basal-body"],
         "cytosol": ["cell-body"],
-        "mitochondrion": ["cell-body"],
+        "mitochondria": ["cell-body"],
         "endoplasmic reticulum": ["cell-body"],
         "golgi apparatus": ["cell-body"],
         "lysosome": ["cell-body"],             // ✨ NEW
