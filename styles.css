@@ -1059,7 +1059,6 @@ input[type="color"] {
     color: var(--gray-dark);
 }
 
-/* Add to the end of styles.css */
 
 /* Wrapper for all new enrichment plots */
 #enrichment-plots-wrapper {
@@ -1091,11 +1090,10 @@ input[type="color"] {
   color: #333;
 }
 
-
 /* A generic tooltip for interactive plots */
 .tooltip {
   position: absolute;
-  visibility: hidden; /* Use visibility instead of display for smoother transitions */
+  visibility: hidden;
   opacity: 0;
   background-color: rgba(0, 0, 0, 0.8);
   color: #fff;
@@ -1104,5 +1102,35 @@ input[type="color"] {
   font-size: 0.9em;
   pointer-events: none; /* Prevents the tooltip from blocking mouse events */
   transition: opacity 0.2s;
-  white-space: nowrap; /* Keep tooltip content on one line */
+  white-space: nowrap;
+}
+
+/* Styles for the Network Graph */
+.network-link {
+  stroke: #999;
+  stroke-opacity: 0.6;
+}
+
+.network-node {
+  stroke: #fff;
+  stroke-width: 1.5px;
+  cursor: pointer;
+}
+
+.network-node:hover {
+  stroke: #000;
+  stroke-width: 2.5px;
+}
+
+/* Styles for the Sunburst Plot */
+.sunburst-path {
+  stroke: #fff;
+  stroke-width: 0.5px;
+  cursor: pointer;
+}
+
+.sunburst-path:hover {
+  stroke: #000;
+  stroke-width: 1.5px;
+  opacity: 0.9;
 }
