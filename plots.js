@@ -66,51 +66,6 @@ async function loadAndPrepareDatabase() {
     }
 }
 
-// 1) Deep-freeze a pristine snapshot (read-only ground truth)
-function deepFreeze(obj) {
-  const seen = new WeakSet();
-  (function _freeze(o) {
-    if (!o || typeof o !== 'object' || seen.has(o)) return;
-    seen.add(o);
-    Object.getOwnPropertyNames(o).forEach((p) => _freeze(o[p]));
-    Object.freeze(o);
-  })(obj);
-  return obj;
-}
-
-// Assume you have `allGenesRaw` from fetched JSON:
-const pristineGeneData = structuredClone(allGenesRaw); // browser-native deep clone
-deepFreeze(pristineGeneData);
-
-// 2) Wrap *only* the mutable working copy with a Proxy that logs *any* writes
-function watchLocalizations(array, geneName) {
-  const mutating = new Set(['copyWithin','fill','pop','push','reverse','shift','sort','splice','unshift']);
-  return new Proxy(array, {
-    get(target, prop, recv) {
-      const val = Reflect.get(target, prop, recv);
-      if (typeof val === 'function' && mutating.has(prop)) {
-        return function(...args) {
-          console.trace(`[MUTATION] ${geneName}.localization.${prop}(${args.map(a=>JSON.stringify(a)).join(',')})`);
-          return Array.prototype[prop].apply(target, args);
-        };
-      }
-      return val;
-    },
-    set(target, prop, value, recv) {
-      console.trace(`[MUTATION] ${geneName}.localization[${String(prop)}] = ${JSON.stringify(value)}`);
-      return Reflect.set(target, prop, value, recv);
-    }
-  });
-}
-
-// 3) Build your working cache. IMPORTANT: never reuse the pristine arrays.
-//    Always copy the localization array and wrap it with the watcher.
-geneDataCache = allGenesRaw.map(g => ({
-  ...g,
-  localization: watchLocalizations([...(const svgLocalization || [])], g.gene)
-}));
-
-
 /**
  * The central search function using the efficient geneMapCache.
  */
