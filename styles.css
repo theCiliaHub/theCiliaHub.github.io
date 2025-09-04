@@ -1134,3 +1134,113 @@ input[type="color"] {
   stroke-width: 1.5px;
   opacity: 0.9;
 }
+
+/* ============================================================================= */
+/* NEW ENRICHMENT PAGE STYLES */
+/* ============================================================================= */
+
+.hidden {
+    display: none !important;
+}
+
+.enrichment-controls-panel {
+    background-color: #f9f9f9;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 30px;
+}
+
+.enrichment-controls-panel label {
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    display: block;
+}
+
+.enrichment-controls-panel textarea {
+    width: 100%;
+    min-height: 120px;
+    margin-bottom: 1rem;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+}
+
+.results-section-container {
+    margin-bottom: 40px;
+    border-top: 2px solid #eee;
+    padding-top: 20px;
+}
+
+.results-section-container h3 {
+    font-size: 1.5em;
+    color: #333;
+    margin-bottom: 20px;
+}
+
+.plot-type-selection {
+    margin-bottom: 20px;
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.plot-area-large {
+    width: 100%;
+    min-height: 500px;
+    position: relative;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 10px;
+}
+
+#advanced-plots-wrapper {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+    gap: 20px;
+}
+
+.plot-container {
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    background-color: #fff;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+    display: flex;
+    flex-direction: column;
+}
+
+.plot-container h4 {
+    text-align: center;
+    margin: 0;
+    padding: 15px;
+    border-bottom: 1px solid #eee;
+    font-size: 1.1em;
+}
+
+.plot-content {
+    width: 100%;
+    min-height: 350px;
+    flex-grow: 1;
+    position: relative;
+}
+
+.plot-content .status-message {
+    padding: 20px;
+    text-align: center;
+    color: #666;
+}
+
+.plot-explanation {
+    padding: 15px;
+    font-size: 0.9em;
+    line-height: 1.5;
+    background-color: #f9f9f9;
+    border-top: 1px solid #eee;
+    color: #333;
+}
+
+.plot-explanation ul {
+    margin: 10px 0 0 0;
+    padding-left: 20px;
+}
