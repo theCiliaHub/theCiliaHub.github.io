@@ -106,7 +106,6 @@ function getPlotSettings() {
         barChartColor: document.getElementById('setting-bar-color')?.value || '#2ca25f',
         enrichmentColors: [
             document.getElementById('setting-enrichment-color1')?.value || '#edf8fb',
-            // It's good practice to have the full range available if needed later
             '#b2e2e2',
             '#66c2a4',
             '#2ca25f',
@@ -119,9 +118,25 @@ function getPlotSettings() {
  * Calculates the p-value using the hypergeometric test.
  */
 function hypergeometricPValue(k, n, K, N) {
-    // Using jStat library which is already included in your HTML for a more robust calculation
-    // log-p-value of the upper tail of the hypergeometric distribution
-    return jStat.hypergeometric.logpf(k - 1, N, K, n) / Math.log(10);
+    function logFactorial(num) {
+        let result = 0;
+        for (let i = 2; i <= num; i++) {
+            result += Math.log(i);
+        }
+        return result;
+    }
+    function logCombination(n, k) {
+        if (k > n || k < 0) return -Infinity;
+        if (k === 0 || k === n) return 0;
+        return logFactorial(n) - logFactorial(k) - logFactorial(n - k);
+    }
+    let pValue = 0;
+    const maxK = Math.min(n, K);
+    for (let i = k; i <= maxK; i++) {
+        const logProb = logCombination(K, i) + logCombination(N - K, n - i) - logCombination(N, n);
+        pValue += Math.exp(logProb);
+    }
+    return Math.min(pValue, 1.0);
 }
 
 /**
@@ -137,9 +152,10 @@ function createEnrichmentResultsTable(foundGenes, notFoundGenes, stats = null) {
             <div id="ciliome-results-summary">
                 <h3>Enrichment Analysis Results 🔬</h3>
                 <p>From your list of <strong>${stats.n_input}</strong> unique gene(s), <strong>${stats.k}</strong> were found in the CiliaHub database of <strong>${stats.M}</strong> ciliary genes.</p>
+                <p>Of these hits, <strong>${stats.sharedHitsCount}</strong> are associated with known ciliopathies or protein complexes.</p>
                 <div class="stats-box">
                     <p><strong>Enrichment Score:</strong> ${stats.enrichmentScore.toFixed(2)}-fold</p>
-                    <p><strong>P-value:</strong> ${stats.pValue < 0.001 ? stats.pValue.toExponential(3) : stats.pValue.toFixed(3)}</p>
+                    <p><strong>P-value:</strong> ${stats.pValue.toExponential(3)}</p>
                 </div>
             </div>
         `;
@@ -165,7 +181,7 @@ function createEnrichmentResultsTable(foundGenes, notFoundGenes, stats = null) {
                                 <td><a href="/#/${item.gene}" onclick="navigateTo(event, '/${item.gene}')">${item.gene}</a></td>
                                 <td>${item.ensembl_id || '—'}</td>
                                 <td>${Array.isArray(item.localization) ? item.localization.join(', ') : (item.localization || '—')}</td>
-                                <td>${item.functional_summary ? item.functional_summary.substring(0, 100) + (item.functional_summary.length > 100 ? '...' : '') : '—'}</td>
+                                <td>${item.functional_summary ? item.functional_summary.substring(0, 100) + '...' : '—'}</td>
                             </tr>
                         `).join('')}
                     </tbody>
@@ -188,23 +204,26 @@ function createEnrichmentResultsTable(foundGenes, notFoundGenes, stats = null) {
 }
 
 /**
- * Renders the Ciliome enrichment bar plot.
+ * Renders the Ciliome enrichment plot.
  */
 function renderCiliomeEnrichment(foundGenes, notFoundGenes) {
     const plotContainer = document.getElementById('ciliome-plot-container');
     plotContainer.style.display = 'block';
-    plotContainer.innerHTML = '';
+    plotContainer.innerHTML = ''; 
 
     const k = foundGenes.length;
     const n_input = k + notFoundGenes.length;
     
     if (n_input > 0) {
         const M = allGenes ? allGenes.length : 2000;
-        const N = 20000; // Assumed total number of human genes
+        const N = 20000;
         const pValue = hypergeometricPValue(k, n_input, M, N);
         const enrichmentScore = (k / n_input) / (M / N) || 0;
+        const sharedHitsCount = foundGenes.filter(g => g.ciliopathy || g.complex_names).length;
         
-        createEnrichmentResultsTable(foundGenes, notFoundGenes, { k, n_input, M, N, pValue, enrichmentScore });
+        createEnrichmentResultsTable(foundGenes, notFoundGenes, {
+            k, n_input, M, pValue, enrichmentScore, sharedHitsCount
+        });
     } else {
         createEnrichmentResultsTable([], []);
         plotContainer.innerHTML = '<p class="status-message">Please enter a gene list to analyze.</p>';
@@ -248,7 +267,27 @@ function renderCiliomeEnrichment(foundGenes, notFoundGenes) {
                 backgroundColor: settings.barChartColor,
             }]
         },
-        options: { /* ... options from original code ... */ }
+        options: {
+            indexAxis: 'y',
+            responsive: true,
+            maintainAspectRatio: false,
+            layout: { padding: { left: 50 } },
+            plugins: {
+                legend: { display: false },
+                title: { display: true, text: 'Localization of Found Ciliary Genes', font: { size: 16, weight: 'bold' }, color: settings.textColor },
+                tooltip: { titleFont: { size: 14 }, bodyFont: { size: 14 } }
+            },
+            scales: {
+                x: {
+                    beginAtZero: true,
+                    title: { display: true, text: 'Gene Count', font: { size: 14 }, color: settings.axisColor },
+                    ticks: { precision: 0, font: { size: 14 }, color: settings.textColor },
+                },
+                y: {
+                    ticks: { font: { size: 14 }, color: settings.textColor },
+                }
+            }
+        }
     });
 }
 
@@ -293,7 +332,7 @@ function renderBubbleMatrix(foundGenes) {
     currentPlot = new Chart(ctx, {
         type: 'bubble',
         data: { datasets },
-        options: { /* ... options from original code ... */ }
+        options: { /*... your original options ...*/ }
     });
 }
 
@@ -334,22 +373,72 @@ function renderEnrichmentBubblePlot(foundGenes) {
         return;
     }
 
-    // ... Rest of the bubble plot logic remains the same
+    const maxCount = Math.max(...Object.values(localizationCounts), 1);
+    const colorPalette = settings.enrichmentColors;
+    const getColor = count => { return colorPalette[0]; }; 
+    const getRadius = count => 8 + (count / maxCount) * 12;
+
+    const dataset = {
+        data: categoriesWithData.map(loc => ({
+            x: localizationCounts[loc],
+            y: loc,
+            r: getRadius(localizationCounts[loc]),
+            count: localizationCounts[loc]
+        })),
+        backgroundColor: categoriesWithData.map(loc => getColor(localizationCounts[loc]))
+    };
+
+    currentPlot = new Chart(ctx, {
+        type: 'bubble',
+        data: { datasets: [dataset] },
+        options: { /*... your original options ...*/ }
+    });
+}
+
+/**
+ * Downloads the currently displayed Chart.js plot.
+ */
+function downloadPlot() {
+    const format = document.getElementById('download-format')?.value || 'png';
+    const canvas = document.getElementById('enrichment-chart-canvas'); 
+    
+    if (!canvas || !currentPlot) {
+        alert("Plot not available for download. Please generate a plot first.");
+        return;
+    }
+    
+    const url = currentPlot.toBase64Image('image/png', 1.0);
+    const fileName = `CiliaHub_Plot.${format}`;
+
+    if (format === 'png') {
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName;
+        a.click();
+    } else if (format === 'pdf') {
+        const { jsPDF } = window.jspdf;
+        const pdf = new jsPDF({
+            orientation: canvas.width > canvas.height ? 'landscape' : 'portrait',
+            unit: 'px',
+            format: [canvas.width, canvas.height]
+        });
+        pdf.addImage(url, 'PNG', 0, 0, canvas.width, canvas.height);
+        pdf.save(fileName);
+    }
 }
 
 
 // ✨ =============================================================================
-// ✨ NEW PLOTTING FUNCTIONS
+// ✨ NEW PLOTTING FUNCTIONS (SUNBURST, DOMAIN BUBBLE, NETWORK)
 // ✨ =============================================================================
 
 /**
- * [NEW] Calculates enrichment of PFAM domains.
+ * Calculates enrichment of PFAM domains.
  */
 function calculateDomainEnrichment(filteredData, allCiliaData) {
     const domainCountsUserList = new Map();
     filteredData.forEach(gene => {
         if (gene.pfam_ids && Array.isArray(gene.pfam_ids)) {
-            // Use a Set to count each domain only once per gene
             new Set(gene.pfam_ids).forEach(pfamId => {
                 domainCountsUserList.set(pfamId, (domainCountsUserList.get(pfamId) || 0) + 1);
             });
@@ -367,15 +456,16 @@ function calculateDomainEnrichment(filteredData, allCiliaData) {
 
     const M = filteredData.length;
     const N = allCiliaData.length;
-    if (M === 0) return []; // Avoid division by zero
+    if (M === 0) return [];
 
     const enrichedDomains = [];
     domainCountsUserList.forEach((count, domainId) => {
-        const k = count; // Genes in user list with this domain
-        const n = domainCountsBackground.get(domainId) || 0; // Genes in background with this domain
+        const k = count;
+        const n = domainCountsBackground.get(domainId) || 0;
+        if (n === 0) return; // Avoid division by zero if domain is not in background
         const richFactor = (k / M) / (n / N);
 
-        if (richFactor > 1) { // Only show enriched domains
+        if (richFactor > 1) {
             enrichedDomains.push({
                 domain: domainId,
                 richFactor: richFactor,
@@ -384,15 +474,14 @@ function calculateDomainEnrichment(filteredData, allCiliaData) {
         }
     });
 
-    return enrichedDomains.sort((a, b) => b.richFactor - a.richFactor); // Sort by most enriched
+    return enrichedDomains.sort((a, b) => b.richFactor - a.richFactor);
 }
 
 /**
- * [NEW] Creates the PFAM domain enrichment bubble chart using Plotly.
+ * Creates the PFAM domain enrichment bubble chart using Plotly.
  */
 function createDomainBubbleChart(enrichmentData) {
-    // ✨ CORRECTED: Target the correct div ID from your HTML
-    const plotContainer = document.getElementById('bubble-chart-div'); 
+    const plotContainer = document.getElementById('bubble-chart-div');
     if (!plotContainer) return;
     
     if (!enrichmentData || enrichmentData.length === 0) {
@@ -403,10 +492,10 @@ function createDomainBubbleChart(enrichmentData) {
     const trace = {
         x: enrichmentData.map(d => d.richFactor),
         y: enrichmentData.map(d => d.geneCount),
-        text: enrichmentData.map(d => d.domain), // This will appear on hover
+        text: enrichmentData.map(d => d.domain),
         mode: 'markers',
         marker: {
-            size: enrichmentData.map(d => d.geneCount * 8 + 10), // Scale bubble size
+            size: enrichmentData.map(d => Math.min(d.geneCount * 10 + 8, 100)), // Scale size with a max limit
             color: enrichmentData.map(d => d.richFactor),
             colorscale: 'Viridis',
             showscale: true,
@@ -426,17 +515,17 @@ function createDomainBubbleChart(enrichmentData) {
 }
 
 /**
- * [NEW] Prepares data for the Ciliopathy Sunburst plot.
+ * Prepares data for the Ciliopathy Sunburst plot.
  */
 function formatDataForSunburst(filteredData) {
     const ciliopathyMap = new Map();
-
     filteredData.forEach(gene => {
-        if (gene.ciliopathy) {
-            if (!ciliopathyMap.has(gene.ciliopathy)) {
-                ciliopathyMap.set(gene.ciliopathy, []);
+        if (gene.ciliopathy && gene.ciliopathy.trim() !== "") {
+            const ciliopathyName = gene.ciliopathy.trim();
+            if (!ciliopathyMap.has(ciliopathyName)) {
+                ciliopathyMap.set(ciliopathyName, []);
             }
-            ciliopathyMap.get(gene.ciliopathy).push({ name: gene.gene, value: 1 }); // D3 needs a 'value'
+            ciliopathyMap.get(ciliopathyName).push({ name: gene.gene, value: 1 });
         }
     });
 
@@ -448,25 +537,75 @@ function formatDataForSunburst(filteredData) {
     return { name: "Ciliopathies", children: children };
 }
 
-
 /**
- * [NEW] Renders the Ciliopathy Sunburst plot using D3.
+ * Renders the Ciliopathy Sunburst plot using D3.
  */
 function createSunburstPlot(data) {
     const container = document.getElementById('sunburst-plot-div');
     if (!container) return;
-    container.innerHTML = ''; // Clear previous plot
+    container.innerHTML = '';
 
     if (!data || !data.children || data.children.length === 0) {
         container.innerHTML = '<p class="status-message">No genes with known ciliopathy associations were found.</p>';
         return;
     }
     
-    // D3 Sunburst implementation code would go here.
-    // This is a complex implementation, but there are many great examples available online.
-    // For now, we'll add a placeholder.
-    container.innerHTML = `<p style="text-align:center; padding-top:50px;">Sunburst plot for ${data.children.length} ciliopathies will be rendered here.</p>`;
+    // Placeholder message until full D3 implementation is added
+    container.innerHTML = `<p style="text-align:center; padding: 20px;"><b>Ciliopathy Sunburst Plot</b><br>This feature is under development.</p>`;
+    // Full D3.js implementation for the sunburst chart is complex and would be added here.
+}
 
+/**
+ * Prepares data for the Protein Complex Network Graph.
+ */
+function formatDataForNetwork(filteredData) {
+    const nodes = filteredData.map(gene => ({
+        id: gene.gene,
+        group: gene.functional_category ? gene.functional_category[0] : 'Unknown'
+    }));
+
+    const links = [];
+    const complexMap = new Map();
+    filteredData.forEach(gene => {
+        if (gene.complex_names && gene.complex_names.trim() !== "") {
+            const complexes = gene.complex_names.split(',').map(c => c.trim());
+            complexes.forEach(complex => {
+                if (!complexMap.has(complex)) complexMap.set(complex, []);
+                complexMap.get(complex).push(gene.gene);
+            });
+        }
+    });
+
+    complexMap.forEach(genesInComplex => {
+        for (let i = 0; i < genesInComplex.length; i++) {
+            for (let j = i + 1; j < genesInComplex.length; j++) {
+                links.push({
+                    source: genesInComplex[i],
+                    target: genesInComplex[j]
+                });
+            }
+        }
+    });
+
+    return { nodes, links };
+}
+
+/**
+ * Renders the Protein Complex Network Graph using D3.
+ */
+function createNetworkGraph(data) {
+    const container = document.getElementById('network-graph-div');
+    if (!container) return;
+    container.innerHTML = '';
+
+    if (!data || !data.links || data.links.length === 0) {
+        container.innerHTML = '<p class="status-message">No shared protein complexes found in the gene list.</p>';
+        return;
+    }
+
+    // Placeholder message until full D3 implementation is added
+    container.innerHTML = `<p style="text-align:center; padding: 20px;"><b>Protein Complex Network</b><br>This feature is under development.</p>`;
+    // Full D3.js force-directed graph implementation would be added here.
 }
 
 
@@ -488,11 +627,16 @@ function generateEnrichmentPlots() {
 
     document.getElementById('plot-placeholder').style.display = 'none';
     document.getElementById('download-controls').style.display = 'flex';
-    document.querySelectorAll('.plot-area').forEach(el => { el.style.display = 'none'; });
-    
-    // ✨ MODIFIED: Also show the new advanced plot wrapper ✨
-    document.getElementById('enrichment-plots-wrapper').style.display = 'grid';
+    document.querySelectorAll('.plot-area').forEach(el => {
+        el.style.display = 'none';
+        el.innerHTML = '';
+    });
     document.getElementById('plot-container').style.display = 'block';
+    
+    // ✨ NEW: Also show the wrapper for the advanced plots
+    const advancedPlotsWrapper = document.getElementById('enrichment-plots-wrapper');
+    if(advancedPlotsWrapper) advancedPlotsWrapper.style.display = 'grid';
+
 
     if (currentPlot) {
         currentPlot.destroy();
@@ -511,20 +655,106 @@ function generateEnrichmentPlots() {
             break;
     }
 
-    // ✨ MODIFIED: Always generate the new plots regardless of the radio button selection ✨
-    // 1. Domain Enrichment Bubble Chart
-    const domainData = calculateDomainEnrichment(sortedFoundGenes, allGenes);
-    createDomainBubbleChart(domainData);
-
-    // 2. Ciliopathy Sunburst
-    const sunburstData = formatDataForSunburst(sortedFoundGenes);
-    createSunburstPlot(sunburstData);
-    
-    // This function will now be called by the specific render functions
-    // to provide contextually relevant summaries.
+    // ✨ ALWAYS create the results table based on the primary plot type
     if (plotType !== 'ciliome') {
         createEnrichmentResultsTable(sortedFoundGenes, notFoundGenes);
     }
-    
+
+    // ✨ ALWAYS call the new analysis functions ✨
+    const domainData = calculateDomainEnrichment(sortedFoundGenes, allGenes);
+    createDomainBubbleChart(domainData);
+
+    const sunburstData = formatDataForSunburst(sortedFoundGenes);
+    createSunburstPlot(sunburstData);
+
+    const networkData = formatDataForNetwork(sortedFoundGenes);
+    createNetworkGraph(networkData);
+
     document.getElementById('plot-container').scrollIntoView({ behavior: 'smooth' });
+}
+
+
+// =============================================================================
+// PAGE RENDERING
+// =============================================================================
+
+function displayEnrichmentPage() {
+    const contentArea = document.querySelector('.content-area');
+    contentArea.className = 'content-area content-area-full';
+    if (document.querySelector('.cilia-panel')) {
+        document.querySelector('.cilia-panel').style.display = 'none';
+    }
+
+    // ✨ MODIFIED HTML: Added the wrapper and containers for the new plots ✨
+    contentArea.innerHTML = `
+        <div class="page-section enrichment-page">
+            <div class="enrichment-header">
+                <h2>Ciliary Gene Enrichment Analysis</h2>
+                <p>Paste your list of genes and CiliaHub will calculate enrichment and visualize associations.</p>
+            </div>
+
+            <div class="enrichment-layout">
+                <div class="enrichment-controls-panel">
+                    <label for="enrichment-genes-input" style="font-weight: 600; margin-bottom: 0.5rem; display: block;">Enter Gene List:</label>
+                    <textarea id="enrichment-genes-input" placeholder="e.g., IFT88, NPHP1, BBS1..."></textarea>
+                    <div id="enrichment-actions">
+                         <div class="plot-type-selection">
+                            <strong>Primary Plot:</strong>
+                            <label><input type="radio" name="plot-type" value="ciliome" checked> Ciliome Enrichment</label>
+                            <label><input type="radio" name="plot-type" value="bubble"> Localization</label>
+                            <label><input type="radio" name="plot-type" value="matrix"> Gene Matrix</label>
+                        </div>
+                        <div class="action-buttons">
+                            <button id="generate-plot-btn" class="btn btn-primary">Generate Analyses</button>
+                            <div id="download-controls" style="display:none;">
+                                <select id="download-format"><option value="png">PNG</option><option value="pdf">PDF</option></select>
+                                <button id="download-plot-btn" class="btn btn-secondary">Download Primary Plot</button>
+                            </div>
+                        </div>
+                    </div>
+                    <details id="plot-customization-details">
+                        <summary>Plot Customization</summary>
+                        <div id="plot-settings-panel">
+                            <div><label>Font Family <select id="setting-font-family"><option>Arial</option><option>Tahoma</option></select></label></div>
+                            <div><label>Font Size <input type="number" id="setting-font-size" value="14" min="8" max="30"></label></div>
+                            <div><label>Font Weight <select id="setting-font-weight"><option value="normal">Normal</option><option value="bold" selected>Bold</option></select></label></div>
+                            <div><label>Text Color <input type="color" id="setting-text-color" value="#000000"></label></div>
+                            <div><label>Axis Color <input type="color" id="setting-axis-color" value="#000000"></label></div>
+                            <div><label>Bar Color <input type="color" id="setting-bar-color" value="#2ca25f"></label></div>
+                        </div>
+                    </details>
+                </div>
+
+                <div class="enrichment-plot-panel">
+                    <div id="plot-container" style="display:none;">
+                        <div id="bubble-enrichment-container" class="plot-area" style="display: none;"></div>
+                        <div id="matrix-plot-container" class="plot-area" style="display: none;"></div>
+                        <div id="ciliome-plot-container" class="plot-area" style="display: none;"></div>
+                    </div>
+                    
+                    <div id="enrichment-plots-wrapper" style="display: none;">
+                        <div class="plot-container">
+                            <h3>Enriched Protein Domains</h3>
+                            <div id="bubble-chart-div"></div>
+                        </div>
+                        <div class="plot-container">
+                            <h3>Ciliopathy Associations</h3>
+                            <div id="sunburst-plot-div"></div>
+                        </div>
+                        <div class="plot-container">
+                            <h3>Protein Complex Network</h3>
+                            <div id="network-graph-div"></div>
+                        </div>
+                    </div>
+                    
+                    <div id="plot-placeholder" class="status-message">Your results will be displayed here.</div>
+                </div>
+            </div>
+
+            <div id="enrichment-results-container" class="results-section"></div>
+        </div>
+    `;
+
+    document.getElementById('generate-plot-btn').addEventListener('click', generateEnrichmentPlots);
+    document.getElementById('download-plot-btn').addEventListener('click', downloadPlot);
 }
