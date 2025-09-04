@@ -28,7 +28,7 @@ function sanitize(input) {
 /**
  * Loads, sanitizes, and prepares the gene database into an efficient lookup map.
  */
-**
+/**
  * Loads, sanitizes, and prepares the gene database into an efficient lookup map.
  */
 async function loadAndPrepareDatabase() {
@@ -44,12 +44,12 @@ async function loadAndPrepareDatabase() {
 
         geneDataCache = rawGenes;
         allGenes = rawGenes;
-        currentData = allGenes;
+        currentData = allGenes; // ✨ THIS IS THE CRITICAL FIX ✨
         geneMapCache = new Map();
 
         allGenes.forEach(g => {
             if (!g.gene || typeof g.gene !== 'string') return;
-
+            
             const nameKey = sanitize(g.gene);
             if (nameKey) geneMapCache.set(nameKey, g);
 
@@ -66,11 +66,7 @@ async function loadAndPrepareDatabase() {
                 });
             }
             
-            // Prepare localization data for the interactive SVG diagram
-            if (g.localization && typeof geneLocalizationData !== 'undefined') {
-                // ✨ THE FIX IS HERE: We pass a COPY of the array using [...g.localization].
-                // This "sandboxes" the mapLocalizationToSVG function, preventing it
-                // from modifying the original, pristine gene data.
+            if (g.localization) {
                 geneLocalizationData[g.gene] = mapLocalizationToSVG([...g.localization]);
             }
         });
@@ -89,7 +85,6 @@ async function loadAndPrepareDatabase() {
         return false;
     }
 }
-
 
 /**
  * The central search function.
