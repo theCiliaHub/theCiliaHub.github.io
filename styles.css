@@ -1059,3 +1059,50 @@ input[type="color"] {
     color: var(--gray-dark);
 }
 
+/* Add to the end of styles.css */
+
+/* Wrapper for all new enrichment plots */
+#enrichment-plots-wrapper {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); /* Responsive grid */
+  gap: 20px; /* Space between plots */
+  padding: 20px 0;
+  width: 100%;
+}
+
+/* Styling for each individual plot container */
+.plot-container {
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 15px;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+  background-color: #fff;
+  width: 100%;
+  min-height: 450px; /* Ensure containers have a minimum height */
+  position: relative; /* Needed for tooltip positioning */
+}
+
+/* Add a title style for each plot */
+.plot-container h3 {
+  text-align: center;
+  margin-top: 0;
+  margin-bottom: 15px;
+  font-size: 1.1em;
+  color: #333;
+}
+
+
+/* A generic tooltip for interactive plots */
+.tooltip {
+  position: absolute;
+  visibility: hidden; /* Use visibility instead of display for smoother transitions */
+  opacity: 0;
+  background-color: rgba(0, 0, 0, 0.8);
+  color: #fff;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 0.9em;
+  pointer-events: none; /* Prevents the tooltip from blocking mouse events */
+  transition: opacity 0.2s;
+  white-space: nowrap; /* Keep tooltip content on one line */
+}
