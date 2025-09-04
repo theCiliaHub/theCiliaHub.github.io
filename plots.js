@@ -107,7 +107,7 @@ function watchLocalizations(array, geneName) {
 //    Always copy the localization array and wrap it with the watcher.
 geneDataCache = allGenesRaw.map(g => ({
   ...g,
-  localization: watchLocalizations([...(g.localization || [])], g.gene)
+  localization: watchLocalizations([...(const svgLocalization || [])], g.gene)
 }));
 
 
