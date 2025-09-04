@@ -88,39 +88,34 @@ async function loadAndPrepareDatabase() {
 
 /**
  * The central search function.
+ * This version now returns deep clones of the gene data to prevent data mutation.
  */
 function findGenes(queries) {
     const foundGenes = new Set();
     const notFound = [];
-    
+
     queries.forEach(query => {
-        // The sanitize function already converts the query to uppercase
-        const sanitizedQuery = sanitize(query); 
-        const result = geneMapCache.get(sanitizedQuery);
-        
-        if (result) {
-            foundGenes.add(result);
+        const sanitizedQuery = sanitize(query);
+        // Find the gene using the fast lookup map
+        const resultFromMap = geneMapCache.get(sanitizedQuery);
+
+        if (resultFromMap) {
+            // ✨ THE FIX IS HERE ✨
+            // Instead of returning a reference to the potentially modified gene object,
+            // we find the original, pristine version from our initial cache...
+            const pristineGene = geneDataCache.find(g => g.gene === resultFromMap.gene);
+            
+            // ...and add a perfect, clean CLONE of it to the results.
+            // This guarantees that no other part of the code could have possibly damaged it.
+            if (pristineGene) {
+                foundGenes.add(JSON.parse(JSON.stringify(pristineGene)));
+            }
         } else {
             notFound.push(query);
         }
     });
-    
-    return { foundGenes: Array.from(foundGenes), notFoundGenes: notFound };
-}
 
-// Add this function to help with debugging
-function debugSearch(query) {
-    console.log("Searching for:", query);
-    console.log("Cache has key?", geneMapCache.has(query));
-    
-    if (!geneMapCache.has(query)) {
-        console.log("Available keys matching query:");
-        for (let key of geneMapCache.keys()) {
-            if (key.includes(query) || query.includes(key)) {
-                console.log(`- ${key}`);
-            }
-        }
-    }
+    return { foundGenes: Array.from(foundGenes), notFoundGenes: notFound };
 }
 
 /**
