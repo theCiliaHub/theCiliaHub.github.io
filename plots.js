@@ -622,3 +622,84 @@ function displayEnrichmentPage() {
     document.getElementById('download-plot-btn').addEventListener('click', downloadPlot);
 }
 
+
+async function loadCiliaHubData() {
+  const response = await fetch('https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/ciliahub_data.json');
+  const data = await response.json();
+  return data;
+}
+
+// Function to get the user's gene list and filter the main data
+function filterDataByUserList(allCiliaData, userGeneList) {
+  const userGeneSet = new Set(userGeneList.map(g => g.toUpperCase()));
+  return allCiliaData.filter(geneData => userGeneSet.has(geneData.gene.toUpperCase()));
+}
+
+
+function formatDataForSunburst(filteredData) {
+  const ciliopathyMap = new Map();
+
+  filteredData.forEach(gene => {
+    if (gene.ciliopathy) { // Check if the ciliopathy field is not empty
+      if (!ciliopathyMap.has(gene.ciliopathy)) {
+        ciliopathyMap.set(gene.ciliopathy, []);
+      }
+      ciliopathyMap.get(gene.ciliopathy).push({ name: gene.gene });
+    }
+  });
+
+  const children = Array.from(ciliopathyMap.entries()).map(([name, genes]) => ({
+    name,
+    children: genes
+  }));
+
+  return { name: "Ciliopathies", children: children };
+}
+
+function calculateDomainEnrichment(filteredData, allCiliaData) {
+    // ... logic to count domains in user list (k) and background (n) ...
+    const M = filteredData.length;
+    const N = allCiliaData.length;
+
+    const enrichedDomains = [];
+    domainCountsUserList.forEach((count, domainId) => {
+        const k = count;
+        const n = domainCountsBackground.get(domainId) || 0;
+        const richFactor = (k / M) / (n / N);
+
+        if (richFactor > 1) { // Only show enriched domains
+             enrichedDomains.push({
+                domain: domainId, // or get full name from domain_descriptions
+                richFactor: richFactor,
+                geneCount: k,
+                // p_value: ... // add if you implement a statistical test
+            });
+        }
+    });
+    return enrichedDomains;
+}
+
+
+function createBubbleChart(enrichmentData) {
+  const trace = {
+    x: enrichmentData.map(d => d.richFactor),
+    y: enrichmentData.map(d => d.geneCount), // Or -log10(p-value) if available
+    text: enrichmentData.map(d => d.domain),
+    mode: 'markers',
+    marker: {
+      size: enrichmentData.map(d => d.geneCount * 5), // Scale bubble size
+      color: enrichmentData.map(d => d.richFactor), // Color by enrichment
+      colorscale: 'Viridis',
+      showscale: true
+    }
+  };
+
+  const layout = {
+    title: 'Enriched Protein Domains (PFAM)',
+    xaxis: { title: 'Rich Factor (Fold Enrichment)' },
+    yaxis: { title: 'Number of Genes in List' }
+  };
+
+  Plotly.newPlot('your-div-id', [trace], layout);
+}
+
