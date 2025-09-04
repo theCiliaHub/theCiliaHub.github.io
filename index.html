@@ -8,7 +8,6 @@
     <link rel="icon" type="image/png" href="CiliaHub_Logo_web.png">
     <link rel="stylesheet" href="styles.css">
 
-    <!-- External libraries -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@panzoom/panzoom@4.5.1/dist/panzoom.min.js"></script>
     <script src="https://unpkg.com/@upsetjs/bundle"></script>
@@ -19,7 +18,6 @@
     <script src="https://cdn.jsdelivr.net/npm/jstat@latest/dist/jstat.min.js"></script>
 </head>
 <body>
-    <!-- Navigation -->
     <nav class="navbar">
         <div class="nav-container">
             <a href="#/" onclick="navigateTo(event, '/')" class="logo">CiliaHub</a>
@@ -35,10 +33,8 @@
         </div>
     </nav>
 
-    <!-- Main content area -->
     <main class="main-container">
         <div class="content-area" id="content-area">
-            <!-- Home page -->
             <div id="home-page">
                 <h1>Welcome to CiliaHub 🔬</h1>
                 <p>Your comprehensive resource for genes with ciliary functions. Explore our database, compare genes, and visualize expression data.</p>
@@ -47,10 +43,10 @@
                 </div>
             </div>
 
-            <!-- Analysis / Enrichment page -->
             <div id="analysis-page" style="display: none;">
                 <h2>Gene Enrichment Analysis</h2>
                 <textarea id="analysis-genes-input" rows="5" placeholder="Enter gene list here..."></textarea>
+                
                 <div class="plot-type-selection">
                     <label><input type="radio" name="plot-type" value="bubble" checked> Bubble Plot</label>
                     <label><input type="radio" name="plot-type" value="matrix"> Matrix Plot</label>
@@ -64,14 +60,29 @@
                     <label>Enrichment Color 1: <input type="color" id="setting-enrichment-color1" value="#edf8fb"></label>
                     <label>Enrichment Color 2: <input type="color" id="setting-enrichment-color2" value="#b2e2e2"></label>
                 </div>
-                <button onclick="generateAnalysisPlots()">Generate Plot</button>
+                
+                <button onclick="generateAnalysisPlots()">Generate Plot(s)</button>
+
                 <div id="plot-container" style="display: none;">
                     <canvas id="analysis-bubble-plot"></canvas>
                     <canvas id="analysis-matrix-plot" style="display: none;"></canvas>
                 </div>
+                
+                <div id="enrichment-plots-wrapper" style="display: none;">
+                    <div class="plot-container">
+                        <h3>Ciliopathy Associations</h3>
+                        <div id="sunburst-plot-div"></div> </div>
+
+                    <div class="plot-container">
+                        <h3>Enriched Protein Domains</h3>
+                        <div id="bubble-chart-div"></div> </div>
+
+                    <div class="plot-container">
+                        <h3>Protein Complex Network</h3>
+                        <div id="network-graph-div"></div> </div>
+                </div>
             </div>
 
-            <!-- Other pages -->
             <div id="compare-page" style="display: none;"></div>
             <div id="batch-query-page" style="display: none;"></div>
             <div id="expression-page" style="display: none;"></div>
@@ -79,7 +90,6 @@
             <div id="contact-page" style="display: none;"></div>
         </div>
 
-        <!-- Sidebar / Cilium Panel -->
         <aside class="cilia-panel">
             <div class="panel-header">
                 <h3>Interactive Cilium</h3>
@@ -103,13 +113,12 @@
         </aside>
     </main>
 
-    <!-- Footer -->
-   <footer class="footer" style="text-align: center;">
+    <div class="tooltip"></div>
+
+    <footer class="footer" style="text-align: center;">
         <p>© 2025 CiliaHub. All rights reserved.</p>
     </footer>
 
-    <!-- Scripts -->
-    <!-- plots.js declares globals like allGenes only once -->
     <script defer src="globals.js"></script>
     <script defer src="plots.js"></script>
     <script defer src="script.js"></script>
