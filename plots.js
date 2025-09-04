@@ -502,34 +502,6 @@ function downloadPlot() {
     }
 }
 
-function displaySingleGene(geneName) {
-    const contentArea = document.querySelector('.content-area');
-    contentArea.className = 'content-area content-area-full';
-    document.querySelector('.cilia-panel').style.display = 'none';
-    
-    const sanitizedGeneName = sanitize(geneName);
-    const gene = geneMapCache.get(sanitizedGeneName);
-    if (!gene) {
-        contentArea.innerHTML = '<p>Gene not found.</p>';
-        return;
-    }
-
-    const localization = renderLocalization(gene);
-    
-    contentArea.innerHTML = `
-        <div class="page-section gene-page">
-            <h2>${gene.gene}</h2>
-            <div class="gene-details">
-                <p><strong>Localization:</strong> ${localization}</p>
-                <p><strong>Ensembl ID:</strong> ${gene.ensembl_id || '—'}</p>
-                <p><strong>Description:</strong> ${gene.description || '—'}</p>
-                <p><strong>Functional Summary:</strong> ${gene.functional_summary || '—'}</p>
-                <p><strong>Reference:</strong> <a href="${gene.reference || '#'}" target="_blank">${gene.reference || '—'}</a></p>
-            </div>
-        </div>
-    `;
-}
-
 /**
  * Main controller for generating enrichment plots and the results table.
  */
@@ -649,5 +621,4 @@ function displayEnrichmentPage() {
     document.getElementById('generate-plot-btn').addEventListener('click', generateEnrichmentPlots);
     document.getElementById('download-plot-btn').addEventListener('click', downloadPlot);
 }
-
 
