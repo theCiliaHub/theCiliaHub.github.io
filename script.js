@@ -69,24 +69,12 @@ async function loadAndPrepareDatabase() {
                 });
             }
             
-            // 4. Prepare localization data for SVG mapping - MODIFIED: Sanitize input to filter non-ciliary terms and add debug logging for ACTN2
+            // 4. Prepare localization data for SVG mapping - Add debug logging
             if (g.localization) {
-                // Sanitize: Only pass valid ciliary localizations to mapLocalizationToSVG to prevent additions like "Cytosol"
-                const validCiliaryLocalizations = ['transition zone', 'cilia', 'basal body', 'axoneme', 'ciliary membrane', 'centrosome', 'autophagosomes', 'endoplasmic reticulum', 'flagella', 'golgi apparatus', 'lysosome', 'microbody', 'microtubules', 'mitochondrion', 'nucleus', 'peroxisome']; // Expanded list based on common terms in plots.js
-                let sanitizedLocalization = Array.isArray(g.localization) 
-                    ? g.localization.map(loc => loc ? loc.trim().toLowerCase() : '').filter(loc => loc && validCiliaryLocalizations.includes(loc))
-                    : (g.localization ? g.localization.split(/[,;]/).map(loc => loc ? loc.trim().toLowerCase() : '').filter(loc => loc && validCiliaryLocalizations.includes(loc)) : []);
-                
-                // Debug logging for ACTN2
+                geneLocalizationData[g.gene] = mapLocalizationToSVG(g.localization);
+                // Debug for ACTN2
                 if (g.gene === 'ACTN2') {
                     console.log('ACTN2 Raw localization from JSON:', g.localization);
-                    console.log('ACTN2 Sanitized localization before mapping:', sanitizedLocalization);
-                }
-                
-                geneLocalizationData[g.gene] = mapLocalizationToSVG(sanitizedLocalization); // Use sanitized input
-                
-                // Additional debug for mapped output
-                if (g.gene === 'ACTN2') {
                     console.log('ACTN2 Mapped localization from mapLocalizationToSVG:', geneLocalizationData[g.gene]);
                 }
             }
@@ -96,7 +84,6 @@ async function loadAndPrepareDatabase() {
         return true;
     } catch (e) {
         console.error('Data load error:', e);
-        // Fallback logic remains the same
         allGenes = getDefaultGenes();
         currentData = allGenes;
         geneMapCache = new Map();
@@ -105,6 +92,24 @@ async function loadAndPrepareDatabase() {
         });
         return false;
     }
+}
+
+function renderLocalization(gene) {
+     const validLocalizations = [
+        'transition zone', 'cilia', 'basal body', 'axoneme', 'ciliary membrane', 'centrosome',
+        'autophagosomes', 'endoplasmic reticulum', 'flagella', 'golgi apparatus', 'lysosome',
+        'microbody', 'microtubules', 'nucleoli', 'mitochondria', 'nucleoplasm', 'peroxisome'
+    ];
+    const localization = Array.isArray(gene.localization)
+        ? gene.localization
+            .map(loc => loc ? loc.trim().toLowerCase() : '')
+            .filter(loc => loc && validLocalizations.includes(loc))
+            .map(loc => loc.charAt(0).toUpperCase() + loc.slice(1))
+            .join(', ') || '—'
+        : (gene.localization ? gene.localization.trim() : '—');
+    
+    console.log(`Rendering localization for ${gene.gene}:`, localization);
+    return localization;
 }
 
 /**
@@ -615,7 +620,6 @@ function displayComparePage() {
         }
     });
 
-    // ✨ THIS FUNCTION IS NOW UPDATED ✨
     function handleSearchInput() {
         const query = searchInput.value.trim().toUpperCase();
         if (query.length < 1) {
@@ -624,11 +628,9 @@ function displayComparePage() {
         }
 
         const filteredGenes = allGenes.filter(g => {
-            // Do not suggest genes that are already selected
             if (selectedCompareGenes.some(sg => sg.gene === g.gene)) {
                 return false;
             }
-            // Check for a match in the gene name, synonyms, or Ensembl ID
             const geneMatch = g.gene && g.gene.toUpperCase().startsWith(query);
             const synonymMatch = g.synonym && g.synonym.toUpperCase().includes(query);
             const ensemblMatch = g.ensembl_id && g.ensembl_id.toUpperCase().startsWith(query);
@@ -636,7 +638,6 @@ function displayComparePage() {
         }).slice(0, 10);
        
         if (filteredGenes.length > 0) {
-            // Update suggestion display to be more informative
             suggestionsContainer.innerHTML = filteredGenes.map(g => {
                 const details = [g.ensembl_id, g.synonym].filter(Boolean).join(', ');
                 return `<div data-gene="${g.gene}">${g.gene}${details ? ` (${details})` : ''}</div>`;
@@ -720,7 +721,7 @@ function displayComparePage() {
                     case 'Ensembl ID': value = gene.ensembl_id ? `<a href="https://www.ensembl.org/Homo_sapiens/Gene/Summary?g=${gene.ensembl_id}" target="_blank">${gene.ensembl_id}</a>` : '-'; break;
                     case 'OMIM ID': value = gene.omim_id ? `<a href="https://www.omim.org/entry/${gene.omim_id}" target="_blank">${gene.omim_id}</a>` : '-'; break;
                     case 'Synonym': value = gene.synonym || '-'; break;
-                    case 'Localization': value = Array.isArray(gene.localization) ? gene.localization.join(', ') : (gene.localization || '-'); break;
+                    case 'Localization': value = renderLocalization(gene); break; // Use renderLocalization
                     case 'Functional Summary': value = gene.functional_summary || '-'; break;
                     case 'Reference': 
                         if (Array.isArray(gene.reference)) {
@@ -751,15 +752,14 @@ function displayComparePage() {
         const ctx = document.getElementById('localization-chart').getContext('2d');
         const localizationCounts = {};
         selectedCompareGenes.forEach(gene => {
-            if (Array.isArray(gene.localization)) {
-                gene.localization.forEach(loc => {
-                    const term = loc.trim();
-                    if (term) {
-                        const capitalizedTerm = term.charAt(0).toUpperCase() + term.slice(1);
-                        localizationCounts[capitalizedTerm] = (localizationCounts[capitalizedTerm] || 0) + 1;
-                    }
-                });
-            }
+            const locs = renderLocalization(gene).split(', ').filter(loc => loc && loc !== '—'); // Use renderLocalization
+            locs.forEach(loc => {
+                const term = loc.trim();
+                if (term) {
+                    const capitalizedTerm = term.charAt(0).toUpperCase() + term.slice(1);
+                    localizationCounts[capitalizedTerm] = (localizationCounts[capitalizedTerm] || 0) + 1;
+                }
+            });
         });
        
         const labels = Object.keys(localizationCounts);
@@ -811,6 +811,33 @@ function displayComparePage() {
     }
 }
 
+function displaySingleGene(geneName) {
+    const contentArea = document.querySelector('.content-area');
+    contentArea.className = 'content-area content-area-full';
+    document.querySelector('.cilia-panel').style.display = 'none';
+    
+    const sanitizedGeneName = sanitize(geneName);
+    const gene = geneMapCache.get(sanitizedGeneName);
+    if (!gene) {
+        contentArea.innerHTML = '<p>Gene not found.</p>';
+        return;
+    }
+
+    const localization = renderLocalization(gene);
+    
+    contentArea.innerHTML = `
+        <div class="page-section gene-page">
+            <h2>${gene.gene}</h2>
+            <div class="gene-details">
+                <p><strong>Localization:</strong> ${localization}</p>
+                <p><strong>Ensembl ID:</strong> ${gene.ensembl_id || '—'}</p>
+                <p><strong>Description:</strong> ${gene.description || '—'}</p>
+                <p><strong>Functional Summary:</strong> ${gene.functional_summary || '—'}</p>
+                <p><strong>Reference:</strong> <a href="${gene.reference || '#'}" target="_blank">${gene.reference || '—'}</a></p>
+            </div>
+        </div>
+    `;
+}
 
 function displayDownloadPage() {
     const contentArea = document.querySelector('.content-area');
@@ -1196,88 +1223,20 @@ function handleCSVUpload(event) {
     reader.readAsText(file);
 }
 
-function displayGeneCards(defaults, searchResults, page = 1, perPage = 10) {
+function displayGeneCards(genes, filters, page, perPage) {
     const container = document.getElementById('gene-cards-container');
-    if (!container) return;
-
-    let uniqueDefaults = defaults.filter(d => !searchResults.some(s => s.gene === d.gene));
-    let allGenesToDisplay = [...searchResults, ...uniqueDefaults];
-
-    // ✨ FIX IS HERE: If no genes are provided for the homepage, proactively get the default set.
-    if (allGenesToDisplay.length === 0 && searchResults.length === 0) {
-        allGenesToDisplay = allGenes.filter(g => defaultGenesNames.includes(g.gene));
-    }
-    // End of fix
-
     const start = (page - 1) * perPage;
     const end = start + perPage;
-    const paginatedGenes = allGenesToDisplay.slice(start, end);
+    const paginatedGenes = genes.slice(start, end);
     
-    const observer = new IntersectionObserver((entries) => {
-        entries.forEach(entry => {
-            if (entry.isIntersecting) {
-                const gene = JSON.parse(entry.target.dataset.gene);
-                const isSearchResult = searchResults.some(s => s.gene === gene.gene);
-                const localizationText = Array.isArray(gene.localization) ? gene.localization.join(', ') : (gene.localization || '');
-
-                entry.target.innerHTML = `
-                    <div class="gene-name">${gene.gene}</div>
-                    <div class="gene-description">${gene.description || 'No description available.'}</div>
-                    ${localizationText ? `
-                        <div class="gene-info">
-                            <strong>Localization:</strong> 
-                            <span style="color: ${isSearchResult ? '#27ae60' : '#1e90ff'}; font-weight: 600;">
-                                ${localizationText}
-                            </span>
-                        </div>` : ''}
-                    ${gene.ensembl_id ? `
-                        <div class="gene-info"><strong>Ensembl:</strong> 
-                            <a href="https://www.ensembl.org/Homo_sapiens/Gene/Summary?g=${gene.ensembl_id}" target="_blank">
-                                ${gene.ensembl_id}
-                            </a>
-                        </div>` : ''}
-                    ${gene.omim_id ? `
-                        <div class="gene-info"><strong>OMIM:</strong> 
-                            <a href="https://www.omim.org/entry/${gene.omim_id}" target="_blank">${gene.omim_id}</a>
-                        </div>` : ''}
-                    ${gene.synonym ? `<div class="gene-info"><strong>Synonym:</strong> ${gene.synonym}</div>` : ''}
-                    <div style="margin-top: 1rem; padding: 0.5rem; background: ${isSearchResult ? '#d5f4e6' : '#e8f4fd'}; 
-                            border-radius: 5px; font-size: 0.9rem; color: ${isSearchResult ? '#27ae60' : '#1e90ff'};">
-                        Click to view detailed information →
-                    </div>
-                `;
-                
-                entry.target.classList.add(isSearchResult ? 'search-result' : 'default');
-                entry.target.onclick = (e) => navigateTo(e, `/${gene.gene}`);
-                entry.target.setAttribute('aria-label', `View details for ${gene.gene}`);
-                observer.unobserve(entry.target);
-            }
-        });
-    }, { rootMargin: '100px' });
-    
-    container.innerHTML = paginatedGenes.map(gene => `
-        <div class="gene-card" data-gene='${JSON.stringify(gene)}'></div>
+    container.innerHTML = paginatedGenes.map(g => `
+        <div class="gene-card">
+            <h3><a href="/${g.gene}" onclick="navigateTo(event, '/${g.gene}')">${g.gene}</a></h3>
+            <p><strong>Localization:</strong> ${renderLocalization(g)}</p>
+            <p><strong>Ensembl ID:</strong> ${g.ensembl_id || '—'}</p>
+            <p><strong>Summary:</strong> ${g.functional_summary ? g.functional_summary.substring(0, 100) + '...' : '—'}</p>
+        </div>
     `).join('');
-    
-    container.querySelectorAll('.gene-card').forEach(card => observer.observe(card));
-    
-    const paginationDiv = document.createElement('div');
-    paginationDiv.className = 'pagination';
-    
-    // Stringify the data once to prevent issues in the onclick attribute
-    const defaultsStr = JSON.stringify(defaults);
-    const searchResultsStr = JSON.stringify(searchResults);
-    
-    paginationDiv.innerHTML = `
-        <button onclick='displayGeneCards(${defaultsStr}, ${searchResultsStr}, ${page - 1}, ${perPage})' ${page === 1 ? 'disabled' : ''}>Previous</button>
-        <span>Page ${page} of ${Math.ceil(allGenesToDisplay.length / perPage)}</span>
-        <button onclick='displayGeneCards(${defaultsStr}, ${searchResultsStr}, ${page + 1}, ${perPage})' ${end >= allGenesToDisplay.length ? 'disabled' : ''}>Next</button>
-    `;
-    if (allGenesToDisplay.length > perPage) {
-        container.appendChild(paginationDiv);
-    }
-    
-    updateGeneButtons(allGenesToDisplay, searchResults);
 }
 
 function updateGeneButtons(genesToDisplay, searchResults = []) {
