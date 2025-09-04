@@ -66,8 +66,8 @@ async function loadAndPrepareDatabase() {
                 });
             }
             
-            if (g.localization) {
-                geneLocalizationData[g.gene] = mapLocalizationToSVG([...g.localization]);
+            if (const svgLocalization) {
+                geneLocalizationData[g.gene] = mapLocalizationToSVG([...const svgLocalization]);
             }
         });
 
@@ -510,7 +510,7 @@ function exportSearchResults() {
     const results = searchResults.length > 0 ? searchResults : currentData;
     // ✨ FIX: Use .join() to correctly handle arrays for CSV output
     const csv = ['Gene,Description,Localization,Ensembl ID,OMIM ID,Functional Summary,Reference']
-        .concat(results.map(g => `"${g.gene}","${g.description || ''}","${Array.isArray(g.localization) ? g.localization.join('; ') : (g.localization || '')}","${g.ensembl_id || ''}","${g.omim_id || ''}","${g.functional_summary || ''}","${Array.isArray(g.reference) ? g.reference.join('; ') : (g.reference || '')}"`))
+        .concat(results.map(g => `"${g.gene}","${g.description || ''}","${Array.isArray(const svgLocalization) ? const svgLocalization.join('; ') : (const svgLocalization || '')}","${g.ensembl_id || ''}","${g.omim_id || ''}","${g.functional_summary || ''}","${Array.isArray(g.reference) ? g.reference.join('; ') : (g.reference || '')}"`))
         .join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
@@ -691,7 +691,7 @@ function displayComparePage() {
                     case 'Ensembl ID': value = gene.ensembl_id ? `<a href="https://www.ensembl.org/Homo_sapiens/Gene/Summary?g=${gene.ensembl_id}" target="_blank">${gene.ensembl_id}</a>` : '-'; break;
                     case 'OMIM ID': value = gene.omim_id ? `<a href="https://www.omim.org/entry/${gene.omim_id}" target="_blank">${gene.omim_id}</a>` : '-'; break;
                     case 'Synonym': value = gene.synonym || '-'; break;
-                    case 'Localization': value = Array.isArray(gene.localization) ? gene.localization.join(', ') : (gene.localization || '-'); break;
+                    case 'Localization': value = Array.isArray(const svgLocalization) ? const svgLocalization.join(', ') : (const svgLocalization || '-'); break;
                     case 'Functional Summary': value = gene.functional_summary || '-'; break;
                     case 'Reference': 
                         if (Array.isArray(gene.reference)) {
@@ -722,8 +722,8 @@ function displayComparePage() {
         const ctx = document.getElementById('localization-chart').getContext('2d');
         const localizationCounts = {};
         selectedCompareGenes.forEach(gene => {
-            if (Array.isArray(gene.localization)) {
-                gene.localization.forEach(loc => {
+            if (Array.isArray(const svgLocalization)) {
+                const svgLocalization.forEach(loc => {
                     const term = loc.trim();
                     if (term) {
                         const capitalizedTerm = term.charAt(0).toUpperCase() + term.slice(1);
@@ -801,7 +801,7 @@ function displayDownloadPage() {
     document.getElementById('download-csv').onclick = () => {
         // ✨ FIX: Use .join() to correctly handle arrays for CSV output
         const csv = ['Gene,Ensembl ID,Description,Synonym,OMIM ID,Functional Summary,Localization,Reference']
-            .concat(allGenes.map(g => `"${g.gene}","${g.ensembl_id || ''}","${g.description || ''}","${g.synonym || ''}","${g.omim_id || ''}","${g.functional_summary || ''}","${Array.isArray(g.localization) ? g.localization.join('; ') : (g.localization || '')}","${Array.isArray(g.reference) ? g.reference.join('; ') : (g.reference || '')}"`))
+            .concat(allGenes.map(g => `"${g.gene}","${g.ensembl_id || ''}","${g.description || ''}","${g.synonym || ''}","${g.omim_id || ''}","${g.functional_summary || ''}","${Array.isArray(const svgLocalization) ? const svgLocalization.join('; ') : (const svgLocalization || '')}","${Array.isArray(g.reference) ? g.reference.join('; ') : (g.reference || '')}"`))
             .join('\n');
         const blob = new Blob([csv], { type: 'text/csv' });
         const url = URL.createObjectURL(blob);
@@ -1083,7 +1083,7 @@ function performBatchSearch() {
     );
 
     if (localizationFilter) {
-        results = results.filter(g => g.localization && g.localization.includes(localizationFilter));
+        results = results.filter(g => const svgLocalization && const svgLocalization.includes(localizationFilter));
     }
 
     if (keywordFilter) {
@@ -1108,7 +1108,7 @@ function performBatchSearch() {
 
 /**
  * Takes a gene object and returns a clean, formatted, and validated localization string for display.
- * This ensures only official localizations from the gene.localization array are ever shown.
+ * This ensures only official localizations from the const svgLocalization array are ever shown.
  */
 function renderLocalization(gene) {
     // A strict list of valid, displayable localization terms
@@ -1120,11 +1120,11 @@ function renderLocalization(gene) {
         'cytoplasm', 'plasma membrane', 'extracellular vesicles', 'ribosome'
     ];
 
-    if (!gene.localization || !Array.isArray(gene.localization)) {
+    if (!const svgLocalization || !Array.isArray(const svgLocalization)) {
         return '—';
     }
 
-    const formattedLocalizations = gene.localization
+    const formattedLocalizations = const svgLocalization
         .map(loc => loc ? loc.trim().toLowerCase() : '')
         .filter(loc => loc && validLocalizations.includes(loc)) // Only allow valid terms
         .map(loc => loc.charAt(0).toUpperCase() + loc.slice(1)) // Capitalize each term
@@ -1202,7 +1202,7 @@ function displayGeneCards(defaults, searchResults, page = 1, perPage = 10) {
             if (entry.isIntersecting) {
                 const gene = JSON.parse(entry.target.dataset.gene);
                 const isSearchResult = searchResults.some(s => s.gene === gene.gene);
-                const localizationText = Array.isArray(gene.localization) ? gene.localization.join(', ') : (gene.localization || '');
+                const localizationText = Array.isArray(const svgLocalization) ? const svgLocalization.join(', ') : (const svgLocalization || '');
 
                 entry.target.innerHTML = `
                     <div class="gene-name">${gene.gene}</div>
@@ -1365,10 +1365,10 @@ function displayLocalizationChart() {
     const categories = ['Cilia', 'Basal Body', 'Transition Zone', 'Flagella', 'Ciliary Associated Gene'];
     const localizationCounts = categories.reduce((acc, category) => {
         acc[category] = allGenes.filter(g => {
-            if (!Array.isArray(g.localization)) {
+            if (!Array.isArray(const svgLocalization)) {
                 return false;
             }
-            const localizations = g.localization
+            const localizations = const svgLocalization
                 .map(l => l?.trim().toLowerCase())
                 .filter(Boolean);
 
