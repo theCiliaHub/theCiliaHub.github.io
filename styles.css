@@ -315,17 +315,19 @@ body {
     margin: 1rem 0;
 }
 
-#batch-results table,
-#comparison-table,
+/* ✨ This rule now styles the tables on all three pages ✨ */
+#batch-results table, 
+#comparison-table, 
 #enrichment-results-container table {
     width: 100%;
     border-collapse: collapse;
     margin-top: 1rem;
 }
 
-#batch-results th,
-#batch-results td,
-#comparison-table th,
+/* ✨ This rule now styles the cells on all three pages ✨ */
+#batch-results th, 
+#batch-results td, 
+#comparison-table th, 
 #comparison-table td,
 #enrichment-results-container th,
 #enrichment-results-container td {
@@ -334,23 +336,25 @@ body {
     text-align: left;
 }
 
-#batch-results th,
+/* ✨ This rule now styles the headers on all three pages ✨ */
+#batch-results th, 
 #comparison-table th,
 #enrichment-results-container th {
     background: var(--primary-blue);
     color: var(--text-light);
 }
 
-#batch-results a,
+/* ✨ These rules now style the links on all three pages ✨ */
+#batch-results a, 
 #comparison-table a,
 #enrichment-results-container a {
     color: var(--primary-blue);
     text-decoration: none;
 }
 
-#batch-results a:hover,
-#batch-results a:focus-visible,
-#comparison-table a:hover,
+#batch-results a:hover, 
+#batch-results a:focus-visible, 
+#comparison-table a:hover, 
 #comparison-table a:focus-visible,
 #enrichment-results-container a:hover,
 #enrichment-results-container a:focus-visible {
@@ -694,6 +698,7 @@ body {
     }
 }
 
+/* Suggested CSS for the gene summary table */
 .gene-summary-table {
     width: 100%;
     border-collapse: collapse;
@@ -729,17 +734,31 @@ body {
     font-weight: bold;
 }
 
+
+/* ---------- CiliaHub: Gene detail page tweaks (Medium Persian Blue) ---------- */
+/* Paste at the end of styles.css */
+
+/* Central color tokens */
+:root {
+  --mpb: #0067A5;         /* Medium Persian Blue */
+  --mpb-light: #e6f0f7;   /* light background */
+  --mpb-border: #c2d9e6;  /* border */
+}
+
+/* Scope everything to the gene detail page to avoid site-wide side effects */
 .gene-detail-page,
 .gene-detail-page * {
   box-sizing: border-box;
 }
 
+/* Breadcrumb & header background */
 .gene-detail-page .breadcrumb,
 .gene-detail-page .gene-header {
   background: var(--mpb-light) !important;
   border-color: var(--mpb-border) !important;
 }
 
+/* Gene name and description */
 .gene-detail-page .gene-name {
   color: var(--mpb) !important;
   font-weight: 700;
@@ -752,6 +771,7 @@ body {
   margin: 0;
 }
 
+/* Cards (visual treatment) */
 .gene-detail-page .detail-card {
   background: #fff !important;
   border: 1px solid var(--mpb-border) !important;
@@ -760,6 +780,8 @@ body {
   box-shadow: 0 2px 8px rgba(0,0,0,0.04) !important;
 }
 
+/* Card title styling (applies to Identifiers, Subcellular Localization, Complex Info,
+   Functional Information, References, etc.) */
 .gene-detail-page .card-title {
   color: var(--mpb) !important;
   font-size: 1.05rem !important;
@@ -772,18 +794,21 @@ body {
   border-bottom: 1px solid var(--mpb-border) !important;
 }
 
+/* Ensure SVG/icons also follow the blue */
 .gene-detail-page .card-title svg,
 .gene-detail-page .detail-card svg {
   stroke: var(--mpb) !important;
   fill: none !important;
 }
 
+/* Strong/labels in info items */
 .gene-detail-page .info-item strong,
 .gene-detail-page .info-item .label {
   color: var(--mpb) !important;
   font-weight: 600 !important;
 }
 
+/* Generic paragraph and small text inside gene page */
 .gene-detail-page .info-item p,
 .gene-detail-page .info-item span,
 .gene-detail-page .info-item div {
@@ -791,6 +816,7 @@ body {
   line-height: 1.35 !important;
 }
 
+/* Tag pills (localization, functional category, etc.) */
 .gene-detail-page .tag,
 .gene-detail-page .tags-container .tag {
   display: inline-block !important;
@@ -805,6 +831,7 @@ body {
   box-shadow: 0 1px 2px rgba(0,0,0,0.03) !important;
 }
 
+/* References list */
 .gene-detail-page .reference-list {
   color: var(--mpb) !important;
 }
@@ -820,16 +847,22 @@ body {
   text-decoration: underline !important;
 }
 
+/* Links inside the gene page — keep them consistent */
 .gene-detail-page a {
   color: var(--mpb) !important;
 }
 
+/* Force card borders and accent where something else tries to override */
 .gene-detail-page .detail-card,
 .gene-detail-page .card-title,
 .gene-detail-page .info-item strong {
   outline: none !important;
 }
 
+/* ---------- Layout: ensure left column = Functional Info + References,
+   right column = Identifiers + Localization + Complex Info ---------- */
+
+/* Standard two-column grid (desktop) */
 .gene-details-grid {
   display: grid !important;
   grid-template-columns: 1fr 1fr !important;
@@ -837,36 +870,198 @@ body {
   align-items: start !important;
 }
 
+/* Rely on the order the page injects the columns — usually the first .details-column is left.
+   If your JS prints the columns in different order, prefer adding classes (see note below). */
 .gene-details-grid > .details-column:first-child {
-  grid-column: 1 / 2 !important;
+  grid-column: 1 / 2 !important;    /* left */
 }
 .gene-details-grid > .details-column:last-child {
-  grid-column: 2 / 3 !important;
+  grid-column: 2 / 3 !important;    /* right */
 }
 
+/* Mobile: stack single column */
 @media (max-width: 899px) {
   .gene-details-grid {
     grid-template-columns: 1fr !important;
   }
 }
 
-.text-\[\#0067A5\],
-.text-\[\#0067A5\] {
+/* ---------- Utility overrides for Tailwind-style arbitrary classes that may not exist
+   (these selectors escape the bracket syntax so they match when Tailwind classes are in HTML) */
+.text-\\[\\#0067A5\\],
+.text-\\[\\#0067A5\\] {
   color: var(--mpb) !important;
 }
-.bg-\[\#e6f0f7\],
-.bg-\[\#e6f0f7\] {
+.bg-\\[\\#e6f0f7\\],
+.bg-\\[\\#e6f0f7\\] {
   background: var(--mpb-light) !important;
 }
 
+/* ---------- Helpful debugging outline (comment out if not needed) ----------
+.gene-detail-page .detail-card { outline: 1px dashed rgba(0,103,165,0.15) !important; }
+---------------------------------------------------------------------------- */
+
+/* Plot Customization Styling */
+details {
+    border: 1px solid #e1ecf4;
+    border-radius: 4px;
+    margin-bottom: 15px;
+}
+
+summary {
+    padding: 8px;
+    background-color: #e1ecf4;
+    cursor: pointer;
+    font-weight: bold;
+    border-radius: 4px;
+}
+
+details[open] summary {
+    border-bottom: 1px solid #d1dbe4;
+}
+
+label {
+    display: block;
+    font-size: 0.9rem;
+    margin-bottom: 5px;
+    color: #333;
+}
+
+input[type="text"],
+input[type="number"],
+select,
+input[type="color"] {
+    width: 100%;
+    padding: 6px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 0.9rem;
+}
+
+input[type="color"] {
+    padding: 2px;
+    height: 30px;
+}
+
+.plot-wrapper {
+    position: relative;
+    width: 100%;
+}
+
+/* =================================================== */
+/* Styles for Compact Enrichment Page Layout           */
+/* =================================================== */
+
+.enrichment-page {
+    display: flex;
+    flex-direction: column;
+    /* ✨ FIX: The fixed height properties have been removed to allow the page to grow. */
+}
+
+.enrichment-header {
+    flex-shrink: 0; /* Prevents header from shrinking */
+}
+
+.enrichment-layout {
+    display: grid;
+    grid-template-columns: 380px 1fr; /* Gives more space to the plot */
+    gap: 2rem;
+    flex-grow: 1;
+    overflow: hidden;
+}
+
+.enrichment-controls-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    overflow-y: auto; /* Add scroll only to controls if they overflow */
+    padding-right: 10px;
+}
+
+#enrichment-genes-input {
+    /* Make textarea shorter and allow it to grow */
+    min-height: 100px; 
+    flex-grow: 1;
+    margin-bottom: 0;
+}
+
+#enrichment-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    background-color: var(--neutral-bg-alt);
+    padding: 1rem;
+    border-radius: var(--border-radius-md);
+}
+
+.plot-type-selection {
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.action-buttons {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+}
+
+#download-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+#plot-customization-details summary {
+    background-color: var(--neutral-bg-alt);
+    border-radius: var(--border-radius-sm);
+}
+
+#plot-customization-details {
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-md);
+}
+
+#plot-settings-panel {
+    /* Make customization controls more compact */
+    display: grid; 
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    padding: 1rem;
+}
+
+..enrichment-plot-panel {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px dashed var(--border-color);
+    border-radius: var(--border-radius-lg);
+    background-color: var(--neutral-bg-alt);
+    height: 100%;
+    overflow: hidden; /* Reverted from auto */
+}
+
+
+.plot-area, .plot-wrapper {
+    /* Ensure plot fills its container without a fixed height */
+    height: 100%;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+#plot-placeholder {
+    margin: auto;
+    color: var(--gray-dark);
+}
 
 /* =================================================== */
 /* NEW, INTEGRATED ENRICHMENT PAGE STYLES              */
 /* =================================================== */
-
-.hidden {
-    display: none !important;
-}
 
 .enrichment-page .enrichment-header {
     margin-bottom: 2rem;
@@ -1015,3 +1210,4 @@ body {
     max-width: 100%;
     height: auto;
 }
+
