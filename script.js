@@ -905,9 +905,7 @@ function displayContactPage() {
 
 /**
  * Displays a visually appealing and detailed page for a single gene.
- * Updated with Complex Info (CORUM), Medium Persian Blue color scheme, 
- * and adjusted layout (Identifiers/Localization/Complex Info → right, 
- * Functional Info/Category/References → left).
+ * This version includes the "Ciliopathy" and a new "Protein Domains" section.
  */
 function displayIndividualGenePage(gene) {
   const contentArea = document.querySelector('.content-area');
@@ -915,13 +913,18 @@ function displayIndividualGenePage(gene) {
   document.querySelector('.cilia-panel').style.display = 'block';
 
   // --- Helper Functions ---
-  const formatAsTags = (data, className = 'tag-default') => {
-    if (!Array.isArray(data) || data.length === 0) return 'Not available';
-    return data.map(item => `
-      <span class="tag ${className} inline-block bg-[#e6f0f7] text-[#0067A5] text-sm font-medium px-2.5 py-0.5 rounded-full mr-2 mb-2">
-        ${item}
-      </span>
-    `).join('');
+  const formatAsTags = (data, className = 'tag-default', isPfam = false) => {
+    if (!Array.isArray(data) || data.length === 0 || (data.length === 1 && data[0] === '')) return 'Not available';
+    return data.map(item => {
+      const tagContent = isPfam 
+        ? `<a href="http://pfam.xfam.org/family/${item}" target="_blank" class="hover:underline">${item}</a>`
+        : item;
+      return `
+        <span class="tag ${className} inline-block bg-[#e6f0f7] text-[#0067A5] text-sm font-medium px-2.5 py-0.5 rounded-full mr-2 mb-2">
+          ${tagContent}
+        </span>
+      `;
+    }).join('');
   };
 
   const formatReferences = (gene) => {
@@ -933,9 +936,8 @@ function displayIndividualGenePage(gene) {
       .map(s => s.trim())
       .filter(Boolean);
     if (allRefs.length === 0) return '<li class="text-[#0067A5]">No reference information available.</li>';
-
     return allRefs.map(ref => {
-      if (/^\d+$/.test(ref)) {
+      if (/^\d{7,8}$/.test(ref)) {
         return `<li><a href="https://pubmed.ncbi.nlm.nih.gov/${ref}" target="_blank" class="text-[#0067A5] hover:underline">PMID: ${ref}</a></li>`;
       }
       if (ref.toLowerCase().includes('proteinatlas.org')) {
@@ -948,30 +950,24 @@ function displayIndividualGenePage(gene) {
     }).join('');
   };
 
-  // Prepare data
+  // Prepare data for display
   const localizationTags = formatAsTags(gene.localization, 'tag-localization');
   const functionalCategoryTags = formatAsTags(gene.functional_category, 'tag-category');
+  const pfamIdTags = formatAsTags(gene.pfam_ids, 'tag-domain', true); // `true` makes PFAM IDs clickable links
   const referenceHTML = formatReferences(gene);
 
   // --- Main Template ---
   contentArea.innerHTML = `
     <div class="page-section gene-detail-page bg-white shadow-lg rounded-lg overflow-hidden">
-      <!-- Breadcrumb -->
       <div class="breadcrumb px-6 py-4 bg-[#e6f0f7] border-b border-[#c2d9e6]">
         <a href="/" onclick="navigateTo(event, '/')" aria-label="Back to Home" class="text-[#0067A5] hover:underline text-sm font-medium">← Back to Home</a>
       </div>
-
-      <!-- Header -->
       <header class="gene-header px-6 py-8 bg-gradient-to-r from-[#e6f0f7] to-white">
         <h1 class="gene-name text-3xl font-bold text-[#0067A5] mb-2">${gene.gene}</h1>
         <p class="gene-description text-[#0067A5] text-lg">${gene.description || 'No description available.'}</p>
       </header>
-
-      <!-- Gene Details Grid -->
       <div class="gene-details-grid grid grid-cols-1 lg:grid-cols-2 gap-6 p-6">
-        <!-- Left Column -->
         <div class="details-column space-y-6">
-          <!-- Functional Info -->
           <div class="detail-card bg-white border border-[#c2d9e6] rounded-lg p-6 shadow-sm">
             <h3 class="card-title text-xl font-semibold text-[#0067A5] mb-4">Functional Information</h3>
             <div class="info-item mb-3">
@@ -980,22 +976,17 @@ function displayIndividualGenePage(gene) {
             </div>
             <div class="info-item mb-3">
               <strong class="font-medium text-[#0067A5]">Functional Category:</strong>
-              <div class="tags-container">${functionalCategoryTags}</div>
+              <div class="tags-container mt-2">${functionalCategoryTags}</div>
             </div>
-            ${gene.ciliopathy ? `<div class="info-item"><strong class="font-medium text-[#0067A5]">Associated Ciliopathy:</strong> <p class="text-[#0067A5]">${gene.ciliopathy}</p></div>` : ''}
-            ${gene.gene_annotation ? `<div class="info-item"><strong class="font-medium text-[#0067A5]">Gene Annotation:</strong> <p class="text-[#0067A5]">${gene.gene_annotation}</p></div>` : ''}
+            ${gene.ciliopathy && gene.ciliopathy.length > 0 ? `<div class="info-item"><strong class="font-medium text-[#0067A5]">Associated Ciliopathy:</strong> <p class="text-[#0067A5] mt-1">${gene.ciliopathy}</p></div>` : ''}
+            ${gene.gene_annotation && gene.gene_annotation.length > 0 ? `<div class="info-item mt-3"><strong class="font-medium text-[#0067A5]">Gene Annotation:</strong> <p class="text-[#0067A5] mt-1">${gene.gene_annotation}</p></div>` : ''}
           </div>
-
-          <!-- References -->
           <div class="detail-card bg-white border border-[#c2d9e6] rounded-lg p-6 shadow-sm">
             <h3 class="card-title text-xl font-semibold text-[#0067A5] mb-4">References</h3>
             <ul class="reference-list list-disc pl-5 text-[#0067A5]">${referenceHTML}</ul>
           </div>
         </div>
-
-        <!-- Right Column -->
         <div class="details-column space-y-6">
-          <!-- Identifiers -->
           <div class="detail-card bg-white border border-[#c2d9e6] rounded-lg p-6 shadow-sm">
             <h3 class="card-title text-xl font-semibold text-[#0067A5] mb-4">Identifiers</h3>
             <div class="space-y-3">
@@ -1004,15 +995,28 @@ function displayIndividualGenePage(gene) {
               ${gene.synonym ? `<div><strong class="text-[#0067A5]">Synonym(s):</strong> <span class="text-[#0067A5]">${gene.synonym}</span></div>` : ''}
             </div>
           </div>
-
-          <!-- Subcellular Localization -->
           <div class="detail-card bg-white border border-[#c2d9e6] rounded-lg p-6 shadow-sm">
             <h3 class="card-title text-xl font-semibold text-[#0067A5] mb-4">Subcellular Localization</h3>
             <div class="tags-container">${localizationTags}</div>
           </div>
-
-          <!-- Complex Info -->
-          ${gene.complex_names ? `
+          ${(gene.pfam_ids && gene.pfam_ids.length > 0) ? `
+            <div class="detail-card bg-white border border-[#c2d9e6] rounded-lg p-6 shadow-sm">
+              <h3 class="card-title text-xl font-semibold text-[#0067A5] mb-4">Protein Domains</h3>
+              <div class="info-item mb-3">
+                <strong class="font-medium text-[#0067A5]">PFAM IDs:</strong>
+                <div class="tags-container mt-2">${pfamIdTags}</div>
+              </div>
+              ${(gene.domain_descriptions && gene.domain_descriptions.length > 0) ? `
+                <div class="info-item">
+                  <strong class="font-medium text-[#0067A5]">Domain Descriptions:</strong>
+                  <ul class="list-disc pl-5 text-[#0067A5] text-sm mt-1">
+                    ${gene.domain_descriptions.map(desc => `<li>${desc}</li>`).join('')}
+                  </ul>
+                </div>
+              ` : ''}
+            </div>
+          ` : ''}
+          ${gene.complex_names && gene.complex_names.length > 0 ? `
             <div class="detail-card bg-white border border-[#c2d9e6] rounded-lg p-6 shadow-sm">
               <h3 class="card-title text-xl font-semibold text-[#0067A5] mb-4">
                 Complex Info 
@@ -1020,11 +1024,11 @@ function displayIndividualGenePage(gene) {
               </h3>
               <div class="mb-3">
                 <strong class="text-[#0067A5]">Complex Names:</strong>
-                <p class="text-[#0067A5]">${gene.complex_names.replace(/; /g, '<br>')}</p>
+                <p class="text-[#0067A5]">${String(gene.complex_names).replace(/; /g, '<br>')}</p>
               </div>
               <div>
                 <strong class="text-[#0067A5]">Complex Components:</strong>
-                <p class="text-[#0067A5]">${gene.complex_components.replace(/ \| /g, '<br>')}</p>
+                <p class="text-[#0067A5]">${String(gene.complex_components).replace(/ \| /g, '<br>')}</p>
               </div>
             </div>
           ` : ''}
@@ -1032,11 +1036,9 @@ function displayIndividualGenePage(gene) {
       </div>
     </div>
   `;
-
   updateGeneButtons([gene], [gene]);
   showLocalization(gene.gene, true);
 }
-
 
 function displayNotFoundPage() {
     const contentArea = document.querySelector('.content-area');
