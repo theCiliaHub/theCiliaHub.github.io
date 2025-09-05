@@ -119,20 +119,7 @@ function findGenes(queries) {
     return { foundGenes: Array.from(foundGenes), notFoundGenes: notFound };
 }
 
-// Add this function to help with debugging
-function debugSearch(query) {
-    console.log("Searching for:", query);
-    console.log("Cache has key?", geneMapCache.has(query));
-    
-    if (!geneMapCache.has(query)) {
-        console.log("Available keys matching query:");
-        for (let key of geneMapCache.keys()) {
-            if (key.includes(query) || query.includes(key)) {
-                console.log(`- ${key}`);
-            }
-        }
-    }
-}
+
 
 // Add this function to help with debugging
 function debugSearch(query) {
@@ -168,18 +155,17 @@ function performBatchSearch() {
 }
 
 // =============================================================================
-// FUNCTION: performSingleSearch
+// SINGLE GENE SEARCH
 // =============================================================================
 function performSingleSearch() {
-    const queryInput = document.getElementById('single-gene-search');
+    const query = document.getElementById('search-input')?.value?.trim().toUpperCase() || '';
     const statusDiv = document.getElementById('status-message');
 
-    if (!queryInput || !statusDiv) {
-        console.error('Required elements not found: single-gene-search or status-message');
+    if (!statusDiv) {
+        console.error('Status message element not found');
         return;
     }
 
-    const query = queryInput.value.trim().toUpperCase();
     statusDiv.innerHTML = '<span>Loading...</span>';
     statusDiv.style.display = 'block';
 
@@ -189,66 +175,29 @@ function performSingleSearch() {
     }
 
     if (!Array.isArray(allGenes)) {
-        console.error('allGenes is not available or not an array');
-        statusDiv.innerHTML = '<span class="error-message">Gene data is not loaded.</span>';
+        console.error('allGenes is not an array or is undefined');
+        statusDiv.innerHTML = '<span class="error-message">Error: Gene data not available.</span>';
         return;
     }
 
-    // Find matches: gene name, synonyms, Ensembl ID
     const results = allGenes.filter(g => {
-        try {
-            if (g?.gene?.toUpperCase() === query) return true;
-
-            if (g?.synonym) {
-                const synonyms = g.synonym
-                    .toUpperCase()
-                    .split(',')
-                    .map(s => s.trim())
-                    .filter(Boolean);
-                if (synonyms.includes(query)) return true;
-            }
-
-            if (g?.ensembl_id?.toUpperCase() === query) return true;
-
-            return false;
-        } catch (err) {
-            console.error(`Error processing gene: ${JSON.stringify(g)}`, err);
-            return false;
-        }
+        if (!g) return false;
+        const geneName = g.gene?.toUpperCase();
+        const synonyms = g.synonym ? g.synonym.toUpperCase().split(/[,;]/).map(s => s.trim()) : [];
+        const ensembl = g.ensembl_id?.toUpperCase();
+        return geneName === query || synonyms.includes(query) || ensembl === query;
     });
 
-    // Handle no matches
     if (results.length === 0) {
-        const closeMatches = allGenes
-            .filter(g => g?.gene?.toUpperCase().startsWith(query.slice(0, 3)))
-            .slice(0, 3);
-
-        statusDiv.innerHTML = `<span class="error-message">
-            No genes found for "${query}". ${
-                closeMatches.length > 0
-                    ? 'Did you mean: ' + closeMatches.map(g => g.gene).join(', ') + '?'
-                    : 'No close matches found.'
-            }
-        </span>`;
+        statusDiv.innerHTML = `<span class="error-message">No genes found for "${query}".</span>`;
         return;
     }
 
-    // Single match: navigate to gene page
     if (results.length === 1) {
-        try {
-            navigateTo(null, `/${results[0].gene}`);
-        } catch (err) {
-            console.error('Navigation failed:', err);
-            statusDiv.innerHTML = '<span class="error-message">Error navigating to gene page.</span>';
-        }
-        return;
+        window.location.hash = `#/gene/${encodeURIComponent(results[0].gene)}`;
+    } else {
+        statusDiv.innerHTML = `<span class="error-message">Multiple genes found matching "${query}": ${results.map(g => g.gene).join(', ')}. Please be more specific or use the Batch Query tool.</span>`;
     }
-
-    // Multiple matches: show message, do NOT go to batch query
-    statusDiv.innerHTML = `<span class="error-message">
-        Multiple genes found matching "${query}": ${results.map(g => g.gene).join(', ')}. 
-        Please be more specific or use the Batch Query tool.
-    </span>`;
 }
 
 // =============================================================================
@@ -257,11 +206,10 @@ function performSingleSearch() {
 const searchForm = document.getElementById('search-form');
 if (searchForm) {
     searchForm.addEventListener('submit', function (e) {
-        e.preventDefault(); // prevent default form submit
-        performSingleSearch(); // let the function handle single/multiple genes
+        e.preventDefault();
+        performSingleSearch(); // handle single or multiple genes
     });
 }
-
 
 /**
  * Displays batch results.
