@@ -8,9 +8,13 @@
 let allGenes = [];
 let currentData = [];
 let searchResults = [];
+let geneMapCache = null;
+let pfamNameMap = new Map();
 const geneLocalizationData = {};
 
-// Plotting
+
+// Plotting - this holds the active plot instance for the Enrichment page
+let currentPlotInstance = null; 
 let currentPlot = null;
 
 // Chart instances
