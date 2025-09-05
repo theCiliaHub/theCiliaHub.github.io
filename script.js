@@ -25,147 +25,77 @@ function sanitize(input) {
 }
 
 /**
- * Loads, sanitizes, and prepares the gene database into an efficient lookup map.
- */
-
+ * Loads, sanitizes, and prepares the gene database into an efficient lookup map.
+ */
 async function loadAndPrepareDatabase() {
-
-    if (geneDataCache) return true;
-
-    try {
-
-        const resp = await fetch('https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/ciliahub_data.json');
-
-        if (!resp.ok) throw new Error(`HTTP Error ${resp.status}`);
-
-        const rawGenes = await resp.json();
-
-
-
-        if (!Array.isArray(rawGenes)) {
-
-            throw new Error('Invalid data format: expected array');
-
-        }
-
-
-
-        geneDataCache = rawGenes;
-
-        allGenes = rawGenes;
-
-        geneMapCache = new Map();
-
-
-
-        allGenes.forEach(g => {
-
-            if (!g.gene || typeof g.gene !== 'string') {
-
-                console.warn('Skipping entry with invalid gene name:', g);
-
-                return;
-
-            }
-
-
-
-            const nameKey = sanitize(g.gene);
-
-            if (nameKey) geneMapCache.set(nameKey, g);
-
-
-
-            if (g.synonym) {
-
-                String(g.synonym).split(/[,;]/).forEach(syn => {
-
-                    const key = sanitize(syn);
-
-                    if (key && !geneMapCache.has(key)) geneMapCache.set(key, g);
-
-                });
-
-            }
-
-
-
-            if (g.ensembl_id) {
-
-                String(g.ensembl_id).split(/[,;]/).forEach(id => {
-
-                    const key = sanitize(id);
-
-                    if (key && !geneMapCache.has(key)) geneMapCache.set(key, g);
-
-                });
-
-            }
-
-
-
-            if (g.localization) {
-
-                const validCiliaryLocalizations = ['transition zone', 'cilia', 'basal body', 'axoneme', 'ciliary membrane', 'centrosome', 'autophagosomes', 'endoplasmic reticulum', 'flagella', 'golgi apparatus', 'lysosome', 'microbody', 'microtubules', 'mitochondrion', 'nucleus', 'peroxisome'];
-
-                let sanitizedLocalization = Array.isArray(g.localization) 
-
-                    ? g.localization.map(loc => loc ? loc.trim().toLowerCase() : '').filter(loc => loc && validCiliaryLocalizations.includes(loc))
-
-                    : (g.localization ? g.localization.split(/[,;]/).map(loc => loc ? loc.trim().toLowerCase() : '').filter(loc => loc && validCiliaryLocalizations.includes(loc)) : []);
-
-                
-
-                if (g.gene === 'ACTN2') {
-
-                    console.log('ACTN2 Raw localization from JSON:', g.localization);
-
-                    console.log('ACTN2 Sanitized localization before mapping:', sanitizedLocalization);
-
-                }
-
-                
-
-                geneLocalizationData[g.gene] = mapLocalizationToSVG(sanitizedLocalization);
-
-                
-
-                if (g.gene === 'ACTN2') {
-
-                    console.log('ACTN2 Mapped localization from mapLocalizationToSVG:', geneLocalizationData[g.gene]);
-
-                }
-
-            }
-
-        });
-
-
-
-        console.log(`Loaded ${allGenes.length} genes into database`);
-
-        return true;
-
-    } catch (e) {
-
-        console.error('Data load error:', e);
-
-        allGenes = getDefaultGenes();
-
-        currentData = allGenes;
-
-        geneMapCache = new Map();
-
-        allGenes.forEach(g => {
-
-            if (g.gene) geneMapCache.set(sanitize(g.gene), g);
-
-        });
-
-        return false;
-
-    }
-
+    if (geneDataCache) return true;
+    try {
+        const resp = await fetch('https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/ciliahub_data.json');
+        if (!resp.ok) throw new Error(`HTTP Error ${resp.status}`);
+        const rawGenes = await resp.json();
+
+        if (!Array.isArray(rawGenes)) {
+            throw new Error('Invalid data format: expected array');
+        }
+
+        geneDataCache = rawGenes;
+        allGenes = rawGenes;
+        geneMapCache = new Map();
+
+        allGenes.forEach(g => {
+            if (!g.gene || typeof g.gene !== 'string') {
+                console.warn('Skipping entry with invalid gene name:', g);
+                return;
+            }
+
+            const nameKey = sanitize(g.gene);
+            if (nameKey) geneMapCache.set(nameKey, g);
+
+            if (g.synonym) {
+                String(g.synonym).split(/[,;]/).forEach(syn => {
+                    const key = sanitize(syn);
+                    if (key && !geneMapCache.has(key)) geneMapCache.set(key, g);
+                });
+            }
+
+            if (g.ensembl_id) {
+                String(g.ensembl_id).split(/[,;]/).forEach(id => {
+                    const key = sanitize(id);
+                    if (key && !geneMapCache.has(key)) geneMapCache.set(key, g);
+                });
+            }
+
+            if (g.localization) {
+                const validCiliaryLocalizations = ['transition zone', 'cilia', 'basal body', 'axoneme', 'ciliary membrane', 'centrosome', 'autophagosomes', 'endoplasmic reticulum', 'flagella', 'golgi apparatus', 'lysosome', 'microbody', 'microtubules', 'mitochondrion', 'nucleus', 'peroxisome'];
+                let sanitizedLocalization = Array.isArray(g.localization) 
+                    ? g.localization.map(loc => loc ? loc.trim().toLowerCase() : '').filter(loc => loc && validCiliaryLocalizations.includes(loc))
+                    : (g.localization ? g.localization.split(/[,;]/).map(loc => loc ? loc.trim().toLowerCase() : '').filter(loc => loc && validCiliaryLocalizations.includes(loc)) : []);
+                
+                if (g.gene === 'ACTN2') {
+                    console.log('ACTN2 Raw localization from JSON:', g.localization);
+                    console.log('ACTN2 Sanitized localization before mapping:', sanitizedLocalization);
+                }
+                
+                geneLocalizationData[g.gene] = mapLocalizationToSVG(sanitizedLocalization);
+                
+                if (g.gene === 'ACTN2') {
+                    console.log('ACTN2 Mapped localization from mapLocalizationToSVG:', geneLocalizationData[g.gene]);
+                }
+            }
+        });
+
+        console.log(`Loaded ${allGenes.length} genes into database`);
+        return true;
+    } catch (e) {
+        console.error('Data load error:', e);
+        allGenes = getDefaultGenes();
+        currentData = allGenes;
+        geneMapCache = new Map();
+        allGenes.forEach(g => {
+            if (g.gene) geneMapCache.set(sanitize(g.gene), g);
+        });
+        return false;
+    }
 }
 
 /**
@@ -362,7 +292,7 @@ function getDefaultGenes() {
             functional_summary: "Essential for intraflagellar transport and ciliary assembly. It is a component of the IFT complex B and is required for cilium biogenesis.",
             localization: ["axoneme", "basal body"],
             reference: ["https://pubmed.ncbi.nlm.nih.gov/9724754/"],
-            complex_names: "IFT-B",
+            protein_complexes: "IFT-B",
             gene_annotation: "",
             functional_category: ["Intraflagellar transport", "Ciliary assembly/disassembly"],
             ciliopathy: "Bardet-Biedl syndrome 20"
@@ -376,7 +306,7 @@ function getDefaultGenes() {
             functional_summary: "Regulates ciliary gating and ciliopathy-related pathways. Acts as a gatekeeper for proteins entering and exiting the cilium.",
             localization: ["transition zone"],
             reference: ["https://pubmed.ncbi.nlm.nih.gov/16971477/"],
-            complex_names: "NPHP-MKS-JBTS complex",
+            protein_complexes: "NPHP-MKS-JBTS complex",
             gene_annotation: "",
             functional_category: ["Transition zone", "Ciliary gating"],
             ciliopathy: "Joubert syndrome 5, Meckel syndrome 4, Bardet-Biedl syndrome 14, Leber congenital amaurosis 10"
@@ -390,7 +320,7 @@ function getDefaultGenes() {
             functional_summary: "Required for proper ciliary structure and function. It is thought to be involved in the regulation of ciliogenesis.",
             localization: ["axoneme"],
             reference: ["https://pubmed.ncbi.nlm.nih.gov/22114125/"],
-            complex_names: "",
+            protein_complexes: "",
             gene_annotation: "",
             functional_category: ["Ciliary assembly/disassembly"],
             ciliopathy: ""
@@ -404,7 +334,7 @@ function getDefaultGenes() {
             functional_summary: "Critical for ciliary signaling and membrane trafficking. It is a small G protein that localizes to the ciliary membrane and regulates the traffic of ciliary proteins.",
             localization: ["ciliary membrane"],
             reference: ["https://pubmed.ncbi.nlm.nih.gov/19732862/"],
-            complex_names: "",
+            protein_complexes: "",
             gene_annotation: "",
             functional_category: ["Ciliary membrane", "Signal transduction"],
             ciliopathy: "Joubert syndrome 8"
@@ -418,7 +348,7 @@ function getDefaultGenes() {
             functional_summary: "Involved in ciliary trafficking and BBSome assembly. The BBSome complex is a key regulator of protein trafficking to and from the cilium.",
             localization: ["basal body", "ciliary membrane"],
             reference: ["https://pubmed.ncbi.nlm.nih.gov/11058628/"],
-            complex_names: "BBSome",
+            protein_complexes: "BBSome",
             gene_annotation: "",
             functional_category: ["Ciliary trafficking", "BBSome complex"],
             ciliopathy: "Bardet-Biedl syndrome 1"
@@ -432,7 +362,7 @@ function getDefaultGenes() {
             functional_summary: "Regulates blood pressure and acts as a receptor for coronaviruses in respiratory cilia. Its expression on ciliated cells is a key factor in COVID-19 infection.",
             localization: ["cilia"],
             reference: ["https://pubmed.ncbi.nlm.nih.gov/32142651/"],
-            complex_names: "",
+            protein_complexes: "",
             gene_annotation: "",
             functional_category: ["Cell surface receptor", "Ciliary membrane"],
             ciliopathy: ""
@@ -446,7 +376,7 @@ function getDefaultGenes() {
             functional_summary: "Ion channel important for mechanosensation in primary cilia.",
             localization: ["axoneme", "endoplasmic reticulum"],
             reference: ["https://pubmed.ncbi.nlm.nih.gov/11285250/"],
-            complex_names: ["Polycystin complex"],
+            protein_complexes: ["Polycystin complex"],
             gene_annotation: "",
             functional_category: ["Ion transport", "Ciliary signaling"],
             ciliopathy: "Autosomal dominant polycystic kidney disease"
