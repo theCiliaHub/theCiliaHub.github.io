@@ -67,17 +67,6 @@ async function handleRouteChange() {
         console.log("DEBUG path:", path);
     }
 
-    // Resolve gene if path is /gene/GENE
-    let gene = null;
-    if (geneMapCache) {
-        if (path.startsWith('/gene/')) {
-            const geneName = decodeURIComponent(path.replace('/gene/', '')).toUpperCase();
-            gene = geneMapCache.get(geneName);
-        }
-    } else {
-        console.warn("geneMapCache is not initialized yet.");
-    }
-
     // Update active nav item
     updateActiveNav(path);
 
@@ -92,13 +81,25 @@ async function handleRouteChange() {
         if (el) el.style.display = 'none';
     });
 
+    // --- Resolve gene from path ---
+    let gene = null;
+    if (geneMapCache) {
+        if (path.startsWith('/gene/')) {
+            const rawGene = decodeURIComponent(path.replace('/gene/', ''));
+            const geneName = sanitize(rawGene); // sanitize as used in geneMapCache
+            gene = geneMapCache.get(geneName); 
+        }
+    } else {
+        console.warn("geneMapCache is not initialized yet.");
+    }
+
     // Show the correct page
     switch (true) {
         case path === '/':
             displayHomePage();
             setTimeout(displayLocalizationChart, 0);
             break;
-        case path.startsWith('/batch'):
+        case path === '/batch-query' || path.startsWith('/batch?genes='):
             displayBatchQueryTool();
             break;
         case path === '/enrichment' || path === '/analysis':
