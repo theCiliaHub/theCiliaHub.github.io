@@ -24,14 +24,11 @@ function sanitize(input) {
                 .toUpperCase();
 }
 
-/**
- * Loads, sanitizes, and prepares the gene database into an efficient lookup map.
- */
 // This variable will store the loaded database to prevent re-fetching.
 let databaseCache = null;
 
 async function loadAndPrepareDatabase() {
-    // 1. If the database is already loaded and cached, return it immediately.
+    // If the database is already loaded and cached, return it immediately.
     if (databaseCache) {
         return databaseCache;
     }
@@ -39,13 +36,23 @@ async function loadAndPrepareDatabase() {
     try {
         const resp = await fetch('https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/ciliahub_data.json');
         if (!resp.ok) throw new Error(`HTTP Error ${resp.status}`);
-        const allGenes = await resp.json(); // Use a local variable
+        
+        // --- KEY CHANGE STARTS HERE ---
+        
+        // 1. Fetch the entire JSON object, which may contain metadata.
+        const dataContainer = await resp.json();
 
-        if (!Array.isArray(allGenes)) {
-            throw new Error('Invalid data format: expected an array');
+        // 2. Check for the nested 'genes' property and ensure it's an array.
+        if (!dataContainer || !Array.isArray(dataContainer.genes)) {
+            throw new Error("Invalid data format: expected an object with a 'genes' array.");
         }
 
-        const geneMap = new Map(); // Use a local variable for the map
+        // 3. Extract the actual array of genes to work with.
+        const allGenes = dataContainer.genes;
+        
+        // --- KEY CHANGE ENDS HERE ---
+
+        const geneMap = new Map();
 
         allGenes.forEach(g => {
             if (!g.gene || typeof g.gene !== 'string') {
@@ -53,11 +60,9 @@ async function loadAndPrepareDatabase() {
                 return;
             }
 
-            // Map the primary gene name
             const nameKey = g.gene.trim().toUpperCase();
             if (nameKey) geneMap.set(nameKey, g);
 
-            // Map synonyms
             if (g.synonym) {
                 String(g.synonym).split(/[,;]/).forEach(syn => {
                     const key = syn.trim().toUpperCase();
@@ -65,7 +70,6 @@ async function loadAndPrepareDatabase() {
                 });
             }
 
-            // Map Ensembl IDs
             if (g.ensembl_id) {
                 String(g.ensembl_id).split(/[,;]/).forEach(id => {
                     const key = id.trim().toUpperCase();
@@ -76,28 +80,22 @@ async function loadAndPrepareDatabase() {
 
         console.log(`Loaded ${allGenes.length} genes into database`);
 
-        // 2. Create the database object to be returned and cached.
         const database = {
             genes: allGenes,
             geneMap: geneMap
         };
 
-        // 3. Store the newly created database object in the cache.
         databaseCache = database;
-        
-        // 4. Return the complete database object.
         return database;
 
     } catch (e) {
         console.error('Data load error:', e);
-        // Handle error case: prepare a default/fallback database object
-        const defaultGenes = getDefaultGenes(); // Assuming this function exists
+        const defaultGenes = getDefaultGenes();
         const defaultGeneMap = new Map();
         defaultGenes.forEach(g => {
             if (g.gene) defaultGeneMap.set(g.gene.trim().toUpperCase(), g);
         });
 
-        // 5. Also return an object in the same format on failure.
         return {
             genes: defaultGenes,
             geneMap: defaultGeneMap
@@ -105,11 +103,8 @@ async function loadAndPrepareDatabase() {
     }
 }
 
-// Note: You'll also need a sanitize function if you don't have one.
-// If you are already handling sanitization elsewhere, you can ignore this.
-// function sanitize(str) {
-//     return str ? str.trim().toUpperCase() : '';
-// }
+
+
 
 /**
  * The central search function.
