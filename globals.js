@@ -52,81 +52,80 @@ function navigateTo(event, path) {
 // ROUTER
 // =============================================================================
 async function handleRouteChange() {
-    // Normalize path
-    let path = window.location.hash.replace(/^#/, '').toLowerCase().trim();
+    // 1. Load the database and get the returned object with genes and the geneMap.
+    // This replaces reliance on multiple global cache variables.
+    const database = await loadAndPrepareDatabase();
+
+    // Normalize the path from the URL hash.
+    let path = window.location.hash.replace(/^#/, '').trim();
     if (!path || path === '/' || path === '/index.html') {
         path = '/';
     }
 
-    // Load database if not loaded
-    try {
-        await loadAndPrepareDatabase(); // must populate geneMapCache + geneDataCache
-    } catch (err) {
-        console.error("Database loading failed:", err);
-        console.log("DEBUG hash:", window.location.hash);
-        console.log("DEBUG path:", path);
-    }
-
-    // Update active nav item
+    // Update the active navigation link based on the current path.
     updateActiveNav(path);
 
-    // Hide all main content sections
-    const pages = [
-        '#home-page', '#analysis-page', '#batch-query-page',
-        '#enrichment-page', '#compare-page', '#expression-page',
-        '#download-page', '#contact-page', '#notfound-page'
-    ];
-    pages.forEach(id => {
-        const el = document.querySelector(id);
-        if (el) el.style.display = 'none';
+    // Get all page elements to manage their visibility.
+    const pages = document.querySelectorAll('.main-content-section'); // A class is better for this
+    pages.forEach(page => {
+        page.style.display = 'none';
     });
 
-    // --- Resolve gene from path ---
-    let gene = null;
-    if (geneMapCache) {
-        if (path.startsWith('/gene/')) {
-            const rawGene = decodeURIComponent(path.replace('/gene/', ''));
-            const geneName = sanitize(rawGene); // sanitize as used in geneMapCache
-            gene = geneMapCache.get(geneName); 
-        }
-    } else {
-        console.warn("geneMapCache is not initialized yet.");
-    }
+    const pathLowerCase = path.toLowerCase();
 
-    // Show the correct page
+    // 2. The routing logic is now a single, clear switch statement.
     switch (true) {
-        case path === '/':
+        case pathLowerCase === '/':
             displayHomePage();
-            setTimeout(displayLocalizationChart, 0);
+            setTimeout(displayLocalizationChart, 0); // Ensures chart renders after page is visible
             break;
-        case path === '/batch-query' || path.startsWith('/batch?genes='):
-            displayBatchQueryTool();
-            break;
-        case path === '/enrichment' || path === '/analysis':
-            displayEnrichmentPage();
-            break;
-        case path === '/compare':
-            displayComparePage();
-            break;
-        case path === '/expression':
-            displayExpressionPage();
-            break;
-        case path === '/download':
-            displayDownloadPage();
-            break;
-        case path === '/contact':
-            displayContactPage();
-            break;
-        default:
+
+        // --- THIS IS THE CRITICAL FIX ---
+        // 3. Handle gene-specific pages as a primary route.
+        case pathLowerCase.startsWith('/gene/'):
+            const geneNameFromURL = decodeURIComponent(path.substring(6)); // Get everything after "/gene/"
+            const sanitizedGeneKey = sanitize(geneNameFromURL); // Sanitize it for lookup.
+            const gene = database.geneMap.get(sanitizedGeneKey); // Look it up in the correct map.
+
             if (gene) {
                 displayIndividualGenePage(gene);
             } else {
+                console.warn(`Gene not found in map for key: "${sanitizedGeneKey}"`);
                 displayNotFoundPage();
             }
             break;
-    }
+        // --- END OF FIX ---
 
-    console.log("Routing completed. Path:", path, "Gene:", gene ? gene.name : "N/A");
+        case pathLowerCase === '/batch-query' || pathLowerCase.startsWith('/batch?genes='):
+            displayBatchQueryTool();
+            break;
+
+        case pathLowerCase === '/enrichment' || pathLowerCase === '/analysis':
+            displayEnrichmentPage();
+            break;
+
+        case pathLowerCase === '/compare':
+            displayComparePage();
+            break;
+
+        case pathLowerCase === '/expression':
+            displayExpressionPage();
+            break;
+
+        case pathLowerCase === '/download':
+            displayDownloadPage();
+            break;
+
+        case pathLowerCase === '/contact':
+            displayContactPage();
+            break;
+
+        default:
+            // If no other route matches, display the "Not Found" page.
+            displayNotFoundPage();
+            break;
+    }
+    console.log("Routing completed. Path:", path);
 }
 
 
