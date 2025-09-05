@@ -190,24 +190,22 @@ function performSingleSearch() {
         return;
     }
 
+    // Filter genes based on official name, synonyms, or Ensembl ID
     const results = allGenes.filter(g => {
         try {
-            if (g?.gene?.toUpperCase().startsWith(query)) {
-                return true;
-            }
+            if (g?.gene?.toUpperCase().startsWith(query)) return true;
+
             if (g?.synonym) {
                 const synonyms = g.synonym
                     .toUpperCase()
                     .split(',')
                     .map(s => s.trim())
                     .filter(s => s);
-                if (synonyms.some(s => s.includes(query))) {
-                    return true;
-                }
+                if (synonyms.some(s => s.includes(query))) return true;
             }
-            if (g?.ensembl_id?.toUpperCase().startsWith(query)) {
-                return true;
-            }
+
+            if (g?.ensembl_id?.toUpperCase().startsWith(query)) return true;
+
             return false;
         } catch (error) {
             console.error(`Error processing gene: ${JSON.stringify(g)}`, error);
@@ -216,6 +214,7 @@ function performSingleSearch() {
     });
 
     if (results.length === 0) {
+        // Suggest close matches (first 3 starting with first 3 letters)
         const closeMatches = allGenes
             .filter(g => g?.gene?.toUpperCase().startsWith(query.slice(0, 3)))
             .slice(0, 3);
@@ -229,13 +228,20 @@ function performSingleSearch() {
     }
 
     if (results.length === 1) {
+        // Single match -> navigate to gene page
         try {
-            navigateTo(null, `/${results[0].gene}`);
+            const geneKey = sanitize(results[0].gene); // normalize to match geneMapCache keys
+            if (geneMapCache.has(geneKey)) {
+                navigateTo(null, `/gene/${encodeURIComponent(geneKey)}`);
+            } else {
+                statusDiv.innerHTML = `<span class="error-message">Gene "${results[0].gene}" not found in database.</span>`;
+            }
         } catch (error) {
             console.error('Navigation failed:', error);
             statusDiv.innerHTML = '<span class="error-message">Error navigating to gene page.</span>';
         }
     } else {
+        // Multiple matches -> show informative message
         statusDiv.innerHTML = `<span class="error-message">Multiple genes found matching "${query}": ${results
             .map(g => g.gene)
             .join(', ')}. Please be more specific or use the Batch Query tool.</span>`;
