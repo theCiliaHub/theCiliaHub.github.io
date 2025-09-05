@@ -130,24 +130,30 @@ async function handleRouteChange() {
 // ----------------------------
 // Intercept search form submission
 // ----------------------------
-document.getElementById('search-form').addEventListener('submit', function (e) {
-    e.preventDefault(); // prevent default form submit
+document.addEventListener('DOMContentLoaded', function () {
+    const searchForm = document.getElementById('search-form');
+    if (!searchForm) return; // safety check
 
-    const searchTerm = document.getElementById('search-input').value.trim();
-    if (!searchTerm) return;
+    searchForm.addEventListener('submit', function (e) {
+        e.preventDefault(); // prevent default form submit
 
-    // Split by comma, semicolon, or space
-    const genes = searchTerm.split(/[\s,;]+/).filter(Boolean);
+        const searchTerm = document.getElementById('search-input').value.trim();
+        if (!searchTerm) return;
 
-    // Redirect depending on number of genes
-    if (genes.length === 1) {
-        // Single gene -> gene page
-        window.location.hash = `#/gene/${encodeURIComponent(genes[0])}`;
-    } else {
-        // Multiple genes -> batch query
-        window.location.hash = `#/batch?genes=${encodeURIComponent(genes.join(","))}`;
-    }
+        // Split by comma, semicolon, or space
+        const genes = searchTerm.split(/[\s,;]+/).filter(Boolean);
+
+        // Redirect depending on number of genes
+        if (genes.length === 1) {
+            // Single gene -> gene page
+            window.location.hash = `#/gene/${encodeURIComponent(genes[0])}`;
+        } else {
+            // Multiple genes -> batch query
+            window.location.hash = `#/batch?genes=${encodeURIComponent(genes.join(","))}`;
+        }
+    });
 });
+
 
 
 // =============================================================================
