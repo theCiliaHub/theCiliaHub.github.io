@@ -168,6 +168,9 @@ function createEnrichmentResultsTable(foundGenes, notFoundGenes) {
 // =============================================================================
 // KEY LOCALIZATIONS (Bubble Plot)
 // =============================================================================
+// =============================================================================
+// KEY LOCALIZATIONS (Bubble Plot)
+// =============================================================================
 function renderKeyLocalizations(foundGenes, container) {
     if (!foundGenes.length) {
         container.innerHTML = '<p class="status-message">No ciliary genes found for plotting.</p>';
@@ -175,9 +178,27 @@ function renderKeyLocalizations(foundGenes, container) {
     }
 
     const settings = getPlotSettings();
-    const yCategories = ['Cilia', 'Basal Body', 'Transition Zone', 'Axoneme', 'Ciliary Membrane', 'Centrosome'];
-    const localizationCounts = {};
+    const yCategories = [
+        'Cilia',
+        'Basal Body',
+        'Transition Zone',
+        'Axoneme',
+        'Ciliary Membrane',
+        'Centrosome',
+        'Microtubules',
+        'Endoplasmic Reticulum',
+        'Flagella',
+        'Cytosol',
+        'Lysosome',
+        'Autophagosomes',
+        'Ribosome',
+        'Nucleus',
+        'P-body',
+        'Peroxisome'
+    ];
 
+    // Count genes per localization
+    const localizationCounts = {};
     foundGenes.forEach(gene => {
         (Array.isArray(gene.localization) ? gene.localization : []).forEach(loc => {
             const match = yCategories.find(cat => cat.toLowerCase() === loc.trim().toLowerCase());
@@ -209,10 +230,11 @@ function renderKeyLocalizations(foundGenes, container) {
             }]
         },
         options: {
-            responsive: true, maintainAspectRatio: false,
+            responsive: true,
+            maintainAspectRatio: false,
             plugins: {
                 legend: { display: false },
-                title: { display: true, text: 'Key Localizations: Distribution of Your Genes Across Primary Ciliary Compartments', font: { size: 20 } },
+                title: { display: true, text: 'Key Localizations: Distribution of Your Genes Across Compartments', font: { size: 20 } },
                 tooltip: { callbacks: { label: c => `${c.raw.y}: ${c.raw.count} gene(s)` } }
             },
             scales: {
@@ -223,15 +245,18 @@ function renderKeyLocalizations(foundGenes, container) {
                     ticks: { font: { size: 20 } } 
                 },
                 y: { 
-                    title: { display: true, text: 'Ciliary Compartment', font: { size: 20 } }, 
+                    type: 'category',
+                    labels: yCategories,
+                    title: { display: true, text: 'Cellular Compartment', font: { size: 20 } }, 
                     grid: { display: false }, 
                     border: { display: true, width: 2 }, 
-                    ticks: { font: { size: 20 } } 
+                    ticks: { font: { size: 20 } }
                 }
             }
         }
     });
 }
+
 
 // =============================================================================
 // GENE MATRIX (Bubble Matrix)
@@ -293,7 +318,7 @@ function renderGeneMatrix(foundGenes, container) {
 // DOMAIN ENRICHMENT (Bar Chart)
 // =============================================================================
 function renderDomainEnrichment(foundGenes, container) {
-    const stats = computeDomainEnrichment(foundGenes); // statistical calculation preserved
+    const stats = computeDomainEnrichment(foundGenes); 
     if (!stats.length) {
         container.innerHTML = '<p class="status-message">No domains found for enrichment.</p>';
         return;
@@ -333,28 +358,30 @@ function renderDomainEnrichment(foundGenes, container) {
 // CILIOPATHY ASSOCIATIONS (Sunburst)
 // =============================================================================
 function renderCiliopathySunburst(foundGenes, container) {
-    const stats = computeCiliopathyAssociations(foundGenes); // statistical calculation preserved
+    const stats = computeCiliopathyAssociations(foundGenes); // statistical calculation
     if (!stats || !stats.length) {
         container.innerHTML = '<p class="status-message">No ciliopathy associations found.</p>';
         return;
     }
 
+    // Clear previous content
     container.innerHTML = '';
     const width = container.clientWidth;
     const height = 500;
     const radius = Math.min(width, height) / 2;
 
-    const svg = d3.select(container).append('svg')
+    const svg = d3.select(container)
+        .append('svg')
         .attr('width', width)
         .attr('height', height)
         .append('g')
-        .attr('transform', `translate(${width/2},${height/2})`);
-
-    const partition = d3.partition()
-        .size([2 * Math.PI, radius]);
+        .attr('transform', `translate(${width / 2},${height / 2})`);
 
     const root = d3.hierarchy({ name: 'Ciliopathies', children: stats })
         .sum(d => d.count);
+
+    const partition = d3.partition()
+        .size([2 * Math.PI, radius]);
 
     partition(root);
 
@@ -377,13 +404,31 @@ function renderCiliopathySunburst(foundGenes, container) {
         .on('mouseout', function(event, d) {
             d3.select(this).attr('fill', d.children ? d3.interpolateCool(d.depth / 3) : '#69b3a2');
         });
+
+    // Optional: add labels
+    svg.selectAll('text')
+        .data(root.descendants().filter(d => (d.x1 - d.x0) > 0.05))
+        .enter()
+        .append('text')
+        .attr('transform', d => {
+            const x = (d.x0 + d.x1) / 2 * 180 / Math.PI;
+            const y = (d.y0 + d.y1) / 2;
+            return `rotate(${x - 90}) translate(${y},0) rotate(${x < 180 ? 0 : 180})`;
+        })
+        .attr('text-anchor', 'middle')
+        .attr('font-size', 12)
+        .text(d => d.data.name);
 }
+
 
 // =============================================================================
 // PROTEIN COMPLEX NETWORK (Force-Directed Graph)
 // =============================================================================
+// =============================================================================
+// PROTEIN COMPLEX NETWORK (Force-Directed Graph)
+// =============================================================================
 function renderComplexNetwork(foundGenes, container) {
-    const stats = computeProteinComplexLinks(foundGenes); // statistical calculation preserved
+    const stats = computeProteinComplexLinks(foundGenes); // statistical calculation
     if (!stats || !stats.nodes || !stats.links) {
         container.innerHTML = '<p class="status-message">No protein complex data found.</p>';
         return;
@@ -393,7 +438,8 @@ function renderComplexNetwork(foundGenes, container) {
     const width = container.clientWidth;
     const height = 500;
 
-    const svg = d3.select(container).append('svg')
+    const svg = d3.select(container)
+        .append('svg')
         .attr('width', width)
         .attr('height', height);
 
@@ -417,7 +463,22 @@ function renderComplexNetwork(foundGenes, container) {
         .append('circle')
         .attr('r', 12)
         .attr('fill', '#1f77b4')
-        .call(drag(simulation));
+        .call(d3.drag()
+            .on('start', event => {
+                if (!event.active) simulation.alphaTarget(0.3).restart();
+                event.subject.fx = event.subject.x;
+                event.subject.fy = event.subject.y;
+            })
+            .on('drag', event => {
+                event.subject.fx = event.x;
+                event.subject.fy = event.y;
+            })
+            .on('end', event => {
+                if (!event.active) simulation.alphaTarget(0);
+                event.subject.fx = null;
+                event.subject.fy = null;
+            })
+        );
 
     const label = svg.append('g')
         .selectAll('text')
@@ -425,7 +486,7 @@ function renderComplexNetwork(foundGenes, container) {
         .enter()
         .append('text')
         .text(d => d.id)
-        .attr('font-size', 14)
+        .attr('font-size', 12)
         .attr('dx', 15)
         .attr('dy', 4);
 
@@ -444,27 +505,7 @@ function renderComplexNetwork(foundGenes, container) {
             .attr('x', d => d.x)
             .attr('y', d => d.y);
     });
-
-    function drag(sim) {
-        return d3.drag()
-            .on('start', event => {
-                if (!event.active) sim.alphaTarget(0.3).restart();
-                event.subject.fx = event.subject.x;
-                event.subject.fy = event.subject.y;
-            })
-            .on('drag', event => {
-                event.subject.fx = event.x;
-                event.subject.fy = event.y;
-            })
-            .on('end', event => {
-                if (!event.active) sim.alphaTarget(0);
-                event.subject.fx = null;
-                event.subject.fy = null;
-            });
-    }
 }
-
-
 
 function calculateDomainEnrichment(filteredData, allCiliaData) {
     const domainCountsUser = new Map();
