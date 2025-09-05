@@ -1,20 +1,24 @@
-'use strict';
 
+// globals.js
 // =============================================================================
-// GLOBAL VARIABLES & STATE
+// GLOBAL VARIABLES
 // =============================================================================
 
-// Data Storage - These are used by multiple scripts
+// Data storage
 let allGenes = [];
-let geneDataCache = null;
-let geneMapCache = null;
-let pfamNameMap = new Map();
+let currentData = [];
+let searchResults = [];
 const geneLocalizationData = {};
 
-// Plotting - Holds the active plot instance for a page
-let currentPlotInstance = null;
+// Plotting
+let currentPlot = null;
 
-// IDs and defaults for other parts of the site
+// Chart instances
+let localizationChartInstance;
+let analysisDotPlotInstance;
+let analysisBarChartInstance;
+
+// IDs and defaults
 const allPartIds = [
     "cell-body", "nucleus", "basal-body",
     "transition-zone", "axoneme", "ciliary-membrane"
@@ -24,22 +28,104 @@ const defaultGenesNames = [
     "CEP290", "WDR31", "ARL13B", "BBS1"
 ];
 
-// =============================================================================
-// GLOBAL NAVIGATION UTILITY
-// =============================================================================
+// Caches
+let geneDataCache = null;
+let geneMapCache = null;
+
 
 /**
  * Handles SPA navigation by updating the URL hash.
- * This triggers the 'hashchange' event listener in script.js.
+ * This triggers the 'hashchange' event listener, which calls handleRouteChange.
+ * @param {Event | null} event - The click event, used to prevent default link behavior.
+ * @param {string} path - The new path to navigate to (e.g., '/', '/ACE2').
  */
 function navigateTo(event, path) {
     if (event) {
-        event.preventDefault();
+        event.preventDefault(); // Prevents the browser from reloading the page
     }
+    // Set the new hash, which will be detected by the 'hashchange' event listener
     window.location.hash = path;
 }
 
 
+// =============================================================================
+// ROUTER
+// =============================================================================
+async function handleRouteChange() {
+    // Normalize path
+    let path = window.location.hash.replace(/^#/, '').toLowerCase().trim();
+    if (!path || path === '/' || path === '/index.html') {
+        path = '/';
+    }
+
+    // Load database if not loaded
+    try {
+        await loadAndPrepareDatabase(); // must populate geneMapCache + geneDataCache
+    } catch (err) {
+        console.error("Database loading failed:", err);
+        console.log("DEBUG hash:", window.location.hash);
+        console.log("DEBUG path:", path);
+    }
+
+    // Try to resolve gene from path
+    let gene = null;
+    if (geneMapCache) {
+        const geneName = sanitize(path.split('/').pop().replace('.html', ''));
+        gene = geneMapCache.get(geneName);
+    } else {
+        console.warn("geneMapCache is not initialized yet.");
+    }
+
+    // Update active nav item
+    updateActiveNav(path);
+
+    // Hide all main content sections
+    const pages = [
+        '#home-page', '#analysis-page', '#batch-query-page',
+        '#enrichment-page', '#compare-page', '#expression-page',
+        '#download-page', '#contact-page', '#notfound-page'
+    ];
+    pages.forEach(id => {
+        const el = document.querySelector(id);
+        if (el) el.style.display = 'none';
+    });
+
+    // Show the correct page
+    switch (path) {
+        case '/':
+            displayHomePage();
+            setTimeout(displayLocalizationChart, 0);
+            break;
+        case '/batch-query':
+            displayBatchQueryTool();
+            break;
+        case '/enrichment':
+        case '/analysis': // handle both routes
+            displayEnrichmentPage();
+            break;
+        case '/compare':
+            displayComparePage();
+            break;
+        case '/expression':
+            displayExpressionPage();
+            break;
+        case '/download':
+            displayDownloadPage();
+            break;
+        case '/contact':
+            displayContactPage();
+            break;
+        default:
+            if (gene) {
+                displayIndividualGenePage(gene);
+            } else {
+                displayNotFoundPage();
+            }
+            break;
+    }
+
+    console.log("Routing completed. Path:", path, "Gene:", gene ? gene.name : "N/A");
+}
 
 // =============================================================================
 // EVENT LISTENERS
