@@ -162,9 +162,6 @@ function performBatchSearch() {
     displayBatchResults(foundGenes, notFoundGenes);
 }
 
-/**
- * Handles the UI for the Single Gene Search on the Home page.
- */
 function performSingleSearch() {
     const query = document.getElementById('single-gene-search').value.trim().toUpperCase();
     const statusDiv = document.getElementById('status-message');
@@ -176,43 +173,43 @@ function performSingleSearch() {
         return;
     }
 
-    // ✅ Only match exact gene symbol or exact synonym
+    // ✅ EXACT MATCH LIKE COMPARE PAGE
     const results = allGenes.filter(g => {
-        if (g.gene && g.gene.toUpperCase() === query) return true;
+        if (g.gene && g.gene.trim().toUpperCase() === query) return true;
         if (g.synonym) {
-            const synonyms = g.synonym.toUpperCase().split(',').map(s => s.trim());
+            const synonyms = g.synonym.split(',').map(s => s.trim().toUpperCase());
             if (synonyms.includes(query)) return true;
         }
+        if (g.ensembl_id && g.ensembl_id.trim().toUpperCase() === query) return true;
         return false;
     });
 
     if (results.length === 0) {
         const closeMatches = allGenes.filter(g =>
-            g.gene && g.gene.toUpperCase().startsWith(query.slice(0, 3))
+            g.gene && g.gene.trim().toUpperCase().startsWith(query.slice(0, 3))
         ).slice(0, 3);
 
         statusDiv.innerHTML = `<span class="error-message">No genes found for "${query}". ${
             closeMatches.length > 0
-                ? 'Did you mean: ' + closeMatches.map(g => g.gene).join(', ') + '?'
+                ? 'Did you mean: ' + closeMatches.map(g => g.gene.trim()).join(', ') + '?'
                 : 'No close matches found.'
         }</span>`;
         return;
     }
 
-    // ✅ FIX: If all results refer to the same gene symbol, treat as single gene
-    const uniqueGenes = [...new Set(results.map(r => r.gene.toUpperCase()))];
+    // ✅ Always navigate to gene page if all matches are same gene
+    const uniqueGenes = [...new Set(results.map(r => r.gene.trim().toUpperCase()))];
     if (uniqueGenes.length === 1) {
         navigateTo(null, `/${uniqueGenes[0]}`);
     } else {
-        // Otherwise, go to batch query
+        // Only use batch query when there are truly multiple distinct genes
         navigateTo(null, '/batch-query');
         setTimeout(() => {
-            document.getElementById('batch-genes-input').value = results.map(r => r.gene).join('\n');
+            document.getElementById('batch-genes-input').value = results.map(r => r.gene.trim()).join('\n');
             performBatchSearch();
         }, 100);
     }
 }
-
 
 /**
  * Displays batch results.
