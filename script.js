@@ -163,13 +163,16 @@ function performBatchSearch() {
 }
 
 // --- HOME PAGE SEARCH HANDLER (FIXED) ---
+// --- HOME PAGE SEARCH HANDLER (FIXED) ---
+// This function handles user input to show a list of suggestions.
 function handleHomeSearchInput() {
-    const query = homeSearchInput.value.trim().toUpperCase(); // ✅ Trim spaces
+    const query = homeSearchInput.value.trim().toUpperCase();
     if (query.length < 1) {
         homeSuggestionsContainer.style.display = 'none';
         return;
     }
 
+    // Filter genes using the same successful logic as the Compare Page
     const filteredGenes = allGenes.filter(g => {
         const geneMatch = g.gene && g.gene.toUpperCase().startsWith(query);
         const synonymMatch = g.synonym && g.synonym.toUpperCase().includes(query);
@@ -178,30 +181,64 @@ function handleHomeSearchInput() {
     }).slice(0, 10);
 
     if (filteredGenes.length > 0) {
+        // Build and display the suggestion list
         homeSuggestionsContainer.innerHTML = filteredGenes.map(g => {
             const details = [g.ensembl_id, g.synonym].filter(Boolean).join(', ');
             return `<div class="suggestion-item" data-gene="${g.gene}">${g.gene}${details ? ` (${details})` : ''}</div>`;
         }).join('');
 
-        homeSuggestionsContainer.style.display = 'block';
+        // Add a click listener to each suggestion
         homeSuggestionsContainer.querySelectorAll('.suggestion-item').forEach(item => {
             item.addEventListener('click', () => {
+                // On click, navigate to the specific gene page
                 navigateToGenePage(item.dataset.gene);
             });
         });
+        homeSuggestionsContainer.style.display = 'block';
     } else {
-        homeSuggestionsContainer.style.display = 'none';
+        homeSuggestionsContainer.innerHTML = `<div class="suggestion-item-none">No results found</div>`;
+        homeSuggestionsContainer.style.display = 'block';
     }
 }
 
+// --- ADDED FUNCTION TO HANDLE 'ENTER' KEY ---
+// This function should be attached to the 'keydown' event of your search input.
+function handleHomeSearchKeyDown(event) {
+    if (event.key === 'Enter') {
+        const query = homeSearchInput.value.trim().toUpperCase();
+        if (query.length === 0) return;
+
+        // Check for an exact match to what the user typed (e.g., "A10")
+        const exactMatch = allGenes.find(g => g.gene.toUpperCase() === query);
+
+        if (exactMatch) {
+            // If an exact match is found, navigate directly
+            navigateToGenePage(exactMatch.gene);
+        } else {
+            // Otherwise, navigate to the first suggestion as a fallback
+            const firstSuggestion = homeSuggestionsContainer.querySelector('.suggestion-item');
+            if (firstSuggestion) {
+                navigateToGenePage(firstSuggestion.dataset.gene);
+            }
+        }
+    }
+}
+
+
 // --- NAVIGATION FIX ---
+// This robust function navigates to the selected gene's page.
 function navigateToGenePage(geneName) {
     const selectedGene = allGenes.find(g => g.gene === geneName);
+
     if (selectedGene) {
-        window.location.hash = `#/${selectedGene.gene}`; // ✅ Always builds correct URL
-        displayGenePage(selectedGene.gene); // ✅ Directly loads page content
+        homeSearchInput.value = selectedGene.gene; // Update input field
+        homeSuggestionsContainer.style.display = 'none'; // Hide suggestions
+
+        // Your existing navigation logic
+        window.location.hash = `#/${selectedGene.gene}`;
+        displayGenePage(selectedGene.gene);
     } else {
-        console.warn(`No gene found for: ${geneName}`);
+        console.warn(`Navigation failed: No gene found for "${geneName}"`);
     }
 }
 
@@ -1798,7 +1835,7 @@ function highlightClickedOrgan(tissueName) {
     });
 }
 
-function displayTiceExpressionData(tissueName) {
+function displayTissueExpressionData(tissueName) {
     const tableWrapper = document.getElementById('expression-table-wrapper');
     if (!tableWrapper) return;
 
