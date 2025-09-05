@@ -158,7 +158,9 @@ function performBatchSearch() {
 // HOME SEARCH FUNCTION
 // =============================================================================
 // Enhanced gene search function with better matching
-function performSingleSearch() {
+async function performSingleSearch() {
+    await loadAndPrepareDatabase();  // Ensure data is loaded before matching
+    // ... (rest of the function remains unchanged: case-insensitive matching, check for exactly one match, set hash or show error)
     const searchInput = document.getElementById('geneSearch') || document.querySelector('input[type="search"]') || document.querySelector('#search-input');
     if (!searchInput) {
         console.error('Search input not found');
