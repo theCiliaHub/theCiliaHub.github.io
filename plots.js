@@ -37,72 +37,59 @@ function getPlotSettings() {
     };
 }
 
-async function downloadPlot() {
-    const format = document.getElementById('download-format')?.value || 'png';
-    const plotArea = document.getElementById('plot-display-area');
-    const plotType = document.querySelector('input[name="plot-type"]:checked')?.value;
-    
-    if (!plotArea.firstChild || !plotType || plotArea.querySelector('.status-message')) {
-        alert("Please generate a plot first.");
+// =============================================================================
+// GENERATE ANALYSIS PLOTS
+// =============================================================================
+async function generateAnalysisPlots() {
+    const geneInput = document.getElementById('analysis-genes-input').value;
+    if (!geneInput.trim()) {
+        alert('Please enter a list of gene names.');
         return;
     }
-    
-    const fileName = `CiliaHub_${plotType}_plot.${format}`;
-    const scale = 3; // Render at 3x resolution for ~300 DPI
-    const width = plotArea.clientWidth;
-    const height = plotArea.clientHeight;
 
-    try {
-        let dataUrl;
-        if (plotArea.querySelector('canvas')) { // Chart.js
-            dataUrl = currentPlotInstance.toBase64Image('image/png', 1.0);
-        } else if (plotArea.querySelector('.js-plotly-plot')) { // Plotly
-             dataUrl = await Plotly.toImage(currentPlotInstance, { format: 'png', width: width * scale, height: height * scale });
-        } else if (plotArea.querySelector('svg')) { // D3
-            const svgElement = plotArea.querySelector('svg');
-            const svgString = new XMLSerializer().serializeToString(svgElement);
-            const canvas = document.createElement('canvas');
-            canvas.width = width * scale;
-            canvas.height = height * scale;
-            const ctx = canvas.getContext('2d');
-            ctx.fillStyle = getPlotSettings().backgroundColor;
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            
-            const img = new Image();
-            const svgBlob = new Blob([svgString], {type: "image/svg+xml;charset=utf-8"});
-            const url = URL.createObjectURL(svgBlob);
-            
-            await new Promise((resolve, reject) => {
-                img.onload = () => {
-                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                    URL.revokeObjectURL(url);
-                    dataUrl = canvas.toDataURL('image/png');
-                    resolve();
-                };
-                img.onerror = reject;
-                img.src = url;
-            });
-        }
+    const queries = geneInput.split(/[\s,;]+/).filter(Boolean);
 
-        if (!dataUrl) { throw new Error("Could not generate image data URL."); }
-
-        if (format === 'png') {
-            const a = document.createElement('a');
-            a.href = dataUrl;
-            a.download = fileName;
-            a.click();
-        } else if (format === 'pdf') {
-            const { jsPDF } = window.jspdf;
-            const pdf = new jsPDF({ orientation: width > height ? 'l' : 'p', unit: 'px', format: [width * scale, height * scale] });
-            pdf.addImage(dataUrl, 'PNG', 0, 0, width * scale, height * scale);
-            pdf.save(fileName);
-        }
-    } catch (e) {
-        console.error("Download failed:", e);
-        alert("An error occurred during download.");
+    // Load and prepare gene database if not already loaded
+    const loaded = await loadAndPrepareDatabase();
+    if (!loaded) {
+        alert('Gene database failed to load. Using default gene set.');
     }
-}
 
+    // Search for genes
+    const { foundGenes, notFoundGenes } = findGenes(queries);
+
+    // Display table of results
+    createEnrichmentResultsTable(foundGenes, notFoundGenes);
+
+    // Show plot container
+    const plotsWrapper = document.getElementById('enrichment-plots-wrapper');
+    plotsWrapper.style.display = 'block';
+
+    // Key Localizations Bubble Plot
+    const keyLocContainer = document.getElementById('analysis-bubble-plot');
+    renderKeyLocalizations(foundGenes, keyLocContainer.parentElement);
+
+    // Gene Matrix
+    const matrixContainer = document.getElementById('analysis-matrix-plot');
+    renderGeneMatrix(foundGenes, matrixContainer.parentElement);
+
+    // Domain Enrichment
+    const domainContainer = document.getElementById('bubble-chart-div');
+    renderDomainEnrichment(foundGenes, domainContainer);
+
+    // Ciliopathy Associations (Sunburst)
+    const ciliopathyContainer = document.getElementById('sunburst-plot-div');
+    renderCiliopathySunburst(foundGenes, ciliopathyContainer);
+
+    // Protein Complex Network
+    const networkContainer = document.getElementById('network-graph-div');
+    renderComplexNetwork(foundGenes, networkContainer);
+
+    // Ensure proper visibility for all plots
+    document.querySelectorAll('#enrichment-plots-wrapper .plot-container canvas, #enrichment-plots-wrapper .plot-container svg').forEach(el => {
+        el.style.display = 'block';
+    });
+}
 
 // =============================================================================
 // PLOTTING FUNCTIONS
