@@ -27,20 +27,25 @@ function sanitize(input) {
 /**
  * Loads, sanitizes, and prepares the gene database into an efficient lookup map.
  */
+// This variable will store the loaded database to prevent re-fetching.
+let databaseCache = null;
+
 async function loadAndPrepareDatabase() {
-    if (geneDataCache) return true;
+    // 1. If the database is already loaded and cached, return it immediately.
+    if (databaseCache) {
+        return databaseCache;
+    }
+
     try {
         const resp = await fetch('https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/ciliahub_data.json');
         if (!resp.ok) throw new Error(`HTTP Error ${resp.status}`);
-        const rawGenes = await resp.json();
+        const allGenes = await resp.json(); // Use a local variable
 
-        if (!Array.isArray(rawGenes)) {
-            throw new Error('Invalid data format: expected array');
+        if (!Array.isArray(allGenes)) {
+            throw new Error('Invalid data format: expected an array');
         }
 
-        geneDataCache = rawGenes;
-        allGenes = rawGenes;
-        geneMapCache = new Map();
+        const geneMap = new Map(); // Use a local variable for the map
 
         allGenes.forEach(g => {
             if (!g.gene || typeof g.gene !== 'string') {
@@ -48,55 +53,63 @@ async function loadAndPrepareDatabase() {
                 return;
             }
 
-            const nameKey = sanitize(g.gene);
-            if (nameKey) geneMapCache.set(nameKey, g);
+            // Map the primary gene name
+            const nameKey = g.gene.trim().toUpperCase();
+            if (nameKey) geneMap.set(nameKey, g);
 
+            // Map synonyms
             if (g.synonym) {
                 String(g.synonym).split(/[,;]/).forEach(syn => {
-                    const key = sanitize(syn);
-                    if (key && !geneMapCache.has(key)) geneMapCache.set(key, g);
+                    const key = syn.trim().toUpperCase();
+                    if (key && !geneMap.has(key)) geneMap.set(key, g);
                 });
             }
 
+            // Map Ensembl IDs
             if (g.ensembl_id) {
                 String(g.ensembl_id).split(/[,;]/).forEach(id => {
-                    const key = sanitize(id);
-                    if (key && !geneMapCache.has(key)) geneMapCache.set(key, g);
+                    const key = id.trim().toUpperCase();
+                    if (key && !geneMap.has(key)) geneMap.set(key, g);
                 });
-            }
-
-            if (g.localization) {
-                const validCiliaryLocalizations = ['transition zone', 'cilia', 'basal body', 'axoneme', 'ciliary membrane', 'centrosome', 'autophagosomes', 'endoplasmic reticulum', 'flagella', 'golgi apparatus', 'lysosome', 'microbody', 'microtubules', 'mitochondrion', 'nucleus', 'peroxisome'];
-                let sanitizedLocalization = Array.isArray(g.localization) 
-                    ? g.localization.map(loc => loc ? loc.trim().toLowerCase() : '').filter(loc => loc && validCiliaryLocalizations.includes(loc))
-                    : (g.localization ? g.localization.split(/[,;]/).map(loc => loc ? loc.trim().toLowerCase() : '').filter(loc => loc && validCiliaryLocalizations.includes(loc)) : []);
-                
-                if (g.gene === 'ACTN2') {
-                    console.log('ACTN2 Raw localization from JSON:', g.localization);
-                    console.log('ACTN2 Sanitized localization before mapping:', sanitizedLocalization);
-                }
-                
-                geneLocalizationData[g.gene] = mapLocalizationToSVG(sanitizedLocalization);
-                
-                if (g.gene === 'ACTN2') {
-                    console.log('ACTN2 Mapped localization from mapLocalizationToSVG:', geneLocalizationData[g.gene]);
-                }
             }
         });
 
         console.log(`Loaded ${allGenes.length} genes into database`);
-        return true;
+
+        // 2. Create the database object to be returned and cached.
+        const database = {
+            genes: allGenes,
+            geneMap: geneMap
+        };
+
+        // 3. Store the newly created database object in the cache.
+        databaseCache = database;
+        
+        // 4. Return the complete database object.
+        return database;
+
     } catch (e) {
         console.error('Data load error:', e);
-        allGenes = getDefaultGenes();
-        currentData = allGenes;
-        geneMapCache = new Map();
-        allGenes.forEach(g => {
-            if (g.gene) geneMapCache.set(sanitize(g.gene), g);
+        // Handle error case: prepare a default/fallback database object
+        const defaultGenes = getDefaultGenes(); // Assuming this function exists
+        const defaultGeneMap = new Map();
+        defaultGenes.forEach(g => {
+            if (g.gene) defaultGeneMap.set(g.gene.trim().toUpperCase(), g);
         });
-        return false;
+
+        // 5. Also return an object in the same format on failure.
+        return {
+            genes: defaultGenes,
+            geneMap: defaultGeneMap
+        };
     }
 }
+
+// Note: You'll also need a sanitize function if you don't have one.
+// If you are already handling sanitization elsewhere, you can ignore this.
+// function sanitize(str) {
+//     return str ? str.trim().toUpperCase() : '';
+// }
 
 /**
  * The central search function.
