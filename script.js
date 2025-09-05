@@ -166,34 +166,53 @@ function performBatchSearch() {
  * Handles the UI for the Single Gene Search on the Home page.
  */
 function performSingleSearch() {
-    const query = sanitize(document.getElementById('single-gene-search')?.value || '');
+    const query = document.getElementById('single-gene-search').value.trim().toUpperCase();
     const statusDiv = document.getElementById('status-message');
-    if (!statusDiv) return;
-    
+    statusDiv.innerHTML = '<span>Loading...</span>';
     statusDiv.style.display = 'block';
+
     if (!query) {
         statusDiv.innerHTML = `<span class="error-message">Please enter a gene name.</span>`;
         return;
     }
-    statusDiv.innerHTML = '<span>Searching...</span>';
 
-    const { foundGenes } = findGenes([query]);
+    // ✅ Only match exact gene symbol or exact synonym
+    const results = allGenes.filter(g => {
+        if (g.gene && g.gene.toUpperCase() === query) return true;
+        if (g.synonym) {
+            const synonyms = g.synonym.toUpperCase().split(',').map(s => s.trim());
+            if (synonyms.includes(query)) return true;
+        }
+        return false;
+    });
 
-    if (foundGenes.length === 1) {
-        navigateTo(null, `/${foundGenes[0].gene}`);
-    } else if (foundGenes.length > 1) {
+    if (results.length === 0) {
+        const closeMatches = allGenes.filter(g =>
+            g.gene && g.gene.toUpperCase().startsWith(query.slice(0, 3))
+        ).slice(0, 3);
+
+        statusDiv.innerHTML = `<span class="error-message">No genes found for "${query}". ${
+            closeMatches.length > 0
+                ? 'Did you mean: ' + closeMatches.map(g => g.gene).join(', ') + '?'
+                : 'No close matches found.'
+        }</span>`;
+        return;
+    }
+
+    // ✅ FIX: If all results refer to the same gene symbol, treat as single gene
+    const uniqueGenes = [...new Set(results.map(r => r.gene.toUpperCase()))];
+    if (uniqueGenes.length === 1) {
+        navigateTo(null, `/${uniqueGenes[0]}`);
+    } else {
+        // Otherwise, go to batch query
         navigateTo(null, '/batch-query');
         setTimeout(() => {
-            const batchInput = document.getElementById('batch-genes-input');
-            if (batchInput) {
-                batchInput.value = foundGenes.map(r => r.gene).join('\n');
-                performBatchSearch();
-            }
+            document.getElementById('batch-genes-input').value = results.map(r => r.gene).join('\n');
+            performBatchSearch();
         }, 100);
-    } else {
-        statusDiv.innerHTML = `<span class="error-message">No exact match found for "${query}".</span>`;
     }
 }
+
 
 /**
  * Displays batch results.
