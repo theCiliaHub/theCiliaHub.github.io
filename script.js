@@ -293,7 +293,7 @@ function getDefaultGenes() {
             functional_summary: "Essential for intraflagellar transport and ciliary assembly. It is a component of the IFT complex B and is required for cilium biogenesis.",
             localization: ["axoneme", "basal body"],
             reference: ["https://pubmed.ncbi.nlm.nih.gov/9724754/"],
-            protein_complexes: "IFT-B",
+            complex_names: "IFT-B",
             gene_annotation: "",
             functional_category: ["Intraflagellar transport", "Ciliary assembly/disassembly"],
             ciliopathy: "Bardet-Biedl syndrome 20"
@@ -307,7 +307,7 @@ function getDefaultGenes() {
             functional_summary: "Regulates ciliary gating and ciliopathy-related pathways. Acts as a gatekeeper for proteins entering and exiting the cilium.",
             localization: ["transition zone"],
             reference: ["https://pubmed.ncbi.nlm.nih.gov/16971477/"],
-            protein_complexes: "NPHP-MKS-JBTS complex",
+            complex_names: "NPHP-MKS-JBTS complex",
             gene_annotation: "",
             functional_category: ["Transition zone", "Ciliary gating"],
             ciliopathy: "Joubert syndrome 5, Meckel syndrome 4, Bardet-Biedl syndrome 14, Leber congenital amaurosis 10"
@@ -321,7 +321,7 @@ function getDefaultGenes() {
             functional_summary: "Required for proper ciliary structure and function. It is thought to be involved in the regulation of ciliogenesis.",
             localization: ["axoneme"],
             reference: ["https://pubmed.ncbi.nlm.nih.gov/22114125/"],
-            protein_complexes: "",
+            complex_names: "",
             gene_annotation: "",
             functional_category: ["Ciliary assembly/disassembly"],
             ciliopathy: ""
@@ -335,7 +335,7 @@ function getDefaultGenes() {
             functional_summary: "Critical for ciliary signaling and membrane trafficking. It is a small G protein that localizes to the ciliary membrane and regulates the traffic of ciliary proteins.",
             localization: ["ciliary membrane"],
             reference: ["https://pubmed.ncbi.nlm.nih.gov/19732862/"],
-            protein_complexes: "",
+            complex_names: "",
             gene_annotation: "",
             functional_category: ["Ciliary membrane", "Signal transduction"],
             ciliopathy: "Joubert syndrome 8"
@@ -349,7 +349,7 @@ function getDefaultGenes() {
             functional_summary: "Involved in ciliary trafficking and BBSome assembly. The BBSome complex is a key regulator of protein trafficking to and from the cilium.",
             localization: ["basal body", "ciliary membrane"],
             reference: ["https://pubmed.ncbi.nlm.nih.gov/11058628/"],
-            protein_complexes: "BBSome",
+            complex_names: "BBSome",
             gene_annotation: "",
             functional_category: ["Ciliary trafficking", "BBSome complex"],
             ciliopathy: "Bardet-Biedl syndrome 1"
@@ -363,7 +363,7 @@ function getDefaultGenes() {
             functional_summary: "Regulates blood pressure and acts as a receptor for coronaviruses in respiratory cilia. Its expression on ciliated cells is a key factor in COVID-19 infection.",
             localization: ["cilia"],
             reference: ["https://pubmed.ncbi.nlm.nih.gov/32142651/"],
-            protein_complexes: "",
+            complex_names: "",
             gene_annotation: "",
             functional_category: ["Cell surface receptor", "Ciliary membrane"],
             ciliopathy: ""
@@ -377,7 +377,7 @@ function getDefaultGenes() {
             functional_summary: "Ion channel important for mechanosensation in primary cilia.",
             localization: ["axoneme", "endoplasmic reticulum"],
             reference: ["https://pubmed.ncbi.nlm.nih.gov/11285250/"],
-            protein_complexes: ["Polycystin complex"],
+            complex_names: ["Polycystin complex"],
             gene_annotation: "",
             functional_category: ["Ion transport", "Ciliary signaling"],
             ciliopathy: "Autosomal dominant polycystic kidney disease"
