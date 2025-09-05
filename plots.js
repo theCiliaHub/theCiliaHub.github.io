@@ -280,7 +280,10 @@ function renderDomainEnrichment(foundGenes, container) {
 }
 
 // ========== 1. CILIAPATHY SUNBURST ==========
-export function renderCiliopathySunburst(foundGenes, container) {
+/**
+ * Renders a D3 sunburst chart for the given genes.
+ */
+function renderCiliopathySunburst(foundGenes, container) {
   // Clear container
   d3.select(container).selectAll("*").remove();
 
@@ -346,7 +349,10 @@ export function renderCiliopathySunburst(foundGenes, container) {
 }
 
 // ========== 2. COMPLEX NETWORK ==========
-export function renderComplexNetwork(foundGenes, container) {
+/**
+ * Renders a D3 network chart for the given genes.
+ */
+function renderComplexNetwork(foundGenes, container)
   // Clear container
   d3.select(container).selectAll("*").remove();
 
