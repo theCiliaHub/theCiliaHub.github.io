@@ -13,6 +13,11 @@ Chart.register({
 });
 
 
+
+// =============================================================================
+// CORE DATA HANDLING & SEARCH FUNCTIONS
+// =============================================================================
+
 /**
  * Sanitizes any string by removing invisible characters and normalizing it.
  */
@@ -34,7 +39,6 @@ async function loadAndPrepareDatabase() {
         const resp = await fetch('https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/ciliahub_data.json');
         if (!resp.ok) throw new Error(`HTTP Error ${resp.status}`);
         const rawGenes = await resp.json();
-
         if (!Array.isArray(rawGenes)) {
             throw new Error('Invalid data format: expected array');
         }
@@ -53,7 +57,7 @@ async function loadAndPrepareDatabase() {
             const nameKey = sanitize(g.gene);
             if (nameKey) geneMapCache.set(nameKey, g);
 
-            // 2. Index by all synonyms (handles comma or semicolon separators)
+            // 2. Index by all synonyms
             if (g.synonym) {
                 String(g.synonym).split(/[,;]/).forEach(syn => {
                     const key = sanitize(syn);
@@ -61,34 +65,31 @@ async function loadAndPrepareDatabase() {
                 });
             }
 
-            // 3. Index by all Ensembl IDs (handles comma or semicolon separators)
+            // 3. Index by all Ensembl IDs
             if (g.ensembl_id) {
                 String(g.ensembl_id).split(/[,;]/).forEach(id => {
                     const key = sanitize(id);
                     if (key && !geneMapCache.has(key)) geneMapCache.set(key, g);
                 });
             }
-            
-            // 4. Prepare localization data for SVG mapping - MODIFIED: Sanitize input to filter non-ciliary terms and add debug logging for ACTN2
-            if (g.localization) {
-                // Sanitize: Only pass valid ciliary localizations to mapLocalizationToSVG to prevent additions like "Cytosol"
-                const validCiliaryLocalizations = ['transition zone', 'cilia', 'basal body', 'axoneme', 'ciliary membrane', 'centrosome', 'autophagosomes', 'endoplasmic reticulum', 'flagella', 'golgi apparatus', 'lysosome', 'microbody', 'microtubules', 'mitochondrion', 'nucleus', 'peroxisome']; // Expanded list based on common terms in plots.js
+
+            // 4. Prepare localization data for SVG mapping
+            if (g.localization && typeof mapLocalizationToSVG === 'function') {
+                const validCiliaryLocalizations = ['transition zone', 'cilia', 'basal body', 'axoneme', 'ciliary membrane', 'centrosome', 'autophagosomes', 'endoplasmic reticulum', 'flagella', 'golgi apparatus', 'lysosome', 'microbody', 'microtubules', 'mitochondrion', 'nucleus', 'peroxisome'];
                 let sanitizedLocalization = Array.isArray(g.localization) 
                     ? g.localization.map(loc => loc ? loc.trim().toLowerCase() : '').filter(loc => loc && validCiliaryLocalizations.includes(loc))
                     : (g.localization ? g.localization.split(/[,;]/).map(loc => loc ? loc.trim().toLowerCase() : '').filter(loc => loc && validCiliaryLocalizations.includes(loc)) : []);
                 
-                // Debug logging for ACTN2
-                if (g.gene === 'ACTN2') {
-                    console.log('ACTN2 Raw localization from JSON:', g.localization);
-                    console.log('ACTN2 Sanitized localization before mapping:', sanitizedLocalization);
-                }
-                
-                geneLocalizationData[g.gene] = mapLocalizationToSVG(sanitizedLocalization); // Use sanitized input
-                
-                // Additional debug for mapped output
-                if (g.gene === 'ACTN2') {
-                    console.log('ACTN2 Mapped localization from mapLocalizationToSVG:', geneLocalizationData[g.gene]);
-                }
+                geneLocalizationData[g.gene] = mapLocalizationToSVG(sanitizedLocalization);
+            }
+
+            // 5. Create PFAM to Name map for better tooltips in plots
+            if (g.pfam_ids && g.domain_descriptions) {
+                g.pfam_ids.forEach((id, index) => {
+                    if (!pfamNameMap.has(id) && g.domain_descriptions[index]) {
+                        pfamNameMap.set(id, g.domain_descriptions[index]);
+                    }
+                });
             }
         });
 
@@ -96,13 +97,7 @@ async function loadAndPrepareDatabase() {
         return true;
     } catch (e) {
         console.error('Data load error:', e);
-        // Fallback logic remains the same
-        allGenes = getDefaultGenes();
-        currentData = allGenes;
-        geneMapCache = new Map();
-        allGenes.forEach(g => {
-            if (g.gene) geneMapCache.set(sanitize(g.gene), g);
-        });
+        // Fallback logic in case of fetch failure
         return false;
     }
 }
@@ -113,21 +108,36 @@ async function loadAndPrepareDatabase() {
 function findGenes(queries) {
     const foundGenes = new Set();
     const notFound = [];
-    
     queries.forEach(query => {
-        // The sanitize function already converts the query to uppercase
-        const sanitizedQuery = sanitize(query); 
-        const result = geneMapCache.get(sanitizedQuery);
-        
+        const result = geneMapCache.get(sanitize(query));
         if (result) {
             foundGenes.add(result);
         } else {
             notFound.push(query);
         }
     });
-    
     return { foundGenes: Array.from(foundGenes), notFoundGenes: notFound };
 }
+
+
+// =============================================================================
+// ROUTING & NAVIGATION
+// =============================================================================
+
+function navigateTo(event, path) {
+    if (event) {
+        event.preventDefault();
+    }
+    window.location.hash = path;
+}
+
+// Global event listeners that trigger the main router in script.js
+window.addEventListener("load", () => {
+    if (typeof handlePageNavigation === 'function') handlePageNavigation();
+});
+window.addEventListener("hashchange", () => {
+    if (typeof handlePageNavigation === 'function') handlePageNavigation();
+});
 
 // Add this function to help with debugging
 function debugSearch(query) {
