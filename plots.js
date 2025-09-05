@@ -317,14 +317,18 @@ function renderGeneMatrix(foundGenes, container) {
 // =============================================================================
 // DOMAIN ENRICHMENT (Bar Chart)
 // =============================================================================
-function renderDomainEnrichment(foundGenes, container) {
-    const stats = computeDomainEnrichment(foundGenes); 
-    if (!stats.length) {
+function renderDomainEnrichment(foundGenes, allGenes, container) {
+    // Correctly calls calculateDomainEnrichment with the background gene set
+    const stats = calculateDomainEnrichment(foundGenes, allGenes); 
+    
+    if (!stats || !stats.length) {
         container.innerHTML = '<p class="status-message">No domains found for enrichment.</p>';
         return;
     }
 
-    const domains = stats.map(d => ({ description: d.description, count: d.count, pValue: d.pValue }));
+    // Note: The original calculateDomainEnrichment function returns 'geneCount'. The chart expects 'count'.
+    // We will map it here to ensure compatibility.
+    const domains = stats.map(d => ({ description: d.domain, count: d.geneCount }));
     container.innerHTML = `<canvas></canvas>`;
     const ctx = container.querySelector('canvas').getContext('2d');
 
@@ -340,7 +344,8 @@ function renderDomainEnrichment(foundGenes, container) {
         },
         options: {
             indexAxis: 'y',
-            responsive: true, maintainAspectRatio: false,
+            responsive: true,
+            maintainAspectRatio: false,
             plugins: { 
                 legend: { display: false }, 
                 title: { display: true, text: 'Protein Domain Enrichment', font: { size: 20 } },
@@ -353,159 +358,72 @@ function renderDomainEnrichment(foundGenes, container) {
         }
     });
 }
-
 // =============================================================================
 // CILIOPATHY ASSOCIATIONS (Sunburst)
 // =============================================================================
-function renderCiliopathySunburst(foundGenes, container) {
-    const stats = computeCiliopathyAssociations(foundGenes); // statistical calculation
-    if (!stats || !stats.length) {
-        container.innerHTML = '<p class="status-message">No ciliopathy associations found.</p>';
-        return;
-    }
+/**
+ * Computes the associations between the found genes and known ciliopathies.
+ * @param {Array<Object>} foundGenes - The array of gene objects found in the database.
+ * @returns {Array<Object>} An array of objects for the sunburst plot, e.g., [{name: "Bardet-Biedl", count: 5}].
+ */
+function computeCiliopathyAssociations(foundGenes) {
+    const associations = {};
 
-    // Clear previous content
-    container.innerHTML = '';
-    const width = container.clientWidth;
-    const height = 500;
-    const radius = Math.min(width, height) / 2;
-
-    const svg = d3.select(container)
-        .append('svg')
-        .attr('width', width)
-        .attr('height', height)
-        .append('g')
-        .attr('transform', `translate(${width / 2},${height / 2})`);
-
-    const root = d3.hierarchy({ name: 'Ciliopathies', children: stats })
-        .sum(d => d.count);
-
-    const partition = d3.partition()
-        .size([2 * Math.PI, radius]);
-
-    partition(root);
-
-    const arc = d3.arc()
-        .startAngle(d => d.x0)
-        .endAngle(d => d.x1)
-        .innerRadius(d => d.y0)
-        .outerRadius(d => d.y1);
-
-    svg.selectAll('path')
-        .data(root.descendants())
-        .enter()
-        .append('path')
-        .attr('d', arc)
-        .attr('fill', d => d.children ? d3.interpolateCool(d.depth / 3) : '#69b3a2')
-        .attr('stroke', '#fff')
-        .on('mouseover', function(event, d) {
-            d3.select(this).attr('fill', 'orange');
-        })
-        .on('mouseout', function(event, d) {
-            d3.select(this).attr('fill', d.children ? d3.interpolateCool(d.depth / 3) : '#69b3a2');
-        });
-
-    // Optional: add labels
-    svg.selectAll('text')
-        .data(root.descendants().filter(d => (d.x1 - d.x0) > 0.05))
-        .enter()
-        .append('text')
-        .attr('transform', d => {
-            const x = (d.x0 + d.x1) / 2 * 180 / Math.PI;
-            const y = (d.y0 + d.y1) / 2;
-            return `rotate(${x - 90}) translate(${y},0) rotate(${x < 180 ? 0 : 180})`;
-        })
-        .attr('text-anchor', 'middle')
-        .attr('font-size', 12)
-        .text(d => d.data.name);
-}
-
-
-// =============================================================================
-// PROTEIN COMPLEX NETWORK (Force-Directed Graph)
-// =============================================================================
-// =============================================================================
-// PROTEIN COMPLEX NETWORK (Force-Directed Graph)
-// =============================================================================
-function renderComplexNetwork(foundGenes, container) {
-    const stats = computeProteinComplexLinks(foundGenes); // statistical calculation
-    if (!stats || !stats.nodes || !stats.links) {
-        container.innerHTML = '<p class="status-message">No protein complex data found.</p>';
-        return;
-    }
-
-    container.innerHTML = '';
-    const width = container.clientWidth;
-    const height = 500;
-
-    const svg = d3.select(container)
-        .append('svg')
-        .attr('width', width)
-        .attr('height', height);
-
-    const simulation = d3.forceSimulation(stats.nodes)
-        .force('link', d3.forceLink(stats.links).id(d => d.id).distance(100))
-        .force('charge', d3.forceManyBody().strength(-200))
-        .force('center', d3.forceCenter(width / 2, height / 2));
-
-    const link = svg.append('g')
-        .selectAll('line')
-        .data(stats.links)
-        .enter()
-        .append('line')
-        .attr('stroke', '#999')
-        .attr('stroke-width', d => Math.sqrt(d.value || 1));
-
-    const node = svg.append('g')
-        .selectAll('circle')
-        .data(stats.nodes)
-        .enter()
-        .append('circle')
-        .attr('r', 12)
-        .attr('fill', '#1f77b4')
-        .call(d3.drag()
-            .on('start', event => {
-                if (!event.active) simulation.alphaTarget(0.3).restart();
-                event.subject.fx = event.subject.x;
-                event.subject.fy = event.subject.y;
-            })
-            .on('drag', event => {
-                event.subject.fx = event.x;
-                event.subject.fy = event.y;
-            })
-            .on('end', event => {
-                if (!event.active) simulation.alphaTarget(0);
-                event.subject.fx = null;
-                event.subject.fy = null;
-            })
-        );
-
-    const label = svg.append('g')
-        .selectAll('text')
-        .data(stats.nodes)
-        .enter()
-        .append('text')
-        .text(d => d.id)
-        .attr('font-size', 12)
-        .attr('dx', 15)
-        .attr('dy', 4);
-
-    simulation.on('tick', () => {
-        link
-            .attr('x1', d => d.source.x)
-            .attr('y1', d => d.source.y)
-            .attr('x2', d => d.target.x)
-            .attr('y2', d => d.target.y);
-
-        node
-            .attr('cx', d => d.x)
-            .attr('cy', d => d.y);
-
-        label
-            .attr('x', d => d.x)
-            .attr('y', d => d.y);
+    // Loop through the user's genes and count occurrences for each ciliopathy
+    foundGenes.forEach(gene => {
+        // Assumes gene.ciliopathy is an array of disease names, e.g., ["Bardet-Biedl syndrome", "Joubert syndrome"]
+        if (gene.ciliopathy && Array.isArray(gene.ciliopathy)) {
+            gene.ciliopathy.forEach(disease => {
+                if (disease) { // Ensure the disease name is not null or empty
+                    if (!associations[disease]) {
+                        associations[disease] = { name: disease, count: 0 };
+                    }
+                    associations[disease].count++;
+                }
+            });
+        }
     });
+
+    // Convert the aggregated object into an array suitable for D3
+    return Object.values(associations);
 }
+
+/**
+ * Computes the network of protein complex interactions from a list of genes.
+ * @param {Array<Object>} foundGenes - The array of gene objects found in the database.
+ * @returns {Object} An object containing 'nodes' and 'links' arrays for the D3 force-directed graph.
+ */
+function computeProteinComplexLinks(foundGenes) {
+    const nodes = foundGenes.map(gene => ({ id: gene.gene }));
+    const links = [];
+    const linkTracker = new Set(); // Prevents duplicate links (e.g., A->B and B->A)
+
+    // Create links based on shared protein complexes
+    for (let i = 0; i < foundGenes.length; i++) {
+        for (let j = i + 1; j < foundGenes.length; j++) {
+            const geneA = foundGenes[i];
+            const geneB = foundGenes[j];
+
+            // Assumes gene.complex is an array of complex IDs, e.g., ["BBSome", "IFT-B"]
+            const sharedComplexes = (geneA.complex || []).filter(c => (geneB.complex || []).includes(c));
+
+            if (sharedComplexes.length > 0) {
+                const linkKey = [geneA.gene, geneB.gene].sort().join('-');
+                if (!linkTracker.has(linkKey)) {
+                    links.push({
+                        source: geneA.gene,
+                        target: geneB.gene,
+                        value: sharedComplexes.length // The more shared complexes, the stronger the link
+                    });
+                    linkTracker.add(linkKey);
+                }
+            }
+        }
+    }
+
+    return { nodes, links };
+}
+
 
 function calculateDomainEnrichment(filteredData, allCiliaData) {
     const domainCountsUser = new Map();
