@@ -443,7 +443,8 @@ function calculateDomainEnrichment(filteredData, allCiliaData) {
 // MAIN CONTROLLER & PAGE RENDERER
 // =============================================================================
 async function generateAnalysisPlots() {
-    await loadAndPrepareDatabase(); // This is in script.js
+    // 1. CORRECT: Load the database and store the returned object in a constant.
+    const database = await loadAndPrepareDatabase(); // This is in script.js
     
     const plotContainer = document.getElementById('plot-display-area');
     const resultsContainer = document.getElementById('enrichment-results-container');
@@ -459,7 +460,9 @@ async function generateAnalysisPlots() {
     currentPlotInstance = null;
 
     const geneList = genesInput.split(/[\s,;\n\r\t]+/).filter(Boolean);
-    const { foundGenes, notFoundGenes } = findGenes(geneList); // This is in script.js
+    
+    // 2. CORRECT: Pass the loaded 'database' to findGenes so it has data to search through.
+    const { foundGenes, notFoundGenes } = findGenes(geneList, database); // This is in script.js
     
     createEnrichmentResultsTable(foundGenes, notFoundGenes);
     
@@ -471,8 +474,8 @@ async function generateAnalysisPlots() {
         case 'matrix': 
             renderGeneMatrix(foundGenes, plotContainer); 
             break;
-         case 'domain': 
-            // Pass both the found genes and the entire gene database for statistical comparison
+        case 'domain': 
+            // This now works correctly because 'database' is defined.
             renderDomainEnrichment(foundGenes, database.genes, plotContainer); 
             break;
         case 'ciliopathy': 
@@ -486,7 +489,6 @@ async function generateAnalysisPlots() {
             break;
     }
 }
-
 
 function displayEnrichmentPage() {
     const contentArea = document.querySelector('.content-area');
