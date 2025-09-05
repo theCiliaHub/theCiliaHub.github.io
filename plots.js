@@ -283,22 +283,34 @@ function renderDomainEnrichment(foundGenes, container) {
 /**
  * Renders a D3 sunburst chart for the given genes.
  */
-function renderCiliopathySunburst(foundGenes, container) {
-  // Clear container
-  d3.select(container).selectAll("*").remove();
+// Minimal working D3 code for ciliopathy enrichment
 
-  // Group genes by ciliopathy
-  const ciliopathyGroups = d3.group(foundGenes, d => d.ciliopathy || "No known ciliopathy");
-  const root = {
+function renderCiliopathySunburst(foundGenes, container) {
+  // Clear container first
+  d3.select(container).html("");
+
+  // Convert your foundGenes into a simple hierarchy for the sunburst
+  const data = {
     name: "Ciliopathy Genes",
-    children: Array.from(ciliopathyGroups, ([ciliopathy, genes]) => ({
-      name: ciliopathy,
-      children: genes.map(g => ({ name: g.gene }))
-    }))
+    children: foundGenes.map(g => ({ name: g, value: 1 }))
   };
 
-  const width = 500;
+  const width = 400;
   const radius = width / 2;
+
+  const partition = d3.partition()
+    .size([2 * Math.PI, radius]);
+
+  const root = d3.hierarchy(data)
+    .sum(d => d.value);
+
+  partition(root);
+
+  const arc = d3.arc()
+    .startAngle(d => d.x0)
+    .endAngle(d => d.x1)
+    .innerRadius(d => d.y0)
+    .outerRadius(d => d.y1);
 
   const svg = d3.select(container)
     .append("svg")
@@ -307,73 +319,29 @@ function renderCiliopathySunburst(foundGenes, container) {
     .append("g")
     .attr("transform", `translate(${radius},${radius})`);
 
-  const partition = d3.partition().size([2 * Math.PI, radius]);
-  const rootNode = d3.hierarchy(root).sum(d => d.children ? d.children.length : 1);
-  partition(rootNode);
-
-  const arc = d3.arc()
-    .startAngle(d => d.x0)
-    .endAngle(d => d.x1)
-    .innerRadius(d => d.y0)
-    .outerRadius(d => d.y1);
-
   svg.selectAll("path")
-    .data(rootNode.descendants())
-    .join("path")
+    .data(root.descendants().filter(d => d.depth))
+    .enter()
+    .append("path")
     .attr("d", arc)
-    .attr("fill", d => d.depth === 0 ? "#ccc" : d3.schemeCategory10[d.depth % 10])
-    .attr("stroke", "#fff")
-    .on("mouseover", (event, d) => {
-      const name = d.data.name;
-      const count = d.value;
-      d3.select(container).append("div")
-        .attr("class", "tooltip")
-        .style("position", "absolute")
-        .style("background", "#fff")
-        .style("border", "1px solid #ccc")
-        .style("padding", "4px 8px")
-        .style("pointer-events", "none")
-        .style("left", `${event.pageX + 10}px`)
-        .style("top", `${event.pageY + 10}px`)
-        .text(`${name}: ${count} gene${count > 1 ? "s" : ""}`);
-    })
-    .on("mouseout", () => {
-      d3.select(container).selectAll(".tooltip").remove();
-    })
-    .on("click", (event, d) => {
-      if (!d.children) {
-        console.log(`Filter table for gene: ${d.data.name}`);
-        // Optionally call your table filter function here
-      }
-    });
+    .style("fill", (d, i) => d3.schemeCategory10[i % 10])
+    .append("title")
+    .text(d => d.data.name);
 }
 
-// ========== 2. COMPLEX NETWORK ==========
-/**
- * Renders a D3 network chart for the given genes.
- */
-function renderComplexNetwork(foundGenes, container)
-  // Clear container
-  d3.select(container).selectAll("*").remove();
 
-  // Build nodes + edges
-  const nodes = foundGenes.map(g => ({
-    id: g.gene,
-    ciliopathy: g.ciliopathy,
-    complex: g.complex_names
+function renderComplexNetwork(foundGenes, container) {
+  // Clear container first
+  d3.select(container).html("");
+
+  // Generate simple nodes and links
+  const nodes = foundGenes.map(g => ({ id: g }));
+  const links = d3.range(foundGenes.length - 1).map(i => ({
+    source: nodes[i].id,
+    target: nodes[i + 1].id
   }));
 
-  const edges = [];
-  for (let i = 0; i < foundGenes.length; i++) {
-    for (let j = i + 1; j < foundGenes.length; j++) {
-      if (foundGenes[i].complex_names && foundGenes[j].complex_names &&
-          foundGenes[i].complex_names === foundGenes[j].complex_names) {
-        edges.push({ source: foundGenes[i].gene, target: foundGenes[j].gene });
-      }
-    }
-  }
-
-  const width = 600;
+  const width = 400;
   const height = 400;
 
   const svg = d3.select(container)
@@ -382,33 +350,37 @@ function renderComplexNetwork(foundGenes, container)
     .attr("height", height);
 
   const simulation = d3.forceSimulation(nodes)
-    .force("link", d3.forceLink(edges).id(d => d.id).distance(80))
-    .force("charge", d3.forceManyBody().strength(-250))
+    .force("link", d3.forceLink(links).id(d => d.id).distance(100))
+    .force("charge", d3.forceManyBody().strength(-200))
     .force("center", d3.forceCenter(width / 2, height / 2));
 
-  // Draw edges
   const link = svg.append("g")
-    .attr("stroke", "#aaa")
-    .attr("stroke-width", 1.5)
     .selectAll("line")
-    .data(edges)
-    .join("line");
+    .data(links)
+    .enter()
+    .append("line")
+    .attr("stroke", "#aaa");
 
-  // Draw nodes
   const node = svg.append("g")
     .selectAll("circle")
     .data(nodes)
-    .join("circle")
+    .enter()
+    .append("circle")
     .attr("r", 6)
-    .attr("fill", d => d.ciliopathy ? "#ff6666" : "#69b3a2")
-    .attr("stroke", "#fff")
-    .attr("stroke-width", 1.5)
+    .attr("fill", (d, i) => d3.schemeCategory10[i % 10])
     .call(d3.drag()
-      .on("start", dragstarted)
+      .on("start", dragStarted)
       .on("drag", dragged)
-      .on("end", dragended));
+      .on("end", dragEnded));
 
-  node.append("title").text(d => `${d.id}${d.complex ? " (" + d.complex + ")" : ""}`);
+  const label = svg.append("g")
+    .selectAll("text")
+    .data(nodes)
+    .enter()
+    .append("text")
+    .attr("dy", -10)
+    .attr("text-anchor", "middle")
+    .text(d => d.id);
 
   simulation.on("tick", () => {
     link
@@ -420,9 +392,13 @@ function renderComplexNetwork(foundGenes, container)
     node
       .attr("cx", d => d.x)
       .attr("cy", d => d.y);
+
+    label
+      .attr("x", d => d.x)
+      .attr("y", d => d.y);
   });
 
-  function dragstarted(event, d) {
+  function dragStarted(event, d) {
     if (!event.active) simulation.alphaTarget(0.3).restart();
     d.fx = d.x;
     d.fy = d.y;
@@ -433,12 +409,13 @@ function renderComplexNetwork(foundGenes, container)
     d.fy = event.y;
   }
 
-  function dragended(event, d) {
+  function dragEnded(event, d) {
     if (!event.active) simulation.alphaTarget(0);
     d.fx = null;
     d.fy = null;
   }
 }
+
 
 function calculateDomainEnrichment(filteredData, allCiliaData) {
     const domainCountsUser = new Map();
