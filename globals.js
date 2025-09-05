@@ -1,3 +1,4 @@
+
 // globals.js
 // =============================================================================
 // GLOBAL VARIABLES
@@ -31,74 +32,50 @@ const defaultGenesNames = [
 let geneDataCache = null;
 let geneMapCache = null;
 
-// Flag to prevent multiple database loads
-let isDatabaseLoaded = false;
 
-// =============================================================================
-// DATABASE LOADING (Placeholder for actual implementation)
-// =============================================================================
-async function loadAndPrepareDatabase() {
-    if (isDatabaseLoaded) return; // Prevent reloading
-    try {
-        // Placeholder: Fetch gene data and populate allGenes and geneMapCache
-        // Example: const response = await fetch('data/genes.json');
-        // allGenes = await response.json();
-        // geneMapCache = new Map(allGenes.map(g => [g.name.toLowerCase(), g]));
-        // geneDataCache = ...;
-        console.log("Database loaded");
-        isDatabaseLoaded = true;
-    } catch (err) {
-        console.error("Failed to load database:", err);
-        isDatabaseLoaded = false;
-        throw err;
-    }
-}
-
-// =============================================================================
-// NAVIGATION
-// =============================================================================
+/**
+ * Handles SPA navigation by updating the URL hash.
+ * This triggers the 'hashchange' event listener, which calls handleRouteChange.
+ * @param {Event | null} event - The click event, used to prevent default link behavior.
+ * @param {string} path - The new path to navigate to (e.g., '/', '/ACE2').
+ */
 function navigateTo(event, path) {
     if (event) {
-        event.preventDefault(); // Prevents browser reload
+        event.preventDefault(); // Prevents the browser from reloading the page
     }
+    // Set the new hash, which will be detected by the 'hashchange' event listener
     window.location.hash = path;
 }
 
-// Sanitize input to prevent injection (basic implementation)
-function sanitize(input) {
-    return input.replace(/[<>&;]/g, '');
-}
-
-// Update active navigation item
-function updateActiveNav(path) {
-    // Placeholder: Update nav UI to reflect active route
-    console.log("Updating nav for path:", path);
-}
 
 // =============================================================================
 // ROUTER
 // =============================================================================
 async function handleRouteChange() {
-    try {
-        await loadAndPrepareDatabase(); // Ensure data is loaded
-    } catch (err) {
-        console.error("Database loading failed:", err);
-        displayHomePage(); // Fallback to Home page
-        setTimeout(displayLocalizationChart, 0);
-        return;
-    }
-
+    await loadAndPrepareDatabase();  // Ensure data is loaded before route resolution
+    // ... (rest of the function remains unchanged: parse hash, lookup gene, call displayIndividualGenePage if single gene)
     // Normalize path
     let path = window.location.hash.replace(/^#/, '').toLowerCase().trim();
     if (!path || path === '/' || path === '/index.html') {
         path = '/';
     }
 
+    // Load database if not loaded
+    try {
+        await loadAndPrepareDatabase(); // must populate geneMapCache + geneDataCache
+    } catch (err) {
+        console.error("Database loading failed:", err);
+        console.log("DEBUG hash:", window.location.hash);
+        console.log("DEBUG path:", path);
+    }
+
     // Try to resolve gene from path
     let gene = null;
-    if (geneMapCache && path.startsWith('/gene/')) {
+    if (geneMapCache) {
         const geneName = sanitize(path.split('/').pop().replace('.html', ''));
-        gene = geneMapCache.get(geneName.toLowerCase());
+        gene = geneMapCache.get(geneName);
+    } else {
+        console.warn("geneMapCache is not initialized yet.");
     }
 
     // Update active nav item
@@ -125,7 +102,7 @@ async function handleRouteChange() {
             displayBatchQueryTool();
             break;
         case '/enrichment':
-        case '/analysis':
+        case '/analysis': // handle both routes
             displayEnrichmentPage();
             break;
         case '/compare':
@@ -155,18 +132,12 @@ async function handleRouteChange() {
 // =============================================================================
 // EVENT LISTENERS
 // =============================================================================
-window.addEventListener('load', async () => {
-    await handleRouteChange();
-});
-
+window.addEventListener("load", handleRouteChange);
 window.addEventListener('hashchange', async () => {
     await handleRouteChange();
-});
 
-document.addEventListener('DOMContentLoaded', async () => {
-    await loadAndPrepareDatabase();
+document.addEventListener('DOMContentLoaded', () => {
     initGlobalEventListeners();
-    await handleRouteChange();
 });
 
 // =============================================================================
@@ -200,10 +171,4 @@ function initGlobalEventListeners() {
             panzoom.zoom(panzoom.getScale() * (e.deltaY > 0 ? 0.9 : 1.1));
         });
     }
-}
-
-// Placeholder for sticky search handler
-function handleStickySearch() {
-    // Placeholder: Implement sticky search bar logic
-    console.log("Handling sticky search");
 }
