@@ -25,107 +25,87 @@ function sanitize(input) {
                 .toUpperCase();
 }
 
-'use strict';
-
-// =============================================================================
-// INITIALIZATION & ROUTING
-// =============================================================================
-
-document.addEventListener('DOMContentLoaded', () => {
-    // Attach main router to page load and hash changes
-    window.addEventListener("hashchange", handlePageNavigation);
-    handlePageNavigation(); 
-});
-
 /**
- * Main router to handle showing/hiding pages.
- */
-async function handlePageNavigation() {
-    await loadAndPrepareDatabase(); // From this file
-
-    const path = window.location.hash.slice(1) || '/';
-    let [page, ...params] = path.split('/').filter(Boolean);
-    page = page || 'home';
-    
-    // Hide all main page containers
-    document.querySelectorAll('.content-area > div[id]').forEach(p => p.style.display = 'none');
-    
-    const pageId = `${page}-page`;
-    let targetPage = document.getElementById(pageId);
-
-    // Handle aliases for enrichment page
-    if (page === 'enrichment' || page === 'analysis') {
-        targetPage = document.getElementById('analysis-page');
-        page = 'analysis'; 
-    }
-
-    if (targetPage) {
-        targetPage.style.display = 'block';
-        if (page === 'analysis') {
-            displayEnrichmentPage(); // Defined in plots.js
-        }
-        // Add other page-specific setup functions here
-    } else {
-        const { foundGenes } = findGenes([page]);
-        if (foundGenes.length > 0) {
-            // displayGenePage(foundGenes[0]); // Your function to show a single gene
-            console.log("Routing to gene page for:", foundGenes[0].gene);
-             document.getElementById('home-page').style.display = 'block'; // Fallback for now
-        } else {
-            document.getElementById('home-page').style.display = 'block';
-        }
-    }
-}
-
-
-// =============================================================================
-// CORE DATA HANDLING & SEARCH
-// =============================================================================
-
-/**
- * Loads and prepares the gene database.
+ * Loads, sanitizes, and prepares the gene database into an efficient lookup map.
  */
 async function loadAndPrepareDatabase() {
     if (geneDataCache) return true;
     try {
         const resp = await fetch('https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/ciliahub_data.json');
+        if (!resp.ok) throw new Error(`HTTP Error ${resp.status}`);
         const rawGenes = await resp.json();
-        
+
+        if (!Array.isArray(rawGenes)) {
+            throw new Error('Invalid data format: expected array');
+        }
+
         geneDataCache = rawGenes;
-        allGenes = rawGenes; // Set global variable
-        geneMapCache = new Map(); // Set global variable
+        allGenes = rawGenes;
+        geneMapCache = new Map();
 
         allGenes.forEach(g => {
-            if (!g.gene || typeof g.gene !== 'string') return;
+            if (!g.gene || typeof g.gene !== 'string') {
+                console.warn('Skipping entry with invalid gene name:', g);
+                return;
+            }
 
+            // 1. Index by the primary gene name
             const nameKey = sanitize(g.gene);
             if (nameKey) geneMapCache.set(nameKey, g);
-            
-            if (g.ensembl_id) String(g.ensembl_id).split(/[,;]/).forEach(id => {
-                const key = sanitize(id);
-                if (key && !geneMapCache.has(key)) geneMapCache.set(key, g);
-            });
-            if (g.synonym) String(g.synonym).split(/[,;]/).forEach(syn => {
-                const key = sanitize(syn);
-                if (key && !geneMapCache.has(key)) geneMapCache.set(key, g);
-            });
-            
-            if (g.pfam_ids && g.domain_descriptions) {
-                g.pfam_ids.forEach((id, index) => {
-                    if (!pfamNameMap.has(id) && g.domain_descriptions[index]) {
-                        pfamNameMap.set(id, g.domain_descriptions[index]);
-                    }
+
+            // 2. Index by all synonyms (handles comma or semicolon separators)
+            if (g.synonym) {
+                String(g.synonym).split(/[,;]/).forEach(syn => {
+                    const key = sanitize(syn);
+                    if (key && !geneMapCache.has(key)) geneMapCache.set(key, g);
                 });
             }
+
+            // 3. Index by all Ensembl IDs (handles comma or semicolon separators)
+            if (g.ensembl_id) {
+                String(g.ensembl_id).split(/[,;]/).forEach(id => {
+                    const key = sanitize(id);
+                    if (key && !geneMapCache.has(key)) geneMapCache.set(key, g);
+                });
+            }
+            
+            // 4. Prepare localization data for SVG mapping - MODIFIED: Sanitize input to filter non-ciliary terms and add debug logging for ACTN2
+            if (g.localization) {
+                // Sanitize: Only pass valid ciliary localizations to mapLocalizationToSVG to prevent additions like "Cytosol"
+                const validCiliaryLocalizations = ['transition zone', 'cilia', 'basal body', 'axoneme', 'ciliary membrane', 'centrosome', 'autophagosomes', 'endoplasmic reticulum', 'flagella', 'golgi apparatus', 'lysosome', 'microbody', 'microtubules', 'mitochondrion', 'nucleus', 'peroxisome']; // Expanded list based on common terms in plots.js
+                let sanitizedLocalization = Array.isArray(g.localization) 
+                    ? g.localization.map(loc => loc ? loc.trim().toLowerCase() : '').filter(loc => loc && validCiliaryLocalizations.includes(loc))
+                    : (g.localization ? g.localization.split(/[,;]/).map(loc => loc ? loc.trim().toLowerCase() : '').filter(loc => loc && validCiliaryLocalizations.includes(loc)) : []);
+                
+                // Debug logging for ACTN2
+                if (g.gene === 'ACTN2') {
+                    console.log('ACTN2 Raw localization from JSON:', g.localization);
+                    console.log('ACTN2 Sanitized localization before mapping:', sanitizedLocalization);
+                }
+                
+                geneLocalizationData[g.gene] = mapLocalizationToSVG(sanitizedLocalization); // Use sanitized input
+                
+                // Additional debug for mapped output
+                if (g.gene === 'ACTN2') {
+                    console.log('ACTN2 Mapped localization from mapLocalizationToSVG:', geneLocalizationData[g.gene]);
+                }
+            }
         });
-        console.log(`Loaded and indexed ${allGenes.length} genes.`);
+
+        console.log(`Loaded ${allGenes.length} genes into database`);
         return true;
     } catch (e) {
         console.error('Data load error:', e);
+        // Fallback logic remains the same
+        allGenes = getDefaultGenes();
+        currentData = allGenes;
+        geneMapCache = new Map();
+        allGenes.forEach(g => {
+            if (g.gene) geneMapCache.set(sanitize(g.gene), g);
+        });
         return false;
     }
 }
-
 
 /**
  * The central search function.
