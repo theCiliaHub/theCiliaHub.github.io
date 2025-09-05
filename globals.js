@@ -48,57 +48,34 @@ function navigateTo(event, path) {
 }
 
 
-
 // =============================================================================
-// MODIFY YOUR EXISTING handleRouteChange FUNCTION
-// Replace the existing handleRouteChange function with this enhanced version
+// ROUTER
 // =============================================================================
-
 async function handleRouteChange() {
-    try {
-        await loadAndPrepareDatabase(); // Ensure data is loaded
-    } catch (err) {
-        console.error("Database loading failed:", err);
-        displayHomePage(); // Fallback to Home page
-        setTimeout(displayLocalizationChart, 0);
-        return;
-    }
-
+    await loadAndPrepareDatabase();  // Ensure data is loaded before route resolution
+    // ... (rest of the function remains unchanged: parse hash, lookup gene, call displayIndividualGenePage if single gene)
     // Normalize path
     let path = window.location.hash.replace(/^#/, '').toLowerCase().trim();
     if (!path || path === '/' || path === '/index.html') {
         path = '/';
     }
 
-    console.log('Handling route change for path:', path);
+    // Load database if not loaded
+    try {
+        await loadAndPrepareDatabase(); // must populate geneMapCache + geneDataCache
+    } catch (err) {
+        console.error("Database loading failed:", err);
+        console.log("DEBUG hash:", window.location.hash);
+        console.log("DEBUG path:", path);
+    }
 
     // Try to resolve gene from path
     let gene = null;
-    if (geneMapCache && path.startsWith('/gene/')) {
-        const geneName = sanitize(path.split('/').pop().replace('.html', '')).toLowerCase();
-        console.log('Looking for gene with name:', geneName);
-        
-        // Try direct lookup
+    if (geneMapCache) {
+        const geneName = sanitize(path.split('/').pop().replace('.html', ''));
         gene = geneMapCache.get(geneName);
-        
-        // If not found, try case variations
-        if (!gene) {
-            for (let [key, value] of geneMapCache.entries()) {
-                if (key.toLowerCase() === geneName) {
-                    gene = value;
-                    break;
-                }
-            }
-        }
-        
-        if (!gene) {
-            console.warn(`Gene not found in geneMapCache for name: ${geneName}`);
-            console.log("Available keys in geneMapCache:", Array.from(geneMapCache.keys()).slice(0, 10));
-        } else {
-            console.log('Found gene:', gene.name);
-        }
-    } else if (!geneMapCache) {
-        console.warn("geneMapCache is not initialized");
+    } else {
+        console.warn("geneMapCache is not initialized yet.");
     }
 
     // Update active nav item
@@ -120,14 +97,12 @@ async function handleRouteChange() {
         case '/':
             displayHomePage();
             setTimeout(displayLocalizationChart, 0);
-            // Set up search listeners when home page is displayed
-            setTimeout(setupSearchListeners, 100);
             break;
         case '/batch-query':
             displayBatchQueryTool();
             break;
         case '/enrichment':
-        case '/analysis':
+        case '/analysis': // handle both routes
             displayEnrichmentPage();
             break;
         case '/compare':
@@ -146,7 +121,6 @@ async function handleRouteChange() {
             if (gene) {
                 displayIndividualGenePage(gene);
             } else {
-                console.warn("No gene found, falling back to not found page");
                 displayNotFoundPage();
             }
             break;
@@ -156,10 +130,19 @@ async function handleRouteChange() {
 }
 
 // =============================================================================
-// MODIFY YOUR EXISTING initGlobalEventListeners FUNCTION
-// Add setupSearchListeners call to the existing function
+// EVENT LISTENERS
 // =============================================================================
+window.addEventListener("load", handleRouteChange);
+window.addEventListener('hashchange', async () => {
+    await handleRouteChange();
 
+document.addEventListener('DOMContentLoaded', () => {
+    initGlobalEventListeners();
+});
+
+// =============================================================================
+// GLOBAL UI HELPERS
+// =============================================================================
 function initGlobalEventListeners() {
     // Sticky search handler
     window.addEventListener('scroll', handleStickySearch);
@@ -188,43 +171,4 @@ function initGlobalEventListeners() {
             panzoom.zoom(panzoom.getScale() * (e.deltaY > 0 ? 0.9 : 1.1));
         });
     }
-
-    // ADD THIS LINE: Set up search listeners
-    setupSearchListeners();
 }
-
-// =============================================================================
-// DEBUGGING HELPER - Add this for troubleshooting
-// =============================================================================
-
-// Debug function to check current state
-window.debugCiliaHub = function() {
-    console.log('=== CiliaHub Debug Info ===');
-    console.log('Current path:', window.location.hash);
-    console.log('isDatabaseLoaded:', isDatabaseLoaded);
-    console.log('allGenes count:', allGenes ? allGenes.length : 'undefined');
-    console.log('geneMapCache size:', geneMapCache ? geneMapCache.size : 'undefined');
-    
-    if (geneMapCache && geneMapCache.size > 0) {
-        console.log('Sample geneMapCache keys:', Array.from(geneMapCache.keys()).slice(0, 5));
-    }
-    
-    const searchForm = document.querySelector('form');
-    const searchInput = document.getElementById('geneSearch') || document.querySelector('input[type="search"]');
-    console.log('Search form found:', !!searchForm);
-    console.log('Search input found:', !!searchInput);
-    
-    console.log('=========================');
-};
-
-// Test search function
-window.testGeneSearch = function(geneName) {
-    console.log('Testing search for:', geneName);
-    const searchInput = document.getElementById('geneSearch') || document.querySelector('input[type="search"]');
-    if (searchInput) {
-        searchInput.value = geneName;
-        performSingleSearch();
-    } else {
-        console.error('Search input not found');
-    }
-};
