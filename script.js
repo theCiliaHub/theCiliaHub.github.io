@@ -162,68 +162,49 @@ function performBatchSearch() {
     displayBatchResults(foundGenes, notFoundGenes);
 }
 
-function performSingleSearch() {
-    // ✅ Trim spaces from input first
-    const query = document.getElementById('single-gene-search').value.trim().toUpperCase();
-    const statusDiv = document.getElementById('status-message');
-    statusDiv.innerHTML = '<span>Loading...</span>';
-    statusDiv.style.display = 'block';
-
-    if (!query) {
-        statusDiv.innerHTML = `<span class="error-message">Please enter a gene name.</span>`;
+// --- HOME PAGE SEARCH HANDLER (FIXED) ---
+function handleHomeSearchInput() {
+    const query = homeSearchInput.value.trim().toUpperCase(); // ✅ Trim spaces
+    if (query.length < 1) {
+        homeSuggestionsContainer.style.display = 'none';
         return;
     }
 
-    const results = allGenes.filter(g => {
-        // ✅ Trim spaces from g.gene and g.synonym before comparing
-        if (g.gene && g.gene.trim().toUpperCase() === query) return true;
-        if (g.synonym) {
-            const synonyms = g.synonym.split(',')
-                .map(s => s.trim().toUpperCase());
-            if (synonyms.includes(query)) return true;
-        }
-        if (g.ensembl_id && g.ensembl_id.trim().toUpperCase() === query) return true;
-        return false;
-    });
+    const filteredGenes = allGenes.filter(g => {
+        const geneMatch = g.gene && g.gene.toUpperCase().startsWith(query);
+        const synonymMatch = g.synonym && g.synonym.toUpperCase().includes(query);
+        const ensemblMatch = g.ensembl_id && g.ensembl_id.toUpperCase().startsWith(query);
+        return geneMatch || synonymMatch || ensemblMatch;
+    }).slice(0, 10);
 
-    if (results.length === 0) {
-        const closeMatches = allGenes.filter(g =>
-            g.gene && g.gene.trim().toUpperCase().startsWith(query.slice(0, 3))
-        ).slice(0, 3);
+    if (filteredGenes.length > 0) {
+        homeSuggestionsContainer.innerHTML = filteredGenes.map(g => {
+            const details = [g.ensembl_id, g.synonym].filter(Boolean).join(', ');
+            return `<div class="suggestion-item" data-gene="${g.gene}">${g.gene}${details ? ` (${details})` : ''}</div>`;
+        }).join('');
 
-        statusDiv.innerHTML = `<span class="error-message">No genes found for "${query}". ${
-            closeMatches.length > 0
-                ? 'Did you mean: ' + closeMatches.map(g => g.gene.trim()).join(', ') + '?'
-                : 'No close matches found.'
-        }</span>`;
-        return;
-    }
-
-    const uniqueGenes = [...new Set(results.map(r => r.gene.trim().toUpperCase()))];
-    if (uniqueGenes.length === 1) {
-        navigateTo(null, `/${uniqueGenes[0]}`);
+        homeSuggestionsContainer.style.display = 'block';
+        homeSuggestionsContainer.querySelectorAll('.suggestion-item').forEach(item => {
+            item.addEventListener('click', () => {
+                navigateToGenePage(item.dataset.gene);
+            });
+        });
     } else {
-        navigateTo(null, '/batch-query');
-        setTimeout(() => {
-            document.getElementById('batch-genes-input').value =
-                results.map(r => r.gene.trim()).join('\n');
-            performBatchSearch();
-        }, 100);
+        homeSuggestionsContainer.style.display = 'none';
     }
 }
-    // ✅ Always navigate to gene page if all matches are same gene
-    const uniqueGenes = [...new Set(results.map(r => r.gene.trim().toUpperCase()))];
-    if (uniqueGenes.length === 1) {
-        navigateTo(null, `/${uniqueGenes[0]}`);
+
+// --- NAVIGATION FIX ---
+function navigateToGenePage(geneName) {
+    const selectedGene = allGenes.find(g => g.gene === geneName);
+    if (selectedGene) {
+        window.location.hash = `#/${selectedGene.gene}`; // ✅ Always builds correct URL
+        displayGenePage(selectedGene.gene); // ✅ Directly loads page content
     } else {
-        // Only use batch query when there are truly multiple distinct genes
-        navigateTo(null, '/batch-query');
-        setTimeout(() => {
-            document.getElementById('batch-genes-input').value = results.map(r => r.gene.trim()).join('\n');
-            performBatchSearch();
-        }, 100);
+        console.warn(`No gene found for: ${geneName}`);
     }
 }
+
 
 /**
  * Displays batch results.
