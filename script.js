@@ -163,6 +163,7 @@ function performBatchSearch() {
 }
 
 function performSingleSearch() {
+    // ✅ Trim spaces from input first
     const query = document.getElementById('single-gene-search').value.trim().toUpperCase();
     const statusDiv = document.getElementById('status-message');
     statusDiv.innerHTML = '<span>Loading...</span>';
@@ -173,11 +174,12 @@ function performSingleSearch() {
         return;
     }
 
-    // ✅ EXACT MATCH LIKE COMPARE PAGE
     const results = allGenes.filter(g => {
+        // ✅ Trim spaces from g.gene and g.synonym before comparing
         if (g.gene && g.gene.trim().toUpperCase() === query) return true;
         if (g.synonym) {
-            const synonyms = g.synonym.split(',').map(s => s.trim().toUpperCase());
+            const synonyms = g.synonym.split(',')
+                .map(s => s.trim().toUpperCase());
             if (synonyms.includes(query)) return true;
         }
         if (g.ensembl_id && g.ensembl_id.trim().toUpperCase() === query) return true;
@@ -197,6 +199,18 @@ function performSingleSearch() {
         return;
     }
 
+    const uniqueGenes = [...new Set(results.map(r => r.gene.trim().toUpperCase()))];
+    if (uniqueGenes.length === 1) {
+        navigateTo(null, `/${uniqueGenes[0]}`);
+    } else {
+        navigateTo(null, '/batch-query');
+        setTimeout(() => {
+            document.getElementById('batch-genes-input').value =
+                results.map(r => r.gene.trim()).join('\n');
+            performBatchSearch();
+        }, 100);
+    }
+}
     // ✅ Always navigate to gene page if all matches are same gene
     const uniqueGenes = [...new Set(results.map(r => r.gene.trim().toUpperCase()))];
     if (uniqueGenes.length === 1) {
