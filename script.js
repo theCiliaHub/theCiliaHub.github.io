@@ -155,10 +155,11 @@ function performBatchSearch() {
 }
 
 // =============================================================================
-// SINGLE GENE SEARCH
+// HOME SEARCH FUNCTION
 // =============================================================================
 function performSingleSearch() {
-    const query = document.getElementById('search-input')?.value?.trim().toUpperCase() || '';
+    const queryInput = document.getElementById('search-input') || document.getElementById('single-gene-search');
+    const query = queryInput?.value?.trim();
     const statusDiv = document.getElementById('status-message');
 
     if (!statusDiv) {
@@ -175,17 +176,14 @@ function performSingleSearch() {
     }
 
     if (!Array.isArray(allGenes)) {
-        console.error('allGenes is not an array or is undefined');
         statusDiv.innerHTML = '<span class="error-message">Error: Gene data not available.</span>';
         return;
     }
 
     const results = allGenes.filter(g => {
-        if (!g) return false;
-        const geneName = g.gene?.toUpperCase();
-        const synonyms = g.synonym ? g.synonym.toUpperCase().split(/[,;]/).map(s => s.trim()) : [];
-        const ensembl = g.ensembl_id?.toUpperCase();
-        return geneName === query || synonyms.includes(query) || ensembl === query;
+        const geneName = g.gene || '';
+        const synonyms = g.synonym ? g.synonym.split(',').map(s => s.trim()) : [];
+        return geneName.toLowerCase() === query.toLowerCase() || synonyms.some(s => s.toLowerCase() === query.toLowerCase());
     });
 
     if (results.length === 0) {
@@ -194,8 +192,10 @@ function performSingleSearch() {
     }
 
     if (results.length === 1) {
+        // Navigate to single gene page
         window.location.hash = `#/gene/${encodeURIComponent(results[0].gene)}`;
     } else {
+        // Multiple matches
         statusDiv.innerHTML = `<span class="error-message">Multiple genes found matching "${query}": ${results.map(g => g.gene).join(', ')}. Please be more specific or use the Batch Query tool.</span>`;
     }
 }
@@ -206,8 +206,8 @@ function performSingleSearch() {
 const searchForm = document.getElementById('search-form');
 if (searchForm) {
     searchForm.addEventListener('submit', function (e) {
-        e.preventDefault();
-        performSingleSearch(); // handle single or multiple genes
+        e.preventDefault(); // prevent default form submit
+        performSingleSearch();
     });
 }
 
