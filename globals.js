@@ -5,10 +5,22 @@
 // =============================================================================
 
 // Data storage
-let allGenes = [];
 let currentData = [];
 let searchResults = [];
 const geneLocalizationData = {};
+
+'use strict';
+
+// =============================================================================
+// GLOBAL VARIABLES & STATE
+// =============================================================================
+
+// Data storage
+let allGenes = [];
+let geneMapCache = null;
+let pfamNameMap = new Map(); // For mapping PFAM IDs to names
+let currentPlotInstance = null; // Holds the active plot instance for a page
+
 
 // Plotting
 let currentPlot = null;
