@@ -1,37 +1,38 @@
-
 // globals.js
 // =============================================================================
 // GLOBAL VARIABLES
 // =============================================================================
 
-// Data storage
-let allGenes = [];
-let currentData = [];
-let searchResults = [];
+// --- Data Storage ---
+// This single variable will hold the entire loaded database object ({ genes, geneMap })
+// once loadAndPrepareDatabase() is finished.
+let databaseCache = null;
+
+// This object will be populated with localization data for the SVG diagram.
 const geneLocalizationData = {};
 
-// Plotting
-let currentPlot = null;
+// These can be used to track the user's current working set of genes.
+let currentData = [];
+let searchResults = [];
 
-// Chart instances
+
+// --- Plotting ---
+let currentPlot = null;
 let localizationChartInstance;
 let analysisDotPlotInstance;
 let analysisBarChartInstance;
 
-// IDs and defaults
+
+// --- IDs and Defaults ---
 const allPartIds = [
     "cell-body", "nucleus", "basal-body",
     "transition-zone", "axoneme", "ciliary-membrane"
 ];
+
 const defaultGenesNames = [
     "ACE2", "ADAMTS20", "ADAMTS9", "IFT88",
     "CEP290", "WDR31", "ARL13B", "BBS1"
 ];
-
-// Caches
-let geneDataCache = null;
-let geneMapCache = null;
-
 
 /**
  * Handles SPA navigation by updating the URL hash.
