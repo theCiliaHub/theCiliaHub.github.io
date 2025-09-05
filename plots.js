@@ -18,85 +18,119 @@ let currentPlotInstance = null; // Holds the active Chart.js, Plotly, or D3 inst
 // =============================================================================
 // PLOT CUSTOMIZATION & HIGH-QUALITY DOWNLOAD
 // =============================================================================
+// =============================================================================
+// PLOT CUSTOMIZATION & HIGH-QUALITY DOWNLOAD
+// =============================================================================
+
+/**
+ * Retrieves user-defined or default plot settings.
+ */
 function getPlotSettings() {
     const setting = (id, def) => document.getElementById(id)?.value || def;
     return {
         mainTitle: setting('setting-main-title', 'CiliaHub Analysis'),
         xAxisTitle: setting('setting-x-axis-title', 'X-Axis'),
         yAxisTitle: setting('setting-y-axis-title', 'Y-Axis'),
-        titleFontSize: parseInt(setting('setting-title-font-size', 18)),
-        axisTitleFontSize: parseInt(setting('setting-axis-title-font-size', 14)),
-        tickFontSize: parseInt(setting('setting-tick-font-size', 12)),
+        titleFontSize: parseInt(setting('setting-title-font-size', 20)),   // default 20
+        axisTitleFontSize: parseInt(setting('setting-axis-title-font-size', 20)), // default 20
+        tickFontSize: parseInt(setting('setting-tick-font-size', 20)),     // default 20
         fontFamily: setting('setting-font-family', 'Arial'),
         backgroundColor: setting('setting-bg-color', '#ffffff'),
         fontColor: setting('setting-font-color', '#333333'),
         gridColor: setting('setting-grid-color', '#e0e0e0'),
         colorScale: setting('setting-color-scale', 'Viridis'),
-        showLegend: document.getElementById('setting-show-legend')?.checked,
-        showGrid: document.getElementById('setting-show-grid')?.checked,
+        showLegend: document.getElementById('setting-show-legend')?.checked ?? true,
+        showGrid: document.getElementById('setting-show-grid')?.checked ?? false, // default no grid
+        axisLineWidth: parseFloat(setting('setting-axis-line-width', 1.5))
     };
 }
 
-// =============================================================================
-// GENERATE ANALYSIS PLOTS
-// =============================================================================
-async function generateAnalysisPlots() {
-    const geneInput = document.getElementById('analysis-genes-input').value;
-    if (!geneInput.trim()) {
-        alert('Please enter a list of gene names.');
+/**
+ * Downloads the currently displayed plot in PNG or PDF format.
+ */
+async function downloadPlot() {
+    const format = document.getElementById('download-format')?.value || 'png';
+    const plotArea = document.getElementById('plot-display-area');
+    const plotType = document.querySelector('input[name="plot-type"]:checked')?.value;
+
+    if (!plotArea.firstChild || !plotType || plotArea.querySelector('.status-message')) {
+        alert("Please generate a plot first.");
         return;
     }
 
-    const queries = geneInput.split(/[\s,;]+/).filter(Boolean);
-    const loaded = await loadAndPrepareDatabase();
-    if (!loaded) {
-        alert('Gene database failed to load. Using default gene set.');
+    const fileName = `CiliaHub_${plotType}_plot.${format}`;
+    const scale = 3; // 3x resolution
+    const width = plotArea.clientWidth;
+    const height = plotArea.clientHeight;
+
+    try {
+        let dataUrl;
+
+        // Chart.js plots
+        if (plotArea.querySelector('canvas')) {
+            dataUrl = currentPlotInstance.toBase64Image('image/png', 1.0);
+        }
+        // Plotly plots
+        else if (plotArea.querySelector('.js-plotly-plot')) {
+            dataUrl = await Plotly.toImage(currentPlotInstance, {
+                format: 'png',
+                width: width * scale,
+                height: height * scale
+            });
+        }
+        // D3 SVG plots
+        else if (plotArea.querySelector('svg')) {
+            const svgElement = plotArea.querySelector('svg');
+            const svgString = new XMLSerializer().serializeToString(svgElement);
+            const canvas = document.createElement('canvas');
+            canvas.width = width * scale;
+            canvas.height = height * scale;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = getPlotSettings().backgroundColor;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            const img = new Image();
+            const svgBlob = new Blob([svgString], { type: "image/svg+xml;charset=utf-8" });
+            const url = URL.createObjectURL(svgBlob);
+
+            await new Promise((resolve, reject) => {
+                img.onload = () => {
+                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                    URL.revokeObjectURL(url);
+                    dataUrl = canvas.toDataURL('image/png');
+                    resolve();
+                };
+                img.onerror = reject;
+                img.src = url;
+            });
+        }
+
+        if (!dataUrl) throw new Error("Could not generate image data URL.");
+
+        // Save as PNG
+        if (format === 'png') {
+            const a = document.createElement('a');
+            a.href = dataUrl;
+            a.download = fileName;
+            a.click();
+        }
+        // Save as PDF
+        else if (format === 'pdf') {
+            const { jsPDF } = window.jspdf;
+            const pdf = new jsPDF({
+                orientation: width > height ? 'l' : 'p',
+                unit: 'px',
+                format: [width * scale, height * scale]
+            });
+            pdf.addImage(dataUrl, 'PNG', 0, 0, width * scale, height * scale);
+            pdf.save(fileName);
+        }
+    } catch (e) {
+        console.error("Download failed:", e);
+        alert("An error occurred during download.");
     }
-
-    const { foundGenes, notFoundGenes } = findGenes(queries);
-    console.log('Found genes:', foundGenes, 'Not found:', notFoundGenes);
-
-    createEnrichmentResultsTable(foundGenes, notFoundGenes);
-
-    // Show plot wrapper
-    const plotsWrapper = document.getElementById('enrichment-plots-wrapper');
-    plotsWrapper.style.display = 'block';
-
-    // -----------------------------
-    // Key Localizations (Bubble Plot)
-    // -----------------------------
-    const keyLocCanvas = document.getElementById('analysis-bubble-plot');
-    keyLocCanvas.style.display = 'block';
-    renderKeyLocalizations(foundGenes, keyLocCanvas);
-
-    // -----------------------------
-    // Gene Matrix
-    // -----------------------------
-    const matrixCanvas = document.getElementById('analysis-matrix-plot');
-    matrixCanvas.style.display = 'block';
-    renderGeneMatrix(foundGenes, matrixCanvas);
-
-    // -----------------------------
-    // Domain Enrichment (Bubble)
-    // -----------------------------
-    const domainDiv = document.getElementById('bubble-chart-div');
-    domainDiv.style.display = 'block';
-    renderDomainEnrichment(foundGenes, domainDiv);
-
-    // -----------------------------
-    // Ciliopathy Associations (Sunburst)
-    // -----------------------------
-    const ciliopathyDiv = document.getElementById('sunburst-plot-div');
-    ciliopathyDiv.style.display = 'block';
-    renderCiliopathySunburst(foundGenes, ciliopathyDiv);
-
-    // -----------------------------
-    // Protein Complex Network
-    // -----------------------------
-    const networkDiv = document.getElementById('network-graph-div');
-    networkDiv.style.display = 'block';
-    renderComplexNetwork(foundGenes, networkDiv);
 }
+
 
 
 // =============================================================================
@@ -472,13 +506,27 @@ async function generateAnalysisPlots() {
     
     const plotType = document.querySelector('input[name="plot-type"]:checked')?.value;
     switch (plotType) {
-        case 'bubble': renderEnrichmentBubblePlot(foundGenes, plotContainer); break;
-        case 'matrix': renderBubbleMatrix(foundGenes, plotContainer); break;
-        case 'domain': renderDomainEnrichment(foundGenes, plotContainer); break;
-        case 'ciliopathy': renderCiliopathySunburst(foundGenes, plotContainer); break;
-        case 'network': renderComplexNetwork(foundGenes, plotContainer); break;
+        case 'bubble': 
+            renderKeyLocalizations(foundGenes, plotContainer); 
+            break;
+        case 'matrix': 
+            renderGeneMatrix(foundGenes, plotContainer); 
+            break;
+        case 'domain': 
+            renderDomainEnrichment(foundGenes, plotContainer); 
+            break;
+        case 'ciliopathy': 
+            renderCiliopathySunburst(foundGenes, plotContainer); 
+            break;
+        case 'network': 
+            renderComplexNetwork(foundGenes, plotContainer); 
+            break;
+        default:
+            plotContainer.innerHTML = '<p class="status-message">Please select a valid plot type.</p>';
+            break;
     }
 }
+
 
 function displayEnrichmentPage() {
     const contentArea = document.querySelector('.content-area');
