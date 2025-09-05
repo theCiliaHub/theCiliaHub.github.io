@@ -1,36 +1,21 @@
 
-// globals.js
-// =============================================================================
-// GLOBAL VARIABLES
-// =============================================================================
-
-// Data storage
-let currentData = [];
-let searchResults = [];
-const geneLocalizationData = {};
-
 'use strict';
 
 // =============================================================================
 // GLOBAL VARIABLES & STATE
 // =============================================================================
 
-// Data storage
+// Data Storage
 let allGenes = [];
+let geneDataCache = null;
 let geneMapCache = null;
-let pfamNameMap = new Map(); // For mapping PFAM IDs to names
-let currentPlotInstance = null; // Holds the active plot instance for a page
+let pfamNameMap = new Map();
+const geneLocalizationData = {};
 
+// Plotting - this holds the active plot instance for a page
+let currentPlotInstance = null; 
 
-// Plotting
-let currentPlot = null;
-
-// Chart instances
-let localizationChartInstance;
-let analysisDotPlotInstance;
-let analysisBarChartInstance;
-
-// IDs and defaults
+// IDs and defaults for other parts of the site
 const allPartIds = [
     "cell-body", "nucleus", "basal-body",
     "transition-zone", "axoneme", "ciliary-membrane"
@@ -40,10 +25,9 @@ const defaultGenesNames = [
     "CEP290", "WDR31", "ARL13B", "BBS1"
 ];
 
-// Caches
-let geneDataCache = null;
-let geneMapCache = null;
-
+// =============================================================================
+// GLOBAL NAVIGATION
+// =============================================================================
 
 /**
  * Handles SPA navigation by updating the URL hash.
