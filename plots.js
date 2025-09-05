@@ -48,48 +48,56 @@ async function generateAnalysisPlots() {
     }
 
     const queries = geneInput.split(/[\s,;]+/).filter(Boolean);
-
-    // Load and prepare gene database if not already loaded
     const loaded = await loadAndPrepareDatabase();
     if (!loaded) {
         alert('Gene database failed to load. Using default gene set.');
     }
 
-    // Search for genes
     const { foundGenes, notFoundGenes } = findGenes(queries);
+    console.log('Found genes:', foundGenes, 'Not found:', notFoundGenes);
 
-    // Display table of results
     createEnrichmentResultsTable(foundGenes, notFoundGenes);
 
-    // Show plot container
+    // Show plot wrapper
     const plotsWrapper = document.getElementById('enrichment-plots-wrapper');
     plotsWrapper.style.display = 'block';
 
-    // Key Localizations Bubble Plot
-    const keyLocContainer = document.getElementById('analysis-bubble-plot');
-    renderKeyLocalizations(foundGenes, keyLocContainer.parentElement);
+    // -----------------------------
+    // Key Localizations (Bubble Plot)
+    // -----------------------------
+    const keyLocCanvas = document.getElementById('analysis-bubble-plot');
+    keyLocCanvas.style.display = 'block';
+    renderKeyLocalizations(foundGenes, keyLocCanvas);
 
+    // -----------------------------
     // Gene Matrix
-    const matrixContainer = document.getElementById('analysis-matrix-plot');
-    renderGeneMatrix(foundGenes, matrixContainer.parentElement);
+    // -----------------------------
+    const matrixCanvas = document.getElementById('analysis-matrix-plot');
+    matrixCanvas.style.display = 'block';
+    renderGeneMatrix(foundGenes, matrixCanvas);
 
-    // Domain Enrichment
-    const domainContainer = document.getElementById('bubble-chart-div');
-    renderDomainEnrichment(foundGenes, domainContainer);
+    // -----------------------------
+    // Domain Enrichment (Bubble)
+    // -----------------------------
+    const domainDiv = document.getElementById('bubble-chart-div');
+    domainDiv.style.display = 'block';
+    renderDomainEnrichment(foundGenes, domainDiv);
 
+    // -----------------------------
     // Ciliopathy Associations (Sunburst)
-    const ciliopathyContainer = document.getElementById('sunburst-plot-div');
-    renderCiliopathySunburst(foundGenes, ciliopathyContainer);
+    // -----------------------------
+    const ciliopathyDiv = document.getElementById('sunburst-plot-div');
+    ciliopathyDiv.style.display = 'block';
+    renderCiliopathySunburst(foundGenes, ciliopathyDiv);
 
+    // -----------------------------
     // Protein Complex Network
-    const networkContainer = document.getElementById('network-graph-div');
-    renderComplexNetwork(foundGenes, networkContainer);
-
-    // Ensure proper visibility for all plots
-    document.querySelectorAll('#enrichment-plots-wrapper .plot-container canvas, #enrichment-plots-wrapper .plot-container svg').forEach(el => {
-        el.style.display = 'block';
-    });
+    // -----------------------------
+    const networkDiv = document.getElementById('network-graph-div');
+    networkDiv.style.display = 'block';
+    renderComplexNetwork(foundGenes, networkDiv);
 }
+
 
 // =============================================================================
 // PLOTTING FUNCTIONS
