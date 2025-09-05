@@ -1,28 +1,20 @@
+'use strict';
 
-// globals.js
 // =============================================================================
-// GLOBAL VARIABLES
+// GLOBAL VARIABLES & STATE
 // =============================================================================
 
-// Data storage
+// Data Storage - These are used by multiple scripts
 let allGenes = [];
-let currentData = [];
-let searchResults = [];
+let geneDataCache = null;
 let geneMapCache = null;
 let pfamNameMap = new Map();
 const geneLocalizationData = {};
 
+// Plotting - Holds the active plot instance for a page
+let currentPlotInstance = null;
 
-// Plotting - this holds the active plot instance for the Enrichment page
-let currentPlotInstance = null; 
-let currentPlot = null;
-
-// Chart instances
-let localizationChartInstance;
-let analysisDotPlotInstance;
-let analysisBarChartInstance;
-
-// IDs and defaults
+// IDs and defaults for other parts of the site
 const allPartIds = [
     "cell-body", "nucleus", "basal-body",
     "transition-zone", "axoneme", "ciliary-membrane"
@@ -32,25 +24,20 @@ const defaultGenesNames = [
     "CEP290", "WDR31", "ARL13B", "BBS1"
 ];
 
-// Caches
-let geneDataCache = null;
-let geneMapCache = null;
-
+// =============================================================================
+// GLOBAL NAVIGATION UTILITY
+// =============================================================================
 
 /**
  * Handles SPA navigation by updating the URL hash.
- * This triggers the 'hashchange' event listener, which calls handleRouteChange.
- * @param {Event | null} event - The click event, used to prevent default link behavior.
- * @param {string} path - The new path to navigate to (e.g., '/', '/ACE2').
+ * This triggers the 'hashchange' event listener in script.js.
  */
 function navigateTo(event, path) {
     if (event) {
-        event.preventDefault(); // Prevents the browser from reloading the page
+        event.preventDefault();
     }
-    // Set the new hash, which will be detected by the 'hashchange' event listener
     window.location.hash = path;
 }
-
 
 // =============================================================================
 // ROUTER
