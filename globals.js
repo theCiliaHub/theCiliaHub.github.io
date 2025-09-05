@@ -1,21 +1,24 @@
 
-'use strict';
-
+// globals.js
 // =============================================================================
-// GLOBAL VARIABLES & STATE
+// GLOBAL VARIABLES
 // =============================================================================
 
-// Data Storage
+// Data storage
 let allGenes = [];
-let geneDataCache = null;
-let geneMapCache = null;
-let pfamNameMap = new Map();
+let currentData = [];
+let searchResults = [];
 const geneLocalizationData = {};
 
-// Plotting - this holds the active plot instance for a page
-let currentPlotInstance = null; 
+// Plotting
+let currentPlot = null;
 
-// IDs and defaults for other parts of the site
+// Chart instances
+let localizationChartInstance;
+let analysisDotPlotInstance;
+let analysisBarChartInstance;
+
+// IDs and defaults
 const allPartIds = [
     "cell-body", "nucleus", "basal-body",
     "transition-zone", "axoneme", "ciliary-membrane"
@@ -25,9 +28,10 @@ const defaultGenesNames = [
     "CEP290", "WDR31", "ARL13B", "BBS1"
 ];
 
-// =============================================================================
-// GLOBAL NAVIGATION
-// =============================================================================
+// Caches
+let geneDataCache = null;
+let geneMapCache = null;
+
 
 /**
  * Handles SPA navigation by updating the URL hash.
@@ -165,4 +169,3 @@ function initGlobalEventListeners() {
         });
     }
 }
-
