@@ -34,23 +34,15 @@ async function loadAndPrepareDatabase() {
     }
 
     try {
-        const resp = await fetch('https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/ciliahub_data.json');
+        const resp = await fetch('https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/ciliahub_data.json');
         if (!resp.ok) throw new Error(`HTTP Error ${resp.status}`);
         
-        // --- KEY CHANGE STARTS HERE ---
-        
-        // 1. Fetch the entire JSON object, which may contain metadata.
-        const dataContainer = await resp.json();
+        // CORRECTED: Process the response directly as an array.
+        const allGenes = await resp.json();
 
-        // 2. Check for the nested 'genes' property and ensure it's an array.
-        if (!dataContainer || !Array.isArray(dataContainer.genes)) {
-            throw new Error("Invalid data format: expected an object with a 'genes' array.");
+        if (!Array.isArray(allGenes)) {
+            throw new Error("Data format error: The fetched data is not an array.");
         }
-
-        // 3. Extract the actual array of genes to work with.
-        const allGenes = dataContainer.genes;
-        
-        // --- KEY CHANGE ENDS HERE ---
 
         const geneMap = new Map();
 
@@ -60,19 +52,22 @@ async function loadAndPrepareDatabase() {
                 return;
             }
 
-            const nameKey = g.gene.trim().toUpperCase();
+            // --- KEY CHANGE ---
+            // Use the robust sanitize function to create clean keys for the map.
+            // This will handle invisible characters, extra spaces, and case differences.
+            const nameKey = sanitize(g.gene);
             if (nameKey) geneMap.set(nameKey, g);
 
             if (g.synonym) {
                 String(g.synonym).split(/[,;]/).forEach(syn => {
-                    const key = syn.trim().toUpperCase();
+                    const key = sanitize(syn);
                     if (key && !geneMap.has(key)) geneMap.set(key, g);
                 });
             }
 
             if (g.ensembl_id) {
                 String(g.ensembl_id).split(/[,;]/).forEach(id => {
-                    const key = id.trim().toUpperCase();
+                    const key = sanitize(id);
                     if (key && !geneMap.has(key)) geneMap.set(key, g);
                 });
             }
@@ -93,7 +88,7 @@ async function loadAndPrepareDatabase() {
         const defaultGenes = getDefaultGenes();
         const defaultGeneMap = new Map();
         defaultGenes.forEach(g => {
-            if (g.gene) defaultGeneMap.set(g.gene.trim().toUpperCase(), g);
+            if (g.gene) defaultGeneMap.set(sanitize(g.gene), g);
         });
 
         return {
@@ -102,8 +97,6 @@ async function loadAndPrepareDatabase() {
         };
     }
 }
-
-
 
 
 /**
