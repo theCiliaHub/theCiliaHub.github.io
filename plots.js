@@ -424,20 +424,151 @@ function computeProteinComplexLinks(foundGenes) {
     return { nodes, links };
 }
 
+function renderCiliopathySunburst(foundGenes, container) {
+    const data = computeCiliopathyAssociations(foundGenes); // uses your existing compute function
+    if (!data.length) {
+        container.innerHTML = '<p class="status-message">No ciliopathy associations found.</p>';
+        return;
+    }
 
+    // Convert data to D3 hierarchy for sunburst
+    const root = d3.hierarchy({ name: "Ciliopathies", children: data })
+        .sum(d => d.count);
+
+    const width = container.clientWidth;
+    const radius = Math.min(width, 400) / 2;
+
+    container.innerHTML = '';
+    const svg = d3.select(container)
+        .append('svg')
+        .attr('width', width)
+        .attr('height', radius * 2)
+        .append('g')
+        .attr('transform', `translate(${width / 2},${radius})`);
+
+    const partition = d3.partition()
+        .size([2 * Math.PI, radius]);
+
+    partition(root);
+
+    const arc = d3.arc()
+        .startAngle(d => d.x0)
+        .endAngle(d => d.x1)
+        .innerRadius(d => d.y0)
+        .outerRadius(d => d.y1);
+
+    svg.selectAll('path')
+        .data(root.descendants().filter(d => d.depth))
+        .enter()
+        .append('path')
+        .attr('d', arc)
+        .attr('fill', d => d3.interpolateViridis(d.value / d.parent.value))
+        .attr('stroke', '#fff')
+        .append('title')
+        .text(d => `${d.data.name}: ${d.value} gene(s)`);
+
+    currentPlotInstance = svg.node();
+}
+
+
+function renderComplexNetwork(foundGenes, container) {
+    const { nodes, links } = computeProteinComplexLinks(foundGenes);
+    if (!nodes.length) {
+        container.innerHTML = '<p class="status-message">No protein complex links found.</p>';
+        return;
+    }
+
+    const width = container.clientWidth;
+    const height = 400;
+    container.innerHTML = '';
+
+    const svg = d3.select(container)
+        .append('svg')
+        .attr('width', width)
+        .attr('height', height);
+
+    const simulation = d3.forceSimulation(nodes)
+        .force('link', d3.forceLink(links).id(d => d.id).distance(80))
+        .force('charge', d3.forceManyBody().strength(-200))
+        .force('center', d3.forceCenter(width / 2, height / 2));
+
+    const link = svg.append('g')
+        .selectAll('line')
+        .data(links)
+        .enter()
+        .append('line')
+        .attr('stroke', '#999')
+        .attr('stroke-width', d => Math.sqrt(d.value));
+
+    const node = svg.append('g')
+        .selectAll('circle')
+        .data(nodes)
+        .enter()
+        .append('circle')
+        .attr('r', 10)
+        .attr('fill', '#5690c7')
+        .call(d3.drag()
+            .on('start', d => { if (!d3.event.active) simulation.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; })
+            .on('drag', d => { d.fx = d3.event.x; d.fy = d3.event.y; })
+            .on('end', d => { if (!d3.event.active) simulation.alphaTarget(0); d.fx = null; d.fy = null; })
+        );
+
+    node.append('title').text(d => d.id);
+
+    simulation.on('tick', () => {
+        link
+            .attr('x1', d => d.source.x)
+            .attr('y1', d => d.source.y)
+            .attr('x2', d => d.target.x)
+            .attr('y2', d => d.target.y);
+        node
+            .attr('cx', d => d.x)
+            .attr('cy', d => d.y);
+    });
+
+    currentPlotInstance = svg.node();
+}
+
+
+/**
+ * Calculate domain enrichment and return descriptive domain names.
+ * @param {Array<Object>} filteredData - Found genes
+ * @param {Array<Object>} allCiliaData - Background gene set
+ * @returns {Array<Object>} - [{domain: "Name", richFactor: 2.5, geneCount: 3}]
+ */
 function calculateDomainEnrichment(filteredData, allCiliaData) {
     const domainCountsUser = new Map();
-    filteredData.forEach(g => (g.pfam_ids || []).forEach(id => domainCountsUser.set(id, (domainCountsUser.get(id) || 0) + 1)));
+    filteredData.forEach(g =>
+        (g.pfam_ids || []).forEach(id =>
+            domainCountsUser.set(id, (domainCountsUser.get(id) || 0) + 1)
+        )
+    );
+
     const domainCountsBg = new Map();
-    allCiliaData.forEach(g => (g.pfam_ids || []).forEach(id => domainCountsBg.set(id, (domainCountsBg.get(id) || 0) + 1)));
-    const M = filteredData.length, N = allCiliaData.length;
+    allCiliaData.forEach(g =>
+        (g.pfam_ids || []).forEach(id =>
+            domainCountsBg.set(id, (domainCountsBg.get(id) || 0) + 1)
+        )
+    );
+
+    const M = filteredData.length,
+        N = allCiliaData.length;
     if (M === 0) return [];
-    return Array.from(domainCountsUser.entries()).map(([id, k]) => {
-        const n = domainCountsBg.get(id) || 0;
-        const richFactor = n > 0 ? (k / M) / (n / N) : Infinity;
-        return { domain: id, richFactor, geneCount: k };
-    }).filter(d => d.richFactor > 1.5 && d.geneCount > 1).sort((a, b) => b.richFactor - a.richFactor);
+
+    return Array.from(domainCountsUser.entries())
+        .map(([id, k]) => {
+            const n = domainCountsBg.get(id) || 0;
+            const richFactor = n > 0 ? (k / M) / (n / N) : Infinity;
+            return {
+                domain: pfamIdToName[id] || id, // use descriptive name if available
+                richFactor,
+                geneCount: k
+            };
+        })
+        .filter(d => d.richFactor > 1.5 && d.geneCount > 1)
+        .sort((a, b) => b.richFactor - a.richFactor);
 }
+
 
 // =============================================================================
 // MAIN CONTROLLER & PAGE RENDERER
