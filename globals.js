@@ -47,218 +47,85 @@ function navigateTo(event, path) {
     window.location.hash = path;
 }
 
-// CiliaHub Router Fix - Add this to your globals.js or main script file
 
+// =============================================================================
+// ROUTER
+// =============================================================================
+async function handleRouteChange() {
+    // Normalize path
+    let path = window.location.hash.replace(/^#/, '').toLowerCase().trim();
+    if (!path || path === '/' || path === '/index.html') {
+        path = '/';
+    }
 
+    // Load database if not loaded
+    try {
+        await loadAndPrepareDatabase(); // must populate geneMapCache + geneDataCache
+    } catch (err) {
+        console.error("Database loading failed:", err);
+        console.log("DEBUG hash:", window.location.hash);
+        console.log("DEBUG path:", path);
+    }
 
-// Enhanced route handler
-function handleRouteChange() {
-    const hash = window.location.hash || '#/';
-    console.log('Route changed to:', hash);
+    // Try to resolve gene from path
+    let gene = null;
+    if (geneMapCache) {
+        const geneName = sanitize(path.split('/').pop().replace('.html', ''));
+        gene = geneMapCache.get(geneName);
+    } else {
+        console.warn("geneMapCache is not initialized yet.");
+    }
 
-    // Remove the leading '#' and split by '/'
-    const pathParts = hash.substring(1).split('/');
-    const route = pathParts[1] || 'home';
-    const param = pathParts[2];
+    // Update active nav item
+    updateActiveNav(path);
 
-    console.log('Route parts:', { route, param });
-
-    // Hide all main sections first
-    const sections = ['home-section', 'gene-section', 'batch-query-section', 'about-section'];
-    sections.forEach(sectionId => {
-        const section = document.getElementById(sectionId);
-        if (section) {
-            section.style.display = 'none';
-        }
+    // Hide all main content sections
+    const pages = [
+        '#home-page', '#analysis-page', '#batch-query-page',
+        '#enrichment-page', '#compare-page', '#expression-page',
+        '#download-page', '#contact-page', '#notfound-page'
+    ];
+    pages.forEach(id => {
+        const el = document.querySelector(id);
+        if (el) el.style.display = 'none';
     });
 
-    // Route handling
-    switch (route) {
-        case 'home':
-        case '':
-            showSection('home-section');
+    // Show the correct page
+    switch (path) {
+        case '/':
+            displayHomePage();
+            setTimeout(displayLocalizationChart, 0);
             break;
-            
-        case 'gene':
-            if (param) {
-                // Decode the gene name from URL
-                const geneName = decodeURIComponent(param);
-                console.log('Loading gene page for:', geneName);
-                
-                // Look for the gene in our data
-                let gene = geneMapCache[geneName];
-                
-                if (!gene) {
-                    // Try case-insensitive lookup
-                    const lowerGeneName = geneName.toLowerCase();
-                    for (let [key, value] of Object.entries(geneMapCache)) {
-                        if (key.toLowerCase() === lowerGeneName) {
-                            gene = value;
-                            break;
-                        }
-                    }
-                }
-                
-                if (!gene) {
-                    // Try searching in allGenes array
-                    gene = allGenes.find(g => {
-                        const name = (g.name || g.gene_name || g.symbol || '').toLowerCase();
-                        return name === geneName.toLowerCase();
-                    });
-                }
-                
-                if (gene) {
-                    // Display the gene page
-                    if (typeof displayIndividualGenePage === 'function') {
-                        displayIndividualGenePage(gene);
-                    } else {
-                        console.error('displayIndividualGenePage function not found');
-                        showSection('home-section');
-                    }
-                } else {
-                    console.error('Gene not found:', geneName);
-                    alert(`Gene "${geneName}" not found in database.`);
-                    window.location.hash = '#/home';
-                }
-            } else {
-                // No gene specified, redirect to home
-                window.location.hash = '#/home';
-            }
+        case '/batch-query':
+            displayBatchQueryTool();
             break;
-            
-        case 'batch':
-        case 'batch-query':
-            showSection('batch-query-section');
+        case '/enrichment':
+        case '/analysis': // handle both routes
+            displayEnrichmentPage();
             break;
-            
-        case 'about':
-            showSection('about-section');
+        case '/compare':
+            displayComparePage();
             break;
-            
+        case '/expression':
+            displayExpressionPage();
+            break;
+        case '/download':
+            displayDownloadPage();
+            break;
+        case '/contact':
+            displayContactPage();
+            break;
         default:
-            // Unknown route, redirect to home
-            console.warn('Unknown route:', route);
-            window.location.hash = '#/home';
+            if (gene) {
+                displayIndividualGenePage(gene);
+            } else {
+                displayNotFoundPage();
+            }
             break;
     }
+
+    console.log("Routing completed. Path:", path, "Gene:", gene ? gene.name : "N/A");
 }
-
-// Helper function to show a section
-function showSection(sectionId) {
-    const section = document.getElementById(sectionId);
-    if (section) {
-        section.style.display = 'block';
-        console.log('Showing section:', sectionId);
-    } else {
-        console.error('Section not found:', sectionId);
-    }
-}
-
-// Initialize router and search functionality
-function initializeRouter() {
-    console.log('Initializing CiliaHub router...');
-    
-    // Set up hash change listener
-    window.addEventListener('hashchange', handleRouteChange);
-    
-    // Set up search form listener
-    const searchForm = document.getElementById('search-form') || document.querySelector('form');
-    const searchInput = document.getElementById('geneSearch') || document.querySelector('input[type="search"]') || document.querySelector('#search-input');
-    
-    if (searchForm && searchInput) {
-        console.log('Setting up search form listener');
-        
-        // Prevent form submission and handle search
-        searchForm.addEventListener('submit', function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            performSingleSearch();
-            return false;
-        });
-        
-        // Also handle Enter key in search input
-        searchInput.addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                performSingleSearch();
-            }
-        });
-        
-    } else {
-        console.warn('Search form or input not found during initialization');
-        
-        // Try to find search elements after DOM is fully loaded
-        document.addEventListener('DOMContentLoaded', function() {
-            const form = document.getElementById('search-form') || document.querySelector('form');
-            const input = document.getElementById('geneSearch') || document.querySelector('input[type="search"]') || document.querySelector('#search-input');
-            
-            if (form && input) {
-                console.log('Setting up search form listener after DOM loaded');
-                
-                form.addEventListener('submit', function(e) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    performSingleSearch();
-                    return false;
-                });
-                
-                input.addEventListener('keypress', function(e) {
-                    if (e.key === 'Enter') {
-                        e.preventDefault();
-                        performSingleSearch();
-                    }
-                });
-            }
-        });
-    }
-    
-    // Handle initial route
-    setTimeout(() => {
-        handleRouteChange();
-    }, 100);
-}
-
-// Auto-initialize when script loads
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initializeRouter);
-} else {
-    initializeRouter();
-}
-
-// Also expose functions globally for debugging
-window.CiliaHubRouter = {
-    handleRouteChange,
-    performSingleSearch,
-    initializeRouter
-};
-// ----------------------------
-// Intercept search form submission
-// ----------------------------
-document.addEventListener('DOMContentLoaded', function () {
-    const searchForm = document.getElementById('search-form');
-    if (!searchForm) return; // safety check
-
-    searchForm.addEventListener('submit', function (e) {
-        e.preventDefault(); // prevent default form submit
-
-        const searchTerm = document.getElementById('search-input').value.trim();
-        if (!searchTerm) return;
-
-        // Split by comma, semicolon, or space
-        const genes = searchTerm.split(/[\s,;]+/).filter(Boolean);
-
-        // Redirect depending on number of genes
-        if (genes.length === 1) {
-            // Single gene -> gene page
-            window.location.hash = `#/gene/${encodeURIComponent(genes[0])}`;
-        } else {
-            // Multiple genes -> batch query
-            window.location.hash = `#/batch?genes=${encodeURIComponent(genes.join(","))}`;
-        }
-    });
-});
-
-
 
 // =============================================================================
 // EVENT LISTENERS
