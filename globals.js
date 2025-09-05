@@ -127,6 +127,29 @@ async function handleRouteChange() {
     console.log("Routing completed. Path:", path, "Gene:", gene ? gene.name : "N/A");
 }
 
+// ----------------------------
+// Intercept search form submission
+// ----------------------------
+document.getElementById('search-form').addEventListener('submit', function (e) {
+    e.preventDefault(); // prevent default form submit
+
+    const searchTerm = document.getElementById('search-input').value.trim();
+    if (!searchTerm) return;
+
+    // Split by comma, semicolon, or space
+    const genes = searchTerm.split(/[\s,;]+/).filter(Boolean);
+
+    // Redirect depending on number of genes
+    if (genes.length === 1) {
+        // Single gene -> gene page
+        window.location.hash = `#/gene/${encodeURIComponent(genes[0])}`;
+    } else {
+        // Multiple genes -> batch query
+        window.location.hash = `#/batch?genes=${encodeURIComponent(genes.join(","))}`;
+    }
+});
+
+
 // =============================================================================
 // EVENT LISTENERS
 // =============================================================================
