@@ -471,8 +471,9 @@ async function generateAnalysisPlots() {
         case 'matrix': 
             renderGeneMatrix(foundGenes, plotContainer); 
             break;
-        case 'domain': 
-            renderDomainEnrichment(foundGenes, plotContainer); 
+         case 'domain': 
+            // Pass both the found genes and the entire gene database for statistical comparison
+            renderDomainEnrichment(foundGenes, database.genes, plotContainer); 
             break;
         case 'ciliopathy': 
             renderCiliopathySunburst(foundGenes, plotContainer); 
