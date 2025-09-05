@@ -24,80 +24,149 @@ function sanitize(input) {
                 .toUpperCase();
 }
 
-// This variable will store the loaded database to prevent re-fetching.
-let databaseCache = null;
+/**
+ * Loads, sanitizes, and prepares the gene database into an efficient lookup map.
+ */
 
 async function loadAndPrepareDatabase() {
-    // If the database is already loaded and cached, return it immediately.
-    if (databaseCache) {
-        return databaseCache;
-    }
 
-    try {
-        const resp = await fetch('https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/ciliahub_data.json');
-        if (!resp.ok) throw new Error(`HTTP Error ${resp.status}`);
-        
-        // CORRECTED: Process the response directly as an array.
-        const allGenes = await resp.json();
+    if (geneDataCache) return true;
 
-        if (!Array.isArray(allGenes)) {
-            throw new Error("Data format error: The fetched data is not an array.");
-        }
+    try {
 
-        const geneMap = new Map();
+        const resp = await fetch('https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/ciliahub_data.json');
 
-        allGenes.forEach(g => {
-            if (!g.gene || typeof g.gene !== 'string') {
-                console.warn('Skipping entry with invalid gene name:', g);
-                return;
-            }
+        if (!resp.ok) throw new Error(`HTTP Error ${resp.status}`);
 
-            // --- KEY CHANGE ---
-            // Use the robust sanitize function to create clean keys for the map.
-            // This will handle invisible characters, extra spaces, and case differences.
-            const nameKey = sanitize(g.gene);
-            if (nameKey) geneMap.set(nameKey, g);
+        const rawGenes = await resp.json();
 
-            if (g.synonym) {
-                String(g.synonym).split(/[,;]/).forEach(syn => {
-                    const key = sanitize(syn);
-                    if (key && !geneMap.has(key)) geneMap.set(key, g);
-                });
-            }
 
-            if (g.ensembl_id) {
-                String(g.ensembl_id).split(/[,;]/).forEach(id => {
-                    const key = sanitize(id);
-                    if (key && !geneMap.has(key)) geneMap.set(key, g);
-                });
-            }
-        });
 
-        console.log(`Loaded ${allGenes.length} genes into database`);
+        if (!Array.isArray(rawGenes)) {
 
-        const database = {
-            genes: allGenes,
-            geneMap: geneMap
-        };
+            throw new Error('Invalid data format: expected array');
 
-        databaseCache = database;
-        return database;
+        }
 
-    } catch (e) {
-        console.error('Data load error:', e);
-        const defaultGenes = getDefaultGenes();
-        const defaultGeneMap = new Map();
-        defaultGenes.forEach(g => {
-            if (g.gene) defaultGeneMap.set(sanitize(g.gene), g);
-        });
 
-        return {
-            genes: defaultGenes,
-            geneMap: defaultGeneMap
-        };
-    }
+
+        geneDataCache = rawGenes;
+
+        allGenes = rawGenes;
+
+        geneMapCache = new Map();
+
+
+
+        allGenes.forEach(g => {
+
+            if (!g.gene || typeof g.gene !== 'string') {
+
+                console.warn('Skipping entry with invalid gene name:', g);
+
+                return;
+
+            }
+
+
+
+            const nameKey = sanitize(g.gene);
+
+            if (nameKey) geneMapCache.set(nameKey, g);
+
+
+
+            if (g.synonym) {
+
+                String(g.synonym).split(/[,;]/).forEach(syn => {
+
+                    const key = sanitize(syn);
+
+                    if (key && !geneMapCache.has(key)) geneMapCache.set(key, g);
+
+                });
+
+            }
+
+
+
+            if (g.ensembl_id) {
+
+                String(g.ensembl_id).split(/[,;]/).forEach(id => {
+
+                    const key = sanitize(id);
+
+                    if (key && !geneMapCache.has(key)) geneMapCache.set(key, g);
+
+                });
+
+            }
+
+
+
+            if (g.localization) {
+
+                const validCiliaryLocalizations = ['transition zone', 'cilia', 'basal body', 'axoneme', 'ciliary membrane', 'centrosome', 'autophagosomes', 'endoplasmic reticulum', 'flagella', 'golgi apparatus', 'lysosome', 'microbody', 'microtubules', 'mitochondrion', 'nucleus', 'peroxisome'];
+
+                let sanitizedLocalization = Array.isArray(g.localization) 
+
+                    ? g.localization.map(loc => loc ? loc.trim().toLowerCase() : '').filter(loc => loc && validCiliaryLocalizations.includes(loc))
+
+                    : (g.localization ? g.localization.split(/[,;]/).map(loc => loc ? loc.trim().toLowerCase() : '').filter(loc => loc && validCiliaryLocalizations.includes(loc)) : []);
+
+                
+
+                if (g.gene === 'ACTN2') {
+
+                    console.log('ACTN2 Raw localization from JSON:', g.localization);
+
+                    console.log('ACTN2 Sanitized localization before mapping:', sanitizedLocalization);
+
+                }
+
+                
+
+                geneLocalizationData[g.gene] = mapLocalizationToSVG(sanitizedLocalization);
+
+                
+
+                if (g.gene === 'ACTN2') {
+
+                    console.log('ACTN2 Mapped localization from mapLocalizationToSVG:', geneLocalizationData[g.gene]);
+
+                }
+
+            }
+
+        });
+
+
+
+        console.log(`Loaded ${allGenes.length} genes into database`);
+
+        return true;
+
+    } catch (e) {
+
+        console.error('Data load error:', e);
+
+        allGenes = getDefaultGenes();
+
+        currentData = allGenes;
+
+        geneMapCache = new Map();
+
+        allGenes.forEach(g => {
+
+            if (g.gene) geneMapCache.set(sanitize(g.gene), g);
+
+        });
+
+        return false;
+
+    }
+
 }
-
 
 /**
  * The central search function.
