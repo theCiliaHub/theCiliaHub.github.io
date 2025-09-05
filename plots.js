@@ -279,8 +279,160 @@ function renderDomainEnrichment(foundGenes, container) {
     Plotly.newPlot(container, data, layout, { responsive: true });
 }
 
-function renderCiliopathySunburst(foundGenes, container) { /* D3 Sunburst Code */ }
-function renderComplexNetwork(foundGenes, container) { /* D3 Network Code */ }
+// ========== 1. CILIAPATHY SUNBURST ==========
+export function renderCiliopathySunburst(foundGenes, container) {
+  // Clear container
+  d3.select(container).selectAll("*").remove();
+
+  // Group genes by ciliopathy
+  const ciliopathyGroups = d3.group(foundGenes, d => d.ciliopathy || "No known ciliopathy");
+  const root = {
+    name: "Ciliopathy Genes",
+    children: Array.from(ciliopathyGroups, ([ciliopathy, genes]) => ({
+      name: ciliopathy,
+      children: genes.map(g => ({ name: g.gene }))
+    }))
+  };
+
+  const width = 500;
+  const radius = width / 2;
+
+  const svg = d3.select(container)
+    .append("svg")
+    .attr("width", width)
+    .attr("height", width)
+    .append("g")
+    .attr("transform", `translate(${radius},${radius})`);
+
+  const partition = d3.partition().size([2 * Math.PI, radius]);
+  const rootNode = d3.hierarchy(root).sum(d => d.children ? d.children.length : 1);
+  partition(rootNode);
+
+  const arc = d3.arc()
+    .startAngle(d => d.x0)
+    .endAngle(d => d.x1)
+    .innerRadius(d => d.y0)
+    .outerRadius(d => d.y1);
+
+  svg.selectAll("path")
+    .data(rootNode.descendants())
+    .join("path")
+    .attr("d", arc)
+    .attr("fill", d => d.depth === 0 ? "#ccc" : d3.schemeCategory10[d.depth % 10])
+    .attr("stroke", "#fff")
+    .on("mouseover", (event, d) => {
+      const name = d.data.name;
+      const count = d.value;
+      d3.select(container).append("div")
+        .attr("class", "tooltip")
+        .style("position", "absolute")
+        .style("background", "#fff")
+        .style("border", "1px solid #ccc")
+        .style("padding", "4px 8px")
+        .style("pointer-events", "none")
+        .style("left", `${event.pageX + 10}px`)
+        .style("top", `${event.pageY + 10}px`)
+        .text(`${name}: ${count} gene${count > 1 ? "s" : ""}`);
+    })
+    .on("mouseout", () => {
+      d3.select(container).selectAll(".tooltip").remove();
+    })
+    .on("click", (event, d) => {
+      if (!d.children) {
+        console.log(`Filter table for gene: ${d.data.name}`);
+        // Optionally call your table filter function here
+      }
+    });
+}
+
+// ========== 2. COMPLEX NETWORK ==========
+export function renderComplexNetwork(foundGenes, container) {
+  // Clear container
+  d3.select(container).selectAll("*").remove();
+
+  // Build nodes + edges
+  const nodes = foundGenes.map(g => ({
+    id: g.gene,
+    ciliopathy: g.ciliopathy,
+    complex: g.complex_names
+  }));
+
+  const edges = [];
+  for (let i = 0; i < foundGenes.length; i++) {
+    for (let j = i + 1; j < foundGenes.length; j++) {
+      if (foundGenes[i].complex_names && foundGenes[j].complex_names &&
+          foundGenes[i].complex_names === foundGenes[j].complex_names) {
+        edges.push({ source: foundGenes[i].gene, target: foundGenes[j].gene });
+      }
+    }
+  }
+
+  const width = 600;
+  const height = 400;
+
+  const svg = d3.select(container)
+    .append("svg")
+    .attr("width", width)
+    .attr("height", height);
+
+  const simulation = d3.forceSimulation(nodes)
+    .force("link", d3.forceLink(edges).id(d => d.id).distance(80))
+    .force("charge", d3.forceManyBody().strength(-250))
+    .force("center", d3.forceCenter(width / 2, height / 2));
+
+  // Draw edges
+  const link = svg.append("g")
+    .attr("stroke", "#aaa")
+    .attr("stroke-width", 1.5)
+    .selectAll("line")
+    .data(edges)
+    .join("line");
+
+  // Draw nodes
+  const node = svg.append("g")
+    .selectAll("circle")
+    .data(nodes)
+    .join("circle")
+    .attr("r", 6)
+    .attr("fill", d => d.ciliopathy ? "#ff6666" : "#69b3a2")
+    .attr("stroke", "#fff")
+    .attr("stroke-width", 1.5)
+    .call(d3.drag()
+      .on("start", dragstarted)
+      .on("drag", dragged)
+      .on("end", dragended));
+
+  node.append("title").text(d => `${d.id}${d.complex ? " (" + d.complex + ")" : ""}`);
+
+  simulation.on("tick", () => {
+    link
+      .attr("x1", d => d.source.x)
+      .attr("y1", d => d.source.y)
+      .attr("x2", d => d.target.x)
+      .attr("y2", d => d.target.y);
+
+    node
+      .attr("cx", d => d.x)
+      .attr("cy", d => d.y);
+  });
+
+  function dragstarted(event, d) {
+    if (!event.active) simulation.alphaTarget(0.3).restart();
+    d.fx = d.x;
+    d.fy = d.y;
+  }
+
+  function dragged(event, d) {
+    d.fx = event.x;
+    d.fy = event.y;
+  }
+
+  function dragended(event, d) {
+    if (!event.active) simulation.alphaTarget(0);
+    d.fx = null;
+    d.fy = null;
+  }
+}
 
 function calculateDomainEnrichment(filteredData, allCiliaData) {
     const domainCountsUser = new Map();
