@@ -405,42 +405,41 @@ function displayHomePage() {
     // Inside the displayHomePage function...
 
     searchInput.addEventListener('input', function() {
-        const query = this.value.trim().toUpperCase();
-        if (query.length < 1) {
-            hideSuggestions();
-            return;
-        }
-       
-        // ✨ UPDATED: Added a check for ensembl_id in the filter
-        const filteredGenes = allGenes.filter(g => 
-            (g.gene && g.gene.toUpperCase().startsWith(query)) || 
-            (g.synonym && g.synonym.toUpperCase().includes(query)) ||
-            (g.ensembl_id && g.ensembl_id.toUpperCase().startsWith(query))
-        ).slice(0, 10);
-       
-        if (filteredGenes.length > 0) {
-            // ✨ UPDATED: Improved suggestion display to include ensembl_id and synonym
-            suggestionsContainer.innerHTML = '<ul>' + 
-                filteredGenes.map(g => {
-                    const details = [g.ensembl_id, g.synonym].filter(Boolean).join(', ');
-                    return `<li>${g.gene}${details ? ` (${details})` : ''}</li>`;
-                }).join('') + 
-                '</ul>';
-           
-            // Event delegation for click handling remains the same
-            suggestionsContainer.querySelector('ul').addEventListener('click', function(event) {
-                if (event.target && event.target.nodeName === "LI") {
-                    searchInput.value = event.target.textContent.split(' ')[0]; // Get just the gene name
-                    hideSuggestions();
-                    performSingleSearch();
-                }
-            });
+    const query = this.value.trim().toUpperCase();
+    if (query.length < 1) {
+        hideSuggestions();
+        return;
+    }
 
-            suggestionsContainer.style.display = 'block';
-        } else {
-            hideSuggestions();
-        }
-    });
+    // Show suggestions broadly (prefix match for better UX)
+    const filteredGenes = allGenes.filter(g => 
+        (g.gene && g.gene.toUpperCase().startsWith(query)) || 
+        (g.synonym && g.synonym.toUpperCase().includes(query)) ||
+        (g.ensembl_id && g.ensembl_id.toUpperCase().startsWith(query))
+    ).slice(0, 10);
+
+    if (filteredGenes.length > 0) {
+        suggestionsContainer.innerHTML = '<ul>' + 
+            filteredGenes.map(g => {
+                const details = [g.ensembl_id, g.synonym].filter(Boolean).join(', ');
+                return `<li data-gene="${g.gene}">${g.gene}${details ? ` (${details})` : ''}</li>`;
+            }).join('') + 
+            '</ul>';
+        
+        suggestionsContainer.querySelector('ul').addEventListener('click', function(event) {
+            if (event.target && event.target.nodeName === "LI") {
+                searchInput.value = event.target.dataset.gene; // ✅ always set exact gene symbol
+                hideSuggestions();
+                performSingleSearch(); // will now be exact
+            }
+        });
+
+        suggestionsContainer.style.display = 'block';
+    } else {
+        hideSuggestions();
+    }
+});
+
     
     searchInput.addEventListener('keydown', function(event) {
         const suggestions = suggestionsContainer.querySelectorAll('li');
@@ -1061,9 +1060,9 @@ function performSingleSearch() {
         return;
     }
 
+    // ✅ Filter using exact match (no partial matches)
     const results = allGenes.filter(g => {
-        // Use sanitized gene field directly, no need for replace(/\s/g, '')
-        if (g.gene && g.gene.toUpperCase().includes(query)) {
+        if (g.gene && g.gene.toUpperCase() === query) {
             return true;
         }
         if (g.synonym) {
@@ -1076,6 +1075,7 @@ function performSingleSearch() {
     });
 
     if (results.length === 0) {
+        // Show close suggestions (still helpful UX)
         const closeMatches = allGenes.filter(g =>
             g.gene && g.gene.toUpperCase().startsWith(query.slice(0, 3))
         ).slice(0, 3);
@@ -1084,9 +1084,11 @@ function performSingleSearch() {
         return;
     }
 
-    if (results.length === 1 && results[0].gene.toUpperCase() === query) {
+    // ✅ If exactly one match, go directly to gene page
+    if (results.length === 1) {
         navigateTo(null, `/${results[0].gene}`);
     } else {
+        // Otherwise use batch query mode (multiple exact matches)
         navigateTo(null, '/batch-query');
         setTimeout(() => {
             document.getElementById('batch-genes-input').value = results.map(r => r.gene).join('\n');
@@ -1094,6 +1096,7 @@ function performSingleSearch() {
         }, 100);
     }
 }
+
 
 function performBatchSearch() {
     const queries = document.getElementById('batch-genes-input').value
