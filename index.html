@@ -33,15 +33,18 @@
         </div>
     </nav>
 
-    <main class="main-container">
-        <div class="content-area" id="content-area">
-            <div id="home-page">
-                <h1>Welcome to CiliaHub 🔬</h1>
-                <p>Your comprehensive resource for genes with ciliary functions. Explore our database, compare genes, and visualize expression data.</p>
-                <div class="call-to-action">
-                    <a href="#/enrichment" onclick="navigateTo(event, '/enrichment')" class="cta-button">Perform Gene Enrichment Analysis</a>
-                </div>
-            </div>
+    <<div id="home-page">
+    <h1>Welcome to CiliaHub 🔬</h1>
+    <p>Your comprehensive resource for genes with ciliary functions. Explore our database, compare genes, and visualize expression data.</p>
+    
+    <form id="home-search-form" class="home-search">
+      <input type="text" id="home-search-input" placeholder="Enter a gene name...">
+      <button type="submit">Search</button>
+    </form>
+    <div class="call-to-action">
+        <a href="#/enrichment" onclick="navigateTo(event, '/enrichment')" class="cta-button">Perform Gene Enrichment Analysis</a>
+    </div>
+</div>
 
             <div id="analysis-page" style="display: none;">
                 <h2>Gene Enrichment Analysis</h2>
