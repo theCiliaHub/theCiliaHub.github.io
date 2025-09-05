@@ -67,11 +67,13 @@ async function handleRouteChange() {
         console.log("DEBUG path:", path);
     }
 
-    // Try to resolve gene from path
+    // Resolve gene if path is /gene/GENE
     let gene = null;
     if (geneMapCache) {
-        const geneName = sanitize(path.split('/').pop().replace('.html', ''));
-        gene = geneMapCache.get(geneName);
+        if (path.startsWith('/gene/')) {
+            const geneName = decodeURIComponent(path.replace('/gene/', '')).toUpperCase();
+            gene = geneMapCache.get(geneName);
+        }
     } else {
         console.warn("geneMapCache is not initialized yet.");
     }
@@ -91,28 +93,27 @@ async function handleRouteChange() {
     });
 
     // Show the correct page
-    switch (path) {
-        case '/':
+    switch (true) {
+        case path === '/':
             displayHomePage();
             setTimeout(displayLocalizationChart, 0);
             break;
-        case '/batch-query':
+        case path.startsWith('/batch'):
             displayBatchQueryTool();
             break;
-        case '/enrichment':
-        case '/analysis': // handle both routes
+        case path === '/enrichment' || path === '/analysis':
             displayEnrichmentPage();
             break;
-        case '/compare':
+        case path === '/compare':
             displayComparePage();
             break;
-        case '/expression':
+        case path === '/expression':
             displayExpressionPage();
             break;
-        case '/download':
+        case path === '/download':
             displayDownloadPage();
             break;
-        case '/contact':
+        case path === '/contact':
             displayContactPage();
             break;
         default:
@@ -126,6 +127,7 @@ async function handleRouteChange() {
 
     console.log("Routing completed. Path:", path, "Gene:", gene ? gene.name : "N/A");
 }
+
 
 // ----------------------------
 // Intercept search form submission
