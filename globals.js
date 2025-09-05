@@ -52,8 +52,6 @@ function navigateTo(event, path) {
 // ROUTER
 // =============================================================================
 async function handleRouteChange() {
-    await loadAndPrepareDatabase();  // Ensure data is loaded before route resolution
-    // ... (rest of the function remains unchanged: parse hash, lookup gene, call displayIndividualGenePage if single gene)
     // Normalize path
     let path = window.location.hash.replace(/^#/, '').toLowerCase().trim();
     if (!path || path === '/' || path === '/index.html') {
@@ -133,8 +131,7 @@ async function handleRouteChange() {
 // EVENT LISTENERS
 // =============================================================================
 window.addEventListener("load", handleRouteChange);
-window.addEventListener('hashchange', async () => {
-    await handleRouteChange();
+window.addEventListener("hashchange", handleRouteChange);
 
 document.addEventListener('DOMContentLoaded', () => {
     initGlobalEventListeners();
