@@ -165,7 +165,6 @@ function debugSearch(query) {
  */
 /**
  * Handles the UI for the Batch Gene Query page.
- */
 /**
  * Handles the UI for the Batch Gene Query page, supporting all identifier types and filters.
  */
