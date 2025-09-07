@@ -31,42 +31,28 @@ const defaultGenesNames = [
 let geneDataCache = null;
 let geneMapCache = null;
 
-
-/**
- * Handles SPA navigation by updating the URL hash.
- * This triggers the 'hashchange' event listener, which calls handleRouteChange.
- * @param {Event | null} event - The click event, used to prevent default link behavior.
- * @param {string} path - The new path to navigate to (e.g., '/', '/ACE2').
- */
 function navigateTo(event, path) {
     if (event) {
-        event.preventDefault(); // Prevents the browser from reloading the page
+        event.preventDefault();
     }
-    // Set the new hash, which will be detected by the 'hashchange' event listener
     window.location.hash = path;
 }
-
 
 // =============================================================================
 // ROUTER
 // =============================================================================
 async function handleRouteChange() {
-    // Normalize path
     let path = window.location.hash.replace(/^#/, '').toLowerCase().trim();
     if (!path || path === '/' || path === '/index.html') {
         path = '/';
     }
 
-    // Load database if not loaded
     try {
-        await loadAndPrepareDatabase(); // must populate geneMapCache + geneDataCache
+        await loadAndPrepareDatabase();
     } catch (err) {
         console.error("Database loading failed:", err);
-        console.log("DEBUG hash:", window.location.hash);
-        console.log("DEBUG path:", path);
     }
 
-    // Try to resolve gene from path
     let gene = null;
     if (geneMapCache) {
         const geneName = sanitize(path.split('/').pop().replace('.html', ''));
@@ -75,13 +61,13 @@ async function handleRouteChange() {
         console.warn("geneMapCache is not initialized yet.");
     }
 
-    // Update active nav item
     updateActiveNav(path);
 
-    // Hide all main content sections
+    // This part is likely superseded by your dynamic page functions,
+    // but we will keep it as requested.
     const pages = [
         '#home-page', '#analysis-page', '#batch-query-page',
-        '#ciliaplot-page', '#compare-page', '#expression-page', // Changed from #enrichment-page
+        '#ciliaplot-page', '#compare-page', '#expression-page',
         '#download-page', '#contact-page', '#notfound-page'
     ];
     pages.forEach(id => {
@@ -89,7 +75,6 @@ async function handleRouteChange() {
         if (el) el.style.display = 'none';
     });
 
-    // Show the correct page
     switch (path) {
         case '/':
             displayHomePage();
@@ -98,9 +83,9 @@ async function handleRouteChange() {
         case '/batch-query':
             displayBatchQueryTool();
             break;
-        case '/ciliaplot': // Changed from /enrichment
-        case '/analysis': // handle both routes
-            displayCiliaPlotPage(); // Changed from displayEnrichmentPage
+        case '/ciliaplot':
+        case '/analysis':
+            displayCiliaPlotPage();
             break;
         case '/compare':
             displayComparePage();
@@ -122,7 +107,6 @@ async function handleRouteChange() {
             }
             break;
     }
-
     console.log("Routing completed. Path:", path, "Gene:", gene ? gene.name : "N/A");
 }
 
@@ -140,10 +124,7 @@ document.addEventListener('DOMContentLoaded', () => {
 // GLOBAL UI HELPERS
 // =============================================================================
 function initGlobalEventListeners() {
-    // Sticky search handler
     window.addEventListener('scroll', handleStickySearch);
-
-    // Keyboard interaction for .cilia-part elements
     document.querySelectorAll('.cilia-part').forEach(part => {
         part.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' || e.key === ' ') {
@@ -153,7 +134,6 @@ function initGlobalEventListeners() {
         });
     });
 
-    // Panzoom setup for interactive cilium
     const ciliaSvg = document.querySelector('.interactive-cilium svg');
     if (ciliaSvg) {
         Panzoom(ciliaSvg, {
