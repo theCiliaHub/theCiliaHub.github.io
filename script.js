@@ -62,12 +62,13 @@ async function loadAndPrepareDatabase() {
             }
 
             // 3. Index by all Ensembl IDs (handles comma or semicolon separators)
-            if (g.ensembl_id) {
-                String(g.ensembl_id).split(/[,;]/).forEach(id => {
-                    const key = sanitize(id);
-                    if (key && !geneMapCache.has(key)) geneMapCache.set(key, g);
-                });
-            }
+          // This part of your code already handles Ensembl IDs
+if (g.ensembl_id) {
+    String(g.ensembl_id).split(/[,;]/).forEach(id => {
+        const key = sanitize(id);
+        if (key) geneMapCache.set(key, g);
+    });
+} 
             
             // 4. Prepare localization data for SVG mapping - MODIFIED: Sanitize input to filter non-ciliary terms and add debug logging for ACTN2
             if (g.localization) {
