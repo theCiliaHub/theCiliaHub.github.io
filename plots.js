@@ -365,129 +365,227 @@ function renderGeneMatrix(foundGenes, container) {
 // =============================================================================
 // DOMAIN ENRICHMENT (Bar Chart) - FIXED
 // =============================================================================
+// =============================================================================
+// DOMAIN ENRICHMENT RENDER - FIXED
+// =============================================================================
 function renderDomainEnrichment(foundGenes, allGenes, container) {
-    const stats = calculateDomainEnrichment(foundGenes, allGenes);
+    console.log('Rendering domain enrichment...');
+    console.log('Found genes:', foundGenes);
+    console.log('All genes:', allGenes);
     
-    if (!stats || !stats.length) {
-        container.innerHTML = '<p class="status-message">No domains found for enrichment.</p>';
+    if (!foundGenes || !Array.isArray(foundGenes) || foundGenes.length === 0) {
+        container.innerHTML = '<p class="status-message">No genes found for domain enrichment analysis.</p>';
+        return;
+    }
+    
+    if (!allGenes || !Array.isArray(allGenes) || allGenes.length === 0) {
+        container.innerHTML = '<p class="status-message">No background gene data available for comparison.</p>';
         return;
     }
 
-    // Sort by count and take top 15 to avoid overcrowding
-    const topDomains = stats.sort((a, b) => b.geneCount - a.geneCount).slice(0, 15);
-    
-    container.innerHTML = `<canvas></canvas>`;
-    const ctx = container.querySelector('canvas').getContext('2d');
-    const settings = getPlotSettings();
+    try {
+        const stats = calculateDomainEnrichment(foundGenes, allGenes);
+        
+        if (!stats || !stats.length) {
+            container.innerHTML = `
+                <p class="status-message">
+                    No significant domain enrichment found. 
+                    This could mean:<br>
+                    1. Your genes don't share common domains<br>
+                    2. The domains aren't enriched compared to background<br>
+                    3. Domain data may not be available for these genes
+                </p>
+            `;
+            return;
+        }
 
-    currentPlotInstance = new Chart(ctx, {
-        type: 'bar',
-        data: {
-            labels: topDomains.map(d => d.domain),
-            datasets: [{ 
-                label: 'Gene Count', 
-                data: topDomains.map(d => d.geneCount), 
-                backgroundColor: 'rgba(89,161,79,0.7)',
-                borderColor: 'rgba(89,161,79,1)',
-                borderWidth: 1
-            }]
-        },
-        options: {
-            indexAxis: 'y',
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: { 
-                legend: { display: false }, 
-                title: { 
-                    display: true, 
-                    text: settings.mainTitle,
-                    font: { 
-                        size: settings.titleFontSize,
-                        family: settings.fontFamily
-                    }
-                },
-                tooltip: { 
-                    callbacks: { 
-                        label: (context) => `${context.dataset.label}: ${context.raw} gene(s)` 
-                    } 
-                }
+        // Sort by count and take top 15 to avoid overcrowding
+        const topDomains = stats.sort((a, b) => b.geneCount - a.geneCount).slice(0, 15);
+        
+        container.innerHTML = `<canvas></canvas>`;
+        const ctx = container.querySelector('canvas').getContext('2d');
+        const settings = getPlotSettings();
+
+        currentPlotInstance = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: topDomains.map(d => {
+                    // Truncate long domain names
+                    const maxLength = 30;
+                    return d.domain.length > maxLength 
+                        ? d.domain.substring(0, maxLength) + '...' 
+                        : d.domain;
+                }),
+                datasets: [{ 
+                    label: 'Gene Count', 
+                    data: topDomains.map(d => d.geneCount), 
+                    backgroundColor: 'rgba(89,161,79,0.7)',
+                    borderColor: 'rgba(89,161,79,1)',
+                    borderWidth: 1
+                }]
             },
-            scales: {
-                x: { 
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { 
+                    legend: { display: false }, 
                     title: { 
                         display: true, 
-                        text: settings.xAxisTitle,
-                        font: {
-                            size: settings.axisTitleFontSize,
+                        text: settings.mainTitle || 'Protein Domain Enrichment',
+                        font: { 
+                            size: settings.titleFontSize,
                             family: settings.fontFamily
                         }
-                    }, 
-                    grid: { display: settings.showGrid, color: settings.gridColor }, 
-                    border: { display: true, width: settings.axisLineWidth },
-                    ticks: {
-                        font: {
-                            size: settings.tickFontSize,
-                            family: settings.fontFamily
-                        }
+                    },
+                    tooltip: { 
+                        callbacks: { 
+                            label: (context) => {
+                                const domain = topDomains[context.dataIndex];
+                                return [
+                                    `Domain: ${domain.domain}`,
+                                    `Gene Count: ${context.raw}`,
+                                    `Rich Factor: ${domain.richFactor.toFixed(2)}`,
+                                    `Background: ${domain.backgroundCount} genes`
+                                ];
+                            }
+                        } 
                     }
                 },
-                y: { 
-                    title: { 
-                        display: true, 
-                        text: settings.yAxisTitle,
-                        font: {
-                            size: settings.axisTitleFontSize,
-                            family: settings.fontFamily
+                scales: {
+                    x: { 
+                        title: { 
+                            display: true, 
+                            text: settings.xAxisTitle || 'Gene Count',
+                            font: {
+                                size: settings.axisTitleFontSize,
+                                family: settings.fontFamily
+                            }
+                        }, 
+                        grid: { display: settings.showGrid, color: settings.gridColor }, 
+                        border: { display: true, width: settings.axisLineWidth },
+                        ticks: {
+                            font: {
+                                size: settings.tickFontSize,
+                                family: settings.fontFamily
+                            }
                         }
-                    }, 
-                    grid: { display: settings.showGrid, color: settings.gridColor }, 
-                    border: { display: true, width: settings.axisLineWidth },
-                    ticks: {
-                        font: {
-                            size: settings.tickFontSize,
-                            family: settings.fontFamily
+                    },
+                    y: { 
+                        title: { 
+                            display: true, 
+                            text: settings.yAxisTitle || 'Protein Domain',
+                            font: {
+                                size: settings.axisTitleFontSize,
+                                family: settings.fontFamily
+                            }
+                        }, 
+                        grid: { display: settings.showGrid, color: settings.gridColor }, 
+                        border: { display: true, width: settings.axisLineWidth },
+                        ticks: {
+                            font: {
+                                size: settings.tickFontSize,
+                                family: settings.fontFamily
+                            }
                         }
                     }
                 }
             }
-        }
-    });
+        });
+    } catch (error) {
+        console.error('Error rendering domain enrichment:', error);
+        container.innerHTML = `
+            <p class="status-message error">
+                Error rendering domain enrichment: ${error.message}<br>
+                Please check the console for details.
+            </p>
+        `;
+    }
 }
 
-// Enhanced domain enrichment calculation
+
+// =============================================================================
+// DOMAIN ENRICHMENT CALCULATION - FIXED WITH ERROR HANDLING
+// =============================================================================
 function calculateDomainEnrichment(filteredData, allCiliaData) {
+    console.log('Calculating domain enrichment...');
+    console.log('Filtered data:', filteredData);
+    console.log('All cilia data:', allCiliaData);
+    
+    if (!filteredData || !Array.isArray(filteredData)) {
+        console.error('Filtered data is not an array:', filteredData);
+        return [];
+    }
+    
+    if (!allCiliaData || !Array.isArray(allCiliaData)) {
+        console.error('All cilia data is not an array:', allCiliaData);
+        return [];
+    }
+
     const domainCountsUser = new Map();
     
     // Handle different possible field names for domains
     filteredData.forEach(g => {
-        const domains = g.pfam_ids || g.domains || g.domain_descriptions || [];
-        domains.forEach(domain => {
-            if (typeof domain === 'string') {
-                domainCountsUser.set(domain, (domainCountsUser.get(domain) || 0) + 1);
-            } else if (domain && domain.id) {
-                domainCountsUser.set(domain.id, (domainCountsUser.get(domain.id) || 0) + 1);
-            }
-        });
+        if (!g) return; // Skip null/undefined genes
+        
+        // Try different possible field names for domains
+        const domains = g.pfam_ids || g.domains || g.domain_descriptions || 
+                       g.pfam_domains || g.protein_domains || [];
+        
+        if (Array.isArray(domains)) {
+            domains.forEach(domain => {
+                if (typeof domain === 'string' && domain.trim()) {
+                    const cleanDomain = domain.trim();
+                    domainCountsUser.set(cleanDomain, (domainCountsUser.get(cleanDomain) || 0) + 1);
+                } else if (domain && domain.id) {
+                    domainCountsUser.set(domain.id, (domainCountsUser.get(domain.id) || 0) + 1);
+                } else if (domain && typeof domain === 'object') {
+                    // Try to extract domain name from object
+                    const domainName = domain.name || domain.description || domain.id;
+                    if (domainName) {
+                        domainCountsUser.set(domainName, (domainCountsUser.get(domainName) || 0) + 1);
+                    }
+                }
+            });
+        }
     });
 
     const domainCountsBg = new Map();
     allCiliaData.forEach(g => {
-        const domains = g.pfam_ids || g.domains || g.domain_descriptions || [];
-        domains.forEach(domain => {
-            if (typeof domain === 'string') {
-                domainCountsBg.set(domain, (domainCountsBg.get(domain) || 0) + 1);
-            } else if (domain && domain.id) {
-                domainCountsBg.set(domain.id, (domainCountsBg.get(domain.id) || 0) + 1);
-            }
-        });
+        if (!g) return; // Skip null/undefined genes
+        
+        const domains = g.pfam_ids || g.domains || g.domain_descriptions || 
+                       g.pfam_domains || g.protein_domains || [];
+        
+        if (Array.isArray(domains)) {
+            domains.forEach(domain => {
+                if (typeof domain === 'string' && domain.trim()) {
+                    const cleanDomain = domain.trim();
+                    domainCountsBg.set(cleanDomain, (domainCountsBg.get(cleanDomain) || 0) + 1);
+                } else if (domain && domain.id) {
+                    domainCountsBg.set(domain.id, (domainCountsBg.get(domain.id) || 0) + 1);
+                } else if (domain && typeof domain === 'object') {
+                    const domainName = domain.name || domain.description || domain.id;
+                    if (domainName) {
+                        domainCountsBg.set(domainName, (domainCountsBg.get(domainName) || 0) + 1);
+                    }
+                }
+            });
+        }
     });
 
     const M = filteredData.length;
     const N = allCiliaData.length;
     
-    if (M === 0) return [];
+    if (M === 0) {
+        console.warn('No filtered data for enrichment calculation');
+        return [];
+    }
 
-    return Array.from(domainCountsUser.entries())
+    console.log('User domain counts:', Array.from(domainCountsUser.entries()));
+    console.log('Background domain counts:', Array.from(domainCountsBg.entries()));
+
+    const enrichmentResults = Array.from(domainCountsUser.entries())
         .map(([domainId, k]) => {
             const n = domainCountsBg.get(domainId) || 0;
             const richFactor = n > 0 ? (k / M) / (n / N) : Infinity;
@@ -502,12 +600,44 @@ function calculateDomainEnrichment(filteredData, allCiliaData) {
                 domain: domainName,
                 richFactor,
                 geneCount: k,
+                backgroundCount: n,
                 pValue: calculateEnrichmentPValue(k, M, n, N)
             };
         })
         .filter(d => d.richFactor > 1.5 && d.geneCount > 1)
         .sort((a, b) => b.richFactor - a.richFactor);
+
+    console.log('Enrichment results:', enrichmentResults);
+    return enrichmentResults;
 }
+
+// Debug function to check database structure
+function debugDatabaseStructure(database) {
+    console.group('Database Structure Debug');
+    console.log('Database type:', typeof database);
+    console.log('Is array:', Array.isArray(database));
+    
+    if (Array.isArray(database)) {
+        console.log('Array length:', database.length);
+        if (database.length > 0) {
+            console.log('First item:', database[0]);
+            console.log('First item keys:', Object.keys(database[0]));
+        }
+    } else if (typeof database === 'object' && database !== null) {
+        console.log('Object keys:', Object.keys(database));
+        if (database.genes && Array.isArray(database.genes)) {
+            console.log('Genes array length:', database.genes.length);
+            if (database.genes.length > 0) {
+                console.log('First gene:', database.genes[0]);
+                console.log('First gene keys:', Object.keys(database.genes[0]));
+            }
+        }
+    }
+    console.groupEnd();
+}
+
+// Use this in your generateAnalysisPlots function:
+// debugDatabaseStructure(database);
 
 // Helper function for p-value calculation
 function calculateEnrichmentPValue(k, M, n, N) {
@@ -995,53 +1125,72 @@ const pfamIdToName = {
 // =============================================================================
 // MAIN CONTROLLER & PAGE RENDERER
 // =============================================================================
+// =============================================================================
+// MAIN CONTROLLER & PAGE RENDERER - FIXED
+// =============================================================================
 async function generateAnalysisPlots() {
-    // 1. CORRECT: Load the database and store the returned object in a constant.
-    const database = await loadAndPrepareDatabase(); // This is in script.js
-    
-    const plotContainer = document.getElementById('plot-display-area');
-    const resultsContainer = document.getElementById('enrichment-results-container');
-    const genesInput = document.getElementById('enrichment-genes-input').value.trim();
+    try {
+        const database = await loadAndPrepareDatabase();
+        const plotContainer = document.getElementById('plot-display-area');
+        const resultsContainer = document.getElementById('enrichment-results-container');
+        const genesInput = document.getElementById('enrichment-genes-input').value.trim();
 
-    if (!genesInput) {
-        alert('Please enter a gene list.');
-        return;
-    }
-    
-    plotContainer.innerHTML = '<p class="status-message">Generating plot...</p>';
-    if (resultsContainer) resultsContainer.innerHTML = '';
-    currentPlotInstance = null;
+        if (!genesInput) {
+            alert('Please enter a gene list.');
+            return;
+        }
+        
+        plotContainer.innerHTML = '<p class="status-message">Generating plot...</p>';
+        if (resultsContainer) resultsContainer.innerHTML = '';
+        currentPlotInstance = null;
 
-    const geneList = genesInput.split(/[\s,;\n\r\t]+/).filter(Boolean);
-    
-    // 2. CORRECT: Pass the loaded 'database' to findGenes so it has data to search through.
-    const { foundGenes, notFoundGenes } = findGenes(geneList, database); // This is in script.js
-    
-    createEnrichmentResultsTable(foundGenes, notFoundGenes);
-    
-    const plotType = document.querySelector('input[name="plot-type"]:checked')?.value;
-    switch (plotType) {
-        case 'bubble': 
-            renderKeyLocalizations(foundGenes, plotContainer); 
-            break;
-        case 'matrix': 
-            renderGeneMatrix(foundGenes, plotContainer); 
-            break;
-        case 'domain': 
-            // This now works correctly because 'database' is defined.
-            renderDomainEnrichment(foundGenes, database.genes, plotContainer); 
-            break;
-        case 'ciliopathy': 
-            renderCiliopathySunburst(foundGenes, plotContainer); 
-            break;
-        case 'network': 
-            renderComplexNetwork(foundGenes, plotContainer); 
-            break;
-        default:
-            plotContainer.innerHTML = '<p class="status-message">Please select a valid plot type.</p>';
-            break;
+        const geneList = genesInput.split(/[\s,;\n\r\t]+/).filter(Boolean);
+        
+        // Debug: Check database structure
+        console.log('Database structure:', database);
+        console.log('Database genes:', database.genes ? database.genes.length : 'No genes property');
+        
+        // Extract the genes array from the database object
+        // The database might be the genes array directly or have a .genes property
+        const allGenes = Array.isArray(database) ? database : (database.genes || []);
+        
+        const { foundGenes, notFoundGenes } = findGenes(geneList, allGenes);
+        
+        console.log('Found genes:', foundGenes.length);
+        console.log('All genes available:', allGenes.length);
+        
+        createEnrichmentResultsTable(foundGenes, notFoundGenes);
+        
+        const plotType = document.querySelector('input[name="plot-type"]:checked')?.value;
+        
+        switch (plotType) {
+            case 'bubble': 
+                renderKeyLocalizations(foundGenes, plotContainer); 
+                break;
+            case 'matrix': 
+                renderGeneMatrix(foundGenes, plotContainer); 
+                break;
+            case 'domain': 
+                // Pass the correct allGenes array
+                renderDomainEnrichment(foundGenes, allGenes, plotContainer); 
+                break;
+            case 'ciliopathy': 
+                renderCiliopathySunburst(foundGenes, plotContainer); 
+                break;
+            case 'network': 
+                renderComplexNetwork(foundGenes, plotContainer); 
+                break;
+            default:
+                plotContainer.innerHTML = '<p class="status-message">Please select a valid plot type.</p>';
+                break;
+        }
+    } catch (error) {
+        console.error('Error generating plots:', error);
+        const plotContainer = document.getElementById('plot-display-area');
+        plotContainer.innerHTML = `<p class="status-message error">Error generating plot: ${error.message}</p>`;
     }
 }
+
 
 function displayEnrichmentPage() {
     const contentArea = document.querySelector('.content-area');
