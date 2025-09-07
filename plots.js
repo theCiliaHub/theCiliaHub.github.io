@@ -18,7 +18,6 @@ let currentPlotInstance = null; // Holds the active Chart.js, Plotly, or D3 inst
 // =============================================================================
 // PLOT CUSTOMIZATION & HIGH-QUALITY DOWNLOAD
 // =============================================================================
-
 /**
  * Retrieves user-defined or default plot settings.
  */
@@ -28,16 +27,16 @@ function getPlotSettings() {
         mainTitle: setting('setting-main-title', 'CiliaHub Analysis'),
         xAxisTitle: setting('setting-x-axis-title', 'X-Axis'),
         yAxisTitle: setting('setting-y-axis-title', 'Y-Axis'),
-        titleFontSize: parseInt(setting('setting-title-font-size', 20)),
-        axisTitleFontSize: parseInt(setting('setting-axis-title-font-size', 20)),
-        tickFontSize: parseInt(setting('setting-tick-font-size', 20)),
+        titleFontSize: parseInt(setting('setting-title-font-size', 20)),   // default 20
+        axisTitleFontSize: parseInt(setting('setting-axis-title-font-size', 20)), // default 20
+        tickFontSize: parseInt(setting('setting-tick-font-size', 20)),     // default 20
         fontFamily: setting('setting-font-family', 'Arial'),
         backgroundColor: setting('setting-bg-color', '#ffffff'),
         fontColor: setting('setting-font-color', '#333333'),
         gridColor: setting('setting-grid-color', '#e0e0e0'),
         colorScale: setting('setting-color-scale', 'Viridis'),
         showLegend: document.getElementById('setting-show-legend')?.checked ?? true,
-        showGrid: document.getElementById('setting-show-grid')?.checked ?? false,
+        showGrid: document.getElementById('setting-show-grid')?.checked ?? false, // default no grid
         axisLineWidth: parseFloat(setting('setting-axis-line-width', 1.5))
     };
 }
@@ -56,21 +55,27 @@ async function downloadPlot() {
     }
 
     const fileName = `CiliaHub_${plotType}_plot.${format}`;
-    const scale = 3;
+    const scale = 3; // 3x resolution
     const width = plotArea.clientWidth;
     const height = plotArea.clientHeight;
 
     try {
         let dataUrl;
+
+        // Chart.js plots
         if (plotArea.querySelector('canvas')) {
             dataUrl = currentPlotInstance.toBase64Image('image/png', 1.0);
-        } else if (plotArea.querySelector('.js-plotly-plot')) {
+        }
+        // Plotly plots
+        else if (plotArea.querySelector('.js-plotly-plot')) {
             dataUrl = await Plotly.toImage(currentPlotInstance, {
                 format: 'png',
                 width: width * scale,
                 height: height * scale
             });
-        } else if (plotArea.querySelector('svg')) {
+        }
+        // D3 SVG plots
+        else if (plotArea.querySelector('svg')) {
             const svgElement = plotArea.querySelector('svg');
             const svgString = new XMLSerializer().serializeToString(svgElement);
             const canvas = document.createElement('canvas');
@@ -79,9 +84,11 @@ async function downloadPlot() {
             const ctx = canvas.getContext('2d');
             ctx.fillStyle = getPlotSettings().backgroundColor;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
+
             const img = new Image();
             const svgBlob = new Blob([svgString], { type: "image/svg+xml;charset=utf-8" });
             const url = URL.createObjectURL(svgBlob);
+
             await new Promise((resolve, reject) => {
                 img.onload = () => {
                     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
@@ -96,12 +103,15 @@ async function downloadPlot() {
 
         if (!dataUrl) throw new Error("Could not generate image data URL.");
 
+        // Save as PNG
         if (format === 'png') {
             const a = document.createElement('a');
             a.href = dataUrl;
             a.download = fileName;
             a.click();
-        } else if (format === 'pdf') {
+        }
+        // Save as PDF
+        else if (format === 'pdf') {
             const { jsPDF } = window.jspdf;
             const pdf = new jsPDF({
                 orientation: width > height ? 'l' : 'p',
@@ -117,11 +127,14 @@ async function downloadPlot() {
     }
 }
 
-function createCiliaPlotResultsTable(foundGenes, notFoundGenes) {
+
+
+function createEnrichmentResultsTable(foundGenes, notFoundGenes) {
     const container = document.getElementById('ciliaplot-results-container');
     if (!container) return;
 
     let tableHTML = '';
+
     if (foundGenes.length > 0) {
         tableHTML += `
         <h4>Found Genes (${foundGenes.length})</h4>
@@ -139,11 +152,33 @@ function createCiliaPlotResultsTable(foundGenes, notFoundGenes) {
             </thead>
             <tbody>
         `;
+
         foundGenes.forEach(g => {
-            const localization = Array.isArray(g.localization) ? g.localization : (g.localization ? [g.localization] : []);
-            const domains = Array.isArray(g.domain_descriptions) ? g.domain_descriptions : (g.domain_descriptions ? [g.domain_descriptions] : []);
-            const complexes = Array.isArray(g.complex_names) ? g.complex_names : (g.complex_names ? [g.complex_names] : []);
-            const ciliopathy = Array.isArray(g.ciliopathy) ? g.ciliopathy : (g.ciliopathy ? [g.ciliopathy] : []);
+            // Ensure all fields are arrays for safe joining
+            const localization = Array.isArray(g.localization)
+                ? g.localization
+                : g.localization
+                ? [g.localization]
+                : [];
+
+            const domains = Array.isArray(g.domain_descriptions)
+                ? g.domain_descriptions
+                : g.domain_descriptions
+                ? [g.domain_descriptions]
+                : [];
+
+            const complexes = Array.isArray(g.complex_names)
+                ? g.complex_names
+                : g.complex_names
+                ? [g.complex_names]
+                : [];
+
+            const ciliopathy = Array.isArray(g.ciliopathy)
+                ? g.ciliopathy
+                : g.ciliopathy
+                ? [g.ciliopathy]
+                : [];
+
             tableHTML += `
                 <tr>
                     <td><a href="/#/${g.gene}" onclick="navigateTo(event, '/${g.gene}')">${g.gene}</a></td>
@@ -155,6 +190,7 @@ function createCiliaPlotResultsTable(foundGenes, notFoundGenes) {
                 </tr>
             `;
         });
+
         tableHTML += `</tbody></table></div>`;
     }
 
@@ -164,11 +200,13 @@ function createCiliaPlotResultsTable(foundGenes, notFoundGenes) {
         <p>${notFoundGenes.join(', ')}</p>
         `;
     }
+
     container.innerHTML = tableHTML;
 }
 
+
 // =============================================================================
-// PLOTTING FUNCTIONS
+// PLOTTING FUNCTIONS FOR CILIAHUB ENRICHMENT
 // =============================================================================
 
 function renderKeyLocalizations(foundGenes, container) {
@@ -176,7 +214,28 @@ function renderKeyLocalizations(foundGenes, container) {
         container.innerHTML = '<p class="status-message">No ciliary genes found for plotting.</p>';
         return;
     }
-    const yCategories = ['Cilia', 'Basal Body', 'Transition Zone', 'Axoneme', 'Ciliary Membrane', 'Centrosome', 'Microtubules', 'Endoplasmic Reticulum', 'Flagella', 'Cytosol', 'Lysosome', 'Autophagosomes', 'Ribosome', 'Nucleus', 'P-body', 'Peroxisome'];
+
+    const settings = getPlotSettings();
+    const yCategories = [
+        'Cilia',
+        'Basal Body',
+        'Transition Zone',
+        'Axoneme',
+        'Ciliary Membrane',
+        'Centrosome',
+        'Microtubules',
+        'Endoplasmic Reticulum',
+        'Flagella',
+        'Cytosol',
+        'Lysosome',
+        'Autophagosomes',
+        'Ribosome',
+        'Nucleus',
+        'P-body',
+        'Peroxisome'
+    ];
+
+    // Count genes per localization
     const localizationCounts = {};
     foundGenes.forEach(gene => {
         (Array.isArray(gene.localization) ? gene.localization : []).forEach(loc => {
@@ -184,13 +243,16 @@ function renderKeyLocalizations(foundGenes, container) {
             if (match) localizationCounts[match] = (localizationCounts[match] || 0) + 1;
         });
     });
+
     const categoriesWithData = yCategories.filter(cat => localizationCounts[cat] > 0);
     if (!categoriesWithData.length) {
         container.innerHTML = '<p class="status-message">No genes found in primary ciliary localizations.</p>';
         return;
     }
+
     container.innerHTML = `<canvas></canvas>`;
     const ctx = container.querySelector('canvas').getContext('2d');
+
     currentPlotInstance = new Chart(ctx, {
         type: 'bubble',
         data: {
@@ -214,8 +276,20 @@ function renderKeyLocalizations(foundGenes, container) {
                 tooltip: { callbacks: { label: c => `${c.raw.y}: ${c.raw.count} gene(s)` } }
             },
             scales: {
-                x: { title: { display: true, text: 'Gene Count', font: { size: 20 } }, grid: { display: false }, border: { display: true, width: 2 }, ticks: { font: { size: 20 } } },
-                y: { type: 'category', labels: yCategories, title: { display: true, text: 'Cellular Compartment', font: { size: 20 } }, grid: { display: false }, border: { display: true, width: 2 }, ticks: { font: { size: 20 } } }
+                x: { 
+                    title: { display: true, text: 'Gene Count', font: { size: 20 } }, 
+                    grid: { display: false }, 
+                    border: { display: true, width: 2 }, 
+                    ticks: { font: { size: 20 } } 
+                },
+                y: { 
+                    type: 'category',
+                    labels: yCategories,
+                    title: { display: true, text: 'Cellular Compartment', font: { size: 20 } }, 
+                    grid: { display: false }, 
+                    border: { display: true, width: 2 }, 
+                    ticks: { font: { size: 20 } }
+                }
             }
         }
     });
@@ -226,16 +300,24 @@ function renderGeneMatrix(foundGenes, container) {
         container.innerHTML = '<p class="status-message">No genes to display in the matrix plot.</p>';
         return;
     }
+
+    const settings = getPlotSettings();
     const yCategories = [...new Set(foundGenes.flatMap(g => g.localization))].filter(Boolean).sort();
     const xLabels = [...new Set(foundGenes.map(g => g.gene))].sort();
+
     container.innerHTML = `<canvas></canvas>`;
     const ctx = container.querySelector('canvas').getContext('2d');
+
     currentPlotInstance = new Chart(ctx, {
         type: 'bubble',
         data: {
             datasets: foundGenes.map((gene, index) => ({
                 label: gene.gene,
-                data: (Array.isArray(gene.localization) ? gene.localization : []).map(loc => ({ x: gene.gene, y: loc, r: 10 })),
+                data: (Array.isArray(gene.localization) ? gene.localization : []).map(loc => ({
+                    x: gene.gene,
+                    y: loc,
+                    r: 10
+                })),
                 backgroundColor: d3.schemeCategory10[index % 10]
             }))
         },
@@ -247,74 +329,322 @@ function renderGeneMatrix(foundGenes, container) {
                 tooltip: { callbacks: { label: c => `${c.dataset.label}: ${c.raw.y}` } }
             },
             scales: {
-                x: { type: 'category', labels: xLabels, title: { display: true, text: 'Genes', font: { size: 20 } }, grid: { display: false }, border: { display: true, width: 2 }, ticks: { font: { size: 20 }, maxRotation: 90, minRotation: 45 } },
-                y: { type: 'category', labels: yCategories, title: { display: true, text: 'Ciliary Compartment', font: { size: 20 } }, grid: { display: false }, border: { display: true, width: 2 }, ticks: { font: { size: 20 } } }
+                x: { 
+                    type: 'category', labels: xLabels,
+                    title: { display: true, text: 'Genes', font: { size: 20 } },
+                    grid: { display: false }, 
+                    border: { display: true, width: 2 },
+                    ticks: { font: { size: 20 }, maxRotation: 90, minRotation: 45 }
+                },
+                y: { 
+                    type: 'category', labels: yCategories,
+                    title: { display: true, text: 'Ciliary Compartment', font: { size: 20 } },
+                    grid: { display: false }, 
+                    border: { display: true, width: 2 },
+                    ticks: { font: { size: 20 } }
+                }
             }
         }
     });
 }
 
 function renderDomainEnrichment(foundGenes, allGenes, container) {
-    if (!foundGenes || !allGenes || allGenes.length === 0) {
-        container.innerHTML = '<p class="status-message">Not enough data for domain enrichment analysis.</p>';
+    console.log('Rendering domain enrichment...');
+    console.log('Found genes:', foundGenes);
+    console.log('All genes:', allGenes);
+    
+    if (!foundGenes || !Array.isArray(foundGenes) || foundGenes.length === 0) {
+        container.innerHTML = '<p class="status-message">No genes found for domain enrichment analysis.</p>';
         return;
     }
-    const stats = calculateDomainEnrichment(foundGenes, allGenes);
-    if (!stats.length) {
-        container.innerHTML = `<p class="status-message">No significant domain enrichment found.</p>`;
+    
+    if (!allGenes || !Array.isArray(allGenes) || allGenes.length === 0) {
+        container.innerHTML = '<p class="status-message">No background gene data available for comparison.</p>';
         return;
     }
-    const topDomains = stats.slice(0, 15);
-    container.innerHTML = `<canvas></canvas>`;
-    const ctx = container.querySelector('canvas').getContext('2d');
-    const settings = getPlotSettings();
-    currentPlotInstance = new Chart(ctx, {
-        type: 'bar',
-        data: {
-            labels: topDomains.map(d => {
-                const maxLength = 30;
-                return d.domain.length > maxLength ? d.domain.substring(0, maxLength) + '...' : d.domain;
-            }),
-            datasets: [{
-                label: 'Gene Count',
-                data: topDomains.map(d => d.geneCount),
-                backgroundColor: 'rgba(89,161,79,0.7)',
-                borderColor: 'rgba(89,161,79,1)',
-                borderWidth: 1
-            }]
-        },
-        options: {
-            indexAxis: 'y', responsive: true, maintainAspectRatio: false,
-            plugins: {
-                legend: { display: false },
-                title: { display: true, text: settings.mainTitle || 'Protein Domain Enrichment', font: { size: settings.titleFontSize, family: settings.fontFamily } },
-                tooltip: {
-                    callbacks: {
-                        label: (context) => {
-                            const domain = topDomains[context.dataIndex];
-                            return [`Domain: ${domain.domain}`, `Gene Count: ${context.raw}`, `Rich Factor: ${domain.richFactor.toFixed(2)}`, `Background: ${domain.backgroundCount} genes`];
+
+    try {
+        const stats = calculateDomainEnrichment(foundGenes, allGenes);
+        
+        if (!stats || !stats.length) {
+            container.innerHTML = `
+                <p class="status-message">
+                    No significant domain enrichment found. 
+                    This could mean:<br>
+                    1. Your genes don't share common domains<br>
+                    2. The domains aren't enriched compared to background<br>
+                    3. Domain data may not be available for these genes
+                </p>
+            `;
+            return;
+        }
+
+        const topDomains = stats.sort((a, b) => b.geneCount - a.geneCount).slice(0, 15);
+        
+        container.innerHTML = `<canvas></canvas>`;
+        const ctx = container.querySelector('canvas').getContext('2d');
+        const settings = getPlotSettings();
+
+        currentPlotInstance = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: topDomains.map(d => {
+                    const maxLength = 30;
+                    return d.domain.length > maxLength 
+                        ? d.domain.substring(0, maxLength) + '...' 
+                        : d.domain;
+                }),
+                datasets: [{ 
+                    label: 'Gene Count', 
+                    data: topDomains.map(d => d.geneCount), 
+                    backgroundColor: 'rgba(89,161,79,0.7)',
+                    borderColor: 'rgba(89,161,79,1)',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { 
+                    legend: { display: false }, 
+                    title: { 
+                        display: true, 
+                        text: settings.mainTitle || 'Protein Domain Enrichment',
+                        font: { 
+                            size: settings.titleFontSize,
+                            family: settings.fontFamily
+                        }
+                    },
+                    tooltip: { 
+                        callbacks: { 
+                            label: (context) => {
+                                const domain = topDomains[context.dataIndex];
+                                return [
+                                    `Domain: ${domain.domain}`,
+                                    `Gene Count: ${context.raw}`,
+                                    `Rich Factor: ${domain.richFactor.toFixed(2)}`,
+                                    `Background: ${domain.backgroundCount} genes`
+                                ];
+                            }
+                        } 
+                    }
+                },
+                scales: {
+                    x: { 
+                        title: { 
+                            display: true, 
+                            text: settings.xAxisTitle || 'Gene Count',
+                            font: {
+                                size: settings.axisTitleFontSize,
+                                family: settings.fontFamily
+                            }
+                        }, 
+                        grid: { display: settings.showGrid, color: settings.gridColor }, 
+                        border: { display: true, width: settings.axisLineWidth },
+                        ticks: {
+                            font: {
+                                size: settings.tickFontSize,
+                                family: settings.fontFamily
+                            }
+                        }
+                    },
+                    y: { 
+                        title: { 
+                            display: true, 
+                            text: settings.yAxisTitle || 'Protein Domain',
+                            font: {
+                                size: settings.axisTitleFontSize,
+                                family: settings.fontFamily
+                            }
+                        }, 
+                        grid: { display: settings.showGrid, color: settings.gridColor }, 
+                        border: { display: true, width: settings.axisLineWidth },
+                        ticks: {
+                            font: {
+                                size: settings.tickFontSize,
+                                family: settings.fontFamily
+                            }
                         }
                     }
                 }
-            },
-            scales: {
-                x: { title: { display: true, text: settings.xAxisTitle || 'Gene Count', font: { size: settings.axisTitleFontSize, family: settings.fontFamily } }, grid: { display: settings.showGrid, color: settings.gridColor }, border: { display: true, width: settings.axisLineWidth }, ticks: { font: { size: settings.tickFontSize, family: settings.fontFamily } } },
-                y: { title: { display: true, text: settings.yAxisTitle || 'Protein Domain', font: { size: settings.axisTitleFontSize, family: settings.fontFamily } }, grid: { display: settings.showGrid, color: settings.gridColor }, border: { display: true, width: settings.axisLineWidth }, ticks: { font: { size: settings.tickFontSize, family: settings.fontFamily } } }
             }
+        });
+    } catch (error) {
+        console.error('Error rendering domain enrichment:', error);
+        container.innerHTML = `
+            <p class="status-message error">
+                Error rendering domain enrichment: ${error.message}<br>
+                Please check the console for details.
+            </p>
+        `;
+    }
+}
+
+
+function calculateDomainEnrichment(filteredData, allCiliaData) {
+    if (!filteredData || !Array.isArray(filteredData)) {
+        console.error('Filtered data is not an array:', filteredData);
+        return [];
+    }
+    
+    if (!allCiliaData || !Array.isArray(allCiliaData)) {
+        console.error('All cilia data is not an array:', allCiliaData);
+        return [];
+    }
+
+    const domainCountsUser = new Map();
+    
+    filteredData.forEach(g => {
+        if (!g) return;
+        const domains = g.pfam_ids || g.domains || g.domain_descriptions || g.pfam_domains || g.protein_domains || [];
+        if (Array.isArray(domains)) {
+            domains.forEach(domain => {
+                if (typeof domain === 'string' && domain.trim()) {
+                    const cleanDomain = domain.trim();
+                    domainCountsUser.set(cleanDomain, (domainCountsUser.get(cleanDomain) || 0) + 1);
+                } else if (domain && domain.id) {
+                    domainCountsUser.set(domain.id, (domainCountsUser.get(domain.id) || 0) + 1);
+                } else if (domain && typeof domain === 'object') {
+                    const domainName = domain.name || domain.description || domain.id;
+                    if (domainName) {
+                        domainCountsUser.set(domainName, (domainCountsUser.get(domainName) || 0) + 1);
+                    }
+                }
+            });
         }
     });
+
+    const domainCountsBg = new Map();
+    allCiliaData.forEach(g => {
+        if (!g) return;
+        const domains = g.pfam_ids || g.domains || g.domain_descriptions || g.pfam_domains || g.protein_domains || [];
+        if (Array.isArray(domains)) {
+            domains.forEach(domain => {
+                if (typeof domain === 'string' && domain.trim()) {
+                    const cleanDomain = domain.trim();
+                    domainCountsBg.set(cleanDomain, (domainCountsBg.get(cleanDomain) || 0) + 1);
+                } else if (domain && domain.id) {
+                    domainCountsBg.set(domain.id, (domainCountsBg.get(domain.id) || 0) + 1);
+                } else if (domain && typeof domain === 'object') {
+                    const domainName = domain.name || domain.description || domain.id;
+                    if (domainName) {
+                        domainCountsBg.set(domainName, (domainCountsBg.get(domainName) || 0) + 1);
+                    }
+                }
+            });
+        }
+    });
+
+    const M = filteredData.length;
+    const N = allCiliaData.length;
+    
+    if (M === 0) {
+        console.warn('No filtered data for enrichment calculation');
+        return [];
+    }
+
+    const enrichmentResults = Array.from(domainCountsUser.entries())
+        .map(([domainId, k]) => {
+            const n = domainCountsBg.get(domainId) || 0;
+            const richFactor = n > 0 ? (k / M) / (n / N) : Infinity;
+            
+            let domainName = domainId;
+            if (typeof domainId === 'string' && pfamIdToName && pfamIdToName[domainId]) {
+                domainName = pfamIdToName[domainId];
+            }
+            
+            return {
+                domain: domainName,
+                richFactor,
+                geneCount: k,
+                backgroundCount: n,
+                pValue: calculateEnrichmentPValue(k, M, n, N)
+            };
+        })
+        .filter(d => d.richFactor > 1.5 && d.geneCount > 1)
+        .sort((a, b) => b.richFactor - a.richFactor);
+
+    return enrichmentResults;
+}
+
+function calculateEnrichmentPValue(k, M, n, N) {
+    let pValue = 0;
+    for (let i = k; i <= Math.min(n, M); i++) {
+        pValue += (combinations(n, i) * combinations(N - n, M - i)) / combinations(N, M);
+    }
+    return pValue;
+}
+
+function combinations(n, k) {
+    if (k < 0 || k > n) return 0;
+    if (k === 0 || k === n) return 1;
+    k = Math.min(k, n - k);
+    let result = 1;
+    for (let i = 1; i <= k; i++) {
+        result = result * (n - k + i) / i;
+    }
+    return result;
+}
+
+function computeCiliopathyAssociations(foundGenes) {
+    const associations = {};
+    foundGenes.forEach(gene => {
+        if (gene.ciliopathy && Array.isArray(gene.ciliopathy)) {
+            gene.ciliopathy.forEach(disease => {
+                if (disease) {
+                    if (!associations[disease]) {
+                        associations[disease] = { name: disease, count: 0 };
+                    }
+                    associations[disease].count++;
+                }
+            });
+        }
+    });
+    return Object.values(associations);
+}
+
+function computeProteinComplexLinks(foundGenes) {
+    const nodes = foundGenes.map(gene => ({ id: gene.gene }));
+    const links = [];
+    const linkTracker = new Set();
+    for (let i = 0; i < foundGenes.length; i++) {
+        for (let j = i + 1; j < foundGenes.length; j++) {
+            const geneA = foundGenes[i];
+            const geneB = foundGenes[j];
+            const sharedComplexes = (geneA.complex || []).filter(c => (geneB.complex || []).includes(c));
+            if (sharedComplexes.length > 0) {
+                const linkKey = [geneA.gene, geneB.gene].sort().join('-');
+                if (!linkTracker.has(linkKey)) {
+                    links.push({
+                        source: geneA.gene,
+                        target: geneB.gene,
+                        value: sharedComplexes.length
+                    });
+                    linkTracker.add(linkKey);
+                }
+            }
+        }
+    }
+    return { nodes, links };
 }
 
 function renderCiliopathySunburst(foundGenes, container) {
     const data = computeCiliopathyAssociations(foundGenes);
-    if (!data.length) {
+    
+    if (!data || !data.length) {
         container.innerHTML = '<p class="status-message">No ciliopathy associations found.</p>';
         return;
     }
-    const genesWithCiliopathy = new Set(foundGenes.filter(g => g.ciliopathy && (Array.isArray(g.ciliopathy) ? g.ciliopathy.length > 0 : g.ciliopathy)).map(g => g.gene));
-    const genesWithoutCiliopathyCount = foundGenes.length - genesWithCiliopathy.size;
-    if (genesWithoutCiliopathyCount > 0) {
-        data.push({ name: "No Known Association", count: genesWithoutCiliopathyCount });
+    const genesWithCiliopathy = new Set();
+    data.forEach(item => {
+        foundGenes.filter(g => g.ciliopathy && g.ciliopathy.includes(item.name))
+            .forEach(g => genesWithCiliopathy.add(g.gene));
+    });
+    
+    const genesWithoutCiliopathy = foundGenes.filter(g => !genesWithCiliopathy.has(g.gene));
+    if (genesWithoutCiliopathy.length > 0) {
+        data.push({ name: "No Known Association", count: genesWithoutCiliopathy.length });
     }
     container.innerHTML = '';
     const width = container.clientWidth;
@@ -329,31 +659,39 @@ function renderCiliopathySunburst(foundGenes, container) {
         if (d.depth === 0) return '#ccc';
         const index = d.parent.children.indexOf(d);
         return d3.schemeCategory10[index % 10];
-    }).style('stroke', '#fff').style('stroke-width', '2px').append('title').text(d => `${d.data.name}: ${d.value} gene(s)`);
+    }).style('stroke', '#fff').style('stroke-width', '2px').on('mouseover', function(event, d) {
+        d3.select(this).style('opacity', 0.8);
+    }).on('mouseout', function() {
+        d3.select(this).style('opacity', 1);
+    }).append('title').text(d => `${d.data.name}: ${d.value} gene(s)`);
+    svg.selectAll('text').data(root.descendants().filter(d => d.depth && (d.x1 - d.x0) > 0.05)).enter().append('text').attr('transform', d => {
+        const x = (d.x0 + d.x1) / 2 * 180 / Math.PI;
+        const y = (d.y0 + d.y1) / 2;
+        return `rotate(${x - 90}) translate(${y},0) rotate(${x < 180 ? 0 : 180})`;
+    }).attr('dy', '0.35em').attr('text-anchor', 'middle').text(d => d.data.name).style('font-size', '12px').style('fill', '#fff').style('font-weight', 'bold');
     currentPlotInstance = svg.node();
 }
 
 function renderComplexNetwork(foundGenes, container) {
     const { nodes, links } = computeProteinComplexLinks(foundGenes);
+    
     if (!nodes.length || !links.length) {
-        container.innerHTML = '<p class="status-message">No protein complex links found among the provided genes.</p>';
+        container.innerHTML = '<p class="status-message">No protein complex links found.</p>';
         return;
     }
     container.innerHTML = '';
     const width = container.clientWidth;
     const height = Math.min(width * 0.8, 600);
     const svg = d3.select(container).append('svg').attr('width', width).attr('height', height);
-    const simulation = d3.forceSimulation(nodes)
-        .force('link', d3.forceLink(links).id(d => d.id).distance(100))
-        .force('charge', d3.forceManyBody().strength(-300))
-        .force('center', d3.forceCenter(width / 2, height / 2))
-        .force('collision', d3.forceCollide().radius(30));
-    const link = svg.append('g').selectAll('line').data(links).enter().append('line').attr('stroke', '#999').attr('stroke-opacity', 0.6).attr('stroke-width', d => Math.sqrt(d.value) * 2);
-    const node = svg.append('g').selectAll('circle').data(nodes).enter().append('circle').attr('r', 12).attr('fill', '#5690c7').call(d3.drag().on('start', dragstarted).on('drag', dragged).on('end', dragended));
+    const simulation = d3.forceSimulation(nodes).force('link', d3.forceLink(links).id(d => d.id).distance(100)).force('charge', d3.forceManyBody().strength(-300)).force('center', d3.forceCenter(width / 2, height / 2)).force('collision', d3.forceCollide().radius(30));
+    const link = svg.append('g').attr('class', 'links').selectAll('line').data(links).enter().append('line').attr('stroke', '#999').attr('stroke-opacity', 0.6).attr('stroke-width', d => Math.sqrt(d.value) * 2);
+    const node = svg.append('g').attr('class', 'nodes').selectAll('circle').data(nodes).enter().append('circle').attr('r', 12).attr('fill', '#5690c7').attr('stroke', '#fff').attr('stroke-width', 2).call(d3.drag().on('start', dragstarted).on('drag', dragged).on('end', dragended));
     node.append('title').text(d => d.id);
+    const label = svg.append('g').attr('class', 'labels').selectAll('text').data(nodes).enter().append('text').text(d => d.id).attr('text-anchor', 'middle').attr('dy', -15).style('font-size', '10px').style('pointer-events', 'none');
     simulation.on('tick', () => {
         link.attr('x1', d => d.source.x).attr('y1', d => d.source.y).attr('x2', d => d.target.x).attr('y2', d => d.target.y);
         node.attr('cx', d => d.x).attr('cy', d => d.y);
+        label.attr('x', d => d.x).attr('y', d => d.y);
     });
     function dragstarted(event, d) { if (!event.active) simulation.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; }
     function dragged(event, d) { d.fx = event.x; d.fy = event.y; }
@@ -362,103 +700,32 @@ function renderComplexNetwork(foundGenes, container) {
 }
 
 // =============================================================================
-// DATA COMPUTATION HELPERS
-// =============================================================================
-
-function calculateDomainEnrichment(foundGenes, allGenes) {
-    const getDomains = (gene) => {
-        if (!gene) return [];
-        const domainData = gene.pfam_ids || gene.domain_descriptions || gene.PFAM_IDs || gene.Domain_Descriptions;
-        if (Array.isArray(domainData)) return domainData.filter(d => d && typeof d === 'string');
-        if (typeof domainData === 'string') return domainData.split(/[,;]/).map(d => d.trim()).filter(Boolean);
-        return [];
-    };
-    const domainCountsUser = new Map();
-    foundGenes.forEach(g => getDomains(g).forEach(domain => domainCountsUser.set(domain, (domainCountsUser.get(domain) || 0) + 1)));
-    const domainCountsBg = new Map();
-    allGenes.forEach(g => getDomains(g).forEach(domain => domainCountsBg.set(domain, (domainCountsBg.get(domain) || 0) + 1)));
-    const M = foundGenes.length;
-    const N = allGenes.length;
-    if (M === 0 || N === 0) return [];
-    return Array.from(domainCountsUser.entries()).map(([domain, k]) => {
-        const n = domainCountsBg.get(domain) || 0;
-        return { domain, geneCount: k, backgroundCount: n, richFactor: n > 0 ? (k / M) / (n / N) : Infinity };
-    }).filter(d => d.richFactor > 1 && d.geneCount > 1).sort((a, b) => b.geneCount - a.geneCount);
-}
-
-function computeCiliopathyAssociations(foundGenes) {
-    const associations = new Map();
-    foundGenes.forEach(gene => {
-        if (!gene || !gene.ciliopathy) return;
-        let ciliopathies = [];
-        if (Array.isArray(gene.ciliopathy)) ciliopathies = gene.ciliopathy;
-        else if (typeof gene.ciliopathy === 'string') ciliopathies = gene.ciliopathy.split(/[,;]/).map(c => c.trim());
-        ciliopathies.filter(Boolean).forEach(disease => associations.set(disease, (associations.get(disease) || 0) + 1));
-    });
-    return Array.from(associations, ([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count);
-}
-
-function computeProteinComplexLinks(foundGenes) {
-    const complexMap = new Map();
-    foundGenes.forEach(gene => {
-        if (!gene || !gene.complex_names) return;
-        let complexes = [];
-        if (Array.isArray(gene.complex_names)) complexes = gene.complex_names;
-        else if (typeof gene.complex_names === 'string') complexes = gene.complex_names.split(/[,;]/).map(c => c.trim());
-        complexes.filter(Boolean).forEach(complexName => {
-            if (!complexMap.has(complexName)) complexMap.set(complexName, []);
-            complexMap.get(complexName).push(gene.gene);
-        });
-    });
-    const links = new Map();
-    complexMap.forEach(genes => {
-        if (genes.length < 2) return;
-        for (let i = 0; i < genes.length; i++) {
-            for (let j = i + 1; j < genes.length; j++) {
-                const key = [genes[i], genes[j]].sort().join('--');
-                if (!links.has(key)) links.set(key, { source: genes[i], target: genes[j], value: 0 });
-                links.get(key).value += 1;
-            }
-        }
-    });
-    return { nodes: foundGenes.map(g => ({ id: g.gene })), links: Array.from(links.values()) };
-}
-
-
-// =============================================================================
 // MAIN CONTROLLER & PAGE RENDERER
 // =============================================================================
-
 async function generateAnalysisPlots() {
     try {
         await loadAndPrepareDatabase();
         const plotContainer = document.getElementById('plot-display-area');
         const resultsContainer = document.getElementById('enrichment-results-container');
         const genesInput = document.getElementById('enrichment-genes-input').value.trim();
-
         if (!genesInput) {
             alert('Please enter a gene list.');
             return;
         }
-
         plotContainer.innerHTML = '<p class="status-message">Generating plot...</p>';
         if (resultsContainer) resultsContainer.innerHTML = '';
         currentPlotInstance = null;
-
         const originalQueries = genesInput.split(/[\s,;\n\r\t]+/).filter(Boolean);
         const sanitizedQueries = [...new Set(originalQueries.map(sanitize))];
         const { foundGenes } = findGenes(sanitizedQueries);
-
         const foundGeneSymbols = new Set(foundGenes.map(g => g.gene.toUpperCase()));
         const notFoundOriginalQueries = originalQueries.filter(q => {
             const result = geneMapCache.get(sanitize(q));
             return !result || !foundGeneSymbols.has(result.gene.toUpperCase());
         });
-
         createEnrichmentResultsTable(foundGenes, notFoundOriginalQueries);
         const plotType = document.querySelector('input[name="plot-type"]:checked')?.value;
         const backgroundGeneSet = window.allGenes || [];
-
         switch (plotType) {
             case 'bubble':
                 renderKeyLocalizations(foundGenes, plotContainer);
@@ -497,13 +764,13 @@ function displayEnrichmentPage() {
         document.querySelector('.cilia-panel').style.display = 'none';
     }
     contentArea.innerHTML = `
-        <div class="page-section ciliaplot-page">
-            <div class="ciliaplot-header">
-                <h2>CiliaPlot: Gene List Analysis</h2>
+        <div class="page-section enrichment-page">
+            <div class="enrichment-header">
+                <h2>Ciliary Gene Enrichment Analysis</h2>
                 <p>Analyze your gene list with a variety of visualization tools and customization options.</p>
             </div>
-            <div class="ciliaplot-container">
-                <div class="ciliaplot-left-panel">
+            <div class="enrichment-container">
+                <div class="enrichment-left-panel">
                     <div class="control-section">
                         <h3>1. Input Genes</h3>
                         <div class="control-section-content">
@@ -549,9 +816,9 @@ function displayEnrichmentPage() {
                         </div>
                     </div>
                 </div>
-                <div class="ciliaplot-right-panel">
+                <div class="enrichment-right-panel">
                     <div id="plot-display-area"><p class="status-message">Enter a gene list and click "Run Analysis" to see your results.</p></div>
-                    <div id="ciliaplot-results-container" class="results-section" style="margin-top: 2rem;"></div>
+                    <div id="enrichment-results-container" class="results-section" style="margin-top: 2rem;"></div>
                 </div>
             </div>
         </div>
