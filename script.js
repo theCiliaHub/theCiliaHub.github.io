@@ -160,245 +160,78 @@ function debugSearch(query) {
     }
 }
 
-
-
 /**
- * Performs a batch gene search using the central findGenes function.
- * Supports gene symbols, synonyms, and Ensembl IDs with optional filters.
+ * Handles the UI for the Batch Gene Query page.
+ */
+/**
+ * Handles the UI for the Batch Gene Query page.
+ */
+/**
+ * Handles the UI for the Batch Gene Query page, supporting all identifier types and filters.
  */
 function performBatchSearch() {
     const inputElement = document.getElementById('batch-genes-input');
-    const localizationFilter = document.getElementById('localization-filter')?.value?.toLowerCase();
-    const keywordFilter = document.getElementById('keyword-filter')?.value?.toLowerCase();
+    const localizationFilter = document.getElementById('localization-filter')?.value;
+    const keywordFilter = document.getElementById('keyword-filter')?.value.toLowerCase();
     const statusDiv = document.getElementById('status-message');
     const resultDiv = document.getElementById('batch-results');
 
-    if (!inputElement || !resultDiv) {
-        console.error('Missing required DOM elements for batch search.');
-        return;
-    }
+    if (!inputElement || !resultDiv) return;
 
-    // 1. Get and sanitize queries
+    // 1. Get all unique, sanitized queries from the input box
     const originalQueries = inputElement.value.split(/[\s,;\n\r\t]+/).filter(Boolean);
-    if (originalQueries.length === 0) {
+    // Use a Set to automatically handle duplicate inputs
+    const sanitizedQueries = [...new Set(originalQueries.map(sanitize))];
+
+    if (sanitizedQueries.length === 0) {
         resultDiv.innerHTML = '<p class="status-message error-message">Please enter one or more gene names, synonyms, or Ensembl IDs.</p>';
         return;
     }
-    const sanitizedQueries = [...new Set(originalQueries.map(q => sanitize(q).toUpperCase()))]; // Ensure consistent case
 
-    // 2. Call findGenes with explicit debug logging
-    console.debug('Batch search queries:', sanitizedQueries);
-    const { foundGenes, errors } = findGenes(sanitizedQueries); // Assume findGenes returns errors for debugging
-    if (errors?.length) {
-        console.warn('findGenes errors:', errors);
-    }
+    // 2. Use the central `findGenes` function that correctly finds all ID types
+    const { foundGenes } = findGenes(sanitizedQueries);
+    let results = foundGenes;
 
-    let results = foundGenes || [];
-
-    // 3. Apply localization filter
+    // 3. Apply the optional localization and keyword filters to the results
     if (localizationFilter) {
         results = results.filter(g =>
-            g.localization?.some(l => l?.toLowerCase() === localizationFilter)
+            g.localization && g.localization.some(l => l && l.toLowerCase() === localizationFilter.toLowerCase())
         );
     }
 
-    // 4. Apply keyword filter
     if (keywordFilter) {
         results = results.filter(g =>
-            (g.functional_summary?.toLowerCase().includes(keywordFilter) ||
-             g.description?.toLowerCase().includes(keywordFilter))
+            (g.functional_summary && g.functional_summary.toLowerCase().includes(keywordFilter)) ||
+            (g.description && g.description.toLowerCase().includes(keywordFilter))
         );
     }
 
-    // 5. Track not-found queries
+    // 4. Determine which of the original, user-entered queries were not found in the final results
     const foundIds = new Set();
     results.forEach(gene => {
-        foundIds.add(gene.gene?.toUpperCase());
+        // Add all known identifiers for the found genes to a set for quick lookup
+        foundIds.add(gene.gene.toUpperCase());
         if (gene.synonym) {
-            gene.synonym.split(/[,;]/).forEach(s => foundIds.add(sanitize(s).toUpperCase()));
+            String(gene.synonym).split(/[,;]/).forEach(s => foundIds.add(sanitize(s)));
         }
         if (gene.ensembl_id) {
-            gene.ensembl_id.split(/[,;]/).forEach(id => foundIds.add(sanitize(id).toUpperCase()));
+            String(gene.ensembl_id).split(/[,;]/).forEach(id => foundIds.add(sanitize(id)));
         }
     });
-    const notFoundOriginalQueries = originalQueries.filter(q => !foundIds.has(sanitize(q).toUpperCase()));
 
-    // 6. Display results
+    const notFoundOriginalQueries = originalQueries.filter(q => !foundIds.has(sanitize(q)));
+
+    // 5. Display the final, filtered results
     statusDiv.style.display = 'none';
-    window.searchResults = results; // Store in global scope with caution
+    searchResults = results; // Update global variable for exports
+
     if (results.length > 0 || notFoundOriginalQueries.length > 0) {
         displayBatchResults(results, notFoundOriginalQueries);
-        displayGeneCards(window.currentData || {}, results, 1, 10);
+        displayGeneCards(currentData, results, 1, 10);
     } else {
         resultDiv.innerHTML = '<p class="status-message error-message">No genes found matching your query and filters.</p>';
-        displayGeneCards(window.currentData || {}, [], 1, 10);
+        displayGeneCards(currentData, [], 1, 10); // Clear the gene cards
     }
-}
-
-/**
- * Sanitizes input strings for consistent processing.
- * @param {string} input - Raw input string
- * @returns {string} - Sanitized string
- */
-function sanitize(input) {
-    if (!input || typeof input !== 'string') return '';
-    // Preserve Ensembl ID format (e.g., ENSG00000123456)
-    return input.trim().replace(/[^a-zA-Z0-9.-]/g, '');
-}
-
-/**
- * Initialize Batch Query page listeners with strict isolation
- */
-function initBatchQueryListeners() {
-    console.log('[BatchSearch] Initializing batch query listeners...');
-
-    try {
-        const batchForm = document.getElementById('batch-gene-form');
-        const inputElement = document.getElementById('batch-genes-input');
-
-        if (!batchForm || !inputElement) {
-            console.warn('[BatchSearch] Batch gene form or input not found');
-            return;
-        }
-
-        // Avoid cloning unless necessary to preserve existing behavior
-        const targetForm = batchForm; // Comment out cloning for now
-        // const newForm = batchForm.cloneNode(true);
-        // batchForm.replaceWith(newForm);
-        // const targetForm = newForm;
-
-        // Store handler for cleanup
-        const submitHandler = (e) => {
-            if (e.target !== targetForm) {
-                console.debug('[BatchSearch] Ignoring non-batch form submission');
-                return;
-            }
-            console.log('[BatchSearch] Form submitted with input:', inputElement.value);
-            e.preventDefault();
-            // Only stop propagation for batch form to avoid affecting other forms
-            e.stopPropagation();
-            performBatchSearch();
-            console.log('[BatchSearch] performBatchSearch completed');
-        };
-
-        // Remove existing submit listeners to avoid duplicates
-        targetForm.removeEventListener('submit', submitHandler);
-        targetForm.addEventListener('submit', submitHandler);
-
-        // Add Enter key listener on input
-        const targetInput = targetForm.querySelector('#batch-genes-input') || inputElement;
-        const keypressHandler = (e) => {
-            if (e.key === 'Enter') {
-                console.log('[BatchSearch] Enter key pressed with input:', targetInput.value);
-                e.preventDefault();
-                e.stopPropagation();
-                performBatchSearch();
-                console.log('[BatchSearch] performBatchSearch completed');
-            }
-        };
-        targetInput.removeEventListener('keypress', keypressHandler);
-        targetInput.addEventListener('keypress', keypressHandler);
-
-        // Add search button listener (if not a submit button)
-        const searchButton = document.getElementById('batch-search-button') ||
-                            document.querySelector('.batch-search-btn');
-        if (searchButton && searchButton.type !== 'submit') {
-            const clickHandler = (e) => {
-                console.log('[BatchSearch] Search button clicked with input:', inputElement.value);
-                e.preventDefault();
-                e.stopPropagation();
-                performBatchSearch();
-                console.log('[BatchSearch] performBatchSearch completed');
-            };
-            searchButton.removeEventListener('click', clickHandler);
-            searchButton.addEventListener('click', clickHandler);
-        }
-
-        console.log('[BatchSearch] All listeners initialized successfully');
-
-    } catch (error) {
-        console.error('[BatchSearch] Error initializing listeners:', error);
-    }
-}
-
-/**
- * Initialize Batch Query page, handling DOM readiness and SPA routing
- */
-function initBatchQueryPage() {
-    console.log('[BatchSearch] Initializing batch query page...');
-
-    let listenersInitialized = false;
-
-    const initializeIfBatchQuery = () => {
-        const isBatchQueryPage = window.location.pathname.includes('/batch-query') || 
-                                window.location.hash.includes('batch-query');
-        if (isBatchQueryPage && !listenersInitialized) {
-            console.log('[BatchSearch] Detected batch query page, initializing listeners');
-            initBatchQueryListeners();
-            listenersInitialized = true;
-        } else if (!isBatchQueryPage && listenersInitialized) {
-            console.log('[BatchSearch] Left batch query page, cleaning up listeners');
-            cleanupBatchListeners();
-            listenersInitialized = false;
-        }
-    };
-
-    const cleanupBatchListeners = () => {
-        console.log('[BatchSearch] Cleaning up batch query listeners');
-        const batchForm = document.getElementById('batch-gene-form');
-        const inputElement = document.getElementById('batch-genes-input');
-        const searchButton = document.getElementById('batch-search-button') ||
-                            document.querySelector('.batch-search-btn');
-
-        // Only remove specific batch listeners
-        if (batchForm) {
-            const submitHandler = (e) => e.target === batchForm && performBatchSearch();
-            batchForm.removeEventListener('submit', submitHandler);
-        }
-        if (inputElement) {
-            const keypressHandler = (e) => e.key === 'Enter' && performBatchSearch();
-            inputElement.removeEventListener('keypress', keypressHandler);
-        }
-        if (searchButton && searchButton.type !== 'submit') {
-            const clickHandler = () => performBatchSearch();
-            searchButton.removeEventListener('click', clickHandler);
-        }
-    };
-
-    // Handle DOM readiness
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', initializeIfBatchQuery, { once: true });
-    } else {
-        initializeIfBatchQuery();
-    }
-
-    // Handle SPA navigation
-    if (typeof window !== 'undefined') {
-        const handleNavigation = () => {
-            initializeIfBatchQuery();
-        };
-        window.addEventListener('popstate', handleNavigation);
-        window.addEventListener('load', handleNavigation, { once: true });
-
-        // Cleanup on unload
-        window.addEventListener('unload', () => {
-            window.removeEventListener('popstate', handleNavigation);
-            cleanupBatchListeners();
-        });
-    }
-}
-
-// Initialize immediately or on DOM load
-initBatchQueryPage();
-
-/**
- * Utility function to safely remove all event listeners from an element
- */
-function removeAllEventListeners(element) {
-    if (!element) return null;
-    const newElement = element.cloneNode(true);
-    element.parentNode.replaceChild(newElement, element);
-    return newElement;
 }
 
 // --- HOME PAGE SEARCH HANDLER (FIXED) ---
