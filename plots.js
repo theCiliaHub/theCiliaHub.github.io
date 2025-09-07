@@ -507,107 +507,54 @@ function renderDomainEnrichment(foundGenes, allGenes, container) {
 // =============================================================================
 // DOMAIN ENRICHMENT CALCULATION - FIXED WITH ERROR HANDLING
 // =============================================================================
-function calculateDomainEnrichment(filteredData, allCiliaData) {
-    console.log('Calculating domain enrichment...');
-    console.log('Filtered data:', filteredData);
-    console.log('All cilia data:', allCiliaData);
-    
-    if (!filteredData || !Array.isArray(filteredData)) {
-        console.error('Filtered data is not an array:', filteredData);
+function calculateDomainEnrichment(foundGenes, allGenes) {
+    const getDomains = (gene) => {
+        if (!gene) return [];
+        // Check multiple possible keys and handle both string and array formats
+        const domainData = gene.pfam_ids || gene.domain_descriptions || gene.PFAM_IDs || gene.Domain_Descriptions;
+        if (Array.isArray(domainData)) {
+            // Filter out null or empty values
+            return domainData.filter(d => d && typeof d === 'string');
+        }
+        if (typeof domainData === 'string') {
+            // Split if it's a semicolon or comma-separated string
+            return domainData.split(/[,;]/).map(d => d.trim()).filter(Boolean);
+        }
         return [];
-    }
-    
-    if (!allCiliaData || !Array.isArray(allCiliaData)) {
-        console.error('All cilia data is not an array:', allCiliaData);
-        return [];
-    }
+    };
 
     const domainCountsUser = new Map();
-    
-    // Handle different possible field names for domains
-    filteredData.forEach(g => {
-        if (!g) return; // Skip null/undefined genes
-        
-        // Try different possible field names for domains
-        const domains = g.pfam_ids || g.domains || g.domain_descriptions || 
-                       g.pfam_domains || g.protein_domains || [];
-        
-        if (Array.isArray(domains)) {
-            domains.forEach(domain => {
-                if (typeof domain === 'string' && domain.trim()) {
-                    const cleanDomain = domain.trim();
-                    domainCountsUser.set(cleanDomain, (domainCountsUser.get(cleanDomain) || 0) + 1);
-                } else if (domain && domain.id) {
-                    domainCountsUser.set(domain.id, (domainCountsUser.get(domain.id) || 0) + 1);
-                } else if (domain && typeof domain === 'object') {
-                    // Try to extract domain name from object
-                    const domainName = domain.name || domain.description || domain.id;
-                    if (domainName) {
-                        domainCountsUser.set(domainName, (domainCountsUser.get(domainName) || 0) + 1);
-                    }
-                }
-            });
-        }
+    foundGenes.forEach(g => {
+        getDomains(g).forEach(domain => {
+            domainCountsUser.set(domain, (domainCountsUser.get(domain) || 0) + 1);
+        });
     });
 
     const domainCountsBg = new Map();
-    allCiliaData.forEach(g => {
-        if (!g) return; // Skip null/undefined genes
-        
-        const domains = g.pfam_ids || g.domains || g.domain_descriptions || 
-                       g.pfam_domains || g.protein_domains || [];
-        
-        if (Array.isArray(domains)) {
-            domains.forEach(domain => {
-                if (typeof domain === 'string' && domain.trim()) {
-                    const cleanDomain = domain.trim();
-                    domainCountsBg.set(cleanDomain, (domainCountsBg.get(cleanDomain) || 0) + 1);
-                } else if (domain && domain.id) {
-                    domainCountsBg.set(domain.id, (domainCountsBg.get(domain.id) || 0) + 1);
-                } else if (domain && typeof domain === 'object') {
-                    const domainName = domain.name || domain.description || domain.id;
-                    if (domainName) {
-                        domainCountsBg.set(domainName, (domainCountsBg.get(domainName) || 0) + 1);
-                    }
-                }
-            });
-        }
+    allGenes.forEach(g => {
+        getDomains(g).forEach(domain => {
+            domainCountsBg.set(domain, (domainCountsBg.get(domain) || 0) + 1);
+        });
     });
 
-    const M = filteredData.length;
-    const N = allCiliaData.length;
-    
-    if (M === 0) {
-        console.warn('No filtered data for enrichment calculation');
-        return [];
-    }
-
-    console.log('User domain counts:', Array.from(domainCountsUser.entries()));
-    console.log('Background domain counts:', Array.from(domainCountsBg.entries()));
+    const M = foundGenes.length;
+    const N = allGenes.length;
+    if (M === 0 || N === 0) return [];
 
     const enrichmentResults = Array.from(domainCountsUser.entries())
-        .map(([domainId, k]) => {
-            const n = domainCountsBg.get(domainId) || 0;
+        .map(([domain, k]) => {
+            const n = domainCountsBg.get(domain) || 0;
             const richFactor = n > 0 ? (k / M) / (n / N) : Infinity;
-            
-            // Try to get descriptive name, fall back to ID
-            let domainName = domainId;
-            if (typeof domainId === 'string' && pfamIdToName && pfamIdToName[domainId]) {
-                domainName = pfamIdToName[domainId];
-            }
-            
             return {
-                domain: domainName,
-                richFactor,
+                domain: domain,
                 geneCount: k,
                 backgroundCount: n,
-                pValue: calculateEnrichmentPValue(k, M, n, N)
+                richFactor: richFactor
             };
         })
-        .filter(d => d.richFactor > 1.5 && d.geneCount > 1)
-        .sort((a, b) => b.richFactor - a.richFactor);
-
-    console.log('Enrichment results:', enrichmentResults);
+        .filter(d => d.richFactor > 1 && d.geneCount > 1) // Keep results with at least 2 genes
+        .sort((a, b) => b.geneCount - a.geneCount);
+        
     return enrichmentResults;
 }
 
@@ -669,25 +616,24 @@ function combinations(n, k) {
  * @returns {Array<Object>} An array of objects for the sunburst plot, e.g., [{name: "Bardet-Biedl", count: 5}].
  */
 function computeCiliopathyAssociations(foundGenes) {
-    const associations = {};
-
-    // Loop through the user's genes and count occurrences for each ciliopathy
+    const associations = new Map();
     foundGenes.forEach(gene => {
-        // Assumes gene.ciliopathy is an array of disease names, e.g., ["Bardet-Biedl syndrome", "Joubert syndrome"]
-        if (gene.ciliopathy && Array.isArray(gene.ciliopathy)) {
-            gene.ciliopathy.forEach(disease => {
-                if (disease) { // Ensure the disease name is not null or empty
-                    if (!associations[disease]) {
-                        associations[disease] = { name: disease, count: 0 };
-                    }
-                    associations[disease].count++;
-                }
-            });
+        if (!gene || !gene.ciliopathy) return;
+
+        let ciliopathies = [];
+        if (Array.isArray(gene.ciliopathy)) {
+            ciliopathies = gene.ciliopathy;
+        } else if (typeof gene.ciliopathy === 'string') {
+            ciliopathies = gene.ciliopathy.split(/[,;]/).map(c => c.trim());
         }
+
+        ciliopathies.filter(Boolean).forEach(disease => {
+            associations.set(disease, (associations.get(disease) || 0) + 1);
+        });
     });
 
-    // Convert the aggregated object into an array suitable for D3
-    return Object.values(associations);
+    return Array.from(associations, ([name, count]) => ({ name, count }))
+        .sort((a, b) => b.count - a.count);
 }
 
 /**
@@ -696,36 +642,46 @@ function computeCiliopathyAssociations(foundGenes) {
  * @returns {Object} An object containing 'nodes' and 'links' arrays for the D3 force-directed graph.
  */
 function computeProteinComplexLinks(foundGenes) {
-    const nodes = foundGenes.map(gene => ({ id: gene.gene }));
-    const links = [];
-    const linkTracker = new Set(); // Prevents duplicate links (e.g., A->B and B->A)
+    const complexMap = new Map();
+    foundGenes.forEach(gene => {
+        if (!gene || !gene.complex_names) return;
+        
+        let complexes = [];
+        if (Array.isArray(gene.complex_names)) {
+            complexes = gene.complex_names;
+        } else if (typeof gene.complex_names === 'string') {
+            complexes = gene.complex_names.split(/[,;]/).map(c => c.trim());
+        }
 
-    // Create links based on shared protein complexes
-    for (let i = 0; i < foundGenes.length; i++) {
-        for (let j = i + 1; j < foundGenes.length; j++) {
-            const geneA = foundGenes[i];
-            const geneB = foundGenes[j];
+        complexes.filter(Boolean).forEach(complexName => {
+            if (!complexMap.has(complexName)) {
+                complexMap.set(complexName, []);
+            }
+            complexMap.get(complexName).push(gene.gene);
+        });
+    });
 
-            // Assumes gene.complex is an array of complex IDs, e.g., ["BBSome", "IFT-B"]
-            const sharedComplexes = (geneA.complex || []).filter(c => (geneB.complex || []).includes(c));
-
-            if (sharedComplexes.length > 0) {
-                const linkKey = [geneA.gene, geneB.gene].sort().join('-');
-                if (!linkTracker.has(linkKey)) {
-                    links.push({
-                        source: geneA.gene,
-                        target: geneB.gene,
-                        value: sharedComplexes.length // The more shared complexes, the stronger the link
+    const links = new Map();
+    complexMap.forEach(genes => {
+        if (genes.length < 2) return;
+        for (let i = 0; i < genes.length; i++) {
+            for (let j = i + 1; j < genes.length; j++) {
+                const key = [genes[i], genes[j]].sort().join('--');
+                if (!links.has(key)) {
+                    links.set(key, {
+                        source: genes[i],
+                        target: genes[j],
+                        value: 0
                     });
-                    linkTracker.add(linkKey);
                 }
+                links.get(key).value += 1; // Increase link strength for each shared complex
             }
         }
-    }
+    });
 
-    return { nodes, links };
+    const nodes = foundGenes.map(g => ({ id: g.gene }));
+    return { nodes, links: Array.from(links.values()) };
 }
-
 // =============================================================================
 // CILIOPATHY ASSOCIATIONS (Sunburst) - FIXED
 // =============================================================================
