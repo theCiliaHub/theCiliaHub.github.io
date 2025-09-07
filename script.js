@@ -108,24 +108,49 @@ async function loadAndPrepareDatabase() {
 }
 
 /**
- * The central search function.
+ * The central search function that handles multiple ENSG IDs and synonyms.
+ * @param {Array<string>} queries - Array of gene queries (symbols, synonyms, or Ensembl IDs)
+ * @param {Array<Object>} database - Full gene database
+ * @returns {Object} - { foundGenes: [...], notFoundGenes: [...] }
  */
-function findGenes(queries) {
+function findGenes(queries, database) {
     const foundGenes = new Set();
     const notFound = [];
-    
+
+    // Build a mapping from all possible identifiers to the gene object
+    const geneMap = new Map();
+    database.forEach(gene => {
+        const ids = [];
+
+        // Gene symbol
+        if (gene.gene) ids.push(gene.gene.toUpperCase());
+
+        // Synonyms (split by comma)
+        if (gene.synonym) {
+            ids.push(...gene.synonym.split(',').map(s => s.trim().toUpperCase()));
+        }
+
+        // Ensembl IDs (split by comma)
+        if (gene.ensembl_id) {
+            ids.push(...gene.ensembl_id.split(',').map(e => e.trim().toUpperCase()));
+        }
+
+        ids.forEach(id => {
+            geneMap.set(id, gene);
+        });
+    });
+
     queries.forEach(query => {
-        // The sanitize function already converts the query to uppercase
-        const sanitizedQuery = sanitize(query); 
-        const result = geneMapCache.get(sanitizedQuery);
-        
+        const sanitizedQuery = query.trim().toUpperCase();
+        const result = geneMap.get(sanitizedQuery);
+
         if (result) {
             foundGenes.add(result);
         } else {
             notFound.push(query);
         }
     });
-    
+
     return { foundGenes: Array.from(foundGenes), notFoundGenes: notFound };
 }
 
