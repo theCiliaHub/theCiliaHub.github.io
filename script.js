@@ -1090,27 +1090,22 @@ function displayIndividualGenePage(gene) {
             <div class="tags-container">${localizationTags}</div>
           </div>
 
-          <!-- Complex Info -->
           ${gene.complex_names ? `
-            <div class="detail-card bg-white border border-[#c2d9e6] rounded-lg p-6 shadow-sm">
-              <h3 class="card-title text-xl font-semibold text-[#0067A5] mb-4">
-                Complex Info 
-                <a href="https://mips.helmholtz-muenchen.de/corum/" target="_blank" class="ml-2 text-sm text-[#0067A5] hover:underline">(Source: CORUM)</a>
-              </h3>
-              <div class="mb-3">
-                <strong class="text-[#0067A5]">Complex Names:</strong>
-                <p class="text-[#0067A5]">${gene.complex_names.replace(/; /g, '<br>')}</p>
-              </div>
-              <div>
-                <strong class="text-[#0067A5]">Complex Components:</strong>
-                <p class="text-[#0067A5]">${gene.complex_components.replace(/ \| /g, '<br>')}</p>
-              </div>
-            </div>
-          ` : ''}
-        </div>
-      </div>
+  <div class="detail-card bg-white border border-[#c2d9e6] rounded-lg p-6 shadow-sm">
+    <h3 class="card-title text-xl font-semibold text-[#0067A5] mb-4">
+      Complex Info 
+      <a href="https://mips.helmholtz-muenchen.de/corum/" target="_blank" class="ml-2 text-sm text-[#0067A5] hover:underline">(Source: CORUM)</a>
+    </h3>
+    <div class="mb-3">
+      <strong class="text-[#0067A5]">Complex Names:</strong>
+      <p class="text-[#0067A5]">${(gene.complex_names || '').replace(/; /g, '<br>')}</p>
     </div>
-  `;
+    <div>
+      <strong class="text-[#0067A5]">Complex Components:</strong>
+      <p class="text-[#0067A5]">${(gene.complex_components || '').replace(/ \| /g, '<br>')}</p>
+    </div>
+  </div>
+` : ''}
 
   updateGeneButtons([gene], [gene]);
   showLocalization(gene.gene, true);
