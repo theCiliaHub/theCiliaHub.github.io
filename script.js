@@ -111,41 +111,38 @@ async function loadAndPrepareDatabase() {
  * Search genes using symbols, synonyms, or ENSG IDs.
  * Handles multiple IDs per gene.
  */
-function findGenes(queries, database) {
-    const geneMap = new Map();
-
-    // Build mapping from all identifiers -> canonical gene
-    database.forEach(gene => {
-        const ids = [];
-
-        if (gene.gene) ids.push(gene.gene.toUpperCase());
-        if (gene.synonym) ids.push(...gene.synonym.split(',').map(s => s.trim().toUpperCase()));
-        if (gene.ensembl_id) ids.push(...gene.ensembl_id.split(',').map(e => e.trim().toUpperCase()));
-
-        ids.forEach(id => {
-            geneMap.set(id, gene);
-        });
-    });
-
-    const foundGenesMap = new Map();
+/**
+ * Search genes using symbols, synonyms, or Ensembl IDs from the pre-built cache.
+ * Handles multiple queries efficiently.
+ *
+ * @param {string[]} queries - An array of sanitized, uppercase gene identifiers.
+ * @returns {{foundGenes: object[], notFoundGenes: string[]}} - An object containing found gene objects and not-found queries.
+ */
+function findGenes(queries) {
+    const foundGenes = new Map(); // Use a Map to store unique genes by their canonical name
     const notFound = [];
 
-    queries.forEach(q => {
-        const sanitized = q.trim().toUpperCase();
-        const gene = geneMap.get(sanitized);
-        if (gene) {
-            foundGenesMap.set(gene.gene, gene); // Use canonical gene symbol to avoid duplicates
+    queries.forEach(query => {
+        // The query is expected to be sanitized (trimmed, uppercased) before being passed.
+        const result = geneMapCache.get(query);
+        
+        if (result) {
+            // Use the canonical gene name as the key to prevent duplicates
+            if (!foundGenes.has(result.gene)) {
+                foundGenes.set(result.gene, result);
+            }
         } else {
-            notFound.push(q);
+            // The original, unsanitized query should be returned for user feedback.
+            // This requires the calling function to manage the original queries.
+            notFound.push(query); 
         }
     });
-
-    return {
-        foundGenes: Array.from(foundGenesMap.values()),
-        notFoundGenes: notFound
+    
+    return { 
+        foundGenes: Array.from(foundGenes.values()), 
+        notFoundGenes: notFound 
     };
 }
-
 
 // Add this function to help with debugging
 function debugSearch(query) {
@@ -165,22 +162,39 @@ function debugSearch(query) {
 /**
  * Handles the UI for the Batch Gene Query page.
  */
+/**
+ * Handles the UI for the Batch Gene Query page.
+ */
 function performBatchSearch() {
     const inputElement = document.getElementById('batch-genes-input');
     const resultDiv = document.getElementById('batch-results');
     if (!inputElement || !resultDiv) return;
 
-    const queries = inputElement.value.split(/[\s,;\n\r\t]+/).map(sanitize).filter(Boolean);
-    if (queries.length === 0) {
+    // Keep the original queries for the "not found" list
+    const originalQueries = inputElement.value.split(/[\s,;\n\r\t]+/).filter(Boolean);
+    const sanitizedQueries = originalQueries.map(sanitize);
+
+    if (sanitizedQueries.length === 0) {
         resultDiv.innerHTML = '<p class="status-message error-message">Please enter one or more gene names.</p>';
         return;
     }
 
-    const { foundGenes, notFoundGenes } = findGenes(queries);
-    displayBatchResults(foundGenes, notFoundGenes);
+    const { foundGenes } = findGenes(sanitizedQueries);
+
+    // Determine which of the original queries were not found
+    const foundGeneSymbols = new Set(foundGenes.map(g => g.gene.toUpperCase()));
+    const notFoundOriginalQueries = originalQueries.filter(q => {
+        const sanitizedQuery = sanitize(q);
+        const result = geneMapCache.get(sanitizedQuery);
+        // A query is "not found" if the cache lookup fails OR if the found gene's canonical symbol isn't in our results
+        // This handles cases where synonyms might point to the same gene but only one is kept.
+        return !result || !foundGeneSymbols.has(result.gene.toUpperCase());
+    });
+    
+    // The notFoundGenes logic is now handled by comparing original input to found results.
+    displayBatchResults(foundGenes, notFoundOriginalQueries);
 }
 
-// --- HOME PAGE SEARCH HANDLER (FIXED) ---
 // --- HOME PAGE SEARCH HANDLER (FIXED) ---
 // This function handles user input to show a list of suggestions.
 function handleHomeSearchInput() {
