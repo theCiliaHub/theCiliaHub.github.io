@@ -133,33 +133,81 @@ async function downloadPlot() {
 
 
 
-// =============================================================================
-// PLOTTING FUNCTIONS
-// =============================================================================
-
 function createEnrichmentResultsTable(foundGenes, notFoundGenes) {
     const container = document.getElementById('enrichment-results-container');
     if (!container) return;
+
     let tableHTML = '';
+
     if (foundGenes.length > 0) {
-        tableHTML += `<h4>Found Genes (${foundGenes.length})</h4><div class="table-wrapper"><table><thead><tr><th>Gene</th><th>Ensembl ID</th><th>Localization</th><th>Domains</th><th>Complexes</th><th>Ciliopathy</th></tr></thead><tbody>`;
+        tableHTML += `
+        <h4>Found Genes (${foundGenes.length})</h4>
+        <div class="table-wrapper">
+        <table>
+            <thead>
+                <tr>
+                    <th>Gene</th>
+                    <th>Ensembl ID</th>
+                    <th>Localization</th>
+                    <th>Domains</th>
+                    <th>Complexes</th>
+                    <th>Ciliopathy</th>
+                </tr>
+            </thead>
+            <tbody>
+        `;
+
         foundGenes.forEach(g => {
-            tableHTML += `<tr>
-                <td><a href="/#/${g.gene}" onclick="navigateTo(event, '/${g.gene}')">${g.gene}</a></td>
-                <td>${g.ensembl_id || ''}</td>
-                <td>${(g.localization || []).join(', ')}</td>
-                <td>${(g.domain_descriptions || []).join(', ')}</td>
-                <td>${(g.complex_names || []).join(', ')}</td>
-                <td>${g.ciliopathy || ''}</td>
-            </tr>`;
+            // Ensure all fields are arrays for safe joining
+            const localization = Array.isArray(g.localization)
+                ? g.localization
+                : g.localization
+                ? [g.localization]
+                : [];
+
+            const domains = Array.isArray(g.domain_descriptions)
+                ? g.domain_descriptions
+                : g.domain_descriptions
+                ? [g.domain_descriptions]
+                : [];
+
+            const complexes = Array.isArray(g.complex_names)
+                ? g.complex_names
+                : g.complex_names
+                ? [g.complex_names]
+                : [];
+
+            const ciliopathy = Array.isArray(g.ciliopathy)
+                ? g.ciliopathy
+                : g.ciliopathy
+                ? [g.ciliopathy]
+                : [];
+
+            tableHTML += `
+                <tr>
+                    <td><a href="/#/${g.gene}" onclick="navigateTo(event, '/${g.gene}')">${g.gene}</a></td>
+                    <td>${g.ensembl_id || ''}</td>
+                    <td>${localization.join(', ')}</td>
+                    <td>${domains.join(', ')}</td>
+                    <td>${complexes.join(', ')}</td>
+                    <td>${ciliopathy.join(', ')}</td>
+                </tr>
+            `;
         });
+
         tableHTML += `</tbody></table></div>`;
     }
+
     if (notFoundGenes.length > 0) {
-        tableHTML += `<h4 style="margin-top: 1.5rem;">Genes Not Found (${notFoundGenes.length})</h4><p>${notFoundGenes.join(', ')}</p>`;
+        tableHTML += `
+        <h4 style="margin-top: 1.5rem;">Genes Not Found (${notFoundGenes.length})</h4>
+        <p>${notFoundGenes.join(', ')}</p>
+        `;
     }
+
     container.innerHTML = tableHTML;
 }
+
 
 // =============================================================================
 // PLOTTING FUNCTIONS FOR CILIAHUB ENRICHMENT
