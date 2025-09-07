@@ -1096,14 +1096,11 @@ async function generateAnalysisPlots() {
         if (resultsContainer) resultsContainer.innerHTML = '';
         currentPlotInstance = null;
 
-        // 1. Sanitize the user's input list
         const originalQueries = genesInput.split(/[\s,;\n\r\t]+/).filter(Boolean);
         const sanitizedQueries = [...new Set(originalQueries.map(sanitize))];
 
-        // 2. Use the modern, cache-based findGenes function from the main script
         const { foundGenes } = findGenes(sanitizedQueries);
         
-        // 3. Correctly determine the list of not-found genes
         const foundGeneSymbols = new Set(foundGenes.map(g => g.gene.toUpperCase()));
         const notFoundOriginalQueries = originalQueries.filter(q => {
             const result = geneMapCache.get(sanitize(q));
@@ -1114,13 +1111,8 @@ async function generateAnalysisPlots() {
         
         const plotType = document.querySelector('input[name="plot-type"]:checked')?.value;
         
-        // 4. Use the globally available `window.allGenes` as the background set
+        // The global `window.allGenes` variable is the background set.
         const backgroundGeneSet = window.allGenes || [];
-
-        if (backgroundGeneSet.length === 0) {
-            plotContainer.innerHTML = '<p class="status-message error">Background gene database not loaded. Cannot perform analysis.</p>';
-            return;
-        }
 
         switch (plotType) {
             case 'bubble':    
@@ -1129,7 +1121,12 @@ async function generateAnalysisPlots() {
             case 'matrix':    
                 renderGeneMatrix(foundGenes, plotContainer);    
                 break;
-            case 'domain':    
+            case 'domain':
+                // **FIX:** The check is now moved INSIDE the case that needs it.
+                if (backgroundGeneSet.length === 0) {
+                    plotContainer.innerHTML = '<p class="status-message error">Background gene database not loaded. Cannot perform Domain Enrichment analysis.</p>';
+                    return; 
+                }
                 renderDomainEnrichment(foundGenes, backgroundGeneSet, plotContainer);    
                 break;
             case 'ciliopathy':    
