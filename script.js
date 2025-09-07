@@ -108,51 +108,44 @@ async function loadAndPrepareDatabase() {
 }
 
 /**
- * The central search function that handles multiple ENSG IDs and synonyms.
- * @param {Array<string>} queries - Array of gene queries (symbols, synonyms, or Ensembl IDs)
- * @param {Array<Object>} database - Full gene database
- * @returns {Object} - { foundGenes: [...], notFoundGenes: [...] }
+ * Search genes using symbols, synonyms, or ENSG IDs.
+ * Handles multiple IDs per gene.
  */
 function findGenes(queries, database) {
-    const foundGenes = new Set();
-    const notFound = [];
-
-    // Build a mapping from all possible identifiers to the gene object
     const geneMap = new Map();
+
+    // Build mapping from all identifiers -> canonical gene
     database.forEach(gene => {
         const ids = [];
 
-        // Gene symbol
         if (gene.gene) ids.push(gene.gene.toUpperCase());
-
-        // Synonyms (split by comma)
-        if (gene.synonym) {
-            ids.push(...gene.synonym.split(',').map(s => s.trim().toUpperCase()));
-        }
-
-        // Ensembl IDs (split by comma)
-        if (gene.ensembl_id) {
-            ids.push(...gene.ensembl_id.split(',').map(e => e.trim().toUpperCase()));
-        }
+        if (gene.synonym) ids.push(...gene.synonym.split(',').map(s => s.trim().toUpperCase()));
+        if (gene.ensembl_id) ids.push(...gene.ensembl_id.split(',').map(e => e.trim().toUpperCase()));
 
         ids.forEach(id => {
             geneMap.set(id, gene);
         });
     });
 
-    queries.forEach(query => {
-        const sanitizedQuery = query.trim().toUpperCase();
-        const result = geneMap.get(sanitizedQuery);
+    const foundGenesMap = new Map();
+    const notFound = [];
 
-        if (result) {
-            foundGenes.add(result);
+    queries.forEach(q => {
+        const sanitized = q.trim().toUpperCase();
+        const gene = geneMap.get(sanitized);
+        if (gene) {
+            foundGenesMap.set(gene.gene, gene); // Use canonical gene symbol to avoid duplicates
         } else {
-            notFound.push(query);
+            notFound.push(q);
         }
     });
 
-    return { foundGenes: Array.from(foundGenes), notFoundGenes: notFound };
+    return {
+        foundGenes: Array.from(foundGenesMap.values()),
+        notFoundGenes: notFound
+    };
 }
+
 
 // Add this function to help with debugging
 function debugSearch(query) {
