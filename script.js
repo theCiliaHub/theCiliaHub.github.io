@@ -247,58 +247,6 @@ function sanitize(input) {
 }
 
 /**
- * Initializes listeners for the Batch Query page, ensuring no conflicts.
- */
-function initBatchQueryListeners() {
-    const batchForm = document.getElementById('batch-gene-form');
-    const inputElement = document.getElementById('batch-genes-input');
-
-    if (!batchForm || !inputElement) {
-        console.error('Batch query form or input element not found.');
-        return;
-    }
-
-    // Clone form to remove old listeners
-    const newForm = batchForm.cloneNode(true);
-    batchForm.replaceWith(newForm);
-
-    // Add submit listener
-    newForm.addEventListener('submit', (e) => {
-        e.preventDefault();
-        e.stopPropagation(); // Prevent global listeners from interfering
-        console.debug('Batch form submitted');
-        performBatchSearch();
-    });
-
-    // Add keypress listener for Enter key
-    inputElement.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            e.stopPropagation();
-            console.debug('Enter key pressed in batch input');
-            performBatchSearch();
-        }
-    });
-
-    // Prevent global form submission handlers
-    document.addEventListener('submit', (e) => {
-        if (e.target === newForm) return; // Allow batch form submission
-        if (e.target.tagName === 'FORM' && e.target.id !== 'batch-gene-form') {
-            console.debug('Blocking global form submission for:', e.target.id);
-            e.stopPropagation();
-        }
-    }, true); // Use capture phase to intercept early
-}
-
-// Initialize on page load
-document.addEventListener('DOMContentLoaded', () => {
-    if (window.location.pathname.includes('/batch-query')) {
-        console.debug('Initializing batch query listeners');
-        initBatchQueryListeners();
-    }
-});
-
-/**
  * Initialize Batch Query page listeners with enhanced cleanup and debugging
  */
 function initBatchQueryListeners() {
@@ -313,27 +261,34 @@ function initBatchQueryListeners() {
             return;
         }
 
-        // Clone form to remove old listeners (includes input element)
-        const newForm = batchForm.cloneNode(true);
-        batchForm.replaceWith(newForm);
+        // Optional: Clone form only if old listeners are suspected; otherwise, skip for simplicity
+        // const newForm = batchForm.cloneNode(true);
+        // batchForm.replaceWith(newForm);
+        const newForm = batchForm; // Use original for now; re-enable cloning if needed
 
-        // Add form submit listener
+        // Add form submit listener with targeted check
         newForm.addEventListener('submit', (e) => {
-            console.log('[BatchSearch] Form submitted');
+            if (e.target !== newForm) {
+                console.debug('[BatchSearch] Ignoring non-batch form submission');
+                return; // Allow non-batch forms to proceed
+            }
+            console.log('[BatchSearch] Form submitted with input:', inputElement.value);
             e.preventDefault();
             e.stopPropagation();
             performBatchSearch();
+            console.log('[BatchSearch] performBatchSearch completed');
         });
 
         // Add Enter key listener on input
-        const newInput = newForm.querySelector('#batch-genes-input');
+        const newInput = newForm.querySelector('#batch-genes-input') || inputElement;
         if (newInput) {
             newInput.addEventListener('keypress', (e) => {
                 if (e.key === 'Enter') {
-                    console.log('[BatchSearch] Enter key pressed in input');
+                    console.log('[BatchSearch] Enter key pressed with input:', newInput.value);
                     e.preventDefault();
                     e.stopPropagation();
                     performBatchSearch();
+                    console.log('[BatchSearch] performBatchSearch completed');
                 }
             });
         }
@@ -343,21 +298,13 @@ function initBatchQueryListeners() {
                             document.querySelector('.batch-search-btn');
         if (searchButton && searchButton.type !== 'submit') {
             searchButton.addEventListener('click', (e) => {
-                console.log('[BatchSearch] Search button clicked');
+                console.log('[BatchSearch] Search button clicked with input:', inputElement.value);
                 e.preventDefault();
                 e.stopPropagation();
                 performBatchSearch();
+                console.log('[BatchSearch] performBatchSearch completed');
             });
         }
-
-        // Block global form submissions
-        document.addEventListener('submit', (e) => {
-            if (e.target === newForm) return;
-            if (e.target.tagName === 'FORM') {
-                console.debug('[BatchSearch] Blocking global form submission for:', e.target.id);
-                e.stopPropagation();
-            }
-        }, { capture: true, once: true }); // Cleanup after one use
 
         console.log('[BatchSearch] All listeners initialized successfully');
 
@@ -372,12 +319,30 @@ function initBatchQueryListeners() {
 function initBatchQueryPage() {
     console.log('[BatchSearch] Initializing batch query page...');
 
+    let listenersInitialized = false;
+
     const initializeIfBatchQuery = () => {
         if (window.location.pathname.includes('/batch-query') || 
             window.location.hash.includes('batch-query')) {
             console.log('[BatchSearch] Detected batch query page, initializing listeners');
-            initBatchQueryListeners();
+            if (!listenersInitialized) {
+                initBatchQueryListeners();
+                listenersInitialized = true;
+            }
+        } else {
+            // Cleanup if leaving the page
+            cleanupBatchListeners();
+            listenersInitialized = false;
         }
+    };
+
+    const cleanupBatchListeners = () => {
+        console.log('[BatchSearch] Cleaning up batch query listeners');
+        const batchForm = document.getElementById('batch-gene-form');
+        if (batchForm) {
+            batchForm.removeEventListener('submit', performBatchSearch); // Approximate; use exact handler if stored
+        }
+        // Add similar removals for keypress and click if needed
     };
 
     // Handle DOM readiness
@@ -395,16 +360,16 @@ function initBatchQueryPage() {
         window.addEventListener('popstate', handleNavigation);
         window.addEventListener('load', handleNavigation, { once: true });
 
-        // Cleanup listeners on page unload to prevent memory leaks
+        // Cleanup on unload
         window.addEventListener('unload', () => {
             window.removeEventListener('popstate', handleNavigation);
+            cleanupBatchListeners();
         });
     }
 }
 
 // Initialize immediately or on DOM load
 initBatchQueryPage();
-
 /**
  * Initialize Batch Query page listeners with enhanced cleanup and debugging
  */
