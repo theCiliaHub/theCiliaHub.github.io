@@ -18,32 +18,26 @@ let currentPlotInstance = null; // Holds the active Chart.js, Plotly, or D3 inst
 // =============================================================================
 // PLOT CUSTOMIZATION & HIGH-QUALITY DOWNLOAD
 // =============================================================================
-/**
- * Retrieves user-defined or default plot settings.
- */
 function getPlotSettings() {
     const setting = (id, def) => document.getElementById(id)?.value || def;
     return {
         mainTitle: setting('setting-main-title', 'CiliaHub Analysis'),
         xAxisTitle: setting('setting-x-axis-title', 'X-Axis'),
         yAxisTitle: setting('setting-y-axis-title', 'Y-Axis'),
-        titleFontSize: parseInt(setting('setting-title-font-size', 20)),   // default 20
-        axisTitleFontSize: parseInt(setting('setting-axis-title-font-size', 20)), // default 20
-        tickFontSize: parseInt(setting('setting-tick-font-size', 20)),     // default 20
+        titleFontSize: parseInt(setting('setting-title-font-size', 20)),
+        axisTitleFontSize: parseInt(setting('setting-axis-title-font-size', 20)),
+        tickFontSize: parseInt(setting('setting-tick-font-size', 20)),
         fontFamily: setting('setting-font-family', 'Arial'),
         backgroundColor: setting('setting-bg-color', '#ffffff'),
         fontColor: setting('setting-font-color', '#333333'),
         gridColor: setting('setting-grid-color', '#e0e0e0'),
         colorScale: setting('setting-color-scale', 'Viridis'),
         showLegend: document.getElementById('setting-show-legend')?.checked ?? true,
-        showGrid: document.getElementById('setting-show-grid')?.checked ?? false, // default no grid
+        showGrid: document.getElementById('setting-show-grid')?.checked ?? false,
         axisLineWidth: parseFloat(setting('setting-axis-line-width', 1.5))
     };
 }
 
-/**
- * Downloads the currently displayed plot in PNG or PDF format.
- */
 async function downloadPlot() {
     const format = document.getElementById('download-format')?.value || 'png';
     const plotArea = document.getElementById('plot-display-area');
@@ -55,27 +49,17 @@ async function downloadPlot() {
     }
 
     const fileName = `CiliaHub_${plotType}_plot.${format}`;
-    const scale = 3; // 3x resolution
+    const scale = 3;
     const width = plotArea.clientWidth;
     const height = plotArea.clientHeight;
 
     try {
         let dataUrl;
-
-        // Chart.js plots
         if (plotArea.querySelector('canvas')) {
             dataUrl = currentPlotInstance.toBase64Image('image/png', 1.0);
-        }
-        // Plotly plots
-        else if (plotArea.querySelector('.js-plotly-plot')) {
-            dataUrl = await Plotly.toImage(currentPlotInstance, {
-                format: 'png',
-                width: width * scale,
-                height: height * scale
-            });
-        }
-        // D3 SVG plots
-        else if (plotArea.querySelector('svg')) {
+        } else if (plotArea.querySelector('.js-plotly-plot')) {
+            dataUrl = await Plotly.toImage(currentPlotInstance, { format: 'png', width: width * scale, height: height * scale });
+        } else if (plotArea.querySelector('svg')) {
             const svgElement = plotArea.querySelector('svg');
             const svgString = new XMLSerializer().serializeToString(svgElement);
             const canvas = document.createElement('canvas');
@@ -84,11 +68,9 @@ async function downloadPlot() {
             const ctx = canvas.getContext('2d');
             ctx.fillStyle = getPlotSettings().backgroundColor;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
-
             const img = new Image();
             const svgBlob = new Blob([svgString], { type: "image/svg+xml;charset=utf-8" });
             const url = URL.createObjectURL(svgBlob);
-
             await new Promise((resolve, reject) => {
                 img.onload = () => {
                     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
@@ -103,21 +85,14 @@ async function downloadPlot() {
 
         if (!dataUrl) throw new Error("Could not generate image data URL.");
 
-        // Save as PNG
         if (format === 'png') {
             const a = document.createElement('a');
             a.href = dataUrl;
             a.download = fileName;
             a.click();
-        }
-        // Save as PDF
-        else if (format === 'pdf') {
+        } else if (format === 'pdf') {
             const { jsPDF } = window.jspdf;
-            const pdf = new jsPDF({
-                orientation: width > height ? 'l' : 'p',
-                unit: 'px',
-                format: [width * scale, height * scale]
-            });
+            const pdf = new jsPDF({ orientation: width > height ? 'l' : 'p', unit: 'px', format: [width * scale, height * scale] });
             pdf.addImage(dataUrl, 'PNG', 0, 0, width * scale, height * scale);
             pdf.save(fileName);
         }
@@ -127,88 +102,31 @@ async function downloadPlot() {
     }
 }
 
-
-
 function createEnrichmentResultsTable(foundGenes, notFoundGenes) {
-    const container = document.getElementById('ciliaplot-results-container');
+    const container = document.getElementById('ciliaplot-results-container'); // CHANGED
     if (!container) return;
 
     let tableHTML = '';
-
     if (foundGenes.length > 0) {
-        tableHTML += `
-        <h4>Found Genes (${foundGenes.length})</h4>
-        <div class="table-wrapper">
-        <table>
-            <thead>
-                <tr>
-                    <th>Gene</th>
-                    <th>Ensembl ID</th>
-                    <th>Localization</th>
-                    <th>Domains</th>
-                    <th>Complexes</th>
-                    <th>Ciliopathy</th>
-                </tr>
-            </thead>
-            <tbody>
-        `;
-
+        tableHTML += `<h4>Found Genes (${foundGenes.length})</h4><div class="table-wrapper"><table><thead><tr><th>Gene</th><th>Ensembl ID</th><th>Localization</th><th>Domains</th><th>Complexes</th><th>Ciliopathy</th></tr></thead><tbody>`;
         foundGenes.forEach(g => {
-            // Ensure all fields are arrays for safe joining
-            const localization = Array.isArray(g.localization)
-                ? g.localization
-                : g.localization
-                ? [g.localization]
-                : [];
-
-            const domains = Array.isArray(g.domain_descriptions)
-                ? g.domain_descriptions
-                : g.domain_descriptions
-                ? [g.domain_descriptions]
-                : [];
-
-            const complexes = Array.isArray(g.complex_names)
-                ? g.complex_names
-                : g.complex_names
-                ? [g.complex_names]
-                : [];
-
-            const ciliopathy = Array.isArray(g.ciliopathy)
-                ? g.ciliopathy
-                : g.ciliopathy
-                ? [g.ciliopathy]
-                : [];
-
-            tableHTML += `
-                <tr>
-                    <td><a href="/#/${g.gene}" onclick="navigateTo(event, '/${g.gene}')">${g.gene}</a></td>
-                    <td>${g.ensembl_id || ''}</td>
-                    <td>${localization.join(', ')}</td>
-                    <td>${domains.join(', ')}</td>
-                    <td>${complexes.join(', ')}</td>
-                    <td>${ciliopathy.join(', ')}</td>
-                </tr>
-            `;
+            const localization = Array.isArray(g.localization) ? g.localization : (g.localization ? [g.localization] : []);
+            const domains = Array.isArray(g.domain_descriptions) ? g.domain_descriptions : (g.domain_descriptions ? [g.domain_descriptions] : []);
+            const complexes = Array.isArray(g.complex_names) ? g.complex_names : (g.complex_names ? [g.complex_names] : []);
+            const ciliopathy = Array.isArray(g.ciliopathy) ? g.ciliopathy : (g.ciliopathy ? [g.ciliopathy] : []);
+            tableHTML += `<tr><td><a href="/#/${g.gene}" onclick="navigateTo(event, '/${g.gene}')">${g.gene}</a></td><td>${g.ensembl_id || ''}</td><td>${localization.join(', ')}</td><td>${domains.join(', ')}</td><td>${complexes.join(', ')}</td><td>${ciliopathy.join(', ')}</td></tr>`;
         });
-
         tableHTML += `</tbody></table></div>`;
     }
-
     if (notFoundGenes.length > 0) {
-        tableHTML += `
-        <h4 style="margin-top: 1.5rem;">Genes Not Found (${notFoundGenes.length})</h4>
-        <p>${notFoundGenes.join(', ')}</p>
-        `;
+        tableHTML += `<h4 style="margin-top: 1.5rem;">Genes Not Found (${notFoundGenes.length})</h4><p>${notFoundGenes.join(', ')}</p>`;
     }
-
     container.innerHTML = tableHTML;
 }
 
-
 // =============================================================================
-// PLOTTING FUNCTIONS FOR CILIAHUB ENRICHMENT
+// KEY LOCALIZATIONS (Bubble Plot)
 // =============================================================================
-
 function renderKeyLocalizations(foundGenes, container) {
     if (!foundGenes.length) {
         container.innerHTML = '<p class="status-message">No ciliary genes found for plotting.</p>';
@@ -295,6 +213,10 @@ function renderKeyLocalizations(foundGenes, container) {
     });
 }
 
+
+// =============================================================================
+// GENE MATRIX (Bubble Matrix)
+// =============================================================================
 function renderGeneMatrix(foundGenes, container) {
     if (!foundGenes.length) {
         container.innerHTML = '<p class="status-message">No genes to display in the matrix plot.</p>';
@@ -348,6 +270,12 @@ function renderGeneMatrix(foundGenes, container) {
     });
 }
 
+// =============================================================================
+// DOMAIN ENRICHMENT (Bar Chart) - FIXED
+// =============================================================================
+// =============================================================================
+// DOMAIN ENRICHMENT RENDER - FIXED
+// =============================================================================
 function renderDomainEnrichment(foundGenes, allGenes, container) {
     console.log('Rendering domain enrichment...');
     console.log('Found genes:', foundGenes);
@@ -963,9 +891,99 @@ function computeProteinComplexLinks(foundGenes) {
 const pfamIdToName = {
     'PF00001': '7 transmembrane receptor',
     'PF00002': '7 transmembrane receptor (rhodopsin family)',
-    // ... (rest of the mapping object)
+    'PF00004': 'ATPase family associated with various cellular activities (AAA)',
+    'PF00005': 'ABC transporter',
+    'PF00008': 'EGF-like domain',
+    'PF00009': 'Elongation factor Tu GTP binding domain',
+    'PF00010': 'Helix-loop-helix DNA-binding domain',
+    'PF00011': 'Hsp20/alpha crystallin family',
+    'PF00012': 'HSP70 protein',
+    'PF00013': 'KH domain',
+    'PF00014': 'Kunitz/Bovine pancreatic trypsin inhibitor domain',
+    'PF00015': 'WD domain, G-beta repeat',
+    'PF00016': 'EGF-like domain',
+    'PF00017': 'SH2 domain',
+    'PF00018': 'SH3 domain',
+    'PF00023': 'Ankyrin repeat',
+    'PF00024': 'PAN domain',
+    'PF00025': 'ADP-ribosylation factor family',
+    'PF00026': 'Eukaryotic aspartyl protease',
+    'PF00027': 'Cyclin, N-terminal domain',
+    'PF00028': 'Cadherin domain',
+    'PF00029': 'Concanavalin A-like lectin/glucanase',
+    'PF00030': 'Pou domain - N-terminal to homeobox domain',
+    'PF00031': 'Cystine-knot domain',
+    'PF00032': 'Cytochrome c family',
+    'PF00033': 'Cytochrome b N-terminal domain',
+    'PF00034': 'Cytochrome c oxidase subunit I',
+    'PF00035': 'Cytochrome c oxidase subunit II',
+    'PF00036': 'EF-hand',
+    'PF00037': 'Ferritin-like domain',
+    'PF00038': 'Zinc finger, C2H2 type',
+    'PF00039': 'Fibronectin type I domain',
+    'PF00040': 'Fibronectin type II domain',
+    'PF00041': 'Fibronectin type III domain',
+    'PF00042': 'Globin',
+    'PF00043': 'Glutathione S-transferase, C-terminal domain',
+    'PF00044': 'Glyceraldehyde 3-phosphate dehydrogenase, NAD binding domain',
+    'PF00045': 'Glyceraldehyde 3-phosphate dehydrogenase, C-terminal domain',
+    'PF00046': 'Homeobox domain',
+    'PF00047': 'Immunoglobulin domain',
+    'PF00048': 'Immunoglobulin I-set domain',
+    'PF00049': 'Immunoglobulin V-set domain',
+    'PF00050': 'Kringle domain',
+    'PF00051': 'Kringle domain',
+    'PF00052': 'Laminin EGF-like domain',
+    'PF00053': 'Laminin G domain',
+    'PF00054': 'Laminin IV domain',
+    'PF00055': 'Laminin B (Domain IV)',
+    'PF00056': 'Lactate/malate dehydrogenase, NAD binding domain',
+    'PF00057': 'Lactate/malate dehydrogenase, alpha/beta C-terminal domain',
+    'PF00058': 'Low-density lipoprotein receptor domain class A',
+    'PF00059': 'Lectin C-type domain',
+    'PF00060': 'Ligand-gated ion channel',
+    'PF00061': 'Lipocalin',
+    'PF00062': 'Lysosome-associated membrane glycoprotein (LAMP) family',
+    'PF00063': 'Myosin head (motor domain)',
+    'PF00064': 'Myosin tail',
+    'PF00065': 'Coagulation factor 5/8 C-terminal domain',
+    'PF00066': 'LNR domain',
+    'PF00067': 'Cytochrome P450',
+    'PF00068': 'C2 domain',
+    'PF00069': 'Protein kinase domain',
+    'PF00070': 'Pyruvate kinase, barrel domain',
+    'PF00071': 'Ras family',
+    'PF00072': 'Response regulator receiver domain',
+    'PF00073': 'Rich family',
+    'PF00074': 'RNA-directed RNA polymerase',
+    'PF00075': 'RNase H',
+    'PF00076': 'RNA recognition motif. (a.k.a. RRM, RBD, or RNP domain)',
+    'PF00077': 'Retrovirus capsid protein',
+    'PF00078': 'Reverse transcriptase (RNA-dependent DNA polymerase)',
+    'PF00079': 'Serine protease',
+    'PF00080': 'Subtilase family',
+    'PF00081': 'Ubiquitin family',
+    'PF00082': 'Ubiquitin-conjugating enzyme',
+    'PF00083': 'Zinc finger, RING-type',
+    'PF00084': 'Sushi domain (SCR repeat)',
+    'PF00085': 'Thioredoxin',
+    'PF00086': 'Zinc finger, C3HC4 type (RING finger)',
+    'PF00087': 'Zinc finger, C2H2 type',
+    'PF00088': 'Zinc finger, C2H2 type',
+    'PF00089': 'Trypsin',
+    'PF00090': 'Tubulin/FtsZ family, GTPase domain',
+    'PF00091': 'Tubulin C-terminal domain',
+    'PF00092': 'Vascular endothelial growth factor receptor (VEGFR)',
+    'PF00093': 'VWC domain',
+    'PF00094': 'von Willebrand factor type A domain',
+    'PF00095': 'von Willebrand factor type C domain',
+    'PF00096': 'Zinc finger, C2H2 type',
+    'PF00097': 'Zinc finger, C3HC4 type (RING finger)',
+    'PF00098': 'Zinc knuckle',
+    'PF00099': 'Zinc finger, C2H2 type',
+    'PF00100': 'Zinc finger, C2H2 type'
+    // Add more mappings as needed
 };
-
 
 // =============================================================================
 // MAIN CONTROLLER & PAGE RENDERER
@@ -974,14 +992,14 @@ async function generateAnalysisPlots() {
     try {
         await loadAndPrepareDatabase();
         const plotContainer = document.getElementById('plot-display-area');
-        const resultsContainer = document.getElementById('enrichment-results-container');
-        const genesInput = document.getElementById('enrichment-genes-input').value.trim();
+        const resultsContainer = document.getElementById('ciliaplot-results-container'); // CHANGED
+        const genesInput = document.getElementById('ciliaplot-genes-input').value.trim(); // CHANGED
 
         if (!genesInput) {
             alert('Please enter a gene list.');
             return;
         }
-        
+
         plotContainer.innerHTML = '<p class="status-message">Generating plot...</p>';
         if (resultsContainer) resultsContainer.innerHTML = '';
         currentPlotInstance = null;
@@ -999,26 +1017,27 @@ async function generateAnalysisPlots() {
         createEnrichmentResultsTable(foundGenes, notFoundOriginalQueries);
         const plotType = document.querySelector('input[name="plot-type"]:checked')?.value;
         const backgroundGeneSet = window.allGenes || [];
-
+        
+        // This switch block remains as you provided it
         switch (plotType) {
-            case 'bubble':   
-                renderKeyLocalizations(foundGenes, plotContainer);   
+            case 'bubble':
+                renderKeyLocalizations(foundGenes, plotContainer);
                 break;
-            case 'matrix':   
-                renderGeneMatrix(foundGenes, plotContainer);   
+            case 'matrix':
+                renderGeneMatrix(foundGenes, plotContainer);
                 break;
             case 'domain':
                 if (backgroundGeneSet.length === 0) {
                     plotContainer.innerHTML = '<p class="status-message error">Background gene database not loaded. Cannot perform Domain Enrichment analysis.</p>';
-                    return; 
+                    return;
                 }
-                renderDomainEnrichment(foundGenes, backgroundGeneSet, plotContainer);   
+                renderDomainEnrichment(foundGenes, backgroundGeneSet, plotContainer);
                 break;
-            case 'ciliopathy':   
-                renderCiliopathySunburst(foundGenes, plotContainer);   
+            case 'ciliopathy':
+                renderCiliopathySunburst(foundGenes, plotContainer);
                 break;
-            case 'network':   
-                renderComplexNetwork(foundGenes, plotContainer);   
+            case 'network':
+                renderComplexNetwork(foundGenes, plotContainer);
                 break;
             default:
                 plotContainer.innerHTML = '<p class="status-message">Please select a valid plot type.</p>';
@@ -1031,24 +1050,24 @@ async function generateAnalysisPlots() {
     }
 }
 
-function displayEnrichmentPage() {
+function displayCiliaPlotPage() { // CHANGED
     const contentArea = document.querySelector('.content-area');
     contentArea.className = 'content-area content-area-full';
     if (document.querySelector('.cilia-panel')) {
         document.querySelector('.cilia-panel').style.display = 'none';
     }
     contentArea.innerHTML = `
-        <div class="page-section enrichment-page">
-            <div class="enrichment-header">
-                <h2>Ciliary Gene Enrichment Analysis</h2>
+        <div class="page-section ciliaplot-page">
+            <div class="ciliaplot-header">
+                <h2>CiliaPlot: Gene List Analysis</h2>
                 <p>Analyze your gene list with a variety of visualization tools and customization options.</p>
             </div>
-            <div class="enrichment-container">
-                <div class="enrichment-left-panel">
+            <div class="ciliaplot-container">
+                <div class="ciliaplot-left-panel">
                     <div class="control-section">
                         <h3>1. Input Genes</h3>
                         <div class="control-section-content">
-                            <textarea id="enrichment-genes-input" placeholder="Enter gene symbols, synonyms, or Ensembl IDs..."></textarea>
+                            <textarea id="ciliaplot-genes-input" placeholder="Enter gene symbols, synonyms, or Ensembl IDs..."></textarea>
                             <button id="generate-plot-btn" class="btn btn-primary" style="width: 100%;">Run Analysis</button>
                         </div>
                     </div>
@@ -1090,9 +1109,9 @@ function displayEnrichmentPage() {
                         </div>
                     </div>
                 </div>
-                <div class="enrichment-right-panel">
+                <div class="ciliaplot-right-panel">
                     <div id="plot-display-area"><p class="status-message">Enter a gene list and click "Run Analysis" to see your results.</p></div>
-                    <div id="enrichment-results-container" class="results-section" style="margin-top: 2rem;"></div>
+                    <div id="ciliaplot-results-container" class="results-section" style="margin-top: 2rem;"></div>
                 </div>
             </div>
         </div>
@@ -1101,3 +1120,4 @@ function displayEnrichmentPage() {
     document.getElementById('generate-plot-btn').addEventListener('click', generateAnalysisPlots);
     document.getElementById('download-plot-btn').addEventListener('click', downloadPlot);
 }
+
