@@ -18,9 +18,6 @@ let currentPlotInstance = null; // Holds the active Chart.js, Plotly, or D3 inst
 // =============================================================================
 // PLOT CUSTOMIZATION & HIGH-QUALITY DOWNLOAD
 // =============================================================================
-// =============================================================================
-// PLOT CUSTOMIZATION & HIGH-QUALITY DOWNLOAD
-// =============================================================================
 
 /**
  * Retrieves user-defined or default plot settings.
@@ -31,16 +28,16 @@ function getPlotSettings() {
         mainTitle: setting('setting-main-title', 'CiliaHub Analysis'),
         xAxisTitle: setting('setting-x-axis-title', 'X-Axis'),
         yAxisTitle: setting('setting-y-axis-title', 'Y-Axis'),
-        titleFontSize: parseInt(setting('setting-title-font-size', 20)),   // default 20
-        axisTitleFontSize: parseInt(setting('setting-axis-title-font-size', 20)), // default 20
-        tickFontSize: parseInt(setting('setting-tick-font-size', 20)),     // default 20
+        titleFontSize: parseInt(setting('setting-title-font-size', 20)),
+        axisTitleFontSize: parseInt(setting('setting-axis-title-font-size', 20)),
+        tickFontSize: parseInt(setting('setting-tick-font-size', 20)),
         fontFamily: setting('setting-font-family', 'Arial'),
         backgroundColor: setting('setting-bg-color', '#ffffff'),
         fontColor: setting('setting-font-color', '#333333'),
         gridColor: setting('setting-grid-color', '#e0e0e0'),
         colorScale: setting('setting-color-scale', 'Viridis'),
         showLegend: document.getElementById('setting-show-legend')?.checked ?? true,
-        showGrid: document.getElementById('setting-show-grid')?.checked ?? false, // default no grid
+        showGrid: document.getElementById('setting-show-grid')?.checked ?? false,
         axisLineWidth: parseFloat(setting('setting-axis-line-width', 1.5))
     };
 }
@@ -59,27 +56,21 @@ async function downloadPlot() {
     }
 
     const fileName = `CiliaHub_${plotType}_plot.${format}`;
-    const scale = 3; // 3x resolution
+    const scale = 3;
     const width = plotArea.clientWidth;
     const height = plotArea.clientHeight;
 
     try {
         let dataUrl;
-
-        // Chart.js plots
         if (plotArea.querySelector('canvas')) {
             dataUrl = currentPlotInstance.toBase64Image('image/png', 1.0);
-        }
-        // Plotly plots
-        else if (plotArea.querySelector('.js-plotly-plot')) {
+        } else if (plotArea.querySelector('.js-plotly-plot')) {
             dataUrl = await Plotly.toImage(currentPlotInstance, {
                 format: 'png',
                 width: width * scale,
                 height: height * scale
             });
-        }
-        // D3 SVG plots
-        else if (plotArea.querySelector('svg')) {
+        } else if (plotArea.querySelector('svg')) {
             const svgElement = plotArea.querySelector('svg');
             const svgString = new XMLSerializer().serializeToString(svgElement);
             const canvas = document.createElement('canvas');
@@ -88,11 +79,9 @@ async function downloadPlot() {
             const ctx = canvas.getContext('2d');
             ctx.fillStyle = getPlotSettings().backgroundColor;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
-
             const img = new Image();
             const svgBlob = new Blob([svgString], { type: "image/svg+xml;charset=utf-8" });
             const url = URL.createObjectURL(svgBlob);
-
             await new Promise((resolve, reject) => {
                 img.onload = () => {
                     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
@@ -107,15 +96,12 @@ async function downloadPlot() {
 
         if (!dataUrl) throw new Error("Could not generate image data URL.");
 
-        // Save as PNG
         if (format === 'png') {
             const a = document.createElement('a');
             a.href = dataUrl;
             a.download = fileName;
             a.click();
-        }
-        // Save as PDF
-        else if (format === 'pdf') {
+        } else if (format === 'pdf') {
             const { jsPDF } = window.jspdf;
             const pdf = new jsPDF({
                 orientation: width > height ? 'l' : 'p',
@@ -131,14 +117,11 @@ async function downloadPlot() {
     }
 }
 
-
-
-function createEnrichmentResultsTable(foundGenes, notFoundGenes) {
-    const container = document.getElementById('enrichment-results-container');
+function createCiliaPlotResultsTable(foundGenes, notFoundGenes) {
+    const container = document.getElementById('ciliaplot-results-container');
     if (!container) return;
 
     let tableHTML = '';
-
     if (foundGenes.length > 0) {
         tableHTML += `
         <h4>Found Genes (${foundGenes.length})</h4>
@@ -156,33 +139,11 @@ function createEnrichmentResultsTable(foundGenes, notFoundGenes) {
             </thead>
             <tbody>
         `;
-
         foundGenes.forEach(g => {
-            // Ensure all fields are arrays for safe joining
-            const localization = Array.isArray(g.localization)
-                ? g.localization
-                : g.localization
-                ? [g.localization]
-                : [];
-
-            const domains = Array.isArray(g.domain_descriptions)
-                ? g.domain_descriptions
-                : g.domain_descriptions
-                ? [g.domain_descriptions]
-                : [];
-
-            const complexes = Array.isArray(g.complex_names)
-                ? g.complex_names
-                : g.complex_names
-                ? [g.complex_names]
-                : [];
-
-            const ciliopathy = Array.isArray(g.ciliopathy)
-                ? g.ciliopathy
-                : g.ciliopathy
-                ? [g.ciliopathy]
-                : [];
-
+            const localization = Array.isArray(g.localization) ? g.localization : (g.localization ? [g.localization] : []);
+            const domains = Array.isArray(g.domain_descriptions) ? g.domain_descriptions : (g.domain_descriptions ? [g.domain_descriptions] : []);
+            const complexes = Array.isArray(g.complex_names) ? g.complex_names : (g.complex_names ? [g.complex_names] : []);
+            const ciliopathy = Array.isArray(g.ciliopathy) ? g.ciliopathy : (g.ciliopathy ? [g.ciliopathy] : []);
             tableHTML += `
                 <tr>
                     <td><a href="/#/${g.gene}" onclick="navigateTo(event, '/${g.gene}')">${g.gene}</a></td>
@@ -194,7 +155,6 @@ function createEnrichmentResultsTable(foundGenes, notFoundGenes) {
                 </tr>
             `;
         });
-
         tableHTML += `</tbody></table></div>`;
     }
 
@@ -204,48 +164,19 @@ function createEnrichmentResultsTable(foundGenes, notFoundGenes) {
         <p>${notFoundGenes.join(', ')}</p>
         `;
     }
-
     container.innerHTML = tableHTML;
 }
 
+// =============================================================================
+// PLOTTING FUNCTIONS
+// =============================================================================
 
-// =============================================================================
-// PLOTTING FUNCTIONS FOR CILIAHUB ENRICHMENT
-// =============================================================================
-
-// =============================================================================
-// KEY LOCALIZATIONS (Bubble Plot)
-// =============================================================================
-// =============================================================================
-// KEY LOCALIZATIONS (Bubble Plot)
-// =============================================================================
 function renderKeyLocalizations(foundGenes, container) {
     if (!foundGenes.length) {
         container.innerHTML = '<p class="status-message">No ciliary genes found for plotting.</p>';
         return;
     }
-
-    const settings = getPlotSettings();
-    const yCategories = [
-        'Cilia',
-        'Basal Body',
-        'Transition Zone',
-        'Axoneme',
-        'Ciliary Membrane',
-        'Centrosome',
-        'Microtubules',
-        'Endoplasmic Reticulum',
-        'Flagella',
-        'Cytosol',
-        'Lysosome',
-        'Autophagosomes',
-        'Ribosome',
-        'Nucleus',
-        'P-body',
-        'Peroxisome'
-    ];
-
-    // Count genes per localization
+    const yCategories = ['Cilia', 'Basal Body', 'Transition Zone', 'Axoneme', 'Ciliary Membrane', 'Centrosome', 'Microtubules', 'Endoplasmic Reticulum', 'Flagella', 'Cytosol', 'Lysosome', 'Autophagosomes', 'Ribosome', 'Nucleus', 'P-body', 'Peroxisome'];
     const localizationCounts = {};
     foundGenes.forEach(gene => {
         (Array.isArray(gene.localization) ? gene.localization : []).forEach(loc => {
@@ -253,16 +184,13 @@ function renderKeyLocalizations(foundGenes, container) {
             if (match) localizationCounts[match] = (localizationCounts[match] || 0) + 1;
         });
     });
-
     const categoriesWithData = yCategories.filter(cat => localizationCounts[cat] > 0);
     if (!categoriesWithData.length) {
         container.innerHTML = '<p class="status-message">No genes found in primary ciliary localizations.</p>';
         return;
     }
-
     container.innerHTML = `<canvas></canvas>`;
     const ctx = container.querySelector('canvas').getContext('2d');
-
     currentPlotInstance = new Chart(ctx, {
         type: 'bubble',
         data: {
@@ -286,52 +214,28 @@ function renderKeyLocalizations(foundGenes, container) {
                 tooltip: { callbacks: { label: c => `${c.raw.y}: ${c.raw.count} gene(s)` } }
             },
             scales: {
-                x: { 
-                    title: { display: true, text: 'Gene Count', font: { size: 20 } }, 
-                    grid: { display: false }, 
-                    border: { display: true, width: 2 }, 
-                    ticks: { font: { size: 20 } } 
-                },
-                y: { 
-                    type: 'category',
-                    labels: yCategories,
-                    title: { display: true, text: 'Cellular Compartment', font: { size: 20 } }, 
-                    grid: { display: false }, 
-                    border: { display: true, width: 2 }, 
-                    ticks: { font: { size: 20 } }
-                }
+                x: { title: { display: true, text: 'Gene Count', font: { size: 20 } }, grid: { display: false }, border: { display: true, width: 2 }, ticks: { font: { size: 20 } } },
+                y: { type: 'category', labels: yCategories, title: { display: true, text: 'Cellular Compartment', font: { size: 20 } }, grid: { display: false }, border: { display: true, width: 2 }, ticks: { font: { size: 20 } } }
             }
         }
     });
 }
 
-
-// =============================================================================
-// GENE MATRIX (Bubble Matrix)
-// =============================================================================
 function renderGeneMatrix(foundGenes, container) {
     if (!foundGenes.length) {
         container.innerHTML = '<p class="status-message">No genes to display in the matrix plot.</p>';
         return;
     }
-
-    const settings = getPlotSettings();
     const yCategories = [...new Set(foundGenes.flatMap(g => g.localization))].filter(Boolean).sort();
     const xLabels = [...new Set(foundGenes.map(g => g.gene))].sort();
-
     container.innerHTML = `<canvas></canvas>`;
     const ctx = container.querySelector('canvas').getContext('2d');
-
     currentPlotInstance = new Chart(ctx, {
         type: 'bubble',
         data: {
             datasets: foundGenes.map((gene, index) => ({
                 label: gene.gene,
-                data: (Array.isArray(gene.localization) ? gene.localization : []).map(loc => ({
-                    x: gene.gene,
-                    y: loc,
-                    r: 10
-                })),
+                data: (Array.isArray(gene.localization) ? gene.localization : []).map(loc => ({ x: gene.gene, y: loc, r: 10 })),
                 backgroundColor: d3.schemeCategory10[index % 10]
             }))
         },
@@ -343,746 +247,191 @@ function renderGeneMatrix(foundGenes, container) {
                 tooltip: { callbacks: { label: c => `${c.dataset.label}: ${c.raw.y}` } }
             },
             scales: {
-                x: { 
-                    type: 'category', labels: xLabels,
-                    title: { display: true, text: 'Genes', font: { size: 20 } },
-                    grid: { display: false }, 
-                    border: { display: true, width: 2 },
-                    ticks: { font: { size: 20 }, maxRotation: 90, minRotation: 45 }
-                },
-                y: { 
-                    type: 'category', labels: yCategories,
-                    title: { display: true, text: 'Ciliary Compartment', font: { size: 20 } },
-                    grid: { display: false }, 
-                    border: { display: true, width: 2 },
-                    ticks: { font: { size: 20 } }
-                }
+                x: { type: 'category', labels: xLabels, title: { display: true, text: 'Genes', font: { size: 20 } }, grid: { display: false }, border: { display: true, width: 2 }, ticks: { font: { size: 20 }, maxRotation: 90, minRotation: 45 } },
+                y: { type: 'category', labels: yCategories, title: { display: true, text: 'Ciliary Compartment', font: { size: 20 } }, grid: { display: false }, border: { display: true, width: 2 }, ticks: { font: { size: 20 } } }
             }
         }
     });
 }
 
-// =============================================================================
-// DOMAIN ENRICHMENT (Bar Chart) - FIXED
-// =============================================================================
-// =============================================================================
-// DOMAIN ENRICHMENT RENDER - FIXED
-// =============================================================================
 function renderDomainEnrichment(foundGenes, allGenes, container) {
-    console.log('Rendering domain enrichment...');
-    console.log('Found genes:', foundGenes);
-    console.log('All genes:', allGenes);
-    
-    if (!foundGenes || !Array.isArray(foundGenes) || foundGenes.length === 0) {
-        container.innerHTML = '<p class="status-message">No genes found for domain enrichment analysis.</p>';
+    if (!foundGenes || !allGenes || allGenes.length === 0) {
+        container.innerHTML = '<p class="status-message">Not enough data for domain enrichment analysis.</p>';
         return;
     }
-    
-    if (!allGenes || !Array.isArray(allGenes) || allGenes.length === 0) {
-        container.innerHTML = '<p class="status-message">No background gene data available for comparison.</p>';
+    const stats = calculateDomainEnrichment(foundGenes, allGenes);
+    if (!stats.length) {
+        container.innerHTML = `<p class="status-message">No significant domain enrichment found.</p>`;
         return;
     }
-
-    try {
-        const stats = calculateDomainEnrichment(foundGenes, allGenes);
-        
-        if (!stats || !stats.length) {
-            container.innerHTML = `
-                <p class="status-message">
-                    No significant domain enrichment found. 
-                    This could mean:<br>
-                    1. Your genes don't share common domains<br>
-                    2. The domains aren't enriched compared to background<br>
-                    3. Domain data may not be available for these genes
-                </p>
-            `;
-            return;
-        }
-
-        // Sort by count and take top 15 to avoid overcrowding
-        const topDomains = stats.sort((a, b) => b.geneCount - a.geneCount).slice(0, 15);
-        
-        container.innerHTML = `<canvas></canvas>`;
-        const ctx = container.querySelector('canvas').getContext('2d');
-        const settings = getPlotSettings();
-
-        currentPlotInstance = new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels: topDomains.map(d => {
-                    // Truncate long domain names
-                    const maxLength = 30;
-                    return d.domain.length > maxLength 
-                        ? d.domain.substring(0, maxLength) + '...' 
-                        : d.domain;
-                }),
-                datasets: [{ 
-                    label: 'Gene Count', 
-                    data: topDomains.map(d => d.geneCount), 
-                    backgroundColor: 'rgba(89,161,79,0.7)',
-                    borderColor: 'rgba(89,161,79,1)',
-                    borderWidth: 1
-                }]
-            },
-            options: {
-                indexAxis: 'y',
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: { 
-                    legend: { display: false }, 
-                    title: { 
-                        display: true, 
-                        text: settings.mainTitle || 'Protein Domain Enrichment',
-                        font: { 
-                            size: settings.titleFontSize,
-                            family: settings.fontFamily
-                        }
-                    },
-                    tooltip: { 
-                        callbacks: { 
-                            label: (context) => {
-                                const domain = topDomains[context.dataIndex];
-                                return [
-                                    `Domain: ${domain.domain}`,
-                                    `Gene Count: ${context.raw}`,
-                                    `Rich Factor: ${domain.richFactor.toFixed(2)}`,
-                                    `Background: ${domain.backgroundCount} genes`
-                                ];
-                            }
-                        } 
-                    }
-                },
-                scales: {
-                    x: { 
-                        title: { 
-                            display: true, 
-                            text: settings.xAxisTitle || 'Gene Count',
-                            font: {
-                                size: settings.axisTitleFontSize,
-                                family: settings.fontFamily
-                            }
-                        }, 
-                        grid: { display: settings.showGrid, color: settings.gridColor }, 
-                        border: { display: true, width: settings.axisLineWidth },
-                        ticks: {
-                            font: {
-                                size: settings.tickFontSize,
-                                family: settings.fontFamily
-                            }
-                        }
-                    },
-                    y: { 
-                        title: { 
-                            display: true, 
-                            text: settings.yAxisTitle || 'Protein Domain',
-                            font: {
-                                size: settings.axisTitleFontSize,
-                                family: settings.fontFamily
-                            }
-                        }, 
-                        grid: { display: settings.showGrid, color: settings.gridColor }, 
-                        border: { display: true, width: settings.axisLineWidth },
-                        ticks: {
-                            font: {
-                                size: settings.tickFontSize,
-                                family: settings.fontFamily
-                            }
+    const topDomains = stats.slice(0, 15);
+    container.innerHTML = `<canvas></canvas>`;
+    const ctx = container.querySelector('canvas').getContext('2d');
+    const settings = getPlotSettings();
+    currentPlotInstance = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: topDomains.map(d => {
+                const maxLength = 30;
+                return d.domain.length > maxLength ? d.domain.substring(0, maxLength) + '...' : d.domain;
+            }),
+            datasets: [{
+                label: 'Gene Count',
+                data: topDomains.map(d => d.geneCount),
+                backgroundColor: 'rgba(89,161,79,0.7)',
+                borderColor: 'rgba(89,161,79,1)',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                title: { display: true, text: settings.mainTitle || 'Protein Domain Enrichment', font: { size: settings.titleFontSize, family: settings.fontFamily } },
+                tooltip: {
+                    callbacks: {
+                        label: (context) => {
+                            const domain = topDomains[context.dataIndex];
+                            return [`Domain: ${domain.domain}`, `Gene Count: ${context.raw}`, `Rich Factor: ${domain.richFactor.toFixed(2)}`, `Background: ${domain.backgroundCount} genes`];
                         }
                     }
                 }
+            },
+            scales: {
+                x: { title: { display: true, text: settings.xAxisTitle || 'Gene Count', font: { size: settings.axisTitleFontSize, family: settings.fontFamily } }, grid: { display: settings.showGrid, color: settings.gridColor }, border: { display: true, width: settings.axisLineWidth }, ticks: { font: { size: settings.tickFontSize, family: settings.fontFamily } } },
+                y: { title: { display: true, text: settings.yAxisTitle || 'Protein Domain', font: { size: settings.axisTitleFontSize, family: settings.fontFamily } }, grid: { display: settings.showGrid, color: settings.gridColor }, border: { display: true, width: settings.axisLineWidth }, ticks: { font: { size: settings.tickFontSize, family: settings.fontFamily } } }
             }
-        });
-    } catch (error) {
-        console.error('Error rendering domain enrichment:', error);
-        container.innerHTML = `
-            <p class="status-message error">
-                Error rendering domain enrichment: ${error.message}<br>
-                Please check the console for details.
-            </p>
-        `;
-    }
+        }
+    });
 }
 
+function renderCiliopathySunburst(foundGenes, container) {
+    const data = computeCiliopathyAssociations(foundGenes);
+    if (!data.length) {
+        container.innerHTML = '<p class="status-message">No ciliopathy associations found.</p>';
+        return;
+    }
+    const genesWithCiliopathy = new Set(foundGenes.filter(g => g.ciliopathy && (Array.isArray(g.ciliopathy) ? g.ciliopathy.length > 0 : g.ciliopathy)).map(g => g.gene));
+    const genesWithoutCiliopathyCount = foundGenes.length - genesWithCiliopathy.size;
+    if (genesWithoutCiliopathyCount > 0) {
+        data.push({ name: "No Known Association", count: genesWithoutCiliopathyCount });
+    }
+    container.innerHTML = '';
+    const width = container.clientWidth;
+    const height = Math.min(width, 600);
+    const radius = Math.min(width, height) / 2;
+    const svg = d3.select(container).append('svg').attr('width', width).attr('height', height).append('g').attr('transform', `translate(${width / 2},${height / 2})`);
+    const root = d3.hierarchy({ children: data }).sum(d => d.count).sort((a, b) => b.value - a.value);
+    const partition = d3.partition().size([2 * Math.PI, radius]);
+    partition(root);
+    const arc = d3.arc().startAngle(d => d.x0).endAngle(d => d.x1).innerRadius(d => d.y0).outerRadius(d => d.y1);
+    svg.selectAll('path').data(root.descendants()).enter().append('path').attr('d', arc).style('fill', d => {
+        if (d.depth === 0) return '#ccc';
+        const index = d.parent.children.indexOf(d);
+        return d3.schemeCategory10[index % 10];
+    }).style('stroke', '#fff').style('stroke-width', '2px').append('title').text(d => `${d.data.name}: ${d.value} gene(s)`);
+    currentPlotInstance = svg.node();
+}
+
+function renderComplexNetwork(foundGenes, container) {
+    const { nodes, links } = computeProteinComplexLinks(foundGenes);
+    if (!nodes.length || !links.length) {
+        container.innerHTML = '<p class="status-message">No protein complex links found among the provided genes.</p>';
+        return;
+    }
+    container.innerHTML = '';
+    const width = container.clientWidth;
+    const height = Math.min(width * 0.8, 600);
+    const svg = d3.select(container).append('svg').attr('width', width).attr('height', height);
+    const simulation = d3.forceSimulation(nodes)
+        .force('link', d3.forceLink(links).id(d => d.id).distance(100))
+        .force('charge', d3.forceManyBody().strength(-300))
+        .force('center', d3.forceCenter(width / 2, height / 2))
+        .force('collision', d3.forceCollide().radius(30));
+    const link = svg.append('g').selectAll('line').data(links).enter().append('line').attr('stroke', '#999').attr('stroke-opacity', 0.6).attr('stroke-width', d => Math.sqrt(d.value) * 2);
+    const node = svg.append('g').selectAll('circle').data(nodes).enter().append('circle').attr('r', 12).attr('fill', '#5690c7').call(d3.drag().on('start', dragstarted).on('drag', dragged).on('end', dragended));
+    node.append('title').text(d => d.id);
+    simulation.on('tick', () => {
+        link.attr('x1', d => d.source.x).attr('y1', d => d.source.y).attr('x2', d => d.target.x).attr('y2', d => d.target.y);
+        node.attr('cx', d => d.x).attr('cy', d => d.y);
+    });
+    function dragstarted(event, d) { if (!event.active) simulation.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; }
+    function dragged(event, d) { d.fx = event.x; d.fy = event.y; }
+    function dragended(event, d) { if (!event.active) simulation.alphaTarget(0); d.fx = null; d.fy = null; }
+    currentPlotInstance = svg.node();
+}
 
 // =============================================================================
-// DOMAIN ENRICHMENT CALCULATION - FIXED WITH ERROR HANDLING
+// DATA COMPUTATION HELPERS
 // =============================================================================
+
 function calculateDomainEnrichment(foundGenes, allGenes) {
     const getDomains = (gene) => {
         if (!gene) return [];
-        // Check multiple possible keys and handle both string and array formats
         const domainData = gene.pfam_ids || gene.domain_descriptions || gene.PFAM_IDs || gene.Domain_Descriptions;
-        if (Array.isArray(domainData)) {
-            // Filter out null or empty values
-            return domainData.filter(d => d && typeof d === 'string');
-        }
-        if (typeof domainData === 'string') {
-            // Split if it's a semicolon or comma-separated string
-            return domainData.split(/[,;]/).map(d => d.trim()).filter(Boolean);
-        }
+        if (Array.isArray(domainData)) return domainData.filter(d => d && typeof d === 'string');
+        if (typeof domainData === 'string') return domainData.split(/[,;]/).map(d => d.trim()).filter(Boolean);
         return [];
     };
-
     const domainCountsUser = new Map();
-    foundGenes.forEach(g => {
-        getDomains(g).forEach(domain => {
-            domainCountsUser.set(domain, (domainCountsUser.get(domain) || 0) + 1);
-        });
-    });
-
+    foundGenes.forEach(g => getDomains(g).forEach(domain => domainCountsUser.set(domain, (domainCountsUser.get(domain) || 0) + 1)));
     const domainCountsBg = new Map();
-    allGenes.forEach(g => {
-        getDomains(g).forEach(domain => {
-            domainCountsBg.set(domain, (domainCountsBg.get(domain) || 0) + 1);
-        });
-    });
-
+    allGenes.forEach(g => getDomains(g).forEach(domain => domainCountsBg.set(domain, (domainCountsBg.get(domain) || 0) + 1)));
     const M = foundGenes.length;
     const N = allGenes.length;
     if (M === 0 || N === 0) return [];
-
-    const enrichmentResults = Array.from(domainCountsUser.entries())
-        .map(([domain, k]) => {
-            const n = domainCountsBg.get(domain) || 0;
-            const richFactor = n > 0 ? (k / M) / (n / N) : Infinity;
-            return {
-                domain: domain,
-                geneCount: k,
-                backgroundCount: n,
-                richFactor: richFactor
-            };
-        })
-        .filter(d => d.richFactor > 1 && d.geneCount > 1) // Keep results with at least 2 genes
-        .sort((a, b) => b.geneCount - a.geneCount);
-        
-    return enrichmentResults;
+    return Array.from(domainCountsUser.entries()).map(([domain, k]) => {
+        const n = domainCountsBg.get(domain) || 0;
+        return { domain, geneCount: k, backgroundCount: n, richFactor: n > 0 ? (k / M) / (n / N) : Infinity };
+    }).filter(d => d.richFactor > 1 && d.geneCount > 1).sort((a, b) => b.geneCount - a.geneCount);
 }
 
-// Debug function to check database structure
-function debugDatabaseStructure(database) {
-    console.group('Database Structure Debug');
-    console.log('Database type:', typeof database);
-    console.log('Is array:', Array.isArray(database));
-    
-    if (Array.isArray(database)) {
-        console.log('Array length:', database.length);
-        if (database.length > 0) {
-            console.log('First item:', database[0]);
-            console.log('First item keys:', Object.keys(database[0]));
-        }
-    } else if (typeof database === 'object' && database !== null) {
-        console.log('Object keys:', Object.keys(database));
-        if (database.genes && Array.isArray(database.genes)) {
-            console.log('Genes array length:', database.genes.length);
-            if (database.genes.length > 0) {
-                console.log('First gene:', database.genes[0]);
-                console.log('First gene keys:', Object.keys(database.genes[0]));
-            }
-        }
-    }
-    console.groupEnd();
-}
-
-// Use this in your generateAnalysisPlots function:
-// debugDatabaseStructure(database);
-
-// Helper function for p-value calculation
-function calculateEnrichmentPValue(k, M, n, N) {
-    // Hypergeometric test p-value
-    let pValue = 0;
-    for (let i = k; i <= Math.min(n, M); i++) {
-        pValue += (combinations(n, i) * combinations(N - n, M - i)) / combinations(N, M);
-    }
-    return pValue;
-}
-
-function combinations(n, k) {
-    if (k < 0 || k > n) return 0;
-    if (k === 0 || k === n) return 1;
-    k = Math.min(k, n - k);
-    let result = 1;
-    for (let i = 1; i <= k; i++) {
-        result = result * (n - k + i) / i;
-    }
-    return result;
-}
-
-// =============================================================================
-// CILIOPATHY ASSOCIATIONS (Sunburst)
-// =============================================================================
-/**
- * Computes the associations between the found genes and known ciliopathies.
- * @param {Array<Object>} foundGenes - The array of gene objects found in the database.
- * @returns {Array<Object>} An array of objects for the sunburst plot, e.g., [{name: "Bardet-Biedl", count: 5}].
- */
 function computeCiliopathyAssociations(foundGenes) {
     const associations = new Map();
     foundGenes.forEach(gene => {
         if (!gene || !gene.ciliopathy) return;
-
         let ciliopathies = [];
-        if (Array.isArray(gene.ciliopathy)) {
-            ciliopathies = gene.ciliopathy;
-        } else if (typeof gene.ciliopathy === 'string') {
-            ciliopathies = gene.ciliopathy.split(/[,;]/).map(c => c.trim());
-        }
-
-        ciliopathies.filter(Boolean).forEach(disease => {
-            associations.set(disease, (associations.get(disease) || 0) + 1);
-        });
+        if (Array.isArray(gene.ciliopathy)) ciliopathies = gene.ciliopathy;
+        else if (typeof gene.ciliopathy === 'string') ciliopathies = gene.ciliopathy.split(/[,;]/).map(c => c.trim());
+        ciliopathies.filter(Boolean).forEach(disease => associations.set(disease, (associations.get(disease) || 0) + 1));
     });
-
-    return Array.from(associations, ([name, count]) => ({ name, count }))
-        .sort((a, b) => b.count - a.count);
+    return Array.from(associations, ([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count);
 }
 
-/**
- * Computes the network of protein complex interactions from a list of genes.
- * @param {Array<Object>} foundGenes - The array of gene objects found in the database.
- * @returns {Object} An object containing 'nodes' and 'links' arrays for the D3 force-directed graph.
- */
 function computeProteinComplexLinks(foundGenes) {
     const complexMap = new Map();
     foundGenes.forEach(gene => {
         if (!gene || !gene.complex_names) return;
-        
         let complexes = [];
-        if (Array.isArray(gene.complex_names)) {
-            complexes = gene.complex_names;
-        } else if (typeof gene.complex_names === 'string') {
-            complexes = gene.complex_names.split(/[,;]/).map(c => c.trim());
-        }
-
+        if (Array.isArray(gene.complex_names)) complexes = gene.complex_names;
+        else if (typeof gene.complex_names === 'string') complexes = gene.complex_names.split(/[,;]/).map(c => c.trim());
         complexes.filter(Boolean).forEach(complexName => {
-            if (!complexMap.has(complexName)) {
-                complexMap.set(complexName, []);
-            }
+            if (!complexMap.has(complexName)) complexMap.set(complexName, []);
             complexMap.get(complexName).push(gene.gene);
         });
     });
-
     const links = new Map();
     complexMap.forEach(genes => {
         if (genes.length < 2) return;
         for (let i = 0; i < genes.length; i++) {
             for (let j = i + 1; j < genes.length; j++) {
                 const key = [genes[i], genes[j]].sort().join('--');
-                if (!links.has(key)) {
-                    links.set(key, {
-                        source: genes[i],
-                        target: genes[j],
-                        value: 0
-                    });
-                }
-                links.get(key).value += 1; // Increase link strength for each shared complex
+                if (!links.has(key)) links.set(key, { source: genes[i], target: genes[j], value: 0 });
+                links.get(key).value += 1;
             }
         }
     });
-
-    const nodes = foundGenes.map(g => ({ id: g.gene }));
-    return { nodes, links: Array.from(links.values()) };
-}
-// =============================================================================
-// CILIOPATHY ASSOCIATIONS (Sunburst) - FIXED
-// =============================================================================
-function renderCiliopathySunburst(foundGenes, container) {
-    const data = computeCiliopathyAssociations(foundGenes);
-    
-    if (!data || !data.length) {
-        container.innerHTML = '<p class="status-message">No ciliopathy associations found.</p>';
-        return;
-    }
-
-    // Add "Other" category for genes without ciliopathy associations
-    const genesWithCiliopathy = new Set();
-    data.forEach(item => {
-        foundGenes.filter(g => g.ciliopathy && g.ciliopathy.includes(item.name))
-            .forEach(g => genesWithCiliopathy.add(g.gene));
-    });
-    
-    const genesWithoutCiliopathy = foundGenes.filter(g => !genesWithCiliopathy.has(g.gene));
-    if (genesWithoutCiliopathy.length > 0) {
-        data.push({ name: "No Known Association", count: genesWithoutCiliopathy.length });
-    }
-
-    container.innerHTML = '';
-    const width = container.clientWidth;
-    const height = Math.min(width, 600);
-    const radius = Math.min(width, height) / 2;
-
-    const svg = d3.select(container)
-        .append('svg')
-        .attr('width', width)
-        .attr('height', height)
-        .append('g')
-        .attr('transform', `translate(${width / 2},${height / 2})`);
-
-    // Create hierarchy
-    const root = d3.hierarchy({ children: data })
-        .sum(d => d.count)
-        .sort((a, b) => b.value - a.value);
-
-    // Create partition layout
-    const partition = d3.partition()
-        .size([2 * Math.PI, radius]);
-
-    partition(root);
-
-    // Create arc generator
-    const arc = d3.arc()
-        .startAngle(d => d.x0)
-        .endAngle(d => d.x1)
-        .innerRadius(d => d.y0)
-        .outerRadius(d => d.y1);
-
-    // Add arcs
-    svg.selectAll('path')
-        .data(root.descendants())
-        .enter()
-        .append('path')
-        .attr('d', arc)
-        .style('fill', d => {
-            if (d.depth === 0) return '#ccc';
-            const index = d.parent.children.indexOf(d);
-            return d3.schemeCategory10[index % 10];
-        })
-        .style('stroke', '#fff')
-        .style('stroke-width', '2px')
-        .on('mouseover', function(event, d) {
-            d3.select(this).style('opacity', 0.8);
-            // Show tooltip
-        })
-        .on('mouseout', function() {
-            d3.select(this).style('opacity', 1);
-            // Hide tooltip
-        })
-        .append('title')
-        .text(d => `${d.data.name}: ${d.value} gene(s)`);
-
-    // Add labels for larger segments
-    svg.selectAll('text')
-        .data(root.descendants().filter(d => d.depth && (d.x1 - d.x0) > 0.05))
-        .enter()
-        .append('text')
-        .attr('transform', d => {
-            const x = (d.x0 + d.x1) / 2 * 180 / Math.PI;
-            const y = (d.y0 + d.y1) / 2;
-            return `rotate(${x - 90}) translate(${y},0) rotate(${x < 180 ? 0 : 180})`;
-        })
-        .attr('dy', '0.35em')
-        .attr('text-anchor', 'middle')
-        .text(d => d.data.name)
-        .style('font-size', '12px')
-        .style('fill', '#fff')
-        .style('font-weight', 'bold');
-
-    currentPlotInstance = svg.node();
+    return { nodes: foundGenes.map(g => ({ id: g.gene })), links: Array.from(links.values()) };
 }
 
-// Enhanced ciliopathy computation
-function computeCiliopathyAssociations(foundGenes) {
-    const associations = {};
-
-    foundGenes.forEach(gene => {
-        let ciliopathies = [];
-        
-        // Handle different data formats
-        if (Array.isArray(gene.ciliopathy)) {
-            ciliopathies = gene.ciliopathy;
-        } else if (typeof gene.ciliopathy === 'string') {
-            ciliopathies = gene.ciliopathy.split(',').map(s => s.trim());
-        } else if (gene.ciliopathy_associations) {
-            ciliopathies = Array.isArray(gene.ciliopathy_associations) 
-                ? gene.ciliopathy_associations 
-                : [gene.ciliopathy_associations];
-        }
-
-        ciliopathies.forEach(disease => {
-            if (disease && disease.trim()) {
-                const cleanDisease = disease.trim();
-                associations[cleanDisease] = (associations[cleanDisease] || 0) + 1;
-            }
-        });
-    });
-
-    return Object.entries(associations).map(([name, count]) => ({
-        name,
-        count
-    })).sort((a, b) => b.count - a.count);
-}
 
 // =============================================================================
-// PROTEIN COMPLEX NETWORK - FIXED
+// MAIN CONTROLLER & PAGE RENDERER
 // =============================================================================
-function renderComplexNetwork(foundGenes, container) {
-    const { nodes, links } = computeProteinComplexLinks(foundGenes);
-    
-    if (!nodes.length || !links.length) {
-        container.innerHTML = '<p class="status-message">No protein complex links found.</p>';
-        return;
-    }
 
-    container.innerHTML = '';
-    const width = container.clientWidth;
-    const height = Math.min(width * 0.8, 600);
-
-    const svg = d3.select(container)
-        .append('svg')
-        .attr('width', width)
-        .attr('height', height);
-
-    const simulation = d3.forceSimulation(nodes)
-        .force('link', d3.forceLink(links).id(d => d.id).distance(100))
-        .force('charge', d3.forceManyBody().strength(-300))
-        .force('center', d3.forceCenter(width / 2, height / 2))
-        .force('collision', d3.forceCollide().radius(30));
-
-    const link = svg.append('g')
-        .attr('class', 'links')
-        .selectAll('line')
-        .data(links)
-        .enter()
-        .append('line')
-        .attr('stroke', '#999')
-        .attr('stroke-opacity', 0.6)
-        .attr('stroke-width', d => Math.sqrt(d.value) * 2);
-
-    const node = svg.append('g')
-        .attr('class', 'nodes')
-        .selectAll('circle')
-        .data(nodes)
-        .enter()
-        .append('circle')
-        .attr('r', 12)
-        .attr('fill', '#5690c7')
-        .attr('stroke', '#fff')
-        .attr('stroke-width', 2)
-        .call(d3.drag()
-            .on('start', dragstarted)
-            .on('drag', dragged)
-            .on('end', dragended)
-        );
-
-    node.append('title')
-        .text(d => d.id);
-
-    // Add labels
-    const label = svg.append('g')
-        .attr('class', 'labels')
-        .selectAll('text')
-        .data(nodes)
-        .enter()
-        .append('text')
-        .text(d => d.id)
-        .attr('text-anchor', 'middle')
-        .attr('dy', -15)
-        .style('font-size', '10px')
-        .style('pointer-events', 'none');
-
-    simulation.on('tick', () => {
-        link
-            .attr('x1', d => d.source.x)
-            .attr('y1', d => d.source.y)
-            .attr('x2', d => d.target.x)
-            .attr('y2', d => d.target.y);
-
-        node
-            .attr('cx', d => d.x)
-            .attr('cy', d => d.y);
-
-        label
-            .attr('x', d => d.x)
-            .attr('y', d => d.y);
-    });
-
-    function dragstarted(event, d) {
-        if (!event.active) simulation.alphaTarget(0.3).restart();
-        d.fx = d.x;
-        d.fy = d.y;
-    }
-
-    function dragged(event, d) {
-        d.fx = event.x;
-        d.fy = event.y;
-    }
-
-    function dragended(event, d) {
-        if (!event.active) simulation.alphaTarget(0);
-        d.fx = null;
-        d.fy = null;
-    }
-
-    currentPlotInstance = svg.node();
-}
-
-// Enhanced complex computation
-function computeProteinComplexLinks(foundGenes) {
-    const nodes = foundGenes.map(gene => ({ 
-        id: gene.gene,
-        group: gene.localization ? (Array.isArray(gene.localization) ? gene.localization[0] : gene.localization) : 'unknown'
-    }));
-    
-    const links = [];
-    const complexMap = new Map();
-
-    // First, map genes to complexes
-    foundGenes.forEach(gene => {
-        let complexes = [];
-        
-        // Handle different complex field names
-        if (Array.isArray(gene.complex)) {
-            complexes = gene.complex;
-        } else if (Array.isArray(gene.complex_names)) {
-            complexes = gene.complex_names;
-        } else if (typeof gene.complex === 'string') {
-            complexes = gene.complex.split(',').map(s => s.trim());
-        }
-
-        complexes.forEach(complex => {
-            if (!complexMap.has(complex)) {
-                complexMap.set(complex, new Set());
-            }
-            complexMap.get(complex).add(gene.gene);
-        });
-    });
-
-    // Create links between genes in the same complex
-    complexMap.forEach((genes, complex) => {
-        const geneArray = Array.from(genes);
-        for (let i = 0; i < geneArray.length; i++) {
-            for (let j = i + 1; j < geneArray.length; j++) {
-                links.push({
-                    source: geneArray[i],
-                    target: geneArray[j],
-                    value: 1, // Each shared complex contributes 1
-                    complex: complex
-                });
-            }
-        }
-    });
-
-    // Merge duplicate links and increase value
-    const mergedLinks = [];
-    const linkMap = new Map();
-    
-    links.forEach(link => {
-        const key = [link.source, link.target].sort().join('-');
-        if (linkMap.has(key)) {
-            linkMap.get(key).value += 1;
-        } else {
-            const newLink = { ...link };
-            linkMap.set(key, newLink);
-            mergedLinks.push(newLink);
-        }
-    });
-
-    return { nodes, links: mergedLinks };
-}
-
-// PFAM ID to Name mapping (example - replace with your actual data)
-const pfamIdToName = {
-    'PF00001': '7 transmembrane receptor',
-    'PF00002': '7 transmembrane receptor (rhodopsin family)',
-    'PF00004': 'ATPase family associated with various cellular activities (AAA)',
-    'PF00005': 'ABC transporter',
-    'PF00008': 'EGF-like domain',
-    'PF00009': 'Elongation factor Tu GTP binding domain',
-    'PF00010': 'Helix-loop-helix DNA-binding domain',
-    'PF00011': 'Hsp20/alpha crystallin family',
-    'PF00012': 'HSP70 protein',
-    'PF00013': 'KH domain',
-    'PF00014': 'Kunitz/Bovine pancreatic trypsin inhibitor domain',
-    'PF00015': 'WD domain, G-beta repeat',
-    'PF00016': 'EGF-like domain',
-    'PF00017': 'SH2 domain',
-    'PF00018': 'SH3 domain',
-    'PF00023': 'Ankyrin repeat',
-    'PF00024': 'PAN domain',
-    'PF00025': 'ADP-ribosylation factor family',
-    'PF00026': 'Eukaryotic aspartyl protease',
-    'PF00027': 'Cyclin, N-terminal domain',
-    'PF00028': 'Cadherin domain',
-    'PF00029': 'Concanavalin A-like lectin/glucanase',
-    'PF00030': 'Pou domain - N-terminal to homeobox domain',
-    'PF00031': 'Cystine-knot domain',
-    'PF00032': 'Cytochrome c family',
-    'PF00033': 'Cytochrome b N-terminal domain',
-    'PF00034': 'Cytochrome c oxidase subunit I',
-    'PF00035': 'Cytochrome c oxidase subunit II',
-    'PF00036': 'EF-hand',
-    'PF00037': 'Ferritin-like domain',
-    'PF00038': 'Zinc finger, C2H2 type',
-    'PF00039': 'Fibronectin type I domain',
-    'PF00040': 'Fibronectin type II domain',
-    'PF00041': 'Fibronectin type III domain',
-    'PF00042': 'Globin',
-    'PF00043': 'Glutathione S-transferase, C-terminal domain',
-    'PF00044': 'Glyceraldehyde 3-phosphate dehydrogenase, NAD binding domain',
-    'PF00045': 'Glyceraldehyde 3-phosphate dehydrogenase, C-terminal domain',
-    'PF00046': 'Homeobox domain',
-    'PF00047': 'Immunoglobulin domain',
-    'PF00048': 'Immunoglobulin I-set domain',
-    'PF00049': 'Immunoglobulin V-set domain',
-    'PF00050': 'Kringle domain',
-    'PF00051': 'Kringle domain',
-    'PF00052': 'Laminin EGF-like domain',
-    'PF00053': 'Laminin G domain',
-    'PF00054': 'Laminin IV domain',
-    'PF00055': 'Laminin B (Domain IV)',
-    'PF00056': 'Lactate/malate dehydrogenase, NAD binding domain',
-    'PF00057': 'Lactate/malate dehydrogenase, alpha/beta C-terminal domain',
-    'PF00058': 'Low-density lipoprotein receptor domain class A',
-    'PF00059': 'Lectin C-type domain',
-    'PF00060': 'Ligand-gated ion channel',
-    'PF00061': 'Lipocalin',
-    'PF00062': 'Lysosome-associated membrane glycoprotein (LAMP) family',
-    'PF00063': 'Myosin head (motor domain)',
-    'PF00064': 'Myosin tail',
-    'PF00065': 'Coagulation factor 5/8 C-terminal domain',
-    'PF00066': 'LNR domain',
-    'PF00067': 'Cytochrome P450',
-    'PF00068': 'C2 domain',
-    'PF00069': 'Protein kinase domain',
-    'PF00070': 'Pyruvate kinase, barrel domain',
-    'PF00071': 'Ras family',
-    'PF00072': 'Response regulator receiver domain',
-    'PF00073': 'Rich family',
-    'PF00074': 'RNA-directed RNA polymerase',
-    'PF00075': 'RNase H',
-    'PF00076': 'RNA recognition motif. (a.k.a. RRM, RBD, or RNP domain)',
-    'PF00077': 'Retrovirus capsid protein',
-    'PF00078': 'Reverse transcriptase (RNA-dependent DNA polymerase)',
-    'PF00079': 'Serine protease',
-    'PF00080': 'Subtilase family',
-    'PF00081': 'Ubiquitin family',
-    'PF00082': 'Ubiquitin-conjugating enzyme',
-    'PF00083': 'Zinc finger, RING-type',
-    'PF00084': 'Sushi domain (SCR repeat)',
-    'PF00085': 'Thioredoxin',
-    'PF00086': 'Zinc finger, C3HC4 type (RING finger)',
-    'PF00087': 'Zinc finger, C2H2 type',
-    'PF00088': 'Zinc finger, C2H2 type',
-    'PF00089': 'Trypsin',
-    'PF00090': 'Tubulin/FtsZ family, GTPase domain',
-    'PF00091': 'Tubulin C-terminal domain',
-    'PF00092': 'Vascular endothelial growth factor receptor (VEGFR)',
-    'PF00093': 'VWC domain',
-    'PF00094': 'von Willebrand factor type A domain',
-    'PF00095': 'von Willebrand factor type C domain',
-    'PF00096': 'Zinc finger, C2H2 type',
-    'PF00097': 'Zinc finger, C3HC4 type (RING finger)',
-    'PF00098': 'Zinc knuckle',
-    'PF00099': 'Zinc finger, C2H2 type',
-    'PF00100': 'Zinc finger, C2H2 type'
-    // Add more mappings as needed
-};
-
-/**
- * Main controller for the Enrichment page.
- * Fetches user input, runs the correct search, and calls the appropriate plotting function.
- */
 async function generateAnalysisPlots() {
     try {
+        await loadAndPrepareDatabase();
         const plotContainer = document.getElementById('plot-display-area');
         const resultsContainer = document.getElementById('enrichment-results-container');
         const genesInput = document.getElementById('enrichment-genes-input').value.trim();
@@ -1091,49 +440,44 @@ async function generateAnalysisPlots() {
             alert('Please enter a gene list.');
             return;
         }
-        
+
         plotContainer.innerHTML = '<p class="status-message">Generating plot...</p>';
         if (resultsContainer) resultsContainer.innerHTML = '';
         currentPlotInstance = null;
 
         const originalQueries = genesInput.split(/[\s,;\n\r\t]+/).filter(Boolean);
         const sanitizedQueries = [...new Set(originalQueries.map(sanitize))];
-
         const { foundGenes } = findGenes(sanitizedQueries);
-        
+
         const foundGeneSymbols = new Set(foundGenes.map(g => g.gene.toUpperCase()));
         const notFoundOriginalQueries = originalQueries.filter(q => {
             const result = geneMapCache.get(sanitize(q));
             return !result || !foundGeneSymbols.has(result.gene.toUpperCase());
         });
-        
+
         createEnrichmentResultsTable(foundGenes, notFoundOriginalQueries);
-        
         const plotType = document.querySelector('input[name="plot-type"]:checked')?.value;
-        
-        // The global `window.allGenes` variable is the background set.
         const backgroundGeneSet = window.allGenes || [];
 
         switch (plotType) {
-            case 'bubble':    
-                renderKeyLocalizations(foundGenes, plotContainer);    
+            case 'bubble':
+                renderKeyLocalizations(foundGenes, plotContainer);
                 break;
-            case 'matrix':    
-                renderGeneMatrix(foundGenes, plotContainer);    
+            case 'matrix':
+                renderGeneMatrix(foundGenes, plotContainer);
                 break;
             case 'domain':
-                // **FIX:** The check is now moved INSIDE the case that needs it.
                 if (backgroundGeneSet.length === 0) {
                     plotContainer.innerHTML = '<p class="status-message error">Background gene database not loaded. Cannot perform Domain Enrichment analysis.</p>';
-                    return; 
+                    return;
                 }
-                renderDomainEnrichment(foundGenes, backgroundGeneSet, plotContainer);    
+                renderDomainEnrichment(foundGenes, backgroundGeneSet, plotContainer);
                 break;
-            case 'ciliopathy':    
-                renderCiliopathySunburst(foundGenes, plotContainer);    
+            case 'ciliopathy':
+                renderCiliopathySunburst(foundGenes, plotContainer);
                 break;
-            case 'network':    
-                renderComplexNetwork(foundGenes, plotContainer);    
+            case 'network':
+                renderComplexNetwork(foundGenes, plotContainer);
                 break;
             default:
                 plotContainer.innerHTML = '<p class="status-message">Please select a valid plot type.</p>';
@@ -1153,13 +497,13 @@ function displayEnrichmentPage() {
         document.querySelector('.cilia-panel').style.display = 'none';
     }
     contentArea.innerHTML = `
-        <div class="page-section enrichment-page">
-            <div class="enrichment-header">
-                <h2>Ciliary Gene Enrichment Analysis</h2>
+        <div class="page-section ciliaplot-page">
+            <div class="ciliaplot-header">
+                <h2>CiliaPlot: Gene List Analysis</h2>
                 <p>Analyze your gene list with a variety of visualization tools and customization options.</p>
             </div>
-            <div class="enrichment-container">
-                <div class="enrichment-left-panel">
+            <div class="ciliaplot-container">
+                <div class="ciliaplot-left-panel">
                     <div class="control-section">
                         <h3>1. Input Genes</h3>
                         <div class="control-section-content">
@@ -1205,9 +549,9 @@ function displayEnrichmentPage() {
                         </div>
                     </div>
                 </div>
-                <div class="enrichment-right-panel">
+                <div class="ciliaplot-right-panel">
                     <div id="plot-display-area"><p class="status-message">Enter a gene list and click "Run Analysis" to see your results.</p></div>
-                    <div id="enrichment-results-container" class="results-section" style="margin-top: 2rem;"></div>
+                    <div id="ciliaplot-results-container" class="results-section" style="margin-top: 2rem;"></div>
                 </div>
             </div>
         </div>
