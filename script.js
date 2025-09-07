@@ -164,8 +164,6 @@ function debugSearch(query) {
  * Handles the UI for the Batch Gene Query page.
  */
 /**
- * Handles the UI for the Batch Gene Query page.
-/**
  * Handles the UI for the Batch Gene Query page, supporting all identifier types and filters.
  */
 function performBatchSearch() {
@@ -179,7 +177,6 @@ function performBatchSearch() {
 
     // 1. Get all unique, sanitized queries from the input box
     const originalQueries = inputElement.value.split(/[\s,;\n\r\t]+/).filter(Boolean);
-    // Use a Set to automatically handle duplicate inputs
     const sanitizedQueries = [...new Set(originalQueries.map(sanitize))];
 
     if (sanitizedQueries.length === 0) {
@@ -187,17 +184,18 @@ function performBatchSearch() {
         return;
     }
 
-    // 2. Use the central `findGenes` function that correctly finds all ID types
+    // 2. Use the central `findGenes` function that correctly finds all ID types (including Ensembl IDs)
     const { foundGenes } = findGenes(sanitizedQueries);
     let results = foundGenes;
 
-    // 3. Apply the optional localization and keyword filters to the results
+    // 3. Apply the optional localization filter
     if (localizationFilter) {
         results = results.filter(g =>
             g.localization && g.localization.some(l => l && l.toLowerCase() === localizationFilter.toLowerCase())
         );
     }
 
+    // 4. Apply the optional keyword filter
     if (keywordFilter) {
         results = results.filter(g =>
             (g.functional_summary && g.functional_summary.toLowerCase().includes(keywordFilter)) ||
@@ -205,10 +203,9 @@ function performBatchSearch() {
         );
     }
 
-    // 4. Determine which of the original, user-entered queries were not found in the final results
+    // 5. Determine which original queries were not found
     const foundIds = new Set();
     results.forEach(gene => {
-        // Add all known identifiers for the found genes to a set for quick lookup
         foundIds.add(gene.gene.toUpperCase());
         if (gene.synonym) {
             String(gene.synonym).split(/[,;]/).forEach(s => foundIds.add(sanitize(s)));
@@ -220,7 +217,7 @@ function performBatchSearch() {
 
     const notFoundOriginalQueries = originalQueries.filter(q => !foundIds.has(sanitize(q)));
 
-    // 5. Display the final, filtered results
+    // 6. Display final results
     statusDiv.style.display = 'none';
     searchResults = results; // Update global variable for exports
 
@@ -229,9 +226,10 @@ function performBatchSearch() {
         displayGeneCards(currentData, results, 1, 10);
     } else {
         resultDiv.innerHTML = '<p class="status-message error-message">No genes found matching your query and filters.</p>';
-        displayGeneCards(currentData, [], 1, 10); // Clear the gene cards
+        displayGeneCards(currentData, [], 1, 10); // Clear gene cards
     }
 }
+
 
 // --- HOME PAGE SEARCH HANDLER (FIXED) ---
 // This function handles user input to show a list of suggestions.
