@@ -1,4 +1,3 @@
-
 // globals.js
 // =============================================================================
 // GLOBAL VARIABLES
@@ -82,7 +81,7 @@ async function handleRouteChange() {
     // Hide all main content sections
     const pages = [
         '#home-page', '#analysis-page', '#batch-query-page',
-        '#enrichment-page', '#compare-page', '#expression-page',
+        '#ciliaplot-page', '#compare-page', '#expression-page', // Changed from #enrichment-page
         '#download-page', '#contact-page', '#notfound-page'
     ];
     pages.forEach(id => {
@@ -99,9 +98,9 @@ async function handleRouteChange() {
         case '/batch-query':
             displayBatchQueryTool();
             break;
-        case '/enrichment':
+        case '/ciliaplot': // Changed from /enrichment
         case '/analysis': // handle both routes
-            displayEnrichmentPage();
+            displayCiliaPlotPage(); // Changed from displayEnrichmentPage
             break;
         case '/compare':
             displayComparePage();
