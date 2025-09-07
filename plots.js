@@ -363,31 +363,33 @@ function renderGeneMatrix(foundGenes, container) {
 }
 
 // =============================================================================
-// DOMAIN ENRICHMENT (Bar Chart)
+// DOMAIN ENRICHMENT (Bar Chart) - FIXED
 // =============================================================================
 function renderDomainEnrichment(foundGenes, allGenes, container) {
-    // Correctly calls calculateDomainEnrichment with the background gene set
-    const stats = calculateDomainEnrichment(foundGenes, allGenes); 
+    const stats = calculateDomainEnrichment(foundGenes, allGenes);
     
     if (!stats || !stats.length) {
         container.innerHTML = '<p class="status-message">No domains found for enrichment.</p>';
         return;
     }
 
-    // Note: The original calculateDomainEnrichment function returns 'geneCount'. The chart expects 'count'.
-    // We will map it here to ensure compatibility.
-    const domains = stats.map(d => ({ description: d.domain, count: d.geneCount }));
+    // Sort by count and take top 15 to avoid overcrowding
+    const topDomains = stats.sort((a, b) => b.geneCount - a.geneCount).slice(0, 15);
+    
     container.innerHTML = `<canvas></canvas>`;
     const ctx = container.querySelector('canvas').getContext('2d');
+    const settings = getPlotSettings();
 
     currentPlotInstance = new Chart(ctx, {
         type: 'bar',
         data: {
-            labels: domains.map(d => d.description),
+            labels: topDomains.map(d => d.domain),
             datasets: [{ 
                 label: 'Gene Count', 
-                data: domains.map(d => d.count), 
-                backgroundColor: 'rgba(89,161,79,0.7)'
+                data: topDomains.map(d => d.geneCount), 
+                backgroundColor: 'rgba(89,161,79,0.7)',
+                borderColor: 'rgba(89,161,79,1)',
+                borderWidth: 1
             }]
         },
         options: {
@@ -396,16 +398,138 @@ function renderDomainEnrichment(foundGenes, allGenes, container) {
             maintainAspectRatio: false,
             plugins: { 
                 legend: { display: false }, 
-                title: { display: true, text: 'Protein Domain Enrichment', font: { size: 20 } },
-                tooltip: { callbacks: { label: c => `${c.label}: ${c.raw} gene(s)` } }
+                title: { 
+                    display: true, 
+                    text: settings.mainTitle,
+                    font: { 
+                        size: settings.titleFontSize,
+                        family: settings.fontFamily
+                    }
+                },
+                tooltip: { 
+                    callbacks: { 
+                        label: (context) => `${context.dataset.label}: ${context.raw} gene(s)` 
+                    } 
+                }
             },
             scales: {
-                x: { title: { display: true, text: 'Gene Count', font: { size: 20 } }, grid: { display: false }, border: { display: true, width: 2 } },
-                y: { title: { display: true, text: 'Domain', font: { size: 20 } }, grid: { display: false }, border: { display: true, width: 2 } }
+                x: { 
+                    title: { 
+                        display: true, 
+                        text: settings.xAxisTitle,
+                        font: {
+                            size: settings.axisTitleFontSize,
+                            family: settings.fontFamily
+                        }
+                    }, 
+                    grid: { display: settings.showGrid, color: settings.gridColor }, 
+                    border: { display: true, width: settings.axisLineWidth },
+                    ticks: {
+                        font: {
+                            size: settings.tickFontSize,
+                            family: settings.fontFamily
+                        }
+                    }
+                },
+                y: { 
+                    title: { 
+                        display: true, 
+                        text: settings.yAxisTitle,
+                        font: {
+                            size: settings.axisTitleFontSize,
+                            family: settings.fontFamily
+                        }
+                    }, 
+                    grid: { display: settings.showGrid, color: settings.gridColor }, 
+                    border: { display: true, width: settings.axisLineWidth },
+                    ticks: {
+                        font: {
+                            size: settings.tickFontSize,
+                            family: settings.fontFamily
+                        }
+                    }
+                }
             }
         }
     });
 }
+
+// Enhanced domain enrichment calculation
+function calculateDomainEnrichment(filteredData, allCiliaData) {
+    const domainCountsUser = new Map();
+    
+    // Handle different possible field names for domains
+    filteredData.forEach(g => {
+        const domains = g.pfam_ids || g.domains || g.domain_descriptions || [];
+        domains.forEach(domain => {
+            if (typeof domain === 'string') {
+                domainCountsUser.set(domain, (domainCountsUser.get(domain) || 0) + 1);
+            } else if (domain && domain.id) {
+                domainCountsUser.set(domain.id, (domainCountsUser.get(domain.id) || 0) + 1);
+            }
+        });
+    });
+
+    const domainCountsBg = new Map();
+    allCiliaData.forEach(g => {
+        const domains = g.pfam_ids || g.domains || g.domain_descriptions || [];
+        domains.forEach(domain => {
+            if (typeof domain === 'string') {
+                domainCountsBg.set(domain, (domainCountsBg.get(domain) || 0) + 1);
+            } else if (domain && domain.id) {
+                domainCountsBg.set(domain.id, (domainCountsBg.get(domain.id) || 0) + 1);
+            }
+        });
+    });
+
+    const M = filteredData.length;
+    const N = allCiliaData.length;
+    
+    if (M === 0) return [];
+
+    return Array.from(domainCountsUser.entries())
+        .map(([domainId, k]) => {
+            const n = domainCountsBg.get(domainId) || 0;
+            const richFactor = n > 0 ? (k / M) / (n / N) : Infinity;
+            
+            // Try to get descriptive name, fall back to ID
+            let domainName = domainId;
+            if (typeof domainId === 'string' && pfamIdToName && pfamIdToName[domainId]) {
+                domainName = pfamIdToName[domainId];
+            }
+            
+            return {
+                domain: domainName,
+                richFactor,
+                geneCount: k,
+                pValue: calculateEnrichmentPValue(k, M, n, N)
+            };
+        })
+        .filter(d => d.richFactor > 1.5 && d.geneCount > 1)
+        .sort((a, b) => b.richFactor - a.richFactor);
+}
+
+// Helper function for p-value calculation
+function calculateEnrichmentPValue(k, M, n, N) {
+    // Hypergeometric test p-value
+    let pValue = 0;
+    for (let i = k; i <= Math.min(n, M); i++) {
+        pValue += (combinations(n, i) * combinations(N - n, M - i)) / combinations(N, M);
+    }
+    return pValue;
+}
+
+function combinations(n, k) {
+    if (k < 0 || k > n) return 0;
+    if (k === 0 || k === n) return 1;
+    k = Math.min(k, n - k);
+    let result = 1;
+    for (let i = 1; i <= k; i++) {
+        result = result * (n - k + i) / i;
+    }
+    return result;
+}
+
 // =============================================================================
 // CILIOPATHY ASSOCIATIONS (Sunburst)
 // =============================================================================
@@ -472,63 +596,149 @@ function computeProteinComplexLinks(foundGenes) {
     return { nodes, links };
 }
 
+// =============================================================================
+// CILIOPATHY ASSOCIATIONS (Sunburst) - FIXED
+// =============================================================================
 function renderCiliopathySunburst(foundGenes, container) {
-    const data = computeCiliopathyAssociations(foundGenes); // uses your existing compute function
-    if (!data.length) {
+    const data = computeCiliopathyAssociations(foundGenes);
+    
+    if (!data || !data.length) {
         container.innerHTML = '<p class="status-message">No ciliopathy associations found.</p>';
         return;
     }
 
-    // Convert data to D3 hierarchy for sunburst
-    const root = d3.hierarchy({ name: "Ciliopathies", children: data })
-        .sum(d => d.count);
-
-    const width = container.clientWidth;
-    const radius = Math.min(width, 400) / 2;
+    // Add "Other" category for genes without ciliopathy associations
+    const genesWithCiliopathy = new Set();
+    data.forEach(item => {
+        foundGenes.filter(g => g.ciliopathy && g.ciliopathy.includes(item.name))
+            .forEach(g => genesWithCiliopathy.add(g.gene));
+    });
+    
+    const genesWithoutCiliopathy = foundGenes.filter(g => !genesWithCiliopathy.has(g.gene));
+    if (genesWithoutCiliopathy.length > 0) {
+        data.push({ name: "No Known Association", count: genesWithoutCiliopathy.length });
+    }
 
     container.innerHTML = '';
+    const width = container.clientWidth;
+    const height = Math.min(width, 600);
+    const radius = Math.min(width, height) / 2;
+
     const svg = d3.select(container)
         .append('svg')
         .attr('width', width)
-        .attr('height', radius * 2)
+        .attr('height', height)
         .append('g')
-        .attr('transform', `translate(${width / 2},${radius})`);
+        .attr('transform', `translate(${width / 2},${height / 2})`);
 
+    // Create hierarchy
+    const root = d3.hierarchy({ children: data })
+        .sum(d => d.count)
+        .sort((a, b) => b.value - a.value);
+
+    // Create partition layout
     const partition = d3.partition()
         .size([2 * Math.PI, radius]);
 
     partition(root);
 
+    // Create arc generator
     const arc = d3.arc()
         .startAngle(d => d.x0)
         .endAngle(d => d.x1)
         .innerRadius(d => d.y0)
         .outerRadius(d => d.y1);
 
+    // Add arcs
     svg.selectAll('path')
-        .data(root.descendants().filter(d => d.depth))
+        .data(root.descendants())
         .enter()
         .append('path')
         .attr('d', arc)
-        .attr('fill', d => d3.interpolateViridis(d.value / d.parent.value))
-        .attr('stroke', '#fff')
+        .style('fill', d => {
+            if (d.depth === 0) return '#ccc';
+            const index = d.parent.children.indexOf(d);
+            return d3.schemeCategory10[index % 10];
+        })
+        .style('stroke', '#fff')
+        .style('stroke-width', '2px')
+        .on('mouseover', function(event, d) {
+            d3.select(this).style('opacity', 0.8);
+            // Show tooltip
+        })
+        .on('mouseout', function() {
+            d3.select(this).style('opacity', 1);
+            // Hide tooltip
+        })
         .append('title')
         .text(d => `${d.data.name}: ${d.value} gene(s)`);
+
+    // Add labels for larger segments
+    svg.selectAll('text')
+        .data(root.descendants().filter(d => d.depth && (d.x1 - d.x0) > 0.05))
+        .enter()
+        .append('text')
+        .attr('transform', d => {
+            const x = (d.x0 + d.x1) / 2 * 180 / Math.PI;
+            const y = (d.y0 + d.y1) / 2;
+            return `rotate(${x - 90}) translate(${y},0) rotate(${x < 180 ? 0 : 180})`;
+        })
+        .attr('dy', '0.35em')
+        .attr('text-anchor', 'middle')
+        .text(d => d.data.name)
+        .style('font-size', '12px')
+        .style('fill', '#fff')
+        .style('font-weight', 'bold');
 
     currentPlotInstance = svg.node();
 }
 
+// Enhanced ciliopathy computation
+function computeCiliopathyAssociations(foundGenes) {
+    const associations = {};
 
+    foundGenes.forEach(gene => {
+        let ciliopathies = [];
+        
+        // Handle different data formats
+        if (Array.isArray(gene.ciliopathy)) {
+            ciliopathies = gene.ciliopathy;
+        } else if (typeof gene.ciliopathy === 'string') {
+            ciliopathies = gene.ciliopathy.split(',').map(s => s.trim());
+        } else if (gene.ciliopathy_associations) {
+            ciliopathies = Array.isArray(gene.ciliopathy_associations) 
+                ? gene.ciliopathy_associations 
+                : [gene.ciliopathy_associations];
+        }
+
+        ciliopathies.forEach(disease => {
+            if (disease && disease.trim()) {
+                const cleanDisease = disease.trim();
+                associations[cleanDisease] = (associations[cleanDisease] || 0) + 1;
+            }
+        });
+    });
+
+    return Object.entries(associations).map(([name, count]) => ({
+        name,
+        count
+    })).sort((a, b) => b.count - a.count);
+}
+
+// =============================================================================
+// PROTEIN COMPLEX NETWORK - FIXED
+// =============================================================================
 function renderComplexNetwork(foundGenes, container) {
     const { nodes, links } = computeProteinComplexLinks(foundGenes);
-    if (!nodes.length) {
+    
+    if (!nodes.length || !links.length) {
         container.innerHTML = '<p class="status-message">No protein complex links found.</p>';
         return;
     }
 
-    const width = container.clientWidth;
-    const height = 400;
     container.innerHTML = '';
+    const width = container.clientWidth;
+    const height = Math.min(width * 0.8, 600);
 
     const svg = d3.select(container)
         .append('svg')
@@ -536,32 +746,52 @@ function renderComplexNetwork(foundGenes, container) {
         .attr('height', height);
 
     const simulation = d3.forceSimulation(nodes)
-        .force('link', d3.forceLink(links).id(d => d.id).distance(80))
-        .force('charge', d3.forceManyBody().strength(-200))
-        .force('center', d3.forceCenter(width / 2, height / 2));
+        .force('link', d3.forceLink(links).id(d => d.id).distance(100))
+        .force('charge', d3.forceManyBody().strength(-300))
+        .force('center', d3.forceCenter(width / 2, height / 2))
+        .force('collision', d3.forceCollide().radius(30));
 
     const link = svg.append('g')
+        .attr('class', 'links')
         .selectAll('line')
         .data(links)
         .enter()
         .append('line')
         .attr('stroke', '#999')
-        .attr('stroke-width', d => Math.sqrt(d.value));
+        .attr('stroke-opacity', 0.6)
+        .attr('stroke-width', d => Math.sqrt(d.value) * 2);
 
     const node = svg.append('g')
+        .attr('class', 'nodes')
         .selectAll('circle')
         .data(nodes)
         .enter()
         .append('circle')
-        .attr('r', 10)
+        .attr('r', 12)
         .attr('fill', '#5690c7')
+        .attr('stroke', '#fff')
+        .attr('stroke-width', 2)
         .call(d3.drag()
-            .on('start', d => { if (!d3.event.active) simulation.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; })
-            .on('drag', d => { d.fx = d3.event.x; d.fy = d3.event.y; })
-            .on('end', d => { if (!d3.event.active) simulation.alphaTarget(0); d.fx = null; d.fy = null; })
+            .on('start', dragstarted)
+            .on('drag', dragged)
+            .on('end', dragended)
         );
 
-    node.append('title').text(d => d.id);
+    node.append('title')
+        .text(d => d.id);
+
+    // Add labels
+    const label = svg.append('g')
+        .attr('class', 'labels')
+        .selectAll('text')
+        .data(nodes)
+        .enter()
+        .append('text')
+        .text(d => d.id)
+        .attr('text-anchor', 'middle')
+        .attr('dy', -15)
+        .style('font-size', '10px')
+        .style('pointer-events', 'none');
 
     simulation.on('tick', () => {
         link
@@ -569,53 +799,197 @@ function renderComplexNetwork(foundGenes, container) {
             .attr('y1', d => d.source.y)
             .attr('x2', d => d.target.x)
             .attr('y2', d => d.target.y);
+
         node
             .attr('cx', d => d.x)
             .attr('cy', d => d.y);
+
+        label
+            .attr('x', d => d.x)
+            .attr('y', d => d.y);
     });
+
+    function dragstarted(event, d) {
+        if (!event.active) simulation.alphaTarget(0.3).restart();
+        d.fx = d.x;
+        d.fy = d.y;
+    }
+
+    function dragged(event, d) {
+        d.fx = event.x;
+        d.fy = event.y;
+    }
+
+    function dragended(event, d) {
+        if (!event.active) simulation.alphaTarget(0);
+        d.fx = null;
+        d.fy = null;
+    }
 
     currentPlotInstance = svg.node();
 }
 
+// Enhanced complex computation
+function computeProteinComplexLinks(foundGenes) {
+    const nodes = foundGenes.map(gene => ({ 
+        id: gene.gene,
+        group: gene.localization ? (Array.isArray(gene.localization) ? gene.localization[0] : gene.localization) : 'unknown'
+    }));
+    
+    const links = [];
+    const complexMap = new Map();
 
-/**
- * Calculate domain enrichment and return descriptive domain names.
- * @param {Array<Object>} filteredData - Found genes
- * @param {Array<Object>} allCiliaData - Background gene set
- * @returns {Array<Object>} - [{domain: "Name", richFactor: 2.5, geneCount: 3}]
- */
-function calculateDomainEnrichment(filteredData, allCiliaData) {
-    const domainCountsUser = new Map();
-    filteredData.forEach(g =>
-        (g.pfam_ids || []).forEach(id =>
-            domainCountsUser.set(id, (domainCountsUser.get(id) || 0) + 1)
-        )
-    );
+    // First, map genes to complexes
+    foundGenes.forEach(gene => {
+        let complexes = [];
+        
+        // Handle different complex field names
+        if (Array.isArray(gene.complex)) {
+            complexes = gene.complex;
+        } else if (Array.isArray(gene.complex_names)) {
+            complexes = gene.complex_names;
+        } else if (typeof gene.complex === 'string') {
+            complexes = gene.complex.split(',').map(s => s.trim());
+        }
 
-    const domainCountsBg = new Map();
-    allCiliaData.forEach(g =>
-        (g.pfam_ids || []).forEach(id =>
-            domainCountsBg.set(id, (domainCountsBg.get(id) || 0) + 1)
-        )
-    );
+        complexes.forEach(complex => {
+            if (!complexMap.has(complex)) {
+                complexMap.set(complex, new Set());
+            }
+            complexMap.get(complex).add(gene.gene);
+        });
+    });
 
-    const M = filteredData.length,
-        N = allCiliaData.length;
-    if (M === 0) return [];
+    // Create links between genes in the same complex
+    complexMap.forEach((genes, complex) => {
+        const geneArray = Array.from(genes);
+        for (let i = 0; i < geneArray.length; i++) {
+            for (let j = i + 1; j < geneArray.length; j++) {
+                links.push({
+                    source: geneArray[i],
+                    target: geneArray[j],
+                    value: 1, // Each shared complex contributes 1
+                    complex: complex
+                });
+            }
+        }
+    });
 
-    return Array.from(domainCountsUser.entries())
-        .map(([id, k]) => {
-            const n = domainCountsBg.get(id) || 0;
-            const richFactor = n > 0 ? (k / M) / (n / N) : Infinity;
-            return {
-                domain: pfamIdToName[id] || id, // use descriptive name if available
-                richFactor,
-                geneCount: k
-            };
-        })
-        .filter(d => d.richFactor > 1.5 && d.geneCount > 1)
-        .sort((a, b) => b.richFactor - a.richFactor);
+    // Merge duplicate links and increase value
+    const mergedLinks = [];
+    const linkMap = new Map();
+    
+    links.forEach(link => {
+        const key = [link.source, link.target].sort().join('-');
+        if (linkMap.has(key)) {
+            linkMap.get(key).value += 1;
+        } else {
+            const newLink = { ...link };
+            linkMap.set(key, newLink);
+            mergedLinks.push(newLink);
+        }
+    });
+
+    return { nodes, links: mergedLinks };
 }
+
+// PFAM ID to Name mapping (example - replace with your actual data)
+const pfamIdToName = {
+    'PF00001': '7 transmembrane receptor',
+    'PF00002': '7 transmembrane receptor (rhodopsin family)',
+    'PF00004': 'ATPase family associated with various cellular activities (AAA)',
+    'PF00005': 'ABC transporter',
+    'PF00008': 'EGF-like domain',
+    'PF00009': 'Elongation factor Tu GTP binding domain',
+    'PF00010': 'Helix-loop-helix DNA-binding domain',
+    'PF00011': 'Hsp20/alpha crystallin family',
+    'PF00012': 'HSP70 protein',
+    'PF00013': 'KH domain',
+    'PF00014': 'Kunitz/Bovine pancreatic trypsin inhibitor domain',
+    'PF00015': 'WD domain, G-beta repeat',
+    'PF00016': 'EGF-like domain',
+    'PF00017': 'SH2 domain',
+    'PF00018': 'SH3 domain',
+    'PF00023': 'Ankyrin repeat',
+    'PF00024': 'PAN domain',
+    'PF00025': 'ADP-ribosylation factor family',
+    'PF00026': 'Eukaryotic aspartyl protease',
+    'PF00027': 'Cyclin, N-terminal domain',
+    'PF00028': 'Cadherin domain',
+    'PF00029': 'Concanavalin A-like lectin/glucanase',
+    'PF00030': 'Pou domain - N-terminal to homeobox domain',
+    'PF00031': 'Cystine-knot domain',
+    'PF00032': 'Cytochrome c family',
+    'PF00033': 'Cytochrome b N-terminal domain',
+    'PF00034': 'Cytochrome c oxidase subunit I',
+    'PF00035': 'Cytochrome c oxidase subunit II',
+    'PF00036': 'EF-hand',
+    'PF00037': 'Ferritin-like domain',
+    'PF00038': 'Zinc finger, C2H2 type',
+    'PF00039': 'Fibronectin type I domain',
+    'PF00040': 'Fibronectin type II domain',
+    'PF00041': 'Fibronectin type III domain',
+    'PF00042': 'Globin',
+    'PF00043': 'Glutathione S-transferase, C-terminal domain',
+    'PF00044': 'Glyceraldehyde 3-phosphate dehydrogenase, NAD binding domain',
+    'PF00045': 'Glyceraldehyde 3-phosphate dehydrogenase, C-terminal domain',
+    'PF00046': 'Homeobox domain',
+    'PF00047': 'Immunoglobulin domain',
+    'PF00048': 'Immunoglobulin I-set domain',
+    'PF00049': 'Immunoglobulin V-set domain',
+    'PF00050': 'Kringle domain',
+    'PF00051': 'Kringle domain',
+    'PF00052': 'Laminin EGF-like domain',
+    'PF00053': 'Laminin G domain',
+    'PF00054': 'Laminin IV domain',
+    'PF00055': 'Laminin B (Domain IV)',
+    'PF00056': 'Lactate/malate dehydrogenase, NAD binding domain',
+    'PF00057': 'Lactate/malate dehydrogenase, alpha/beta C-terminal domain',
+    'PF00058': 'Low-density lipoprotein receptor domain class A',
+    'PF00059': 'Lectin C-type domain',
+    'PF00060': 'Ligand-gated ion channel',
+    'PF00061': 'Lipocalin',
+    'PF00062': 'Lysosome-associated membrane glycoprotein (LAMP) family',
+    'PF00063': 'Myosin head (motor domain)',
+    'PF00064': 'Myosin tail',
+    'PF00065': 'Coagulation factor 5/8 C-terminal domain',
+    'PF00066': 'LNR domain',
+    'PF00067': 'Cytochrome P450',
+    'PF00068': 'C2 domain',
+    'PF00069': 'Protein kinase domain',
+    'PF00070': 'Pyruvate kinase, barrel domain',
+    'PF00071': 'Ras family',
+    'PF00072': 'Response regulator receiver domain',
+    'PF00073': 'Rich family',
+    'PF00074': 'RNA-directed RNA polymerase',
+    'PF00075': 'RNase H',
+    'PF00076': 'RNA recognition motif. (a.k.a. RRM, RBD, or RNP domain)',
+    'PF00077': 'Retrovirus capsid protein',
+    'PF00078': 'Reverse transcriptase (RNA-dependent DNA polymerase)',
+    'PF00079': 'Serine protease',
+    'PF00080': 'Subtilase family',
+    'PF00081': 'Ubiquitin family',
+    'PF00082': 'Ubiquitin-conjugating enzyme',
+    'PF00083': 'Zinc finger, RING-type',
+    'PF00084': 'Sushi domain (SCR repeat)',
+    'PF00085': 'Thioredoxin',
+    'PF00086': 'Zinc finger, C3HC4 type (RING finger)',
+    'PF00087': 'Zinc finger, C2H2 type',
+    'PF00088': 'Zinc finger, C2H2 type',
+    'PF00089': 'Trypsin',
+    'PF00090': 'Tubulin/FtsZ family, GTPase domain',
+    'PF00091': 'Tubulin C-terminal domain',
+    'PF00092': 'Vascular endothelial growth factor receptor (VEGFR)',
+    'PF00093': 'VWC domain',
+    'PF00094': 'von Willebrand factor type A domain',
+    'PF00095': 'von Willebrand factor type C domain',
+    'PF00096': 'Zinc finger, C2H2 type',
+    'PF00097': 'Zinc finger, C3HC4 type (RING finger)',
+    'PF00098': 'Zinc knuckle',
+    'PF00099': 'Zinc finger, C2H2 type',
+    'PF00100': 'Zinc finger, C2H2 type'
+    // Add more mappings as needed
+};
 
 
 // =============================================================================
