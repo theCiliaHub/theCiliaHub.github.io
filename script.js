@@ -247,7 +247,7 @@ function sanitize(input) {
 }
 
 /**
- * Initialize Batch Query page listeners with enhanced cleanup and debugging
+ * Initialize Batch Query page listeners with strict isolation
  */
 function initBatchQueryListeners() {
     console.log('[BatchSearch] Initializing batch query listeners...');
@@ -261,49 +261,57 @@ function initBatchQueryListeners() {
             return;
         }
 
-        // Optional: Clone form only if old listeners are suspected; otherwise, skip for simplicity
+        // Avoid cloning unless necessary to preserve existing behavior
+        const targetForm = batchForm; // Comment out cloning for now
         // const newForm = batchForm.cloneNode(true);
         // batchForm.replaceWith(newForm);
-        const newForm = batchForm; // Use original for now; re-enable cloning if needed
+        // const targetForm = newForm;
 
-        // Add form submit listener with targeted check
-        newForm.addEventListener('submit', (e) => {
-            if (e.target !== newForm) {
+        // Store handler for cleanup
+        const submitHandler = (e) => {
+            if (e.target !== targetForm) {
                 console.debug('[BatchSearch] Ignoring non-batch form submission');
-                return; // Allow non-batch forms to proceed
+                return;
             }
             console.log('[BatchSearch] Form submitted with input:', inputElement.value);
             e.preventDefault();
+            // Only stop propagation for batch form to avoid affecting other forms
             e.stopPropagation();
             performBatchSearch();
             console.log('[BatchSearch] performBatchSearch completed');
-        });
+        };
+
+        // Remove existing submit listeners to avoid duplicates
+        targetForm.removeEventListener('submit', submitHandler);
+        targetForm.addEventListener('submit', submitHandler);
 
         // Add Enter key listener on input
-        const newInput = newForm.querySelector('#batch-genes-input') || inputElement;
-        if (newInput) {
-            newInput.addEventListener('keypress', (e) => {
-                if (e.key === 'Enter') {
-                    console.log('[BatchSearch] Enter key pressed with input:', newInput.value);
-                    e.preventDefault();
-                    e.stopPropagation();
-                    performBatchSearch();
-                    console.log('[BatchSearch] performBatchSearch completed');
-                }
-            });
-        }
+        const targetInput = targetForm.querySelector('#batch-genes-input') || inputElement;
+        const keypressHandler = (e) => {
+            if (e.key === 'Enter') {
+                console.log('[BatchSearch] Enter key pressed with input:', targetInput.value);
+                e.preventDefault();
+                e.stopPropagation();
+                performBatchSearch();
+                console.log('[BatchSearch] performBatchSearch completed');
+            }
+        };
+        targetInput.removeEventListener('keypress', keypressHandler);
+        targetInput.addEventListener('keypress', keypressHandler);
 
-        // Add search button listener (if not a form submit button)
+        // Add search button listener (if not a submit button)
         const searchButton = document.getElementById('batch-search-button') ||
                             document.querySelector('.batch-search-btn');
         if (searchButton && searchButton.type !== 'submit') {
-            searchButton.addEventListener('click', (e) => {
+            const clickHandler = (e) => {
                 console.log('[BatchSearch] Search button clicked with input:', inputElement.value);
                 e.preventDefault();
                 e.stopPropagation();
                 performBatchSearch();
                 console.log('[BatchSearch] performBatchSearch completed');
-            });
+            };
+            searchButton.removeEventListener('click', clickHandler);
+            searchButton.addEventListener('click', clickHandler);
         }
 
         console.log('[BatchSearch] All listeners initialized successfully');
@@ -322,15 +330,14 @@ function initBatchQueryPage() {
     let listenersInitialized = false;
 
     const initializeIfBatchQuery = () => {
-        if (window.location.pathname.includes('/batch-query') || 
-            window.location.hash.includes('batch-query')) {
+        const isBatchQueryPage = window.location.pathname.includes('/batch-query') || 
+                                window.location.hash.includes('batch-query');
+        if (isBatchQueryPage && !listenersInitialized) {
             console.log('[BatchSearch] Detected batch query page, initializing listeners');
-            if (!listenersInitialized) {
-                initBatchQueryListeners();
-                listenersInitialized = true;
-            }
-        } else {
-            // Cleanup if leaving the page
+            initBatchQueryListeners();
+            listenersInitialized = true;
+        } else if (!isBatchQueryPage && listenersInitialized) {
+            console.log('[BatchSearch] Left batch query page, cleaning up listeners');
             cleanupBatchListeners();
             listenersInitialized = false;
         }
@@ -339,10 +346,23 @@ function initBatchQueryPage() {
     const cleanupBatchListeners = () => {
         console.log('[BatchSearch] Cleaning up batch query listeners');
         const batchForm = document.getElementById('batch-gene-form');
+        const inputElement = document.getElementById('batch-genes-input');
+        const searchButton = document.getElementById('batch-search-button') ||
+                            document.querySelector('.batch-search-btn');
+
+        // Only remove specific batch listeners
         if (batchForm) {
-            batchForm.removeEventListener('submit', performBatchSearch); // Approximate; use exact handler if stored
+            const submitHandler = (e) => e.target === batchForm && performBatchSearch();
+            batchForm.removeEventListener('submit', submitHandler);
         }
-        // Add similar removals for keypress and click if needed
+        if (inputElement) {
+            const keypressHandler = (e) => e.key === 'Enter' && performBatchSearch();
+            inputElement.removeEventListener('keypress', keypressHandler);
+        }
+        if (searchButton && searchButton.type !== 'submit') {
+            const clickHandler = () => performBatchSearch();
+            searchButton.removeEventListener('click', clickHandler);
+        }
     };
 
     // Handle DOM readiness
@@ -370,113 +390,6 @@ function initBatchQueryPage() {
 
 // Initialize immediately or on DOM load
 initBatchQueryPage();
-/**
- * Initialize Batch Query page listeners with enhanced cleanup and debugging
- */
-function initBatchQueryListeners() {
-    console.log('[BatchSearch] Initializing batch query listeners...');
-
-    try {
-        const batchForm = document.getElementById('batch-gene-form');
-        const inputElement = document.getElementById('batch-genes-input');
-
-        if (!batchForm || !inputElement) {
-            console.warn('[BatchSearch] Batch gene form or input not found');
-            return;
-        }
-
-        // Clone form to remove old listeners (includes input element)
-        const newForm = batchForm.cloneNode(true);
-        batchForm.replaceWith(newForm);
-
-        // Add form submit listener
-        newForm.addEventListener('submit', (e) => {
-            console.log('[BatchSearch] Form submitted');
-            e.preventDefault();
-            e.stopPropagation();
-            performBatchSearch();
-        });
-
-        // Add Enter key listener on input
-        const newInput = newForm.querySelector('#batch-genes-input');
-        if (newInput) {
-            newInput.addEventListener('keypress', (e) => {
-                if (e.key === 'Enter') {
-                    console.log('[BatchSearch] Enter key pressed in input');
-                    e.preventDefault();
-                    e.stopPropagation();
-                    performBatchSearch();
-                }
-            });
-        }
-
-        // Add search button listener (if not a form submit button)
-        const searchButton = document.getElementById('batch-search-button') ||
-                            document.querySelector('.batch-search-btn');
-        if (searchButton && searchButton.type !== 'submit') {
-            searchButton.addEventListener('click', (e) => {
-                console.log('[BatchSearch] Search button clicked');
-                e.preventDefault();
-                e.stopPropagation();
-                performBatchSearch();
-            });
-        }
-
-        // Block global form submissions
-        document.addEventListener('submit', (e) => {
-            if (e.target === newForm) return;
-            if (e.target.tagName === 'FORM') {
-                console.debug('[BatchSearch] Blocking global form submission for:', e.target.id);
-                e.stopPropagation();
-            }
-        }, { capture: true, once: true }); // Cleanup after one use
-
-        console.log('[BatchSearch] All listeners initialized successfully');
-
-    } catch (error) {
-        console.error('[BatchSearch] Error initializing listeners:', error);
-    }
-}
-
-/**
- * Initialize Batch Query page, handling DOM readiness and SPA routing
- */
-function initBatchQueryPage() {
-    console.log('[BatchSearch] Initializing batch query page...');
-
-    const initializeIfBatchQuery = () => {
-        if (window.location.pathname.includes('/batch-query') || 
-            window.location.hash.includes('batch-query')) {
-            console.log('[BatchSearch] Detected batch query page, initializing listeners');
-            initBatchQueryListeners();
-        }
-    };
-
-    // Handle DOM readiness
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', initializeIfBatchQuery, { once: true });
-    } else {
-        initializeIfBatchQuery();
-    }
-
-    // Handle SPA navigation
-    if (typeof window !== 'undefined') {
-        const handleNavigation = () => {
-            initializeIfBatchQuery();
-        };
-        window.addEventListener('popstate', handleNavigation);
-        window.addEventListener('load', handleNavigation, { once: true });
-
-        // Cleanup listeners on page unload to prevent memory leaks
-        window.addEventListener('unload', () => {
-            window.removeEventListener('popstate', handleNavigation);
-        });
-    }
-}
-
-// Initialize immediately or on DOM load
-initBatchQueryPage();
-
 
 /**
  * Utility function to safely remove all event listeners from an element
@@ -487,39 +400,6 @@ function removeAllEventListeners(element) {
     element.parentNode.replaceChild(newElement, element);
     return newElement;
 }
-
-// Initialize when script loads
-initBatchQueryPage();
-
-/**
- * Initialize Batch Query page listeners
- */
-function initBatchQueryListeners() {
-    const batchForm = document.getElementById('batch-gene-form');
-    if (batchForm) {
-        // Remove old listeners
-        batchForm.replaceWith(batchForm.cloneNode(true));
-        const newForm = document.getElementById('batch-gene-form');
-        newForm.addEventListener('submit', function (e) {
-            e.preventDefault();
-            performBatchSearch();
-        });
-    }
-
-    const inputElement = document.getElementById('batch-genes-input');
-    if (inputElement) {
-        inputElement.addEventListener('keypress', function (e) {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                performBatchSearch();
-            }
-        });
-    }
-}
-
-// Call this on page load or when routing to /batch-query
-initBatchQueryListeners();
-
 
 // --- HOME PAGE SEARCH HANDLER (FIXED) ---
 // This function handles user input to show a list of suggestions.
