@@ -161,9 +161,6 @@ function debugSearch(query) {
 }
 
 /**
- * Handles the UI for the Batch Gene Query page.
- */
-/**
  * Handles the UI for the Batch Gene Query page, supporting all identifier types and filters.
  */
 function performBatchSearch() {
@@ -184,18 +181,18 @@ function performBatchSearch() {
         return;
     }
 
-    // 2. Use the central `findGenes` function that correctly finds all ID types (including Ensembl IDs)
+    // 2. Use central findGenes function (supports symbols, synonyms, and Ensembl IDs)
     const { foundGenes } = findGenes(sanitizedQueries);
     let results = foundGenes;
 
-    // 3. Apply the optional localization filter
+    // 3. Apply optional localization filter
     if (localizationFilter) {
         results = results.filter(g =>
             g.localization && g.localization.some(l => l && l.toLowerCase() === localizationFilter.toLowerCase())
         );
     }
 
-    // 4. Apply the optional keyword filter
+    // 4. Apply optional keyword filter
     if (keywordFilter) {
         results = results.filter(g =>
             (g.functional_summary && g.functional_summary.toLowerCase().includes(keywordFilter)) ||
@@ -203,7 +200,7 @@ function performBatchSearch() {
         );
     }
 
-    // 5. Determine which original queries were not found
+    // 5. Track not-found queries
     const foundIds = new Set();
     results.forEach(gene => {
         foundIds.add(gene.gene.toUpperCase());
@@ -219,16 +216,45 @@ function performBatchSearch() {
 
     // 6. Display final results
     statusDiv.style.display = 'none';
-    searchResults = results; // Update global variable for exports
+    searchResults = results; // update global variable for exports
 
     if (results.length > 0 || notFoundOriginalQueries.length > 0) {
         displayBatchResults(results, notFoundOriginalQueries);
         displayGeneCards(currentData, results, 1, 10);
     } else {
         resultDiv.innerHTML = '<p class="status-message error-message">No genes found matching your query and filters.</p>';
-        displayGeneCards(currentData, [], 1, 10); // Clear gene cards
+        displayGeneCards(currentData, [], 1, 10);
     }
 }
+
+/**
+ * Initialize Batch Query page listeners
+ */
+function initBatchQueryListeners() {
+    const batchForm = document.getElementById('batch-gene-form');
+    if (batchForm) {
+        // Remove old listeners
+        batchForm.replaceWith(batchForm.cloneNode(true));
+        const newForm = document.getElementById('batch-gene-form');
+        newForm.addEventListener('submit', function (e) {
+            e.preventDefault();
+            performBatchSearch();
+        });
+    }
+
+    const inputElement = document.getElementById('batch-genes-input');
+    if (inputElement) {
+        inputElement.addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                performBatchSearch();
+            }
+        });
+    }
+}
+
+// Call this on page load or when routing to /batch-query
+initBatchQueryListeners();
 
 
 // --- HOME PAGE SEARCH HANDLER (FIXED) ---
