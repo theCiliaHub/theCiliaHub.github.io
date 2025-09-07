@@ -166,34 +166,72 @@ function debugSearch(query) {
 /**
  * Handles the UI for the Batch Gene Query page.
  */
+/**
+ * Handles the UI for the Batch Gene Query page, supporting all identifier types and filters.
+ */
 function performBatchSearch() {
     const inputElement = document.getElementById('batch-genes-input');
+    const localizationFilter = document.getElementById('localization-filter')?.value;
+    const keywordFilter = document.getElementById('keyword-filter')?.value.toLowerCase();
+    const statusDiv = document.getElementById('status-message');
     const resultDiv = document.getElementById('batch-results');
+
     if (!inputElement || !resultDiv) return;
 
-    // Keep the original queries for the "not found" list
+    // 1. Get all unique, sanitized queries from the input box
     const originalQueries = inputElement.value.split(/[\s,;\n\r\t]+/).filter(Boolean);
-    const sanitizedQueries = originalQueries.map(sanitize);
+    // Use a Set to automatically handle duplicate inputs
+    const sanitizedQueries = [...new Set(originalQueries.map(sanitize))];
 
     if (sanitizedQueries.length === 0) {
-        resultDiv.innerHTML = '<p class="status-message error-message">Please enter one or more gene names.</p>';
+        resultDiv.innerHTML = '<p class="status-message error-message">Please enter one or more gene names, synonyms, or Ensembl IDs.</p>';
         return;
     }
 
+    // 2. Use the central `findGenes` function that correctly finds all ID types
     const { foundGenes } = findGenes(sanitizedQueries);
+    let results = foundGenes;
 
-    // Determine which of the original queries were not found
-    const foundGeneSymbols = new Set(foundGenes.map(g => g.gene.toUpperCase()));
-    const notFoundOriginalQueries = originalQueries.filter(q => {
-        const sanitizedQuery = sanitize(q);
-        const result = geneMapCache.get(sanitizedQuery);
-        // A query is "not found" if the cache lookup fails OR if the found gene's canonical symbol isn't in our results
-        // This handles cases where synonyms might point to the same gene but only one is kept.
-        return !result || !foundGeneSymbols.has(result.gene.toUpperCase());
+    // 3. Apply the optional localization and keyword filters to the results
+    if (localizationFilter) {
+        results = results.filter(g =>
+            g.localization && g.localization.some(l => l && l.toLowerCase() === localizationFilter.toLowerCase())
+        );
+    }
+
+    if (keywordFilter) {
+        results = results.filter(g =>
+            (g.functional_summary && g.functional_summary.toLowerCase().includes(keywordFilter)) ||
+            (g.description && g.description.toLowerCase().includes(keywordFilter))
+        );
+    }
+
+    // 4. Determine which of the original, user-entered queries were not found in the final results
+    const foundIds = new Set();
+    results.forEach(gene => {
+        // Add all known identifiers for the found genes to a set for quick lookup
+        foundIds.add(gene.gene.toUpperCase());
+        if (gene.synonym) {
+            String(gene.synonym).split(/[,;]/).forEach(s => foundIds.add(sanitize(s)));
+        }
+        if (gene.ensembl_id) {
+            String(gene.ensembl_id).split(/[,;]/).forEach(id => foundIds.add(sanitize(id)));
+        }
     });
-    
-    // The notFoundGenes logic is now handled by comparing original input to found results.
-    displayBatchResults(foundGenes, notFoundOriginalQueries);
+
+    const notFoundOriginalQueries = originalQueries.filter(q => !foundIds.has(sanitize(q)));
+
+    // 5. Display the final, filtered results
+    statusDiv.style.display = 'none';
+    searchResults = results; // Update global variable for exports
+
+    if (results.length > 0 || notFoundOriginalQueries.length > 0) {
+        displayBatchResults(results, notFoundOriginalQueries);
+        displayGeneCards(currentData, results, 1, 10);
+    } else {
+        resultDiv.innerHTML = '<p class="status-message error-message">No genes found matching your query and filters.</p>';
+        displayGeneCards(currentData, [], 1, 10); // Clear the gene cards
+    }
 }
 
 // --- HOME PAGE SEARCH HANDLER (FIXED) ---
