@@ -1077,16 +1077,12 @@ const pfamIdToName = {
     // Add more mappings as needed
 };
 
-
-// =============================================================================
-// MAIN CONTROLLER & PAGE RENDERER
-// =============================================================================
-// =============================================================================
-// MAIN CONTROLLER & PAGE RENDERER - FIXED
-// =============================================================================
+/**
+ * Main controller for the Enrichment page.
+ * Fetches user input, runs the correct search, and calls the appropriate plotting function.
+ */
 async function generateAnalysisPlots() {
     try {
-        const database = await loadAndPrepareDatabase();
         const plotContainer = document.getElementById('plot-display-area');
         const resultsContainer = document.getElementById('enrichment-results-container');
         const genesInput = document.getElementById('enrichment-genes-input').value.trim();
@@ -1100,41 +1096,47 @@ async function generateAnalysisPlots() {
         if (resultsContainer) resultsContainer.innerHTML = '';
         currentPlotInstance = null;
 
-        const geneList = genesInput.split(/[\s,;\n\r\t]+/).filter(Boolean);
+        // 1. Sanitize the user's input list
+        const originalQueries = genesInput.split(/[\s,;\n\r\t]+/).filter(Boolean);
+        const sanitizedQueries = [...new Set(originalQueries.map(sanitize))];
+
+        // 2. Use the modern, cache-based findGenes function from the main script
+        const { foundGenes } = findGenes(sanitizedQueries);
         
-        // Debug: Check database structure
-        console.log('Database structure:', database);
-        console.log('Database genes:', database.genes ? database.genes.length : 'No genes property');
+        // 3. Correctly determine the list of not-found genes
+        const foundGeneSymbols = new Set(foundGenes.map(g => g.gene.toUpperCase()));
+        const notFoundOriginalQueries = originalQueries.filter(q => {
+            const result = geneMapCache.get(sanitize(q));
+            return !result || !foundGeneSymbols.has(result.gene.toUpperCase());
+        });
         
-        // Extract the genes array from the database object
-        // The database might be the genes array directly or have a .genes property
-        const allGenes = Array.isArray(database) ? database : (database.genes || []);
-        
-        const { foundGenes, notFoundGenes } = findGenes(geneList, allGenes);
-        
-        console.log('Found genes:', foundGenes.length);
-        console.log('All genes available:', allGenes.length);
-        
-        createEnrichmentResultsTable(foundGenes, notFoundGenes);
+        createEnrichmentResultsTable(foundGenes, notFoundOriginalQueries);
         
         const plotType = document.querySelector('input[name="plot-type"]:checked')?.value;
         
+        // 4. Use the globally available `window.allGenes` as the background set
+        const backgroundGeneSet = window.allGenes || [];
+
+        if (backgroundGeneSet.length === 0) {
+            plotContainer.innerHTML = '<p class="status-message error">Background gene database not loaded. Cannot perform analysis.</p>';
+            return;
+        }
+
         switch (plotType) {
-            case 'bubble': 
-                renderKeyLocalizations(foundGenes, plotContainer); 
+            case 'bubble':    
+                renderKeyLocalizations(foundGenes, plotContainer);    
                 break;
-            case 'matrix': 
-                renderGeneMatrix(foundGenes, plotContainer); 
+            case 'matrix':    
+                renderGeneMatrix(foundGenes, plotContainer);    
                 break;
-            case 'domain': 
-                // Pass the correct allGenes array
-                renderDomainEnrichment(foundGenes, allGenes, plotContainer); 
+            case 'domain':    
+                renderDomainEnrichment(foundGenes, backgroundGeneSet, plotContainer);    
                 break;
-            case 'ciliopathy': 
-                renderCiliopathySunburst(foundGenes, plotContainer); 
+            case 'ciliopathy':    
+                renderCiliopathySunburst(foundGenes, plotContainer);    
                 break;
-            case 'network': 
-                renderComplexNetwork(foundGenes, plotContainer); 
+            case 'network':    
+                renderComplexNetwork(foundGenes, plotContainer);    
                 break;
             default:
                 plotContainer.innerHTML = '<p class="status-message">Please select a valid plot type.</p>';
@@ -1146,7 +1148,6 @@ async function generateAnalysisPlots() {
         plotContainer.innerHTML = `<p class="status-message error">Error generating plot: ${error.message}</p>`;
     }
 }
-
 
 function displayEnrichmentPage() {
     const contentArea = document.querySelector('.content-area');
