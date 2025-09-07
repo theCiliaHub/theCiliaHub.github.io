@@ -35,7 +35,63 @@
 
     <main class="main-container">
         <div class="content-area" id="content-area">
+            <div id="home-page">
+                <h1>Welcome to CiliaHub 🔬</h1>
+                <p>Your comprehensive resource for genes with ciliary functions. Explore our database, compare genes, and visualize expression data.</p>
+                <div class="call-to-action">
+                    <a href="#/ciliaplot" onclick="navigateTo(event, '/ciliaplot')" class="cta-button">Perform Gene Analysis with CiliaPlot</a>
+                </div>
             </div>
+
+            <div id="analysis-page" style="display: none;">
+                <h2>Gene CiliaPlot Analysis</h2>
+                <textarea id="analysis-genes-input" rows="5" placeholder="Enter gene list here..."></textarea>
+                
+                <div class="plot-type-selection">
+                    <label><input type="radio" name="plot-type" value="bubble" checked> Bubble Plot</label>
+                    <label><input type="radio" name="plot-type" value="matrix"> Matrix Plot</label>
+                </div>
+                <div class="plot-settings">
+                    <label>Font Family: <input type="text" id="setting-font-family" value="Arial"></label>
+                    <label>Font Size: <input type="number" id="setting-font-size" value="16"></label>
+                    <label>Font Weight: <input type="text" id="setting-font-weight" value="bold"></label>
+                    <label>Text Color: <input type="color" id="setting-text-color" value="#000000"></label>
+                    <label>Y-Axis Title: <input type="text" id="setting-y-axis-title" value="Localization"></label>
+                    <label>CiliaPlot Color 1: <input type="color" id="setting-enrichment-color1" value="#edf8fb"></label>
+                    <label>CiliaPlot Color 2: <input type="color" id="setting-enrichment-color2" value="#b2e2e2"></label>
+                </div>
+                
+                <button onclick="generateAnalysisPlots()">Generate Plot(s)</button>
+
+                <div id="plot-container" style="display: none;">
+                    <canvas id="analysis-bubble-plot"></canvas>
+                    <canvas id="analysis-matrix-plot" style="display: none;"></canvas>
+                </div>
+                
+                <div id="ciliaplot-plots-wrapper" style="display: none;">
+                    <div class="plot-container">
+                        <h3>Ciliopathy Associations</h3>
+                        <div id="sunburst-plot-div"></div>
+                    </div>
+
+                    <div class="plot-container">
+                        <h3>Enriched Protein Domains</h3>
+                        <div id="bubble-chart-div"></div>
+                    </div>
+
+                    <div class="plot-container">
+                        <h3>Protein Complex Network</h3>
+                        <div id="network-graph-div"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="compare-page" style="display: none;"></div>
+            <div id="batch-query-page" style="display: none;"></div>
+            <div id="expression-page" style="display: none;"></div>
+            <div id="download-page" style="display: none;"></div>
+            <div id="contact-page" style="display: none;"></div>
+        </div>
 
         <aside class="cilia-panel">
             <div class="panel-header">
