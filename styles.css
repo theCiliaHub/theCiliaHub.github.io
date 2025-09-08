@@ -1,10 +1,4 @@
-/* =================================================== */
-/* CiliaHub Stylesheet                                 */
-/* =================================================== */
-
-/* ------------------- */
-/* Root Variables      */
-/* ------------------- */
+/* styles.css */
 :root {
     /* Colors */
     --primary-dark: #2c3e50;
@@ -23,20 +17,12 @@
     --gray-dark: #7f8c8d;
     --gray-light: #d3d3d3;
     
-    /* Gene Page Specific (Medium Persian Blue) */
-    --mpb: #0067A5;
-    --mpb-light: #e6f0f7;
-    --mpb-border: #c2d9e6;
-
     /* Spacing & Borders */
     --border-radius-sm: 5px;
     --border-radius-md: 10px;
     --border-radius-lg: 15px;
 }
 
-/* ------------------- */
-/* General Styles      */
-/* ------------------- */
 body {
     margin: 0;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
@@ -45,21 +31,14 @@ body {
     line-height: 1.6;
 }
 
-* {
-    box-sizing: border-box;
-}
-
-/* ------------------- */
-/* Navigation          */
-/* ------------------- */
 .navbar {
     background: linear-gradient(90deg, var(--primary-blue), var(--primary-blue-light));
     color: var(--text-light);
-    padding: 1rem 0;
+    padding: 1.5rem 0;
     position: sticky;
     top: 0;
     z-index: 1000;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
     border-bottom: 2px solid var(--accent-green-1);
 }
 
@@ -73,7 +52,7 @@ body {
 }
 
 .logo {
-    font-size: 2rem;
+    font-size: 2.2rem;
     font-weight: 800;
     text-decoration: none;
     color: var(--text-light);
@@ -83,12 +62,13 @@ body {
 
 .logo:hover {
     transform: scale(1.05);
+    text-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
 }
 
 .nav-links {
     list-style: none;
     display: flex;
-    gap: 1.5rem;
+    gap: 2rem;
     margin: 0;
     padding: 0;
 }
@@ -96,7 +76,7 @@ body {
 .nav-links li a {
     color: var(--text-light);
     text-decoration: none;
-    font-size: 1.1rem;
+    font-size: 1.2rem;
     font-weight: 500;
     padding: 0.5rem 1rem;
     border-radius: var(--border-radius-sm);
@@ -104,64 +84,44 @@ body {
 }
 
 .nav-links li a:hover,
+.nav-links li a:focus-visible,
 .nav-links li a.active {
     background: rgba(255, 255, 255, 0.2);
-    color: var(--text-light);
+    color: var(--accent-green-1);
     transform: translateY(-2px);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    outline: none;
 }
 
-/* ------------------- */
-/* Main Layout         */
-/* ------------------- */
 .main-container {
     display: flex;
     max-width: 1400px;
-    margin: 2rem auto;
-    padding: 0 2rem;
+    margin: 0 auto;
+    padding: 2rem;
     gap: 2rem;
 }
 
 .cilia-panel {
-    flex: 0 0 300px;
+    width: 300px;
     background: var(--panel-bg);
     padding: 2rem;
     border-radius: var(--border-radius-lg);
     box-shadow: 0 8px 32px rgba(44, 90, 160, 0.1);
     position: sticky;
-    top: 120px;
-    align-self: flex-start;
-    height: calc(100vh - 140px);
-    overflow-y: auto;
+    top: 100px;
 }
 
-.content-area {
-    flex: 1;
-    background: var(--panel-bg);
-    padding: 2rem;
-    border-radius: var(--border-radius-lg);
-    box-shadow: 0 8px 32px rgba(44, 90, 160, 0.1);
-    min-width: 0;
-}
-
-.page-section {
-    display: none; /* Hidden by default */
-}
-.page-section.active {
-    display: block; /* Shown by JS */
-}
-
-/* ------------------- */
-/* Cilium Sidebar      */
-/* ------------------- */
 .cilia-panel h2 {
     font-size: 1.3rem;
     color: var(--primary-dark);
-    margin-top: 0;
     margin-bottom: 1.5rem;
 }
 
-.cilia-diagram img, .cilia-diagram svg {
+.cilia-diagram {
+    margin-bottom: 1.5rem;
+}
+
+.cilia-diagram img {
     max-width: 100%;
     height: auto;
 }
@@ -169,19 +129,23 @@ body {
 .cilia-part {
     fill: var(--primary-blue-light);
     transition: fill 0.3s, stroke 0.3s;
-    cursor: pointer;
+}
+
+.cilia-part.cilia {
+    fill: var(--accent-green-1);
+}
+
+.cilia-part.search-gene {
+    fill: var(--accent-green-2);
 }
 
 .cilia-part.highlighted {
     stroke: var(--accent-red);
-    stroke-width: 4px;
-    fill: var(--accent-red) !important;
+    stroke-width: 2px;
 }
 
-#cell-body,
-#nucleus {
+#cell-body, #nucleus {
     fill: var(--gray-light);
-    cursor: default;
 }
 
 #geneButtons {
@@ -198,12 +162,18 @@ body {
     cursor: pointer;
     font-size: 0.9rem;
     transition: background 0.3s, color 0.3s;
-    text-align: center;
 }
 
 .gene-btn:hover,
+.gene-btn:focus-visible,
 .gene-btn.search-gene {
     background: var(--accent-green-2);
+    color: var(--text-light);
+    outline: none;
+}
+
+.gene-btn.default {
+    background: var(--primary-blue-light);
     color: var(--text-light);
 }
 
@@ -212,66 +182,58 @@ body {
     color: var(--text-light);
 }
 
-/* ------------------- */
-/* Common Components   */
-/* ------------------- */
-h1, h2, h3 { color: var(--primary-dark); }
-h1 { font-size: 2.2rem; margin-bottom: 1rem; }
-h2 { font-size: 1.6rem; margin-bottom: 1rem; }
-h3 { font-size: 1.2rem; margin-top: 0; }
-
-.btn {
-    padding: 0.8rem 1.5rem;
-    border: none;
-    border-radius: var(--border-radius-md);
-    cursor: pointer;
-    font-size: 1rem;
-    font-weight: 500;
-    transition: all 0.3s ease;
-}
-.btn-sm {
-    padding: 0.4rem 0.8rem;
-    font-size: 0.8rem;
-    border-radius: var(--border-radius-sm);
+.content-area {
+    flex: 1;
+    background: var(--panel-bg);
+    padding: 2rem;
+    border-radius: var(--border-radius-lg);
+    box-shadow: 0 8px 32px rgba(44, 90, 160, 0.1);
 }
 
-.btn-primary {
-    background: var(--primary-blue);
-    color: var(--text-light);
-}
-.btn-primary:hover {
-    background: var(--primary-blue-light);
-    transform: translateY(-2px);
-    box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+.content-area-full {
+    max-width: 100%;
 }
 
-.btn-secondary {
-    background: var(--gray-medium);
-    color: var(--text-light);
-}
-.btn-secondary:hover {
-    background: var(--gray-dark);
+.page-section h1,
+.page-section h2 {
+    color: var(--primary-dark);
+    margin-bottom: 1rem;
 }
 
-textarea {
-    width: 100%;
-    padding: 0.8rem;
-    border: 2px solid var(--border-color);
-    border-radius: var(--border-radius-md);
-    font-size: 1rem;
-    resize: vertical;
+.page-section h1 {
+    font-size: 2rem;
+}
+
+.page-section h2 {
+    font-size: 1.5rem;
 }
 
 .search-container {
     display: flex;
     gap: 1rem;
     margin-bottom: 2rem;
+    position: relative;
+}
+
+.search-container.sticky {
+    position: fixed;
+    top: 80px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 80%;
+    max-width: 800px;
+    background: var(--panel-bg);
+    padding: 1rem;
+    border-radius: var(--border-radius-md);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    z-index: 999;
 }
 
 .search-wrapper {
     position: relative;
     flex: 1;
 }
+
 .search-wrapper input {
     width: 100%;
     padding: 0.8rem;
@@ -280,8 +242,26 @@ textarea {
     font-size: 1rem;
 }
 
+.search-btn {
+    padding: 0.8rem 1.5rem;
+    background: var(--primary-blue);
+    color: var(--text-light);
+    border: none;
+    border-radius: var(--border-radius-md);
+    cursor: pointer;
+    font-size: 1rem;
+    transition: background 0.3s;
+}
+
+.search-btn:hover,
+.search-btn:focus-visible {
+    background: var(--primary-blue-light);
+    outline: none;
+}
+
 #search-suggestions,
-#compare-search-suggestions {
+#compare-search-suggestions,
+#suggestions {
     position: absolute;
     top: 100%;
     left: 0;
@@ -296,73 +276,125 @@ textarea {
     display: none;
 }
 
-#search-suggestions div,
-#compare-search-suggestions div {
+#search-suggestions ul,
+#compare-search-suggestions div,
+#suggestions div {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+#search-suggestions li,
+#compare-search-suggestions div,
+#suggestions div {
     padding: 0.8rem;
     cursor: pointer;
     transition: background 0.2s;
 }
 
-#search-suggestions div:hover,
-#compare-search-suggestions div:hover {
+#search-suggestions li:hover,
+#search-suggestions li.active,
+#compare-search-suggestions div:hover,
+#suggestions div:hover {
     background: var(--border-color);
+    color: var(--primary-blue);
 }
 
-.gene-cards {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-    gap: 1.5rem;
-    margin-top: 2rem;
-}
-.gene-card {
-    background: var(--neutral-bg-alt);
-    padding: 1.5rem;
-    border-radius: var(--border-radius-md);
-    border: 1px solid var(--border-color);
-    cursor: pointer;
-    transition: transform 0.3s, box-shadow 0.3s;
-}
-.gene-card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 5px 15px rgba(44, 90, 160, 0.15);
-}
-
-.pagination {
+.filters {
     display: flex;
-    justify-content: center;
-    align-items: center;
     gap: 1rem;
-    margin-top: 2rem;
-}
-.pagination button:disabled {
-    background: var(--gray-medium);
-    cursor: not-allowed;
+    margin-bottom: 1rem;
 }
 
-.table-container { overflow-x: auto; }
-table {
+.filters label {
+    font-weight: 600;
+}
+
+.filters input,
+.filters select {
+    padding: 0.5rem;
+    border: 2px solid var(--border-color);
+    border-radius: var(--border-radius-sm);
+    font-size: 0.9rem;
+}
+
+#batch-genes-input,
+#feedback-text {
+    width: 100%;
+    min-height: 100px;
+    padding: 0.8rem;
+    border: 2px solid var(--border-color);
+    border-radius: var(--border-radius-md);
+    font-size: 1rem;
+    resize: vertical;
+}
+
+#csv-upload {
+    margin: 1rem 0;
+}
+
+/* Table styling */
+#batch-results table,
+#comparison-table,
+#enrichment-results-container table {
     width: 100%;
     border-collapse: collapse;
     margin-top: 1rem;
 }
-th, td {
-    padding: 0.8rem 1rem;
+
+#batch-results th,
+#batch-results td,
+#comparison-table th,
+#comparison-table td,
+#enrichment-results-container th,
+#enrichment-results-container td {
+    padding: 0.8rem;
     border-bottom: 1px solid var(--border-color);
     text-align: left;
 }
-th {
+
+#batch-results th,
+#comparison-table th,
+#enrichment-results-container th {
     background: var(--primary-blue);
     color: var(--text-light);
 }
-tbody tr:nth-child(even) { background-color: var(--neutral-bg-alt); }
-table a {
+
+#batch-results a,
+#comparison-table a,
+#enrichment-results-container a {
     color: var(--primary-blue);
     text-decoration: none;
-    font-weight: 500;
 }
-table a:hover { text-decoration: underline; }
 
-.tabs { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
+#batch-results a:hover,
+#batch-results a:focus-visible,
+#comparison-table a:hover,
+#comparison-table a:focus-visible,
+#enrichment-results-container a:hover,
+#enrichment-results-container a:focus-visible {
+    text-decoration: underline;
+    outline: none;
+}
+
+.comparison-tool {
+    background: var(--neutral-bg-alt);
+    padding: 1.5rem;
+    border-radius: var(--border-radius-md);
+}
+
+.comparison-controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.tabs {
+    display: flex;
+    gap: 0.5rem;
+}
+
 .tab-link {
     padding: 0.5rem 1rem;
     background: var(--border-color);
@@ -372,148 +404,416 @@ table a:hover { text-decoration: underline; }
     font-size: 0.9rem;
     transition: background 0.3s;
 }
-.tab-link.active, .tab-link:hover {
+
+.tab-link.active,
+.tab-link:hover,
+.tab-link:focus-visible {
     background: var(--primary-blue);
     color: var(--text-light);
+    outline: none;
 }
-.tab-content { display: none; }
-.tab-content.active { display: block; }
+
+.tab-content {
+    display: none;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+.chart-container {
+    position: relative;
+    margin: auto;
+}
+
+.functional-comparison-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1rem;
+}
+
+.function-card {
+    background: var(--neutral-bg-alt);
+    padding: 1rem;
+    border-radius: var(--border-radius-md);
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+.function-card h4 {
+    margin: 0 0 0.5rem;
+    color: var(--primary-dark);
+}
 
 .gene-tags-container {
     display: flex;
     flex-wrap: wrap;
     gap: 0.5rem;
-    margin: 1rem 0;
+    margin-top: 1rem;
 }
+
 .gene-tag {
-    background: var(--primary-blue-light);
-    color: var(--text-light);
+    background: var(--border-color);
     padding: 0.5rem 1rem;
-    border-radius: 999px;
+    border-radius: 15px;
     font-size: 0.9rem;
     display: flex;
     align-items: center;
     gap: 0.5rem;
 }
-.remove-tag { cursor: pointer; font-weight: bold; }
-.remove-tag:hover { color: var(--accent-red); }
+
+.remove-tag {
+    cursor: pointer;
+    font-weight: bold;
+}
+
+.remove-tag:hover,
+.remove-tag:focus-visible {
+    color: var(--accent-red);
+    outline: none;
+}
+
+.error-message {
+    color: var(--accent-red);
+    font-size: 0.9rem;
+}
 
 .status-message {
     text-align: center;
     padding: 2rem;
+    color: #666;
+}
+
+.success-message {
+    color: var(--accent-green-2);
+}
+
+.gene-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1rem;
+    margin-top: 2rem;
+}
+
+.gene-card {
+    background: var(--neutral-bg-alt);
+    padding: 1.5rem;
+    border-radius: var(--border-radius-md);
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    cursor: pointer;
+    transition: transform 0.3s, box-shadow 0.3s;
+}
+
+.gene-card:hover,
+.gene-card:focus-visible {
+    transform: translateY(-5px);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+    outline: 2px solid var(--primary-blue);
+    outline-offset: 2px;
+}
+
+.gene-card.search-result {
+    background: #d5f4e6;
+}
+
+.gene-card.default {
+    background: #e8f4fd;
+}
+
+.gene-name {
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: var(--primary-dark);
+    margin-bottom: 0.5rem;
+}
+
+.gene-description {
+    font-size: 0.9rem;
+    color: #555;
+    margin-bottom: 0.5rem;
+}
+
+.gene-info {
+    font-size: 0.9rem;
+    margin-bottom: 0.3rem;
+}
+
+.pagination {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 1rem;
+    margin-top: 2rem;
+}
+
+.pagination button {
+    padding: 0.5rem 1rem;
+    background: var(--primary-blue);
+    color: var(--text-light);
+    border: none;
+    border-radius: var(--border-radius-sm);
+    cursor: pointer;
+}
+
+.pagination button:disabled {
+    background: var(--gray-medium);
+    cursor: not-allowed;
+}
+
+.download-options {
+    display: flex;
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.download-options a,
+.download-options button {
+    padding: 0.8rem 1.5rem;
+    background: var(--primary-blue);
+    color: var(--text-light);
+    text-decoration: none;
+    border-radius: var(--border-radius-md);
+    font-size: 1rem;
+}
+
+.download-options a:hover,
+.download-options a:focus-visible,
+.download-options button:hover,
+.download-options button:focus-visible {
+    background: var(--primary-blue-light);
+    outline: none;
+}
+
+.contact-info,
+.cite-list,
+.feedback-form {
+    margin-bottom: 2rem;
+}
+
+.contact-info ul,
+.cite-list ul {
+    list-style: none;
+    padding: 0;
+}
+
+.contact-info li,
+.cite-list li {
+    margin-bottom: 0.5rem;
+}
+
+.contact-info a,
+.cite-list a {
+    color: var(--primary-blue);
+    text-decoration: none;
+}
+
+.contact-info a:hover,
+.contact-info a:focus-visible,
+.cite-list a:hover,
+.cite-list a:focus-visible {
+    text-decoration: underline;
+    outline: none;
+}
+
+.btn {
+    cursor: pointer;
+    transition: background 0.3s;
+}
+
+.btn-primary {
+    background: var(--primary-blue);
+    color: var(--text-light);
+    border: none;
+    padding: 0.8rem 1.5rem;
+    border-radius: var(--border-radius-md);
+}
+
+.btn-primary:hover,
+.btn-primary:focus-visible {
+    background: var(--primary-blue-light);
+    outline: none;
+}
+
+.btn-secondary {
+    background: var(--gray-medium);
+    color: var(--text-light);
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: var(--border-radius-sm);
+}
+
+.btn-secondary:hover,
+.btn-secondary:focus-visible {
+    background: var(--gray-dark);
+    outline: none;
+}
+
+.tooltip {
+    position: relative;
+    display: inline-block;
+}
+
+.tooltip-icon {
+    background: var(--primary-blue);
+    color: var(--text-light);
+    border-radius: 50%;
+    width: 16px;
+    height: 16px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.8rem;
+    cursor: help;
+}
+
+.tooltip-text {
+    visibility: hidden;
+    width: 200px;
+    background: var(--primary-dark);
+    color: var(--text-light);
+    text-align: center;
+    padding: 0.5rem;
+    border-radius: var(--border-radius-sm);
+    position: absolute;
+    z-index: 1;
+    bottom: 125%;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 0.8rem;
+}
+
+.tooltip:hover .tooltip-text {
+    visibility: visible;
+}
+
+/* Gene detail page specific styles */
+.gene-detail-page {
+    display: none;
+}
+
+.breadcrumb {
+    margin-bottom: 1rem;
+    padding: 0.5rem 0;
+    font-size: 0.9rem;
     color: var(--gray-dark);
 }
 
-/* =================================================== */
-/* GENE DETAIL PAGE STYLES                             */
-/* =================================================== */
-.gene-detail-page .breadcrumb {
-    padding: 0.5rem 1rem;
-    border-radius: var(--border-radius-sm);
-    margin-bottom: 1.5rem;
-    font-size: 0.9rem;
-    background: var(--mpb-light);
-    border: 1px solid var(--mpb-border);
-    color: var(--mpb);
+.breadcrumb a {
+    color: var(--primary-blue);
+    text-decoration: none;
 }
-.gene-detail-page .gene-header {
-    background: var(--mpb-light);
+
+.breadcrumb a:hover {
+    text-decoration: underline;
+}
+
+.gene-header {
+    background-color: var(--neutral-bg-alt);
     padding: 1.5rem;
     border-radius: var(--border-radius-md);
     margin-bottom: 2rem;
 }
-.gene-detail-page .gene-name {
-    color: var(--mpb);
-    font-weight: 700;
+
+.gene-name {
     font-size: 2.2rem;
+    color: var(--primary-dark);
     margin: 0 0 0.5rem 0;
 }
-.gene-detail-page .gene-description {
-    color: var(--mpb);
-    opacity: 0.95;
-    margin: 0;
+
+.gene-description {
     font-size: 1.1rem;
+    color: var(--gray-dark);
+    margin: 0;
 }
+
 .gene-details-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 1.5rem;
-    align-items: start;
+    gap: 2rem;
 }
-.gene-detail-page .detail-card {
-    background: #fff;
-    border: 1px solid var(--mpb-border);
+
+.detail-card {
+    background: var(--panel-bg);
+    border: 1px solid var(--border-color);
     border-radius: var(--border-radius-md);
     padding: 1.5rem;
     margin-bottom: 1.5rem;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 }
-.gene-detail-page .card-title {
-    color: var(--mpb);
+
+.card-title {
     font-size: 1.2rem;
-    font-weight: 600;
+    color: var(--primary-dark);
     margin: 0 0 1rem 0;
     padding-bottom: 0.5rem;
-    border-bottom: 2px solid var(--mpb-border);
+    border-bottom: 2px solid var(--accent-green-1);
 }
-.gene-detail-page .info-item { margin-bottom: 1rem; }
-.gene-detail-page .info-item strong {
-    color: var(--mpb);
-    font-weight: 600;
-    display: block;
-    margin-bottom: 0.5rem;
+
+.info-content {
+    line-height: 1.6;
 }
-.gene-detail-page .info-item p,
-.gene-detail-page .info-item span,
-.gene-detail-page .info-item div {
-    color: var(--mpb);
-    line-height: 1.5;
+
+.info-item {
+    margin-bottom: 0.8rem;
 }
-.gene-detail-page .tags-container {
+
+.info-item strong {
+    color: var(--primary-dark);
+    margin-right: 0.5rem;
+}
+
+.tags-container {
     display: flex;
     flex-wrap: wrap;
     gap: 0.5rem;
+    margin-top: 0.5rem;
 }
-.gene-detail-page .tag {
-    display: inline-block;
-    padding: 0.25rem 0.75rem;
-    border-radius: 999px;
-    background: var(--mpb-light);
-    color: var(--mpb);
-    font-weight: 500;
+
+.tag {
+    background: var(--accent-green-1);
+    color: white;
+    padding: 0.3rem 0.8rem;
+    border-radius: 15px;
     font-size: 0.85rem;
 }
-.gene-detail-page .reference-list {
-    list-style-type: decimal;
-    padding-left: 1.5rem;
-    color: var(--mpb);
+
+.reference-list {
+    list-style: none;
+    padding: 0;
 }
-.gene-detail-page .reference-list li { margin-bottom: 0.5rem; }
-.gene-detail-page .reference-list a {
-    color: var(--mpb);
+
+.reference-list li {
+    margin-bottom: 0.8rem;
+    padding-left: 1.2rem;
+    text-indent: -1.2rem;
+}
+
+.reference-list a {
+    color: var(--primary-blue);
     text-decoration: none;
 }
-.gene-detail-page .reference-list a:hover { text-decoration: underline; }
 
-/* =================================================== */
-/* CILIAPLOT PAGE STYLES (COMPACT VIEW)                */
-/* =================================================== */
+.reference-list a:hover {
+    text-decoration: underline;
+}
+
+/* CiliaPlot page specific styles */
 .enrichment-page {
-    display: flex;
-    flex-direction: column;
-    min-height: calc(100vh - 200px);
+    display: none;
 }
+
 .enrichment-header {
-    flex-shrink: 0;
-    margin-bottom: 1.5rem;
+    margin-bottom: 2rem;
+    border-bottom: 2px solid var(--border-color);
+    padding-bottom: 1rem;
 }
+
 .enrichment-layout {
     display: grid;
     grid-template-columns: 380px 1fr;
     gap: 2rem;
-    flex-grow: 1;
-    overflow: hidden;
+    height: calc(100vh - 250px);
 }
+
 .enrichment-controls-panel {
     display: flex;
     flex-direction: column;
@@ -521,56 +821,7 @@ table a:hover { text-decoration: underline; }
     overflow-y: auto;
     padding-right: 10px;
 }
-#enrichment-genes-input {
-    min-height: 150px;
-    flex-grow: 1;
-    margin-bottom: 0;
-}
-#enrichment-actions {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-    background-color: var(--neutral-bg-alt);
-    padding: 1rem;
-    border-radius: var(--border-radius-md);
-    border: 1px solid var(--border-color);
-}
-.plot-type-selection {
-    display: flex;
-    align-items: center;
-    justify-content: space-around;
-    gap: 10px;
-}
-.action-buttons {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 1rem;
-}
-#download-controls {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-#plot-customization-details summary {
-    background-color: var(--neutral-bg-alt);
-    padding: 0.8rem 1rem;
-    border-radius: var(--border-radius-sm);
-    cursor: pointer;
-    font-weight: 600;
-}
-#plot-customization-details {
-    border: 1px solid var(--border-color);
-    border-radius: var(--border-radius-md);
-}
-#plot-settings-panel {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 1rem;
-    padding: 1rem;
-}
-#plot-settings-panel label { font-size: 0.9em; }
-#plot-settings-panel input, #plot-settings-panel select { width: 100%; padding: 6px; }
+
 .enrichment-plot-panel {
     display: flex;
     align-items: center;
@@ -581,55 +832,267 @@ table a:hover { text-decoration: underline; }
     height: 100%;
     overflow: auto;
 }
-.plot-area {
-    height: 100%;
-    width: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-.plot-area svg, .plot-area .plotly {
-    max-width: 100%;
-    max-height: 100%;
+
+.control-section {
+    background-color: var(--panel-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-md);
+    margin-bottom: 1.5rem;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
 }
 
-/* =================================================== */
-/* RESPONSIVE DESIGN                                   */
-/* =================================================== */
-@media (max-width: 1200px) {
-    .main-container { flex-direction: column; }
-    .cilia-panel {
-        position: static;
-        width: 100%;
-        flex: auto;
+.control-section h3 {
+    margin: 0;
+    padding: 1rem 1.5rem;
+    font-size: 1.2rem;
+    color: var(--primary-dark);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.control-section-content {
+    padding: 1.5rem;
+}
+
+#enrichment-genes-input {
+    width: 100%;
+    min-height: 120px;
+    margin-bottom: 1rem;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: var(--border-radius-sm);
+    font-size: 1rem;
+    resize: vertical;
+}
+
+.plot-type-selection {
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.plot-option {
+    margin-bottom: 1.2rem;
+}
+
+.plot-option:last-child {
+    margin-bottom: 0;
+}
+
+.plot-option label {
+    font-weight: bold;
+    font-size: 1.1em;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+}
+
+.plot-option input[type="radio"] {
+    accent-color: var(--primary-blue);
+    width: 18px;
+    height: 18px;
+}
+
+.plot-option-explanation {
+    font-size: 0.9em;
+    color: var(--gray-dark);
+    line-height: 1.5;
+    margin-left: 26px;
+    margin-top: 5px;
+}
+
+#plot-customization-details summary {
+    padding: 1rem 1.5rem;
+    cursor: pointer;
+    font-weight: bold;
+    outline: none;
+    position: relative;
+}
+
+#plot-customization-details summary::after {
+    content: '▶';
+    position: absolute;
+    right: 1.5rem;
+    transition: transform 0.2s;
+}
+
+#plot-customization-details[open] summary::after {
+    transform: rotate(90deg);
+}
+
+#plot-settings-panel {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1rem;
+}
+
+#plot-settings-panel label {
+    display: block;
+    font-weight: bold;
+    margin-bottom: 5px;
+    font-size: 0.9em;
+}
+
+#plot-settings-panel input,
+#plot-settings-panel select {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+}
+
+.action-buttons {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+}
+
+#download-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+#plot-display-area {
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-md);
+    width: 100%;
+    min-height: 600px;
+    padding: 1.5rem;
+    position: relative;
+    background-color: var(--panel-bg);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+#plot-display-area .status-message {
+    text-align: center;
+    color: var(--gray-dark);
+    font-size: 1.1em;
+    padding: 50px 20px;
+}
+
+.plot-wrapper {
+    width: 100%;
+    height: 100%;
+}
+
+/* Home page feature cards */
+.feature-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 1.5rem;
+    margin-top: 2rem;
+}
+
+.feature-card {
+    background: var(--neutral-bg-alt);
+    padding: 1.5rem;
+    border-radius: var(--border-radius-md);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    transition: transform 0.3s, box-shadow 0.3s;
+}
+
+.feature-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
+}
+
+.feature-card h3 {
+    color: var(--primary-dark);
+    margin-top: 0;
+}
+
+.feature-card p {
+    color: var(--gray-dark);
+    margin-bottom: 1.5rem;
+}
+
+/* Responsive design */
+@media (max-width: 1024px) {
+    .gene-details-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .enrichment-layout {
+        grid-template-columns: 1fr;
         height: auto;
     }
-}
-@media (max-width: 950px) {
-    .enrichment-layout {
-        grid-template-columns: 1fr; /* Stack columns on smaller screens */
+    
+    .enrichment-controls-panel {
+        padding-right: 0;
     }
-    .enrichment-plot-panel { min-height: 500px; }
 }
-@media (max-width: 899px) {
-    .gene-details-grid { grid-template-columns: 1fr !important; }
-}
+
 @media (max-width: 768px) {
+    .navbar {
+        padding: 1rem 0;
+    }
+    
     .nav-container {
         flex-direction: column;
-        gap: 1rem;
+        gap: 1.5rem;
         padding: 0 1.5rem;
     }
+    
+    .logo {
+        font-size: 1.8rem;
+    }
+    
     .nav-links {
-        flex-wrap: wrap;
-        justify-content: center;
-        gap: 0.5rem 1rem;
+        flex-direction: column;
+        align-items: center;
+        gap: 1rem;
     }
+    
+    .nav-links li a {
+        font-size: 1rem;
+        padding: 0.4rem 0.8rem;
+    }
+    
     .main-container {
-        padding: 0 1rem;
-        margin-top: 1rem;
+        flex-direction: column;
+        padding: 1rem;
     }
-    .content-area, .cilia-panel { padding: 1.5rem; }
-    h1 { font-size: 1.8rem; }
-    h2 { font-size: 1.4rem; }
+    
+    .cilia-panel {
+        position: static;
+        width: auto;
+    }
+    
+    .search-container.sticky {
+        position: static;
+        transform: none;
+        width: 100%;
+    }
+    
+    .gene-cards,
+    .functional-comparison-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .action-buttons {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    #download-controls {
+        justify-content: center;
+    }
+}
+
+/* Ensure D3 SVG plots are responsive */
+#plot-display-area svg {
+    max-width: 100%;
+    height: auto;
+}
+
+footer {
+    text-align: center;
+    padding: 2rem;
+    background: var(--primary-dark);
+    color: var(--text-light);
+    margin-top: 2rem;
 }
