@@ -1067,7 +1067,7 @@ function displayContactPage() {
 
 /**
  * Displays a visually appealing and detailed page for a single gene.
- * Fully rewritten with defensive checks and safe handling for multiple Ensembl IDs.
+ * Now includes gene name, description, functional summary, and complexes.
  */
 function displayIndividualGenePage(gene) {
     const contentArea = document.querySelector('.content-area');
@@ -1077,14 +1077,13 @@ function displayIndividualGenePage(gene) {
     const panel = document.querySelector('.cilia-panel');
     if (panel) panel.style.display = 'block';
 
-    // Helper: convert data to tags safely
+    // Helpers
     const formatAsTags = (data, className = 'tag-default') => {
         if (!data) return 'Not available';
         const arr = Array.isArray(data) ? data : String(data).split(/\s*,\s*/).filter(Boolean);
         return arr.map(item => `<span class="tag ${className}">${item}</span>`).join('');
     };
 
-    // Helper: format references safely
     const formatReferences = (gene) => {
         if (!gene.reference) return '<li>No reference information available.</li>';
         const allRefs = Array.isArray(gene.reference)
@@ -1105,12 +1104,24 @@ function displayIndividualGenePage(gene) {
             }).join('');
     };
 
+    const formatComplexes = (complexes) => {
+        if (!complexes || complexes.length === 0) return '<li>No complexes found for this gene.</li>';
+        const arr = Array.isArray(complexes) ? complexes : String(complexes).split(/\s*,\s*/).filter(Boolean);
+        return arr.map(c => {
+            if (typeof c === "object" && c.name) {
+                return `<li><a href="https://mips.helmholtz-muenchen.de/corum/#${c.corum_id || ''}" target="_blank" class="text-[#0067A5] hover:underline">${c.name}</a>
+                ${c.subunits ? ` <span class="text-gray-600 text-sm">(Subunits: ${c.subunits.join(", ")})</span>` : ''}</li>`;
+            }
+            return `<li class="text-[#0067A5]">${c}</li>`;
+        }).join('');
+    };
+
     // Prepare data
     const localizationTags = formatAsTags(gene.localization, 'tag-localization');
     const functionalCategoryTags = formatAsTags(gene.functional_category, 'tag-category');
     const referenceHTML = formatReferences(gene);
+    const complexesHTML = formatComplexes(gene.complexes);
 
-    // Create separate Ensembl links
     let ensemblHTML = 'Not available';
     if (gene.ensembl_id) {
         const ids = String(gene.ensembl_id).split(/\s*,\s*/).filter(Boolean);
@@ -1119,9 +1130,13 @@ function displayIndividualGenePage(gene) {
         ).join('<br>');
     }
 
-    // Main Template (no syntax-breaking placeholders)
+    // ✅ MAIN TEMPLATE - includes gene name + description + summary + complexes
     contentArea.innerHTML = `
-      <div class="page-section gene-detail-page">
+      <div class="page-section gene-detail-page space-y-6">
+        <h1 class="text-3xl font-bold text-gray-900">${gene.gene || "Unknown Gene"}</h1>
+        ${gene.description ? `<p class="text-lg text-gray-700">${gene.description}</p>` : ''}
+        ${gene.functional_summary ? `<p class="text-base text-gray-600 italic">${gene.functional_summary}</p>` : ''}
+
         <div class="details-column space-y-6">
           <div class="detail-card p-4 rounded-2xl shadow-md bg-white">
             <h3 class="card-title text-lg font-semibold">Identifiers</h3>
@@ -1140,6 +1155,11 @@ function displayIndividualGenePage(gene) {
           <div class="detail-card p-4 rounded-2xl shadow-md bg-white">
             <h3 class="card-title text-lg font-semibold">Functional Category</h3>
             <div>${functionalCategoryTags}</div>
+          </div>
+
+          <div class="detail-card p-4 rounded-2xl shadow-md bg-white">
+            <h3 class="card-title text-lg font-semibold">Protein Complexes</h3>
+            <ul>${complexesHTML}</ul>
           </div>
 
           <div class="detail-card p-4 rounded-2xl shadow-md bg-white">
