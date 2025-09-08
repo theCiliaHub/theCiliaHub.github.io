@@ -1096,6 +1096,14 @@ function displayIndividualGenePage(gene) {
                 return `<li class="text-[#0067A5]">${ref}</li>`;
             }).join('');
     };
+const formatComplexes = (complexes) => {
+    if (!complexes) return '<span class="text-gray-500">No complexes found for this gene.</span>';
+    const arr = Array.isArray(complexes) ? complexes.join(';').split(/;\s*/) : String(complexes).split(/;\s*/);
+    return arr.map(name => {
+        const url = `https://mips.helmholtz-muenchen.de/corum/#search;complex=${encodeURIComponent(name.trim())}`;
+        return `<a href="${url}" target="_blank" class="tag tag-complex hover:underline">${name.trim()}</a>`;
+    }).join(' ');
+};
 
     const formatPfam = (ids) => {
         if (!ids) return 'Not available';
@@ -1121,7 +1129,7 @@ function displayIndividualGenePage(gene) {
     const pfamHTML = gene.pfam_ids ? formatPfam(gene.pfam_ids) : 'Not available';
     const domainDescriptionsHTML = gene.domain_descriptions ? formatAsTags(gene.domain_descriptions, 'tag-domain') : 'Not available';
     const ciliopathyHTML = gene.ciliopathy ? formatAsTags(gene.ciliopathy, 'tag-ciliopathy') : 'Not available';
-    const complexesHTML = gene.complex_names ? formatAsTags(gene.complex_names, 'tag-complex') : '<span class="text-gray-500">No complexes found for this gene.</span>';
+    const complexesHTML = formatComplexes(gene.complex_names);
 
     contentArea.innerHTML = `
       <div class="page-section gene-detail-page space-y-6">
