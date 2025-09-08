@@ -129,7 +129,7 @@ body {
     border-radius: var(--border-radius-lg);
     box-shadow: 0 8px 32px rgba(44, 90, 160, 0.1);
     position: sticky;
-    top: 120px; /* Adjusted for nav bar height */
+    top: 120px;
     align-self: flex-start;
     height: calc(100vh - 140px);
     overflow-y: auto;
@@ -174,7 +174,7 @@ body {
 
 .cilia-part.highlighted {
     stroke: var(--accent-red);
-    stroke-width: 4px; /* Make highlight more visible */
+    stroke-width: 4px;
     fill: var(--accent-red) !important;
 }
 
@@ -308,7 +308,6 @@ textarea {
     background: var(--border-color);
 }
 
-/* Gene Cards (Home Page) */
 .gene-cards {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
@@ -328,7 +327,6 @@ textarea {
     box-shadow: 0 5px 15px rgba(44, 90, 160, 0.15);
 }
 
-/* Pagination */
 .pagination {
     display: flex;
     justify-content: center;
@@ -341,10 +339,7 @@ textarea {
     cursor: not-allowed;
 }
 
-/* Tables */
-.table-container {
-    overflow-x: auto;
-}
+.table-container { overflow-x: auto; }
 table {
     width: 100%;
     border-collapse: collapse;
@@ -359,19 +354,14 @@ th {
     background: var(--primary-blue);
     color: var(--text-light);
 }
-tbody tr:nth-child(even) {
-    background-color: var(--neutral-bg-alt);
-}
+tbody tr:nth-child(even) { background-color: var(--neutral-bg-alt); }
 table a {
     color: var(--primary-blue);
     text-decoration: none;
     font-weight: 500;
 }
-table a:hover {
-    text-decoration: underline;
-}
+table a:hover { text-decoration: underline; }
 
-/* Compare Page Tabs */
 .tabs { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
 .tab-link {
     padding: 0.5rem 1rem;
@@ -405,15 +395,9 @@ table a:hover {
     align-items: center;
     gap: 0.5rem;
 }
-.remove-tag {
-    cursor: pointer;
-    font-weight: bold;
-}
-.remove-tag:hover {
-    color: var(--accent-red);
-}
+.remove-tag { cursor: pointer; font-weight: bold; }
+.remove-tag:hover { color: var(--accent-red); }
 
-/* Status Messages */
 .status-message {
     text-align: center;
     padding: 2rem;
@@ -472,9 +456,7 @@ table a:hover {
     padding-bottom: 0.5rem;
     border-bottom: 2px solid var(--mpb-border);
 }
-.gene-detail-page .info-item {
-    margin-bottom: 1rem;
-}
+.gene-detail-page .info-item { margin-bottom: 1rem; }
 .gene-detail-page .info-item strong {
     color: var(--mpb);
     font-weight: 600;
@@ -506,54 +488,44 @@ table a:hover {
     padding-left: 1.5rem;
     color: var(--mpb);
 }
-.gene-detail-page .reference-list li {
-    margin-bottom: 0.5rem;
-}
+.gene-detail-page .reference-list li { margin-bottom: 0.5rem; }
 .gene-detail-page .reference-list a {
     color: var(--mpb);
     text-decoration: none;
 }
-.gene-detail-page .reference-list a:hover {
-    text-decoration: underline;
-}
+.gene-detail-page .reference-list a:hover { text-decoration: underline; }
 
 /* =================================================== */
-/* CILIAPLOT PAGE STYLES (REDESIGNED FOR COMPACT VIEW) */
+/* CILIAPLOT PAGE STYLES (COMPACT VIEW)                */
 /* =================================================== */
 .enrichment-page {
     display: flex;
     flex-direction: column;
-    /* Allow page to grow naturally */
-    min-height: calc(100vh - 200px); /* Fill available vertical space */
+    min-height: calc(100vh - 200px);
 }
-
 .enrichment-header {
     flex-shrink: 0;
     margin-bottom: 1.5rem;
 }
-
 .enrichment-layout {
     display: grid;
     grid-template-columns: 380px 1fr;
     gap: 2rem;
     flex-grow: 1;
-    overflow: hidden; /* Prevent container from causing double scrollbars */
+    overflow: hidden;
 }
-
 .enrichment-controls-panel {
     display: flex;
     flex-direction: column;
     gap: 1.5rem;
-    overflow-y: auto; /* Add scroll only to this panel if content overflows */
+    overflow-y: auto;
     padding-right: 10px;
 }
-
 #enrichment-genes-input {
     min-height: 150px;
-    flex-grow: 1; /* Allow textarea to take up flexible space */
+    flex-grow: 1;
     margin-bottom: 0;
 }
-
 #enrichment-actions {
     display: flex;
     flex-direction: column;
@@ -580,7 +552,6 @@ table a:hover {
     align-items: center;
     gap: 0.5rem;
 }
-
 #plot-customization-details summary {
     background-color: var(--neutral-bg-alt);
     padding: 0.8rem 1rem;
@@ -600,7 +571,6 @@ table a:hover {
 }
 #plot-settings-panel label { font-size: 0.9em; }
 #plot-settings-panel input, #plot-settings-panel select { width: 100%; padding: 6px; }
-
 .enrichment-plot-panel {
     display: flex;
     align-items: center;
@@ -609,9 +579,8 @@ table a:hover {
     border-radius: var(--border-radius-lg);
     background-color: var(--neutral-bg-alt);
     height: 100%;
-    overflow: auto; /* Use auto to handle large plots */
+    overflow: auto;
 }
-
 .plot-area {
     height: 100%;
     width: 100%;
@@ -624,14 +593,11 @@ table a:hover {
     max-height: 100%;
 }
 
-
 /* =================================================== */
 /* RESPONSIVE DESIGN                                   */
 /* =================================================== */
 @media (max-width: 1200px) {
-    .main-container {
-        flex-direction: column;
-    }
+    .main-container { flex-direction: column; }
     .cilia-panel {
         position: static;
         width: 100%;
@@ -639,22 +605,15 @@ table a:hover {
         height: auto;
     }
 }
-
 @media (max-width: 950px) {
     .enrichment-layout {
         grid-template-columns: 1fr; /* Stack columns on smaller screens */
     }
-    .enrichment-plot-panel {
-        min-height: 500px;
-    }
+    .enrichment-plot-panel { min-height: 500px; }
 }
-
 @media (max-width: 899px) {
-    .gene-details-grid {
-        grid-template-columns: 1fr !important;
-    }
+    .gene-details-grid { grid-template-columns: 1fr !important; }
 }
-
 @media (max-width: 768px) {
     .nav-container {
         flex-direction: column;
@@ -670,9 +629,7 @@ table a:hover {
         padding: 0 1rem;
         margin-top: 1rem;
     }
-    .content-area, .cilia-panel {
-        padding: 1.5rem;
-    }
+    .content-area, .cilia-panel { padding: 1.5rem; }
     h1 { font-size: 1.8rem; }
     h2 { font-size: 1.4rem; }
 }
