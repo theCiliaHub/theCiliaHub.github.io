@@ -318,7 +318,7 @@ body {
 /* ✨ This rule now styles the tables on all three pages ✨ */
 #batch-results table, 
 #comparison-table, 
-#enrichment-results-container table {
+#ciliahub-results-container table {
     width: 100%;
     border-collapse: collapse;
     margin-top: 1rem;
@@ -329,8 +329,8 @@ body {
 #batch-results td, 
 #comparison-table th, 
 #comparison-table td,
-#enrichment-results-container th,
-#enrichment-results-container td {
+#ciliahub-results-container th,
+#ciliahub-results-container td {
     padding: 0.8rem;
     border-bottom: 1px solid var(--border-color);
     text-align: left;
@@ -339,7 +339,7 @@ body {
 /* ✨ This rule now styles the headers on all three pages ✨ */
 #batch-results th, 
 #comparison-table th,
-#enrichment-results-container th {
+#ciliahub-results-container th {
     background: var(--primary-blue);
     color: var(--text-light);
 }
@@ -347,7 +347,7 @@ body {
 /* ✨ These rules now style the links on all three pages ✨ */
 #batch-results a, 
 #comparison-table a,
-#enrichment-results-container a {
+#ciliahub-results-container a {
     color: var(--primary-blue);
     text-decoration: none;
 }
@@ -356,8 +356,8 @@ body {
 #batch-results a:focus-visible, 
 #comparison-table a:hover, 
 #comparison-table a:focus-visible,
-#enrichment-results-container a:hover,
-#enrichment-results-container a:focus-visible {
+#ciliahub-results-container a:hover,
+#ciliahub-results-container a:focus-visible {
     text-decoration: underline;
     outline: none;
 }
@@ -734,7 +734,6 @@ body {
     font-weight: bold;
 }
 
-
 /* ---------- CiliaHub: Gene detail page tweaks (Medium Persian Blue) ---------- */
 /* Paste at the end of styles.css */
 
@@ -901,210 +900,311 @@ body {
 .gene-detail-page .detail-card { outline: 1px dashed rgba(0,103,165,0.15) !important; }
 ---------------------------------------------------------------------------- */
 
-/* ======================================== */
-/* CiliaPlot Page Redesign (Corrected)      */
-/* ======================================== */
-
-/* --- Right Panel: Display (Corrected for Tidiness & Table Integration) --- */
-.ciliaplot-display-panel {
-    position: sticky;
-    top: 100px;
-    background-color: var(--panel-bg);
-    border: 1px solid var(--border-color);
-    border-radius: var(--border-radius-lg);
-    box-shadow: 0 8px 32px rgba(44, 90, 160, 0.1);
-    /* The panel itself will manage its children's layout */
-    display: flex;
-    flex-direction: column;
-    max-height: calc(100vh - 120px); /* Prevent panel from being too tall */
+/* Plot Customization Styling */
+details {
+    border: 1px solid #e1ecf4;
+    border-radius: 4px;
+    margin-bottom: 15px;
 }
 
-.ciliaplot-display-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 1rem 1.5rem;
-    border-bottom: 1px solid var(--border-color);
-    flex-shrink: 0; /* Prevent header from shrinking */
-}
-
-.ciliaplot-display-header h3 {
-    margin: 0;
-    font-size: 1.3rem;
-    color: var(--primary-dark);
-}
-
-.ciliaplot-download-options {
-    display: flex;
-    gap: 0.75rem;
-}
-
-.ciliaplot-download-btn {
-    padding: 0.5rem 1rem;
-    font-size: 0.9rem;
-    background-color: var(--primary-blue);
-    color: var(--text-light);
-    border: none;
-    border-radius: var(--border-radius-sm);
+summary {
+    padding: 8px;
+    background-color: #e1ecf4;
     cursor: pointer;
-    text-decoration: none;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    transition: background-color 0.3s;
+    font-weight: bold;
+    border-radius: 4px;
 }
 
-.ciliaplot-download-btn:hover, .ciliaplot-download-btn:focus-visible {
-    background-color: var(--primary-blue-light);
-    outline: none;
+details[open] summary {
+    border-bottom: 1px solid #d1dbe4;
 }
 
-/* --- Plot Area (Corrected for Tidiness) --- */
-.ciliaplot-plot-area {
-    min-height: 500px; /* A large but more reasonable default height */
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 1.5rem;
-    overflow: auto; /* Allow scrolling for very large plots */
-    flex-grow: 1; /* Allow the plot area to fill available space */
+label {
+    display: block;
+    font-size: 0.9rem;
+    margin-bottom: 5px;
+    color: #333;
 }
 
-/* Ensure the SVG is responsive and never overflows its container */
-.ciliaplot-plot-area svg {
+input[type="text"],
+input[type="number"],
+select,
+input[type="color"] {
     width: 100%;
-    height: auto; /* Maintains aspect ratio */
-    max-width: 100%; /* This is the key to preventing overflow! */
+    padding: 6px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 0.9rem;
 }
 
-
-#### **Step 2: Replace the CiliaPlot CSS (`styles.css`)**
-
-This new HTML requires different CSS. Please **replace the entire `CiliaPlot Page Redesign` CSS block** you added previously with this single, corrected block.
-
-```css
-/* ======================================== */
-/* CiliaPlot Page Redesign (Corrected Layout) */
-/* ======================================== */
-
-/* --- Main Layout Sections --- */
-.ciliaplot-top-section {
-    display: grid;
-    grid-template-columns: 420px 1fr; /* Fixed width for input, flexible for plot */
-    gap: 2rem;
-    align-items: stretch; /* Make columns same height */
+input[type="color"] {
+    padding: 2px;
+    height: 30px;
 }
 
-.ciliaplot-bottom-section {
-    margin-top: 2rem;
-    display: grid;
-    grid-template-columns: 1fr 1.5fr; /* 2 columns for controls and table */
-    gap: 2rem;
-    align-items: start;
+.plot-wrapper {
+    position: relative;
+    width: 100%;
 }
 
-/* --- Left Panel: Gene Input --- */
-.ciliaplot-input-panel {
+/* =================================================== */
+/* Styles for Compact CiliaHub Page Layout             */
+/* =================================================== */
+
+.ciliahub-page {
     display: flex;
     flex-direction: column;
-}
-.ciliaplot-input-panel .ciliaplot-control-card {
-    flex-grow: 1; /* Make the card fill the space */
-}
-#ciliaplot-genes-input {
-    width: 100%;
-    min-height: 450px; /* Much larger text area */
-    font-size: 1rem;
-    border: 2px solid var(--border-color);
-    border-radius: var(--border-radius-sm);
-    padding: 0.8rem;
-    resize: none; /* Lock the size */
-}
-#ciliaplot-generate-btn {
-    margin-top: 1rem;
+    /* ✨ FIX: The fixed height properties have been removed to allow the page to grow. */
 }
 
-/* --- Right Panel: Main Plot --- */
-.ciliaplot-main-plot-panel {
-    display: flex;
-    flex-direction: column;
-    background-color: var(--panel-bg);
-    border: 1px solid var(--border-color);
-    border-radius: var(--border-radius-lg);
-    box-shadow: 0 8px 32px rgba(44, 90, 160, 0.1);
-}
-.ciliaplot-plot-area {
-    flex-grow: 1; /* Make plot area fill available vertical space */
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 1.5rem;
-    overflow: auto;
-}
-.ciliaplot-plot-area svg {
-    width: 100%;
-    height: auto;
-    max-width: 100%;
+.ciliahub-header {
+    flex-shrink: 0; /* Prevents header from shrinking */
 }
 
+.ciliahub-layout {
+    display: grid;
+    grid-template-columns: 380px 1fr; /* Gives more space to the plot */
+    gap: 2rem;
+    flex-grow: 1;
+    overflow: hidden;
+}
 
-/* --- Bottom Section: Controls & Table --- */
-.ciliaplot-controls-grid {
+.ciliahub-controls-panel {
     display: flex;
     flex-direction: column;
     gap: 1.5rem;
+    overflow-y: auto; /* Add scroll only to controls if they overflow */
+    padding-right: 10px;
 }
 
-.ciliaplot-results-table-container {
+#ciliahub-genes-input {
+    /* Make textarea shorter and allow it to grow */
+    min-height: 100px; 
+    flex-grow: 1;
+    margin-bottom: 0;
+}
+
+#ciliahub-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    background-color: var(--neutral-bg-alt);
+    padding: 1rem;
+    border-radius: var(--border-radius-md);
+}
+
+.plot-type-selection {
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.action-buttons {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+}
+
+#download-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+#plot-customization-details summary {
+    background-color: var(--neutral-bg-alt);
+    border-radius: var(--border-radius-sm);
+}
+
+#plot-customization-details {
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-md);
+}
+
+#plot-settings-panel {
+    /* Make customization controls more compact */
+    display: grid; 
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    padding: 1rem;
+}
+
+.ciliahub-plot-panel {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px dashed var(--border-color);
+    border-radius: var(--border-radius-lg);
+    background-color: var(--neutral-bg-alt);
+    height: 100%;
+    overflow: hidden; /* Reverted from auto */
+}
+
+.plot-area, .plot-wrapper {
+    /* Ensure plot fills its container without a fixed height */
+    height: 100%;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+#plot-placeholder {
+    margin: auto;
+    color: var(--gray-dark);
+}
+
+/* =================================================== */
+/* NEW, INTEGRATED CILIAHUB PAGE STYLES                */
+/* =================================================== */
+
+.ciliahub-page .ciliahub-header {
+    margin-bottom: 2rem;
+    border-bottom: 2px solid var(--border-color);
+    padding-bottom: 1rem;
+}
+
+.ciliahub-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2rem;
+}
+
+.ciliahub-left-panel {
+    flex: 1 1 380px;
+    min-width: 350px;
+}
+
+.ciliahub-right-panel {
+    flex: 2 1 600px;
+    min-width: 400px;
+}
+
+.control-section {
     background-color: var(--panel-bg);
     border: 1px solid var(--border-color);
-    border-radius: var(--border-radius-lg);
-    overflow: hidden; /* Important for border-radius */
-    box-shadow: 0 4px 12px rgba(44, 90, 160, 0.05);
+    border-radius: var(--border-radius-md);
+    margin-bottom: 1.5rem;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
 }
 
-.ciliaplot-results-table-container h3 {
+.control-section h3 {
     margin: 0;
     padding: 1rem 1.5rem;
-    border-bottom: 1px solid var(--border-color);
     font-size: 1.2rem;
     color: var(--primary-dark);
-}
-
-.ciliaplot-results-table {
-    width: 100%;
-    border-collapse: collapse;
-}
-.ciliaplot-results-table-wrapper {
-    max-height: 400px; /* Make table scrollable if too long */
-    overflow-x: auto;
-    overflow-y: auto;
-}
-/* The actual table styles for stripes, headers, etc. */
-.ciliaplot-results-table th,
-.ciliaplot-results-table td {
-    padding: 12px 15px;
     border-bottom: 1px solid var(--border-color);
-    text-align: left;
-    white-space: nowrap;
-}
-.ciliaplot-results-table th {
-    background-color: var(--primary-blue);
-    color: var(--text-light);
-    position: sticky;
-    top: 0;
-    z-index: 1;
-}
-.ciliaplot-results-table tbody tr:nth-child(even) {
-    background-color: var(--neutral-bg-alt); /* Light blue stripe */
-}
-.ciliaplot-results-table tbody tr:hover {
-    background-color: #eaf3f8;
 }
 
-/* Responsive adjustments */
-@media (max-width: 1200px) {
-    .ciliaplot-top-section, .ciliaplot-bottom-section {
-        grid-template-columns: 1fr; /* Stack everything vertically */
-    }
+.control-section-content {
+    padding: 1.5rem;
+}
+
+#ciliahub-genes-input {
+    width: 100%;
+    min-height: 120px;
+    margin-bottom: 1rem;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: var(--border-radius-sm);
+    font-size: 1rem;
+    resize: vertical;
+}
+
+/* Plot Options Styling */
+.plot-option {
+    margin-bottom: 1.2rem;
+}
+.plot-option:last-child {
+    margin-bottom: 0;
+}
+
+.plot-option label {
+    font-weight: bold;
+    font-size: 1.1em;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+}
+
+.plot-option input[type="radio"] {
+    accent-color: var(--primary-blue);
+    width: 18px;
+    height: 18px;
+}
+
+.plot-option-explanation {
+    font-size: 0.9em;
+    color: var(--gray-dark);
+    line-height: 1.5;
+    margin-left: 26px;
+    margin-top: 5px;
+}
+
+/* Plot Customization Panel */
+.control-section details summary {
+    padding: 1rem 1.5rem;
+    cursor: pointer;
+    font-weight: bold;
+    outline: none;
+    position: relative;
+}
+.control-section details summary::after {
+    content: '▶';
+    position: absolute;
+    right: 1.5rem;
+    transition: transform 0.2s;
+}
+.control-section details[open] summary::after {
+    transform: rotate(90deg);
+}
+
+#plot-settings-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1rem;
+}
+
+#plot-settings-grid label {
+    display: block;
+    font-weight: bold;
+    margin-bottom: 5px;
+    font-size: 0.9em;
+}
+
+#plot-settings-grid input,
+#plot-settings-grid select {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+}
+
+/* Plot Display Area */
+#plot-display-area {
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-md);
+    width: 100%;
+    min-height: 600px;
+    padding: 1.5rem;
+    position: relative;
+    background-color: var(--panel-bg);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+}
+
+#plot-display-area .status-message {
+    text-align: center;
+    color: var(--gray-dark);
+    font-size: 1.1em;
+    padding: 50px 20px;
+}
+
+/* Ensure D3 SVG plots are responsive */
+#plot-display-area svg {
+    max-width: 100%;
+    height: auto;
 }
