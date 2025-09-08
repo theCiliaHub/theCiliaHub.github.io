@@ -1145,36 +1145,7 @@ body {
     max-width: none; /* Override max-width to allow it to be truly large */
 }
 
-.ciliaplot-plot-area .status-message {
-    text-align: center;
-    color: var(--gray-dark);
-    font-size: 1.1em;
-}
 
-
-
-/* --- Responsive Design for CiliaPlot --- */
-@media (max-width: 992px) {
-    .ciliaplot-container {
-        grid-template-columns: 1fr; /* Stack columns */
-    }
-
-    .ciliaplot-display-panel {
-        position: static; /* Remove sticky positioning on smaller screens */
-        margin-top: 2rem;
-    }
-}
-
-@media (max-width: 480px) {
-    #ciliaplot-settings-grid {
-        grid-template-columns: 1fr; /* Single column for customization on mobile */
-    }
-
-    .ciliaplot-display-header {
-        flex-direction: column;
-        gap: 1rem;
-    }
-}
 
 /* --- New Table Styling Below Plot --- */
 .ciliaplot-results-table-container {
