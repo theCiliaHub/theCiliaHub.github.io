@@ -13,136 +13,118 @@ Chart.register({
 });
 
 
-// =================================================================
-// script.js
-// This file contains all functions for the CiliaHub application.
-// IT MUST BE LOADED BEFORE globals.js IN YOUR HTML.
-// =================================================================
-
-// --- CORE HELPER & DATA LOADING ---
-
 /**
- * Sanitizes any string by trimming whitespace and converting to uppercase.
+ * Sanitizes any string by removing invisible characters and normalizing it.
  */
 function sanitize(input) {
     if (typeof input !== 'string') return '';
-    return input.trim().toUpperCase();
+    // Removes zero-width spaces, non-printable characters, trims, and normalizes case
+    return input.replace(/[\u200B-\u200D\u2060\uFEFF]/g, '')
+                .replace(/[^\x20-\x7E]/g, '') // Remove non-printable ASCII
+                .trim()
+                .toUpperCase();
 }
 
 /**
- * Loads and indexes the gene database into the geneMapCache.
+ * Loads, sanitizes, and prepares the gene database into an efficient lookup map.
  */
 async function loadAndPrepareDatabase() {
     if (geneDataCache) return true;
-
     try {
         const resp = await fetch('https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/ciliahub_data.json');
-        if (!resp.ok) throw new Error(`HTTP Error: ${resp.status}`);
-        
+        if (!resp.ok) throw new Error(`HTTP Error ${resp.status}`);
         const rawGenes = await resp.json();
-        if (!Array.isArray(rawGenes)) throw new Error('Data format is not an array.');
+
+        if (!Array.isArray(rawGenes)) {
+            throw new Error('Invalid data format: expected array');
+        }
 
         geneDataCache = rawGenes;
         allGenes = rawGenes;
-        currentData = rawGenes;
         geneMapCache = new Map();
 
-        allGenes.forEach(gene => {
-            if (!gene.gene) return;
-            const primaryKey = sanitize(gene.gene);
-            geneMapCache.set(primaryKey, gene);
+        allGenes.forEach(g => {
+            if (!g.gene || typeof g.gene !== 'string') {
+                console.warn('Skipping entry with invalid gene name:', g);
+                return;
+            }
 
-            if (gene.synonym) {
-                String(gene.synonym).split(/[,;]/).forEach(syn => {
+            // 1. Index by the primary gene name
+            const nameKey = sanitize(g.gene);
+            if (nameKey) geneMapCache.set(nameKey, g);
+
+            // 2. Index by all synonyms (handles comma or semicolon separators)
+            if (g.synonym) {
+                String(g.synonym).split(/[,;]/).forEach(syn => {
                     const key = sanitize(syn);
-                    if (key && !geneMapCache.has(key)) geneMapCache.set(key, gene);
+                    if (key && !geneMapCache.has(key)) geneMapCache.set(key, g);
                 });
             }
-            if (gene.ensembl_id) {
-                String(gene.ensembl_id).split(/[,;]/).forEach(id => {
-                    const key = sanitize(id);
-                    if (key) geneMapCache.set(key, gene);
-                });
+
+            // 3. Index by all Ensembl IDs (handles comma or semicolon separators)
+          // This part of your code already handles Ensembl IDs
+if (g.ensembl_id) {
+    String(g.ensembl_id).split(/[,;]/).forEach(id => {
+        const key = sanitize(id);
+        if (key) geneMapCache.set(key, g);
+    });
+} 
+            
+            // 4. Prepare localization data for SVG mapping - MODIFIED: Sanitize input to filter non-ciliary terms and add debug logging for ACTN2
+            if (g.localization) {
+                // Sanitize: Only pass valid ciliary localizations to mapLocalizationToSVG to prevent additions like "Cytosol"
+                const validCiliaryLocalizations = ['transition zone', 'cilia', 'basal body', 'axoneme', 'ciliary membrane', 'centrosome', 'autophagosomes', 'endoplasmic reticulum', 'flagella', 'golgi apparatus', 'lysosome', 'microbody', 'microtubules', 'mitochondrion', 'nucleus', 'peroxisome']; // Expanded list based on common terms in plots.js
+                let sanitizedLocalization = Array.isArray(g.localization) 
+                    ? g.localization.map(loc => loc ? loc.trim().toLowerCase() : '').filter(loc => loc && validCiliaryLocalizations.includes(loc))
+                    : (g.localization ? g.localization.split(/[,;]/).map(loc => loc ? loc.trim().toLowerCase() : '').filter(loc => loc && validCiliaryLocalizations.includes(loc)) : []);
+                
+                // Debug logging for ACTN2
+                if (g.gene === 'ACTN2') {
+                    console.log('ACTN2 Raw localization from JSON:', g.localization);
+                    console.log('ACTN2 Sanitized localization before mapping:', sanitizedLocalization);
+                }
+                
+                geneLocalizationData[g.gene] = mapLocalizationToSVG(sanitizedLocalization); // Use sanitized input
+                
+                // Additional debug for mapped output
+                if (g.gene === 'ACTN2') {
+                    console.log('ACTN2 Mapped localization from mapLocalizationToSVG:', geneLocalizationData[g.gene]);
+                }
             }
         });
-        
-        console.log(`✅ Database ready! Indexed ${geneMapCache.size} search terms.`);
-        return true;
 
+        console.log(`Loaded ${allGenes.length} genes into database`);
+        return true;
     } catch (e) {
-        console.error('Database loading failed:', e);
+        console.error('Data load error:', e);
+        // Fallback logic remains the same
+        allGenes = getDefaultGenes();
+        currentData = allGenes;
+        geneMapCache = new Map();
+        allGenes.forEach(g => {
+            if (g.gene) geneMapCache.set(sanitize(g.gene), g);
+        });
         return false;
     }
 }
 
-// --- PAGE DISPLAY FUNCTIONS ---
-
-function displayHomePage() {
-    const contentArea = document.querySelector('.content-area');
-    document.querySelector('.cilia-panel').style.display = 'block';
-    contentArea.innerHTML = `
-        <div class="page-section">
-            <h1>The CiliaHub: An Updated Database of Gold Standard Genes with Ciliary Functions</h1>
-            <p style="font-size: 1.1rem; color: #555;">CiliaHub is an advanced bioinformatics platform...</p>
-            <div class="search-container">
-                <div class="search-wrapper" style="flex: 1;">
-                    <input type="text" id="single-gene-search" placeholder="Search by gene, synonym, or Ensembl ID" autocomplete="off">
-                    <div id="search-suggestions"></div>
-                </div>
-                <button id="single-search-btn" class="search-btn btn btn-primary">Search</button>
-            </div>
-            <div id="gene-cards-container" class="gene-cards"></div>
-        </div>`;
-    
-    document.getElementById('single-search-btn').onclick = performSingleSearch;
-    // Add other event listeners for the home page here
-}
-
-function displayIndividualGenePage(gene) {
-    const contentArea = document.querySelector('.content-area');
-    if (!contentArea) return;
-
-    let ensemblHTML = 'Not available';
-    if (gene.ensembl_id) {
-        const ids = String(gene.ensembl_id).split(/\s*,\s*/).filter(Boolean);
-        ensemblHTML = ids.map(id => 
-            `<a href="https://www.ensembl.org/Homo_sapiens/Gene/Summary?g=${id}" target="_blank" class="text-[#0067A5] hover:underline">${id}</a>`
-        ).join('<br>');
-    }
-
-    // This uses your beautiful template for the gene page
-    // (You can paste your full displayIndividualGenePage innerHTML here if you wish)
-    contentArea.innerHTML = `
-      <div class="page-section gene-detail-page bg-white shadow-lg rounded-lg overflow-hidden">
-        <header class="gene-header px-6 py-8 bg-gradient-to-r from-[#e6f0f7] to-white">
-          <h1 class="gene-name text-3xl font-bold text-[#0067A5] mb-2">${gene.gene}</h1>
-          <p class="gene-description text-[#0067A5] text-lg">${gene.description || 'No description available.'}</p>
-        </header>
-        <div class="gene-details-grid grid grid-cols-1 lg:grid-cols-2 gap-6 p-6">
-          <div class="detail-card bg-white border border-[#c2d9e6] rounded-lg p-6 shadow-sm">
-            <h3 class="card-title text-xl font-semibold text-[#0067A5] mb-4">Identifiers</h3>
-            <div class="space-y-3">
-              <div><strong class="text-[#0067A5]">Ensembl ID(s):</strong> ${ensemblHTML}</div>
-              ${gene.synonym ? `<div><strong class="text-[#0067A5]">Synonym(s):</strong> <span class="text-[#0067A5]">${gene.synonym}</span></div>` : ''}
-            </div>
-          </div>
-          <div class="detail-card bg-white border border-[#c2d9e6] rounded-lg p-6 shadow-sm">
-            <h3 class="card-title text-xl font-semibold text-[#0067A5] mb-4">Functional Summary</h3>
-            <p class="text-[#0067A5]">${gene.functional_summary || 'Not available.'}</p>
-          </div>
-        </div>
-      </div>
-    `;
-}
-
 /**
- * Finds genes from a list of queries using the pre-built cache.
+ * Search genes using symbols, synonyms, or ENSG IDs.
+ * Handles multiple IDs per gene.
+ */
+/**
+ * Search genes using symbols, synonyms, or Ensembl IDs from the pre-built cache.
+ * Handles multiple queries efficiently.
+ *
+ * @param {string[]} queries - An array of sanitized, uppercase gene identifiers.
+ * @returns {{foundGenes: object[], notFoundGenes: string[]}} - An object containing found gene objects and not-found queries.
  */
 function findGenes(queries) {
     const foundGenes = new Map(); // Use a Map to store unique genes by their canonical name
     const notFound = [];
 
     queries.forEach(query => {
+        // The query is expected to be sanitized (trimmed, uppercased) before being passed.
         const result = geneMapCache.get(query);
         
         if (result) {
@@ -151,6 +133,8 @@ function findGenes(queries) {
                 foundGenes.set(result.gene, result);
             }
         } else {
+            // The original, unsanitized query should be returned for user feedback.
+            // This requires the calling function to manage the original queries.
             notFound.push(query); 
         }
     });
@@ -161,212 +145,29 @@ function findGenes(queries) {
     };
 }
 
-
-/**
- * A helper function for debugging search failures.
- */
+// Add this function to help with debugging
 function debugSearch(query) {
-    console.log("Debugging search for:", query);
+    console.log("Searching for:", query);
     console.log("Cache has key?", geneMapCache.has(query));
     
     if (!geneMapCache.has(query)) {
-        console.log("Searching for keys that might match...");
+        console.log("Available keys matching query:");
         for (let key of geneMapCache.keys()) {
-            if (key.includes(query)) {
-                console.log(`- Found similar key: ${key}`);
+            if (key.includes(query) || query.includes(key)) {
+                console.log(`- ${key}`);
             }
         }
-    }
-}
-
-
-/**
- * Displays a visually rich, detailed page for a single gene object.
- * @param {object} gene The complete gene object from the database.
- */
-function displayIndividualGenePage(gene) {
-    const contentArea = document.querySelector('.content-area');
-    if (!contentArea) {
-        console.error('Content area not found!');
-        return;
-    }
-
-    // Ensure the main cilia diagram panel is visible for this page
-    document.querySelector('.cilia-panel').style.display = 'block';
-
-    // --- Data Formatting ---
-
-    // CORRECTED: Properly handle and format comma-separated Ensembl IDs into clickable links
-    let ensemblHTML = 'Not available';
-    if (gene.ensembl_id) {
-        const ids = String(gene.ensembl_id).split(/\s*,\s*/).filter(Boolean);
-        ensemblHTML = ids.map(id => 
-            `<a href="https://www.ensembl.org/Homo_sapiens/Gene/Summary?g=${id}" target="_blank" class="text-[#0067A5] hover:underline">${id}</a>`
-        ).join('<br>'); // Use a line break for multiple IDs for better readability
-    }
-    
-    // Safely format other data
-    const omimLink = gene.omim_id ? `<a href="https://www.omim.org/entry/${gene.omim_id}" target="_blank" class="text-[#0067A5] hover:underline">${gene.omim_id}</a>` : 'Not available';
-
-    // --- Main Page Template ---
-    contentArea.innerHTML = `
-      <div class="page-section gene-detail-page bg-white shadow-lg rounded-lg overflow-hidden">
-        <header class="gene-header px-6 py-8 bg-gradient-to-r from-[#e6f0f7] to-white">
-          <h1 class="gene-name text-3xl font-bold text-[#0067A5] mb-2">${gene.gene}</h1>
-          <p class="gene-description text-[#0067A5] text-lg">${gene.description || 'No description available.'}</p>
-        </header>
-
-        <div class="gene-details-grid grid grid-cols-1 lg:grid-cols-2 gap-6 p-6">
-          
-          <div class="detail-card bg-white border border-[#c2d9e6] rounded-lg p-6 shadow-sm">
-            <h3 class="card-title text-xl font-semibold text-[#0067A5] mb-4">Identifiers</h3>
-            <div class="space-y-3">
-              <div><strong class="text-[#0067A5]">Ensembl ID(s):</strong> ${ensemblHTML}</div>
-              <div><strong class="text-[#0067A5]">OMIM ID:</strong> ${omimLink}</div>
-              <div><strong class="text-[#0067A5]">Synonym(s):</strong> <span class="text-[#0067A5]">${gene.synonym || 'Not available'}</span></div>
-            </div>
-          </div>
-
-          <div class="detail-card bg-white border border-[#c2d9e6] rounded-lg p-6 shadow-sm">
-            <h3 class="card-title text-xl font-semibold text-[#0067A5] mb-4">Functional Summary</h3>
-            <p class="text-[#0067A5]">${gene.functional_summary || 'Not available.'}</p>
-          </div>
-
-        </div>
-      </div>
-    `;
-    
-    // This ensures that after displaying the page, related UI elements like localization buttons are updated.
-    if (typeof updateGeneButtons === 'function') {
-        updateGeneButtons([gene], [gene]);
-    }
-    if (typeof showLocalization === 'function') {
-        showLocalization(gene.gene, true);
-    }
-}
-function displayHomePage() {
-    const contentArea = document.querySelector('.content-area');
-    contentArea.className = 'content-area';
-    document.querySelector('.cilia-panel').style.display = 'block';
-    contentArea.innerHTML = `
-        <div class="page-section">
-            <h1>The CiliaHub: An Updated Database of Gold Standard Genes with Ciliary Functions</h1>
-            <p style="font-size: 1.1rem; color: #555;">CiliaHub is an advanced <strong>bioinformatics</strong> platform that hosts a detailed database of <strong>gold standard cilia genes</strong> and their role in various <strong>ciliopathies</strong>. Our comprehensive collection includes the most reliable and well-established genes linked to ciliary function, with reference papers also provided. With our user-friendly search tool, researchers can explore <strong>genome</strong>-wide data, focusing on both known and novel ciliary genes. Discover their contributions to the biology of cilia and the mechanisms behind ciliary-related disorders. Search for a single gene below or use the Batch Query tool to analyze multiple genes.</p>
-            <div class="search-container">
-                <div class="search-wrapper" style="flex: 1;">
-                    <input type="text" id="single-gene-search" placeholder="Search for a single gene (e.g., ACE2, IFT88)" aria-label="Search for a single gene" autocomplete="off">
-                    <div id="search-suggestions"></div>
-                </div>
-                <button id="single-search-btn" class="search-btn btn btn-primary" aria-label="Search for the entered gene name">Search</button>
-            </div>
-            <div id="gene-cards-container" class="gene-cards"></div>
-            <div id="status-message" class="status-message" style="display: none;"></div>
-        </div>`;
-    
-    document.getElementById('single-search-btn').onclick = performSingleSearch;
-    const searchInput = document.getElementById('single-gene-search');
-    const suggestionsContainer = document.getElementById('search-suggestions');
-
-    const hideSuggestions = () => {
-        suggestionsContainer.innerHTML = '';
-        suggestionsContainer.style.display = 'none';
-    };
-    
-    searchInput.addEventListener('input', function() {
-        const query = this.value.trim().toUpperCase();
-        if (query.length < 1) {
-            hideSuggestions();
-            return;
-        }
-
-        // --- CORRECTED LOGIC FOR LIVE SEARCH SUGGESTIONS ---
-        const filteredGenes = allGenes.filter(g => {
-            const upperQuery = query;
-
-            // Check primary gene symbol (prefix match)
-            if (g.gene && g.gene.toUpperCase().startsWith(upperQuery)) return true;
-            
-            // Check all Ensembl IDs (prefix match on any ID in the list)
-            if (g.ensembl_id) {
-                if (String(g.ensembl_id).split(/[,;]/).some(id => id.trim().toUpperCase().startsWith(upperQuery))) return true;
-            }
-            
-            // Check all synonyms (includes match on any synonym in the list)
-            if (g.synonym) {
-                if (String(g.synonym).split(/[,;]/).some(syn => syn.trim().toUpperCase().includes(upperQuery))) return true;
-            }
-            
-            return false;
-        }).slice(0, 10);
-
-        if (filteredGenes.length > 0) {
-            suggestionsContainer.innerHTML = '<ul>' + 
-                filteredGenes.map(g => {
-                    const details = [g.ensembl_id, g.synonym].filter(Boolean).join(', ');
-                    return `<li data-gene="${g.gene}">${g.gene}${details ? ` (${details})` : ''}</li>`;
-                }).join('') + 
-                '</ul>';
-            
-            suggestionsContainer.querySelector('ul').addEventListener('click', function(event) {
-                if (event.target && event.target.nodeName === "LI") {
-                    searchInput.value = event.target.dataset.gene;
-                    hideSuggestions();
-                    performSingleSearch();
-                }
-            });
-
-            suggestionsContainer.style.display = 'block';
-        } else {
-            hideSuggestions();
-        }
-    });
-
-    searchInput.addEventListener('keydown', function(event) {
-        const suggestions = suggestionsContainer.querySelectorAll('li');
-        if (suggestions.length === 0 && event.key !== 'Enter') return;
-        
-        let activeElement = suggestionsContainer.querySelector('.active');
-
-        if (event.key === 'Enter') {
-            event.preventDefault();
-            if (activeElement) {
-                searchInput.value = activeElement.textContent.split(' ')[0];
-            }
-            hideSuggestions();
-            performSingleSearch();
-            return;
-        }
-        
-        if (event.key === 'ArrowDown') {
-            event.preventDefault();
-            let nextElement = activeElement ? activeElement.nextElementSibling : suggestions[0];
-            if (nextElement) {
-                activeElement?.classList.remove('active');
-                nextElement.classList.add('active');
-            }
-        } else if (event.key === 'ArrowUp') {
-            event.preventDefault();
-            let prevElement = activeElement ? activeElement.previousElementSibling : suggestions[suggestions.length - 1];
-            if (prevElement) {
-                activeElement?.classList.remove('active');
-                prevElement.classList.add('active');
-            }
-        }
-    });
-    
-    document.addEventListener('click', function(event) {
-        if (!searchInput.contains(event.target) && !suggestionsContainer.contains(event.target)) {
-            hideSuggestions();
-        }
-    });
-    
-    if(typeof displayGeneCards === 'function') {
-        displayGeneCards(currentData, [], 1, 10);
     }
 }
 
 /**
  * Handles the UI for the Batch Gene Query page.
+ */
+/**
+ * Handles the UI for the Batch Gene Query page.
+ */
+/**
+ * Handles the UI for the Batch Gene Query page, supporting all identifier types and filters.
  */
 function performBatchSearch() {
     const inputElement = document.getElementById('batch-genes-input');
@@ -379,6 +180,7 @@ function performBatchSearch() {
 
     // 1. Get all unique, sanitized queries from the input box
     const originalQueries = inputElement.value.split(/[\s,;\n\r\t]+/).filter(Boolean);
+    // Use a Set to automatically handle duplicate inputs
     const sanitizedQueries = [...new Set(originalQueries.map(sanitize))];
 
     if (sanitizedQueries.length === 0) {
@@ -386,11 +188,11 @@ function performBatchSearch() {
         return;
     }
 
-    // 2. Use the central `findGenes` function
+    // 2. Use the central `findGenes` function that correctly finds all ID types
     const { foundGenes } = findGenes(sanitizedQueries);
     let results = foundGenes;
 
-    // 3. Apply optional filters
+    // 3. Apply the optional localization and keyword filters to the results
     if (localizationFilter) {
         results = results.filter(g =>
             g.localization && g.localization.some(l => l && l.toLowerCase() === localizationFilter.toLowerCase())
@@ -404,9 +206,10 @@ function performBatchSearch() {
         );
     }
 
-    // 4. Determine which queries were not found
+    // 4. Determine which of the original, user-entered queries were not found in the final results
     const foundIds = new Set();
     results.forEach(gene => {
+        // Add all known identifiers for the found genes to a set for quick lookup
         foundIds.add(gene.gene.toUpperCase());
         if (gene.synonym) {
             String(gene.synonym).split(/[,;]/).forEach(s => foundIds.add(sanitize(s)));
@@ -418,7 +221,7 @@ function performBatchSearch() {
 
     const notFoundOriginalQueries = originalQueries.filter(q => !foundIds.has(sanitize(q)));
 
-    // 5. Display the results
+    // 5. Display the final, filtered results
     statusDiv.style.display = 'none';
     searchResults = results; // Update global variable for exports
 
@@ -427,13 +230,12 @@ function performBatchSearch() {
         displayGeneCards(currentData, results, 1, 10);
     } else {
         resultDiv.innerHTML = '<p class="status-message error-message">No genes found matching your query and filters.</p>';
-        displayGeneCards(currentData, [], 1, 10);
+        displayGeneCards(currentData, [], 1, 10); // Clear the gene cards
     }
 }
 
-/**
- * Handles the live search suggestions on the home page.
- */
+// --- HOME PAGE SEARCH HANDLER (FIXED) ---
+// This function handles user input to show a list of suggestions.
 function handleHomeSearchInput() {
     const query = homeSearchInput.value.trim().toUpperCase();
     if (query.length < 1) {
@@ -441,40 +243,25 @@ function handleHomeSearchInput() {
         return;
     }
 
-    // CORRECTED: This logic now correctly handles comma-separated values for synonyms and Ensembl IDs.
+    // Filter genes using the same successful logic as the Compare Page
     const filteredGenes = allGenes.filter(g => {
-        const upperQuery = query; // Already uppercased
-
-        // Check primary gene symbol (prefix match)
-        if (g.gene && g.gene.toUpperCase().startsWith(upperQuery)) {
-            return true;
-        }
-
-        // Check all Ensembl IDs (prefix match on any ID in the list)
-        if (g.ensembl_id) {
-            if (String(g.ensembl_id).split(/[,;]/).some(id => sanitize(id).startsWith(upperQuery))) {
-                return true;
-            }
-        }
-        
-        // Check all synonyms (includes match on any synonym in the list)
-        if (g.synonym) {
-            if (String(g.synonym).split(/[,;]/).some(syn => sanitize(syn).includes(upperQuery))) {
-                return true;
-            }
-        }
-
-        return false;
+        const geneMatch = g.gene && g.gene.toUpperCase().startsWith(query);
+        const synonymMatch = g.synonym && g.synonym.toUpperCase().includes(query);
+        const ensemblMatch = g.ensembl_id && g.ensembl_id.toUpperCase().startsWith(query);
+        return geneMatch || synonymMatch || ensemblMatch;
     }).slice(0, 10);
 
     if (filteredGenes.length > 0) {
+        // Build and display the suggestion list
         homeSuggestionsContainer.innerHTML = filteredGenes.map(g => {
             const details = [g.ensembl_id, g.synonym].filter(Boolean).join(', ');
             return `<div class="suggestion-item" data-gene="${g.gene}">${g.gene}${details ? ` (${details})` : ''}</div>`;
         }).join('');
 
+        // Add a click listener to each suggestion
         homeSuggestionsContainer.querySelectorAll('.suggestion-item').forEach(item => {
             item.addEventListener('click', () => {
+                // On click, navigate to the specific gene page
                 navigateToGenePage(item.dataset.gene);
             });
         });
@@ -485,60 +272,47 @@ function handleHomeSearchInput() {
     }
 }
 
-/**
- * Handles the 'Enter' key press in the home page search box.
- */
+// --- ADDED FUNCTION TO HANDLE 'ENTER' KEY ---
+// This function should be attached to the 'keydown' event of your search input.
 function handleHomeSearchKeyDown(event) {
     if (event.key === 'Enter') {
         const query = homeSearchInput.value.trim().toUpperCase();
         if (query.length === 0) return;
 
-        // Use the powerful geneMapCache for a direct, exact match on any identifier
-        const foundGene = geneMapCache.get(query);
+        // Check for an exact match to what the user typed (e.g., "A10")
+        const exactMatch = allGenes.find(g => g.gene.toUpperCase() === query);
 
-        if (foundGene) {
-            // If an exact match is found, navigate directly to that gene's page
-            navigateToGenePage(foundGene.gene);
+        if (exactMatch) {
+            // If an exact match is found, navigate directly
+            navigateToGenePage(exactMatch.gene);
         } else {
             // Otherwise, navigate to the first suggestion as a fallback
             const firstSuggestion = homeSuggestionsContainer.querySelector('.suggestion-item');
             if (firstSuggestion) {
                 navigateToGenePage(firstSuggestion.dataset.gene);
-            } else {
-                alert(`No gene found for "${homeSearchInput.value.trim()}"`);
             }
         }
     }
 }
 
 
-/**
- * Navigates to the selected gene's page.
- */
+// --- NAVIGATION FIX ---
+// This robust function navigates to the selected gene's page.
 function navigateToGenePage(geneName) {
-    // Look up the gene object using the master cache to ensure consistency
-    const selectedGene = geneMapCache.get(sanitize(geneName));
+    const selectedGene = allGenes.find(g => g.gene === geneName);
 
     if (selectedGene) {
-        if (typeof homeSearchInput !== 'undefined') {
-            homeSearchInput.value = selectedGene.gene;
-            homeSuggestionsContainer.style.display = 'none';
-        }
-        
-        // This should trigger your router (e.g., handleRouteChange) to display the page
-        window.location.hash = `#/${selectedGene.gene}`;
-        
-        // Directly call the display function for immediate feedback
-        if (typeof displayGenePage === 'function') { // Check if the function exists
-             displayGenePage(selectedGene.gene);
-        } else if (typeof displayIndividualGenePage === 'function') {
-             displayIndividualGenePage(selectedGene);
-        }
+        homeSearchInput.value = selectedGene.gene; // Update input field
+        homeSuggestionsContainer.style.display = 'none'; // Hide suggestions
 
+        // Your existing navigation logic
+        window.location.hash = `#/${selectedGene.gene}`;
+        displayGenePage(selectedGene.gene);
     } else {
         console.warn(`Navigation failed: No gene found for "${geneName}"`);
     }
 }
+
 
 /**
  * Displays batch results.
@@ -718,7 +492,116 @@ function mapLocalizationToSVG(localizationArray) {
 
 
 
+function displayHomePage() {
+    const contentArea = document.querySelector('.content-area');
+    contentArea.className = 'content-area';
+    document.querySelector('.cilia-panel').style.display = 'block';
+    contentArea.innerHTML = `
+        <div class="page-section">
+            <h1>The CiliaHub: An Updated Database of Gold Standard Genes with Ciliary Functions</h1>
+            <p style="font-size: 1.1rem; color: #555;">CiliaHub is an advanced <strong>bioinformatics</strong> platform that hosts a detailed database of <strong>gold standard cilia genes</strong> and their role in various <strong>ciliopathies</strong>. Our comprehensive collection includes the most reliable and well-established genes linked to ciliary function, with reference papers also provided. With our user-friendly search tool, researchers can explore <strong>genome</strong>-wide data, focusing on both known and novel ciliary genes. Discover their contributions to the biology of cilia and the mechanisms behind ciliary-related disorders. Search for a single gene below or use the Batch Query tool to analyze multiple genes.</p>
+            <div class="search-container">
+                <div class="search-wrapper" style="flex: 1;">
+                    <input type="text" id="single-gene-search" placeholder="Search for a single gene (e.g., ACE2, IFT88)" aria-label="Search for a single gene" autocomplete="off">
+                    <div id="search-suggestions"></div>
+                </div>
+                <button id="single-search-btn" class="search-btn btn btn-primary" aria-label="Search for the entered gene name">Search</button>
+            </div>
+            <div id="gene-cards-container" class="gene-cards"></div>
+            <div id="status-message" class="status-message" style="display: none;"></div>
+        </div>`;
+    
+    document.getElementById('single-search-btn').onclick = performSingleSearch;
+    const searchInput = document.getElementById('single-gene-search');
+    const suggestionsContainer = document.getElementById('search-suggestions');
 
+    // --- HELPER FUNCTION to hide suggestions ---
+    const hideSuggestions = () => {
+        suggestionsContainer.innerHTML = '';
+        suggestionsContainer.style.display = 'none'; // ADDED: Ensure it's hidden
+    };
+    
+    // Inside the displayHomePage function...
+
+    searchInput.addEventListener('input', function() {
+    const query = this.value.trim().toUpperCase();
+    if (query.length < 1) {
+        hideSuggestions();
+        return;
+    }
+
+    // Show suggestions broadly (prefix match for better UX)
+    const filteredGenes = allGenes.filter(g => 
+        (g.gene && g.gene.toUpperCase().startsWith(query)) || 
+        (g.synonym && g.synonym.toUpperCase().includes(query)) ||
+        (g.ensembl_id && g.ensembl_id.toUpperCase().startsWith(query))
+    ).slice(0, 10);
+
+    if (filteredGenes.length > 0) {
+        suggestionsContainer.innerHTML = '<ul>' + 
+            filteredGenes.map(g => {
+                const details = [g.ensembl_id, g.synonym].filter(Boolean).join(', ');
+                return `<li data-gene="${g.gene}">${g.gene}${details ? ` (${details})` : ''}</li>`;
+            }).join('') + 
+            '</ul>';
+        
+        suggestionsContainer.querySelector('ul').addEventListener('click', function(event) {
+            if (event.target && event.target.nodeName === "LI") {
+                searchInput.value = event.target.dataset.gene; // ✅ always set exact gene symbol
+                hideSuggestions();
+                performSingleSearch(); // will now be exact
+            }
+        });
+
+        suggestionsContainer.style.display = 'block';
+    } else {
+        hideSuggestions();
+    }
+});
+
+    
+    searchInput.addEventListener('keydown', function(event) {
+        const suggestions = suggestionsContainer.querySelectorAll('li');
+        if (suggestions.length === 0 && event.key !== 'Enter') return;
+        
+        let activeElement = suggestionsContainer.querySelector('.active');
+
+        if (event.key === 'Enter') {
+            event.preventDefault(); // Prevent form submission
+            if (activeElement) {
+                searchInput.value = activeElement.textContent.split(' ')[0];
+            }
+            hideSuggestions();
+            performSingleSearch();
+            return;
+        }
+        
+        if (event.key === 'ArrowDown') {
+            event.preventDefault();
+            let nextElement = activeElement ? activeElement.nextElementSibling : suggestions[0];
+            if (nextElement) {
+                activeElement?.classList.remove('active');
+                nextElement.classList.add('active');
+            }
+        } else if (event.key === 'ArrowUp') {
+            event.preventDefault();
+            let prevElement = activeElement ? activeElement.previousElementSibling : suggestions[suggestions.length - 1];
+            if (prevElement) {
+                activeElement?.classList.remove('active');
+                prevElement.classList.add('active');
+            }
+        }
+    });
+    
+    document.addEventListener('click', function(event) {
+        // CHANGE: Also check if the click is inside the suggestions container
+        if (!searchInput.contains(event.target) && !suggestionsContainer.contains(event.target)) {
+            hideSuggestions();
+        }
+    });
+    
+    displayGeneCards(currentData, [], 1, 10);
+}
 
 function displayBatchQueryTool() {
     const contentArea = document.querySelector('.content-area');
@@ -1141,57 +1024,123 @@ function displayContactPage() {
 /**
  * Displays a visually appealing and detailed page for a single gene.
  */
-/**
- * Displays a visually rich, detailed page for a single gene object.
- * This function is called after a successful search.
- * @param {object} gene The complete gene object from our database.
- */
 function displayIndividualGenePage(gene) {
-    const contentArea = document.querySelector('.content-area');
-    if (!contentArea) return;
-    
-    // Make sure the cilia diagram is visible for localization buttons
-    document.querySelector('.cilia-panel').style.display = 'block';
+  const contentArea = document.querySelector('.content-area');
+  contentArea.className = 'content-area max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8';
+  document.querySelector('.cilia-panel').style.display = 'block';
 
-    // --- Format Ensembl IDs for Display ---
-    let ensemblHTML = 'Not available';
-    if (gene.ensembl_id) {
-        const ids = String(gene.ensembl_id).split(/\s*,\s*/).filter(Boolean);
-        // Create a clickable link for each ID
-        ensemblHTML = ids.map(id => 
-            `<a href="https://www.ensembl.org/Homo_sapiens/Gene/Summary?g=${id}" target="_blank" class="text-[#0067A5] hover:underline">${id}</a>`
-        ).join('<br>'); // Use a line break for multiple IDs
+  // --- Helper Functions ---
+  const formatAsTags = (data, className = 'tag-default') => {
+    if (!Array.isArray(data) || data.length === 0) return 'Not available';
+    return data.map(item => `
+      <span class="tag ${className} inline-block bg-[#e6f0f7] text-[#0067A5] text-sm font-medium px-2.5 py-0.5 rounded-full mr-2 mb-2">
+        ${item}
+      </span>
+    `).join('');
+  };
+
+  const formatReferences = (gene) => {
+    if (!gene.reference || !Array.isArray(gene.reference) || gene.reference.length === 0) {
+      return '<li class="text-[#0067A5]">No reference information available.</li>';
     }
+    const allRefs = gene.reference
+      .flatMap(item => String(item).split(/[,;]\s*/))
+      .map(s => s.trim())
+      .filter(Boolean);
+    if (allRefs.length === 0) return '<li class="text-[#0067A5]">No reference information available.</li>';
 
-    // --- Main Page Template ---
-    contentArea.innerHTML = `
-      <div class="page-section gene-detail-page bg-white shadow-lg rounded-lg overflow-hidden">
-        <header class="gene-header px-6 py-8 bg-gradient-to-r from-[#e6f0f7] to-white">
-          <h1 class="gene-name text-3xl font-bold text-[#0067A5] mb-2">${gene.gene}</h1>
-          <p class="gene-description text-[#0067A5] text-lg">${gene.description || 'No description available.'}</p>
-        </header>
-        <div class="gene-details-grid grid grid-cols-1 lg:grid-cols-2 gap-6 p-6">
+    return allRefs.map(ref => {
+      if (/^\d+$/.test(ref)) {
+        return `<li><a href="https://pubmed.ncbi.nlm.nih.gov/${ref}" target="_blank" class="text-[#0067A5] hover:underline">PMID: ${ref}</a></li>`;
+      }
+      if (ref.toLowerCase().includes('proteinatlas.org')) {
+        return `<li><a href="https://www.proteinatlas.org/${gene.ensembl_id}" target="_blank" class="text-[#0067A5] hover:underline">Human Protein Atlas</a></li>`;
+      }
+      if (ref.toLowerCase().startsWith('http')) {
+        return `<li><a href="${ref}" target="_blank" class="text-[#0067A5] hover:underline">${ref}</a></li>`;
+      }
+      return `<li class="text-[#0067A5]">${ref}</li>`;
+    }).join('');
+  };
+
+  // Prepare data
+  const localizationTags = formatAsTags(gene.localization, 'tag-localization');
+  const functionalCategoryTags = formatAsTags(gene.functional_category, 'tag-category');
+  const referenceHTML = formatReferences(gene);
+
+  // --- Main Template ---
+  contentArea.innerHTML = `
+    <div class="page-section gene-detail-page bg-white shadow-lg rounded-lg overflow-hidden">
+      <div class="breadcrumb px-6 py-4 bg-[#e6f0f7] border-b border-[#c2d9e6]">
+        <a href="/" onclick="navigateTo(event, '/')" aria-label="Back to Home" class="text-[#0067A5] hover:underline text-sm font-medium">← Back to Home</a>
+      </div>
+
+      <header class="gene-header px-6 py-8 bg-gradient-to-r from-[#e6f0f7] to-white">
+        <h1 class="gene-name text-3xl font-bold text-[#0067A5] mb-2">${gene.gene}</h1>
+        <p class="gene-description text-[#0067A5] text-lg">${gene.description || 'No description available.'}</p>
+      </header>
+
+      <div class="gene-details-grid grid grid-cols-1 lg:grid-cols-2 gap-6 p-6">
+        <div class="details-column space-y-6">
+          <div class="detail-card bg-white border border-[#c2d9e6] rounded-lg p-6 shadow-sm">
+            <h3 class="card-title text-xl font-semibold text-[#0067A5] mb-4">Functional Information</h3>
+            <div class="info-item mb-3">
+              <strong class="font-medium text-[#0067A5]">Functional Summary:</strong>
+              <p class="text-[#0067A5]">${gene.functional_summary || 'Not available.'}</p>
+            </div>
+            <div class="info-item mb-3">
+              <strong class="font-medium text-[#0067A5]">Functional Category:</strong>
+              <div class="tags-container">${functionalCategoryTags}</div>
+            </div>
+            ${gene.ciliopathy ? `<div class="info-item"><strong class="font-medium text-[#0067A5]">Associated Ciliopathy:</strong> <p class="text-[#0067A5]">${gene.ciliopathy}</p></div>` : ''}
+            ${gene.gene_annotation ? `<div class="info-item"><strong class="font-medium text-[#0067A5]">Gene Annotation:</strong> <p class="text-[#0067A5]">${gene.gene_annotation}</p></div>` : ''}
+          </div>
+
+          <div class="detail-card bg-white border border-[#c2d9e6] rounded-lg p-6 shadow-sm">
+            <h3 class="card-title text-xl font-semibold text-[#0067A5] mb-4">References</h3>
+            <ul class="reference-list list-disc pl-5 text-[#0067A5]">${referenceHTML}</ul>
+          </div>
+        </div>
+
+        <div class="details-column space-y-6">
           <div class="detail-card bg-white border border-[#c2d9e6] rounded-lg p-6 shadow-sm">
             <h3 class="card-title text-xl font-semibold text-[#0067A5] mb-4">Identifiers</h3>
             <div class="space-y-3">
-              <div><strong class="text-[#0067A5]">Ensembl ID(s):</strong> ${ensemblHTML}</div>
+              ${gene.ensembl_id ? `<div><strong class="text-[#0067A5]">Ensembl ID:</strong> <a href="https://www.ensembl.org/Homo_sapiens/Gene/Summary?g=${gene.ensembl_id}" target="_blank" class="text-[#0067A5] hover:underline">${gene.ensembl_id}</a></div>` : ''}
               ${gene.omim_id ? `<div><strong class="text-[#0067A5]">OMIM ID:</strong> <a href="https://www.omim.org/entry/${gene.omim_id}" target="_blank" class="text-[#0067A5] hover:underline">${gene.omim_id}</a></div>` : ''}
               ${gene.synonym ? `<div><strong class="text-[#0067A5]">Synonym(s):</strong> <span class="text-[#0067A5]">${gene.synonym}</span></div>` : ''}
             </div>
           </div>
+
           <div class="detail-card bg-white border border-[#c2d9e6] rounded-lg p-6 shadow-sm">
-            <h3 class="card-title text-xl font-semibold text-[#0067A5] mb-4">Functional Summary</h3>
-            <p class="text-[#0067A5]">${gene.functional_summary || 'Not available.'}</p>
+            <h3 class="card-title text-xl font-semibold text-[#0067A5] mb-4">Subcellular Localization</h3>
+            <div class="tags-container">${localizationTags}</div>
           </div>
+
+          ${gene.complex_names ? `
+            <div class="detail-card bg-white border border-[#c2d9e6] rounded-lg p-6 shadow-sm">
+              <h3 class="card-title text-xl font-semibold text-[#0067A5] mb-4">
+                Complex Info 
+                <a href="https://mips.helmholtz-muenchen.de/corum/" target="_blank" class="ml-2 text-sm text-[#0067A5] hover:underline">(Source: CORUM)</a>
+              </h3>
+              <div class="mb-3">
+                <strong class="text-[#0067A5]">Complex Names:</strong>
+                <p class="text-[#0067A5]">${(gene.complex_names || '').replace(/; /g, '<br>')}</p>
+              </div>
+              <div>
+                <strong class="text-[#0067A5]">Complex Components:</strong>
+                <p class="text-[#0067A5]">${(gene.complex_components || '').replace(/ \| /g, '<br>')}</p>
+              </div>
+            </div>
+          ` : ''}
         </div>
       </div>
-    `;
-    
-    // After displaying, ensure the localization buttons are updated for the new gene
-    updateGeneButtons([gene], [gene]);
-    showLocalization(gene.gene, true);
-}
+    </div>
+  `; // <<<< Make sure this backtick and semicolon are here!
 
+  updateGeneButtons([gene], [gene]);
+  showLocalization(gene.gene, true);
+}
 
 function displayNotFoundPage() {
     const contentArea = document.querySelector('.content-area');
@@ -1205,35 +1154,51 @@ function displayNotFoundPage() {
         </div>`;
 }
 
-/**
- * Performs a search for a single gene using the master geneMapCache.
- * This is the ONLY function that should be called when a user wants to find one gene.
- */
-async function performSingleSearch() {
-    // Crucial: Make sure data is loaded before attempting to search.
-    await loadAndPrepareDatabase();
+function performSingleSearch() {
+    const query = document.getElementById('single-gene-search').value.trim().toUpperCase();
+    const statusDiv = document.getElementById('status-message');
+    statusDiv.innerHTML = '<span>Loading...</span>';
+    statusDiv.style.display = 'block';
 
-    const searchInput = document.getElementById('single-gene-search');
-    if (!searchInput) return;
-
-    const query = searchInput.value.trim();
     if (!query) {
-        alert("Please enter a gene symbol, synonym, or Ensembl ID.");
+        statusDiv.innerHTML = `<span class="error-message">Please enter a gene name.</span>`;
         return;
     }
 
-    // Sanitize the query and look it up in our powerful search map.
-    const sanitizedQuery = sanitize(query);
-    const foundGene = geneMapCache.get(sanitizedQuery);
+    // ✅ Filter using exact match (no partial matches)
+    const results = allGenes.filter(g => {
+        if (g.gene && g.gene.toUpperCase() === query) {
+            return true;
+        }
+        if (g.synonym) {
+            const synonyms = g.synonym.toUpperCase().split(',').map(s => s.trim());
+            if (synonyms.includes(query)) {
+                return true;
+            }
+        }
+        return false;
+    });
 
-    if (foundGene) {
-        // If we found the gene, display its dedicated page.
-        displayIndividualGenePage(foundGene);
-        // Also update the URL hash for navigation.
-        window.location.hash = `#/${foundGene.gene}`;
+    if (results.length === 0) {
+        // Show close suggestions (still helpful UX)
+        const closeMatches = allGenes.filter(g =>
+            g.gene && g.gene.toUpperCase().startsWith(query.slice(0, 3))
+        ).slice(0, 3);
+
+        statusDiv.innerHTML = `<span class="error-message">No genes found for "${query}". ${closeMatches.length > 0 ? 'Did you mean: ' + closeMatches.map(g => g.gene).join(', ') + '?' : 'No close matches found.'}</span>`;
+        return;
+    }
+
+    // ✅ If exactly one match, go directly to gene page
+    if (results.length === 1) {
+        navigateTo(null, `/${results[0].gene}`);
     } else {
-        // If not found, show a clear error message.
-        alert(`Gene not found for query: "${query}"`);
+        // Otherwise use batch query mode (multiple exact matches)
+        navigateTo(null, '/batch-query');
+        setTimeout(() => {
+            document.getElementById('batch-genes-input').value = results.map(r => r.gene).join('\n');
+            performBatchSearch();
+        }, 100);
     }
 }
 
