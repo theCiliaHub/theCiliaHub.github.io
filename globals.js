@@ -1,23 +1,19 @@
+// =============================================================================
 // globals.js
 // =============================================================================
-// GLOBAL VARIABLES
+// This file defines global variables and controls the page routing.
+// It MUST be loaded AFTER script.js in your HTML.
 // =============================================================================
 
-// Data storage
+// --- GLOBAL VARIABLES ---
 let allGenes = [];
+let geneDataCache = null;
+let geneMapCache = new Map();
 let currentData = [];
 let searchResults = [];
 const geneLocalizationData = {};
+let localizationChartInstance; // For Chart.js
 
-// Plotting
-let currentPlot = null;
-
-// Chart instances
-let localizationChartInstance;
-let analysisDotPlotInstance;
-let analysisBarChartInstance;
-
-// IDs and defaults
 const allPartIds = [
     "cell-body", "nucleus", "basal-body",
     "transition-zone", "axoneme", "ciliary-membrane"
@@ -27,9 +23,7 @@ const defaultGenesNames = [
     "CEP290", "WDR31", "ARL13B", "BBS1"
 ];
 
-// Caches
-let geneDataCache = null;
-let geneMapCache = null;
+// --- NAVIGATION & ROUTING ---
 
 function navigateTo(event, path) {
     if (event) {
@@ -38,88 +32,64 @@ function navigateTo(event, path) {
     window.location.hash = path;
 }
 
-// =============================================================================
-// ROUTER
-// =============================================================================
 async function handleRouteChange() {
     let path = window.location.hash.replace(/^#/, '').toLowerCase().trim();
     if (!path || path === '/' || path === '/index.html') {
         path = '/';
     }
 
-    try {
-        await loadAndPrepareDatabase();
-    } catch (err) {
-        console.error("Database loading failed:", err);
-    }
-
-    let gene = null;
-    if (geneMapCache) {
-        const geneName = sanitize(path.split('/').pop().replace('.html', ''));
-        gene = geneMapCache.get(geneName);
-    } else {
-        console.warn("geneMapCache is not initialized yet.");
-    }
-
+    // Ensure the database is loaded before doing anything else
+    await loadAndPrepareDatabase();
+    
     updateActiveNav(path);
 
-    // This part is likely superseded by your dynamic page functions,
-    // but we will keep it as requested.
-    const pages = [
-        '#home-page', '#analysis-page', '#batch-query-page',
-        '#ciliaplot-page', '#compare-page', '#expression-page',
-        '#download-page', '#contact-page', '#notfound-page'
-    ];
-    pages.forEach(id => {
-        const el = document.querySelector(id);
-        if (el) el.style.display = 'none';
-    });
+    const geneName = sanitize(path.split('/').pop());
+    const isGenePath = path.startsWith('/') && geneName && !['batch-query', 'compare', 'download', 'contact', 'expression', 'ciliaplot', 'analysis', ''].includes(geneName);
+    const gene = isGenePath ? geneMapCache.get(geneName) : null;
 
-    switch (path) {
-        case '/':
+    switch (true) {
+        case path === '/':
             displayHomePage();
             setTimeout(displayLocalizationChart, 0);
             break;
-        case '/batch-query':
+        case path === '/batch-query':
             displayBatchQueryTool();
             break;
-        case '/ciliaplot':
-        case '/analysis':
+        case path === '/ciliaplot' || path === '/analysis':
             displayCiliaPlotPage();
             break;
-        case '/compare':
+        case path === '/compare':
             displayComparePage();
             break;
-        case '/expression':
+        case path === '/expression':
             displayExpressionPage();
             break;
-        case '/download':
+        case path === '/download':
             displayDownloadPage();
             break;
-        case '/contact':
+        case path === '/contact':
             displayContactPage();
             break;
+        case !!gene: // If a gene object was successfully found
+            displayIndividualGenePage(gene);
+            break;
         default:
-            if (gene) {
-                displayIndividualGenePage(gene);
-            } else {
-                displayNotFoundPage();
-            }
+            displayNotFoundPage();
             break;
     }
-    console.log("Routing completed. Path:", path, "Gene:", gene ? gene.name : "N/A");
 }
 
-// =============================================================================
-// EVENT LISTENERS
-// =============================================================================
+// --- GLOBAL EVENT LISTENERS ---
+
+function initGlobalEventListeners() {
+    window.addEventListener('scroll', handleStickySearch);
+    // Add other global listeners here if needed
+}
+
+// Kick off the application
 window.addEventListener("load", handleRouteChange);
 window.addEventListener("hashchange", handleRouteChange);
-
-document.addEventListener('DOMContentLoaded', () => {
-    initGlobalEventListeners();
-});
-
+document.addEventListener('DOMContentLoaded', initGlobalEventListeners);
 // =============================================================================
 // GLOBAL UI HELPERS
 // =============================================================================
