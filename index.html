@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CiliaHub</title>
     <link rel="stylesheet" href="styles.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔬</text></svg>">
 </head>
 <body>
 
@@ -49,7 +50,7 @@
 
         <main class="content-area">
             
-            <section id="home-page" class="page-section">
+            <section id="home-page" class="page-section active">
                 <h1>Welcome to CiliaHub 🔬</h1>
                 <p>Your comprehensive resource for genes with ciliary functions. Explore our database, compare genes, and visualize expression data.</p>
                 <div class="search-container">
@@ -90,30 +91,25 @@
                         </div>
                         <div class="detail-card">
                             <h3 class="card-title">References</h3>
-                            <ul id="gene-references" class="reference-list">
-                                </ul>
+                            <ul id="gene-references" class="reference-list"></ul>
                         </div>
                     </div>
                     <div class="details-column" id="gene-details-right">
                         <div class="detail-card">
                             <h3 class="card-title">Identifiers</h3>
-                            <div id="gene-identifiers" class="info-item">
-                                </div>
+                            <div id="gene-identifiers" class="info-item"></div>
                         </div>
                         <div class="detail-card">
                             <h3 class="card-title">Subcellular Localization</h3>
-                            <div id="gene-localization" class="tags-container">
-                                </div>
+                            <div id="gene-localization" class="tags-container"></div>
                         </div>
                         <div class="detail-card">
                             <h3 class="card-title">Complex Info</h3>
-                            <div id="gene-complex-info" class="info-item">
-                                </div>
+                            <div id="gene-complex-info" class="info-item"></div>
                         </div>
                     </div>
                 </div>
             </section>
-
 
             <section id="analysis-page" class="page-section enrichment-page">
                 <div class="enrichment-header">
@@ -124,7 +120,6 @@
                     <div class="enrichment-controls-panel">
                         <h3>1. Input Genes</h3>
                         <textarea id="enrichment-genes-input" placeholder="Enter gene symbols, one per line (e.g., ARL13B, BBS1, CEP290)"></textarea>
-                        
                         <div id="enrichment-actions">
                              <h3>2. Plot Type</h3>
                              <div class="plot-type-selection">
@@ -139,7 +134,6 @@
                                 </div>
                              </div>
                         </div>
-                        
                         <details id="plot-customization-details">
                             <summary>3. Customize Plot (Optional)</summary>
                             <div id="plot-settings-panel">
@@ -167,8 +161,7 @@
                 <textarea id="batch-genes-input" placeholder="Enter gene names, one per line or separated by commas/spaces."></textarea>
                 <input type="file" id="csv-upload" accept=".csv,.txt">
                 <button id="batch-query-btn" class="btn btn-primary">Query Genes</button>
-                <div id="batch-results" class="table-container">
-                    </div>
+                <div id="batch-results" class="table-container"></div>
             </section>
 
             <section id="compare-page" class="page-section">
@@ -191,15 +184,9 @@
                         </div>
                         <button id="clear-comparison-btn" class="btn btn-secondary">Clear All</button>
                     </div>
-                    <div id="table-view" class="tab-content active">
-                        <div id="comparison-table" class="table-container"></div>
-                    </div>
-                    <div id="venn-diagram-view" class="tab-content chart-container">
-                        <canvas id="venn-diagram"></canvas>
-                    </div>
-                    <div id="upset-plot-view" class="tab-content chart-container">
-                        <div id="upset-plot"></div>
-                    </div>
+                    <div id="table-view" class="tab-content active"><div id="comparison-table" class="table-container"></div></div>
+                    <div id="venn-diagram-view" class="tab-content chart-container"><canvas id="venn-diagram"></canvas></div>
+                    <div id="upset-plot-view" class="tab-content chart-container"><div id="upset-plot"></div></div>
                  </div>
             </section>
 
@@ -236,7 +223,7 @@
         </main>
     </div>
 
-    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.3.0/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@upsetjs/core/dist/bundle.min.js"></script>
