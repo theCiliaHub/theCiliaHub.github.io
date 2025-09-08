@@ -978,59 +978,133 @@ body {
 }
 
 
-/* --- Table Styling (Integrated into Display Panel) --- */
+#### **Step 2: Replace the CiliaPlot CSS (`styles.css`)**
+
+This new HTML requires different CSS. Please **replace the entire `CiliaPlot Page Redesign` CSS block** you added previously with this single, corrected block.
+
+```css
+/* ======================================== */
+/* CiliaPlot Page Redesign (Corrected Layout) */
+/* ======================================== */
+
+/* --- Main Layout Sections --- */
+.ciliaplot-top-section {
+    display: grid;
+    grid-template-columns: 420px 1fr; /* Fixed width for input, flexible for plot */
+    gap: 2rem;
+    align-items: stretch; /* Make columns same height */
+}
+
+.ciliaplot-bottom-section {
+    margin-top: 2rem;
+    display: grid;
+    grid-template-columns: 1fr 1.5fr; /* 2 columns for controls and table */
+    gap: 2rem;
+    align-items: start;
+}
+
+/* --- Left Panel: Gene Input --- */
+.ciliaplot-input-panel {
+    display: flex;
+    flex-direction: column;
+}
+.ciliaplot-input-panel .ciliaplot-control-card {
+    flex-grow: 1; /* Make the card fill the space */
+}
+#ciliaplot-genes-input {
+    width: 100%;
+    min-height: 450px; /* Much larger text area */
+    font-size: 1rem;
+    border: 2px solid var(--border-color);
+    border-radius: var(--border-radius-sm);
+    padding: 0.8rem;
+    resize: none; /* Lock the size */
+}
+#ciliaplot-generate-btn {
+    margin-top: 1rem;
+}
+
+/* --- Right Panel: Main Plot --- */
+.ciliaplot-main-plot-panel {
+    display: flex;
+    flex-direction: column;
+    background-color: var(--panel-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-lg);
+    box-shadow: 0 8px 32px rgba(44, 90, 160, 0.1);
+}
+.ciliaplot-plot-area {
+    flex-grow: 1; /* Make plot area fill available vertical space */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem;
+    overflow: auto;
+}
+.ciliaplot-plot-area svg {
+    width: 100%;
+    height: auto;
+    max-width: 100%;
+}
+
+
+/* --- Bottom Section: Controls & Table --- */
+.ciliaplot-controls-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
 .ciliaplot-results-table-container {
-    padding: 0 1.5rem 1.5rem 1.5rem; /* Padding for the table wrapper */
-    border-top: 1px solid var(--border-color); /* Separator from the plot */
-    overflow-x: auto; /* CRITICAL: Allows horizontal scrolling for wide tables */
-    flex-shrink: 0; /* Prevent table from shrinking */
+    background-color: var(--panel-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-lg);
+    overflow: hidden; /* Important for border-radius */
+    box-shadow: 0 4px 12px rgba(44, 90, 160, 0.05);
+}
+
+.ciliaplot-results-table-container h3 {
+    margin: 0;
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid var(--border-color);
+    font-size: 1.2rem;
+    color: var(--primary-dark);
 }
 
 .ciliaplot-results-table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 0.95rem;
 }
-
+.ciliaplot-results-table-wrapper {
+    max-height: 400px; /* Make table scrollable if too long */
+    overflow-x: auto;
+    overflow-y: auto;
+}
+/* The actual table styles for stripes, headers, etc. */
 .ciliaplot-results-table th,
 .ciliaplot-results-table td {
     padding: 12px 15px;
-    border: 1px solid var(--border-color);
+    border-bottom: 1px solid var(--border-color);
     text-align: left;
-    white-space: nowrap; /* Prevents text wrapping in cells */
+    white-space: nowrap;
 }
-
 .ciliaplot-results-table th {
     background-color: var(--primary-blue);
     color: var(--text-light);
-    font-weight: 600;
     position: sticky;
-    top: 0; /* Makes header sticky within its scrolling container */
+    top: 0;
     z-index: 1;
 }
-
 .ciliaplot-results-table tbody tr:nth-child(even) {
     background-color: var(--neutral-bg-alt); /* Light blue stripe */
 }
-
 .ciliaplot-results-table tbody tr:hover {
-    background-color: #eaf3f8; /* Subtle hover effect */
+    background-color: #eaf3f8;
 }
 
-.ciliaplot-results-table a {
-    color: var(--primary-blue-light);
-    text-decoration: none;
-    font-weight: 500;
-}
-
-.ciliaplot-results-table a:hover {
-    text-decoration: underline;
-}
-
-/* --- Responsive Design for CiliaPlot --- */
-@media (max-width: 992px) {
-    .ciliaplot-display-panel {
-        position: static;
-        max-height: none; /* Remove max-height on smaller screens */
+/* Responsive adjustments */
+@media (max-width: 1200px) {
+    .ciliaplot-top-section, .ciliaplot-bottom-section {
+        grid-template-columns: 1fr; /* Stack everything vertically */
     }
 }
