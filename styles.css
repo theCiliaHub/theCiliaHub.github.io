@@ -996,15 +996,19 @@ input[type="color"] {
     padding-right: 10px;
 }
 
+/* ===== CILIAPLOT PAGE SPECIFIC IMPROVEMENTS ===== */
+
+/* 1. Bigger search box for CiliaPlot page */
 #ciliahub-genes-input {
     width: 100%;
-    height: 100px; /* Fixed height to match #batch-genes-input */
-    padding: 0.8rem; /* Matches #batch-genes-input */
-    border: 2px solid var(--border-color); /* Matches #batch-genes-input */
-    border-radius: var(--border-radius-md); /* Matches #batch-genes-input */
-    font-size: 1rem; /* Matches #batch-genes-input */
-    resize: none; /* Disables resizing for fixed size */
+    height: 120px; /* Increased from 100px */
+    padding: 1rem; /* Increased padding */
+    border: 2px solid var(--border-color);
+    border-radius: var(--border-radius-md);
+    font-size: 1.1rem; /* Slightly larger font */
+    resize: vertical; /* Allow vertical resizing */
     margin-bottom: 1rem;
+    line-height: 1.4;
 }
 
 #ciliahub-actions {
@@ -1126,17 +1130,6 @@ input[type="color"] {
     padding: 1.5rem;
 }
 
-#ciliahub-genes-input {
-    width: 100%;
-    height: 100px; /* Fixed height to match #batch-genes-input */
-    padding: 0.8rem; /* Matches #batch-genes-input */
-    border: 2px solid var(--border-color); /* Matches #batch-genes-input */
-    border-radius: var(--border-radius-md); /* Matches #batch-genes-input */
-    font-size: 1rem; /* Matches #batch-genes-input */
-    resize: none; /* Disables resizing for fixed size */
-    margin-bottom: 1rem;
-}
-
 /* Plot Options Styling */
 .plot-option {
     margin-bottom: 1.2rem;
@@ -1230,4 +1223,118 @@ input[type="color"] {
 #plot-display-area svg {
     max-width: 100%;
     height: auto;
+}
+
+/* 2. Fancy table styling for CiliaPlot results */
+#ciliahub-results-container table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 1.5rem;
+    position: relative;
+    border-radius: var(--border-radius-md);
+    overflow: hidden;
+    box-shadow: 0 8px 24px rgba(44, 90, 160, 0.15);
+}
+
+/* Beautiful blue gradient header */
+#ciliahub-results-container th {
+    background: linear-gradient(135deg, var(--primary-blue), var(--primary-blue-light));
+    color: var(--text-light);
+    position: sticky;
+    top: 160px;
+    z-index: 998;
+    padding: 1rem 0.8rem;
+    font-weight: 600;
+    font-size: 1rem;
+    text-align: left;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+    border: none;
+}
+
+/* First header cell rounded corner */
+#ciliahub-results-container th:first-child {
+    border-top-left-radius: var(--border-radius-md);
+}
+
+/* Last header cell rounded corner */
+#ciliahub-results-container th:last-child {
+    border-top-right-radius: var(--border-radius-md);
+}
+
+/* Light blue and white striped rows */
+#ciliahub-results-container tbody tr:nth-child(even) {
+    background-color: #f0f7ff; /* Light blue */
+}
+
+#ciliahub-results-container tbody tr:nth-child(odd) {
+    background-color: #ffffff; /* White */
+}
+
+/* Table cell styling */
+#ciliahub-results-container td {
+    padding: 0.9rem 0.8rem;
+    border: none;
+    border-bottom: 1px solid rgba(44, 90, 160, 0.1);
+    font-size: 0.95rem;
+    line-height: 1.4;
+    vertical-align: top;
+}
+
+/* Hover effect for table rows */
+#ciliahub-results-container tbody tr:hover {
+    background-color: rgba(44, 90, 160, 0.08) !important;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(44, 90, 160, 0.1);
+    transition: all 0.2s ease;
+}
+
+/* Links in the table */
+#ciliahub-results-container a {
+    color: var(--primary-blue);
+    text-decoration: none;
+    font-weight: 500;
+    padding: 0.2rem 0.4rem;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+}
+
+#ciliahub-results-container a:hover,
+#ciliahub-results-container a:focus-visible {
+    background-color: rgba(44, 90, 160, 0.1);
+    text-decoration: none;
+    outline: none;
+    transform: translateY(-1px);
+}
+
+/* Remove the old column-based striping since we're using row-based now */
+#ciliahub-results-container th:nth-child(odd),
+#ciliahub-results-container td:nth-child(odd),
+#ciliahub-results-container th:nth-child(even),
+#ciliahub-results-container td:nth-child(even) {
+    background-color: transparent !important;
+}
+
+/* Add some visual flair to the table container */
+#ciliahub-results-container {
+    border-radius: var(--border-radius-md);
+    overflow: hidden;
+    margin-top: 2rem;
+}
+
+/* Responsive table on mobile */
+@media (max-width: 768px) {
+    #ciliahub-genes-input {
+        height: 100px; /* Slightly smaller on mobile */
+        font-size: 1rem;
+    }
+    
+    #ciliahub-results-container {
+        overflow-x: auto;
+    }
+    
+    #ciliahub-results-container th,
+    #ciliahub-results-container td {
+        padding: 0.7rem 0.5rem;
+        font-size: 0.9rem;
+    }
 }
