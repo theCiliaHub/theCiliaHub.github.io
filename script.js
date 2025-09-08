@@ -315,6 +315,62 @@ function handleHomeSearchKeyDown(event) {
     }
 }
 
+/**
+ * Displays a detailed page for a single, specific gene.
+ * It retrieves the gene's data and renders it in a structured format, including the Ensembl ID.
+ * @param {string} geneSymbol The official symbol of the gene to display.
+ */
+function displayGenePage(geneSymbol) {
+    // Find the gene object from the cache using its primary symbol
+    const gene = geneMapCache.get(geneSymbol.toUpperCase());
+    const contentArea = document.querySelector('.content-area');
+
+    if (!gene) {
+        contentArea.innerHTML = `<div class="page-section"><h1>Gene '${geneSymbol}' not found.</h1></div>`;
+        return;
+    }
+    
+    // Hide the main cilia diagram and show the content area
+    document.querySelector('.cilia-panel').style.display = 'none';
+    contentArea.className = 'content-area content-area-wide';
+
+    // Safely format potentially missing data
+    const synonyms = gene.synonym ? String(gene.synonym).split(/[,;]/).join(', ') : 'N/A';
+    const ensemblIds = gene.ensembl_id ? String(gene.ensembl_id).split(/[,;]/).join(', ') : 'N/A';
+    const omimId = gene.omim_id || 'N/A';
+    const functionalSummary = gene.functional_summary || 'No functional summary available.';
+    const localization = Array.isArray(gene.localization) ? gene.localization.join(', ') : (gene.localization || 'N/A');
+
+    // Generate the HTML for the gene page
+    contentArea.innerHTML = `
+        <div class="page-section gene-page">
+            <h1>${gene.gene}</h1>
+            <p class="gene-description"><em>${gene.description || ''}</em></p>
+            
+            <div class="gene-details-grid">
+                <div class="detail-item">
+                    <strong class="detail-title">Ensembl ID(s)</strong>
+                    <div class="detail-content">${ensemblIds}</div>
+                </div>
+                <div class="detail-item">
+                    <strong class="detail-title">Synonyms</strong>
+                    <div class="detail-content">${synonyms}</div>
+                </div>
+                <div class="detail-item">
+                    <strong class="detail-title">OMIM ID</strong>
+                    <div class="detail-content">${omimId}</div>
+                </div>
+                <div class="detail-item">
+                    <strong class="detail-title">Localization</strong>
+                    <div class="detail-content">${localization}</div>
+                </div>
+            </div>
+
+            <h2>Functional Summary</h2>
+            <p>${functionalSummary}</p>
+        </div>
+    `;
+}
 
 // --- NAVIGATION FIX ---
 // This robust function navigates to the selected gene's page.
@@ -1179,18 +1235,27 @@ function performSingleSearch() {
     statusDiv.style.display = 'block';
 
     if (!query) {
-        statusDiv.innerHTML = `<span class="error-message">Please enter a gene name.</span>`;
+        statusDiv.innerHTML = `<span class="error-message">Please enter a gene name, synonym, or Ensembl ID.</span>`;
         return;
     }
 
-    // ✅ Filter using exact match (no partial matches)
+    // Filter using an exact match for gene, synonym, or Ensembl ID
     const results = allGenes.filter(g => {
+        // Check for match in gene symbol
         if (g.gene && g.gene.toUpperCase() === query) {
             return true;
         }
+        // Check for match in synonyms
         if (g.synonym) {
             const synonyms = g.synonym.toUpperCase().split(',').map(s => s.trim());
             if (synonyms.includes(query)) {
+                return true;
+            }
+        }
+        // ✅ NEW: Check for match in Ensembl IDs
+        if (g.ensembl_id) {
+            const ensemblIds = g.ensembl_id.toUpperCase().split(',').map(id => id.trim());
+            if (ensemblIds.includes(query)) {
                 return true;
             }
         }
@@ -1203,15 +1268,15 @@ function performSingleSearch() {
             g.gene && g.gene.toUpperCase().startsWith(query.slice(0, 3))
         ).slice(0, 3);
 
-        statusDiv.innerHTML = `<span class="error-message">No genes found for "${query}". ${closeMatches.length > 0 ? 'Did you mean: ' + closeMatches.map(g => g.gene).join(', ') + '?' : 'No close matches found.'}</span>`;
+        statusDiv.innerHTML = `<span class="error-message">No genes found for "${query}". ${closeMatches.length > 0 ? 'Did you mean: ' + closeMatches.map(g => g.gene).join(', ') + '?' : ''}</span>`;
         return;
     }
 
-    // ✅ If exactly one match, go directly to gene page
+    // If exactly one match, go directly to that gene's page
     if (results.length === 1) {
         navigateTo(null, `/${results[0].gene}`);
     } else {
-        // Otherwise use batch query mode (multiple exact matches)
+        // Otherwise use batch query mode for multiple exact matches
         navigateTo(null, '/batch-query');
         setTimeout(() => {
             document.getElementById('batch-genes-input').value = results.map(r => r.gene).join('\n');
@@ -1219,6 +1284,7 @@ function performSingleSearch() {
         }, 100);
     }
 }
+
 
 
 function performBatchSearch() {
