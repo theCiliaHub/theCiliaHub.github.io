@@ -1,9 +1,8 @@
-// =============================================================================
+// =================================================================
 // globals.js
-// =============================================================================
-// This file defines global variables and controls the page routing.
-// It MUST be loaded AFTER script.js in your HTML.
-// =============================================================================
+// This file declares global variables and controls the page router.
+// IT MUST BE LOADED AFTER script.js IN YOUR HTML.
+// =================================================================
 
 // --- GLOBAL VARIABLES ---
 let allGenes = [];
@@ -12,7 +11,7 @@ let geneMapCache = new Map();
 let currentData = [];
 let searchResults = [];
 const geneLocalizationData = {};
-let localizationChartInstance; // For Chart.js
+let localizationChartInstance;
 
 const allPartIds = [
     "cell-body", "nucleus", "basal-body",
@@ -38,9 +37,10 @@ async function handleRouteChange() {
         path = '/';
     }
 
-    // Ensure the database is loaded before doing anything else
+    // This now works because loadAndPrepareDatabase is defined in script.js (loaded first)
     await loadAndPrepareDatabase();
     
+    // This now works because updateActiveNav is defined in script.js
     updateActiveNav(path);
 
     const geneName = sanitize(path.split('/').pop());
@@ -56,13 +56,13 @@ async function handleRouteChange() {
             displayBatchQueryTool();
             break;
         case path === '/ciliaplot' || path === '/analysis':
-            displayCiliaPlotPage();
+            // displayCiliaPlotPage(); // Make sure this function exists in script.js
             break;
         case path === '/compare':
             displayComparePage();
             break;
         case path === '/expression':
-            displayExpressionPage();
+            // displayExpressionPage(); // Make sure this function exists in script.js
             break;
         case path === '/download':
             displayDownloadPage();
@@ -70,7 +70,7 @@ async function handleRouteChange() {
         case path === '/contact':
             displayContactPage();
             break;
-        case !!gene: // If a gene object was successfully found
+        case !!gene:
             displayIndividualGenePage(gene);
             break;
         default:
@@ -79,19 +79,17 @@ async function handleRouteChange() {
     }
 }
 
-// --- GLOBAL EVENT LISTENERS ---
+// --- INITIALIZATION ---
 
 function initGlobalEventListeners() {
+    // This now works because handleStickySearch is defined in script.js
     window.addEventListener('scroll', handleStickySearch);
-    // Add other global listeners here if needed
 }
 
-// Kick off the application
+// Kick off the application router and event listeners
 window.addEventListener("load", handleRouteChange);
 window.addEventListener("hashchange", handleRouteChange);
 document.addEventListener('DOMContentLoaded', initGlobalEventListeners);
-// =============================================================================
-// GLOBAL UI HELPERS
 // =============================================================================
 function initGlobalEventListeners() {
     window.addEventListener('scroll', handleStickySearch);
