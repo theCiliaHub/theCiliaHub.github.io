@@ -214,10 +214,10 @@ body {
     top: 80px;
     left: 50%;
     transform: translateX(-50%);
-    width: 90%; /* Increased from 80% to make search box bigger */
-    max-width: 1000px; /* Increased from 800px */
+    width: 90%;
+    max-width: 1000px;
     background: var(--panel-bg);
-    padding: 1.2rem; /* Slightly increased padding */
+    padding: 1.2rem;
     border-radius: var(--border-radius-md);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
     z-index: 999;
@@ -230,10 +230,10 @@ body {
 
 .search-wrapper input {
     width: 100%;
-    padding: 1rem; /* Increased from 0.8rem for larger input */
+    padding: 1rem;
     border: 2px solid var(--border-color);
     border-radius: var(--border-radius-md);
-    font-size: 1.2rem; /* Increased from 1rem for larger text */
+    font-size: 1.2rem;
 }
 
 .search-btn {
@@ -322,7 +322,7 @@ body {
     width: 100%;
     border-collapse: collapse;
     margin-top: 1rem;
-    position: relative; /* Ensure table can support sticky headers */
+    position: relative;
 }
 
 /* ✨ This rule now styles the cells on all three pages ✨ */
@@ -340,12 +340,12 @@ body {
 /* ✨ Add stripes for columns in ciliarhub-results-container table ✨ */
 #ciliahub-results-container th:nth-child(odd),
 #ciliahub-results-container td:nth-child(odd) {
-    background-color: var(--neutral-bg-alt); /* Light background for odd columns */
+    background-color: var(--neutral-bg-alt);
 }
 
 #ciliahub-results-container th:nth-child(even),
 #ciliahub-results-container td:nth-child(even) {
-    background-color: var(--panel-bg); /* White background for even columns */
+    background-color: var(--panel-bg);
 }
 
 /* ✨ This rule now styles the headers on all three pages, with navbar blue for ciliarhub-results-container ✨ */
@@ -356,11 +356,11 @@ body {
 }
 
 #ciliahub-results-container th {
-    background: linear-gradient(90deg, var(--primary-blue), var(--primary-blue-light)); /* Matches navbar gradient */
+    background: linear-gradient(90deg, var(--primary-blue), var(--primary-blue-light));
     color: var(--text-light);
-    position: sticky; /* Make header sticky */
-    top: 160px; /* Adjusted to account for fixed search bar (80px + some margin) */
-    z-index: 998; /* Below search bar (z-index: 999) */
+    position: sticky;
+    top: 160px;
+    z-index: 998;
 }
 
 /* ✨ These rules now style the links on all three pages ✨ */
@@ -744,12 +744,12 @@ body {
 }
 
 .gene-summary-table .status-found {
-    color: var(--accent-green-2); /* Green */
+    color: var(--accent-green-2);
     font-weight: bold;
 }
 
 .gene-summary-table .status-not-found {
-    color: var(--accent-red); /* Red */
+    color: var(--accent-red);
     font-weight: bold;
 }
 
@@ -758,9 +758,9 @@ body {
 
 /* Central color tokens */
 :root {
-  --mpb: #0067A5;         /* Medium Persian Blue */
-  --mpb-light: #e6f0f7;   /* light background */
-  --mpb-border: #c2d9e6;  /* border */
+  --mpb: #0067A5;
+  --mpb-light: #e6f0f7;
+  --mpb-border: #c2d9e6;
 }
 
 /* Scope everything to the gene detail page to avoid site-wide side effects */
@@ -998,13 +998,13 @@ input[type="color"] {
 
 #ciliahub-genes-input {
     width: 100%;
-    min-height: 150px; /* Increased from 120px for larger textarea */
+    height: 100px; /* Fixed height to match #batch-genes-input */
+    padding: 0.8rem; /* Matches #batch-genes-input */
+    border: 2px solid var(--border-color); /* Matches #batch-genes-input */
+    border-radius: var(--border-radius-md); /* Matches #batch-genes-input */
+    font-size: 1rem; /* Matches #batch-genes-input */
+    resize: none; /* Disables resizing for fixed size */
     margin-bottom: 1rem;
-    padding: 12px; /* Increased from 10px */
-    border: 1px solid #ccc;
-    border-radius: var(--border-radius-sm);
-    font-size: 1.2rem; /* Increased from 1rem */
-    resize: vertical;
 }
 
 #ciliahub-actions {
@@ -1128,13 +1128,13 @@ input[type="color"] {
 
 #ciliahub-genes-input {
     width: 100%;
-    min-height: 150px; /* Increased from 120px for larger textarea */
+    height: 100px; /* Fixed height to match #batch-genes-input */
+    padding: 0.8rem; /* Matches #batch-genes-input */
+    border: 2px solid var(--border-color); /* Matches #batch-genes-input */
+    border-radius: var(--border-radius-md); /* Matches #batch-genes-input */
+    font-size: 1rem; /* Matches #batch-genes-input */
+    resize: none; /* Disables resizing for fixed size */
     margin-bottom: 1rem;
-    padding: 12px; /* Increased from 10px */
-    border: 1px solid #ccc;
-    border-radius: var(--border-radius-sm);
-    font-size: 1.2rem; /* Increased from 1rem */
-    resize: vertical;
 }
 
 /* Plot Options Styling */
