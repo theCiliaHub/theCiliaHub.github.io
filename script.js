@@ -1065,10 +1065,6 @@ function displayContactPage() {
     });
 }
 
-/**
- * Displays a visually appealing and detailed page for a single gene.
- * Now includes gene name, description, functional summary, and complexes.
- */
 function displayIndividualGenePage(gene) {
     const contentArea = document.querySelector('.content-area');
     if (!contentArea) return console.warn("⚠️ .content-area not found.");
@@ -1077,18 +1073,15 @@ function displayIndividualGenePage(gene) {
     const panel = document.querySelector('.cilia-panel');
     if (panel) panel.style.display = 'block';
 
-    // Helpers
     const formatAsTags = (data, className = 'tag-default') => {
         if (!data) return 'Not available';
-        const arr = Array.isArray(data) ? data : String(data).split(/\s*,\s*/).filter(Boolean);
+        const arr = Array.isArray(data) ? data : String(data).split(/[;,]\s*/).filter(Boolean);
         return arr.map(item => `<span class="tag ${className}">${item}</span>`).join('');
     };
 
     const formatReferences = (gene) => {
         if (!gene.reference) return '<li>No reference information available.</li>';
-        const allRefs = Array.isArray(gene.reference)
-            ? gene.reference
-            : [gene.reference];
+        const allRefs = Array.isArray(gene.reference) ? gene.reference : [gene.reference];
         return allRefs
             .flatMap(item => String(item).split(/[,;]\s*/))
             .map(s => s.trim())
@@ -1104,23 +1097,18 @@ function displayIndividualGenePage(gene) {
             }).join('');
     };
 
-    const formatComplexes = (complexes) => {
-        if (!complexes || complexes.length === 0) return '<li>No complexes found for this gene.</li>';
-        const arr = Array.isArray(complexes) ? complexes : String(complexes).split(/\s*,\s*/).filter(Boolean);
-        return arr.map(c => {
-            if (typeof c === "object" && c.name) {
-                return `<li><a href="https://mips.helmholtz-muenchen.de/corum/#${c.corum_id || ''}" target="_blank" class="text-[#0067A5] hover:underline">${c.name}</a>
-                ${c.subunits ? ` <span class="text-gray-600 text-sm">(Subunits: ${c.subunits.join(", ")})</span>` : ''}</li>`;
-            }
-            return `<li class="text-[#0067A5]">${c}</li>`;
-        }).join('');
+    const formatPfam = (ids) => {
+        if (!ids) return 'Not available';
+        const arr = Array.isArray(ids) ? ids.join(';').split(/;\s*/) : String(ids).split(/;\s*/);
+        return arr.map(id =>
+            `<a href="https://www.ebi.ac.uk/interpro/entry/pfam/${id}" target="_blank" class="text-[#0067A5] hover:underline">${id}</a>`
+        ).join('<br>');
     };
 
     // Prepare data
     const localizationTags = formatAsTags(gene.localization, 'tag-localization');
     const functionalCategoryTags = formatAsTags(gene.functional_category, 'tag-category');
     const referenceHTML = formatReferences(gene);
-    const complexesHTML = formatComplexes(gene.complexes);
 
     let ensemblHTML = 'Not available';
     if (gene.ensembl_id) {
@@ -1130,7 +1118,11 @@ function displayIndividualGenePage(gene) {
         ).join('<br>');
     }
 
-    // ✅ MAIN TEMPLATE - includes gene name + description + summary + complexes
+    const pfamHTML = gene.pfam_ids ? formatPfam(gene.pfam_ids) : 'Not available';
+    const domainDescriptionsHTML = gene.domain_descriptions ? formatAsTags(gene.domain_descriptions, 'tag-domain') : 'Not available';
+    const ciliopathyHTML = gene.ciliopathy ? formatAsTags(gene.ciliopathy, 'tag-ciliopathy') : 'Not available';
+    const complexesHTML = gene.complex_names ? formatAsTags(gene.complex_names, 'tag-complex') : '<span class="text-gray-500">No complexes found for this gene.</span>';
+
     contentArea.innerHTML = `
       <div class="page-section gene-detail-page space-y-6">
         <h1 class="text-3xl font-bold text-gray-900">${gene.gene || "Unknown Gene"}</h1>
@@ -1138,6 +1130,7 @@ function displayIndividualGenePage(gene) {
         ${gene.functional_summary ? `<p class="text-base text-gray-600 italic">${gene.functional_summary}</p>` : ''}
 
         <div class="details-column space-y-6">
+
           <div class="detail-card p-4 rounded-2xl shadow-md bg-white">
             <h3 class="card-title text-lg font-semibold">Identifiers</h3>
             <div class="space-y-3">
@@ -1158,8 +1151,19 @@ function displayIndividualGenePage(gene) {
           </div>
 
           <div class="detail-card p-4 rounded-2xl shadow-md bg-white">
+            <h3 class="card-title text-lg font-semibold">Ciliopathies</h3>
+            <div>${ciliopathyHTML}</div>
+          </div>
+
+          <div class="detail-card p-4 rounded-2xl shadow-md bg-white">
+            <h3 class="card-title text-lg font-semibold">PFAM Domains</h3>
+            <div>${pfamHTML}</div>
+            <div class="mt-2 text-sm text-gray-600">${domainDescriptionsHTML}</div>
+          </div>
+
+          <div class="detail-card p-4 rounded-2xl shadow-md bg-white">
             <h3 class="card-title text-lg font-semibold">Protein Complexes</h3>
-            <ul>${complexesHTML}</ul>
+            <div>${complexesHTML}</div>
           </div>
 
           <div class="detail-card p-4 rounded-2xl shadow-md bg-white">
