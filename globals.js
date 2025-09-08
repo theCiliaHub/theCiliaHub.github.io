@@ -1,18 +1,23 @@
-// =================================================================
 // globals.js
-// This file declares global variables and controls the page router.
-// IT MUST BE LOADED AFTER script.js IN YOUR HTML.
-// =================================================================
+// =============================================================================
+// GLOBAL VARIABLES
+// =============================================================================
 
-// --- GLOBAL VARIABLES ---
+// Data storage
 let allGenes = [];
-let geneDataCache = null;
-let geneMapCache = new Map();
 let currentData = [];
 let searchResults = [];
 const geneLocalizationData = {};
-let localizationChartInstance;
 
+// Plotting
+let currentPlot = null;
+
+// Chart instances
+let localizationChartInstance;
+let analysisDotPlotInstance;
+let analysisBarChartInstance;
+
+// IDs and defaults
 const allPartIds = [
     "cell-body", "nucleus", "basal-body",
     "transition-zone", "axoneme", "ciliary-membrane"
@@ -22,7 +27,9 @@ const defaultGenesNames = [
     "CEP290", "WDR31", "ARL13B", "BBS1"
 ];
 
-// --- NAVIGATION & ROUTING ---
+// Caches
+let geneDataCache = null;
+let geneMapCache = null;
 
 function navigateTo(event, path) {
     if (event) {
@@ -31,65 +38,90 @@ function navigateTo(event, path) {
     window.location.hash = path;
 }
 
+// =============================================================================
+// ROUTER
+// =============================================================================
 async function handleRouteChange() {
     let path = window.location.hash.replace(/^#/, '').toLowerCase().trim();
     if (!path || path === '/' || path === '/index.html') {
         path = '/';
     }
 
-    // This now works because loadAndPrepareDatabase is defined in script.js (loaded first)
-    await loadAndPrepareDatabase();
-    
-    // This now works because updateActiveNav is defined in script.js
+    try {
+        await loadAndPrepareDatabase();
+    } catch (err) {
+        console.error("Database loading failed:", err);
+    }
+
+    let gene = null;
+    if (geneMapCache) {
+        const geneName = sanitize(path.split('/').pop().replace('.html', ''));
+        gene = geneMapCache.get(geneName);
+    } else {
+        console.warn("geneMapCache is not initialized yet.");
+    }
+
     updateActiveNav(path);
 
-    const geneName = sanitize(path.split('/').pop());
-    const isGenePath = path.startsWith('/') && geneName && !['batch-query', 'compare', 'download', 'contact', 'expression', 'ciliaplot', 'analysis', ''].includes(geneName);
-    const gene = isGenePath ? geneMapCache.get(geneName) : null;
+    // This part is likely superseded by your dynamic page functions,
+    // but we will keep it as requested.
+    const pages = [
+        '#home-page', '#analysis-page', '#batch-query-page',
+        '#ciliaplot-page', '#compare-page', '#expression-page',
+        '#download-page', '#contact-page', '#notfound-page'
+    ];
+    pages.forEach(id => {
+        const el = document.querySelector(id);
+        if (el) el.style.display = 'none';
+    });
 
-    switch (true) {
-        case path === '/':
+    switch (path) {
+        case '/':
             displayHomePage();
             setTimeout(displayLocalizationChart, 0);
             break;
-        case path === '/batch-query':
+        case '/batch-query':
             displayBatchQueryTool();
             break;
-        case path === '/ciliaplot' || path === '/analysis':
-            // displayCiliaPlotPage(); // Make sure this function exists in script.js
+        case '/ciliaplot':
+        case '/analysis':
+            displayCiliaPlotPage();
             break;
-        case path === '/compare':
+        case '/compare':
             displayComparePage();
             break;
-        case path === '/expression':
-            // displayExpressionPage(); // Make sure this function exists in script.js
+        case '/expression':
+            displayExpressionPage();
             break;
-        case path === '/download':
+        case '/download':
             displayDownloadPage();
             break;
-        case path === '/contact':
+        case '/contact':
             displayContactPage();
             break;
-        case !!gene:
-            displayIndividualGenePage(gene);
-            break;
         default:
-            displayNotFoundPage();
+            if (gene) {
+                displayIndividualGenePage(gene);
+            } else {
+                displayNotFoundPage();
+            }
             break;
     }
+    console.log("Routing completed. Path:", path, "Gene:", gene ? gene.name : "N/A");
 }
 
-// --- INITIALIZATION ---
-
-function initGlobalEventListeners() {
-    // This now works because handleStickySearch is defined in script.js
-    window.addEventListener('scroll', handleStickySearch);
-}
-
-// Kick off the application router and event listeners
+// =============================================================================
+// EVENT LISTENERS
+// =============================================================================
 window.addEventListener("load", handleRouteChange);
 window.addEventListener("hashchange", handleRouteChange);
-document.addEventListener('DOMContentLoaded', initGlobalEventListeners);
+
+document.addEventListener('DOMContentLoaded', () => {
+    initGlobalEventListeners();
+});
+
+// =============================================================================
+// GLOBAL UI HELPERS
 // =============================================================================
 function initGlobalEventListeners() {
     window.addEventListener('scroll', handleStickySearch);
