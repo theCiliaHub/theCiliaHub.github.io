@@ -43,49 +43,107 @@
                 </div>
             </div>
 
-            <div id="analysis-page" style="display: none;">
-                <h2>Gene CiliaPlot Analysis</h2>
-                <textarea id="analysis-genes-input" rows="5" placeholder="Enter gene list here..."></textarea>
-                
-                <div class="plot-type-selection">
-                    <label><input type="radio" name="plot-type" value="bubble" checked> Bubble Plot</label>
-                    <label><input type="radio" name="plot-type" value="matrix"> Matrix Plot</label>
-                </div>
-                <div class="plot-settings">
-                    <label>Font Family: <input type="text" id="setting-font-family" value="Arial"></label>
-                    <label>Font Size: <input type="number" id="setting-font-size" value="16"></label>
-                    <label>Font Weight: <input type="text" id="setting-font-weight" value="bold"></label>
-                    <label>Text Color: <input type="color" id="setting-text-color" value="#000000"></label>
-                    <label>Y-Axis Title: <input type="text" id="setting-y-axis-title" value="Localization"></label>
-                    <label>CiliaPlot Color 1: <input type="color" id="setting-enrichment-color1" value="#edf8fb"></label>
-                    <label>CiliaPlot Color 2: <input type="color" id="setting-enrichment-color2" value="#b2e2e2"></label>
-                </div>
-                
-                <button onclick="generateAnalysisPlots()">Generate Plot(s)</button>
+            <div id="ciliaplot-page" class="ciliaplot-page" style="display: none;">
+                <section class="page-section">
+                    <h1>CiliaPlot Gene Set Analysis</h1>
+                    <p>Enter a list of genes to perform functional enrichment analysis and generate publication-ready visualizations.</p>
+                </section>
 
-                <div id="plot-container" style="display: none;">
-                    <canvas id="analysis-bubble-plot"></canvas>
-                    <canvas id="analysis-matrix-plot" style="display: none;"></canvas>
-                </div>
-                
-                <div id="ciliaplot-plots-wrapper" style="display: none;">
-                    <div class="plot-container">
-                        <h3>Ciliopathy Associations</h3>
-                        <div id="sunburst-plot-div"></div>
+                <div class="ciliaplot-container">
+
+                    <div class="ciliaplot-controls-panel">
+
+                        <details class="ciliaplot-control-card" open>
+                            <summary>1. Input Your Gene List</summary>
+                            <div class="ciliaplot-card-content">
+                                <textarea id="ciliaplot-genes-input" rows="8" placeholder="Enter one gene per line... e.g., ARL13B, IFT88, BBS1"></textarea>
+                                <button class="btn btn-secondary" style="margin-top: 10px; width: 100%;">Load Sample Genes</button>
+                            </div>
+                        </details>
+
+                        <details class="ciliaplot-control-card" open>
+                            <summary>2. Select Plot Type</summary>
+                            <div class="ciliaplot-card-content">
+                                <div class="ciliaplot-plot-options">
+                                    <div class="ciliaplot-plot-option">
+                                        <label><input type="radio" name="plot-type" value="bubble" checked> Bubble Plot</label>
+                                        <p class="ciliaplot-plot-option-desc">Visualizes enrichment significance and gene count for each term.</p>
+                                    </div>
+                                    <div class="ciliaplot-plot-option">
+                                        <label><input type="radio" name="plot-type" value="matrix"> Matrix Plot</label>
+                                        <p class="ciliaplot-plot-option-desc">Shows the relationship between genes and enriched terms.</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </details>
+
+                        <details class="ciliaplot-control-card">
+                            <summary>3. Customize Plot</summary>
+                            <div class="ciliaplot-card-content">
+                                <div id="ciliaplot-settings-grid">
+                                    <div>
+                                        <label for="setting-font-family">Font Family</label>
+                                        <input type="text" id="setting-font-family" value="Arial">
+                                    </div>
+                                    <div>
+                                        <label for="setting-font-size">Font Size</label>
+                                        <input type="number" id="setting-font-size" value="12">
+                                    </div>
+                                    <div>
+                                        <label for="setting-text-color">Text Color</label>
+                                        <input type="color" id="setting-text-color" value="#333333">
+                                    </div>
+                                    <div>
+                                        <label for="setting-enrichment-color1">Color Low</label>
+                                        <input type="color" id="setting-enrichment-color1" value="#e6f0f7">
+                                    </div>
+                                    <div>
+                                        <label for="setting-enrichment-color2">Color High</label>
+                                        <input type="color" id="setting-enrichment-color2" value="#0067a5">
+                                    </div>
+                                </div>
+                            </div>
+                        </details>
+
+                        <button id="ciliaplot-generate-btn">Generate Plot</button>
                     </div>
 
-                    <div class="plot-container">
-                        <h3>Enriched Protein Domains</h3>
-                        <div id="bubble-chart-div"></div>
+                    <div class="ciliaplot-display-panel">
+                        <div class="ciliaplot-display-header">
+                            <h3>Analysis Results</h3>
+                            <div class="ciliaplot-download-options">
+                                <button class="ciliaplot-download-btn">Download SVG</button>
+                                <button class="ciliaplot-download-btn">Download PNG</button>
+                            </div>
+                        </div>
+                        <div class="ciliaplot-plot-area">
+                            <div class="status-message">Your plot will appear here once generated.</div>
+                        </div>
+                        <div class="ciliaplot-results-table-container">
+                            <table class="ciliaplot-results-table">
+                                <thead>
+                                    <tr>
+                                        <th>Term ID</th>
+                                        <th>Description</th>
+                                        <th>P-value</th>
+                                        <th>Adj. P-value</th>
+                                        <th>Genes</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr><td>GO:0005929</td><td>cilium</td><td>1.25e-12</td><td>2.10e-10</td><td>15</td></tr>
+                                    <tr><td>GO:0030286</td><td>dynein complex</td><td>3.40e-9</td><td>4.50e-7</td><td>12</td></tr>
+                                    <tr><td>HP:0001250</td><td>Seizure</td><td>8.12e-7</td><td>9.30e-5</td><td>8</td></tr>
+                                    <tr><td>GO:0005886</td><td>plasma membrane</td><td>1.50e-6</td><td>1.65e-4</td><td>25</td></tr>
+                                    <tr><td>HP:0000518</td><td>Cataract</td><td>2.33e-5</td><td>2.41e-3</td><td>6</td></tr>
+                                    <tr><td>GO:0005739</td><td>mitochondrion</td><td>4.15e-5</td><td>4.21e-3</td><td>18</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
 
-                    <div class="plot-container">
-                        <h3>Protein Complex Network</h3>
-                        <div id="network-graph-div"></div>
-                    </div>
                 </div>
             </div>
-
             <div id="compare-page" style="display: none;"></div>
             <div id="batch-query-page" style="display: none;"></div>
             <div id="expression-page" style="display: none;"></div>
@@ -103,7 +161,7 @@
                         <path id="cell-body" class="cilia-part" tabindex="0" fill="none" d="M 50,380 C -20,300 20,200 150,200 C 280,200 320,300 250,380 Z"/>
                         <circle id="nucleus" class="cilia-part" tabindex="0" fill="#A7C7E7" cx="150" cy="320" r="40"/>
                         <rect id="basal-body" class="cilia-part" tabindex="0" fill="#2F2F2F" x="140" y="195" width="20" height="15"/>
-                        <path id="transition-zone" class="cilia-part" tabindex="0" fill="#9B59B6" d="M 142,195 L 138,180 L 162,180 L 158,195 Z"/>
+                        <path id="transition-zone" class="ciliaplot-part" tabindex="0" fill="#9B59B6" d="M 142,195 L 138,180 L 162,180 L 158,195 Z"/>
                         <path id="ciliary-membrane" class="cilia-part" tabindex="0" fill="none" fill-opacity="0.5" d="M 138,180 L 145,10 L 155,10 L 162,180 Z"/>
                         <path id="axoneme" class="cilia-part" tabindex="0" fill="none" d="M 145,180 L 148,15 L 152,15 L 155,180 Z"/>
                     </svg>
