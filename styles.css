@@ -214,10 +214,10 @@ body {
     top: 80px;
     left: 50%;
     transform: translateX(-50%);
-    width: 80%;
-    max-width: 800px;
+    width: 90%; /* Increased from 80% to make search box bigger */
+    max-width: 1000px; /* Increased from 800px */
     background: var(--panel-bg);
-    padding: 1rem;
+    padding: 1.2rem; /* Slightly increased padding */
     border-radius: var(--border-radius-md);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
     z-index: 999;
@@ -230,10 +230,10 @@ body {
 
 .search-wrapper input {
     width: 100%;
-    padding: 0.8rem;
+    padding: 1rem; /* Increased from 0.8rem for larger input */
     border: 2px solid var(--border-color);
     border-radius: var(--border-radius-md);
-    font-size: 1rem;
+    font-size: 1.2rem; /* Increased from 1rem for larger text */
 }
 
 .search-btn {
@@ -322,6 +322,7 @@ body {
     width: 100%;
     border-collapse: collapse;
     margin-top: 1rem;
+    position: relative; /* Ensure table can support sticky headers */
 }
 
 /* ✨ This rule now styles the cells on all three pages ✨ */
@@ -336,12 +337,30 @@ body {
     text-align: left;
 }
 
-/* ✨ This rule now styles the headers on all three pages ✨ */
+/* ✨ Add stripes for columns in ciliarhub-results-container table ✨ */
+#ciliahub-results-container th:nth-child(odd),
+#ciliahub-results-container td:nth-child(odd) {
+    background-color: var(--neutral-bg-alt); /* Light background for odd columns */
+}
+
+#ciliahub-results-container th:nth-child(even),
+#ciliahub-results-container td:nth-child(even) {
+    background-color: var(--panel-bg); /* White background for even columns */
+}
+
+/* ✨ This rule now styles the headers on all three pages, with navbar blue for ciliarhub-results-container ✨ */
 #batch-results th, 
-#comparison-table th,
-#ciliahub-results-container th {
+#comparison-table th {
     background: var(--primary-blue);
     color: var(--text-light);
+}
+
+#ciliahub-results-container th {
+    background: linear-gradient(90deg, var(--primary-blue), var(--primary-blue-light)); /* Matches navbar gradient */
+    color: var(--text-light);
+    position: sticky; /* Make header sticky */
+    top: 160px; /* Adjusted to account for fixed search bar (80px + some margin) */
+    z-index: 998; /* Below search bar (z-index: 999) */
 }
 
 /* ✨ These rules now style the links on all three pages ✨ */
@@ -978,10 +997,14 @@ input[type="color"] {
 }
 
 #ciliahub-genes-input {
-    /* Make textarea shorter and allow it to grow */
-    min-height: 100px; 
-    flex-grow: 1;
-    margin-bottom: 0;
+    width: 100%;
+    min-height: 150px; /* Increased from 120px for larger textarea */
+    margin-bottom: 1rem;
+    padding: 12px; /* Increased from 10px */
+    border: 1px solid #ccc;
+    border-radius: var(--border-radius-sm);
+    font-size: 1.2rem; /* Increased from 1rem */
+    resize: vertical;
 }
 
 #ciliahub-actions {
@@ -1105,12 +1128,12 @@ input[type="color"] {
 
 #ciliahub-genes-input {
     width: 100%;
-    min-height: 120px;
+    min-height: 150px; /* Increased from 120px for larger textarea */
     margin-bottom: 1rem;
-    padding: 10px;
+    padding: 12px; /* Increased from 10px */
     border: 1px solid #ccc;
     border-radius: var(--border-radius-sm);
-    font-size: 1rem;
+    font-size: 1.2rem; /* Increased from 1rem */
     resize: vertical;
 }
 
