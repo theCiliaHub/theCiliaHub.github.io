@@ -836,7 +836,16 @@ function displayComparePage() {
                 switch(feature) {
                     case 'Description': value = gene.description || '-'; break;
                     case 'Ensembl ID': value = gene.ensembl_id ? `<a href="https://www.ensembl.org/Homo_sapiens/Gene/Summary?g=${gene.ensembl_id}" target="_blank">${gene.ensembl_id}</a>` : '-'; break;
-                    case 'OMIM ID': value = gene.omim_id ? `<a href="https://www.omim.org/entry/${gene.omim_id}" target="_blank">${gene.omim_id}</a>` : '-'; break;
+                  // --- FIX IS HERE ---
+                case 'Ensembl ID':
+                    if (gene.ensembl_id) {
+                        const ids = String(gene.ensembl_id).split(/\s*,\s*/).filter(Boolean);
+                        value = ids.map(id => 
+                            `<a href="https://www.ensembl.org/Homo_sapiens/Gene/Summary?g=${id.trim()}" target="_blank">${id.trim()}</a>`
+                        ).join('<br>');
+                    }
+                    break;
+                // --- End of Fix ---  
                     case 'Synonym': value = gene.synonym || '-'; break;
                     case 'Localization': value = Array.isArray(gene.localization) ? gene.localization.join(', ') : (gene.localization || '-'); break;
                     case 'Functional Summary': value = gene.functional_summary || '-'; break;
@@ -1101,6 +1110,15 @@ function displayIndividualGenePage(gene) {
             <ul class="reference-list list-disc pl-5 text-[#0067A5]">${referenceHTML}</ul>
           </div>
         </div>
+        // --- FIX IS HERE: Create separate links for each Ensembl ID ---
+    let ensemblHTML = 'Not available';
+    if (gene.ensembl_id) {
+        const ids = String(gene.ensembl_id).split(/\s*,\s*/).filter(Boolean);
+        ensemblHTML = ids.map(id =>
+            `<a href="https://www.ensembl.org/Homo_sapiens/Gene/Summary?g=${id.trim()}" target="_blank" class="text-[#0067A5] hover:underline">${id.trim()}</a>`
+        ).join('<br>'); // Use <br> to put each ID on a new line
+    }
+    // --- End of Fix ---
 
         <div class="details-column space-y-6">
           <div class="detail-card bg-white border border-[#c2d9e6] rounded-lg p-6 shadow-sm">
