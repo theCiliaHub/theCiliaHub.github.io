@@ -3,10 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CiliaHub: Gene Details</title>
-    <meta name="description" content="Detailed information about genes with ciliary functions in CiliaHub.">
+    <title>The CiliaHub: An Updated Database of Gold Standard Genes with Ciliary Functions</title>
+    <meta name="description" content="CiliaHub is an advanced bioinformatics platform that hosts a detailed database of gold standard cilia genes and their role in various ciliopathies. Our comprehensive collection includes the most reliable and well-established genes linked to ciliary function, with reference papers also provided. With our user-friendly search tool, researchers can explore genome-wide data, focusing on both known and novel ciliary genes. Discover their contributions to the biology of cilia and the mechanisms behind ciliary-related disorders. Search for a single gene below or use the Batch Query tool to analyze multiple genes.">
     <link rel="icon" type="image/png" href="CiliaHub_Logo_web.png">
     <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@panzoom/panzoom@4.5.1/dist/panzoom.min.js"></script>
     <script src="https://unpkg.com/@upsetjs/bundle"></script>
@@ -21,103 +22,216 @@
         <div class="nav-container">
             <a href="#/" onclick="navigateTo(event, '/')" class="logo">CiliaHub</a>
             <ul class="nav-links">
-                <li><a href="#/" onclick="navigateTo(event, '/')" aria-label="Home">Home</a></li>
-                <li><a href="#/ciliaplot" onclick="navigateTo(event, '/ciliaplot')" aria-label="CiliaPlot">CiliaPlot</a></li>
-                <li><a href="#/batch-query" onclick="navigateTo(event, '/batch-query')" aria-label="Batch Query">Batch Query</a></li>
-                <li><a href="#/compare" onclick="navigateTo(event, '/compare')" aria-label="Compare">Compare</a></li>
-                <li><a href="#/expression" onclick="navigateTo(event, '/expression')" aria-label="Expression">Expression</a></li>
-                <li><a href="#/download" onclick="navigateTo(event, '/download')" aria-label="Download">Download</a></li>
-                <li><a href="#/contact" onclick="navigateTo(event, '/contact')" aria-label="Contact">Contact</a></li>
+                <li><a href="#/" onclick="navigateTo(event, '/')" aria-label="Home" class="nav-link">Home</a></li>
+                <li><a href="#/ciliaplot" onclick="navigateTo(event, '/ciliaplot')" aria-label="CiliaPlot" class="nav-link">CiliaPlot</a></li>
+                <li><a href="#/batch-query" onclick="navigateTo(event, '/batch-query')" aria-label="Batch Query" class="nav-link">Batch Query</a></li>
+                <li><a href="#/compare" onclick="navigateTo(event, '/compare')" aria-label="Compare" class="nav-link">Compare</a></li>
+                <li><a href="#/expression" onclick="navigateTo(event, '/expression')" aria-label="Expression" class="nav-link">Expression</a></li>
+                <li><a href="#/download" onclick="navigateTo(event, '/download')" aria-label="Download" class="nav-link">Download</a></li>
+                <li><a href="#/contact" onclick="navigateTo(event, '/contact')" aria-label="Contact" class="nav-link">Contact</a></li>
             </ul>
         </div>
     </nav>
-    <main class="main-container gene-detail-page">
-        <div class="content-area content-area-full">
-            <div class="breadcrumb">
-                <a href="#/" onclick="navigateTo(event, '/')">Home</a> &gt; <span>Gene: <span id="gene-name">TTC8</span></span>
+    <main class="main-container">
+        <div class="content-area" id="content-area">
+            <div id="home-page">
+                <h1>Welcome to CiliaHub 🔬</h1>
+                <p>Your comprehensive resource for genes with ciliary functions. Explore our database, compare genes, and visualize expression data.</p>
+                <div class="call-to-action">
+                    <a href="#/ciliaplot" onclick="navigateTo(event, '/ciliaplot')" class="btn btn-primary">Start Gene Analysis with CiliaPlot</a>
+                </div>
             </div>
-            <div class="gene-header">
-                <h1 class="gene-name">TTC8</h1>
-                <p class="gene-description">Tetratricopeptide repeat domain 8</p>
-            </div>
-            <div class="gene-details-grid">
-                <div class="details-column">
-                    <div class="detail-card">
-                        <h3 class="card-title">
-                            <svg width="20" height="20"><path d="M2 18V2h16v16H2zm2-2h12V4H4v12z" fill="none" stroke-width="1.5"/></svg>
-                            Functional Information
-                        </h3>
-                        <div class="info-item">
-                            <p>Plays a critical role in ciliary function, involved in protein-protein interactions within the BBSome complex.</p>
-                        </div>
-                        <div class="info-item">
-                            <strong>Ciliary Role:</strong> <span>Component of the BBSome, facilitating ciliary membrane biogenesis.</span>
-                        </div>
-                        <div class="info-item">
-                            <strong>Associated Diseases:</strong>
-                            <div class="tags-container">
-                                <span class="tag">Bardet-Biedl Syndrome</span>
-                                <span class="tag">Retinitis Pigmentosa</span>
+            <div id="ciliaplot-page" style="display: none;">
+                <div class="enrichment-header">
+                    <h1>CiliaPlot Analysis</h1>
+                    <p>Visualize ciliary gene data with customizable plots.</p>
+                </div>
+                <div class="enrichment-container">
+                    <div class="enrichment-left-panel">
+                        <div class="control-section">
+                            <h3>Gene Input</h3>
+                            <div class="control-section-content">
+                                <textarea id="enrichment-genes-input" placeholder="Enter gene list (e.g., TTC8, BBS1, BBS2)" aria-label="Gene list input"></textarea>
+                                <div class="action-buttons">
+                                    <button class="btn btn-primary" onclick="generateAnalysisPlots()">Generate Plot(s)</button>
+                                </div>
                             </div>
                         </div>
+                        <div class="control-section">
+                            <h3>Plot Type</h3>
+                            <div class="control-section-content">
+                                <div class="plot-option">
+                                    <label><input type="radio" name="plot-type" value="bubble" checked aria-label="Bubble Plot"> Bubble Plot</label>
+                                    <div class="plot-option-explanation">Visualize gene relationships with a bubble plot.</div>
+                                </div>
+                                <div class="plot-option">
+                                    <label><input type="radio" name="plot-type" value="matrix" aria-label="Matrix Plot"> Matrix Plot</label>
+                                    <div class="plot-option-explanation">Display gene interactions in a matrix format.</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="control-section">
+                            <details id="plot-customization-details">
+                                <summary>Plot Customization</summary>
+                                <div class="control-section-content">
+                                    <div id="plot-settings-grid">
+                                        <div>
+                                            <label for="setting-font-family">Font Family</label>
+                                            <input type="text" id="setting-font-family" value="Inter">
+                                        </div>
+                                        <div>
+                                            <label for="setting-font-size">Font Size</label>
+                                            <input type="number" id="setting-font-size" value="16">
+                                        </div>
+                                        <div>
+                                            <label for="setting-font-weight">Font Weight</label>
+                                            <input type="text" id="setting-font-weight" value="500">
+                                        </div>
+                                        <div>
+                                            <label for="setting-text-color">Text Color</label>
+                                            <input type="color" id="setting-text-color" value="#333333">
+                                        </div>
+                                        <div>
+                                            <label for="setting-y-axis-title">Y-Axis Title</label>
+                                            <input type="text" id="setting-y-axis-title" value="Localization">
+                                        </div>
+                                        <div>
+                                            <label for="setting-enrichment-color1">Color 1</label>
+                                            <input type="color" id="setting-enrichment-color1" value="#edf8fb">
+                                        </div>
+                                        <div>
+                                            <label for="setting-enrichment-color2">Color 2</label>
+                                            <input type="color" id="setting-enrichment-color2" value="#b2e2e2">
+                                        </div>
+                                    </div>
+                                </div>
+                            </details>
+                        </div>
                     </div>
-                    <div class="detail-card">
-                        <h3 class="card-title">
-                            <svg width="20" height="20"><path d="M2 18V2h16v16H2zm2-2h12V4H4v12z" fill="none" stroke-width="1.5"/></svg>
-                            References
-                        </h3>
-                        <ul class="reference-list">
-                            <li><a href="#">Nachury et al., 2007: A core complex of BBS genes...</a></li>
-                            <li><a href="#">Loktev et al., 2008: Functional analysis of TTC8...</a></li>
-                        </ul>
+                    <div class="enrichment-right-panel">
+                        <div class="control-section">
+                            <h3>Plot Display</h3>
+                            <div id="plot-display-area" class="plot-area">
+                                <div class="status-message">Enter genes and select a plot type to visualize data.</div>
+                                <canvas id="analysis-bubble-plot" style="display: none;"></canvas>
+                                <canvas id="analysis-matrix-plot" style="display: none;"></canvas>
+                            </div>
+                        </div>
                     </div>
                 </div>
-                <div class="details-column">
-                    <div class="detail-card">
-                        <h3 class="card-title">
-                            <svg width="20" height="20"><path d="M2 18V2h16v16H2zm2-2h12V4H4v12z" fill="none" stroke-width="1.5"/></svg>
-                            Identifiers
-                        </h3>
-                        <div class="info-item">
-                            <strong>Ensembl:</strong> <span>ENSG00000165533</span>
-                        </div>
-                        <div class="info-item">
-                            <strong>UniProt:</strong> <span>Q8TAM2</span>
-                        </div>
-                        <div class="info-item">
-                            <strong>NCBI Gene:</strong> <span>123016</span>
-                        </div>
-                    </div>
-                    <div class="detail-card">
-                        <h3 class="card-title">
-                            <svg width="20" height="20"><path d="M2 18V2h16v16H2zm2-2h12V4H4v12z" fill="none" stroke-width="1.5"/></svg>
-                            Subcellular Localization
-                        </h3>
-                        <div class="info-item">
-                            <div class="tags-container">
-                                <span class="tag">Ciliary Membrane</span>
-                                <span class="tag">Basal Body</span>
+            </div>
+            <div id="gene-detail-page" style="display: none;" class="gene-detail-page">
+                <div class="breadcrumb">
+                    <a href="#/" onclick="navigateTo(event, '/')" aria-label="Back to Home">Home</a> &gt; <span>Gene: <span id="gene-name">TTC8</span></span>
+                </div>
+                <div class="gene-header">
+                    <h1 class="gene-name">TTC8</h1>
+                    <p class="gene-description">Tetratricopeptide repeat domain 8</p>
+                </div>
+                <div class="gene-details-grid">
+                    <div class="details-column">
+                        <div class="detail-card">
+                            <h3 class="card-title">
+                                <svg width="20" height="20"><path d="M2 18V2h16v16H2zm2-2h12V4H4v12z" fill="none" stroke-width="1.5"/></svg>
+                                Functional Information
+                            </h3>
+                            <div class="info-item">
+                                <p>Plays a critical role in ciliary function, involved in protein-protein interactions within the BBSome complex.</p>
+                            </div>
+                            <div class="info-item">
+                                <strong>Ciliary Role:</strong> <span>Component of the BBSome, facilitating ciliary membrane biogenesis.</span>
+                            </div>
+                            <div class="info-item">
+                                <strong>Associated Diseases:</strong>
+                                <div class="tags-container">
+                                    <span class="tag">Bardet-Biedl Syndrome</span>
+                                    <span class="tag">Retinitis Pigmentosa</span>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                    <div class="detail-card">
-                        <h3 class="card-title">
-                            <svg width="20" height="20"><path d="M2 18V2h16v16H2zm2-2h12V4H4v12z" fill="none" stroke-width="1.5"/></svg>
-                            Complex Information
-                        </h3>
-                        <div class="info-item">
-                            <strong>Complex:</strong> <span>BBSome</span>
+                        <div class="detail-card">
+                            <h3 class="card-title">
+                                <svg width="20" height="20"><path d="M2 18V2h16v16H2zm2-2h12V4H4v12z" fill="none" stroke-width="1.5"/></svg>
+                                References
+                            </h3>
+                            <ul class="reference-list">
+                                <li><a href="#">Nachury et al., 2007: A core complex of BBS genes...</a></li>
+                                <li><a href="#">Loktev et al., 2008: Functional analysis of TTC8...</a></li>
+                            </ul>
                         </div>
-                        <div class="info-item">
-                            <strong>Interacting Proteins:</strong>
-                            <div class="tags-container">
-                                <span class="tag">BBS1</span>
-                                <span class="tag">BBS2</span>
-                                <span class="tag">BBS7</span>
+                    </div>
+                    <div class="details-column">
+                        <div class="detail-card">
+                            <h3 class="card-title">
+                                <svg width="20" height="20"><path d="M2 18V2h16v16H2zm2-2h12V4H4v12z" fill="none" stroke-width="1.5"/></svg>
+                                Identifiers
+                            </h3>
+                            <div class="info-item">
+                                <strong>Ensembl:</strong> <span>ENSG00000165533</span>
+                            </div>
+                            <div class="info-item">
+                                <strong>UniProt:</strong> <span>Q8TAM2</span>
+                            </div>
+                            <div class="info-item">
+                                <strong>NCBI Gene:</strong> <span>123016</span>
+                            </div>
+                        </div>
+                        <div class="detail-card">
+                            <h3 class="card-title">
+                                <svg width="20" height="20"><path d="M2 18V2h16v16H2zm2-2h12V4H4v12z" fill="none" stroke-width="1.5"/></svg>
+                                Subcellular Localization
+                            </h3>
+                            <div class="info-item">
+                                <div class="tags-container">
+                                    <span class="tag">Ciliary Membrane</span>
+                                    <span class="tag">Basal Body</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="detail-card">
+                            <h3 class="card-title">
+                                <svg width="20" height="20"><path d="M2 18V2h16v16H2zm2-2h12V4H4v12z" fill="none" stroke-width="1.5"/></svg>
+                                Complex Information
+                            </h3>
+                            <div class="info-item">
+                                <strong>Complex:</strong> <span>BBSome</span>
+                            </div>
+                            <div class="info-item">
+                                <strong>Interacting Proteins:</strong>
+                                <div class="tags-container">
+                                    <span class="tag">BBS1</span>
+                                    <span class="tag">BBS2</span>
+                                    <span class="tag">BBS7</span>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
+            </div>
+            <div id="batch-query-page" style="display: none;">
+                <h1>Batch Query</h1>
+                <p>Perform batch queries for multiple genes.</p>
+                <!-- Existing JavaScript will populate content -->
+            </div>
+            <div id="compare-page" style="display: none;">
+                <h1>Compare Genes</h1>
+                <p>Compare ciliary genes and their properties.</p>
+                <!-- Existing JavaScript will populate content -->
+            </div>
+            <div id="expression-page" style="display: none;">
+                <h1>Expression Analysis</h1>
+                <p>Analyze gene expression data.</p>
+                <!-- Existing JavaScript will populate content -->
+            </div>
+            <div id="download-page" style="display: none;">
+                <h1>Download Data</h1>
+                <p>Download datasets and results.</p>
+                <!-- Existing JavaScript will populate content -->
+            </div>
+            <div id="contact-page" style="display: none;">
+                <h1>Contact Us</h1>
+                <p>Get in touch with the CiliaHub team.</p>
+                <!-- Existing JavaScript will populate content -->
             </div>
         </div>
         <aside class="cilia-panel">
@@ -142,9 +256,10 @@
             </div>
         </aside>
     </main>
-    <footer class="footer" style="text-align: center;">
+    <footer class="footer">
         <p>© 2025 CiliaHub. All rights reserved.</p>
     </footer>
+    <div class="tooltip"></div>
     <script defer src="globals.js"></script>
     <script defer src="plots.js"></script>
     <script defer src="script.js"></script>
