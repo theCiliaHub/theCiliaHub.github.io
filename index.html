@@ -3,284 +3,124 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CiliaHub - Comprehensive Ciliary Gene Database</title>
+    <title>The CiliaHub: A Database of Genes with Ciliary Functions</title>
+    <meta name="description" content="The CiliaHub is a comprehensive bioinformatics database for genes with ciliary functions.">
+    <link rel="icon" type="image/png" href="CiliaHub_Logo_web.png">
     <link rel="stylesheet" href="styles.css">
+
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://unpkg.com/panzoom@9.4.0/dist/panzoom.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/upsetjs/1.8.0/upsetjs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@panzoom/panzoom@4.5.1/dist/panzoom.min.js"></script>
+    <script src="https://unpkg.com/@upsetjs/bundle"></script>
     <script src="https://d3js.org/d3.v7.min.js"></script>
-    <script src="https://cdn.plot.ly/plotly-2.24.1.min.js"></script>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jstat/1.9.5/jstat.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jstat@latest/dist/jstat.min.js"></script>
 </head>
 <body>
-    <!-- Navigation Bar -->
     <nav class="navbar">
         <div class="nav-container">
-            <a href="#/" class="logo">CiliaHub</a>
+            <a href="#/" onclick="navigateTo(event, '/')" class="logo">CiliaHub</a>
             <ul class="nav-links">
-                <li><a href="#/" class="active">Home</a></li>
-                <li><a href="#/CiliaPlot">CiliaPlot</a></li>
-                <li><a href="#/BatchQuery">Batch Query</a></li>
-                <li><a href="#/Compare">Compare</a></li>
-                <li><a href="#/Expression">Expression</a></li>
-                <li><a href="#/Download">Download</a></li>
-                <li><a href="#/Contact">Contact</a></li>
+                <li><a href="#/" onclick="navigateTo(event, '/')" aria-label="Home">Home</a></li>
+                <li><a href="#/enrichment" onclick="navigateTo(event, '/enrichment')" aria-label="Enrichment">Enrichment</a></li>
+                <li><a href="#/batch-query" onclick="navigateTo(event, '/batch-query')" aria-label="Batch Query">Batch Query</a></li>
+                <li><a href="#/compare" onclick="navigateTo(event, '/compare')" aria-label="Compare">Compare</a></li>
+                <li><a href="#/expression" onclick="navigateTo(event, '/expression')" aria-label="Expression">Expression</a></li>
+                <li><a href="#/download" onclick="navigateTo(event, '/download')" aria-label="Download">Download</a></li>
+                <li><a href="#/contact" onclick="navigateTo(event, '/contact')" aria-label="Contact">Contact</a></li>
             </ul>
         </div>
     </nav>
 
-    <!-- Main Content Container -->
-    <div class="main-container">
-        <!-- Interactive Cilium Sidebar -->
-        <aside class="cilia-panel">
-            <h2>Interactive Cilium</h2>
-            <div class="cilia-diagram">
-                <svg id="cilia-svg" width="250" height="300" viewBox="0 0 250 300">
-                    <!-- Cilium structure will be rendered by JavaScript -->
-                    <g id="cell-body">
-                        <ellipse cx="125" cy="250" rx="80" ry="40" fill="#d3d3d3" />
-                        <ellipse cx="125" cy="220" rx="50" ry="30" fill="#e8e8e8" />
-                    </g>
-                    <g id="nucleus">
-                        <circle cx="125" cy="230" r="20" fill="#e0e0e0" stroke="#a0a0a0" stroke-width="1" />
-                    </g>
-                    <g id="cilium-base">
-                        <rect x="120" y="180" width="10" height="20" fill="#2c5aa0" />
-                    </g>
-                    <g id="cilium-shaft">
-                        <line x1="125" y1="180" x2="125" y2="50" stroke="#4a89dc" stroke-width="8" />
-                    </g>
-                    <g id="cilium-tip">
-                        <circle cx="125" cy="45" r="10" fill="#66c2a5" />
-                    </g>
-                </svg>
-            </div>
-            <div id="geneButtons">
-                <button class="gene-btn default" data-gene="TTC8">TTC8</button>
-                <button class="gene-btn default" data-gene="IFT88">IFT88</button>
-                <button class="gene-btn default" data-gene="ARL13B">ARL13B</button>
-                <button class="gene-btn reset-btn" id="resetCilium">Reset View</button>
-            </div>
-        </aside>
-
-        <!-- Content Area -->
-        <main class="content-area">
-            <!-- Home Page -->
-            <section id="home-page" class="page-section active">
+    <main class="main-container">
+        <div class="content-area" id="content-area">
+            <div id="home-page">
                 <h1>Welcome to CiliaHub 🔬</h1>
                 <p>Your comprehensive resource for genes with ciliary functions. Explore our database, compare genes, and visualize expression data.</p>
-                
-                <div class="search-container">
-                    <div class="search-wrapper">
-                        <input type="text" id="search-input" placeholder="Search for a gene (e.g., TTC8, IFT88)">
-                        <div id="search-suggestions">
-                            <ul></ul>
-                        </div>
-                    </div>
-                    <button class="search-btn" id="search-btn">Search</button>
+                <div class="call-to-action">
+                    <a href="#/enrichment" onclick="navigateTo(event, '/enrichment')" class="cta-button">Perform Gene Enrichment Analysis</a>
                 </div>
-                
-                <h2>Perform Gene Analysis with CiliaPlot</h2>
-                <div class="feature-cards">
-                    <div class="feature-card">
-                        <h3>Gene CiliaPlot Analysis</h3>
-                        <p>Generate customized plots for gene expression and functional analysis.</p>
-                        <a href="#/CiliaPlot" class="btn-primary">Try CiliaPlot</a>
-                    </div>
-                    <div class="feature-card">
-                        <h3>Batch Query</h3>
-                        <p>Analyze multiple genes simultaneously to identify patterns and relationships.</p>
-                        <a href="#/BatchQuery" class="btn-primary">Run Batch Query</a>
-                    </div>
-                    <div class="feature-card">
-                        <h3>Compare Genes</h3>
-                        <p>Directly compare functional annotations and expression profiles.</p>
-                        <a href="#/Compare" class="btn-primary">Compare Genes</a>
-                    </div>
-                </div>
-            </section>
+            </div>
 
-            <!-- Gene-Specific Page Template -->
-            <section id="gene-page" class="page-section gene-detail-page">
-                <div class="breadcrumb">
-                    <a href="#/">Home</a> > <span id="gene-breadcrumb">Gene</span>
+            <div id="analysis-page" style="display: none;">
+                <h2>Gene Enrichment Analysis</h2>
+                <textarea id="analysis-genes-input" rows="5" placeholder="Enter gene list here..."></textarea>
+                
+                <div class="plot-type-selection">
+                    <label><input type="radio" name="plot-type" value="bubble" checked> Bubble Plot</label>
+                    <label><input type="radio" name="plot-type" value="matrix"> Matrix Plot</label>
+                </div>
+                <div class="plot-settings">
+                    <label>Font Family: <input type="text" id="setting-font-family" value="Arial"></label>
+                    <label>Font Size: <input type="number" id="setting-font-size" value="16"></label>
+                    <label>Font Weight: <input type="text" id="setting-font-weight" value="bold"></label>
+                    <label>Text Color: <input type="color" id="setting-text-color" value="#000000"></label>
+                    <label>Y-Axis Title: <input type="text" id="setting-y-axis-title" value="Localization"></label>
+                    <label>Enrichment Color 1: <input type="color" id="setting-enrichment-color1" value="#edf8fb"></label>
+                    <label>Enrichment Color 2: <input type="color" id="setting-enrichment-color2" value="#b2e2e2"></label>
                 </div>
                 
-                <div class="gene-header">
-                    <h1 id="gene-name" class="gene-name">Gene Name</h1>
-                    <p id="gene-description" class="gene-description">Gene description will appear here</p>
+                <button onclick="generateAnalysisPlots()">Generate Plot(s)</button>
+
+                <div id="plot-container" style="display: none;">
+                    <canvas id="analysis-bubble-plot"></canvas>
+                    <canvas id="analysis-matrix-plot" style="display: none;"></canvas>
                 </div>
                 
-                <div class="gene-details-grid">
-                    <div class="details-column">
-                        <div class="detail-card">
-                            <h3 class="card-title">Functional Information</h3>
-                            <div id="functional-info" class="info-content">
-                                <!-- Functional information will be populated by JavaScript -->
-                            </div>
-                        </div>
-                        
-                        <div class="detail-card">
-                            <h3 class="card-title">References</h3>
-                            <div id="references" class="info-content">
-                                <!-- References will be populated by JavaScript -->
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="details-column">
-                        <div class="detail-card">
-                            <h3 class="card-title">Identifiers</h3>
-                            <div id="identifiers" class="info-content">
-                                <!-- Identifiers will be populated by JavaScript -->
-                            </div>
-                        </div>
-                        
-                        <div class="detail-card">
-                            <h3 class="card-title">Subcellular Localization</h3>
-                            <div id="localization" class="info-content">
-                                <!-- Localization info will be populated by JavaScript -->
-                            </div>
-                        </div>
-                        
-                        <div class="detail-card">
-                            <h3 class="card-title">Complex Information</h3>
-                            <div id="complex-info" class="info-content">
-                                <!-- Complex info will be populated by JavaScript -->
-                            </div>
-                        </div>
-                    </div>
+                <div id="enrichment-plots-wrapper" style="display: none;">
+                    <div class="plot-container">
+                        <h3>Ciliopathy Associations</h3>
+                        <div id="sunburst-plot-div"></div> </div>
+
+                    <div class="plot-container">
+                        <h3>Enriched Protein Domains</h3>
+                        <div id="bubble-chart-div"></div> </div>
+
+                    <div class="plot-container">
+                        <h3>Protein Complex Network</h3>
+                        <div id="network-graph-div"></div> </div>
                 </div>
-            </section>
+            </div>
 
-            <!-- CiliaPlot Page -->
-            <section id="ciliaplot-page" class="page-section enrichment-page">
-                <div class="enrichment-header">
-                    <h1>CiliaPlot Analysis</h1>
-                    <p>Generate customized plots for gene expression and functional analysis</p>
+            <div id="compare-page" style="display: none;"></div>
+            <div id="batch-query-page" style="display: none;"></div>
+            <div id="expression-page" style="display: none;"></div>
+            <div id="download-page" style="display: none;"></div>
+            <div id="contact-page" style="display: none;"></div>
+        </div>
+
+        <aside class="cilia-panel">
+            <div class="panel-header">
+                <h3>Interactive Cilium</h3>
+            </div>
+            <div class="panel-content">
+                <div class="cilia-container interactive-cilium">
+                    <svg viewBox="0 0 300 400" xmlns="http://www.w3.org/2000/svg">
+                        <path id="cell-body" class="cilia-part" tabindex="0" fill="none" d="M 50,380 C -20,300 20,200 150,200 C 280,200 320,300 250,380 Z"/>
+                        <circle id="nucleus" class="cilia-part" tabindex="0" fill="#A7C7E7" cx="150" cy="320" r="40"/>
+                        <rect id="basal-body" class="cilia-part" tabindex="0" fill="#2F2F2F" x="140" y="195" width="20" height="15"/>
+                        <path id="transition-zone" class="cilia-part" tabindex="0" fill="#9B59B6" d="M 142,195 L 138,180 L 162,180 L 158,195 Z"/>
+                        <path id="ciliary-membrane" class="cilia-part" tabindex="0" fill="none" fill-opacity="0.5" d="M 138,180 L 145,10 L 155,10 L 162,180 Z"/>
+                        <path id="axoneme" class="cilia-part" tabindex="0" fill="none" d="M 145,180 L 148,15 L 152,15 L 155,180 Z"/>
+                    </svg>
                 </div>
-                
-                <div class="enrichment-layout">
-                    <div class="enrichment-controls-panel">
-                        <div class="control-section">
-                            <h3>Input Genes</h3>
-                            <div class="control-section-content">
-                                <textarea id="enrichment-genes-input" placeholder="Enter gene names (one per line) or upload a CSV file"></textarea>
-                                <input type="file" id="csv-upload" accept=".csv">
-                            </div>
-                        </div>
-                        
-                        <div class="control-section">
-                            <h3>Plot Type</h3>
-                            <div class="control-section-content plot-type-selection">
-                                <div class="plot-option">
-                                    <input type="radio" id="bubble-plot" name="plot-type" value="bubble" checked>
-                                    <label for="bubble-plot">Bubble Plot</label>
-                                    <div class="plot-option-explanation">Shows gene expression across multiple conditions</div>
-                                </div>
-                                <div class="plot-option">
-                                    <input type="radio" id="matrix-plot" name="plot-type" value="matrix">
-                                    <label for="matrix-plot">Matrix Plot</label>
-                                    <div class="plot-option-explanation">Displays correlation matrix between genes</div>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div class="control-section">
-                            <details id="plot-customization-details">
-                                <summary>Customization Options</summary>
-                                <div class="control-section-content" id="plot-settings-panel">
-                                    <div class="plot-option">
-                                        <label for="font-family">Font Family:</label>
-                                        <select id="font-family">
-                                            <option value="Arial, sans-serif">Arial</option>
-                                            <option value="Helvetica, sans-serif">Helvetica</option>
-                                            <option value="'Times New Roman', serif">Times New Roman</option>
-                                        </select>
-                                    </div>
-                                    <div class="plot-option">
-                                        <label for="font-size">Font Size:</label>
-                                        <input type="number" id="font-size" value="12" min="8" max="24">
-                                    </div>
-                                    <div class="plot-option">
-                                        <label for="font-weight">Font Weight:</label>
-                                        <select id="font-weight">
-                                            <option value="normal">Normal</option>
-                                            <option value="bold">Bold</option>
-                                        </select>
-                                    </div>
-                                    <div class="plot-option">
-                                        <label for="text-color">Text Color:</label>
-                                        <input type="color" id="text-color" value="#333333">
-                                    </div>
-                                    <div class="plot-option">
-                                        <label for="y-axis-title">Y-Axis Title:</label>
-                                        <input type="text" id="y-axis-title" value="Expression Level">
-                                    </div>
-                                    <div class="plot-option">
-                                        <label for="color-1">CiliaPlot Color 1:</label>
-                                        <input type="color" id="color-1" value="#2c5aa0">
-                                    </div>
-                                    <div class="plot-option">
-                                        <label for="color-2">CiliaPlot Color 2:</label>
-                                        <input type="color" id="color-2" value="#66c2a5">
-                                    </div>
-                                </div>
-                            </details>
-                        </div>
-                        
-                        <div class="action-buttons">
-                            <button id="generate-plot" class="btn-primary">Generate Plot</button>
-                            <div id="download-controls">
-                                <button id="download-plot" class="btn-secondary" disabled>Download PNG</button>
-                                <button id="download-pdf" class="btn-secondary" disabled>Download PDF</button>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="enrichment-plot-panel">
-                        <div id="plot-display-area">
-                            <div id="plot-placeholder" class="status-message">
-                                Your plot will appear here after generating
-                            </div>
-                            <div class="plot-wrapper" id="plot-wrapper" style="display: none;"></div>
-                        </div>
-                    </div>
+                <div class="controls">
+                    <h4>Gene Localization:</h4>
+                    <div id="geneButtons" class="gene-buttons"></div>
                 </div>
-            </section>
+            </div>
+        </aside>
+    </main>
 
-            <!-- Other existing pages (unchanged functionality) -->
-            <section id="batch-query-page" class="page-section">
-                <!-- Batch Query content (unchanged) -->
-            </section>
+    <div class="tooltip"></div>
 
-            <section id="compare-page" class="page-section">
-                <!-- Compare content (unchanged) -->
-            </section>
-
-            <section id="expression-page" class="page-section">
-                <!-- Expression content (unchanged) -->
-            </section>
-
-            <section id="download-page" class="page-section">
-                <!-- Download content (unchanged) -->
-            </section>
-
-            <section id="contact-page" class="page-section">
-                <!-- Contact content (unchanged) -->
-            </section>
-        </main>
-    </div>
-
-    <!-- JavaScript Files -->
-    <script src="globals.js"></script>
-    <script src="plots.js"></script>
-    <script src="script.js"></script>
-    
-    <footer>
+    <footer class="footer" style="text-align: center;">
         <p>© 2025 CiliaHub. All rights reserved.</p>
     </footer>
+
+    <script defer src="globals.js"></script>
+    <script defer src="plots.js"></script>
+    <script defer src="script.js"></script>
 </body>
 </html>
