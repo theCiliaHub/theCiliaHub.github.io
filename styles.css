@@ -1128,11 +1128,21 @@ body {
 }
 
 .ciliaplot-plot-area {
-    min-height: 600px;
+    /* Increased minimum height for a larger default plot view */
+    min-height: 800px; 
     display: flex;
     align-items: center;
     justify-content: center;
     padding: 1.5rem;
+    /* Allow plot area to scroll if content is too large, but prefer it expanding */
+    overflow: auto; 
+}
+
+/* Ensure the SVG itself can grow within the plot area */
+.ciliaplot-plot-area svg {
+    width: 100%; /* Make SVG take full width of its container */
+    height: 100%; /* Make SVG take full height of its container */
+    max-width: none; /* Override max-width to allow it to be truly large */
 }
 
 .ciliaplot-plot-area .status-message {
@@ -1141,11 +1151,6 @@ body {
     font-size: 1.1em;
 }
 
-/* Ensure D3 SVG plots are responsive */
-.ciliaplot-plot-area svg {
-    max-width: 100%;
-    height: auto;
-}
 
 
 /* --- Responsive Design for CiliaPlot --- */
@@ -1169,5 +1174,62 @@ body {
         flex-direction: column;
         gap: 1rem;
     }
+}
+
+/* --- New Table Styling Below Plot --- */
+.ciliaplot-results-table-container {
+    padding: 1.5rem; /* Match plot area padding */
+    margin-top: 2rem; /* Space between plot and table */
+    background-color: var(--panel-bg); /* Match panel background */
+    border-top: 1px solid var(--border-color); /* Separator from the plot panel */
+    border-radius: 0 0 var(--border-radius-lg) var(--border-radius-lg); /* Rounded bottom corners */
+    box-shadow: 0 8px 32px rgba(44, 90, 160, 0.05); /* Soft shadow */
+    max-width: 100%; /* Ensure it doesn't expand beyond its parent */
+    overflow-x: auto; /* Allow horizontal scrolling for wide tables */
+}
+
+.ciliaplot-results-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 0; /* Remove default margin from table */
+    font-size: 0.95rem;
+}
+
+.ciliaplot-results-table th,
+.ciliaplot-results-table td {
+    padding: 12px 15px; /* Comfortable padding */
+    border: 1px solid var(--border-color); /* Light borders */
+    text-align: left;
+}
+
+.ciliaplot-results-table th {
+    background-color: var(--primary-blue); /* Darker header */
+    color: var(--text-light);
+    font-weight: 600;
+    position: sticky; /* Make headers sticky for scrollable tables */
+    top: 0;
+    z-index: 1;
+}
+
+.ciliaplot-results-table tbody tr:nth-child(odd) {
+    background-color: var(--neutral-bg-alt); /* Light blue stripe for odd rows */
+}
+
+.ciliaplot-results-table tbody tr:nth-child(even) {
+    background-color: var(--panel-bg); /* White for even rows */
+}
+
+.ciliaplot-results-table tbody tr:hover {
+    background-color: #eaf3f8; /* Subtle hover effect */
+    cursor: default;
+}
+
+.ciliaplot-results-table a {
+    color: var(--primary-blue-light); /* Link color */
+    text-decoration: none;
+}
+
+.ciliaplot-results-table a:hover {
+    text-decoration: underline;
 }
 
