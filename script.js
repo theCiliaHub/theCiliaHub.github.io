@@ -14,15 +14,15 @@ Chart.register({
 
 
 /**
- * Sanitizes any string by removing invisible characters and normalizing it.
+ * Sanitizes any string by trimming whitespace and converting to uppercase.
+ * This is the single, definitive version used by the entire application.
  */
 function sanitize(input) {
     if (typeof input !== 'string') return '';
-    // Removes zero-width spaces, non-printable characters, trims, and normalizes case
+    // Removes zero-width spaces, trims, and normalizes case
     return input.replace(/[\u200B-\u200D\u2060\uFEFF]/g, '')
-                .replace(/[^\x20-\x7E]/g, '') // Remove non-printable ASCII
-                .trim()
-                .toUpperCase();
+        .trim()
+        .toUpperCase();
 }
 
 // A single source of truth for our search map
@@ -31,11 +31,6 @@ let geneMapCache = new Map();
 let allGenes = [];
 // A flag to ensure we only load data once
 let isDataLoaded = false;
-
-/**
- * Sanitizes a string for use as a key (trims whitespace, converts to uppercase).
- */
-const sanitize = (str) => (str ? str.trim().toUpperCase() : '');
 
 /**
  * Loads, sanitizes, and prepares the gene database into an efficient lookup map.
@@ -91,22 +86,13 @@ async function loadAndPrepareDatabase() {
 }
 
 /**
- * Search genes using symbols, synonyms, or ENSG IDs.
- * Handles multiple IDs per gene.
- */
-/**
- * Search genes using symbols, synonyms, or Ensembl IDs from the pre-built cache.
- * Handles multiple queries efficiently.
- *
- * @param {string[]} queries - An array of sanitized, uppercase gene identifiers.
- * @returns {{foundGenes: object[], notFoundGenes: string[]}} - An object containing found gene objects and not-found queries.
+ * Finds genes from a list of queries using the pre-built cache.
  */
 function findGenes(queries) {
     const foundGenes = new Map(); // Use a Map to store unique genes by their canonical name
     const notFound = [];
 
     queries.forEach(query => {
-        // The query is expected to be sanitized (trimmed, uppercased) before being passed.
         const result = geneMapCache.get(query);
         
         if (result) {
@@ -115,8 +101,6 @@ function findGenes(queries) {
                 foundGenes.set(result.gene, result);
             }
         } else {
-            // The original, unsanitized query should be returned for user feedback.
-            // This requires the calling function to manage the original queries.
             notFound.push(query); 
         }
     });
@@ -127,16 +111,18 @@ function findGenes(queries) {
     };
 }
 
-// Add this function to help with debugging
+/**
+ * A helper function for debugging search failures.
+ */
 function debugSearch(query) {
-    console.log("Searching for:", query);
+    console.log("Debugging search for:", query);
     console.log("Cache has key?", geneMapCache.has(query));
     
     if (!geneMapCache.has(query)) {
-        console.log("Available keys matching query:");
+        console.log("Searching for keys that might match...");
         for (let key of geneMapCache.keys()) {
-            if (key.includes(query) || query.includes(key)) {
-                console.log(`- ${key}`);
+            if (key.includes(query)) {
+                console.log(`- Found similar key: ${key}`);
             }
         }
     }
@@ -144,12 +130,6 @@ function debugSearch(query) {
 
 /**
  * Handles the UI for the Batch Gene Query page.
- */
-/**
- * Handles the UI for the Batch Gene Query page.
- */
-/**
- * Handles the UI for the Batch Gene Query page, supporting all identifier types and filters.
  */
 function performBatchSearch() {
     const inputElement = document.getElementById('batch-genes-input');
@@ -162,7 +142,6 @@ function performBatchSearch() {
 
     // 1. Get all unique, sanitized queries from the input box
     const originalQueries = inputElement.value.split(/[\s,;\n\r\t]+/).filter(Boolean);
-    // Use a Set to automatically handle duplicate inputs
     const sanitizedQueries = [...new Set(originalQueries.map(sanitize))];
 
     if (sanitizedQueries.length === 0) {
@@ -170,11 +149,11 @@ function performBatchSearch() {
         return;
     }
 
-    // 2. Use the central `findGenes` function that correctly finds all ID types
+    // 2. Use the central `findGenes` function
     const { foundGenes } = findGenes(sanitizedQueries);
     let results = foundGenes;
 
-    // 3. Apply the optional localization and keyword filters to the results
+    // 3. Apply optional filters
     if (localizationFilter) {
         results = results.filter(g =>
             g.localization && g.localization.some(l => l && l.toLowerCase() === localizationFilter.toLowerCase())
@@ -188,10 +167,9 @@ function performBatchSearch() {
         );
     }
 
-    // 4. Determine which of the original, user-entered queries were not found in the final results
+    // 4. Determine which queries were not found
     const foundIds = new Set();
     results.forEach(gene => {
-        // Add all known identifiers for the found genes to a set for quick lookup
         foundIds.add(gene.gene.toUpperCase());
         if (gene.synonym) {
             String(gene.synonym).split(/[,;]/).forEach(s => foundIds.add(sanitize(s)));
@@ -203,7 +181,7 @@ function performBatchSearch() {
 
     const notFoundOriginalQueries = originalQueries.filter(q => !foundIds.has(sanitize(q)));
 
-    // 5. Display the final, filtered results
+    // 5. Display the results
     statusDiv.style.display = 'none';
     searchResults = results; // Update global variable for exports
 
@@ -212,12 +190,13 @@ function performBatchSearch() {
         displayGeneCards(currentData, results, 1, 10);
     } else {
         resultDiv.innerHTML = '<p class="status-message error-message">No genes found matching your query and filters.</p>';
-        displayGeneCards(currentData, [], 1, 10); // Clear the gene cards
+        displayGeneCards(currentData, [], 1, 10);
     }
 }
 
-// --- HOME PAGE SEARCH HANDLER (FIXED) ---
-// This function handles user input to show a list of suggestions.
+/**
+ * Handles the live search suggestions on the home page.
+ */
 function handleHomeSearchInput() {
     const query = homeSearchInput.value.trim().toUpperCase();
     if (query.length < 1) {
@@ -225,25 +204,40 @@ function handleHomeSearchInput() {
         return;
     }
 
-    // Filter genes using the same successful logic as the Compare Page
+    // CORRECTED: This logic now correctly handles comma-separated values for synonyms and Ensembl IDs.
     const filteredGenes = allGenes.filter(g => {
-        const geneMatch = g.gene && g.gene.toUpperCase().startsWith(query);
-        const synonymMatch = g.synonym && g.synonym.toUpperCase().includes(query);
-        const ensemblMatch = g.ensembl_id && g.ensembl_id.toUpperCase().startsWith(query);
-        return geneMatch || synonymMatch || ensemblMatch;
+        const upperQuery = query; // Already uppercased
+
+        // Check primary gene symbol (prefix match)
+        if (g.gene && g.gene.toUpperCase().startsWith(upperQuery)) {
+            return true;
+        }
+
+        // Check all Ensembl IDs (prefix match on any ID in the list)
+        if (g.ensembl_id) {
+            if (String(g.ensembl_id).split(/[,;]/).some(id => sanitize(id).startsWith(upperQuery))) {
+                return true;
+            }
+        }
+        
+        // Check all synonyms (includes match on any synonym in the list)
+        if (g.synonym) {
+            if (String(g.synonym).split(/[,;]/).some(syn => sanitize(syn).includes(upperQuery))) {
+                return true;
+            }
+        }
+
+        return false;
     }).slice(0, 10);
 
     if (filteredGenes.length > 0) {
-        // Build and display the suggestion list
         homeSuggestionsContainer.innerHTML = filteredGenes.map(g => {
             const details = [g.ensembl_id, g.synonym].filter(Boolean).join(', ');
             return `<div class="suggestion-item" data-gene="${g.gene}">${g.gene}${details ? ` (${details})` : ''}</div>`;
         }).join('');
 
-        // Add a click listener to each suggestion
         homeSuggestionsContainer.querySelectorAll('.suggestion-item').forEach(item => {
             item.addEventListener('click', () => {
-                // On click, navigate to the specific gene page
                 navigateToGenePage(item.dataset.gene);
             });
         });
@@ -254,47 +248,60 @@ function handleHomeSearchInput() {
     }
 }
 
-// --- ADDED FUNCTION TO HANDLE 'ENTER' KEY ---
-// This function should be attached to the 'keydown' event of your search input.
+/**
+ * Handles the 'Enter' key press in the home page search box.
+ */
 function handleHomeSearchKeyDown(event) {
     if (event.key === 'Enter') {
         const query = homeSearchInput.value.trim().toUpperCase();
         if (query.length === 0) return;
 
-        // Check for an exact match to what the user typed (e.g., "A10")
-        const exactMatch = allGenes.find(g => g.gene.toUpperCase() === query);
+        // Use the powerful geneMapCache for a direct, exact match on any identifier
+        const foundGene = geneMapCache.get(query);
 
-        if (exactMatch) {
-            // If an exact match is found, navigate directly
-            navigateToGenePage(exactMatch.gene);
+        if (foundGene) {
+            // If an exact match is found, navigate directly to that gene's page
+            navigateToGenePage(foundGene.gene);
         } else {
             // Otherwise, navigate to the first suggestion as a fallback
             const firstSuggestion = homeSuggestionsContainer.querySelector('.suggestion-item');
             if (firstSuggestion) {
                 navigateToGenePage(firstSuggestion.dataset.gene);
+            } else {
+                alert(`No gene found for "${homeSearchInput.value.trim()}"`);
             }
         }
     }
 }
 
 
-// --- NAVIGATION FIX ---
-// This robust function navigates to the selected gene's page.
+/**
+ * Navigates to the selected gene's page.
+ */
 function navigateToGenePage(geneName) {
-    const selectedGene = allGenes.find(g => g.gene === geneName);
+    // Look up the gene object using the master cache to ensure consistency
+    const selectedGene = geneMapCache.get(sanitize(geneName));
 
     if (selectedGene) {
-        homeSearchInput.value = selectedGene.gene; // Update input field
-        homeSuggestionsContainer.style.display = 'none'; // Hide suggestions
-
-        // Your existing navigation logic
+        if (typeof homeSearchInput !== 'undefined') {
+            homeSearchInput.value = selectedGene.gene;
+            homeSuggestionsContainer.style.display = 'none';
+        }
+        
+        // This should trigger your router (e.g., handleRouteChange) to display the page
         window.location.hash = `#/${selectedGene.gene}`;
-        displayGenePage(selectedGene.gene);
+        
+        // Directly call the display function for immediate feedback
+        if (typeof displayGenePage === 'function') { // Check if the function exists
+             displayGenePage(selectedGene.gene);
+        } else if (typeof displayIndividualGenePage === 'function') {
+             displayIndividualGenePage(selectedGene);
+        }
+
     } else {
         console.warn(`Navigation failed: No gene found for "${geneName}"`);
     }
 }
-
 
 /**
  * Displays batch results.
