@@ -498,6 +498,8 @@ async function loadData() {
             throw new Error(`Failed to fetch data: ${response.statusText}`);
         }
         const data = await response.json();
+        // Log data for debugging
+        console.log('Loaded data:', data);
         // Assuming data is an array of gene objects
         return {
             currentData: data,
@@ -505,7 +507,6 @@ async function loadData() {
         };
     } catch (error) {
         console.error('Error loading data:', error);
-        // Update UI to show error
         const statusMessage = document.getElementById('status-message');
         if (statusMessage) {
             statusMessage.textContent = 'Failed to load gene data. Please try again later.';
@@ -525,15 +526,39 @@ function updateStats(data) {
 
     // Compute stats
     const geneCount = data.length;
+
+    // Handle localization with robust validation
     const uniqueLocalizations = [...new Set(
         data
-            .filter(g => Array.isArray(g.localization))
+            .filter(g => {
+                if (!g.localization) {
+                    console.warn(`Gene ${g.gene || 'unknown'} has no localization data`);
+                    return false;
+                }
+                if (!Array.isArray(g.localization)) {
+                    console.warn(`Gene ${g.gene || 'unknown'} has invalid localization data:`, g.localization);
+                    return false;
+                }
+                return true;
+            })
             .map(g => g.localization)
             .flat()
-            .filter(Boolean)
+            .filter(loc => {
+                if (typeof loc !== 'string' || loc.trim() === '') {
+                    console.warn('Invalid localization value:', loc);
+                    return false;
+                }
+                return true;
+            })
+            .map(loc => loc.trim().toLowerCase()) // Normalize to avoid case-sensitive duplicates
     )];
+    console.log('Unique localizations:', uniqueLocalizations);
+
     const totalReferences = data.reduce((sum, g) => {
-        if (!g.reference || !Array.isArray(g.reference)) return sum;
+        if (!g.reference || !Array.isArray(g.reference)) {
+            console.warn(`Gene ${g.gene || 'unknown'} has invalid reference data:`, g.reference);
+            return sum;
+        }
         return sum + g.reference.length;
     }, 0);
 
@@ -545,6 +570,35 @@ function updateStats(data) {
     if (geneCountElement) geneCountElement.textContent = geneCount || 'N/A';
     if (localizationCountElement) localizationCountElement.textContent = uniqueLocalizations.length || 'N/A';
     if (referenceCountElement) referenceCountElement.textContent = totalReferences || 'N/A';
+}
+
+// Placeholder for displayGeneCards (replace with actual implementation)
+function displayGeneCards(data, filters, page, perPage) {
+    const container = document.getElementById('gene-cards-container');
+    if (!container) {
+        console.error('Gene cards container not found');
+        return;
+    }
+    if (!data || !Array.isArray(data)) {
+        container.innerHTML = '<p>No gene data available</p>';
+        return;
+    }
+
+    // Example rendering of gene cards
+    container.innerHTML = data.slice((page - 1) * perPage, page * perPage).map(g => {
+        const localizations = Array.isArray(g.localization)
+            ? g.localization.filter(loc => typeof loc === 'string' && loc.trim()).join(', ') || 'None'
+            : 'None';
+        return `
+            <div class="gene-card">
+                <h3>${g.gene || 'Unknown'}</h3>
+                <p><strong>Localizations:</strong> ${localizations}</p>
+                <p><strong>References:</strong> ${Array.isArray(g.reference) ? g.reference.length : 0}</p>
+                <p><strong>Ensembl ID:</strong> ${g.ensembl_id || 'N/A'}</p>
+                <p><strong>Synonym:</strong> ${g.synonym || 'N/A'}</p>
+            </div>
+        `;
+    }).join('');
 }
 
 async function displayHomePage() {
@@ -704,6 +758,7 @@ async function displayHomePage() {
     updateStats(currentData);
     displayGeneCards(currentData, [], 1, 10);
 }
+
 function displayBatchQueryTool() {
     const contentArea = document.querySelector('.content-area');
     contentArea.className = 'content-area';
