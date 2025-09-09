@@ -490,6 +490,32 @@ function mapLocalizationToSVG(localizationArray) {
     }).filter(id => allPartIds.includes(id));
 }
 
+async function loadData() {
+    try {
+        // Replace 'data.json' with your actual data source (e.g., API endpoint)
+        const response = await fetch('https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/ciliahub_data.json');
+        if (!response.ok) {
+            throw new Error(`Failed to fetch data: ${response.statusText}`);
+        }
+        const data = await response.json();
+        // Assuming data is an array of gene objects
+        return {
+            currentData: data,
+            allGenes: data // Adjust if allGenes is a different dataset
+        };
+    } catch (error) {
+        console.error('Error loading data:', error);
+        // Update UI to show error
+        const statusMessage = document.getElementById('status-message');
+        if (statusMessage) {
+            statusMessage.textContent = 'Failed to load gene data. Please try again later.';
+            statusMessage.style.display = 'block';
+            statusMessage.style.color = 'red';
+        }
+        return { currentData: [], allGenes: [] };
+    }
+}
+
 function updateStats(data) {
     // Error handling for invalid data
     if (!data || !Array.isArray(data)) {
@@ -516,12 +542,12 @@ function updateStats(data) {
     const localizationCountElement = document.getElementById('localization-count');
     const referenceCountElement = document.getElementById('reference-count');
 
-    if (geneCountElement) geneCountElement.textContent = geneCount;
-    if (localizationCountElement) localizationCountElement.textContent = uniqueLocalizations.length;
-    if (referenceCountElement) referenceCountElement.textContent = totalReferences;
+    if (geneCountElement) geneCountElement.textContent = geneCount || 'N/A';
+    if (localizationCountElement) localizationCountElement.textContent = uniqueLocalizations.length || 'N/A';
+    if (referenceCountElement) referenceCountElement.textContent = totalReferences || 'N/A';
 }
 
-function displayHomePage() {
+async function displayHomePage() {
     const contentArea = document.querySelector('.content-area');
     if (!contentArea) {
         console.error('Content area not found');
@@ -529,7 +555,10 @@ function displayHomePage() {
     }
 
     contentArea.className = 'content-area';
-    document.querySelector('.cilia-panel').style.display = 'block';
+    const ciliaPanel = document.querySelector('.cilia-panel');
+    if (ciliaPanel) {
+        ciliaPanel.style.display = 'block';
+    }
 
     // Initial render with loading placeholders
     contentArea.innerHTML = `
@@ -593,8 +622,11 @@ function displayHomePage() {
         }
     };
 
+    // Load data asynchronously
+    const { currentData, allGenes } = await loadData();
+
     // Search suggestions
-    if (searchInput && suggestionsContainer) {
+    if (searchInput && suggestionsContainer && Array.isArray(allGenes)) {
         searchInput.addEventListener('input', function() {
             const query = this.value.trim().toUpperCase();
             if (query.length < 1) {
@@ -668,13 +700,10 @@ function displayHomePage() {
         });
     }
 
-    // Display gene cards immediately (empty or with placeholder)
-    displayGeneCards(currentData, [], 1, 10);
-
-    // Dynamic stats update after data is loaded
+    // Update stats and gene cards after data is loaded
     updateStats(currentData);
+    displayGeneCards(currentData, [], 1, 10);
 }
-
 function displayBatchQueryTool() {
     const contentArea = document.querySelector('.content-area');
     contentArea.className = 'content-area';
