@@ -493,17 +493,3 @@ function displayCiliaPlotPage() {
     });
     updatePlotInfo(document.getElementById('plot-type-select').value);
 }
-
-function initializePlotSettings() {
-    const showGridCheckbox = document.getElementById('setting-show-grid');
-    if (!showGridCheckbox) return;
-
-    // Optional: force default unchecked
-    showGridCheckbox.checked = false;
-
-    console.log('Show Gridlines:', showGridCheckbox.checked);
-}
-
-// Call this **after** displayCiliaPlotPage()
-displayCiliaPlotPage();
-initializePlotSettings();
