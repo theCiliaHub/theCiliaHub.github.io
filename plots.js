@@ -1,22 +1,7 @@
 // =============================================================================
-// CHART.JS PLUGIN & GLOBAL VARIABLES
+// GLOBAL VARIABLES
 // =============================================================================
-Chart.register({
-    id: 'customCanvasBackgroundColor',
-    beforeDraw: (chart, args, options) => {
-        // **CRITICAL FIX:** Only draw a background if `options.color` is explicitly set AND not 'transparent'
-        if (options.color && options.color !== 'transparent') {
-            const { ctx } = chart;
-            ctx.save();
-            ctx.globalCompositeOperation = 'destination-over';
-            ctx.fillStyle = options.color;
-            ctx.fillRect(0, 0, chart.width, chart.height);
-            ctx.restore();
-        }
-    }
-});
-
-let currentPlotInstance = null;
+let currentPlotInstance = null; // Holds the active Chart.js, Plotly, or D3 instance
 
 // =============================================================================
 // DATA PARSING HELPER
@@ -44,15 +29,17 @@ function getCleanArray(gene, ...keys) {
 function getPlotSettings() {
     const setting = (id, def) => document.getElementById(id)?.value || def;
     return {
-        mainTitle: setting('setting-main-title', 'CiliaHub Analysis'),
-        xAxisTitle: setting('setting-x-axis-title', 'X-Axis'),
-        yAxisTitle: setting('setting-y-axis-title', 'Y-Axis'),
-        titleFontSize: parseInt(setting('setting-title-font-size', 18)),
-        axisTitleFontSize: parseInt(setting('setting-axis-title-font-size', 14)),
-        tickFontSize: parseInt(setting('setting-tick-font-size', 12)),
+        // Text & Font Settings
         fontFamily: setting('setting-font-family', 'Arial'),
-        backgroundColor: setting('setting-bg-color', '#ffffff'),
         fontColor: setting('setting-font-color', '#333333'),
+        titleFontSize: parseInt(setting('setting-title-font-size', 21)),
+        axisTitleFontSize: parseInt(setting('setting-axis-title-font-size', 20)),
+        tickFontSize: parseInt(setting('setting-tick-font-size', 20)),
+        // Axis Line Settings
+        axisLineWidth: parseFloat(setting('setting-axis-line-width', 2)),
+        axisLineColor: setting('setting-axis-line-color', '#333333'),
+        // Plot Background & Grid
+        backgroundColor: setting('setting-bg-color', '#ffffff'),
         gridColor: setting('setting-grid-color', '#e0e0e0'),
         showGrid: document.getElementById('setting-show-grid')?.checked ?? true,
     };
@@ -76,16 +63,17 @@ async function downloadPlot() {
         if (plotArea.querySelector('canvas')) {
             const tempCanvas = document.createElement('canvas');
             const sourceCanvas = plotArea.querySelector('canvas');
-            tempCanvas.width = sourceCanvas.width;
-            tempCanvas.height = sourceCanvas.height;
+            tempCanvas.width = sourceCanvas.width * scale / window.devicePixelRatio;
+            tempCanvas.height = sourceCanvas.height * scale / window.devicePixelRatio;
             const tempCtx = tempCanvas.getContext('2d');
-            
-            // Only draw background if it's not a Chart.js bubble/matrix plot requesting transparency
-            if ((plotType !== 'bubble' && plotType !== 'matrix') || backgroundColor !== 'transparent') {
-                 tempCtx.fillStyle = backgroundColor;
-                 tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+
+            // **FIXED (3):** For downloads, always fill a background unless it's explicitly transparent.
+            // This ensures D3 plots with custom backgrounds and Chart.js plots both export correctly.
+            if (backgroundColor !== 'transparent') {
+                tempCtx.fillStyle = backgroundColor;
+                tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
             }
-            tempCtx.drawImage(sourceCanvas, 0, 0);
+            tempCtx.drawImage(sourceCanvas, 0, 0, tempCanvas.width, tempCanvas.height);
             dataUrl = tempCanvas.toDataURL('image/png');
         } else if (plotArea.querySelector('svg')) {
             const svgElement = plotArea.querySelector('svg');
@@ -93,7 +81,6 @@ async function downloadPlot() {
             canvas.width = width * scale;
             canvas.height = height * scale;
             const ctx = canvas.getContext('2d');
-            // For SVG plots, we always apply the background from settings if specified
             if (backgroundColor !== 'transparent') {
                 ctx.fillStyle = backgroundColor;
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -146,6 +133,7 @@ function renderKeyLocalizations(foundGenes, container) {
     });
     const categoriesWithData = yCategories.filter(cat => localizationCounts[cat] > 0);
     if (!categoriesWithData.length) { container.innerHTML = '<p class="status-message">No genes in primary ciliary localizations.</p>'; return; }
+    
     currentPlotInstance = new Chart(ctx, {
         type: 'bubble',
         data: {
@@ -153,22 +141,29 @@ function renderKeyLocalizations(foundGenes, container) {
                 label: 'Gene Count',
                 data: categoriesWithData.map(loc => ({ x: localizationCounts[loc], y: loc, r: 8 + localizationCounts[loc] * 2, count: localizationCounts[loc] })),
                 backgroundColor: 'rgba(52, 152, 219, 0.7)',
-                borderColor: 'rgba(41, 128, 185, 1)',
-                borderWidth: 1
             }]
         },
         options: {
             responsive: true, maintainAspectRatio: false,
             plugins: {
-                // **FIXED (1):** Set background color to transparent for this chart
-                customCanvasBackgroundColor: { color: 'transparent' }, 
+                title: { display: true, text: "Key Ciliary Localizations", font: { size: settings.titleFontSize, family: settings.fontFamily }, color: settings.fontColor },
                 legend: { display: false },
-                title: { display: true, text: settings.mainTitle, font: { size: settings.titleFontSize, family: settings.fontFamily }, color: settings.fontColor },
                 tooltip: { callbacks: { label: c => `${c.raw.y}: ${c.raw.count} gene(s)` } }
             },
             scales: {
-                x: { title: { display: true, text: settings.xAxisTitle, font: { size: settings.axisTitleFontSize, family: settings.fontFamily }, color: settings.fontColor }, grid: { display: settings.showGrid, color: settings.gridColor }, border: { display: true, width: 1.5 }, ticks: { font: { size: settings.tickFontSize, family: settings.fontFamily }, color: settings.fontColor } },
-                y: { type: 'category', labels: yCategories, title: { display: true, text: settings.yAxisTitle, font: { size: settings.axisTitleFontSize, family: settings.fontFamily }, color: settings.fontColor }, grid: { display: settings.showGrid, color: settings.gridColor }, border: { display: true, width: 1.5 }, ticks: { font: { size: settings.tickFontSize, family: settings.fontFamily }, color: settings.fontColor } }
+                x: {
+                    title: { display: true, text: "Gene Count", font: { size: settings.axisTitleFontSize, family: settings.fontFamily, weight: 'bold' }, color: settings.fontColor },
+                    grid: { display: settings.showGrid, color: settings.gridColor },
+                    border: { display: true, width: settings.axisLineWidth, color: settings.axisLineColor },
+                    ticks: { font: { size: settings.tickFontSize, family: settings.fontFamily, weight: 'bold' }, color: settings.fontColor }
+                },
+                y: {
+                    type: 'category', labels: yCategories,
+                    title: { display: true, text: "Cellular Compartment", font: { size: settings.axisTitleFontSize, family: settings.fontFamily, weight: 'bold' }, color: settings.fontColor },
+                    grid: { display: settings.showGrid, color: settings.gridColor },
+                    border: { display: true, width: settings.axisLineWidth, color: settings.axisLineColor },
+                    ticks: { font: { size: settings.tickFontSize, family: settings.fontFamily, weight: 'bold' }, color: settings.fontColor }
+                }
             }
         }
     });
@@ -194,20 +189,31 @@ function renderGeneMatrix(foundGenes, container) {
         options: {
             responsive: true, maintainAspectRatio: false,
             plugins: {
-                // **FIXED (2):** Set background color to transparent for this chart
-                customCanvasBackgroundColor: { color: 'transparent' }, 
+                title: { display: true, text: "Gene Localization Matrix", font: { size: settings.titleFontSize, family: settings.fontFamily }, color: settings.fontColor },
                 legend: { display: false },
-                title: { display: true, text: settings.mainTitle, font: { size: settings.titleFontSize, family: settings.fontFamily }, color: settings.fontColor },
                 tooltip: { callbacks: { label: c => `${c.dataset.label}: ${c.raw.y}` } }
             },
             scales: {
-                x: { type: 'category', labels: xLabels, title: { display: true, text: settings.xAxisTitle, font: { size: settings.axisTitleFontSize, family: settings.fontFamily }, color: settings.fontColor }, grid: { display: settings.showGrid, color: settings.gridColor }, border: { display: true, width: 1.5 }, ticks: { font: { size: settings.tickFontSize, family: settings.fontFamily }, color: settings.fontColor, maxRotation: 90, minRotation: 45 } },
-                y: { type: 'category', labels: yCategories, title: { display: true, text: settings.yAxisTitle, font: { size: settings.axisTitleFontSize, family: settings.fontFamily }, color: settings.fontColor }, grid: { display: settings.showGrid, color: settings.gridColor }, border: { display: true, width: 1.5 }, ticks: { font: { size: settings.tickFontSize, family: settings.fontFamily }, color: settings.fontColor } }
+                x: {
+                    type: 'category', labels: xLabels,
+                    title: { display: true, text: "Genes", font: { size: settings.axisTitleFontSize, family: settings.fontFamily, weight: 'bold' }, color: settings.fontColor },
+                    grid: { display: settings.showGrid, color: settings.gridColor },
+                    border: { display: true, width: settings.axisLineWidth, color: settings.axisLineColor },
+                    ticks: { font: { size: settings.tickFontSize, family: settings.fontFamily, weight: 'bold' }, color: settings.fontColor, maxRotation: 90, minRotation: 45 }
+                },
+                y: {
+                    type: 'category', labels: yCategories,
+                    title: { display: true, text: "Ciliary Compartment", font: { size: settings.axisTitleFontSize, family: settings.fontFamily, weight: 'bold' }, color: settings.fontColor },
+                    grid: { display: settings.showGrid, color: settings.gridColor },
+                    border: { display: true, width: settings.axisLineWidth, color: settings.axisLineColor },
+                    ticks: { font: { size: settings.tickFontSize, family: settings.fontFamily, weight: 'bold' }, color: settings.fontColor }
+                }
             }
         }
     });
 }
 
+// **FIXED (4):** This function is now included and correct.
 function calculateDomainEnrichmentFactor(selectedData, database) {
     if (selectedData.length === 0) return { enrichmentData: [] };
     const countDomains = (geneSet) => {
@@ -236,83 +242,54 @@ function renderDomainEnrichmentFactorPlot(foundGenes, allGenes, container) {
     const settings = getPlotSettings();
     const { enrichmentData } = calculateDomainEnrichmentFactor(foundGenes, allGenes);
     if (!enrichmentData || enrichmentData.length === 0) { container.innerHTML = '<p class="status-message">No domain enrichment found.</p>'; return; }
-    
     container.innerHTML = '';
     const topData = enrichmentData.slice(0, 20);
-    const margin = { top: 30, right: 30, bottom: 60, left: 250 };
+    const margin = { top: 40, right: 30, bottom: 80, left: 250 };
     const width = container.clientWidth - margin.left - margin.right;
     const height = topData.length * 28;
-    
-    const svg = d3.select(container).append("svg").attr("width", width + margin.left + margin.right).attr("height", height + margin.top + margin.bottom).append("g").attr("transform", `translate(${margin.left},${margin.top})`);
+    const svg = d3.select(container).append("svg").attr("width", width + margin.left + margin.right).attr("height", height + margin.top + margin.bottom);
+    // Add background rect based on settings
+    svg.append("rect").attr("width", "100%").attr("height", "100%").attr("fill", settings.backgroundColor);
+    const g = svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
     const x = d3.scaleLinear().domain([0, d3.max(topData, d => d.factor) * 1.1]).range([0, width]);
     const y = d3.scaleBand().domain(topData.map(d => d.domain)).range([0, height]).padding(0.2);
-    svg.append("g").attr("transform", `translate(0,${height})`).call(d3.axisBottom(x)).selectAll("text").style("font-family", settings.fontFamily).style("font-size", settings.tickFontSize + 'px').style("fill", settings.fontColor);
-    svg.append("g").call(d3.axisLeft(y)).selectAll("text").style("font-family", settings.fontFamily).style("font-size", settings.tickFontSize + 'px').style("fill", settings.fontColor);
-    svg.selectAll(".bar").data(topData).enter().append("rect").attr("x", x(0)).attr("y", d => y(d.domain)).attr("width", d => x(d.factor)).attr("height", y.bandwidth()).attr("fill", "#3498db");
-    
-    svg.append("text").attr("text-anchor", "middle").attr("x", width / 2).attr("y", -10).text(settings.mainTitle).style("font-family", settings.fontFamily).style("font-size", settings.titleFontSize + 'px').style("fill", settings.fontColor);
-    svg.append("text").attr("text-anchor", "middle").attr("x", width / 2).attr("y", height + margin.bottom - 15).text(settings.xAxisTitle).style("font-family", settings.fontFamily).style("font-size", settings.axisTitleFontSize + 'px').style("fill", settings.fontColor);
-
-    currentPlotInstance = svg.node().parentNode;
+    g.append("g").attr("transform", `translate(0,${height})`).call(d3.axisBottom(x)).call(s => s.selectAll("text").style("font-family", settings.fontFamily).style("font-size", settings.tickFontSize + 'px').style("font-weight", "bold").style("fill", settings.fontColor)).call(s => s.selectAll(".domain, .tick line").style("stroke", settings.axisLineColor).style("stroke-width", settings.axisLineWidth + 'px'));
+    g.append("g").call(d3.axisLeft(y)).call(s => s.selectAll("text").style("font-family", settings.fontFamily).style("font-size", settings.tickFontSize + 'px').style("font-weight", "bold").style("fill", settings.fontColor)).call(s => s.selectAll(".domain, .tick line").style("stroke", settings.axisLineColor).style("stroke-width", settings.axisLineWidth + 'px'));
+    g.selectAll(".bar").data(topData).enter().append("rect").attr("x", x(0)).attr("y", d => y(d.domain)).attr("width", d => x(d.factor)).attr("height", y.bandwidth()).attr("fill", "#3498db");
+    svg.append("text").attr("text-anchor", "middle").attr("x", margin.left + width / 2).attr("y", 25).text("Domain Enrichment Factor").style("font-family", settings.fontFamily).style("font-size", settings.titleFontSize + 'px').style("fill", settings.fontColor);
+    svg.append("text").attr("text-anchor", "middle").attr("x", margin.left + width / 2).attr("y", height + margin.top + 60).text("Enrichment Factor").style("font-family", settings.fontFamily).style("font-size", settings.axisTitleFontSize + 'px').style("font-weight", "bold").style("fill", settings.fontColor);
+    currentPlotInstance = svg.node();
 }
 
 function renderMultiDimNetwork(foundGenes, container) {
     const settings = getPlotSettings();
-    
     const nodes = [], links = [], nodeMap = new Map();
-    const addNode = (nodesRef, nodeMapRef, id, type) => {
-        if (!nodeMapRef.has(id)) {
-            const newNode = { id, type };
-            nodeMapRef.set(id, newNode);
-            nodesRef.push(newNode);
-        }
-        return nodeMapRef.get(id); // Return the node object
+    const addNode = (id, type) => {
+        if (!nodeMap.has(id)) { nodeMap.set(id, { id, type }); nodes.push(nodeMap.get(id)); }
     };
-
     foundGenes.forEach(gene => {
-        addNode(nodes, nodeMap, gene.gene, 'gene');
-        getCleanArray(gene, 'complex_names', 'complex').forEach(c => links.push({ source: gene.gene, target: addNode(nodes, nodeMap, c, 'complex').id }));
-        getCleanArray(gene, 'Domain_Descriptions', 'domain_descriptions').forEach(d => links.push({ source: gene.gene, target: addNode(nodes, nodeMap, d, 'domain').id }));
-        getCleanArray(gene, 'localization').forEach(l => links.push({ source: gene.gene, target: addNode(nodes, nodeMap, l, 'localization').id }));
+        addNode(gene.gene, 'gene');
+        getCleanArray(gene, 'complex_names', 'complex').forEach(c => links.push({ source: gene.gene, target: addNode(c, 'complex').id }));
+        getCleanArray(gene, 'Domain_Descriptions', 'domain_descriptions').forEach(d => links.push({ source: gene.gene, target: addNode(d, 'domain').id }));
+        getCleanArray(gene, 'localization').forEach(l => links.push({ source: gene.gene, target: addNode(l, 'localization').id }));
     });
-
     if (nodes.length < 2 || links.length === 0) { container.innerHTML = '<p class="status-message">Not enough data to build a network.</p>'; return; }
-    
     container.innerHTML = '';
     const width = container.clientWidth;
     const height = Math.max(500, container.clientHeight);
-    
     const svg = d3.select(container).append("svg").attr("width", width).attr("height", height);
+    svg.append("rect").attr("width", "100%").attr("height", "100%").attr("fill", settings.backgroundColor);
     const nodeColors = { 'gene': '#27ae60', 'complex': '#f39c12', 'domain': '#3498db', 'localization': '#8e44ad' };
-    
-    const simulation = d3.forceSimulation(nodes)
-        .force("link", d3.forceLink(links).id(d => d.id).distance(80))
-        .force("charge", d3.forceManyBody().strength(-150))
-        .force("center", d3.forceCenter(width / 2, height / 2));
-        
+    const simulation = d3.forceSimulation(nodes).force("link", d3.forceLink(links).id(d => d.id).distance(80)).force("charge", d3.forceManyBody().strength(-150)).force("center", d3.forceCenter(width / 2, height / 2));
     const link = svg.append("g").selectAll("line").data(links).enter().append("line").style("stroke", "#aaa");
-    
-    const nodeGroup = svg.append("g").selectAll("g").data(nodes).enter().append("g")
-        .call(d3.drag().on("start", (e, d) => { if (!e.active) simulation.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; }).on("drag", (e, d) => { d.fx = e.x; d.fy = e.y; }).on("end", (e, d) => { if (!e.active) simulation.alphaTarget(0); d.fx = null; d.fy = null; }));
-
+    const nodeGroup = svg.append("g").selectAll("g").data(nodes).enter().append("g").call(d3.drag().on("start", (e, d) => { if (!e.active) simulation.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; }).on("drag", (e, d) => { d.fx = e.x; d.fy = e.y; }).on("end", (e, d) => { if (!e.active) simulation.alphaTarget(0); d.fx = null; d.fy = null; }));
     nodeGroup.append("circle").attr("r", d => d.type === 'gene' ? 8 : 6).style("fill", d => nodeColors[d.type] || '#ccc').style("stroke", "#fff").style("stroke-width", 1.5);
-    
-    nodeGroup.append("text")
-        .text(d => d.id)
-        .attr('x', 12)
-        .attr('y', 4)
-        .style("font-size", "11px")
-        .style("font-family", settings.fontFamily)
-        .style("fill", settings.fontColor)
-        .style("pointer-events", "none");
-
+    nodeGroup.append("text").text(d => d.id).attr('x', 12).attr('y', 4).style("font-size", "11px").style("font-family", settings.fontFamily).style("fill", settings.fontColor).style("pointer-events", "none");
     nodeGroup.append("title").text(d => `${d.id} (${d.type})`);
-    
     simulation.on("tick", () => {
         link.attr("x1", d => d.source.x).attr("y1", d => d.source.y).attr("x2", d => d.target.x).attr("y2", d => d.target.y);
         nodeGroup.attr("transform", d => `translate(${d.x},${d.y})`);
     });
-    
     currentPlotInstance = svg.node();
 }
 
@@ -420,15 +397,14 @@ function displayCiliaPlotPage() {
                      <h3>2. Customize Plot</h3>
                      <details id="plot-customization-details"><summary>Expand Options</summary>
                          <div class="control-section-content" id="plot-settings-grid">
-                            <div><label>Main Title <input type="text" id="setting-main-title" value="CiliaHub Analysis"></label></div>
-                            <div><label>X-Axis Title <input type="text" id="setting-x-axis-title" value="X-Axis"></label></div>
-                            <div><label>Y-Axis Title <input type="text" id="setting-y-axis-title" value="Y-Axis"></label></div>
+                            <div><label>Title Font Size <input type="number" id="setting-title-font-size" value="21" step="1"></label></div>
+                            <div><label>Axis Title Font Size <input type="number" id="setting-axis-title-font-size" value="20" step="1"></label></div>
+                            <div><label>Axis Tick Font Size <input type="number" id="setting-tick-font-size" value="20" step="1"></label></div>
                             <div><label>Font <select id="setting-font-family"><option>Arial</option><option>Verdana</option></select></label></div>
-                            <div><label>Title Font Size <input type="number" id="setting-title-font-size" value="18" step="1"></label></div>
-                            <div><label>Axis Font Size <input type="number" id="setting-axis-title-font-size" value="14" step="1"></label></div>
-                            <div><label>Tick Font Size <input type="number" id="setting-tick-font-size" value="12" step="1"></label></div>
+                            <div><label>Text & Label Color <input type="color" id="setting-font-color" value="#333333"></label></div>
                             <div><label>Background <input type="color" id="setting-bg-color" value="#ffffff"></label></div>
-                            <div><label>Font Color <input type="color" id="setting-font-color" value="#333333"></label></div>
+                            <div><label>Axis Line Width <input type="number" id="setting-axis-line-width" value="2" step="0.5" min="1"></label></div>
+                            <div><label>Axis Line Color <input type="color" id="setting-axis-line-color" value="#333333"></label></div>
                             <div><label>Gridline Color <input type="color" id="setting-grid-color" value="#e0e0e0"></label></div>
                             <div><label><input type="checkbox" id="setting-show-grid" checked> Show Gridlines</label></div>
                          </div>
