@@ -490,140 +490,118 @@ function mapLocalizationToSVG(localizationArray) {
     }).filter(id => allPartIds.includes(id));
 }
 
-
-
 function displayHomePage() {
     const contentArea = document.querySelector('.content-area');
     contentArea.className = 'content-area';
     document.querySelector('.cilia-panel').style.display = 'block';
 
-   
- // --- Extract stats like your Localization section ---
-// Correct stats computation for your data
-const geneCount = currentData.length;
+    // --- Initial render with placeholders ---
+    contentArea.innerHTML = `
+        <div class="page-section">
+            <h1>The CiliaHub: An Updated Database of Gold Standard Genes with Ciliary Functions</h1>
 
-const uniqueLocalizations = [...new Set(
-    currentData
-        .map(g => g.localization)       // get the array
-        .flat()                        // flatten all arrays into one
-        .filter(Boolean)               // remove undefined/null
-)];
+            <!-- CiliaHub V0.1 and Stats Section -->
+            <div class="ciliahub-stats" style="margin-top: 1rem; margin-bottom: 2rem; display: flex; gap: 1rem; flex-wrap: wrap; font-family: 'Arial', sans-serif;">
+                
+                <!-- Version -->
+                <div style="flex: 1; min-width: 140px; background-color: #007bff; color: #fff; padding: 1rem; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.15); text-align: center;">
+                    <div style="font-size: 1.2rem; font-weight: 700;">CiliaHub V0.1</div>
+                </div>
 
-const totalReferences = currentData.reduce((sum, g) => {
-    if (!g.reference) return sum;      // note singular 'reference'
-    return sum + g.reference.length;   // all are arrays
-}, 0);
+                <!-- Genes -->
+                <div style="flex: 1; min-width: 140px; background-color: #e7f1ff; color: #007bff; padding: 1rem; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); text-align: center;">
+                    <div id="gene-count" style="font-size: 1.5rem; font-weight: 700;">0</div>
+                    <div>Genes</div>
+                </div>
 
-contentArea.innerHTML = `
-    <div class="page-section">
-        <h1>The CiliaHub: An Updated Database of Gold Standard Genes with Ciliary Functions</h1>
+                <!-- Localizations -->
+                <div style="flex: 1; min-width: 140px; background-color: #e7f1ff; color: #007bff; padding: 1rem; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); text-align: center;">
+                    <div id="localization-count" style="font-size: 1.5rem; font-weight: 700;">0</div>
+                    <div>Localizations</div>
+                </div>
 
-        <!-- CiliaHub V0.1 and Stats Section -->
-        <div class="ciliahub-stats" style="margin-top: 1rem; margin-bottom: 2rem; display: flex; gap: 1rem; flex-wrap: wrap; font-family: 'Arial', sans-serif;">
-            
-            <!-- Version -->
-            <div style="flex: 1; min-width: 140px; background-color: #007bff; color: #fff; padding: 1rem; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.15); text-align: center;">
-                <div style="font-size: 1.2rem; font-weight: 700;">CiliaHub V0.1</div>
+                <!-- References -->
+                <div style="flex: 1; min-width: 140px; background-color: #e7f1ff; color: #007bff; padding: 1rem; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); text-align: center;">
+                    <div id="reference-count" style="font-size: 1.5rem; font-weight: 700;">0</div>
+                    <div>References</div>
+                </div>
             </div>
 
-            <!-- Genes -->
-            <div style="flex: 1; min-width: 140px; background-color: #e7f1ff; color: #007bff; padding: 1rem; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); text-align: center;">
-                <div style="font-size: 1.5rem; font-weight: 700;">${geneCount}</div>
-                <div>Genes</div>
+            <p style="font-size: 1.1rem; color: #555;">CiliaHub is an advanced <strong>bioinformatics</strong> platform that hosts a detailed database of <strong>gold standard cilia genes</strong> and their role in various <strong>ciliopathies</strong>. Our comprehensive collection includes the most reliable and well-established genes linked to ciliary function, with reference papers also provided. With our user-friendly search tool, researchers can explore <strong>genome</strong>-wide data, focusing on both known and novel ciliary genes. Discover their contributions to the biology of cilia and the mechanisms behind ciliary-related disorders. Search for a single gene below or use the Batch Query tool to analyze multiple genes.</p>
+
+            <div class="search-container">
+                <div class="search-wrapper" style="flex: 1;">
+                    <input type="text" id="single-gene-search" placeholder="Search for a single gene (e.g., ACE2, IFT88)" aria-label="Search for a single gene" autocomplete="off">
+                    <div id="search-suggestions"></div>
+                </div>
+                <button id="single-search-btn" class="search-btn btn btn-primary" aria-label="Search for the entered gene name">Search</button>
             </div>
 
-            <!-- Localizations -->
-            <div style="flex: 1; min-width: 140px; background-color: #e7f1ff; color: #007bff; padding: 1rem; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); text-align: center;">
-                <div style="font-size: 1.5rem; font-weight: 700;">${uniqueLocalizations.length}</div>
-                <div>Localizations</div>
-            </div>
+            <div id="gene-cards-container" class="gene-cards"></div>
+            <div id="status-message" class="status-message" style="display: none;"></div>
+        </div>`;
 
-            <!-- References -->
-            <div style="flex: 1; min-width: 140px; background-color: #e7f1ff; color: #007bff; padding: 1rem; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); text-align: center;">
-                <div style="font-size: 1.5rem; font-weight: 700;">${totalReferences}</div>
-                <div>References</div>
-            </div>
-        </div>
+    // --- Search button ---
+    document.getElementById('single-search-btn').onclick = performSingleSearch;
 
-        <p style="font-size: 1.1rem; color: #555;">CiliaHub is an advanced <strong>bioinformatics</strong> platform that hosts a detailed database of <strong>gold standard cilia genes</strong> and their role in various <strong>ciliopathies</strong>. Our comprehensive collection includes the most reliable and well-established genes linked to ciliary function, with reference papers also provided. With our user-friendly search tool, researchers can explore <strong>genome</strong>-wide data, focusing on both known and novel ciliary genes. Discover their contributions to the biology of cilia and the mechanisms behind ciliary-related disorders. Search for a single gene below or use the Batch Query tool to analyze multiple genes.</p>
-
-        <div class="search-container">
-            <div class="search-wrapper" style="flex: 1;">
-                <input type="text" id="single-gene-search" placeholder="Search for a single gene (e.g., ACE2, IFT88)" aria-label="Search for a single gene" autocomplete="off">
-                <div id="search-suggestions"></div>
-            </div>
-            <button id="single-search-btn" class="search-btn btn btn-primary" aria-label="Search for the entered gene name">Search</button>
-        </div>
-
-        <div id="gene-cards-container" class="gene-cards"></div>
-        <div id="status-message" class="status-message" style="display: none;"></div>
-    </div>`;
-
-    document.getElementById('single-search-btn').onclick = performSingleSearch;    
     const searchInput = document.getElementById('single-gene-search');
     const suggestionsContainer = document.getElementById('search-suggestions');
 
-    // --- HELPER FUNCTION to hide suggestions ---
     const hideSuggestions = () => {
         suggestionsContainer.innerHTML = '';
-        suggestionsContainer.style.display = 'none'; // ADDED: Ensure it's hidden
+        suggestionsContainer.style.display = 'none';
     };
-    
-    // Inside the displayHomePage function...
 
+    // --- Search suggestions ---
     searchInput.addEventListener('input', function() {
-    const query = this.value.trim().toUpperCase();
-    if (query.length < 1) {
-        hideSuggestions();
-        return;
-    }
+        const query = this.value.trim().toUpperCase();
+        if (query.length < 1) {
+            hideSuggestions();
+            return;
+        }
 
-    // Show suggestions broadly (prefix match for better UX)
-    const filteredGenes = allGenes.filter(g => 
-        (g.gene && g.gene.toUpperCase().startsWith(query)) || 
-        (g.synonym && g.synonym.toUpperCase().includes(query)) ||
-        (g.ensembl_id && g.ensembl_id.toUpperCase().startsWith(query))
-    ).slice(0, 10);
+        const filteredGenes = allGenes.filter(g =>
+            (g.gene && g.gene.toUpperCase().startsWith(query)) ||
+            (g.synonym && g.synonym.toUpperCase().includes(query)) ||
+            (g.ensembl_id && g.ensembl_id.toUpperCase().startsWith(query))
+        ).slice(0, 10);
 
-    if (filteredGenes.length > 0) {
-        suggestionsContainer.innerHTML = '<ul>' + 
-            filteredGenes.map(g => {
-                const details = [g.ensembl_id, g.synonym].filter(Boolean).join(', ');
-                return `<li data-gene="${g.gene}">${g.gene}${details ? ` (${details})` : ''}</li>`;
-            }).join('') + 
-            '</ul>';
-        
-        suggestionsContainer.querySelector('ul').addEventListener('click', function(event) {
-            if (event.target && event.target.nodeName === "LI") {
-                searchInput.value = event.target.dataset.gene; // ✅ always set exact gene symbol
-                hideSuggestions();
-                performSingleSearch(); // will now be exact
-            }
-        });
+        if (filteredGenes.length > 0) {
+            suggestionsContainer.innerHTML = '<ul>' +
+                filteredGenes.map(g => {
+                    const details = [g.ensembl_id, g.synonym].filter(Boolean).join(', ');
+                    return `<li data-gene="${g.gene}">${g.gene}${details ? ` (${details})` : ''}</li>`;
+                }).join('') +
+                '</ul>';
 
-        suggestionsContainer.style.display = 'block';
-    } else {
-        hideSuggestions();
-    }
-});
+            suggestionsContainer.querySelector('ul').addEventListener('click', function(event) {
+                if (event.target && event.target.nodeName === "LI") {
+                    searchInput.value = event.target.dataset.gene;
+                    hideSuggestions();
+                    performSingleSearch();
+                }
+            });
 
-    
+            suggestionsContainer.style.display = 'block';
+        } else {
+            hideSuggestions();
+        }
+    });
+
     searchInput.addEventListener('keydown', function(event) {
         const suggestions = suggestionsContainer.querySelectorAll('li');
         if (suggestions.length === 0 && event.key !== 'Enter') return;
-        
+
         let activeElement = suggestionsContainer.querySelector('.active');
 
         if (event.key === 'Enter') {
-            event.preventDefault(); // Prevent form submission
-            if (activeElement) {
-                searchInput.value = activeElement.textContent.split(' ')[0];
-            }
+            event.preventDefault();
+            if (activeElement) searchInput.value = activeElement.textContent.split(' ')[0];
             hideSuggestions();
             performSingleSearch();
             return;
         }
-        
+
         if (event.key === 'ArrowDown') {
             event.preventDefault();
             let nextElement = activeElement ? activeElement.nextElementSibling : suggestions[0];
@@ -640,16 +618,37 @@ contentArea.innerHTML = `
             }
         }
     });
-    
+
     document.addEventListener('click', function(event) {
-        // CHANGE: Also check if the click is inside the suggestions container
         if (!searchInput.contains(event.target) && !suggestionsContainer.contains(event.target)) {
             hideSuggestions();
         }
     });
-    
+
+    // --- Display gene cards immediately (empty or with placeholder) ---
     displayGeneCards(currentData, [], 1, 10);
+
+    // --- Dynamic stats update after data is loaded ---
+    if (currentData && currentData.length > 0) {
+        const geneCount = currentData.length;
+        const uniqueLocalizations = [...new Set(
+            currentData
+                .map(g => g.localization)
+                .flat()
+                .filter(Boolean)
+        )];
+        const totalReferences = currentData.reduce((sum, g) => {
+            if (!g.reference) return sum;
+            return sum + g.reference.length;
+        }, 0);
+
+        // Update the cards dynamically
+        document.getElementById('gene-count').textContent = geneCount;
+        document.getElementById('localization-count').textContent = uniqueLocalizations.length;
+        document.getElementById('reference-count').textContent = totalReferences;
+    }
 }
+
 
 function displayBatchQueryTool() {
     const contentArea = document.querySelector('.content-area');
