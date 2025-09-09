@@ -49,7 +49,7 @@ async function downloadPlot() {
     }
 
     const fileName = `CiliaHub_${plotType}_plot.${format}`;
-    const scale = 3; // High-resolution scaling
+    const scale = 3;
     const width = plotArea.clientWidth;
     const height = plotArea.clientHeight;
 
@@ -103,8 +103,36 @@ async function downloadPlot() {
 }
 
 // =============================================================================
-// RESULTS TABLE (YOUR ORIGINAL FUNCTION)
+// DATA PARSING HELPER & RESULTS TABLE
 // =============================================================================
+
+/**
+ * **NEW** Robustly extracts a clean array of values from a gene object,
+ * handling multiple possible keys, data types, and nested separators.
+ * @param {Object} gene - The gene object from the database.
+ * @param {...string} keys - The possible keys to check for the data (e.g., 'localization').
+ * @returns {Array<string>} A clean array of strings.
+ */
+function getCleanArray(gene, ...keys) {
+    let data = null;
+    for (const key of keys) {
+        if (gene[key] != null) { // Use != null to catch both null and undefined
+            data = gene[key];
+            break;
+        }
+    }
+    if (data == null) return [];
+
+    const initialArray = Array.isArray(data) ? data : String(data).split(';');
+
+    return initialArray
+        .filter(Boolean) // Remove null, undefined, and empty strings from the array
+        .flatMap(item => String(item).split(';')) // Split items that are themselves lists
+        .map(item => item.trim()) // Trim whitespace
+        .filter(Boolean); // Filter again after trimming to remove empty strings
+}
+
+
 function createEnrichmentResultsTable(foundGenes, notFoundGenes) {
     const container = document.getElementById('ciliaplot-results-container');
     if (!container) return;
@@ -211,27 +239,26 @@ function renderGeneMatrix(foundGenes, container) {
     });
 }
 
+
 // =============================================================================
-// NEW INTEGRATED PLOTTING FUNCTIONS
+// NEW INTEGRATED PLOTTING FUNCTIONS (WITH ROBUST PARSING)
 // =============================================================================
 
 function calculateDomainEnrichmentFactor(selectedData, database) {
     if (selectedData.length === 0) return { enrichmentData: [] };
     const countDomains = (geneSet) => {
         const domainCounts = new Map();
-        let genesWithDomains = 0;
+        let genesWithDomains = new Set();
         geneSet.forEach(gene => {
-            const domainData = gene.Domain_Descriptions || gene.domain_descriptions;
-            if (domainData) {
-                genesWithDomains++;
-                const domains = Array.isArray(domainData) ? domainData : String(domainData).split(';');
-                domains.forEach(domain => {
-                    const d = domain.trim();
-                    if (d) domainCounts.set(d, (domainCounts.get(d) || 0) + 1);
+            const domains = getCleanArray(gene, 'Domain_Descriptions', 'domain_descriptions', 'pfam_ids', 'PFAM_IDs');
+            if (domains.length > 0) {
+                genesWithDomains.add(gene.gene);
+                domains.forEach(d => {
+                    domainCounts.set(d, (domainCounts.get(d) || 0) + 1);
                 });
             }
         });
-        return { counts: domainCounts, total: genesWithDomains };
+        return { counts: domainCounts, total: genesWithDomains.size };
     };
     const { counts: selectedCounts, total: selectedTotal } = countDomains(selectedData);
     const { counts: dbCounts, total: dbTotal } = countDomains(database);
@@ -284,12 +311,9 @@ function parseMultiDimData(geneData) {
     };
     geneData.forEach(gene => {
         addNode(gene.gene, 'gene');
-        const complexes = gene.complex_names || gene.complex;
-        if (complexes) (Array.isArray(complexes) ? complexes : String(complexes).split(';')).forEach(c => c.trim() && links.push({ source: gene.gene, target: addNode(c.trim(), 'complex').id, type: 'gene-complex' }));
-        const domains = gene.Domain_Descriptions || gene.domain_descriptions;
-        if (domains) (Array.isArray(domains) ? domains : String(domains).split(';')).forEach(d => d.trim() && links.push({ source: gene.gene, target: addNode(d.trim(), 'domain').id, type: 'gene-domain' }));
-        const localizations = gene.localization;
-        if (localizations) (Array.isArray(localizations) ? localizations : String(localizations).split(';')).forEach(l => l.trim() && links.push({ source: gene.gene, target: addNode(l.trim(), 'localization').id, type: 'gene-localization' }));
+        getCleanArray(gene, 'complex_names', 'complex').forEach(c => links.push({ source: gene.gene, target: addNode(c, 'complex').id, type: 'gene-complex' }));
+        getCleanArray(gene, 'Domain_Descriptions', 'domain_descriptions', 'pfam_ids', 'PFAM_IDs').forEach(d => links.push({ source: gene.gene, target: addNode(d, 'domain').id, type: 'gene-domain' }));
+        getCleanArray(gene, 'localization').forEach(l => links.push({ source: gene.gene, target: addNode(l, 'localization').id, type: 'gene-localization' }));
     });
     return { nodes, links };
 }
@@ -327,7 +351,7 @@ function renderMultiDimNetwork(foundGenes, container) {
 // =============================================================================
 async function generateAnalysisPlots() {
     try {
-        await loadAndPrepareDatabase(); // Assumes this exists in your script.js
+        await loadAndPrepareDatabase(); // Assumes this exists in script.js
         const plotContainer = document.getElementById('plot-display-area');
         const resultsContainer = document.getElementById('ciliaplot-results-container');
         const genesInput = document.getElementById('ciliaplot-genes-input').value.trim();
@@ -343,7 +367,7 @@ async function generateAnalysisPlots() {
 
         const originalQueries = genesInput.split(/[\s,;\n\r\t]+/).filter(Boolean);
         const sanitizedQueries = [...new Set(originalQueries.map(q => q.toUpperCase()))];
-        const { foundGenes, notFoundGenes } = findGenes(sanitizedQueries); // Assumes findGenes exists in your script.js
+        const { foundGenes, notFoundGenes } = findGenes(sanitizedQueries); // Assumes findGenes exists in script.js
 
         createEnrichmentResultsTable(foundGenes, notFoundGenes);
         
