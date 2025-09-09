@@ -496,44 +496,50 @@ function displayHomePage() {
     const contentArea = document.querySelector('.content-area');
     contentArea.className = 'content-area';
     document.querySelector('.cilia-panel').style.display = 'block';
+
+    // Compute stats safely
+    const geneCount = currentData.length;
+    const uniqueLocalizations = [...new Set(currentData.map(g => g.localization).flat())];
+    const totalReferences = currentData.reduce((sum, g) => sum + (g.references?.length || 0), 0);
+
     contentArea.innerHTML = `
-    <div class="page-section">
-        <h1>The CiliaHub: An Updated Database of Gold Standard Genes with Ciliary Functions</h1>
+        <div class="page-section">
+            <h1>The CiliaHub: An Updated Database of Gold Standard Genes with Ciliary Functions</h1>
 
-        <!-- CiliaHub V0.1 and Statistics Section -->
-        <div class="ciliahub-stats" style="margin-top: 1rem; margin-bottom: 2rem; display: flex; gap: 1.5rem; flex-wrap: wrap; font-family: 'Arial', sans-serif;">
-            <div style="flex: 1; min-width: 140px; background: linear-gradient(135deg, #6a11cb, #2575fc); color: #fff; padding: 1rem; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.2); text-align: center;">
-                <div style="font-size: 1.2rem; font-weight: 700;">CiliaHub V0.1</div>
+            <!-- CiliaHub V0.1 and Statistics Section -->
+            <div class="ciliahub-stats" style="margin-top: 1rem; margin-bottom: 2rem; display: flex; gap: 1.5rem; flex-wrap: wrap; font-family: 'Arial', sans-serif;">
+                <div style="flex: 1; min-width: 140px; background: linear-gradient(135deg, #6a11cb, #2575fc); color: #fff; padding: 1rem; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.2); text-align: center;">
+                    <div style="font-size: 1.2rem; font-weight: 700;">CiliaHub V0.1</div>
+                </div>
+                <div style="flex: 1; min-width: 140px; background: linear-gradient(135deg, #ff9a9e, #fad0c4); color: #fff; padding: 1rem; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.2); text-align: center;">
+                    <div style="font-size: 1.5rem; font-weight: 700;">${geneCount}</div>
+                    <div>Genes</div>
+                </div>
+                <div style="flex: 1; min-width: 140px; background: linear-gradient(135deg, #a1c4fd, #c2e9fb); color: #fff; padding: 1rem; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.2); text-align: center;">
+                    <div style="font-size: 1.5rem; font-weight: 700;">${uniqueLocalizations.length}</div>
+                    <div>Localizations</div>
+                </div>
+                <div style="flex: 1; min-width: 140px; background: linear-gradient(135deg, #fbc2eb, #a6c1ee); color: #fff; padding: 1rem; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.2); text-align: center;">
+                    <div style="font-size: 1.5rem; font-weight: 700;">${totalReferences}</div>
+                    <div>References</div>
+                </div>
             </div>
-            <div style="flex: 1; min-width: 140px; background: linear-gradient(135deg, #ff9a9e, #fad0c4); color: #fff; padding: 1rem; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.2); text-align: center;">
-                <div style="font-size: 1.5rem; font-weight: 700;">${currentData.length}</div>
-                <div>Genes</div>
-            </div>
-            <div style="flex: 1; min-width: 140px; background: linear-gradient(135deg, #a1c4fd, #c2e9fb); color: #fff; padding: 1rem; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.2); text-align: center;">
-                <div style="font-size: 1.5rem; font-weight: 700;">${uniqueLocalizations.length}</div>
-                <div>Localizations</div>
-            </div>
-            <div style="flex: 1; min-width: 140px; background: linear-gradient(135deg, #fbc2eb, #a6c1ee); color: #fff; padding: 1rem; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.2); text-align: center;">
-                <div style="font-size: 1.5rem; font-weight: 700;">${totalReferences}</div>
-                <div>References</div>
-            </div>
-        </div>
 
-        <p style="font-size: 1.1rem; color: #555;">CiliaHub is an advanced <strong>bioinformatics</strong> platform that hosts a detailed database of <strong>gold standard cilia genes</strong> and their role in various <strong>ciliopathies</strong>. Our comprehensive collection includes the most reliable and well-established genes linked to ciliary function, with reference papers also provided. With our user-friendly search tool, researchers can explore <strong>genome</strong>-wide data, focusing on both known and novel ciliary genes. Discover their contributions to the biology of cilia and the mechanisms behind ciliary-related disorders. Search for a single gene below or use the Batch Query tool to analyze multiple genes.</p>
+            <p style="font-size: 1.1rem; color: #555;">CiliaHub is an advanced <strong>bioinformatics</strong> platform that hosts a detailed database of <strong>gold standard cilia genes</strong> and their role in various <strong>ciliopathies</strong>. Our comprehensive collection includes the most reliable and well-established genes linked to ciliary function, with reference papers also provided. With our user-friendly search tool, researchers can explore <strong>genome</strong>-wide data, focusing on both known and novel ciliary genes. Discover their contributions to the biology of cilia and the mechanisms behind ciliary-related disorders. Search for a single gene below or use the Batch Query tool to analyze multiple genes.</p>
 
-        <div class="search-container">
-            <div class="search-wrapper" style="flex: 1;">
-                <input type="text" id="single-gene-search" placeholder="Search for a single gene (e.g., ACE2, IFT88)" aria-label="Search for a single gene" autocomplete="off">
-                <div id="search-suggestions"></div>
+            <div class="search-container">
+                <div class="search-wrapper" style="flex: 1;">
+                    <input type="text" id="single-gene-search" placeholder="Search for a single gene (e.g., ACE2, IFT88)" aria-label="Search for a single gene" autocomplete="off">
+                    <div id="search-suggestions"></div>
+                </div>
+                <button id="single-search-btn" class="search-btn btn btn-primary" aria-label="Search for the entered gene name">Search</button>
             </div>
-            <button id="single-search-btn" class="search-btn btn btn-primary" aria-label="Search for the entered gene name">Search</button>
-        </div>
 
-        <div id="gene-cards-container" class="gene-cards"></div>
-        <div id="status-message" class="status-message" style="display: none;"></div>
-    </div>`;
-    
-    document.getElementById('single-search-btn').onclick = performSingleSearch;
+            <div id="gene-cards-container" class="gene-cards"></div>
+            <div id="status-message" class="status-message" style="display: none;"></div>
+        </div>`;
+
+    document.getElementById('single-search-btn').onclick = performSingleSearch;    
     const searchInput = document.getElementById('single-gene-search');
     const suggestionsContainer = document.getElementById('search-suggestions');
 
