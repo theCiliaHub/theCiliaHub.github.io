@@ -19,8 +19,7 @@ let currentPlotInstance = null; // Holds the active Chart.js, Plotly, or D3 inst
 // DATA PARSING HELPER
 // =============================================================================
 /**
- * Robustly extracts a clean array of values from a gene object,
- * handling multiple possible keys, data types, and nested separators.
+ * Robustly extracts a clean array of values from a gene object.
  * @param {Object} gene - The gene object from the database.
  * @param {...string} keys - The possible keys to check for the data.
  * @returns {Array<string>} A clean array of strings.
@@ -48,28 +47,24 @@ function getCleanArray(gene, ...keys) {
 // PLOT CUSTOMIZATION & DOWNLOAD (YOUR ORIGINAL FUNCTIONS)
 // =============================================================================
 function getPlotSettings() {
-    // This is your original function
     const setting = (id, def) => document.getElementById(id)?.value || def;
     return {
         mainTitle: setting('setting-main-title', 'CiliaHub Analysis'),
         xAxisTitle: setting('setting-x-axis-title', 'X-Axis'),
         yAxisTitle: setting('setting-y-axis-title', 'Y-Axis'),
-        titleFontSize: parseInt(setting('setting-title-font-size', 20)),
-        axisTitleFontSize: parseInt(setting('setting-axis-title-font-size', 20)),
-        tickFontSize: parseInt(setting('setting-tick-font-size', 20)),
+        titleFontSize: parseInt(setting('setting-title-font-size', 18)),
+        axisTitleFontSize: parseInt(setting('setting-axis-title-font-size', 14)),
+        tickFontSize: parseInt(setting('setting-tick-font-size', 12)),
         fontFamily: setting('setting-font-family', 'Arial'),
         backgroundColor: setting('setting-bg-color', '#ffffff'),
         fontColor: setting('setting-font-color', '#333333'),
         gridColor: setting('setting-grid-color', '#e0e0e0'),
-        colorScale: setting('setting-color-scale', 'Viridis'),
-        showLegend: document.getElementById('setting-show-legend')?.checked ?? true,
-        showGrid: document.getElementById('setting-show-grid')?.checked ?? false,
-        axisLineWidth: parseFloat(setting('setting-axis-line-width', 1.5))
+        showGrid: document.getElementById('setting-show-grid')?.checked ?? true,
+        axisLineWidth: 1.5
     };
 }
 
 async function downloadPlot() {
-    // This is your original function
     const format = document.getElementById('download-format')?.value || 'png';
     const plotArea = document.getElementById('plot-display-area');
     const plotType = document.querySelector('input[name="plot-type"]:checked')?.value;
@@ -86,21 +81,17 @@ async function downloadPlot() {
 
     try {
         let dataUrl;
-        const backgroundColor = getPlotSettings().backgroundColor; // Use background from settings
+        const backgroundColor = getPlotSettings().backgroundColor;
 
         if (plotArea.querySelector('canvas')) {
-             // For Chart.js, we need to re-render on a temporary canvas to apply background
             const tempCanvas = document.createElement('canvas');
-            tempCanvas.width = width * scale;
-            tempCanvas.height = height * scale;
+            tempCanvas.width = plotArea.querySelector('canvas').width;
+            tempCanvas.height = plotArea.querySelector('canvas').height;
             const tempCtx = tempCanvas.getContext('2d');
             tempCtx.fillStyle = backgroundColor;
             tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
-            tempCtx.drawImage(plotArea.querySelector('canvas'), 0, 0, tempCanvas.width, tempCanvas.height);
+            tempCtx.drawImage(plotArea.querySelector('canvas'), 0, 0);
             dataUrl = tempCanvas.toDataURL('image/png');
-
-        } else if (plotArea.querySelector('.js-plotly-plot')) {
-            dataUrl = await Plotly.toImage(currentPlotInstance, { format: 'png', width: width * scale, height: height * scale });
         } else if (plotArea.querySelector('svg')) {
             const svgElement = plotArea.querySelector('svg');
             const svgString = new XMLSerializer().serializeToString(svgElement);
@@ -128,10 +119,7 @@ async function downloadPlot() {
         if (!dataUrl) throw new Error("Could not generate image data URL.");
 
         if (format === 'png') {
-            const a = document.createElement('a');
-            a.href = dataUrl;
-            a.download = fileName;
-            a.click();
+            const a = document.createElement('a'); a.href = dataUrl; a.download = fileName; a.click();
         } else if (format === 'pdf') {
             const { jsPDF } = window.jspdf;
             const pdf = new jsPDF({ orientation: width > height ? 'l' : 'p', unit: 'px', format: [width, height] });
@@ -144,21 +132,16 @@ async function downloadPlot() {
     }
 }
 
-
 // =============================================================================
 // PLOTTING FUNCTIONS (ORIGINAL + NEW)
 // =============================================================================
 
 function renderKeyLocalizations(foundGenes, container) {
-    // This is your original function, kept as is.
     const settings = getPlotSettings();
     container.innerHTML = `<canvas></canvas>`;
     const ctx = container.querySelector('canvas').getContext('2d');
+    if (!foundGenes.length) { container.innerHTML = '<p class="status-message">No genes found.</p>'; return; }
 
-    if (!foundGenes.length) {
-        container.innerHTML = '<p class="status-message">No ciliary genes found for plotting.</p>';
-        return;
-    }
     const yCategories = ['Cilia','Basal Body','Transition Zone','Axoneme','Ciliary Membrane','Centrosome','Microtubules','Endoplasmic Reticulum','Flagella','Cytosol','Lysosome','Autophagosomes','Ribosome','Nucleus','P-body','Peroxisome'];
     const localizationCounts = {};
     foundGenes.forEach(gene => {
@@ -168,10 +151,7 @@ function renderKeyLocalizations(foundGenes, container) {
         });
     });
     const categoriesWithData = yCategories.filter(cat => localizationCounts[cat] > 0);
-    if (!categoriesWithData.length) {
-        container.innerHTML = '<p class="status-message">No genes found in primary ciliary localizations.</p>';
-        return;
-    }
+    if (!categoriesWithData.length) { container.innerHTML = '<p class="status-message">No genes in primary ciliary localizations.</p>'; return; }
     
     currentPlotInstance = new Chart(ctx, {
         type: 'bubble',
@@ -179,7 +159,9 @@ function renderKeyLocalizations(foundGenes, container) {
             datasets: [{
                 label: 'Gene Count',
                 data: categoriesWithData.map(loc => ({ x: localizationCounts[loc], y: loc, r: 8 + localizationCounts[loc] * 2, count: localizationCounts[loc] })),
-                backgroundColor: 'rgba(44, 90, 160, 0.7)'
+                backgroundColor: 'rgba(52, 152, 219, 0.7)',
+                borderColor: 'rgba(41, 128, 185, 1)',
+                borderWidth: 1
             }]
         },
         options: {
@@ -199,19 +181,15 @@ function renderKeyLocalizations(foundGenes, container) {
 }
 
 function renderGeneMatrix(foundGenes, container) {
-    // This is your original function, kept as is.
     const settings = getPlotSettings();
     container.innerHTML = `<canvas></canvas>`;
     const ctx = container.querySelector('canvas').getContext('2d');
-
-    if (!foundGenes.length) {
-        container.innerHTML = '<p class="status-message">No genes to display in the matrix plot.</p>';
-        return;
-    }
+    if (!foundGenes.length) { container.innerHTML = '<p class="status-message">No genes to display.</p>'; return; }
 
     const yCategories = [...new Set(foundGenes.flatMap(g => getCleanArray(g, 'localization')))].filter(Boolean).sort();
     const xLabels = [...new Set(foundGenes.map(g => g.gene))].sort();
-
+    if (yCategories.length === 0) { container.innerHTML = '<p class="status-message">Selected genes have no localization data.</p>'; return; }
+    
     currentPlotInstance = new Chart(ctx, {
         type: 'bubble',
         data: {
@@ -230,22 +208,21 @@ function renderGeneMatrix(foundGenes, container) {
                 tooltip: { callbacks: { label: c => `${c.dataset.label}: ${c.raw.y}` } }
             },
             scales: {
-                x: { type: 'category', labels: xLabels, title: { display: true, text: settings.xAxisTitle, font: { size: settings.axisTitleFontSize, family: settings.fontFamily }, color: settings.fontColor }, grid: { display: settings.showGrid, color: settings.gridColor }, border: { display: true, width: settings.axisLineWidth, color: settings.fontColor }, ticks: { font: { size: settings.tickFontSize, family: settings.fontFamily }, color: settings.fontColor, maxRotation: 90, minRotation: 45 } },
-                y: { type: 'category', labels: yCategories, title: { display: true, text: settings.yAxisTitle, font: { size: settings.axisTitleFontSize, family: settings.fontFamily }, color: settings.fontColor }, grid: { display: settings.showGrid, color: settings.gridColor }, border: { display: true, width: settings.axisLineWidth, color: settings.fontColor }, ticks: { font: { size: settings.tickFontSize, family: settings.fontFamily }, color: settings.fontColor } }
+                x: { type: 'category', labels: xLabels, title: { display: true, text: settings.xAxisTitle, font: { size: settings.axisTitleFontSize, family: settings.fontFamily }, color: settings.fontColor }, grid: { display: settings.showGrid, color: settings.gridColor }, border: { display: true, width: settings.axisLineWidth }, ticks: { font: { size: settings.tickFontSize, family: settings.fontFamily }, color: settings.fontColor, maxRotation: 90, minRotation: 45 } },
+                y: { type: 'category', labels: yCategories, title: { display: true, text: settings.yAxisTitle, font: { size: settings.axisTitleFontSize, family: settings.fontFamily }, color: settings.fontColor }, grid: { display: settings.showGrid, color: settings.gridColor }, border: { display: true, width: settings.axisLineWidth }, ticks: { font: { size: settings.tickFontSize, family: settings.fontFamily }, color: settings.fontColor } }
             }
         }
     });
 }
 
 function renderDomainEnrichmentFactorPlot(foundGenes, allGenes, container) {
-    // This is the new plot
     const settings = getPlotSettings();
     
     const countDomains = (geneSet) => {
         const domainCounts = new Map();
         let genesWithDomains = new Set();
         geneSet.forEach(gene => {
-            const domains = getCleanArray(gene, 'Domain_Descriptions', 'domain_descriptions', 'pfam_ids', 'PFAM_IDs');
+            const domains = getCleanArray(gene, 'Domain_Descriptions', 'domain_descriptions');
             if (domains.length > 0) {
                 genesWithDomains.add(gene.gene);
                 domains.forEach(d => domainCounts.set(d, (domainCounts.get(d) || 0) + 1));
@@ -257,34 +234,22 @@ function renderDomainEnrichmentFactorPlot(foundGenes, allGenes, container) {
     const { counts: selectedCounts, total: selectedTotal } = countDomains(foundGenes);
     const { counts: dbCounts, total: dbTotal } = countDomains(allGenes);
     
-    if (selectedTotal === 0) {
-        container.innerHTML = '<p class="status-message">No domains found in selected genes.</p>';
-        return;
-    }
+    if (selectedTotal === 0) { container.innerHTML = '<p class="status-message">No domains in selected genes.</p>'; return; }
 
-    const enrichmentData = Array.from(selectedCounts.entries()).map(([domain, count]) => {
-        const factor = ((count / selectedTotal) / ((dbCounts.get(domain) || 0) / dbTotal)) || 0;
-        return { domain, factor, count };
-    }).sort((a, b) => b.factor - a.factor);
+    const enrichmentData = Array.from(selectedCounts.entries())
+        .map(([domain, count]) => ({ domain, factor: ((count / selectedTotal) / ((dbCounts.get(domain) || 0) / dbTotal)) || 0 }))
+        .sort((a, b) => b.factor - a.factor)
+        .filter(d => d.factor > 0);
+
+    if (!enrichmentData.length) { container.innerHTML = '<p class="status-message">No domain enrichment found.</p>'; return; }
     
-    if (!enrichmentData.length) {
-        container.innerHTML = '<p class="status-message">No domain enrichment found.</p>';
-        return;
-    }
-    
-    container.innerHTML = ''; // Clear previous content
-    const topData = enrichmentData.slice(0, 20); // Show top 20
-    
+    container.innerHTML = '';
+    const topData = enrichmentData.slice(0, 20);
     const margin = { top: 30, right: 30, bottom: 60, left: 250 };
     const width = container.clientWidth - margin.left - margin.right;
     const height = topData.length * 28;
     
-    const svg = d3.select(container).append("svg")
-        .attr("width", width + margin.left + margin.right)
-        .attr("height", height + margin.top + margin.bottom)
-        .style("background-color", settings.backgroundColor)
-        .append("g").attr("transform", `translate(${margin.left},${margin.top})`);
-        
+    const svg = d3.select(container).append("svg").attr("width", width + margin.left + margin.right).attr("height", height + margin.top + margin.bottom).append("g").attr("transform", `translate(${margin.left},${margin.top})`);
     const x = d3.scaleLinear().domain([0, d3.max(topData, d => d.factor) * 1.1]).range([0, width]);
     const y = d3.scaleBand().domain(topData.map(d => d.domain)).range([0, height]).padding(0.2);
 
@@ -292,24 +257,17 @@ function renderDomainEnrichmentFactorPlot(foundGenes, allGenes, container) {
     svg.append("g").call(d3.axisLeft(y)).selectAll("text").style("font-family", settings.fontFamily).style("font-size", settings.tickFontSize + 'px').style("fill", settings.fontColor);
     svg.selectAll(".bar").data(topData).enter().append("rect").attr("x", x(0)).attr("y", d => y(d.domain)).attr("width", d => x(d.factor)).attr("height", y.bandwidth()).attr("fill", "#3498db");
     
-    // Add titles using settings
     svg.append("text").attr("text-anchor", "middle").attr("x", width / 2).attr("y", -10).text(settings.mainTitle).style("font-family", settings.fontFamily).style("font-size", settings.titleFontSize + 'px').style("fill", settings.fontColor);
     svg.append("text").attr("text-anchor", "middle").attr("x", width / 2).attr("y", height + margin.bottom - 15).text(settings.xAxisTitle).style("font-family", settings.fontFamily).style("font-size", settings.axisTitleFontSize + 'px').style("fill", settings.fontColor);
 
-    currentPlotInstance = svg.node().parentNode; // For download
+    currentPlotInstance = svg.node().parentNode;
 }
 
 function renderMultiDimNetwork(foundGenes, container) {
-    // This is the new plot
     const settings = getPlotSettings();
-    
     const nodes = [], links = [], nodeMap = new Map();
     const addNode = (id, type) => {
-        if (!nodeMap.has(id)) {
-            const node = { id, type, count: 0 };
-            nodeMap.set(id, node);
-            nodes.push(node);
-        }
+        if (!nodeMap.has(id)) { nodeMap.set(id, { id, type, count: 0 }); nodes.push(nodeMap.get(id)); }
         nodeMap.get(id).count++;
         return nodeMap.get(id);
     };
@@ -317,32 +275,25 @@ function renderMultiDimNetwork(foundGenes, container) {
     foundGenes.forEach(gene => {
         addNode(gene.gene, 'gene');
         getCleanArray(gene, 'complex_names', 'complex').forEach(c => links.push({ source: gene.gene, target: addNode(c, 'complex').id }));
-        getCleanArray(gene, 'Domain_Descriptions', 'domain_descriptions', 'pfam_ids', 'PFAM_IDs').forEach(d => links.push({ source: gene.gene, target: addNode(d, 'domain').id }));
+        getCleanArray(gene, 'Domain_Descriptions', 'domain_descriptions').forEach(d => links.push({ source: gene.gene, target: addNode(d, 'domain').id }));
         getCleanArray(gene, 'localization').forEach(l => links.push({ source: gene.gene, target: addNode(l, 'localization').id }));
     });
 
-    if (nodes.length < 2 || links.length === 0) {
-        container.innerHTML = '<p class="status-message">Not enough data to build a network.</p>';
-        return;
-    }
+    if (nodes.length < 2 || links.length === 0) { container.innerHTML = '<p class="status-message">Not enough data to build a network.</p>'; return; }
     
     container.innerHTML = '';
     const width = container.clientWidth;
     const height = Math.max(500, container.clientHeight);
     
-    const svg = d3.select(container).append("svg")
-        .attr("width", width)
-        .attr("height", height)
-        .style("background-color", settings.backgroundColor);
-        
-    const nodeColors = { 'gene': '#2ecc71', 'complex': '#f39c12', 'domain': '#3498db', 'localization': '#8e44ad' };
+    const svg = d3.select(container).append("svg").attr("width", width).attr("height", height);
+    const nodeColors = { 'gene': '#27ae60', 'complex': '#f39c12', 'domain': '#3498db', 'localization': '#8e44ad' };
     
     const simulation = d3.forceSimulation(nodes)
-        .force("link", d3.forceLink(links).id(d => d.id).distance(60))
-        .force("charge", d3.forceManyBody().strength(-100))
+        .force("link", d3.forceLink(links).id(d => d.id).distance(80))
+        .force("charge", d3.forceManyBody().strength(-150))
         .force("center", d3.forceCenter(width / 2, height / 2));
         
-    const link = svg.append("g").selectAll("line").data(links).enter().append("line").style("stroke", "#aaa").style("stroke-width", 1.5);
+    const link = svg.append("g").selectAll("line").data(links).enter().append("line").style("stroke", "#aaa");
     const node = svg.append("g").selectAll("circle").data(nodes).enter().append("circle").attr("r", d => d.type === 'gene' ? 8 : 5).style("fill", d => nodeColors[d.type] || '#ccc').style("stroke", "#fff").style("stroke-width", 1.5)
         .call(d3.drag().on("start", (e, d) => { if (!e.active) simulation.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; }).on("drag", (e, d) => { d.fx = e.x; d.fy = e.y; }).on("end", (e, d) => { if (!e.active) simulation.alphaTarget(0); d.fx = null; d.fy = null; }));
         
@@ -353,7 +304,7 @@ function renderMultiDimNetwork(foundGenes, container) {
         node.attr("cx", d => d.x).attr("cy", d => d.y);
     });
     
-    currentPlotInstance = svg.node(); // For download
+    currentPlotInstance = svg.node();
 }
 
 
@@ -380,13 +331,14 @@ async function generateAnalysisPlots() {
         const sanitizedQueries = [...new Set(originalQueries.map(q => q.toUpperCase()))];
         const { foundGenes, notFoundGenes } = findGenes(sanitizedQueries);
 
+        // This function now only runs when a plot is generated
+        // createEnrichmentResultsTable(foundGenes, notFoundGenes); 
+        
         const plotType = document.querySelector('input[name="plot-type"]:checked')?.value;
         const backgroundGeneSet = window.allGenes || [];
 
-        // UPDATE STATS & LEGEND BASED ON PLOT TYPE
         updateStatsAndLegend(plotType, foundGenes, backgroundGeneSet);
         
-        // This switch statement calls the correct rendering function
         switch (plotType) {
             case 'bubble':
                 renderKeyLocalizations(foundGenes, plotContainer);
@@ -410,8 +362,9 @@ async function generateAnalysisPlots() {
     }
 }
 
+
 // =============================================================================
-// NEW: DYNAMIC STATS AND LEGEND RENDERER
+// DYNAMIC STATS AND LEGEND RENDERER
 // =============================================================================
 function updateStatsAndLegend(plotType, foundGenes, allGenes) {
     const statsContainer = document.getElementById('ciliaplot-stats-container');
@@ -424,34 +377,44 @@ function updateStatsAndLegend(plotType, foundGenes, allGenes) {
     statsHTML += `<div class="stat-box"><div class="stat-number">${foundGenes.length}</div><div class="stat-label">Input Genes Found</div></div>`;
 
     if (plotType === 'multi_dim_network') {
-        const { nodes } = parseMultiDimData(foundGenes);
-        const complexes = nodes.filter(n => n.type === 'complex').length;
-        const domains = nodes.filter(n => n.type === 'domain').length;
-        const localizations = nodes.filter(n => n.type === 'localization').length;
+        const nodes = [], nodeMap = new Map();
+        const addNode = (id, type) => { if (!nodeMap.has(id)) nodeMap.set(id, { id, type }); };
+        foundGenes.forEach(gene => {
+            addNode(gene.gene, 'gene');
+            getCleanArray(gene, 'complex_names', 'complex').forEach(c => addNode(c, 'complex'));
+            getCleanArray(gene, 'Domain_Descriptions', 'domain_descriptions').forEach(d => addNode(d, 'domain'));
+            getCleanArray(gene, 'localization').forEach(l => addNode(l, 'localization'));
+        });
+        
         statsHTML += `
-            <div class="stat-box"><div class="stat-number">${complexes}</div><div class="stat-label">Complexes</div></div>
-            <div class="stat-box"><div class="stat-number">${domains}</div><div class="stat-label">Domains</div></div>
-            <div class="stat-box"><div class="stat-number">${localizations}</div><div class="stat-label">Localizations</div></div>`;
+            <div class="stat-box"><div class="stat-number">${nodes.filter(n=>n.type==='complex').length}</div><div class="stat-label">Complexes</div></div>
+            <div class="stat-box"><div class="stat-number">${nodes.filter(n=>n.type==='domain').length}</div><div class="stat-label">Domains</div></div>
+            <div class="stat-box"><div class="stat-number">${nodes.filter(n=>n.type==='localization').length}</div><div class="stat-label">Localizations</div></div>`;
         legendHTML = `
-            <div class="legend-item"><div class="legend-color" style="background-color: #2ecc71;"></div><span>Gene</span></div>
+            <div class="legend-item"><div class="legend-color" style="background-color: #27ae60;"></div><span>Gene</span></div>
             <div class="legend-item"><div class="legend-color" style="background-color: #f39c12;"></div><span>Complex</span></div>
             <div class="legend-item"><div class="legend-color" style="background-color: #3498db;"></div><span>Domain</span></div>
             <div class="legend-item"><div class="legend-color" style="background-color: #8e44ad;"></div><span>Localization</span></div>`;
     } else if (plotType === 'enrichment_factor') {
         const { enrichmentData } = calculateDomainEnrichmentFactor(foundGenes, allGenes);
-        const enrichedCount = enrichmentData.filter(d => d.factor > 1.5).length; // Example threshold
+        const enrichedCount = enrichmentData.filter(d => d.factor > 1.5).length;
         statsHTML += `
             <div class="stat-box"><div class="stat-number">${enrichmentData.length}</div><div class="stat-label">Unique Domains</div></div>
             <div class="stat-box"><div class="stat-number">${enrichedCount}</div><div class="stat-label">Enriched (>1.5)</div></div>`;
-        legendHTML = `<div class="legend-item"><div class="legend-color" style="background-color: #3498db;"></div><span>Enrichment Factor</span></div>`;
+        legendHTML = `<div class="legend-item"><div class="legend-color" style="background-color: #3498db; border-radius: 4px;"></div><span>Enrichment Factor</span></div>`;
+    } else {
+        // Default stats for bubble and matrix
+        const localizations = new Set(foundGenes.flatMap(g => getCleanArray(g, 'localization'))).size;
+        statsHTML += `<div class="stat-box"><div class="stat-number">${localizations}</div><div class="stat-label">Unique Localizations</div></div>`;
     }
 
     statsContainer.innerHTML = statsHTML;
     legendContainer.innerHTML = legendHTML;
 }
 
+
 // =============================================================================
-// PAGE RENDERER (MODIFIED TO RENDER THE NEW UI DESIGN)
+// PAGE RENDERER (UPDATED WITH NEW DESIGN)
 // =============================================================================
 function displayCiliaPlotPage() {
     const contentArea = document.querySelector('.content-area');
@@ -460,7 +423,6 @@ function displayCiliaPlotPage() {
         document.querySelector('.cilia-panel').style.display = 'none';
     }
 
-    // This function now generates the complete, updated CiliaPlot UI
     contentArea.innerHTML = `
     <div class="page-section ciliaplot-page">
         <div class="ciliaplot-header">
