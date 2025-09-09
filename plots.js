@@ -497,7 +497,7 @@ function displayCiliaPlotPage() {
 // Make sure this runs after DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
     const showGridCheckbox = document.getElementById('setting-show-grid');
-    if (showGridCheckbox) showGridCheckbox.checked = false;
+    
     // Ensure default state is unchecked
     showGridCheckbox.checked = false;
 
