@@ -44,7 +44,7 @@ function getCleanArray(gene, ...keys) {
 }
 
 // =============================================================================
-// PLOT CUSTOMIZATION & DOWNLOAD (YOUR ORIGINAL FUNCTIONS)
+// PLOT CUSTOMIZATION & DOWNLOAD
 // =============================================================================
 function getPlotSettings() {
     const setting = (id, def) => document.getElementById(id)?.value || def;
@@ -67,7 +67,7 @@ function getPlotSettings() {
 async function downloadPlot() {
     const format = document.getElementById('download-format')?.value || 'png';
     const plotArea = document.getElementById('plot-display-area');
-    const plotType = document.querySelector('input[name="plot-type"]:checked')?.value;
+    const plotType = document.getElementById('plot-type-select')?.value;
 
     if (!plotArea.firstChild || !plotType || plotArea.querySelector('.status-message')) {
         alert("Please generate a plot first.");
@@ -85,13 +85,20 @@ async function downloadPlot() {
 
         if (plotArea.querySelector('canvas')) {
             const tempCanvas = document.createElement('canvas');
-            tempCanvas.width = plotArea.querySelector('canvas').width;
-            tempCanvas.height = plotArea.querySelector('canvas').height;
+            const sourceCanvas = plotArea.querySelector('canvas');
+            tempCanvas.width = sourceCanvas.width;
+            tempCanvas.height = sourceCanvas.height;
             const tempCtx = tempCanvas.getContext('2d');
-            tempCtx.fillStyle = backgroundColor;
-            tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
-            tempCtx.drawImage(plotArea.querySelector('canvas'), 0, 0);
+            
+            // MODIFIED: Only add background for plots that need it
+            if (plotType !== 'bubble' && plotType !== 'matrix') {
+                tempCtx.fillStyle = backgroundColor;
+                tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+            }
+            
+            tempCtx.drawImage(sourceCanvas, 0, 0);
             dataUrl = tempCanvas.toDataURL('image/png');
+
         } else if (plotArea.querySelector('svg')) {
             const svgElement = plotArea.querySelector('svg');
             const svgString = new XMLSerializer().serializeToString(svgElement);
@@ -133,7 +140,7 @@ async function downloadPlot() {
 }
 
 // =============================================================================
-// PLOTTING FUNCTIONS (ORIGINAL + NEW)
+// PLOTTING FUNCTIONS
 // =============================================================================
 
 function renderKeyLocalizations(foundGenes, container) {
@@ -167,14 +174,14 @@ function renderKeyLocalizations(foundGenes, container) {
         options: {
             responsive: true, maintainAspectRatio: false,
             plugins: {
-                customCanvasBackgroundColor: { color: settings.backgroundColor },
+                // MODIFIED: Background removed for transparency
                 legend: { display: false },
                 title: { display: true, text: settings.mainTitle, font: { size: settings.titleFontSize, family: settings.fontFamily }, color: settings.fontColor },
                 tooltip: { callbacks: { label: c => `${c.raw.y}: ${c.raw.count} gene(s)` } }
             },
             scales: {
-                x: { title: { display: true, text: settings.xAxisTitle, font: { size: settings.axisTitleFontSize, family: settings.fontFamily }, color: settings.fontColor }, grid: { display: settings.showGrid, color: settings.gridColor }, border: { display: true, width: settings.axisLineWidth, color: settings.fontColor }, ticks: { font: { size: settings.tickFontSize, family: settings.fontFamily }, color: settings.fontColor } },
-                y: { type: 'category', labels: yCategories, title: { display: true, text: settings.yAxisTitle, font: { size: settings.axisTitleFontSize, family: settings.fontFamily }, color: settings.fontColor }, grid: { display: settings.showGrid, color: settings.gridColor }, border: { display: true, width: settings.axisLineWidth, color: settings.fontColor }, ticks: { font: { size: settings.tickFontSize, family: settings.fontFamily }, color: settings.fontColor } }
+                x: { title: { display: true, text: settings.xAxisTitle, font: { size: settings.axisTitleFontSize, family: settings.fontFamily }, color: settings.fontColor }, grid: { display: settings.showGrid, color: settings.gridColor }, border: { display: true, width: settings.axisLineWidth }, ticks: { font: { size: settings.tickFontSize, family: settings.fontFamily }, color: settings.fontColor } },
+                y: { type: 'category', labels: yCategories, title: { display: true, text: settings.yAxisTitle, font: { size: settings.axisTitleFontSize, family: settings.fontFamily }, color: settings.fontColor }, grid: { display: settings.showGrid, color: settings.gridColor }, border: { display: true, width: settings.axisLineWidth }, ticks: { font: { size: settings.tickFontSize, family: settings.fontFamily }, color: settings.fontColor } }
             }
         }
     });
@@ -202,7 +209,7 @@ function renderGeneMatrix(foundGenes, container) {
         options: {
             responsive: true, maintainAspectRatio: false,
             plugins: {
-                customCanvasBackgroundColor: { color: settings.backgroundColor },
+                // MODIFIED: Background removed for transparency
                 legend: { display: false },
                 title: { display: true, text: settings.mainTitle, font: { size: settings.titleFontSize, family: settings.fontFamily }, color: settings.fontColor },
                 tooltip: { callbacks: { label: c => `${c.dataset.label}: ${c.raw.y}` } }
@@ -215,9 +222,9 @@ function renderGeneMatrix(foundGenes, container) {
     });
 }
 
-function renderDomainEnrichmentFactorPlot(foundGenes, allGenes, container) {
-    const settings = getPlotSettings();
-    
+// FIXED: This function was missing and has been restored.
+function calculateDomainEnrichmentFactor(selectedData, database) {
+    if (selectedData.length === 0) return { enrichmentData: [] };
     const countDomains = (geneSet) => {
         const domainCounts = new Map();
         let genesWithDomains = new Set();
@@ -231,17 +238,23 @@ function renderDomainEnrichmentFactorPlot(foundGenes, allGenes, container) {
         return { counts: domainCounts, total: genesWithDomains.size };
     };
 
-    const { counts: selectedCounts, total: selectedTotal } = countDomains(foundGenes);
-    const { counts: dbCounts, total: dbTotal } = countDomains(allGenes);
+    const { counts: selectedCounts, total: selectedTotal } = countDomains(selectedData);
+    const { counts: dbCounts, total: dbTotal } = countDomains(database);
     
-    if (selectedTotal === 0) { container.innerHTML = '<p class="status-message">No domains in selected genes.</p>'; return; }
+    if (selectedTotal === 0) return { enrichmentData: [] };
 
     const enrichmentData = Array.from(selectedCounts.entries())
         .map(([domain, count]) => ({ domain, factor: ((count / selectedTotal) / ((dbCounts.get(domain) || 0) / dbTotal)) || 0 }))
         .sort((a, b) => b.factor - a.factor)
         .filter(d => d.factor > 0);
 
-    if (!enrichmentData.length) { container.innerHTML = '<p class="status-message">No domain enrichment found.</p>'; return; }
+    return { enrichmentData };
+}
+
+function renderDomainEnrichmentFactorPlot(foundGenes, allGenes, container) {
+    const settings = getPlotSettings();
+    const { enrichmentData } = calculateDomainEnrichmentFactor(foundGenes, allGenes);
+    if (!enrichmentData || enrichmentData.length === 0) { container.innerHTML = '<p class="status-message">No domain enrichment found.</p>'; return; }
     
     container.innerHTML = '';
     const topData = enrichmentData.slice(0, 20);
@@ -267,11 +280,8 @@ function renderMultiDimNetwork(foundGenes, container) {
     const settings = getPlotSettings();
     const nodes = [], links = [], nodeMap = new Map();
     const addNode = (id, type) => {
-        if (!nodeMap.has(id)) { nodeMap.set(id, { id, type, count: 0 }); nodes.push(nodeMap.get(id)); }
-        nodeMap.get(id).count++;
-        return nodeMap.get(id);
+        if (!nodeMap.has(id)) { nodeMap.set(id, { id, type }); nodes.push(nodeMap.get(id)); }
     };
-
     foundGenes.forEach(gene => {
         addNode(gene.gene, 'gene');
         getCleanArray(gene, 'complex_names', 'complex').forEach(c => links.push({ source: gene.gene, target: addNode(c, 'complex').id }));
@@ -294,14 +304,26 @@ function renderMultiDimNetwork(foundGenes, container) {
         .force("center", d3.forceCenter(width / 2, height / 2));
         
     const link = svg.append("g").selectAll("line").data(links).enter().append("line").style("stroke", "#aaa");
-    const node = svg.append("g").selectAll("circle").data(nodes).enter().append("circle").attr("r", d => d.type === 'gene' ? 8 : 5).style("fill", d => nodeColors[d.type] || '#ccc').style("stroke", "#fff").style("stroke-width", 1.5)
+    
+    const nodeGroup = svg.append("g").selectAll("g").data(nodes).enter().append("g")
         .call(d3.drag().on("start", (e, d) => { if (!e.active) simulation.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; }).on("drag", (e, d) => { d.fx = e.x; d.fy = e.y; }).on("end", (e, d) => { if (!e.active) simulation.alphaTarget(0); d.fx = null; d.fy = null; }));
-        
-    node.append("title").text(d => `${d.id} (${d.type})`);
+
+    nodeGroup.append("circle").attr("r", d => d.type === 'gene' ? 8 : 6).style("fill", d => nodeColors[d.type] || '#ccc').style("stroke", "#fff").style("stroke-width", 1.5);
+    
+    // NEW: Add text labels to nodes
+    nodeGroup.append("text")
+        .text(d => d.id)
+        .attr('x', 10)
+        .attr('y', 4)
+        .style("font-size", "10px")
+        .style("font-family", settings.fontFamily)
+        .style("fill", settings.fontColor);
+
+    nodeGroup.append("title").text(d => `${d.id} (${d.type})`);
     
     simulation.on("tick", () => {
         link.attr("x1", d => d.source.x).attr("y1", d => d.source.y).attr("x2", d => d.target.x).attr("y2", d => d.target.y);
-        node.attr("cx", d => d.x).attr("cy", d => d.y);
+        nodeGroup.attr("transform", d => `translate(${d.x},${d.y})`);
     });
     
     currentPlotInstance = svg.node();
@@ -315,28 +337,20 @@ async function generateAnalysisPlots() {
     try {
         await loadAndPrepareDatabase();
         const plotContainer = document.getElementById('plot-display-area');
-        const resultsContainer = document.getElementById('ciliaplot-results-container');
         const genesInput = document.getElementById('ciliaplot-genes-input').value.trim();
-
-        if (!genesInput) {
-            alert('Please enter a gene list.');
-            return;
-        }
+        if (!genesInput) { alert('Please enter a gene list.'); return; }
 
         plotContainer.innerHTML = '<p class="status-message">Generating plot...</p>';
-        if (resultsContainer) resultsContainer.innerHTML = '';
         currentPlotInstance = null;
 
         const originalQueries = genesInput.split(/[\s,;\n\r\t]+/).filter(Boolean);
         const sanitizedQueries = [...new Set(originalQueries.map(q => q.toUpperCase()))];
-        const { foundGenes, notFoundGenes } = findGenes(sanitizedQueries);
+        const { foundGenes } = findGenes(sanitizedQueries);
 
-        // This function now only runs when a plot is generated
-        // createEnrichmentResultsTable(foundGenes, notFoundGenes); 
-        
-        const plotType = document.querySelector('input[name="plot-type"]:checked')?.value;
+        const plotType = document.getElementById('plot-type-select').value;
         const backgroundGeneSet = window.allGenes || [];
 
+        updatePlotInfo(plotType);
         updateStatsAndLegend(plotType, foundGenes, backgroundGeneSet);
         
         switch (plotType) {
@@ -364,8 +378,31 @@ async function generateAnalysisPlots() {
 
 
 // =============================================================================
-// DYNAMIC STATS AND LEGEND RENDERER
+// DYNAMIC UI UPDATERS
 // =============================================================================
+function updatePlotInfo(plotType) {
+    // NEW: This function updates the description box for the current plot
+    const infoContainer = document.getElementById('ciliaplot-plot-info');
+    if (!infoContainer) return;
+    
+    let infoHTML = '';
+    switch(plotType) {
+        case 'bubble':
+            infoHTML = `<strong>Key Localizations:</strong> This bubble plot shows the distribution of your genes across primary ciliary and cellular compartments. The size of each bubble corresponds to the number of genes found in that location.`;
+            break;
+        case 'matrix':
+            infoHTML = `<strong>Gene Matrix:</strong> This plot shows the specific localization for each gene in your list. A bubble indicates that a gene is associated with a particular ciliary compartment.`;
+            break;
+        case 'enrichment_factor':
+            infoHTML = `<strong>Domain Enrichment Analysis:</strong> This plot shows which protein domains are overrepresented (enriched) in your selected genes compared to all genes in the CiliaHub database.<br><b>Enrichment Factor = </b>(Domain frequency in your genes) / (Domain frequency in database).`;
+            break;
+        case 'multi_dim_network':
+            infoHTML = `<strong>Interactive Gene Network:</strong> This visualization shows relationships between genes (green) and their associated protein complexes (orange), domains (blue), and cellular localizations (purple).`;
+            break;
+    }
+    infoContainer.innerHTML = infoHTML;
+}
+
 function updateStatsAndLegend(plotType, foundGenes, allGenes) {
     const statsContainer = document.getElementById('ciliaplot-stats-container');
     const legendContainer = document.getElementById('ciliaplot-legend-container');
@@ -403,9 +440,9 @@ function updateStatsAndLegend(plotType, foundGenes, allGenes) {
             <div class="stat-box"><div class="stat-number">${enrichedCount}</div><div class="stat-label">Enriched (>1.5)</div></div>`;
         legendHTML = `<div class="legend-item"><div class="legend-color" style="background-color: #3498db; border-radius: 4px;"></div><span>Enrichment Factor</span></div>`;
     } else {
-        // Default stats for bubble and matrix
         const localizations = new Set(foundGenes.flatMap(g => getCleanArray(g, 'localization'))).size;
         statsHTML += `<div class="stat-box"><div class="stat-number">${localizations}</div><div class="stat-label">Unique Localizations</div></div>`;
+        legendHTML = ''; // No legend needed for bubble/matrix plots
     }
 
     statsContainer.innerHTML = statsHTML;
@@ -427,36 +464,31 @@ function displayCiliaPlotPage() {
     <div class="page-section ciliaplot-page">
         <div class="ciliaplot-header">
             <h1>CiliaPlot Gene Set Analysis</h1>
-            <div class="info">
-                <strong>Interactive Gene Analysis:</strong> Enter a gene list to generate visualizations. Use the controls to select an analysis type and customize the appearance. Download publication-ready plots in PNG or PDF format.
-            </div>
         </div>
-
         <div class="ciliaplot-container-new">
             <div class="ciliaplot-left-panel-new">
                 <div class="control-section">
-                    <h3>1. Input Genes</h3>
+                    <h3>1. Input & Analyse</h3>
                     <div class="control-section-content">
                         <textarea id="ciliaplot-genes-input" placeholder="Enter one gene per line..."></textarea>
+                        <label for="plot-type-select" style="font-weight:bold; margin-top: 1rem; margin-bottom: 0.5rem;">Select Analysis Type</label>
+                        <select id="plot-type-select" style="width:100%;padding:8px;margin-bottom:1rem;">
+                            <option value="bubble">Key Localizations</option>
+                            <option value="matrix">Gene Matrix</option>
+                            <option value="enrichment_factor">Domain Enrichment</option>
+                            <option value="multi_dim_network">Gene Network</option>
+                        </select>
+                        <button id="generate-plot-btn" class="btn btn-primary" style="width: 100%;">Run Analysis</button>
                     </div>
                 </div>
                 <div class="control-section">
-                    <h3>2. Select Analysis</h3>
-                    <div class="control-section-content">
-                        <div class="plot-option"><label><input type="radio" name="plot-type" value="bubble" checked> Key Localizations</label></div>
-                        <div class="plot-option"><label><input type="radio" name="plot-type" value="matrix"> Gene Matrix</label></div>
-                        <div class="plot-option"><label><input type="radio" name="plot-type" value="enrichment_factor"> Domain Enrichment</label></div>
-                        <div class="plot-option"><label><input type="radio" name="plot-type" value="multi_dim_network"> Gene Network</label></div>
-                    </div>
-                </div>
-                <div class="control-section">
-                     <h3>3. Customize Plot</h3>
+                     <h3>2. Customize Plot</h3>
                      <details id="plot-customization-details"><summary>Expand Options</summary>
                          <div class="control-section-content" id="plot-settings-grid">
                             <div><label>Main Title <input type="text" id="setting-main-title" value="CiliaHub Analysis"></label></div>
                             <div><label>X-Axis Title <input type="text" id="setting-x-axis-title" value="X-Axis"></label></div>
                             <div><label>Y-Axis Title <input type="text" id="setting-y-axis-title" value="Y-Axis"></label></div>
-                            <div><label>Font <select id="setting-font-family"><option>Arial</option><option>Verdana</option><option>Times New Roman</option></select></label></div>
+                            <div><label>Font <select id="setting-font-family"><option>Arial</option><option>Verdana</option></select></label></div>
                             <div><label>Title Font Size <input type="number" id="setting-title-font-size" value="18" step="1"></label></div>
                             <div><label>Axis Font Size <input type="number" id="setting-axis-title-font-size" value="14" step="1"></label></div>
                             <div><label>Tick Font Size <input type="number" id="setting-tick-font-size" value="12" step="1"></label></div>
@@ -468,39 +500,39 @@ function displayCiliaPlotPage() {
                      </details>
                 </div>
                 <div class="control-section">
-                    <h3>4. Generate & Download</h3>
+                    <h3>3. Download</h3>
                     <div class="control-section-content">
-                        <button id="generate-plot-btn" class="btn btn-primary" style="width: 100%; margin-bottom: 10px;">Run Analysis</button>
                         <select id="download-format" style="width:100%;padding:8px;margin-bottom:10px;"><option value="png">PNG</option><option value="pdf">PDF</option></select>
                         <button id="download-plot-btn" class="btn btn-secondary" style="width: 100%;">Download Plot</button>
                     </div>
                 </div>
             </div>
-
             <div class="ciliaplot-right-panel-new">
-                <div id="ciliaplot-stats-container" class="stats-container">
-                    </div>
-                <div id="plot-display-area" class="plot-container-new">
-                    <p class="status-message">Enter a gene list and click "Run Analysis" to see your results.</p>
+                <div id="ciliaplot-plot-info" class="info">
+                    Select an analysis type and click "Run Analysis" to begin.
                 </div>
-                <div id="ciliaplot-legend-container" class="legend">
-                    </div>
-                 <div id="ciliaplot-results-container" class="results-section" style="margin-top: 2rem;">
-                    </div>
+                <div id="ciliaplot-stats-container" class="stats-container"></div>
+                <div id="plot-display-area" class="plot-container-new">
+                    <p class="status-message">Your plot will appear here.</p>
+                </div>
+                <div id="ciliaplot-legend-container" class="legend"></div>
             </div>
         </div>
     </div>`;
-
-    // Re-attach event listeners
+    
     document.getElementById('generate-plot-btn').addEventListener('click', generateAnalysisPlots);
     document.getElementById('download-plot-btn').addEventListener('click', downloadPlot);
     
-    document.querySelectorAll('input[name="plot-type"]').forEach(radio => {
-        radio.addEventListener('change', () => {
-            const plotArea = document.getElementById('plot-display-area');
-            if (plotArea && !plotArea.querySelector('.status-message')) {
-                generateAnalysisPlots();
-            }
-        });
+    document.getElementById('plot-type-select').addEventListener('change', () => {
+        const plotArea = document.getElementById('plot-display-area');
+        if (plotArea && !plotArea.querySelector('.status-message')) {
+            generateAnalysisPlots();
+        } else {
+            // Update info box even if no plot is generated yet
+            const plotType = document.getElementById('plot-type-select').value;
+            updatePlotInfo(plotType);
+        }
     });
+    // Set initial info box text
+    updatePlotInfo(document.getElementById('plot-type-select').value);
 }
