@@ -356,6 +356,7 @@ function renderMultiDimNetwork(foundGenes, container) {
     currentPlotInstance = svg.node(); // For download
 }
 
+
 // =============================================================================
 // MAIN CONTROLLER
 // =============================================================================
@@ -459,12 +460,13 @@ function displayCiliaPlotPage() {
         document.querySelector('.cilia-panel').style.display = 'none';
     }
 
+    // This function now generates the complete, updated CiliaPlot UI
     contentArea.innerHTML = `
     <div class="page-section ciliaplot-page">
         <div class="ciliaplot-header">
             <h1>CiliaPlot Gene Set Analysis</h1>
             <div class="info">
-                <strong>Analyze Your Genes:</strong> Enter a gene list to generate visualizations. Use the controls to select an analysis type and customize the appearance. Download publication-ready plots in PNG or PDF format.
+                <strong>Interactive Gene Analysis:</strong> Enter a gene list to generate visualizations. Use the controls to select an analysis type and customize the appearance. Download publication-ready plots in PNG or PDF format.
             </div>
         </div>
 
@@ -527,14 +529,13 @@ function displayCiliaPlotPage() {
         </div>
     </div>`;
 
+    // Re-attach event listeners
     document.getElementById('generate-plot-btn').addEventListener('click', generateAnalysisPlots);
     document.getElementById('download-plot-btn').addEventListener('click', downloadPlot);
     
-    // Add event listener to re-run analysis when plot type changes
     document.querySelectorAll('input[name="plot-type"]').forEach(radio => {
         radio.addEventListener('change', () => {
             const plotArea = document.getElementById('plot-display-area');
-            // Only re-run if a plot is already displayed
             if (plotArea && !plotArea.querySelector('.status-message')) {
                 generateAnalysisPlots();
             }
