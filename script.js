@@ -490,297 +490,39 @@ function mapLocalizationToSVG(localizationArray) {
     }).filter(id => allPartIds.includes(id));
 }
 
-async function loadData() {
-    try {
-        // Replace 'data.json' with your actual data source (e.g., API endpoint)
-        const response = await fetch('https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/ciliahub_data.json');
-        if (!response.ok) {
-            throw new Error(`Failed to fetch data: ${response.statusText}`);
-        }
-        const data = await response.json();
-        // Log data for debugging
-        console.log('Loaded data:', data);
-        // Assuming data is an array of gene objects
-        return {
-            currentData: data,
-            allGenes: data // Adjust if allGenes is a different dataset
-        };
-    } catch (error) {
-        console.error('Error loading data:', error);
-        const statusMessage = document.getElementById('status-message');
-        if (statusMessage) {
-            statusMessage.textContent = 'Failed to load gene data. Please try again later.';
-            statusMessage.style.display = 'block';
-            statusMessage.style.color = 'red';
-        }
-        return { currentData: [], allGenes: [] };
-    }
-}
-
-function updateStats(data) {
-    // Error handling for invalid data
-    if (!data || !Array.isArray(data)) {
-        console.error('updateStats: Invalid or empty data');
-        return;
-    }
-
-    // Compute stats
-    const geneCount = data.length;
-
-    // Handle localization with robust validation
-    const uniqueLocalizations = [...new Set(
-        data
-            .filter(g => {
-                if (!g.localization) {
-                    console.warn(`Gene ${g.gene || 'unknown'} has no localization data`);
-                    return false;
-                }
-                if (!Array.isArray(g.localization)) {
-                    console.warn(`Gene ${g.gene || 'unknown'} has invalid localization data:`, g.localization);
-                    return false;
-                }
-                return true;
-            })
-            .map(g => g.localization)
-            .flat()
-            .filter(loc => {
-                if (typeof loc !== 'string' || loc.trim() === '') {
-                    console.warn('Invalid localization value:', loc);
-                    return false;
-                }
-                return true;
-            })
-            .map(loc => loc.trim().toLowerCase()) // Normalize to avoid case-sensitive duplicates
-    )];
-    console.log('Unique localizations:', uniqueLocalizations);
-
-    const totalReferences = data.reduce((sum, g) => {
-        if (!g.reference || !Array.isArray(g.reference)) {
-            console.warn(`Gene ${g.gene || 'unknown'} has invalid reference data:`, g.reference);
-            return sum;
-        }
-        return sum + g.reference.length;
-    }, 0);
-
-    // Update DOM with null checks
-    const geneCountElement = document.getElementById('gene-count');
-    const localizationCountElement = document.getElementById('localization-count');
-    const referenceCountElement = document.getElementById('reference-count');
-
-    if (geneCountElement) geneCountElement.textContent = geneCount || 'N/A';
-    if (localizationCountElement) localizationCountElement.textContent = uniqueLocalizations.length || 'N/A';
-    if (referenceCountElement) referenceCountElement.textContent = totalReferences || 'N/A';
-}
-
-// Placeholder for displayGeneCards (replace with actual implementation)
-function displayGeneCards(data, filters, page, perPage) {
-    const container = document.getElementById('gene-cards-container');
-    if (!container) {
-        console.error('Gene cards container not found');
-        return;
-    }
-    if (!data || !Array.isArray(data)) {
-        container.innerHTML = '<p>No gene data available</p>';
-        return;
-    }
-
-    // Example rendering of gene cards
-    container.innerHTML = data.slice((page - 1) * perPage, page * perPage).map(g => {
-        const localizations = Array.isArray(g.localization)
-            ? g.localization.filter(loc => typeof loc === 'string' && loc.trim()).join(', ') || 'None'
-            : 'None';
-        return `
-            <div class="gene-card">
-                <h3>${g.gene || 'Unknown'}</h3>
-                <p><strong>Localizations:</strong> ${localizations}</p>
-                <p><strong>References:</strong> ${Array.isArray(g.reference) ? g.reference.length : 0}</p>
-                <p><strong>Ensembl ID:</strong> ${g.ensembl_id || 'N/A'}</p>
-                <p><strong>Synonym:</strong> ${g.synonym || 'N/A'}</p>
-            </div>
-        `;
-    }).join('');
-}
-
-/* Enhanced CSS to override blue background */
-const styleSheet = document.createElement('style');
-styleSheet.textContent = `
-    .content-area {
-        background: #ffffff !important;
-    }
-    .ciliahub-stats {
-        margin-top: 1rem;
-        margin-bottom: 2rem;
-        display: flex;
-        gap: 1rem;
-        flex-wrap: wrap;
-        font-family: 'Arial', sans-serif;
-        background: #ffffff !important;
-    }
-    .content-area .ciliahub-stats .stat-card {
-        flex: 1;
-        min-width: 140px;
-        background: #e7f1ff !important;
-        color: #007bff !important;
-        padding: 1rem;
-        border-radius: 12px;
-        box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-        text-align: center;
-    }
-    .content-area .ciliahub-stats .version-card {
-        flex: 1;
-        min-width: 140px;
-        background: #007bff !important;
-        color: #fff !important;
-        padding: 1rem;
-        border-radius: 12px;
-        box-shadow: 0 4px 10px rgba(0,0,0,0.15);
-        text-align: center;
-    }
-    .stat-value {
-        font-size: 1.5rem;
-        font-weight: 700;
-    }
-    .version-value {
-        font-size: 1.2rem;
-        font-weight: 700;
-    }
-    .content-area .gene-card {
-        background: #ffffff !important;
-        border: 1px solid var(--border-color, #e1ecf4);
-        padding: 1.5rem;
-        border-radius: 10px;
-        margin-bottom: 1rem;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-    }
-    .content-area .gene-card.search-result {
-        background: #d5f4e6 !important;
-    }
-    .content-area .gene-card.default {
-        background: #e8f4fd !important;
-    }
-    .content-area .page-section {
-        background: #ffffff !important;
-    }
-    .content-area #locChart {
-        background: transparent !important;
-    }
-    .content-area .chart-container {
-        background: #ffffff !important;
-    }
-`;
-document.head.appendChild(styleSheet);
-
-async function loadData() {
-    try {
-        const response = await fetch('https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/ciliahub_data.json');
-        if (!response.ok) {
-            throw new Error(`Failed to fetch data: ${response.statusText}`);
-        }
-        const data = await response.json();
-        console.log('Loaded data:', data);
-        return {
-            currentData: data,
-            allGenes: data
-        };
-    } catch (error) {
-        console.error('Error loading data:', error);
-        const statusMessage = document.getElementById('status-message');
-        if (statusMessage) {
-            statusMessage.textContent = 'Failed to load gene data. Please try again later.';
-            statusMessage.style.display = 'block';
-            statusMessage.style.color = 'red';
-        }
-        return { currentData: [], allGenes: [] };
-    }
-}
-
-function updateStats(data) {
-    if (!data || !Array.isArray(data)) {
-        console.error('updateStats: Invalid or empty data');
-        return;
-    }
-
-    const geneCount = data.length;
-
-    const uniqueLocalizations = [...new Set(
-        data
-            .filter(g => {
-                if (!g.localization) {
-                    console.warn(`Gene ${g.gene || 'unknown'} has no localization data`);
-                    return false;
-                }
-                if (!Array.isArray(g.localization)) {
-                    console.warn(`Gene ${g.gene || 'unknown'} has invalid localization data:`, g.localization);
-                    return false;
-                }
-                return true;
-            })
-            .map(g => g.localization)
-            .flat()
-            .filter(loc => {
-                if (typeof loc !== 'string' || loc.trim() === '') {
-                    console.warn(`Invalid localization value for gene ${g.gene || 'unknown'}:`, loc);
-                    return false;
-                }
-                return true;
-            })
-            .map(loc => loc.trim().toLowerCase())
-    )];
-    console.log('Unique localizations:', uniqueLocalizations);
-
-    const totalReferences = data.reduce((sum, g) => {
-        if (!g.reference || !Array.isArray(g.reference)) {
-            console.warn(`Gene ${g.gene || 'unknown'} has invalid reference data:`, g.reference);
-            return sum;
-        }
-        return sum + g.reference.length;
-    }, 0);
-
-    const geneCountElement = document.getElementById('gene-count');
-    const localizationCountElement = document.getElementById('localization-count');
-    const referenceCountElement = document.getElementById('reference-count');
-
-    if (geneCountElement) geneCountElement.textContent = geneCount || 'N/A';
-    if (localizationCountElement) localizationCountElement.textContent = uniqueLocalizations.length || 'N/A';
-    if (referenceCountElement) referenceCountElement.textContent = totalReferences || 'N/A';
-}
-
-async function displayHomePage() {
+function displayHomePage() {
     const contentArea = document.querySelector('.content-area');
-    if (!contentArea) {
-        console.error('Content area not found');
-        return;
-    }
-
     contentArea.className = 'content-area';
-    const ciliaPanel = document.querySelector('.cilia-panel');
-    if (ciliaPanel) {
-        ciliaPanel.style.display = 'block';
-    }
+    document.querySelector('.cilia-panel').style.display = 'block';
 
+    // --- Initial render with placeholders ---
     contentArea.innerHTML = `
         <div class="page-section">
             <h1>The CiliaHub: An Updated Database of Gold Standard Genes with Ciliary Functions</h1>
 
             <!-- CiliaHub V0.1 and Stats Section -->
-            <div class="ciliahub-stats">
+            <div class="ciliahub-stats" style="margin-top: 1rem; margin-bottom: 2rem; display: flex; gap: 1rem; flex-wrap: wrap; font-family: 'Arial', sans-serif;">
+                
                 <!-- Version -->
-                <div class="version-card">
-                    <div class="version-value">CiliaHub V0.1</div>
+                <div style="flex: 1; min-width: 140px; background-color: #007bff; color: #fff; padding: 1rem; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.15); text-align: center;">
+                    <div style="font-size: 1.2rem; font-weight: 700;">CiliaHub V0.1</div>
                 </div>
+
                 <!-- Genes -->
-                <div class="stat-card">
-                    <div id="gene-count" aria-live="polite" class="stat-value">Loading...</div>
+                <div style="flex: 1; min-width: 140px; background-color: #e7f1ff; color: #007bff; padding: 1rem; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); text-align: center;">
+                    <div id="gene-count" style="font-size: 1.5rem; font-weight: 700;">0</div>
                     <div>Genes</div>
                 </div>
+
                 <!-- Localizations -->
-                <div class="stat-card">
-                    <div id="localization-count" aria-live="polite" class="stat-value">Loading...</div>
+                <div style="flex: 1; min-width: 140px; background-color: #e7f1ff; color: #007bff; padding: 1rem; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); text-align: center;">
+                    <div id="localization-count" style="font-size: 1.5rem; font-weight: 700;">0</div>
                     <div>Localizations</div>
                 </div>
+
                 <!-- References -->
-                <div class="stat-card">
-                    <div id="reference-count" aria-live="polite" class="stat-value">Loading...</div>
+                <div style="flex: 1; min-width: 140px; background-color: #e7f1ff; color: #007bff; padding: 1rem; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); text-align: center;">
+                    <div id="reference-count" style="font-size: 1.5rem; font-weight: 700;">0</div>
                     <div>References</div>
                 </div>
             </div>
@@ -799,151 +541,114 @@ async function displayHomePage() {
             <div id="status-message" class="status-message" style="display: none;"></div>
         </div>`;
 
-    // Enhanced debugging for computed styles
-    setTimeout(() => {
-        const localizationCard = document.querySelector('#localization-count')?.parentElement;
-        if (localizationCard) {
-            const styles = window.getComputedStyle(localizationCard);
-            console.log('Localization card computed styles:', {
-                backgroundColor: styles.backgroundColor,
-                color: styles.color,
-                className: localizationCard.className,
-                id: localizationCard.id || 'none'
-            });
-        } else {
-            console.warn('Localization card not found');
-        }
-        const geneCard = document.querySelector('.gene-card');
-        if (geneCard) {
-            const styles = window.getComputedStyle(geneCard);
-            console.log('Gene card computed styles:', {
-                backgroundColor: styles.backgroundColor,
-                color: styles.color,
-                className: geneCard.className,
-                id: geneCard.id || 'none'
-            });
-        } else {
-            console.warn('Gene card not found');
-        }
-        const pageSection = document.querySelector('.page-section');
-        if (pageSection) {
-            const styles = window.getComputedStyle(pageSection);
-            console.log('Page section computed styles:', {
-                backgroundColor: styles.backgroundColor,
-                className: pageSection.className,
-                id: pageSection.id || 'none'
-            });
-        } else {
-            console.warn('Page section not found');
-        }
-        const contentArea = document.querySelector('.content-area');
-        if (contentArea) {
-            const styles = window.getComputedStyle(contentArea);
-            console.log('Content area computed styles:', {
-                backgroundColor: styles.backgroundColor,
-                className: contentArea.className,
-                id: contentArea.id || 'none'
-            });
-        } else {
-            console.warn('Content area not found');
-        }
-    }, 1000);
-
-    const searchBtn = document.getElementById('single-search-btn');
-    if (searchBtn) {
-        searchBtn.onclick = performSingleSearch;
-    }
+    // --- Search button ---
+    document.getElementById('single-search-btn').onclick = performSingleSearch;
 
     const searchInput = document.getElementById('single-gene-search');
     const suggestionsContainer = document.getElementById('search-suggestions');
 
     const hideSuggestions = () => {
-        if (suggestionsContainer) {
-            suggestionsContainer.innerHTML = '';
-            suggestionsContainer.style.display = 'none';
-        }
+        suggestionsContainer.innerHTML = '';
+        suggestionsContainer.style.display = 'none';
     };
 
-    const { currentData, allGenes } = await loadData();
+    // --- Search suggestions ---
+    searchInput.addEventListener('input', function() {
+        const query = this.value.trim().toUpperCase();
+        if (query.length < 1) {
+            hideSuggestions();
+            return;
+        }
 
-    if (searchInput && suggestionsContainer && Array.isArray(allGenes)) {
-        searchInput.addEventListener('input', function() {
-            const query = this.value.trim().toUpperCase();
-            if (query.length < 1) {
-                hideSuggestions();
-                return;
-            }
+        const filteredGenes = allGenes.filter(g =>
+            (g.gene && g.gene.toUpperCase().startsWith(query)) ||
+            (g.synonym && g.synonym.toUpperCase().includes(query)) ||
+            (g.ensembl_id && g.ensembl_id.toUpperCase().startsWith(query))
+        ).slice(0, 10);
 
-            const filteredGenes = allGenes.filter(g =>
-                (g.gene && g.gene.toUpperCase().startsWith(query)) ||
-                (g.synonym && g.synonym.toUpperCase().includes(query)) ||
-                (g.ensembl_id && g.ensembl_id.toUpperCase().startsWith(query))
-            ).slice(0, 10);
+        if (filteredGenes.length > 0) {
+            suggestionsContainer.innerHTML = '<ul>' +
+                filteredGenes.map(g => {
+                    const details = [g.ensembl_id, g.synonym].filter(Boolean).join(', ');
+                    return `<li data-gene="${g.gene}">${g.gene}${details ? ` (${details})` : ''}</li>`;
+                }).join('') +
+                '</ul>';
 
-            if (filteredGenes.length > 0) {
-                suggestionsContainer.innerHTML = '<ul>' +
-                    filteredGenes.map(g => {
-                        const details = [g.ensembl_id, g.synonym].filter(Boolean).join(', ');
-                        return `<li data-gene="${g.gene}">${g.gene}${details ? ` (${details})` : ''}</li>`;
-                    }).join('') +
-                    '</ul>';
-
-                suggestionsContainer.querySelector('ul').addEventListener('click', function(event) {
-                    if (event.target && event.target.nodeName === "LI") {
-                        searchInput.value = event.target.dataset.gene;
-                        hideSuggestions();
-                        performSingleSearch();
-                    }
-                });
-
-                suggestionsContainer.style.display = 'block';
-            } else {
-                hideSuggestions();
-            }
-        });
-
-        searchInput.addEventListener('keydown', function(event) {
-            const suggestions = suggestionsContainer.querySelectorAll('li');
-            if (suggestions.length === 0 && event.key !== 'Enter') return;
-
-            let activeElement = suggestionsContainer.querySelector('.active');
-
-            if (event.key === 'Enter') {
-                event.preventDefault();
-                if (activeElement) searchInput.value = activeElement.textContent.split(' ')[0];
-                hideSuggestions();
-                performSingleSearch();
-                return;
-            }
-
-            if (event.key === 'ArrowDown') {
-                event.preventDefault();
-                let nextElement = activeElement ? activeElement.nextElementSibling : suggestions[0];
-                if (nextElement) {
-                    activeElement?.classList.remove('active');
-                    nextElement.classList.add('active');
+            suggestionsContainer.querySelector('ul').addEventListener('click', function(event) {
+                if (event.target && event.target.nodeName === "LI") {
+                    searchInput.value = event.target.dataset.gene;
+                    hideSuggestions();
+                    performSingleSearch();
                 }
-            } else if (event.key === 'ArrowUp') {
-                event.preventDefault();
-                let prevElement = activeElement ? activeElement.previousElementSibling : suggestions[suggestions.length - 1];
-                if (prevElement) {
-                    activeElement?.classList.remove('active');
-                    prevElement.classList.add('active');
-                }
-            }
-        });
+            });
 
-        document.addEventListener('click', function(event) {
-            if (!searchInput.contains(event.target) && !suggestionsContainer.contains(event.target)) {
-                hideSuggestions();
-            }
-        });
-    }
+            suggestionsContainer.style.display = 'block';
+        } else {
+            hideSuggestions();
+        }
+    });
 
-    updateStats(currentData);
+    searchInput.addEventListener('keydown', function(event) {
+        const suggestions = suggestionsContainer.querySelectorAll('li');
+        if (suggestions.length === 0 && event.key !== 'Enter') return;
+
+        let activeElement = suggestionsContainer.querySelector('.active');
+
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            if (activeElement) searchInput.value = activeElement.textContent.split(' ')[0];
+            hideSuggestions();
+            performSingleSearch();
+            return;
+        }
+
+        if (event.key === 'ArrowDown') {
+            event.preventDefault();
+            let nextElement = activeElement ? activeElement.nextElementSibling : suggestions[0];
+            if (nextElement) {
+                activeElement?.classList.remove('active');
+                nextElement.classList.add('active');
+            }
+        } else if (event.key === 'ArrowUp') {
+            event.preventDefault();
+            let prevElement = activeElement ? activeElement.previousElementSibling : suggestions[suggestions.length - 1];
+            if (prevElement) {
+                activeElement?.classList.remove('active');
+                prevElement.classList.add('active');
+            }
+        }
+    });
+
+    document.addEventListener('click', function(event) {
+        if (!searchInput.contains(event.target) && !suggestionsContainer.contains(event.target)) {
+            hideSuggestions();
+        }
+    });
+
+    // --- Display gene cards immediately (empty or with placeholder) ---
     displayGeneCards(currentData, [], 1, 10);
-    displayLocalizationChart();
+
+    // --- Dynamic stats update after data is loaded ---
+    if (currentData && currentData.length > 0) {
+        const geneCount = currentData.length;
+        const uniqueLocalizations = [...new Set(
+            currentData
+                .map(g => g.localization)
+                .flat()
+                .filter(Boolean)
+        )];
+        const totalReferences = currentData.reduce((sum, g) => {
+            if (!g.reference) return sum;
+            return sum + g.reference.length;
+        }, 0);
+
+        // Update the cards dynamically
+        document.getElementById('gene-count').textContent = geneCount;
+        document.getElementById('localization-count').textContent = uniqueLocalizations.length;
+        document.getElementById('reference-count').textContent = totalReferences;
+    }
 }
+
 
 function displayBatchQueryTool() {
     const contentArea = document.querySelector('.content-area');
