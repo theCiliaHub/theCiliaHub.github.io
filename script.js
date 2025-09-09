@@ -497,14 +497,23 @@ function displayHomePage() {
     contentArea.className = 'content-area';
     document.querySelector('.cilia-panel').style.display = 'block';
 
-    // Compute stats safely
-   // Compute stats safely
+   
+ // --- Extract stats like your Localization section ---
 const geneCount = currentData.length;
-const uniqueLocalizations = [...new Set(currentData.map(g => g.localization).filter(Boolean))];
+
+// Assume currentData items have a "localization" array or string
+const uniqueLocalizations = [...new Set(
+    currentData
+        .map(g => Array.isArray(g.localization) ? g.localization : [g.localization])
+        .flat()
+        .filter(Boolean)
+)];
+
+// Assume currentData items have a "references" array
 const totalReferences = currentData.reduce((sum, g) => {
     if (!g.references) return sum;
     if (Array.isArray(g.references)) return sum + g.references.length;
-    return sum + 1; 
+    return sum + 1; // single reference string
 }, 0);
 
 contentArea.innerHTML = `
