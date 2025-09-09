@@ -1090,9 +1090,8 @@ input[type="color"] {
     color: var(--gray-dark);
 }
 
-
 /* ========================================================================= */
-/* NEW CILIAPLOT DASHBOARD DESIGN                                            */
+/* CILIA PLOT DASHBOARD DESIGN                                               */
 /* ========================================================================= */
 
 /* Main container for the new design */
@@ -1114,13 +1113,14 @@ input[type="color"] {
     border-left: 4px solid var(--mpb, #3498db);
     border-radius: var(--border-radius-sm);
     font-size: 0.95rem;
+    line-height: 1.5;
 }
 
 /* Left & Right Panels */
 .ciliaplot-left-panel-new {
     display: flex;
     flex-direction: column;
-    gap: 1.5rem;
+    gap: 1rem; /* **FIXED (2):** Reduced space between control sections */
 }
 .ciliaplot-right-panel-new {
     display: flex;
@@ -1193,6 +1193,7 @@ input[type="color"] {
         grid-template-columns: 1fr; /* Stack panels on smaller screens */
     }
 }
+
 /* Add these new/updated styles to your styles.css file */
 
 /* CiliaPlot Customization & Download Controls */
