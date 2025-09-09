@@ -601,6 +601,68 @@ function displayGeneCards(data, filters, page, perPage) {
     }).join('');
 }
 
+/* Add CSS to ensure correct styling */
+const styleSheet = document.createElement('style');
+styleSheet.textContent = `
+    .ciliahub-stats {
+        margin-top: 1rem;
+        margin-bottom: 2rem;
+        display: flex;
+        gap: 1rem;
+        flex-wrap: wrap;
+        font-family: 'Arial', sans-serif;
+    }
+    .stat-card {
+        flex: 1;
+        min-width: 140px;
+        background: #e7f1ff !important;
+        color: #007bff !important;
+        padding: 1rem;
+        border-radius: 12px;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        text-align: center;
+    }
+    .version-card {
+        flex: 1;
+        min-width: 140px;
+        background: #007bff !important;
+        color: #fff !important;
+        padding: 1rem;
+        border-radius: 12px;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+        text-align: center;
+    }
+    .stat-value {
+        font-size: 1.5rem;
+        font-weight: 700;
+    }
+    .version-value {
+        font-size: 1.2rem;
+        font-weight: 700;
+    }
+    .gene-card {
+        background: #ffffff !important; /* Override --neutral-bg-alt (#f8f9fa) */
+        border: 1px solid var(--border-color, #e1ecf4);
+        padding: 1.5rem;
+        border-radius: 10px;
+        margin-bottom: 1rem;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+    .gene-card.search-result {
+        background: #d5f4e6 !important; /* Preserve search result highlight */
+    }
+    .gene-card.default {
+        background: #e8f4fd !important; /* Preserve default highlight */
+    }
+    .page-section {
+        background: #ffffff !important; /* Ensure chart container is white */
+    }
+    #locChart {
+        background: transparent !important; /* Ensure chart canvas is transparent */
+    }
+`;
+document.head.appendChild(styleSheet);
+
 async function displayHomePage() {
     const contentArea = document.querySelector('.content-area');
     if (!contentArea) {
@@ -620,28 +682,24 @@ async function displayHomePage() {
             <h1>The CiliaHub: An Updated Database of Gold Standard Genes with Ciliary Functions</h1>
 
             <!-- CiliaHub V0.1 and Stats Section -->
-            <div class="ciliahub-stats" style="margin-top: 1rem; margin-bottom: 2rem; display: flex; gap: 1rem; flex-wrap: wrap; font-family: 'Arial', sans-serif;">
-                
+            <div class="ciliahub-stats">
                 <!-- Version -->
-                <div style="flex: 1; min-width: 140px; background-color: #007bff; color: #fff; padding: 1rem; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.15); text-align: center;">
-                    <div style="font-size: 1.2rem; font-weight: 700;">CiliaHub V0.1</div>
+                <div class="version-card">
+                    <div class="version-value">CiliaHub V0.1</div>
                 </div>
-
                 <!-- Genes -->
-                <div style="flex: 1; min-width: 140px; background-color: #e7f1ff; color: #007bff; padding: 1rem; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); text-align: center;">
-                    <div id="gene-count" aria-live="polite" style="font-size: 1.5rem; font-weight: 700;">Loading...</div>
+                <div class="stat-card">
+                    <div id="gene-count" aria-live="polite" class="stat-value">Loading...</div>
                     <div>Genes</div>
                 </div>
-
                 <!-- Localizations -->
-                <div style="flex: 1; min-width: 140px; background-color: #e7f1ff; color: #007bff; padding: 1rem; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); text-align: center;">
-                    <div id="localization-count" aria-live="polite" style="font-size: 1.5rem; font-weight: 700;">Loading...</div>
+                <div class="stat-card">
+                    <div id="localization-count" aria-live="polite" class="stat-value">Loading...</div>
                     <div>Localizations</div>
                 </div>
-
                 <!-- References -->
-                <div style="flex: 1; min-width: 140px; background-color: #e7f1ff; color: #007bff; padding: 1rem; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); text-align: center;">
-                    <div id="reference-count" aria-live="polite" style="font-size: 1.5rem; font-weight: 700;">Loading...</div>
+                <div class="stat-card">
+                    <div id="reference-count" aria-live="polite" class="stat-value">Loading...</div>
                     <div>References</div>
                 </div>
             </div>
@@ -659,6 +717,33 @@ async function displayHomePage() {
             <div id="gene-cards-container" class="gene-cards"></div>
             <div id="status-message" class="status-message" style="display: none;"></div>
         </div>`;
+
+    // Debug computed styles
+    setTimeout(() => {
+        const localizationCard = document.querySelector('#localization-count')?.parentElement;
+        if (localizationCard) {
+            const styles = window.getComputedStyle(localizationCard);
+            console.log('Localization card computed styles:', {
+                backgroundColor: styles.backgroundColor,
+                color: styles.color
+            });
+        }
+        const geneCard = document.querySelector('.gene-card');
+        if (geneCard) {
+            const styles = window.getComputedStyle(geneCard);
+            console.log('Gene card computed styles:', {
+                backgroundColor: styles.backgroundColor,
+                color: styles.color
+            });
+        }
+        const pageSection = document.querySelector('.page-section');
+        if (pageSection) {
+            const styles = window.getComputedStyle(pageSection);
+            console.log('Page section computed styles:', {
+                backgroundColor: styles.backgroundColor
+            });
+        }
+    }, 1000);
 
     // Search button
     const searchBtn = document.getElementById('single-search-btn');
@@ -757,7 +842,11 @@ async function displayHomePage() {
     // Update stats and gene cards after data is loaded
     updateStats(currentData);
     displayGeneCards(currentData, [], 1, 10);
+
+    // Render localization chart
+    displayLocalizationChart();
 }
+
 
 function displayBatchQueryTool() {
     const contentArea = document.querySelector('.content-area');
