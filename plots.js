@@ -45,11 +45,9 @@ function getPlotSettings() {
         axisLineColor: setting('setting-axis-line-color', '#333333'),
         backgroundColor: setting('setting-bg-color', '#ffffff'),
         gridColor: setting('setting-grid-color', '#e0e0e0'),
-        howGrid: document.getElementById('setting-show-grid')?.checked ?? false,
+        showGrid: document.getElementById('setting-show-grid')?.checked ?? true,
     };
 }
-
-
 
 async function downloadPlot() {
     const format = document.getElementById('download-format')?.value || 'png';
@@ -104,7 +102,6 @@ async function downloadPlot() {
                 };
                 img.onerror = reject;
                 img.src = url;
-                await new Promise((resolve, reject) => { ... });
             });
         }
         if (!dataUrl) throw new Error("Could not generate image data.");
@@ -493,17 +490,3 @@ function displayCiliaPlotPage() {
     });
     updatePlotInfo(document.getElementById('plot-type-select').value);
 }
-
-function initializePlotSettings() {
-    const showGridCheckbox = document.getElementById('setting-show-grid');
-    if (!showGridCheckbox) return;
-
-    // Optional: force default unchecked
-    showGridCheckbox.checked = false;
-
-    console.log('Show Gridlines:', showGridCheckbox.checked);
-}
-
-// Call this **after** displayCiliaPlotPage()
-displayCiliaPlotPage();
-initializePlotSettings();
