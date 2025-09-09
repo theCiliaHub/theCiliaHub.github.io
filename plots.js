@@ -494,14 +494,16 @@ function displayCiliaPlotPage() {
     updatePlotInfo(document.getElementById('plot-type-select').value);
 }
 
-// Make sure this runs after DOM is loaded
-document.addEventListener('DOMContentLoaded', () => {
+function initializePlotSettings() {
     const showGridCheckbox = document.getElementById('setting-show-grid');
-    
-    // Ensure default state is unchecked
+    if (!showGridCheckbox) return;
+
+    // Optional: force default unchecked
     showGridCheckbox.checked = false;
 
-    // Read the current value when needed
-    const showGrid = showGridCheckbox.checked;
-    console.log('Show Gridlines:', showGrid);
-});
+    console.log('Show Gridlines:', showGridCheckbox.checked);
+}
+
+// Call this **after** displayCiliaPlotPage()
+displayCiliaPlotPage();
+initializePlotSettings();
