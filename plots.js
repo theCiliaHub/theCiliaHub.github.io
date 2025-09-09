@@ -49,6 +49,8 @@ function getPlotSettings() {
     };
 }
 
+
+
 async function downloadPlot() {
     const format = document.getElementById('download-format')?.value || 'png';
     const plotArea = document.getElementById('plot-display-area');
@@ -490,3 +492,15 @@ function displayCiliaPlotPage() {
     });
     updatePlotInfo(document.getElementById('plot-type-select').value);
 }
+
+// Make sure this runs after DOM is loaded
+document.addEventListener('DOMContentLoaded', () => {
+    const showGridCheckbox = document.getElementById('setting-show-grid');
+    
+    // Ensure default state is unchecked
+    showGridCheckbox.checked = false;
+
+    // Read the current value when needed
+    const showGrid = showGridCheckbox.checked;
+    console.log('Show Gridlines:', showGrid);
+});
