@@ -4,15 +4,15 @@
 Chart.register({
     id: 'customCanvasBackgroundColor',
     beforeDraw: (chart, args, options) => {
-        if (options.enabled === false) {
-            return;
+        // **CRITICAL FIX:** Only draw a background if `options.color` is explicitly set AND not 'transparent'
+        if (options.color && options.color !== 'transparent') {
+            const { ctx } = chart;
+            ctx.save();
+            ctx.globalCompositeOperation = 'destination-over';
+            ctx.fillStyle = options.color;
+            ctx.fillRect(0, 0, chart.width, chart.height);
+            ctx.restore();
         }
-        const { ctx } = chart;
-        ctx.save();
-        ctx.globalCompositeOperation = 'destination-over';
-        ctx.fillStyle = options.color || '#ffffff';
-        ctx.fillRect(0, 0, chart.width, chart.height);
-        ctx.restore();
     }
 });
 
@@ -79,9 +79,11 @@ async function downloadPlot() {
             tempCanvas.width = sourceCanvas.width;
             tempCanvas.height = sourceCanvas.height;
             const tempCtx = tempCanvas.getContext('2d');
-            if (plotType !== 'bubble' && plotType !== 'matrix') {
-                tempCtx.fillStyle = backgroundColor;
-                tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+            
+            // Only draw background if it's not a Chart.js bubble/matrix plot requesting transparency
+            if ((plotType !== 'bubble' && plotType !== 'matrix') || backgroundColor !== 'transparent') {
+                 tempCtx.fillStyle = backgroundColor;
+                 tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
             }
             tempCtx.drawImage(sourceCanvas, 0, 0);
             dataUrl = tempCanvas.toDataURL('image/png');
@@ -91,8 +93,11 @@ async function downloadPlot() {
             canvas.width = width * scale;
             canvas.height = height * scale;
             const ctx = canvas.getContext('2d');
-            ctx.fillStyle = backgroundColor;
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            // For SVG plots, we always apply the background from settings if specified
+            if (backgroundColor !== 'transparent') {
+                ctx.fillStyle = backgroundColor;
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+            }
             const img = new Image();
             const svgBlob = new Blob([new XMLSerializer().serializeToString(svgElement)], { type: "image/svg+xml;charset=utf-8" });
             const url = URL.createObjectURL(svgBlob);
@@ -155,7 +160,8 @@ function renderKeyLocalizations(foundGenes, container) {
         options: {
             responsive: true, maintainAspectRatio: false,
             plugins: {
-                customCanvasBackgroundColor: { enabled: false },
+                // **FIXED (1):** Set background color to transparent for this chart
+                customCanvasBackgroundColor: { color: 'transparent' }, 
                 legend: { display: false },
                 title: { display: true, text: settings.mainTitle, font: { size: settings.titleFontSize, family: settings.fontFamily }, color: settings.fontColor },
                 tooltip: { callbacks: { label: c => `${c.raw.y}: ${c.raw.count} gene(s)` } }
@@ -188,7 +194,8 @@ function renderGeneMatrix(foundGenes, container) {
         options: {
             responsive: true, maintainAspectRatio: false,
             plugins: {
-                customCanvasBackgroundColor: { enabled: false },
+                // **FIXED (2):** Set background color to transparent for this chart
+                customCanvasBackgroundColor: { color: 'transparent' }, 
                 legend: { display: false },
                 title: { display: true, text: settings.mainTitle, font: { size: settings.titleFontSize, family: settings.fontFamily }, color: settings.fontColor },
                 tooltip: { callbacks: { label: c => `${c.dataset.label}: ${c.raw.y}` } }
@@ -252,17 +259,16 @@ function renderDomainEnrichmentFactorPlot(foundGenes, allGenes, container) {
 function renderMultiDimNetwork(foundGenes, container) {
     const settings = getPlotSettings();
     
-    // **FIXED (5):** This helper function was missing its return statement.
-    const addNode = (nodes, nodeMap, id, type) => {
-        if (!nodeMap.has(id)) {
+    const nodes = [], links = [], nodeMap = new Map();
+    const addNode = (nodesRef, nodeMapRef, id, type) => {
+        if (!nodeMapRef.has(id)) {
             const newNode = { id, type };
-            nodeMap.set(id, newNode);
-            nodes.push(newNode);
+            nodeMapRef.set(id, newNode);
+            nodesRef.push(newNode);
         }
-        return nodeMap.get(id); // Return the node object
+        return nodeMapRef.get(id); // Return the node object
     };
 
-    const nodes = [], links = [], nodeMap = new Map();
     foundGenes.forEach(gene => {
         addNode(nodes, nodeMap, gene.gene, 'gene');
         getCleanArray(gene, 'complex_names', 'complex').forEach(c => links.push({ source: gene.gene, target: addNode(nodes, nodeMap, c, 'complex').id }));
