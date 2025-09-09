@@ -490,12 +490,48 @@ function mapLocalizationToSVG(localizationArray) {
     }).filter(id => allPartIds.includes(id));
 }
 
+function updateStats(data) {
+    // Error handling for invalid data
+    if (!data || !Array.isArray(data)) {
+        console.error('updateStats: Invalid or empty data');
+        return;
+    }
+
+    // Compute stats
+    const geneCount = data.length;
+    const uniqueLocalizations = [...new Set(
+        data
+            .filter(g => Array.isArray(g.localization))
+            .map(g => g.localization)
+            .flat()
+            .filter(Boolean)
+    )];
+    const totalReferences = data.reduce((sum, g) => {
+        if (!g.reference || !Array.isArray(g.reference)) return sum;
+        return sum + g.reference.length;
+    }, 0);
+
+    // Update DOM with null checks
+    const geneCountElement = document.getElementById('gene-count');
+    const localizationCountElement = document.getElementById('localization-count');
+    const referenceCountElement = document.getElementById('reference-count');
+
+    if (geneCountElement) geneCountElement.textContent = geneCount;
+    if (localizationCountElement) localizationCountElement.textContent = uniqueLocalizations.length;
+    if (referenceCountElement) referenceCountElement.textContent = totalReferences;
+}
+
 function displayHomePage() {
     const contentArea = document.querySelector('.content-area');
+    if (!contentArea) {
+        console.error('Content area not found');
+        return;
+    }
+
     contentArea.className = 'content-area';
     document.querySelector('.cilia-panel').style.display = 'block';
 
-    // --- Initial render with placeholders ---
+    // Initial render with loading placeholders
     contentArea.innerHTML = `
         <div class="page-section">
             <h1>The CiliaHub: An Updated Database of Gold Standard Genes with Ciliary Functions</h1>
@@ -510,19 +546,19 @@ function displayHomePage() {
 
                 <!-- Genes -->
                 <div style="flex: 1; min-width: 140px; background-color: #e7f1ff; color: #007bff; padding: 1rem; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); text-align: center;">
-                    <div id="gene-count" style="font-size: 1.5rem; font-weight: 700;">0</div>
+                    <div id="gene-count" aria-live="polite" style="font-size: 1.5rem; font-weight: 700;">Loading...</div>
                     <div>Genes</div>
                 </div>
 
                 <!-- Localizations -->
                 <div style="flex: 1; min-width: 140px; background-color: #e7f1ff; color: #007bff; padding: 1rem; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); text-align: center;">
-                    <div id="localization-count" style="font-size: 1.5rem; font-weight: 700;">0</div>
+                    <div id="localization-count" aria-live="polite" style="font-size: 1.5rem; font-weight: 700;">Loading...</div>
                     <div>Localizations</div>
                 </div>
 
                 <!-- References -->
                 <div style="flex: 1; min-width: 140px; background-color: #e7f1ff; color: #007bff; padding: 1rem; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); text-align: center;">
-                    <div id="reference-count" style="font-size: 1.5rem; font-weight: 700;">0</div>
+                    <div id="reference-count" aria-live="polite" style="font-size: 1.5rem; font-weight: 700;">Loading...</div>
                     <div>References</div>
                 </div>
             </div>
@@ -541,114 +577,103 @@ function displayHomePage() {
             <div id="status-message" class="status-message" style="display: none;"></div>
         </div>`;
 
-    // --- Search button ---
-    document.getElementById('single-search-btn').onclick = performSingleSearch;
+    // Search button
+    const searchBtn = document.getElementById('single-search-btn');
+    if (searchBtn) {
+        searchBtn.onclick = performSingleSearch;
+    }
 
     const searchInput = document.getElementById('single-gene-search');
     const suggestionsContainer = document.getElementById('search-suggestions');
 
     const hideSuggestions = () => {
-        suggestionsContainer.innerHTML = '';
-        suggestionsContainer.style.display = 'none';
+        if (suggestionsContainer) {
+            suggestionsContainer.innerHTML = '';
+            suggestionsContainer.style.display = 'none';
+        }
     };
 
-    // --- Search suggestions ---
-    searchInput.addEventListener('input', function() {
-        const query = this.value.trim().toUpperCase();
-        if (query.length < 1) {
-            hideSuggestions();
-            return;
-        }
+    // Search suggestions
+    if (searchInput && suggestionsContainer) {
+        searchInput.addEventListener('input', function() {
+            const query = this.value.trim().toUpperCase();
+            if (query.length < 1) {
+                hideSuggestions();
+                return;
+            }
 
-        const filteredGenes = allGenes.filter(g =>
-            (g.gene && g.gene.toUpperCase().startsWith(query)) ||
-            (g.synonym && g.synonym.toUpperCase().includes(query)) ||
-            (g.ensembl_id && g.ensembl_id.toUpperCase().startsWith(query))
-        ).slice(0, 10);
+            const filteredGenes = allGenes.filter(g =>
+                (g.gene && g.gene.toUpperCase().startsWith(query)) ||
+                (g.synonym && g.synonym.toUpperCase().includes(query)) ||
+                (g.ensembl_id && g.ensembl_id.toUpperCase().startsWith(query))
+            ).slice(0, 10);
 
-        if (filteredGenes.length > 0) {
-            suggestionsContainer.innerHTML = '<ul>' +
-                filteredGenes.map(g => {
-                    const details = [g.ensembl_id, g.synonym].filter(Boolean).join(', ');
-                    return `<li data-gene="${g.gene}">${g.gene}${details ? ` (${details})` : ''}</li>`;
-                }).join('') +
-                '</ul>';
+            if (filteredGenes.length > 0) {
+                suggestionsContainer.innerHTML = '<ul>' +
+                    filteredGenes.map(g => {
+                        const details = [g.ensembl_id, g.synonym].filter(Boolean).join(', ');
+                        return `<li data-gene="${g.gene}">${g.gene}${details ? ` (${details})` : ''}</li>`;
+                    }).join('') +
+                    '</ul>';
 
-            suggestionsContainer.querySelector('ul').addEventListener('click', function(event) {
-                if (event.target && event.target.nodeName === "LI") {
-                    searchInput.value = event.target.dataset.gene;
-                    hideSuggestions();
-                    performSingleSearch();
+                suggestionsContainer.querySelector('ul').addEventListener('click', function(event) {
+                    if (event.target && event.target.nodeName === "LI") {
+                        searchInput.value = event.target.dataset.gene;
+                        hideSuggestions();
+                        performSingleSearch();
+                    }
+                });
+
+                suggestionsContainer.style.display = 'block';
+            } else {
+                hideSuggestions();
+            }
+        });
+
+        searchInput.addEventListener('keydown', function(event) {
+            const suggestions = suggestionsContainer.querySelectorAll('li');
+            if (suggestions.length === 0 && event.key !== 'Enter') return;
+
+            let activeElement = suggestionsContainer.querySelector('.active');
+
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                if (activeElement) searchInput.value = activeElement.textContent.split(' ')[0];
+                hideSuggestions();
+                performSingleSearch();
+                return;
+            }
+
+            if (event.key === 'ArrowDown') {
+                event.preventDefault();
+                let nextElement = activeElement ? activeElement.nextElementSibling : suggestions[0];
+                if (nextElement) {
+                    activeElement?.classList.remove('active');
+                    nextElement.classList.add('active');
                 }
-            });
-
-            suggestionsContainer.style.display = 'block';
-        } else {
-            hideSuggestions();
-        }
-    });
-
-    searchInput.addEventListener('keydown', function(event) {
-        const suggestions = suggestionsContainer.querySelectorAll('li');
-        if (suggestions.length === 0 && event.key !== 'Enter') return;
-
-        let activeElement = suggestionsContainer.querySelector('.active');
-
-        if (event.key === 'Enter') {
-            event.preventDefault();
-            if (activeElement) searchInput.value = activeElement.textContent.split(' ')[0];
-            hideSuggestions();
-            performSingleSearch();
-            return;
-        }
-
-        if (event.key === 'ArrowDown') {
-            event.preventDefault();
-            let nextElement = activeElement ? activeElement.nextElementSibling : suggestions[0];
-            if (nextElement) {
-                activeElement?.classList.remove('active');
-                nextElement.classList.add('active');
+            } else if (event.key === 'ArrowUp') {
+                event.preventDefault();
+                let prevElement = activeElement ? activeElement.previousElementSibling : suggestions[suggestions.length - 1];
+                if (prevElement) {
+                    activeElement?.classList.remove('active');
+                    prevElement.classList.add('active');
+                }
             }
-        } else if (event.key === 'ArrowUp') {
-            event.preventDefault();
-            let prevElement = activeElement ? activeElement.previousElementSibling : suggestions[suggestions.length - 1];
-            if (prevElement) {
-                activeElement?.classList.remove('active');
-                prevElement.classList.add('active');
+        });
+
+        document.addEventListener('click', function(event) {
+            if (!searchInput.contains(event.target) && !suggestionsContainer.contains(event.target)) {
+                hideSuggestions();
             }
-        }
-    });
+        });
+    }
 
-    document.addEventListener('click', function(event) {
-        if (!searchInput.contains(event.target) && !suggestionsContainer.contains(event.target)) {
-            hideSuggestions();
-        }
-    });
-
-    // --- Display gene cards immediately (empty or with placeholder) ---
+    // Display gene cards immediately (empty or with placeholder)
     displayGeneCards(currentData, [], 1, 10);
 
-    // --- Dynamic stats update after data is loaded ---
-    if (currentData && currentData.length > 0) {
-        const geneCount = currentData.length;
-        const uniqueLocalizations = [...new Set(
-            currentData
-                .map(g => g.localization)
-                .flat()
-                .filter(Boolean)
-        )];
-        const totalReferences = currentData.reduce((sum, g) => {
-            if (!g.reference) return sum;
-            return sum + g.reference.length;
-        }, 0);
-
-        // Update the cards dynamically
-        document.getElementById('gene-count').textContent = geneCount;
-        document.getElementById('localization-count').textContent = uniqueLocalizations.length;
-        document.getElementById('reference-count').textContent = totalReferences;
-    }
+    // Dynamic stats update after data is loaded
+    updateStats(currentData);
 }
-
 
 function displayBatchQueryTool() {
     const contentArea = document.querySelector('.content-area');
