@@ -45,7 +45,7 @@ function getPlotSettings() {
         axisLineColor: setting('setting-axis-line-color', '#333333'),
         backgroundColor: setting('setting-bg-color', '#ffffff'),
         gridColor: setting('setting-grid-color', '#e0e0e0'),
-        showGrid: document.getElementById('setting-show-grid')?.checked ?? true,
+        howGrid: document.getElementById('setting-show-grid')?.checked ?? false,
     };
 }
 
