@@ -499,21 +499,19 @@ function displayHomePage() {
 
    
  // --- Extract stats like your Localization section ---
+// Correct stats computation for your data
 const geneCount = currentData.length;
 
-// Assume currentData items have a "localization" array or string
 const uniqueLocalizations = [...new Set(
     currentData
-        .map(g => Array.isArray(g.localization) ? g.localization : [g.localization])
-        .flat()
-        .filter(Boolean)
+        .map(g => g.localization)       // get the array
+        .flat()                        // flatten all arrays into one
+        .filter(Boolean)               // remove undefined/null
 )];
 
-// Assume currentData items have a "references" array
 const totalReferences = currentData.reduce((sum, g) => {
-    if (!g.references) return sum;
-    if (Array.isArray(g.references)) return sum + g.references.length;
-    return sum + 1; // single reference string
+    if (!g.reference) return sum;      // note singular 'reference'
+    return sum + g.reference.length;   // all are arrays
 }, 0);
 
 contentArea.innerHTML = `
