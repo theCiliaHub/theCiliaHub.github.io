@@ -4,7 +4,6 @@
 Chart.register({
     id: 'customCanvasBackgroundColor',
     beforeDraw: (chart, args, options) => {
-        // This plugin is now conditional and will not run if options.enabled is false
         if (options.enabled === false) {
             return;
         }
@@ -20,15 +19,8 @@ Chart.register({
 let currentPlotInstance = null;
 
 // =============================================================================
-// ROBUST DATA PARSING HELPER
+// DATA PARSING HELPER
 // =============================================================================
-/**
- * **FIXED:** This robust function correctly parses complex and inconsistent data formats.
- * It handles multiple keys, mixed arrays/strings, nested separators, and null/empty values.
- * @param {Object} gene - The gene object from the database.
- * @param {...string} keys - The possible keys to check for the data.
- * @returns {Array<string>} A clean array of strings.
- */
 function getCleanArray(gene, ...keys) {
     let data = null;
     for (const key of keys) {
@@ -38,16 +30,13 @@ function getCleanArray(gene, ...keys) {
         }
     }
     if (data == null) return [];
-
     const initialArray = Array.isArray(data) ? data : String(data).split(';');
-
     return initialArray
-        .filter(Boolean) // Remove null, undefined, and empty strings from the array
-        .flatMap(item => String(item).split(';')) // Split items that are themselves lists
-        .map(item => item.trim()) // Trim whitespace
-        .filter(Boolean); // Filter again after trimming to remove empty strings
+        .filter(Boolean)
+        .flatMap(item => String(item).split(';'))
+        .map(item => item.trim())
+        .filter(Boolean);
 }
-
 
 // =============================================================================
 // PLOT CUSTOMIZATION & DOWNLOAD
@@ -166,7 +155,7 @@ function renderKeyLocalizations(foundGenes, container) {
         options: {
             responsive: true, maintainAspectRatio: false,
             plugins: {
-                customCanvasBackgroundColor: { enabled: false }, // Disables background
+                customCanvasBackgroundColor: { enabled: false },
                 legend: { display: false },
                 title: { display: true, text: settings.mainTitle, font: { size: settings.titleFontSize, family: settings.fontFamily }, color: settings.fontColor },
                 tooltip: { callbacks: { label: c => `${c.raw.y}: ${c.raw.count} gene(s)` } }
@@ -199,7 +188,7 @@ function renderGeneMatrix(foundGenes, container) {
         options: {
             responsive: true, maintainAspectRatio: false,
             plugins: {
-                customCanvasBackgroundColor: { enabled: false }, // Disables background
+                customCanvasBackgroundColor: { enabled: false },
                 legend: { display: false },
                 title: { display: true, text: settings.mainTitle, font: { size: settings.titleFontSize, family: settings.fontFamily }, color: settings.fontColor },
                 tooltip: { callbacks: { label: c => `${c.dataset.label}: ${c.raw.y}` } }
@@ -240,51 +229,84 @@ function renderDomainEnrichmentFactorPlot(foundGenes, allGenes, container) {
     const settings = getPlotSettings();
     const { enrichmentData } = calculateDomainEnrichmentFactor(foundGenes, allGenes);
     if (!enrichmentData || enrichmentData.length === 0) { container.innerHTML = '<p class="status-message">No domain enrichment found.</p>'; return; }
+    
     container.innerHTML = '';
     const topData = enrichmentData.slice(0, 20);
     const margin = { top: 30, right: 30, bottom: 60, left: 250 };
     const width = container.clientWidth - margin.left - margin.right;
     const height = topData.length * 28;
+    
     const svg = d3.select(container).append("svg").attr("width", width + margin.left + margin.right).attr("height", height + margin.top + margin.bottom).append("g").attr("transform", `translate(${margin.left},${margin.top})`);
     const x = d3.scaleLinear().domain([0, d3.max(topData, d => d.factor) * 1.1]).range([0, width]);
     const y = d3.scaleBand().domain(topData.map(d => d.domain)).range([0, height]).padding(0.2);
     svg.append("g").attr("transform", `translate(0,${height})`).call(d3.axisBottom(x)).selectAll("text").style("font-family", settings.fontFamily).style("font-size", settings.tickFontSize + 'px').style("fill", settings.fontColor);
     svg.append("g").call(d3.axisLeft(y)).selectAll("text").style("font-family", settings.fontFamily).style("font-size", settings.tickFontSize + 'px').style("fill", settings.fontColor);
     svg.selectAll(".bar").data(topData).enter().append("rect").attr("x", x(0)).attr("y", d => y(d.domain)).attr("width", d => x(d.factor)).attr("height", y.bandwidth()).attr("fill", "#3498db");
+    
     svg.append("text").attr("text-anchor", "middle").attr("x", width / 2).attr("y", -10).text(settings.mainTitle).style("font-family", settings.fontFamily).style("font-size", settings.titleFontSize + 'px').style("fill", settings.fontColor);
     svg.append("text").attr("text-anchor", "middle").attr("x", width / 2).attr("y", height + margin.bottom - 15).text(settings.xAxisTitle).style("font-family", settings.fontFamily).style("font-size", settings.axisTitleFontSize + 'px').style("fill", settings.fontColor);
+
     currentPlotInstance = svg.node().parentNode;
 }
 
 function renderMultiDimNetwork(foundGenes, container) {
     const settings = getPlotSettings();
-    const nodes = [], links = [], nodeMap = new Map();
-    const addNode = (id, type) => {
-        if (!nodeMap.has(id)) { nodeMap.set(id, { id, type }); nodes.push(nodeMap.get(id)); }
+    
+    // **FIXED (5):** This helper function was missing its return statement.
+    const addNode = (nodes, nodeMap, id, type) => {
+        if (!nodeMap.has(id)) {
+            const newNode = { id, type };
+            nodeMap.set(id, newNode);
+            nodes.push(newNode);
+        }
+        return nodeMap.get(id); // Return the node object
     };
+
+    const nodes = [], links = [], nodeMap = new Map();
     foundGenes.forEach(gene => {
-        addNode(gene.gene, 'gene');
-        getCleanArray(gene, 'complex_names', 'complex').forEach(c => links.push({ source: gene.gene, target: addNode(c, 'complex').id }));
-        getCleanArray(gene, 'Domain_Descriptions', 'domain_descriptions').forEach(d => links.push({ source: gene.gene, target: addNode(d, 'domain').id }));
-        getCleanArray(gene, 'localization').forEach(l => links.push({ source: gene.gene, target: addNode(l, 'localization').id }));
+        addNode(nodes, nodeMap, gene.gene, 'gene');
+        getCleanArray(gene, 'complex_names', 'complex').forEach(c => links.push({ source: gene.gene, target: addNode(nodes, nodeMap, c, 'complex').id }));
+        getCleanArray(gene, 'Domain_Descriptions', 'domain_descriptions').forEach(d => links.push({ source: gene.gene, target: addNode(nodes, nodeMap, d, 'domain').id }));
+        getCleanArray(gene, 'localization').forEach(l => links.push({ source: gene.gene, target: addNode(nodes, nodeMap, l, 'localization').id }));
     });
+
     if (nodes.length < 2 || links.length === 0) { container.innerHTML = '<p class="status-message">Not enough data to build a network.</p>'; return; }
+    
     container.innerHTML = '';
     const width = container.clientWidth;
     const height = Math.max(500, container.clientHeight);
+    
     const svg = d3.select(container).append("svg").attr("width", width).attr("height", height);
     const nodeColors = { 'gene': '#27ae60', 'complex': '#f39c12', 'domain': '#3498db', 'localization': '#8e44ad' };
-    const simulation = d3.forceSimulation(nodes).force("link", d3.forceLink(links).id(d => d.id).distance(80)).force("charge", d3.forceManyBody().strength(-150)).force("center", d3.forceCenter(width / 2, height / 2));
+    
+    const simulation = d3.forceSimulation(nodes)
+        .force("link", d3.forceLink(links).id(d => d.id).distance(80))
+        .force("charge", d3.forceManyBody().strength(-150))
+        .force("center", d3.forceCenter(width / 2, height / 2));
+        
     const link = svg.append("g").selectAll("line").data(links).enter().append("line").style("stroke", "#aaa");
+    
     const nodeGroup = svg.append("g").selectAll("g").data(nodes).enter().append("g")
         .call(d3.drag().on("start", (e, d) => { if (!e.active) simulation.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; }).on("drag", (e, d) => { d.fx = e.x; d.fy = e.y; }).on("end", (e, d) => { if (!e.active) simulation.alphaTarget(0); d.fx = null; d.fy = null; }));
+
     nodeGroup.append("circle").attr("r", d => d.type === 'gene' ? 8 : 6).style("fill", d => nodeColors[d.type] || '#ccc').style("stroke", "#fff").style("stroke-width", 1.5);
-    nodeGroup.append("text").text(d => d.id).attr('x', 12).attr('y', 4).style("font-size", "11px").style("font-family", settings.fontFamily).style("fill", settings.fontColor).style("pointer-events", "none");
+    
+    nodeGroup.append("text")
+        .text(d => d.id)
+        .attr('x', 12)
+        .attr('y', 4)
+        .style("font-size", "11px")
+        .style("font-family", settings.fontFamily)
+        .style("fill", settings.fontColor)
+        .style("pointer-events", "none");
+
     nodeGroup.append("title").text(d => `${d.id} (${d.type})`);
+    
     simulation.on("tick", () => {
         link.attr("x1", d => d.source.x).attr("y1", d => d.source.y).attr("x2", d => d.target.x).attr("y2", d => d.target.y);
         nodeGroup.attr("transform", d => `translate(${d.x},${d.y})`);
     });
+    
     currentPlotInstance = svg.node();
 }
 
