@@ -2160,7 +2160,41 @@ function hideAllPages() {
 }
 
 function displayCiliAIPage() {
-    hideAllPages(); // Hide other pages
+    hideAllPages(); // hide all other pages
     const page = document.querySelector('#ciliAI-page');
     if (page) page.style.display = 'block';
 }
+
+// --- Home Search ---
+const homeSearchInput = document.querySelector('#home-search-input'); // make sure you have this input in your HTML
+const homeSuggestionsContainer = document.querySelector('#home-suggestions'); // div for showing suggestions
+
+// Populate suggestions as you type
+homeSearchInput.addEventListener('input', () => {
+    const query = homeSearchInput.value.trim().toUpperCase();
+    if (!query) {
+        homeSuggestionsContainer.innerHTML = '';
+        homeSuggestionsContainer.style.display = 'none';
+        return;
+    }
+
+    const matches = allGenes.filter(g => g.gene.toUpperCase().includes(query));
+    homeSuggestionsContainer.innerHTML = '';
+    matches.slice(0, 10).forEach(g => {
+        const btn = document.createElement('button');
+        btn.textContent = g.gene;
+        btn.className = 'suggestion-btn';
+        btn.addEventListener('click', () => navigateToGenePage(g.gene));
+        homeSuggestionsContainer.appendChild(btn);
+    });
+
+    homeSuggestionsContainer.style.display = matches.length ? 'block' : 'none';
+});
+
+// Navigate on Enter key
+homeSearchInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+        const firstMatch = allGenes.find(g => g.gene.toUpperCase() === homeSearchInput.value.trim().toUpperCase());
+        if (firstMatch) navigateToGenePage(firstMatch.gene);
+    }
+});
