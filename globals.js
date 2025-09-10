@@ -87,6 +87,9 @@ async function handleRouteChange() {
     case '/analysis':
         displayCiliaPlotPage();
         break;
+    case '/ciliAI':
+        displayCiliAIPage(); // NEW: show CiliAI page
+        break;
     case '/compare':
         displayComparePage();
         break;
@@ -98,9 +101,6 @@ async function handleRouteChange() {
         break;
     case '/contact':
         displayContactPage();
-        break;
-    case '/cili-ai':      // <-- NEW
-        displayCiliAIPage();
         break;
     default:
         if (gene) {
