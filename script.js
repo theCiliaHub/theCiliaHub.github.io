@@ -2144,13 +2144,9 @@ document.addEventListener('DOMContentLoaded', () => {
     initGlobalEventListeners();
 });
 
-#CiliAIPage 
-function displayCiliAIPage() {
-    hideAllPages(); // Make sure other pages are hidden
-    const page = document.querySelector('#ciliAI-page');
-    if (page) page.style.display = 'block';
-}
-
+// =============================================================================
+// PAGE DISPLAY HELPERS
+// =============================================================================
 function hideAllPages() {
     const pages = [
         '#home-page', '#analysis-page', '#batch-query-page',
@@ -2161,4 +2157,10 @@ function hideAllPages() {
         const el = document.querySelector(id);
         if (el) el.style.display = 'none';
     });
+}
+
+function displayCiliAIPage() {
+    hideAllPages(); // Hide other pages
+    const page = document.querySelector('#ciliAI-page');
+    if (page) page.style.display = 'block';
 }
