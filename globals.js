@@ -1,21 +1,23 @@
-// =============================================================================
 // globals.js
 // =============================================================================
-
-// -------------------------------
 // GLOBAL VARIABLES
-// -------------------------------
+// =============================================================================
+
+// Data storage
 let allGenes = [];
 let currentData = [];
 let searchResults = [];
 const geneLocalizationData = {};
 
+// Plotting
 let currentPlot = null;
 
+// Chart instances
 let localizationChartInstance;
 let analysisDotPlotInstance;
 let analysisBarChartInstance;
 
+// IDs and defaults
 const allPartIds = [
     "cell-body", "nucleus", "basal-body",
     "transition-zone", "axoneme", "ciliary-membrane"
@@ -25,15 +27,25 @@ const defaultGenesNames = [
     "CEP290", "WDR31", "ARL13B", "BBS1"
 ];
 
+// Caches
 let geneDataCache = null;
 let geneMapCache = null;
 
-// -------------------------------
+function navigateTo(event, path) {
+    if (event) {
+        event.preventDefault();
+    }
+    window.location.hash = path;
+}
+
+// =============================================================================
 // ROUTER
-// -------------------------------
+// =============================================================================
 async function handleRouteChange() {
     let path = window.location.hash.replace(/^#/, '').toLowerCase().trim();
-    if (!path || path === '/' || path === '/index.html') path = '/';
+    if (!path || path === '/' || path === '/index.html') {
+        path = '/';
+    }
 
     try {
         await loadAndPrepareDatabase();
@@ -51,17 +63,30 @@ async function handleRouteChange() {
 
     updateActiveNav(path);
 
-    // Hide all pages before displaying the correct one
-    hideAllPages();
+    // This part is likely superseded by your dynamic page functions,
+    // but we will keep it as requested.
+    const pages = [
+        '#home-page', '#analysis-page', '#batch-query-page',
+        '#ciliaplot-page', '#compare-page', '#expression-page',
+        '#download-page', '#contact-page', '#notfound-page'
+    ];
+    pages.forEach(id => {
+        const el = document.querySelector(id);
+        if (el) el.style.display = 'none';
+    });
 
     switch (path) {
         case '/':
             displayHomePage();
+            setTimeout(displayLocalizationChart, 0);
             break;
         case '/batch-query':
             displayBatchQueryTool();
             break;
         case '/ciliaplot':
+        case '/ciliai':
+            displayCiliAIPage();
+            break;
         case '/analysis':
             displayCiliaPlotPage();
             break;
@@ -77,9 +102,6 @@ async function handleRouteChange() {
         case '/contact':
             displayContactPage();
             break;
-         case '/ciliAI':
-        displayCiliAIPage();
-        break;
         default:
             if (gene) {
                 displayIndividualGenePage(gene);
@@ -91,9 +113,9 @@ async function handleRouteChange() {
     console.log("Routing completed. Path:", path, "Gene:", gene ? gene.name : "N/A");
 }
 
-// -------------------------------
+// =============================================================================
 // EVENT LISTENERS
-// -------------------------------
+// =============================================================================
 window.addEventListener("load", handleRouteChange);
 window.addEventListener("hashchange", handleRouteChange);
 
@@ -101,14 +123,18 @@ document.addEventListener('DOMContentLoaded', () => {
     initGlobalEventListeners();
 });
 
-// -------------------------------
+// =============================================================================
 // GLOBAL UI HELPERS
-// -------------------------------
+// =============================================================================
 function initGlobalEventListeners() {
     window.addEventListener('scroll', handleStickySearch);
-
     document.querySelectorAll('.cilia-part').forEach(part => {
-        part.addEventListener('keydown', (e) => {});
+        part.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                part.classList.toggle('highlighted');
+            }
+        });
     });
 
     const ciliaSvg = document.querySelector('.interactive-cilium svg');
@@ -118,39 +144,10 @@ function initGlobalEventListeners() {
             minZoom: 0.5,
             contain: 'outside'
         });
-        ciliaSvg.parentElement.addEventListener('wheel', (e) => {});
+        ciliaSvg.parentElement.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const panzoom = Panzoom(ciliaSvg);
+            panzoom.zoom(panzoom.getScale() * (e.deltaY > 0 ? 0.9 : 1.1));
+        });
     }
 }
-
-// -------------------------------
-// NAVIGATION HELPERS
-// -------------------------------
-function navigateTo(event, path) {}
-function navigateToGenePage(geneName) {}
-
-// -------------------------------
-// DATABASE & SEARCH HELPERS
-// -------------------------------
-async function loadAndPrepareDatabase() {}
-function sanitize(str) { return str; }
-function updateActiveNav(path) {}
-
-// -------------------------------
-// PAGE DISPLAY HELPERS
-// -------------------------------
-function hideAllPages() {}
-function displayHomePage() {}
-function displayBatchQueryTool() {}
-function displayCiliaPlotPage() {}
-function displayComparePage() {}
-function displayExpressionPage() {}
-function displayDownloadPage() {}
-function displayContactPage() {}
-function displayCiliAIPage() {}
-function displayIndividualGenePage(gene) {}
-function displayNotFoundPage() {}
-
-// -------------------------------
-// UI & INTERACTIVE HELPERS
-// -------------------------------
-function handleStickySearch() {}
