@@ -2143,3 +2143,22 @@ function displayExpressionPage() {
 document.addEventListener('DOMContentLoaded', () => {
     initGlobalEventListeners();
 });
+
+#CiliAIPage 
+function displayCiliAIPage() {
+    hideAllPages(); // Make sure other pages are hidden
+    const page = document.querySelector('#ciliAI-page');
+    if (page) page.style.display = 'block';
+}
+
+function hideAllPages() {
+    const pages = [
+        '#home-page', '#analysis-page', '#batch-query-page',
+        '#ciliaplot-page', '#compare-page', '#expression-page',
+        '#download-page', '#contact-page', '#ciliAI-page', '#notfound-page'
+    ];
+    pages.forEach(id => {
+        const el = document.querySelector(id);
+        if (el) el.style.display = 'none';
+    });
+}
