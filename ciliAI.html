@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CiliAI - Cilia Gene Evidence Analyzer</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-container">
+            <a href="index.html" class="logo">CiliaHub</a>
+            <ul class="nav-links">
+                <li><a href="index.html" aria-label="Home">Home</a></li>
+                <li><a href="ciliAI.html" aria-label="CiliAI">CiliAI</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <main class="main-container">
+        <div class="content-area">
+            <h1 class="text-3xl font-bold">Cilia Gene Evidence Analyzer</h1>
+            <p>Enter gene names to search a curated database for cilia-related experimental evidence.</p>
+
+            <div class="mb-6">
+                <label for="gene-input">Paste your gene list (one per line) or upload a .txt file:</label>
+                <textarea id="gene-input" rows="8" placeholder="ZDHHC5&#10;WDR54&#10;IFT88&#10;ARL13B"></textarea>
+                <input type="file" id="gene-file" accept=".txt">
+                <button id="analyze-btn">Analyze Genes</button>
+            </div>
+
+            <div id="progress-container" class="hidden">
+                <p id="progress-text"></p>
+                <div class="progress-bar-bg">
+                    <div id="progress-bar" class="progress-bar-fill" style="width:0%"></div>
+                </div>
+            </div>
+
+            <div id="results-container" class="hidden">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Gene</th>
+                            <th>Confidence</th>
+                            <th>Ciliation Frequency</th>
+                            <th>Cilia Length</th>
+                            <th>Source Reference</th>
+                        </tr>
+                    </thead>
+                    <tbody id="results-tbody"></tbody>
+                </table>
+                <button id="export-btn">Export CSV</button>
+                <button id="clear-btn">Clear Results</button>
+            </div>
+        </div>
+    </main>
+
+    <script src="ciliAI.js"></script>
+</body>
+</html>
