@@ -297,47 +297,21 @@ function handleHomeSearchKeyDown(event) {
 
 
 // --- NAVIGATION FIX ---
-// Robust function to navigate to a selected gene's page
+// This robust function navigates to the selected gene's page.
 function navigateToGenePage(geneName) {
-    if (!geneName) return;
+    const selectedGene = allGenes.find(g => g.gene === geneName);
 
-    // Find the gene in the global list
-    const selectedGene = allGenes.find(g => g.gene.toUpperCase() === geneName.toUpperCase());
+    if (selectedGene) {
+        homeSearchInput.value = selectedGene.gene; // Update input field
+        homeSuggestionsContainer.style.display = 'none'; // Hide suggestions
 
-    if (!selectedGene) {
-        console.warn(`Navigation failed: No gene found for "${geneName}"`);
-        displayNotFoundPage();
-        return;
-    }
-
-    // Update search input field if it exists
-    const homeSearchInput = document.getElementById('home-search-input');
-    if (homeSearchInput) homeSearchInput.value = selectedGene.gene;
-
-    // Hide suggestions dropdown if it exists
-    const homeSuggestionsContainer = document.getElementById('home-suggestions-container');
-    if (homeSuggestionsContainer) homeSuggestionsContainer.style.display = 'none';
-
-    // Update the URL hash to reflect the gene
-    const geneHash = `#/${selectedGene.gene}`;
-    if (window.location.hash !== geneHash) {
-        window.location.hash = geneHash;
-    }
-
-    // Use your existing routing function to handle displaying the gene page
-    if (typeof handleRouteChange === 'function') {
-        // Delay slightly to ensure hashchange triggers routing correctly
-        setTimeout(() => handleRouteChange(), 10);
+        // Your existing navigation logic
+        window.location.hash = `#/${selectedGene.gene}`;
+        displayGenePage(selectedGene.gene);
     } else {
-        // Fallback: manually display the gene page
-        if (typeof displayIndividualGenePage === 'function') {
-            displayIndividualGenePage(selectedGene);
-        }
+        console.warn(`Navigation failed: No gene found for "${geneName}"`);
     }
-
-    console.log(`Navigated to gene page: ${selectedGene.gene}`);
 }
-
 
 
 /**
@@ -2169,68 +2143,3 @@ function displayExpressionPage() {
 document.addEventListener('DOMContentLoaded', () => {
     initGlobalEventListeners();
 });
-
-
-// =============================================================================
-// NEW SEARCH & AUTOCOMPLETE FUNCTIONS
-// =============================================================================
-function sanitize(input) {
-    return input.trim().toUpperCase();
-}
-
-function filterGenes(query) {
-    if (!query) return [];
-    const q = sanitize(query);
-    return allGenes.filter(g => g.gene.toUpperCase().includes(q));
-}
-
-function showSuggestions(matches) {
-    if (!homeSuggestionsContainer || !homeSuggestionsList) return;
-    homeSuggestionsList.innerHTML = '';
-    if (matches.length === 0) {
-        homeSuggestionsContainer.style.display = 'none';
-        return;
-    }
-
-    matches.forEach(gene => {
-        const li = document.createElement('li');
-        li.textContent = gene.gene;
-        li.className = 'suggestion-item';
-        li.addEventListener('click', () => navigateToGenePage(gene.gene));
-        homeSuggestionsList.appendChild(li);
-    });
-    homeSuggestionsContainer.style.display = 'block';
-}
-
-// =============================================================================
-// UPDATED INDIVIDUAL GENE DISPLAY FUNCTION
-// =============================================================================
-function displayIndividualGenePage(gene) {
-    hideAllPages();
-    const el = document.getElementById('gene-page');
-    if (el) el.style.display = 'block';
-
-    if (!gene) return;
-
-    // Populate gene page content
-    const geneTitle = el.querySelector('.gene-title');
-    if (geneTitle) geneTitle.textContent = gene.gene;
-
-    const geneDesc = el.querySelector('.gene-description');
-    if (geneDesc) geneDesc.textContent = gene.description || 'No description available.';
-
-    // Highlight gene in interactive Cilium panel if exists
-    highlightGeneInCilium(gene.gene);
-}
-
-// =============================================================================
-// NEW HELPER FUNCTION
-// =============================================================================
-function highlightGeneInCilium(geneName) {
-    document.querySelectorAll('.gene-buttons button').forEach(btn => {
-        btn.classList.remove('active');
-        if (btn.textContent.toUpperCase() === geneName.toUpperCase()) {
-            btn.classList.add('active');
-        }
-    });
-}
