@@ -84,9 +84,6 @@ async function handleRouteChange() {
             displayBatchQueryTool();
             break;
         case '/ciliaplot':
-        case '/ciliai':
-            displayCiliAIPage();
-            break;
         case '/analysis':
             displayCiliaPlotPage();
             break;
