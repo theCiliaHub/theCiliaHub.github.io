@@ -76,38 +76,41 @@ async function handleRouteChange() {
     });
 
     switch (path) {
-        case '/':
-            displayHomePage();
-            setTimeout(displayLocalizationChart, 0);
-            break;
-        case '/batch-query':
-            displayBatchQueryTool();
-            break;
-        case '/ciliaplot':
-        case '/analysis':
-            displayCiliaPlotPage();
-            break;
-        case '/compare':
-            displayComparePage();
-            break;
-        case '/expression':
-            displayExpressionPage();
-            break;
-        case '/download':
-            displayDownloadPage();
-            break;
-        case '/contact':
-            displayContactPage();
-            break;
-        default:
-            if (gene) {
-                displayIndividualGenePage(gene);
-            } else {
-                displayNotFoundPage();
-            }
-            break;
-    }
-    console.log("Routing completed. Path:", path, "Gene:", gene ? gene.name : "N/A");
+    case '/':
+        displayHomePage();
+        setTimeout(displayLocalizationChart, 0);
+        break;
+    case '/batch-query':
+        displayBatchQueryTool();
+        break;
+    case '/ciliaplot':
+    case '/analysis':
+        displayCiliaPlotPage();
+        break;
+    case '/compare':
+        displayComparePage();
+        break;
+    case '/expression':
+        displayExpressionPage();
+        break;
+    case '/download':
+        displayDownloadPage();
+        break;
+    case '/contact':
+        displayContactPage();
+        break;
+    case '/cili-ai':      // <-- NEW
+        displayCiliAIPage();
+        break;
+    default:
+        if (gene) {
+            displayIndividualGenePage(gene);
+        } else {
+            displayNotFoundPage();
+        }
+        break;
+}
+   console.log("Routing completed. Path:", path, "Gene:", gene ? gene.name : "N/A");
 }
 
 // =============================================================================
