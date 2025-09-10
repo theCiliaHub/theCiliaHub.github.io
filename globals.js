@@ -77,9 +77,9 @@ async function handleRouteChange() {
         case '/contact':
             displayContactPage();
             break;
-        case '/ciliai':
-            displayCiliAIPage();
-            break;
+         case '/ciliAI':
+        displayCiliAIPage();
+        break;
         default:
             if (gene) {
                 displayIndividualGenePage(gene);
