@@ -29,7 +29,22 @@ function getCleanArray(gene, ...keys) {
         .map(item => item.trim()) // Trim whitespace
         .filter(Boolean); // Filter again after trimming to remove empty strings
 }
-
+function normalizeGeneData(database) {
+    return database.map(gene => ({
+        ...gene,
+        gene: gene.gene || gene.gene_name || gene.symbol || "UNKNOWN",
+        domain_descriptions: getCleanArray(gene, 'Domain_Descriptions', 'domain_descriptions', 'domains')
+            .map(d => typeof d === 'object' ? d.name || d.id || JSON.stringify(d) : d),
+        complex: getCleanArray(gene, 'complex_names', 'complex', 'complexes')
+            .map(c => typeof c === 'object' ? c.name || c.id || JSON.stringify(c) : c),
+        localization: getCleanArray(gene, 'localization', 'localizations')
+            .map(l => typeof l === 'object' ? l.name || l : l)
+    }));
+}
+async function loadAndPrepareDatabase() {
+    const rawData = await fetchDatabase();
+    window.allGenes = normalizeGeneData(rawData);
+}
 // =============================================================================
 // PLOT CUSTOMIZATION & DOWNLOAD
 // =============================================================================
