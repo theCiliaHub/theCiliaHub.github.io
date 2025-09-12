@@ -83,12 +83,17 @@ async function handleRouteChange() {
         if (el) el.style.display = 'none';
     });
 
+    // Clear any residual chart elements
+    const contentArea = document.querySelector('.content-area');
+    const existingChart = contentArea?.querySelector('#locChart');
+    if (existingChart) {
+        existingChart.closest('.page-section')?.remove();
+    }
+
     // Show the correct page
     switch (path) {
         case '/':
             displayHomePage();
-            // FIX: Removed the problematic setTimeout(displayLocalizationChart, 0); call
-            // which was incorrectly adding an extra plot section.
             break;
         case '/batch-query':
             displayBatchQueryTool();
@@ -145,7 +150,6 @@ function getGeneFromURL() {
     return null;
 }
 
-
 // =============================================================================
 // EVENT LISTENERS
 // =============================================================================
@@ -184,4 +188,3 @@ function initGlobalEventListeners() {
         });
     }
 }
-
