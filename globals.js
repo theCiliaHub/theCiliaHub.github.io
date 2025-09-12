@@ -1,6 +1,9 @@
+// globals.js
 // =============================================================================
 // GLOBAL VARIABLES
 // =============================================================================
+
+// Data storage
 let allGenes = [];
 let currentData = [];
 let searchResults = [];
@@ -45,16 +48,16 @@ async function handleRouteChange() {
     }
 
     try {
-        await loadAndPrepareDatabase(); // Defined in script.js
+        // Make sure database is loaded before any gene lookup
+        await loadAndPrepareDatabase();
     } catch (err) {
-        console.error('Database loading failed:', err);
-        const contentArea = document.querySelector('.content-area');
-        if (contentArea) {
-            contentArea.innerHTML += `<p class="status-message error">Error loading database: ${err.message}</p>`;
-        }
+        console.error("Database loading failed:", err);
     }
 
+    // Initialize gene as null
     let gene = null;
+
+    // Only try to get a gene if geneMapCache exists
     if (geneMapCache) {
         const geneName = getGeneFromURL();
         if (geneName && geneName.toLowerCase() !== 'ciliaplot') {
@@ -81,100 +84,43 @@ async function handleRouteChange() {
         if (el) el.style.display = 'none';
     });
 
-    // Clear plot-related elements, preserve home page and search
-    const contentArea = document.querySelector('.content-area');
-    if (contentArea) {
-        const elementsToRemove = contentArea.querySelectorAll(
-            '#locChart, .page-section:not(#home-page .page-section), .plot-container-new, .chart-container, canvas, .stats-container:not(.ciliahub-stats), .legend, .pagination, #ciliaplot-stats-container, #plot-display-area'
-        );
-        elementsToRemove.forEach(el => el.closest('.page-section, .plot-container-new, .ciliaplot-container-new')?.remove() || el.remove());
-        contentArea.style.background = 'var(--panel-bg)';
-        contentArea.style.minHeight = 'calc(100vh - 100px)';
-    }
-
     // Show the correct page
     switch (path) {
         case '/':
-            document.querySelector('#home-page').style.display = 'block';
             displayHomePage();
+            setTimeout(displayLocalizationChart, 0);
             break;
         case '/batch-query':
-            document.querySelector('#batch-query-page').style.display = 'block';
             displayBatchQueryTool();
             break;
         case '/ciliaplot':
         case '/analysis':
-            document.querySelector('#ciliaplot-page').style.display = 'block';
             displayCiliaPlotPage();
+            // If a gene was found, pass it to the plots logic
             if (gene) {
-                try {
-                    renderDomainEnrichment([gene]);
-                    computeProteinComplexLinks([gene]);
-                } catch (err) {
-                    console.error('Error in renderDomainEnrichment or computeProteinComplexLinks:', err);
-                    const plotArea = document.getElementById('plot-display-area');
-                    if (plotArea) {
-                        plotArea.innerHTML = `<p class="status-message error">Error processing gene data: ${err.message}</p>`;
-                    }
-                }
+                renderDomainEnrichment([gene]);
+                computeProteinComplexLinks([gene]);
             }
             break;
         case '/compare':
-            document.querySelector('#compare-page').style.display = 'block';
             displayComparePage();
             break;
         case '/expression':
-            document.querySelector('#expression-page').style.display = 'block';
             displayExpressionPage();
             break;
         case '/download':
-            document.querySelector('#download-page').style.display = 'block';
             displayDownloadPage();
             break;
         case '/contact':
-            document.querySelector('#contact-page').style.display = 'block';
             displayContactPage();
             break;
         default:
             if (gene) {
-                document.querySelector('#home-page').style.display = 'block';
                 displayIndividualGenePage(gene);
             } else {
-                document.querySelector('#notfound-page').style.display = 'block';
                 displayNotFoundPage();
             }
             break;
-    }
-
-    // Restore search event listener
-    const searchInput = document.getElementById('single-gene-search');
-    if (searchInput) {
-        searchInput.addEventListener('input', () => {
-            const query = searchInput.value.trim().toUpperCase();
-            const suggestionsContainer = document.getElementById('search-suggestions');
-            if (query.length < 1) {
-                suggestionsContainer.innerHTML = '';
-                suggestionsContainer.style.display = 'none';
-                return;
-            }
-            const filteredGenes = allGenes.filter(g =>
-                (g.gene && g.gene.toUpperCase().startsWith(query)) ||
-                (g.synonym && g.synonym.toUpperCase().includes(query)) ||
-                (g.ensembl_id && g.ensembl_id.toUpperCase().startsWith(query))
-            ).slice(0, 10);
-            if (filteredGenes.length > 0) {
-                suggestionsContainer.innerHTML = '<ul>' +
-                    filteredGenes.map(g => {
-                        const details = [g.ensembl_id, g.synonym].filter(Boolean).join(', ');
-                        return `<li data-gene="${g.gene}">${g.gene}${details ? ` (${details})` : ''}</li>`;
-                    }).join('') +
-                    '</ul>';
-                suggestionsContainer.style.display = 'block';
-            } else {
-                suggestionsContainer.innerHTML = '';
-                suggestionsContainer.style.display = 'none';
-            }
-        });
     }
 
     console.log("Routing completed. Path:", path, "Gene:", gene ? gene.gene : "N/A");
@@ -184,10 +130,12 @@ async function handleRouteChange() {
 // URL HELPERS
 // =============================================================================
 function getGeneFromURL() {
+    // Try query string first: /ciliaplot?gene=ACTN2
     const params = new URLSearchParams(window.location.search);
     const fromQuery = params.get('gene');
     if (fromQuery) return fromQuery;
 
+    // Fallback: last part of hash or path: /ciliaplot/ACTN2
     const hashPath = window.location.hash.replace(/^#/, '');
     const pathParts = hashPath.split('/');
     if (pathParts.length > 1 && pathParts[pathParts.length - 1].toLowerCase() !== 'ciliaplot') {
@@ -196,6 +144,7 @@ function getGeneFromURL() {
 
     return null;
 }
+
 
 // =============================================================================
 // EVENT LISTENERS
@@ -232,37 +181,6 @@ function initGlobalEventListeners() {
             e.preventDefault();
             const panzoom = Panzoom(ciliaSvg);
             panzoom.zoom(panzoom.getScale() * (e.deltaY > 0 ? 0.9 : 1.1));
-        });
-    }
-
-    // Ensure search event listener
-    const searchInput = document.getElementById('single-gene-search');
-    if (searchInput) {
-        searchInput.addEventListener('input', () => {
-            const query = searchInput.value.trim().toUpperCase();
-            const suggestionsContainer = document.getElementById('search-suggestions');
-            if (query.length < 1) {
-                suggestionsContainer.innerHTML = '';
-                suggestionsContainer.style.display = 'none';
-                return;
-            }
-            const filteredGenes = allGenes.filter(g =>
-                (g.gene && g.gene.toUpperCase().startsWith(query)) ||
-                (g.synonym && g.synonym.toUpperCase().includes(query)) ||
-                (g.ensembl_id && g.ensembl_id.toUpperCase().startsWith(query))
-            ).slice(0, 10);
-            if (filteredGenes.length > 0) {
-                suggestionsContainer.innerHTML = '<ul>' +
-                    filteredGenes.map(g => {
-                        const details = [g.ensembl_id, g.synonym].filter(Boolean).join(', ');
-                        return `<li data-gene="${g.gene}">${g.gene}${details ? ` (${details})` : ''}</li>`;
-                    }).join('') +
-                    '</ul>';
-                suggestionsContainer.style.display = 'block';
-            } else {
-                suggestionsContainer.innerHTML = '';
-                suggestionsContainer.style.display = 'none';
-            }
         });
     }
 }
