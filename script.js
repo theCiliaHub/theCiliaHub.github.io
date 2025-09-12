@@ -1602,11 +1602,7 @@ function displayLocalizationChart() {
     // ✨ Change: Sort data to show the most frequent category on top
     const sortedCategories = categories.sort((a, b) => localizationCounts[b] - localizationCounts[a]);
 
-    const chartContainer = document.createElement('div');
-    chartContainer.className = 'page-section';
-    // ✨ Change: Updated the title for a cleaner look
-    chartContainer.innerHTML = `<h2>Localization in Ciliary Genes</h2><div style="position: relative; height:350px; width:100%;"><canvas id="locChart"></canvas></div>`;
-
+  
     const contentArea = document.querySelector('.content-area');
     const existingChart = contentArea.querySelector('#locChart');
     if (existingChart) {
