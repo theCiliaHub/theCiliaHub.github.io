@@ -1,3 +1,4 @@
+/* Root Variables */
 :root {
   /* Colors */
   --primary-dark: #2c3e50;
@@ -15,6 +16,9 @@
   --gray-medium: #95a5a6;
   --gray-dark: #7f8c8d;
   --gray-light: #d3d3d3;
+  --mpb: #0067A5;
+  --mpb-light: #e6f0f7;
+  --mpb-border: #c2d9e6;
 
   /* Spacing & Borders */
   --border-radius-sm: 5px;
@@ -22,14 +26,16 @@
   --border-radius-lg: 15px;
 }
 
+/* General Body Styling */
 body {
     margin: 0;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
-    background: var(--neutral-bg);
+    background: var(--panel-bg) !important; /* #ffffff */
     color: var(--text-dark);
     line-height: 1.6;
 }
 
+/* Navbar */
 .navbar {
     background: linear-gradient(90deg, var(--primary-blue), var(--primary-blue-light));
     color: var(--text-light);
@@ -90,6 +96,7 @@ body {
     outline: none;
 }
 
+/* Main Layout */
 .main-container {
     display: flex;
     max-width: 1400px;
@@ -179,14 +186,22 @@ body {
 
 .content-area {
     flex: 1;
-    background: var(--panel-bg);
+    background: var(--panel-bg) !important; /* #ffffff */
     padding: 2rem;
     border-radius: var(--border-radius-lg);
     box-shadow: 0 8px 32px rgba(44, 90, 160, 0.1);
+    min-height: calc(100vh - 100px) !important;
 }
 
 .content-area-full {
     max-width: 100%;
+}
+
+/* Page Sections */
+#home-page, #analysis-page, #batch-query-page, #ciliaplot-page, #compare-page, 
+#expression-page, #download-page, #contact-page, #notfound-page {
+    background: var(--panel-bg) !important; /* #ffffff */
+    min-height: 100vh !important;
 }
 
 .page-section h1, .page-section h2 {
@@ -202,10 +217,11 @@ body {
     font-size: 1.5rem;
 }
 
+/* Search UI */
 .search-container {
+    margin: 1rem 0;
     display: flex;
-    gap: 1rem;
-    margin-bottom: 2rem;
+    gap: 0.5rem;
     position: relative;
 }
 
@@ -252,18 +268,22 @@ body {
     outline: none;
 }
 
+#single-gene-search {
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-sm);
+}
+
 #search-suggestions, #compare-search-suggestions, #suggestions {
     position: absolute;
-    top: 100%;
-    left: 0;
-    right: 0;
     background: var(--panel-bg);
     border: 1px solid var(--border-color);
     border-radius: var(--border-radius-sm);
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-    z-index: 1000;
     max-height: 200px;
     overflow-y: auto;
+    z-index: 1000;
+    width: calc(100% - 1rem);
     display: none;
 }
 
@@ -274,16 +294,53 @@ body {
 }
 
 #search-suggestions li, #compare-search-suggestions div, #suggestions div {
-    padding: 0.8rem;
+    padding: 0.5rem;
     cursor: pointer;
     transition: background 0.2s;
 }
 
 #search-suggestions li:hover, #search-suggestions li.active, #compare-search-suggestions div:hover, #suggestions div:hover {
-    background: var(--border-color);
+    background: var(--neutral-bg-alt);
     color: var(--primary-blue);
 }
 
+/* CiliaHub Stats */
+.ciliahub-stats {
+    margin-top: 1rem;
+    margin-bottom: 2rem;
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+    font-family: 'Arial', sans-serif;
+}
+
+.stats-box {
+    flex: 1;
+    min-width: 140px;
+    background-color: var(--neutral-bg-alt); /* #f8f9fa */
+    color: var(--primary-blue);
+    padding: 1rem;
+    border-radius: 12px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    text-align: center;
+}
+
+.stats-box.version-box {
+    background-color: var(--neutral-bg-alt); /* #f8f9fa */
+    color: var(--text-dark); /* #333 */
+}
+
+.stats-box .stat-number {
+    font-size: 1.5rem;
+    font-weight: bold;
+}
+
+.stats-box .stat-label {
+    font-size: 0.75rem;
+    opacity: 0.9;
+}
+
+/* Filters and Inputs */
 .filters {
     display: flex;
     gap: 1rem;
@@ -315,7 +372,7 @@ body {
     margin: 1rem 0;
 }
 
-/* ✨ This rule now styles the tables on all three pages ✨ */
+/* Tables */
 #batch-results table, 
 #comparison-table, 
 #ciliahub-results-container table {
@@ -325,7 +382,6 @@ body {
     position: relative;
 }
 
-/* ✨ This rule now styles the cells on all three pages ✨ */
 #batch-results th, 
 #batch-results td, 
 #comparison-table th, 
@@ -337,7 +393,6 @@ body {
     text-align: left;
 }
 
-/* ✨ Add stripes for columns in ciliarhub-results-container table ✨ */
 #ciliahub-results-container th:nth-child(odd),
 #ciliahub-results-container td:nth-child(odd) {
     background-color: var(--neutral-bg-alt);
@@ -348,7 +403,6 @@ body {
     background-color: var(--panel-bg);
 }
 
-/* ✨ This rule now styles the headers on all three pages, with navbar blue for ciliarhub-results-container ✨ */
 #batch-results th, 
 #comparison-table th {
     background: var(--primary-blue);
@@ -363,7 +417,6 @@ body {
     z-index: 998;
 }
 
-/* ✨ These rules now style the links on all three pages ✨ */
 #batch-results a, 
 #comparison-table a,
 #ciliahub-results-container a {
@@ -381,6 +434,7 @@ body {
     outline: none;
 }
 
+/* Comparison Tool */
 .comparison-tool {
     background: var(--neutral-bg-alt);
     padding: 1.5rem;
@@ -473,6 +527,7 @@ body {
     outline: none;
 }
 
+/* Messages */
 .error-message {
     color: var(--accent-red);
     font-size: 0.9rem;
@@ -484,10 +539,20 @@ body {
     color: #666;
 }
 
+.status-message.error {
+    color: var(--accent-red);
+    font-weight: bold;
+    padding: 1rem;
+    background: var(--neutral-bg-alt);
+    border: 1px solid var(--accent-red);
+    border-radius: var(--border-radius-sm);
+}
+
 .success-message {
     color: var(--accent-green-2);
 }
 
+/* Gene Cards */
 .gene-cards {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
@@ -537,6 +602,7 @@ body {
     margin-bottom: 0.3rem;
 }
 
+/* Pagination */
 .pagination {
     display: flex;
     justify-content: center;
@@ -547,9 +613,9 @@ body {
 
 .pagination button {
     padding: 0.5rem 1rem;
-    background: var(--primary-blue);
-    color: var(--text-light);
-    border: none;
+    background: var(--neutral-bg-alt) !important; /* #f8f9fa */
+    color: var(--text-dark) !important; /* #333 */
+    border: 1px solid var(--border-color) !important;
     border-radius: var(--border-radius-sm);
     cursor: pointer;
 }
@@ -559,6 +625,7 @@ body {
     cursor: not-allowed;
 }
 
+/* Download Options */
 .download-options {
     display: flex;
     gap: 1rem;
@@ -579,6 +646,7 @@ body {
     outline: none;
 }
 
+/* Contact and Cite */
 .contact-info, .cite-list, .feedback-form {
     margin-bottom: 2rem;
 }
@@ -602,15 +670,16 @@ body {
     outline: none;
 }
 
+/* Buttons */
 .btn {
     cursor: pointer;
     transition: background 0.3s;
 }
 
 .btn-primary {
-    background: var(--primary-blue);
-    color: var(--text-light);
-    border: none;
+    background: var(--neutral-bg-alt) !important; /* #f8f9fa */
+    color: var(--text-dark) !important; /* #333 */
+    border: 1px solid var(--border-color) !important;
     padding: 0.8rem 1.5rem;
     border-radius: var(--border-radius-md);
 }
@@ -621,9 +690,9 @@ body {
 }
 
 .btn-secondary {
-    background: var(--gray-medium);
-    color: var(--text-light);
-    border: none;
+    background: var(--neutral-bg-alt) !important; /* #f8f9fa */
+    color: var(--text-dark) !important; /* #333 */
+    border: 1px solid var(--border-color) !important;
     padding: 0.5rem 1rem;
     border-radius: var(--border-radius-sm);
 }
@@ -633,6 +702,7 @@ body {
     outline: none;
 }
 
+/* Tooltip */
 .tooltip {
     position: relative;
     display: inline-block;
@@ -669,6 +739,505 @@ body {
 
 .tooltip:hover .tooltip-text {
     visibility: visible;
+}
+
+/* Gene Summary Table */
+.gene-summary-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 10px;
+    font-family: Arial, sans-serif;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.gene-summary-table th,
+.gene-summary-table td {
+    border: 1px solid #ddd;
+    padding: 10px 12px;
+    text-align: left;
+}
+
+.gene-summary-table th {
+    background-color: var(--neutral-bg-alt);
+    font-weight: bold;
+    color: var(--text-dark);
+}
+
+.gene-summary-table tbody tr:nth-child(even) {
+    background-color: #fdfdfd;
+}
+
+.gene-summary-table .status-found {
+    color: var(--accent-green-2);
+    font-weight: bold;
+}
+
+.gene-summary-table .status-not-found {
+    color: var(--accent-red);
+    font-weight: bold;
+}
+
+/* Gene Detail Page */
+.gene-detail-page,
+.gene-detail-page * {
+    box-sizing: border-box;
+}
+
+.gene-detail-page .breadcrumb,
+.gene-detail-page .gene-header {
+    background: var(--mpb-light) !important;
+    border-color: var(--mpb-border) !important;
+}
+
+.gene-detail-page .gene-name {
+    color: var(--mpb) !important;
+    font-weight: 700;
+    font-size: 2rem;
+    margin: 0 0 0.25rem 0;
+}
+
+.gene-detail-page .gene-description {
+    color: var(--mpb) !important;
+    opacity: 0.95;
+    margin: 0;
+}
+
+.gene-detail-page .detail-card {
+    background: #fff !important;
+    border: 1px solid var(--mpb-border) !important;
+    border-radius: 0.6rem !important;
+    padding: 1rem !important;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04) !important;
+}
+
+.gene-detail-page .card-title {
+    color: var(--mpb) !important;
+    font-size: 1.05rem !important;
+    font-weight: 600 !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 0.5rem !important;
+    margin: 0 0 0.75rem 0 !important;
+    padding-bottom: 0.45rem !important;
+    border-bottom: 1px solid var(--mpb-border) !important;
+}
+
+.gene-detail-page .card-title svg,
+.gene-detail-page .detail-card svg {
+    stroke: var(--mpb) !important;
+    fill: none !important;
+}
+
+.gene-detail-page .info-item strong,
+.gene-detail-page .info-item .label {
+    color: var(--mpb) !important;
+    font-weight: 600 !important;
+}
+
+.gene-detail-page .info-item p,
+.gene-detail-page .info-item span,
+.gene-detail-page .info-item div {
+    color: var(--mpb) !important;
+    line-height: 1.35 !important;
+}
+
+.gene-detail-page .tag,
+.gene-detail-page .tags-container .tag {
+    display: inline-block !important;
+    padding: 0.22rem 0.6rem !important;
+    margin: 0.12rem 0.28rem !important;
+    border-radius: 999px !important;
+    background: var(--mpb-light) !important;
+    color: var(--mpb) !important;
+    font-weight: 500 !important;
+    font-size: 0.85rem !important;
+    vertical-align: middle !important;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.03) !important;
+}
+
+.gene-detail-page .reference-list {
+    color: var(--mpb) !important;
+}
+
+.gene-detail-page .reference-list li {
+    margin-bottom: 0.4rem;
+    color: var(--mpb) !important;
+}
+
+.gene-detail-page .reference-list a {
+    color: var(--mpb) !important;
+    text-decoration: none !important;
+}
+
+.gene-detail-page .reference-list a:hover {
+    text-decoration: underline !important;
+}
+
+.gene-detail-page a {
+    color: var(--mpb) !important;
+}
+
+.gene-detail-page .detail-card,
+.gene-detail-page .card-title,
+.gene-detail-page .info-item strong {
+    outline: none !important;
+}
+
+.gene-details-grid {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 1.5rem !important;
+    align-items: start !important;
+}
+
+.gene-details-grid > .details-column:first-child {
+    grid-column: 1 / 2 !important; /* left */
+}
+
+.gene-details-grid > .details-column:last-child {
+    grid-column: 2 / 3 !important; /* right */
+}
+
+.text-\\[\\#0067A5\\],
+.text-\\[\\#0067A5\\] {
+    color: var(--mpb) !important;
+}
+
+.bg-\\[\\#e6f0f7\\],
+.bg-\\[\\#e6f0f7\\] {
+    background: var(--mpb-light) !important;
+}
+
+/* Plot Customization */
+details {
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    margin-bottom: 15px;
+}
+
+summary {
+    padding: 8px;
+    background-color: var(--neutral-bg-alt);
+    cursor: pointer;
+    font-weight: bold;
+    border-radius: 4px;
+}
+
+details[open] summary {
+    border-bottom: 1px solid var(--border-color);
+}
+
+label {
+    display: block;
+    font-size: 0.9rem;
+    margin-bottom: 5px;
+    color: var(--text-dark);
+}
+
+input[type="text"],
+input[type="number"],
+select,
+input[type="color"] {
+    width: 100%;
+    padding: 6px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    font-size: 0.9rem;
+}
+
+input[type="color"] {
+    padding: 2px;
+    height: 30px;
+}
+
+/* CiliaPlot Page */
+.ciliaplot-page {
+    width: 100%;
+}
+
+.ciliaplot-container-new {
+    display: grid;
+    grid-template-columns: 380px 1fr;
+    gap: 2rem;
+    align-items: flex-start;
+    background: var(--panel-bg) !important; /* #ffffff */
+}
+
+.ciliaplot-header {
+    margin-bottom: 2rem;
+}
+
+.ciliaplot-left-panel-new {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.ciliaplot-right-panel-new {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    background: var(--panel-bg) !important; /* #ffffff */
+}
+
+#ciliaplot-genes-input {
+    width: 100%;
+    height: 120px;
+    padding: 1rem;
+    border: 2px solid var(--border-color);
+    border-radius: var(--border-radius-md);
+    font-size: 1.1rem;
+    resize: vertical;
+    margin-bottom: 1rem;
+    line-height: 1.4;
+    font-family: inherit;
+}
+
+#ciliahub-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    background-color: var(--neutral-bg-alt);
+    padding: 1rem;
+    border-radius: var(--border-radius-md);
+}
+
+.plot-type-selection {
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.action-buttons {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+}
+
+#download-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+#plot-customization-details {
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-md);
+}
+
+#plot-settings-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    align-items: center;
+    padding: 1rem;
+}
+
+#plot-settings-grid label {
+    font-size: 0.9em;
+}
+
+#plot-settings-grid input[type="text"],
+#plot-settings-grid input[type="number"] {
+    width: 80px;
+    padding: 4px;
+}
+
+#plot-settings-grid input[type="color"] {
+    width: 40px;
+    height: 30px;
+    padding: 2px;
+}
+
+.ciliaplot-display-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.ciliaplot-download-btn {
+    background-color: #f0f0f0;
+    border: 1px solid #ccc;
+    padding: 5px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.8rem;
+    transition: background-color 0.2s;
+}
+
+.ciliaplot-download-btn:hover {
+    background-color: #e0e0e0;
+}
+
+.ciliaplot-controls-group {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.info {
+    margin-top: 1rem;
+    padding: 15px;
+    background-color: var(--neutral-bg-alt);
+    border-left: 4px solid var(--accent-green-2) !important; /* #27ae60 */
+    border-radius: var(--border-radius-sm);
+    font-size: 0.95rem;
+    line-height: 1.5;
+}
+
+.plot-container-new {
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-md);
+    padding: 1.5rem;
+    background: var(--panel-bg) !important; /* #ffffff */
+    min-height: 500px;
+    width: 100%;
+    box-sizing: border-box;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+}
+
+.ciliaplot-plot-panel, .plot-wrapper {
+    background: var(--panel-bg) !important; /* #ffffff */
+    height: 100%;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.legend {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 20px;
+    margin-top: 1rem;
+    background: var(--panel-bg) !important; /* #ffffff */
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.8rem;
+}
+
+.legend-color {
+    width: 16px;
+    height: 16px;
+    border-radius: 4px;
+}
+
+#plot-placeholder {
+    margin: auto;
+    color: var(--gray-dark);
+}
+
+/* Plot and Chart Overrides */
+#home-page .plot-container-new, #home-page .stats-container:not(.ciliahub-stats),
+#home-page .pagination, #home-page #ciliaplot-stats-container, #home-page #plot-display-area {
+    display: none !important; /* Prevent plot elements on home page */
+}
+
+#locChart, canvas:not(.visible), .chart-container:not(.visible) {
+    display: none !important;
+}
+
+#ciliahub-results-container th, .plot-area {
+    background: var(--neutral-bg-alt) !important; /* #f8f9fa */
+    background-image: none !important;
+}
+
+.stats-container:empty, .plot-container-new:empty, #ciliaplot-stats-container:empty, #plot-display-area:empty {
+    display: none !important;
+}
+
+/* Plot-Specific Styles */
+.bar:hover {
+    opacity: 0.8;
+}
+
+.bar.neutral {
+    fill: #95a5a6;
+}
+
+.enrichment-line {
+    stroke-width: 2;
+    stroke-dasharray: 4,4;
+}
+
+.view-btn {
+    padding: 5px 10px;
+    font-size: 0.8rem;
+    border: 1px solid #ddd;
+    background: white;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.view-btn.active {
+    background: #3498db;
+    color: white;
+    border-color: #3498db;
+}
+
+.node {
+    stroke: #fff;
+    stroke-width: 1.5px;
+    cursor: pointer;
+}
+
+.node.gene {
+    fill: #2ecc71;
+}
+
+.node.complex {
+    fill: #f39c12;
+}
+
+.node.domain {
+    fill: #3498db;
+}
+
+.node.localization {
+    fill: #8e44ad;
+}
+
+.link {
+    stroke-opacity: 0.6;
+}
+
+.link.gene-complex {
+    stroke: #f39c12;
+}
+
+.link.gene-domain {
+    stroke: #3498db;
+}
+
+.link.gene-localization {
+    stroke: #8e44ad;
+}
+
+#multi-dim-legend-container .legend-color {
+    border-radius: 50%;
+}
+
+.matrix-cell {
+    stroke: #fff;
+    stroke-width: 0.5px;
+    cursor: pointer;
+}
+
+/* Responsive Adjustments */
+@media (max-width: 1024px) {
+    .ciliaplot-container-new {
+        grid-template-columns: 1fr;
+    }
 }
 
 @media (max-width: 768px) {
@@ -715,635 +1284,8 @@ body {
     .gene-cards, .functional-comparison-grid {
         grid-template-columns: 1fr;
     }
-}
 
-/* Suggested CSS for the gene summary table */
-.gene-summary-table {
-    width: 100%;
-    border-collapse: collapse;
-    margin-top: 10px;
-    font-family: Arial, sans-serif;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-
-.gene-summary-table th,
-.gene-summary-table td {
-    border: 1px solid #ddd;
-    padding: 10px 12px;
-    text-align: left;
-}
-
-.gene-summary-table th {
-    background-color: var(--neutral-bg-alt);
-    font-weight: bold;
-    color: var(--text-dark);
-}
-
-.gene-summary-table tbody tr:nth-child(even) {
-    background-color: #fdfdfd;
-}
-
-.gene-summary-table .status-found {
-    color: var(--accent-green-2);
-    font-weight: bold;
-}
-
-.gene-summary-table .status-not-found {
-    color: var(--accent-red);
-    font-weight: bold;
-}
-
-/* ---------- CiliaHub: Gene detail page tweaks (Medium Persian Blue) ---------- */
-/* Paste at the end of styles.css */
-
-/* Central color tokens */
-:root {
-  --mpb: #0067A5;
-  --mpb-light: #e6f0f7;
-  --mpb-border: #c2d9e6;
-}
-
-/* Scope everything to the gene detail page to avoid site-wide side effects */
-.gene-detail-page,
-.gene-detail-page * {
-  box-sizing: border-box;
-}
-
-/* Breadcrumb & header background */
-.gene-detail-page .breadcrumb,
-.gene-detail-page .gene-header {
-  background: var(--mpb-light) !important;
-  border-color: var(--mpb-border) !important;
-}
-
-/* Gene name and description */
-.gene-detail-page .gene-name {
-  color: var(--mpb) !important;
-  font-weight: 700;
-  font-size: 2rem;
-  margin: 0 0 0.25rem 0;
-}
-.gene-detail-page .gene-description {
-  color: var(--mpb) !important;
-  opacity: 0.95;
-  margin: 0;
-}
-
-/* Cards (visual treatment) */
-.gene-detail-page .detail-card {
-  background: #fff !important;
-  border: 1px solid var(--mpb-border) !important;
-  border-radius: 0.6rem !important;
-  padding: 1rem !important;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.04) !important;
-}
-
-/* Card title styling (applies to Identifiers, Subcellular Localization, Complex Info,
-   Functional Information, References, etc.) */
-.gene-detail-page .card-title {
-  color: var(--mpb) !important;
-  font-size: 1.05rem !important;
-  font-weight: 600 !important;
-  display: flex !important;
-  align-items: center !important;
-  gap: 0.5rem !important;
-  margin: 0 0 0.75rem 0 !important;
-  padding-bottom: 0.45rem !important;
-  border-bottom: 1px solid var(--mpb-border) !important;
-}
-
-/* Ensure SVG/icons also follow the blue */
-.gene-detail-page .card-title svg,
-.gene-detail-page .detail-card svg {
-  stroke: var(--mpb) !important;
-  fill: none !important;
-}
-
-/* Strong/labels in info items */
-.gene-detail-page .info-item strong,
-.gene-detail-page .info-item .label {
-  color: var(--mpb) !important;
-  font-weight: 600 !important;
-}
-
-/* Generic paragraph and small text inside gene page */
-.gene-detail-page .info-item p,
-.gene-detail-page .info-item span,
-.gene-detail-page .info-item div {
-  color: var(--mpb) !important;
-  line-height: 1.35 !important;
-}
-
-/* Tag pills (localization, functional category, etc.) */
-.gene-detail-page .tag,
-.gene-detail-page .tags-container .tag {
-  display: inline-block !important;
-  padding: 0.22rem 0.6rem !important;
-  margin: 0.12rem 0.28rem !important;
-  border-radius: 999px !important;
-  background: var(--mpb-light) !important;
-  color: var(--mpb) !important;
-  font-weight: 500 !important;
-  font-size: 0.85rem !important;
-  vertical-align: middle !important;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.03) !important;
-}
-
-/* References list */
-.gene-detail-page .reference-list {
-  color: var(--mpb) !important;
-}
-.gene-detail-page .reference-list li {
-  margin-bottom: 0.4rem;
-  color: var(--mpb) !important;
-}
-.gene-detail-page .reference-list a {
-  color: var(--mpb) !important;
-  text-decoration: none !important;
-}
-.gene-detail-page .reference-list a:hover {
-  text-decoration: underline !important;
-}
-
-/* Links inside the gene page — keep them consistent */
-.gene-detail-page a {
-  color: var(--mpb) !important;
-}
-
-/* Force card borders and accent where something else tries to override */
-.gene-detail-page .detail-card,
-.gene-detail-page .card-title,
-.gene-detail-page .info-item strong {
-  outline: none !important;
-}
-
-/* ---------- Layout: ensure left column = Functional Info + References,
-   right column = Identifiers + Localization + Complex Info ---------- */
-
-/* Standard two-column grid (desktop) */
-.gene-details-grid {
-  display: grid !important;
-  grid-template-columns: 1fr 1fr !important;
-  gap: 1.5rem !important;
-  align-items: start !important;
-}
-
-/* Rely on the order the page injects the columns — usually the first .details-column is left.
-   If your JS prints the columns in different order, prefer adding classes (see note below). */
-.gene-details-grid > .details-column:first-child {
-  grid-column: 1 / 2 !important;    /* left */
-}
-.gene-details-grid > .details-column:last-child {
-  grid-column: 2 / 3 !important;    /* right */
-}
-
-/* Mobile: stack single column */
-@media (max-width: 899px) {
-  .gene-details-grid {
-    grid-template-columns: 1fr !important;
-  }
-}
-
-/* ---------- Utility overrides for Tailwind-style arbitrary classes that may not exist
-   (these selectors escape the bracket syntax so they match when Tailwind classes are in HTML) */
-.text-\\[\\#0067A5\\],
-.text-\\[\\#0067A5\\] {
-  color: var(--mpb) !important;
-}
-.bg-\\[\\#e6f0f7\\],
-.bg-\\[\\#e6f0f7\\] {
-  background: var(--mpb-light) !important;
-}
-
-/* ---------- Helpful debugging outline (comment out if not needed) ----------
-.gene-detail-page .detail-card { outline: 1px dashed rgba(0,103,165,0.15) !important; }
----------------------------------------------------------------------------- */
-
-/* Plot Customization Styling */
-details {
-    border: 1px solid #e1ecf4;
-    border-radius: 4px;
-    margin-bottom: 15px;
-}
-
-summary {
-    padding: 8px;
-    background-color: #e1ecf4;
-    cursor: pointer;
-    font-weight: bold;
-    border-radius: 4px;
-}
-
-details[open] summary {
-    border-bottom: 1px solid #d1dbe4;
-}
-
-label {
-    display: block;
-    font-size: 0.9rem;
-    margin-bottom: 5px;
-    color: #333;
-}
-
-input[type="text"],
-input[type="number"],
-select,
-input[type="color"] {
-    width: 100%;
-    padding: 6px;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    font-size: 0.9rem;
-}
-
-input[type="color"] {
-    padding: 2px;
-    height: 30px;
-}
-
-.plot-wrapper {
-    position: relative;
-    width: 100%;
-}
-
-/* =================================================== */
-/* Styles for Compact CiliaHub Page Layout             */
-/* =================================================== */
-
-.ciliahub-page {
-    display: flex;
-    flex-direction: column;
-    /* ✨ FIX: The fixed height properties have been removed to allow the page to grow. */
-}
-
-.ciliahub-header {
-    flex-shrink: 0; /* Prevents header from shrinking */
-}
-
-.ciliahub-layout {
-    display: grid;
-    grid-template-columns: 380px 1fr; /* Gives more space to the plot */
-    gap: 2rem;
-    flex-grow: 1;
-    overflow: hidden;
-}
-
-.ciliahub-controls-panel {
-    display: flex;
-    flex-direction: column;
-    gap: 1.5rem;
-    overflow-y: auto; /* Add scroll only to controls if they overflow */
-    padding-right: 10px;
-}
-
-/* ===== CILIAPLOT PAGE SPECIFIC IMPROVEMENTS ===== */
-
-/* 1. Bigger search box for CiliaPlot page */
-#ciliaplot-genes-input {
-    width: 100%;
-    height: 120px; /* Increased from default */
-    padding: 1rem; /* Increased padding */
-    border: 2px solid var(--border-color);
-    border-radius: var(--border-radius-md);
-    font-size: 1.1rem; /* Slightly larger font */
-    resize: vertical; /* Allow vertical resizing */
-    margin-bottom: 1rem;
-    line-height: 1.4;
-    font-family: inherit;
-}
-
-/* 2. Enhanced CiliaPlot layout styling */
-.ciliaplot-page {
-    width: 100%;
-}
-
-#ciliahub-actions {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-    background-color: var(--neutral-bg-alt);
-    padding: 1rem;
-    border-radius: var(--border-radius-md);
-}
-
-.plot-type-selection {
-    display: flex;
-    align-items: center;
-    justify-content: space-around;
-    flex-wrap: wrap;
-    gap: 10px;
-}
-
-.action-buttons {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 1rem;
-}
-
-#download-controls {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-
-#plot-customization-details summary {
-    background-color: var(--neutral-bg-alt);
-    border-radius: var(--border-radius-sm);
-}
-
-#plot-customization-details {
-    border: 1px solid var(--border-color);
-    border-radius: var(--border-radius-md);
-}
-
-#plot-settings-panel {
-    /* Make customization controls more compact */
-    display: grid; 
-    grid-template-columns: 1fr 1fr;
-    gap: 1rem;
-    padding: 1rem;
-}
-
-.ciliahub-plot-panel {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border: 2px dashed var(--border-color);
-    border-radius: var(--border-radius-lg);
-    background-color: var(--neutral-bg-alt);
-    height: 100%;
-    overflow: hidden; /* Reverted from auto */
-}
-
-.plot-area, .plot-wrapper {
-    /* Ensure plot fills its container without a fixed height */
-    height: 100%;
-    width: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-#plot-placeholder {
-    margin: auto;
-    color: var(--gray-dark);
-}
-
-/* ========================================================================= */
-/* CILIA PLOT DASHBOARD DESIGN                                               */
-/* ========================================================================= */
-
-/* Main container for the new design */
-.ciliaplot-container-new {
-    display: grid;
-    grid-template-columns: 380px 1fr; /* Fixed left panel, flexible right panel */
-    gap: 2rem;
-    align-items: flex-start;
-}
-
-/* Header/Info Box Styling */
-.ciliaplot-header {
-    margin-bottom: 2rem;
-}
-.info {
-    margin-top: 1rem;
-    padding: 15px;
-    background-color: var(--mpb-light, #eaf5fd);
-    border-left: 4px solid var(--mpb, #3498db);
-    border-radius: var(--border-radius-sm);
-    font-size: 0.95rem;
-    line-height: 1.5;
-}
-
-/* Left & Right Panels */
-.ciliaplot-left-panel-new {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem; /* **FIXED (2):** Reduced space between control sections */
-}
-.ciliaplot-right-panel-new {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-}
-
-/* Stats Container Styling */
-.stats-container {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-    gap: 1rem;
-}
-.stat-box {
-    background: linear-gradient(135deg, var(--primary-dark), #34495e);
-    color: white;
-    padding: 15px;
-    border-radius: var(--border-radius-md);
-    text-align: center;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-}
-.stat-number {
-    font-size: 2rem;
-    font-weight: bold;
-}
-.stat-label {
-    font-size: 0.8rem;
-    opacity: 0.9;
-    margin-top: 5px;
-}
-
-/* Plot Container & Legend */
-.plot-container-new {
-    border: 1px solid var(--border-color);
-    border-radius: var(--border-radius-md);
-    padding: 1.5rem;
-    background-color: var(--panel-bg);
-    min-height: 500px;
-    width: 100%;
-    box-sizing: border-box;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-}
-
-.legend {
-    display: flex;
-    justify-content: center;
-    gap: 20px;
-    flex-wrap: wrap;
-    padding: 10px;
-}
-.legend-item {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 5px 12px;
-    background: var(--neutral-bg-alt);
-    border-radius: 999px;
-    border: 1px solid var(--border-color);
-    font-size: 0.9rem;
-}
-.legend-color {
-    width: 16px;
-    height: 16px;
-    border-radius: 50%;
-}
-
-/* Responsive adjustments */
-@media (max-width: 1024px) {
-    .ciliaplot-container-new {
-        grid-template-columns: 1fr; /* Stack panels on smaller screens */
+    .gene-details-grid {
+        grid-template-columns: 1fr !important;
     }
 }
-
-/* Add these new/updated styles to your styles.css file */
-
-/* CiliaPlot Customization & Download Controls */
-#ciliaplot-settings-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
-    align-items: center;
-}
-#ciliaplot-settings-grid label { font-size: 0.9em; }
-#ciliaplot-settings-grid input[type="text"],
-#ciliaplot-settings-grid input[type="number"] { width: 80px; padding: 4px; }
-#ciliaplot-settings-grid input[type="color"] { width: 40px; height: 30px; padding: 2px; }
-
-.ciliaplot-display-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 1rem;
-}
-
-.ciliaplot-download-btn {
-    background-color: #f0f0f0;
-    border: 1px solid #ccc;
-    padding: 5px 10px;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 0.8rem;
-    transition: background-color 0.2s;
-}
-.ciliaplot-download-btn:hover { background-color: #e0e0e0; }
-.ciliaplot-controls-group { display: flex; align-items: center; gap: 1rem; }
-
-/* Existing styles from previous response (ensure they are present) */
-.stats-container {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
-    gap: 10px;
-    margin: 1rem 0;
-    text-align: center;
-}
-
-
-/* Add to the end of styles.css to style ciliahub-stats and prevent blue background */
-.ciliahub-stats {
-    margin-top: 1rem;
-    margin-bottom: 2rem;
-    display: flex;
-    gap: 1rem;
-    flex-wrap: wrap;
-    font-family: 'Arial', sans-serif;
-}
-
-.stats-box {
-    flex: 1;
-    min-width: 140px;
-    background-color: var(--neutral-bg-alt); /* #f8f9fa */
-    color: var(--primary-blue);
-    padding: 1rem;
-    border-radius: 12px;
-    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-    text-align: center;
-}
-
-.stats-box.version-box {
-    background-color: var(--neutral-bg-alt); /* #f8f9fa */
-    color: var(--text-dark); /* #333 */
-}
-
-#home-page .content-area {
-    background: var(--panel-bg) !important; /* #ffffff */
-    min-height: 100vh; /* Ensure it covers the viewport */
-}
-
-#home-page .page-section {
-    background: transparent !important;
-}
-
-#home-page #locChart,
-#home-page canvas {
-    display: none !important; /* Hide any stray canvas elements */
-}
-
-/* Add to the end of styles.css to override blue backgrounds */
-body {
-    background: var(--panel-bg) !important; /* #ffffff */
-    margin: 0;
-}
-
-#home-page, #analysis-page, #batch-query-page, #ciliaplot-page, #compare-page, 
-#expression-page, #download-page, #contact-page, #notfound-page {
-    background: var(--panel-bg) !important; /* #ffffff */
-    min-height: 100vh !important;
-}
-
-.content-area, .page-section, .ciliaplot-container-new, .ciliaplot-right-panel-new,
-.plot-container-new, .stats-container, .legend, .info {
-    background: var(--panel-bg) !important; /* #ffffff */
-    min-height: calc(100vh - 100px) !important; /* Adjust for navbar */
-}
-
-#locChart, canvas:not(.visible), .chart-container:not(.visible) {
-    display: none !important; /* Hide stray chart elements */
-}
-
-#ciliahub-results-container th, .stat-box, .plot-area {
-    background: var(--neutral-bg-alt) !important; /* #f8f9fa */
-    background-image: none !important; /* Remove blue gradients */
-}
-
-.ciliaplot-plot-panel, .plot-wrapper {
-    background: var(--panel-bg) !important; /* #ffffff */
-}
-
-.btn-primary, .btn-secondary, 
-.content-area .pagination button, 
-.ciliaplot-page .pagination button,
-.page-section .pagination button {
-    background: var(--neutral-bg-alt) !important; /* #f8f9fa */
-    color: var(--text-dark) !important; /* #333 */
-    border: 1px solid var(--border-color) !important; /* Add border for visibility */
-}
-
-.info {
-    border-left: 4px solid var(--accent-green-2) !important; /* #27ae60 */
-}
-
-
-.stat-box { padding: 10px; border-radius: 6px; color: white; }
-.stat-box .stat-number { font-size: 1.5rem; font-weight: bold; }
-.stat-box .stat-label { font-size: 0.75rem; opacity: 0.9; }
-.legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 20px; margin-top: 1rem; }
-.legend-item { display: flex; align-items: center; gap: 8px; font-size: 0.8rem; }
-.legend-color { width: 16px; height: 16px; border-radius: 4px; }
-#enrichment-stats-container .stat-box { background: linear-gradient(135deg, #3498db, #2980b9); }
-.bar:hover { opacity: 0.8; }
-.bar.neutral { fill: #95a5a6; }
-.enrichment-line { stroke-width: 2; stroke-dasharray: 4,4; }
-#multi-dim-stats-container .stat-box { background: linear-gradient(135deg, #2c3e50, #34495e); }
-.view-btn { padding: 5px 10px; font-size: 0.8rem; border: 1px solid #ddd; background: white; border-radius: 4px; cursor: pointer; }
-.view-btn.active { background: #3498db; color: white; border-color: #3498db;}
-.node { stroke: #fff; stroke-width: 1.5px; cursor: pointer; }
-.node.gene { fill: #2ecc71; }
-.node.complex { fill: #f39c12; }
-.node.domain { fill: #3498db; }
-.node.localization { fill: #8e44ad; }
-.link { stroke-opacity: 0.6; }
-.link.gene-complex { stroke: #f39c12; }
-.link.gene-domain { stroke: #3498db; }
-.link.gene-localization { stroke: #8e44ad; }
-#multi-dim-legend-container .legend-color { border-radius: 50%; }
-.matrix-cell { stroke: #fff; stroke-width: 0.5px; cursor: pointer; }
