@@ -83,13 +83,13 @@ async function handleRouteChange() {
         if (el) el.style.display = 'none';
     });
 
-    // Clear residual chart and plot elements
+    // Clear all chart, plot, and pagination elements
     const contentArea = document.querySelector('.content-area');
     if (contentArea) {
-        // Remove chart-related elements
-        const chartElements = contentArea.querySelectorAll('#locChart, .page-section, .plot-container-new, canvas');
-        chartElements.forEach(el => el.closest('.page-section, .plot-container-new')?.remove() || el.remove());
-        // Reset content-area styles
+        const elementsToRemove = contentArea.querySelectorAll(
+            '#locChart, .page-section, .plot-container-new, .chart-container, canvas, .stats-container, .legend, .pagination'
+        );
+        elementsToRemove.forEach(el => el.closest('.page-section, .plot-container-new, .ciliaplot-container-new')?.remove() || el.remove());
         contentArea.style.background = 'var(--panel-bg)';
         contentArea.style.minHeight = 'calc(100vh - 100px)';
     }
@@ -139,6 +139,16 @@ async function handleRouteChange() {
             }
             break;
     }
+
+    // Neutralize any dynamically added pagination buttons
+    setTimeout(() => {
+        const buttons = document.querySelectorAll('.pagination button');
+        buttons.forEach(btn => {
+            btn.style.background = 'var(--neutral-bg-alt)';
+            btn.style.color = 'var(--text-dark)';
+            btn.style.border = '1px solid var(--border-color)';
+        });
+    }, 100);
 
     console.log("Routing completed. Path:", path, "Gene:", gene ? gene.gene : "N/A");
 }
