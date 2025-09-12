@@ -34,118 +34,7 @@
     </nav>
 
     <main class="main-container">
-        <div class="content-area" id="content-area">
-            <div id="home-page">
-                <h1>Welcome to CiliaHub 🔬</h1>
-                <p>Your comprehensive resource for genes with ciliary functions. Explore our database, compare genes, and visualize expression data.</p>
-                <div class="call-to-action">
-                    <a href="#/ciliaplot" onclick="navigateTo(event, '/ciliaplot')" class="cta-button">Perform Gene Analysis with CiliaPlot</a>
-                </div>
-            </div>
-
-           <div id="ciliaplot-page" class="ciliaplot-page" style="display: none;">
-                <section class="page-section">
-    <h1>CiliaPlot Gene Set Analysis</h1>
-    <p>Enter a list of genes to perform functional enrichment and network analysis, generating publication-ready visualizations.</p>
-</section>
-
-<div class="ciliaplot-top-section">
-    <div class="ciliaplot-input-panel">
-        <details class="ciliaplot-control-card" open>
-            <summary>1. Input Gene List</summary>
-            <div class="ciliaplot-card-content">
-                <p>Enter one gene symbol per line.</p>
-                <textarea id="ciliaplot-genes-input" placeholder="e.g., ARL13B&#10;IFT88&#10;BBS1&#10;CEP290"></textarea>
-            </div>
-        </details>
-        
-        <details class="ciliaplot-control-card" open>
-            <summary>2. Analysis Settings</summary>
-            <div class="ciliaplot-card-content">
-                <div class="setting-item">
-                    <label for="enrichment-threshold-input">Enrichment Threshold:</label>
-                    <input type="number" id="enrichment-threshold-input" value="1.5" min="1" step="0.1">
-                </div>
-                <hr>
-                <div class="setting-item">
-                    <label for="complex-filter">Filter by Complex:</label>
-                    <select id="complex-filter"><option value="">All Complexes</option></select>
-                </div>
-                <div class="setting-item">
-                    <label for="localization-filter">Filter by Localization:</label>
-                    <select id="localization-filter"><option value="">All Localizations</option></select>
-                </div>
-            </div>
-        </details>
-
-        <details class="ciliaplot-control-card">
-            <summary>3. Customize Plots</summary>
-            <div class="ciliaplot-card-content">
-                <div id="ciliaplot-settings-grid">
-                    <div><label for="setting-font-family">Font Family</label><input type="text" id="setting-font-family" value="Arial"></div>
-                    <div><label for="setting-font-size">Font Size</label><input type="number" id="setting-font-size" value="12"></div>
-                    <div><label for="setting-text-color">Text Color</label><input type="color" id="setting-text-color" value="#333333"></div>
-                    <div><label for="setting-enriched-color">Enriched Color</label><input type="color" id="setting-enriched-color" value="#2ecc71"></div>
-                    <div><label for="setting-depleted-color">Depleted Color</label><input type="color" id="setting-depleted-color" value="#e74c3c"></div>
-                </div>
-            </div>
-        </details>
-        
-        <button id="ciliaplot-generate-btn">Generate Analysis</button>
-    </div>
-
-    <div class="ciliaplot-main-plot-panel" id="ciliaplot-dashboard">
-        
-        <div id="ciliaplot-status-message" class="status-message">
-            Enter genes and click "Generate Analysis" to see your results.
-        </div>
-        
-        <div id="ciliaplot-results-container" style="display: none;">
-            
-            <section class="ciliaplot-result-section">
-                <div class="ciliaplot-display-header">
-                    <h3>Domain Enrichment Analysis</h3>
-                    <div class="ciliaplot-download-options">
-                        <button class="ciliaplot-download-btn" data-target="enrichment-plot-container" data-format="svg">Download SVG</button>
-                        <button class="ciliaplot-download-btn" data-target="enrichment-plot-container" data-format="png">Download PNG</button>
-                    </div>
-                </div>
-                <div id="enrichment-stats-container" class="stats-container"></div>
-                <div id="enrichment-plot-container" class="plot-container"></div>
-                <div id="enrichment-legend-container" class="legend"></div>
-            </section>
-            
-            <section class="ciliaplot-result-section">
-                <div class="ciliaplot-display-header">
-                    <h3>Multi-Dimensional Gene Network</h3>
-                    <div class="ciliaplot-controls-group">
-                        <div class="view-toggle">
-                            <button class="view-btn active" data-view="network">Network</button>
-                            <button class="view-btn" data-view="matrix">Matrix</button>
-                        </div>
-                        <div class="ciliaplot-download-options">
-                            <button class="ciliaplot-download-btn" data-target="multi-dim-plot-container" data-format="svg">Download SVG</button>
-                            <button class="ciliaplot-download-btn" data-target="multi-dim-plot-container" data-format="png">Download PNG</button>
-                        </div>
-                    </div>
-                </div>
-                <div id="multi-dim-stats-container" class="stats-container"></div>
-                <div id="multi-dim-plot-container" class="plot-container"></div>
-                <div id="multi-dim-legend-container" class="legend"></div>
-            </section>
-        </div>
-    </div>
-</div>
-
-<div id="enrichment-tooltip" class="tooltip"></div>
-<div id="multi-dim-tooltip" class="tooltip"></div>
-        </div>
-            <div id="compare-page" style="display: none;"></div>
-            <div id="batch-query-page" style="display: none;"></div>
-            <div id="expression-page" style="display: none;"></div>
-            <div id="download-page" style="display: none;"></div>
-            <div id="contact-page" style="display: none;"></div>
-        </div>
+        <div class="content-area" id="content-area"></div>
 
         <aside class="cilia-panel">
             <div class="panel-header">
@@ -170,14 +59,15 @@
         </aside>
     </main>
 
-    <div class="tooltip"></div>
+    <div id="enrichment-tooltip" class="tooltip"></div>
+    <div id="multi-dim-tooltip" class="tooltip"></div>
 
     <footer class="footer" style="text-align: center;">
         <p>© 2025 CiliaHub. All rights reserved.</p>
     </footer>
 
-    <script defer src="globals.js"></script>
-    <script defer src="plots.js"></script>
     <script defer src="script.js"></script>
+    <script defer src="plots.js"></script>
+    <script defer src="globals.js"></script>
 </body>
 </html>
