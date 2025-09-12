@@ -1573,129 +1573,145 @@ function handleStickySearch() {
     }
 }
 
+/**
+ * Displays a horizontal bar chart of gene counts for key ciliary localizations.
+ * This function creates and appends the necessary HTML elements to the content area.
+ */
 function displayLocalizationChart() {
-    const categories = ['Cilia', 'Basal Body', 'Transition Zone', 'Flagella', 'Ciliary Associated Gene'];
-    const localizationCounts = categories.reduce((acc, category) => {
-        acc[category] = allGenes.filter(g => {
-            if (!Array.isArray(g.localization)) {
-                return false;
-            }
-            const localizations = g.localization
-                .map(l => l?.trim().toLowerCase())
-                .filter(Boolean);
+    // Define the primary categories to be displayed on the chart
+    const categories = ['Cilia', 'Basal Body', 'Transition Zone', 'Flagella', 'Ciliary Associated Gene'];
 
-            if (localizations.length === 0) {
-                return false;
-            }
-            // Logic to count genes remains the same
-            return localizations.includes(category.toLowerCase()) ||
-                (category === 'Cilia' && localizations.includes('ciliary membrane')) ||
-                (category === 'Flagella' && localizations.includes('axoneme')) ||
-                (category === 'Ciliary Associated Gene' && localizations.includes('ciliary associated gene'));
-        }).length;
-        return acc;
-    }, {});
+    // Calculate the number of genes associated with each category
+    const localizationCounts = categories.reduce((acc, category) => {
+        acc[category] = allGenes.filter(g => {
+            if (!Array.isArray(g.localization)) {
+                return false;
+            }
+            // Sanitize the localization data for accurate matching
+            const localizations = g.localization
+                .map(l => l?.trim().toLowerCase())
+                .filter(Boolean);
 
-    // ✨ Change: Sort data to show the most frequent category on top
-    const sortedCategories = categories.sort((a, b) => localizationCounts[b] - localizationCounts[a]);
+            if (localizations.length === 0) {
+                return false;
+            }
 
-  
-    const contentArea = document.querySelector('.content-area');
-    const existingChart = contentArea.querySelector('#locChart');
-    if (existingChart) {
-        existingChart.closest('.page-section').remove();
-    }
+            // Check if the gene's localizations match the current category
+            return localizations.includes(category.toLowerCase()) ||
+                (category === 'Cilia' && localizations.includes('ciliary membrane')) ||
+                (category === 'Flagella' && localizations.includes('axoneme')) ||
+                (category === 'Ciliary Associated Gene' && localizations.includes('ciliary associated gene'));
+        }).length;
+        return acc;
+    }, {});
 
-    contentArea.appendChild(chartContainer);
+    // Sort categories to show the most frequent ones on top
+    const sortedCategories = categories.sort((a, b) => localizationCounts[b] - localizationCounts[a]);
 
-    const ctx = document.getElementById('locChart').getContext('2d');
-    
-    // ✨ Change: Using gradients for a more modern "fancy" look
-    const createGradient = (color1, color2) => {
-        const gradient = ctx.createLinearGradient(0, 0, 800, 0); // Horizontal gradient
-        gradient.addColorStop(0, color1);
-        gradient.addColorStop(1, color2);
-        return gradient;
-    };
+    // Prepare the page for the new chart
+    const contentArea = document.querySelector('.content-area');
+    const existingChart = contentArea.querySelector('#locChart');
+    if (existingChart) {
+        existingChart.closest('.page-section').remove();
+    }
 
-    const backgroundColors = [
-        createGradient('rgba(0, 85, 102, 0.8)', 'rgba(0, 128, 153, 0.8)'),
-        createGradient('rgba(102, 194, 165, 0.8)', 'rgba(140, 212, 194, 0.8)'),
-        createGradient('rgba(216, 27, 96, 0.8)', 'rgba(230, 64, 129, 0.8)'),
-        createGradient('rgba(255, 127, 0, 0.8)', 'rgba(255, 159, 64, 0.8)'),
-        createGradient('rgba(107, 174, 214, 0.8)', 'rgba(141, 190, 223, 0.8)')
-    ];
-    
-    new Chart(ctx, {
-        // ✨ Change: Switched to a horizontal bar chart
-        type: 'bar',
-        data: {
-            labels: sortedCategories,
-            datasets: [{
-                label: 'Number of Genes',
-                data: sortedCategories.map(category => localizationCounts[category] || 0),
-                backgroundColor: backgroundColors,
-                // ✨ Change: Added rounded corners to the bars
-                borderRadius: 5,
-                borderWidth: 0, // No border for a flatter look
-            }]
-        },
-        options: {
-            // ✨ Change: Set to horizontal bar chart
-            indexAxis: 'y',
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    // ✨ Change: Cleaner look by removing grid lines
-                    grid: {
-                        display: false,
-                        drawBorder: false,
-                    },
-                    ticks: {
-                        color: '#333', // Darker font for better readability
-                        font: {
-                            size: 14,
-                            family: "'Helvetica Neue', 'Helvetica', 'Arial', sans-serif"
-                        }
-                    }
-                },
-                x: {
-                    grid: {
-                        display: false,
-                        drawBorder: false,
-                    },
-                    ticks: {
-                        display: false // Hide x-axis labels, as count is in the tooltip
-                    }
-                }
-            },
-            plugins: {
-                // ✨ Fix: This ensures a transparent background for the plot
-                customCanvasBackgroundColor: {
-                    color: 'transparent',
-                },
-                legend: {
-                    display: false // Legend is not needed for a single dataset
-                },
-                title: {
-                    display: false // Title is now in the HTML h2 tag
-                },
-                tooltip: {
-                    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-                    titleFont: { size: 16 },
-                    bodyFont: { size: 14 },
-                    displayColors: false, // Hides the little color box in the tooltip
-                    callbacks: {
-                        label: function(context) {
-                            return ` ${context.raw} genes`;
-                        }
-                    }
-                }
-            }
-        }
-    });
+    // ✨ FIX: Create the chart's container element dynamically ✨
+    const chartContainer = document.createElement('div');
+    chartContainer.className = 'page-section';
+    chartContainer.innerHTML = `
+        <h2 style="text-align: center; margin-bottom: 1.5rem;">Localization in Ciliary Genes</h2>
+        <div class="chart-wrapper" style="position: relative; height: 400px; width: 100%;">
+            <canvas id="locChart"></canvas>
+        </div>
+    `;
+
+    // Append the newly created container to the page
+    contentArea.appendChild(chartContainer);
+
+    const ctx = document.getElementById('locChart').getContext('2d');
+    
+    // Create gradients for a more modern look
+    const createGradient = (color1, color2) => {
+        const gradient = ctx.createLinearGradient(0, 0, ctx.canvas.width, 0);
+        gradient.addColorStop(0, color1);
+        gradient.addColorStop(1, color2);
+        return gradient;
+    };
+
+    const backgroundColors = [
+        createGradient('rgba(0, 85, 102, 0.8)', 'rgba(0, 128, 153, 0.8)'),
+        createGradient('rgba(102, 194, 165, 0.8)', 'rgba(140, 212, 194, 0.8)'),
+        createGradient('rgba(216, 27, 96, 0.8)', 'rgba(230, 64, 129, 0.8)'),
+        createGradient('rgba(255, 127, 0, 0.8)', 'rgba(255, 159, 64, 0.8)'),
+        createGradient('rgba(107, 174, 214, 0.8)', 'rgba(141, 190, 223, 0.8)')
+    ];
+    
+    // Initialize the new Chart.js instance
+    new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: sortedCategories,
+            datasets: [{
+                label: 'Number of Genes',
+                data: sortedCategories.map(category => localizationCounts[category] || 0),
+                backgroundColor: backgroundColors,
+                borderRadius: 5,
+                borderWidth: 0,
+            }]
+        },
+        options: {
+            indexAxis: 'y', // Switch to a horizontal bar chart
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    grid: {
+                        display: false,
+                        drawBorder: false,
+                    },
+                    ticks: {
+                        color: '#333',
+                        font: {
+                            size: 14,
+                            family: "'Helvetica Neue', 'Helvetica', 'Arial', sans-serif"
+                        }
+                    }
+                },
+                x: {
+                    grid: {
+                        display: false,
+                        drawBorder: false,
+                    },
+                    ticks: {
+                        display: false
+                    }
+                }
+            },
+            plugins: {
+                customCanvasBackgroundColor: {
+                    color: 'transparent',
+                },
+                legend: {
+                    display: false
+                },
+                title: {
+                    display: false
+                },
+                tooltip: {
+                    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                    titleFont: { size: 16 },
+                    bodyFont: { size: 14 },
+                    displayColors: false,
+                    callbacks: {
+                        label: function(context) {
+                            return ` ${context.raw} genes`;
+                        }
+                    }
+                }
+            }
+        }
+    });
 }
 
 // --- Expression Visualization System ---
