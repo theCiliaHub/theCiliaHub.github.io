@@ -498,7 +498,7 @@ function displayHomePage() {
     contentArea.className = 'content-area';
     document.querySelector('.cilia-panel').style.display = 'block';
 
-    // --- Initial render with placeholders ---
+    // --- Initial render with placeholders and a container for the plot ---
     contentArea.innerHTML = `
         <div class="page-section">
             <h1>The CiliaHub: An Updated Database of Gold Standard Genes with Ciliary Functions</h1>
@@ -542,33 +542,34 @@ function displayHomePage() {
 
             <div id="gene-cards-container" class="gene-cards"></div>
             <div id="status-message" class="status-message" style="display: none;"></div>
+        </div>
+        
+        <!-- Section for the home page plot -->
+        <div class="page-section">
+            <h2>Localization in Ciliary Genes</h2>
+            <div id="home-plot-container" class="plot-container-home" style="height: 500px; width: 100%; position: relative;"></div>
         </div>`;
 
-    // --- Search button ---
+    // --- Attach search event listeners ---
     document.getElementById('single-search-btn').onclick = performSingleSearch;
-
     const searchInput = document.getElementById('single-gene-search');
     const suggestionsContainer = document.getElementById('search-suggestions');
-
     const hideSuggestions = () => {
         suggestionsContainer.innerHTML = '';
         suggestionsContainer.style.display = 'none';
     };
 
-    // --- Search suggestions ---
     searchInput.addEventListener('input', function() {
         const query = this.value.trim().toUpperCase();
         if (query.length < 1) {
             hideSuggestions();
             return;
         }
-
         const filteredGenes = allGenes.filter(g =>
             (g.gene && g.gene.toUpperCase().startsWith(query)) ||
             (g.synonym && g.synonym.toUpperCase().includes(query)) ||
             (g.ensembl_id && g.ensembl_id.toUpperCase().startsWith(query))
         ).slice(0, 10);
-
         if (filteredGenes.length > 0) {
             suggestionsContainer.innerHTML = '<ul>' +
                 filteredGenes.map(g => {
@@ -576,7 +577,6 @@ function displayHomePage() {
                     return `<li data-gene="${g.gene}">${g.gene}${details ? ` (${details})` : ''}</li>`;
                 }).join('') +
                 '</ul>';
-
             suggestionsContainer.querySelector('ul').addEventListener('click', function(event) {
                 if (event.target && event.target.nodeName === "LI") {
                     searchInput.value = event.target.dataset.gene;
@@ -584,7 +584,6 @@ function displayHomePage() {
                     performSingleSearch();
                 }
             });
-
             suggestionsContainer.style.display = 'block';
         } else {
             hideSuggestions();
@@ -594,9 +593,7 @@ function displayHomePage() {
     searchInput.addEventListener('keydown', function(event) {
         const suggestions = suggestionsContainer.querySelectorAll('li');
         if (suggestions.length === 0 && event.key !== 'Enter') return;
-
         let activeElement = suggestionsContainer.querySelector('.active');
-
         if (event.key === 'Enter') {
             event.preventDefault();
             if (activeElement) searchInput.value = activeElement.textContent.split(' ')[0];
@@ -604,7 +601,6 @@ function displayHomePage() {
             performSingleSearch();
             return;
         }
-
         if (event.key === 'ArrowDown') {
             event.preventDefault();
             let nextElement = activeElement ? activeElement.nextElementSibling : suggestions[0];
@@ -628,27 +624,26 @@ function displayHomePage() {
         }
     });
 
-    // --- Display gene cards immediately (empty or with placeholder) ---
-    displayGeneCards(currentData, [], 1, 10);
+    // --- Display initial gene cards (using all genes) ---
+    displayGeneCards(allGenes, [], 1, 10);
 
-    // --- Dynamic stats update after data is loaded ---
-    if (currentData && currentData.length > 0) {
-        const geneCount = currentData.length;
-        const uniqueLocalizations = [...new Set(
-            currentData
-                .map(g => g.localization)
-                .flat()
-                .filter(Boolean)
-        )];
-        const totalReferences = currentData.reduce((sum, g) => {
-            if (!g.reference) return sum;
-            return sum + g.reference.length;
-        }, 0);
+    // --- Update stats and plot using the globally loaded `allGenes` array ---
+    if (allGenes && allGenes.length > 0) {
+        // Calculate and display statistics
+        const geneCount = allGenes.length;
+        const uniqueLocalizations = new Set(allGenes.flatMap(g => getCleanArray(g, 'localization'))).size;
+        const uniqueReferences = new Set(allGenes.map(g => g.reference).filter(Boolean)).size;
 
-        // Update the cards dynamically
         document.getElementById('gene-count').textContent = geneCount;
-        document.getElementById('localization-count').textContent = uniqueLocalizations.length;
-        document.getElementById('reference-count').textContent = totalReferences;
+        document.getElementById('localization-count').textContent = uniqueLocalizations;
+        document.getElementById('reference-count').textContent = uniqueReferences;
+
+        // Render the home page plot
+        const plotContainer = document.getElementById('home-plot-container');
+        if (plotContainer) {
+            // Assuming renderKeyLocalizations is available from plots.js
+            renderKeyLocalizations(allGenes, plotContainer);
+        }
     }
 }
 
