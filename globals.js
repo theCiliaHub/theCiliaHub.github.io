@@ -1,8 +1,36 @@
+async function loadAndPrepareDatabase() {
+    try {
+        if (!allGenes || allGenes.length === 0) {
+            console.log('Loading gene database...');
+            // Simulate or replace with actual data fetching logic
+            // Example: const response = await fetch('/api/genes');
+            // allGenes = await response.json();
+            allGenes = []; // Placeholder; replace with actual data
+            if (!allGenes || allGenes.length === 0) {
+                throw new Error('Gene database is empty or failed to load');
+            }
+
+            geneMapCache = new Map();
+            allGenes.forEach(gene => {
+                if (gene.gene) {
+                    geneMapCache.set(sanitize(gene.gene.toLowerCase()), gene);
+                }
+            });
+            console.log('Database loaded. Genes:', allGenes.length, 'Cache size:', geneMapCache.size);
+        }
+    } catch (err) {
+        console.error('Failed to load database:', err);
+        const contentArea = document.querySelector('.content-area');
+        if (contentArea) {
+            contentArea.innerHTML = `<p class="status-message error">Error loading database: ${err.message}</p>`;
+        }
+        throw err;
+    }
+}
+
 // =============================================================================
 // GLOBAL VARIABLES
 // =============================================================================
-
-// Data storage
 let allGenes = [];
 let currentData = [];
 let searchResults = [];
@@ -47,16 +75,12 @@ async function handleRouteChange() {
     }
 
     try {
-        // Make sure database is loaded before any gene lookup
         await loadAndPrepareDatabase();
     } catch (err) {
-        console.error("Database loading failed:", err);
+        console.error('Database loading failed:', err);
     }
 
-    // Initialize gene as null
     let gene = null;
-
-    // Only try to get a gene if geneMapCache exists
     if (geneMapCache) {
         const geneName = getGeneFromURL();
         if (geneName && geneName.toLowerCase() !== 'ciliaplot') {
@@ -72,7 +96,6 @@ async function handleRouteChange() {
 
     updateActiveNav(path);
 
-    // Hide all pages
     const pages = [
         '#home-page', '#analysis-page', '#batch-query-page',
         '#ciliaplot-page', '#compare-page', '#expression-page',
@@ -83,7 +106,6 @@ async function handleRouteChange() {
         if (el) el.style.display = 'none';
     });
 
-    // Clear all chart, plot, and pagination elements
     const contentArea = document.querySelector('.content-area');
     if (contentArea) {
         const elementsToRemove = contentArea.querySelectorAll(
@@ -94,7 +116,6 @@ async function handleRouteChange() {
         contentArea.style.minHeight = 'calc(100vh - 100px)';
     }
 
-    // Show the correct page
     switch (path) {
         case '/':
             document.querySelector('#home-page').style.display = 'block';
@@ -109,8 +130,16 @@ async function handleRouteChange() {
             document.querySelector('#ciliaplot-page').style.display = 'block';
             displayCiliaPlotPage();
             if (gene) {
-                renderDomainEnrichment([gene]);
-                computeProteinComplexLinks([gene]);
+                try {
+                    renderDomainEnrichment([gene]);
+                    computeProteinComplexLinks([gene]);
+                } catch (err) {
+                    console.error('Error in renderDomainEnrichment or computeProteinComplexLinks:', err);
+                    const plotArea = document.getElementById('plot-display-area');
+                    if (plotArea) {
+                        plotArea.innerHTML = `<p class="status-message error">Error processing gene data: ${err.message}</p>`;
+                    }
+                }
             }
             break;
         case '/compare':
@@ -140,7 +169,7 @@ async function handleRouteChange() {
             break;
     }
 
-    // Neutralize any dynamically added pagination buttons
+    // Neutralize pagination buttons
     setTimeout(() => {
         const buttons = document.querySelectorAll('.pagination button');
         buttons.forEach(btn => {
