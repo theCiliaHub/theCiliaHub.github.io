@@ -493,6 +493,9 @@ function mapLocalizationToSVG(localizationArray) {
 /**
  * Renders the content for the home page, including stats, search, and gene cards.
  */
+/**
+ * Renders the content for the home page, including stats, search, and gene cards.
+ */
 function displayHomePage() {
     const contentArea = document.querySelector('.content-area');
     contentArea.className = 'content-area';
@@ -505,26 +508,22 @@ function displayHomePage() {
 
             <!-- CiliaHub V0.1 and Stats Section -->
             <div class="ciliahub-stats" style="margin-top: 1rem; margin-bottom: 2rem; display: flex; gap: 1rem; flex-wrap: wrap; font-family: 'Arial', sans-serif;">
-                
                 <!-- Version -->
-                <div style="flex: 1; min-width: 140px; background-color: #007bff; color: #fff; padding: 1rem; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.15); text-align: center;">
+                <div class="stats-box version-box" style="flex: 1; min-width: 140px; background-color: var(--neutral-bg-alt); color: var(--text-dark); padding: 1rem; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.15); text-align: center;">
                     <div style="font-size: 1.2rem; font-weight: 700;">CiliaHub V0.1</div>
                 </div>
-
                 <!-- Genes -->
-                <div style="flex: 1; min-width: 140px; background-color: #e7f1ff; color: #007bff; padding: 1rem; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); text-align: center;">
+                <div class="stats-box" style="flex: 1; min-width: 140px; background-color: var(--neutral-bg-alt); color: var(--primary-blue); padding: 1rem; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); text-align: center;">
                     <div id="gene-count" style="font-size: 1.5rem; font-weight: 700;">0</div>
                     <div>Genes</div>
                 </div>
-
                 <!-- Localizations -->
-                <div style="flex: 1; min-width: 140px; background-color: #e7f1ff; color: #007bff; padding: 1rem; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); text-align: center;">
+                <div class="stats-box" style="flex: 1; min-width: 140px; background-color: var(--neutral-bg-alt); color: var(--primary-blue); padding: 1rem; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); text-align: center;">
                     <div id="localization-count" style="font-size: 1.5rem; font-weight: 700;">0</div>
                     <div>Localizations</div>
                 </div>
-
                 <!-- References -->
-                <div style="flex: 1; min-width: 140px; background-color: #e7f1ff; color: #007bff; padding: 1rem; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); text-align: center;">
+                <div class="stats-box" style="flex: 1; min-width: 140px; background-color: var(--neutral-bg-alt); color: var(--primary-blue); padding: 1rem; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); text-align: center;">
                     <div id="reference-count" style="font-size: 1.5rem; font-weight: 700;">0</div>
                     <div>References</div>
                 </div>
@@ -621,9 +620,8 @@ function displayHomePage() {
     // --- Display initial gene cards (using all genes) ---
     displayGeneCards(allGenes, [], 1, 10);
 
-    // --- Update stats and plot using the globally loaded `allGenes` array ---
+    // --- Update stats using the globally loaded `allGenes` array ---
     if (allGenes && allGenes.length > 0) {
-        // Calculate and display statistics
         const geneCount = allGenes.length;
         const uniqueLocalizations = new Set(allGenes.flatMap(g => getCleanArray(g, 'localization'))).size;
         const uniqueReferences = new Set(allGenes.map(g => g.reference).filter(Boolean)).size;
@@ -632,8 +630,10 @@ function displayHomePage() {
         document.getElementById('localization-count').textContent = uniqueLocalizations;
         document.getElementById('reference-count').textContent = uniqueReferences;
     }
-}
 
+    // --- Do NOT call displayLocalizationChart to prevent chart and potential blue background ---
+    // displayLocalizationChart(); // Removed to avoid unwanted section
+}
 
 /**
  * Renders the content for the gene details page.
