@@ -61,6 +61,15 @@ async function loadAndPrepareDatabase() {
     );
 }
 
+const geneName = getGeneFromURL();
+if (geneName) {
+    const geneData = window.allGenes.find(g => g.gene === geneName);
+    if (geneData) {
+        renderDomainEnrichment([geneData]);
+        computeProteinComplexLinks([geneData]);
+    }
+}
+
 // =============================================================================
 // PLOT CUSTOMIZATION & DOWNLOAD
 // =============================================================================
