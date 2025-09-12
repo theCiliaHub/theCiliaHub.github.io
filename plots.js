@@ -62,13 +62,22 @@ async function loadAndPrepareDatabase() {
 }
 
 const geneName = getGeneFromURL();
-if (geneName) {
+
+if (geneName && Array.isArray(window.allGenes)) {
     const geneData = window.allGenes.find(g => g.gene === geneName);
+    
+    console.log("DEBUG plots.js: selectedGene =", geneName, "allGenes loaded =", window.allGenes.length);
+    
     if (geneData) {
         renderDomainEnrichment([geneData]);
         computeProteinComplexLinks([geneData]);
+    } else {
+        console.warn("Gene not found in database:", geneName);
     }
+} else {
+    console.warn("No gene specified in URL or database not loaded yet.");
 }
+
 
 // =============================================================================
 // PLOT CUSTOMIZATION & DOWNLOAD
