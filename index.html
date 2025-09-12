@@ -7,6 +7,26 @@
     <meta name="description" content="The CiliaHub is a comprehensive bioinformatics database for genes with ciliary functions.">
     <link rel="icon" type="image/png" href="CiliaHub_Logo_web.png">
     <link rel="stylesheet" href="styles.css">
+    
+    <!-- Inline CSS override to permanently hide/fix the problematic section and blue background -->
+    <style>
+        /* Force-hide any dynamically added Localization section and remove blue background */
+        .localization-section,
+        #localization-section,
+        [class*="localization"],
+        [id*="localization"] {
+            display: none !important;
+            background: none !important;
+            visibility: hidden !important;
+        }
+        /* Ensure home page layout doesn't extend due to hidden content */
+        #home-page {
+            min-height: auto;
+        }
+        .main-container {
+            overflow: hidden; /* Prevent layout bleed from hidden elements */
+        }
+    </style>
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@panzoom/panzoom@4.5.1/dist/panzoom.min.js"></script>
@@ -138,6 +158,7 @@
                 <div id="enrichment-tooltip" class="tooltip"></div>
                 <div id="multi-dim-tooltip" class="tooltip"></div>
             </div>
+
             <div id="compare-page" style="display: none;"></div>
             <div id="batch-query-page" style="display: none;"></div>
             <div id="expression-page" style="display: none;"></div>
@@ -161,7 +182,7 @@
                     </svg>
                 </div>
                 <div class="controls">
-                    <h4>Gene Localization</h4>
+                    <h4>Gene Localization:</h4>
                     <div id="geneButtons" class="gene-buttons"></div>
                 </div>
             </div>
