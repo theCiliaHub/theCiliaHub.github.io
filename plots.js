@@ -3,7 +3,22 @@
 // =============================================================================
 
 let currentPlotInstance = null; // Holds the active Chart.js, D3, etc. instance
+let geneName = getGeneFromURL();
+if (!geneName) {
+    // Pick first default gene from allGenes
+    geneName = window.allGenes.length > 0 ? window.allGenes[0].gene : null;
+    console.log("No gene specified, using default:", geneName);
+}
 
+if (geneName) {
+    const geneData = window.allGenes.find(g => g.gene === geneName);
+    if (geneData) {
+        renderDomainEnrichment([geneData]);
+        computeProteinComplexLinks([geneData]);
+    } else {
+        console.warn("Gene not found in database:", geneName);
+    }
+}
 /**
  * Robustly extracts a clean array of values from a gene object,
  * handling multiple possible keys, data types, and nested separators.
