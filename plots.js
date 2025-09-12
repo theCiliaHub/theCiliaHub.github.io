@@ -495,11 +495,14 @@ function renderComplexNetwork(foundGenes, container) {
 }
 
 // =============================================================================
-// MAIN CONTROLLER & UI
+// UPDATES FOR PLOTS.JS
 // =============================================================================
+// Update the generateAnalysisPlots function in plots.js to include expression loading
 async function generateAnalysisPlots() {
     try {
         await loadAndPrepareDatabase();
+        await loadExpressionData(); // Add this line to load expression data
+
         const plotContainer = document.getElementById('plot-display-area');
         const genesInput = document.getElementById('ciliaplot-genes-input').value.trim();
         if (!genesInput) {
@@ -507,14 +510,13 @@ async function generateAnalysisPlots() {
             return;
         }
         plotContainer.innerHTML = '<p class="status-message">Generating plot...</p>';
-        
+
         const sanitizedQueries = [...new Set(genesInput.split(/[\s,;\n\r\t]+/).filter(Boolean).map(q => q.toUpperCase()))];
         const { foundGenes } = findGenes(sanitizedQueries);
         const plotType = document.getElementById('plot-type-select').value;
-        
+
         updatePlotInfo(plotType);
         updateStatsAndLegend(plotType, foundGenes);
-
         switch (plotType) {
             case 'bubble':
                 renderKeyLocalizations(foundGenes, plotContainer);
@@ -531,6 +533,19 @@ async function generateAnalysisPlots() {
             case 'network':
                 renderComplexNetwork(foundGenes, plotContainer);
                 break;
+            // Add the new expression plot cases
+            case 'expression_heatmap':
+                renderExpressionHeatmap(foundGenes, plotContainer);
+                break;
+            case 'tissue_profile':
+                renderTissueExpressionProfile(foundGenes, plotContainer);
+                break;
+            case 'expression_localization':
+                renderExpressionLocalizationBubble(foundGenes, plotContainer);
+                break;
+            case 'top_tissues':
+                renderTopExpressingTissues(foundGenes, plotContainer);
+                break;
             default:
                 plotContainer.innerHTML = `<p class="status-message">Plot type "${plotType}" is not yet implemented.</p>`;
                 break;
@@ -541,16 +556,44 @@ async function generateAnalysisPlots() {
     }
 }
 
+// Update the updatePlotInfo function in plots.js to include expression plot descriptions
 function updatePlotInfo(plotType) {
     const infoContainer = document.getElementById('ciliaplot-plot-info');
     if (!infoContainer) return;
     let infoHTML = '';
     switch (plotType) {
-        case 'bubble': infoHTML = `<strong>Key Localizations:</strong> This bubble plot shows the distribution of your genes across primary ciliary and cellular compartments. The size of each bubble corresponds to the number of genes found in that location.`; break;
-        case 'matrix': infoHTML = `<strong>Gene-Localization Matrix:</strong> This plot shows the specific localization for each gene in your list. A bubble indicates that a gene is associated with a particular ciliary compartment.`; break;
-        case 'domain_matrix': infoHTML = `<strong>Gene-Domain Matrix:</strong> This plot shows which protein domains are present in each gene from your list.`; break;
-        case 'functional_category': infoHTML = `<strong>Functional Category Analysis:</strong> This chart displays the number of genes in your list that fall into various biological functions and processes.`; break;
-        case 'network': infoHTML = `<strong>Protein Complex Network:</strong> This visualization shows connections between genes in your list that are known to be part of the same protein complex.`; break;
+        case 'bubble':
+             infoHTML = `<strong>Key Localizations:</strong> This bubble plot shows the distribution of your genes across primary ciliary and cellular compartments. The size of each bubble corresponds to the number of genes found in that location.`;
+             break;
+        case 'matrix':
+             infoHTML = `<strong>Gene-Localization Matrix:</strong> This plot shows the specific localization for each gene in your list. A bubble indicates that a gene is associated with a particular ciliary compartment.`;
+             break;
+        case 'domain_matrix':
+             infoHTML = `<strong>Gene-Domain Matrix:</strong> This plot shows which protein domains are present in each gene. This helps identify shared functional components among your selected genes.`;
+             break;
+        
+        // ✨ COMPLETED SECTION ✨
+        case 'functional_category':
+             infoHTML = `<strong>Functional Category Bar Chart:</strong> This chart categorizes your genes into broader functional groups, providing an overview of the biological processes they are involved in.`;
+             break;
+        case 'network':
+             infoHTML = `<strong>Protein Complex Network:</strong> This network graph visualizes known protein-protein interactions and complex memberships among your selected genes, revealing functional modules.`;
+             break;
+        case 'expression_heatmap':
+             infoHTML = `<strong>Expression Heatmap:</strong> This plot displays the expression level (nTPM) of each selected gene across various human tissues. Darker colors indicate higher expression.`;
+             break;
+        case 'tissue_profile':
+             infoHTML = `<strong>Tissue Expression Profile:</strong> This radar chart shows the average expression of your gene set across tissues, highlighting potential tissue-specific enrichment.`;
+             break;
+        case 'expression_localization':
+             infoHTML = `<strong>Expression vs. Localization:</strong> This bubble plot correlates expression breadth (number of expressing tissues) with localization diversity. Bubble size represents the maximum expression level.`;
+             break;
+        case 'top_tissues':
+             infoHTML = `<strong>Top Expressing Tissues:</strong> This bar chart ranks tissues by the average expression level of your gene set, showing where these genes are most active.`;
+             break;
+        default:
+             infoHTML = `Select a plot type to see a description.`;
+             break;
     }
     infoContainer.innerHTML = infoHTML;
 }
