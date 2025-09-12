@@ -490,6 +490,9 @@ function mapLocalizationToSVG(localizationArray) {
     }).filter(id => allPartIds.includes(id));
 }
 
+/**
+ * Renders the content for the home page, including stats, search, and gene cards.
+ */
 function displayHomePage() {
     const contentArea = document.querySelector('.content-area');
     contentArea.className = 'content-area';
@@ -648,6 +651,29 @@ function displayHomePage() {
         document.getElementById('reference-count').textContent = totalReferences;
     }
 }
+
+
+/**
+ * Renders the content for the gene details page.
+ * @param {string} geneName - The name of the gene to display.
+ */
+function displayGeneDetailsPage(geneName) {
+    // This function can be expanded later
+    const contentArea = document.querySelector('.content-area');
+    contentArea.innerHTML = `<h1>Details for ${geneName}</h1><p>Details page is under construction.</p>`;
+}
+
+/**
+ * Renders the content for the batch query page.
+ */
+function displayBatchQueryPage() {
+    // This function can be expanded later
+    const contentArea = document.querySelector('.content-area');
+    contentArea.innerHTML = `<h1>Batch Query</h1><p>Batch query page is under construction.</p>`;
+}
+
+// Note: The main `initializeApp` function in globals.js now starts everything.
+
 
 
 function displayBatchQueryTool() {
