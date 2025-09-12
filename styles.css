@@ -454,7 +454,7 @@ body {
 }
 
 .gene-tag {
-    background: var(--border-color);
+    background: var(--mpb-border); /* Uses the #c2d9e6 color */
     padding: 0.5rem 1rem;
     border-radius: 15px;
     font-size: 0.9rem;
