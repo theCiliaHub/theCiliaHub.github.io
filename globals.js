@@ -54,12 +54,15 @@ async function handleRouteChange() {
     }
 
     let gene = null;
-    if (geneMapCache) {
-        const geneName = sanitize(path.split('/').pop().replace('.html', ''));
-        gene = geneMapCache.get(geneName);
-    } else {
-        console.warn("geneMapCache is not initialized yet.");
+if (geneMapCache) {
+    const geneName = getGeneFromURL();
+    if (geneName) {
+        const safeName = sanitize(geneName);
+        gene = geneMapCache.get(safeName);
     }
+} else {
+    console.warn("geneMapCache is not initialized yet.");
+}
 
     updateActiveNav(path);
 
@@ -109,6 +112,26 @@ async function handleRouteChange() {
     }
     console.log("Routing completed. Path:", path, "Gene:", gene ? gene.name : "N/A");
 }
+
+// =============================================================================
+// URL HELPERS
+// =============================================================================
+function getGeneFromURL() {
+    // Try query string first: /ciliaplot?gene=ACTN2
+    const params = new URLSearchParams(window.location.search);
+    const fromQuery = params.get('gene');
+    if (fromQuery) return fromQuery;
+
+    // Fallback: last part of hash or path: /ciliaplot/ACTN2
+    const hashPath = window.location.hash.replace(/^#/, '');
+    const pathParts = hashPath.split('/');
+    if (pathParts.length > 1) {
+        return pathParts[pathParts.length - 1] || null;
+    }
+
+    return null;
+}
+
 
 // =============================================================================
 // EVENT LISTENERS
