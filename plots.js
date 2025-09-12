@@ -588,12 +588,15 @@ function updateStatsAndLegend(plotType, foundGenes) {
 function displayCiliaPlotPage() {
     const contentArea = document.querySelector('.content-area');
     contentArea.className = 'content-area content-area-full ciliaplot-page';
-    if (document.querySelector('.cilia-panel')) {
-        document.querySelector('.cilia-panel').style.display = 'none';
+    const ciliaPanel = document.querySelector('.cilia-panel');
+    if (ciliaPanel) {
+        ciliaPanel.style.display = 'none';
     }
 
-    // Clear existing charts, plots, and pagination
-    const existingElements = contentArea.querySelectorAll('canvas, .chart-container, .page-section, .pagination, .stats-container, .legend');
+    // Clear plot-related elements
+    const existingElements = contentArea.querySelectorAll(
+        'canvas, .chart-container, .page-section, .pagination, .stats-container, .legend, #ciliaplot-stats-container, #plot-display-area'
+    );
     existingElements.forEach(el => el.closest('.page-section, .plot-container-new, .ciliaplot-container-new')?.remove() || el.remove());
 
     contentArea.innerHTML = `
@@ -643,26 +646,42 @@ function displayCiliaPlotPage() {
             </div>
             <div class="ciliaplot-right-panel-new">
                 <div id="ciliaplot-plot-info" class="info" style="background: var(--neutral-bg-alt); border-left: 4px solid var(--accent-green-2);">Select an analysis type and click "Run Analysis" to begin.</div>
-                <div id="ciliaplot-stats-container" class="stats-container" style="background: var(--panel-bg);"></div>
+                <div id="ciliaplot-stats-container" class="stats-container" style="background: var(--panel-bg); display: none;"></div>
                 <div id="plot-display-area" class="plot-container-new" style="background: var(--panel-bg); min-height: 500px;"><p class="status-message">Your plot will appear here.</p></div>
-                <div id="ciliaplot-legend-container" class="legend" style="background: var(--panel-bg);"></div>
+                <div id="ciliaplot-legend-container" class="legend" style="background: var(--panel-bg); display: none;"></div>
             </div>
         </div>
     </div>`;
 
-    // Neutralize pagination buttons if added dynamically
-    const neutralizePagination = () => {
+    const neutralizePaginationAndHandleErrors = () => {
         const buttons = contentArea.querySelectorAll('.pagination button');
         buttons.forEach(btn => {
             btn.style.background = 'var(--neutral-bg-alt)';
             btn.style.color = 'var(--text-dark)';
             btn.style.border = '1px solid var(--border-color)';
         });
+
+        const plotArea = document.getElementById('plot-display-area');
+        const statsContainer = document.getElementById('ciliaplot-stats-container');
+        if (!allGenes || allGenes.length === 0) {
+            plotArea.innerHTML = '<p class="status-message error">Error: No gene data loaded. Please try again.</p>';
+            statsContainer.style.display = 'none';
+            console.error('No gene data available in allGenes');
+        }
     };
 
     document.getElementById('generate-plot-btn').addEventListener('click', () => {
-        generateAnalysisPlots();
-        neutralizePagination();
+        try {
+            generateAnalysisPlots();
+            neutralizePaginationAndHandleErrors();
+            const plotArea = document.getElementById('plot-display-area');
+            if (plotArea.innerHTML.includes('Your plot will appear here')) {
+                plotArea.innerHTML = '<p class="status-message error">Failed to load plot data. Please check your input.</p>';
+            }
+        } catch (err) {
+            console.error('Error in generateAnalysisPlots:', err);
+            document.getElementById('plot-display-area').innerHTML = `<p class="status-message error">Error generating plot: ${err.message}</p>`;
+        }
     });
 
     document.getElementById('download-plot-btn').addEventListener('click', downloadPlot);
@@ -670,8 +689,13 @@ function displayCiliaPlotPage() {
     document.getElementById('plot-type-select').addEventListener('change', () => {
         const plotArea = document.getElementById('plot-display-area');
         if (plotArea && !plotArea.querySelector('.status-message')) {
-            generateAnalysisPlots();
-            neutralizePagination();
+            try {
+                generateAnalysisPlots();
+                neutralizePaginationAndHandleErrors();
+            } catch (err) {
+                console.error('Error in generateAnalysisPlots on plot type change:', err);
+                plotArea.innerHTML = `<p class="status-message error">Error generating plot: ${err.message}</p>`;
+            }
         } else {
             updatePlotInfo(document.getElementById('plot-type-select').value);
         }
@@ -681,8 +705,13 @@ function displayCiliaPlotPage() {
     settingsGrid.addEventListener('change', (event) => {
         if (event.target.id.startsWith('setting-') && currentPlotInstance) {
             setTimeout(() => {
-                generateAnalysisPlots();
-                neutralizePagination();
+                try {
+                    generateAnalysisPlots();
+                    neutralizePaginationAndHandleErrors();
+                } catch (err) {
+                    console.error('Error in generateAnalysisPlots on settings change:', err);
+                    document.getElementById('plot-display-area').innerHTML = `<p class="status-message error">Error generating plot: ${err.message}</p>`;
+                }
             }, 50);
         }
     });
