@@ -298,16 +298,22 @@ function calculateDomainEnrichmentFactor(selectedGenes, allGenes) {
 
 function renderDomainEnrichmentFactorPlot(selectedGenes, allGenes, container) {
     const settings = getPlotSettings();
+
+    // Ensure selectedGenes is always an array
+    if (!Array.isArray(selectedGenes)) selectedGenes = [selectedGenes];
+    if (!Array.isArray(allGenes)) allGenes = [allGenes];
+
     const { enrichmentData } = calculateDomainEnrichmentFactor(selectedGenes, allGenes);
 
-    if (!enrichmentData || enrichmentData.length === 0) {
+    // Make sure enrichmentData is an array
+    const data = Array.isArray(enrichmentData) ? enrichmentData : [];
+    if (data.length === 0) {
         container.innerHTML = '<p class="status-message">No domain enrichment found.</p>';
         return;
     }
 
     container.innerHTML = '';
-
-    const topData = enrichmentData.slice(0, 20); // top 20 enriched domains
+    const topData = data.slice(0, 20);
     const margin = { top: 40, right: 30, bottom: 80, left: 250 };
     const width = container.clientWidth - margin.left - margin.right;
     const height = topData.length * 28;
@@ -417,10 +423,18 @@ function computeProteinComplexLinks(foundGenes) {
 
 function renderComplexNetwork(foundGenes, container) {
     const settings = getPlotSettings();
+
+    // Normalize input
+    if (!Array.isArray(foundGenes)) foundGenes = [foundGenes];
+
     const { nodes, links } = computeProteinComplexLinks(foundGenes);
 
-    if (!nodes.length || !links.length) {
-        container.innerHTML = '<p class="status-message">No protein complex links found among the selected genes.</p>';
+    // Ensure nodes and links are arrays
+    const nodeArray = Array.isArray(nodes) ? nodes : [];
+    const linkArray = Array.isArray(links) ? links : [];
+
+    if (!nodeArray.length || !linkArray.length) {
+        container.innerHTML = '<p class="status-message">No protein complex links found.</p>';
         return;
     }
 
