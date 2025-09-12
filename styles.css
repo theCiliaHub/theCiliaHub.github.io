@@ -1260,3 +1260,143 @@ input[type="color"] {
 .link.gene-localization { stroke: #8e44ad; }
 #multi-dim-legend-container .legend-color { border-radius: 50%; }
 .matrix-cell { stroke: #fff; stroke-width: 0.5px; cursor: pointer; }
+
+
+
+/* =================================================== */
+/* CiliaHub: Redesigned Single Gene Page               */
+/* =================================================== */
+
+.gene-detail-page {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+/* Page Header */
+.gene-header {
+  background-color: var(--mpb-light);
+  padding: 2rem;
+  border-radius: var(--border-radius-lg);
+  border: 1px solid var(--mpb-border);
+}
+
+.gene-header h1 {
+  font-size: 2.5rem;
+  font-weight: 800;
+  color: var(--mpb);
+  margin: 0 0 0.5rem 0;
+  line-height: 1.2;
+}
+
+.gene-header .synonym-tags .tag {
+  background-color: var(--mpb-border);
+  font-size: 0.8rem;
+}
+
+.gene-header p {
+  font-size: 1.1rem;
+  color: var(--primary-dark);
+  margin-top: 1rem;
+  max-width: 80ch; /* Improves readability */
+}
+
+/* Two-Column Layout */
+.gene-details-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 2rem;
+  align-items: start;
+}
+
+/* Card Styling */
+.detail-card {
+  background: var(--panel-bg);
+  border: 1px solid var(--mpb-border);
+  border-radius: 0.75rem; /* Slightly softer corners */
+  padding: 1.5rem;
+  box-shadow: 0 4px 12px rgba(0, 103, 165, 0.05);
+  height: 100%; /* Make cards in the same row equal height */
+}
+
+.card-title {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--mpb);
+  margin: 0 0 1rem 0;
+  padding-bottom: 0.75rem;
+  border-bottom: 2px solid var(--mpb-border);
+}
+
+.card-title svg {
+  width: 24px;
+  height: 24px;
+  stroke: var(--mpb);
+  stroke-width: 2;
+}
+
+/* Key-Value Info Items */
+.info-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.info-item strong {
+  display: block;
+  color: var(--primary-dark);
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+  font-size: 0.9rem;
+}
+
+.info-item a {
+  word-break: break-all;
+}
+
+/* Tag/Pill Styling */
+.tags-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.tag {
+  display: inline-block;
+  padding: 0.25rem 0.75rem;
+  border-radius: 999px;
+  background-color: var(--mpb-light);
+  color: var(--mpb);
+  font-weight: 500;
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+
+.tag-ciliopathy {
+    background-color: #fceded;
+    color: var(--accent-red);
+}
+
+/* References List */
+.reference-list {
+    list-style-type: disc;
+    padding-left: 1.5rem;
+    margin: 0;
+}
+
+.reference-list li::marker {
+    color: var(--mpb);
+}
+
+/* Responsive Breakpoint */
+@media (max-width: 900px) {
+  .gene-details-grid {
+    grid-template-columns: 1fr; /* Stack columns on smaller screens */
+  }
+}
