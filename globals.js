@@ -1,33 +1,3 @@
-async function loadAndPrepareDatabase() {
-    try {
-        if (!allGenes || allGenes.length === 0) {
-            console.log('Loading gene database...');
-            // Simulate or replace with actual data fetching logic
-            // Example: const response = await fetch('/api/genes');
-            // allGenes = await response.json();
-            allGenes = []; // Placeholder; replace with actual data
-            if (!allGenes || allGenes.length === 0) {
-                throw new Error('Gene database is empty or failed to load');
-            }
-
-            geneMapCache = new Map();
-            allGenes.forEach(gene => {
-                if (gene.gene) {
-                    geneMapCache.set(sanitize(gene.gene.toLowerCase()), gene);
-                }
-            });
-            console.log('Database loaded. Genes:', allGenes.length, 'Cache size:', geneMapCache.size);
-        }
-    } catch (err) {
-        console.error('Failed to load database:', err);
-        const contentArea = document.querySelector('.content-area');
-        if (contentArea) {
-            contentArea.innerHTML = `<p class="status-message error">Error loading database: ${err.message}</p>`;
-        }
-        throw err;
-    }
-}
-
 // =============================================================================
 // GLOBAL VARIABLES
 // =============================================================================
@@ -75,9 +45,13 @@ async function handleRouteChange() {
     }
 
     try {
-        await loadAndPrepareDatabase();
+        await loadAndPrepareDatabase(); // Defined in script.js
     } catch (err) {
         console.error('Database loading failed:', err);
+        const contentArea = document.querySelector('.content-area');
+        if (contentArea) {
+            contentArea.innerHTML += `<p class="status-message error">Error loading database: ${err.message}</p>`;
+        }
     }
 
     let gene = null;
@@ -96,6 +70,7 @@ async function handleRouteChange() {
 
     updateActiveNav(path);
 
+    // Hide all pages
     const pages = [
         '#home-page', '#analysis-page', '#batch-query-page',
         '#ciliaplot-page', '#compare-page', '#expression-page',
@@ -106,16 +81,18 @@ async function handleRouteChange() {
         if (el) el.style.display = 'none';
     });
 
+    // Clear plot-related elements, preserve home page and search
     const contentArea = document.querySelector('.content-area');
     if (contentArea) {
         const elementsToRemove = contentArea.querySelectorAll(
-            '#locChart, .page-section, .plot-container-new, .chart-container, canvas, .stats-container, .legend, .pagination'
+            '#locChart, .page-section:not(#home-page .page-section), .plot-container-new, .chart-container, canvas, .stats-container:not(.ciliahub-stats), .legend, .pagination, #ciliaplot-stats-container, #plot-display-area'
         );
         elementsToRemove.forEach(el => el.closest('.page-section, .plot-container-new, .ciliaplot-container-new')?.remove() || el.remove());
         contentArea.style.background = 'var(--panel-bg)';
         contentArea.style.minHeight = 'calc(100vh - 100px)';
     }
 
+    // Show the correct page
     switch (path) {
         case '/':
             document.querySelector('#home-page').style.display = 'block';
@@ -169,15 +146,36 @@ async function handleRouteChange() {
             break;
     }
 
-    // Neutralize pagination buttons
-    setTimeout(() => {
-        const buttons = document.querySelectorAll('.pagination button');
-        buttons.forEach(btn => {
-            btn.style.background = 'var(--neutral-bg-alt)';
-            btn.style.color = 'var(--text-dark)';
-            btn.style.border = '1px solid var(--border-color)';
+    // Restore search event listener
+    const searchInput = document.getElementById('single-gene-search');
+    if (searchInput) {
+        searchInput.addEventListener('input', () => {
+            const query = searchInput.value.trim().toUpperCase();
+            const suggestionsContainer = document.getElementById('search-suggestions');
+            if (query.length < 1) {
+                suggestionsContainer.innerHTML = '';
+                suggestionsContainer.style.display = 'none';
+                return;
+            }
+            const filteredGenes = allGenes.filter(g =>
+                (g.gene && g.gene.toUpperCase().startsWith(query)) ||
+                (g.synonym && g.synonym.toUpperCase().includes(query)) ||
+                (g.ensembl_id && g.ensembl_id.toUpperCase().startsWith(query))
+            ).slice(0, 10);
+            if (filteredGenes.length > 0) {
+                suggestionsContainer.innerHTML = '<ul>' +
+                    filteredGenes.map(g => {
+                        const details = [g.ensembl_id, g.synonym].filter(Boolean).join(', ');
+                        return `<li data-gene="${g.gene}">${g.gene}${details ? ` (${details})` : ''}</li>`;
+                    }).join('') +
+                    '</ul>';
+                suggestionsContainer.style.display = 'block';
+            } else {
+                suggestionsContainer.innerHTML = '';
+                suggestionsContainer.style.display = 'none';
+            }
         });
-    }, 100);
+    }
 
     console.log("Routing completed. Path:", path, "Gene:", gene ? gene.gene : "N/A");
 }
@@ -234,6 +232,37 @@ function initGlobalEventListeners() {
             e.preventDefault();
             const panzoom = Panzoom(ciliaSvg);
             panzoom.zoom(panzoom.getScale() * (e.deltaY > 0 ? 0.9 : 1.1));
+        });
+    }
+
+    // Ensure search event listener
+    const searchInput = document.getElementById('single-gene-search');
+    if (searchInput) {
+        searchInput.addEventListener('input', () => {
+            const query = searchInput.value.trim().toUpperCase();
+            const suggestionsContainer = document.getElementById('search-suggestions');
+            if (query.length < 1) {
+                suggestionsContainer.innerHTML = '';
+                suggestionsContainer.style.display = 'none';
+                return;
+            }
+            const filteredGenes = allGenes.filter(g =>
+                (g.gene && g.gene.toUpperCase().startsWith(query)) ||
+                (g.synonym && g.synonym.toUpperCase().includes(query)) ||
+                (g.ensembl_id && g.ensembl_id.toUpperCase().startsWith(query))
+            ).slice(0, 10);
+            if (filteredGenes.length > 0) {
+                suggestionsContainer.innerHTML = '<ul>' +
+                    filteredGenes.map(g => {
+                        const details = [g.ensembl_id, g.synonym].filter(Boolean).join(', ');
+                        return `<li data-gene="${g.gene}">${g.gene}${details ? ` (${details})` : ''}</li>`;
+                    }).join('') +
+                    '</ul>';
+                suggestionsContainer.style.display = 'block';
+            } else {
+                suggestionsContainer.innerHTML = '';
+                suggestionsContainer.style.display = 'none';
+            }
         });
     }
 }
