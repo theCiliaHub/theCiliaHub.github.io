@@ -1142,14 +1142,14 @@ function displayIndividualGenePage(gene) {
                 return `<li class="text-[#0067A5]">${ref}</li>`;
             }).join('');
     };
-const formatComplexes = (complexes) => {
-    if (!complexes) return '<span class="text-gray-500">No complexes found for this gene.</span>';
-    const arr = Array.isArray(complexes) ? complexes.join(';').split(/;\s*/) : String(complexes).split(/;\s*/);
-    return arr.map(name => {
-        const url = `https://mips.helmholtz-muenchen.de/corum/#search;complex=${encodeURIComponent(name.trim())}`;
-        return `<a href="${url}" target="_blank" class="tag tag-complex hover:underline">${name.trim()}</a>`;
-    }).join(' ');
-};
+    const formatComplexes = (complexes) => {
+        if (!complexes) return '<span class="text-gray-500">No complexes found for this gene.</span>';
+        const arr = Array.isArray(complexes) ? complexes.join(';').split(/;\s*/) : String(complexes).split(/;\s*/);
+        return arr.map(name => {
+            const url = `https://mips.helmholtz-muenchen.de/corum/#search;complex=${encodeURIComponent(name.trim())}`;
+            return `<a href="${url}" target="_blank" class="tag tag-complex hover:underline">${name.trim()}</a>`;
+        }).join(' ');
+    };
 
     const formatPfam = (ids) => {
         if (!ids) return 'Not available';
@@ -1186,11 +1186,15 @@ const formatComplexes = (complexes) => {
         <div class="details-column space-y-6">
 
           <div class="detail-card p-4 rounded-2xl shadow-md bg-white">
-            <h3 class="card-title text-lg font-semibold">Identifiers</h3>
+            <h3 class="card-title text-lg font-semibold">Identifiers & External Links</h3>
             <div class="space-y-3">
               <div><strong class="text-[#0067A5]">Ensembl ID(s):</strong> ${ensemblHTML}</div>
               ${gene.omim_id ? `<div><strong class="text-[#0067A5]">OMIM ID:</strong> <a href="https://www.omim.org/entry/${gene.omim_id}" target="_blank" class="text-[#0067A5] hover:underline">${gene.omim_id}</a></div>` : ''}
               ${gene.synonym ? `<div><strong class="text-[#0067A5]">Synonym(s):</strong> <span class="text-[#0067A5]">${gene.synonym}</span></div>` : ''}
+              
+              ${gene.string_link ? `<div><strong class="text-[#0067A5]">STRING DB:</strong> <a href="${gene.string_link}" target="_blank" class="text-[#0067A5] hover:underline">Protein Interaction Network</a></div>` : ''}
+              ${gene.protein_atlas_link ? `<div><strong class="text-[#0067A5]">Protein Atlas:</strong> <a href="${gene.protein_atlas_link}" target="_blank" class="text-[#0067A5] hover:underline">Subcellular Localization</a></div>` : ''}
+
             </div>
           </div>
 
@@ -1231,7 +1235,6 @@ const formatComplexes = (complexes) => {
     if (typeof updateGeneButtons === "function") updateGeneButtons([gene], [gene]);
     if (typeof showLocalization === "function") showLocalization(gene.gene, true);
 }
-
 
 function displayNotFoundPage() {
     const contentArea = document.querySelector('.content-area');
