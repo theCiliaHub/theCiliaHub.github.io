@@ -239,36 +239,27 @@ function renderGeneMatrix(foundGenes, container) {
 }
 
 function calculateDomainEnrichmentFactor(selectedData, database) {
-    console.log('Selected Data:', selectedData.length, 'Database:', database.length);
     if (selectedData.length === 0 || database.length === 0) {
         console.warn('Empty selectedData or database in calculateDomainEnrichmentFactor');
         return { enrichmentData: [] };
     }
 
-    console.log('Sample Database Domains:', database.slice(0, 5).map(g => ({
-        gene: g.gene,
-        domains: getCleanArray(g, 'Domain_Descriptions', 'domain_descriptions')
-    })));
-
     const countDomains = (geneSet) => {
         const domainCounts = new Map();
         let genesWithDomains = new Set();
         geneSet.forEach(gene => {
-            const domains = getCleanArray(gene, 'Domain_Descriptions', 'domain_descriptions') || ['Unknown'];
-            console.log(`Gene ${gene.gene} domains:`, domains);
-            if (domains.length > 0 && domains[0] !== 'Unknown') {
+            const domains = getCleanArray(gene, 'Domain_Descriptions', 'domain_descriptions');
+            console.log(`Gene ${gene.gene} domains:`, domains); // Debug
+            if (domains.length > 0) {
                 genesWithDomains.add(gene.gene);
                 domains.forEach(d => domainCounts.set(d, (domainCounts.get(d) || 0) + 1));
             }
         });
-        return { counts: domainCounts, total: genesWithDomains.size || 1 }; // Avoid division by zero
+        return { counts: domainCounts, total: genesWithDomains.size };
     };
 
     const { counts: selectedCounts, total: selectedTotal } = countDomains(selectedData);
     const { counts: dbCounts, total: dbTotal } = countDomains(database);
-
-    console.log('Selected Counts:', selectedCounts, 'Total:', selectedTotal);
-    console.log('Database Counts:', dbCounts, 'Total:', dbTotal);
 
     if (selectedTotal === 0 || dbTotal === 0) {
         console.warn('No genes with domains in selectedData or database');
@@ -284,7 +275,6 @@ function calculateDomainEnrichmentFactor(selectedData, database) {
         .filter(d => isFinite(d.factor) && d.factor > 0)
         .sort((a, b) => b.factor - a.factor);
 
-    console.log('Enrichment Data:', enrichmentData);
     return { enrichmentData };
 }
 
@@ -420,118 +410,6 @@ function renderComplexNetwork(foundGenes, container) {
     currentPlotInstance = svg.node();
 }
 
-function renderDomainEnrichmentFactorPlot(foundGenes, allGenes, container) {
-    const settings = getPlotSettings();
-    const { enrichmentData } = calculateDomainEnrichmentFactor(foundGenes, allGenes);
-
-    console.log('Enrichment Data:', enrichmentData); // Debug
-
-    if (!enrichmentData || enrichmentData.length === 0) {
-        container.innerHTML = '<p class="status-message">No domain enrichment found. Check if genes have valid domain data.</p>';
-        console.warn('No valid enrichment data for rendering.');
-        return;
-    }
-
-    if (container.clientWidth === 0 || container.clientHeight === 0) {
-        container.innerHTML = '<p class="status-message">Plot container has invalid dimensions.</p>';
-        console.warn('Invalid container dimensions:', container.clientWidth, container.clientHeight);
-        return;
-    }
-
-    const topData = enrichmentData.slice(0, 20).map(d => ({
-        ...d,
-        domain: d.domain.length > 30 ? d.domain.substring(0, 27) + '...' : d.domain
-    }));
-
-    container.innerHTML = '';
-    const margin = { top: 40, right: 30, bottom: 100, left: 250 };
-    const width = Math.max(400, container.clientWidth - margin.left - margin.right);
-    const height = Math.max(200, topData.length * 28);
-
-    const svg = d3.select(container)
-        .append('svg')
-        .attr('width', width + margin.left + margin.right)
-        .attr('height', height + margin.top + margin.bottom);
-
-    svg.append('rect')
-        .attr('width', '100%')
-        .attr('height', '100%')
-        .attr('fill', settings.backgroundColor);
-
-    const g = svg.append('g')
-        .attr('transform', `translate(${margin.left},${margin.top})`);
-
-    const maxFactor = d3.max(topData, d => isFinite(d.factor) ? d.factor : 0);
-    if (maxFactor === 0) {
-        container.innerHTML = '<p class="status-message">Invalid enrichment factors calculated.</p>';
-        console.warn('All enrichment factors are zero or invalid.');
-        return;
-    }
-
-    const x = d3.scaleLinear()
-        .domain([0, maxFactor * 1.1])
-        .range([0, width]);
-
-    const y = d3.scaleBand()
-        .domain(topData.map(d => d.domain))
-        .range([0, height])
-        .padding(0.2);
-
-    g.append('g')
-        .attr('transform', `translate(0,${height})`)
-        .call(d3.axisBottom(x))
-        .call(s => s.selectAll('text')
-            .style('font-family', settings.fontFamily)
-            .style('font-size', settings.tickFontSize + 'px')
-            .style('font-weight', 'bold')
-            .style('fill', settings.fontColor))
-        .call(s => s.selectAll('.domain, .tick line')
-            .style('stroke', settings.axisLineColor)
-            .style('stroke-width', settings.axisLineWidth + 'px'));
-
-    g.append('g')
-        .call(d3.axisLeft(y))
-        .call(s => s.selectAll('text')
-            .style('font-family', settings.fontFamily)
-            .style('font-size', settings.tickFontSize + 'px')
-            .style('font-weight', 'bold')
-            .style('fill', settings.fontColor))
-        .call(s => s.selectAll('.domain, .tick line')
-            .style('stroke', settings.axisLineColor)
-            .style('stroke-width', settings.axisLineWidth + 'px'));
-
-    g.selectAll('.bar')
-        .data(topData)
-        .enter()
-        .append('rect')
-        .attr('class', 'bar')
-        .attr('x', x(0))
-        .attr('y', d => y(d.domain))
-        .attr('width', d => x(isFinite(d.factor) ? d.factor : 0))
-        .attr('height', y.bandwidth())
-        .attr('fill', '#3498db');
-
-    svg.append('text')
-        .attr('text-anchor', 'middle')
-        .attr('x', margin.left + width / 2)
-        .attr('y', 25)
-        .text('Domain Enrichment Factor')
-        .style('font-family', settings.fontFamily)
-        .style('font-size', settings.titleFontSize + 'px')
-        .style('fill', settings.fontColor);
-
-    svg.append('text')
-        .attr('text-anchor', 'middle')
-        .attr('x', margin.left + width / 2)
-        .attr('y', height + margin.top + 60)
-        .text('Enrichment Factor')
-        .style('font-family', settings.fontFamily)
-        .style('font-size', settings.axisTitleFontSize + 'px')
-        .style('font-weight', 'bold')
-        .style('fill', settings.fontColor);
-
-    currentPlotInstance = svg.node();
-}
 
 // =============================================================================
 // MAIN CONTROLLER & UI
@@ -545,26 +423,16 @@ async function generateAnalysisPlots() {
             alert('Please enter a gene list.');
             return;
         }
-        if (!window.allGenes || !window.allGenes.length) {
-            console.error('Background gene set is empty');
-            plotContainer.innerHTML = '<p class="status-message error">Error: Background gene set is empty</p>';
-            return;
-        }
         plotContainer.innerHTML = '<p class="status-message">Generating plot...</p>';
         currentPlotInstance = null;
         const sanitizedQueries = [...new Set(genesInput.split(/[\s,;\n\r\t]+/).filter(Boolean).map(q => q.toUpperCase()))];
         const { foundGenes } = findGenes(sanitizedQueries);
-        console.log('Found Genes:', foundGenes.map(g => g.gene));
-        if (!foundGenes.length) {
-            console.warn('No genes found for input:', sanitizedQueries);
-            plotContainer.innerHTML = '<p class="status-message">No matching genes found in database.</p>';
-            return;
-        }
         const plotType = document.getElementById('plot-type-select').value;
         const backgroundGeneSet = window.allGenes || [];
-        console.log('Background Gene Set Size:', backgroundGeneSet.length);
+        
         updatePlotInfo(plotType);
         updateStatsAndLegend(plotType, foundGenes, backgroundGeneSet);
+        
         switch (plotType) {
             case 'bubble':
                 renderKeyLocalizations(foundGenes, plotContainer);
@@ -587,7 +455,6 @@ async function generateAnalysisPlots() {
         document.getElementById('plot-display-area').innerHTML = `<p class="status-message error">Error generating plot: ${error.message}</p>`;
     }
 }
-
 
 function updatePlotInfo(plotType) {
     const infoContainer = document.getElementById('ciliaplot-plot-info');
