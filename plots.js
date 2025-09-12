@@ -261,121 +261,234 @@ function renderGeneMatrix(foundGenes, container) {
     });
 }
 
-function calculateDomainEnrichmentFactor(selectedData, database) {
-    if (selectedData.length === 0) return { enrichmentData: [] };
-    const countDomains = (geneSet) => {
+function calculateDomainEnrichmentFactor(selectedGenes, allGenes) {
+    if (!selectedGenes || selectedGenes.length === 0) return { enrichmentData: [] };
+
+    const countDomains = geneSet => {
         const domainCounts = new Map();
-        let genesWithDomains = new Set();
+        const genesWithDomains = new Set();
+
         geneSet.forEach(gene => {
-            const domains = getCleanArray(gene, 'Domain_Descriptions', 'domain_descriptions');
+            const domains = getCleanArray(gene, 'Domain_Descriptions', 'domain_descriptions', 'domains');
             if (domains.length > 0) {
                 genesWithDomains.add(gene.gene);
                 domains.forEach(d => domainCounts.set(d, (domainCounts.get(d) || 0) + 1));
             }
         });
+
         return { counts: domainCounts, total: genesWithDomains.size };
     };
-    const { counts: selectedCounts, total: selectedTotal } = countDomains(selectedData);
-    const { counts: dbCounts, total: dbTotal } = countDomains(database);
+
+    const { counts: selectedCounts, total: selectedTotal } = countDomains(selectedGenes);
+    const { counts: dbCounts, total: dbTotal } = countDomains(allGenes);
+
     if (selectedTotal === 0) return { enrichmentData: [] };
+
     const enrichmentData = Array.from(selectedCounts.entries())
-        .map(([domain, count]) => ({ domain, factor: ((count / selectedTotal) / ((dbCounts.get(domain) || 0) / dbTotal)) || 0 }))
+        .map(([domain, count]) => ({
+            domain,
+            factor: ((count / selectedTotal) / ((dbCounts.get(domain) || 0) / dbTotal)) || 0
+        }))
         .sort((a, b) => b.factor - a.factor)
         .filter(d => d.factor > 0);
+
     return { enrichmentData };
 }
 
-function renderDomainEnrichmentFactorPlot(foundGenes, allGenes, container) {
+
+function renderDomainEnrichmentFactorPlot(selectedGenes, allGenes, container) {
     const settings = getPlotSettings();
-    const { enrichmentData } = calculateDomainEnrichmentFactor(foundGenes, allGenes);
-    if (!enrichmentData || enrichmentData.length === 0) { container.innerHTML = '<p class="status-message">No domain enrichment found.</p>'; return; }
-    
+    const { enrichmentData } = calculateDomainEnrichmentFactor(selectedGenes, allGenes);
+
+    if (!enrichmentData || enrichmentData.length === 0) {
+        container.innerHTML = '<p class="status-message">No domain enrichment found.</p>';
+        return;
+    }
+
     container.innerHTML = '';
-    const topData = enrichmentData.slice(0, 20);
+
+    const topData = enrichmentData.slice(0, 20); // top 20 enriched domains
     const margin = { top: 40, right: 30, bottom: 80, left: 250 };
     const width = container.clientWidth - margin.left - margin.right;
     const height = topData.length * 28;
-    
-    const svg = d3.select(container).append("svg").attr("width", width + margin.left + margin.right).attr("height", height + margin.top + margin.bottom);
-    svg.append("rect").attr("width", "100%").attr("height", "100%").attr("fill", settings.backgroundColor);
+
+    const svg = d3.select(container)
+        .append("svg")
+        .attr("width", width + margin.left + margin.right)
+        .attr("height", height + margin.top + margin.bottom);
+
+    svg.append("rect")
+        .attr("width", "100%")
+        .attr("height", "100%")
+        .attr("fill", settings.backgroundColor);
+
     const g = svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
-    
+
     const x = d3.scaleLinear().domain([0, d3.max(topData, d => d.factor) * 1.1]).range([0, width]);
     const y = d3.scaleBand().domain(topData.map(d => d.domain)).range([0, height]).padding(0.2);
 
-    g.append("g").attr("transform", `translate(0,${height})`).call(d3.axisBottom(x)).call(s => s.selectAll("text").style("font-family", settings.fontFamily).style("font-size", settings.tickFontSize + 'px').style("font-weight", "bold").style("fill", settings.fontColor)).call(s => s.selectAll(".domain, .tick line").style("stroke", settings.axisLineColor).style("stroke-width", settings.axisLineWidth + 'px'));
-    g.append("g").call(d3.axisLeft(y)).call(s => s.selectAll("text").style("font-family", settings.fontFamily).style("font-size", settings.tickFontSize + 'px').style("font-weight", "bold").style("fill", settings.fontColor)).call(s => s.selectAll(".domain, .tick line").style("stroke", settings.axisLineColor).style("stroke-width", settings.axisLineWidth + 'px'));
-    
-    g.selectAll(".bar").data(topData).enter().append("rect").attr("x", x(0)).attr("y", d => y(d.domain)).attr("width", d => x(d.factor)).attr("height", y.bandwidth()).attr("fill", "#3498db");
-    
-    svg.append("text").attr("text-anchor", "middle").attr("x", margin.left + width / 2).attr("y", 25).text("Domain Enrichment Factor").style("font-family", settings.fontFamily).style("font-size", settings.titleFontSize + 'px').style("fill", settings.fontColor);
-    svg.append("text").attr("text-anchor", "middle").attr("x", margin.left + width / 2).attr("y", height + margin.top + 60).text("Enrichment Factor").style("font-family", settings.fontFamily).style("font-size", settings.axisTitleFontSize + 'px').style("font-weight", "bold").style("fill", settings.fontColor);
+    g.append("g")
+        .attr("transform", `translate(0,${height})`)
+        .call(d3.axisBottom(x))
+        .call(s => s.selectAll("text")
+            .style("font-family", settings.fontFamily)
+            .style("font-size", settings.tickFontSize + "px")
+            .style("font-weight", "bold")
+            .style("fill", settings.fontColor))
+        .call(s => s.selectAll(".tick line").style("stroke", settings.axisLineColor).style("stroke-width", settings.axisLineWidth + "px"));
+
+    g.append("g")
+        .call(d3.axisLeft(y))
+        .call(s => s.selectAll("text")
+            .style("font-family", settings.fontFamily)
+            .style("font-size", settings.tickFontSize + "px")
+            .style("font-weight", "bold")
+            .style("fill", settings.fontColor))
+        .call(s => s.selectAll(".tick line").style("stroke", settings.axisLineColor).style("stroke-width", settings.axisLineWidth + "px"));
+
+    g.selectAll(".bar")
+        .data(topData)
+        .enter()
+        .append("rect")
+        .attr("x", x(0))
+        .attr("y", d => y(d.domain))
+        .attr("width", d => x(d.factor))
+        .attr("height", y.bandwidth())
+        .attr("fill", "#3498db");
+
+    // Titles
+    svg.append("text")
+        .attr("text-anchor", "middle")
+        .attr("x", margin.left + width / 2)
+        .attr("y", 25)
+        .text("Domain Enrichment Factor")
+        .style("font-family", settings.fontFamily)
+        .style("font-size", settings.titleFontSize + "px")
+        .style("fill", settings.fontColor);
+
+    svg.append("text")
+        .attr("text-anchor", "middle")
+        .attr("x", margin.left + width / 2)
+        .attr("y", height + margin.top + 60)
+        .text("Enrichment Factor")
+        .style("font-family", settings.fontFamily)
+        .style("font-size", settings.axisTitleFontSize + "px")
+        .style("font-weight", "bold")
+        .style("fill", settings.fontColor);
 
     currentPlotInstance = svg.node();
 }
 
+
 // **RESTORED:** This is your original, functional code for the Protein Complex Network, now using the robust parser.
 function computeProteinComplexLinks(foundGenes) {
-    const nodes = foundGenes.map(gene => ({ id: gene.gene }));
+    if (!foundGenes || foundGenes.length === 0) return { nodes: [], links: [] };
+
+    // Nodes: one per gene
+    const nodes = foundGenes.map(g => ({ id: g.gene }));
+
+    // Map each complex to the genes it contains
     const complexMap = new Map();
     foundGenes.forEach(gene => {
-        getCleanArray(gene, 'complex_names', 'complex').forEach(complex => {
-            if (!complexMap.has(complex)) {
-                complexMap.set(complex, new Set());
-            }
-            complexMap.get(complex).add(gene.gene);
-        });
+        getCleanArray(gene, 'complex_names', 'complex', 'complexes')
+            .forEach(complex => {
+                if (!complexMap.has(complex)) complexMap.set(complex, new Set());
+                complexMap.get(complex).add(gene.gene);
+            });
     });
+
+    // Generate links between genes that share a complex
     const linkMap = new Map();
-    complexMap.forEach((genes) => {
-        const geneArray = Array.from(genes);
-        for (let i = 0; i < geneArray.length; i++) {
-            for (let j = i + 1; j < geneArray.length; j++) {
-                const key = [geneArray[i], geneArray[j]].sort().join('-');
-                if (linkMap.has(key)) {
-                    linkMap.get(key).value += 1;
-                } else {
-                    linkMap.set(key, { source: geneArray[i], target: geneArray[j], value: 1 });
-                }
+    complexMap.forEach(genesSet => {
+        const genes = Array.from(genesSet);
+        for (let i = 0; i < genes.length; i++) {
+            for (let j = i + 1; j < genes.length; j++) {
+                const key = [genes[i], genes[j]].sort().join('-');
+                if (linkMap.has(key)) linkMap.get(key).value += 1;
+                else linkMap.set(key, { source: genes[i], target: genes[j], value: 1 });
             }
         }
     });
+
     return { nodes, links: Array.from(linkMap.values()) };
 }
+
+
 
 function renderComplexNetwork(foundGenes, container) {
     const settings = getPlotSettings();
     const { nodes, links } = computeProteinComplexLinks(foundGenes);
+
     if (!nodes.length || !links.length) {
         container.innerHTML = '<p class="status-message">No protein complex links found among the selected genes.</p>';
         return;
     }
+
     container.innerHTML = '';
     const width = container.clientWidth;
     const height = Math.max(500, container.clientHeight);
-    const svg = d3.select(container).append("svg").attr("width", width).attr("height", height);
-    svg.append("rect").attr("width", "100%").attr("height", "100%").attr("fill", settings.backgroundColor);
-    
+
+    const svg = d3.select(container)
+        .append("svg")
+        .attr("width", width)
+        .attr("height", height);
+
+    svg.append("rect")
+        .attr("width", "100%")
+        .attr("height", "100%")
+        .attr("fill", settings.backgroundColor);
+
     const simulation = d3.forceSimulation(nodes)
         .force("link", d3.forceLink(links).id(d => d.id).distance(100))
         .force("charge", d3.forceManyBody().strength(-300))
         .force("center", d3.forceCenter(width / 2, height / 2));
-    
-    const link = svg.append("g").selectAll("line").data(links).enter().append("line").style("stroke", "#999").style("stroke-opacity", 0.6).style("stroke-width", d => Math.sqrt(d.value) * 2);
-    
-    const nodeGroup = svg.append("g").selectAll("g").data(nodes).enter().append("g").call(d3.drag().on("start", (e, d) => { if (!e.active) simulation.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; }).on("drag", (e, d) => { d.fx = e.x; d.fy = e.y; }).on("end", (e, d) => { if (!e.active) simulation.alphaTarget(0); d.fx = null; d.fy = null; }));
-    
-    nodeGroup.append("circle").attr("r", 10).style("fill", "#3498db").style("stroke", "#fff").style("stroke-width", 2);
-    
-    nodeGroup.append("text").text(d => d.id).attr("x", 15).attr("y", 5).style("font-family", settings.fontFamily).style("font-size", "12px").style("fill", settings.fontColor);
-    
+
+    const link = svg.append("g")
+        .selectAll("line")
+        .data(links)
+        .enter()
+        .append("line")
+        .style("stroke", "#999")
+        .style("stroke-opacity", 0.6)
+        .style("stroke-width", d => Math.sqrt(d.value) * 2);
+
+    const nodeGroup = svg.append("g")
+        .selectAll("g")
+        .data(nodes)
+        .enter()
+        .append("g")
+        .call(d3.drag()
+            .on("start", (e, d) => { if (!e.active) simulation.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; })
+            .on("drag", (e, d) => { d.fx = e.x; d.fy = e.y; })
+            .on("end", (e, d) => { if (!e.active) simulation.alphaTarget(0); d.fx = null; d.fy = null; })
+        );
+
+    nodeGroup.append("circle")
+        .attr("r", 10)
+        .style("fill", "#3498db")
+        .style("stroke", "#fff")
+        .style("stroke-width", 2);
+
+    nodeGroup.append("text")
+        .text(d => d.id)
+        .attr("x", 15)
+        .attr("y", 5)
+        .style("font-family", settings.fontFamily)
+        .style("font-size", "12px")
+        .style("fill", settings.fontColor);
+
     simulation.on("tick", () => {
-        link.attr("x1", d => d.source.x).attr("y1", d => d.source.y).attr("x2", d => d.target.x).attr("y2", d => d.target.y);
+        link.attr("x1", d => d.source.x)
+            .attr("y1", d => d.source.y)
+            .attr("x2", d => d.target.x)
+            .attr("y2", d => d.target.y);
+
         nodeGroup.attr("transform", d => `translate(${d.x},${d.y})`);
     });
-    
+
     currentPlotInstance = svg.node();
 }
+
 
 // =============================================================================
 // MAIN CONTROLLER & UI
