@@ -1236,6 +1236,48 @@ input[type="color"] {
     margin: 1rem 0;
     text-align: center;
 }
+
+
+/* Add to the end of styles.css to style ciliahub-stats and prevent blue background */
+.ciliahub-stats {
+    margin-top: 1rem;
+    margin-bottom: 2rem;
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+    font-family: 'Arial', sans-serif;
+}
+
+.stats-box {
+    flex: 1;
+    min-width: 140px;
+    background-color: var(--neutral-bg-alt); /* #f8f9fa */
+    color: var(--primary-blue);
+    padding: 1rem;
+    border-radius: 12px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    text-align: center;
+}
+
+.stats-box.version-box {
+    background-color: var(--neutral-bg-alt); /* #f8f9fa */
+    color: var(--text-dark); /* #333 */
+}
+
+#home-page .content-area {
+    background: var(--panel-bg) !important; /* #ffffff */
+    min-height: 100vh; /* Ensure it covers the viewport */
+}
+
+#home-page .page-section {
+    background: transparent !important;
+}
+
+#home-page #locChart,
+#home-page canvas {
+    display: none !important; /* Hide any stray canvas elements */
+}
+
 .stat-box { padding: 10px; border-radius: 6px; color: white; }
 .stat-box .stat-number { font-size: 1.5rem; font-weight: bold; }
 .stat-box .stat-label { font-size: 0.75rem; opacity: 0.9; }
