@@ -6,7 +6,7 @@ let currentPlotInstance = null; // Holds the active Chart.js, D3, etc. instance
 
 /**
  * Robustly extracts a clean array of values from a gene object,
- * handling multiple possible keys, data types, and nested separators.
+ * handling multiple possible keys, data types, and separators.
  * @param {Object} gene - The gene object from the database.
  * @param {...string} keys - The possible keys to check for the data.
  * @returns {Array<string>} A clean array of strings.
@@ -21,13 +21,16 @@ function getCleanArray(gene, ...keys) {
     }
     if (data == null) return [];
 
-    const initialArray = Array.isArray(data) ? data : String(data).split(';');
+    // ✅ FIX: Use a regular expression to split by either comma or semicolon
+    const separatorRegex = /[,;]/; 
+
+    const initialArray = Array.isArray(data) ? data : String(data).split(separatorRegex);
 
     return initialArray
-        .filter(Boolean) // Remove null, undefined, and empty strings from the array
-        .flatMap(item => String(item).split(';')) // Split items that are themselves lists
-        .map(item => item.trim()) // Trim whitespace
-        .filter(Boolean); // Filter again after trimming to remove empty strings
+        .filter(Boolean) // Remove null, undefined, and empty strings
+        .flatMap(item => String(item).split(separatorRegex)) // Split items that are themselves lists
+        .map(item => item.trim()) // Trim whitespace from each item
+        .filter(Boolean); // Filter again to remove empty strings created by trimming
 }
 
 // =============================================================================
