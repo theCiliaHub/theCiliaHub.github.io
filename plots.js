@@ -650,13 +650,28 @@ function displayCiliaPlotPage() {
         </div>
     </div>`;
 
-    document.getElementById('generate-plot-btn').addEventListener('click', generateAnalysisPlots);
+    // Neutralize pagination buttons if added dynamically
+    const neutralizePagination = () => {
+        const buttons = contentArea.querySelectorAll('.pagination button');
+        buttons.forEach(btn => {
+            btn.style.background = 'var(--neutral-bg-alt)';
+            btn.style.color = 'var(--text-dark)';
+            btn.style.border = '1px solid var(--border-color)';
+        });
+    };
+
+    document.getElementById('generate-plot-btn').addEventListener('click', () => {
+        generateAnalysisPlots();
+        neutralizePagination();
+    });
+
     document.getElementById('download-plot-btn').addEventListener('click', downloadPlot);
 
     document.getElementById('plot-type-select').addEventListener('change', () => {
         const plotArea = document.getElementById('plot-display-area');
         if (plotArea && !plotArea.querySelector('.status-message')) {
             generateAnalysisPlots();
+            neutralizePagination();
         } else {
             updatePlotInfo(document.getElementById('plot-type-select').value);
         }
@@ -665,7 +680,10 @@ function displayCiliaPlotPage() {
     const settingsGrid = document.getElementById('plot-settings-grid');
     settingsGrid.addEventListener('change', (event) => {
         if (event.target.id.startsWith('setting-') && currentPlotInstance) {
-            setTimeout(generateAnalysisPlots, 50);
+            setTimeout(() => {
+                generateAnalysisPlots();
+                neutralizePagination();
+            }, 50);
         }
     });
 
