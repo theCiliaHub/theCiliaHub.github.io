@@ -649,7 +649,6 @@ function displayHomePage() {
     }
 }
 
-
 function displayBatchQueryTool() {
     const contentArea = document.querySelector('.content-area');
     contentArea.className = 'content-area';
