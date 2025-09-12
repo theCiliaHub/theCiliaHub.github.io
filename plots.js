@@ -33,18 +33,34 @@ function normalizeGeneData(database) {
     return database.map(gene => ({
         ...gene,
         gene: gene.gene || gene.gene_name || gene.symbol || "UNKNOWN",
+
+        // Always return array, even if null/missing
         domain_descriptions: getCleanArray(gene, 'Domain_Descriptions', 'domain_descriptions', 'domains')
-            .map(d => typeof d === 'object' ? d.name || d.id || JSON.stringify(d) : d),
+            .map(d => typeof d === 'object' ? d.name || d.id || JSON.stringify(d) : d)
+            .filter(Boolean), // remove empty strings
+
         complex: getCleanArray(gene, 'complex_names', 'complex', 'complexes')
-            .map(c => typeof c === 'object' ? c.name || c.id || JSON.stringify(c) : c),
+            .map(c => typeof c === 'object' ? c.name || c.id || JSON.stringify(c) : c)
+            .filter(Boolean),
+
         localization: getCleanArray(gene, 'localization', 'localizations')
             .map(l => typeof l === 'object' ? l.name || l : l)
+            .filter(Boolean)
     }));
 }
 async function loadAndPrepareDatabase() {
     const rawData = await fetchDatabase();
     window.allGenes = normalizeGeneData(rawData);
+// Debug: check first 5 normalized genes
+    console.log("Sample normalized genes:", 
+        window.allGenes.slice(0, 5).map(g => ({
+            gene: g.gene,
+            domains: g.domain_descriptions,
+            complexes: g.complex
+        }))
+    );
 }
+
 // =============================================================================
 // PLOT CUSTOMIZATION & DOWNLOAD
 // =============================================================================
