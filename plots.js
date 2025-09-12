@@ -1,5 +1,27 @@
 // =============================================================================
-// GLOBAL VARIABLES & DATA PARSING HELPER
+// Developer Note on Home Page Plot (Request 1)
+// =============================================================================
+// The issue of the "Localization in Ciliary Genes" plot not appearing on the
+// home page (path: "/") is likely not within this `plots.js` file. This file
+// exclusively manages the `/ciliaplot` analysis page.
+//
+// The problem is probably in the script that handles the home page rendering.
+// To fix it, find the file that builds the home page and ensure it correctly
+// calls a plotting function (like `renderKeyLocalizations`) after the gene
+// database has fully loaded.
+//
+// Example of what the fix might look like in your home page script:
+//
+//   async function setupHomePage() {
+//       await loadAndPrepareDatabase(); // Ensure data is ready
+//       const allGenes = window.allGenes || [];
+//       const plotContainer = document.getElementById('home-page-plot-container');
+//       if (allGenes.length > 0 && plotContainer) {
+//           renderKeyLocalizations(allGenes, plotContainer); // Pass ALL genes
+//       }
+//   }
+//   setupHomePage();
+//
 // =============================================================================
 
 let currentPlotInstance = null; // Holds the active Chart.js, D3, etc. instance
@@ -48,7 +70,6 @@ function getPlotSettings() {
         axisLineColor: setting('setting-axis-line-color', '#333333'),
         backgroundColor: setting('setting-bg-color', '#ffffff'),
         gridColor: setting('setting-grid-color', '#e0e0e0'),
-        // 2. Set grid to be off by default
         showGrid: document.getElementById('setting-show-grid')?.checked ?? false,
     };
 }
@@ -208,7 +229,12 @@ function renderGeneMatrix(foundGenes, container) {
         container.innerHTML = '<p class="status-message">No genes to display.</p>';
         return;
     }
-    const yCategories = [...new Set(foundGenes.flatMap(g => getCleanArray(g, 'localization')))].filter(Boolean).sort();
+    // 2. Capitalize Y-axis labels
+    const yCategories = [...new Set(foundGenes.flatMap(g => getCleanArray(g, 'localization')))]
+        .filter(Boolean)
+        .map(loc => loc.charAt(0).toUpperCase() + loc.slice(1))
+        .sort();
+
     const xLabels = [...new Set(foundGenes.map(g => g.gene))].sort();
     if (yCategories.length === 0) {
         container.innerHTML = '<p class="status-message">Selected genes have no localization data.</p>';
@@ -219,7 +245,12 @@ function renderGeneMatrix(foundGenes, container) {
         data: {
             datasets: foundGenes.map((gene, index) => ({
                 label: gene.gene,
-                data: getCleanArray(gene, 'localization').map(loc => ({ x: gene.gene, y: loc, r: 10 })),
+                // 2. Ensure data points map to capitalized labels
+                data: getCleanArray(gene, 'localization').map(loc => ({
+                    x: gene.gene,
+                    y: loc.charAt(0).toUpperCase() + loc.slice(1),
+                    r: 10
+                })),
                 backgroundColor: d3.schemeTableau10[index % 10]
             }))
         },
@@ -250,11 +281,6 @@ function renderGeneMatrix(foundGenes, container) {
     });
 }
 
-/**
- * 1. NEW PLOT FUNCTION: Renders a bubble matrix of Genes vs. Domain Descriptions.
- * @param {Array<Object>} foundGenes - The array of gene objects.
- * @param {HTMLElement} container - The DOM element to render the plot into.
- */
 function renderDomainMatrixPlot(foundGenes, container) {
     if (currentPlotInstance) currentPlotInstance.destroy();
     const settings = getPlotSettings();
@@ -265,18 +291,20 @@ function renderDomainMatrixPlot(foundGenes, container) {
         container.innerHTML = '<p class="status-message">No genes to display.</p>';
         return;
     }
-
-    const domainData = foundGenes.flatMap(gene => {
-        const domains = getCleanArray(gene, 'domain_descriptions');
-        return domains.map(domain => ({ gene: gene.gene, domain }));
-    });
     
-    if (domainData.length === 0) {
+    const allDomains = [...new Set(foundGenes.flatMap(g => getCleanArray(g, 'domain_descriptions')))];
+    if (allDomains.length === 0) {
         container.innerHTML = '<p class="status-message">No domain description data found for the selected genes.</p>';
         return;
     }
 
-    const yCategories = [...new Set(domainData.map(d => d.domain))].sort();
+    // 3. Create a map for original vs. truncated labels
+    const yLabelMap = new Map(allDomains.map(domain => [
+        domain,
+        domain.length > 50 ? domain.substring(0, 47) + '...' : domain
+    ]));
+
+    const yCategories = [...yLabelMap.values()].sort();
     const xLabels = [...new Set(foundGenes.map(g => g.gene))].sort();
     
     currentPlotInstance = new Chart(ctx, {
@@ -284,7 +312,12 @@ function renderDomainMatrixPlot(foundGenes, container) {
         data: {
             datasets: foundGenes.map((gene, index) => ({
                 label: gene.gene,
-                data: getCleanArray(gene, 'domain_descriptions').map(domain => ({ x: gene.gene, y: domain, r: 10 })),
+                // 3. Use the map to get the truncated label for each data point
+                data: getCleanArray(gene, 'domain_descriptions').map(domain => ({
+                    x: gene.gene,
+                    y: yLabelMap.get(domain),
+                    r: 10
+                })),
                 backgroundColor: d3.schemeCategory10[index % 10]
             }))
         },
@@ -342,7 +375,12 @@ function renderFunctionalCategoryPlot(foundGenes, container) {
     }
 
     const sortedData = Array.from(categoryCounts.entries()).sort((a, b) => b[1] - a[1]);
-    const labels = sortedData.map(item => item[0]);
+    
+    // 3. Truncate long labels
+    const labels = sortedData.map(item => {
+        const label = item[0];
+        return label.length > 45 ? label.substring(0, 42) + '...' : label;
+    });
     const data = sortedData.map(item => item[1]);
 
     currentPlotInstance = new Chart(ctx, {
@@ -439,7 +477,14 @@ function renderComplexNetwork(foundGenes, container) {
     }));
 
     nodeGroup.append("circle").attr("r", 10).style("fill", "#3498db").style("stroke", "#fff").style("stroke-width", 2);
-    nodeGroup.append("text").text(d => d.id).attr("x", 15).attr("y", 5).style("font-family", settings.fontFamily).style("font-size", "12px").style("fill", settings.fontColor);
+    
+    // 3. Truncate long node labels
+    nodeGroup.append("text")
+        .text(d => d.id.length > 12 ? d.id.substring(0, 9) + '...' : d.id)
+        .attr("x", 15).attr("y", 5)
+        .style("font-family", settings.fontFamily)
+        .style("font-size", "12px")
+        .style("fill", settings.fontColor);
 
     simulation.on("tick", () => {
         link.attr("x1", d => d.source.x).attr("y1", d => d.source.y).attr("x2", d => d.target.x).attr("y2", d => d.target.y);
@@ -617,17 +662,11 @@ function displayCiliaPlotPage() {
     settingsGrid.addEventListener('change', (event) => {
         // Check if the event was triggered by a setting input and a plot exists
         if (event.target.id.startsWith('setting-') && currentPlotInstance) {
-            const plotType = document.getElementById('plot-type-select').value;
-            // Find the correct render function and call it again to update the plot
-            switch (plotType) {
-                case 'bubble': renderKeyLocalizations(findGenes(document.getElementById('ciliaplot-genes-input').value.trim().toUpperCase().split(/[\s,;\n\r\t]+/)).foundGenes, document.getElementById('plot-display-area')); break;
-                case 'matrix': renderGeneMatrix(findGenes(document.getElementById('ciliaplot-genes-input').value.trim().toUpperCase().split(/[\s,;\n\r\t]+/)).foundGenes, document.getElementById('plot-display-area')); break;
-                case 'domain_matrix': renderDomainMatrixPlot(findGenes(document.getElementById('ciliaplot-genes-input').value.trim().toUpperCase().split(/[\s,;\n\r\t]+/)).foundGenes, document.getElementById('plot-display-area')); break;
-                case 'functional_category': renderFunctionalCategoryPlot(findGenes(document.getElementById('ciliaplot-genes-input').value.trim().toUpperCase().split(/[\s,;\n\r\t]+/)).foundGenes, document.getElementById('plot-display-area')); break;
-                case 'network': renderComplexNetwork(findGenes(document.getElementById('ciliaplot-genes-input').value.trim().toUpperCase().split(/[\s,;\n\r\t]+/)).foundGenes, document.getElementById('plot-display-area')); break;
-            }
+            // A small delay ensures the setting value is updated before re-rendering
+            setTimeout(generateAnalysisPlots, 50);
         }
     });
 
     updatePlotInfo(document.getElementById('plot-type-select').value);
 }
+
