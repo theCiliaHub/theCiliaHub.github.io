@@ -1278,6 +1278,51 @@ input[type="color"] {
     display: none !important; /* Hide any stray canvas elements */
 }
 
+/* Add to the end of styles.css to override blue backgrounds */
+body {
+    background: var(--panel-bg) !important; /* #ffffff */
+    margin: 0;
+}
+
+#home-page, #analysis-page, #batch-query-page, #ciliaplot-page, #compare-page, 
+#expression-page, #download-page, #contact-page, #notfound-page {
+    background: var(--panel-bg) !important; /* #ffffff */
+    min-height: 100vh !important;
+}
+
+.content-area, .page-section, .ciliaplot-container-new, .ciliaplot-right-panel-new,
+.plot-container-new, .stats-container, .legend, .info {
+    background: var(--panel-bg) !important; /* #ffffff */
+    min-height: calc(100vh - 100px) !important; /* Adjust for navbar */
+}
+
+#locChart, canvas:not(.visible), .chart-container:not(.visible) {
+    display: none !important; /* Hide stray chart elements */
+}
+
+#ciliahub-results-container th, .stat-box, .plot-area {
+    background: var(--neutral-bg-alt) !important; /* #f8f9fa */
+    background-image: none !important; /* Remove blue gradients */
+}
+
+.ciliaplot-plot-panel, .plot-wrapper {
+    background: var(--panel-bg) !important; /* #ffffff */
+}
+
+.btn-primary, .btn-secondary, 
+.content-area .pagination button, 
+.ciliaplot-page .pagination button,
+.page-section .pagination button {
+    background: var(--neutral-bg-alt) !important; /* #f8f9fa */
+    color: var(--text-dark) !important; /* #333 */
+    border: 1px solid var(--border-color) !important; /* Add border for visibility */
+}
+
+.info {
+    border-left: 4px solid var(--accent-green-2) !important; /* #27ae60 */
+}
+
+
 .stat-box { padding: 10px; border-radius: 6px; color: white; }
 .stat-box .stat-number { font-size: 1.5rem; font-weight: bold; }
 .stat-box .stat-label { font-size: 0.75rem; opacity: 0.9; }
