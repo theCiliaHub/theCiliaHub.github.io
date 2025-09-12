@@ -1,4 +1,3 @@
-// globals.js
 // =============================================================================
 // GLOBAL VARIABLES
 // =============================================================================
@@ -88,7 +87,8 @@ async function handleRouteChange() {
     switch (path) {
         case '/':
             displayHomePage();
-            setTimeout(displayLocalizationChart, 0);
+            // FIX: Removed the problematic setTimeout(displayLocalizationChart, 0); call
+            // which was incorrectly adding an extra plot section.
             break;
         case '/batch-query':
             displayBatchQueryTool();
