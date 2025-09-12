@@ -83,46 +83,58 @@ async function handleRouteChange() {
         if (el) el.style.display = 'none';
     });
 
-    // Clear any residual chart elements
+    // Clear residual chart and plot elements
     const contentArea = document.querySelector('.content-area');
-    const existingChart = contentArea?.querySelector('#locChart');
-    if (existingChart) {
-        existingChart.closest('.page-section')?.remove();
+    if (contentArea) {
+        // Remove chart-related elements
+        const chartElements = contentArea.querySelectorAll('#locChart, .page-section, .plot-container-new, canvas');
+        chartElements.forEach(el => el.closest('.page-section, .plot-container-new')?.remove() || el.remove());
+        // Reset content-area styles
+        contentArea.style.background = 'var(--panel-bg)';
+        contentArea.style.minHeight = 'calc(100vh - 100px)';
     }
 
     // Show the correct page
     switch (path) {
         case '/':
+            document.querySelector('#home-page').style.display = 'block';
             displayHomePage();
             break;
         case '/batch-query':
+            document.querySelector('#batch-query-page').style.display = 'block';
             displayBatchQueryTool();
             break;
         case '/ciliaplot':
         case '/analysis':
+            document.querySelector('#ciliaplot-page').style.display = 'block';
             displayCiliaPlotPage();
-            // If a gene was found, pass it to the plots logic
             if (gene) {
                 renderDomainEnrichment([gene]);
                 computeProteinComplexLinks([gene]);
             }
             break;
         case '/compare':
+            document.querySelector('#compare-page').style.display = 'block';
             displayComparePage();
             break;
         case '/expression':
+            document.querySelector('#expression-page').style.display = 'block';
             displayExpressionPage();
             break;
         case '/download':
+            document.querySelector('#download-page').style.display = 'block';
             displayDownloadPage();
             break;
         case '/contact':
+            document.querySelector('#contact-page').style.display = 'block';
             displayContactPage();
             break;
         default:
             if (gene) {
+                document.querySelector('#home-page').style.display = 'block';
                 displayIndividualGenePage(gene);
             } else {
+                document.querySelector('#notfound-page').style.display = 'block';
                 displayNotFoundPage();
             }
             break;
@@ -135,12 +147,10 @@ async function handleRouteChange() {
 // URL HELPERS
 // =============================================================================
 function getGeneFromURL() {
-    // Try query string first: /ciliaplot?gene=ACTN2
     const params = new URLSearchParams(window.location.search);
     const fromQuery = params.get('gene');
     if (fromQuery) return fromQuery;
 
-    // Fallback: last part of hash or path: /ciliaplot/ACTN2
     const hashPath = window.location.hash.replace(/^#/, '');
     const pathParts = hashPath.split('/');
     if (pathParts.length > 1 && pathParts[pathParts.length - 1].toLowerCase() !== 'ciliaplot') {
