@@ -587,10 +587,15 @@ function updateStatsAndLegend(plotType, foundGenes) {
 
 function displayCiliaPlotPage() {
     const contentArea = document.querySelector('.content-area');
-    contentArea.className = 'content-area content-area-full';
+    contentArea.className = 'content-area content-area-full ciliaplot-page';
     if (document.querySelector('.cilia-panel')) {
         document.querySelector('.cilia-panel').style.display = 'none';
     }
+
+    // Clear existing charts, plots, and pagination
+    const existingElements = contentArea.querySelectorAll('canvas, .chart-container, .page-section, .pagination, .stats-container, .legend');
+    existingElements.forEach(el => el.closest('.page-section, .plot-container-new, .ciliaplot-container-new')?.remove() || el.remove());
+
     contentArea.innerHTML = `
     <div class="page-section ciliaplot-page">
         <div class="ciliaplot-header"><h1>CiliaPlot Gene Set Analysis</h1></div>
@@ -608,13 +613,13 @@ function displayCiliaPlotPage() {
                             <option value="functional_category">Functional Category</option>
                             <option value="network">Protein Complex Network</option>
                         </select>
-                        <button id="generate-plot-btn" class="btn btn-primary" style="width: 100%;">Run Analysis</button>
+                        <button id="generate-plot-btn" class="btn btn-primary" style="width: 100%; background: var(--neutral-bg-alt); color: var(--text-dark);">Run Analysis</button>
                     </div>
                 </div>
                 <div class="control-section">
-                     <h3>2. Customize Plot</h3>
-                     <details id="plot-customization-details"><summary>Expand Options</summary>
-                         <div class="control-section-content" id="plot-settings-grid">
+                    <h3>2. Customize Plot</h3>
+                    <details id="plot-customization-details"><summary>Expand Options</summary>
+                        <div class="control-section-content" id="plot-settings-grid">
                             <div><label>Title Font Size <input type="number" id="setting-title-font-size" value="21" step="1"></label></div>
                             <div><label>Axis Title Font Size <input type="number" id="setting-axis-title-font-size" value="20" step="1"></label></div>
                             <div><label>Axis Tick Font Size <input type="number" id="setting-tick-font-size" value="20" step="1"></label></div>
@@ -625,22 +630,22 @@ function displayCiliaPlotPage() {
                             <div><label>Axis Line Color <input type="color" id="setting-axis-line-color" value="#333333"></label></div>
                             <div><label>Gridline Color <input type="color" id="setting-grid-color" value="#e0e0e0"></label></div>
                             <div><label><input type="checkbox" id="setting-show-grid"> Show Gridlines</label></div>
-                         </div>
-                     </details>
+                        </div>
+                    </details>
                 </div>
                 <div class="control-section">
                     <h3>3. Download</h3>
                     <div class="control-section-content">
                         <select id="download-format" style="width:100%;padding:8px;margin-bottom:10px;"><option value="png">PNG</option><option value="pdf">PDF</option></select>
-                        <button id="download-plot-btn" class="btn btn-secondary" style="width: 100%;">Download Plot</button>
+                        <button id="download-plot-btn" class="btn btn-secondary" style="width: 100%; background: var(--neutral-bg-alt); color: var(--text-dark);">Download Plot</button>
                     </div>
                 </div>
             </div>
             <div class="ciliaplot-right-panel-new">
-                <div id="ciliaplot-plot-info" class="info">Select an analysis type and click "Run Analysis" to begin.</div>
-                <div id="ciliaplot-stats-container" class="stats-container"></div>
-                <div id="plot-display-area" class="plot-container-new"><p class="status-message">Your plot will appear here.</p></div>
-                <div id="ciliaplot-legend-container" class="legend"></div>
+                <div id="ciliaplot-plot-info" class="info" style="background: var(--neutral-bg-alt); border-left: 4px solid var(--accent-green-2);">Select an analysis type and click "Run Analysis" to begin.</div>
+                <div id="ciliaplot-stats-container" class="stats-container" style="background: var(--panel-bg);"></div>
+                <div id="plot-display-area" class="plot-container-new" style="background: var(--panel-bg); min-height: 500px;"><p class="status-message">Your plot will appear here.</p></div>
+                <div id="ciliaplot-legend-container" class="legend" style="background: var(--panel-bg);"></div>
             </div>
         </div>
     </div>`;
@@ -656,17 +661,13 @@ function displayCiliaPlotPage() {
             updatePlotInfo(document.getElementById('plot-type-select').value);
         }
     });
-    
-    // 3. Ensure plot customization works by adding event listeners
+
     const settingsGrid = document.getElementById('plot-settings-grid');
     settingsGrid.addEventListener('change', (event) => {
-        // Check if the event was triggered by a setting input and a plot exists
         if (event.target.id.startsWith('setting-') && currentPlotInstance) {
-            // A small delay ensures the setting value is updated before re-rendering
             setTimeout(generateAnalysisPlots, 50);
         }
     });
 
     updatePlotInfo(document.getElementById('plot-type-select').value);
 }
-
