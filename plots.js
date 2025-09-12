@@ -3,28 +3,11 @@
 // =============================================================================
 
 let currentPlotInstance = null; // Holds the active Chart.js, D3, etc. instance
-let geneName = getGeneFromURL();
-if (!geneName) {
-    // Pick first default gene from allGenes
-    geneName = window.allGenes.length > 0 ? window.allGenes[0].gene : null;
-    console.log("No gene specified, using default:", geneName);
-}
+let geneName = null; // Will be assigned after database is loaded
 
-if (geneName) {
-    const geneData = window.allGenes.find(g => g.gene === geneName);
-    if (geneData) {
-        renderDomainEnrichment([geneData]);
-        computeProteinComplexLinks([geneData]);
-    } else {
-        console.warn("Gene not found in database:", geneName);
-    }
-}
 /**
  * Robustly extracts a clean array of values from a gene object,
  * handling multiple possible keys, data types, and nested separators.
- * @param {Object} gene - The gene object from the database.
- * @param {...string} keys - The possible keys to check for the data.
- * @returns {Array<string>} A clean array of strings.
  */
 function getCleanArray(gene, ...keys) {
     let data = null;
@@ -39,64 +22,60 @@ function getCleanArray(gene, ...keys) {
     const initialArray = Array.isArray(data) ? data : String(data).split(';');
 
     return initialArray
-        .filter(Boolean) // Remove null, undefined, and empty strings from the array
-        .flatMap(item => String(item).split(';')) // Split items that are themselves lists
-        .map(item => item.trim()) // Trim whitespace
-        .filter(Boolean); // Filter again after trimming to remove empty strings
+        .filter(Boolean)
+        .flatMap(item => String(item).split(';'))
+        .map(item => item.trim())
+        .filter(Boolean);
 }
+
 function normalizeGeneData(database) {
     return database.map(gene => ({
         ...gene,
         gene: gene.gene || gene.gene_name || gene.symbol || "UNKNOWN",
-
-        // Always return array, even if null/missing
         domain_descriptions: getCleanArray(gene, 'Domain_Descriptions', 'domain_descriptions', 'domains')
             .map(d => typeof d === 'object' ? d.name || d.id || JSON.stringify(d) : d)
-            .filter(Boolean), // remove empty strings
-
+            .filter(Boolean),
         complex: getCleanArray(gene, 'complex_names', 'complex', 'complexes')
             .map(c => typeof c === 'object' ? c.name || c.id || JSON.stringify(c) : c)
             .filter(Boolean),
-
         localization: getCleanArray(gene, 'localization', 'localizations')
             .map(l => typeof l === 'object' ? l.name || l : l)
             .filter(Boolean)
     }));
 }
+
 async function loadAndPrepareDatabase() {
     const rawData = await fetchDatabase();
     window.allGenes = normalizeGeneData(rawData);
-// Debug: check first 5 normalized genes
-    console.log("Sample normalized genes:", 
-        window.allGenes.slice(0, 5).map(g => ({
-            gene: g.gene,
-            domains: g.domain_descriptions,
-            complexes: g.complex
-        }))
-    );
-}
 
-const geneName = getGeneFromURL();
+    console.log("Loaded genes:", window.allGenes.length);
+    console.log("Sample normalized genes:", window.allGenes.slice(0, 5).map(g => ({
+        gene: g.gene,
+        domains: g.domain_descriptions,
+        complexes: g.complex
+    })));
 
-if (geneName && Array.isArray(window.allGenes)) {
-    const geneData = window.allGenes.find(g => g.gene === geneName);
-    
-    console.log("DEBUG plots.js: selectedGene =", geneName, "allGenes loaded =", window.allGenes.length);
-    
-    if (geneData) {
-        renderDomainEnrichment([geneData]);
-        computeProteinComplexLinks([geneData]);
+    // Assign geneName after database is loaded
+    const urlGene = getGeneFromURL();
+    geneName = urlGene || (window.allGenes.length > 0 ? window.allGenes[0].gene : null);
+
+    if (geneName) {
+        const geneData = window.allGenes.find(g => g.gene === geneName);
+        if (geneData) {
+            renderDomainEnrichment([geneData]);
+            computeProteinComplexLinks([geneData]);
+        } else {
+            console.warn("Gene not found in database:", geneName);
+        }
     } else {
-        console.warn("Gene not found in database:", geneName);
+        console.warn("No gene specified and database is empty.");
     }
-} else {
-    console.warn("No gene specified in URL or database not loaded yet.");
 }
-
 
 // =============================================================================
 // PLOT CUSTOMIZATION & DOWNLOAD
 // =============================================================================
+
 function getPlotSettings() {
     const setting = (id, def) => document.getElementById(id)?.value || def;
     return {
@@ -112,6 +91,7 @@ function getPlotSettings() {
         showGrid: document.getElementById('setting-show-grid')?.checked ?? true,
     };
 }
+
 
 async function downloadPlot() {
     const format = document.getElementById('download-format')?.value || 'png';
@@ -400,42 +380,37 @@ function renderComplexNetwork(foundGenes, container) {
 // =============================================================================
 // MAIN CONTROLLER & UI
 // =============================================================================
+
 async function generateAnalysisPlots() {
+    if (!window.allGenes) await loadAndPrepareDatabase();
+
     try {
-        await loadAndPrepareDatabase();
         const plotContainer = document.getElementById('plot-display-area');
         const genesInput = document.getElementById('ciliaplot-genes-input').value.trim();
         if (!genesInput) { alert('Please enter a gene list.'); return; }
+
         plotContainer.innerHTML = '<p class="status-message">Generating plot...</p>';
         currentPlotInstance = null;
+
         const sanitizedQueries = [...new Set(genesInput.split(/[\s,;\n\r\t]+/).filter(Boolean).map(q => q.toUpperCase()))];
         const { foundGenes } = findGenes(sanitizedQueries);
+
         const plotType = document.getElementById('plot-type-select').value;
         const backgroundGeneSet = window.allGenes || [];
-        
+
         updatePlotInfo(plotType);
         updateStatsAndLegend(plotType, foundGenes, backgroundGeneSet);
-        
+
         switch (plotType) {
-            case 'bubble':
-                renderKeyLocalizations(foundGenes, plotContainer);
-                break;
-            case 'matrix':
-                renderGeneMatrix(foundGenes, plotContainer);
-                break;
-            case 'enrichment_factor':
-                renderDomainEnrichmentFactorPlot(foundGenes, backgroundGeneSet, plotContainer);
-                break;
-            case 'network': // Now calls your restored network plot
-                renderComplexNetwork(foundGenes, plotContainer);
-                break;
-            default:
-                plotContainer.innerHTML = `<p class="status-message">Plot type "${plotType}" is not yet implemented.</p>`;
-                break;
+            case 'bubble': renderKeyLocalizations(foundGenes, plotContainer); break;
+            case 'matrix': renderGeneMatrix(foundGenes, plotContainer); break;
+            case 'enrichment_factor': renderDomainEnrichmentFactorPlot(foundGenes, backgroundGeneSet, plotContainer); break;
+            case 'network': renderComplexNetwork(foundGenes, plotContainer); break;
+            default: plotContainer.innerHTML = `<p class="status-message">Plot type "${plotType}" not implemented.</p>`; break;
         }
     } catch (error) {
         console.error('Error generating plots:', error);
-        document.getElementById('plot-display-area').innerHTML = `<p class="status-message error">Error generating plot: ${error.message}</p>`;
+        document.getElementById('plot-display-area').innerHTML = `<p class="status-message error">Error: ${error.message}</p>`;
     }
 }
 
