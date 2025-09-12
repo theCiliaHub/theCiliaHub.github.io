@@ -498,7 +498,7 @@ function displayHomePage() {
     contentArea.className = 'content-area';
     document.querySelector('.cilia-panel').style.display = 'block';
 
-    // --- Initial render with placeholders and a container for the plot ---
+    // --- Initial render with placeholders ---
     contentArea.innerHTML = `
         <div class="page-section">
             <h1>The CiliaHub: An Updated Database of Gold Standard Genes with Ciliary Functions</h1>
@@ -542,12 +542,6 @@ function displayHomePage() {
 
             <div id="gene-cards-container" class="gene-cards"></div>
             <div id="status-message" class="status-message" style="display: none;"></div>
-        </div>
-        
-        <!-- Section for the home page plot -->
-        <div class="page-section">
-            <h2>Localization in Ciliary Genes</h2>
-            <div id="home-plot-container" class="plot-container-home" style="height: 500px; width: 100%; position: relative;"></div>
         </div>`;
 
     // --- Attach search event listeners ---
@@ -637,13 +631,6 @@ function displayHomePage() {
         document.getElementById('gene-count').textContent = geneCount;
         document.getElementById('localization-count').textContent = uniqueLocalizations;
         document.getElementById('reference-count').textContent = uniqueReferences;
-
-        // Render the home page plot
-        const plotContainer = document.getElementById('home-plot-container');
-        if (plotContainer) {
-            // Assuming renderKeyLocalizations is available from plots.js
-            renderKeyLocalizations(allGenes, plotContainer);
-        }
     }
 }
 
@@ -668,7 +655,6 @@ function displayBatchQueryPage() {
 }
 
 // Note: The main `initializeApp` function in globals.js now starts everything.
-
 
 
 function displayBatchQueryTool() {
