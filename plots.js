@@ -239,13 +239,17 @@ function renderGeneMatrix(foundGenes, container) {
 }
 
 function calculateDomainEnrichmentFactor(selectedData, database) {
-    if (selectedData.length === 0) return { enrichmentData: [] };
+    if (selectedData.length === 0 || database.length === 0) {
+        console.warn('Empty selectedData or database in calculateDomainEnrichmentFactor');
+        return { enrichmentData: [] };
+    }
+
     const countDomains = (geneSet) => {
         const domainCounts = new Map();
         let genesWithDomains = new Set();
         geneSet.forEach(gene => {
-            // ✅ FIX: Checks for multiple possible keys for domain data
             const domains = getCleanArray(gene, 'Domain_Descriptions', 'domain_descriptions');
+            console.log(`Gene ${gene.gene} domains:`, domains); // Debug
             if (domains.length > 0) {
                 genesWithDomains.add(gene.gene);
                 domains.forEach(d => domainCounts.set(d, (domainCounts.get(d) || 0) + 1));
@@ -253,60 +257,43 @@ function calculateDomainEnrichmentFactor(selectedData, database) {
         });
         return { counts: domainCounts, total: genesWithDomains.size };
     };
+
     const { counts: selectedCounts, total: selectedTotal } = countDomains(selectedData);
     const { counts: dbCounts, total: dbTotal } = countDomains(database);
-    if (selectedTotal === 0) return { enrichmentData: [] };
+
+    if (selectedTotal === 0 || dbTotal === 0) {
+        console.warn('No genes with domains in selectedData or database');
+        return { enrichmentData: [] };
+    }
+
     const enrichmentData = Array.from(selectedCounts.entries())
-        .map(([domain, count]) => ({ domain, factor: ((count / selectedTotal) / ((dbCounts.get(domain) || 0) / dbTotal)) || 0 }))
-        .sort((a, b) => b.factor - a.factor)
-        .filter(d => d.factor > 0);
+        .map(([domain, count]) => {
+            const dbFreq = (dbCounts.get(domain) || 0) / dbTotal;
+            const factor = dbFreq > 0 ? (count / selectedTotal) / dbFreq : 0;
+            return { domain, factor };
+        })
+        .filter(d => isFinite(d.factor) && d.factor > 0)
+        .sort((a, b) => b.factor - a.factor);
+
     return { enrichmentData };
 }
 
-function renderDomainEnrichmentFactorPlot(foundGenes, allGenes, container) {
-    const settings = getPlotSettings();
-    const { enrichmentData } = calculateDomainEnrichmentFactor(foundGenes, allGenes);
-    if (!enrichmentData || enrichmentData.length === 0) {
-        container.innerHTML = '<p class="status-message">No domain enrichment found.</p>';
-        return;
-    }
-    
-    container.innerHTML = '';
-    const topData = enrichmentData.slice(0, 20);
-    const margin = { top: 40, right: 30, bottom: 80, left: 250 };
-    const width = container.clientWidth - margin.left - margin.right;
-    const height = topData.length * 28;
-    
-    const svg = d3.select(container).append("svg").attr("width", width + margin.left + margin.right).attr("height", height + margin.top + margin.bottom);
-    svg.append("rect").attr("width", "100%").attr("height", "100%").attr("fill", settings.backgroundColor);
-    const g = svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
-    
-    const x = d3.scaleLinear().domain([0, d3.max(topData, d => d.factor) * 1.1]).range([0, width]);
-    const y = d3.scaleBand().domain(topData.map(d => d.domain)).range([0, height]).padding(0.2);
-
-    g.append("g").attr("transform", `translate(0,${height})`).call(d3.axisBottom(x)).call(s => s.selectAll("text").style("font-family", settings.fontFamily).style("font-size", settings.tickFontSize + 'px').style("font-weight", "bold").style("fill", settings.fontColor)).call(s => s.selectAll(".domain, .tick line").style("stroke", settings.axisLineColor).style("stroke-width", settings.axisLineWidth + 'px'));
-    g.append("g").call(d3.axisLeft(y)).call(s => s.selectAll("text").style("font-family", settings.fontFamily).style("font-size", settings.tickFontSize + 'px').style("font-weight", "bold").style("fill", settings.fontColor)).call(s => s.selectAll(".domain, .tick line").style("stroke", settings.axisLineColor).style("stroke-width", settings.axisLineWidth + 'px'));
-    
-    g.selectAll(".bar").data(topData).enter().append("rect").attr("class", "bar").attr("x", x(0)).attr("y", d => y(d.domain)).attr("width", d => x(d.factor)).attr("height", y.bandwidth()).attr("fill", "#3498db");
-    
-    svg.append("text").attr("text-anchor", "middle").attr("x", margin.left + width / 2).attr("y", 25).text("Domain Enrichment Factor").style("font-family", settings.fontFamily).style("font-size", settings.titleFontSize + 'px').style("fill", settings.fontColor);
-    svg.append("text").attr("text-anchor", "middle").attr("x", margin.left + width / 2).attr("y", height + margin.top + 60).text("Enrichment Factor").style("font-family", settings.fontFamily).style("font-size", settings.axisTitleFontSize + 'px').style("font-weight", "bold").style("fill", settings.fontColor);
-
-    currentPlotInstance = svg.node();
-}
 
 function computeProteinComplexLinks(foundGenes) {
     const nodes = foundGenes.map(gene => ({ id: gene.gene }));
     const complexMap = new Map();
+
     foundGenes.forEach(gene => {
-        // ✅ FIX: Checks for multiple possible keys for complex data
-        getCleanArray(gene, 'complex_names', 'complex').forEach(complex => {
+        const complexes = getCleanArray(gene, 'complex_names', 'complex');
+        console.log(`Gene ${gene.gene} complexes:`, complexes); // Debug
+        complexes.forEach(complex => {
             if (!complexMap.has(complex)) {
                 complexMap.set(complex, new Set());
             }
             complexMap.get(complex).add(gene.gene);
         });
     });
+
     const linkMap = new Map();
     complexMap.forEach((genes) => {
         const geneArray = Array.from(genes);
@@ -321,42 +308,108 @@ function computeProteinComplexLinks(foundGenes) {
             }
         }
     });
-    return { nodes, links: Array.from(linkMap.values()) };
+
+    const links = Array.from(linkMap.values());
+    return { nodes, links };
 }
+
+
 
 function renderComplexNetwork(foundGenes, container) {
     const settings = getPlotSettings();
     const { nodes, links } = computeProteinComplexLinks(foundGenes);
+
+    // Log for debugging
+    console.log('Network Data:', { nodes, links });
+
     if (!nodes.length || !links.length) {
         container.innerHTML = '<p class="status-message">No protein complex links found among the selected genes.</p>';
+        console.warn('No valid nodes or links for network rendering.');
         return;
     }
+
+    // Ensure valid container dimensions
+    if (container.clientWidth === 0 || container.clientHeight === 0) {
+        container.innerHTML = '<p class="status-message">Plot container has invalid dimensions.</p>';
+        console.warn('Invalid container dimensions:', container.clientWidth, container.clientHeight);
+        return;
+    }
+
     container.innerHTML = '';
-    const width = container.clientWidth;
+    const width = Math.max(400, container.clientWidth);
     const height = Math.max(500, container.clientHeight);
-    const svg = d3.select(container).append("svg").attr("width", width).attr("height", height);
-    svg.append("rect").attr("width", "100%").attr("height", "100%").attr("fill", settings.backgroundColor);
-    
+
+    const svg = d3.select(container)
+        .append('svg')
+        .attr('width', width)
+        .attr('height', height);
+
+    svg.append('rect')
+        .attr('width', '100%')
+        .attr('height', '100%')
+        .attr('fill', settings.backgroundColor);
+
     const simulation = d3.forceSimulation(nodes)
-        .force("link", d3.forceLink(links).id(d => d.id).distance(100))
-        .force("charge", d3.forceManyBody().strength(-300))
-        .force("center", d3.forceCenter(width / 2, height / 2));
-    
-    const link = svg.append("g").selectAll("line").data(links).enter().append("line").style("stroke", "#999").style("stroke-opacity", 0.6).style("stroke-width", d => Math.sqrt(d.value) * 2);
-    
-    const nodeGroup = svg.append("g").selectAll("g").data(nodes).enter().append("g").call(d3.drag().on("start", (e, d) => { if (!e.active) simulation.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; }).on("drag", (e, d) => { d.fx = e.x; d.fy = e.y; }).on("end", (e, d) => { if (!e.active) simulation.alphaTarget(0); d.fx = null; d.fy = null; }));
-    
-    nodeGroup.append("circle").attr("r", 10).style("fill", "#3498db").style("stroke", "#fff").style("stroke-width", 2);
-    
-    nodeGroup.append("text").text(d => d.id).attr("x", 15).attr("y", 5).style("font-family", settings.fontFamily).style("font-size", "12px").style("fill", settings.fontColor);
-    
-    simulation.on("tick", () => {
-        link.attr("x1", d => d.source.x).attr("y1", d => d.source.y).attr("x2", d => d.target.x).attr("y2", d => d.target.y);
-        nodeGroup.attr("transform", d => `translate(${d.x},${d.y})`);
+        .force('link', d3.forceLink(links).id(d => d.id).distance(100))
+        .force('charge', d3.forceManyBody().strength(-300))
+        .force('center', d3.forceCenter(width / 2, height / 2))
+        .force('collide', d3.forceCollide(15)); // Prevent node overlap
+
+    const link = svg.append('g')
+        .selectAll('line')
+        .data(links)
+        .enter()
+        .append('line')
+        .style('stroke', '#999')
+        .style('stroke-opacity', 0.6)
+        .style('stroke-width', d => Math.sqrt(d.value) * 2);
+
+    const nodeGroup = svg.append('g')
+        .selectAll('g')
+        .data(nodes)
+        .enter()
+        .append('g')
+        .call(d3.drag()
+            .on('start', (e, d) => {
+                if (!e.active) simulation.alphaTarget(0.3).restart();
+                d.fx = d.x;
+                d.fy = d.y;
+            })
+            .on('drag', (e, d) => {
+                d.fx = e.x;
+                d.fy = e.y;
+            })
+            .on('end', (e, d) => {
+                if (!e.active) simulation.alphaTarget(0);
+                d.fx = null;
+                d.fy = null;
+            }));
+
+    nodeGroup.append('circle')
+        .attr('r', 10)
+        .style('fill', '#3498db')
+        .style('stroke', '#fff')
+        .style('stroke-width', 2);
+
+    nodeGroup.append('text')
+        .text(d => d.id.length > 10 ? d.id.substring(0, 7) + '...' : d.id)
+        .attr('x', 15)
+        .attr('y', 5)
+        .style('font-family', settings.fontFamily)
+        .style('font-size', '12px')
+        .style('fill', settings.fontColor);
+
+    simulation.on('tick', () => {
+        link.attr('x1', d => Math.max(10, Math.min(width - 10, d.source.x)))
+            .attr('y1', d => Math.max(10, Math.min(height - 10, d.source.y)))
+            .attr('x2', d => Math.max(10, Math.min(width - 10, d.target.x)))
+            .attr('y2', d => Math.max(10, Math.min(height - 10, d.target.y)));
+        nodeGroup.attr('transform', d => `translate(${Math.max(10, Math.min(width - 10, d.x))},${Math.max(10, Math.min(height - 10, d.y))})`);
     });
-    
+
     currentPlotInstance = svg.node();
 }
+
 
 // =============================================================================
 // MAIN CONTROLLER & UI
