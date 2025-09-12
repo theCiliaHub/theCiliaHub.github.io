@@ -48,7 +48,8 @@ function getPlotSettings() {
         axisLineColor: setting('setting-axis-line-color', '#333333'),
         backgroundColor: setting('setting-bg-color', '#ffffff'),
         gridColor: setting('setting-grid-color', '#e0e0e0'),
-        showGrid: document.getElementById('setting-show-grid')?.checked ?? true,
+        // 2. Set grid to be off by default
+        showGrid: document.getElementById('setting-show-grid')?.checked ?? false,
     };
 }
 
@@ -136,6 +137,7 @@ async function downloadPlot() {
 // =============================================================================
 
 function renderKeyLocalizations(foundGenes, container) {
+    if (currentPlotInstance) currentPlotInstance.destroy();
     const settings = getPlotSettings();
     container.innerHTML = `<canvas></canvas>`;
     const ctx = container.querySelector('canvas').getContext('2d');
@@ -174,84 +176,23 @@ function renderKeyLocalizations(foundGenes, container) {
             responsive: true,
             maintainAspectRatio: false,
             plugins: {
-                title: {
-                    display: true,
-                    text: "Key Ciliary Localizations",
-                    font: {
-                        size: settings.titleFontSize,
-                        family: settings.fontFamily
-                    },
-                    color: settings.fontColor
-                },
-                legend: {
-                    display: false
-                },
-                tooltip: {
-                    callbacks: {
-                        label: c => `${c.raw.y}: ${c.raw.count} gene(s)`
-                    }
-                }
+                title: { display: true, text: "Key Ciliary Localizations", font: { size: settings.titleFontSize, family: settings.fontFamily }, color: settings.fontColor },
+                legend: { display: false },
+                tooltip: { callbacks: { label: c => `${c.raw.y}: ${c.raw.count} gene(s)` } }
             },
             scales: {
                 x: {
-                    title: {
-                        display: true,
-                        text: "Gene Count",
-                        font: {
-                            size: settings.axisTitleFontSize,
-                            family: settings.fontFamily,
-                            weight: 'bold'
-                        },
-                        color: settings.fontColor
-                    },
-                    grid: {
-                        display: settings.showGrid,
-                        color: settings.gridColor
-                    },
-                    border: {
-                        display: true,
-                        width: settings.axisLineWidth,
-                        color: settings.axisLineColor
-                    },
-                    ticks: {
-                        font: {
-                            size: settings.tickFontSize,
-                            family: settings.fontFamily,
-                            weight: 'bold'
-                        },
-                        color: settings.fontColor
-                    }
+                    title: { display: true, text: "Gene Count", font: { size: settings.axisTitleFontSize, family: settings.fontFamily, weight: 'bold' }, color: settings.fontColor },
+                    grid: { display: settings.showGrid, color: settings.gridColor },
+                    border: { display: true, width: settings.axisLineWidth, color: settings.axisLineColor },
+                    ticks: { font: { size: settings.tickFontSize, family: settings.fontFamily, weight: 'bold' }, color: settings.fontColor }
                 },
                 y: {
-                    type: 'category',
-                    labels: yCategories,
-                    title: {
-                        display: true,
-                        text: "Cellular Compartment",
-                        font: {
-                            size: settings.axisTitleFontSize,
-                            family: settings.fontFamily,
-                            weight: 'bold'
-                        },
-                        color: settings.fontColor
-                    },
-                    grid: {
-                        display: settings.showGrid,
-                        color: settings.gridColor
-                    },
-                    border: {
-                        display: true,
-                        width: settings.axisLineWidth,
-                        color: settings.axisLineColor
-                    },
-                    ticks: {
-                        font: {
-                            size: settings.tickFontSize,
-                            family: settings.fontFamily,
-                            weight: 'bold'
-                        },
-                        color: settings.fontColor
-                    }
+                    type: 'category', labels: yCategories,
+                    title: { display: true, text: "Cellular Compartment", font: { size: settings.axisTitleFontSize, family: settings.fontFamily, weight: 'bold' }, color: settings.fontColor },
+                    grid: { display: settings.showGrid, color: settings.gridColor },
+                    border: { display: true, width: settings.axisLineWidth, color: settings.axisLineColor },
+                    ticks: { font: { size: settings.tickFontSize, family: settings.fontFamily, weight: 'bold' }, color: settings.fontColor }
                 }
             }
         }
@@ -259,6 +200,7 @@ function renderKeyLocalizations(foundGenes, container) {
 }
 
 function renderGeneMatrix(foundGenes, container) {
+    if (currentPlotInstance) currentPlotInstance.destroy();
     const settings = getPlotSettings();
     container.innerHTML = `<canvas></canvas>`;
     const ctx = container.querySelector('canvas').getContext('2d');
@@ -277,100 +219,31 @@ function renderGeneMatrix(foundGenes, container) {
         data: {
             datasets: foundGenes.map((gene, index) => ({
                 label: gene.gene,
-                data: getCleanArray(gene, 'localization').map(loc => ({
-                    x: gene.gene,
-                    y: loc,
-                    r: 10
-                })),
+                data: getCleanArray(gene, 'localization').map(loc => ({ x: gene.gene, y: loc, r: 10 })),
                 backgroundColor: d3.schemeTableau10[index % 10]
             }))
         },
         options: {
-            responsive: true,
-            maintainAspectRatio: false,
+            responsive: true, maintainAspectRatio: false,
             plugins: {
-                title: {
-                    display: true,
-                    text: "Gene Localization Matrix",
-                    font: {
-                        size: settings.titleFontSize,
-                        family: settings.fontFamily
-                    },
-                    color: settings.fontColor
-                },
-                legend: {
-                    display: false
-                },
-                tooltip: {
-                    callbacks: {
-                        label: c => `${c.dataset.label}: ${c.raw.y}`
-                    }
-                }
+                title: { display: true, text: "Gene Localization Matrix", font: { size: settings.titleFontSize, family: settings.fontFamily }, color: settings.fontColor },
+                legend: { display: false },
+                tooltip: { callbacks: { label: c => `${c.dataset.label}: ${c.raw.y}` } }
             },
             scales: {
                 x: {
-                    type: 'category',
-                    labels: xLabels,
-                    title: {
-                        display: true,
-                        text: "Genes",
-                        font: {
-                            size: settings.axisTitleFontSize,
-                            family: settings.fontFamily,
-                            weight: 'bold'
-                        },
-                        color: settings.fontColor
-                    },
-                    grid: {
-                        display: settings.showGrid,
-                        color: settings.gridColor
-                    },
-                    border: {
-                        display: true,
-                        width: settings.axisLineWidth,
-                        color: settings.axisLineColor
-                    },
-                    ticks: {
-                        font: {
-                            size: settings.tickFontSize,
-                            family: settings.fontFamily,
-                            weight: 'bold'
-                        },
-                        color: settings.fontColor,
-                        maxRotation: 90,
-                        minRotation: 45
-                    }
+                    type: 'category', labels: xLabels,
+                    title: { display: true, text: "Genes", font: { size: settings.axisTitleFontSize, family: settings.fontFamily, weight: 'bold' }, color: settings.fontColor },
+                    grid: { display: settings.showGrid, color: settings.gridColor },
+                    border: { display: true, width: settings.axisLineWidth, color: settings.axisLineColor },
+                    ticks: { font: { size: settings.tickFontSize, family: settings.fontFamily, weight: 'bold' }, color: settings.fontColor, maxRotation: 90, minRotation: 45 }
                 },
                 y: {
-                    type: 'category',
-                    labels: yCategories,
-                    title: {
-                        display: true,
-                        text: "Ciliary Compartment",
-                        font: {
-                            size: settings.axisTitleFontSize,
-                            family: settings.fontFamily,
-                            weight: 'bold'
-                        },
-                        color: settings.fontColor
-                    },
-                    grid: {
-                        display: settings.showGrid,
-                        color: settings.gridColor
-                    },
-                    border: {
-                        display: true,
-                        width: settings.axisLineWidth,
-                        color: settings.axisLineColor
-                    },
-                    ticks: {
-                        font: {
-                            size: settings.tickFontSize,
-                            family: settings.fontFamily,
-                            weight: 'bold'
-                        },
-                        color: settings.fontColor
-                    }
+                    type: 'category', labels: yCategories,
+                    title: { display: true, text: "Ciliary Compartment", font: { size: settings.axisTitleFontSize, family: settings.fontFamily, weight: 'bold' }, color: settings.fontColor },
+                    grid: { display: settings.showGrid, color: settings.gridColor },
+                    border: { display: true, width: settings.axisLineWidth, color: settings.axisLineColor },
+                    ticks: { font: { size: settings.tickFontSize, family: settings.fontFamily, weight: 'bold' }, color: settings.fontColor }
                 }
             }
         }
@@ -378,11 +251,74 @@ function renderGeneMatrix(foundGenes, container) {
 }
 
 /**
- * Generates a bar chart visualizing the distribution of functional categories.
- * @param {Array<Object>} foundGenes - The array of gene objects found from user input.
+ * 1. NEW PLOT FUNCTION: Renders a bubble matrix of Genes vs. Domain Descriptions.
+ * @param {Array<Object>} foundGenes - The array of gene objects.
  * @param {HTMLElement} container - The DOM element to render the plot into.
  */
+function renderDomainMatrixPlot(foundGenes, container) {
+    if (currentPlotInstance) currentPlotInstance.destroy();
+    const settings = getPlotSettings();
+    container.innerHTML = `<canvas></canvas>`;
+    const ctx = container.querySelector('canvas').getContext('2d');
+
+    if (!foundGenes.length) {
+        container.innerHTML = '<p class="status-message">No genes to display.</p>';
+        return;
+    }
+
+    const domainData = foundGenes.flatMap(gene => {
+        const domains = getCleanArray(gene, 'domain_descriptions');
+        return domains.map(domain => ({ gene: gene.gene, domain }));
+    });
+    
+    if (domainData.length === 0) {
+        container.innerHTML = '<p class="status-message">No domain description data found for the selected genes.</p>';
+        return;
+    }
+
+    const yCategories = [...new Set(domainData.map(d => d.domain))].sort();
+    const xLabels = [...new Set(foundGenes.map(g => g.gene))].sort();
+    
+    currentPlotInstance = new Chart(ctx, {
+        type: 'bubble',
+        data: {
+            datasets: foundGenes.map((gene, index) => ({
+                label: gene.gene,
+                data: getCleanArray(gene, 'domain_descriptions').map(domain => ({ x: gene.gene, y: domain, r: 10 })),
+                backgroundColor: d3.schemeCategory10[index % 10]
+            }))
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                title: { display: true, text: "Genes vs. Domain Descriptions", font: { size: settings.titleFontSize, family: settings.fontFamily }, color: settings.fontColor },
+                legend: { display: false },
+                tooltip: { callbacks: { label: c => `${c.dataset.label}: ${c.raw.y}` } }
+            },
+            scales: {
+                x: {
+                    type: 'category', labels: xLabels,
+                    title: { display: true, text: "Genes", font: { size: settings.axisTitleFontSize, family: settings.fontFamily, weight: 'bold' }, color: settings.fontColor },
+                    grid: { display: settings.showGrid, color: settings.gridColor },
+                    border: { display: true, width: settings.axisLineWidth, color: settings.axisLineColor },
+                    ticks: { font: { size: settings.tickFontSize, family: settings.fontFamily }, color: settings.fontColor, maxRotation: 90, minRotation: 45 }
+                },
+                y: {
+                    type: 'category', labels: yCategories,
+                    title: { display: true, text: "Domain Description", font: { size: settings.axisTitleFontSize, family: settings.fontFamily, weight: 'bold' }, color: settings.fontColor },
+                    grid: { display: settings.showGrid, color: settings.gridColor },
+                    border: { display: true, width: settings.axisLineWidth, color: settings.axisLineColor },
+                    ticks: { font: { size: settings.tickFontSize, family: settings.fontFamily }, color: settings.fontColor }
+                }
+            }
+        }
+    });
+}
+
+
 function renderFunctionalCategoryPlot(foundGenes, container) {
+    if (currentPlotInstance) currentPlotInstance.destroy();
     const settings = getPlotSettings();
     container.innerHTML = `<canvas></canvas>`;
     const ctx = container.querySelector('canvas').getContext('2d');
@@ -392,10 +328,8 @@ function renderFunctionalCategoryPlot(foundGenes, container) {
         return;
     }
 
-    // Count occurrences of each functional category
     const categoryCounts = new Map();
     foundGenes.forEach(gene => {
-        // Use the robust getCleanArray to handle the comma-separated string
         const categories = getCleanArray(gene, 'functional_category');
         categories.forEach(cat => {
             categoryCounts.set(cat, (categoryCounts.get(cat) || 0) + 1);
@@ -407,12 +341,10 @@ function renderFunctionalCategoryPlot(foundGenes, container) {
         return;
     }
 
-    // Sort data for plotting
     const sortedData = Array.from(categoryCounts.entries()).sort((a, b) => b[1] - a[1]);
     const labels = sortedData.map(item => item[0]);
     const data = sortedData.map(item => item[1]);
 
-    // Create the chart
     currentPlotInstance = new Chart(ctx, {
         type: 'bar',
         data: {
@@ -426,52 +358,22 @@ function renderFunctionalCategoryPlot(foundGenes, container) {
             }]
         },
         options: {
-            indexAxis: 'y', // Make the bar chart horizontal
-            responsive: true,
-            maintainAspectRatio: false,
+            indexAxis: 'y', responsive: true, maintainAspectRatio: false,
             plugins: {
-                title: {
-                    display: true,
-                    text: 'Functional Category Distribution',
-                    font: {
-                        size: settings.titleFontSize,
-                        family: settings.fontFamily
-                    },
-                    color: settings.fontColor
-                },
-                legend: {
-                    display: false
-                }
+                title: { display: true, text: 'Functional Category Distribution', font: { size: settings.titleFontSize, family: settings.fontFamily }, color: settings.fontColor },
+                legend: { display: false }
             },
             scales: {
                 x: {
-                    title: {
-                        display: true,
-                        text: 'Number of Genes',
-                        font: {
-                            size: settings.axisTitleFontSize,
-                            family: settings.fontFamily,
-                            weight: 'bold'
-                        },
-                        color: settings.fontColor
-                    },
-                    ticks: {
-                        font: {
-                            size: settings.tickFontSize,
-                            family: settings.fontFamily
-                        },
-                        color: settings.fontColor,
-                        stepSize: 1
-                    }
+                    title: { display: true, text: 'Number of Genes', font: { size: settings.axisTitleFontSize, family: settings.fontFamily, weight: 'bold' }, color: settings.fontColor },
+                    grid: { display: settings.showGrid, color: settings.gridColor },
+                    border: { display: true, width: settings.axisLineWidth, color: settings.axisLineColor },
+                    ticks: { font: { size: settings.tickFontSize, family: settings.fontFamily }, color: settings.fontColor, stepSize: 1 }
                 },
                 y: {
-                    ticks: {
-                        font: {
-                            size: settings.tickFontSize,
-                            family: settings.fontFamily
-                        },
-                        color: settings.fontColor
-                    }
+                    grid: { display: settings.showGrid, color: settings.gridColor },
+                    border: { display: true, width: settings.axisLineWidth, color: settings.axisLineColor },
+                    ticks: { font: { size: settings.tickFontSize, family: settings.fontFamily }, color: settings.fontColor }
                 }
             }
         }
@@ -479,9 +381,7 @@ function renderFunctionalCategoryPlot(foundGenes, container) {
 }
 
 function computeProteinComplexLinks(foundGenes) {
-    const nodes = foundGenes.map(gene => ({
-        id: gene.gene
-    }));
+    const nodes = foundGenes.map(gene => ({ id: gene.gene }));
     const complexMap = new Map();
     foundGenes.forEach(gene => {
         getCleanArray(gene, 'complex_names', 'complex').forEach(complex => {
@@ -500,27 +400,17 @@ function computeProteinComplexLinks(foundGenes) {
                 if (linkMap.has(key)) {
                     linkMap.get(key).value += 1;
                 } else {
-                    linkMap.set(key, {
-                        source: geneArray[i],
-                        target: geneArray[j],
-                        value: 1
-                    });
+                    linkMap.set(key, { source: geneArray[i], target: geneArray[j], value: 1 });
                 }
             }
         }
     });
-    return {
-        nodes,
-        links: Array.from(linkMap.values())
-    };
+    return { nodes, links: Array.from(linkMap.values()) };
 }
 
 function renderComplexNetwork(foundGenes, container) {
     const settings = getPlotSettings();
-    const {
-        nodes,
-        links
-    } = computeProteinComplexLinks(foundGenes);
+    const { nodes, links } = computeProteinComplexLinks(foundGenes);
     if (!nodes.length || !links.length) {
         container.innerHTML = '<p class="status-message">No protein complex links found among the selected genes.</p>';
         return;
@@ -540,19 +430,15 @@ function renderComplexNetwork(foundGenes, container) {
 
     const nodeGroup = svg.append("g").selectAll("g").data(nodes).enter().append("g").call(d3.drag().on("start", (e, d) => {
         if (!e.active) simulation.alphaTarget(0.3).restart();
-        d.fx = d.x;
-        d.fy = d.y;
+        d.fx = d.x; d.fy = d.y;
     }).on("drag", (e, d) => {
-        d.fx = e.x;
-        d.fy = e.y;
+        d.fx = e.x; d.fy = e.y;
     }).on("end", (e, d) => {
         if (!e.active) simulation.alphaTarget(0);
-        d.fx = null;
-        d.fy = null;
+        d.fx = null; d.fy = null;
     }));
 
     nodeGroup.append("circle").attr("r", 10).style("fill", "#3498db").style("stroke", "#fff").style("stroke-width", 2);
-
     nodeGroup.append("text").text(d => d.id).attr("x", 15).attr("y", 5).style("font-family", settings.fontFamily).style("font-size", "12px").style("fill", settings.fontColor);
 
     simulation.on("tick", () => {
@@ -576,16 +462,13 @@ async function generateAnalysisPlots() {
             return;
         }
         plotContainer.innerHTML = '<p class="status-message">Generating plot...</p>';
-        currentPlotInstance = null;
+        
         const sanitizedQueries = [...new Set(genesInput.split(/[\s,;\n\r\t]+/).filter(Boolean).map(q => q.toUpperCase()))];
-        const {
-            foundGenes
-        } = findGenes(sanitizedQueries);
+        const { foundGenes } = findGenes(sanitizedQueries);
         const plotType = document.getElementById('plot-type-select').value;
-        const backgroundGeneSet = window.allGenes || [];
-
+        
         updatePlotInfo(plotType);
-        updateStatsAndLegend(plotType, foundGenes, backgroundGeneSet);
+        updateStatsAndLegend(plotType, foundGenes);
 
         switch (plotType) {
             case 'bubble':
@@ -593,6 +476,9 @@ async function generateAnalysisPlots() {
                 break;
             case 'matrix':
                 renderGeneMatrix(foundGenes, plotContainer);
+                break;
+            case 'domain_matrix':
+                renderDomainMatrixPlot(foundGenes, plotContainer);
                 break;
             case 'functional_category':
                 renderFunctionalCategoryPlot(foundGenes, plotContainer);
@@ -615,44 +501,37 @@ function updatePlotInfo(plotType) {
     if (!infoContainer) return;
     let infoHTML = '';
     switch (plotType) {
-        case 'bubble':
-            infoHTML = `<strong>Key Localizations:</strong> This bubble plot shows the distribution of your genes across primary ciliary and cellular compartments. The size of each bubble corresponds to the number of genes found in that location.`;
-            break;
-        case 'matrix':
-            infoHTML = `<strong>Gene Matrix:</strong> This plot shows the specific localization for each gene in your list. A bubble indicates that a gene is associated with a particular ciliary compartment.`;
-            break;
-        case 'functional_category':
-            infoHTML = `<strong>Functional Category Analysis:</strong> This chart displays the number of genes in your list that fall into various biological functions and processes.`;
-            break;
-        case 'network':
-            infoHTML = `<strong>Protein Complex Network:</strong> This visualization shows connections between genes in your list that are known to be part of the same protein complex.`;
-            break;
+        case 'bubble': infoHTML = `<strong>Key Localizations:</strong> This bubble plot shows the distribution of your genes across primary ciliary and cellular compartments. The size of each bubble corresponds to the number of genes found in that location.`; break;
+        case 'matrix': infoHTML = `<strong>Gene-Localization Matrix:</strong> This plot shows the specific localization for each gene in your list. A bubble indicates that a gene is associated with a particular ciliary compartment.`; break;
+        case 'domain_matrix': infoHTML = `<strong>Gene-Domain Matrix:</strong> This plot shows which protein domains are present in each gene from your list.`; break;
+        case 'functional_category': infoHTML = `<strong>Functional Category Analysis:</strong> This chart displays the number of genes in your list that fall into various biological functions and processes.`; break;
+        case 'network': infoHTML = `<strong>Protein Complex Network:</strong> This visualization shows connections between genes in your list that are known to be part of the same protein complex.`; break;
     }
     infoContainer.innerHTML = infoHTML;
 }
 
-function updateStatsAndLegend(plotType, foundGenes, allGenes) {
+function updateStatsAndLegend(plotType, foundGenes) {
     const statsContainer = document.getElementById('ciliaplot-stats-container');
     const legendContainer = document.getElementById('ciliaplot-legend-container');
     if (!statsContainer || !legendContainer) return;
-    let statsHTML = '',
-        legendHTML = '';
+    let statsHTML = '', legendHTML = '';
     statsHTML += `<div class="stat-box"><div class="stat-number">${foundGenes.length}</div><div class="stat-label">Input Genes Found</div></div>`;
 
     if (plotType === 'network') {
-        const {
-            links
-        } = computeProteinComplexLinks(foundGenes);
+        const { links } = computeProteinComplexLinks(foundGenes);
         const complexSet = new Set(foundGenes.flatMap(g => getCleanArray(g, 'complex_names', 'complex')));
-        statsHTML += `
-            <div class="stat-box"><div class="stat-number">${complexSet.size}</div><div class="stat-label">Unique Complexes</div></div>
-            <div class="stat-box"><div class="stat-number">${links.length}</div><div class="stat-label">Interactions</div></div>`;
+        statsHTML += `<div class="stat-box"><div class="stat-number">${complexSet.size}</div><div class="stat-label">Unique Complexes</div></div><div class="stat-box"><div class="stat-number">${links.length}</div><div class="stat-label">Interactions</div></div>`;
         legendHTML = `<div class="legend-item"><div class="legend-color" style="background-color: #3498db;"></div><span>Gene</span></div>`;
     } else if (plotType === 'functional_category') {
         const categorySet = new Set(foundGenes.flatMap(g => getCleanArray(g, 'functional_category')));
         statsHTML += `<div class="stat-box"><div class="stat-number">${categorySet.size}</div><div class="stat-label">Unique Categories</div></div>`;
         legendHTML = `<div class="legend-item"><div class="legend-color" style="background-color: rgba(26, 188, 156, 0.7); border-radius: 4px;"></div><span>Gene Count</span></div>`;
-    } else {
+    } else if (plotType === 'domain_matrix') {
+        const domainSet = new Set(foundGenes.flatMap(g => getCleanArray(g, 'domain_descriptions')));
+        statsHTML += `<div class="stat-box"><div class="stat-number">${domainSet.size}</div><div class="stat-label">Unique Domains</div></div>`;
+        legendHTML = ``;
+    }
+    else {
         const localizations = new Set(foundGenes.flatMap(g => getCleanArray(g, 'localization'))).size;
         statsHTML += `<div class="stat-box"><div class="stat-number">${localizations}</div><div class="stat-label">Unique Localizations</div></div>`;
         legendHTML = '';
@@ -679,7 +558,8 @@ function displayCiliaPlotPage() {
                         <label for="plot-type-select" style="font-weight:bold; margin-top: 1rem; margin-bottom: 0.5rem;">Select Analysis Type</label>
                         <select id="plot-type-select" style="width:100%;padding:8px;margin-bottom:1rem;">
                             <option value="bubble">Key Localizations</option>
-                            <option value="matrix">Gene Matrix</option>
+                            <option value="matrix">Gene-Localization Matrix</option>
+                            <option value="domain_matrix">Gene-Domain Matrix</option>
                             <option value="functional_category">Functional Category</option>
                             <option value="network">Protein Complex Network</option>
                         </select>
@@ -699,7 +579,7 @@ function displayCiliaPlotPage() {
                             <div><label>Axis Line Width <input type="number" id="setting-axis-line-width" value="2" step="0.5" min="1"></label></div>
                             <div><label>Axis Line Color <input type="color" id="setting-axis-line-color" value="#333333"></label></div>
                             <div><label>Gridline Color <input type="color" id="setting-grid-color" value="#e0e0e0"></label></div>
-                            <div><label><input type="checkbox" id="setting-show-grid" checked> Show Gridlines</label></div>
+                            <div><label><input type="checkbox" id="setting-show-grid"> Show Gridlines</label></div>
                          </div>
                      </details>
                 </div>
@@ -731,5 +611,23 @@ function displayCiliaPlotPage() {
             updatePlotInfo(document.getElementById('plot-type-select').value);
         }
     });
+    
+    // 3. Ensure plot customization works by adding event listeners
+    const settingsGrid = document.getElementById('plot-settings-grid');
+    settingsGrid.addEventListener('change', (event) => {
+        // Check if the event was triggered by a setting input and a plot exists
+        if (event.target.id.startsWith('setting-') && currentPlotInstance) {
+            const plotType = document.getElementById('plot-type-select').value;
+            // Find the correct render function and call it again to update the plot
+            switch (plotType) {
+                case 'bubble': renderKeyLocalizations(findGenes(document.getElementById('ciliaplot-genes-input').value.trim().toUpperCase().split(/[\s,;\n\r\t]+/)).foundGenes, document.getElementById('plot-display-area')); break;
+                case 'matrix': renderGeneMatrix(findGenes(document.getElementById('ciliaplot-genes-input').value.trim().toUpperCase().split(/[\s,;\n\r\t]+/)).foundGenes, document.getElementById('plot-display-area')); break;
+                case 'domain_matrix': renderDomainMatrixPlot(findGenes(document.getElementById('ciliaplot-genes-input').value.trim().toUpperCase().split(/[\s,;\n\r\t]+/)).foundGenes, document.getElementById('plot-display-area')); break;
+                case 'functional_category': renderFunctionalCategoryPlot(findGenes(document.getElementById('ciliaplot-genes-input').value.trim().toUpperCase().split(/[\s,;\n\r\t]+/)).foundGenes, document.getElementById('plot-display-area')); break;
+                case 'network': renderComplexNetwork(findGenes(document.getElementById('ciliaplot-genes-input').value.trim().toUpperCase().split(/[\s,;\n\r\t]+/)).foundGenes, document.getElementById('plot-display-area')); break;
+            }
+        }
+    });
+
     updatePlotInfo(document.getElementById('plot-type-select').value);
 }
