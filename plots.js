@@ -28,10 +28,8 @@ function clearPreviousPlot() {
             currentPlotInstance.remove();
         }
     }
-    document.getElementById('plot-display-area').innerHTML = ''; // Ensure container is empty
     currentPlotInstance = null; // Reset the variable
 }
-
 /**
  * Robustly extracts a clean array of values from a gene object.
  * @param {Object} gene - The gene object from the database.
@@ -154,7 +152,7 @@ function updatePlotInfo(plotType) {
              infoHTML = `<strong>Expression Heatmap:</strong> This plot displays the expression level (nTPM) of each selected gene across various human tissues. Darker colors indicate higher expression.`;
              break;
         case 'tissue_profile':
-             infoHTML = `<strong>Tissue Expression Profile:</strong> This line chart shows the average expression of your gene set across the top 20 tissues, highlighting potential tissue-specific enrichment.`;
+             infoHTML = `<strong>Tissue Expression Profile:</strong> This radar chart shows the average expression of your gene set across tissues, highlighting potential tissue-specific enrichment.`;
              break;
         case 'expression_localization':
              infoHTML = `<strong>Expression vs. Localization:</strong> This bubble plot correlates expression breadth (number of expressing tissues) with localization diversity. Bubble size represents the maximum expression level.`;
@@ -314,7 +312,7 @@ async function downloadPlot() {
 // =============================================================================
 
 function renderKeyLocalizations(foundGenes, container) {
-    clearPreviousPlot();
+    clearPreviousPlot(); // Use the new, safe cleanup function
     const settings = getPlotSettings();
     container.innerHTML = `<canvas></canvas>`;
     const ctx = container.querySelector('canvas').getContext('2d');
@@ -376,10 +374,8 @@ function renderKeyLocalizations(foundGenes, container) {
     });
 }
 
-// NOTE: This matrix plot and the domain matrix plot could be merged into a single,
-// customizable component to reduce redundancy, as they share the same structure.
 function renderGeneMatrix(foundGenes, container) {
-    clearPreviousPlot();
+    clearPreviousPlot(); // Use the new, safe cleanup function
     const settings = getPlotSettings();
     container.innerHTML = `<canvas></canvas>`;
     const ctx = container.querySelector('canvas').getContext('2d');
@@ -437,9 +433,7 @@ function renderGeneMatrix(foundGenes, container) {
 }
 
 function renderDomainMatrixPlot(foundGenes, container) {
-    clearPreviousPlot();
-    // TODO: Enhance this plot by adding domain enrichment statistics (e.g., via a hypergeometric test)
-    // to make the output more suitable for publication.
+    clearPreviousPlot(); // Use the new, safe cleanup function
     const settings = getPlotSettings();
     container.innerHTML = `<canvas></canvas>`;
     const ctx = container.querySelector('canvas').getContext('2d');
@@ -505,9 +499,7 @@ function renderDomainMatrixPlot(foundGenes, container) {
 }
 
 function renderFunctionalCategoryPlot(foundGenes, container) {
-    clearPreviousPlot();
-    // TODO: To align with publication standards, replace raw gene counts with
-    // statistical enrichment results (e.g., p-values from a GO/KEGG analysis).
+    clearPreviousPlot(); // Use the new, safe cleanup function
     const settings = getPlotSettings();
     container.innerHTML = `<canvas></canvas>`;
     const ctx = container.querySelector('canvas').getContext('2d');
@@ -603,16 +595,13 @@ function computeProteinComplexLinks(foundGenes) {
 }
 
 function renderComplexNetwork(foundGenes, container) {
-    clearPreviousPlot();
-    // TODO: Add advanced features like network clustering (e.g., Louvain) and an
-    // "Export to Cytoscape" option for publication-quality figure generation.
     const settings = getPlotSettings();
     const { nodes, links } = computeProteinComplexLinks(foundGenes);
     if (!nodes.length || !links.length) {
         container.innerHTML = '<p class="status-message">No protein complex links found among the selected genes.</p>';
         return;
     }
-
+    container.innerHTML = '';
     const width = container.clientWidth;
     const height = Math.max(500, container.clientHeight);
     const svg = d3.select(container).append("svg").attr("width", width).attr("height", height);
@@ -675,45 +664,44 @@ function getTissueNames() {
     return [];
 }
 
+
 /**
- * REVISED: Calculate expression statistics, now including standard deviation.
+ * Pre-calculate expression statistics for a set of genes.
  */
 function calculateExpressionStats(genes) {
     const tissues = getTissueNames();
-    const stats = { meanExpression: {}, medianExpression: {}, maxExpression: {}, geneCount: {}, stdDevExpression: {} };
+    const stats = { meanExpression: {}, medianExpression: {}, maxExpression: {}, geneCount: {} };
     tissues.forEach(tissue => {
-        const values = genes.map(gene => {
-            const expr = getGeneExpression(gene.gene);
-            return expr && expr[tissue] !== undefined && expr[tissue] !== null ? expr[tissue] : 0;
-        }).filter(v => v > 0);
+        const values = genes.map(gene => getGeneExpression(gene.gene)[tissue] || 0).filter(v => v > 0);
         if (values.length > 0) {
-            const mean = values.reduce((a, b) => a + b, 0) / values.length;
-            stats.meanExpression[tissue] = mean;
-            stats.medianExpression[tissue] = values.sort((a, b) => a - b)[Math.floor(values.length / 2)];
+            stats.meanExpression[tissue] = values.reduce((a, b) => a + b, 0) / values.length;
+            values.sort((a, b) => a - b);
+            stats.medianExpression[tissue] = values[Math.floor(values.length / 2)];
             stats.maxExpression[tissue] = Math.max(...values);
             stats.geneCount[tissue] = values.length;
-            const sumSq = values.reduce((a, b) => a + (b * b), 0);
-            stats.stdDevExpression[tissue] = values.length > 1 ? Math.sqrt((sumSq - (mean * mean * values.length)) / (values.length - 1)) : 0;
         } else {
             stats.meanExpression[tissue] = 0;
             stats.medianExpression[tissue] = 0;
             stats.maxExpression[tissue] = 0;
             stats.geneCount[tissue] = 0;
-            stats.stdDevExpression[tissue] = 0;
         }
     });
     return stats;
 }
 
-
 /**
  * Renders an expression heatmap.
  */
 function renderExpressionHeatmap(foundGenes, container) {
-    clearPreviousPlot();
-    // TODO: Add hierarchical clustering for both genes and tissues to reveal
-    // expression patterns, which is a standard feature in publication heatmaps.
+    if (currentPlotInstance) {
+        if (typeof currentPlotInstance.destroy === 'function') {
+            currentPlotInstance.destroy();
+        } else {
+            d3.select(currentPlotInstance).remove();
+        }
+    }
     const settings = getPlotSettings();
+    container.innerHTML = '';
     
     if (!foundGenes.length || Object.keys(expressionData).length === 0) {
         container.innerHTML = '<p class="status-message">No expression data available for selected genes.</p>';
@@ -818,10 +806,16 @@ function renderExpressionHeatmap(foundGenes, container) {
     currentPlotInstance = svg.node();
 }
 
+// =============================================================================
+// PLOTTING FUNCTIONS: EXPRESSION ANALYSIS (Improved)
+// =============================================================================
 /**
- * REPLACED: Renders a tissue expression profile as a line chart instead of a radar chart.
- * This version is better for comparing across many categories and is more conventional
- * for scientific publications.
+ * Renders a tissue expression profile as a line chart with error bars.
+ * Fixes:
+ * - Validate tissue names against expressionData to avoid undefined errors.
+ * - Log mismatches for debugging.
+ * - Add fallback for missing tissues.
+ * - Maintain publication quality: large fonts, wrapped labels, colorblind-friendly palette.
  */
 function renderTissueExpressionProfile(foundGenes, container) {
     clearPreviousPlot();
@@ -834,13 +828,16 @@ function renderTissueExpressionProfile(foundGenes, container) {
         return;
     }
     
+    // Validate tissue names
     const tissues = getTissueNames();
     const validTissues = tissues.filter(tissue => {
         const isValid = foundGenes.some(gene => {
             const expr = getGeneExpression(gene.gene);
             return expr && typeof expr[tissue] !== 'undefined' && expr[tissue] !== null;
         });
-        if (!isValid) console.warn(`Tissue "${tissue}" not found in expression data for any gene.`);
+        if (!isValid) {
+            console.warn(`Tissue "${tissue}" not found in expression data for any gene.`);
+        }
         return isValid;
     });
     
@@ -853,7 +850,7 @@ function renderTissueExpressionProfile(foundGenes, container) {
     
     // Sort by mean expression, limit to top 20 for readability
     const sortedTissues = validTissues.sort((a, b) => (stats.meanExpression[b] || 0) - (stats.meanExpression[a] || 0));
-    const displayTissues = sortedTissues.slice(0, Math.min(20, sortedTissues.length));
+    const displayTissues = sortedTissues.slice(0, Math.min(20, sortedTissues.length)); // Reduced for publication clarity
     
     const labels = displayTissues.map(tissue => tissue.replace(/(.{15})/g, "$1\n"));
     const means = displayTissues.map(tissue => stats.meanExpression[tissue] || 0);
@@ -879,7 +876,8 @@ function renderTissueExpressionProfile(foundGenes, container) {
             }]
         },
         options: {
-            responsive: true, maintainAspectRatio: false,
+            responsive: true,
+            maintainAspectRatio: false,
             plugins: {
                 title: { 
                     display: true, 
@@ -888,7 +886,8 @@ function renderTissueExpressionProfile(foundGenes, container) {
                     color: '#333333'
                 },
                 legend: { 
-                    display: true, position: 'top',
+                    display: true, 
+                    position: 'top',
                     labels: { font: { size: settings.tickFontSize, family: 'Helvetica' }, color: '#333333' }
                 },
                 tooltip: {
@@ -901,12 +900,19 @@ function renderTissueExpressionProfile(foundGenes, container) {
                         ]
                     },
                     bodyFont: { size: 14 }
+                },
+                datalabels: {
+                    display: (context) => means[context.dataIndex] > 0,
+                    color: '#333',
+                    font: { size: 12, family: 'Helvetica', weight: 'bold' },
+                    formatter: (value) => value.toFixed(1)
                 }
             },
             scales: {
                 x: {
                     title: { 
-                        display: true, text: 'Tissues (Sorted by Expression)', 
+                        display: true, 
+                        text: 'Tissues (Sorted by Expression)', 
                         font: { size: settings.axisTitleFontSize + 2, family: 'Helvetica', weight: 'bold' },
                         color: '#333333'
                     },
@@ -914,12 +920,16 @@ function renderTissueExpressionProfile(foundGenes, container) {
                     border: { display: true, width: settings.axisLineWidth + 1, color: '#333333' },
                     ticks: { 
                         font: { size: settings.tickFontSize + 2, family: 'Helvetica' },
-                        color: '#333333', maxRotation: 90, minRotation: 45, padding: 10
+                        color: '#333333',
+                        maxRotation: 90,
+                        minRotation: 45,
+                        padding: 10
                     }
                 },
                 y: {
                     title: { 
-                        display: true, text: 'Mean Expression (nTPM)', 
+                        display: true, 
+                        text: 'Mean Expression (nTPM)', 
                         font: { size: settings.axisTitleFontSize + 2, family: 'Helvetica', weight: 'bold' },
                         color: '#333333'
                     },
@@ -938,10 +948,40 @@ function renderTissueExpressionProfile(foundGenes, container) {
 }
 
 /**
+ * Updated calculateExpressionStats to include standard deviation and handle missing tissues.
+ */
+function calculateExpressionStats(genes) {
+    const tissues = getTissueNames();
+    const stats = { meanExpression: {}, medianExpression: {}, maxExpression: {}, geneCount: {}, stdDevExpression: {} };
+    tissues.forEach(tissue => {
+        const values = genes.map(gene => {
+            const expr = getGeneExpression(gene.gene);
+            return expr && expr[tissue] !== undefined && expr[tissue] !== null ? expr[tissue] : 0;
+        }).filter(v => v > 0);
+        if (values.length > 0) {
+            const mean = values.reduce((a, b) => a + b, 0) / values.length;
+            stats.meanExpression[tissue] = mean;
+            stats.medianExpression[tissue] = values.sort((a, b) => a - b)[Math.floor(values.length / 2)];
+            stats.maxExpression[tissue] = Math.max(...values);
+            stats.geneCount[tissue] = values.length;
+            const sumSq = values.reduce((a, b) => a + b * b, 0);
+            stats.stdDevExpression[tissue] = values.length > 1 ? Math.sqrt((sumSq - (mean * mean * values.length)) / (values.length - 1)) : 0;
+        } else {
+            stats.meanExpression[tissue] = 0;
+            stats.medianExpression[tissue] = 0;
+            stats.maxExpression[tissue] = 0;
+            stats.geneCount[tissue] = 0;
+            stats.stdDevExpression[tissue] = 0;
+        }
+    });
+    return stats;
+}
+
+/**
  * Renders a bubble plot of expression breadth vs. localization diversity.
  */
 function renderExpressionLocalizationBubble(foundGenes, container) {
-    clearPreviousPlot();
+    clearPreviousPlot(); // Use the new, safe cleanup function
     const settings = getPlotSettings();
     container.innerHTML = `<canvas></canvas>`;
     const ctx = container.querySelector('canvas').getContext('2d');
@@ -1026,7 +1066,7 @@ function renderExpressionLocalizationBubble(foundGenes, container) {
  * Renders a bar chart of the top expressing tissues.
  */
 function renderTopExpressingTissues(foundGenes, container) {
-    clearPreviousPlot();
+    clearPreviousPlot(); // Use the new, safe cleanup function
     const settings = getPlotSettings();
     container.innerHTML = `<canvas></canvas>`;
     const ctx = container.querySelector('canvas').getContext('2d');
