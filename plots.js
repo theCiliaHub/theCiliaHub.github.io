@@ -1,42 +1,61 @@
 // =============================================================================
-// CiliaHub Plotting Engine (plots.js)
-// =============================================================================
-// This file contains all functions for generating analytical plots on the
-// CiliaPlot page, including localization, domain, network, and expression
-// analyses.
-//
-// Dependencies:
-// - D3.js (for network plot)
-// - Chart.js (for most plots)
-// - jsPDF (for PDF downloads)
-// - Global variables from script.js (allGenes, expressionData, etc.)
+// MISSING HELPER & DATA FUNCTIONS (Stubs)
+// These functions were being called but were not defined in the code.
+// You should replace these stubs with your actual data loading logic.
 // =============================================================================
 
-let currentPlotInstance = null; // Holds the active Chart.js, D3, etc. instance
+// In a real app, these would be populated from your data files.
+let allGenes = [];
+let expressionData = {};
+let tissueNames = [];
+
+async function loadAndPrepareDatabase() {
+    console.log("Loading database...");
+    // In a real app, this would fetch 'ciliagenes.json'
+    // For now, we'll assume `allGenes` is populated by another script.
+    if (allGenes.length === 0) {
+        console.warn("`allGenes` data is missing.");
+    }
+}
+
+async function loadExpressionData() {
+    console.log("Loading expression data...");
+    // In a real app, this would fetch 'expression.json'
+    if (Object.keys(expressionData).length === 0) {
+        console.warn("`expressionData` is missing.");
+    }
+}
+
+function findGenes(queryArray) {
+    console.log("Finding genes for queries:", queryArray);
+    // This is a simplified mock of the findGenes function.
+    const foundGenes = allGenes.filter(gene => queryArray.includes(gene.gene.toUpperCase()));
+    return { foundGenes };
+}
+
+// =============================================================================
+// CORE PLOTTING LOGIC
+// =============================================================================
 
 /**
- * Safely clears the previous plot, handling both Chart.js and D3.js instances.
+ * ✅ FIXED: Safely clears the previous plot AND the data table.
  */
 function clearPreviousPlot() {
     if (currentPlotInstance) {
-        // Check if it's a Chart.js instance
         if (typeof currentPlotInstance.destroy === 'function') {
             currentPlotInstance.destroy();
-        }
-        // Check if it's a D3.js DOM element (like an SVG)
-        else if (currentPlotInstance.nodeType) {
+        } else if (currentPlotInstance.nodeType) {
             currentPlotInstance.remove();
         }
     }
-    document.getElementById('plot-display-area').innerHTML = ''; // Ensure container is empty
-    currentPlotInstance = null; // Reset the variable
+    document.getElementById('plot-display-area').innerHTML = '';
+    const tableContainer = document.getElementById('plot-data-table-container');
+    if (tableContainer) tableContainer.innerHTML = '';
+    currentPlotInstance = null;
 }
 
 /**
  * Robustly extracts a clean array of values from a gene object.
- * @param {Object} gene - The gene object from the database.
- * @param {...string} keys - The possible keys to check for the data.
- * @returns {Array<string>} A clean array of strings.
  */
 function getCleanArray(gene, ...keys) {
     let data = null;
@@ -57,13 +76,8 @@ function getCleanArray(gene, ...keys) {
         .filter(Boolean);
 }
 
-// =============================================================================
-// MAIN PLOT GENERATION & UI
-// =============================================================================
-
 /**
-**
- * MODIFIED: Main controller, now calls the table renderer for the bubble plot.
+ * Main controller to generate plots.
  */
 async function generateAnalysisPlots() {
     try {
@@ -76,8 +90,8 @@ async function generateAnalysisPlots() {
             alert('Please enter a gene list.');
             return;
         }
-        
-        clearPreviousPlot(); // Clear previous results before starting
+        
+        clearPreviousPlot();
         plotContainer.innerHTML = '<p class="status-message">Generating plot...</p>';
 
         const sanitizedQueries = [...new Set(genesInput.split(/[\s,;\n\r\t]+/).filter(Boolean).map(q => q.toUpperCase()))];
@@ -87,14 +101,11 @@ async function generateAnalysisPlots() {
         updatePlotInfo(plotType);
         updateStatsAndLegend(plotType, foundGenes);
 
-        // Routing and table generation
         switch (plotType) {
             case 'expression_localization':
                 renderExpressionLocalizationBubble(foundGenes, plotContainer);
-                // NEW: Render the data table below this specific plot
                 renderGeneDataTable(foundGenes, document.getElementById('plot-data-table-container'));
                 break;
-            // ... (other cases remain the same)
             case 'bubble':
                 renderKeyLocalizations(foundGenes, plotContainer);
                 break;
@@ -129,16 +140,20 @@ async function generateAnalysisPlots() {
     }
 }
 
+// =============================================================================
+// ✅ ADDED BACK: MISSING UI and UTILITY FUNCTIONS
+// =============================================================================
 
 /**
  * Updates the informational text box with a description of the current plot.
- * @param {string} plotType - The selected plot type.
  */
 function updatePlotInfo(plotType) {
+    // This function was already present and correct.
     const infoContainer = document.getElementById('ciliaplot-plot-info');
     if (!infoContainer) return;
     let infoHTML = '';
     switch (plotType) {
+        // Cases are correct as provided earlier
         case 'bubble':
              infoHTML = `<strong>Key Localizations:</strong> This bubble plot shows the distribution of your genes across primary ciliary and cellular compartments. The size of each bubble corresponds to the number of genes found in that location.`;
              break;
@@ -173,20 +188,18 @@ function updatePlotInfo(plotType) {
     infoContainer.innerHTML = infoHTML;
 }
 
+
 /**
  * Updates the statistics and legend sections based on the plot type.
- * @param {string} plotType - The selected plot type.
- * @param {Array} foundGenes - The array of gene objects being plotted.
  */
 function updateStatsAndLegend(plotType, foundGenes) {
+    // This function was already present and correct.
     const statsContainer = document.getElementById('ciliaplot-stats-container');
     const legendContainer = document.getElementById('ciliaplot-legend-container');
     if (!statsContainer || !legendContainer) return;
-    
-    // Show containers
+    
     statsContainer.style.display = 'grid';
     legendContainer.style.display = 'flex';
-
     let statsHTML = '', legendHTML = '';
     statsHTML += `<div class="stat-box"><div class="stat-number">${foundGenes.length}</div><div class="stat-label">Input Genes Found</div></div>`;
 
@@ -202,24 +215,24 @@ function updateStatsAndLegend(plotType, foundGenes) {
     } else if (plotType === 'domain_matrix') {
         const domainSet = new Set(foundGenes.flatMap(g => getCleanArray(g, 'domain_descriptions')));
         statsHTML += `<div class="stat-box"><div class="stat-number">${domainSet.size}</div><div class="stat-label">Unique Domains</div></div>`;
-        legendContainer.style.display = 'none'; // No legend for this plot
+        legendContainer.style.display = 'none';
     } else if (plotType.startsWith('expression') || plotType === 'top_tissues' || plotType === 'tissue_profile') {
         const genesWithExpr = foundGenes.filter(g => expressionData[g.gene.toUpperCase()]);
         statsHTML += `<div class="stat-box"><div class="stat-number">${genesWithExpr.length}</div><div class="stat-label">Genes with Expression Data</div></div>`;
-        legendContainer.style.display = 'none'; // Legends are built into these plots
+        legendContainer.style.display = 'none';
     } else {
         const localizations = new Set(foundGenes.flatMap(g => getCleanArray(g, 'localization'))).size;
         statsHTML += `<div class="stat-box"><div class="stat-number">${localizations}</div><div class="stat-label">Unique Localizations</div></div>`;
-        legendContainer.style.display = 'none'; // No legend for this plot
+        legendContainer.style.display = 'none';
     }
     statsContainer.innerHTML = statsHTML;
     legendContainer.innerHTML = legendHTML;
 }
 
-// =============================================================================
-// PLOT CUSTOMIZATION & DOWNLOAD
-// =============================================================================
 
+/**
+ * Gets plot customization settings from the UI.
+ */
 function getPlotSettings() {
     const setting = (id, def) => document.getElementById(id)?.value || def;
     return {
@@ -236,7 +249,11 @@ function getPlotSettings() {
     };
 }
 
+/**
+ * Handles downloading the currently displayed plot.
+ */
 async function downloadPlot() {
+    // This function was already present and correct.
     const format = document.getElementById('download-format')?.value || 'png';
     const plotArea = document.getElementById('plot-display-area');
     const plotType = document.getElementById('plot-type-select')?.value;
@@ -257,14 +274,12 @@ async function downloadPlot() {
             tempCanvas.width = sourceCanvas.width;
             tempCanvas.height = sourceCanvas.height;
             const tempCtx = tempCanvas.getContext('2d');
-
             if (backgroundColor !== 'transparent') {
                 tempCtx.fillStyle = backgroundColor;
                 tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
             }
             tempCtx.drawImage(sourceCanvas, 0, 0);
             dataUrl = tempCanvas.toDataURL('image/png');
-
         } else if (plotArea.querySelector('svg')) {
             const svgElement = plotArea.querySelector('svg');
             const canvas = document.createElement('canvas');
@@ -276,9 +291,7 @@ async function downloadPlot() {
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
             }
             const img = new Image();
-            const svgBlob = new Blob([new XMLSerializer().serializeToString(svgElement)], {
-                type: "image/svg+xml;charset=utf-8"
-            });
+            const svgBlob = new Blob([new XMLSerializer().serializeToString(svgElement)], { type: "image/svg+xml;charset=utf-8" });
             const url = URL.createObjectURL(svgBlob);
             await new Promise((resolve, reject) => {
                 img.onload = () => {
@@ -299,11 +312,7 @@ async function downloadPlot() {
             a.click();
         } else if (format === 'pdf') {
             const { jsPDF } = window.jspdf;
-            const pdf = new jsPDF({
-                orientation: width > height ? 'l' : 'p',
-                unit: 'px',
-                format: [width, height]
-            });
+            const pdf = new jsPDF({ orientation: width > height ? 'l' : 'p', unit: 'px', format: [width, height] });
             pdf.addImage(dataUrl, 'PNG', 0, 0, width, height);
             pdf.save(fileName);
         }
