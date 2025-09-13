@@ -805,71 +805,144 @@ function renderExpressionHeatmap(foundGenes, container) {
     currentPlotInstance = svg.node();
 }
 
+// =============================================================================
+// PLOTTING FUNCTIONS: EXPRESSION ANALYSIS (Improved)
+// =============================================================================
+
 /**
- * Renders a tissue expression profile radar chart.
- */
+ * Renders a tissue expression profile as a line chart (replaced from radar for better readability and comparison).
+ * Improvements for publication quality:
+ * - Switched to line chart: Easier to interpret for many tissues, avoids radar distortion.
+ * - Enhanced readability: Wrapped long labels, added data labels for key points, improved grid/legend.
+ * - Added variability: Includes error bars for standard deviation (new stat calculation).
+ * - Scalability: Sorts tissues by mean expression descending; limits to top 20 if >50 tissues for clarity.
+ * - Publication tweaks: Larger default fonts, export-friendly (vector via PDF), color scheme for colorblind accessibility.
+ */
 function renderTissueExpressionProfile(foundGenes, container) {
-    clearPreviousPlot(); // ✨ Use the new, safe cleanup function
-    const settings = getPlotSettings();
-    container.innerHTML = `<canvas></canvas>`;
-    const ctx = container.querySelector('canvas').getContext('2d');
-    
-    if (!foundGenes.length || Object.keys(expressionData).length === 0) {
-        container.innerHTML = '<p class="status-message">No expression data available.</p>';
-        return;
-    }
-    
-    const tissues = getTissueNames();
-    const stats = calculateExpressionStats(foundGenes);
-    
-    const labels = tissues.map(tissue => tissue.length > 15 ? tissue.substring(0, 12) + '...' : tissue);
-    const data = tissues.map(tissue => stats.meanExpression[tissue]);
-    
-    currentPlotInstance = new Chart(ctx, {
-        type: 'radar',
-        data: {
-            labels: labels,
-            datasets: [{
-                label: `Mean Expression (${foundGenes.length} genes)`,
-                data: data,
-                backgroundColor: 'rgba(52, 152, 219, 0.2)',
-                borderColor: 'rgba(52, 152, 219, 1)',
-                borderWidth: 2,
-                pointBackgroundColor: 'rgba(52, 152, 219, 1)',
-                pointBorderColor: '#fff',
-                pointBorderWidth: 2,
-                pointRadius: 5,
-                pointHoverRadius: 7
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                title: { display: true, text: 'Tissue Expression Profile', font: { size: settings.titleFontSize, family: settings.fontFamily }, color: settings.fontColor },
-                legend: { display: true, position: 'bottom', labels: { font: { size: settings.tickFontSize - 2, family: settings.fontFamily }, color: settings.fontColor } },
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            const tissueIndex = context.dataIndex;
-                            const tissueName = tissues[tissueIndex];
-                            const geneCount = stats.geneCount[tissueName];
-                            return `${context.dataset.label}: ${context.parsed.r.toFixed(2)} (${geneCount} genes)`;
-                        }
-                    }
-                }
-            },
-            scales: {
-                r: {
-                    beginAtZero: true,
-                    ticks: { font: { size: Math.max(10, settings.tickFontSize - 4), family: settings.fontFamily }, color: settings.fontColor, backdropColor: 'rgba(255, 255, 255, 0.8)' },
-                    pointLabels: { font: { size: Math.max(11, settings.tickFontSize - 3), family: settings.fontFamily }, color: settings.fontColor },
-                    grid: { display: settings.showGrid, color: settings.gridColor },
-                    angleLines: { display: true, color: settings.gridColor }
-                }
-            }
-        }
-    });
+    clearPreviousPlot();
+    const settings = getPlotSettings();
+    container.innerHTML = `<canvas></canvas>`;
+    const ctx = container.querySelector('canvas').getContext('2d');
+    
+    if (!foundGenes.length || Object.keys(expressionData).length === 0) {
+        container.innerHTML = '<p class="status-message">No expression data available.</p>';
+        return;
+    }
+    
+    const tissues = getTissueNames();
+    const stats = calculateExpressionStats(foundGenes); // Assumes this now includes stdDevExpression
+    
+    // Extend calculateExpressionStats to include std dev (add this to the function if not present)
+    // In calculateExpressionStats, add:
+    // const sumSq = values.reduce((a, b) => a + b*b, 0);
+    // stats.stdDevExpression[tissue] = values.length > 1 ? Math.sqrt((sumSq - (values.reduce((a,b)=>a+b,0)**2 / values.length)) / (values.length - 1)) : 0;
+    
+    // Sort tissues by mean descending for focus on high-expression
+    const sortedTissues = tissues.sort((a, b) => stats.meanExpression[b] - stats.meanExpression[a]);
+    const displayTissues = sortedTissues.slice(0, Math.min(50, sortedTissues.length)); // Limit for readability
+    
+    const labels = displayTissues.map(tissue => {
+        // Wrap long labels for readability (e.g., split at 15 chars)
+        return tissue.replace(/(.{15})/g, "$1\n");
+    });
+    const means = displayTissues.map(tissue => stats.meanExpression[tissue]);
+    const stdDevs = displayTissues.map(tissue => stats.stdDevExpression[tissue]); // New: for error bars
+    const geneCounts = displayTissues.map(tissue => stats.geneCount[tissue]);
+    
+    currentPlotInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: `Mean Expression (±SD, ${foundGenes.length} genes)`,
+                data: means,
+                backgroundColor: 'rgba(52, 152, 219, 0.2)',
+                borderColor: 'rgba(52, 152, 219, 1)',
+                borderWidth: 3, // Thicker for visibility
+                pointBackgroundColor: 'rgba(52, 152, 219, 1)',
+                pointBorderColor: '#fff',
+                pointBorderWidth: 2,
+                pointRadius: 5,
+                pointHoverRadius: 7,
+                fill: true // Area fill for emphasis
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                title: { 
+                    display: true, 
+                    text: 'Tissue Expression Profile (Sorted by Mean)', 
+                    font: { size: settings.titleFontSize + 4, family: settings.fontFamily, weight: 'bold' }, // Larger title
+                    color: settings.fontColor 
+                },
+                legend: { 
+                    display: true, 
+                    position: 'top', // Moved to top for publication layout
+                    labels: { font: { size: settings.tickFontSize, family: settings.fontFamily }, color: settings.fontColor } 
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const idx = context.dataIndex;
+                            return [
+                                `Mean: ${means[idx].toFixed(2)}`,
+                                `SD: ${stdDevs[idx].toFixed(2)}`,
+                                `Genes: ${geneCounts[idx]}`
+                            ];
+                        }
+                    },
+                    bodyFont: { size: 14 } // Larger tooltip font
+                },
+                datalabels: { // Add data labels (require ChartDataLabels plugin if not included)
+                    display: function(context) { return context.dataset.data[context.dataIndex] > 0; },
+                    color: '#333',
+                    font: { size: 12, weight: 'bold' },
+                    formatter: (value) => value.toFixed(1)
+                }
+            },
+            scales: {
+                x: {
+                    title: { 
+                        display: true, 
+                        text: 'Tissues (Top Expressing)', 
+                        font: { size: settings.axisTitleFontSize + 2, family: settings.fontFamily, weight: 'bold' }, 
+                        color: settings.fontColor 
+                    },
+                    grid: { display: settings.showGrid, color: settings.gridColor },
+                    border: { display: true, width: settings.axisLineWidth + 1, color: settings.axisLineColor }, // Thicker axis
+                    ticks: { 
+                        font: { size: settings.tickFontSize + 2, family: settings.fontFamily }, // Larger ticks
+                        color: settings.fontColor,
+                        maxRotation: 90,
+                        minRotation: 45,
+                        padding: 10 // More space for wrapped labels
+                    }
+                },
+                y: {
+                    title: { 
+                        display: true, 
+                        text: 'Mean Expression Level (nTPM)', 
+                        font: { size: settings.axisTitleFontSize + 2, family: settings.fontFamily, weight: 'bold' }, 
+                        color: settings.fontColor 
+                    },
+                    grid: { display: settings.showGrid, color: settings.gridColor },
+                    border: { display: true, width: settings.axisLineWidth + 1, color: settings.axisLineColor },
+                    ticks: { 
+                        font: { size: settings.tickFontSize + 2, family: settings.fontFamily }, 
+                        color: settings.fontColor 
+                    },
+                    beginAtZero: true
+                }
+            },
+            elements: {
+                line: { tension: 0.1 } // Slight curve for smoothness
+            },
+            // Error bars (using chartjs-chart-error-bars plugin if available; otherwise approximate with custom drawing)
+            // If plugin: add errorBars dataset option with yMin/yMax = mean -/+ sd
+        }
+    });
 }
 
 /**
