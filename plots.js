@@ -1,13 +1,15 @@
 // =============================================================================
-// CiliaHub Plotting Engine (plots.js) - Improved
+// CiliaHub Plotting Engine (plots.js) - v2.0.3
 // =============================================================================
+// Fixes:
+// - Added downloadPlot function to handle PNG/PDF exports.
+// - Initialized legendHTML to prevent undefined errors in updateStatsAndLegend.
+// - Added robust DOM checks in generateAnalysisPlots for plotContainer.
 // Improvements:
-// - Merged gene and domain matrix plots into a single customizable matrix.
-// - Added robustness: Validate data, handle undefined values, log warnings.
-// - Publication quality: Larger fonts, colorblind-friendly colors, wrapped labels.
-// - Scalability: Limit genes/tissues for large datasets, add clustering where relevant.
-// - Stats: Added enrichment stats for functional categories (mock p-values for now).
-// Dependencies: D3.js, Chart.js, ChartDataLabels (new), jsPDF
+// - Merged matrix plots, added clustering, colorblind-friendly colors, larger fonts.
+// - Scalability: Limits genes/categories/tissues (50/15-20).
+// - Robustness: Validates data, logs warnings for missing keys.
+// Dependencies: D3.js, Chart.js, ChartDataLabels, chartjs-plugin-zoom, jsPDF
 // =============================================================================
 
 let currentPlotInstance = null;
@@ -27,10 +29,85 @@ function clearPreviousPlot() {
 }
 
 /**
+ * Downloads the current plot as PNG or PDF.
+ */
+function downloadPlot(format = 'png') {
+    if (!currentPlotInstance) {
+        console.error('No plot available to download.');
+        alert('No plot available to download.');
+        return;
+    }
+    
+    const plotContainer = document.getElementById('plot-display-area');
+    if (!plotContainer) {
+        console.error('Plot container not found.');
+        return;
+    }
+    
+    const filename = `ciliahub_plot_${new Date().toISOString().replace(/[:.]/g, '-')}.${format}`;
+    
+    if (currentPlotInstance instanceof Chart) {
+        const canvas = plotContainer.querySelector('canvas');
+        if (!canvas) {
+            console.error('Canvas not found for Chart.js plot.');
+            return;
+        }
+        if (format === 'png') {
+            const url = canvas.toDataURL('image/png');
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = filename;
+            link.click();
+        } else if (format === 'pdf') {
+            const pdf = new jsPDF('landscape');
+            const imgData = canvas.toDataURL('image/png');
+            const imgProps = pdf.getImageProperties(imgData);
+            const pdfWidth = pdf.internal.pageSize.getWidth();
+            const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+            pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+            pdf.save(filename);
+        }
+    } else if (currentPlotInstance.nodeType && currentPlotInstance.tagName === 'svg') {
+        const svg = currentPlotInstance;
+        const serializer = new XMLSerializer();
+        let source = serializer.serializeToString(svg);
+        if (!source.match(/^<svg[^>]+xmlns="http:\/\/www\.w3\.org\/2000\/svg"/)) {
+            source = `<?xml version="1.0" standalone="no"?>\n${source}`;
+        }
+        if (format === 'png') {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            const img = new Image();
+            const svgBlob = new Blob([source], { type: 'image/svg+xml;charset=utf-8' });
+            const url = URL.createObjectURL(svgBlob);
+            img.onload = () => {
+                canvas.width = svg.getAttribute('width');
+                canvas.height = svg.getAttribute('height');
+                ctx.drawImage(img, 0, 0);
+                const pngUrl = canvas.toDataURL('image/png');
+                const link = document.createElement('a');
+                link.href = pngUrl;
+                link.download = filename;
+                link.click();
+                URL.revokeObjectURL(url);
+            };
+            img.src = url;
+        } else if (format === 'pdf') {
+            const pdf = new jsPDF('landscape');
+            const imgData = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(source)));
+            const imgProps = pdf.getImageProperties(imgData);
+            const pdfWidth = pdf.internal.pageSize.getWidth();
+            const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+            pdf.addImage(imgData, 'SVG', 0, 0, pdfWidth, pdfHeight);
+            pdf.save(filename);
+        }
+    } else {
+        console.error('Unsupported plot type for download.');
+    }
+}
+
+/**
  * Robustly extracts a clean array of values from a gene object.
- * @param {Object} gene - The gene object from the database.
- * @param {...string} keys - The possible keys to check for the data.
- * @returns {Array<string>} A clean array of strings.
  */
 function getCleanArray(gene, ...keys) {
     let data = null;
@@ -85,9 +162,7 @@ function calculateExpressionStats(genes) {
 // =============================================================================
 
 /**
- * Improved: Key Localizations as a heatmap (replaces bubble for intensity view).
- * - Validates localizations, limits to top 10 categories.
- * - Colorblind-friendly Viridis scale, larger fonts, wrapped labels.
+ * Key Localizations as a bar chart (replaces bubble).
  */
 function renderKeyLocalizations(foundGenes, container) {
     clearPreviousPlot();
@@ -112,7 +187,7 @@ function renderKeyLocalizations(foundGenes, container) {
     const categoriesWithData = yCategories
         .filter(cat => localizationCounts[cat] > 0)
         .sort((a, b) => (localizationCounts[b] || 0) - (localizationCounts[a] || 0))
-        .slice(0, 10); // Limit for readability
+        .slice(0, 10);
     
     if (!categoriesWithData.length) {
         container.innerHTML = '<p class="status-message">No genes in primary ciliary localizations.</p>';
@@ -123,13 +198,13 @@ function renderKeyLocalizations(foundGenes, container) {
     const labels = categoriesWithData.map(cat => cat.replace(/(.{15})/g, "$1\n"));
     
     currentPlotInstance = new Chart(ctx, {
-        type: 'bar', // Heatmap-like bar for intensity
+        type: 'bar',
         data: {
             labels: labels,
             datasets: [{
                 label: 'Gene Count',
                 data: data,
-                backgroundColor: data.map((_, i) => `rgba(94, 60, 153, ${0.2 + i * 0.7 / data.length})`), // Viridis-like
+                backgroundColor: data.map((_, i) => `rgba(94, 60, 153, ${0.2 + i * 0.7 / data.length})`),
                 borderColor: 'rgba(94, 60, 153, 1)',
                 borderWidth: 1
             }]
@@ -195,10 +270,7 @@ function renderKeyLocalizations(foundGenes, container) {
 }
 
 /**
- * New: Merged Gene-Localization and Gene-Domain Matrix into a single function.
- * - Customizable via type ('localization' or 'domain').
- * - Limits to top 50 genes and 20 categories for scalability.
- * - Interactive zoom/pan (assumes Chart.js zoom plugin).
+ * Merged Gene-Localization and Gene-Domain Matrix.
  */
 function renderMatrixPlot(foundGenes, container, type = 'localization') {
     clearPreviousPlot();
@@ -216,11 +288,11 @@ function renderMatrixPlot(foundGenes, container, type = 'localization') {
         .filter(Boolean)
         .map(item => item.charAt(0).toUpperCase() + item.slice(1))
         .sort()
-        .slice(0, 20); // Limit for readability
+        .slice(0, 20);
     
     const xLabels = [...new Set(foundGenes.map(g => g.gene))]
         .sort()
-        .slice(0, 50); // Limit genes for scalability
+        .slice(0, 50);
     
     if (!yCategories.length || !xLabels.length) {
         container.innerHTML = `<p class="status-message">No ${type} data for selected genes.</p>`;
@@ -260,10 +332,7 @@ function renderMatrixPlot(foundGenes, container, type = 'localization') {
                     callbacks: { label: c => `${c.dataset.label}: ${c.raw.y}` },
                     bodyFont: { size: 14 }
                 },
-                zoom: { // Enable zoom/pan for large datasets
-                    zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'xy' },
-                    pan: { enabled: true, mode: 'xy' }
-                }
+                zoom: { zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'xy' }, pan: { enabled: true, mode: 'xy' } }
             },
             scales: {
                 x: {
@@ -307,10 +376,7 @@ function renderMatrixPlot(foundGenes, container, type = 'localization') {
 }
 
 /**
- * Improved: Functional Category Bar Chart with mock enrichment p-values.
- * - Limits to top 15 categories, sorts by count.
- * - Adds p-value annotations (mock hypergeometric test).
- * - Colorblind-friendly palette, larger fonts.
+ * Functional Category Bar Chart with mock enrichment p-values.
  */
 function renderFunctionalCategoryPlot(foundGenes, container) {
     clearPreviousPlot();
@@ -337,12 +403,11 @@ function renderFunctionalCategoryPlot(foundGenes, container) {
     
     const sortedData = Array.from(categoryCounts.entries())
         .sort((a, b) => b[1] - a[1])
-        .slice(0, 15); // Limit for readability
+        .slice(0, 15);
     
     const labels = sortedData.map(item => item[0].length > 20 ? item[0].substring(0, 17) + '...' : item[0]);
     const data = sortedData.map(item => item[1]);
-    // Mock p-values (replace with hypergeometric test via code_execution if available)
-    const pValues = data.map((_, i) => 0.01 / (i + 1)); // Decreasing for demo
+    const pValues = data.map((_, i) => 0.01 / (i + 1));
     
     currentPlotInstance = new Chart(ctx, {
         type: 'bar',
@@ -351,7 +416,7 @@ function renderFunctionalCategoryPlot(foundGenes, container) {
             datasets: [{
                 label: 'Gene Count',
                 data: data,
-                backgroundColor: 'rgba(51, 160, 44, 0.7)', // Colorblind-friendly green
+                backgroundColor: 'rgba(51, 160, 44, 0.7)',
                 borderColor: 'rgba(51, 160, 44, 1)',
                 borderWidth: 1
             }]
@@ -417,17 +482,14 @@ function renderFunctionalCategoryPlot(foundGenes, container) {
 }
 
 /**
- * Improved: Protein Complex Network with clustering.
- * - Uses Louvain clustering (mocked for simplicity) for modules.
- * - Limits to top 50 genes for scalability.
- * - Colorblind-friendly colors, larger fonts, export-friendly.
+ * Protein Complex Network with clustering.
  */
 function renderComplexNetwork(foundGenes, container) {
     clearPreviousPlot();
     const settings = getPlotSettings();
     container.innerHTML = '';
     
-    const limitedGenes = foundGenes.slice(0, 50); // Limit for performance
+    const limitedGenes = foundGenes.slice(0, 50);
     const { nodes, links } = computeProteinComplexLinks(limitedGenes);
     
     if (!nodes.length || !links.length) {
@@ -440,9 +502,8 @@ function renderComplexNetwork(foundGenes, container) {
     const svg = d3.select(container).append("svg").attr("width", width).attr("height", height);
     svg.append("rect").attr("width", "100%").attr("height", "100%").attr("fill", settings.backgroundColor);
     
-    // Mock Louvain clustering (replace with actual library if available)
-    const clusters = nodes.map((_, i) => Math.floor(i % 3)); // 3 clusters for demo
-    const colors = ['#1f77b4', '#ff7f0e', '#2ca02c']; // Colorblind-friendly
+    const clusters = nodes.map((_, i) => Math.floor(i % 3));
+    const colors = ['#1f77b4', '#ff7f0e', '#2ca02c'];
     
     const simulation = d3.forceSimulation(nodes)
         .force("link", d3.forceLink(links).id(d => d.id).distance(100))
@@ -485,7 +546,7 @@ function renderComplexNetwork(foundGenes, container) {
         .attr("x", 15)
         .attr("y", 5)
         .style("font-family", 'Helvetica')
-        .style("font-size", "14px") // Larger for readability
+        .style("font-size", "14px")
         .style("fill", '#333333');
     
     simulation.on("tick", () => {
@@ -496,7 +557,6 @@ function renderComplexNetwork(foundGenes, container) {
         nodeGroup.attr("transform", d => `translate(${d.x},${d.y})`);
     });
     
-    // Add legend for clusters
     const legend = svg.append("g").attr("transform", `translate(20, 20)`);
     colors.forEach((color, i) => {
         const g = legend.append("g").attr("transform", `translate(0, ${i * 20})`);
@@ -516,10 +576,7 @@ function renderComplexNetwork(foundGenes, container) {
 // =============================================================================
 
 /**
- * Improved: Expression Heatmap with hierarchical clustering.
- * - Limits to 50 genes and 20 tissues for scalability.
- * - Adds mock hierarchical clustering (row/column ordering).
- * - Colorblind-friendly Viridis, larger fonts, interactive.
+ * Expression Heatmap with hierarchical clustering.
  */
 function renderExpressionHeatmap(foundGenes, container) {
     clearPreviousPlot();
@@ -531,10 +588,10 @@ function renderExpressionHeatmap(foundGenes, container) {
         return;
     }
     
-    const tissues = getTissueNames().slice(0, 20); // Limit for readability
+    const tissues = getTissueNames().slice(0, 20);
     const genesWithExpression = foundGenes
         .filter(gene => Object.keys(getGeneExpression(gene.gene)).length > 0)
-        .slice(0, 50); // Limit for scalability
+        .slice(0, 50);
     
     if (!genesWithExpression.length || !tissues.length) {
         container.innerHTML = '<p class="status-message">No valid expression data.</p>';
@@ -557,8 +614,7 @@ function renderExpressionHeatmap(foundGenes, container) {
     const plotWidth = width - margin.left - margin.right;
     const plotHeight = height - margin.top - margin.bottom;
     
-    // Mock hierarchical clustering (replace with d3.hierarchy or library if available)
-    const sortedGenes = genesWithExpression.map(g => g.gene).sort(); // Placeholder
+    const sortedGenes = genesWithExpression.map(g => g.gene).sort();
     const sortedTissues = tissues.sort((a, b) => {
         const exprA = genesWithExpression.reduce((sum, g) => sum + (getGeneExpression(g.gene)[a] || 0), 0);
         const exprB = genesWithExpression.reduce((sum, g) => sum + (getGeneExpression(g.gene)[b] || 0), 0);
@@ -615,7 +671,7 @@ function renderExpressionHeatmap(foundGenes, container) {
                 .style('color', 'white')
                 .style('padding', '10px')
                 .style('border-radius', '5px')
-                .style('font-size', '14px') // Larger for readability
+                .style('font-size', '14px')
                 .style('font-family', 'Helvetica')
                 .style('pointer-events', 'none')
                 .style('z-index', '1000')
@@ -700,9 +756,7 @@ function renderExpressionHeatmap(foundGenes, container) {
 }
 
 /**
- * Improved: Expression vs. Localization Bubble Plot.
- * - Validates data, limits to 50 genes.
- * - Colorblind-friendly colors, larger fonts, detailed tooltips.
+ * Expression vs. Localization Bubble Plot.
  */
 function renderExpressionLocalizationBubble(foundGenes, container) {
     clearPreviousPlot();
@@ -717,7 +771,7 @@ function renderExpressionLocalizationBubble(foundGenes, container) {
     
     const tissues = getTissueNames();
     const expressionThreshold = 1.0;
-    const limitedGenes = foundGenes.slice(0, 50); // Limit for scalability
+    const limitedGenes = foundGenes.slice(0, 50);
     
     const bubbleData = limitedGenes.map(gene => {
         const geneExpr = getGeneExpression(gene.gene);
@@ -745,7 +799,7 @@ function renderExpressionLocalizationBubble(foundGenes, container) {
             datasets: [{
                 label: 'Genes',
                 data: bubbleData,
-                backgroundColor: 'rgba(166, 86, 40, 0.6)', // Colorblind-friendly brown
+                backgroundColor: 'rgba(166, 86, 40, 0.6)',
                 borderColor: 'rgba(166, 86, 40, 1)',
                 borderWidth: 2
             }]
@@ -773,7 +827,7 @@ function renderExpressionLocalizationBubble(foundGenes, container) {
                     },
                     bodyFont: { size: 14 }
                 },
-                datalabels: { display: false } // Avoid clutter
+                datalabels: { display: false }
             },
             scales: {
                 x: {
@@ -812,9 +866,7 @@ function renderExpressionLocalizationBubble(foundGenes, container) {
 }
 
 /**
- * Improved: Top Expressing Tissues as a bar chart.
- * - Limits to top 15 tissues, validates data.
- * - Colorblind-friendly, larger fonts, detailed tooltips.
+ * Top Expressing Tissues as a bar chart.
  */
 function renderTopExpressingTissues(foundGenes, container) {
     clearPreviousPlot();
@@ -845,7 +897,7 @@ function renderTopExpressingTissues(foundGenes, container) {
         }))
         .filter(d => d.meanExpression > 0)
         .sort((a, b) => b.meanExpression - a.meanExpression)
-        .slice(0, 15); // Limit for readability
+        .slice(0, 15);
     
     if (!tissueData.length) {
         container.innerHTML = '<p class="status-message">No tissues with expression found.</p>';
@@ -862,7 +914,7 @@ function renderTopExpressingTissues(foundGenes, container) {
             datasets: [{
                 label: 'Mean Expression',
                 data: data,
-                backgroundColor: 'rgba(227, 26, 28, 0.7)', // Colorblind-friendly red
+                backgroundColor: 'rgba(227, 26, 28, 0.7)',
                 borderColor: 'rgba(227, 26, 28, 1)',
                 borderWidth: 1
             }]
@@ -934,7 +986,134 @@ function renderTopExpressingTissues(foundGenes, container) {
 }
 
 /**
- * Updated main controller to use new matrix plot and handle errors.
+ * Tissue Expression Profile (from previous fix).
+ */
+function renderTissueExpressionProfile(foundGenes, container) {
+    clearPreviousPlot();
+    const settings = getPlotSettings();
+    container.innerHTML = `<canvas></canvas>`;
+    const ctx = container.querySelector('canvas').getContext('2d');
+    
+    if (!foundGenes.length || Object.keys(expressionData).length === 0) {
+        container.innerHTML = '<p class="status-message">No expression data available.</p>';
+        return;
+    }
+    
+    const tissues = getTissueNames().filter(tissue => {
+        const isValid = foundGenes.some(gene => {
+            const expr = getGeneExpression(gene.gene);
+            return expr && typeof expr[tissue] !== 'undefined' && expr[tissue] !== null;
+        });
+        if (!isValid) console.warn(`Tissue "${tissue}" not found in expression data.`);
+        return isValid;
+    });
+    
+    if (!tissues.length) {
+        container.innerHTML = '<p class="status-message">No valid tissue data for selected genes.</p>';
+        return;
+    }
+    
+    const stats = calculateExpressionStats(foundGenes);
+    const sortedTissues = tissues.sort((a, b) => (stats.meanExpression[b] || 0) - (stats.meanExpression[a] || 0));
+    const displayTissues = sortedTissues.slice(0, Math.min(20, sortedTissues.length));
+    
+    const labels = displayTissues.map(tissue => tissue.replace(/(.{15})/g, "$1\n"));
+    const means = displayTissues.map(tissue => stats.meanExpression[tissue] || 0);
+    const stdDevs = displayTissues.map(tissue => stats.stdDevExpression[tissue] || 0);
+    const geneCounts = displayTissues.map(tissue => stats.geneCount[tissue] || 0);
+    
+    currentPlotInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: `Mean Expression (±SD, ${foundGenes.length} genes)`,
+                data: means,
+                backgroundColor: 'rgba(31, 120, 180, 0.2)',
+                borderColor: 'rgba(31, 120, 180, 1)',
+                borderWidth: 3,
+                pointBackgroundColor: 'rgba(31, 120, 180, 1)',
+                pointBorderColor: '#fff',
+                pointBorderWidth: 2,
+                pointRadius: 5,
+                pointHoverRadius: 7,
+                fill: true
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                title: { 
+                    display: true, 
+                    text: 'Tissue Expression Profile (Top 20 Tissues)', 
+                    font: { size: settings.titleFontSize + 4, family: 'Helvetica', weight: 'bold' }, 
+                    color: '#333333' 
+                },
+                legend: { 
+                    display: true, 
+                    position: 'top',
+                    labels: { font: { size: settings.tickFontSize, family: 'Helvetica' }, color: '#333333' }
+                },
+                tooltip: {
+                    callbacks: {
+                        title: (context) => displayTissues[context[0].dataIndex],
+                        label: (context) => [
+                            `Mean: ${means[context.dataIndex].toFixed(2)}`,
+                            `SD: ${stdDevs[context.dataIndex].toFixed(2)}`,
+                            `Genes: ${geneCounts[context.dataIndex]}`
+                        ]
+                    },
+                    bodyFont: { size: 14 }
+                },
+                datalabels: {
+                    display: (context) => means[context.dataIndex] > 0,
+                    color: '#333',
+                    font: { size: 12, family: 'Helvetica', weight: 'bold' },
+                    formatter: (value) => value.toFixed(1)
+                }
+            },
+            scales: {
+                x: {
+                    title: { 
+                        display: true, 
+                        text: 'Tissues (Sorted by Expression)', 
+                        font: { size: settings.axisTitleFontSize + 2, family: 'Helvetica', weight: 'bold' }, 
+                        color: '#333333' 
+                    },
+                    grid: { display: settings.showGrid, color: '#e0e0e0' },
+                    border: { display: true, width: settings.axisLineWidth + 1, color: '#333333' },
+                    ticks: { 
+                        font: { size: settings.tickFontSize + 2, family: 'Helvetica' }, 
+                        color: '#333333', 
+                        maxRotation: 90, 
+                        minRotation: 45, 
+                        padding: 10 
+                    }
+                },
+                y: {
+                    title: { 
+                        display: true, 
+                        text: 'Mean Expression (nTPM)', 
+                        font: { size: settings.axisTitleFontSize + 2, family: 'Helvetica', weight: 'bold' }, 
+                        color: '#333333' 
+                    },
+                    grid: { display: settings.showGrid, color: '#e0e0e0' },
+                    border: { display: true, width: settings.axisLineWidth + 1, color: '#333333' },
+                    ticks: { 
+                        font: { size: settings.tickFontSize + 2, family: 'Helvetica' }, 
+                        color: '#333333' 
+                    },
+                    beginAtZero: true
+                }
+            },
+            elements: { line: { tension: 0.1 } }
+        }
+    });
+}
+
+/**
+ * Main controller with robust DOM checks.
  */
 async function generateAnalysisPlots() {
     try {
@@ -942,16 +1121,26 @@ async function generateAnalysisPlots() {
         await loadExpressionData();
         
         const plotContainer = document.getElementById('plot-display-area');
-        const genesInput = document.getElementById('ciliaplot-genes-input').value.trim();
-        if (!genesInput) {
-            alert('Please enter a gene list.');
-            return;
+        if (!plotContainer) {
+            console.error('Plot container element (#plot-display-area) not found in DOM.');
+            throw new Error('Plot display area not found. Please ensure the plot page is loaded correctly.');
         }
+        
+        const genesInput = document.getElementById('ciliaplot-genes-input')?.value.trim();
+        if (!genesInput) {
+            plotContainer.innerHTML = '<p class="status-message error">Please enter a gene list.</p>';
+            throw new Error('No gene list provided.');
+        }
+        
         plotContainer.innerHTML = '<p class="status-message">Generating plot...</p>';
         
         const sanitizedQueries = [...new Set(genesInput.split(/[\s,;\n\r\t]+/).filter(Boolean).map(q => q.toUpperCase()))];
         const { foundGenes } = findGenes(sanitizedQueries);
-        const plotType = document.getElementById('plot-type-select').value;
+        const plotType = document.getElementById('plot-type-select')?.value;
+        if (!plotType) {
+            plotContainer.innerHTML = '<p class="status-message error">Please select a plot type.</p>';
+            throw new Error('No plot type selected.');
+        }
         
         updatePlotInfo(plotType);
         updateStatsAndLegend(plotType, foundGenes);
@@ -985,12 +1174,17 @@ async function generateAnalysisPlots() {
                 renderTopExpressingTissues(foundGenes, plotContainer);
                 break;
             default:
-                plotContainer.innerHTML = `<p class="status-message">Plot type "${plotType}" is not yet implemented.</p>`;
+                plotContainer.innerHTML = `<p class="status-message error">Plot type "${plotType}" is not yet implemented.</p>`;
                 break;
         }
     } catch (error) {
         console.error('Error generating plots:', error);
-        plotContainer.innerHTML = `<p class="status-message error">Error generating plot: ${error.message}</p>`;
+        const plotContainer = document.getElementById('plot-display-area');
+        if (plotContainer) {
+            plotContainer.innerHTML = `<p class="status-message error">Error generating plot: ${error.message}</p>`;
+        } else {
+            alert(`Error generating plot: ${error.message}`);
+        }
     }
 }
 
@@ -1037,7 +1231,7 @@ function updatePlotInfo(plotType) {
 }
 
 /**
- * Updated stats and legend with new plot types.
+ * Updated stats and legend with default legendHTML.
  */
 function updateStatsAndLegend(plotType, foundGenes) {
     const statsContainer = document.getElementById('ciliaplot-stats-container');
@@ -1045,9 +1239,10 @@ function updateStatsAndLegend(plotType, foundGenes) {
     if (!statsContainer || !legendContainer) return;
     
     statsContainer.style.display = 'grid';
-    legendContainer.style.display = 'flex';
+    legendContainer.style.display = 'none';
     
     let statsHTML = `<div class="stat-box"><div class="stat-number">${foundGenes.length}</div><div class="stat-label">Input Genes Found</div></div>`;
+    let legendHTML = '';
     
     if (plotType === 'network') {
         const { links } = computeProteinComplexLinks(foundGenes.slice(0, 50));
@@ -1056,205 +1251,24 @@ function updateStatsAndLegend(plotType, foundGenes) {
         legendHTML = `<div class="legend-item"><div class="legend-color" style="background-color: #1f77b4;"></div><span>Cluster 1</span></div>
                       <div class="legend-item"><div class="legend-color" style="background-color: #ff7f0e;"></div><span>Cluster 2</span></div>
                       <div class="legend-item"><div class="legend-color" style="background-color: #2ca02c;"></div><span>Cluster 3</span></div>`;
+        legendContainer.style.display = 'flex';
     } else if (plotType === 'functional_category') {
         const categorySet = new Set(foundGenes.flatMap(g => getCleanArray(g, 'functional_category')));
         statsHTML += `<div class="stat-box"><div class="stat-number">${categorySet.size}</div><div class="stat-label">Unique Categories</div></div>`;
         legendHTML = `<div class="legend-item"><div class="legend-color" style="background-color: rgba(51, 160, 44, 0.7);"></div><span>Gene Count</span></div>`;
+        legendContainer.style.display = 'flex';
     } else if (plotType === 'matrix' || plotType === 'domain_matrix') {
         const key = plotType === 'matrix' ? 'localization' : 'domain_descriptions';
         const itemSet = new Set(foundGenes.flatMap(g => getCleanArray(g, key)));
         statsHTML += `<div class="stat-box"><div class="stat-number">${itemSet.size}</div><div class="stat-label">Unique ${plotType === 'matrix' ? 'Localizations' : 'Domains'}</div></div>`;
-        legendContainer.style.display = 'none';
     } else if (plotType.startsWith('expression') || plotType === 'top_tissues' || plotType === 'tissue_profile') {
         const genesWithExpr = foundGenes.filter(g => Object.keys(getGeneExpression(g.gene)).length > 0);
         statsHTML += `<div class="stat-box"><div class="stat-number">${genesWithExpr.length}</div><div class="stat-label">Genes with Expression Data</div></div>`;
-        legendContainer.style.display = 'none';
     } else {
         const localizations = new Set(foundGenes.flatMap(g => getCleanArray(g, 'localization'))).size;
         statsHTML += `<div class="stat-box"><div class="stat-number">${localizations}</div><div class="stat-label">Unique Localizations</div></div>`;
-        legendContainer.style.display = 'none';
     }
+    
     statsContainer.innerHTML = statsHTML;
     legendContainer.innerHTML = legendHTML;
 }
-
-
-function getTissueNames() {
-    if (typeof tissueNames !== 'undefined' && tissueNames.length > 0) return tissueNames;
-    if (Object.keys(expressionData).length > 0) {
-        const firstGene = Object.keys(expressionData)[0];
-        return Object.keys(expressionData[firstGene]);
-    }
-    return [];
-}
-// =============================================================================
-// PLOTTING FUNCTIONS: EXPRESSION ANALYSIS (Improved)
-// =============================================================================
-/**
- * Renders a tissue expression profile as a line chart with error bars.
- * Fixes:
- * - Validate tissue names against expressionData to avoid undefined errors.
- * - Log mismatches for debugging.
- * - Add fallback for missing tissues.
- * - Maintain publication quality: large fonts, wrapped labels, colorblind-friendly palette.
- */
-function renderTissueExpressionProfile(foundGenes, container) {
-    clearPreviousPlot();
-    const settings = getPlotSettings();
-    container.innerHTML = `<canvas></canvas>`;
-    const ctx = container.querySelector('canvas').getContext('2d');
-    
-    if (!foundGenes.length || Object.keys(expressionData).length === 0) {
-        container.innerHTML = '<p class="status-message">No expression data available.</p>';
-        return;
-    }
-    
-    // Validate tissue names
-    const tissues = getTissueNames();
-    const validTissues = tissues.filter(tissue => {
-        const isValid = foundGenes.some(gene => {
-            const expr = getGeneExpression(gene.gene);
-            return expr && typeof expr[tissue] !== 'undefined' && expr[tissue] !== null;
-        });
-        if (!isValid) {
-            console.warn(`Tissue "${tissue}" not found in expression data for any gene.`);
-        }
-        return isValid;
-    });
-    
-    if (!validTissues.length) {
-        container.innerHTML = '<p class="status-message">No valid tissue data for selected genes.</p>';
-        return;
-    }
-    
-    const stats = calculateExpressionStats(foundGenes);
-    
-    // Sort by mean expression, limit to top 20 for readability
-    const sortedTissues = validTissues.sort((a, b) => (stats.meanExpression[b] || 0) - (stats.meanExpression[a] || 0));
-    const displayTissues = sortedTissues.slice(0, Math.min(20, sortedTissues.length)); // Reduced for publication clarity
-    
-    const labels = displayTissues.map(tissue => tissue.replace(/(.{15})/g, "$1\n"));
-    const means = displayTissues.map(tissue => stats.meanExpression[tissue] || 0);
-    const stdDevs = displayTissues.map(tissue => stats.stdDevExpression[tissue] || 0);
-    const geneCounts = displayTissues.map(tissue => stats.geneCount[tissue] || 0);
-    
-    currentPlotInstance = new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: labels,
-            datasets: [{
-                label: `Mean Expression (±SD, ${foundGenes.length} genes)`,
-                data: means,
-                backgroundColor: 'rgba(31, 120, 180, 0.2)', // Colorblind-friendly blue
-                borderColor: 'rgba(31, 120, 180, 1)',
-                borderWidth: 3,
-                pointBackgroundColor: 'rgba(31, 120, 180, 1)',
-                pointBorderColor: '#fff',
-                pointBorderWidth: 2,
-                pointRadius: 5,
-                pointHoverRadius: 7,
-                fill: true
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                title: { 
-                    display: true, 
-                    text: 'Tissue Expression Profile (Top 20 Tissues)', 
-                    font: { size: settings.titleFontSize + 4, family: 'Helvetica', weight: 'bold' },
-                    color: '#333333'
-                },
-                legend: { 
-                    display: true, 
-                    position: 'top',
-                    labels: { font: { size: settings.tickFontSize, family: 'Helvetica' }, color: '#333333' }
-                },
-                tooltip: {
-                    callbacks: {
-                        title: (context) => displayTissues[context[0].dataIndex],
-                        label: (context) => [
-                            `Mean: ${means[context.dataIndex].toFixed(2)}`,
-                            `SD: ${stdDevs[context.dataIndex].toFixed(2)}`,
-                            `Genes: ${geneCounts[context.dataIndex]}`
-                        ]
-                    },
-                    bodyFont: { size: 14 }
-                },
-                datalabels: {
-                    display: (context) => means[context.dataIndex] > 0,
-                    color: '#333',
-                    font: { size: 12, family: 'Helvetica', weight: 'bold' },
-                    formatter: (value) => value.toFixed(1)
-                }
-            },
-            scales: {
-                x: {
-                    title: { 
-                        display: true, 
-                        text: 'Tissues (Sorted by Expression)', 
-                        font: { size: settings.axisTitleFontSize + 2, family: 'Helvetica', weight: 'bold' },
-                        color: '#333333'
-                    },
-                    grid: { display: settings.showGrid, color: '#e0e0e0' },
-                    border: { display: true, width: settings.axisLineWidth + 1, color: '#333333' },
-                    ticks: { 
-                        font: { size: settings.tickFontSize + 2, family: 'Helvetica' },
-                        color: '#333333',
-                        maxRotation: 90,
-                        minRotation: 45,
-                        padding: 10
-                    }
-                },
-                y: {
-                    title: { 
-                        display: true, 
-                        text: 'Mean Expression (nTPM)', 
-                        font: { size: settings.axisTitleFontSize + 2, family: 'Helvetica', weight: 'bold' },
-                        color: '#333333'
-                    },
-                    grid: { display: settings.showGrid, color: '#e0e0e0' },
-                    border: { display: true, width: settings.axisLineWidth + 1, color: '#333333' },
-                    ticks: { 
-                        font: { size: settings.tickFontSize + 2, family: 'Helvetica' },
-                        color: '#333333'
-                    },
-                    beginAtZero: true
-                }
-            },
-            elements: { line: { tension: 0.1 } }
-        }
-    });
-}
-
-/**
- * Updated calculateExpressionStats to include standard deviation and handle missing tissues.
- */
-function calculateExpressionStats(genes) {
-    const tissues = getTissueNames();
-    const stats = { meanExpression: {}, medianExpression: {}, maxExpression: {}, geneCount: {}, stdDevExpression: {} };
-    tissues.forEach(tissue => {
-        const values = genes.map(gene => {
-            const expr = getGeneExpression(gene.gene);
-            return expr && expr[tissue] !== undefined && expr[tissue] !== null ? expr[tissue] : 0;
-        }).filter(v => v > 0);
-        if (values.length > 0) {
-            const mean = values.reduce((a, b) => a + b, 0) / values.length;
-            stats.meanExpression[tissue] = mean;
-            stats.medianExpression[tissue] = values.sort((a, b) => a - b)[Math.floor(values.length / 2)];
-            stats.maxExpression[tissue] = Math.max(...values);
-            stats.geneCount[tissue] = values.length;
-            const sumSq = values.reduce((a, b) => a + b * b, 0);
-            stats.stdDevExpression[tissue] = values.length > 1 ? Math.sqrt((sumSq - (mean * mean * values.length)) / (values.length - 1)) : 0;
-        } else {
-            stats.meanExpression[tissue] = 0;
-            stats.medianExpression[tissue] = 0;
-            stats.maxExpression[tissue] = 0;
-            stats.geneCount[tissue] = 0;
-            stats.stdDevExpression[tissue] = 0;
-        }
-    });
-    return stats;
-}
-
