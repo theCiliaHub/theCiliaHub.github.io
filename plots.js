@@ -62,12 +62,11 @@ function getCleanArray(gene, ...keys) {
 // =============================================================================
 
 /**
- * The main controller function that routes to the correct plotting function
- * based on the user's selection.
+**
+ * MODIFIED: Main controller, now calls the table renderer for the bubble plot.
  */
 async function generateAnalysisPlots() {
     try {
-        // Ensure all necessary data is loaded before plotting
         await loadAndPrepareDatabase();
         await loadExpressionData();
 
@@ -77,6 +76,8 @@ async function generateAnalysisPlots() {
             alert('Please enter a gene list.');
             return;
         }
+        
+        clearPreviousPlot(); // Clear previous results before starting
         plotContainer.innerHTML = '<p class="status-message">Generating plot...</p>';
 
         const sanitizedQueries = [...new Set(genesInput.split(/[\s,;\n\r\t]+/).filter(Boolean).map(q => q.toUpperCase()))];
@@ -86,8 +87,14 @@ async function generateAnalysisPlots() {
         updatePlotInfo(plotType);
         updateStatsAndLegend(plotType, foundGenes);
 
-        // Routing to the selected plot function
+        // Routing and table generation
         switch (plotType) {
+            case 'expression_localization':
+                renderExpressionLocalizationBubble(foundGenes, plotContainer);
+                // NEW: Render the data table below this specific plot
+                renderGeneDataTable(foundGenes, document.getElementById('plot-data-table-container'));
+                break;
+            // ... (other cases remain the same)
             case 'bubble':
                 renderKeyLocalizations(foundGenes, plotContainer);
                 break;
@@ -109,15 +116,12 @@ async function generateAnalysisPlots() {
             case 'tissue_profile':
                 renderTissueExpressionProfile(foundGenes, plotContainer);
                 break;
-            case 'expression_localization':
-                renderExpressionLocalizationBubble(foundGenes, plotContainer);
-                break;
             case 'top_tissues':
                 renderTopExpressingTissues(foundGenes, plotContainer);
                 break;
             default:
                 plotContainer.innerHTML = `<p class="status-message">Plot type "${plotType}" is not yet implemented.</p>`;
-                break;
+        		break;
         }
     } catch (error) {
         console.error('Error generating plots:', error);
@@ -938,7 +942,7 @@ function renderTissueExpressionProfile(foundGenes, container) {
 }
 
 /**
- * Renders a bubble plot of expression breadth vs. localization diversity.
+ * IMPROVED: Renders a bubble plot with conditional gene labels.
  */
 function renderExpressionLocalizationBubble(foundGenes, container) {
     clearPreviousPlot();
@@ -993,7 +997,7 @@ function renderExpressionLocalizationBubble(foundGenes, container) {
                 title: { display: true, text: 'Expression Breadth vs Localization Diversity', font: { size: settings.titleFontSize, family: settings.fontFamily }, color: settings.fontColor },
                 legend: { display: false },
                 tooltip: {
-                    callbacks: {
+                    callbacks: {
                         title: context => context[0].raw.gene,
                         label: context => [
                             `Expressing tissues: ${context.raw.x}`,
@@ -1002,7 +1006,25 @@ function renderExpressionLocalizationBubble(foundGenes, container) {
                             `Locations: ${context.raw.localizations || 'None'}`
                         ]
                     }
-                }
+                },
+                // NEW: Configuration for the datalabels plugin
+                datalabels: {
+                    // Only display labels if 15 or fewer genes are plotted
+                    display: context => context.chart.data.datasets[0].data.length <= 15 ? 'auto' : false,
+                    color: '#2c3e50',
+                    anchor: 'end',
+                    align: 'top',
+                    offset: 4,
+                    font: {
+                        size: 12,
+                        weight: 'bold',
+                        family: settings.fontFamily
+                    },
+                    formatter: (value, context) => {
+                        // Use the gene name for the label
+                        return value.gene;
+                    }
+                }
             },
             scales: {
                 x: {
@@ -1021,6 +1043,51 @@ function renderExpressionLocalizationBubble(foundGenes, container) {
         }
     });
 }
+/**
+ * NEW: Renders a data table below the plot.
+ * @param {Array} foundGenes - The array of gene objects to display.
+ * @param {HTMLElement} container - The container element to render the table into.
+ */
+function renderGeneDataTable(foundGenes, container) {
+    if (!container || !foundGenes.length) return;
+
+    let tableHTML = `
+        <h3 class="table-title">Gene Data Summary</h3>
+        <table class="data-summary-table">
+            <thead>
+                <tr>
+                    <th>Gene</th>
+                    <th>ENSG ID</th>
+                    <th>Localizations</th>
+                    <th>Max Expression (nTPM)</th>
+                </tr>
+            </thead>
+            <tbody>
+    `;
+
+    foundGenes.forEach(gene => {
+        const localizations = getCleanArray(gene, 'localization').join(', ') || 'N/A';
+        const geneExpr = getGeneExpression(gene.gene);
+        const maxExpression = Math.max(0, ...Object.values(geneExpr));
+
+        tableHTML += `
+            <tr>
+                <td><strong>${gene.gene}</strong></td>
+                <td>${gene.ensg_id || 'N/A'}</td>
+                <td>${localizations}</td>
+                <td>${maxExpression.toFixed(2)}</td>
+            </tr>
+        `;
+    });
+
+    tableHTML += `
+            </tbody>
+        </table>
+    `;
+
+    container.innerHTML = tableHTML;
+}
+
 
 /**
  * Renders a bar chart of the top expressing tissues.
