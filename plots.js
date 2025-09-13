@@ -15,6 +15,22 @@
 let currentPlotInstance = null; // Holds the active Chart.js, D3, etc. instance
 
 /**
+ * Safely clears the previous plot, handling both Chart.js and D3.js instances.
+ */
+function clearPreviousPlot() {
+    if (currentPlotInstance) {
+        // Check if it's a Chart.js instance
+        if (typeof currentPlotInstance.destroy === 'function') {
+            currentPlotInstance.destroy();
+        }
+        // Check if it's a D3.js DOM element (like an SVG)
+        else if (currentPlotInstance.nodeType) {
+            currentPlotInstance.remove();
+        }
+    }
+    currentPlotInstance = null; // Reset the variable
+}
+/**
  * Robustly extracts a clean array of values from a gene object.
  * @param {Object} gene - The gene object from the database.
  * @param {...string} keys - The possible keys to check for the data.
@@ -296,7 +312,7 @@ async function downloadPlot() {
 // =============================================================================
 
 function renderKeyLocalizations(foundGenes, container) {
-    if (currentPlotInstance) currentPlotInstance.destroy();
+    clearPreviousPlot(); // ✨ Use the new, safe cleanup function
     const settings = getPlotSettings();
     container.innerHTML = `<canvas></canvas>`;
     const ctx = container.querySelector('canvas').getContext('2d');
@@ -359,7 +375,7 @@ function renderKeyLocalizations(foundGenes, container) {
 }
 
 function renderGeneMatrix(foundGenes, container) {
-    if (currentPlotInstance) currentPlotInstance.destroy();
+    clearPreviousPlot(); // ✨ Use the new, safe cleanup function
     const settings = getPlotSettings();
     container.innerHTML = `<canvas></canvas>`;
     const ctx = container.querySelector('canvas').getContext('2d');
@@ -417,7 +433,7 @@ function renderGeneMatrix(foundGenes, container) {
 }
 
 function renderDomainMatrixPlot(foundGenes, container) {
-    if (currentPlotInstance) currentPlotInstance.destroy();
+    clearPreviousPlot(); // ✨ Use the new, safe cleanup function
     const settings = getPlotSettings();
     container.innerHTML = `<canvas></canvas>`;
     const ctx = container.querySelector('canvas').getContext('2d');
@@ -483,7 +499,7 @@ function renderDomainMatrixPlot(foundGenes, container) {
 }
 
 function renderFunctionalCategoryPlot(foundGenes, container) {
-    if (currentPlotInstance) currentPlotInstance.destroy();
+    clearPreviousPlot(); // ✨ Use the new, safe cleanup function
     const settings = getPlotSettings();
     container.innerHTML = `<canvas></canvas>`;
     const ctx = container.querySelector('canvas').getContext('2d');
@@ -793,7 +809,7 @@ function renderExpressionHeatmap(foundGenes, container) {
  * Renders a tissue expression profile radar chart.
  */
 function renderTissueExpressionProfile(foundGenes, container) {
-    if (currentPlotInstance) currentPlotInstance.destroy();
+    clearPreviousPlot(); // ✨ Use the new, safe cleanup function
     const settings = getPlotSettings();
     container.innerHTML = `<canvas></canvas>`;
     const ctx = container.querySelector('canvas').getContext('2d');
@@ -860,7 +876,7 @@ function renderTissueExpressionProfile(foundGenes, container) {
  * Renders a bubble plot of expression breadth vs. localization diversity.
  */
 function renderExpressionLocalizationBubble(foundGenes, container) {
-    if (currentPlotInstance) currentPlotInstance.destroy();
+    clearPreviousPlot(); // ✨ Use the new, safe cleanup function
     const settings = getPlotSettings();
     container.innerHTML = `<canvas></canvas>`;
     const ctx = container.querySelector('canvas').getContext('2d');
@@ -945,7 +961,7 @@ function renderExpressionLocalizationBubble(foundGenes, container) {
  * Renders a bar chart of the top expressing tissues.
  */
 function renderTopExpressingTissues(foundGenes, container) {
-    if (currentPlotInstance) currentPlotInstance.destroy();
+    clearPreviousPlot(); // ✨ Use the new, safe cleanup function
     const settings = getPlotSettings();
     container.innerHTML = `<canvas></canvas>`;
     const ctx = container.querySelector('canvas').getContext('2d');
