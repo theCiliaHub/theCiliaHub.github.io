@@ -1,756 +1,756 @@
 :root {
-  /* Colors */
-  --primary-dark: #2c3e50;
-  --primary-blue: #2c5aa0;
-  --primary-blue-light: #4a89dc;
-  --accent-green-1: #66c2a5;
-  --accent-green-2: #27ae60;
-  --accent-red: #e74c3c;
-  --neutral-bg: #f4f8fb;
-  --neutral-bg-alt: #f8f9fa;
-  --panel-bg: #ffffff;
-  --text-dark: #333;
-  --text-light: #ffffff;
-  --border-color: #e1ecf4;
-  --gray-medium: #95a5a6;
-  --gray-dark: #7f8c8d;
-  --gray-light: #d3d3d3;
+  /* Colors */
+  --primary-dark: #2c3e50;
+  --primary-blue: #2c5aa0;
+  --primary-blue-light: #4a89dc;
+  --accent-green-1: #66c2a5;
+  --accent-green-2: #27ae60;
+  --accent-red: #e74c3c;
+  --neutral-bg: #f4f8fb;
+  --neutral-bg-alt: #f8f9fa;
+  --panel-bg: #ffffff;
+  --text-dark: #333;
+  --text-light: #ffffff;
+  --border-color: #e1ecf4;
+  --gray-medium: #95a5a6;
+  --gray-dark: #7f8c8d;
+  --gray-light: #d3d3d3;
 
-  /* Spacing & Borders */
-  --border-radius-sm: 5px;
-  --border-radius-md: 10px;
-  --border-radius-lg: 15px;
+  /* Spacing & Borders */
+  --border-radius-sm: 5px;
+  --border-radius-md: 10px;
+  --border-radius-lg: 15px;
 }
 
 body {
-    margin: 0;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
-    background: var(--neutral-bg);
-    color: var(--text-dark);
-    line-height: 1.6;
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+    background: var(--neutral-bg);
+    color: var(--text-dark);
+    line-height: 1.6;
 }
 
 .navbar {
-    background: linear-gradient(90deg, var(--primary-blue), var(--primary-blue-light));
-    color: var(--text-light);
-    padding: 1.5rem 0;
-    position: sticky;
-    top: 0;
-    z-index: 1000;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-    border-bottom: 2px solid var(--accent-green-1);
+    background: linear-gradient(90deg, var(--primary-blue), var(--primary-blue-light));
+    color: var(--text-light);
+    padding: 1.5rem 0;
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    border-bottom: 2px solid var(--accent-green-1);
 }
 
 .nav-container {
-    max-width: 1400px;
-    margin: 0 auto;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0 2.5rem;
+    max-width: 1400px;
+    margin: 0 auto;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 2.5rem;
 }
 
 .logo {
-    font-size: 2.2rem;
-    font-weight: 800;
-    text-decoration: none;
-    color: var(--text-light);
-    letter-spacing: 1px;
-    transition: transform 0.3s ease;
+    font-size: 2.2rem;
+    font-weight: 800;
+    text-decoration: none;
+    color: var(--text-light);
+    letter-spacing: 1px;
+    transition: transform 0.3s ease;
 }
 
 .logo:hover {
-    transform: scale(1.05);
-    text-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
+    transform: scale(1.05);
+    text-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
 }
 
 .nav-links {
-    list-style: none;
-    display: flex;
-    gap: 2rem;
-    margin: 0;
-    padding: 0;
+    list-style: none;
+    display: flex;
+    gap: 2rem;
+    margin: 0;
+    padding: 0;
 }
 
 .nav-links li a {
-    color: var(--text-light);
-    text-decoration: none;
-    font-size: 1.2rem;
-    font-weight: 500;
-    padding: 0.5rem 1rem;
-    border-radius: var(--border-radius-sm);
-    transition: all 0.3s ease;
+    color: var(--text-light);
+    text-decoration: none;
+    font-size: 1.2rem;
+    font-weight: 500;
+    padding: 0.5rem 1rem;
+    border-radius: var(--border-radius-sm);
+    transition: all 0.3s ease;
 }
 
 .nav-links li a:hover, .nav-links li a:focus-visible, .nav-links li a.active {
-    background: rgba(255, 255, 255, 0.2);
-    color: var(--accent-green-1);
-    transform: translateY(-2px);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-    outline: none;
+    background: rgba(255, 255, 255, 0.2);
+    color: var(--accent-green-1);
+    transform: translateY(-2px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    outline: none;
 }
 
 .main-container {
-    display: flex;
-    max-width: 1400px;
-    margin: 0 auto;
-    padding: 2rem;
-    gap: 2rem;
+    display: flex;
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 2rem;
+    gap: 2rem;
 }
 
 .cilia-panel {
-    width: 300px;
-    background: var(--panel-bg);
-    padding: 2rem;
-    border-radius: var(--border-radius-lg);
-    box-shadow: 0 8px 32px rgba(44, 90, 160, 0.1);
-    position: sticky;
-    top: 100px;
+    width: 300px;
+    background: var(--panel-bg);
+    padding: 2rem;
+    border-radius: var(--border-radius-lg);
+    box-shadow: 0 8px 32px rgba(44, 90, 160, 0.1);
+    position: sticky;
+    top: 100px;
 }
 
 .cilia-panel h2 {
-    font-size: 1.3rem;
-    color: var(--primary-dark);
-    margin-bottom: 1.5rem;
+    font-size: 1.3rem;
+    color: var(--primary-dark);
+    margin-bottom: 1.5rem;
 }
 
 .cilia-diagram {
-    margin-bottom: 1.5rem;
+    margin-bottom: 1.5rem;
 }
 
 .cilia-diagram img {
-    max-width: 100%;
-    height: auto;
+    max-width: 100%;
+    height: auto;
 }
 
 .cilia-part {
-    fill: var(--primary-blue-light);
-    transition: fill 0.3s, stroke 0.3s;
+    fill: var(--primary-blue-light);
+    transition: fill 0.3s, stroke 0.3s;
 }
 
 .cilia-part.cilia {
-    fill: var(--accent-green-1);
+    fill: var(--accent-green-1);
 }
 
 .cilia-part.search-gene {
-    fill: var(--accent-green-2);
+    fill: var(--accent-green-2);
 }
 
 .cilia-part.highlighted {
-    stroke: var(--accent-red);
-    stroke-width: 2px;
+    stroke: var(--accent-red);
+    stroke-width: 2px;
 }
 
 #cell-body, #nucleus {
-    fill: var(--gray-light);
+    fill: var(--gray-light);
 }
 
 #geneButtons {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
 }
 
 .gene-btn {
-    padding: 0.5rem;
-    background: var(--border-color);
-    border: none;
-    border-radius: var(--border-radius-sm);
-    cursor: pointer;
-    font-size: 0.9rem;
-    transition: background 0.3s, color 0.3s;
+    padding: 0.5rem;
+    background: var(--border-color);
+    border: none;
+    border-radius: var(--border-radius-sm);
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: background 0.3s, color 0.3s;
 }
 
 .gene-btn:hover, .gene-btn:focus-visible, .gene-btn.search-gene {
-    background: var(--accent-green-2);
-    color: var(--text-light);
-    outline: none;
+    background: var(--accent-green-2);
+    color: var(--text-light);
+    outline: none;
 }
 
 .gene-btn.default {
-    background: var(--primary-blue-light);
-    color: var(--text-light);
+    background: var(--primary-blue-light);
+    color: var(--text-light);
 }
 
 .gene-btn.reset-btn {
-    background: var(--gray-medium);
-    color: var(--text-light);
+    background: var(--gray-medium);
+    color: var(--text-light);
 }
 
 .content-area {
-    flex: 1;
-    background: var(--panel-bg);
-    padding: 2rem;
-    border-radius: var(--border-radius-lg);
-    box-shadow: 0 8px 32px rgba(44, 90, 160, 0.1);
+    flex: 1;
+    background: var(--panel-bg);
+    padding: 2rem;
+    border-radius: var(--border-radius-lg);
+    box-shadow: 0 8px 32px rgba(44, 90, 160, 0.1);
 }
 
 .content-area-full {
-    max-width: 100%;
+    max-width: 100%;
 }
 
 .page-section h1, .page-section h2 {
-    color: var(--primary-dark);
-    margin-bottom: 1rem;
+    color: var(--primary-dark);
+    margin-bottom: 1rem;
 }
 
 .page-section h1 {
-    font-size: 2rem;
+    font-size: 2rem;
 }
 
 .page-section h2 {
-    font-size: 1.5rem;
+    font-size: 1.5rem;
 }
 
 .search-container {
-    display: flex;
-    gap: 1rem;
-    margin-bottom: 2rem;
-    position: relative;
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 2rem;
+    position: relative;
 }
 
 .search-container.sticky {
-    position: fixed;
-    top: 80px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 90%;
-    max-width: 1000px;
-    background: var(--panel-bg);
-    padding: 1.2rem;
-    border-radius: var(--border-radius-md);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-    z-index: 999;
+    position: fixed;
+    top: 80px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 90%;
+    max-width: 1000px;
+    background: var(--panel-bg);
+    padding: 1.2rem;
+    border-radius: var(--border-radius-md);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    z-index: 999;
 }
 
 .search-wrapper {
-    position: relative;
-    flex: 1;
+    position: relative;
+    flex: 1;
 }
 
 .search-wrapper input {
-    width: 100%;
-    padding: 1rem;
-    border: 2px solid var(--border-color);
-    border-radius: var(--border-radius-md);
-    font-size: 1.2rem;
+    width: 100%;
+    padding: 1rem;
+    border: 2px solid var(--border-color);
+    border-radius: var(--border-radius-md);
+    font-size: 1.2rem;
 }
 
 .search-btn {
-    padding: 0.8rem 1.5rem;
-    background: var(--primary-blue);
-    color: var(--text-light);
-    border: none;
-    border-radius: var(--border-radius-md);
-    cursor: pointer;
-    font-size: 1rem;
-    transition: background 0.3s;
+    padding: 0.8rem 1.5rem;
+    background: var(--primary-blue);
+    color: var(--text-light);
+    border: none;
+    border-radius: var(--border-radius-md);
+    cursor: pointer;
+    font-size: 1rem;
+    transition: background 0.3s;
 }
 
 .search-btn:hover, .search-btn:focus-visible {
-    background: var(--primary-blue-light);
-    outline: none;
+    background: var(--primary-blue-light);
+    outline: none;
 }
 
 #search-suggestions, #compare-search-suggestions, #suggestions {
-    position: absolute;
-    top: 100%;
-    left: 0;
-    right: 0;
-    background: var(--panel-bg);
-    border: 1px solid var(--border-color);
-    border-radius: var(--border-radius-sm);
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-    z-index: 1000;
-    max-height: 200px;
-    overflow-y: auto;
-    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: var(--panel-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-sm);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    z-index: 1000;
+    max-height: 200px;
+    overflow-y: auto;
+    display: none;
 }
 
 #search-suggestions ul, #compare-search-suggestions div, #suggestions div {
-    margin: 0;
-    padding: 0;
-    list-style: none;
+    margin: 0;
+    padding: 0;
+    list-style: none;
 }
 
 #search-suggestions li, #compare-search-suggestions div, #suggestions div {
-    padding: 0.8rem;
-    cursor: pointer;
-    transition: background 0.2s;
+    padding: 0.8rem;
+    cursor: pointer;
+    transition: background 0.2s;
 }
 
 #search-suggestions li:hover, #search-suggestions li.active, #compare-search-suggestions div:hover, #suggestions div:hover {
-    background: var(--border-color);
-    color: var(--primary-blue);
+    background: var(--border-color);
+    color: var(--primary-blue);
 }
 
 .filters {
-    display: flex;
-    gap: 1rem;
-    margin-bottom: 1rem;
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1rem;
 }
 
 .filters label {
-    font-weight: 600;
+    font-weight: 600;
 }
 
 .filters input, .filters select {
-    padding: 0.5rem;
-    border: 2px solid var(--border-color);
-    border-radius: var(--border-radius-sm);
-    font-size: 0.9rem;
+    padding: 0.5rem;
+    border: 2px solid var(--border-color);
+    border-radius: var(--border-radius-sm);
+    font-size: 0.9rem;
 }
 
 #batch-genes-input, #feedback-text {
-    width: 100%;
-    min-height: 100px;
-    padding: 0.8rem;
-    border: 2px solid var(--border-color);
-    border-radius: var(--border-radius-md);
-    font-size: 1rem;
-    resize: vertical;
+    width: 100%;
+    min-height: 100px;
+    padding: 0.8rem;
+    border: 2px solid var(--border-color);
+    border-radius: var(--border-radius-md);
+    font-size: 1rem;
+    resize: vertical;
 }
 
 #csv-upload {
-    margin: 1rem 0;
+    margin: 1rem 0;
 }
 
 /* ✨ This rule now styles the tables on all three pages ✨ */
-#batch-results table, 
-#comparison-table, 
+#batch-results table, 
+#comparison-table, 
 #ciliahub-results-container table {
-    width: 100%;
-    border-collapse: collapse;
-    margin-top: 1rem;
-    position: relative;
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 1rem;
+    position: relative;
 }
 
 /* ✨ This rule now styles the cells on all three pages ✨ */
-#batch-results th, 
-#batch-results td, 
-#comparison-table th, 
+#batch-results th, 
+#batch-results td, 
+#comparison-table th, 
 #comparison-table td,
 #ciliahub-results-container th,
 #ciliahub-results-container td {
-    padding: 0.8rem;
-    border-bottom: 1px solid var(--border-color);
-    text-align: left;
+    padding: 0.8rem;
+    border-bottom: 1px solid var(--border-color);
+    text-align: left;
 }
 
 /* ✨ Add stripes for columns in ciliarhub-results-container table ✨ */
 #ciliahub-results-container th:nth-child(odd),
 #ciliahub-results-container td:nth-child(odd) {
-    background-color: var(--neutral-bg-alt);
+    background-color: var(--neutral-bg-alt);
 }
 
 #ciliahub-results-container th:nth-child(even),
 #ciliahub-results-container td:nth-child(even) {
-    background-color: var(--panel-bg);
+    background-color: var(--panel-bg);
 }
 
 /* ✨ This rule now styles the headers on all three pages, with navbar blue for ciliarhub-results-container ✨ */
-#batch-results th, 
+#batch-results th, 
 #comparison-table th {
-    background: var(--primary-blue);
-    color: var(--text-light);
+    background: var(--primary-blue);
+    color: var(--text-light);
 }
 
 #ciliahub-results-container th {
-    background: linear-gradient(90deg, var(--primary-blue), var(--primary-blue-light));
-    color: var(--text-light);
-    position: sticky;
-    top: 160px;
-    z-index: 998;
+    background: linear-gradient(90deg, var(--primary-blue), var(--primary-blue-light));
+    color: var(--text-light);
+    position: sticky;
+    top: 160px;
+    z-index: 998;
 }
 
 /* ✨ These rules now style the links on all three pages ✨ */
-#batch-results a, 
+#batch-results a, 
 #comparison-table a,
 #ciliahub-results-container a {
-    color: var(--primary-blue);
-    text-decoration: none;
+    color: var(--primary-blue);
+    text-decoration: none;
 }
 
-#batch-results a:hover, 
-#batch-results a:focus-visible, 
-#comparison-table a:hover, 
+#batch-results a:hover, 
+#batch-results a:focus-visible, 
+#comparison-table a:hover, 
 #comparison-table a:focus-visible,
 #ciliahub-results-container a:hover,
 #ciliahub-results-container a:focus-visible {
-    text-decoration: underline;
-    outline: none;
+    text-decoration: underline;
+    outline: none;
 }
 
 .comparison-tool {
-    background: var(--neutral-bg-alt);
-    padding: 1.5rem;
-    border-radius: var(--border-radius-md);
+    background: var(--neutral-bg-alt);
+    padding: 1.5rem;
+    border-radius: var(--border-radius-md);
 }
 
 .comparison-controls {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
 }
 
 .tabs {
-    display: flex;
-    gap: 0.5rem;
+    display: flex;
+    gap: 0.5rem;
 }
 
 .tab-link {
-    padding: 0.5rem 1rem;
-    background: var(--border-color);
-    border: none;
-    border-radius: var(--border-radius-sm);
-    cursor: pointer;
-    font-size: 0.9rem;
-    transition: background 0.3s;
+    padding: 0.5rem 1rem;
+    background: var(--border-color);
+    border: none;
+    border-radius: var(--border-radius-sm);
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: background 0.3s;
 }
 
 .tab-link.active, .tab-link:hover, .tab-link:focus-visible {
-    background: var(--primary-blue);
-    color: var(--text-light);
-    outline: none;
+    background: var(--primary-blue);
+    color: var(--text-light);
+    outline: none;
 }
 
 .tab-content {
-    display: none;
+    display: none;
 }
 
 .tab-content.active {
-    display: block;
+    display: block;
 }
 
 .chart-container {
-    position: relative;
-    margin: auto;
+    position: relative;
+    margin: auto;
 }
 
 .functional-comparison-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-    gap: 1rem;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1rem;
 }
 
 .function-card {
-    background: var(--neutral-bg-alt);
-    padding: 1rem;
-    border-radius: var(--border-radius-md);
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    background: var(--neutral-bg-alt);
+    padding: 1rem;
+    border-radius: var(--border-radius-md);
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
 }
 
 .function-card h4 {
-    margin: 0 0 0.5rem;
-    color: var(--primary-dark);
+    margin: 0 0 0.5rem;
+    color: var(--primary-dark);
 }
 
 .gene-tags-container {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-    margin-top: 1rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 1rem;
 }
 
 .gene-tag {
-    background: var(--mpb-border); /* Uses the #c2d9e6 color */
-    padding: 0.5rem 1rem;
-    border-radius: 15px;
-    font-size: 0.9rem;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
+    background: var(--mpb-border); /* Uses the #c2d9e6 color */
+    padding: 0.5rem 1rem;
+    border-radius: 15px;
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
 }
 
 .remove-tag {
-    cursor: pointer;
-    font-weight: bold;
+    cursor: pointer;
+    font-weight: bold;
 }
 
 .remove-tag:hover, .remove-tag:focus-visible {
-    color: var(--accent-red);
-    outline: none;
+    color: var(--accent-red);
+    outline: none;
 }
 
 .error-message {
-    color: var(--accent-red);
-    font-size: 0.9rem;
+    color: var(--accent-red);
+    font-size: 0.9rem;
 }
 
 .status-message {
-    text-align: center;
-    padding: 2rem;
-    color: #666;
+    text-align: center;
+    padding: 2rem;
+    color: #666;
 }
 
 .success-message {
-    color: var(--accent-green-2);
+    color: var(--accent-green-2);
 }
 
 .gene-cards {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-    gap: 1rem;
-    margin-top: 2rem;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1rem;
+    margin-top: 2rem;
 }
 
 .gene-card {
-    background: var(--neutral-bg-alt);
-    padding: 1.5rem;
-    border-radius: var(--border-radius-md);
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-    cursor: pointer;
-    transition: transform 0.3s, box-shadow 0.3s;
+    background: var(--neutral-bg-alt);
+    padding: 1.5rem;
+    border-radius: var(--border-radius-md);
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    cursor: pointer;
+    transition: transform 0.3s, box-shadow 0.3s;
 }
 
 .gene-card:hover, .gene-card:focus-visible {
-    transform: translateY(-5px);
-    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
-    outline: 2px solid var(--primary-blue);
-    outline-offset: 2px;
+    transform: translateY(-5px);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+    outline: 2px solid var(--primary-blue);
+    outline-offset: 2px;
 }
 
 .gene-card.search-result {
-    background: #d5f4e6;
+    background: #d5f4e6;
 }
 
 .gene-card.default {
-    background: #e8f4fd;
+    background: #e8f4fd;
 }
 
 .gene-name {
-    font-size: 1.2rem;
-    font-weight: 600;
-    color: var(--primary-dark);
-    margin-bottom: 0.5rem;
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: var(--primary-dark);
+    margin-bottom: 0.5rem;
 }
 
 .gene-description {
-    font-size: 0.9rem;
-    color: #555;
-    margin-bottom: 0.5rem;
+    font-size: 0.9rem;
+    color: #555;
+    margin-bottom: 0.5rem;
 }
 
 .gene-info {
-    font-size: 0.9rem;
-    margin-bottom: 0.3rem;
+    font-size: 0.9rem;
+    margin-bottom: 0.3rem;
 }
 
 .pagination {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    gap: 1rem;
-    margin-top: 2rem;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 1rem;
+    margin-top: 2rem;
 }
 
 .pagination button {
-    padding: 0.5rem 1rem;
-    background: var(--primary-blue);
-    color: var(--text-light);
-    border: none;
-    border-radius: var(--border-radius-sm);
-    cursor: pointer;
+    padding: 0.5rem 1rem;
+    background: var(--primary-blue);
+    color: var(--text-light);
+    border: none;
+    border-radius: var(--border-radius-sm);
+    cursor: pointer;
 }
 
 .pagination button:disabled {
-    background: var(--gray-medium);
-    cursor: not-allowed;
+    background: var(--gray-medium);
+    cursor: not-allowed;
 }
 
 .download-options {
-    display: flex;
-    gap: 1rem;
-    margin-top: 1rem;
+    display: flex;
+    gap: 1rem;
+    margin-top: 1rem;
 }
 
 .download-options a, .download-options button {
-    padding: 0.8rem 1.5rem;
-    background: var(--primary-blue);
-    color: var(--text-light);
-    text-decoration: none;
-    border-radius: var(--border-radius-md);
-    font-size: 1rem;
+    padding: 0.8rem 1.5rem;
+    background: var(--primary-blue);
+    color: var(--text-light);
+    text-decoration: none;
+    border-radius: var(--border-radius-md);
+    font-size: 1rem;
 }
 
 .download-options a:hover, .download-options a:focus-visible, .download-options button:hover, .download-options button:focus-visible {
-    background: var(--primary-blue-light);
-    outline: none;
+    background: var(--primary-blue-light);
+    outline: none;
 }
 
 .contact-info, .cite-list, .feedback-form {
-    margin-bottom: 2rem;
+    margin-bottom: 2rem;
 }
 
 .contact-info ul, .cite-list ul {
-    list-style: none;
-    padding: 0;
+    list-style: none;
+    padding: 0;
 }
 
 .contact-info li, .cite-list li {
-    margin-bottom: 0.5rem;
+    margin-bottom: 0.5rem;
 }
 
 .contact-info a, .cite-list a {
-    color: var(--primary-blue);
-    text-decoration: none;
+    color: var(--primary-blue);
+    text-decoration: none;
 }
 
 .contact-info a:hover, .contact-info a:focus-visible, .cite-list a:hover, .cite-list a:focus-visible {
-    text-decoration: underline;
-    outline: none;
+    text-decoration: underline;
+    outline: none;
 }
 
 .btn {
-    cursor: pointer;
-    transition: background 0.3s;
+    cursor: pointer;
+    transition: background 0.3s;
 }
 
 .btn-primary {
-    background: var(--primary-blue);
-    color: var(--text-light);
-    border: none;
-    padding: 0.8rem 1.5rem;
-    border-radius: var(--border-radius-md);
+    background: var(--primary-blue);
+    color: var(--text-light);
+    border: none;
+    padding: 0.8rem 1.5rem;
+    border-radius: var(--border-radius-md);
 }
 
 .btn-primary:hover, .btn-primary:focus-visible {
-    background: var(--primary-blue-light);
-    outline: none;
+    background: var(--primary-blue-light);
+    outline: none;
 }
 
 .btn-secondary {
-    background: var(--gray-medium);
-    color: var(--text-light);
-    border: none;
-    padding: 0.5rem 1rem;
-    border-radius: var(--border-radius-sm);
+    background: var(--gray-medium);
+    color: var(--text-light);
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: var(--border-radius-sm);
 }
 
 .btn-secondary:hover, .btn-secondary:focus-visible {
-    background: var(--gray-dark);
-    outline: none;
+    background: var(--gray-dark);
+    outline: none;
 }
 
 .tooltip {
-    position: relative;
-    display: inline-block;
+    position: relative;
+    display: inline-block;
 }
 
 .tooltip-icon {
-    background: var(--primary-blue);
-    color: var(--text-light);
-    border-radius: 50%;
-    width: 16px;
-    height: 16px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 0.8rem;
-    cursor: help;
+    background: var(--primary-blue);
+    color: var(--text-light);
+    border-radius: 50%;
+    width: 16px;
+    height: 16px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.8rem;
+    cursor: help;
 }
 
 .tooltip-text {
-    visibility: hidden;
-    width: 200px;
-    background: var(--primary-dark);
-    color: var(--text-light);
-    text-align: center;
-    padding: 0.5rem;
-    border-radius: var(--border-radius-sm);
-    position: absolute;
-    z-index: 1;
-    bottom: 125%;
-    left: 50%;
-    transform: translateX(-50%);
-    font-size: 0.8rem;
+    visibility: hidden;
+    width: 200px;
+    background: var(--primary-dark);
+    color: var(--text-light);
+    text-align: center;
+    padding: 0.5rem;
+    border-radius: var(--border-radius-sm);
+    position: absolute;
+    z-index: 1;
+    bottom: 125%;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 0.8rem;
 }
 
 .tooltip:hover .tooltip-text {
-    visibility: visible;
+    visibility: visible;
 }
 
 @media (max-width: 768px) {
-    .navbar {
-        padding: 1rem 0;
-    }
+    .navbar {
+        padding: 1rem 0;
+    }
 
-    .nav-container {
-        flex-direction: column;
-        gap: 1.5rem;
-        padding: 0 1.5rem;
-    }
+    .nav-container {
+        flex-direction: column;
+        gap: 1.5rem;
+        padding: 0 1.5rem;
+    }
 
-    .logo {
-        font-size: 1.8rem;
-    }
+    .logo {
+        font-size: 1.8rem;
+    }
 
-    .nav-links {
-        flex-direction: column;
-        align-items: center;
-        gap: 1rem;
-    }
+    .nav-links {
+        flex-direction: column;
+        align-items: center;
+        gap: 1rem;
+    }
 
-    .nav-links li a {
-        font-size: 1rem;
-        padding: 0.4rem 0.8rem;
-    }
+    .nav-links li a {
+        font-size: 1rem;
+        padding: 0.4rem 0.8rem;
+    }
 
-    .main-container {
-        flex-direction: column;
-        padding: 1rem;
-    }
+    .main-container {
+        flex-direction: column;
+        padding: 1rem;
+    }
 
-    .cilia-panel {
-        position: static;
-    }
+    .cilia-panel {
+        position: static;
+    }
 
-    .search-container.sticky {
-        position: static;
-        transform: none;
-        width: 100%;
-    }
+    .search-container.sticky {
+        position: static;
+        transform: none;
+        width: 100%;
+    }
 
-    .gene-cards, .functional-comparison-grid {
-        grid-template-columns: 1fr;
-    }
+    .gene-cards, .functional-comparison-grid {
+        grid-template-columns: 1fr;
+    }
 }
 
 /* Suggested CSS for the gene summary table */
 .gene-summary-table {
-    width: 100%;
-    border-collapse: collapse;
-    margin-top: 10px;
-    font-family: Arial, sans-serif;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 10px;
+    font-family: Arial, sans-serif;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .gene-summary-table th,
 .gene-summary-table td {
-    border: 1px solid #ddd;
-    padding: 10px 12px;
-    text-align: left;
+    border: 1px solid #ddd;
+    padding: 10px 12px;
+    text-align: left;
 }
 
 .gene-summary-table th {
-    background-color: var(--neutral-bg-alt);
-    font-weight: bold;
-    color: var(--text-dark);
+    background-color: var(--neutral-bg-alt);
+    font-weight: bold;
+    color: var(--text-dark);
 }
 
 .gene-summary-table tbody tr:nth-child(even) {
-    background-color: #fdfdfd;
+    background-color: #fdfdfd;
 }
 
 .gene-summary-table .status-found {
-    color: var(--accent-green-2);
-    font-weight: bold;
+    color: var(--accent-green-2);
+    font-weight: bold;
 }
 
 .gene-summary-table .status-not-found {
-    color: var(--accent-red);
-    font-weight: bold;
+    color: var(--accent-red);
+    font-weight: bold;
 }
 
 /* ---------- CiliaHub: Gene detail page tweaks (Medium Persian Blue) ---------- */
@@ -758,161 +758,161 @@ body {
 
 /* Central color tokens */
 :root {
-  --mpb: #0067A5;
-  --mpb-light: #e6f0f7;
-  --mpb-border: #c2d9e6;
+  --mpb: #0067A5;
+  --mpb-light: #e6f0f7;
+  --mpb-border: #c2d9e6;
 }
 
 /* Scope everything to the gene detail page to avoid site-wide side effects */
 .gene-detail-page,
 .gene-detail-page * {
-  box-sizing: border-box;
+  box-sizing: border-box;
 }
 
 /* Breadcrumb & header background */
 .gene-detail-page .breadcrumb,
 .gene-detail-page .gene-header {
-  background: var(--mpb-light) !important;
-  border-color: var(--mpb-border) !important;
+  background: var(--mpb-light) !important;
+  border-color: var(--mpb-border) !important;
 }
 
 /* Gene name and description */
 .gene-detail-page .gene-name {
-  color: var(--mpb) !important;
-  font-weight: 700;
-  font-size: 2rem;
-  margin: 0 0 0.25rem 0;
+  color: var(--mpb) !important;
+  font-weight: 700;
+  font-size: 2rem;
+  margin: 0 0 0.25rem 0;
 }
 .gene-detail-page .gene-description {
-  color: var(--mpb) !important;
-  opacity: 0.95;
-  margin: 0;
+  color: var(--mpb) !important;
+  opacity: 0.95;
+  margin: 0;
 }
 
 /* Cards (visual treatment) */
 .gene-detail-page .detail-card {
-  background: #fff !important;
-  border: 1px solid var(--mpb-border) !important;
-  border-radius: 0.6rem !important;
-  padding: 1rem !important;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.04) !important;
+  background: #fff !important;
+  border: 1px solid var(--mpb-border) !important;
+  border-radius: 0.6rem !important;
+  padding: 1rem !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04) !important;
 }
 
 /* Card title styling (applies to Identifiers, Subcellular Localization, Complex Info,
-   Functional Information, References, etc.) */
+   Functional Information, References, etc.) */
 .gene-detail-page .card-title {
-  color: var(--mpb) !important;
-  font-size: 1.05rem !important;
-  font-weight: 600 !important;
-  display: flex !important;
-  align-items: center !important;
-  gap: 0.5rem !important;
-  margin: 0 0 0.75rem 0 !important;
-  padding-bottom: 0.45rem !important;
-  border-bottom: 1px solid var(--mpb-border) !important;
+  color: var(--mpb) !important;
+  font-size: 1.05rem !important;
+  font-weight: 600 !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.5rem !important;
+  margin: 0 0 0.75rem 0 !important;
+  padding-bottom: 0.45rem !important;
+  border-bottom: 1px solid var(--mpb-border) !important;
 }
 
 /* Ensure SVG/icons also follow the blue */
 .gene-detail-page .card-title svg,
 .gene-detail-page .detail-card svg {
-  stroke: var(--mpb) !important;
-  fill: none !important;
+  stroke: var(--mpb) !important;
+  fill: none !important;
 }
 
 /* Strong/labels in info items */
 .gene-detail-page .info-item strong,
 .gene-detail-page .info-item .label {
-  color: var(--mpb) !important;
-  font-weight: 600 !important;
+  color: var(--mpb) !important;
+  font-weight: 600 !important;
 }
 
 /* Generic paragraph and small text inside gene page */
 .gene-detail-page .info-item p,
 .gene-detail-page .info-item span,
 .gene-detail-page .info-item div {
-  color: var(--mpb) !important;
-  line-height: 1.35 !important;
+  color: var(--mpb) !important;
+  line-height: 1.35 !important;
 }
 
 /* Tag pills (localization, functional category, etc.) */
 .gene-detail-page .tag,
 .gene-detail-page .tags-container .tag {
-  display: inline-block !important;
-  padding: 0.22rem 0.6rem !important;
-  margin: 0.12rem 0.28rem !important;
-  border-radius: 999px !important;
-  background: var(--mpb-light) !important;
-  color: var(--mpb) !important;
-  font-weight: 500 !important;
-  font-size: 0.85rem !important;
-  vertical-align: middle !important;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.03) !important;
+  display: inline-block !important;
+  padding: 0.22rem 0.6rem !important;
+  margin: 0.12rem 0.28rem !important;
+  border-radius: 999px !important;
+  background: var(--mpb-light) !important;
+  color: var(--mpb) !important;
+  font-weight: 500 !important;
+  font-size: 0.85rem !important;
+  vertical-align: middle !important;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.03) !important;
 }
 
 /* References list */
 .gene-detail-page .reference-list {
-  color: var(--mpb) !important;
+  color: var(--mpb) !important;
 }
 .gene-detail-page .reference-list li {
-  margin-bottom: 0.4rem;
-  color: var(--mpb) !important;
+  margin-bottom: 0.4rem;
+  color: var(--mpb) !important;
 }
 .gene-detail-page .reference-list a {
-  color: var(--mpb) !important;
-  text-decoration: none !important;
+  color: var(--mpb) !important;
+  text-decoration: none !important;
 }
 .gene-detail-page .reference-list a:hover {
-  text-decoration: underline !important;
+  text-decoration: underline !important;
 }
 
 /* Links inside the gene page — keep them consistent */
 .gene-detail-page a {
-  color: var(--mpb) !important;
+  color: var(--mpb) !important;
 }
 
 /* Force card borders and accent where something else tries to override */
 .gene-detail-page .detail-card,
 .gene-detail-page .card-title,
 .gene-detail-page .info-item strong {
-  outline: none !important;
+  outline: none !important;
 }
 
 /* ---------- Layout: ensure left column = Functional Info + References,
-   right column = Identifiers + Localization + Complex Info ---------- */
+   right column = Identifiers + Localization + Complex Info ---------- */
 
 /* Standard two-column grid (desktop) */
 .gene-details-grid {
-  display: grid !important;
-  grid-template-columns: 1fr 1fr !important;
-  gap: 1.5rem !important;
-  align-items: start !important;
+  display: grid !important;
+  grid-template-columns: 1fr 1fr !important;
+  gap: 1.5rem !important;
+  align-items: start !important;
 }
 
 /* Rely on the order the page injects the columns — usually the first .details-column is left.
-   If your JS prints the columns in different order, prefer adding classes (see note below). */
+   If your JS prints the columns in different order, prefer adding classes (see note below). */
 .gene-details-grid > .details-column:first-child {
-  grid-column: 1 / 2 !important;    /* left */
+  grid-column: 1 / 2 !important;    /* left */
 }
 .gene-details-grid > .details-column:last-child {
-  grid-column: 2 / 3 !important;    /* right */
+  grid-column: 2 / 3 !important;    /* right */
 }
 
 /* Mobile: stack single column */
 @media (max-width: 899px) {
-  .gene-details-grid {
-    grid-template-columns: 1fr !important;
-  }
+  .gene-details-grid {
+    grid-template-columns: 1fr !important;
+  }
 }
 
 /* ---------- Utility overrides for Tailwind-style arbitrary classes that may not exist
-   (these selectors escape the bracket syntax so they match when Tailwind classes are in HTML) */
+   (these selectors escape the bracket syntax so they match when Tailwind classes are in HTML) */
 .text-\\[\\#0067A5\\],
 .text-\\[\\#0067A5\\] {
-  color: var(--mpb) !important;
+  color: var(--mpb) !important;
 }
 .bg-\\[\\#e6f0f7\\],
 .bg-\\[\\#e6f0f7\\] {
-  background: var(--mpb-light) !important;
+  background: var(--mpb-light) !important;
 }
 
 /* ---------- Helpful debugging outline (comment out if not needed) ----------
@@ -921,287 +921,287 @@ body {
 
 /* Plot Customization Styling */
 details {
-    border: 1px solid #e1ecf4;
-    border-radius: 4px;
-    margin-bottom: 15px;
+    border: 1px solid #e1ecf4;
+    border-radius: 4px;
+    margin-bottom: 15px;
 }
 
 summary {
-    padding: 8px;
-    background-color: #e1ecf4;
-    cursor: pointer;
-    font-weight: bold;
-    border-radius: 4px;
+    padding: 8px;
+    background-color: #e1ecf4;
+    cursor: pointer;
+    font-weight: bold;
+    border-radius: 4px;
 }
 
 details[open] summary {
-    border-bottom: 1px solid #d1dbe4;
+    border-bottom: 1px solid #d1dbe4;
 }
 
 label {
-    display: block;
-    font-size: 0.9rem;
-    margin-bottom: 5px;
-    color: #333;
+    display: block;
+    font-size: 0.9rem;
+    margin-bottom: 5px;
+    color: #333;
 }
 
 input[type="text"],
 input[type="number"],
 select,
 input[type="color"] {
-    width: 100%;
-    padding: 6px;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    font-size: 0.9rem;
+    width: 100%;
+    padding: 6px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 0.9rem;
 }
 
 input[type="color"] {
-    padding: 2px;
-    height: 30px;
+    padding: 2px;
+    height: 30px;
 }
 
 .plot-wrapper {
-    position: relative;
-    width: 100%;
+    position: relative;
+    width: 100%;
 }
 
 /* =================================================== */
-/* Styles for Compact CiliaHub Page Layout             */
+/* Styles for Compact CiliaHub Page Layout             */
 /* =================================================== */
 
 .ciliahub-page {
-    display: flex;
-    flex-direction: column;
-    /* ✨ FIX: The fixed height properties have been removed to allow the page to grow. */
+    display: flex;
+    flex-direction: column;
+    /* ✨ FIX: The fixed height properties have been removed to allow the page to grow. */
 }
 
 .ciliahub-header {
-    flex-shrink: 0; /* Prevents header from shrinking */
+    flex-shrink: 0; /* Prevents header from shrinking */
 }
 
 .ciliahub-layout {
-    display: grid;
-    grid-template-columns: 380px 1fr; /* Gives more space to the plot */
-    gap: 2rem;
-    flex-grow: 1;
-    overflow: hidden;
+    display: grid;
+    grid-template-columns: 380px 1fr; /* Gives more space to the plot */
+    gap: 2rem;
+    flex-grow: 1;
+    overflow: hidden;
 }
 
 .ciliahub-controls-panel {
-    display: flex;
-    flex-direction: column;
-    gap: 1.5rem;
-    overflow-y: auto; /* Add scroll only to controls if they overflow */
-    padding-right: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    overflow-y: auto; /* Add scroll only to controls if they overflow */
+    padding-right: 10px;
 }
 
 /* ===== CILIAPLOT PAGE SPECIFIC IMPROVEMENTS ===== */
 
 /* 1. Bigger search box for CiliaPlot page */
 #ciliaplot-genes-input {
-    width: 100%;
-    height: 120px; /* Increased from default */
-    padding: 1rem; /* Increased padding */
-    border: 2px solid var(--border-color);
-    border-radius: var(--border-radius-md);
-    font-size: 1.1rem; /* Slightly larger font */
-    resize: vertical; /* Allow vertical resizing */
-    margin-bottom: 1rem;
-    line-height: 1.4;
-    font-family: inherit;
+    width: 100%;
+    height: 120px; /* Increased from default */
+    padding: 1rem; /* Increased padding */
+    border: 2px solid var(--border-color);
+    border-radius: var(--border-radius-md);
+    font-size: 1.1rem; /* Slightly larger font */
+    resize: vertical; /* Allow vertical resizing */
+    margin-bottom: 1rem;
+    line-height: 1.4;
+    font-family: inherit;
 }
 
 /* 2. Enhanced CiliaPlot layout styling */
 .ciliaplot-page {
-    width: 100%;
+    width: 100%;
 }
 
 #ciliahub-actions {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-    background-color: var(--neutral-bg-alt);
-    padding: 1rem;
-    border-radius: var(--border-radius-md);
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    background-color: var(--neutral-bg-alt);
+    padding: 1rem;
+    border-radius: var(--border-radius-md);
 }
 
 .plot-type-selection {
-    display: flex;
-    align-items: center;
-    justify-content: space-around;
-    flex-wrap: wrap;
-    gap: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+    flex-wrap: wrap;
+    gap: 10px;
 }
 
 .action-buttons {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
 }
 
 #download-controls {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
 }
 
 #plot-customization-details summary {
-    background-color: var(--neutral-bg-alt);
-    border-radius: var(--border-radius-sm);
+    background-color: var(--neutral-bg-alt);
+    border-radius: var(--border-radius-sm);
 }
 
 #plot-customization-details {
-    border: 1px solid var(--border-color);
-    border-radius: var(--border-radius-md);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-md);
 }
 
 #plot-settings-panel {
-    /* Make customization controls more compact */
-    display: grid; 
-    grid-template-columns: 1fr 1fr;
-    gap: 1rem;
-    padding: 1rem;
+    /* Make customization controls more compact */
+    display: grid; 
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    padding: 1rem;
 }
 
 .ciliahub-plot-panel {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border: 2px dashed var(--border-color);
-    border-radius: var(--border-radius-lg);
-    background-color: var(--neutral-bg-alt);
-    height: 100%;
-    overflow: hidden; /* Reverted from auto */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px dashed var(--border-color);
+    border-radius: var(--border-radius-lg);
+    background-color: var(--neutral-bg-alt);
+    height: 100%;
+    overflow: hidden; /* Reverted from auto */
 }
 
 .plot-area, .plot-wrapper {
-    /* Ensure plot fills its container without a fixed height */
-    height: 100%;
-    width: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    /* Ensure plot fills its container without a fixed height */
+    height: 100%;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 #plot-placeholder {
-    margin: auto;
-    color: var(--gray-dark);
+    margin: auto;
+    color: var(--gray-dark);
 }
 
 /* ========================================================================= */
-/* CILIA PLOT DASHBOARD DESIGN                                               */
+/* CILIA PLOT DASHBOARD DESIGN                                               */
 /* ========================================================================= */
 
 /* Main container for the new design */
 .ciliaplot-container-new {
-    display: grid;
-    grid-template-columns: 380px 1fr; /* Fixed left panel, flexible right panel */
-    gap: 2rem;
-    align-items: flex-start;
+    display: grid;
+    grid-template-columns: 380px 1fr; /* Fixed left panel, flexible right panel */
+    gap: 2rem;
+    align-items: flex-start;
 }
 
 /* Header/Info Box Styling */
 .ciliaplot-header {
-    margin-bottom: 2rem;
+    margin-bottom: 2rem;
 }
 .info {
-    margin-top: 1rem;
-    padding: 15px;
-    background-color: var(--mpb-light, #eaf5fd);
-    border-left: 4px solid var(--mpb, #3498db);
-    border-radius: var(--border-radius-sm);
-    font-size: 0.95rem;
-    line-height: 1.5;
+    margin-top: 1rem;
+    padding: 15px;
+    background-color: var(--mpb-light, #eaf5fd);
+    border-left: 4px solid var(--mpb, #3498db);
+    border-radius: var(--border-radius-sm);
+    font-size: 0.95rem;
+    line-height: 1.5;
 }
 
 /* Left & Right Panels */
 .ciliaplot-left-panel-new {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem; /* **FIXED (2):** Reduced space between control sections */
+    display: flex;
+    flex-direction: column;
+    gap: 1rem; /* **FIXED (2):** Reduced space between control sections */
 }
 .ciliaplot-right-panel-new {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
 }
 
 /* Stats Container Styling */
 .stats-container {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-    gap: 1rem;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 1rem;
 }
 .stat-box {
-    background: linear-gradient(135deg, var(--primary-dark), #34495e);
-    color: white;
-    padding: 15px;
-    border-radius: var(--border-radius-md);
-    text-align: center;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    background: linear-gradient(135deg, var(--primary-dark), #34495e);
+    color: white;
+    padding: 15px;
+    border-radius: var(--border-radius-md);
+    text-align: center;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
 }
 .stat-number {
-    font-size: 2rem;
-    font-weight: bold;
+    font-size: 2rem;
+    font-weight: bold;
 }
 .stat-label {
-    font-size: 0.8rem;
-    opacity: 0.9;
-    margin-top: 5px;
+    font-size: 0.8rem;
+    opacity: 0.9;
+    margin-top: 5px;
 }
 
 /* Plot Container & Legend */
 .plot-container-new {
-    border: 1px solid var(--border-color);
-    border-radius: var(--border-radius-md);
-    padding: 1.5rem;
-    background-color: var(--panel-bg);
-    min-height: 500px;
-    width: 100%;
-    box-sizing: border-box;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-md);
+    padding: 1.5rem;
+    background-color: var(--panel-bg);
+    min-height: 500px;
+    width: 100%;
+    box-sizing: border-box;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
 }
 
 .legend {
-    display: flex;
-    justify-content: center;
-    gap: 20px;
-    flex-wrap: wrap;
-    padding: 10px;
+    display: flex;
+    justify-content: center;
+    gap: 20px;
+    flex-wrap: wrap;
+    padding: 10px;
 }
 .legend-item {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 5px 12px;
-    background: var(--neutral-bg-alt);
-    border-radius: 999px;
-    border: 1px solid var(--border-color);
-    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 12px;
+    background: var(--neutral-bg-alt);
+    border-radius: 999px;
+    border: 1px solid var(--border-color);
+    font-size: 0.9rem;
 }
 .legend-color {
-    width: 16px;
-    height: 16px;
-    border-radius: 50%;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
 }
 
 /* Responsive adjustments */
 @media (max-width: 1024px) {
-    .ciliaplot-container-new {
-        grid-template-columns: 1fr; /* Stack panels on smaller screens */
-    }
+    .ciliaplot-container-new {
+        grid-template-columns: 1fr; /* Stack panels on smaller screens */
+    }
 }
 
 /* Add these new/updated styles to your styles.css file */
 
 /* CiliaPlot Customization & Download Controls */
 #ciliaplot-settings-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
-    align-items: center;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    align-items: center;
 }
 #ciliaplot-settings-grid label { font-size: 0.9em; }
 #ciliaplot-settings-grid input[type="text"],
@@ -1209,32 +1209,32 @@ input[type="color"] {
 #ciliaplot-settings-grid input[type="color"] { width: 40px; height: 30px; padding: 2px; }
 
 .ciliaplot-display-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 1rem;
 }
 
 .ciliaplot-download-btn {
-    background-color: #f0f0f0;
-    border: 1px solid #ccc;
-    padding: 5px 10px;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 0.8rem;
-    transition: background-color 0.2s;
+    background-color: #f0f0f0;
+    border: 1px solid #ccc;
+    padding: 5px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.8rem;
+    transition: background-color 0.2s;
 }
 .ciliaplot-download-btn:hover { background-color: #e0e0e0; }
 .ciliaplot-controls-group { display: flex; align-items: center; gap: 1rem; }
 
 /* Existing styles from previous response (ensure they are present) */
 .stats-container {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
-    gap: 10px;
-    margin: 1rem 0;
-    text-align: center;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: 10px;
+    margin: 1rem 0;
+    text-align: center;
 }
 .stat-box { padding: 10px; border-radius: 6px; color: white; }
 .stat-box .stat-number { font-size: 1.5rem; font-weight: bold; }
@@ -1264,139 +1264,203 @@ input[type="color"] {
 
 
 /* =================================================== */
-/* CiliaHub: Redesigned Single Gene Page               */
+/* CiliaHub: Redesigned Single Gene Page               */
 /* =================================================== */
 
 .gene-detail-page {
-  display: flex;
-  flex-direction: column;
-  gap: 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
 }
 
 /* Page Header */
 .gene-header {
-  background-color: var(--mpb-light);
-  padding: 2rem;
-  border-radius: var(--border-radius-lg);
-  border: 1px solid var(--mpb-border);
+  background-color: var(--mpb-light);
+  padding: 2rem;
+  border-radius: var(--border-radius-lg);
+  border: 1px solid var(--mpb-border);
 }
 
 .gene-header h1 {
-  font-size: 2.5rem;
-  font-weight: 800;
-  color: var(--mpb);
-  margin: 0 0 0.5rem 0;
-  line-height: 1.2;
+  font-size: 2.5rem;
+  font-weight: 800;
+  color: var(--mpb);
+  margin: 0 0 0.5rem 0;
+  line-height: 1.2;
 }
 
 .gene-header .synonym-tags .tag {
-  background-color: var(--mpb-border);
-  font-size: 0.8rem;
+  background-color: var(--mpb-border);
+  font-size: 0.8rem;
 }
 
 .gene-header p {
-  font-size: 1.1rem;
-  color: var(--primary-dark);
-  margin-top: 1rem;
-  max-width: 80ch; /* Improves readability */
+  font-size: 1.1rem;
+  color: var(--primary-dark);
+  margin-top: 1rem;
+  max-width: 80ch; /* Improves readability */
 }
 
 /* Two-Column Layout */
 .gene-details-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 2rem;
-  align-items: start;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 2rem;
+  align-items: start;
 }
 
 /* Card Styling */
 .detail-card {
-  background: var(--panel-bg);
-  border: 1px solid var(--mpb-border);
-  border-radius: 0.75rem; /* Slightly softer corners */
-  padding: 1.5rem;
-  box-shadow: 0 4px 12px rgba(0, 103, 165, 0.05);
-  height: 100%; /* Make cards in the same row equal height */
+  background: var(--panel-bg);
+  border: 1px solid var(--mpb-border);
+  border-radius: 0.75rem; /* Slightly softer corners */
+  padding: 1.5rem;
+  box-shadow: 0 4px 12px rgba(0, 103, 165, 0.05);
+  height: 100%; /* Make cards in the same row equal height */
 }
 
 .card-title {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  font-size: 1.2rem;
-  font-weight: 700;
-  color: var(--mpb);
-  margin: 0 0 1rem 0;
-  padding-bottom: 0.75rem;
-  border-bottom: 2px solid var(--mpb-border);
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--mpb);
+  margin: 0 0 1rem 0;
+  padding-bottom: 0.75rem;
+  border-bottom: 2px solid var(--mpb-border);
 }
 
 .card-title svg {
-  width: 24px;
-  height: 24px;
-  stroke: var(--mpb);
-  stroke-width: 2;
+  width: 24px;
+  height: 24px;
+  stroke: var(--mpb);
+  stroke-width: 2;
 }
 
 /* Key-Value Info Items */
 .info-list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
 }
 
 .info-item strong {
-  display: block;
-  color: var(--primary-dark);
-  font-weight: 600;
-  margin-bottom: 0.25rem;
-  font-size: 0.9rem;
+  display: block;
+  color: var(--primary-dark);
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+  font-size: 0.9rem;
 }
 
 .info-item a {
-  word-break: break-all;
+  word-break: break-all;
 }
 
 /* Tag/Pill Styling */
 .tags-container {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
 }
 
 .tag {
-  display: inline-block;
-  padding: 0.25rem 0.75rem;
-  border-radius: 999px;
-  background-color: var(--mpb-light);
-  color: var(--mpb);
-  font-weight: 500;
-  font-size: 0.85rem;
-  line-height: 1.4;
+  display: inline-block;
+  padding: 0.25rem 0.75rem;
+  border-radius: 999px;
+  background-color: var(--mpb-light);
+  color: var(--mpb);
+  font-weight: 500;
+  font-size: 0.85rem;
+  line-height: 1.4;
 }
 
 .tag-ciliopathy {
-    background-color: #fceded;
-    color: var(--accent-red);
+    background-color: #fceded;
+    color: var(--accent-red);
 }
 
 /* References List */
 .reference-list {
-    list-style-type: disc;
-    padding-left: 1.5rem;
-    margin: 0;
+    list-style-type: disc;
+    padding-left: 1.5rem;
+    margin: 0;
 }
 
 .reference-list li::marker {
-    color: var(--mpb);
+    color: var(--mpb);
 }
 
 /* Responsive Breakpoint */
 @media (max-width: 900px) {
-  .gene-details-grid {
-    grid-template-columns: 1fr; /* Stack columns on smaller screens */
-  }
+  .gene-details-grid {
+    grid-template-columns: 1fr; /* Stack columns on smaller screens */
+  }
+}
+
+/* =================================================== */
+/* NEW: CiliaPlot Data Summary Table Styling           */
+/* =================================================== */
+
+.table-title {
+    font-size: 1.5rem;
+    color: var(--primary-dark);
+    margin-top: 2rem;
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid var(--border-color);
+}
+
+/* Add a wrapper to handle overflow on small screens */
+#plot-data-table-container {
+    overflow-x: auto;
+    width: 100%;
+}
+
+.data-summary-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.95rem;
+    box-shadow: 0 4px 12px rgba(0, 103, 165, 0.05);
+    border-radius: var(--border-radius-md);
+    overflow: hidden; /* Ensures border-radius is respected by children */
+}
+
+.data-summary-table th,
+.data-summary-table td {
+    padding: 12px 15px;
+    text-align: left;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.data-summary-table th {
+    background-color: var(--primary-blue);
+    color: var(--text-light);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.data-summary-table tbody tr {
+    background-color: var(--panel-bg);
+    transition: background-color 0.2s ease-in-out;
+}
+
+.data-summary-table tbody tr:nth-child(even) {
+    background-color: var(--neutral-bg-alt);
+}
+
+.data-summary-table tbody tr:hover {
+    background-color: var(--mpb-border); /* A light blue hover from the theme */
+}
+
+.data-summary-table tbody tr:last-child td {
+    border-bottom: none; /* Remove border from the last row */
+}
+
+.data-summary-table strong {
+    color: var(--primary-dark);
 }
