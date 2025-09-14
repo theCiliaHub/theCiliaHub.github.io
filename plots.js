@@ -1180,6 +1180,8 @@ function renderTopExpressingTissues(foundGenes, container) {
 
 // Clean renderFoundNotFoundTable function - ready to use
 function renderFoundNotFoundTable(geneData, containerId = 'table-container') {
+     // Add this line at the very beginning:
+       ensureTableContainer();
     // Validate parameters
     if (Array.isArray(containerId)) {
         console.warn('containerId should be a string, not an array. Using default.');
