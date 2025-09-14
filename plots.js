@@ -1178,10 +1178,38 @@ function renderTopExpressingTissues(foundGenes, container) {
 }
 
 
-// Clean renderFoundNotFoundTable function - ready to use
+// Add this debugging function to plots.js to see what data you're getting
+function debugGeneData(geneData) {
+    console.log('=== DEBUGGING GENE DATA ===');
+    console.log('Total genes:', geneData.length);
+    console.log('First 3 genes:', geneData.slice(0, 3));
+    console.log('Sample gene structure:', geneData[0]);
+    
+    // Check what properties each gene object has
+    if (geneData.length > 0) {
+        console.log('Available properties:', Object.keys(geneData[0]));
+    }
+    
+    // Check different possible property names
+    geneData.slice(0, 5).forEach((gene, i) => {
+        console.log(`Gene ${i}:`, {
+            name: gene.name,
+            gene: gene.gene, 
+            symbol: gene.symbol,
+            id: gene.id,
+            found: gene.found,
+            allProperties: Object.keys(gene)
+        });
+    });
+}
+
+// Updated renderFoundNotFoundTable function with better data handling
 function renderFoundNotFoundTable(geneData, containerId = 'table-container') {
-    // ADD THIS LINE AS THE FIRST LINE:
     ensureTableContainer();
+    
+    // Add debugging
+    debugGeneData(geneData);
+    
     // Validate parameters
     if (Array.isArray(containerId)) {
         console.warn('containerId should be a string, not an array. Using default.');
@@ -1248,11 +1276,26 @@ function renderFoundNotFoundTable(geneData, containerId = 'table-container') {
         const tbody = document.createElement('tbody');
         geneData.forEach((gene) => {
             const row = document.createElement('tr');
-            const status = gene.found ? 'Found' : 'Not Found';
-            const statusColor = gene.found ? '#28a745' : '#dc3545';
+            
+            // Try multiple ways to get the gene name
+            let geneName = 'Unknown';
+            if (typeof gene === 'string') {
+                geneName = gene;
+            } else if (gene && typeof gene === 'object') {
+                geneName = gene.name || gene.gene || gene.symbol || gene.id || gene.geneName || gene.geneSymbol || 'Unknown';
+            }
+            
+            // Try multiple ways to get the status
+            let isFound = false;
+            if (typeof gene === 'object' && gene !== null) {
+                isFound = gene.found === true || gene.status === 'found' || gene.present === true;
+            }
+            
+            const status = isFound ? 'Found' : 'Not Found';
+            const statusColor = isFound ? '#28a745' : '#dc3545';
             
             row.innerHTML = `
-                <td style="padding: 10px; border: 1px solid #ddd;">${gene.name || gene.gene || 'Unknown'}</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">${geneName}</td>
                 <td style="padding: 10px; border: 1px solid #ddd; color: ${statusColor}; font-weight: bold;">${status}</td>
             `;
             
@@ -1301,15 +1344,27 @@ function renderFoundNotFoundTable(geneData, containerId = 'table-container') {
     }
 }
 
-// Helper function for CSV download
+// Updated CSV download function with better data handling
 function downloadTableAsCSV(geneData) {
     try {
         const csvContent = [
             'Input Gene,Status',
             ...geneData.map(gene => {
-                const name = gene.name || gene.gene || 'Unknown';
-                const status = gene.found ? 'Found' : 'Not Found';
-                return `"${name}","${status}"`;
+                // Handle different data structures
+                let geneName = 'Unknown';
+                if (typeof gene === 'string') {
+                    geneName = gene;
+                } else if (gene && typeof gene === 'object') {
+                    geneName = gene.name || gene.gene || gene.symbol || gene.id || gene.geneName || gene.geneSymbol || 'Unknown';
+                }
+                
+                let isFound = false;
+                if (typeof gene === 'object' && gene !== null) {
+                    isFound = gene.found === true || gene.status === 'found' || gene.present === true;
+                }
+                
+                const status = isFound ? 'Found' : 'Not Found';
+                return `"${geneName}","${status}"`;
             })
         ].join('\n');
         
@@ -1328,7 +1383,6 @@ function downloadTableAsCSV(geneData) {
         alert('Error downloading CSV file');
     }
 }
-
 // Function to call after heatmap rendering
 function renderHeatmapAndTable(expressionData, geneList) {
     // Render heatmap first
