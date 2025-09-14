@@ -717,7 +717,7 @@ function calculateExpressionStats(genes) {
  * Renders an expression heatmap.
  */
 function renderExpressionHeatmap(foundGenes, container) {
-    clearPreviousPlot();
+    // clearPreviousPlot(); // REMOVE THIS LINE
     // TODO: Add hierarchical clustering for both genes and tissues to reveal
     // expression patterns, which is a standard feature in publication heatmaps.
     const settings = getPlotSettings();
