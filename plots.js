@@ -1177,352 +1177,60 @@ function renderTopExpressingTissues(foundGenes, container) {
     });
 }
 
+/**
+ * NEW: Renders a table of found and not found input genes.
+ * @param {Array} queries - The sanitized input queries.
+ * @param {Array} foundGenes - The array of found gene objects.
+ * @param {HTMLElement} container - The container element to render the table into.
+ */
+function renderFoundNotFoundTable(queries, foundGenes, container) {
+    if (!container) return;
 
-// Check where you're calling renderFoundNotFoundTable and how you're creating the gene data
-// The issue is likely in how the gene status data is being prepared
+    const foundSet = new Set(foundGenes.map(g => g.gene.toUpperCase()));
 
-// OPTION 1: If you're creating the gene data from a gene list and expression data
-function createGeneStatusData(geneList, expressionData) {
-    console.log('Creating gene status data...');
-    console.log('Gene list:', geneList);
-    console.log('Expression data sample:', expressionData.slice(0, 3));
-    
-    return geneList.map(geneName => {
-        // Check if this gene exists in the expression data
-        const foundInExpression = expressionData.some(row => {
-            // Try different possible property names for the gene identifier
-            const rowGene = row.gene || row.symbol || row.name || row.id || row.geneName;
-            return rowGene === geneName;
+    let tableHTML = `
+        <h3 class="table-title">Input Genes Status</h3>
+        <button id="download-status-csv" class="download-button">Download as CSV</button>
+        <table class="data-summary-table">
+            <thead>
+                <tr>
+                    <th>Input Gene</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+    `;
+
+    queries.forEach(query => {
+        const status = foundSet.has(query) ? 'Found' : 'Not Found';
+        tableHTML += `
+            <tr>
+                <td>${query}</td>
+                <td>${status}</td>
+            </tr>
+        `;
+    });
+
+    tableHTML += `
+            </tbody>
+        </table>
+    `;
+
+    container.innerHTML = tableHTML;
+
+    // Add event listener for download
+    document.getElementById('download-status-csv').addEventListener('click', () => {
+        let csvContent = 'Input Gene,Status\n';
+        queries.forEach(query => {
+            const status = foundSet.has(query) ? 'Found' : 'Not Found';
+            csvContent += `${query},${status}\n`;
         });
-        
-        console.log(`Gene ${geneName}: ${foundInExpression ? 'Found' : 'Not Found'}`);
-        
-        return {
-            name: geneName,
-            found: foundInExpression
-        };
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = 'gene_status.csv';
+        link.click();
+        URL.revokeObjectURL(url);
     });
 }
-
-// OPTION 2: If your gene data already has the found status but it's wrong
-function fixGeneFoundStatus(geneData, expressionData) {
-    console.log('Fixing gene found status...');
-    
-    return geneData.map(gene => {
-        const geneName = gene.name || gene.gene || gene.symbol || gene.id;
-        
-        // Check if this gene exists in expression data
-        const foundInExpression = expressionData.some(row => {
-            const rowGene = row.gene || row.symbol || row.name || row.id || row.geneName;
-            return rowGene === geneName;
-        });
-        
-        return {
-            ...gene,
-            name: geneName,
-            found: foundInExpression
-        };
-    });
-}
-
-// OPTION 3: Quick fix - modify your existing call to renderFoundNotFoundTable
-// Find where you call renderFoundNotFoundTable and replace it with this:
-
-// BEFORE (probably what you have now):
-// renderFoundNotFoundTable(someGeneArray, 'table-container');
-
-// AFTER (what you should have):
-// const properGeneData = geneList.map(geneName => ({
-//     name: geneName,
-//     found: expressionData.some(row => 
-//         (row.gene || row.symbol || row.name) === geneName
-//     )
-// }));
-// renderFoundNotFoundTable(properGeneData, 'table-container');
-
-// DEBUGGING VERSION: Add this to see what's happening
-function debugRenderTable(inputGenes, expressionData) {
-    console.log('=== DEBUGGING GENE STATUS CREATION ===');
-    console.log('Input genes:', inputGenes);
-    console.log('Expression data sample:', expressionData?.slice(0, 3));
-    
-    if (!expressionData || !Array.isArray(expressionData)) {
-        console.error('Expression data is missing or invalid');
-        return;
-    }
-    
-    // Create proper gene status data
-    const geneStatusData = inputGenes.map(geneName => {
-        const foundInExpression = expressionData.some(row => {
-            const rowGene = row.gene || row.symbol || row.name || row.id;
-            const isMatch = rowGene === geneName;
-            if (isMatch) {
-                console.log(`✓ Found match: ${geneName} = ${rowGene}`);
-            }
-            return isMatch;
-        });
-        
-        console.log(`Gene ${geneName}: ${foundInExpression ? 'FOUND' : 'NOT FOUND'}`);
-        
-        return {
-            name: geneName,
-            found: foundInExpression
-        };
-    });
-    
-    console.log('Final gene status data:', geneStatusData);
-    renderFoundNotFoundTable(geneStatusData, 'table-container');
-}
-
-// EXAMPLE OF HOW TO USE IT:
-// Replace your current call to renderFoundNotFoundTable with:
-// debugRenderTable(['RAB43', 'RRAGB', 'PPFIA3', 'ARL5B', 'PAK3'], expressionData);
-
-// Updated renderFoundNotFoundTable function with better data handling
-function renderFoundNotFoundTable(geneData, containerId = 'table-container') {
-    ensureTableContainer();
-    
-    // Add debugging
-    debugGeneData(geneData);
-    
-    // Validate parameters
-    if (Array.isArray(containerId)) {
-        console.warn('containerId should be a string, not an array. Using default.');
-        containerId = 'table-container';
-    }
-    
-    if (typeof containerId !== 'string') {
-        console.warn('containerId should be a string. Using default.');
-        containerId = 'table-container';
-    }
-    
-    // Find container
-    const container = document.getElementById(containerId);
-    if (!container) {
-        console.error(`Container with ID '${containerId}' not found`);
-        return false;
-    }
-    
-    // Validate data
-    if (!geneData || !Array.isArray(geneData)) {
-        console.error('Invalid gene data provided');
-        return false;
-    }
-    
-    try {
-        // Clear existing content
-        container.innerHTML = '';
-        
-        // Create table wrapper
-        const tableWrapper = document.createElement('div');
-        tableWrapper.className = 'table-wrapper';
-        tableWrapper.style.cssText = `
-            margin-top: 20px;
-            overflow-x: auto;
-            border: 1px solid #ddd;
-            background: white;
-            min-height: 100px;
-            padding: 15px;
-            border-radius: 5px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        `;
-        
-        // Create table
-        const table = document.createElement('table');
-        table.className = 'gene-status-table';
-        table.style.cssText = `
-            width: 100%;
-            border-collapse: collapse;
-            font-family: Arial, sans-serif;
-            margin-bottom: 15px;
-        `;
-        
-        // Create header
-        const thead = document.createElement('thead');
-        const headerRow = document.createElement('tr');
-        headerRow.innerHTML = `
-            <th style="padding: 12px; border: 1px solid #ddd; background: #f5f5f5; font-weight: bold;">Input Gene</th>
-            <th style="padding: 12px; border: 1px solid #ddd; background: #f5f5f5; font-weight: bold;">Status</th>
-        `;
-        thead.appendChild(headerRow);
-        table.appendChild(thead);
-        
-        // Create table body
-        const tbody = document.createElement('tbody');
-        geneData.forEach((gene) => {
-            const row = document.createElement('tr');
-            
-            // Try multiple ways to get the gene name
-            let geneName = 'Unknown';
-            if (typeof gene === 'string') {
-                geneName = gene;
-            } else if (gene && typeof gene === 'object') {
-                geneName = gene.name || gene.gene || gene.symbol || gene.id || gene.geneName || gene.geneSymbol || 'Unknown';
-            }
-            
-            // Try multiple ways to get the status
-            let isFound = false;
-            if (typeof gene === 'object' && gene !== null) {
-                isFound = gene.found === true || gene.status === 'found' || gene.present === true;
-            }
-            
-            const status = isFound ? 'Found' : 'Not Found';
-            const statusColor = isFound ? '#28a745' : '#dc3545';
-            
-            row.innerHTML = `
-                <td style="padding: 10px; border: 1px solid #ddd;">${geneName}</td>
-                <td style="padding: 10px; border: 1px solid #ddd; color: ${statusColor}; font-weight: bold;">${status}</td>
-            `;
-            
-            // Add hover effect
-            row.addEventListener('mouseenter', () => row.style.backgroundColor = '#f8f9fa');
-            row.addEventListener('mouseleave', () => row.style.backgroundColor = '');
-            
-            tbody.appendChild(row);
-        });
-        table.appendChild(tbody);
-        
-        // Create download button
-        const downloadBtn = document.createElement('button');
-        downloadBtn.textContent = 'Download as CSV';
-        downloadBtn.className = 'download-csv-btn';
-        downloadBtn.style.cssText = `
-            padding: 8px 16px;
-            background: #007bff;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 14px;
-            transition: background-color 0.2s;
-        `;
-        
-        downloadBtn.addEventListener('click', () => downloadTableAsCSV(geneData));
-        downloadBtn.addEventListener('mouseenter', () => downloadBtn.style.background = '#0056b3');
-        downloadBtn.addEventListener('mouseleave', () => downloadBtn.style.background = '#007bff');
-        
-        // Assemble and append
-        tableWrapper.appendChild(table);
-        tableWrapper.appendChild(downloadBtn);
-        container.appendChild(tableWrapper);
-        
-        // Ensure visibility
-        container.style.display = 'block';
-        container.style.visibility = 'visible';
-        
-        return true;
-        
-    } catch (error) {
-        console.error('Error rendering table:', error);
-        container.innerHTML = `<div style="color: red; padding: 20px;">Error rendering table: ${error.message}</div>`;
-        return false;
-    }
-}
-
-// Updated CSV download function with better data handling
-function downloadTableAsCSV(geneData) {
-    try {
-        const csvContent = [
-            'Input Gene,Status',
-            ...geneData.map(gene => {
-                // Handle different data structures
-                let geneName = 'Unknown';
-                if (typeof gene === 'string') {
-                    geneName = gene;
-                } else if (gene && typeof gene === 'object') {
-                    geneName = gene.name || gene.gene || gene.symbol || gene.id || gene.geneName || gene.geneSymbol || 'Unknown';
-                }
-                
-                let isFound = false;
-                if (typeof gene === 'object' && gene !== null) {
-                    isFound = gene.found === true || gene.status === 'found' || gene.present === true;
-                }
-                
-                const status = isFound ? 'Found' : 'Not Found';
-                return `"${geneName}","${status}"`;
-            })
-        ].join('\n');
-        
-        const blob = new Blob([csvContent], { type: 'text/csv' });
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'gene_status_table.csv';
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(a);
-        
-    } catch (error) {
-        console.error('Error downloading CSV:', error);
-        alert('Error downloading CSV file');
-    }
-}
-// Function to call after heatmap rendering
-function renderHeatmapAndTable(expressionData, geneList) {
-    // Render heatmap first
-    const heatmapSuccess = renderExpressionHeatmap(expressionData);
-    
-    if (heatmapSuccess) {
-        // Wait for DOM to settle, then render table
-        setTimeout(() => {
-            const geneStatusData = geneList.map(gene => ({
-                name: gene,
-                found: expressionData.some(row => row.gene === gene)
-            }));
-            
-            renderFoundNotFoundTable(geneStatusData, 'table-container');
-        }, 500);
-    } else {
-        console.error('Heatmap rendering failed, skipping table');
-    }
-}
-
-
-// Add this function to your plots.js file (add it anywhere before renderFoundNotFoundTable)
-function ensureTableContainer() {
-    let container = document.getElementById('table-container');
-    if (!container) {
-        // Create the container
-        container = document.createElement('div');
-        container.id = 'table-container';
-        container.style.cssText = `
-            margin-top: 20px;
-            min-height: 50px;
-            width: 100%;
-        `;
-        
-        // Find the best place to add it - try these in order:
-        const targetSelectors = [
-            '#heatmap-container',
-            '#expression-heatmap', 
-            '#plotly-div',
-            '.expression-container',
-            '.content-area',
-            '#content-area'
-        ];
-        
-        let targetElement = null;
-        for (const selector of targetSelectors) {
-            targetElement = document.querySelector(selector);
-            if (targetElement) break;
-        }
-        
-        if (targetElement) {
-            // If it's the content area, append inside
-            if (targetElement.id === 'content-area' || targetElement.classList.contains('content-area')) {
-                targetElement.appendChild(container);
-            } else {
-                // Otherwise, insert after the target element
-                targetElement.parentNode.insertBefore(container, targetElement.nextSibling);
-            }
-            console.log('Created table-container and added to:', targetElement.id || targetElement.className);
-        } else {
-            // Fallback: add to body
-            document.body.appendChild(container);
-            console.log('Created table-container and added to body as fallback');
-        }
-    }
-    return container;
-}
-
