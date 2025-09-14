@@ -748,6 +748,10 @@ function renderExpressionHeatmap(foundGenes, container) {
     });
     
     container.style.overflowX = 'auto';
+    // ADD THESE TWO LINES
+    container.style.maxHeight = '70vh'; // Limit container height to 70% of the viewport's height
+    container.style.overflowY = 'auto'; // Add a vertical scrollbar if needed
+
     const containerWidth = container.clientWidth || 800;
     const minBandWidth = 15;
     const calcWidth = Math.max(containerWidth, tissues.length * minBandWidth + 200);
