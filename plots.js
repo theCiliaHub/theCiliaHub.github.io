@@ -1180,8 +1180,8 @@ function renderTopExpressingTissues(foundGenes, container) {
 
 // Clean renderFoundNotFoundTable function - ready to use
 function renderFoundNotFoundTable(geneData, containerId = 'table-container') {
-     // Add this line at the very beginning:
-       ensureTableContainer();
+    // ADD THIS LINE AS THE FIRST LINE:
+    ensureTableContainer();
     // Validate parameters
     if (Array.isArray(containerId)) {
         console.warn('containerId should be a string, not an array. Using default.');
@@ -1348,3 +1348,52 @@ function renderHeatmapAndTable(expressionData, geneList) {
         console.error('Heatmap rendering failed, skipping table');
     }
 }
+
+
+// Add this function to your plots.js file (add it anywhere before renderFoundNotFoundTable)
+function ensureTableContainer() {
+    let container = document.getElementById('table-container');
+    if (!container) {
+        // Create the container
+        container = document.createElement('div');
+        container.id = 'table-container';
+        container.style.cssText = `
+            margin-top: 20px;
+            min-height: 50px;
+            width: 100%;
+        `;
+        
+        // Find the best place to add it - try these in order:
+        const targetSelectors = [
+            '#heatmap-container',
+            '#expression-heatmap', 
+            '#plotly-div',
+            '.expression-container',
+            '.content-area',
+            '#content-area'
+        ];
+        
+        let targetElement = null;
+        for (const selector of targetSelectors) {
+            targetElement = document.querySelector(selector);
+            if (targetElement) break;
+        }
+        
+        if (targetElement) {
+            // If it's the content area, append inside
+            if (targetElement.id === 'content-area' || targetElement.classList.contains('content-area')) {
+                targetElement.appendChild(container);
+            } else {
+                // Otherwise, insert after the target element
+                targetElement.parentNode.insertBefore(container, targetElement.nextSibling);
+            }
+            console.log('Created table-container and added to:', targetElement.id || targetElement.className);
+        } else {
+            // Fallback: add to body
+            document.body.appendChild(container);
+            console.log('Created table-container and added to body as fallback');
+        }
+    }
+    return container;
+}
+
