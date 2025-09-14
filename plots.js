@@ -1177,34 +1177,38 @@ function renderTopExpressingTissues(foundGenes, container) {
     });
 }
 
-// Enhanced renderFoundNotFoundTable with debugging and error handling
+
+// Clean renderFoundNotFoundTable function - ready to use
 function renderFoundNotFoundTable(geneData, containerId = 'table-container') {
-    console.log('=== Table Rendering Debug ===');
-    console.log('Gene data:', geneData);
-    console.log('Container ID:', containerId);
+    // Validate parameters
+    if (Array.isArray(containerId)) {
+        console.warn('containerId should be a string, not an array. Using default.');
+        containerId = 'table-container';
+    }
     
-    // 1. Verify container exists
+    if (typeof containerId !== 'string') {
+        console.warn('containerId should be a string. Using default.');
+        containerId = 'table-container';
+    }
+    
+    // Find container
     const container = document.getElementById(containerId);
     if (!container) {
         console.error(`Container with ID '${containerId}' not found`);
-        console.log('Available elements:', document.querySelectorAll('[id*="table"], [id*="container"]'));
         return false;
     }
     
-    console.log('Container found:', container);
-    console.log('Container styles:', window.getComputedStyle(container));
-    
-    // 2. Clear existing content
-    container.innerHTML = '';
-    
-    // 3. Validate data
+    // Validate data
     if (!geneData || !Array.isArray(geneData)) {
         console.error('Invalid gene data provided');
         return false;
     }
     
     try {
-        // 4. Create table structure
+        // Clear existing content
+        container.innerHTML = '';
+        
+        // Create table wrapper
         const tableWrapper = document.createElement('div');
         tableWrapper.className = 'table-wrapper';
         tableWrapper.style.cssText = `
@@ -1213,29 +1217,34 @@ function renderFoundNotFoundTable(geneData, containerId = 'table-container') {
             border: 1px solid #ddd;
             background: white;
             min-height: 100px;
+            padding: 15px;
+            border-radius: 5px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         `;
         
+        // Create table
         const table = document.createElement('table');
         table.className = 'gene-status-table';
         table.style.cssText = `
             width: 100%;
             border-collapse: collapse;
             font-family: Arial, sans-serif;
+            margin-bottom: 15px;
         `;
         
-        // 5. Create header
+        // Create header
         const thead = document.createElement('thead');
         const headerRow = document.createElement('tr');
         headerRow.innerHTML = `
-            <th style="padding: 12px; border: 1px solid #ddd; background: #f5f5f5;">Input Gene</th>
-            <th style="padding: 12px; border: 1px solid #ddd; background: #f5f5f5;">Status</th>
+            <th style="padding: 12px; border: 1px solid #ddd; background: #f5f5f5; font-weight: bold;">Input Gene</th>
+            <th style="padding: 12px; border: 1px solid #ddd; background: #f5f5f5; font-weight: bold;">Status</th>
         `;
         thead.appendChild(headerRow);
         table.appendChild(thead);
         
-        // 6. Create body
+        // Create table body
         const tbody = document.createElement('tbody');
-        geneData.forEach((gene, index) => {
+        geneData.forEach((gene) => {
             const row = document.createElement('tr');
             const status = gene.found ? 'Found' : 'Not Found';
             const statusColor = gene.found ? '#28a745' : '#dc3545';
@@ -1253,12 +1262,11 @@ function renderFoundNotFoundTable(geneData, containerId = 'table-container') {
         });
         table.appendChild(tbody);
         
-        // 7. Create download button
+        // Create download button
         const downloadBtn = document.createElement('button');
         downloadBtn.textContent = 'Download as CSV';
         downloadBtn.className = 'download-csv-btn';
         downloadBtn.style.cssText = `
-            margin-top: 10px;
             padding: 8px 16px;
             background: #007bff;
             color: white;
@@ -1266,28 +1274,21 @@ function renderFoundNotFoundTable(geneData, containerId = 'table-container') {
             border-radius: 4px;
             cursor: pointer;
             font-size: 14px;
+            transition: background-color 0.2s;
         `;
         
         downloadBtn.addEventListener('click', () => downloadTableAsCSV(geneData));
         downloadBtn.addEventListener('mouseenter', () => downloadBtn.style.background = '#0056b3');
         downloadBtn.addEventListener('mouseleave', () => downloadBtn.style.background = '#007bff');
         
-        // 8. Assemble and append
+        // Assemble and append
         tableWrapper.appendChild(table);
         tableWrapper.appendChild(downloadBtn);
         container.appendChild(tableWrapper);
         
-        // 9. Force visibility and scroll into view
+        // Ensure visibility
         container.style.display = 'block';
         container.style.visibility = 'visible';
-        
-        // Scroll to table if needed
-        setTimeout(() => {
-            tableWrapper.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-        }, 100);
-        
-        console.log('Table successfully rendered');
-        console.log('Final container HTML:', container.innerHTML.substring(0, 200) + '...');
         
         return true;
         
@@ -1320,22 +1321,19 @@ function downloadTableAsCSV(geneData) {
         window.URL.revokeObjectURL(url);
         document.body.removeChild(a);
         
-        console.log('CSV download initiated');
     } catch (error) {
         console.error('Error downloading CSV:', error);
         alert('Error downloading CSV file');
     }
 }
 
-// Enhanced function to call after heatmap rendering
+// Function to call after heatmap rendering
 function renderHeatmapAndTable(expressionData, geneList) {
-    console.log('=== Heatmap and Table Rendering ===');
-    
     // Render heatmap first
     const heatmapSuccess = renderExpressionHeatmap(expressionData);
     
     if (heatmapSuccess) {
-        // Wait a bit for DOM to settle, then render table
+        // Wait for DOM to settle, then render table
         setTimeout(() => {
             const geneStatusData = geneList.map(gene => ({
                 name: gene,
