@@ -1,4 +1,3 @@
-```
 // =============================================================================
 // CiliaHub Plotting Engine (plots.js)
 // =============================================================================
@@ -63,24 +62,23 @@ function getCleanArray(gene, ...keys) {
 // =============================================================================
 
 /**
- * Main controller, now calls the table renderer for the bubble plot and heatmap.
+*
+ * MODIFIED: Main controller, now calls the table renderer for the bubble plot.
  */
- ```
-
-window.generateAnalysisPlots = async function() {
+async function generateAnalysisPlots() {
     try {
         await loadAndPrepareDatabase();
         await loadExpressionData();
 
         const plotContainer = document.getElementById('plot-display-area');
-        const tableContainer = document.getElementById('plot-data-table-container');
         const genesInput = document.getElementById('ciliaplot-genes-input').value.trim();
         if (!genesInput) {
             alert('Please enter a gene list.');
             return;
         }
         
-        clearPreviousPlot();
+        clearPreviousPlot(); // Clear previous results before starting
+        const tableContainer = document.getElementById('plot-data-table-container');
         if (tableContainer) tableContainer.innerHTML = '';
         plotContainer.innerHTML = '<p class="status-message">Generating plot...</p>';
 
@@ -91,25 +89,49 @@ window.generateAnalysisPlots = async function() {
         updatePlotInfo(plotType);
         updateStatsAndLegend(plotType, foundGenes);
 
+        // Routing and table generation
         switch (plotType) {
+            case 'expression_localization':
+                renderExpressionLocalizationBubble(foundGenes, plotContainer);
+                // NEW: Render the data table below this specific plot
+                renderGeneDataTable(foundGenes, document.getElementById('plot-data-table-container'));
+                break;
+            // ... (other cases remain the same)
+            case 'bubble':
+                renderKeyLocalizations(foundGenes, plotContainer);
+                break;
+            case 'matrix':
+                renderGeneMatrix(foundGenes, plotContainer);
+                break;
+            case 'domain_matrix':
+                renderDomainMatrixPlot(foundGenes, plotContainer);
+                break;
+            case 'functional_category':
+                renderFunctionalCategoryPlot(foundGenes, plotContainer);
+                break;
+            case 'network':
+                renderComplexNetwork(foundGenes, plotContainer);
+                break;
             case 'expression_heatmap':
                 renderExpressionHeatmap(foundGenes, plotContainer);
-                if (tableContainer) {
-                    renderFoundNotFoundTable(sanitizedQueries, foundGenes, tableContainer);
-                } else {
-                    console.warn('Table container not found for expression_heatmap');
-                }
+                renderFoundNotFoundTable(sanitizedQueries, foundGenes, document.getElementById('plot-data-table-container'));
                 break;
-            // ... (other cases unchanged)
+            case 'tissue_profile':
+                renderTissueExpressionProfile(foundGenes, plotContainer);
+                break;
+            case 'top_tissues':
+                renderTopExpressingTissues(foundGenes, plotContainer);
+                break;
             default:
                 plotContainer.innerHTML = `<p class="status-message">Plot type "${plotType}" is not yet implemented.</p>`;
-                break;
+        		break;
         }
     } catch (error) {
         console.error('Error generating plots:', error);
         document.getElementById('plot-display-area').innerHTML = `<p class="status-message error">Error generating plot: ${error.message}</p>`;
     }
-};
+}
+
 
 /**
  * Updates the informational text box with a description of the current plot.
@@ -121,40 +143,38 @@ function updatePlotInfo(plotType) {
     let infoHTML = '';
     switch (plotType) {
         case 'bubble':
-            infoHTML = `<strong>Key Localizations:</strong> This bubble plot shows the distribution of your genes across primary ciliary and cellular compartments. The size of each bubble corresponds to the number of genes found in that location.`;
-            break;
+             infoHTML = `<strong>Key Localizations:</strong> This bubble plot shows the distribution of your genes across primary ciliary and cellular compartments. The size of each bubble corresponds to the number of genes found in that location.`;
+             break;
         case 'matrix':
-            infoHTML = `<strong>Gene-Localization Matrix:</strong> This plot shows the specific localization for each gene in your list. A bubble indicates that a gene is associated with a particular ciliary compartment.`;
-            break;
+             infoHTML = `<strong>Gene-Localization Matrix:</strong> This plot shows the specific localization for each gene in your list. A bubble indicates that a gene is associated with a particular ciliary compartment.`;
+             break;
         case 'domain_matrix':
-            infoHTML = `<strong>Gene-Domain Matrix:</strong> This plot shows which protein domains are present in each gene. This helps identify shared functional components among your selected genes.`;
-            break;
+             infoHTML = `<strong>Gene-Domain Matrix:</strong> This plot shows which protein domains are present in each gene. This helps identify shared functional components among your selected genes.`;
+             break;
         case 'functional_category':
-            infoHTML = `<strong>Functional Category Bar Chart:</strong> This chart categorizes your genes into broader functional groups, providing an overview of the biological processes they are involved in.`;
-            break;
+             infoHTML = `<strong>Functional Category Bar Chart:</strong> This chart categorizes your genes into broader functional groups, providing an overview of the biological processes they are involved in.`;
+             break;
         case 'network':
-            infoHTML = `<strong>Protein Complex Network:</strong> This network graph visualizes known protein-protein interactions and complex memberships among your selected genes, revealing functional modules.`;
-            break;
+             infoHTML = `<strong>Protein Complex Network:</strong> This network graph visualizes known protein-protein interactions and complex memberships among your selected genes, revealing functional modules.`;
+             break;
         case 'expression_heatmap':
-            infoHTML = `<strong>Expression Heatmap:</strong> This plot displays the expression level (nTPM) of each selected gene across various human tissues. Darker colors indicate higher expression.`;
-            break;
+             infoHTML = `<strong>Expression Heatmap:</strong> This plot displays the expression level (nTPM) of each selected gene across various human tissues. Darker colors indicate higher expression.`;
+             break;
         case 'tissue_profile':
-            infoHTML = `<strong>Tissue Expression Profile:</strong> This line chart shows the average expression of your gene set across the top 20 tissues, highlighting potential tissue-specific enrichment.`;
-            break;
+             infoHTML = `<strong>Tissue Expression Profile:</strong> This line chart shows the average expression of your gene set across the top 20 tissues, highlighting potential tissue-specific enrichment.`;
+             break;
         case 'expression_localization':
-            infoHTML = `<strong>Expression vs. Localization:</strong> This bubble plot correlates expression breadth (number of expressing tissues) with localization diversity. Bubble size represents the maximum expression level.`;
-            break;
+             infoHTML = `<strong>Expression vs. Localization:</strong> This bubble plot correlates expression breadth (number of expressing tissues) with localization diversity. Bubble size represents the maximum expression level.`;
+             break;
         case 'top_tissues':
-            infoHTML = `<strong>Top Expressing Tissues:</strong> This bar chart ranks tissues by the average expression level of your gene set, showing where these genes are most active.`;
-            break;
+             infoHTML = `<strong>Top Expressing Tissues:</strong> This bar chart ranks tissues by the average expression level of your gene set, showing where these genes are most active.`;
+             break;
         default:
-            infoHTML = `Select a plot type to see a description.`;
-            break;
+             infoHTML = `Select a plot type to see a description.`;
+             break;
     }
     infoContainer.innerHTML = infoHTML;
 }
-
-
 
 /**
  * Updates the statistics and legend sections based on the plot type.
@@ -542,7 +562,7 @@ function renderFunctionalCategoryPlot(foundGenes, container) {
             plugins: {
                 title: { display: true, text: 'Functional Category Distribution', font: { size: settings.titleFontSize, family: settings.fontFamily }, color: settings.fontColor },
                 legend: { display: false },
-                tooltip: { callbacks: { title: (c) => sortedData[c[0].dataIndex][0] } } // Show full title on hover
+              tooltip: { callbacks: { title: (c) => sortedData[c[0].dataIndex][0] } } // Show full title on hover
             },
             scales: {
                 x: {
@@ -577,7 +597,7 @@ function computeProteinComplexLinks(foundGenes) {
         const geneArray = Array.from(genes);
         for (let i = 0; i < geneArray.length; i++) {
             for (let j = i + 1; j < geneArray.length; j++) {
-                const key = [geneArray[i], geneArray[j].sort().join('-');
+                const key = [geneArray[i], geneArray[j]].sort().join('-');
                 if (linkMap.has(key)) {
                     linkMap.get(key).value += 1;
                 } else {
@@ -610,22 +630,17 @@ function renderComplexNetwork(foundGenes, container) {
         .force("charge", d3.forceManyBody().strength(-300))
         .force("center", d3.forceCenter(width / 2, height / 2));
 
-    const link = svg.append("g").selectAll("line").data(links).enter().append("line")
-        .style("stroke", "#999").style("stroke-opacity", 0.6).style("stroke-width", d => Math.sqrt(d.value) * 2);
+    const link = svg.append("g").selectAll("line").data(links).enter().append("line").style("stroke", "#999").style("stroke-opacity", 0.6).style("stroke-width", d => Math.sqrt(d.value) * 2);
 
-    const nodeGroup = svg.append("g").selectAll("g").data(nodes).enter().append("g")
-        .call(d3.drag()
-            .on("start", (e, d) => {
-                if (!e.active) simulation.alphaTarget(0.3).restart();
-                d.fx = d.x; d.fy = d.y;
-            })
-            .on("drag", (e, d) => {
-                d.fx = e.x; d.fy = e.y;
-            })
-            .on("end", (e, d) => {
-                if (!e.active) simulation.alphaTarget(0);
-                d.fx = null; d.fy = null;
-            }));
+    const nodeGroup = svg.append("g").selectAll("g").data(nodes).enter().append("g").call(d3.drag().on("start", (e, d) => {
+        if (!e.active) simulation.alphaTarget(0.3).restart();
+        d.fx = d.x; d.fy = d.y;
+    }).on("drag", (e, d) => {
+        d.fx = e.x; d.fy = e.y;
+    }).on("end", (e, d) => {
+        if (!e.active) simulation.alphaTarget(0);
+        d.fx = null; d.fy = null;
+    }));
 
     nodeGroup.append("circle").attr("r", 10).style("fill", "#3498db").style("stroke", "#fff").style("stroke-width", 2);
     
@@ -637,8 +652,7 @@ function renderComplexNetwork(foundGenes, container) {
         .style("fill", settings.fontColor);
 
     simulation.on("tick", () => {
-        link.attr("x1", d => d.source.x).attr("y1", d => d.source.y)
-            .attr("x2", d => d.target.x).attr("y2", d => d.target.y);
+        link.attr("x1", d => d.source.x).attr("y1", d => d.source.y).attr("x2", d => d.target.x).attr("y2", d => d.target.y);
         nodeGroup.attr("transform", d => `translate(${d.x},${d.y})`);
     });
 
@@ -669,7 +683,7 @@ function getTissueNames() {
 }
 
 /**
- * Calculate expression statistics, including standard deviation.
+ * REVISED: Calculate expression statistics, now including standard deviation.
  */
 function calculateExpressionStats(genes) {
     const tissues = getTissueNames();
@@ -698,8 +712,9 @@ function calculateExpressionStats(genes) {
     return stats;
 }
 
+
 /**
- * Renders an expression heatmap with adjusted X-axis text.
+ * Renders an expression heatmap.
  */
 function renderExpressionHeatmap(foundGenes, container) {
     clearPreviousPlot();
@@ -817,7 +832,7 @@ function renderExpressionHeatmap(foundGenes, container) {
 }
 
 /**
- * Renders a tissue expression profile as a line chart instead of a radar chart.
+ * REPLACED: Renders a tissue expression profile as a line chart instead of a radar chart.
  * This version is better for comparing across many categories and is more conventional
  * for scientific publications.
  */
@@ -936,7 +951,7 @@ function renderTissueExpressionProfile(foundGenes, container) {
 }
 
 /**
- * Renders a bubble plot with conditional gene labels.
+ * IMPROVED: Renders a bubble plot with conditional gene labels.
  */
 function renderExpressionLocalizationBubble(foundGenes, container) {
     clearPreviousPlot();
@@ -1001,7 +1016,9 @@ function renderExpressionLocalizationBubble(foundGenes, container) {
                         ]
                     }
                 },
+                // NEW: Configuration for the datalabels plugin
                 datalabels: {
+                    // Only display labels if 15 or fewer genes are plotted
                     display: context => context.chart.data.datasets[0].data.length <= 15 ? 'auto' : false,
                     color: '#2c3e50',
                     anchor: 'end',
@@ -1013,6 +1030,7 @@ function renderExpressionLocalizationBubble(foundGenes, container) {
                         family: settings.fontFamily
                     },
                     formatter: (value, context) => {
+                        // Use the gene name for the label
                         return value.gene;
                     }
                 }
@@ -1034,9 +1052,8 @@ function renderExpressionLocalizationBubble(foundGenes, container) {
         }
     });
 }
-
 /**
- * Renders a data table below the plot.
+ * NEW: Renders a data table below the plot.
  * @param {Array} foundGenes - The array of gene objects to display.
  * @param {HTMLElement} container - The container element to render the table into.
  */
@@ -1079,6 +1096,7 @@ function renderGeneDataTable(foundGenes, container) {
 
     container.innerHTML = tableHTML;
 }
+
 
 /**
  * Renders a bar chart of the top expressing tissues.
@@ -1160,16 +1178,13 @@ function renderTopExpressingTissues(foundGenes, container) {
 }
 
 /**
- * Renders a table of found and not found input genes with download option.
+ * NEW: Renders a table of found and not found input genes.
  * @param {Array} queries - The sanitized input queries.
  * @param {Array} foundGenes - The array of found gene objects.
  * @param {HTMLElement} container - The container element to render the table into.
  */
 function renderFoundNotFoundTable(queries, foundGenes, container) {
-    if (!container || !queries.length) {
-        console.warn('No container or queries provided for rendering found/not found table.');
-        return;
-    }
+    if (!container) return;
 
     const foundSet = new Set(foundGenes.map(g => g.gene.toUpperCase()));
 
@@ -1204,24 +1219,18 @@ function renderFoundNotFoundTable(queries, foundGenes, container) {
     container.innerHTML = tableHTML;
 
     // Add event listener for download
-    const downloadButton = document.getElementById('download-status-csv');
-    if (downloadButton) {
-        downloadButton.addEventListener('click', () => {
-            let csvContent = 'Input Gene,Status\n';
-            queries.forEach(query => {
-                const status = foundSet.has(query) ? 'Found' : 'Not Found';
-                csvContent += `${query},${status}\n`;
-            });
-            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = 'gene_status.csv';
-            link.click();
-            URL.revokeObjectURL(url);
+    document.getElementById('download-status-csv').addEventListener('click', () => {
+        let csvContent = 'Input Gene,Status\n';
+        queries.forEach(query => {
+            const status = foundSet.has(query) ? 'Found' : 'Not Found';
+            csvContent += `${query},${status}\n`;
         });
-    } else {
-        console.warn('Download button not found after rendering table.');
-    }
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = 'gene_status.csv';
+        link.click();
+        URL.revokeObjectURL(url);
+    });
 }
-```
