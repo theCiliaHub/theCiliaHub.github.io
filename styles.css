@@ -1400,3 +1400,69 @@ input[type="color"] {
     grid-template-columns: 1fr; /* Stack columns on smaller screens */
   }
 }
+
+// CSS to ensure proper layout
+const additionalCSS = `
+<style>
+.heatmap-container {
+    margin-bottom: 30px;
+    min-height: 400px;
+}
+
+.table-wrapper {
+    clear: both;
+    margin-top: 20px;
+    padding: 15px;
+    background: white;
+    border-radius: 5px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.gene-status-table {
+    width: 100%;
+    margin-bottom: 15px;
+}
+
+.download-csv-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0,123,255,0.3);
+}
+
+/* Ensure container is visible */
+#table-container {
+    display: block !important;
+    visibility: visible !important;
+    min-height: 50px;
+    background: #f8f9fa;
+    padding: 10px;
+    margin-top: 20px;
+    border-radius: 5px;
+}
+
+/* Debug helper */
+.debug-visible {
+    border: 2px dashed red !important;
+    background: yellow !important;
+    opacity: 0.8 !important;
+}
+</style>
+`;
+
+// Add debugging helper
+function debugTableContainer() {
+    const containers = document.querySelectorAll('[id*="table"], [class*="table"], [id*="container"]');
+    console.log('Found potential containers:', containers);
+    
+    containers.forEach((el, i) => {
+        console.log(`Container ${i}:`, {
+            element: el,
+            id: el.id,
+            class: el.className,
+            visible: el.offsetHeight > 0,
+            styles: window.getComputedStyle(el)
+        });
+    });
+}
+
+// Call this in browser console to debug
+// debugTableContainer();
