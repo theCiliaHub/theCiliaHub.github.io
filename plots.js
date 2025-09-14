@@ -1178,30 +1178,105 @@ function renderTopExpressingTissues(foundGenes, container) {
 }
 
 
-// Add this debugging function to plots.js to see what data you're getting
-function debugGeneData(geneData) {
-    console.log('=== DEBUGGING GENE DATA ===');
-    console.log('Total genes:', geneData.length);
-    console.log('First 3 genes:', geneData.slice(0, 3));
-    console.log('Sample gene structure:', geneData[0]);
+// Check where you're calling renderFoundNotFoundTable and how you're creating the gene data
+// The issue is likely in how the gene status data is being prepared
+
+// OPTION 1: If you're creating the gene data from a gene list and expression data
+function createGeneStatusData(geneList, expressionData) {
+    console.log('Creating gene status data...');
+    console.log('Gene list:', geneList);
+    console.log('Expression data sample:', expressionData.slice(0, 3));
     
-    // Check what properties each gene object has
-    if (geneData.length > 0) {
-        console.log('Available properties:', Object.keys(geneData[0]));
-    }
-    
-    // Check different possible property names
-    geneData.slice(0, 5).forEach((gene, i) => {
-        console.log(`Gene ${i}:`, {
-            name: gene.name,
-            gene: gene.gene, 
-            symbol: gene.symbol,
-            id: gene.id,
-            found: gene.found,
-            allProperties: Object.keys(gene)
+    return geneList.map(geneName => {
+        // Check if this gene exists in the expression data
+        const foundInExpression = expressionData.some(row => {
+            // Try different possible property names for the gene identifier
+            const rowGene = row.gene || row.symbol || row.name || row.id || row.geneName;
+            return rowGene === geneName;
         });
+        
+        console.log(`Gene ${geneName}: ${foundInExpression ? 'Found' : 'Not Found'}`);
+        
+        return {
+            name: geneName,
+            found: foundInExpression
+        };
     });
 }
+
+// OPTION 2: If your gene data already has the found status but it's wrong
+function fixGeneFoundStatus(geneData, expressionData) {
+    console.log('Fixing gene found status...');
+    
+    return geneData.map(gene => {
+        const geneName = gene.name || gene.gene || gene.symbol || gene.id;
+        
+        // Check if this gene exists in expression data
+        const foundInExpression = expressionData.some(row => {
+            const rowGene = row.gene || row.symbol || row.name || row.id || row.geneName;
+            return rowGene === geneName;
+        });
+        
+        return {
+            ...gene,
+            name: geneName,
+            found: foundInExpression
+        };
+    });
+}
+
+// OPTION 3: Quick fix - modify your existing call to renderFoundNotFoundTable
+// Find where you call renderFoundNotFoundTable and replace it with this:
+
+// BEFORE (probably what you have now):
+// renderFoundNotFoundTable(someGeneArray, 'table-container');
+
+// AFTER (what you should have):
+// const properGeneData = geneList.map(geneName => ({
+//     name: geneName,
+//     found: expressionData.some(row => 
+//         (row.gene || row.symbol || row.name) === geneName
+//     )
+// }));
+// renderFoundNotFoundTable(properGeneData, 'table-container');
+
+// DEBUGGING VERSION: Add this to see what's happening
+function debugRenderTable(inputGenes, expressionData) {
+    console.log('=== DEBUGGING GENE STATUS CREATION ===');
+    console.log('Input genes:', inputGenes);
+    console.log('Expression data sample:', expressionData?.slice(0, 3));
+    
+    if (!expressionData || !Array.isArray(expressionData)) {
+        console.error('Expression data is missing or invalid');
+        return;
+    }
+    
+    // Create proper gene status data
+    const geneStatusData = inputGenes.map(geneName => {
+        const foundInExpression = expressionData.some(row => {
+            const rowGene = row.gene || row.symbol || row.name || row.id;
+            const isMatch = rowGene === geneName;
+            if (isMatch) {
+                console.log(`✓ Found match: ${geneName} = ${rowGene}`);
+            }
+            return isMatch;
+        });
+        
+        console.log(`Gene ${geneName}: ${foundInExpression ? 'FOUND' : 'NOT FOUND'}`);
+        
+        return {
+            name: geneName,
+            found: foundInExpression
+        };
+    });
+    
+    console.log('Final gene status data:', geneStatusData);
+    renderFoundNotFoundTable(geneStatusData, 'table-container');
+}
+
+// EXAMPLE OF HOW TO USE IT:
+// Replace your current call to renderFoundNotFoundTable with:
+// debugRenderTable(['RAB43', 'RRAGB', 'PPFIA3', 'ARL5B', 'PAK3'], expressionData);
 
 // Updated renderFoundNotFoundTable function with better data handling
 function renderFoundNotFoundTable(geneData, containerId = 'table-container') {
