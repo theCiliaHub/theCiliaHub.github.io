@@ -41,58 +41,6 @@ function clearPreviousPlot() {
  * @param {Array} foundGenes - Array of gene objects that were found.
  * @param {Array} notFoundGenes - Array of gene names that were not found.
  */
-function renderCiliaPlotSearchResultsTable(foundGenes, notFoundGenes) {
-    const resultDiv = document.getElementById('ciliaplot-search-results');
-    if (!resultDiv) return;
-
-    // Only show the table if there was a search performed
-    if (foundGenes.length === 0 && notFoundGenes.length === 0) {
-        resultDiv.innerHTML = '';
-        return;
-    }
-
-    // NEW: Added a styled header and container classes
-    let html = `<h3 class="table-title">Gene Query Summary</h3>`;
-
-    if (foundGenes.length > 0) {
-        html += `
-            <div class="table-responsive">
-                <table class="data-summary-table">
-                    <thead>
-                        <tr>
-                            <th>Gene</th>
-                            <th>Ensembl ID</th>
-                            <th>Localization Summary</th>
-                            <th>Function Summary</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-        `;
-        foundGenes.forEach(item => {
-            const localizationText = Array.isArray(item.localization) ? item.localization.join(', ') : (item.localization || 'N/A');
-            html += `
-                <tr>
-                    <td><a href="/${item.gene}" onclick="navigateTo(event, '/${item.gene}')">${item.gene}</a></td>
-                    <td>${item.ensembl_id || 'N/A'}</td>
-                    <td>${localizationText}</td>
-                    <td>${item.functional_summary ? item.functional_summary.substring(0, 100) + '...' : 'N/A'}</td>
-                </tr>
-            `;
-        });
-        html += '</tbody></table></div>';
-    }
-
-    if (notFoundGenes && notFoundGenes.length > 0) {
-        html += `
-            <div class="not-found-genes">
-                <h4>Genes Not Found (${notFoundGenes.length}):</h4>
-                <p>${notFoundGenes.join(', ')}</p>
-            </div>
-        `;
-    }
-
-    resultDiv.innerHTML = html;
-}
 
 /**
  * Robustly extracts a clean array of values from a gene object.
@@ -1131,51 +1079,130 @@ function renderExpressionLocalizationBubble(foundGenes, container) {
         }
     });
 }
+// In plots.js, replace these three functions
+
 /**
- * NEW: Renders a data table below the plot.
- * @param {Array} foundGenes - The array of gene objects to display.
- * @param {HTMLElement} container - The container element to render the table into.
+ * NEW: Renders a data table below the plot, ensuring consistent styling.
  */
 function renderGeneDataTable(foundGenes, container) {
-    if (!container || !foundGenes.length) return;
+    if (!container || !foundGenes.length) {
+        if(container) container.innerHTML = ''; // Clear if no data
+        return;
+    }
 
     let tableHTML = `
         <h3 class="table-title">Gene Data Summary</h3>
-        <table class="data-summary-table">
-            <thead>
-                <tr>
-                    <th>Gene</th>
-                    <th>ENSG ID</th>
-                    <th>Localizations</th>
-                    <th>Max Expression (nTPM)</th>
-                </tr>
-            </thead>
-            <tbody>
-    `;
+        <div class="table-responsive">
+            <table class="data-summary-table">
+                <thead>
+                    <tr>
+                        <th>Gene</th>
+                        <th>ENSG ID</th>
+                        <th>Localizations</th>
+                        <th>Max Expression (nTPM)</th>
+                    </tr>
+                </thead>
+                <tbody>`;
 
     foundGenes.forEach(gene => {
         const localizations = getCleanArray(gene, 'localization').join(', ') || 'N/A';
         const geneExpr = getGeneExpression(gene.gene);
         const maxExpression = Math.max(0, ...Object.values(geneExpr));
-
         tableHTML += `
             <tr>
                 <td><strong>${gene.gene}</strong></td>
-                <td>${gene.ensg_id || 'N/A'}</td>
+                <td>${gene.ensembl_id || 'N/A'}</td>
                 <td>${localizations}</td>
                 <td>${maxExpression.toFixed(2)}</td>
-            </tr>
-        `;
+            </tr>`;
     });
 
-    tableHTML += `
-            </tbody>
-        </table>
-    `;
-
+    tableHTML += `</tbody></table></div>`;
     container.innerHTML = tableHTML;
 }
 
+/**
+ * NEW: Renders a table of found and not found input genes, ensuring consistent styling.
+ */
+function renderFoundNotFoundTable(queries, foundGenes, container) {
+    if (!container) return;
+
+    const foundSet = new Set(foundGenes.map(g => g.gene.toUpperCase()));
+    let tableHTML = `
+        <h3 class="table-title">Input Genes Status</h3>
+        <div class="table-responsive">
+            <table class="data-summary-table">
+                <thead>
+                    <tr>
+                        <th>Input Gene</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>`;
+
+    queries.forEach(query => {
+        const status = foundSet.has(query) ? 'Found' : 'Not Found';
+        tableHTML += `
+            <tr>
+                <td>${query}</td>
+                <td>${status}</td>
+            </tr>`;
+    });
+
+    tableHTML += `</tbody></table></div>`;
+    container.innerHTML = tableHTML;
+    // Note: The download button logic can be added here if needed
+}
+
+
+/**
+ * Renders a styled summary table of found and not-found genes for CiliaPlot.
+ */
+function renderCiliaPlotSearchResultsTable(foundGenes, notFoundGenes) {
+    const resultDiv = document.getElementById('ciliaplot-search-results');
+    if (!resultDiv) return;
+
+    if (foundGenes.length === 0 && notFoundGenes.length === 0) {
+        resultDiv.innerHTML = '';
+        return;
+    }
+    
+    let html = `<h3 class="table-title">Gene Query Summary</h3>`;
+
+    if (foundGenes.length > 0) {
+        html += `
+            <div class="table-responsive">
+                <table class="data-summary-table">
+                    <thead>
+                        <tr>
+                            <th>Gene</th>
+                            <th>Ensembl ID</th>
+                            <th>Localization Summary</th>
+                        </tr>
+                    </thead>
+                    <tbody>`;
+        foundGenes.forEach(item => {
+            const localizationText = getCleanArray(item, 'localization').join(', ') || 'N/A';
+            html += `
+                <tr>
+                    <td><a href="/#/${item.gene}" onclick="navigateTo(event, '/${item.gene}')">${item.gene}</a></td>
+                    <td>${item.ensembl_id || 'N/A'}</td>
+                    <td>${localizationText}</td>
+                </tr>`;
+        });
+        html += '</tbody></table></div>';
+    }
+
+    if (notFoundGenes && notFoundGenes.length > 0) {
+        html += `
+            <div class="not-found-genes">
+                <h4>Genes Not Found (${notFoundGenes.length}):</h4>
+                <p>${notFoundGenes.join(', ')}</p>
+            </div>`;
+    }
+
+    resultDiv.innerHTML = html;
+}
 
 /**
  * Renders a bar chart of the top expressing tissues.
@@ -1256,63 +1283,6 @@ function renderTopExpressingTissues(foundGenes, container) {
     });
 }
 
-/**
- * NEW: Renders a table of found and not found input genes.
- * @param {Array} queries - The sanitized input queries.
- * @param {Array} foundGenes - The array of found gene objects.
- * @param {HTMLElement} container - The container element to render the table into.
- */
-function renderFoundNotFoundTable(queries, foundGenes, container) {
-    if (!container) return;
-
-    const foundSet = new Set(foundGenes.map(g => g.gene.toUpperCase()));
-
-    let tableHTML = `
-        <h3 class="table-title">Input Genes Status</h3>
-        <button id="download-status-csv" class="download-button">Download as CSV</button>
-        <table class="data-summary-table">
-            <thead>
-                <tr>
-                    <th>Input Gene</th>
-                    <th>Status</th>
-                </tr>
-            </thead>
-            <tbody>
-    `;
-
-    queries.forEach(query => {
-        const status = foundSet.has(query) ? 'Found' : 'Not Found';
-        tableHTML += `
-            <tr>
-                <td>${query}</td>
-                <td>${status}</td>
-            </tr>
-        `;
-    });
-
-    tableHTML += `
-            </tbody>
-        </table>
-    `;
-
-    container.innerHTML = tableHTML;
-
-    // Add event listener for download
-    document.getElementById('download-status-csv').addEventListener('click', () => {
-        let csvContent = 'Input Gene,Status\n';
-        queries.forEach(query => {
-            const status = foundSet.has(query) ? 'Found' : 'Not Found';
-            csvContent += `${query},${status}\n`;
-        });
-        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = 'gene_status.csv';
-        link.click();
-        URL.revokeObjectURL(url);
-    });
-}
 
 
 // Replace the existing displayCiliaPlotPage function with this new one
