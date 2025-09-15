@@ -1137,41 +1137,64 @@ function renderGeneDataTable(foundGenes, container) {
     container.innerHTML = tableHTML;
 }
 
-/**
- * Renders a table of found and not-found genes (e.g., for the heatmap).
- * This function also uses your specified CSS classes.
- */
 function renderFoundNotFoundTable(queries, foundGenes, container) {
-    if (!container) return;
+    if (!container) return;
 
-    const foundSet = new Set(foundGenes.map(g => g.gene.toUpperCase()));
+    const foundSet = new Set(foundGenes.map(g => g.gene.toUpperCase()));
 
-    // Uses the .table-title class
-    let tableHTML = `<h3 class="table-title">Input Genes Status</h3>`;
-    
-    // Uses the .table-responsive and .data-summary-table classes
-    tableHTML += `
-        <div class="table-responsive">
-            <table class="data-summary-table">
-                <thead>
-                    <tr>
-                        <th>Input Gene</th>
-                        <th>Status</th>
-                    </tr>
-                </thead>
-                <tbody>`;
+    // Add a download button to the HTML
+    let tableHTML = `
+        <div class="table-header-controls">
+            <h3 class="table-title">Input Genes Status</h3>
+            <button id="download-status-csv-btn" class="btn btn-secondary">Download CSV</button>
+        </div>`;
+    
+    tableHTML += `
+        <div class="table-responsive">
+            <table class="data-summary-table">
+                <thead>
+                    <tr>
+                        <th>Input Gene</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>`;
 
-    queries.forEach(query => {
-        const status = foundSet.has(query) ? 'Found' : 'Not Found';
-        tableHTML += `
-            <tr>
-                <td>${query}</td>
-                <td>${status}</td>
-            </tr>`;
-    });
+    queries.forEach(query => {
+        const isFound = foundSet.has(query);
+        const statusText = isFound ? 'Found' : 'Not Found';
+        const statusClass = isFound ? 'status-found' : 'status-not-found';
+        tableHTML += `
+            <tr>
+                <td>${query}</td>
+                <td><span class="${statusClass}">${statusText}</span></td>
+            </tr>`;
+    });
 
-    tableHTML += `</tbody></table></div>`;
-    container.innerHTML = tableHTML;
+    tableHTML += `</tbody></table></div>`;
+    container.innerHTML = tableHTML;
+
+    // --- Add event listener for the new download button ---
+    const downloadBtn = document.getElementById('download-status-csv-btn');
+    if (downloadBtn) {
+        downloadBtn.onclick = () => {
+            // 1. Create CSV content
+            let csvContent = "data:text/csv;charset=utf-8,Input Gene,Status\n";
+            queries.forEach(query => {
+                const status = foundSet.has(query) ? 'Found' : 'Not Found';
+                csvContent += `${query},${status}\n`;
+            });
+
+            // 2. Trigger download
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", "gene_status_report.csv");
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        };
+    }
 }
 
 /**
