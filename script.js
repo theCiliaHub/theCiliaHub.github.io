@@ -879,8 +879,8 @@ function renderComparisonTable() {
     }
 
     const features = ['Description', 'Ensembl ID', 'OMIM ID', 'Synonym', 'Localization', 'Functional Summary', 'Reference'];
-    let tableHTML = '<table id="comparison-table"><thead><tr><th>Feature</th>';
-
+    let tableHTML = '<table class="data-summary-table"><thead><tr><th>Feature</th>';
+  
     selectedCompareGenes.forEach(g => {
         tableHTML += `<th><a href="/#/${g.gene}" onclick="navigateTo(event, '/${g.gene}')">${g.gene}</a></th>`;
     });
