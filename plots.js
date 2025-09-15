@@ -1310,55 +1310,109 @@ function renderFoundNotFoundTable(queries, foundGenes, container) {
 }
 
 
-/**
- * Renders the CiliaPlot analysis page, restoring the original layout.
- */
+// Replace the existing displayCiliaPlotPage function with this new one
+
 function displayCiliaPlotPage() {
     const contentArea = document.querySelector('.content-area');
-    // Use the default class to match the original design
-    contentArea.className = 'content-area'; 
-    // Ensure the side panel is visible, consistent with other pages
-    document.querySelector('.cilia-panel').style.display = 'block';
+    // Use a full-width class and hide the default side panel
+    contentArea.className = 'content-area content-area-full'; 
+    document.querySelector('.cilia-panel').style.display = 'none';
 
+    // This HTML builds the new two-column dashboard layout
     contentArea.innerHTML = `
-        <div class="page-section">
-            <h2>CiliaPlot Gene Set Analysis</h2>
-            <p style="font-size: 1rem; color: #555;">
-                Enter a list of genes to generate analytical plots for localization, expression, and more.
-            </p>
-
-            <div class="ciliaplot-controls">
-                <div class="control-group">
-                    <label for="ciliaplot-genes-input">Enter Gene Names (comma, space, or newline separated):</label>
-                    <textarea id="ciliaplot-genes-input" placeholder="e.g., IFT88, CEP290, BBS1..."></textarea>
+        <div class="ciliaplot-dashboard">
+            <div class="ciliaplot-header">
+                <h2>CiliaPlot Dashboard</h2>
+                <div id="ciliaplot-plot-info" class="info">
+                    Select a plot type to see a description and generate an analysis.
                 </div>
-                <div class="control-group">
-                    <label for="plot-type-select">Select Plot Type:</label>
-                    <select id="plot-type-select">
-                        <option value="bubble">Key Localizations</option>
-                        <option value="matrix">Gene-Localization Matrix</option>
-                        <option value="domain_matrix">Gene-Domain Matrix</option>
-                        <option value="functional_category">Functional Categories</option>
-                        <option value="network">Protein Complex Network</option>
-                        <option value="expression_heatmap">Expression Heatmap</option>
-                        <option value="tissue_profile">Tissue Expression Profile</option>
-                        <option value="top_tissues">Top Expressing Tissues</option>
-                        <option value="expression_localization">Expression vs. Localization</option>
-                    </select>
-                </div>
-                <button id="generate-plot-btn" class="btn btn-primary">Generate Plot</button>
             </div>
-            
-            <div id="plot-display-area" class="plot-container"></div>
-            
-            <div id="plot-data-table-container"></div>
-            
-            <div id="ciliaplot-search-results"></div>
+
+            <div class="ciliaplot-container">
+                <div class="ciliaplot-left-panel">
+                    <div class="control-card">
+                        <label for="ciliaplot-genes-input"><strong>1. Enter Gene List</strong></label>
+                        <textarea id="ciliaplot-genes-input" placeholder="e.g., IFT88, CEP290, BBS1..."></textarea>
+                    </div>
+
+                    <div class="control-card">
+                        <label for="plot-type-select"><strong>2. Select Plot Type</strong></label>
+                        <select id="plot-type-select">
+                            <option value="bubble">Key Localizations</option>
+                            <option value="matrix">Gene-Localization Matrix</option>
+                            <option value="domain_matrix">Gene-Domain Matrix</option>
+                            <option value="functional_category">Functional Categories</option>
+                            <option value="network">Protein Complex Network</option>
+                            <option value="expression_heatmap">Expression Heatmap</option>
+                            <option value="tissue_profile">Tissue Expression Profile</option>
+                            <option value="top_tissues">Top Expressing Tissues</option>
+                            <option value="expression_localization">Expression vs. Localization</option>
+                        </select>
+                    </div>
+                    
+                    <details class="control-card collapsible-card">
+                        <summary><strong>3. Customize Plot (Optional)</strong></summary>
+                        <div id="plot-settings-panel">
+                            <label for="setting-font-family">Font Family:</label>
+                            <input type="text" id="setting-font-family" value="Arial">
+                            
+                            <label for="setting-font-color">Font Color:</label>
+                            <input type="color" id="setting-font-color" value="#333333">
+                            
+                            <label for="setting-bg-color">Background Color:</label>
+                            <input type="color" id="setting-bg-color" value="#ffffff">
+
+                            <label for="setting-title-font-size">Title Font (px):</label>
+                            <input type="number" id="setting-title-font-size" value="21" step="1">
+
+                            <label for="setting-axis-title-font-size">Axis Title (px):</label>
+                            <input type="number" id="setting-axis-title-font-size" value="20" step="1">
+                            
+                            <label for="setting-tick-font-size">Axis Ticks (px):</label>
+                            <input type="number" id="setting-tick-font-size" value="20" step="1">
+                        </div>
+                    </details>
+                    
+                    <button id="generate-plot-btn" class="btn btn-primary btn-large">Generate Plot</button>
+                </div>
+
+                <div class="ciliaplot-right-panel">
+                    <div id="ciliaplot-stats-container" class="stats-container">
+                        </div>
+
+                    <div class="plot-card">
+                        <div class="plot-card-header">
+                            <h3>Visualization</h3>
+                            <div class="download-controls">
+                                <select id="download-format">
+                                    <option value="png">Download as PNG</option>
+                                    <option value="pdf">Download as PDF</option>
+                                </select>
+                                <button id="download-plot-btn" class="btn btn-secondary">Download</button>
+                            </div>
+                        </div>
+                        <div id="plot-display-area" class="plot-area-large">
+                            </div>
+                        <div id="ciliaplot-legend-container" class="legend">
+                            </div>
+                    </div>
+
+                    <div id="plot-data-table-container">
+                        </div>
+
+                    <div id="ciliaplot-search-results">
+                        </div>
+                </div>
+            </div>
         </div>
     `;
 
-    // Re-attach the event listener
+    // Re-attach event listeners for the new buttons
     document.getElementById('generate-plot-btn').onclick = generateAnalysisPlots;
+    document.getElementById('download-plot-btn').onclick = downloadPlot;
+    // Add event listener for plot type change to update info box
+    document.getElementById('plot-type-select').addEventListener('change', (e) => {
+        updatePlotInfo(e.target.value);
+    });
 }
-
 
