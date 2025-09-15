@@ -18,19 +18,18 @@ let currentPlotInstance = null; // Holds the active Chart.js, D3, etc. instance
 /**
  * Safely clears the previous plot, handling both Chart.js and D3.js instances.
  */
-function clearPreviousPlot() {
+function clearPreviousPlot(container) {
     if (currentPlotInstance) {
-        // Check if it's a Chart.js instance
         if (typeof currentPlotInstance.destroy === 'function') {
             currentPlotInstance.destroy();
-        }
-        // Check if it's a D3.js DOM element (like an SVG)
-        else if (currentPlotInstance.nodeType) {
+        } else if (currentPlotInstance.nodeType) {
             currentPlotInstance.remove();
         }
     }
-    document.getElementById('plot-display-area').innerHTML = ''; // Ensure container is empty
-    currentPlotInstance = null; // Reset the variable
+    if (container) {
+        container.innerHTML = ''; // FIX: Clears the provided container
+    }
+    currentPlotInstance = null;
 }
 
 
@@ -546,7 +545,7 @@ function renderDomainMatrixPlot(foundGenes, container) {
 }
 
 function renderFunctionalCategoryPlot(foundGenes, container) {
-    clearPreviousPlot();
+    clearPreviousPlot(container); // FIX: Pass the container to the clearing function
     // TODO: To align with publication standards, replace raw gene counts with
     // statistical enrichment results (e.g., p-values from a GO/KEGG analysis).
     const settings = getPlotSettings();
@@ -644,7 +643,7 @@ function computeProteinComplexLinks(foundGenes) {
 }
 
 function renderComplexNetwork(foundGenes, container) {
-    clearPreviousPlot();
+    clearPreviousPlot(container); // FIX: Pass the container to the clearing function
     // TODO: Add advanced features like network clustering (e.g., Louvain) and an
     // "Export to Cytoscape" option for publication-quality figure generation.
     const settings = getPlotSettings();
@@ -752,7 +751,7 @@ function calculateExpressionStats(genes) {
  * Renders an expression heatmap with corrected positioning for the new dashboard layout.
  */
 function renderExpressionHeatmap(foundGenes, container) {
-    clearPreviousPlot();
+    clearPreviousPlot(container); // FIX: Pass the container to the clearing function
     const settings = getPlotSettings();
 
     if (!foundGenes.length || Object.keys(expressionData).length === 0) {
@@ -1231,7 +1230,7 @@ function renderCiliaPlotSearchResultsTable(foundGenes, notFoundGenes) {
  * Renders a bar chart of the top expressing tissues.
  */
 function renderTopExpressingTissues(foundGenes, container) {
-    clearPreviousPlot();
+    clearPreviousPlot(container); // FIX: Pass the container to the clearing function
     const settings = getPlotSettings();
     container.innerHTML = `<canvas></canvas>`;
     const ctx = container.querySelector('canvas').getContext('2d');
@@ -1448,7 +1447,7 @@ async function runFullAnalysis() {
  * is colored by localization, creating a feature plot effect.
  */
 function renderFeaturePlot(foundGenes, container) {
-    clearPreviousPlot();
+   clearPreviousPlot(container); // FIX: Pass the container to the clearing function
     container.innerHTML = `<canvas></canvas>`;
     const ctx = container.querySelector('canvas').getContext('2d');
     const settings = getPlotSettings();
@@ -1604,7 +1603,7 @@ const precomputedUMAP = {
  * Renders a Radar plot comparing the user's gene set profile to known organellar markers.
  */
 function renderOrganelleRadarPlot(foundGenes, container) {
-    clearPreviousPlot();
+    clearPreviousPlot(container); // FIX: Pass the container to the clearing function
     container.innerHTML = `<canvas></canvas>`;
     const ctx = container.querySelector('canvas').getContext('2d');
     const settings = getPlotSettings();
@@ -1691,7 +1690,7 @@ function renderOrganelleRadarPlot(foundGenes, container) {
  * Renders a UMAP scatter plot showing organelle clusters and highlighting the user's genes.
  */
 function renderOrganelleUMAP(foundGenes, container) {
-    clearPreviousPlot();
+    clearPreviousPlot(container); // FIX: Pass the container to the clearing function
     container.innerHTML = `<canvas></canvas>`;
     const ctx = container.querySelector('canvas').getContext('2d');
     const settings = getPlotSettings();
