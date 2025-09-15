@@ -1,3 +1,18 @@
+// In globals.js
+
+// Data storage
+let allGenes = [];
+let geneDataCache = null;
+let geneMapCache = null;
+let searchResults = [];
+let expressionData = {};
+const geneLocalizationData = {};
+
+// Default gene names for the home page
+const defaultGenesNames = [
+    "ACE2", "ADAMTS20", "ADAMTS9", "IFT88",
+    "CEP290", "WDR31", "ARL13B", "BBS1"
+];
 
 // ✨ THE NEW PLUGIN CODE RIGHT HERE for PLOT ✨
 Chart.register({
