@@ -1079,19 +1079,23 @@ function renderExpressionLocalizationBubble(foundGenes, container) {
         }
     });
 }
-// In plots.js, replace these three functions
+// In plots.js, use these three functions for all CiliaPlot tables
 
 /**
- * NEW: Renders a data table below the plot, ensuring consistent styling.
+ * Renders a plot-specific data table (e.g., for Expression vs. Localization).
+ * This function uses your specified CSS classes.
  */
 function renderGeneDataTable(foundGenes, container) {
     if (!container || !foundGenes.length) {
-        if(container) container.innerHTML = ''; // Clear if no data
+        if (container) container.innerHTML = ''; // Clear if no data
         return;
     }
 
-    let tableHTML = `
-        <h3 class="table-title">Gene Data Summary</h3>
+    // Uses the .table-title class from your CSS
+    let tableHTML = `<h3 class="table-title">Gene Data Summary</h3>`;
+    
+    // Uses the .table-responsive and .data-summary-table classes
+    tableHTML += `
         <div class="table-responsive">
             <table class="data-summary-table">
                 <thead>
@@ -1122,14 +1126,19 @@ function renderGeneDataTable(foundGenes, container) {
 }
 
 /**
- * NEW: Renders a table of found and not found input genes, ensuring consistent styling.
+ * Renders a table of found and not-found genes (e.g., for the heatmap).
+ * This function also uses your specified CSS classes.
  */
 function renderFoundNotFoundTable(queries, foundGenes, container) {
     if (!container) return;
 
     const foundSet = new Set(foundGenes.map(g => g.gene.toUpperCase()));
-    let tableHTML = `
-        <h3 class="table-title">Input Genes Status</h3>
+
+    // Uses the .table-title class
+    let tableHTML = `<h3 class="table-title">Input Genes Status</h3>`;
+    
+    // Uses the .table-responsive and .data-summary-table classes
+    tableHTML += `
         <div class="table-responsive">
             <table class="data-summary-table">
                 <thead>
@@ -1151,12 +1160,11 @@ function renderFoundNotFoundTable(queries, foundGenes, container) {
 
     tableHTML += `</tbody></table></div>`;
     container.innerHTML = tableHTML;
-    // Note: The download button logic can be added here if needed
 }
 
-
 /**
- * Renders a styled summary table of found and not-found genes for CiliaPlot.
+ * Renders the main gene query summary table at the bottom of the page.
+ * This function also uses your specified CSS classes.
  */
 function renderCiliaPlotSearchResultsTable(foundGenes, notFoundGenes) {
     const resultDiv = document.getElementById('ciliaplot-search-results');
@@ -1167,9 +1175,11 @@ function renderCiliaPlotSearchResultsTable(foundGenes, notFoundGenes) {
         return;
     }
     
+    // Uses the .table-title class
     let html = `<h3 class="table-title">Gene Query Summary</h3>`;
 
     if (foundGenes.length > 0) {
+        // Uses the .table-responsive and .data-summary-table classes
         html += `
             <div class="table-responsive">
                 <table class="data-summary-table">
@@ -1194,6 +1204,7 @@ function renderCiliaPlotSearchResultsTable(foundGenes, notFoundGenes) {
     }
 
     if (notFoundGenes && notFoundGenes.length > 0) {
+        // Uses the .not-found-genes class
         html += `
             <div class="not-found-genes">
                 <h4>Genes Not Found (${notFoundGenes.length}):</h4>
