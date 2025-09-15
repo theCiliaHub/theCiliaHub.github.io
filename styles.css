@@ -1466,3 +1466,104 @@ function debugTableContainer() {
 
 // Call this in browser console to debug
 // debugTableContainer();
+
+/* Add this to your styles.css file */
+
+/* CiliaPlot Input Controls Layout */
+.ciliaplot-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.5rem;
+    align-items: flex-end;
+    margin-bottom: 2rem;
+    padding: 1rem;
+    background-color: #f9f9f9;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+}
+
+.ciliaplot-controls .control-group {
+    display: flex;
+    flex-direction: column;
+    flex-grow: 1;
+}
+
+.ciliaplot-controls label {
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    color: #333;
+}
+
+.ciliaplot-controls textarea,
+.ciliaplot-controls select {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 1rem;
+}
+
+.ciliaplot-controls textarea {
+    min-height: 80px;
+    resize: vertical;
+}
+
+/* Styled Table Header */
+.table-title {
+    font-size: 1.5rem;
+    color: #2c3e50;
+    margin-top: 2.5rem; /* Add space above the header */
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid #3498db;
+}
+
+/* Responsive Table Container */
+.table-responsive {
+    overflow-x: auto;
+    width: 100%;
+}
+
+/* Data Summary Table Styling */
+.data-summary-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 1.5rem;
+}
+
+.data-summary-table th,
+.data-summary-table td {
+    padding: 12px 15px;
+    text-align: left;
+    border-bottom: 1px solid #ddd;
+}
+
+.data-summary-table th {
+    background-color: #f2f2f2;
+    font-weight: 600;
+    color: #333;
+}
+
+.data-summary-table tbody tr:nth-of-type(even) {
+    background-color: #f9f9f9;
+}
+
+.data-summary-table tbody tr:hover {
+    background-color: #f1f1f1;
+}
+
+/* "Not Found" Section Styling */
+.not-found-genes {
+    margin-top: 1.5rem;
+    padding: 1rem;
+    border: 1px solid #e74c3c;
+    background-color: #fbeae5;
+    border-radius: 4px;
+}
+
+.not-found-genes h4 {
+    margin-top: 0;
+    color: #c0392b;
+}
+
+
