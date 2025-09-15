@@ -147,6 +147,12 @@ async function generateAnalysisPlots() {
             default:
                 plotContainer.innerHTML = `<p class="status-message">Plot type "${plotType}" is not yet implemented.</p>`;
                 break;
+            case 'organelle_radar':
+                renderOrganelleRadarPlot(foundGenes, plotContainer);
+                break;
+            case 'organelle_umap':
+                renderOrganelleUMAP(foundGenes, plotContainer);
+                break;
         }
     } catch (error) {
         console.error('Error generating plots:', error);
@@ -193,6 +199,12 @@ function updatePlotInfo(plotType) {
             break;
         default:
             infoHTML = `Select a plot type to see a description.`;
+            break;
+        case 'organelle_radar':
+            infoHTML = `<strong>Organellar Profile (Radar):</strong> This plot compares the average protein abundance profile of your gene set across simulated cellular fractions against known organellar markers (e.g., ER, Golgi, Cilia). It helps identify which organelle your gene set most closely resembles.`;
+            break;
+        case 'organelle_umap':
+            infoHTML = `<strong>Organellar Projection (UMAP):</strong> This scatter plot shows a 2D representation of the entire organellar proteome, where proteins with similar abundance profiles cluster together. Your input genes are highlighted to show where they fall within these defined organellar clusters.`;
             break;
     }
     infoContainer.innerHTML = infoHTML;
@@ -1296,7 +1308,7 @@ function renderTopExpressingTissues(foundGenes, container) {
 
 
 
-// Replace the existing displayCiliaPlotPage function with this new one
+// Replace the existing  function with this new one
 
 function displayCiliaPlotPage() {
     const contentArea = document.querySelector('.content-area');
@@ -1324,16 +1336,19 @@ function displayCiliaPlotPage() {
                     <div class="control-card">
                         <label for="plot-type-select"><strong>2. Select Plot Type</strong></label>
                         <select id="plot-type-select">
-                            <option value="bubble">Key Localizations</option>
-                            <option value="matrix">Gene-Localization Matrix</option>
-                            <option value="domain_matrix">Gene-Domain Matrix</option>
-                            <option value="functional_category">Functional Categories</option>
-                            <option value="network">Protein Complex Network</option>
-                            <option value="expression_heatmap">Expression Heatmap</option>
-                            <option value="tissue_profile">Tissue Expression Profile</option>
-                            <option value="top_tissues">Top Expressing Tissues</option>
-                            <option value="expression_localization">Expression vs. Localization</option>
-                        </select>
+    <option value="bubble">Key Localizations</option>
+    <option value="matrix">Gene-Localization Matrix</option>
+    <option value="domain_matrix">Gene-Domain Matrix</option>
+    <option value="functional_category">Functional Categories</option>
+    <option value="network">Protein Complex Network</option>
+    <option value="expression_heatmap">Expression Heatmap</option>
+    <option value="tissue_profile">Tissue Expression Profile</option>
+    <option value="top_tissues">Top Expressing Tissues</option>
+    <option value="expression_localization">Expression vs. Localization</option>
+    
+    <option value="organelle_radar">Organellar Profile (Radar)</option>
+    <option value="organelle_umap">Organellar Projection (UMAP)</option>
+</select>
                     </div>
                     
                     <details class="control-card collapsible-card">
@@ -1402,3 +1417,210 @@ function displayCiliaPlotPage() {
     });
 }
 
+// =============================================================================
+// SIMULATED PROTEOMICS DATA FOR ADVANCED PLOTS
+// =============================================================================
+
+// This data simulates quantitative profiles for known organellar markers.
+// Each array represents normalized abundance across 8 fictional cellular fractions.
+const organelleMarkerProfiles = {
+    "Cilia":         [0.1, 0.1, 0.2, 0.8, 0.9, 0.6, 0.2, 0.1],
+    "Basal Body":    [0.1, 0.2, 0.7, 0.9, 0.8, 0.3, 0.1, 0.1],
+    "Mitochondrion": [0.8, 0.9, 0.7, 0.2, 0.1, 0.1, 0.2, 0.3],
+    "Nucleus":       [0.9, 0.8, 0.3, 0.1, 0.1, 0.1, 0.1, 0.1],
+    "ER":            [0.2, 0.4, 0.8, 0.3, 0.2, 0.1, 0.5, 0.7],
+    "Golgi":         [0.1, 0.2, 0.5, 0.2, 0.2, 0.2, 0.8, 0.9],
+    "Cytosol":       [0.4, 0.5, 0.3, 0.3, 0.3, 0.4, 0.4, 0.3]
+};
+const fractionLabels = ['Fr 1', 'Fr 2', 'Fr 3', 'Fr 4', 'Fr 5', 'Fr 6', 'Fr 7', 'Fr 8'];
+
+// This data simulates pre-computed UMAP coordinates for a set of proteins.
+// This would typically be calculated from the high-dimensional proteomics data.
+const precomputedUMAP = {
+    // Each key is an organelle, containing an array of {gene, x, y} points
+    "Cilia": Array.from({length: 50}, (_, i) => ({gene: `CILGEN${i}`, x: 8 + Math.random()*2, y: 8 + Math.random()*2})),
+    "Basal Body": Array.from({length: 40}, (_, i) => ({gene: `BBGEN${i}`, x: 6 + Math.random()*2, y: 7 + Math.random()*2})),
+    "Mitochondrion": Array.from({length: 60}, (_, i) => ({gene: `MTGEN${i}`, x: 1 + Math.random()*2, y: 2 + Math.random()*2})),
+    "Nucleus": Array.from({length: 70}, (_, i) => ({gene: `NUCGEN${i}`, x: 9 + Math.random()*1.5, y: 1 + Math.random()*2})),
+    "ER": Array.from({length: 50}, (_, i) => ({gene: `ERGEN${i}`, x: 2 + Math.random()*2, y: 8 + Math.random()*2})),
+    "Golgi": Array.from({length: 40}, (_, i) => ({gene: `GOLGEN${i}`, x: 1 + Math.random()*2, y: 6 + Math.random()*2})),
+    "Cytosol": Array.from({length: 80}, (_, i) => ({gene: `CYTGEN${i}`, x: 5 + Math.random()*3, y: 4 + Math.random()*3})),
+};
+
+// =============================================================================
+// NEW PLOTTING FUNCTIONS: RADAR and UMAP
+// =============================================================================
+
+/**
+ * Renders a Radar plot comparing the user's gene set profile to known organellar markers.
+ */
+function renderOrganelleRadarPlot(foundGenes, container) {
+    clearPreviousPlot();
+    container.innerHTML = `<canvas></canvas>`;
+    const ctx = container.querySelector('canvas').getContext('2d');
+    const settings = getPlotSettings();
+
+    // Calculate the average profile for the user's gene set based on localization
+    const userProfile = new Array(fractionLabels.length).fill(0);
+    let contributingGenes = 0;
+    foundGenes.forEach(gene => {
+        const localizations = getCleanArray(gene, 'localization');
+        let geneAdded = false;
+        localizations.forEach(loc => {
+            const matchedProfile = Object.keys(organelleMarkerProfiles).find(key => loc.toLowerCase().includes(key.toLowerCase()));
+            if (matchedProfile) {
+                const profile = organelleMarkerProfiles[matchedProfile];
+                profile.forEach((val, i) => userProfile[i] += val);
+                geneAdded = true;
+            }
+        });
+        if (geneAdded) contributingGenes++;
+    });
+    
+    if (contributingGenes > 0) {
+        userProfile.forEach((val, i) => userProfile[i] /= contributingGenes);
+    } else {
+        container.innerHTML = '<p class="status-message">None of the input genes could be mapped to a known organellar profile.</p>';
+        return;
+    }
+
+    const datasets = Object.entries(organelleMarkerProfiles).map(([name, data], index) => ({
+        label: name,
+        data: data,
+        borderColor: d3.schemeTableau10[index],
+        backgroundColor: d3.schemeTableau10[index] + '33', // Add transparency
+        pointBackgroundColor: d3.schemeTableau10[index],
+        hidden: true, // Hide markers by default for clarity
+    }));
+
+    // Add the user's gene set as a prominent, visible dataset
+    datasets.push({
+        label: 'Your Gene Set',
+        data: userProfile,
+        borderColor: '#e74c3c',
+        backgroundColor: '#e74c3c55',
+        pointBackgroundColor: '#c0392b',
+        borderWidth: 3,
+    });
+
+    currentPlotInstance = new Chart(ctx, {
+        type: 'radar',
+        data: {
+            labels: fractionLabels,
+            datasets: datasets,
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                title: { display: true, text: "Organellar Profile Comparison", font: { size: settings.titleFontSize } },
+                legend: { position: 'top' },
+                tooltip: {
+                    callbacks: {
+                        label: (context) => `${context.dataset.label}: ${context.raw.toFixed(2)}`
+                    }
+                }
+            },
+            scales: {
+                r: {
+                    angleLines: { display: true },
+                    suggestedMin: 0,
+                    suggestedMax: 1,
+                    pointLabels: { font: { size: 14 } },
+                    grid: { color: settings.gridColor },
+                }
+            },
+            elements: {
+                line: { tension: 0.1 }
+            }
+        }
+    });
+}
+
+
+/**
+ * Renders a UMAP scatter plot showing organelle clusters and highlighting the user's genes.
+ */
+function renderOrganelleUMAP(foundGenes, container) {
+    clearPreviousPlot();
+    container.innerHTML = `<canvas></canvas>`;
+    const ctx = container.querySelector('canvas').getContext('2d');
+    const settings = getPlotSettings();
+
+    const backgroundDatasets = Object.entries(precomputedUMAP).map(([name, data], index) => ({
+        label: name,
+        data: data,
+        backgroundColor: d3.schemeCategory10[index] + '77', // Semi-transparent background points
+        pointRadius: 4,
+    }));
+    
+    // Find the coordinates for the user's genes from our simulated data
+    const userGeneData = [];
+    let mappedCount = 0;
+    foundGenes.forEach(gene => {
+        let found = false;
+        for (const organelle in precomputedUMAP) {
+            // In a real scenario, you'd look up the gene name directly.
+            // Here, we simulate by assigning the first available point from the matching organelle.
+            const localizations = getCleanArray(gene, 'localization');
+            if (localizations.some(loc => organelle.toLowerCase().includes(loc.toLowerCase()))) {
+                const availablePoint = precomputedUMAP[organelle][mappedCount % precomputedUMAP[organelle].length];
+                if (availablePoint) {
+                    userGeneData.push({ ...availablePoint, gene: gene.gene }); // Use real gene name
+                    mappedCount++;
+                    found = true;
+                    break; 
+                }
+            }
+        }
+    });
+    
+    if (userGeneData.length === 0) {
+        container.innerHTML = '<p class="status-message">None of the input genes could be mapped to the UMAP projection.</p>';
+        return;
+    }
+
+    const userDataset = {
+        label: 'Your Genes',
+        data: userGeneData,
+        backgroundColor: '#e74c3c',
+        pointRadius: 8,
+        borderColor: '#ffffff',
+        borderWidth: 2,
+    };
+
+    currentPlotInstance = new Chart(ctx, {
+        type: 'scatter',
+        data: {
+            datasets: [...backgroundDatasets, userDataset],
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                title: { display: true, text: "UMAP Projection of Organellar Proteomes", font: { size: settings.titleFontSize } },
+                legend: { position: 'right' },
+                tooltip: {
+                    callbacks: {
+                        label: (context) => {
+                           // context.raw has the {x, y, gene} object
+                           return context.raw.gene ? `Gene: ${context.raw.gene}` : `${context.dataset.label}`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    title: { display: true, text: 'UMAP 1' },
+                    grid: { display: false },
+                    ticks: { display: false },
+                },
+                y: {
+                    title: { display: true, text: 'UMAP 2' },
+                    grid: { display: false },
+                    ticks: { display: false },
+                }
+            }
+        }
+    });
+}
