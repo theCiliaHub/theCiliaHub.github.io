@@ -1,13 +1,14 @@
+// data.js
+
 /**
  * Sanitizes any string by removing invisible characters and normalizing it.
  */
 function sanitize(input) {
     if (typeof input !== 'string') return '';
-    // Removes zero-width spaces, non-printable characters, trims, and normalizes case
     return input.replace(/[\u200B-\u200D\u2060\uFEFF]/g, '')
-                .replace(/[^\x20-\x7E]/g, '') // Remove non-printable ASCII
-                .trim()
-                .toUpperCase();
+        .replace(/[^\x20-\x7E]/g, '')
+        .trim()
+        .toUpperCase();
 }
 
 /**
@@ -33,12 +34,9 @@ async function loadAndPrepareDatabase() {
                 console.warn('Skipping entry with invalid gene name:', g);
                 return;
             }
-
-            // 1. Index by the primary gene name
             const nameKey = sanitize(g.gene);
             if (nameKey) geneMapCache.set(nameKey, g);
 
-            // 2. Index by all synonyms (handles comma or semicolon separators)
             if (g.synonym) {
                 String(g.synonym).split(/[,;]/).forEach(syn => {
                     const key = sanitize(syn);
@@ -46,36 +44,24 @@ async function loadAndPrepareDatabase() {
                 });
             }
 
-            // 3. Index by all Ensembl IDs (handles comma or semicolon separators)
-          // This part of your code already handles Ensembl IDs
-if (g.ensembl_id) {
-    String(g.ensembl_id).split(/[,;]/).forEach(id => {
-        const key = sanitize(id);
-        if (key) geneMapCache.set(key, g);
-    });
-} 
-            
-            // 4. Prepare localization data for SVG mapping - MODIFIED: Sanitize input to filter non-ciliary terms and add debug logging for ACTN2
-           if (g.localization) {
-            // ✨ REPLACE the old array with this one ✨
-            const validLocalizations = [
-                'cilia', 'basal body', 'transition zone', 'axoneme', 'ciliary membrane', 
-                'centrosome', 'flagella', 'nucleus', 'cytosol', 'mitochondrion', 
-                'endoplasmic reticulum', 'golgi apparatus', 'lysosome', 'microbody', 
-                'peroxisome', 'microtubules', 'autophagosomes', 'ribosome', 'p-body'
-            ];
-            
-            let sanitizedLocalization = (Array.isArray(g.localization) ? g.localization : String(g.localization).split(/[,;]/))
-                .map(loc => loc ? loc.trim().toLowerCase() : '')
-                .filter(loc => loc && validLocalizations.includes(loc));
-            
-            geneLocalizationData[g.gene] = mapLocalizationToSVG(sanitizedLocalization); 
-        }
-                
-                // Additional debug for mapped output
-                if (g.gene === 'ACTN2') {
-                    console.log('ACTN2 Mapped localization from mapLocalizationToSVG:', geneLocalizationData[g.gene]);
-                }
+            if (g.ensembl_id) {
+                String(g.ensembl_id).split(/[,;]/).forEach(id => {
+                    const key = sanitize(id);
+                    if (key) geneMapCache.set(key, g);
+                });
+            }
+
+            if (g.localization) {
+                const validLocalizations = [
+                    'cilia', 'basal body', 'transition zone', 'axoneme', 'ciliary membrane',
+                    'centrosome', 'flagella', 'nucleus', 'cytosol', 'mitochondrion',
+                    'endoplasmic reticulum', 'golgi apparatus', 'lysosome', 'microbody',
+                    'peroxisome', 'microtubules', 'autophagosomes', 'ribosome', 'p-body'
+                ];
+                let sanitizedLocalization = (Array.isArray(g.localization) ? g.localization : String(g.localization).split(/[,;]/))
+                    .map(loc => loc ? loc.trim().toLowerCase() : '')
+                    .filter(loc => loc && validLocalizations.includes(loc));
+                geneLocalizationData[g.gene] = mapLocalizationToSVG(sanitizedLocalization);
             }
         });
 
@@ -83,9 +69,7 @@ if (g.ensembl_id) {
         return true;
     } catch (e) {
         console.error('Data load error:', e);
-        // Fallback logic remains the same
         allGenes = getDefaultGenes();
-        currentData = allGenes;
         geneMapCache = new Map();
         allGenes.forEach(g => {
             if (g.gene) geneMapCache.set(sanitize(g.gene), g);
@@ -95,114 +79,194 @@ if (g.ensembl_id) {
 }
 
 /**
- * Search genes using symbols, synonyms, or ENSG IDs.
- * Handles multiple IDs per gene.
- */
-/**
  * Search genes using symbols, synonyms, or Ensembl IDs from the pre-built cache.
- * Handles multiple queries efficiently.
- *
- * @param {string[]} queries - An array of sanitized, uppercase gene identifiers.
- * @returns {{foundGenes: object[], notFoundGenes: string[]}} - An object containing found gene objects and not-found queries.
  */
 function findGenes(queries) {
-    const foundGenes = new Map(); // Use a Map to store unique genes by their canonical name
+    const foundGenes = new Map();
     const notFound = [];
-
     queries.forEach(query => {
-        // The query is expected to be sanitized (trimmed, uppercased) before being passed.
         const result = geneMapCache.get(query);
-        
         if (result) {
-            // Use the canonical gene name as the key to prevent duplicates
             if (!foundGenes.has(result.gene)) {
                 foundGenes.set(result.gene, result);
             }
         } else {
-            // The original, unsanitized query should be returned for user feedback.
-            // This requires the calling function to manage the original queries.
-            notFound.push(query); 
+            notFound.push(query);
         }
     });
-    
-    return { 
-        foundGenes: Array.from(foundGenes.values()), 
-        notFoundGenes: notFound 
+    return {
+        foundGenes: Array.from(foundGenes.values()),
+        notFoundGenes: notFound
     };
 }
 
-// Add this function to help with debugging
-function debugSearch(query) {
-    console.log("Searching for:", query);
-    console.log("Cache has key?", geneMapCache.has(query));
-    
-    if (!geneMapCache.has(query)) {
-        console.log("Available keys matching query:");
-        for (let key of geneMapCache.keys()) {
-            if (key.includes(query) || query.includes(key)) {
-                console.log(`- ${key}`);
-            }
-        }
-    }
+// ✨ --- MOVED HERE FROM SCRIPT.JS --- ✨
+/**
+ * Maps semantic localization terms to specific SVG element IDs.
+ * @param {string[]} localizationArray - An array of sanitized, lowercase localization terms.
+ * @returns {string[]} An array of corresponding SVG part IDs.
+ */
+function mapLocalizationToSVG(localizationArray) {
+    const mapping = {
+        "ciliary membrane": ["ciliary-membrane", "axoneme"],
+        "axoneme": ["ciliary-membrane", "axoneme"],
+        "basal body": ["basal-body"],
+        "transition zone": ["transition-zone"],
+        "cilia": ["ciliary-membrane", "axoneme"],
+        "flagella": ["ciliary-membrane", "axoneme"],
+        "nucleus": ["nucleus"],
+        "centrosome": ["basal-body"],
+        "cytosol": ["cell-body"],
+        "mitochondrion": ["cell-body"],
+        "endoplasmic reticulum": ["cell-body"],
+        "golgi apparatus": ["cell-body"],
+        "lysosome": ["cell-body"],
+        "microbody": ["cell-body"],
+        "peroxisome": ["cell-body"],
+        "microtubules": ["cell-body"],
+        "autophagosomes": ["cell-body"]
+    };
+    if (!Array.isArray(localizationArray)) return [];
+    return [...new Set(localizationArray.flatMap(loc => mapping[loc] || []))];
 }
 
-async function loadExpressionData() {
-    try {
-        const response = await fetch('rna_tissue_consensus.tsv');
-        if (!response.ok) throw new Error('Failed to load expression data');
-
-        const tsvText = await response.text();
-        const rawData = parseTSV(tsvText);
-        expressionData = processExpressionData(rawData);
-
-        const geneSet = new Set();
-        Object.keys(expressionData).forEach(gene => {
-            geneSet.add(gene); // Gene names are now already uppercase
-        });
-        availableGenes = geneSet;
-
-        console.log(`Loaded ${Object.keys(expressionData).length} genes with expression data from TSV`);
-    } catch (error) {
-        console.error('Error loading expression data:', error);
-    }
+/**
+ * Provides a default set of genes as a fallback if the main database fails to load.
+ */
+// Default gene set as fallback if loading fails
+function getDefaultGenes() {
+    return [
+        {
+            gene: "IFT88",
+            ensembl_id: "ENSG00000032742",
+            description: "Intraflagellar transport protein 88. Key component of the IFT-B complex.",
+            synonym: "BBS20, D13S840E, TG737, TTC10",
+            omim_id: "605484",
+            functional_summary: "Essential for intraflagellar transport and ciliary assembly. It is a component of the IFT complex B and is required for cilium biogenesis.",
+            localization: ["axoneme", "basal body"],
+            reference: ["https://pubmed.ncbi.nlm.nih.gov/9724754/"],
+            protein_complexes: "IFT-B",
+            gene_annotation: "",
+            functional_category: ["Intraflagellar transport", "Ciliary assembly/disassembly"],
+            ciliopathy: "Bardet-Biedl syndrome 20"
+        },
+        {
+            gene: "CEP290",
+            ensembl_id: "ENSG00000198707",
+            description: "Centrosomal protein 290. Critical component of the ciliary transition zone.",
+            synonym: "BBS14, JBTS5, MKS4, NPHP6, SLSN6",
+            omim_id: "610142",
+            functional_summary: "Regulates ciliary gating and ciliopathy-related pathways. Acts as a gatekeeper for proteins entering and exiting the cilium.",
+            localization: ["transition zone"],
+            reference: ["https://pubmed.ncbi.nlm.nih.gov/16971477/"],
+            protein_complexes: "NPHP-MKS-JBTS complex",
+            gene_annotation: "",
+            functional_category: ["Transition zone", "Ciliary gating"],
+            ciliopathy: "Joubert syndrome 5, Meckel syndrome 4, Bardet-Biedl syndrome 14, Leber congenital amaurosis 10"
+        },
+        {
+            gene: "WDR31",
+            ensembl_id: "ENSG00000106459",
+            description: "WD repeat domain 31. Involved in ciliary assembly and maintenance.",
+            synonym: "C14orf148",
+            omim_id: "",
+            functional_summary: "Required for proper ciliary structure and function. It is thought to be involved in the regulation of ciliogenesis.",
+            localization: ["axoneme"],
+            reference: ["https://pubmed.ncbi.nlm.nih.gov/22114125/"],
+            protein_complexes: "",
+            gene_annotation: "",
+            functional_category: ["Ciliary assembly/disassembly"],
+            ciliopathy: ""
+        },
+        {
+            gene: "ARL13B",
+            ensembl_id: "ENSG00000169379",
+            description: "ADP-ribosylation factor-like protein 13B. Involved in ciliary membrane biogenesis.",
+            synonym: "ARL2L2, JBTS8",
+            omim_id: "608922",
+            functional_summary: "Critical for ciliary signaling and membrane trafficking. It is a small G protein that localizes to the ciliary membrane and regulates the traffic of ciliary proteins.",
+            localization: ["ciliary membrane"],
+            reference: ["https://pubmed.ncbi.nlm.nih.gov/19732862/"],
+            protein_complexes: "",
+            gene_annotation: "",
+            functional_category: ["Ciliary membrane", "Signal transduction"],
+            ciliopathy: "Joubert syndrome 8"
+        },
+        {
+            gene: "BBS1",
+            ensembl_id: "ENSG00000166246",
+            description: "Bardet-Biedl syndrome 1 protein. Part of the BBSome complex.",
+            synonym: "BBS",
+            omim_id: "209901",
+            functional_summary: "Involved in ciliary trafficking and BBSome assembly. The BBSome complex is a key regulator of protein trafficking to and from the cilium.",
+            localization: ["basal body", "ciliary membrane"],
+            reference: ["https://pubmed.ncbi.nlm.nih.gov/11058628/"],
+            protein_complexes: "BBSome",
+            gene_annotation: "",
+            functional_category: ["Ciliary trafficking", "BBSome complex"],
+            ciliopathy: "Bardet-Biedl syndrome 1"
+        },
+        {
+            gene: "ACE2",
+            ensembl_id: "ENSG00000130234",
+            description: "Angiotensin-converting enzyme 2. Serves as the entry point for SARS-CoV-2.",
+            synonym: "ACEH",
+            omim_id: "300335",
+            functional_summary: "Regulates blood pressure and acts as a receptor for coronaviruses in respiratory cilia. Its expression on ciliated cells is a key factor in COVID-19 infection.",
+            localization: ["cilia"],
+            reference: ["https://pubmed.ncbi.nlm.nih.gov/32142651/"],
+            protein_complexes: "",
+            gene_annotation: "",
+            functional_category: ["Cell surface receptor", "Ciliary membrane"],
+            ciliopathy: ""
+        },
+        {
+            gene: "PKD2",
+            ensembl_id: "ENSG00000118762",
+            description: "Polycystin-2, a calcium-permeable ion channel.",
+            synonym: "TRPP2",
+            omim_id: "173910",
+            functional_summary: "Ion channel important for mechanosensation in primary cilia.",
+            localization: ["axoneme", "endoplasmic reticulum"],
+            reference: ["https://pubmed.ncbi.nlm.nih.gov/11285250/"],
+            protein_complexes: ["Polycystin complex"],
+            gene_annotation: "",
+            functional_category: ["Ion transport", "Ciliary signaling"],
+            ciliopathy: "Autosomal dominant polycystic kidney disease"
+        }
+    ];
 }
 
-function parseTSV(tsvText) {
-    const lines = tsvText.split('\n').filter(line => line.trim());
-    if (lines.length === 0) return [];
 
-    const headers = lines[0].split('\t');
-    const data = [];
+function mapLocalizationToSVG(localizationArray) {
+    const mapping = {
+        "ciliary membrane": ["ciliary-membrane", "axoneme"],
+        "axoneme": ["ciliary-membrane", "axoneme"],
+        "basal body": ["basal-body"],
+        "transition zone": ["transition-zone"],
+        "cilia": ["ciliary-membrane", "axoneme"],
+        "flagella": ["ciliary-membrane", "axoneme"],
+        "ciliary associated gene": ["ciliary-membrane", "axoneme"],
+        "nucleus": ["nucleus"],
+        "centrosome": ["basal-body"],
+        "cytosol": ["cell-body"],
+        "mitochondrion": ["cell-body"],
+        "endoplasmic reticulum": ["cell-body"],
+        "golgi apparatus": ["cell-body"],
+        "lysosome": ["cell-body"],             // ✨ NEW
+        "microbody": ["cell-body"],             // ✨ NEW
+        "peroxisome": ["cell-body"],            // ✨ NEW
+        "microtubules": ["cell-body"],          // ✨ NEW
+        "autophagosomes": ["cell-body"]         // ✨ NEW
+    };
+    if (!Array.isArray(localizationArray)) return [];
 
-    for (let i = 1; i < lines.length; i++) {
-        const values = lines[i].split('\t');
-        if (values.length === headers.length) {
-            const row = {};
-            headers.forEach((header, index) => {
-                row[header.trim()] = values[index] ? values[index].trim() : '';
-            });
-            data.push(row);
-        }
-    }
-    return data;
-}
+    return localizationArray.flatMap(loc => {
+        // If 'loc' is not a string (e.g., it's null), skip it.
+        if (typeof loc !== 'string') return []; 
 
-function processExpressionData(rawData) {
-    const processedData = {};
-    rawData.forEach(row => {
-        const geneName = row['Gene name'] || row['Gene'];
-        if (geneName) {
-            const upperGeneName = geneName.toUpperCase(); // Standardize to uppercase
-            const tissue = row['Tissue'];
-            const nTPM = parseFloat(row['nTPM']);
+        const normalized = loc.trim().toLowerCase().replace(/[-_]/g, ' ');
+        return mapping[normalized] || [];
 
-            if (tissue && !isNaN(nTPM)) {
-                if (!processedData[upperGeneName]) {
-                    processedData[upperGeneName] = {};
-                }
-                processedData[upperGeneName][tissue] = nTPM;
-            }
-        }
-    });
-    return processedData;
+    }).filter(id => allPartIds.includes(id));
 }
