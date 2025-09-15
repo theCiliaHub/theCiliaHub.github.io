@@ -1304,3 +1304,55 @@ function renderFoundNotFoundTable(queries, foundGenes, container) {
         URL.revokeObjectURL(url);
     });
 }
+
+
+/**
+ * Renders the main structure of the CiliaPlot analysis page.
+ */
+function displayCiliaPlotPage() {
+    const contentArea = document.querySelector('.content-area');
+    // Set the class to style the page layout correctly
+    contentArea.className = 'content-area ciliaplot-layout'; 
+    document.querySelector('.cilia-panel').style.display = 'none'; // Hide side panel for more space
+
+    // This is the HTML structure for the entire CiliaPlot page
+    contentArea.innerHTML = `
+        <div class="page-section">
+            <h2>CiliaPlot: Gene Set Analysis</h2>
+            <p style="font-size: 1rem; color: #555;">
+                Enter a list of genes to generate analytical plots for localization, 
+                protein domains, expression, and more.
+            </p>
+
+            <div class="ciliaplot-input-section">
+                <label for="ciliaplot-genes-input">Enter Gene Names:</label>
+                <textarea id="ciliaplot-genes-input" placeholder="e.g., IFT88, CEP290, BBS1..."></textarea>
+                
+                <label for="plot-type-select">Select Plot Type:</label>
+                <select id="plot-type-select">
+                    <option value="bubble">Key Localizations</option>
+                    <option value="matrix">Gene-Localization Matrix</option>
+                    <option value="domain_matrix">Gene-Domain Matrix</option>
+                    <option value="functional_category">Functional Categories</option>
+                    <option value="network">Protein Complex Network</option>
+                    <option value="expression_heatmap">Expression Heatmap</option>
+                    <option value="tissue_profile">Tissue Expression Profile</option>
+                    <option value="top_tissues">Top Expressing Tissues</option>
+                    <option value="expression_localization">Expression vs. Localization</option>
+                </select>
+
+                <button id="generate-plot-btn" class="btn btn-primary">Generate Plot</button>
+            </div>
+            
+            <div id="ciliaplot-search-results" class="search-results-container"></div>
+
+            <div id="plot-display-area" class="plot-container"></div>
+            <div id="plot-data-table-container"></div>
+        </div>
+    `;
+
+    // Attach the event listener to the new button
+    document.getElementById('generate-plot-btn').onclick = generateAnalysisPlots;
+}
+
+
