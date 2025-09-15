@@ -1466,3 +1466,12 @@ function debugTableContainer() {
 
 // Call this in browser console to debug
 // debugTableContainer();
+
+/* Add this to styles.css for the download button layout */
+.table-header-controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
