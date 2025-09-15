@@ -115,45 +115,50 @@ async function generateAnalysisPlots() {
 
         // Routing for plot generation
         switch (plotType) {
-            case 'expression_localization':
-                renderExpressionLocalizationBubble(foundGenes, plotContainer);
-                renderGeneDataTable(foundGenes, document.getElementById('plot-data-table-container'));
-                break;
-            case 'bubble':
-                renderKeyLocalizations(foundGenes, plotContainer);
-                break;
-            case 'matrix':
-                renderGeneMatrix(foundGenes, plotContainer);
-                break;
-            case 'domain_matrix':
-                renderDomainMatrixPlot(foundGenes, plotContainer);
-                break;
-            case 'functional_category':
-                renderFunctionalCategoryPlot(foundGenes, plotContainer);
-                break;
-            case 'network':
-                renderComplexNetwork(foundGenes, plotContainer);
-                break;
-            case 'expression_heatmap':
-                renderExpressionHeatmap(foundGenes, plotContainer);
-                renderFoundNotFoundTable(sanitizedQueries, foundGenes, document.getElementById('plot-data-table-container'));
-                break;
-            case 'tissue_profile':
-                renderTissueExpressionProfile(foundGenes, plotContainer);
-                break;
-            case 'top_tissues':
-                renderTopExpressingTissues(foundGenes, plotContainer);
-                break;
-            default:
-                plotContainer.innerHTML = `<p class="status-message">Plot type "${plotType}" is not yet implemented.</p>`;
-                break;
-            case 'organelle_radar':
-                renderOrganelleRadarPlot(foundGenes, plotContainer);
-                break;
-            case 'organelle_umap':
-                renderOrganelleUMAP(foundGenes, plotContainer);
-                break;
-        }
+        case 'expression_localization':
+            renderExpressionLocalizationBubble(foundGenes, plotContainer);
+            renderGeneDataTable(foundGenes, document.getElementById('plot-data-table-container'));
+            break;
+        case 'bubble':
+            renderKeyLocalizations(foundGenes, plotContainer);
+            break;
+        case 'matrix':
+            renderGeneMatrix(foundGenes, plotContainer);
+            break;
+        case 'domain_matrix':
+            renderDomainMatrixPlot(foundGenes, plotContainer);
+            break;
+        case 'functional_category':
+            renderFunctionalCategoryPlot(foundGenes, plotContainer);
+            break;
+        case 'network':
+            renderComplexNetwork(foundGenes, plotContainer);
+            break;
+        case 'expression_heatmap':
+            renderExpressionHeatmap(foundGenes, plotContainer);
+            const tableContainer = document.getElementById('plot-data-table-container');
+            renderFoundNotFoundTable(sanitizedQueries, foundGenes, tableContainer);
+            break;
+        case 'tissue_profile':
+            renderTissueExpressionProfile(foundGenes, plotContainer);
+            break;
+        case 'top_tissues':
+            renderTopExpressingTissues(foundGenes, plotContainer);
+            break;
+        
+        // --- MOVED TO HERE ---
+        case 'organelle_radar':
+            renderOrganelleRadarPlot(foundGenes, plotContainer);
+            break;
+        case 'organelle_umap':
+            renderOrganelleUMAP(foundGenes, plotContainer);
+            break;
+
+        // --- 'default' IS NOW THE LAST CASE ---
+        default:
+            plotContainer.innerHTML = `<p class="status-message">Plot type "${plotType}" is not yet implemented.</p>`;
+            break;
+    }
     } catch (error) {
         console.error('Error generating plots:', error);
         document.getElementById('plot-display-area').innerHTML = `<p class="status-message error">Error generating plot: ${error.message}</p>`;
