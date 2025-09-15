@@ -1454,6 +1454,11 @@ const precomputedUMAP = {
 /**
  * Renders a Radar plot comparing the user's gene set profile to known organellar markers.
  */
+// In plots.js, replace the old function with this one
+
+/**
+ * Renders a Radar plot comparing the user's gene set profile to known organellar markers.
+ */
 function renderOrganelleRadarPlot(foundGenes, container) {
     clearPreviousPlot();
     container.innerHTML = `<canvas></canvas>`;
@@ -1490,7 +1495,8 @@ function renderOrganelleRadarPlot(foundGenes, container) {
         borderColor: d3.schemeTableau10[index],
         backgroundColor: d3.schemeTableau10[index] + '33', // Add transparency
         pointBackgroundColor: d3.schemeTableau10[index],
-        hidden: true, // Hide markers by default for clarity
+        // FIX: The following line has been removed to make all datasets visible by default.
+        // hidden: true, 
     }));
 
     // Add the user's gene set as a prominent, visible dataset
@@ -1536,7 +1542,6 @@ function renderOrganelleRadarPlot(foundGenes, container) {
         }
     });
 }
-
 
 /**
  * Renders a UMAP scatter plot showing organelle clusters and highlighting the user's genes.
