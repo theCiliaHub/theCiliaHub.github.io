@@ -71,20 +71,21 @@ if (g.ensembl_id) {
 } 
             
             // 4. Prepare localization data for SVG mapping - MODIFIED: Sanitize input to filter non-ciliary terms and add debug logging for ACTN2
-            if (g.localization) {
-                // Sanitize: Only pass valid ciliary localizations to mapLocalizationToSVG to prevent additions like "Cytosol"
-                const validCiliaryLocalizations = ['transition zone', 'cilia', 'basal body', 'axoneme', 'ciliary membrane', 'centrosome', 'autophagosomes', 'endoplasmic reticulum', 'flagella', 'golgi apparatus', 'lysosome', 'microbody', 'microtubules', 'mitochondrion', 'nucleus', 'peroxisome']; // Expanded list based on common terms in plots.js
-                let sanitizedLocalization = Array.isArray(g.localization) 
-                    ? g.localization.map(loc => loc ? loc.trim().toLowerCase() : '').filter(loc => loc && validCiliaryLocalizations.includes(loc))
-                    : (g.localization ? g.localization.split(/[,;]/).map(loc => loc ? loc.trim().toLowerCase() : '').filter(loc => loc && validCiliaryLocalizations.includes(loc)) : []);
-                
-                // Debug logging for ACTN2
-                if (g.gene === 'ACTN2') {
-                    console.log('ACTN2 Raw localization from JSON:', g.localization);
-                    console.log('ACTN2 Sanitized localization before mapping:', sanitizedLocalization);
-                }
-                
-                geneLocalizationData[g.gene] = mapLocalizationToSVG(sanitizedLocalization); // Use sanitized input
+           if (g.localization) {
+            // ✨ REPLACE the old array with this one ✨
+            const validLocalizations = [
+                'cilia', 'basal body', 'transition zone', 'axoneme', 'ciliary membrane', 
+                'centrosome', 'flagella', 'nucleus', 'cytosol', 'mitochondrion', 
+                'endoplasmic reticulum', 'golgi apparatus', 'lysosome', 'microbody', 
+                'peroxisome', 'microtubules', 'autophagosomes', 'ribosome', 'p-body'
+            ];
+            
+            let sanitizedLocalization = (Array.isArray(g.localization) ? g.localization : String(g.localization).split(/[,;]/))
+                .map(loc => loc ? loc.trim().toLowerCase() : '')
+                .filter(loc => loc && validLocalizations.includes(loc));
+            
+            geneLocalizationData[g.gene] = mapLocalizationToSVG(sanitizedLocalization); 
+        }
                 
                 // Additional debug for mapped output
                 if (g.gene === 'ACTN2') {
@@ -2163,7 +2164,12 @@ function displayCiliaPlotPage() {
                                 <option value="expression_localization">Expression vs. Localization</option>
                                 <option value="top_tissues">Top Expressing Tissues</option>
                             </optgroup>
-                        </select>
+                            
+                            <optgroup label="Advanced Analysis">
+                                <option value="organelle_radar">Organellar Profile (Radar)</option>
+                                <option value="organelle_umap">Organellar Projection (UMAP)</option>
+                            </optgroup>
+                            </select>
                         
                         <button id="generate-plot-btn" class="btn btn-primary">Run Analysis</button>
                     </div>
@@ -2229,174 +2235,4 @@ function displayCiliaPlotPage() {
     updatePlotInfo(document.getElementById('plot-type-select').value);
 }
 
-// Enhanced renderFoundNotFoundTable with debugging and error handling
-function renderFoundNotFoundTable(geneData, containerId = 'table-container') {
-    console.log('=== Table Rendering Debug ===');
-    console.log('Gene data:', geneData);
-    console.log('Container ID:', containerId);
-    
-    // 1. Verify container exists
-    const container = document.getElementById(containerId);
-    if (!container) {
-        console.error(`Container with ID '${containerId}' not found`);
-        console.log('Available elements:', document.querySelectorAll('[id*="table"], [id*="container"]'));
-        return false;
-    }
-    
-    console.log('Container found:', container);
-    console.log('Container styles:', window.getComputedStyle(container));
-    
-    // 2. Clear existing content
-    container.innerHTML = '';
-    
-    // 3. Validate data
-    if (!geneData || !Array.isArray(geneData)) {
-        console.error('Invalid gene data provided');
-        return false;
-    }
-    
-    try {
-        // 4. Create table structure
-        const tableWrapper = document.createElement('div');
-        tableWrapper.className = 'table-wrapper';
-        tableWrapper.style.cssText = `
-            margin-top: 20px;
-            overflow-x: auto;
-            border: 1px solid #ddd;
-            background: white;
-            min-height: 100px;
-        `;
-        
-        const table = document.createElement('table');
-        table.className = 'gene-status-table';
-        table.style.cssText = `
-            width: 100%;
-            border-collapse: collapse;
-            font-family: Arial, sans-serif;
-        `;
-        
-        // 5. Create header
-        const thead = document.createElement('thead');
-        const headerRow = document.createElement('tr');
-        headerRow.innerHTML = `
-            <th style="padding: 12px; border: 1px solid #ddd; background: #f5f5f5;">Input Gene</th>
-            <th style="padding: 12px; border: 1px solid #ddd; background: #f5f5f5;">Status</th>
-        `;
-        thead.appendChild(headerRow);
-        table.appendChild(thead);
-        
-        // 6. Create body
-        const tbody = document.createElement('tbody');
-        geneData.forEach((gene, index) => {
-            const row = document.createElement('tr');
-            const status = gene.found ? 'Found' : 'Not Found';
-            const statusColor = gene.found ? '#28a745' : '#dc3545';
-            
-            row.innerHTML = `
-                <td style="padding: 10px; border: 1px solid #ddd;">${gene.name || gene.gene || 'Unknown'}</td>
-                <td style="padding: 10px; border: 1px solid #ddd; color: ${statusColor}; font-weight: bold;">${status}</td>
-            `;
-            
-            // Add hover effect
-            row.addEventListener('mouseenter', () => row.style.backgroundColor = '#f8f9fa');
-            row.addEventListener('mouseleave', () => row.style.backgroundColor = '');
-            
-            tbody.appendChild(row);
-        });
-        table.appendChild(tbody);
-        
-        // 7. Create download button
-        const downloadBtn = document.createElement('button');
-        downloadBtn.textContent = 'Download as CSV';
-        downloadBtn.className = 'download-csv-btn';
-        downloadBtn.style.cssText = `
-            margin-top: 10px;
-            padding: 8px 16px;
-            background: #007bff;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 14px;
-        `;
-        
-        downloadBtn.addEventListener('click', () => downloadTableAsCSV(geneData));
-        downloadBtn.addEventListener('mouseenter', () => downloadBtn.style.background = '#0056b3');
-        downloadBtn.addEventListener('mouseleave', () => downloadBtn.style.background = '#007bff');
-        
-        // 8. Assemble and append
-        tableWrapper.appendChild(table);
-        tableWrapper.appendChild(downloadBtn);
-        container.appendChild(tableWrapper);
-        
-        // 9. Force visibility and scroll into view
-        container.style.display = 'block';
-        container.style.visibility = 'visible';
-        
-        // Scroll to table if needed
-        setTimeout(() => {
-            tableWrapper.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-        }, 100);
-        
-        console.log('Table successfully rendered');
-        console.log('Final container HTML:', container.innerHTML.substring(0, 200) + '...');
-        
-        return true;
-        
-    } catch (error) {
-        console.error('Error rendering table:', error);
-        container.innerHTML = `<div style="color: red; padding: 20px;">Error rendering table: ${error.message}</div>`;
-        return false;
-    }
-}
 
-// Helper function for CSV download
-function downloadTableAsCSV(geneData) {
-    try {
-        const csvContent = [
-            'Input Gene,Status',
-            ...geneData.map(gene => {
-                const name = gene.name || gene.gene || 'Unknown';
-                const status = gene.found ? 'Found' : 'Not Found';
-                return `"${name}","${status}"`;
-            })
-        ].join('\n');
-        
-        const blob = new Blob([csvContent], { type: 'text/csv' });
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'gene_status_table.csv';
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(a);
-        
-        console.log('CSV download initiated');
-    } catch (error) {
-        console.error('Error downloading CSV:', error);
-        alert('Error downloading CSV file');
-    }
-}
-
-// Enhanced function to call after heatmap rendering
-function renderHeatmapAndTable(expressionData, geneList) {
-    console.log('=== Heatmap and Table Rendering ===');
-    
-    // Render heatmap first
-    const heatmapSuccess = renderExpressionHeatmap(expressionData);
-    
-    if (heatmapSuccess) {
-        // Wait a bit for DOM to settle, then render table
-        setTimeout(() => {
-            const geneStatusData = geneList.map(gene => ({
-                name: gene,
-                found: expressionData.some(row => row.gene === gene)
-            }));
-            
-            renderFoundNotFoundTable(geneStatusData, 'table-container');
-        }, 500);
-    } else {
-        console.error('Heatmap rendering failed, skipping table');
-    }
-}
