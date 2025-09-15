@@ -1310,111 +1310,255 @@ function renderTopExpressingTissues(foundGenes, container) {
 
 // Replace the existing  function with this new one
 
+// In your script.js or plots.js file, replace the existing displayCiliaPlotPage function
+
+/**
+ * Renders the CiliaPlot page with a new multi-panel dashboard layout,
+ * inspired by the CZ Biohub Organelle Atlas.
+ */
 function displayCiliaPlotPage() {
     const contentArea = document.querySelector('.content-area');
-    // Use a full-width class and hide the default side panel
-    contentArea.className = 'content-area content-area-full'; 
+    contentArea.className = 'content-area content-area-full'; // Use full width
     document.querySelector('.cilia-panel').style.display = 'none';
 
-    // This HTML builds the new two-column dashboard layout
+    // This HTML builds the new dashboard structure
     contentArea.innerHTML = `
         <div class="ciliaplot-dashboard">
-            <div class="ciliaplot-header">
-                <h2>CiliaPlot Dashboard</h2>
-                <div id="ciliaplot-plot-info" class="info">
-                    Select a plot type to see a description and generate an analysis.
+            <div class="ciliaplot-control-panel">
+                <h3>CiliaPlot Controls</h3>
+                
+                <div class="control-card">
+                    <label for="ciliaplot-genes-input"><strong>1. Enter Gene List</strong></label>
+                    <textarea id="ciliaplot-genes-input" placeholder="e.g., IFT88, CEP290, BBS1..."></textarea>
                 </div>
+
+                <details class="control-card collapsible-card" open>
+                    <summary><strong>2. Select Visualization</strong></summary>
+                    <div class="control-group">
+                        <label for="primary-plot-select">Primary Visualization:</label>
+                        <select id="primary-plot-select">
+                            <option value="organelle_umap" selected>Organellar Projection (UMAP)</option>
+                            <option value="feature_plot">Gene Set Feature Plot (UMAP)</option>
+                            <option value="network">Protein Complex Network</option>
+                        </select>
+                    </div>
+                    <div class="control-group">
+                        <label for="secondary-plot-select">Secondary Visualization:</label>
+                        <select id="secondary-plot-select">
+                            <option value="organelle_radar">Organellar Profile (Radar)</option>
+                            <option value="expression_heatmap">Expression Heatmap</option>
+                            <option value="top_tissues">Top Expressing Tissues</option>
+                            <option value="functional_category">Functional Categories</option>
+                        </select>
+                    </div>
+                </details>
+
+                <button id="generate-plot-btn" class="btn btn-primary btn-large">Generate Plots</button>
             </div>
 
-            <div class="ciliaplot-container">
-                <div class="ciliaplot-left-panel">
-                    <div class="control-card">
-                        <label for="ciliaplot-genes-input"><strong>1. Enter Gene List</strong></label>
-                        <textarea id="ciliaplot-genes-input" placeholder="e.g., IFT88, CEP290, BBS1..."></textarea>
-                    </div>
-
-                    <div class="control-card">
-                        <label for="plot-type-select"><strong>2. Select Plot Type</strong></label>
-                        <select id="plot-type-select">
-    <option value="bubble">Key Localizations</option>
-    <option value="matrix">Gene-Localization Matrix</option>
-    <option value="domain_matrix">Gene-Domain Matrix</option>
-    <option value="functional_category">Functional Categories</option>
-    <option value="network">Protein Complex Network</option>
-    <option value="expression_heatmap">Expression Heatmap</option>
-    <option value="tissue_profile">Tissue Expression Profile</option>
-    <option value="top_tissues">Top Expressing Tissues</option>
-    <option value="expression_localization">Expression vs. Localization</option>
-    
-    <option value="organelle_radar">Organellar Profile (Radar)</option>
-    <option value="organelle_umap">Organellar Projection (UMAP)</option>
-</select>
-                    </div>
-                    
-                    <details class="control-card collapsible-card">
-                        <summary><strong>3. Customize Plot (Optional)</strong></summary>
-                        <div id="plot-settings-panel">
-                            <label for="setting-font-family">Font Family:</label>
-                            <input type="text" id="setting-font-family" value="Arial">
-                            
-                            <label for="setting-font-color">Font Color:</label>
-                            <input type="color" id="setting-font-color" value="#333333">
-                            
-                            <label for="setting-bg-color">Background Color:</label>
-                            <input type="color" id="setting-bg-color" value="#ffffff">
-
-                            <label for="setting-title-font-size">Title Font (px):</label>
-                            <input type="number" id="setting-title-font-size" value="21" step="1">
-
-                            <label for="setting-axis-title-font-size">Axis Title (px):</label>
-                            <input type="number" id="setting-axis-title-font-size" value="20" step="1">
-                            
-                            <label for="setting-tick-font-size">Axis Ticks (px):</label>
-                            <input type="number" id="setting-tick-font-size" value="20" step="1">
-                        </div>
-                    </details>
-                    
-                    <button id="generate-plot-btn" class="btn btn-primary btn-large">Generate Plot</button>
+            <div class="ciliaplot-results-panel">
+                <div id="ciliaplot-main-plot-area" class="main-plot-card">
+                    <p class="status-message">Enter a gene list and click "Generate Plots" to begin.</p>
                 </div>
-
-                <div class="ciliaplot-right-panel">
-                    <div id="ciliaplot-stats-container" class="stats-container">
-                        </div>
-
-                    <div class="plot-card">
-                        <div class="plot-card-header">
-                            <h3>Visualization</h3>
-                            <div class="download-controls">
-                                <select id="download-format">
-                                    <option value="png">Download as PNG</option>
-                                    <option value="pdf">Download as PDF</option>
-                                </select>
-                                <button id="download-plot-btn" class="btn btn-secondary">Download</button>
-                            </div>
-                        </div>
-                        <div id="plot-display-area" class="plot-area-large">
-                            </div>
-                        <div id="ciliaplot-legend-container" class="legend">
-                            </div>
+                
+                <div class="secondary-plots-card">
+                    <div class="tab-header">
+                        <button class="tab-link active" data-tab="secondary-plot">Secondary Plot</button>
+                        <button class="tab-link" data-tab="summary-table">Gene Summary</button>
                     </div>
-
-                    <div id="plot-data-table-container">
+                    <div class="tab-content active" id="secondary-plot-container">
                         </div>
-
-                    <div id="ciliaplot-search-results">
+                    <div class="tab-content" id="ciliaplot-search-results-container">
                         </div>
                 </div>
             </div>
         </div>
     `;
 
-    // Re-attach event listeners for the new buttons
-    document.getElementById('generate-plot-btn').onclick = generateAnalysisPlots;
-    document.getElementById('download-plot-btn').onclick = downloadPlot;
-    // Add event listener for plot type change to update info box
-    document.getElementById('plot-type-select').addEventListener('change', (e) => {
-        updatePlotInfo(e.target.value);
+    // Re-attach event listeners
+    document.getElementById('generate-plot-btn').onclick = runFullAnalysis;
+
+    // Add event listeners for the new tabs
+    document.querySelectorAll('.tab-link').forEach(button => {
+        button.addEventListener('click', () => {
+            const tabName = button.dataset.tab;
+            // Update active button
+            document.querySelectorAll('.tab-link').forEach(btn => btn.classList.remove('active'));
+            button.classList.add('active');
+            // Update active content
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            if (tabName === 'secondary-plot') {
+                document.getElementById('secondary-plot-container').classList.add('active');
+            } else {
+                document.getElementById('ciliaplot-search-results-container').classList.add('active');
+            }
+        });
     });
+}
+
+// Add this new function to plots.js
+/**
+ * Main orchestrator for the new dashboard. Runs all selected analyses.
+ */
+async function runFullAnalysis() {
+    try {
+        await loadAndPrepareDatabase();
+        
+        const primaryPlotType = document.getElementById('primary-plot-select').value;
+        const secondaryPlotType = document.getElementById('secondary-plot-select').value;
+        const genesInput = document.getElementById('ciliaplot-genes-input').value.trim();
+
+        if (!genesInput) {
+            alert('Please enter a gene list.');
+            return;
+        }
+
+        // Clear previous results
+        document.getElementById('ciliaplot-main-plot-area').innerHTML = '<p class="status-message">Generating...</p>';
+        document.getElementById('secondary-plot-container').innerHTML = '';
+        document.getElementById('ciliaplot-search-results-container').innerHTML = '';
+
+        const sanitizedQueries = [...new Set(genesInput.split(/[\s,;\n\r\t]+/).filter(Boolean).map(q => q.toUpperCase()))];
+        const { foundGenes, notFoundGenes } = findGenes(sanitizedQueries);
+
+        if (foundGenes.length === 0) {
+            document.getElementById('ciliaplot-main-plot-area').innerHTML = '<p class="status-message error">No valid genes found.</p>';
+            return;
+        }
+        
+        // Generate the plots
+        await generateAnalysisPlots(primaryPlotType, foundGenes, document.getElementById('ciliaplot-main-plot-area'));
+        await generateAnalysisPlots(secondaryPlotType, foundGenes, document.getElementById('secondary-plot-container'));
+
+        // Render the summary table in its dedicated container
+        renderCiliaPlotSearchResultsTable(foundGenes, notFoundGenes);
+
+    } catch (error) {
+        console.error('Error during analysis:', error);
+        document.getElementById('ciliaplot-main-plot-area').innerHTML = `<p class="status-message error">An error occurred: ${error.message}</p>`;
+    }
+}
+
+
+// Add this new function to plots.js
+/**
+ * Renders a UMAP where background points are gray and the user's gene set
+ * is colored by localization, creating a feature plot effect.
+ */
+function renderFeaturePlot(foundGenes, container) {
+    clearPreviousPlot();
+    container.innerHTML = `<canvas></canvas>`;
+    const ctx = container.querySelector('canvas').getContext('2d');
+    const settings = getPlotSettings();
+
+    // Background data: all organelles in a neutral color
+    const backgroundData = Object.values(precomputedUMAP).flat();
+    const backgroundDataset = {
+        label: 'All Proteins',
+        data: backgroundData,
+        backgroundColor: '#cccccc66', // Light gray, semi-transparent
+        pointRadius: 3,
+    };
+
+    // User gene data, colored by localization
+    const userGeneData = [];
+    const colorMap = {};
+    const localizationColors = d3.schemeCategory10;
+    let colorIndex = 0;
+
+    foundGenes.forEach(gene => {
+        const localizations = getCleanArray(gene, 'localization');
+        const primaryLoc = localizations[0] || 'Unknown';
+
+        if (!colorMap[primaryLoc]) {
+            colorMap[primaryLoc] = localizationColors[colorIndex % localizationColors.length];
+            colorIndex++;
+        }
+        
+        // Find a representative point (simulation)
+        let pointFound = false;
+        for (const loc of localizations) {
+            const matchedOrganelle = Object.keys(precomputedUMAP).find(org => loc.toLowerCase().includes(org.toLowerCase()));
+            if (matchedOrganelle && precomputedUMAP[matchedOrganelle].length > 0) {
+                const point = precomputedUMAP[matchedOrganelle][userGeneData.length % precomputedUMAP[matchedOrganelle].length];
+                userGeneData.push({
+                    ...point,
+                    gene: gene.gene,
+                    localization: primaryLoc,
+                    color: colorMap[primaryLoc]
+                });
+                pointFound = true;
+                break;
+            }
+        }
+    });
+
+    const userDatasets = Object.entries(colorMap).map(([loc, color]) => ({
+        label: loc,
+        data: userGeneData.filter(d => d.localization === loc),
+        backgroundColor: color,
+        pointRadius: 8,
+        borderColor: '#ffffff',
+        borderWidth: 2,
+    }));
+
+    currentPlotInstance = new Chart(ctx, {
+        type: 'scatter',
+        data: {
+            datasets: [backgroundDataset, ...userDatasets],
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                title: { display: true, text: "Gene Set Feature Plot", font: { size: settings.titleFontSize } },
+                legend: { position: 'right' },
+                tooltip: { callbacks: { label: c => `Gene: ${c.raw.gene} (${c.raw.localization})` } }
+            },
+            scales: {
+                x: { title: { display: true, text: 'UMAP 1' }, grid: { display: false }, ticks: { display: false } },
+                y: { title: { display: true, text: 'UMAP 2' }, grid: { display: false }, ticks: { display: false } }
+            }
+        }
+    });
+}
+
+
+// Replace your old generateAnalysisPlots function with this refactored one
+/**
+ * A router function that calls the correct rendering function based on plotType.
+ */
+async function generateAnalysisPlots(plotType, foundGenes, container) {
+    switch (plotType) {
+        case 'organelle_umap':
+            await renderOrganelleUMAP(foundGenes, container);
+            break;
+        case 'feature_plot':
+            await renderFeaturePlot(foundGenes, container);
+            break;
+        case 'network':
+            await renderComplexNetwork(foundGenes, container);
+            break;
+        case 'organelle_radar':
+            await renderOrganelleRadarPlot(foundGenes, container);
+            break;
+        case 'expression_heatmap':
+            await loadExpressionData();
+            await renderExpressionHeatmap(foundGenes, container);
+            break;
+        case 'top_tissues':
+             await loadExpressionData();
+            await renderTopExpressingTissues(foundGenes, container);
+            break;
+        case 'functional_category':
+            await renderFunctionalCategoryPlot(foundGenes, container);
+            break;
+        default:
+            container.innerHTML = `<p class="status-message">Plot type "${plotType}" is not yet implemented.</p>`;
+            break;
+    }
 }
 
 // =============================================================================
