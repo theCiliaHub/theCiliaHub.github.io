@@ -202,17 +202,20 @@ function updatePlotInfo(plotType) {
         case 'top_tissues':
             infoHTML = `<strong>Top Expressing Tissues:</strong> This bar chart ranks tissues by the average expression level of your gene set, showing where these genes are most active.`;
             break;
-        default:
-            infoHTML = `Select a plot type to see a description.`;
-            break;
-        case 'organelle_radar':
-            infoHTML = `<strong>Organellar Profile (Radar):</strong> This plot compares the average protein abundance profile of your gene set across simulated cellular fractions against known organellar markers (e.g., ER, Golgi, Cilia). It helps identify which organelle your gene set most closely resembles.`;
-            break;
-        case 'organelle_umap':
-            infoHTML = `<strong>Organellar Projection (UMAP):</strong> This scatter plot shows a 2D representation of the entire organellar proteome, where proteins with similar abundance profiles cluster together. Your input genes are highlighted to show where they fall within these defined organellar clusters.`;
-            break;
-    }
-    infoContainer.innerHTML = infoHTML;
+         // --- MOVED TO HERE ---
+        case 'organelle_radar':
+            infoHTML = `<strong>Organellar Profile (Radar):</strong> This plot compares the average protein abundance profile of your gene set across simulated cellular fractions against known organellar markers (e.g., ER, Golgi, Cilia). It helps identify which organelle your gene set most closely resembles.`;
+            break;
+        case 'organelle_umap':
+            infoHTML = `<strong>Organellar Projection (UMAP):</strong> This scatter plot shows a 2D representation of the entire organellar proteome, where proteins with similar abundance profiles cluster together. Your input genes are highlighted to show where they fall within these defined organellar clusters.`;
+            break;
+
+        // --- 'default' IS NOW THE LAST CASE ---
+        default:
+            infoHTML = `Select a plot type to see a description.`;
+            break;
+    }
+    infoContainer.innerHTML = infoHTML;
 }
 
 /**
