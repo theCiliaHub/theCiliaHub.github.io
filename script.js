@@ -1346,38 +1346,6 @@ function performBatchSearch() {
     }
 }
 
-function displayBatchResults(results) {
-    const batchResults = document.getElementById('batch-results');
-    if (!batchResults) return;
-    
-    if (results.length === 0) {
-        batchResults.innerHTML = '<p class="error-message">No matching genes found</p>';
-        return;
-    }
-    
-    let html = `
-        <h3>Search Results (${results.length} genes found)</h3>
-        <table>
-            <tr>
-                <th>Gene</th>
-                <th>Ensembl ID</th>
-                <th>Localization</th>
-                <th>Function Summary</th>
-            </tr>`;
-    
-    results.forEach(item => {
-        html += `<tr>
-            <td><a href="/${item.gene}" onclick="navigateTo(event, '/${item.gene}')">${item.gene}</a></td>
-            <td>${item.ensembl_id || '-'}</td>
-            <td>${item.localization || '-'}</td>
-            <td>${item.functional_summary ? item.functional_summary.substring(0, 100) + '...' : '-'}</td>
-        </tr>`;
-    });
-    
-    html += '</table>';
-    batchResults.innerHTML = html;
-}
-
 function handleCSVUpload(event) {
     const file = event.target.files[0];
     if (!file) return;
