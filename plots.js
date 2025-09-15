@@ -786,123 +786,128 @@ function calculateExpressionStats(genes) {
     return stats;
 }
 
+// In plots.js, replace the old function with this one
 
 /**
- * Renders an expression heatmap.
+ * Renders an expression heatmap with corrected positioning for the new dashboard layout.
  */
 function renderExpressionHeatmap(foundGenes, container) {
     clearPreviousPlot();
-    // TODO: Add hierarchical clustering for both genes and tissues to reveal
-    // expression patterns, which is a standard feature in publication heatmaps.
     const settings = getPlotSettings();
-    
+
     if (!foundGenes.length || Object.keys(expressionData).length === 0) {
         container.innerHTML = '<p class="status-message">No expression data available for selected genes.</p>';
         return;
     }
-    
+
     const tissues = getTissueNames();
-    if (tissues.length === 0) {
-        container.innerHTML = '<p class="status-message">No tissue data found in expression dataset.</p>';
-        return;
-    }
-    
     const genesWithExpression = foundGenes.filter(gene => Object.keys(getGeneExpression(gene.gene)).length > 0);
-    
+
     if (genesWithExpression.length === 0) {
         container.innerHTML = '<p class="status-message">None of the selected genes have expression data.</p>';
         return;
     }
-    
+
+    // Prepare data and calculate max expression
     let maxExpression = 0;
+    const heatmapData = [];
     genesWithExpression.forEach(gene => {
         const expr = getGeneExpression(gene.gene);
         const maxGeneExpr = Math.max(0, ...Object.values(expr));
         maxExpression = Math.max(maxExpression, maxGeneExpr);
-    });
-    
-    container.style.overflowX = 'auto';
-    const containerWidth = container.clientWidth || 800;
-    const minBandWidth = 15;
-    const calcWidth = Math.max(containerWidth, tissues.length * minBandWidth + 200);
-    const width = Math.min(calcWidth, 2000);
-    const height = Math.max(400, genesWithExpression.length * 25 + 220);
-    
-    const svg = d3.select(container).append('svg').attr('width', width).attr('height', height);
-    svg.append('rect').attr('width', '100%').attr('height', '100%').attr('fill', settings.backgroundColor);
-    
-    const margin = {top: 80, right: 80, bottom: 140, left: 120};
-    const plotWidth = width - margin.left - margin.right;
-    const plotHeight = height - margin.top - margin.bottom;
-    
-    const xScale = d3.scaleBand().domain(tissues).range([0, plotWidth]).padding(0.1);
-    const yScale = d3.scaleBand().domain(genesWithExpression.map(g => g.gene)).range([0, plotHeight]).padding(0.1);
-    const colorScale = d3.scaleSequential().interpolator(d3.interpolateViridis).domain([0, maxExpression]);
-    
-    const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
-    
-    svg.append('text').attr('x', width / 2).attr('y', 30).attr('text-anchor', 'middle')
-        .style('font-family', settings.fontFamily).style('font-size', `${settings.titleFontSize}px`)
-        .style('font-weight', 'bold').style('fill', settings.fontColor).text('Gene Expression Heatmap Across Tissues');
-    
-    const heatmapData = [];
-    genesWithExpression.forEach(gene => {
-        const expr = getGeneExpression(gene.gene);
         tissues.forEach(tissue => {
             heatmapData.push({ gene: gene.gene, tissue: tissue, expression: expr[tissue] || 0 });
         });
     });
+
+    // --- FIX: Revised Sizing and Margins for the new layout ---
+    const containerWidth = container.clientWidth;
+    const containerHeight = container.clientHeight;
     
-    g.selectAll('.heatmap-rect').data(heatmapData).enter().append('rect')
-        .attr('class', 'heatmap-rect').attr('x', d => xScale(d.tissue)).attr('y', d => yScale(d.gene))
-        .attr('width', xScale.bandwidth()).attr('height', yScale.bandwidth())
-        .attr('fill', d => d.expression > 0 ? colorScale(d.expression) : '#f0f0f0')
-        .attr('stroke', 'white').attr('stroke-width', 0.5).style('cursor', 'pointer')
-        .on('mouseover', function(event, d) {
-            d3.select(this).attr('stroke-width', 2).attr('stroke', '#333');
-            const tooltip = d3.select('body').append('div').attr('class', 'expression-tooltip')
-                .style('position', 'absolute').style('background', 'rgba(0,0,0,0.9)').style('color', 'white')
-                .style('padding', '10px').style('border-radius', '5px').style('font-size', '12px')
-                .style('pointer-events', 'none').style('z-index', '1000').style('opacity', 0);
-            tooltip.html(`<strong>${d.gene}</strong><br/>${d.tissue}<br/>Expression: ${d.expression.toFixed(2)}`)
-                .style('left', `${event.pageX + 10}px`).style('top', `${event.pageY - 10}px`)
-                .transition().duration(200).style('opacity', 1);
-        }).on('mouseout', function() {
-            d3.select(this).attr('stroke-width', 0.5).attr('stroke', 'white');
-            d3.selectAll('.expression-tooltip').remove();
-        });
+    const margin = { top: 60, right: 100, bottom: 150, left: 120 };
+    const width = containerWidth - margin.left - margin.right;
+    const height = containerHeight - margin.top - margin.bottom;
+
+    const svg = d3.select(container).append('svg')
+        .attr('width', '100%')
+        .attr('height', '100%')
+        .attr('viewBox', `0 0 ${containerWidth} ${containerHeight}`)
+        .append('g')
+        .attr('transform', `translate(${margin.left}, ${margin.top})`);
+
+    // Scales
+    const xScale = d3.scaleBand().domain(tissues).range([0, width]).padding(0.05);
+    const yScale = d3.scaleBand().domain(genesWithExpression.map(g => g.gene)).range([0, height]).padding(0.05);
+    const colorScale = d3.scaleSequential(d3.interpolateViridis).domain([0, maxExpression]);
+
+    // Draw heatmap rectangles
+    svg.selectAll('.heatmap-rect')
+       .data(heatmapData)
+       .enter()
+       .append('rect')
+       .attr('class', 'heatmap-rect')
+       .attr('x', d => xScale(d.tissue))
+       .attr('y', d => yScale(d.gene))
+       .attr('width', xScale.bandwidth())
+       .attr('height', yScale.bandwidth())
+       .attr('fill', d => colorScale(d.expression || 0));
+
+    // Draw Axes
+    // X-Axis
+    svg.append('g')
+        .attr('transform', `translate(0, ${height})`)
+        .call(d3.axisBottom(xScale))
+        .selectAll('text')
+        .attr('transform', 'translate(-10,0)rotate(-45)')
+        .style('text-anchor', 'end');
     
-    const xTickFontSize = Math.max(6, Math.min(settings.tickFontSize, xScale.bandwidth() * 0.8));
-    g.append('g').attr('transform', `translate(0,${plotHeight})`).call(d3.axisBottom(xScale))
-        .selectAll('text').style('font-family', settings.fontFamily)
-        .style('font-size', `${xTickFontSize}px`).style('fill', settings.fontColor)
-        .attr('transform', 'rotate(-45)').style('text-anchor', 'end');
+    // Y-Axis (The missing axis)
+    svg.append('g')
+       .call(d3.axisLeft(yScale));
+       
+    // --- FIX: Correctly positioned axis labels ---
+    // X-Axis Label
+    d3.select(container).select('svg').append('text')
+        .attr('text-anchor', 'middle')
+        .attr('x', margin.left + width / 2)
+        .attr('y', containerHeight - margin.bottom / 2 + 30)
+        .text('Tissues')
+        .attr('font-weight', 'bold');
+
+    // Y-Axis Label
+    d3.select(container).select('svg').append('text')
+        .attr('text-anchor', 'middle')
+        .attr('transform', 'rotate(-90)')
+        .attr('y', margin.left / 2 - 20)
+        .attr('x', -(margin.top + height / 2))
+        .text('Genes')
+        .attr('font-weight', 'bold');
+
+    // --- FIX: Robust color legend (the missing bar) ---
+    const legendWidth = 20, legendHeight = height / 2;
+    const legendX = width + 40; // Position it inside the right margin
+    const legendY = height / 4;
+
+    const legend = svg.append('g').attr('transform', `translate(${legendX}, ${legendY})`);
+    const defs = legend.append('defs');
+    const linearGradient = defs.append('linearGradient').attr('id', 'legend-gradient').attr('gradientTransform', 'rotate(90)');
+    linearGradient.selectAll('stop')
+        .data(colorScale.ticks().map((t, i, n) => ({ offset: `${100*i/n.length}%`, color: colorScale(t) })))
+        .enter().append('stop')
+        .attr('offset', d => d.offset)
+        .attr('stop-color', d => d.color);
+
+    legend.append('rect')
+        .attr('width', legendWidth)
+        .attr('height', legendHeight)
+        .style('fill', 'url(#legend-gradient)');
+
+    const legendScale = d3.scaleLinear().domain(colorScale.domain()).range([legendHeight, 0]);
+    legend.append('g')
+        .attr('transform', `translate(${legendWidth}, 0)`)
+        .call(d3.axisRight(legendScale).ticks(5));
     
-    const yTickFontSize = Math.max(6, Math.min(settings.tickFontSize, yScale.bandwidth() * 0.8));
-    g.append('g').call(d3.axisLeft(yScale)).selectAll('text')
-        .style('font-family', settings.fontFamily).style('font-size', `${yTickFontSize}px`).style('fill', settings.fontColor);
-    
-    svg.append('text').attr('transform', `translate(${width/2},${height - 20})`).style('text-anchor', 'middle')
-        .style('font-family', settings.fontFamily).style('font-size', `${settings.axisTitleFontSize}px`)
-        .style('font-weight', 'bold').style('fill', settings.fontColor).text('Tissues');
-    
-    svg.append('text').attr('transform', 'rotate(-90)').attr('y', 20).attr('x', 0 - (height / 2)).style('text-anchor', 'middle')
-        .style('font-family', settings.fontFamily).style('font-size', `${settings.axisTitleFontSize}px`)
-        .style('font-weight', 'bold').style('fill', settings.fontColor).text('Genes');
-    
-    const legendWidth = 20, legendHeight = 200, legendX = width - 60, legendY = margin.top;
-    const legendScale = d3.scaleLinear().domain([0, maxExpression]).range([legendHeight, 0]);
-    const legendAxis = d3.axisRight(legendScale).ticks(5).tickFormat(d3.format('.1f'));
-    const defs = svg.append('defs');
-    const legendGradient = defs.append('linearGradient').attr('id', 'legend-gradient').attr('x1', '0%').attr('y1', '100%').attr('x2', '0%').attr('y2', '0%');
-    legendGradient.selectAll('stop').data(d3.range(0, 1.1, 0.1)).enter().append('stop')
-        .attr('offset', d => `${d * 100}%`).attr('stop-color', d => colorScale(d * maxExpression));
-    svg.append('rect').attr('x', legendX).attr('y', legendY).attr('width', legendWidth).attr('height', legendHeight)
-        .style('fill', 'url(#legend-gradient)').style('stroke', '#ccc');
-    svg.append('g').attr('transform', `translate(${legendX + legendWidth}, ${legendY})`).call(legendAxis)
-        .selectAll('text').style('font-family', settings.fontFamily).style('font-size', '10px').style('fill', settings.fontColor);
-    
-    currentPlotInstance = svg.node();
+    currentPlotInstance = d3.select(container).select('svg').node();
 }
 
 /**
