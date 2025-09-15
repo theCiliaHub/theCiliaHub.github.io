@@ -3,7 +3,8 @@
 // =============================================================================
 // This file contains all functions for generating analytical plots on the
 // CiliaPlot page, including localization, domain, network, and expression
-// analyses.
+// analyses. It now also includes functions to display a summary table of the
+// queried genes before rendering the plot.
 //
 // Dependencies:
 // - D3.js (for network plot)
@@ -31,6 +32,63 @@ function clearPreviousPlot() {
     document.getElementById('plot-display-area').innerHTML = ''; // Ensure container is empty
     currentPlotInstance = null; // Reset the variable
 }
+
+
+/**
+ * Renders a summary table of found and not-found genes for CiliaPlot.
+ * This function is adapted from the BatchQuery's displayBatchResults.
+ * @param {Array} foundGenes - Array of gene objects that were found in the database.
+ * @param {Array} notFoundGenes - Array of gene names that were not found.
+ */
+function renderCiliaPlotSearchResultsTable(foundGenes, notFoundGenes) {
+    const resultDiv = document.getElementById('ciliaplot-search-results');
+    if (!resultDiv) {
+        console.error('CiliaPlot search results container not found.');
+        return;
+    }
+
+    let html = `<h3>Query Summary (${foundGenes.length} gene${foundGenes.length !== 1 ? 's' : ''} found)</h3>`;
+
+    if (foundGenes.length > 0) {
+        html += `
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Gene</th>
+                            <th>Ensembl ID</th>
+                            <th>Localization Summary</th>
+                            <th>Function Summary</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+        `;
+        foundGenes.forEach(item => {
+            const localizationText = Array.isArray(item.localization) ? item.localization.join(', ') : (item.localization || 'N/A');
+            html += `
+                <tr>
+                    <td><a href="/${item.gene}" onclick="navigateTo(event, '/${item.gene}')">${item.gene}</a></td>
+                    <td>${item.ensembl_id || 'N/A'}</td>
+                    <td>${localizationText}</td>
+                    <td>${item.functional_summary ? item.functional_summary.substring(0, 100) + '...' : 'N/A'}</td>
+                </tr>
+            `;
+        });
+        html += '</tbody></table></div>';
+    }
+
+    if (notFoundGenes && notFoundGenes.length > 0) {
+        html += `
+            <div class="not-found-genes">
+                <h4>Genes Not Found (${notFoundGenes.length}):</h4>
+                <p>${notFoundGenes.join(', ')}</p>
+            </div>
+        `;
+    }
+
+    resultDiv.innerHTML = html;
+}
+
 
 /**
  * Robustly extracts a clean array of values from a gene object.
@@ -62,8 +120,8 @@ function getCleanArray(gene, ...keys) {
 // =============================================================================
 
 /**
-*
- * MODIFIED: Main controller, now calls the table renderer for the bubble plot.
+ * Main controller for CiliaPlot. It now performs the search, displays a summary
+ * table of results, and then generates the selected analytical plot.
  */
 async function generateAnalysisPlots() {
     try {
@@ -71,32 +129,44 @@ async function generateAnalysisPlots() {
         await loadExpressionData();
 
         const plotContainer = document.getElementById('plot-display-area');
+        const searchResultsContainer = document.getElementById('ciliaplot-search-results');
         const genesInput = document.getElementById('ciliaplot-genes-input').value.trim();
+
         if (!genesInput) {
             alert('Please enter a gene list.');
             return;
         }
-        
-        clearPreviousPlot(); // Clear previous results before starting
+
+        // Clear all previous results before starting a new analysis
+        clearPreviousPlot();
+        if (searchResultsContainer) searchResultsContainer.innerHTML = '';
         const tableContainer = document.getElementById('plot-data-table-container');
         if (tableContainer) tableContainer.innerHTML = '';
-        plotContainer.innerHTML = '<p class="status-message">Generating plot...</p>';
+        plotContainer.innerHTML = '<p class="status-message">Searching genes and generating plot...</p>';
 
         const sanitizedQueries = [...new Set(genesInput.split(/[\s,;\n\r\t]+/).filter(Boolean).map(q => q.toUpperCase()))];
-        const { foundGenes } = findGenes(sanitizedQueries);
+        const { foundGenes, notFoundGenes } = findGenes(sanitizedQueries);
+
+        // **NEW**: Render the search results table first
+        renderCiliaPlotSearchResultsTable(foundGenes, notFoundGenes);
+
+        if (foundGenes.length === 0) {
+            plotContainer.innerHTML = '<p class="status-message error">No valid genes were found to generate a plot.</p>';
+            updateStatsAndLegend(document.getElementById('plot-type-select').value, []); // Clear stats
+            return;
+        }
+
         const plotType = document.getElementById('plot-type-select').value;
 
         updatePlotInfo(plotType);
         updateStatsAndLegend(plotType, foundGenes);
 
-        // Routing and table generation
+        // Routing for plot generation
         switch (plotType) {
             case 'expression_localization':
                 renderExpressionLocalizationBubble(foundGenes, plotContainer);
-                // NEW: Render the data table below this specific plot
                 renderGeneDataTable(foundGenes, document.getElementById('plot-data-table-container'));
                 break;
-            // ... (other cases remain the same)
             case 'bubble':
                 renderKeyLocalizations(foundGenes, plotContainer);
                 break;
@@ -124,7 +194,7 @@ async function generateAnalysisPlots() {
                 break;
             default:
                 plotContainer.innerHTML = `<p class="status-message">Plot type "${plotType}" is not yet implemented.</p>`;
-        		break;
+                break;
         }
     } catch (error) {
         console.error('Error generating plots:', error);
@@ -143,35 +213,35 @@ function updatePlotInfo(plotType) {
     let infoHTML = '';
     switch (plotType) {
         case 'bubble':
-             infoHTML = `<strong>Key Localizations:</strong> This bubble plot shows the distribution of your genes across primary ciliary and cellular compartments. The size of each bubble corresponds to the number of genes found in that location.`;
-             break;
+            infoHTML = `<strong>Key Localizations:</strong> This bubble plot shows the distribution of your genes across primary ciliary and cellular compartments. The size of each bubble corresponds to the number of genes found in that location.`;
+            break;
         case 'matrix':
-             infoHTML = `<strong>Gene-Localization Matrix:</strong> This plot shows the specific localization for each gene in your list. A bubble indicates that a gene is associated with a particular ciliary compartment.`;
-             break;
+            infoHTML = `<strong>Gene-Localization Matrix:</strong> This plot shows the specific localization for each gene in your list. A bubble indicates that a gene is associated with a particular ciliary compartment.`;
+            break;
         case 'domain_matrix':
-             infoHTML = `<strong>Gene-Domain Matrix:</strong> This plot shows which protein domains are present in each gene. This helps identify shared functional components among your selected genes.`;
-             break;
+            infoHTML = `<strong>Gene-Domain Matrix:</strong> This plot shows which protein domains are present in each gene. This helps identify shared functional components among your selected genes.`;
+            break;
         case 'functional_category':
-             infoHTML = `<strong>Functional Category Bar Chart:</strong> This chart categorizes your genes into broader functional groups, providing an overview of the biological processes they are involved in.`;
-             break;
+            infoHTML = `<strong>Functional Category Bar Chart:</strong> This chart categorizes your genes into broader functional groups, providing an overview of the biological processes they are involved in.`;
+            break;
         case 'network':
-             infoHTML = `<strong>Protein Complex Network:</strong> This network graph visualizes known protein-protein interactions and complex memberships among your selected genes, revealing functional modules.`;
-             break;
+            infoHTML = `<strong>Protein Complex Network:</strong> This network graph visualizes known protein-protein interactions and complex memberships among your selected genes, revealing functional modules.`;
+            break;
         case 'expression_heatmap':
-             infoHTML = `<strong>Expression Heatmap:</strong> This plot displays the expression level (nTPM) of each selected gene across various human tissues. Darker colors indicate higher expression.`;
-             break;
+            infoHTML = `<strong>Expression Heatmap:</strong> This plot displays the expression level (nTPM) of each selected gene across various human tissues. Darker colors indicate higher expression.`;
+            break;
         case 'tissue_profile':
-             infoHTML = `<strong>Tissue Expression Profile:</strong> This line chart shows the average expression of your gene set across the top 20 tissues, highlighting potential tissue-specific enrichment.`;
-             break;
+            infoHTML = `<strong>Tissue Expression Profile:</strong> This line chart shows the average expression of your gene set across the top 20 tissues, highlighting potential tissue-specific enrichment.`;
+            break;
         case 'expression_localization':
-             infoHTML = `<strong>Expression vs. Localization:</strong> This bubble plot correlates expression breadth (number of expressing tissues) with localization diversity. Bubble size represents the maximum expression level.`;
-             break;
+            infoHTML = `<strong>Expression vs. Localization:</strong> This bubble plot correlates expression breadth (number of expressing tissues) with localization diversity. Bubble size represents the maximum expression level.`;
+            break;
         case 'top_tissues':
-             infoHTML = `<strong>Top Expressing Tissues:</strong> This bar chart ranks tissues by the average expression level of your gene set, showing where these genes are most active.`;
-             break;
+            infoHTML = `<strong>Top Expressing Tissues:</strong> This bar chart ranks tissues by the average expression level of your gene set, showing where these genes are most active.`;
+            break;
         default:
-             infoHTML = `Select a plot type to see a description.`;
-             break;
+            infoHTML = `Select a plot type to see a description.`;
+            break;
     }
     infoContainer.innerHTML = infoHTML;
 }
