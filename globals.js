@@ -39,7 +39,7 @@ function navigateTo(event, path) {
 }
 
 // =============================================================================
-// ROUTER
+// ROUTER (REVISED)
 // =============================================================================
 async function handleRouteChange() {
     let path = window.location.hash.replace(/^#/, '').toLowerCase().trim();
@@ -48,32 +48,15 @@ async function handleRouteChange() {
     }
 
     try {
-        // Make sure database is loaded before any gene lookup
-        await loadAndPrepareDatabase();
+        await loadAndPrepareDatabase(); // Ensure database is ready
     } catch (err) {
         console.error("Database loading failed:", err);
-    }
-
-    // Initialize gene as null
-    let gene = null;
-
-    // Only try to get a gene if geneMapCache exists
-    if (geneMapCache) {
-        const geneName = getGeneFromURL();
-        if (geneName && geneName.toLowerCase() !== 'ciliaplot') {
-            const safeName = sanitize(geneName);
-            gene = geneMapCache.get(safeName);
-            if (!gene) {
-                console.warn(`Gene "${safeName}" not found in database.`);
-            }
-        }
-    } else {
-        console.warn("geneMapCache is not initialized yet.");
+        return; // Stop execution if DB fails
     }
 
     updateActiveNav(path);
 
-    // Hide all pages
+    // Hide all page containers
     const pages = [
         '#home-page', '#analysis-page', '#batch-query-page',
         '#ciliaplot-page', '#compare-page', '#expression-page',
@@ -83,6 +66,9 @@ async function handleRouteChange() {
         const el = document.querySelector(id);
         if (el) el.style.display = 'none';
     });
+
+    // REFACTORED: The gene lookup is now inside the `default` case
+    let geneToDisplay = null;
 
     // Show the correct page
     switch (path) {
@@ -96,11 +82,6 @@ async function handleRouteChange() {
         case '/ciliaplot':
         case '/analysis':
             displayCiliaPlotPage();
-            // If a gene was found, pass it to the plots logic
-            if (gene) {
-                renderDomainEnrichment([gene]);
-                computeProteinComplexLinks([gene]);
-            }
             break;
         case '/compare':
             displayComparePage();
@@ -115,15 +96,26 @@ async function handleRouteChange() {
             displayContactPage();
             break;
         default:
-            if (gene) {
-                displayIndividualGenePage(gene);
+            // This block now exclusively handles potential gene pages
+            if (geneMapCache) {
+                const geneName = getGeneFromURL(); // Get gene name from the unknown path
+                if (geneName) {
+                    const safeName = sanitize(geneName);
+                    geneToDisplay = geneMapCache.get(safeName);
+                }
+            } else {
+                console.warn("geneMapCache is not initialized yet.");
+            }
+
+            if (geneToDisplay) {
+                displayIndividualGenePage(geneToDisplay);
             } else {
                 displayNotFoundPage();
             }
             break;
     }
 
-    console.log("Routing completed. Path:", path, "Gene:", gene ? gene.gene : "N/A");
+    console.log("Routing completed. Path:", path, "Gene:", geneToDisplay ? geneToDisplay.gene : "N/A");
 }
 
 // =============================================================================
