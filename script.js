@@ -25,10 +25,6 @@ function sanitize(input) {
                 .toUpperCase();
 }
 
-
-
-
-
 /**
  * Loads, sanitizes, and prepares the gene database into an efficient lookup map.
  */
@@ -461,19 +457,7 @@ function getDefaultGenes() {
 }
 
 
-function sanitizeLocalization(localization) {
-    console.log('sanitizeLocalization input:', localization);
-    const result = Array.isArray(localization) ? localization : String(localization).split(/[,;]/)
-        .map(item => item.trim().toLowerCase())
-        .filter(item => item && ['cilia', 'basal body', 'transition zone', 'axoneme', 'ciliary membrane', 'cytosol'].includes(item));
-    console.log('sanitizeLocalization output:', result);
-    return result;
-}
-
 function mapLocalizationToSVG(localizationArray) {
-    console.log('mapLocalizationToSVG input:', localizationArray);
-
-    // Define the mapping of localization terms to SVG IDs
     const mapping = {
         "ciliary membrane": ["ciliary-membrane", "axoneme"],
         "axoneme": ["ciliary-membrane", "axoneme"],
@@ -488,51 +472,24 @@ function mapLocalizationToSVG(localizationArray) {
         "mitochondrion": ["cell-body"],
         "endoplasmic reticulum": ["cell-body"],
         "golgi apparatus": ["cell-body"],
-        "lysosome": ["cell-body"],
-        "microbody": ["cell-body"],
-        "peroxisome": ["cell-body"],
-        "microtubules": ["cell-body"],
-        "autophagosomes": ["cell-body"]
+        "lysosome": ["cell-body"],             // ✨ NEW
+        "microbody": ["cell-body"],             // ✨ NEW
+        "peroxisome": ["cell-body"],            // ✨ NEW
+        "microtubules": ["cell-body"],          // ✨ NEW
+        "autophagosomes": ["cell-body"]         // ✨ NEW
     };
+    if (!Array.isArray(localizationArray)) return [];
 
-    // Validate input
-    if (!Array.isArray(localizationArray)) {
-        console.warn('Invalid input: localizationArray is not an array', localizationArray);
-        return [];
-    }
+    return localizationArray.flatMap(loc => {
+        // If 'loc' is not a string (e.g., it's null), skip it.
+        if (typeof loc !== 'string') return []; 
 
-    // Process localizations and collect unique SVG IDs
-    const svgIds = [...new Set(localizationArray.flatMap(loc => {
-        // Skip non-string or empty values
-        if (typeof loc !== 'string' || !loc.trim()) {
-            console.warn('Skipping invalid localization:', loc);
-            return [];
-        }
-
-        // Normalize the localization string
         const normalized = loc.trim().toLowerCase().replace(/[-_]/g, ' ');
-        
-        // Check if the normalized localization exists in the mapping
-        if (!mapping[normalized]) {
-            console.warn(`No SVG mapping found for localization: "${normalized}"`);
-            return [];
-        }
+        return mapping[normalized] || [];
 
-        return mapping[normalized];
-    }))];
-
-    // Filter by allPartIds and log the result
-    const filteredSvgIds = svgIds.filter(id => {
-        const isValid = allPartIds.includes(id);
-        if (!isValid) {
-            console.warn(`SVG ID "${id}" not found in allPartIds`);
-        }
-        return isValid;
-    });
-
-    console.log('mapLocalizationToSVG output:', filteredSvgIds);
-    return filteredSvgIds;
+    }).filter(id => allPartIds.includes(id));
 }
+
 function displayHomePage() {
     const contentArea = document.querySelector('.content-area');
     contentArea.className = 'content-area';
@@ -2164,64 +2121,147 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 
+// In script.js
 
+/**
+ * NEW: Builds the redesigned CiliaPlot page with a professional, two-column layout
+ * inspired by bioinformatics tools like GO Panther.
+ */
+function displayCiliaPlotPage() {
+    const contentArea = document.querySelector('.content-area');
+    contentArea.className = 'content-area content-area-full'; // Use full width for the layout
+    document.querySelector('.cilia-panel').style.display = 'none'; // Hide the default side panel
 
+    contentArea.innerHTML = `
+        <div class="page-section ciliaplot-page">
+            <div class="ciliaplot-header">
+                <h1>CiliaPlot Gene Set Analysis</h1>
+                <p class="info">
+                    Enter a list of genes to perform functional enrichment and network analysis, 
+                    generating publication-ready visualizations.
+                </p>
+            </div>
+
+            <div class="ciliaplot-container-new">
+                <div class="ciliaplot-left-panel-new">
+                    
+                    <div class="control-section">
+                        <h3>1. Input & Analyse</h3>
+                        <div class="control-section-content">
+                            <textarea id="ciliaplot-genes-input" placeholder="Enter one gene per line...\ne.g., ARL13B\nIFT88\nBBS1\nCEP290"></textarea>
+                            <label for="plot-type-select"><b>Select Analysis Type</b></label>
+                            <select id="plot-type-select">
+                                <optgroup label="Localization Analysis">
+                                    <option value="bubble">Key Localizations</option>
+                                    <option value="matrix">Gene-Localization Matrix</option>
+                                </optgroup>
+                                <optgroup label="Functional Analysis">
+                                    <option value="domain_matrix">Gene-Domain Matrix</option>
+                                    <option value="functional_category">Functional Category</option>
+                                    <option value="network">Protein Complex Network</option>
+                                </optgroup>
+                                <optgroup label="Expression Analysis">
+                                    <option value="expression_heatmap">Expression Heatmap</option>
+                                    <option value="tissue_profile">Tissue Expression Profile</option>
+                                    <option value="expression_localization">Expression vs. Localization</option>
+                                    <option value="top_tissues">Top Expressing Tissues</option>
+                                </optgroup>
+                            </select>
+                            <button id="generate-plot-btn" class="btn btn-primary">Run Analysis</button>
+                        </div>
+                    </div>
+
+                    <details class="control-section">
+                        <summary>2. Customize Plot</summary>
+                        <div class="control-section-content" id="plot-settings-grid">
+                            <div><label>Title Font Size</label><input type="number" id="setting-title-font-size" value="21"></div>
+                            <div><label>Axis Title Font Size</label><input type="number" id="setting-axis-title-font-size" value="20"></div>
+                            <div><label>Axis Tick Font Size</label><input type="number" id="setting-tick-font-size" value="20"></div>
+                            <div><label>Font</label><select id="setting-font-family"><option>Arial</option><option>Verdana</option><option>Times New Roman</option></select></div>
+                            <div><label>Text Color</label><input type="color" id="setting-font-color" value="#333333"></div>
+                            <div><label>Background</label><input type="color" id="setting-bg-color" value="#ffffff"></div>
+                            <div><label>Axis Line Width</label><input type="number" id="setting-axis-line-width" value="2" step="0.5"></div>
+                            <div><label>Axis Line Color</label><input type="color" id="setting-axis-line-color" value="#333333"></div>
+                            <div><label>Gridline Color</label><input type="color" id="setting-grid-color" value="#e0e0e0"></div>
+                            <div><label><input type="checkbox" id="setting-show-grid"> Show Grid</label></div>
+                        </div>
+                    </details>
+
+                    <div class="control-section">
+                        <h3>3. Download</h3>
+                        <div class="control-section-content">
+                            <select id="download-format">
+                                <option value="png">PNG</option>
+                                <option value="pdf">PDF</option>
+                            </select>
+                            <button id="download-plot-btn" class="btn btn-secondary">Download Plot</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="ciliaplot-right-panel-new">
+                    <div id="ciliaplot-plot-info" class="info">Select an analysis type and click "Run Analysis" to begin.</div>
+                    <div id="ciliaplot-stats-container" class="stats-container"></div>
+                    <div id="plot-display-area" class="plot-container-new">
+                        <p class="status-message">Your plot will appear here.</p>
+                    </div>
+                    <div id="ciliaplot-legend-container" class="legend"></div>
+                    <div id="plot-data-table-container"></div>
+                    <div id="ciliaplot-search-results"></div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Attach all necessary event listeners
+    document.getElementById('generate-plot-btn').addEventListener('click', generateAnalysisPlots);
+    document.getElementById('download-plot-btn').addEventListener('click', downloadPlot);
+    document.getElementById('plot-type-select').addEventListener('change', (e) => {
+        updatePlotInfo(e.target.value);
+    });
+    
+    // Auto-update plot when settings change, if a plot already exists
+    document.getElementById('plot-settings-grid').addEventListener('change', () => {
+        if (currentPlotInstance) { 
+            generateAnalysisPlots();
+        }
+    });
+
+    // Initialize the info text for the default selection
+    updatePlotInfo(document.getElementById('plot-type-select').value);
+}
 
 
 // Enhanced renderFoundNotFoundTable with debugging and error handling
-function renderFoundNotFoundTable(data, containerOrId = 'table-container') {
+function renderFoundNotFoundTable(geneData, containerId = 'table-container') {
     console.log('=== Table Rendering Debug ===');
-    console.log('Data:', data);
-    console.log('Container or ID:', containerOrId);
-
-    // Determine container
-    let container;
-    if (typeof containerOrId === 'string') {
-        container = document.getElementById(containerOrId);
-    } else if (containerOrId instanceof HTMLElement) {
-        container = containerOrId;
-    } else {
-        console.error('Invalid container provided:', containerOrId);
+    console.log('Gene data:', geneData);
+    console.log('Container ID:', containerId);
+    
+    // 1. Verify container exists
+    const container = document.getElementById(containerId);
+    if (!container) {
+        console.error(`Container with ID '${containerId}' not found`);
         console.log('Available elements:', document.querySelectorAll('[id*="table"], [id*="container"]'));
         return false;
     }
-
-    if (!container) {
-        console.error(`Container not found for: ${containerOrId}`);
-        return false;
-    }
-
+    
     console.log('Container found:', container);
-
-    // Clear existing content
+    console.log('Container styles:', window.getComputedStyle(container));
+    
+    // 2. Clear existing content
     container.innerHTML = '';
-
-    // Validate data
-    if (!data || !Array.isArray(data)) {
-        console.error('Invalid data provided');
-        container.innerHTML = '<div style="color: red; padding: 20px;">Error: Invalid data provided</div>';
+    
+    // 3. Validate data
+    if (!geneData || !Array.isArray(geneData)) {
+        console.error('Invalid gene data provided');
         return false;
     }
-
+    
     try {
-        // Determine data type (queries or gene objects)
-        const isQueryBased = typeof data[0] === 'string';
-        let geneData;
-        if (isQueryBased) {
-            // Handle queries (from plots.js)
-            const foundSet = new Set(data.foundGenes ? data.foundGenes.map(g => g.gene.toUpperCase()) : []);
-            geneData = data.map(query => ({
-                name: query,
-                found: foundSet.has(query.toUpperCase())
-            }));
-        } else {
-            // Handle gene objects (from script.js)
-            geneData = data;
-        }
-
-        // Create table structure
+        // 4. Create table structure
         const tableWrapper = document.createElement('div');
-        tableWrapper.className = 'table-responsive';
+        tableWrapper.className = 'table-wrapper';
         tableWrapper.style.cssText = `
             margin-top: 20px;
             overflow-x: auto;
@@ -2229,16 +2269,16 @@ function renderFoundNotFoundTable(data, containerOrId = 'table-container') {
             background: white;
             min-height: 100px;
         `;
-
+        
         const table = document.createElement('table');
-        table.className = 'data-summary-table';
+        table.className = 'gene-status-table';
         table.style.cssText = `
             width: 100%;
             border-collapse: collapse;
             font-family: Arial, sans-serif;
         `;
-
-        // Create header
+        
+        // 5. Create header
         const thead = document.createElement('thead');
         const headerRow = document.createElement('tr');
         headerRow.innerHTML = `
@@ -2247,27 +2287,31 @@ function renderFoundNotFoundTable(data, containerOrId = 'table-container') {
         `;
         thead.appendChild(headerRow);
         table.appendChild(thead);
-
-        // Create body
+        
+        // 6. Create body
         const tbody = document.createElement('tbody');
-        geneData.forEach((item, index) => {
+        geneData.forEach((gene, index) => {
             const row = document.createElement('tr');
-            const status = item.found ? 'Found' : 'Not Found';
-            const statusClass = item.found ? 'status-found' : 'status-not-found';
+            const status = gene.found ? 'Found' : 'Not Found';
+            const statusColor = gene.found ? '#28a745' : '#dc3545';
+            
             row.innerHTML = `
-                <td style="padding: 10px; border: 1px solid #ddd;">${item.name || item.gene || 'Unknown'}</td>
-                <td style="padding: 10px; border: 1px solid #ddd;"><span class="${statusClass}">${status}</span></td>
+                <td style="padding: 10px; border: 1px solid #ddd;">${gene.name || gene.gene || 'Unknown'}</td>
+                <td style="padding: 10px; border: 1px solid #ddd; color: ${statusColor}; font-weight: bold;">${status}</td>
             `;
+            
+            // Add hover effect
             row.addEventListener('mouseenter', () => row.style.backgroundColor = '#f8f9fa');
             row.addEventListener('mouseleave', () => row.style.backgroundColor = '');
+            
             tbody.appendChild(row);
         });
         table.appendChild(tbody);
-
-        // Create download button
+        
+        // 7. Create download button
         const downloadBtn = document.createElement('button');
         downloadBtn.textContent = 'Download as CSV';
-        downloadBtn.className = 'btn btn-secondary';
+        downloadBtn.className = 'download-csv-btn';
         downloadBtn.style.cssText = `
             margin-top: 10px;
             padding: 8px 16px;
@@ -2278,35 +2322,36 @@ function renderFoundNotFoundTable(data, containerOrId = 'table-container') {
             cursor: pointer;
             font-size: 14px;
         `;
+        
         downloadBtn.addEventListener('click', () => downloadTableAsCSV(geneData));
         downloadBtn.addEventListener('mouseenter', () => downloadBtn.style.background = '#0056b3');
         downloadBtn.addEventListener('mouseleave', () => downloadBtn.style.background = '#007bff');
-
-        // Assemble and append
+        
+        // 8. Assemble and append
         tableWrapper.appendChild(table);
         tableWrapper.appendChild(downloadBtn);
         container.appendChild(tableWrapper);
-
-        // Force visibility
+        
+        // 9. Force visibility and scroll into view
         container.style.display = 'block';
         container.style.visibility = 'visible';
-
-        // Scroll to table
+        
+        // Scroll to table if needed
         setTimeout(() => {
             tableWrapper.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         }, 100);
-
+        
         console.log('Table successfully rendered');
+        console.log('Final container HTML:', container.innerHTML.substring(0, 200) + '...');
+        
         return true;
-
+        
     } catch (error) {
         console.error('Error rendering table:', error);
         container.innerHTML = `<div style="color: red; padding: 20px;">Error rendering table: ${error.message}</div>`;
         return false;
     }
 }
-
-
 
 // Helper function for CSV download
 function downloadTableAsCSV(geneData) {
@@ -2336,18 +2381,25 @@ function downloadTableAsCSV(geneData) {
         alert('Error downloading CSV file');
     }
 }
-let expressionDataLoaded = false;
 
-async function loadExpressionData() {
-    if (expressionDataLoaded) {
-        console.log('Expression data already loaded, skipping.');
-        return;
-    }
-    try {
-        // Existing code to fetch and parse TSV
-        console.log('Loaded 20151 genes with expression data from TSV');
-        expressionDataLoaded = true;
-    } catch (error) {
-        console.error('Error loading expression data:', error);
+// Enhanced function to call after heatmap rendering
+function renderHeatmapAndTable(expressionData, geneList) {
+    console.log('=== Heatmap and Table Rendering ===');
+    
+    // Render heatmap first
+    const heatmapSuccess = renderExpressionHeatmap(expressionData);
+    
+    if (heatmapSuccess) {
+        // Wait a bit for DOM to settle, then render table
+        setTimeout(() => {
+            const geneStatusData = geneList.map(gene => ({
+                name: gene,
+                found: expressionData.some(row => row.gene === gene)
+            }));
+            
+            renderFoundNotFoundTable(geneStatusData, 'table-container');
+        }, 500);
+    } else {
+        console.error('Heatmap rendering failed, skipping table');
     }
 }
