@@ -1338,65 +1338,67 @@ function renderTopExpressingTissues(foundGenes, container) {
 }
 
 
-
-// Replace the existing  function with this new one
-
 function displayCiliaPlotPage() {
     const contentArea = document.querySelector('.content-area');
     contentArea.className = 'content-area content-area-full';
     document.querySelector('.cilia-panel').style.display = 'none';
 
     contentArea.innerHTML = `
-        <section class="ciliaplot-dashboard" aria-labelledby="dashboard-title">
+        <section class="page-section ciliaplot-page" aria-labelledby="ciliaplot-title">
             <header class="ciliaplot-header">
-                <h1 id="dashboard-title">CiliaPlot Dashboard</h1>
-                <p class="info" id="plot-info" role="region" aria-live="polite">
-                    Select a plot type and enter genes to generate publication-ready visualizations.
+                <h1 id="ciliaplot-title">CiliaPlot Analysis</h1>
+                <p class="info" id="ciliaplot-plot-info" role="region" aria-live="polite">
+                    Input genes and select a plot type to generate ciliary function visualizations.
+                    <span class="tooltip">
+                        <span class="tooltip-icon">?</span>
+                        <span class="tooltip-text">Enter up to 100 genes (e.g., IFT88, BBS1) and choose a plot type.</span>
+                    </span>
                 </p>
             </header>
 
-            <div class="ciliaplot-container">
-                <aside class="ciliaplot-left-panel" aria-labelledby="input-section">
-                    <h2 id="input-section" class="visually-hidden">Input and Settings</h2>
+            <div class="ciliaplot-container-pro">
+                <div class="ciliaplot-input-section">
                     <div class="control-card">
-                        <label for="ciliaplot-genes-input">Enter Gene List</label>
+                        <label for="ciliaplot-genes-input">Gene List</label>
                         <textarea 
                             id="ciliaplot-genes-input" 
                             placeholder="e.g., IFT88, CEP290, BBS1, ARL13B (comma, space, or line-separated)"
                             aria-describedby="genes-help"
                         ></textarea>
-                        <p id="genes-help" class="help-text">Enter up to 100 genes, separated by commas, spaces, or new lines. Case-insensitive.</p>
+                        <p id="genes-help" class="help-text">
+                            Enter up to 100 genes, case-insensitive. Separate with commas, spaces, or new lines.
+                        </p>
                     </div>
+                </div>
 
+                <div class="ciliaplot-settings-section">
+                    <h2>Plot Settings</h2>
                     <div class="control-card">
-                        <label for="plot-type-select">Select Plot Type</label>
-                        <select id="plot-type-select" aria-describedby="plot-help">
-                            <optgroup label="Localization Analysis">
-                                <option value="bubble">Key Localizations</option>
-                                <option value="matrix">Gene-Localization Matrix</option>
-                            </optgroup>
-                            <optgroup label="Functional Analysis">
-                                <option value="domain_matrix">Gene-Domain Matrix</option>
-                                <option value="functional_category">Functional Categories</option>
-                                <option value="network">Protein Complex Network</option>
-                            </optgroup>
-                            <optgroup label="Expression Analysis">
-                                <option value="expression_heatmap">Expression Heatmap</option>
-                                <option value="tissue_profile">Tissue Expression Profile</option>
-                                <option value="top_tissues">Top Expressing Tissues</option>
-                                <option value="expression_localization">Expression vs. Localization</option>
-                            </optgroup>
-                            <optgroup label="Proteomics Analysis">
-                                <option value="organelle_radar">Organellar Profile (Radar)</option>
-                                <option value="organelle_umap">Organellar Projection (UMAP)</option>
-                            </optgroup>
-                        </select>
-                        <p id="plot-help" class="help-text">Choose a visualization type for your gene set analysis.</p>
-                    </div>
-
-                    <details class="control-card collapsible-card" open>
-                        <summary>Customize Plot Settings</summary>
-                        <div id="plot-settings-panel" class="settings-grid">
+                        <div class="settings-grid">
+                            <div>
+                                <label for="plot-type-select">Plot Type</label>
+                                <select id="plot-type-select" aria-describedby="plot-help">
+                                    <optgroup label="Localization Analysis">
+                                        <option value="bubble">Key Localizations</option>
+                                        <option value="matrix">Gene-Localization Matrix</option>
+                                    </optgroup>
+                                    <optgroup label="Functional Analysis">
+                                        <option value="domain_matrix">Gene-Domain Matrix</option>
+                                        <option value="functional_category">Functional Categories</option>
+                                        <option value="network">Protein Complex Network</option>
+                                    </optgroup>
+                                    <optgroup label="Expression Analysis">
+                                        <option value="expression_heatmap">Expression Heatmap</option>
+                                        <option value="tissue_profile">Tissue Expression Profile</option>
+                                        <option value="top_tissues">Top Expressing Tissues</option>
+                                        <option value="expression_localization">Expression vs. Localization</option>
+                                    </optgroup>
+                                    <optgroup label="Proteomics Analysis">
+                                        <option value="organelle_radar">Organellar Profile (Radar)</option>
+                                        <option value="organelle_umap">Organellar Projection (UMAP)</option>
+                                    </optgroup>
+                                </select>
+                            </div>
                             <div>
                                 <label for="setting-font-family">Font Family</label>
                                 <select id="setting-font-family">
@@ -1427,15 +1429,11 @@ function displayCiliaPlotPage() {
                                 <input type="number" id="setting-tick-font-size" value="20" min="8" max="24" step="1">
                             </div>
                         </div>
-                    </details>
+                        <button id="generate-plot-btn" class="btn btn-primary btn-large">Generate Plot</button>
+                    </div>
+                </div>
 
-                    <button id="generate-plot-btn" class="btn btn-primary btn-large">Generate Plot</button>
-                </aside>
-
-                <section class="ciliaplot-right-panel" aria-labelledby="output-section">
-                    <h2 id="output-section" class="visually-hidden">Visualization and Results</h2>
-                    <div id="ciliaplot-stats-container" class="stats-container" role="region" aria-live="polite"></div>
-
+                <div class="ciliaplot-visualization-section">
                     <div class="plot-card">
                         <div class="plot-card-header">
                             <h3>Visualization</h3>
@@ -1448,12 +1446,14 @@ function displayCiliaPlotPage() {
                                 <button id="download-plot-btn" class="btn btn-secondary">Download</button>
                             </div>
                         </div>
-                        <div id="plot-display-area" class="plot-area-large" role="region" aria-live="polite">
-                            <p class="status-message">Your plot will appear here after analysis.</p>
+                        <div id="plot-display-area" class="plot-container-pro" role="region" aria-live="polite">
+                            <p class="status-message">Your visualization will appear here.</p>
                         </div>
                         <div id="ciliaplot-legend-container" class="legend"></div>
                     </div>
+                </div>
 
+                <div class="ciliaplot-results-section">
                     <div class="tab-container">
                         <div class="tab-buttons" role="tablist">
                             <button class="tab-button active" data-tab="summary-tab" role="tab" aria-selected="true" aria-controls="summary-tab">Data Summary</button>
@@ -1461,14 +1461,15 @@ function displayCiliaPlotPage() {
                         </div>
                         <div class="tab-content">
                             <div id="summary-tab" class="tab-pane active" role="tabpanel">
-                                <div id="plot-data-table-container"></div>
+                                <div id="plot-data-table-container" class="table-wrapper"></div>
                             </div>
                             <div id="status-tab" class="tab-pane" role="tabpanel">
-                                <div id="ciliaplot-search-results"></div>
+                                <div id="ciliaplot-search-results" class="table-wrapper"></div>
                             </div>
                         </div>
                     </div>
-                </section>
+                    <div id="ciliaplot-stats-container" class="stats-container" role="region" aria-live="polite"></div>
+                </div>
             </div>
         </section>
     `;
@@ -1483,17 +1484,19 @@ function displayCiliaPlotPage() {
     // Tab functionality
     document.querySelectorAll('.tab-button').forEach(button => {
         button.addEventListener('click', () => {
-            document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.tab-button').forEach(btn => {
+                btn.classList.remove('active');
+                btn.setAttribute('aria-selected', 'false');
+            });
             document.querySelectorAll('.tab-pane').forEach(pane => pane.classList.remove('active'));
             button.classList.add('active');
-            document.getElementById(button.dataset.tab).classList.add('active');
             button.setAttribute('aria-selected', 'true');
-            document.querySelectorAll('.tab-button').forEach(btn => {
-                if (btn !== button) btn.setAttribute('aria-selected', 'false');
-            });
+            document.getElementById(button.dataset.tab).classList.add('active');
         });
     });
 }
+
+
 // =============================================================================
 // SIMULATED PROTEOMICS DATA FOR ADVANCED PLOTS
 // =============================================================================
