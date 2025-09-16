@@ -39,7 +39,7 @@ function navigateTo(event, path) {
 }
 
 // =============================================================================
-// ROUTER (REVISED)
+// ROUTER (REVISED WITH CILIA PLOT INTEGRATION)
 // =============================================================================
 async function handleRouteChange() {
     let path = window.location.hash.replace(/^#/, '').toLowerCase().trim();
@@ -76,29 +76,36 @@ async function handleRouteChange() {
             displayHomePage();
             setTimeout(displayLocalizationChart, 0);
             break;
+
         case '/batch-query':
             displayBatchQueryTool();
             break;
-        case '/ciliaplot':
-        case '/analysis':
-            displayCiliaPlotPage();
+
+        case '/ciliaplot':    // <-- our new CiliaPlot layout
+        case '/analysis':     // optional alias
+            displayCiliaPlotPage(); // call the redesigned function
             break;
+
         case '/compare':
             displayComparePage();
             break;
+
         case '/expression':
             displayExpressionPage();
             break;
+
         case '/download':
             displayDownloadPage();
             break;
+
         case '/contact':
             displayContactPage();
             break;
+
         default:
-            // This block now exclusively handles potential gene pages
+            // Handle potential gene pages
             if (geneMapCache) {
-                const geneName = getGeneFromURL(); // Get gene name from the unknown path
+                const geneName = getGeneFromURL(); // Extract gene from URL
                 if (geneName) {
                     const safeName = sanitize(geneName);
                     geneToDisplay = geneMapCache.get(safeName);
@@ -119,6 +126,17 @@ async function handleRouteChange() {
 }
 
 // =============================================================================
+// EVENT LISTENERS
+// =============================================================================
+window.addEventListener("load", handleRouteChange);
+window.addEventListener("hashchange", handleRouteChange);
+
+document.addEventListener('DOMContentLoaded', () => {
+    initGlobalEventListeners();
+});
+
+
+// =============================================================================
 // URL HELPERS
 // =============================================================================
 function getGeneFromURL() {
@@ -137,16 +155,6 @@ function getGeneFromURL() {
     return null;
 }
 
-
-// =============================================================================
-// EVENT LISTENERS
-// =============================================================================
-window.addEventListener("load", handleRouteChange);
-window.addEventListener("hashchange", handleRouteChange);
-
-document.addEventListener('DOMContentLoaded', () => {
-    initGlobalEventListeners();
-});
 
 // =============================================================================
 // GLOBAL UI HELPERS
