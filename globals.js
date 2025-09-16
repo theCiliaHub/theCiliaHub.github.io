@@ -78,20 +78,40 @@ async function handleRouteChange() {
             break;
 
         case '/batch-query':
-            displayBatchQueryTool();
+            if (typeof displayBatchQueryTool === 'function') {
+                displayBatchQueryTool();
+            } else {
+                console.warn('displayBatchQueryTool not defined');
+                displayNotFoundPage();
+            }
             break;
 
-       case '/ciliaplot':
+        case '/ciliaplot':
         case '/analysis':
-            displayCiliaPlotPage(); // Display the main analysis page
+            if (typeof displayCiliaPlotPage === 'function') {
+                displayCiliaPlotPage(); // Display the main analysis page
+            } else {
+                console.warn('displayCiliaPlotPage not defined');
+                displayNotFoundPage();
+            }
             break;
 
         case '/compare':
-            displayComparePage();
+            if (typeof displayComparePage === 'function') {
+                displayComparePage();
+            } else {
+                console.warn('displayComparePage not defined');
+                displayNotFoundPage();
+            }
             break;
 
         case '/expression':
-            displayExpressionPage();
+            if (typeof displayExpressionPage === 'function') {
+                displayExpressionPage();
+            } else {
+                console.warn('displayExpressionPage not defined');
+                displayNotFoundPage();
+            }
             break;
 
         case '/download':
@@ -115,7 +135,12 @@ async function handleRouteChange() {
             }
 
             if (geneToDisplay) {
-                displayIndividualGenePage(geneToDisplay);
+                if (typeof displayIndividualGenePage === 'function') {
+                    displayIndividualGenePage(geneToDisplay);
+                } else {
+                    console.warn('displayIndividualGenePage not defined');
+                    displayNotFoundPage();
+                }
             } else {
                 displayNotFoundPage();
             }
