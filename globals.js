@@ -2,26 +2,15 @@
 // =============================================================================
 // GLOBAL VARIABLES
 // =============================================================================
-// Plotting
-let currentPlotInstance = null; // Changed from currentPlot
 
-// Chart instances (these can be removed if currentPlotInstance handles all cases)
-let localizationChartInstance;
-let analysisDotPlotInstance;
-let analysisBarChartInstance;
 // Data storage
 let allGenes = [];
 let currentData = [];
 let searchResults = [];
 const geneLocalizationData = {};
 
-// Plotting
-let currentPlotInstance = null; // Changed from currentPlot
-
-// Chart instances (these can be removed if currentPlotInstance handles all cases)
-let localizationChartInstance;
-let analysisDotPlotInstance;
-let analysisBarChartInstance;
+// Plotting - Consolidated into a single instance variable
+let currentPlotInstance = null;
 
 // IDs and defaults
 const allPartIds = [
