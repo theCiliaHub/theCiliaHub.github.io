@@ -123,7 +123,7 @@ async function generateAnalysisPlots() {
                 break;
             case 'expression_heatmap':
                 renderExpressionHeatmap(foundGenes, plotContainer);
-                renderFoundNotFoundTable(sanitizedQueries, foundGenes, document.getElementById('plot-data-table-container'));
+                renderFoundNotFoundTable(sanitizedQueries, document.getElementById('plot-data-table-container'));
                 break;
             case 'tissue_profile':
                 renderTissueExpressionProfile(foundGenes, plotContainer);
@@ -842,7 +842,7 @@ function renderExpressionHeatmap(foundGenes, container) {
 
     if (!foundGenes.length || Object.keys(expressionData).length === 0) {
         container.innerHTML = '<p class="status-message">No expression data available for selected genes.</p>';
-        return;
+        return false;
     }
 
     const tissues = getTissueNames();
@@ -850,7 +850,7 @@ function renderExpressionHeatmap(foundGenes, container) {
 
     if (genesWithExpression.length === 0) {
         container.innerHTML = '<p class="status-message">None of the selected genes have expression data.</p>';
-        return;
+        return false;
     }
 
     // Prepare data and calculate max expression
@@ -865,13 +865,18 @@ function renderExpressionHeatmap(foundGenes, container) {
         });
     });
 
-    // --- FIX: Revised Sizing and Margins for the new layout ---
-    const containerWidth = container.clientWidth;
-    const containerHeight = container.clientHeight;
-    
+    // Ensure container has sufficient size
+    const containerWidth = Math.max(600, container.clientWidth || 600); // Minimum width
+    const containerHeight = Math.max(400, container.clientHeight || 400); // Minimum height
     const margin = { top: 60, right: 100, bottom: 150, left: 120 };
     const width = containerWidth - margin.left - margin.right;
-    const height = containerHeight - margin.top - margin.bottom;
+    const height = Math.max(100, containerHeight - margin.top - margin.bottom); // Ensure positive height
+
+    if (width <= 0 || height <= 0) {
+        container.innerHTML = '<p class="status-message">Container size too small to render heatmap.</p>';
+        console.error('Invalid dimensions: width=', width, 'height=', height);
+        return false;
+    }
 
     const svg = d3.select(container).append('svg')
         .attr('width', '100%')
@@ -898,39 +903,48 @@ function renderExpressionHeatmap(foundGenes, container) {
        .attr('fill', d => colorScale(d.expression || 0));
 
     // Draw Axes
-    // X-Axis
     svg.append('g')
         .attr('transform', `translate(0, ${height})`)
         .call(d3.axisBottom(xScale))
         .selectAll('text')
         .attr('transform', 'translate(-10,0)rotate(-45)')
-        .style('text-anchor', 'end');
-    
-    // Y-Axis (The missing axis)
+        .style('text-anchor', 'end')
+        .style('font-family', settings.fontFamily)
+        .style('font-size', `${settings.tickFontSize}px`)
+        .style('fill', settings.fontColor);
+
     svg.append('g')
-       .call(d3.axisLeft(yScale));
-       
-    // --- FIX: Correctly positioned axis labels ---
-    // X-Axis Label
+       .call(d3.axisLeft(yScale))
+       .selectAll('text')
+       .style('font-family', settings.fontFamily)
+       .style('font-size', `${settings.tickFontSize}px`)
+       .style('fill', settings.fontColor);
+
+    // Axis Labels
     d3.select(container).select('svg').append('text')
         .attr('text-anchor', 'middle')
         .attr('x', margin.left + width / 2)
         .attr('y', containerHeight - margin.bottom / 2 + 30)
         .text('Tissues')
-        .attr('font-weight', 'bold');
+        .attr('font-weight', 'bold')
+        .style('font-family', settings.fontFamily)
+        .style('font-size', `${settings.axisTitleFontSize}px`)
+        .style('fill', settings.fontColor);
 
-    // Y-Axis Label
     d3.select(container).select('svg').append('text')
         .attr('text-anchor', 'middle')
         .attr('transform', 'rotate(-90)')
         .attr('y', margin.left / 2 - 20)
         .attr('x', -(margin.top + height / 2))
         .text('Genes')
-        .attr('font-weight', 'bold');
+        .attr('font-weight', 'bold')
+        .style('font-family', settings.fontFamily)
+        .style('font-size', `${settings.axisTitleFontSize}px`)
+        .style('fill', settings.fontColor);
 
-    // --- FIX: Robust color legend (the missing bar) ---
+    // Color Legend
     const legendWidth = 20, legendHeight = height / 2;
-    const legendX = width + 40; // Position it inside the right margin
+    const legendX = width + 40;
     const legendY = height / 4;
 
     const legend = svg.append('g').attr('transform', `translate(${legendX}, ${legendY})`);
@@ -950,11 +964,15 @@ function renderExpressionHeatmap(foundGenes, container) {
     const legendScale = d3.scaleLinear().domain(colorScale.domain()).range([legendHeight, 0]);
     legend.append('g')
         .attr('transform', `translate(${legendWidth}, 0)`)
-        .call(d3.axisRight(legendScale).ticks(5));
-    
-    currentPlotInstance = d3.select(container).select('svg').node();
-}
+        .call(d3.axisRight(legendScale).ticks(5))
+        .selectAll('text')
+        .style('font-family', settings.fontFamily)
+        .style('font-size', `${settings.tickFontSize}px`)
+        .style('fill', settings.fontColor);
 
+    currentPlotInstance = d3.select(container).select('svg').node();
+    return true;
+}
 /**
  * REPLACED: Renders a tissue expression profile as a line chart instead of a radar chart.
  * This version is better for comparing across many categories and is more conventional
@@ -1221,65 +1239,144 @@ function renderGeneDataTable(foundGenes, container) {
     container.innerHTML = tableHTML;
 }
 
-function renderFoundNotFoundTable(queries, foundGenes, container) {
-    if (!container) return;
+function renderFoundNotFoundTable(data, containerOrId = 'table-container') {
+    console.log('=== Table Rendering Debug ===');
+    console.log('Data:', data);
+    console.log('Container or ID:', containerOrId);
 
-    const foundSet = new Set(foundGenes.map(g => g.gene.toUpperCase()));
+    // Determine container
+    let container;
+    if (typeof containerOrId === 'string') {
+        container = document.getElementById(containerOrId);
+    } else if (containerOrId instanceof HTMLElement) {
+        container = containerOrId;
+    } else {
+        console.error('Invalid container provided:', containerOrId);
+        console.log('Available elements:', document.querySelectorAll('[id*="table"], [id*="container"]'));
+        return false;
+    }
 
-    // Add a download button to the HTML
-    let tableHTML = `
-        <div class="table-header-controls">
-            <h3 class="table-title">Input Genes Status</h3>
-            <button id="download-status-csv-btn" class="btn btn-secondary">Download CSV</button>
-        </div>`;
-    
-    tableHTML += `
-        <div class="table-responsive">
-            <table class="data-summary-table">
-                <thead>
-                    <tr>
-                        <th>Input Gene</th>
-                        <th>Status</th>
-                    </tr>
-                </thead>
-                <tbody>`;
+    if (!container) {
+        console.error(`Container not found for: ${containerOrId}`);
+        return false;
+    }
 
-    queries.forEach(query => {
-        const isFound = foundSet.has(query);
-        const statusText = isFound ? 'Found' : 'Not Found';
-        const statusClass = isFound ? 'status-found' : 'status-not-found';
-        tableHTML += `
-            <tr>
-                <td>${query}</td>
-                <td><span class="${statusClass}">${statusText}</span></td>
-            </tr>`;
-    });
+    console.log('Container found:', container);
 
-    tableHTML += `</tbody></table></div>`;
-    container.innerHTML = tableHTML;
+    // Clear existing content
+    container.innerHTML = '';
 
-    // --- Add event listener for the new download button ---
-    const downloadBtn = document.getElementById('download-status-csv-btn');
-    if (downloadBtn) {
-        downloadBtn.onclick = () => {
-            // 1. Create CSV content
-            let csvContent = "data:text/csv;charset=utf-8,Input Gene,Status\n";
-            queries.forEach(query => {
-                const status = foundSet.has(query) ? 'Found' : 'Not Found';
-                csvContent += `${query},${status}\n`;
-            });
+    // Validate data
+    if (!data || !Array.isArray(data)) {
+        console.error('Invalid data provided');
+        container.innerHTML = '<div style="color: red; padding: 20px;">Error: Invalid data provided</div>';
+        return false;
+    }
 
-            // 2. Trigger download
-            const encodedUri = encodeURI(csvContent);
-            const link = document.createElement("a");
-            link.setAttribute("href", encodedUri);
-            link.setAttribute("download", "gene_status_report.csv");
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-        };
+    try {
+        // Determine data type (queries or gene objects)
+        const isQueryBased = typeof data[0] === 'string';
+        let geneData;
+        if (isQueryBased) {
+            // Handle queries (from plots.js)
+            const foundSet = new Set(data.foundGenes ? data.foundGenes.map(g => g.gene.toUpperCase()) : []);
+            geneData = data.map(query => ({
+                name: query,
+                found: foundSet.has(query.toUpperCase())
+            }));
+        } else {
+            // Handle gene objects (from script.js)
+            geneData = data;
+        }
+
+        // Create table structure
+        const tableWrapper = document.createElement('div');
+        tableWrapper.className = 'table-responsive';
+        tableWrapper.style.cssText = `
+            margin-top: 20px;
+            overflow-x: auto;
+            border: 1px solid #ddd;
+            background: white;
+            min-height: 100px;
+        `;
+
+        const table = document.createElement('table');
+        table.className = 'data-summary-table';
+        table.style.cssText = `
+            width: 100%;
+            border-collapse: collapse;
+            font-family: Arial, sans-serif;
+        `;
+
+        // Create header
+        const thead = document.createElement('thead');
+        const headerRow = document.createElement('tr');
+        headerRow.innerHTML = `
+            <th style="padding: 12px; border: 1px solid #ddd; background: #f5f5f5;">Input Gene</th>
+            <th style="padding: 12px; border: 1px solid #ddd; background: #f5f5f5;">Status</th>
+        `;
+        thead.appendChild(headerRow);
+        table.appendChild(thead);
+
+        // Create body
+        const tbody = document.createElement('tbody');
+        geneData.forEach((item, index) => {
+            const row = document.createElement('tr');
+            const status = item.found ? 'Found' : 'Not Found';
+            const statusClass = item.found ? 'status-found' : 'status-not-found';
+            row.innerHTML = `
+                <td style="padding: 10px; border: 1px solid #ddd;">${item.name || item.gene || 'Unknown'}</td>
+                <td style="padding: 10px; border: 1px solid #ddd;"><span class="${statusClass}">${status}</span></td>
+            `;
+            row.addEventListener('mouseenter', () => row.style.backgroundColor = '#f8f9fa');
+            row.addEventListener('mouseleave', () => row.style.backgroundColor = '');
+            tbody.appendChild(row);
+        });
+        table.appendChild(tbody);
+
+        // Create download button
+        const downloadBtn = document.createElement('button');
+        downloadBtn.textContent = 'Download as CSV';
+        downloadBtn.className = 'btn btn-secondary';
+        downloadBtn.style.cssText = `
+            margin-top: 10px;
+            padding: 8px 16px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        `;
+        downloadBtn.addEventListener('click', () => downloadTableAsCSV(geneData));
+        downloadBtn.addEventListener('mouseenter', () => downloadBtn.style.background = '#0056b3');
+        downloadBtn.addEventListener('mouseleave', () => downloadBtn.style.background = '#007bff');
+
+        // Assemble and append
+        tableWrapper.appendChild(table);
+        tableWrapper.appendChild(downloadBtn);
+        container.appendChild(tableWrapper);
+
+        // Force visibility
+        container.style.display = 'block';
+        container.style.visibility = 'visible';
+
+        // Scroll to table
+        setTimeout(() => {
+            tableWrapper.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }, 100);
+
+        console.log('Table successfully rendered');
+        return true;
+
+    } catch (error) {
+        console.error('Error rendering table:', error);
+        container.innerHTML = `<div style="color: red; padding: 20px;">Error rendering table: ${error.message}</div>`;
+        return false;
     }
 }
+
+
 
 /**
  * Renders the main gene query summary table at the bottom of the page.
