@@ -153,6 +153,18 @@ async function generateAnalysisPlots() {
         case 'organelle_umap':
             renderOrganelleUMAP(foundGenes, plotContainer);
             break;
+                        case 'localization_bar':
+            renderLocalizationBarPlot(foundGenes, plotContainer);
+            break;
+        case 'chord_plot':
+            renderChordPlot(foundGenes, plotContainer);
+            break;
+        case 'violin_plot':
+            renderViolinPlot(foundGenes, plotContainer);
+            break;
+        case 'expression_domain_bubble':
+            renderExpressionDomainBubblePlot(foundGenes, plotContainer);
+            break;
 
         // --- 'default' IS NOW THE LAST CASE ---
         default:
@@ -208,6 +220,18 @@ function updatePlotInfo(plotType) {
             break;
         case 'organelle_umap':
             infoHTML = `<strong>Organellar Projection (UMAP):</strong> This scatter plot shows a 2D representation of the entire organellar proteome, where proteins with similar abundance profiles cluster together. Your input genes are highlighted to show where they fall within these defined organellar clusters.`;
+            break;
+        case 'localization_bar':
+            infoHTML = `<strong>Key Localizations (Bar):</strong> This bar chart shows the distribution of your genes across different cellular compartments, sorted by the number of genes found in each location.`;
+            break;
+        case 'chord_plot':
+            infoHTML = `<strong>Protein Complex (Chord):</strong> This chord diagram visualizes shared protein complex membership. A link (ribbon) is drawn between genes that are members of the same complex.`;
+            break;
+        case 'violin_plot':
+            infoHTML = `<strong>Expression Violin Plot:</strong> This plot shows the distribution of expression values (nTPM) for your entire gene set across the top 25 tissues. The shape of the violin indicates the density of expression values.`;
+            break;
+        case 'expression_domain_bubble':
+            infoHTML = `<strong>Expression vs. Domain:</strong> This bubble plot correlates expression breadth (number of expressing tissues) with the number of protein domains in each gene. Bubble size represents the maximum expression level.`;
             break;
 
         // --- 'default' IS NOW THE LAST CASE ---
@@ -1654,4 +1678,328 @@ function renderOrganelleUMAP(foundGenes, container) {
             }
         }
     });
+}
+
+// =============================================================================
+// NEW PLOTTING FUNCTIONS: Bar, Chord, Violin, Bubble
+// =============================================================================
+
+/**
+ * Renders a bar chart of key localizations.
+ */
+function renderLocalizationBarPlot(foundGenes, container) {
+    clearPreviousPlot();
+    const settings = getPlotSettings();
+    container.innerHTML = `<canvas></canvas>`;
+    const ctx = container.querySelector('canvas').getContext('2d');
+
+    const localizationCounts = new Map();
+    foundGenes.forEach(gene => {
+        getCleanArray(gene, 'localization').forEach(loc => {
+            localizationCounts.set(loc, (localizationCounts.get(loc) || 0) + 1);
+        });
+    });
+
+    if (localizationCounts.size === 0) {
+        container.innerHTML = '<p class="status-message">No localization data found for the selected genes.</p>';
+        return;
+    }
+
+    const sortedData = Array.from(localizationCounts.entries()).sort((a, b) => b[1] - a[1]);
+    const labels = sortedData.map(item => item[0]);
+    const data = sortedData.map(item => item[1]);
+
+    currentPlotInstance = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Gene Count',
+                data: data,
+                backgroundColor: 'rgba(52, 152, 219, 0.7)',
+                borderColor: 'rgba(52, 152, 219, 1)',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            indexAxis: 'y',
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                title: { display: true, text: 'Key Ciliary Localizations', font: { size: settings.titleFontSize, family: settings.fontFamily }, color: settings.fontColor },
+                legend: { display: false },
+            },
+            scales: {
+                x: {
+                    title: { display: true, text: 'Number of Genes', font: { size: settings.axisTitleFontSize, family: settings.fontFamily }, color: settings.fontColor },
+                    grid: { display: settings.showGrid, color: settings.gridColor },
+                    border: { display: true, width: settings.axisLineWidth, color: settings.axisLineColor },
+                    ticks: { font: { size: settings.tickFontSize, family: settings.fontFamily }, color: settings.fontColor, stepSize: 1 }
+                },
+                y: {
+                    grid: { display: false },
+                    border: { display: true, width: settings.axisLineWidth, color: settings.axisLineColor },
+                    ticks: { font: { size: settings.tickFontSize, family: settings.fontFamily }, color: settings.fontColor }
+                }
+            }
+        }
+    });
+}
+
+
+/**
+ * Renders a D3 Chord Plot for protein complex interactions.
+ */
+function renderChordPlot(foundGenes, container) {
+    clearPreviousPlot();
+    const settings = getPlotSettings();
+    const genesInComplexes = foundGenes.filter(g => getCleanArray(g, 'complex_names', 'complex').length > 0);
+    
+    if (genesInComplexes.length < 2) {
+        container.innerHTML = '<p class="status-message">At least two genes with shared complex data are needed for a chord plot.</p>';
+        return;
+    }
+
+    // Create a matrix of co-occurrence
+    const geneNames = genesInComplexes.map(g => g.gene);
+    const matrix = Array(geneNames.length).fill(0).map(() => Array(geneNames.length).fill(0));
+
+    const complexMap = new Map();
+    genesInComplexes.forEach(gene => {
+        getCleanArray(gene, 'complex_names', 'complex').forEach(complex => {
+            if (!complexMap.has(complex)) complexMap.set(complex, []);
+            complexMap.get(complex).push(gene.gene);
+        });
+    });
+
+    complexMap.forEach(genes => {
+        for (let i = 0; i < genes.length; i++) {
+            for (let j = i + 1; j < genes.length; j++) {
+                const idx1 = geneNames.indexOf(genes[i]);
+                const idx2 = geneNames.indexOf(genes[j]);
+                if (idx1 !== -1 && idx2 !== -1) {
+                    matrix[idx1][idx2]++;
+                    matrix[idx2][idx1]++;
+                }
+            }
+        }
+    });
+
+    const width = container.clientWidth;
+    const height = container.clientHeight;
+    const outerRadius = Math.min(width, height) * 0.5 - 40;
+    const innerRadius = outerRadius - 30;
+
+    const svg = d3.select(container).append("svg")
+        .attr("width", width)
+        .attr("height", height)
+      .append("g")
+        .attr("transform", `translate(${width / 2},${height / 2})`);
+
+    const chord = d3.chord()
+        .padAngle(0.05)
+        .sortSubgroups(d3.descending);
+
+    const arc = d3.arc()
+        .innerRadius(innerRadius)
+        .outerRadius(outerRadius);
+
+    const ribbon = d3.ribbon()
+        .radius(innerRadius);
+
+    const color = d3.scaleOrdinal(d3.schemeCategory10);
+
+    const chords = chord(matrix);
+
+    const group = svg.append("g")
+        .selectAll("g")
+        .data(chords.groups)
+        .join("g");
+
+    group.append("path")
+        .attr("fill", d => color(d.index))
+        .attr("stroke", d => d3.rgb(color(d.index)).darker())
+        .attr("d", arc);
+
+    group.append("text")
+        .each(d => { d.angle = (d.startAngle + d.endAngle) / 2; })
+        .attr("dy", ".35em")
+        .attr("transform", d => `rotate(${(d.angle * 180 / Math.PI - 90)}) translate(${outerRadius + 5}) ${d.angle > Math.PI ? "rotate(180)" : ""}`)
+        .style("text-anchor", d => d.angle > Math.PI ? "end" : null)
+        .text(d => geneNames[d.index])
+        .style("font-family", settings.fontFamily)
+        .style("fill", settings.fontColor);
+
+    svg.append("g")
+        .attr("fill-opacity", 0.67)
+      .selectAll("path")
+      .data(chords)
+      .join("path")
+        .attr("d", ribbon)
+        .attr("fill", d => color(d.target.index))
+        .attr("stroke", d => d3.rgb(color(d.target.index)).darker());
+    
+    currentPlotInstance = d3.select(container).select("svg").node();
+}
+
+
+/**
+ * Renders a violin plot of gene expression across tissues.
+ * Requires chartjs-chart-box-and-violin-plot plugin.
+ */
+function renderViolinPlot(foundGenes, container) {
+    clearPreviousPlot();
+    const settings = getPlotSettings();
+    container.innerHTML = `<canvas></canvas>`;
+    const ctx = container.querySelector('canvas').getContext('2d');
+
+    if (!foundGenes.length || typeof expressionData === 'undefined' || Object.keys(expressionData).length === 0) {
+        container.innerHTML = '<p class="status-message">Expression data is not available for this plot.</p>';
+        return;
+    }
+    
+    const tissues = getTissueNames();
+    const tissueExpressionData = {};
+    tissues.forEach(tissue => {
+        tissueExpressionData[tissue] = [];
+    });
+
+    foundGenes.forEach(gene => {
+        const expr = getGeneExpression(gene.gene);
+        tissues.forEach(tissue => {
+            if (expr && expr[tissue] != null) {
+                tissueExpressionData[tissue].push(expr[tissue]);
+            }
+        });
+    });
+
+    const plotData = tissues
+        .map(tissue => ({ tissue: tissue, values: tissueExpressionData[tissue] }))
+        .filter(d => d.values.length > 0)
+        .sort((a,b) => { // Sort by median expression descending
+            const medianA = d3.median(a.values);
+            const medianB = d3.median(b.values);
+            return medianB - medianA;
+        }).slice(0, 25); // Limit to top 25 tissues for readability
+
+    if (plotData.length === 0) {
+        container.innerHTML = '<p class="status-message">No expression data found for any genes in any tissues.</p>';
+        return;
+    }
+
+    currentPlotInstance = new Chart(ctx, {
+        type: 'violin',
+        data: {
+            labels: plotData.map(d => d.tissue),
+            datasets: [{
+                label: `Expression Distribution (${foundGenes.length} genes)`,
+                data: plotData.map(d => d.values),
+                backgroundColor: 'rgba(155, 89, 182, 0.5)',
+                borderColor: 'rgba(155, 89, 182, 1)',
+                borderWidth: 1,
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                title: { display: true, text: 'Gene Set Expression Across Tissues', font: { size: settings.titleFontSize, family: settings.fontFamily }, color: settings.fontColor },
+                legend: { display: false }
+            },
+            scales: {
+                y: {
+                    title: { display: true, text: 'Expression (nTPM)', font: { size: settings.axisTitleFontSize, family: settings.fontFamily }, color: settings.fontColor },
+                    grid: { display: settings.showGrid, color: settings.gridColor },
+                    border: { display: true, width: settings.axisLineWidth, color: settings.axisLineColor },
+                    ticks: { font: { size: settings.tickFontSize, family: settings.fontFamily }, color: settings.fontColor }
+                },
+                x: {
+                    grid: { display: false },
+                    border: { display: true, width: settings.axisLineWidth, color: settings.axisLineColor },
+                    ticks: { font: { size: settings.tickFontSize - 4, family: settings.fontFamily }, color: settings.fontColor, maxRotation: 90, minRotation: 45 }
+                }
+            }
+        }
+    });
+}
+
+/**
+ * Renders a bubble plot correlating expression breadth with protein domain diversity.
+ */
+function renderExpressionDomainBubblePlot(foundGenes, container) {
+    clearPreviousPlot();
+    const settings = getPlotSettings();
+    container.innerHTML = `<canvas></canvas>`;
+    const ctx = container.querySelector('canvas').getContext('2d');
+    
+    if (!foundGenes.length || typeof expressionData === 'undefined' || Object.keys(expressionData).length === 0) {
+        container.innerHTML = '<p class="status-message">Expression data is not available for this plot.</p>';
+        return;
+    }
+
+    const expressionThreshold = 1.0;
+    const bubbleData = foundGenes.map(gene => {
+        const geneExpr = getGeneExpression(gene.gene);
+        const expressingTissues = Object.values(geneExpr).filter(val => val > expressionThreshold).length;
+        const maxExpression = Math.max(0, ...Object.values(geneExpr));
+        const domains = getCleanArray(gene, 'domain_descriptions');
+        
+        return {
+            x: expressingTissues,
+            y: domains.length,
+            r: Math.max(5, Math.sqrt(maxExpression) * 2),
+            gene: gene.gene,
+            maxExpression: maxExpression,
+            domainCount: domains.length
+        };
+    }).filter(d => d.x > 0 || d.y > 0);
+    
+    if (bubbleData.length === 0) {
+        container.innerHTML = '<p class="status-message">No expression or domain data found for selected genes.</p>';
+        return;
+    }
+    
+    currentPlotInstance = new Chart(ctx, {
+        type: 'bubble',
+        data: {
+            datasets: [{
+                label: 'Genes',
+                data: bubbleData,
+                backgroundColor: 'rgba(231, 126, 35, 0.6)',
+                borderColor: 'rgba(231, 126, 35, 1)',
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                title: { display: true, text: 'Expression Breadth vs. Domain Diversity', font: { size: settings.titleFontSize, family: settings.fontFamily }, color: settings.fontColor },
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        title: context => context[0].raw.gene,
+                        label: context => [
+                            `Expressing tissues: ${context.raw.x}`,
+                            `Protein domains: ${context.raw.y}`,
+                            `Max expression: ${context.raw.maxExpression.toFixed(1)} nTPM`
+                        ]
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    title: { display: true, text: 'Number of Expressing Tissues', font: { size: settings.axisTitleFontSize, family: settings.fontFamily }, color: settings.fontColor },
+                    grid: { display: settings.showGrid, color: settings.gridColor },
+                    border: { display: true, width: settings.axisLineWidth, color: settings.axisLineColor },
+                    ticks: { font: { size: settings.tickFontSize, family: settings.fontFamily }, color: settings.fontColor }
+                },
+                y: {
+                    title: { display: true, text: 'Number of Protein Domains', font: { size: settings.axisTitleFontSize, family: settings.fontFamily }, color: settings.fontColor },
+                    grid: { display: settings.showGrid, color: settings.gridColor },
+                    border: { display: true, width: settings.axisLineWidth, color: settings.axisLineColor },
+                    ticks: { font: { size: settings.tickFontSize, family: settings.fontFamily }, color: settings.fontColor, stepSize: 1 }
+                }
+            }
+        }
+    });
 }
