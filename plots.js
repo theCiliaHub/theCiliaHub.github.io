@@ -13,7 +13,6 @@
 // - Global variables from script.js (allGenes, expressionData, etc.)
 // =============================================================================
 
-let currentPlotInstance = null; // Holds the active Chart.js, D3, etc. instance
 
 /**
  * Safely clears the previous plot, handling both Chart.js and D3.js instances.
