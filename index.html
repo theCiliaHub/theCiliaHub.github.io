@@ -8,16 +8,16 @@
     <link rel="icon" type="image/png" href="CiliaHub_Logo_web.png">
     <link rel="stylesheet" href="styles.css">
 
-    <!-- Chart.js core (v3.9.1) -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+    <!-- ✅ Chart.js v4 (latest stable) -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 
-    <!-- Violin & Box plot plugin (compatible with Chart.js v3) -->
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-box-and-violin-plot@4.0.0/build/Chart.BoxPlot.js"></script>
+    <!-- ✅ Box & Violin plot plugin (v4.x, compatible with Chart.js v4) -->
+    <script src="https://cdn.jsdelivr.net/npm/@sgratzl/chartjs-chart-boxplot@4.4.4/build/index.umd.min.js"></script>
 
-    <!-- Chart.js datalabels -->
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
+    <!-- ✅ Chart.js datalabels plugin (works with Chart.js >=3) -->
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
 
-    <!-- Other libs -->
+    <!-- Other dependencies -->
     <script src="https://cdn.jsdelivr.net/npm/@panzoom/panzoom@4.5.1/dist/panzoom.min.js"></script>
     <script src="https://unpkg.com/@upsetjs/bundle"></script>
     <script src="https://d3js.org/d3.v7.min.js"></script>
@@ -74,9 +74,10 @@
     <footer class="footer" style="text-align: center;">
         <p>© 2025 CiliaHub. All rights reserved.</p>
     </footer>
-    
-    <script src="script.js?v=2.0"></script>
-    <script src="plots.js"></script>
+
+    <!-- ✅ Load application scripts in correct order -->
     <script src="globals.js"></script>
+    <script src="plots.js"></script>
+    <script src="script.js?v=2.0"></script>
 </body>
 </html>
