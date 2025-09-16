@@ -39,7 +39,7 @@ function navigateTo(event, path) {
 }
 
 // =============================================================================
-// ROUTER (REVISED WITH CILIA PLOT INTEGRATION)
+// ROUTER (REVISED)
 // =============================================================================
 async function handleRouteChange() {
     let path = window.location.hash.replace(/^#/, '').toLowerCase().trim();
@@ -76,56 +76,29 @@ async function handleRouteChange() {
             displayHomePage();
             setTimeout(displayLocalizationChart, 0);
             break;
-
         case '/batch-query':
-            if (typeof displayBatchQueryTool === 'function') {
-                displayBatchQueryTool();
-            } else {
-                console.warn('displayBatchQueryTool not defined');
-                displayNotFoundPage();
-            }
+            displayBatchQueryTool();
             break;
-
         case '/ciliaplot':
         case '/analysis':
-            if (typeof displayCiliaPlotPage === 'function') {
-                displayCiliaPlotPage(); // Display the main analysis page
-            } else {
-                console.warn('displayCiliaPlotPage not defined');
-                displayNotFoundPage();
-            }
+            displayCiliaPlotPage();
             break;
-
         case '/compare':
-            if (typeof displayComparePage === 'function') {
-                displayComparePage();
-            } else {
-                console.warn('displayComparePage not defined');
-                displayNotFoundPage();
-            }
+            displayComparePage();
             break;
-
         case '/expression':
-            if (typeof displayExpressionPage === 'function') {
-                displayExpressionPage();
-            } else {
-                console.warn('displayExpressionPage not defined');
-                displayNotFoundPage();
-            }
+            displayExpressionPage();
             break;
-
         case '/download':
             displayDownloadPage();
             break;
-
         case '/contact':
             displayContactPage();
             break;
-
         default:
-            // Handle potential gene pages
+            // This block now exclusively handles potential gene pages
             if (geneMapCache) {
-                const geneName = getGeneFromURL(); // Extract gene from URL
+                const geneName = getGeneFromURL(); // Get gene name from the unknown path
                 if (geneName) {
                     const safeName = sanitize(geneName);
                     geneToDisplay = geneMapCache.get(safeName);
@@ -135,12 +108,7 @@ async function handleRouteChange() {
             }
 
             if (geneToDisplay) {
-                if (typeof displayIndividualGenePage === 'function') {
-                    displayIndividualGenePage(geneToDisplay);
-                } else {
-                    console.warn('displayIndividualGenePage not defined');
-                    displayNotFoundPage();
-                }
+                displayIndividualGenePage(geneToDisplay);
             } else {
                 displayNotFoundPage();
             }
@@ -149,17 +117,6 @@ async function handleRouteChange() {
 
     console.log("Routing completed. Path:", path, "Gene:", geneToDisplay ? geneToDisplay.gene : "N/A");
 }
-
-// =============================================================================
-// EVENT LISTENERS
-// =============================================================================
-window.addEventListener("load", handleRouteChange);
-window.addEventListener("hashchange", handleRouteChange);
-
-document.addEventListener('DOMContentLoaded', () => {
-    initGlobalEventListeners();
-});
-
 
 // =============================================================================
 // URL HELPERS
@@ -180,6 +137,16 @@ function getGeneFromURL() {
     return null;
 }
 
+
+// =============================================================================
+// EVENT LISTENERS
+// =============================================================================
+window.addEventListener("load", handleRouteChange);
+window.addEventListener("hashchange", handleRouteChange);
+
+document.addEventListener('DOMContentLoaded', () => {
+    initGlobalEventListeners();
+});
 
 // =============================================================================
 // GLOBAL UI HELPERS
