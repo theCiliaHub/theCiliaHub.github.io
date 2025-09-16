@@ -2127,12 +2127,12 @@ document.addEventListener('DOMContentLoaded', () => {
  * NEW: Builds the redesigned CiliaPlot page with a professional, two-column layout
  * inspired by bioinformatics tools like GO Panther.
  */
-function displayCiliaPlotPage() {
+function displayCiliaPlotPage_v2() {
     const contentArea = document.querySelector('.content-area');
-    contentArea.className = 'content-area content-area-full'; // Use full width for the layout
-    document.querySelector('.cilia-panel').style.display = 'none'; // Hide the default side panel
-
-    contentArea.innerHTML = `
+    contentArea.className = 'content-area content-area-full';
+    document.querySelector('.cilia-panel').style.display = 'none';
+    
+    contentArea.innerHTML =`
         <div class="page-section ciliaplot-page">
             <div class="ciliaplot-header">
                 <h1>CiliaPlot Gene Set Analysis</h1>
