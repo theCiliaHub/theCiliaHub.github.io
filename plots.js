@@ -1342,112 +1342,158 @@ function renderTopExpressingTissues(foundGenes, container) {
 // Replace the existing  function with this new one
 
 function displayCiliaPlotPage() {
-    const contentArea = document.querySelector('.content-area');
-    // Use a full-width class and hide the default side panel
-    contentArea.className = 'content-area content-area-full'; 
-    document.querySelector('.cilia-panel').style.display = 'none';
+    const contentArea = document.querySelector('.content-area');
+    contentArea.className = 'content-area content-area-full';
+    document.querySelector('.cilia-panel').style.display = 'none';
 
-    // This HTML builds the new two-column dashboard layout
-    contentArea.innerHTML = `
-        <div class="ciliaplot-dashboard">
-            <div class="ciliaplot-header">
-                <h2>CiliaPlot Dashboard</h2>
-                <div id="ciliaplot-plot-info" class="info">
-                    Select a plot type to see a description and generate an analysis.
-                </div>
-            </div>
+    contentArea.innerHTML = `
+        <section class="ciliaplot-dashboard" aria-labelledby="dashboard-title">
+            <header class="ciliaplot-header">
+                <h1 id="dashboard-title">CiliaPlot Dashboard</h1>
+                <p class="info" id="plot-info" role="region" aria-live="polite">
+                    Select a plot type and enter genes to generate publication-ready visualizations.
+                </p>
+            </header>
 
-            <div class="ciliaplot-container">
-                <div class="ciliaplot-left-panel">
-                    <div class="control-card">
-                        <label for="ciliaplot-genes-input"><strong>1. Enter Gene List</strong></label>
-                        <textarea id="ciliaplot-genes-input" placeholder="e.g., IFT88, CEP290, BBS1..."></textarea>
-                    </div>
+            <div class="ciliaplot-container">
+                <aside class="ciliaplot-left-panel" aria-labelledby="input-section">
+                    <h2 id="input-section" class="visually-hidden">Input and Settings</h2>
+                    <div class="control-card">
+                        <label for="ciliaplot-genes-input">Enter Gene List</label>
+                        <textarea 
+                            id="ciliaplot-genes-input" 
+                            placeholder="e.g., IFT88, CEP290, BBS1, ARL13B (comma, space, or line-separated)"
+                            aria-describedby="genes-help"
+                        ></textarea>
+                        <p id="genes-help" class="help-text">Enter up to 100 genes, separated by commas, spaces, or new lines. Case-insensitive.</p>
+                    </div>
 
-                    <div class="control-card">
-                        <label for="plot-type-select"><strong>2. Select Plot Type</strong></label>
-                        <select id="plot-type-select">
-    <option value="bubble">Key Localizations</option>
-    <option value="matrix">Gene-Localization Matrix</option>
-    <option value="domain_matrix">Gene-Domain Matrix</option>
-    <option value="functional_category">Functional Categories</option>
-    <option value="network">Protein Complex Network</option>
-    <option value="expression_heatmap">Expression Heatmap</option>
-    <option value="tissue_profile">Tissue Expression Profile</option>
-    <option value="top_tissues">Top Expressing Tissues</option>
-    <option value="expression_localization">Expression vs. Localization</option>
-    
-    <option value="organelle_radar">Organellar Profile (Radar)</option>
-    <option value="organelle_umap">Organellar Projection (UMAP)</option>
-</select>
-                    </div>
-                    
-                    <details class="control-card collapsible-card">
-                        <summary><strong>3. Customize Plot (Optional)</strong></summary>
-                        <div id="plot-settings-panel">
-                            <label for="setting-font-family">Font Family:</label>
-                            <input type="text" id="setting-font-family" value="Arial">
-                            
-                            <label for="setting-font-color">Font Color:</label>
-                            <input type="color" id="setting-font-color" value="#333333">
-                            
-                            <label for="setting-bg-color">Background Color:</label>
-                            <input type="color" id="setting-bg-color" value="#ffffff">
+                    <div class="control-card">
+                        <label for="plot-type-select">Select Plot Type</label>
+                        <select id="plot-type-select" aria-describedby="plot-help">
+                            <optgroup label="Localization Analysis">
+                                <option value="bubble">Key Localizations</option>
+                                <option value="matrix">Gene-Localization Matrix</option>
+                            </optgroup>
+                            <optgroup label="Functional Analysis">
+                                <option value="domain_matrix">Gene-Domain Matrix</option>
+                                <option value="functional_category">Functional Categories</option>
+                                <option value="network">Protein Complex Network</option>
+                            </optgroup>
+                            <optgroup label="Expression Analysis">
+                                <option value="expression_heatmap">Expression Heatmap</option>
+                                <option value="tissue_profile">Tissue Expression Profile</option>
+                                <option value="top_tissues">Top Expressing Tissues</option>
+                                <option value="expression_localization">Expression vs. Localization</option>
+                            </optgroup>
+                            <optgroup label="Proteomics Analysis">
+                                <option value="organelle_radar">Organellar Profile (Radar)</option>
+                                <option value="organelle_umap">Organellar Projection (UMAP)</option>
+                            </optgroup>
+                        </select>
+                        <p id="plot-help" class="help-text">Choose a visualization type for your gene set analysis.</p>
+                    </div>
 
-                            <label for="setting-title-font-size">Title Font (px):</label>
-                            <input type="number" id="setting-title-font-size" value="21" step="1">
+                    <details class="control-card collapsible-card" open>
+                        <summary>Customize Plot Settings</summary>
+                        <div id="plot-settings-panel" class="settings-grid">
+                            <div>
+                                <label for="setting-font-family">Font Family</label>
+                                <select id="setting-font-family">
+                                    <option value="Arial">Arial</option>
+                                    <option value="Helvetica">Helvetica</option>
+                                    <option value="Verdana">Verdana</option>
+                                    <option value="Times New Roman">Times New Roman</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label for="setting-font-color">Font Color</label>
+                                <input type="color" id="setting-font-color" value="#333333">
+                            </div>
+                            <div>
+                                <label for="setting-bg-color">Background Color</label>
+                                <input type="color" id="setting-bg-color" value="#ffffff">
+                            </div>
+                            <div>
+                                <label for="setting-title-font-size">Title Font Size (px)</label>
+                                <input type="number" id="setting-title-font-size" value="21" min="10" max="40" step="1">
+                            </div>
+                            <div>
+                                <label for="setting-axis-title-font-size">Axis Title Size (px)</label>
+                                <input type="number" id="setting-axis-title-font-size" value="20" min="10" max="30" step="1">
+                            </div>
+                            <div>
+                                <label for="setting-tick-font-size">Axis Tick Size (px)</label>
+                                <input type="number" id="setting-tick-font-size" value="20" min="8" max="24" step="1">
+                            </div>
+                        </div>
+                    </details>
 
-                            <label for="setting-axis-title-font-size">Axis Title (px):</label>
-                            <input type="number" id="setting-axis-title-font-size" value="20" step="1">
-                            
-                            <label for="setting-tick-font-size">Axis Ticks (px):</label>
-                            <input type="number" id="setting-tick-font-size" value="20" step="1">
-                        </div>
-                    </details>
-                    
-                    <button id="generate-plot-btn" class="btn btn-primary btn-large">Generate Plot</button>
-                </div>
+                    <button id="generate-plot-btn" class="btn btn-primary btn-large">Generate Plot</button>
+                </aside>
 
-                <div class="ciliaplot-right-panel">
-                    <div id="ciliaplot-stats-container" class="stats-container">
-                        </div>
+                <section class="ciliaplot-right-panel" aria-labelledby="output-section">
+                    <h2 id="output-section" class="visually-hidden">Visualization and Results</h2>
+                    <div id="ciliaplot-stats-container" class="stats-container" role="region" aria-live="polite"></div>
 
-                    <div class="plot-card">
-                        <div class="plot-card-header">
-                            <h3>Visualization</h3>
-                            <div class="download-controls">
-                                <select id="download-format">
-                                    <option value="png">Download as PNG</option>
-                                    <option value="pdf">Download as PDF</option>
-                                </select>
-                                <button id="download-plot-btn" class="btn btn-secondary">Download</button>
-                            </div>
-                        </div>
-                        <div id="plot-display-area" class="plot-area-large">
-                            </div>
-                        <div id="ciliaplot-legend-container" class="legend">
-                            </div>
-                    </div>
+                    <div class="plot-card">
+                        <div class="plot-card-header">
+                            <h3>Visualization</h3>
+                            <div class="download-controls">
+                                <label for="download-format" class="visually-hidden">Download Format</label>
+                                <select id="download-format">
+                                    <option value="png">PNG (High-res Image)</option>
+                                    <option value="pdf">PDF (Publication-ready)</option>
+                                </select>
+                                <button id="download-plot-btn" class="btn btn-secondary">Download</button>
+                            </div>
+                        </div>
+                        <div id="plot-display-area" class="plot-area-large" role="region" aria-live="polite">
+                            <p class="status-message">Your plot will appear here after analysis.</p>
+                        </div>
+                        <div id="ciliaplot-legend-container" class="legend"></div>
+                    </div>
 
-                    <div id="plot-data-table-container">
-                        </div>
+                    <div class="tab-container">
+                        <div class="tab-buttons" role="tablist">
+                            <button class="tab-button active" data-tab="summary-tab" role="tab" aria-selected="true" aria-controls="summary-tab">Data Summary</button>
+                            <button class="tab-button" data-tab="status-tab" role="tab" aria-selected="false" aria-controls="status-tab">Input Status</button>
+                        </div>
+                        <div class="tab-content">
+                            <div id="summary-tab" class="tab-pane active" role="tabpanel">
+                                <div id="plot-data-table-container"></div>
+                            </div>
+                            <div id="status-tab" class="tab-pane" role="tabpanel">
+                                <div id="ciliaplot-search-results"></div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </section>
+    `;
 
-                    <div id="ciliaplot-search-results">
-                        </div>
-                </div>
-            </div>
-        </div>
-    `;
+    // Attach event listeners
+    document.getElementById('generate-plot-btn').addEventListener('click', generateAnalysisPlots);
+    document.getElementById('download-plot-btn').addEventListener('click', downloadPlot);
+    document.getElementById('plot-type-select').addEventListener('change', (e) => {
+        updatePlotInfo(e.target.value);
+    });
 
-    // Re-attach event listeners for the new buttons
-    document.getElementById('generate-plot-btn').onclick = generateAnalysisPlots;
-    document.getElementById('download-plot-btn').onclick = downloadPlot;
-    // Add event listener for plot type change to update info box
-    document.getElementById('plot-type-select').addEventListener('change', (e) => {
-        updatePlotInfo(e.target.value);
-    });
+    // Tab functionality
+    document.querySelectorAll('.tab-button').forEach(button => {
+        button.addEventListener('click', () => {
+            document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.tab-pane').forEach(pane => pane.classList.remove('active'));
+            button.classList.add('active');
+            document.getElementById(button.dataset.tab).classList.add('active');
+            button.setAttribute('aria-selected', 'true');
+            document.querySelectorAll('.tab-button').forEach(btn => {
+                if (btn !== button) btn.setAttribute('aria-selected', 'false');
+            });
+        });
+    });
 }
-
 // =============================================================================
 // SIMULATED PROTEOMICS DATA FOR ADVANCED PLOTS
 // =============================================================================
