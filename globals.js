@@ -81,9 +81,9 @@ async function handleRouteChange() {
             displayBatchQueryTool();
             break;
 
-        case '/ciliaplot':    // <-- our new CiliaPlot layout
-        case '/analysis':     // optional alias
-            displayCiliaPlotPage(); // use new version
+       case '/ciliaplot':
+        case '/analysis':
+            displayCiliaPlotPage(); // Display the main analysis page
             break;
 
         case '/compare':
