@@ -2125,7 +2125,7 @@ document.addEventListener('DOMContentLoaded', () => {
  * NEW: Builds the redesigned CiliaPlot page with a professional, two-column layout
  * inspired by bioinformatics tools like GO Panther.
  */
-function displayCiliaPlotPage_v2() {
+function displayCiliaPlotPage() {
     const contentArea = document.querySelector('.content-area');
     contentArea.className = 'content-area content-area-full';
     document.querySelector('.cilia-panel').style.display = 'none';
