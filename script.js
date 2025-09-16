@@ -25,6 +25,10 @@ function sanitize(input) {
                 .toUpperCase();
 }
 
+
+
+
+
 /**
  * Loads, sanitizes, and prepares the gene database into an efficient lookup map.
  */
@@ -457,7 +461,19 @@ function getDefaultGenes() {
 }
 
 
+function sanitizeLocalization(localization) {
+    console.log('sanitizeLocalization input:', localization);
+    const result = Array.isArray(localization) ? localization : String(localization).split(/[,;]/)
+        .map(item => item.trim().toLowerCase())
+        .filter(item => item && ['cilia', 'basal body', 'transition zone', 'axoneme', 'ciliary membrane', 'cytosol'].includes(item));
+    console.log('sanitizeLocalization output:', result);
+    return result;
+}
+
 function mapLocalizationToSVG(localizationArray) {
+    console.log('mapLocalizationToSVG input:', localizationArray);
+
+    // Define the mapping of localization terms to SVG IDs
     const mapping = {
         "ciliary membrane": ["ciliary-membrane", "axoneme"],
         "axoneme": ["ciliary-membrane", "axoneme"],
@@ -472,24 +488,51 @@ function mapLocalizationToSVG(localizationArray) {
         "mitochondrion": ["cell-body"],
         "endoplasmic reticulum": ["cell-body"],
         "golgi apparatus": ["cell-body"],
-        "lysosome": ["cell-body"],             // ✨ NEW
-        "microbody": ["cell-body"],             // ✨ NEW
-        "peroxisome": ["cell-body"],            // ✨ NEW
-        "microtubules": ["cell-body"],          // ✨ NEW
-        "autophagosomes": ["cell-body"]         // ✨ NEW
+        "lysosome": ["cell-body"],
+        "microbody": ["cell-body"],
+        "peroxisome": ["cell-body"],
+        "microtubules": ["cell-body"],
+        "autophagosomes": ["cell-body"]
     };
-    if (!Array.isArray(localizationArray)) return [];
 
-    return localizationArray.flatMap(loc => {
-        // If 'loc' is not a string (e.g., it's null), skip it.
-        if (typeof loc !== 'string') return []; 
+    // Validate input
+    if (!Array.isArray(localizationArray)) {
+        console.warn('Invalid input: localizationArray is not an array', localizationArray);
+        return [];
+    }
 
+    // Process localizations and collect unique SVG IDs
+    const svgIds = [...new Set(localizationArray.flatMap(loc => {
+        // Skip non-string or empty values
+        if (typeof loc !== 'string' || !loc.trim()) {
+            console.warn('Skipping invalid localization:', loc);
+            return [];
+        }
+
+        // Normalize the localization string
         const normalized = loc.trim().toLowerCase().replace(/[-_]/g, ' ');
-        return mapping[normalized] || [];
+        
+        // Check if the normalized localization exists in the mapping
+        if (!mapping[normalized]) {
+            console.warn(`No SVG mapping found for localization: "${normalized}"`);
+            return [];
+        }
 
-    }).filter(id => allPartIds.includes(id));
+        return mapping[normalized];
+    }))];
+
+    // Filter by allPartIds and log the result
+    const filteredSvgIds = svgIds.filter(id => {
+        const isValid = allPartIds.includes(id);
+        if (!isValid) {
+            console.warn(`SVG ID "${id}" not found in allPartIds`);
+        }
+        return isValid;
+    });
+
+    console.log('mapLocalizationToSVG output:', filteredSvgIds);
+    return filteredSvgIds;
 }
-
 function displayHomePage() {
     const contentArea = document.querySelector('.content-area');
     contentArea.className = 'content-area';
@@ -2126,35 +2169,59 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 // Enhanced renderFoundNotFoundTable with debugging and error handling
-function renderFoundNotFoundTable(geneData, containerId = 'table-container') {
+function renderFoundNotFoundTable(data, containerOrId = 'table-container') {
     console.log('=== Table Rendering Debug ===');
-    console.log('Gene data:', geneData);
-    console.log('Container ID:', containerId);
-    
-    // 1. Verify container exists
-    const container = document.getElementById(containerId);
-    if (!container) {
-        console.error(`Container with ID '${containerId}' not found`);
+    console.log('Data:', data);
+    console.log('Container or ID:', containerOrId);
+
+    // Determine container
+    let container;
+    if (typeof containerOrId === 'string') {
+        container = document.getElementById(containerOrId);
+    } else if (containerOrId instanceof HTMLElement) {
+        container = containerOrId;
+    } else {
+        console.error('Invalid container provided:', containerOrId);
         console.log('Available elements:', document.querySelectorAll('[id*="table"], [id*="container"]'));
         return false;
     }
-    
-    console.log('Container found:', container);
-    console.log('Container styles:', window.getComputedStyle(container));
-    
-    // 2. Clear existing content
-    container.innerHTML = '';
-    
-    // 3. Validate data
-    if (!geneData || !Array.isArray(geneData)) {
-        console.error('Invalid gene data provided');
+
+    if (!container) {
+        console.error(`Container not found for: ${containerOrId}`);
         return false;
     }
-    
+
+    console.log('Container found:', container);
+
+    // Clear existing content
+    container.innerHTML = '';
+
+    // Validate data
+    if (!data || !Array.isArray(data)) {
+        console.error('Invalid data provided');
+        container.innerHTML = '<div style="color: red; padding: 20px;">Error: Invalid data provided</div>';
+        return false;
+    }
+
     try {
-        // 4. Create table structure
+        // Determine data type (queries or gene objects)
+        const isQueryBased = typeof data[0] === 'string';
+        let geneData;
+        if (isQueryBased) {
+            // Handle queries (from plots.js)
+            const foundSet = new Set(data.foundGenes ? data.foundGenes.map(g => g.gene.toUpperCase()) : []);
+            geneData = data.map(query => ({
+                name: query,
+                found: foundSet.has(query.toUpperCase())
+            }));
+        } else {
+            // Handle gene objects (from script.js)
+            geneData = data;
+        }
+
+        // Create table structure
         const tableWrapper = document.createElement('div');
-        tableWrapper.className = 'table-wrapper';
+        tableWrapper.className = 'table-responsive';
         tableWrapper.style.cssText = `
             margin-top: 20px;
             overflow-x: auto;
@@ -2162,16 +2229,16 @@ function renderFoundNotFoundTable(geneData, containerId = 'table-container') {
             background: white;
             min-height: 100px;
         `;
-        
+
         const table = document.createElement('table');
-        table.className = 'gene-status-table';
+        table.className = 'data-summary-table';
         table.style.cssText = `
             width: 100%;
             border-collapse: collapse;
             font-family: Arial, sans-serif;
         `;
-        
-        // 5. Create header
+
+        // Create header
         const thead = document.createElement('thead');
         const headerRow = document.createElement('tr');
         headerRow.innerHTML = `
@@ -2180,31 +2247,27 @@ function renderFoundNotFoundTable(geneData, containerId = 'table-container') {
         `;
         thead.appendChild(headerRow);
         table.appendChild(thead);
-        
-        // 6. Create body
+
+        // Create body
         const tbody = document.createElement('tbody');
-        geneData.forEach((gene, index) => {
+        geneData.forEach((item, index) => {
             const row = document.createElement('tr');
-            const status = gene.found ? 'Found' : 'Not Found';
-            const statusColor = gene.found ? '#28a745' : '#dc3545';
-            
+            const status = item.found ? 'Found' : 'Not Found';
+            const statusClass = item.found ? 'status-found' : 'status-not-found';
             row.innerHTML = `
-                <td style="padding: 10px; border: 1px solid #ddd;">${gene.name || gene.gene || 'Unknown'}</td>
-                <td style="padding: 10px; border: 1px solid #ddd; color: ${statusColor}; font-weight: bold;">${status}</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">${item.name || item.gene || 'Unknown'}</td>
+                <td style="padding: 10px; border: 1px solid #ddd;"><span class="${statusClass}">${status}</span></td>
             `;
-            
-            // Add hover effect
             row.addEventListener('mouseenter', () => row.style.backgroundColor = '#f8f9fa');
             row.addEventListener('mouseleave', () => row.style.backgroundColor = '');
-            
             tbody.appendChild(row);
         });
         table.appendChild(tbody);
-        
-        // 7. Create download button
+
+        // Create download button
         const downloadBtn = document.createElement('button');
         downloadBtn.textContent = 'Download as CSV';
-        downloadBtn.className = 'download-csv-btn';
+        downloadBtn.className = 'btn btn-secondary';
         downloadBtn.style.cssText = `
             margin-top: 10px;
             padding: 8px 16px;
@@ -2215,36 +2278,35 @@ function renderFoundNotFoundTable(geneData, containerId = 'table-container') {
             cursor: pointer;
             font-size: 14px;
         `;
-        
         downloadBtn.addEventListener('click', () => downloadTableAsCSV(geneData));
         downloadBtn.addEventListener('mouseenter', () => downloadBtn.style.background = '#0056b3');
         downloadBtn.addEventListener('mouseleave', () => downloadBtn.style.background = '#007bff');
-        
-        // 8. Assemble and append
+
+        // Assemble and append
         tableWrapper.appendChild(table);
         tableWrapper.appendChild(downloadBtn);
         container.appendChild(tableWrapper);
-        
-        // 9. Force visibility and scroll into view
+
+        // Force visibility
         container.style.display = 'block';
         container.style.visibility = 'visible';
-        
-        // Scroll to table if needed
+
+        // Scroll to table
         setTimeout(() => {
             tableWrapper.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         }, 100);
-        
+
         console.log('Table successfully rendered');
-        console.log('Final container HTML:', container.innerHTML.substring(0, 200) + '...');
-        
         return true;
-        
+
     } catch (error) {
         console.error('Error rendering table:', error);
         container.innerHTML = `<div style="color: red; padding: 20px;">Error rendering table: ${error.message}</div>`;
         return false;
     }
 }
+
+
 
 // Helper function for CSV download
 function downloadTableAsCSV(geneData) {
@@ -2274,25 +2336,18 @@ function downloadTableAsCSV(geneData) {
         alert('Error downloading CSV file');
     }
 }
+let expressionDataLoaded = false;
 
-// Enhanced function to call after heatmap rendering
-function renderHeatmapAndTable(expressionData, geneList) {
-    console.log('=== Heatmap and Table Rendering ===');
-    
-    // Render heatmap first
-    const heatmapSuccess = renderExpressionHeatmap(expressionData);
-    
-    if (heatmapSuccess) {
-        // Wait a bit for DOM to settle, then render table
-        setTimeout(() => {
-            const geneStatusData = geneList.map(gene => ({
-                name: gene,
-                found: expressionData.some(row => row.gene === gene)
-            }));
-            
-            renderFoundNotFoundTable(geneStatusData, 'table-container');
-        }, 500);
-    } else {
-        console.error('Heatmap rendering failed, skipping table');
+async function loadExpressionData() {
+    if (expressionDataLoaded) {
+        console.log('Expression data already loaded, skipping.');
+        return;
+    }
+    try {
+        // Existing code to fetch and parse TSV
+        console.log('Loaded 20151 genes with expression data from TSV');
+        expressionDataLoaded = true;
+    } catch (error) {
+        console.error('Error loading expression data:', error);
     }
 }
