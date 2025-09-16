@@ -83,7 +83,7 @@ async function handleRouteChange() {
 
         case '/ciliaplot':    // <-- our new CiliaPlot layout
         case '/analysis':     // optional alias
-            displayCiliaPlotPage(); // call the redesigned function
+            displayCiliaPlotPage_v2(); // use new version
             break;
 
         case '/compare':
