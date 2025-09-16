@@ -2121,25 +2121,30 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 
+// In script.js
+
 /**
- * NEW: Builds the redesigned CiliaPlot page with a professional dashboard layout.
+ * NEW: Builds the redesigned CiliaPlot page with a professional, two-column layout
+ * inspired by bioinformatics tools like GO Panther.
  */
 function displayCiliaPlotPage() {
     const contentArea = document.querySelector('.content-area');
-    contentArea.className = 'content-area content-area-full'; // Use full width for the dashboard
-    document.querySelector('.cilia-panel').style.display = 'none'; // Hide the side panel
+    contentArea.className = 'content-area content-area-full'; // Use full width for the layout
+    document.querySelector('.cilia-panel').style.display = 'none'; // Hide the default side panel
 
     contentArea.innerHTML = `
-        <div class="ciliaplot-dashboard">
+        <div class="page-section ciliaplot-page">
             <div class="ciliaplot-header">
-                <h2>CiliaPlot Gene Set Analysis</h2>
-                <div id="ciliaplot-plot-info" class="info">
-                    Enter a list of genes, select an analysis type, and click "Run Analysis" to generate publication-ready visualizations.
-                </div>
+                <h1>CiliaPlot Gene Set Analysis</h1>
+                <p class="info">
+                    Enter a list of genes to perform functional enrichment and network analysis, 
+                    generating publication-ready visualizations.
+                </p>
             </div>
 
             <div class="ciliaplot-container-new">
                 <div class="ciliaplot-left-panel-new">
+                    
                     <div class="control-section">
                         <h3>1. Input & Analyse</h3>
                         <div class="control-section-content">
@@ -2161,10 +2166,6 @@ function displayCiliaPlotPage() {
                                     <option value="expression_localization">Expression vs. Localization</option>
                                     <option value="top_tissues">Top Expressing Tissues</option>
                                 </optgroup>
-                                <optgroup label="Advanced Analysis">
-                                    <option value="organelle_radar">Organellar Profile (Radar)</option>
-                                    <option value="organelle_umap">Organellar Projection (UMAP)</option>
-                                </optgroup>
                             </select>
                             <button id="generate-plot-btn" class="btn btn-primary">Run Analysis</button>
                         </div>
@@ -2176,9 +2177,13 @@ function displayCiliaPlotPage() {
                             <div><label>Title Font Size</label><input type="number" id="setting-title-font-size" value="21"></div>
                             <div><label>Axis Title Font Size</label><input type="number" id="setting-axis-title-font-size" value="20"></div>
                             <div><label>Axis Tick Font Size</label><input type="number" id="setting-tick-font-size" value="20"></div>
-                            <div><label>Font</label><select id="setting-font-family"><option>Arial</option><option>Verdana</option></select></div>
+                            <div><label>Font</label><select id="setting-font-family"><option>Arial</option><option>Verdana</option><option>Times New Roman</option></select></div>
                             <div><label>Text Color</label><input type="color" id="setting-font-color" value="#333333"></div>
                             <div><label>Background</label><input type="color" id="setting-bg-color" value="#ffffff"></div>
+                            <div><label>Axis Line Width</label><input type="number" id="setting-axis-line-width" value="2" step="0.5"></div>
+                            <div><label>Axis Line Color</label><input type="color" id="setting-axis-line-color" value="#333333"></div>
+                            <div><label>Gridline Color</label><input type="color" id="setting-grid-color" value="#e0e0e0"></div>
+                            <div><label><input type="checkbox" id="setting-show-grid"> Show Grid</label></div>
                         </div>
                     </details>
 
@@ -2195,6 +2200,7 @@ function displayCiliaPlotPage() {
                 </div>
 
                 <div class="ciliaplot-right-panel-new">
+                    <div id="ciliaplot-plot-info" class="info">Select an analysis type and click "Run Analysis" to begin.</div>
                     <div id="ciliaplot-stats-container" class="stats-container"></div>
                     <div id="plot-display-area" class="plot-container-new">
                         <p class="status-message">Your plot will appear here.</p>
@@ -2204,23 +2210,27 @@ function displayCiliaPlotPage() {
                     <div id="ciliaplot-search-results"></div>
                 </div>
             </div>
-        </div>`;
+        </div>
+    `;
     
-    // Attach all event listeners for the CiliaPlot page
+    // Attach all necessary event listeners
     document.getElementById('generate-plot-btn').addEventListener('click', generateAnalysisPlots);
     document.getElementById('download-plot-btn').addEventListener('click', downloadPlot);
-    document.getElementById('plot-type-select').addEventListener('change', (e) => updatePlotInfo(e.target.value));
+    document.getElementById('plot-type-select').addEventListener('change', (e) => {
+        updatePlotInfo(e.target.value);
+    });
     
     // Auto-update plot when settings change, if a plot already exists
     document.getElementById('plot-settings-grid').addEventListener('change', () => {
-        if (currentPlotInstance) {
+        if (currentPlotInstance) { 
             generateAnalysisPlots();
         }
     });
 
-    // Initialize the info text
+    // Initialize the info text for the default selection
     updatePlotInfo(document.getElementById('plot-type-select').value);
 }
+
 
 // Enhanced renderFoundNotFoundTable with debugging and error handling
 function renderFoundNotFoundTable(geneData, containerId = 'table-container') {
