@@ -1365,7 +1365,7 @@ function renderTopExpressingTissues(foundGenes, container) {
 
 // Replace the existing  function with this new one
 
-function displayCiliaPlotPage() {
+function displayCiliaPlotPage_v2() {
     const contentArea = document.querySelector('.content-area');
     // Use a full-width class and hide the default side panel
     contentArea.className = 'content-area content-area-full'; 
