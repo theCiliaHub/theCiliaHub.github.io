@@ -1368,69 +1368,158 @@ function renderTopExpressingTissues(foundGenes, container) {
 
 function displayCiliaPlotPage() {
     const contentArea = document.querySelector('.content-area');
-    contentArea.className = 'content-area content-area-full';
-    document.querySelector('.cilia-panel').style.display = 'none';
-    
-    contentArea.innerHTML =`
-        <div class="page-section ciliaplot-page">
-            <div class="ciliaplot-header">
-                <h1>CiliaPlot Gene Set Analysis</h1>
-                <p class="info">
-                    Enter a list of genes to perform functional enrichment and network analysis, 
-                    generating publication-ready visualizations.
-                </p>
-            </div>
+    contentArea.className = 'content-area content-area-full';
+    document.querySelector('.cilia-panel').style.display = 'none';
+    
+    // New HTML structure with accordions and tabs
+    contentArea.innerHTML = `
+        <div class="page-section ciliaplot-page">
+            <div class="ciliaplot-header">
+                <h1>CiliaPlot Gene Set Analysis</h1>
+                <p class="info">
+                    Enter a list of genes to perform functional enrichment and network analysis, 
+                    generating publication-ready visualizations.
+                </p>
+            </div>
 
-            <div class="ciliaplot-container-new">
-                <div class="ciliaplot-left-panel-new">
-                    
-                    <div class="control-section">
-                        <h3>1. Input & Analyse</h3>
-                        <div class="control-section-content">
-                            <textarea id="ciliaplot-genes-input" placeholder="Enter one gene per line..."></textarea>
-                            <label for="plot-type-select"><b>Select Analysis Type</b></label>
-                            <select id="plot-type-select">
-                                <optgroup label="Localization Analysis">
-                                    <option value="bubble">Key Localizations (Bubble)</option>
-                                    <option value="localization_bar">Key Localizations (Bar)</option>
-                                    <option value="matrix">Gene-Localization Matrix</option>
-                                </optgroup>
-                                <optgroup label="Functional Analysis">
-                                    <option value="domain_matrix">Gene-Domain Matrix</option>
-                                    <option value="functional_category">Functional Category</option>
-                                    <option value="network">Protein Complex Network</option>
-                                    <option value="chord_plot">Protein Complex (Chord)</option>
-                                </optgroup>
-                                <optgroup label="Expression Analysis">
-                                    <option value="expression_heatmap">Expression Heatmap</option>
-                                    <option value="violin_plot">Expression Violin Plot</option>
-                    _profile">Tissue Expression Profile</option>
-                                    <option value="expression_localization">Expression vs. Localization</option>
-                                    <option value="expression_domain_bubble">Expression vs. Domain</option>
-                                    <option value="top_tissues">Top Expressing Tissues</option>
-                                </optgroup>
-                                <optgroup label="Proteomics Analysis">
-                                    <option value="organelle_radar">Organellar Profile (Radar)</option>
-                                    <option value="organelle_umap">Organellar Projection (UMAP)</option>
-                                </optgroup>
-                            </select>
-                            <button id="generate-plot-btn" class="btn btn-primary">Run Analysis</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    `;
-    
-    document.getElementById('generate-plot-btn').addEventListener('click', generateAnalysisPlots);
-    document.getElementById('download-plot-btn').addEventListener('click', downloadPlot);
-    document.getElementById('plot-type-select').addEventListener('change', (e) => updatePlotInfo(e.target.value));
-    document.getElementById('plot-settings-grid').addEventListener('change', () => {
-        if (currentPlotInstance) generateAnalysisPlots();
-    });
-    updatePlotInfo(document.getElementById('plot-type-select').value);
+            <div class="ciliaplot-container-pro">
+                <div class="ciliaplot-left-panel-pro">
+                    <div class="accordion-item active">
+                        <div class="accordion-header">
+                            <h3>1. Input Data & Analysis</h3>
+                        </div>
+                        <div class="accordion-content">
+                            <textarea id="ciliaplot-genes-input" placeholder="Enter one gene per line...\ne.g., ARL13B\nIFT88\nBBS1\nCEP290"></textarea>
+                            <label for="plot-type-select"><b>Select Analysis Type</b></label>
+                            <select id="plot-type-select">
+                                <optgroup label="Localization Analysis">
+                                    <option value="bubble">Key Localizations (Bubble)</option>
+                                    <option value="localization_bar">Key Localizations (Bar)</option>
+                                    <option value="matrix">Gene-Localization Matrix</option>
+                                </optgroup>
+                                <optgroup label="Functional Analysis">
+                                    <option value="domain_matrix">Gene-Domain Matrix</option>
+                                    <option value="functional_category">Functional Category</option>
+                                    <option value="network">Protein Complex Network</option>
+                                    <option value="chord_plot">Protein Complex (Chord)</option>
+                                </optgroup>
+                                <optgroup label="Expression Analysis">
+                                    <option value="expression_heatmap">Expression Heatmap</option>
+                                    <option value="violin_plot">Expression Violin Plot</option>
+                                    <option value="tissue_profile">Tissue Expression Profile</option>
+                                    <option value="expression_localization">Expression vs. Localization</option>
+                                    <option value="expression_domain_bubble">Expression vs. Domain</option>
+                                    <option value="top_tissues">Top Expressing Tissues</option>
+                                </optgroup>
+                                <optgroup label="Proteomics Analysis">
+                                    <option value="organelle_radar">Organellar Profile (Radar)</option>
+                                    <option value="organelle_umap">Organellar Projection (UMAP)</option>
+                                </optgroup>
+                            </select>
+                            <button id="generate-plot-btn" class="btn btn-primary">Run Analysis</button>
+                        </div>
+                    </div>
+
+                    <div class="accordion-item">
+                        <div class="accordion-header">
+                            <h3>2. Plot Style Settings</h3>
+                        </div>
+                        <div class="accordion-content" id="plot-settings-grid">
+                             <div><label>Title Font Size</label><input type="number" id="setting-title-font-size" value="21"></div>
+                             <div><label>Axis Title Font Size</label><input type="number" id="setting-axis-title-font-size" value="20"></div>
+                             <div><label>Axis Tick Font Size</label><input type="number" id="setting-tick-font-size" value="20"></div>
+                             <div><label>Font</label><select id="setting-font-family"><option>Arial</option><option>Verdana</option><option>Times New Roman</option></select></div>
+                             <div><label>Text Color</label><input type="color" id="setting-font-color" value="#333333"></div>
+                             <div><label>Background</label><input type="color" id="setting-bg-color" value="#ffffff"></div>
+                             <div><label>Axis Line Width</label><input type="number" id="setting-axis-line-width" value="2" step="0.5"></div>
+                             <div><label>Axis Line Color</label><input type="color" id="setting-axis-line-color" value="#333333"></div>
+                             <div><label>Gridline Color</label><input type="color" id="setting-grid-color" value="#e0e0e0"></div>
+                             <div><label><input type="checkbox" id="setting-show-grid"> Show Grid</label></div>
+                        </div>
+                    </div>
+
+                    <div class="accordion-item">
+                        <div class="accordion-header">
+                            <h3>3. Download Plot</h3>
+                        </div>
+                        <div class="accordion-content">
+                             <select id="download-format">
+                                 <option value="png">Download as PNG</option>
+                                 <option value="pdf">Download as PDF</option>
+                             </select>
+                             <button id="download-plot-btn" class="btn btn-secondary">Download</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="ciliaplot-right-panel-pro">
+                    <div id="ciliaplot-plot-info" class="info">Select an analysis type and click "Run Analysis" to begin.</div>
+                    <div id="ciliaplot-stats-container" class="stats-container"></div>
+                    
+                    <div class="tab-container">
+                        <div class="tab-buttons">
+                            <button class="tab-button active" data-tab="plot-tab">Plot</button>
+                            <button class="tab-button" data-tab="summary-tab">Data Summary</button>
+                            <button class="tab-button" data-tab="status-tab">Input Status</button>
+                        </div>
+                        <div class="tab-content">
+                            <div id="plot-tab" class="tab-pane active">
+                                <div id="plot-display-area" class="plot-container-pro">
+                                    <p class="status-message">Your plot will appear here.</p>
+                                </div>
+                                <div id="ciliaplot-legend-container" class="legend"></div>
+                            </div>
+                            <div id="summary-tab" class="tab-pane">
+                                <div id="plot-data-table-container"></div>
+                            </div>
+                            <div id="status-tab" class="tab-pane">
+                                <div id="ciliaplot-search-results"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // --- JAVASCRIPT FOR NEW INTERACTIVE ELEMENTS ---
+    
+    // Accordion functionality
+    const accordionHeaders = document.querySelectorAll('.accordion-header');
+    accordionHeaders.forEach(header => {
+        header.addEventListener('click', () => {
+            const accordionItem = header.parentElement;
+            accordionItem.classList.toggle('active');
+        });
+    });
+
+    // Tab functionality
+    const tabButtons = document.querySelectorAll('.tab-button');
+    const tabPanes = document.querySelectorAll('.tab-pane');
+    tabButtons.forEach(button => {
+        button.addEventListener('click', () => {
+            // Deactivate all
+            tabButtons.forEach(btn => btn.classList.remove('active'));
+            tabPanes.forEach(pane => pane.classList.remove('active'));
+
+            // Activate clicked
+            button.classList.add('active');
+            document.getElementById(button.dataset.tab).classList.add('active');
+        });
+    });
+
+    // --- RE-ATTACH ORIGINAL EVENT LISTENERS ---
+    
+    document.getElementById('generate-plot-btn').addEventListener('click', generateAnalysisPlots);
+    document.getElementById('download-plot-btn').addEventListener('click', downloadPlot);
+    document.getElementById('plot-type-select').addEventListener('change', (e) => updatePlotInfo(e.target.value));
+    document.getElementById('plot-settings-grid').addEventListener('change', () => {
+        if (currentPlotInstance) { 
+            generateAnalysisPlots();
+        }
+    });
+    updatePlotInfo(document.getElementById('plot-type-select').value);
 }
-
 
 // =============================================================================
 // SIMULATED PROTEOMICS DATA FOR ADVANCED PLOTS
