@@ -1363,9 +1363,9 @@ function renderTopExpressingTissues(foundGenes, container) {
 
 
 
- NEW: Builds the redesigned CiliaPlot page with a professional, two-column layout
- * inspired by bioinformatics tools like GO Panther. RENAMED TO FIX ROUTER ERROR.
- */
+// In plots.js, replace the old function with this one.
+// This version is correctly named and contains all the plot options.
+
 function displayCiliaPlotPage() {
     const contentArea = document.querySelector('.content-area');
     contentArea.className = 'content-area content-area-full';
@@ -1387,7 +1387,7 @@ function displayCiliaPlotPage() {
                     <div class="control-section">
                         <h3>1. Input & Analyse</h3>
                         <div class="control-section-content">
-                            <textarea id="ciliaplot-genes-input" placeholder="Enter one gene per line...\ne.g., ARL13B\nIFT88\nBBS1\nCEP290"></textarea>
+                            <textarea id="ciliaplot-genes-input" placeholder="Enter one gene per line..."></textarea>
                             <label for="plot-type-select"><b>Select Analysis Type</b></label>
                             <select id="plot-type-select">
                                 <optgroup label="Localization Analysis">
@@ -1404,7 +1404,7 @@ function displayCiliaPlotPage() {
                                 <optgroup label="Expression Analysis">
                                     <option value="expression_heatmap">Expression Heatmap</option>
                                     <option value="violin_plot">Expression Violin Plot</option>
-                                    <option value="tissue_profile">Tissue Expression Profile</option>
+                    _profile">Tissue Expression Profile</option>
                                     <option value="expression_localization">Expression vs. Localization</option>
                                     <option value="expression_domain_bubble">Expression vs. Domain</option>
                                     <option value="top_tissues">Top Expressing Tissues</option>
@@ -1417,66 +1417,20 @@ function displayCiliaPlotPage() {
                             <button id="generate-plot-btn" class="btn btn-primary">Run Analysis</button>
                         </div>
                     </div>
-
-                    <details class="control-section">
-                        <summary>2. Customize Plot</summary>
-                        <div class="control-section-content" id="plot-settings-grid">
-                            <div><label>Title Font Size</label><input type="number" id="setting-title-font-size" value="21"></div>
-                            <div><label>Axis Title Font Size</label><input type="number" id="setting-axis-title-font-size" value="20"></div>
-                            <div><label>Axis Tick Font Size</label><input type="number" id="setting-tick-font-size" value="20"></div>
-                            <div><label>Font</label><select id="setting-font-family"><option>Arial</option><option>Verdana</option><option>Times New Roman</option></select></div>
-                            <div><label>Text Color</label><input type="color" id="setting-font-color" value="#333333"></div>
-                            <div><label>Background</label><input type="color" id="setting-bg-color" value="#ffffff"></div>
-                            <div><label>Axis Line Width</label><input type="number" id="setting-axis-line-width" value="2" step="0.5"></div>
-                            <div><label>Axis Line Color</label><input type="color" id="setting-axis-line-color" value="#333333"></div>
-                            <div><label>Gridline Color</label><input type="color" id="setting-grid-color" value="#e0e0e0"></div>
-                            <div><label><input type="checkbox" id="setting-show-grid"> Show Grid</label></div>
-                        </div>
-                    </details>
-
-                    <div class="control-section">
-                        <h3>3. Download</h3>
-                        <div class="control-section-content">
-                            <select id="download-format">
-                                <option value="png">PNG</option>
-                                <option value="pdf">PDF</option>
-                            </select>
-                            <button id="download-plot-btn" class="btn btn-secondary">Download Plot</button>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="ciliaplot-right-panel-new">
-                    <div id="ciliaplot-plot-info" class="info">Select an analysis type and click "Run Analysis" to begin.</div>
-                    <div id="ciliaplot-stats-container" class="stats-container"></div>
-                    <div id="plot-display-area" class="plot-container-new">
-                        <p class="status-message">Your plot will appear here.</p>
-                    </div>
-                    <div id="ciliaplot-legend-container" class="legend"></div>
-                    <div id="plot-data-table-container"></div>
-                    <div id="ciliaplot-search-results"></div>
                 </div>
             </div>
         </div>
     `;
     
-    // Attach all necessary event listeners
     document.getElementById('generate-plot-btn').addEventListener('click', generateAnalysisPlots);
     document.getElementById('download-plot-btn').addEventListener('click', downloadPlot);
-    document.getElementById('plot-type-select').addEventListener('change', (e) => {
-        updatePlotInfo(e.target.value);
-    });
-    
-    // Auto-update plot when settings change, if a plot already exists
+    document.getElementById('plot-type-select').addEventListener('change', (e) => updatePlotInfo(e.target.value));
     document.getElementById('plot-settings-grid').addEventListener('change', () => {
-        if (currentPlotInstance) { 
-            generateAnalysisPlots();
-        }
+        if (currentPlotInstance) generateAnalysisPlots();
     });
-
-    // Initialize the info text for the default selection
     updatePlotInfo(document.getElementById('plot-type-select').value);
 }
+
 
 // =============================================================================
 // SIMULATED PROTEOMICS DATA FOR ADVANCED PLOTS
