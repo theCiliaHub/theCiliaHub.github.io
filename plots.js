@@ -67,150 +67,313 @@ function getCleanArray(gene, ...keys) {
         .filter(Boolean);
 }
 
-// =============================================================================
-// MAIN PLOT GENERATION & UI
-// =============================================================================
-
 /**
- * Main controller for CiliaPlot. It now performs the search, displays a summary
- * table of results, and then generates the selected analytical plot.
- */
-async function generateAnalysisPlots() {
-    try {
-        await loadAndPrepareDatabase();
-        await loadExpressionData();
+ * Displays the main CiliaPlot analysis page with updated plot options.
+ */
+function displayCiliaPlotPage() {
+    const contentArea = document.querySelector('.content-area');
+    contentArea.className = 'content-area content-area-full';
+    document.querySelector('.cilia-panel').style.display = 'none';
 
-        const plotContainer = document.getElementById('plot-display-area');
-        const searchResultsContainer = document.getElementById('ciliaplot-search-results');
-        const genesInput = document.getElementById('ciliaplot-genes-input').value.trim();
+    contentArea.innerHTML = `
+        <section class="page-section ciliaplot-page" aria-labelledby="ciliaplot-title">
+            <header class="ciliaplot-header">
+                <h1 id="ciliaplot-title">CiliaPlot Analysis</h1>
+                <p class="info" id="ciliaplot-plot-info" role="region" aria-live="polite">
+                    Input genes and select a plot type to generate ciliary function visualizations.
+                    <span class="tooltip">
+                        <span class="tooltip-icon">?</span>
+                        <span class="tooltip-text">Enter up to 100 genes (e.g., IFT88, BBS1) and choose a plot type.</span>
+                    </span>
+                </p>
+            </header>
 
-        if (!genesInput) {
-            alert('Please enter a gene list.');
-            return;
-        }
+            <div class="ciliaplot-container-pro">
+                <div class="ciliaplot-input-section">
+                    <div class="control-card">
+                        <label for="ciliaplot-genes-input">Gene List</label>
+                        <textarea 
+                            id="ciliaplot-genes-input" 
+                            placeholder="e.g., IFT88, CEP290, BBS1, ARL13B (comma, space, or line-separated)"
+                            aria-describedby="genes-help"
+                        ></textarea>
+                        <p id="genes-help" class="help-text">
+                            Enter up to 100 genes, case-insensitive. Separate with commas, spaces, or new lines.
+                        </p>
+                    </div>
+                </div>
 
-        // Clear all previous results before starting a new analysis
-        clearPreviousPlot();
-        if (searchResultsContainer) searchResultsContainer.innerHTML = '';
-        const tableContainer = document.getElementById('plot-data-table-container');
-        if (tableContainer) tableContainer.innerHTML = '';
-        plotContainer.innerHTML = '<p class="status-message">Searching genes and generating plot...</p>';
+                <div class="ciliaplot-settings-section">
+                    <h2>Plot Settings</h2>
+                    <div class="control-card">
+                        <div class="settings-grid">
+                            <div>
+                                <label for="plot-type-select">Plot Type</label>
+                                <select id="plot-type-select" aria-describedby="plot-help">
+                                    <optgroup label="Localization Analysis">
+                                        <option value="bubble">Key Localizations</option>
+                                        <option value="matrix">Gene-Localization Matrix</option>
+                                    </optgroup>
+                                    <optgroup label="Functional Analysis">
+                                        <option value="domain_matrix">Gene-Domain Matrix</option>
+                                        <option value="functional_category">Functional Categories (Bar)</option>
+                                        <option value="complex_chord">Complex Interactions (Chord)</option>
+                                        <option value="network">Protein Complex Network</option>
+                                    </optgroup>
+                                    <optgroup label="Expression Analysis">
+                                        <option value="expression_heatmap">Expression Heatmap</option>
+                                        <option value="tissue_profile">Tissue Expression Profile</option>
+                                        <option value="top_tissues">Top Expressing Tissues</option>
+                                        <option value="expression_violin">Expression Distribution (Violin)</option>
+                                        <option value="expression_localization">Expression vs. Localization</option>
+                                        <option value="expression_domain_bubble">Expression vs. Domains (Bubble)</option>
+                                    </optgroup>
+                                    <optgroup label="Proteomics Analysis">
+                                        <option value="organelle_radar">Organellar Profile (Radar)</option>
+                                        <option value="organelle_umap">Organellar Projection (UMAP)</option>
+                                    </optgroup>
+                                </select>
+                            </div>
+                            <div>
+                                <label for="setting-font-family">Font Family</label>
+                                <select id="setting-font-family">
+                                    <option value="Arial">Arial</option>
+                                    <option value="Helvetica">Helvetica</option>
+                                    <option value="Verdana">Verdana</option>
+                                    <option value="Times New Roman">Times New Roman</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label for="setting-font-color">Font Color</label>
+                                <input type="color" id="setting-font-color" value="#333333">
+                            </div>
+                            <div>
+                                <label for="setting-bg-color">Background Color</label>
+                                <input type="color" id="setting-bg-color" value="#ffffff">
+                            </div>
+                            <div>
+                                <label for="setting-title-font-size">Title Font Size (px)</label>
+                                <input type="number" id="setting-title-font-size" value="21" min="10" max="40" step="1">
+                            </div>
+                            <div>
+                                <label for="setting-axis-title-font-size">Axis Title Size (px)</label>
+                                <input type="number" id="setting-axis-title-font-size" value="20" min="10" max="30" step="1">
+                            </div>
+                            <div>
+                                <label for="setting-tick-font-size">Axis Tick Size (px)</label>
+                                <input type="number" id="setting-tick-font-size" value="20" min="8" max="24" step="1">
+                            </div>
+                        </div>
+                        <button id="generate-plot-btn" class="btn btn-primary btn-large">Generate Plot</button>
+                    </div>
+                </div>
 
-        const sanitizedQueries = [...new Set(genesInput.split(/[\s,;\n\r\t]+/).filter(Boolean).map(q => q.toUpperCase()))];
-        const { foundGenes, notFoundGenes } = findGenes(sanitizedQueries);
+                <div class="ciliaplot-visualization-section">
+                    <div class="plot-card">
+                        <div class="plot-card-header">
+                            <h3>Visualization</h3>
+                            <div class="download-controls">
+                                <label for="download-format" class="visually-hidden">Download Format</label>
+                                <select id="download-format">
+                                    <option value="png">PNG (High-res Image)</option>
+                                    <option value="pdf">PDF (Publication-ready)</option>
+                                </select>
+                                <button id="download-plot-btn" class="btn btn-secondary">Download</button>
+                            </div>
+                        </div>
+                        <div id="plot-display-area" class="plot-container-pro" role="region" aria-live="polite">
+                            <p class="status-message">Your visualization will appear here.</p>
+                        </div>
+                        <div id="ciliaplot-legend-container" class="legend"></div>
+                    </div>
+                </div>
 
-        // **NEW**: Render the search results table first
-        renderCiliaPlotSearchResultsTable(foundGenes, notFoundGenes);
+                <div class="ciliaplot-results-section">
+                    <div class="tab-container">
+                        <div class="tab-buttons" role="tablist">
+                            <button class="tab-button active" data-tab="summary-tab" role="tab" aria-selected="true" aria-controls="summary-tab">Data Summary</button>
+                            <button class="tab-button" data-tab="status-tab" role="tab" aria-selected="false" aria-controls="status-tab">Input Status</button>
+                        </div>
+                        <div class="tab-content">
+                            <div id="summary-tab" class="tab-pane active" role="tabpanel">
+                                <div id="plot-data-table-container" class="table-wrapper"></div>
+                            </div>
+                            <div id="status-tab" class="tab-pane" role="tabpanel">
+                                <div id="ciliaplot-search-results" class="table-wrapper"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="ciliaplot-stats-container" class="stats-container" role="region" aria-live="polite"></div>
+                </div>
+            </div>
+        </section>
+    `;
 
-        if (foundGenes.length === 0) {
-            plotContainer.innerHTML = '<p class="status-message error">No valid genes were found to generate a plot.</p>';
-            updateStatsAndLegend(document.getElementById('plot-type-select').value, []); // Clear stats
-            return;
-        }
+    // Attach event listeners
+    document.getElementById('generate-plot-btn').addEventListener('click', generateAnalysisPlots);
+    document.getElementById('download-plot-btn').addEventListener('click', downloadPlot);
+    document.getElementById('plot-type-select').addEventListener('change', (e) => {
+        updatePlotInfo(e.target.value);
+    });
 
-        const plotType = document.getElementById('plot-type-select').value;
-
-        updatePlotInfo(plotType);
-        updateStatsAndLegend(plotType, foundGenes);
-
-        // Routing for plot generation
-        switch (plotType) {
-        case 'expression_localization':
-            renderExpressionLocalizationBubble(foundGenes, plotContainer);
-            renderGeneDataTable(foundGenes, document.getElementById('plot-data-table-container'));
-            break;
-        case 'bubble':
-            renderKeyLocalizations(foundGenes, plotContainer);
-            break;
-        case 'matrix':
-            renderGeneMatrix(foundGenes, plotContainer);
-            break;
-        case 'domain_matrix':
-            renderDomainMatrixPlot(foundGenes, plotContainer);
-            break;
-        case 'functional_category':
-            renderFunctionalCategoryPlot(foundGenes, plotContainer);
-            break;
-        case 'network':
-            renderComplexNetwork(foundGenes, plotContainer);
-            break;
-        case 'expression_heatmap':
-            renderExpressionHeatmap(foundGenes, plotContainer);
-            const tableContainer = document.getElementById('plot-data-table-container');
-            renderFoundNotFoundTable(sanitizedQueries, foundGenes, tableContainer);
-            break;
-        case 'tissue_profile':
-            renderTissueExpressionProfile(foundGenes, plotContainer);
-            break;
-        case 'top_tissues':
-            renderTopExpressingTissues(foundGenes, plotContainer);
-            break;
-        
-        // --- MOVED TO HERE ---
-        case 'organelle_radar':
-            renderOrganelleRadarPlot(foundGenes, plotContainer);
-            break;
-        case 'organelle_umap':
-            renderOrganelleUMAP(foundGenes, plotContainer);
-            break;
-
-        // --- 'default' IS NOW THE LAST CASE ---
-        default:
-            plotContainer.innerHTML = `<p class="status-message">Plot type "${plotType}" is not yet implemented.</p>`;
-            break;
-    }
-    } catch (error) {
-        console.error('Error generating plots:', error);
-        document.getElementById('plot-display-area').innerHTML = `<p class="status-message error">Error generating plot: ${error.message}</p>`;
-    }
+    // Tab functionality
+    document.querySelectorAll('.tab-button').forEach(button => {
+        button.addEventListener('click', () => {
+            document.querySelectorAll('.tab-button').forEach(btn => {
+                btn.classList.remove('active');
+                btn.setAttribute('aria-selected', 'false');
+            });
+            document.querySelectorAll('.tab-pane').forEach(pane => pane.classList.remove('active'));
+            button.classList.add('active');
+            button.setAttribute('aria-selected', 'true');
+            document.getElementById(button.dataset.tab).classList.add('active');
+        });
+    });
 }
 
+/**
+ * Main controller for CiliaPlot, routing to the correct plot generation function.
+ */
+async function generateAnalysisPlots() {
+    try {
+        await loadAndPrepareDatabase();
+        await loadExpressionData();
+
+        const plotContainer = document.getElementById('plot-display-area');
+        const searchResultsContainer = document.getElementById('ciliaplot-search-results');
+        const genesInput = document.getElementById('ciliaplot-genes-input').value.trim();
+
+        if (!genesInput) {
+            alert('Please enter a gene list.');
+            return;
+        }
+
+        clearPreviousPlot();
+        if (searchResultsContainer) searchResultsContainer.innerHTML = '';
+        const tableContainer = document.getElementById('plot-data-table-container');
+        if (tableContainer) tableContainer.innerHTML = '';
+        plotContainer.innerHTML = '<p class="status-message">Searching genes and generating plot...</p>';
+
+        const sanitizedQueries = [...new Set(genesInput.split(/[\s,;\n\r\t]+/).filter(Boolean).map(q => q.toUpperCase()))];
+        const { foundGenes, notFoundGenes } = findGenes(sanitizedQueries);
+
+        renderCiliaPlotSearchResultsTable(foundGenes, notFoundGenes);
+
+        if (foundGenes.length === 0) {
+            plotContainer.innerHTML = '<p class="status-message error">No valid genes were found to generate a plot.</p>';
+            updateStatsAndLegend(document.getElementById('plot-type-select').value, []);
+            return;
+        }
+
+        const plotType = document.getElementById('plot-type-select').value;
+        updatePlotInfo(plotType);
+        updateStatsAndLegend(plotType, foundGenes);
+
+        // Routing for plot generation with new plot types
+        switch (plotType) {
+            case 'bubble':
+                renderKeyLocalizations(foundGenes, plotContainer);
+                break;
+            case 'matrix':
+                renderGeneMatrix(foundGenes, plotContainer);
+                break;
+            case 'domain_matrix':
+                renderDomainMatrixPlot(foundGenes, plotContainer);
+                break;
+            case 'functional_category':
+                renderFunctionalBarPlot(foundGenes, plotContainer, 'functional_category', 'Gene Count by Functional Category');
+                break;
+            case 'complex_chord':
+                renderComplexChordPlot(foundGenes, plotContainer);
+                break;
+            case 'network':
+                renderComplexNetwork(foundGenes, plotContainer);
+                break;
+            case 'expression_heatmap':
+                renderExpressionHeatmap(foundGenes, plotContainer);
+                break;
+            case 'tissue_profile':
+                renderTissueExpressionProfile(foundGenes, plotContainer);
+                break;
+            case 'top_tissues':
+                renderTopExpressingTissues(foundGenes, plotContainer);
+                break;
+            case 'expression_violin':
+                renderExpressionViolinPlot(foundGenes, plotContainer);
+                break;
+            case 'expression_localization':
+                renderExpressionLocalizationBubble(foundGenes, plotContainer);
+                break;
+            case 'expression_domain_bubble':
+                renderExpressionDomainBubblePlot(foundGenes, plotContainer);
+                break;
+            case 'organelle_radar':
+                renderOrganelleRadarPlot(foundGenes, plotContainer);
+                break;
+            case 'organelle_umap':
+                renderOrganelleUMAP(foundGenes, plotContainer);
+                break;
+            default:
+                plotContainer.innerHTML = `<p class="status-message">Plot type "${plotType}" is not yet implemented.</p>`;
+                break;
+        }
+    } catch (error) {
+        console.error('Error generating plots:', error);
+        document.getElementById('plot-display-area').innerHTML = `<p class="status-message error">Error generating plot: ${error.message}</p>`;
+    }
+}
 
 /**
- * Updates the informational text box with a description of the current plot.
- * @param {string} plotType - The selected plot type.
- */
+ * Updates the informational text box with a description of the current plot.
+ * @param {string} plotType - The selected plot type.
+ */
 function updatePlotInfo(plotType) {
-    const infoContainer = document.getElementById('ciliaplot-plot-info');
-    if (!infoContainer) return;
-    let infoHTML = '';
-    switch (plotType) {
-        case 'bubble':
-            infoHTML = `<strong>Key Localizations:</strong> This bubble plot shows the distribution of your genes across primary ciliary and cellular compartments. The size of each bubble corresponds to the number of genes found in that location.`;
-            break;
-        case 'matrix':
-            infoHTML = `<strong>Gene-Localization Matrix:</strong> This plot shows the specific localization for each gene in your list. A bubble indicates that a gene is associated with a particular ciliary compartment.`;
-            break;
-        case 'domain_matrix':
-            infoHTML = `<strong>Gene-Domain Matrix:</strong> This plot shows which protein domains are present in each gene. This helps identify shared functional components among your selected genes.`;
-            break;
-        case 'functional_category':
-            infoHTML = `<strong>Functional Category Bar Chart:</strong> This chart categorizes your genes into broader functional groups, providing an overview of the biological processes they are involved in.`;
-            break;
-        case 'network':
-            infoHTML = `<strong>Protein Complex Network:</strong> This network graph visualizes known protein-protein interactions and complex memberships among your selected genes, revealing functional modules.`;
-            break;
-        case 'expression_heatmap':
-            infoHTML = `<strong>Expression Heatmap:</strong> This plot displays the expression level (nTPM) of each selected gene across various human tissues. Darker colors indicate higher expression.`;
-            break;
-        case 'tissue_profile':
-            infoHTML = `<strong>Tissue Expression Profile:</strong> This line chart shows the average expression of your gene set across the top 20 tissues, highlighting potential tissue-specific enrichment.`;
-            break;
-        case 'expression_localization':
-            infoHTML = `<strong>Expression vs. Localization:</strong> This bubble plot correlates expression breadth (number of expressing tissues) with localization diversity. Bubble size represents the maximum expression level.`;
-            break;
-        case 'top_tissues':
-            infoHTML = `<strong>Top Expressing Tissues:</strong> This bar chart ranks tissues by the average expression level of your gene set, showing where these genes are most active.`;
-            break;
-         // --- MOVED TO HERE ---
+    const infoContainer = document.getElementById('ciliaplot-plot-info');
+    if (!infoContainer) return;
+    let infoHTML = '';
+    switch (plotType) {
+        case 'bubble':
+            infoHTML = `<strong>Key Localizations:</strong> This bubble plot shows the distribution of your genes across primary ciliary and cellular compartments. The size of each bubble corresponds to the number of genes found in that location.`;
+            break;
+        case 'matrix':
+            infoHTML = `<strong>Gene-Localization Matrix:</strong> This plot shows the specific localization for each gene in your list. A bubble indicates that a gene is associated with a particular ciliary compartment.`;
+            break;
+        case 'domain_matrix':
+            infoHTML = `<strong>Gene-Domain Matrix:</strong> This plot shows which protein domains are present in each gene. This helps identify shared functional components among your selected genes.`;
+            break;
+        case 'functional_category':
+            infoHTML = `<strong>Functional Categories (Bar):</strong> This chart categorizes your genes into broader functional groups by counting the number of genes per category, providing an overview of the biological processes they are involved in.`;
+            break;
+        case 'complex_chord':
+            infoHTML = `<strong>Complex Interactions (Chord):</strong> This diagram visualizes relationships between genes based on shared membership in protein complexes. Each arc represents a gene, and ribbons connecting them indicate co-complex partnership.`;
+            break;
+        case 'network':
+            infoHTML = `<strong>Protein Complex Network:</strong> This network graph visualizes known protein-protein interactions and complex memberships among your selected genes, revealing functional modules.`;
+            break;
+        case 'expression_heatmap':
+            infoHTML = `<strong>Expression Heatmap:</strong> This plot displays the expression level (nTPM) of each selected gene across various human tissues. Darker colors indicate higher expression.`;
+            break;
+        case 'tissue_profile':
+            infoHTML = `<strong>Tissue Expression Profile:</strong> This line chart shows the average expression of your gene set across the top 20 tissues, highlighting potential tissue-specific enrichment.`;
+            break;
+        case 'expression_violin':
+            infoHTML = `<strong>Expression Distribution (Violin):</strong> This plot shows the distribution of expression levels (nTPM) for your gene set across different tissues. The width of the violin shape represents the density of genes at a particular expression level.`;
+            break;
+        case 'expression_localization':
+            infoHTML = `<strong>Expression vs. Localization:</strong> This bubble plot correlates expression breadth (number of expressing tissues) with localization diversity. Bubble size represents the maximum expression level.`;
+            break;
+        case 'expression_domain_bubble':
+            infoHTML = `<strong>Expression vs. Domains (Bubble):</strong> This plot correlates gene expression breadth (number of expressing tissues) with protein complexity (number of domains). The bubble size represents the gene's maximum expression level across all tissues.`;
+            break;
+        case 'top_tissues':
+            infoHTML = `<strong>Top Expressing Tissues:</strong> This bar chart ranks tissues by the average expression level of your gene set, showing where these genes are most active.`;
+            break;
         case 'organelle_radar':
             infoHTML = `<strong>Organellar Profile (Radar):</strong> This plot compares the average protein abundance profile of your gene set across simulated cellular fractions against known organellar markers (e.g., ER, Golgi, Cilia). It helps identify which organelle your gene set most closely resembles.`;
             break;
         case 'organelle_umap':
             infoHTML = `<strong>Organellar Projection (UMAP):</strong> This scatter plot shows a 2D representation of the entire organellar proteome, where proteins with similar abundance profiles cluster together. Your input genes are highlighted to show where they fall within these defined organellar clusters.`;
             break;
-
-        // --- 'default' IS NOW THE LAST CASE ---
         default:
             infoHTML = `Select a plot type to see a description.`;
             break;
@@ -219,46 +382,139 @@ function updatePlotInfo(plotType) {
 }
 
 /**
- * Updates the statistics and legend sections based on the plot type.
- * @param {string} plotType - The selected plot type.
- * @param {Array} foundGenes - The array of gene objects being plotted.
- */
+ * Updates the statistics and legend sections based on the plot type.
+ * @param {string} plotType - The selected plot type.
+ * @param {Array} foundGenes - The array of gene objects being plotted.
+ */
 function updateStatsAndLegend(plotType, foundGenes) {
-    const statsContainer = document.getElementById('ciliaplot-stats-container');
-    const legendContainer = document.getElementById('ciliaplot-legend-container');
-    if (!statsContainer || !legendContainer) return;
-    
-    // Show containers
-    statsContainer.style.display = 'grid';
-    legendContainer.style.display = 'flex';
+    const statsContainer = document.getElementById('ciliaplot-stats-container');
+    const legendContainer = document.getElementById('ciliaplot-legend-container');
+    if (!statsContainer || !legendContainer) return;
 
-    let statsHTML = '', legendHTML = '';
-    statsHTML += `<div class="stat-box"><div class="stat-number">${foundGenes.length}</div><div class="stat-label">Input Genes Found</div></div>`;
+    statsContainer.style.display = 'grid';
+    legendContainer.style.display = 'flex';
 
-    if (plotType === 'network') {
-        const { links } = computeProteinComplexLinks(foundGenes);
-        const complexSet = new Set(foundGenes.flatMap(g => getCleanArray(g, 'complex_names', 'complex')));
-        statsHTML += `<div class="stat-box"><div class="stat-number">${complexSet.size}</div><div class="stat-label">Unique Complexes</div></div><div class="stat-box"><div class="stat-number">${links.length}</div><div class="stat-label">Interactions</div></div>`;
-        legendHTML = `<div class="legend-item"><div class="legend-color" style="background-color: #3498db;"></div><span>Gene</span></div>`;
-    } else if (plotType === 'functional_category') {
-        const categorySet = new Set(foundGenes.flatMap(g => getCleanArray(g, 'functional_category')));
-        statsHTML += `<div class="stat-box"><div class="stat-number">${categorySet.size}</div><div class="stat-label">Unique Categories</div></div>`;
-        legendHTML = `<div class="legend-item"><div class="legend-color" style="background-color: rgba(26, 188, 156, 0.7); border-radius: 4px;"></div><span>Gene Count</span></div>`;
-    } else if (plotType === 'domain_matrix') {
-        const domainSet = new Set(foundGenes.flatMap(g => getCleanArray(g, 'domain_descriptions')));
-        statsHTML += `<div class="stat-box"><div class="stat-number">${domainSet.size}</div><div class="stat-label">Unique Domains</div></div>`;
-        legendContainer.style.display = 'none'; // No legend for this plot
-    } else if (plotType.startsWith('expression') || plotType === 'top_tissues' || plotType === 'tissue_profile') {
-        const genesWithExpr = foundGenes.filter(g => expressionData[g.gene.toUpperCase()]);
-        statsHTML += `<div class="stat-box"><div class="stat-number">${genesWithExpr.length}</div><div class="stat-label">Genes with Expression Data</div></div>`;
-        legendContainer.style.display = 'none'; // Legends are built into these plots
-    } else {
-        const localizations = new Set(foundGenes.flatMap(g => getCleanArray(g, 'localization'))).size;
-        statsHTML += `<div class="stat-box"><div class="stat-number">${localizations}</div><div class="stat-label">Unique Localizations</div></div>`;
-        legendContainer.style.display = 'none'; // No legend for this plot
-    }
-    statsContainer.innerHTML = statsHTML;
-    legendContainer.innerHTML = legendHTML;
+    let statsHTML = '',
+        legendHTML = '';
+    statsHTML += `<div class="stat-box"><div class="stat-number">${foundGenes.length}</div><div class="stat-label">Input Genes Found</div></div>`;
+
+    if (plotType === 'network') {
+        const { links } = computeProteinComplexLinks(foundGenes);
+        const complexSet = new Set(foundGenes.flatMap(g => getCleanArray(g, 'complex_names', 'complex')));
+        statsHTML += `<div class="stat-box"><div class="stat-number">${complexSet.size}</div><div class="stat-label">Unique Complexes</div></div><div class="stat-box"><div class="stat-number">${links.length}</div><div class="stat-label">Interactions</div></div>`;
+        legendHTML = `<div class="legend-item"><div class="legend-color" style="background-color: #3498db;"></div><span>Gene</span></div>`;
+    } else if (plotType === 'complex_chord') {
+        const genesInPlot = new Set();
+        foundGenes.forEach(gene => {
+            const geneComplexes = getCleanArray(gene, 'complex');
+            if (geneComplexes.length > 0) {
+                const hasPartner = foundGenes.some(otherGene => {
+                    if (otherGene.gene === gene.gene) return false;
+                    const otherComplexes = getCleanArray(otherGene, 'complex');
+                    return geneComplexes.some(c => otherComplexes.includes(c));
+                });
+                if (hasPartner) genesInPlot.add(gene.gene);
+            }
+        });
+        const complexSet = new Set(foundGenes.flatMap(g => getCleanArray(g, 'complex')));
+        statsHTML += `<div class="stat-box"><div class="stat-number">${genesInPlot.size}</div><div class="stat-label">Interacting Genes</div></div><div class="stat-box"><div class="stat-number">${complexSet.size}</div><div class="stat-label">Unique Complexes</div></div>`;
+        legendContainer.style.display = 'none';
+    } else if (plotType === 'functional_category') {
+        const categorySet = new Set(foundGenes.flatMap(g => getCleanArray(g, 'functional_category')));
+        statsHTML += `<div class="stat-box"><div class="stat-number">${categorySet.size}</div><div class="stat-label">Unique Categories</div></div>`;
+        legendHTML = `<div class="legend-item"><div class="legend-color" style="background-color: steelblue; border-radius: 4px;"></div><span>Gene Count</span></div>`;
+    } else if (plotType === 'domain_matrix') {
+        const domainSet = new Set(foundGenes.flatMap(g => getCleanArray(g, 'domain_descriptions')));
+        statsHTML += `<div class="stat-box"><div class="stat-number">${domainSet.size}</div><div class="stat-label">Unique Domains</div></div>`;
+        legendContainer.style.display = 'none';
+    } else if (plotType.includes('expression') || plotType === 'top_tissues' || plotType === 'tissue_profile') {
+        const genesWithExpr = foundGenes.filter(g => expressionData[g.gene.toUpperCase()]);
+        statsHTML += `<div class="stat-box"><div class="stat-number">${genesWithExpr.length}</div><div class="stat-label">Genes with Expression Data</div></div>`;
+        legendContainer.style.display = 'none';
+    } else {
+        const localizations = new Set(foundGenes.flatMap(g => getCleanArray(g, 'localization'))).size;
+        statsHTML += `<div class="stat-box"><div class="stat-number">${localizations}</div><div class="stat-label">Unique Localizations</div></div>`;
+        legendContainer.style.display = 'none';
+    }
+    statsContainer.innerHTML = statsHTML;
+    legendContainer.innerHTML = legendHTML;
+}
+
+// =============================================================================
+// NEW PLOT RENDERER FUNCTIONS
+// =============================================================================
+
+/** Renders a violin plot of gene expression distribution. */
+function renderExpressionViolinPlot(foundGenes, container) {
+    clearPreviousPlot(container.id);
+    const settings = getPlotSettings();
+    const genesWithExpr = foundGenes.filter(g => expressionData[g.gene.toUpperCase()]);
+    if (genesWithExpr.length === 0) {
+        container.innerHTML = '<p class="status-message error">No expression data found for the input genes.</p>';
+        return;
+    }
+    const plotData = genesWithExpr.map(g => ({
+        gene: g.gene.toUpperCase(),
+        ...expressionData[g.gene.toUpperCase()]
+    }));
+    violinPlot(genesWithExpr, container.id, plotData, settings);
+}
+
+/** Renders a bar plot for a given categorical field. */
+function renderFunctionalBarPlot(foundGenes, container, categoryField, title) {
+    clearPreviousPlot(container.id);
+    const settings = getPlotSettings();
+    settings.title = title;
+    if (foundGenes.length === 0) {
+        container.innerHTML = '<p class="status-message error">No genes to plot.</p>';
+        return;
+    }
+    barPlot(foundGenes, container.id, categoryField, settings);
+}
+
+/** Renders a chord diagram of protein complex interactions. */
+function renderComplexChordPlot(foundGenes, container) {
+    clearPreviousPlot(container.id);
+    const settings = getPlotSettings();
+
+    const genesWithComplexComponents = foundGenes
+        .map(gene => {
+            const geneComplexes = getCleanArray(gene, 'complex');
+            if (geneComplexes.length === 0) return null;
+            let components = new Set([gene.gene]);
+            foundGenes.forEach(otherGene => {
+                if (otherGene.gene !== gene.gene) {
+                    const otherComplexes = getCleanArray(otherGene, 'complex');
+                    if (geneComplexes.some(c => otherComplexes.includes(c))) {
+                        components.add(otherGene.gene);
+                    }
+                }
+            });
+            return { ...gene, complex_components: Array.from(components) };
+        })
+        .filter(Boolean)
+        .filter(g => g.complex_components.length > 1);
+
+    if (genesWithComplexComponents.length < 2) {
+        container.innerHTML = '<p class="status-message error">At least two genes sharing a complex are needed to draw interactions.</p>';
+        return;
+    }
+    chordPlot(genesWithComplexComponents, container.id, settings);
+}
+
+/** Renders a bubble plot correlating expression breadth, domain count, and max expression. */
+function renderExpressionDomainBubblePlot(foundGenes, container) {
+    clearPreviousPlot(container.id);
+    const settings = getPlotSettings();
+    const genesWithExpr = foundGenes.filter(g => expressionData[g.gene.toUpperCase()]);
+    if (genesWithExpr.length === 0) {
+        container.innerHTML = '<p class="status-message error">No expression data found for the input genes.</p>';
+        return;
+    }
+    const expressionArray = Object.entries(expressionData).map(([gene, tissues]) => ({
+        gene, ...tissues
+    }));
+    expressionDomainBubblePlot(genesWithExpr, container.id, expressionArray, settings);
 }
 
 // =============================================================================
@@ -1338,163 +1594,6 @@ function renderTopExpressingTissues(foundGenes, container) {
 }
 
 
-function displayCiliaPlotPage() {
-    const contentArea = document.querySelector('.content-area');
-    contentArea.className = 'content-area content-area-full';
-    document.querySelector('.cilia-panel').style.display = 'none';
-
-    contentArea.innerHTML = `
-        <section class="page-section ciliaplot-page" aria-labelledby="ciliaplot-title">
-            <header class="ciliaplot-header">
-                <h1 id="ciliaplot-title">CiliaPlot Analysis</h1>
-                <p class="info" id="ciliaplot-plot-info" role="region" aria-live="polite">
-                    Input genes and select a plot type to generate ciliary function visualizations.
-                    <span class="tooltip">
-                        <span class="tooltip-icon">?</span>
-                        <span class="tooltip-text">Enter up to 100 genes (e.g., IFT88, BBS1) and choose a plot type.</span>
-                    </span>
-                </p>
-            </header>
-
-            <div class="ciliaplot-container-pro">
-                <div class="ciliaplot-input-section">
-                    <div class="control-card">
-                        <label for="ciliaplot-genes-input">Gene List</label>
-                        <textarea 
-                            id="ciliaplot-genes-input" 
-                            placeholder="e.g., IFT88, CEP290, BBS1, ARL13B (comma, space, or line-separated)"
-                            aria-describedby="genes-help"
-                        ></textarea>
-                        <p id="genes-help" class="help-text">
-                            Enter up to 100 genes, case-insensitive. Separate with commas, spaces, or new lines.
-                        </p>
-                    </div>
-                </div>
-
-                <div class="ciliaplot-settings-section">
-                    <h2>Plot Settings</h2>
-                    <div class="control-card">
-                        <div class="settings-grid">
-                            <div>
-                                <label for="plot-type-select">Plot Type</label>
-                                <select id="plot-type-select" aria-describedby="plot-help">
-                                    <optgroup label="Localization Analysis">
-                                        <option value="bubble">Key Localizations</option>
-                                        <option value="matrix">Gene-Localization Matrix</option>
-                                    </optgroup>
-                                    <optgroup label="Functional Analysis">
-                                        <option value="domain_matrix">Gene-Domain Matrix</option>
-                                        <option value="functional_category">Functional Categories</option>
-                                        <option value="network">Protein Complex Network</option>
-                                    </optgroup>
-                                    <optgroup label="Expression Analysis">
-                                        <option value="expression_heatmap">Expression Heatmap</option>
-                                        <option value="tissue_profile">Tissue Expression Profile</option>
-                                        <option value="top_tissues">Top Expressing Tissues</option>
-                                        <option value="expression_localization">Expression vs. Localization</option>
-                                    </optgroup>
-                                    <optgroup label="Proteomics Analysis">
-                                        <option value="organelle_radar">Organellar Profile (Radar)</option>
-                                        <option value="organelle_umap">Organellar Projection (UMAP)</option>
-                                    </optgroup>
-                                </select>
-                            </div>
-                            <div>
-                                <label for="setting-font-family">Font Family</label>
-                                <select id="setting-font-family">
-                                    <option value="Arial">Arial</option>
-                                    <option value="Helvetica">Helvetica</option>
-                                    <option value="Verdana">Verdana</option>
-                                    <option value="Times New Roman">Times New Roman</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label for="setting-font-color">Font Color</label>
-                                <input type="color" id="setting-font-color" value="#333333">
-                            </div>
-                            <div>
-                                <label for="setting-bg-color">Background Color</label>
-                                <input type="color" id="setting-bg-color" value="#ffffff">
-                            </div>
-                            <div>
-                                <label for="setting-title-font-size">Title Font Size (px)</label>
-                                <input type="number" id="setting-title-font-size" value="21" min="10" max="40" step="1">
-                            </div>
-                            <div>
-                                <label for="setting-axis-title-font-size">Axis Title Size (px)</label>
-                                <input type="number" id="setting-axis-title-font-size" value="20" min="10" max="30" step="1">
-                            </div>
-                            <div>
-                                <label for="setting-tick-font-size">Axis Tick Size (px)</label>
-                                <input type="number" id="setting-tick-font-size" value="20" min="8" max="24" step="1">
-                            </div>
-                        </div>
-                        <button id="generate-plot-btn" class="btn btn-primary btn-large">Generate Plot</button>
-                    </div>
-                </div>
-
-                <div class="ciliaplot-visualization-section">
-                    <div class="plot-card">
-                        <div class="plot-card-header">
-                            <h3>Visualization</h3>
-                            <div class="download-controls">
-                                <label for="download-format" class="visually-hidden">Download Format</label>
-                                <select id="download-format">
-                                    <option value="png">PNG (High-res Image)</option>
-                                    <option value="pdf">PDF (Publication-ready)</option>
-                                </select>
-                                <button id="download-plot-btn" class="btn btn-secondary">Download</button>
-                            </div>
-                        </div>
-                        <div id="plot-display-area" class="plot-container-pro" role="region" aria-live="polite">
-                            <p class="status-message">Your visualization will appear here.</p>
-                        </div>
-                        <div id="ciliaplot-legend-container" class="legend"></div>
-                    </div>
-                </div>
-
-                <div class="ciliaplot-results-section">
-                    <div class="tab-container">
-                        <div class="tab-buttons" role="tablist">
-                            <button class="tab-button active" data-tab="summary-tab" role="tab" aria-selected="true" aria-controls="summary-tab">Data Summary</button>
-                            <button class="tab-button" data-tab="status-tab" role="tab" aria-selected="false" aria-controls="status-tab">Input Status</button>
-                        </div>
-                        <div class="tab-content">
-                            <div id="summary-tab" class="tab-pane active" role="tabpanel">
-                                <div id="plot-data-table-container" class="table-wrapper"></div>
-                            </div>
-                            <div id="status-tab" class="tab-pane" role="tabpanel">
-                                <div id="ciliaplot-search-results" class="table-wrapper"></div>
-                            </div>
-                        </div>
-                    </div>
-                    <div id="ciliaplot-stats-container" class="stats-container" role="region" aria-live="polite"></div>
-                </div>
-            </div>
-        </section>
-    `;
-
-    // Attach event listeners
-    document.getElementById('generate-plot-btn').addEventListener('click', generateAnalysisPlots);
-    document.getElementById('download-plot-btn').addEventListener('click', downloadPlot);
-    document.getElementById('plot-type-select').addEventListener('change', (e) => {
-        updatePlotInfo(e.target.value);
-    });
-
-    // Tab functionality
-    document.querySelectorAll('.tab-button').forEach(button => {
-        button.addEventListener('click', () => {
-            document.querySelectorAll('.tab-button').forEach(btn => {
-                btn.classList.remove('active');
-                btn.setAttribute('aria-selected', 'false');
-            });
-            document.querySelectorAll('.tab-pane').forEach(pane => pane.classList.remove('active'));
-            button.classList.add('active');
-            button.setAttribute('aria-selected', 'true');
-            document.getElementById(button.dataset.tab).classList.add('active');
-        });
-    });
-}
 
 
 // =============================================================================
@@ -1703,4 +1802,378 @@ function renderOrganelleUMAP(foundGenes, container) {
             }
         }
     });
+}
+
+
+
+// New Plot Functions (updated to use settings)
+function violinPlot(data, containerId, expressionData, settings = {}) {
+    const margin = { top: 20, right: 30, bottom: 120, left: 60 };
+    const width = 900 - margin.left - margin.right;
+    const height = 500 - margin.top - margin.bottom;
+
+    const svg = d3.select(`#${containerId}`)
+        .append("svg")
+        .attr("width", width + margin.left + margin.right)
+        .attr("height", height + margin.top + margin.bottom)
+        .style("background", settings.backgroundColor || "#ffffff")
+        .append("g")
+        .attr("transform", `translate(${margin.left},${margin.top})`);
+
+    const tissues = Object.keys(expressionData[0]).filter(k => k !== "gene");
+    const maxExpression = d3.max(expressionData, d => d3.max(tissues, t => +d[t] || 0));
+
+    const xScale = d3.scaleBand()
+        .domain(tissues)
+        .range([0, width])
+        .padding(0.05);
+
+    const yScale = d3.scaleLinear()
+        .domain([0, maxExpression * 1.1]) // Add padding to y-axis
+        .range([height, 0]);
+
+    // Build a color scale
+    const myColor = d3.scaleSequential()
+        .interpolator(d3.interpolateInferno)
+        .domain([0, tissues.length]);
+    
+    // Build and display the Y axis
+    svg.append("g")
+        .call(d3.axisLeft(yScale))
+        .selectAll("text")
+        .style("font-family", settings.fontFamily || "Arial")
+        .style("font-size", `${settings.tickFontSize || 12}px`)
+        .style("fill", settings.fontColor || "#333333");
+
+    svg.append("text")
+        .attr("transform", "rotate(-90)")
+        .attr("y", 0 - margin.left + 10)
+        .attr("x", 0 - (height / 2))
+        .attr("dy", "1em")
+        .style("text-anchor", "middle")
+        .style("font-family", settings.fontFamily || "Arial")
+        .style("font-size", `${settings.axisTitleFontSize || 14}px`)
+        .style("fill", settings.fontColor || "#333333")
+        .text("nTPM Expression");
+
+    // Build and display the X axis
+    svg.append("g")
+        .attr("transform", `translate(0,${height})`)
+        .call(d3.axisBottom(xScale))
+        .selectAll("text")
+        .attr("transform", "rotate(-65)")
+        .style("text-anchor", "end")
+        .style("font-family", settings.fontFamily || "Arial")
+        .style("font-size", `${settings.tickFontSize || 12}px`)
+        .style("fill", settings.fontColor || "#333333");
+
+    // Compute the density for each group
+    const kde = kernelDensityEstimator(kernelEpanechnikov(7), yScale.ticks(40));
+    const violinData = tissues.map((tissue, i) => {
+        const values = expressionData.map(d => +d[tissue] || 0).filter(v => !isNaN(v));
+        const density = kde(values);
+        return { tissue, density, color: myColor(i) };
+    });
+
+    const xNum = d3.scaleLinear()
+        .range([0, xScale.bandwidth()])
+        .domain([-1, 1]);
+
+    svg.selectAll(".violin")
+        .data(violinData)
+        .enter()
+        .append("g")
+        .attr("transform", d => `translate(${xScale(d.tissue)}, 0)`)
+        .append("path")
+            .datum(d => d.density)
+            .style("stroke", "none")
+            .style("fill", d => violinData.find(v => v.density === d).color)
+            .attr("d", d3.area()
+                .x0(d => xNum(-d[1]))
+                .x1(d => xNum(d[1]))
+                .y(d => yScale(d[0]))
+                .curve(d3.curveCatmullRom)
+            );
+}
+
+
+function barPlot(data, containerId, categoryField, settings = {}) {
+    const margin = { top: 40, right: 30, bottom: 150, left: 60 };
+    const width = 900 - margin.left - margin.right;
+    const height = 500 - margin.top - margin.bottom;
+
+    const svg = d3.select(`#${containerId}`)
+        .append("svg")
+        .attr("width", width + margin.left + margin.right)
+        .attr("height", height + margin.top + margin.bottom)
+        .style("background", settings.backgroundColor || "#ffffff")
+        .append("g")
+        .attr("transform", `translate(${margin.left},${margin.top})`);
+
+    const categoryCounts = new Map();
+    const getCats = d => {
+        let val = d[categoryField];
+        if (Array.isArray(val)) return val.map(c => c.trim());
+        if (typeof val === 'string') return val.split(/[;,]/).map(c => c.trim()).filter(c => c);
+        return [];
+    };
+
+    data.forEach(d => {
+        const cats = getCats(d);
+        cats.forEach(c => {
+            categoryCounts.set(c, (categoryCounts.get(c) || 0) + 1);
+        });
+    });
+
+    const sortedData = Array.from(categoryCounts.entries()).sort((a, b) => b[1] - a[1]);
+    const categories = sortedData.map(d => d[0]);
+    const counts = sortedData.map(d => d[1]);
+
+    const xScale = d3.scaleBand()
+        .domain(categories)
+        .range([0, width])
+        .padding(0.2);
+
+    const yScale = d3.scaleLinear()
+        .domain([0, d3.max(counts)])
+        .range([height, 0]);
+
+    svg.selectAll(".bar")
+        .data(sortedData)
+        .enter()
+        .append("rect")
+        .attr("x", d => xScale(d[0]))
+        .attr("y", d => yScale(d[1]))
+        .attr("width", xScale.bandwidth())
+        .attr("height", d => height - yScale(d[1]))
+        .attr("fill", "steelblue");
+
+    svg.append("g")
+        .attr("transform", `translate(0,${height})`)
+        .call(d3.axisBottom(xScale))
+        .selectAll("text")
+        .attr("transform", "rotate(-65)")
+        .style("text-anchor", "end")
+        .style("font-family", settings.fontFamily || "Arial")
+        .style("font-size", `${settings.tickFontSize || 12}px`)
+        .style("fill", settings.fontColor || "#333333");
+
+    svg.append("g")
+        .call(d3.axisLeft(yScale))
+        .selectAll("text")
+        .style("font-family", settings.fontFamily || "Arial")
+        .style("font-size", `${settings.tickFontSize || 12}px`)
+        .style("fill", settings.fontColor || "#333333");
+
+    svg.append("text")
+        .attr("transform", "rotate(-90)")
+        .attr("y", 0 - margin.left)
+        .attr("x", 0 - (height / 2))
+        .attr("dy", "1em")
+        .style("text-anchor", "middle")
+        .style("font-family", settings.fontFamily || "Arial")
+        .style("font-size", `${settings.axisTitleFontSize || 14}px`)
+        .style("fill", settings.fontColor || "#333333")
+        .text("Number of Genes");
+        
+    svg.append("text")
+        .attr("x", width / 2)
+        .attr("y", 0 - (margin.top / 2) + 10)
+        .attr("text-anchor", "middle")
+        .style("font-size", `${settings.titleFontSize || 16}px`)
+        .style("font-family", settings.fontFamily || "Arial")
+        .style("fill", settings.fontColor || "#333333")
+        .text(settings.title || "Gene Counts by Category");
+}
+
+function chordPlot(data, containerId, settings = {}) {
+    const width = 700;
+    const height = 700;
+    const outerRadius = Math.min(width, height) * 0.5 - 100;
+    const innerRadius = outerRadius - 20;
+
+    const svg = d3.select(`#${containerId}`)
+        .append("svg")
+        .attr("width", width)
+        .attr("height", height)
+        .style("background", settings.backgroundColor || "#ffffff")
+        .append("g")
+        .attr("transform", `translate(${width / 2},${height / 2})`);
+
+    const complexData = data.filter(d => d.complex_components && d.complex_components.length > 1);
+    const genes = [...new Set(complexData.flatMap(d => d.complex_components))];
+    const matrix = Array(genes.length).fill().map(() => Array(genes.length).fill(0));
+
+    // Create a map to avoid redundant pairings
+    const pairs = new Set();
+    complexData.forEach(d => {
+        const components = d.complex_components.sort();
+        for (let i = 0; i < components.length; i++) {
+            for (let j = i + 1; j < components.length; j++) {
+                const pairKey = `${components[i]}|${components[j]}`;
+                if (!pairs.has(pairKey)) {
+                    const idx1 = genes.indexOf(components[i]);
+                    const idx2 = genes.indexOf(components[j]);
+                    if (idx1 >= 0 && idx2 >= 0) {
+                        matrix[idx1][idx2]++;
+                        matrix[idx2][idx1]++;
+                    }
+                    pairs.add(pairKey);
+                }
+            }
+        }
+    });
+
+    const chord = d3.chord()
+        .padAngle(0.05)
+        .sortSubgroups(d3.descending);
+
+    const chords = chord(matrix);
+    const color = d3.scaleOrdinal(d3.schemeCategory10);
+
+    const group = svg.append("g")
+        .selectAll("g")
+        .data(chords.groups)
+        .enter()
+        .append("g");
+
+    group.append("path")
+        .attr("d", d3.arc().innerRadius(innerRadius).outerRadius(outerRadius))
+        .style("fill", (d, i) => color(i))
+        .style("stroke", "black");
+
+    group.append("text")
+        .each(d => { d.angle = (d.startAngle + d.endAngle) / 2; })
+        .attr("dy", ".35em")
+        .attr("transform", d => `
+            rotate(${(d.angle * 180 / Math.PI - 90)})
+            translate(${outerRadius + 10})
+            ${d.angle > Math.PI ? "rotate(180)" : ""}
+        `)
+        .style("text-anchor", d => d.angle > Math.PI ? "end" : null)
+        .style("font-family", settings.fontFamily || "Arial")
+        .style("font-size", `${settings.tickFontSize - 4 || 10}px`)
+        .style("fill", settings.fontColor || "#333333")
+        .text(d => genes[d.index]);
+
+    svg.append("g")
+        .attr("class", "chords")
+        .selectAll("path")
+        .data(chords)
+        .enter()
+        .append("path")
+        .attr("d", d3.ribbon().radius(innerRadius))
+        .style("fill", d => color(d.source.index))
+        .style("opacity", 0.7);
+}
+
+
+function expressionDomainBubblePlot(data, containerId, expressionData, settings = {}) {
+    const margin = { top: 40, right: 150, bottom: 60, left: 60 };
+    const width = 900 - margin.left - margin.right;
+    const height = 500 - margin.top - margin.bottom;
+
+    const svg = d3.select(`#${containerId}`)
+        .append("svg")
+        .attr("width", width + margin.left + margin.right)
+        .attr("height", height + margin.top + margin.bottom)
+        .style("background", settings.backgroundColor || "#ffffff")
+        .append("g")
+        .attr("transform", `translate(${margin.left},${margin.top})`);
+
+    const plotData = data.map(d => {
+        const tissues = expressionData.find(e => e.gene === d.gene.toUpperCase()) || {};
+        const tissueKeys = Object.keys(tissues).filter(k => k !== 'gene');
+        const tissueCount = tissueKeys.filter(t => +tissues[t] > 1).length; // Count tissues with nTPM > 1
+        const maxExpression = d3.max(tissueKeys.map(t => +tissues[t] || 0));
+        const domainCount = d.domain_descriptions ? getCleanArray(d, 'domain_descriptions').length : 0;
+        return { gene: d.gene, tissueCount, maxExpression, domainCount };
+    }).filter(d => d.maxExpression > 0);
+
+    const xScale = d3.scaleLinear()
+        .domain([0, d3.max(plotData, d => d.tissueCount)])
+        .range([0, width]);
+
+    const yScale = d3.scaleLinear()
+        .domain([0, d3.max(plotData, d => d.domainCount)])
+        .range([height, 0]);
+
+    const sizeScale = d3.scaleSqrt()
+        .domain([1, d3.max(plotData, d => d.maxExpression)])
+        .range([4, 40]);
+    
+    const colorScale = d3.scaleSequential(d3.interpolateViridis)
+      .domain(d3.extent(plotData, d => d.maxExpression));
+
+    svg.selectAll("circle")
+        .data(plotData)
+        .enter()
+        .append("circle")
+        .attr("cx", d => xScale(d.tissueCount))
+        .attr("cy", d => yScale(d.domainCount))
+        .attr("r", d => sizeScale(d.maxExpression))
+        .style("fill", d => colorScale(d.maxExpression))
+        .attr("opacity", 0.7)
+        .append("title")
+        .text(d => `${d.gene}\nExpressed Tissues: ${d.tissueCount}\nDomains: ${d.domainCount}\nMax Expression (nTPM): ${d.maxExpression.toFixed(2)}`);
+
+    svg.append("g")
+        .attr("transform", `translate(0,${height})`)
+        .call(d3.axisBottom(xScale))
+        .selectAll("text")
+        .style("font-family", settings.fontFamily || "Arial")
+        .style("font-size", `${settings.tickFontSize || 12}px`)
+        .style("fill", settings.fontColor || "#333333");
+
+    svg.append("g")
+        .call(d3.axisLeft(yScale))
+        .selectAll("text")
+        .style("font-family", settings.fontFamily || "Arial")
+        .style("font-size", `${settings.tickFontSize || 12}px`)
+        .style("fill", settings.fontColor || "#333333");
+
+    // Axis Titles
+    svg.append("text")
+        .attr("x", width / 2)
+        .attr("y", height + margin.bottom - 10)
+        .style("text-anchor", "middle")
+        .style("font-family", settings.fontFamily || "Arial")
+        .style("font-size", `${settings.axisTitleFontSize || 14}px`)
+        .style("fill", settings.fontColor || "#333333")
+        .text("Number of Tissues Expressed (nTPM > 1)");
+
+    svg.append("text")
+        .attr("transform", "rotate(-90)")
+        .attr("y", 0 - margin.left)
+        .attr("x", 0 - (height / 2))
+        .attr("dy", "1em")
+        .style("text-anchor", "middle")
+        .style("font-family", settings.fontFamily || "Arial")
+        .style("font-size", `${settings.axisTitleFontSize || 14}px`)
+        .style("fill", settings.fontColor || "#333333")
+        .text("Number of Protein Domains");
+    
+    // Title
+    svg.append("text")
+        .attr("x", width / 2)
+        .attr("y", 0 - (margin.top / 2))
+        .attr("text-anchor", "middle")
+        .style("font-size", `${settings.titleFontSize || 16}px`)
+        .style("font-family", settings.fontFamily || "Arial")
+        .style("fill", settings.fontColor || "#333333")
+        .text("Expression Breadth vs. Domain Complexity");
+}
+
+
+// Helper functions for violin plot
+function kernelDensityEstimator(kernel, X) {
+    return function(V) {
+        return X.map(x => [x, d3.mean(V, v => kernel(x - v))]);
+    };
+}
+
+function kernelEpanechnikov(k) {
+    return function(v) {
+        return Math.abs(v /= k) <= 1 ? 0.75 * (1 - v * v) / k : 0;
+    };
 }
