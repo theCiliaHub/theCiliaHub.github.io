@@ -1363,113 +1363,119 @@ function renderTopExpressingTissues(foundGenes, container) {
 
 
 
-// Replace the existing  function with this new one
-
+ NEW: Builds the redesigned CiliaPlot page with a professional, two-column layout
+ * inspired by bioinformatics tools like GO Panther. RENAMED TO FIX ROUTER ERROR.
+ */
 function displayCiliaPlotPage() {
     const contentArea = document.querySelector('.content-area');
-    // Use a full-width class and hide the default side panel
-    contentArea.className = 'content-area content-area-full'; 
+    contentArea.className = 'content-area content-area-full';
     document.querySelector('.cilia-panel').style.display = 'none';
-
-    // This HTML builds the new two-column dashboard layout
-    contentArea.innerHTML = `
-        <div class="ciliaplot-dashboard">
+    
+    contentArea.innerHTML =`
+        <div class="page-section ciliaplot-page">
             <div class="ciliaplot-header">
-                <h2>CiliaPlot Dashboard</h2>
-                <div id="ciliaplot-plot-info" class="info">
-                    Select a plot type to see a description and generate an analysis.
-                </div>
+                <h1>CiliaPlot Gene Set Analysis</h1>
+                <p class="info">
+                    Enter a list of genes to perform functional enrichment and network analysis, 
+                    generating publication-ready visualizations.
+                </p>
             </div>
 
-            <div class="ciliaplot-container">
-                <div class="ciliaplot-left-panel">
-                    <div class="control-card">
-                        <label for="ciliaplot-genes-input"><strong>1. Enter Gene List</strong></label>
-                        <textarea id="ciliaplot-genes-input" placeholder="e.g., IFT88, CEP290, BBS1..."></textarea>
+            <div class="ciliaplot-container-new">
+                <div class="ciliaplot-left-panel-new">
+                    
+                    <div class="control-section">
+                        <h3>1. Input & Analyse</h3>
+                        <div class="control-section-content">
+                            <textarea id="ciliaplot-genes-input" placeholder="Enter one gene per line...\ne.g., ARL13B\nIFT88\nBBS1\nCEP290"></textarea>
+                            <label for="plot-type-select"><b>Select Analysis Type</b></label>
+                            <select id="plot-type-select">
+                                <optgroup label="Localization Analysis">
+                                    <option value="bubble">Key Localizations (Bubble)</option>
+                                    <option value="localization_bar">Key Localizations (Bar)</option>
+                                    <option value="matrix">Gene-Localization Matrix</option>
+                                </optgroup>
+                                <optgroup label="Functional Analysis">
+                                    <option value="domain_matrix">Gene-Domain Matrix</option>
+                                    <option value="functional_category">Functional Category</option>
+                                    <option value="network">Protein Complex Network</option>
+                                    <option value="chord_plot">Protein Complex (Chord)</option>
+                                </optgroup>
+                                <optgroup label="Expression Analysis">
+                                    <option value="expression_heatmap">Expression Heatmap</option>
+                                    <option value="violin_plot">Expression Violin Plot</option>
+                                    <option value="tissue_profile">Tissue Expression Profile</option>
+                                    <option value="expression_localization">Expression vs. Localization</option>
+                                    <option value="expression_domain_bubble">Expression vs. Domain</option>
+                                    <option value="top_tissues">Top Expressing Tissues</option>
+                                </optgroup>
+                                <optgroup label="Proteomics Analysis">
+                                    <option value="organelle_radar">Organellar Profile (Radar)</option>
+                                    <option value="organelle_umap">Organellar Projection (UMAP)</option>
+                                </optgroup>
+                            </select>
+                            <button id="generate-plot-btn" class="btn btn-primary">Run Analysis</button>
+                        </div>
                     </div>
 
-                    <div class="control-card">
-                        <label for="plot-type-select"><strong>2. Select Plot Type</strong></label>
-                        <select id="plot-type-select">
-    <option value="bubble">Key Localizations</option>
-    <option value="matrix">Gene-Localization Matrix</option>
-    <option value="domain_matrix">Gene-Domain Matrix</option>
-    <option value="functional_category">Functional Categories</option>
-    <option value="network">Protein Complex Network</option>
-    <option value="expression_heatmap">Expression Heatmap</option>
-    <option value="tissue_profile">Tissue Expression Profile</option>
-    <option value="top_tissues">Top Expressing Tissues</option>
-    <option value="expression_localization">Expression vs. Localization</option>
-    
-    <option value="organelle_radar">Organellar Profile (Radar)</option>
-    <option value="organelle_umap">Organellar Projection (UMAP)</option>
-</select>
-                    </div>
-                    
-                    <details class="control-card collapsible-card">
-                        <summary><strong>3. Customize Plot (Optional)</strong></summary>
-                        <div id="plot-settings-panel">
-                            <label for="setting-font-family">Font Family:</label>
-                            <input type="text" id="setting-font-family" value="Arial">
-                            
-                            <label for="setting-font-color">Font Color:</label>
-                            <input type="color" id="setting-font-color" value="#333333">
-                            
-                            <label for="setting-bg-color">Background Color:</label>
-                            <input type="color" id="setting-bg-color" value="#ffffff">
-
-                            <label for="setting-title-font-size">Title Font (px):</label>
-                            <input type="number" id="setting-title-font-size" value="21" step="1">
-
-                            <label for="setting-axis-title-font-size">Axis Title (px):</label>
-                            <input type="number" id="setting-axis-title-font-size" value="20" step="1">
-                            
-                            <label for="setting-tick-font-size">Axis Ticks (px):</label>
-                            <input type="number" id="setting-tick-font-size" value="20" step="1">
+                    <details class="control-section">
+                        <summary>2. Customize Plot</summary>
+                        <div class="control-section-content" id="plot-settings-grid">
+                            <div><label>Title Font Size</label><input type="number" id="setting-title-font-size" value="21"></div>
+                            <div><label>Axis Title Font Size</label><input type="number" id="setting-axis-title-font-size" value="20"></div>
+                            <div><label>Axis Tick Font Size</label><input type="number" id="setting-tick-font-size" value="20"></div>
+                            <div><label>Font</label><select id="setting-font-family"><option>Arial</option><option>Verdana</option><option>Times New Roman</option></select></div>
+                            <div><label>Text Color</label><input type="color" id="setting-font-color" value="#333333"></div>
+                            <div><label>Background</label><input type="color" id="setting-bg-color" value="#ffffff"></div>
+                            <div><label>Axis Line Width</label><input type="number" id="setting-axis-line-width" value="2" step="0.5"></div>
+                            <div><label>Axis Line Color</label><input type="color" id="setting-axis-line-color" value="#333333"></div>
+                            <div><label>Gridline Color</label><input type="color" id="setting-grid-color" value="#e0e0e0"></div>
+                            <div><label><input type="checkbox" id="setting-show-grid"> Show Grid</label></div>
                         </div>
                     </details>
-                    
-                    <button id="generate-plot-btn" class="btn btn-primary btn-large">Generate Plot</button>
+
+                    <div class="control-section">
+                        <h3>3. Download</h3>
+                        <div class="control-section-content">
+                            <select id="download-format">
+                                <option value="png">PNG</option>
+                                <option value="pdf">PDF</option>
+                            </select>
+                            <button id="download-plot-btn" class="btn btn-secondary">Download Plot</button>
+                        </div>
+                    </div>
                 </div>
 
-                <div class="ciliaplot-right-panel">
-                    <div id="ciliaplot-stats-container" class="stats-container">
-                        </div>
-
-                    <div class="plot-card">
-                        <div class="plot-card-header">
-                            <h3>Visualization</h3>
-                            <div class="download-controls">
-                                <select id="download-format">
-                                    <option value="png">Download as PNG</option>
-                                    <option value="pdf">Download as PDF</option>
-                                </select>
-                                <button id="download-plot-btn" class="btn btn-secondary">Download</button>
-                            </div>
-                        </div>
-                        <div id="plot-display-area" class="plot-area-large">
-                            </div>
-                        <div id="ciliaplot-legend-container" class="legend">
-                            </div>
+                <div class="ciliaplot-right-panel-new">
+                    <div id="ciliaplot-plot-info" class="info">Select an analysis type and click "Run Analysis" to begin.</div>
+                    <div id="ciliaplot-stats-container" class="stats-container"></div>
+                    <div id="plot-display-area" class="plot-container-new">
+                        <p class="status-message">Your plot will appear here.</p>
                     </div>
-
-                    <div id="plot-data-table-container">
-                        </div>
-
-                    <div id="ciliaplot-search-results">
-                        </div>
+                    <div id="ciliaplot-legend-container" class="legend"></div>
+                    <div id="plot-data-table-container"></div>
+                    <div id="ciliaplot-search-results"></div>
                 </div>
             </div>
         </div>
     `;
-
-    // Re-attach event listeners for the new buttons
-    document.getElementById('generate-plot-btn').onclick = generateAnalysisPlots;
-    document.getElementById('download-plot-btn').onclick = downloadPlot;
-    // Add event listener for plot type change to update info box
+    
+    // Attach all necessary event listeners
+    document.getElementById('generate-plot-btn').addEventListener('click', generateAnalysisPlots);
+    document.getElementById('download-plot-btn').addEventListener('click', downloadPlot);
     document.getElementById('plot-type-select').addEventListener('change', (e) => {
         updatePlotInfo(e.target.value);
     });
+    
+    // Auto-update plot when settings change, if a plot already exists
+    document.getElementById('plot-settings-grid').addEventListener('change', () => {
+        if (currentPlotInstance) { 
+            generateAnalysisPlots();
+        }
+    });
+
+    // Initialize the info text for the default selection
+    updatePlotInfo(document.getElementById('plot-type-select').value);
 }
 
 // =============================================================================
