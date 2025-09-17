@@ -2209,12 +2209,11 @@ function kernelEpanechnikov(k) {
     };
 }
 
-
 /**
  * Generates a bubble plot for screen data of selected genes.
  */
 function renderGeneScreenAnalysis(foundGenes, container) {
-    clearPreviousPlot(container.id); // Reset previous plot
+    clearPreviousPlot(container.id); // Reset previous plot instance
     container.innerHTML = `<canvas></canvas>`;
     const ctx = container.querySelector('canvas').getContext('2d');
 
@@ -2223,38 +2222,46 @@ function renderGeneScreenAnalysis(foundGenes, container) {
         return;
     }
 
-    // Normalize and flatten screens safely
-    const screenData = foundGenes.flatMap(gene => {
-        const screensArray = Array.isArray(gene.screens) ? gene.screens : []; // ✅ safe fallback
+    // Step 1: Flatten and normalize screen data
+    const rawScreenData = foundGenes.flatMap(gene => {
+        const screensArray = Array.isArray(gene.screens) ? gene.screens : [];
         return screensArray.map(screen => ({
             gene: gene.gene,
             dataset: screen.dataset ?? "Unknown dataset",
             mean: (screen.mean_percent_ciliated !== "NA" && screen.mean_percent_ciliated != null)
-                ? screen.mean_percent_ciliated
+                ? Number(screen.mean_percent_ciliated)
                 : null,
             z: (screen.z_score !== "NA" && screen.z_score != null)
-                ? screen.z_score
+                ? Number(screen.z_score)
                 : null,
             classification: screen.classification ?? "Unclassified",
             paper: screen.paper_link ?? "#"
         }));
-    }).filter(d => d.mean !== null || d.z !== null); // Only keep valid numeric data
+    });
+
+    console.log("DEBUG: Raw Screen Data", rawScreenData);
+
+    // Step 2: Filter out data with no numeric values
+    const screenData = rawScreenData.filter(d => d.mean !== null || d.z !== null);
+
+    console.log("DEBUG: Filtered Screen Data", screenData);
 
     if (!screenData.length) {
         container.innerHTML = '<p class="status-message">No numeric screen data available for these genes.</p>';
         return;
     }
 
-    // Build bubble dataset
+    // Step 3: Prepare dataset for Chart.js
     const datasets = screenData.map(d => ({
         x: d.dataset,
         y: d.mean,
-        r: (d.z !== null ? Math.abs(d.z) * 2 : 5), // fallback bubble size
+        r: d.z !== null ? Math.max(Math.abs(d.z) * 2, 4) : 5, // Ensure bubble isn't too small
         backgroundColor: d.classification === "Negative regulator" ? "#E74C3C" : "#3498DB",
         gene: d.gene,
         paper: d.paper
     }));
 
+    // Step 4: Render bubble chart
     currentPlotInstance = new Chart(ctx, {
         type: 'bubble',
         data: {
@@ -2266,12 +2273,15 @@ function renderGeneScreenAnalysis(foundGenes, container) {
         options: {
             responsive: true,
             plugins: {
-                title: { display: true, text: "Gene Screens Analysis" },
+                title: {
+                    display: true,
+                    text: "Gene Screens Analysis"
+                },
                 tooltip: {
                     callbacks: {
                         label: c => {
                             const { gene, x, y, paper } = c.raw;
-                            const meanValue = (typeof y === 'number')
+                            const meanValue = (typeof y === 'number' && !isNaN(y))
                                 ? y.toFixed(2)
                                 : 'N/A';
                             return `${gene} | ${x}: ${meanValue}\n${paper}`;
@@ -2284,7 +2294,9 @@ function renderGeneScreenAnalysis(foundGenes, container) {
                     title: { display: true, text: "Dataset" },
                     ticks: { autoSkip: false }
                 },
-                y: { title: { display: true, text: "Mean % Ciliated" } }
+                y: {
+                    title: { display: true, text: "Mean % Ciliated" }
+                }
             }
         }
     });
