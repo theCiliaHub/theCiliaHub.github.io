@@ -2212,7 +2212,7 @@ function kernelEpanechnikov(k) {
 
 
 /**
- * Generates a comprehensive screen analysis plot for selected genes.
+ * Generates a stable screen analysis plot for selected genes.
  */
 function renderGeneScreenAnalysis(foundGenes, container) {
     clearPreviousPlot(container.id); // Reset previous plot instance
@@ -2228,22 +2228,19 @@ function renderGeneScreenAnalysis(foundGenes, container) {
     
     // Step 1: Extract and validate screen data
     const processedData = [];
+    let geneIndex = 0;
+    const geneIndexMap = {};
     
     foundGenes.forEach(gene => {
+        // Assign each gene a fixed x-position
+        if (!(gene.gene in geneIndexMap)) {
+            geneIndexMap[gene.gene] = geneIndex++;
+        }
+        
         // Handle cases where screens is undefined, null, empty object, or not an array
         if (!gene.screens || !Array.isArray(gene.screens) || gene.screens.length === 0) {
             console.warn(`Gene ${gene.gene} has no screen data or invalid screens format:`, gene.screens);
-            // Add gene with no screen data for visualization
-            processedData.push({
-                gene: gene.gene,
-                dataset: "No Data",
-                mean: 0,
-                z_score: 0,
-                classification: "No data available",
-                paper: "#",
-                hasData: false
-            });
-            return;
+            return; // Skip genes with no data instead of adding empty points
         }
         
         // Process each screen for this gene
@@ -2251,22 +2248,25 @@ function renderGeneScreenAnalysis(foundGenes, container) {
             const meanValue = parseFloat(screen.mean_percent_ciliated);
             const zValue = parseFloat(screen.z_score);
             
-            processedData.push({
-                gene: gene.gene,
-                dataset: screen.dataset || "Unknown",
-                mean: (!isNaN(meanValue)) ? meanValue : 0,
-                z_score: (!isNaN(zValue)) ? zValue : 0,
-                classification: screen.classification || "Unclassified",
-                paper: screen.paper_link || "#",
-                hasData: !isNaN(meanValue) || !isNaN(zValue)
-            });
+            // Only add if we have valid numeric data
+            if (!isNaN(meanValue)) {
+                processedData.push({
+                    gene: gene.gene,
+                    x: geneIndexMap[gene.gene], // Fixed x position
+                    y: meanValue,
+                    dataset: screen.dataset || "Unknown",
+                    z_score: (!isNaN(zValue)) ? zValue : 0,
+                    classification: screen.classification || "Unclassified",
+                    paper: screen.paper_link || "#"
+                });
+            }
         });
     });
     
     console.log("DEBUG: Processed screen data:", processedData);
     
     if (!processedData.length) {
-        container.innerHTML = '<p class="status-message">No screen data available for analysis.</p>';
+        container.innerHTML = '<p class="status-message">No valid screen data available for analysis.</p>';
         return;
     }
     
@@ -2275,8 +2275,7 @@ function renderGeneScreenAnalysis(foundGenes, container) {
         "Negative regulator": "#E74C3C",    // Red
         "Positive regulator": "#27AE60",    // Green  
         "No significant effect": "#3498DB", // Blue
-        "Unclassified": "#95A5A6",         // Gray
-        "No data available": "#BDC3C7"      // Light Gray
+        "Unclassified": "#95A5A6"          // Gray
     };
     
     // Group data by classification
@@ -2295,43 +2294,35 @@ function renderGeneScreenAnalysis(foundGenes, container) {
         
         return {
             label: classification,
-            data: items.map((item, index) => ({
-                x: item.gene,
-                y: item.mean,
-                r: Math.max(Math.abs(item.z_score) * 4, 6), // Bubble size based on z-score
-                gene: item.gene,
-                dataset: item.dataset,
-                z_score: item.z_score,
-                classification: item.classification,
-                paper: item.paper,
-                hasData: item.hasData
-            })),
+            data: items,
             backgroundColor: classificationColors[classification] || "#95A5A6",
             borderColor: classificationColors[classification] || "#95A5A6",
             borderWidth: 2,
+            pointRadius: 6,
             pointHoverRadius: 8
         };
     });
     
     console.log("DEBUG: Chart datasets:", datasets);
     
-    // Step 3: Get all unique genes for x-axis
-    const allGenes = [...new Set(processedData.map(item => item.gene))];
+    // Step 3: Create gene labels for x-axis
+    const geneLabels = Object.keys(geneIndexMap).sort((a, b) => geneIndexMap[a] - geneIndexMap[b]);
     
-    // Step 4: Render the chart
+    // Step 4: Render the chart as a scatter plot for stability
     currentPlotInstance = new Chart(ctx, {
-        type: 'bubble',
+        type: 'scatter',
         data: {
             datasets: datasets
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
+            animation: false, // Disable animations for stability
             layout: {
                 padding: {
-                    left: 10,
-                    right: 10,
-                    top: 10,
+                    left: 20,
+                    right: 20,
+                    top: 20,
                     bottom: 20
                 }
             },
@@ -2380,15 +2371,17 @@ function renderGeneScreenAnalysis(foundGenes, container) {
                         },
                         afterLabel: function(context) {
                             const data = context.raw;
-                            return data.paper !== "#" ? `Click to view paper` : "";
+                            return data.paper !== "#" ? "Click to view paper" : "";
                         }
                     }
                 }
             },
             scales: {
                 x: {
-                    type: 'category',
-                    labels: allGenes,
+                    type: 'linear',
+                    position: 'bottom',
+                    min: -0.5,
+                    max: geneLabels.length - 0.5,
                     title: {
                         display: true,
                         text: 'Genes',
@@ -2398,6 +2391,10 @@ function renderGeneScreenAnalysis(foundGenes, container) {
                         }
                     },
                     ticks: {
+                        stepSize: 1,
+                        callback: function(value, index) {
+                            return geneLabels[Math.round(value)] || '';
+                        },
                         maxRotation: 90,
                         minRotation: 45,
                         font: {
@@ -2445,10 +2442,13 @@ function renderGeneScreenAnalysis(foundGenes, container) {
         }
     });
     
-    // Set canvas dimensions for better visibility
+    // Set fixed canvas dimensions for stability
     const canvas = container.querySelector('canvas');
-    canvas.style.height = '500px';
+    canvas.width = 1000;
+    canvas.height = 500;
     canvas.style.width = '100%';
+    canvas.style.height = '500px';
+    canvas.style.maxWidth = '100%';
     
     // Add summary statistics
     const summary = document.createElement('div');
@@ -2459,24 +2459,30 @@ function renderGeneScreenAnalysis(foundGenes, container) {
         background: #f8f9fa;
         border-radius: 8px;
         border-left: 4px solid #3498db;
+        position: relative;
     `;
     
-    const totalGenes = allGenes.length;
-    const negativeRegulators = processedData.filter(d => d.classification === "Negative regulator").map(d => d.gene);
-    const positiveRegulators = processedData.filter(d => d.classification === "Positive regulator").map(d => d.gene);
-    const uniqueNegative = [...new Set(negativeRegulators)];
-    const uniquePositive = [...new Set(positiveRegulators)];
+    const totalGenes = geneLabels.length;
+    const negativeRegulators = [...new Set(processedData.filter(d => d.classification === "Negative regulator").map(d => d.gene))];
+    const positiveRegulators = [...new Set(processedData.filter(d => d.classification === "Positive regulator").map(d => d.gene))];
+    const datasets = [...new Set(processedData.map(d => d.dataset))];
     
     summary.innerHTML = `
         <h4 style="margin: 0 0 10px 0; color: #2c3e50;">Analysis Summary</h4>
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px;">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin-bottom: 10px;">
             <div><strong>Total Genes:</strong> ${totalGenes}</div>
-            <div><strong>Negative Regulators:</strong> <span style="color: #E74C3C;">${uniqueNegative.length} genes</span></div>
-            <div><strong>Positive Regulators:</strong> <span style="color: #27AE60;">${uniquePositive.length} genes</span></div>
+            <div><strong>Datasets:</strong> ${datasets.join(', ')}</div>
             <div><strong>Total Data Points:</strong> ${processedData.length}</div>
+            <div><strong>Negative Regulators:</strong> <span style="color: #E74C3C;">${negativeRegulators.length} genes</span></div>
         </div>
-        ${uniqueNegative.length > 0 ? `<div style="margin-top: 10px;"><strong>Negative Regulators:</strong> ${uniqueNegative.join(', ')}</div>` : ''}
-        ${uniquePositive.length > 0 ? `<div style="margin-top: 5px;"><strong>Positive Regulators:</strong> ${uniquePositive.join(', ')}</div>` : ''}
+        ${negativeRegulators.length > 0 ? `
+            <div style="margin-top: 10px; padding: 8px; background: #ffebee; border-radius: 4px;">
+                <strong style="color: #E74C3C;">Negative Regulators:</strong> ${negativeRegulators.join(', ')}
+            </div>` : ''}
+        ${positiveRegulators.length > 0 ? `
+            <div style="margin-top: 8px; padding: 8px; background: #e8f5e8; border-radius: 4px;">
+                <strong style="color: #27AE60;">Positive Regulators:</strong> ${positiveRegulators.join(', ')}
+            </div>` : ''}
     `;
     
     container.appendChild(summary);
