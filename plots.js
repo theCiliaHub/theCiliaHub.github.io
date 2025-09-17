@@ -2212,7 +2212,7 @@ function kernelEpanechnikov(k) {
 
 
 /**
- * Generates a bubble plot for screen data of selected genes.
+ * Generates a comprehensive screen analysis plot for selected genes.
  */
 function renderGeneScreenAnalysis(foundGenes, container) {
     clearPreviousPlot(container.id); // Reset previous plot instance
@@ -2224,76 +2224,101 @@ function renderGeneScreenAnalysis(foundGenes, container) {
         return;
     }
     
-    // Step 1: Flatten and normalize screen data with proper validation
-    const rawScreenData = foundGenes.flatMap(gene => {
+    console.log("DEBUG: Input genes:", foundGenes.map(g => g.gene));
+    
+    // Step 1: Extract and validate screen data
+    const processedData = [];
+    
+    foundGenes.forEach(gene => {
         // Handle cases where screens is undefined, null, empty object, or not an array
         if (!gene.screens || !Array.isArray(gene.screens) || gene.screens.length === 0) {
             console.warn(`Gene ${gene.gene} has no screen data or invalid screens format:`, gene.screens);
-            return []; // Return empty array for this gene
+            // Add gene with no screen data for visualization
+            processedData.push({
+                gene: gene.gene,
+                dataset: "No Data",
+                mean: 0,
+                z_score: 0,
+                classification: "No data available",
+                paper: "#",
+                hasData: false
+            });
+            return;
         }
         
-        return gene.screens.map(screen => ({
-            gene: gene.gene,
-            dataset: screen.dataset ?? "Unknown dataset",
-            mean: (screen.mean_percent_ciliated !== "NA" && 
-                   screen.mean_percent_ciliated != null && 
-                   screen.mean_percent_ciliated !== undefined)
-                ? Number(screen.mean_percent_ciliated)
-                : null,
-            z: (screen.z_score !== "NA" && 
-                screen.z_score != null && 
-                screen.z_score !== undefined)
-                ? Number(screen.z_score)
-                : null,
-            classification: screen.classification ?? "Unclassified",
-            paper: screen.paper_link ?? "#"
-        }));
+        // Process each screen for this gene
+        gene.screens.forEach(screen => {
+            const meanValue = parseFloat(screen.mean_percent_ciliated);
+            const zValue = parseFloat(screen.z_score);
+            
+            processedData.push({
+                gene: gene.gene,
+                dataset: screen.dataset || "Unknown",
+                mean: (!isNaN(meanValue)) ? meanValue : 0,
+                z_score: (!isNaN(zValue)) ? zValue : 0,
+                classification: screen.classification || "Unclassified",
+                paper: screen.paper_link || "#",
+                hasData: !isNaN(meanValue) || !isNaN(zValue)
+            });
+        });
     });
     
-    console.log("DEBUG: Raw Screen Data", rawScreenData);
+    console.log("DEBUG: Processed screen data:", processedData);
     
-    // Step 2: Filter out data with no numeric values
-    const screenData = rawScreenData.filter(d => d.mean !== null || d.z !== null);
-    
-    console.log("DEBUG: Filtered Screen Data", screenData);
-    
-    if (!screenData.length) {
-        container.innerHTML = '<p class="status-message">No numeric screen data available for these genes.</p>';
+    if (!processedData.length) {
+        container.innerHTML = '<p class="status-message">No screen data available for analysis.</p>';
         return;
     }
     
-    // Step 3: Get unique datasets for better color coding
-    const uniqueDatasets = [...new Set(screenData.map(d => d.dataset))];
-    const datasetColors = {
-        "Kim2016": "#E74C3C",
-        "Roosing2015": "#3498DB", 
-        "Breslow2018": "#2ECC71",
-        "Wheway2015": "#F39C12"
+    // Step 2: Create datasets grouped by classification
+    const classificationColors = {
+        "Negative regulator": "#E74C3C",    // Red
+        "Positive regulator": "#27AE60",    // Green  
+        "No significant effect": "#3498DB", // Blue
+        "Unclassified": "#95A5A6",         // Gray
+        "No data available": "#BDC3C7"      // Light Gray
     };
     
-    // Step 4: Group data by dataset for better visualization
-    const datasets = uniqueDatasets.map(dataset => {
-        const datasetData = screenData.filter(d => d.dataset === dataset);
+    // Group data by classification
+    const groupedData = {};
+    processedData.forEach(item => {
+        const classification = item.classification;
+        if (!groupedData[classification]) {
+            groupedData[classification] = [];
+        }
+        groupedData[classification].push(item);
+    });
+    
+    // Create datasets for Chart.js
+    const datasets = Object.keys(groupedData).map(classification => {
+        const items = groupedData[classification];
         
         return {
-            label: dataset,
-            data: datasetData.map(d => ({
-                x: d.gene,
-                y: d.mean,
-                r: d.z !== null ? Math.max(Math.abs(d.z) * 3, 4) : 5, // Ensure bubble isn't too small
-                gene: d.gene,
-                dataset: d.dataset,
-                classification: d.classification,
-                z_score: d.z,
-                paper: d.paper
+            label: classification,
+            data: items.map((item, index) => ({
+                x: item.gene,
+                y: item.mean,
+                r: Math.max(Math.abs(item.z_score) * 4, 6), // Bubble size based on z-score
+                gene: item.gene,
+                dataset: item.dataset,
+                z_score: item.z_score,
+                classification: item.classification,
+                paper: item.paper,
+                hasData: item.hasData
             })),
-            backgroundColor: datasetColors[dataset] || "#95A5A6",
-            borderColor: datasetColors[dataset] || "#95A5A6",
-            borderWidth: 1
+            backgroundColor: classificationColors[classification] || "#95A5A6",
+            borderColor: classificationColors[classification] || "#95A5A6",
+            borderWidth: 2,
+            pointHoverRadius: 8
         };
     });
     
-    // Step 5: Render bubble chart
+    console.log("DEBUG: Chart datasets:", datasets);
+    
+    // Step 3: Get all unique genes for x-axis
+    const allGenes = [...new Set(processedData.map(item => item.gene))];
+    
+    // Step 4: Render the chart
     currentPlotInstance = new Chart(ctx, {
         type: 'bubble',
         data: {
@@ -2302,70 +2327,106 @@ function renderGeneScreenAnalysis(foundGenes, container) {
         options: {
             responsive: true,
             maintainAspectRatio: false,
+            layout: {
+                padding: {
+                    left: 10,
+                    right: 10,
+                    top: 10,
+                    bottom: 20
+                }
+            },
             plugins: {
                 title: {
                     display: true,
-                    text: "Gene Screens Analysis",
+                    text: 'Gene Screen Analysis - Functional Classification',
                     font: {
-                        size: 16,
+                        size: 18,
                         weight: 'bold'
+                    },
+                    padding: {
+                        top: 10,
+                        bottom: 20
                     }
                 },
                 legend: {
                     display: true,
-                    position: 'top'
+                    position: 'top',
+                    labels: {
+                        usePointStyle: true,
+                        padding: 15,
+                        font: {
+                            size: 12
+                        }
+                    }
                 },
                 tooltip: {
+                    backgroundColor: 'rgba(0,0,0,0.8)',
+                    titleColor: 'white',
+                    bodyColor: 'white',
+                    borderColor: '#ddd',
+                    borderWidth: 1,
                     callbacks: {
+                        title: function(context) {
+                            return `Gene: ${context[0].raw.gene}`;
+                        },
                         label: function(context) {
                             const data = context.raw;
-                            const meanValue = (typeof data.y === 'number' && !isNaN(data.y))
-                                ? data.y.toFixed(2)
-                                : 'N/A';
-                            const zScore = (typeof data.z_score === 'number' && !isNaN(data.z_score))
-                                ? data.z_score.toFixed(2)
-                                : 'N/A';
-                            
                             return [
-                                `Gene: ${data.gene}`,
                                 `Dataset: ${data.dataset}`,
-                                `Mean % Ciliated: ${meanValue}`,
-                                `Z-Score: ${zScore}`,
+                                `Mean % Ciliated: ${data.y.toFixed(2)}`,
+                                `Z-Score: ${data.z_score.toFixed(2)}`,
                                 `Classification: ${data.classification}`
                             ];
                         },
                         afterLabel: function(context) {
-                            return `Paper: ${context.raw.paper}`;
+                            const data = context.raw;
+                            return data.paper !== "#" ? `Click to view paper` : "";
                         }
                     }
                 }
             },
             scales: {
                 x: {
-                    title: { 
-                        display: true, 
-                        text: "Gene",
+                    type: 'category',
+                    labels: allGenes,
+                    title: {
+                        display: true,
+                        text: 'Genes',
                         font: {
                             size: 14,
                             weight: 'bold'
                         }
                     },
-                    ticks: { 
-                        autoSkip: false,
-                        maxRotation: 45,
-                        minRotation: 45
+                    ticks: {
+                        maxRotation: 90,
+                        minRotation: 45,
+                        font: {
+                            size: 10
+                        }
+                    },
+                    grid: {
+                        display: true,
+                        color: 'rgba(200, 200, 200, 0.3)'
                     }
                 },
                 y: {
-                    title: { 
-                        display: true, 
-                        text: "Mean % Ciliated",
+                    title: {
+                        display: true,
+                        text: 'Mean % Ciliated',
                         font: {
                             size: 14,
                             weight: 'bold'
                         }
                     },
-                    beginAtZero: false
+                    ticks: {
+                        font: {
+                            size: 11
+                        }
+                    },
+                    grid: {
+                        display: true,
+                        color: 'rgba(200, 200, 200, 0.3)'
+                    }
                 }
             },
             interaction: {
@@ -2384,7 +2445,39 @@ function renderGeneScreenAnalysis(foundGenes, container) {
         }
     });
     
-    // Set canvas height for better visibility
+    // Set canvas dimensions for better visibility
     const canvas = container.querySelector('canvas');
-    canvas.style.height = '400px';
+    canvas.style.height = '500px';
+    canvas.style.width = '100%';
+    
+    // Add summary statistics
+    const summary = document.createElement('div');
+    summary.className = 'screen-analysis-summary';
+    summary.style.cssText = `
+        margin-top: 15px;
+        padding: 15px;
+        background: #f8f9fa;
+        border-radius: 8px;
+        border-left: 4px solid #3498db;
+    `;
+    
+    const totalGenes = allGenes.length;
+    const negativeRegulators = processedData.filter(d => d.classification === "Negative regulator").map(d => d.gene);
+    const positiveRegulators = processedData.filter(d => d.classification === "Positive regulator").map(d => d.gene);
+    const uniqueNegative = [...new Set(negativeRegulators)];
+    const uniquePositive = [...new Set(positiveRegulators)];
+    
+    summary.innerHTML = `
+        <h4 style="margin: 0 0 10px 0; color: #2c3e50;">Analysis Summary</h4>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px;">
+            <div><strong>Total Genes:</strong> ${totalGenes}</div>
+            <div><strong>Negative Regulators:</strong> <span style="color: #E74C3C;">${uniqueNegative.length} genes</span></div>
+            <div><strong>Positive Regulators:</strong> <span style="color: #27AE60;">${uniquePositive.length} genes</span></div>
+            <div><strong>Total Data Points:</strong> ${processedData.length}</div>
+        </div>
+        ${uniqueNegative.length > 0 ? `<div style="margin-top: 10px;"><strong>Negative Regulators:</strong> ${uniqueNegative.join(', ')}</div>` : ''}
+        ${uniquePositive.length > 0 ? `<div style="margin-top: 5px;"><strong>Positive Regulators:</strong> ${uniquePositive.join(', ')}</div>` : ''}
+    `;
+    
+    container.appendChild(summary);
 }
