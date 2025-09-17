@@ -2209,249 +2209,247 @@ function kernelEpanechnikov(k) {
     };
 }
 
-
-
 /**
- * Generates a stable screen analysis plot for selected genes.
- */
+ * Generates a stable screen analysis plot for selected genes.
+ */
 function renderGeneScreenAnalysis(foundGenes, container) {
-    clearPreviousPlot(container.id); // Reset previous plot instance
-    container.innerHTML = `<canvas></canvas>`;
-    const ctx = container.querySelector('canvas').getContext('2d');
-    
-    if (!foundGenes.length) {
-        container.innerHTML = '<p class="status-message">No genes found.</p>';
-        return;
-    }
-    
-    // Step 1: Extract and validate screen data
-    const processedData = [];
-    let geneIndex = 0;
-    const geneIndexMap = {};
-    
-    foundGenes.forEach(gene => {
-        // Assign each gene a fixed x-position
-        if (!(gene.gene in geneIndexMap)) {
-            geneIndexMap[gene.gene] = geneIndex++;
-        }
-        
-        // Handle cases where screens is undefined, null, empty object, or not an array
-        if (!gene.screens || !Array.isArray(gene.screens) || gene.screens.length === 0) {
-            console.warn(`Gene ${gene.gene} has no screen data or invalid screens format:`, gene.screens);
-            return; // Skip genes with no data instead of adding empty points
-        }
-        
-        // Process each screen for this gene
-        gene.screens.forEach(screen => {
-            const meanValue = parseFloat(screen.mean_percent_ciliated);
-            const zValue = parseFloat(screen.z_score);
-            
-            // Only add if we have valid numeric data
-            if (!isNaN(meanValue)) {
-                processedData.push({
-                    gene: gene.gene,
-                    x: geneIndexMap[gene.gene], // Fixed x position
-                    y: meanValue,
-                    dataset: screen.dataset || "Unknown",
-                    z_score: (!isNaN(zValue)) ? zValue : 0,
-                    classification: screen.classification || "Unclassified",
-                    paper: screen.paper_link || "#"
-                });
-            }
-        });
-    });
-    
-    if (!processedData.length) {
-        container.innerHTML = '<p class="status-message">No valid screen data available for analysis.</p>';
-        return;
-    }
-    
-    // Step 2: Create datasets grouped by classification
-    const classificationColors = {
-        "Negative regulator": "#E74C3C",
-        "Positive regulator": "#27AE60",
-        "No significant effect": "#3498DB",
-        "Unclassified": "#95A5A6"
-    };
-    
-    // Group data by classification
-    const groupedData = {};
-    processedData.forEach(item => {
-        const classification = item.classification;
-        if (!groupedData[classification]) {
-            groupedData[classification] = [];
-        }
-        groupedData[classification].push(item);
-    });
-    
-    // Create datasets for Chart.js
-    const datasets = Object.keys(groupedData).map(classification => {
-        const items = groupedData[classification];
-        
-        return {
-            label: classification,
-            data: items,
-            backgroundColor: classificationColors[classification] || "#95A5A6",
-            borderColor: classificationColors[classification] || "#95A5A6",
-            borderWidth: 2,
-            pointRadius: 6,
-            pointHoverRadius: 8
-        };
-    });
-    
-    // Step 3: Create gene labels for x-axis
-    const geneLabels = Object.keys(geneIndexMap).sort((a, b) => geneIndexMap[a] - geneIndexMap[b]);
-    
-    // Step 4: Render the chart as a scatter plot for stability
-    currentPlotInstance = new Chart(ctx, {
-        type: 'scatter',
-        data: {
-            datasets: datasets
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            animation: false,
-            layout: {
-                padding: { left: 20, right: 20, top: 20, bottom: 20 }
-            },
-            plugins: {
-                title: {
-                    display: true,
-                    text: 'Gene Screen Analysis - Functional Classification',
-                    font: { size: 18, weight: 'bold' },
-                    padding: { top: 10, bottom: 20 }
-                },
-                legend: {
-                    display: true,
-                    position: 'top',
-                    labels: {
-                        usePointStyle: true,
-                        padding: 15,
-                        font: { size: 12 }
-                    }
-                },
-                tooltip: {
-                    backgroundColor: 'rgba(0,0,0,0.8)',
-                    titleColor: 'white',
-                    bodyColor: 'white',
-                    borderColor: '#ddd',
-                    borderWidth: 1,
-                    callbacks: {
-                        title: (context) => `Gene: ${context[0].raw.gene}`,
-                        label: (context) => {
-                            const data = context.raw;
-                            return [
-                                `Dataset: ${data.dataset}`,
-                                `Mean % Ciliated: ${data.y.toFixed(2)}`,
-                                `Z-Score: ${data.z_score.toFixed(2)}`,
-                                `Classification: ${data.classification}`
-                            ];
-                        },
-                        afterLabel: (context) => {
-                            const data = context.raw;
-                            return data.paper !== "#" ? "Click to view paper" : "";
-                        }
-                    }
-                }
-            },
-            scales: {
-                x: {
-                    type: 'linear',
-                    position: 'bottom',
-                    min: -0.5,
-                    max: geneLabels.length - 0.5,
-                    title: {
-                        display: true,
-                        text: 'Genes',
-                        font: { size: 14, weight: 'bold' }
-                    },
-                    ticks: {
-                        stepSize: 1,
-                        callback: (value, index) => geneLabels[Math.round(value)] || '',
-                        maxRotation: 90,           
+    clearPreviousPlot(container.id); // Reset previous plot instance
+    
+    // Create a wrapper div with fixed dimensions
+    container.innerHTML = `
+        <div class="chart-wrapper" style="position: relative; width: 100%; height: 500px; margin-bottom: 20px;">
+            <canvas></canvas>
+        </div>
+    `;
+    
+    const canvas = container.querySelector('canvas');
+    const ctx = canvas.getContext('2d');
+    
+    if (!foundGenes.length) {
+        container.innerHTML = '<p class="status-message">No genes found.</p>';
+        return;
+    }
+    
+    // Step 1: Extract and validate screen data
+    const processedData = [];
+    let geneIndex = 0;
+    const geneIndexMap = {};
+    
+    foundGenes.forEach(gene => {
+        // Assign each gene a fixed x-position
+        if (!(gene.gene in geneIndexMap)) {
+            geneIndexMap[gene.gene] = geneIndex++;
+        }
+        
+        // Handle cases where screens is undefined, null, empty object, or not an array
+        if (!gene.screens || !Array.isArray(gene.screens) || gene.screens.length === 0) {
+            console.warn(`Gene ${gene.gene} has no screen data or invalid screens format:`, gene.screens);
+            return; // Skip genes with no data instead of adding empty points
+        }
+        
+        // Process each screen for this gene
+        gene.screens.forEach(screen => {
+            const meanValue = parseFloat(screen.mean_percent_ciliated);
+            const zValue = parseFloat(screen.z_score);
+            
+            // Only add if we have valid numeric data
+            if (!isNaN(meanValue)) {
+                processedData.push({
+                    gene: gene.gene,
+                    x: geneIndexMap[gene.gene], // Fixed x position
+                    y: meanValue,
+                    dataset: screen.dataset || "Unknown",
+                    z_score: (!isNaN(zValue)) ? zValue : 0,
+                    classification: screen.classification || "Unclassified",
+                    paper: screen.paper_link || "#"
+                });
+            }
+        });
+    });
+    
+    if (!processedData.length) {
+        container.innerHTML = '<p class="status-message">No valid screen data available for analysis.</p>';
+        return;
+    }
+    
+    // Step 2: Create datasets grouped by classification
+    const classificationColors = {
+        "Negative regulator": "#E74C3C",
+        "Positive regulator": "#27AE60",
+        "No significant effect": "#3498DB",
+        "Unclassified": "#95A5A6"
+    };
+    
+    // Group data by classification
+    const groupedData = {};
+    processedData.forEach(item => {
+        const classification = item.classification;
+        if (!groupedData[classification]) {
+            groupedData[classification] = [];
+        }
+        groupedData[classification].push(item);
+    });
+    
+    // Create datasets for Chart.js
+    const datasets = Object.keys(groupedData).map(classification => {
+        const items = groupedData[classification];
+        
+        return {
+            label: classification,
+            data: items,
+            backgroundColor: classificationColors[classification] || "#95A5A6",
+            borderColor: classificationColors[classification] || "#95A5A6",
+            borderWidth: 2,
+            pointRadius: 6,
+            pointHoverRadius: 8
+        };
+    });
+    
+    // Step 3: Create gene labels for x-axis
+    const geneLabels = Object.keys(geneIndexMap).sort((a, b) => geneIndexMap[a] - geneIndexMap[b]);
+    
+    // Step 4: Render the chart as a scatter plot for stability
+    currentPlotInstance = new Chart(ctx, {
+        type: 'scatter',
+        data: {
+            datasets: datasets
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false, // This allows the chart to fill the container
+            animation: false,
+            layout: {
+                padding: { left: 10, right: 10, top: 10, bottom: 10 }
+            },
+            plugins: {
+                title: {
+                    display: true,
+                    text: 'Gene Screen Analysis - Functional Classification',
+                    font: { size: 16, weight: 'bold' },
+                    padding: { top: 5, bottom: 15 }
+                },
+                legend: {
+                    display: true,
+                    position: 'top',
+                    labels: {
+                        usePointStyle: true,
+                        padding: 12,
+                        font: { size: 11 }
+                    }
+                },
+                tooltip: {
+                    backgroundColor: 'rgba(0,0,0,0.8)',
+                    titleColor: 'white',
+                    bodyColor: 'white',
+                    borderColor: '#ddd',
+                    borderWidth: 1,
+                    callbacks: {
+                        title: (context) => `Gene: ${context[0].raw.gene}`,
+                        label: (context) => {
+                            const data = context.raw;
+                            return [
+                                `Dataset: ${data.dataset}`,
+                                `Mean % Ciliated: ${data.y.toFixed(2)}`,
+                                `Z-Score: ${data.z_score.toFixed(2)}`,
+                                `Classification: ${data.classification}`
+                            ];
+                        },
+                        afterLabel: (context) => {
+                            const data = context.raw;
+                            return data.paper !== "#" ? "Click to view paper" : "";
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    type: 'linear',
+                    position: 'bottom',
+                    min: -0.5,
+                    max: geneLabels.length - 0.5,
+                    title: {
+                        display: true,
+                        text: 'Genes',
+                        font: { size: 13, weight: 'bold' }
+                    },
+                    ticks: {
+                        stepSize: 1,
+                        callback: (value, index) => geneLabels[Math.round(value)] || '',
+                        maxRotation: 90,           
                         minRotation: 45,
-                        font: { size: 10 }
-                    },
-                    grid: {
-                        display: true,
-                        color: 'rgba(200, 200, 200, 0.3)'
-                    }
-                },
-                y: {
-                    title: {
-                        display: true,
-                        text: 'Mean % Ciliated',
-                        font: { size: 14, weight: 'bold' }
-                    },
-                    ticks: {
-                        font: { size: 11 }
-                    },
-                    grid: {
-                        display: true,
-                        color: 'rgba(200, 200, 200, 0.3)'
-                    }
-                }
-            },
-            interaction: {
-                intersect: false,
-                mode: 'nearest'
-            },
-            onClick: (event, elements) => {
-                if (elements.length > 0) {
-                    const element = elements[0];
-                    const dataPoint = this.data.datasets[element.datasetIndex].data[element.index];
-                    if (dataPoint.paper && dataPoint.paper !== "#") {
-                        window.open(dataPoint.paper, '_blank');
-                    }
-                }
-            }
-        }
-    });
-    
-    // Set fixed canvas dimensions for stability
-    const canvas = container.querySelector('canvas');
-    canvas.width = 1000;
-    canvas.height = 500;
-    canvas.style.width = '100%';
-    canvas.style.height = '500px';
-    canvas.style.maxWidth = '100%';
-    
-    // Add summary statistics
-    const summary = document.createElement('div');
-    summary.className = 'screen-analysis-summary';
-    summary.style.cssText = `
-        margin-top: 15px;
-        padding: 15px;
-        background: #f8f9fa;
-        border-radius: 8px;
-        border-left: 4px solid #3498db;
-        position: relative;
-    `;
-    
-    const totalGenes = geneLabels.length;
-    const negativeRegulators = [...new Set(processedData.filter(d => d.classification === "Negative regulator").map(d => d.gene))];
-    const positiveRegulators = [...new Set(processedData.filter(d => d.classification === "Positive regulator").map(d => d.gene))];
-    // FIX: Renamed the 'datasets' variable to 'datasetNames' to avoid conflict
-    const datasetNames = [...new Set(processedData.map(d => d.dataset))];
-    
-    summary.innerHTML = `
-        <h4 style="margin: 0 0 10px 0; color: #2c3e50;">Analysis Summary</h4>
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin-bottom: 10px;">
-            <div><strong>Total Genes:</strong> ${totalGenes}</div>
-            <div><strong>Datasets:</strong> ${datasetNames.join(', ')}</div>
-            <div><strong>Total Data Points:</strong> ${processedData.length}</div>
-            <div><strong>Negative Regulators:</strong> <span style="color: #E74C3C;">${negativeRegulators.length} genes</span></div>
-        </div>
-        ${negativeRegulators.length > 0 ? `
-            <div style="margin-top: 10px; padding: 8px; background: #ffebee; border-radius: 4px;">
-                <strong style="color: #E74C3C;">Negative Regulators:</strong> ${negativeRegulators.join(', ')}
-            </div>` : ''}
-        ${positiveRegulators.length > 0 ? `
-            <div style="margin-top: 8px; padding: 8px; background: #e8f5e8; border-radius: 4px;">
-                <strong style="color: #27AE60;">Positive Regulators:</strong> ${positiveRegulators.join(', ')}
-            </div>` : ''}
-    `;
-    
-    container.appendChild(summary);
+                        font: { size: 9 }
+                    },
+                    grid: {
+                        display: true,
+                        color: 'rgba(200, 200, 200, 0.3)'
+                    }
+                },
+                y: {
+                    title: {
+                        display: true,
+                        text: 'Mean % Ciliated',
+                        font: { size: 13, weight: 'bold' }
+                    },
+                    ticks: {
+                        font: { size: 10 }
+                    },
+                    grid: {
+                        display: true,
+                        color: 'rgba(200, 200, 200, 0.3)'
+                    }
+                }
+            },
+            interaction: {
+                intersect: false,
+                mode: 'nearest'
+            },
+            onClick: (event, elements) => {
+                if (elements.length > 0) {
+                    const element = elements[0];
+                    const dataPoint = currentPlotInstance.data.datasets[element.datasetIndex].data[element.index];
+                    if (dataPoint.paper && dataPoint.paper !== "#") {
+                        window.open(dataPoint.paper, '_blank');
+                    }
+                }
+            }
+        }
+    });
+    
+    // Add summary statistics
+    const summary = document.createElement('div');
+    summary.className = 'screen-analysis-summary';
+    summary.style.cssText = `
+        margin-top: 15px;
+        padding: 15px;
+        background: #f8f9fa;
+        border-radius: 8px;
+        border-left: 4px solid #3498db;
+        position: relative;
+    `;
+    
+    const totalGenes = geneLabels.length;
+    const negativeRegulators = [...new Set(processedData.filter(d => d.classification === "Negative regulator").map(d => d.gene))];
+    const positiveRegulators = [...new Set(processedData.filter(d => d.classification === "Positive regulator").map(d => d.gene))];
+    // FIX: Renamed the 'datasets' variable to 'datasetNames' to avoid conflict
+    const datasetNames = [...new Set(processedData.map(d => d.dataset))];
+    
+    summary.innerHTML = `
+        <h4 style="margin: 0 0 10px 0; color: #2c3e50;">Analysis Summary</h4>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin-bottom: 10px;">
+            <div><strong>Total Genes:</strong> ${totalGenes}</div>
+            <div><strong>Datasets:</strong> ${datasetNames.join(', ')}</div>
+            <div><strong>Total Data Points:</strong> ${processedData.length}</div>
+            <div><strong>Negative Regulators:</strong> <span style="color: #E74C3C;">${negativeRegulators.length} genes</span></div>
+        </div>
+        ${negativeRegulators.length > 0 ? `
+            <div style="margin-top: 10px; padding: 8px; background: #ffebee; border-radius: 4px;">
+                <strong style="color: #E74C3C;">Negative Regulators:</strong> ${negativeRegulators.join(', ')}
+            </div>` : ''}
+        ${positiveRegulators.length > 0 ? `
+            <div style="margin-top: 8px; padding: 8px; background: #e8f5e8; border-radius: 4px;">
+                <strong style="color: #27AE60;">Positive Regulators:</strong> ${positiveRegulators.join(', ')}
+            </div>` : ''}
+    `;
+    
+    container.appendChild(summary);
 }
