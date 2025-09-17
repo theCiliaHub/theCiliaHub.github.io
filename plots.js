@@ -39,13 +39,6 @@ function clearPreviousPlot(containerId = 'plot-display-area') {
 }
 
 
-// In your plots.js file
-
-/**
- * Renders a styled summary table of found and not-found genes for CiliaPlot.
- * @param {Array} foundGenes - Array of gene objects that were found.
- * @param {Array} notFoundGenes - Array of gene names that were not found.
- */
 
 /**
  * Robustly extracts a clean array of values from a gene object.
@@ -239,13 +232,17 @@ function displayCiliaPlotPage() {
     });
 }
 
-/**
- * Main controller for CiliaPlot, routing to the correct plot generation function.
- */
+// In plots.js 
+
 async function generateAnalysisPlots() {
+    console.log("--- CiliaPlot Generation Started ---");
     try {
-        await loadAndPrepareDatabase();
-        await loadExpressionData();
+        // Data should already be loaded, but we check the cache just in case.
+        if (!geneMapCache || geneMapCache.size === 0) {
+            console.error("CRITICAL: geneMapCache is empty. Data did not load on startup.");
+            alert("Error: Gene database is not loaded. Please refresh the page.");
+            return;
+        }
 
         const plotContainer = document.getElementById('plot-display-area');
         const searchResultsContainer = document.getElementById('ciliaplot-search-results');
@@ -257,27 +254,37 @@ async function generateAnalysisPlots() {
         }
 
         clearPreviousPlot();
+        // Clear other containers
         if (searchResultsContainer) searchResultsContainer.innerHTML = '';
         const tableContainer = document.getElementById('plot-data-table-container');
         if (tableContainer) tableContainer.innerHTML = '';
         plotContainer.innerHTML = '<p class="status-message">Searching genes and generating plot...</p>';
 
         const sanitizedQueries = [...new Set(genesInput.split(/[\s,;\n\r\t]+/).filter(Boolean).map(q => q.toUpperCase()))];
+        console.log("1. Sanitized Input Queries:", sanitizedQueries);
+
         const { foundGenes, notFoundGenes } = findGenes(sanitizedQueries);
+        console.log("2. Genes Found by findGenes():", foundGenes);
+        console.log("   - Genes Not Found:", notFoundGenes);
 
         renderCiliaPlotSearchResultsTable(foundGenes, notFoundGenes);
 
         if (foundGenes.length === 0) {
             plotContainer.innerHTML = '<p class="status-message error">No valid genes were found to generate a plot.</p>';
             updateStatsAndLegend(document.getElementById('plot-type-select').value, []);
+            console.log("--- CiliaPlot Generation Halted: No genes found. ---");
             return;
         }
 
         const plotType = document.getElementById('plot-type-select').value;
+        console.log("3. Selected Plot Type:", plotType);
+        
         updatePlotInfo(plotType);
         updateStatsAndLegend(plotType, foundGenes);
 
-        // Routing for plot generation with new plot types
+        console.log("4. Routing to plot function...");
+        
+        // Routing for plot generation
         switch (plotType) {
             case 'bubble':
                 renderKeyLocalizations(foundGenes, plotContainer);
@@ -321,19 +328,21 @@ async function generateAnalysisPlots() {
             case 'organelle_umap':
                 renderOrganelleUMAP(foundGenes, plotContainer);
                 break;
-                case 'screen_analysis':
+            case 'screen_analysis':
+                console.log("   -> Calling renderGeneScreenAnalysis...");
                 renderGeneScreenAnalysis(foundGenes, plotContainer);
                 break;
             default:
                 plotContainer.innerHTML = `<p class="status-message">Plot type "${plotType}" is not yet implemented.</p>`;
                 break;
         }
+        console.log("--- CiliaPlot Generation Finished ---");
+
     } catch (error) {
-        console.error('Error generating plots:', error);
-        document.getElementById('plot-display-area').innerHTML = `<p class="status-message error">Error generating plot: ${error.message}</p>`;
+        console.error('FATAL ERROR during plot generation:', error);
+        document.getElementById('plot-display-area').innerHTML = `<p class="status-message error">A fatal error occurred: ${error.message}</p>`;
     }
 }
-
 /**
  * Updates the informational text box with a description of the current plot.
  * @param {string} plotType - The selected plot type.
