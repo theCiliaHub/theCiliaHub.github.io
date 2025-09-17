@@ -1147,7 +1147,7 @@ function displayIndividualGenePage(gene) {
         }).join(' ');
     };
 
-    // --- Icon SVGs for card titles ---
+    // --- Icon SVGs for card titles (with a new icon for screens) ---
     const icons = {
         summary: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22h6a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16"></path><path d="M11 7h2"></path><path d="M11 11h4"></path><path d="M11 15h4"></path><path d="M5 22v-5"></path><path d="M3 17h4"></path></svg>`,
         references: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v15H6.5A2.5 2.5 0 0 1 4 14.5V4A2.5 2.5 0 0 1 6.5 2z"></path></svg>`,
@@ -1156,7 +1156,8 @@ function displayIndividualGenePage(gene) {
         category: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>`,
         ciliopathy: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>`,
         pfam: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>`,
-        complex: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="3"></circle><circle cx="12" cy="19" r="3"></circle><line x1="12" y1="8" x2="12" y2="16"></line><circle cx="5" cy="12" r="3"></circle><line x1="8" y1="12" x2="16" y2="12"></line><circle cx="19" cy="12" r="3"></circle></svg>`
+        complex: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="3"></circle><circle cx="12" cy="19" r="3"></circle><line x1="12" y1="8" x2="12" y2="16"></line><circle cx="5" cy="12" r="3"></circle><line x1="8" y1="12" x2="16" y2="12"></line><circle cx="19" cy="12" r="3"></circle></svg>`,
+        screen: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 10.5h-5m5 3h-5m8-10h-8a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V5.5a2 2 0 0 0-2-2z"></path><path d="M4.5 3.5v15"></path></svg>`
     };
 
     contentArea.innerHTML = `
@@ -1168,18 +1169,21 @@ function displayIndividualGenePage(gene) {
         </header>
 
         <div class="gene-details-grid">
+          
           <div class="details-column">
             <div class="detail-card">
               <h3 class="card-title">${icons.summary} Functional Summary</h3>
               <p>${gene.functional_summary || 'No functional summary available.'}</p>
             </div>
           </div>
+          
           <div class="details-column">
             <div class="detail-card">
               <h3 class="card-title">${icons.references} References</h3>
               <ul class="reference-list">${formatReferences(gene)}</ul>
             </div>
           </div>
+          
           <div class="details-column">
             <div class="detail-card">
               <h3 class="card-title">${icons.links} Identifiers & External Links</h3>
@@ -1191,36 +1195,49 @@ function displayIndividualGenePage(gene) {
               </ul>
             </div>
           </div>
+          
           <div class="details-column">
             <div class="detail-card">
               <h3 class="card-title">${icons.location} Subcellular Localization</h3>
               <div class="tags-container">${formatAsTags(gene.localization)}</div>
             </div>
           </div>
+          
           <div class="details-column">
-             <div class="detail-card">
+              <div class="detail-card">
               <h3 class="card-title">${icons.category} Functional Category</h3>
               <div class="tags-container">${formatAsTags(gene.functional_category)}</div>
             </div>
           </div>
+          
           <div class="details-column">
             <div class="detail-card">
               <h3 class="card-title">${icons.ciliopathy} Associated Ciliopathies</h3>
               <div class="tags-container">${formatAsTags(gene.ciliopathy, 'tag-ciliopathy')}</div>
             </div>
           </div>
+          
           <div class="details-column">
             <div class="detail-card">
               <h3 class="card-title">${icons.pfam} PFAM Domains</h3>
               <div class="tags-container">${formatAsTags(gene.domain_descriptions)}</div>
             </div>
           </div>
-           <div class="details-column">
+            
+          <div class="details-column">
             <div class="detail-card">
               <h3 class="card-title">${icons.complex} Protein Complexes</h3>
               <div class="tags-container">${formatComplexes(gene.complex_names)}</div>
             </div>
           </div>
+
+          <div class="details-column full-width">
+            <div class="detail-card">
+              <h3 class="card-title">${icons.screen} Functional Screen Data</h3>
+              ${formatScreenData(gene.screens)}
+            </div>
+          </div>
+
         </div>
       </div>
     `;
@@ -1229,6 +1246,55 @@ function displayIndividualGenePage(gene) {
     if (typeof showLocalization === "function") showLocalization(gene.gene, true);
 }
 
+/**
+ * Formats screen data into an HTML table.
+ * @param {Array} screens - The array of screen objects for a gene.
+ * @returns {string} An HTML table string.
+ */
+function formatScreenData(screens) {
+    // If there's no screen data or the array is empty, return a message.
+    if (!screens || screens.length === 0) {
+        return '<p>No functional screen data available for this gene.</p>';
+    }
+
+    // Start building the HTML table with appropriate classes for styling
+    let tableHTML = `
+        <div class="table-responsive">
+            <table class="data-summary-table">
+                <thead>
+                    <tr>
+                        <th>Dataset</th>
+                        <th>Mean % Ciliated</th>
+                        <th>Z-Score</th>
+                        <th>Classification</th>
+                        <th>Reference</th>
+                    </tr>
+                </thead>
+                <tbody>
+    `;
+
+    // Create a table row for each screen entry
+    screens.forEach(screen => {
+        // Handle potentially missing numeric data by displaying "N/A"
+        const meanCiliated = typeof screen.mean_percent_ciliated === 'number' ? screen.mean_percent_ciliated.toFixed(2) : 'N/A';
+        const zScore = typeof screen.z_score === 'number' ? screen.z_score.toFixed(2) : 'N/A';
+
+        tableHTML += `
+            <tr>
+                <td>${screen.dataset || 'N/A'}</td>
+                <td>${meanCiliated}</td>
+                <td>${zScore}</td>
+                <td>${screen.classification || 'N/A'}</td>
+                <td>
+                    <a href="${screen.paper_link}" target="_blank" rel="noopener noreferrer" class="external-link">View Paper</a>
+                </td>
+            </tr>
+        `;
+    });
+
+    tableHTML += `</tbody></table></div>`;
+    return tableHTML;
+}
 
 function displayNotFoundPage() {
     const contentArea = document.querySelector('.content-area');
