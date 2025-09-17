@@ -131,6 +131,9 @@ function displayCiliaPlotPage() {
                                         <option value="organelle_radar">Organellar Profile (Radar)</option>
                                         <option value="organelle_umap">Organellar Projection (UMAP)</option>
                                     </optgroup>
+                                    <optgroup label="Screen Analysis">
+                                        <option value="screen_analysis">Gene Screen Data (Bubble)</option>
+                                    </optgroup>
                                 </select>
                             </div>
                             <div>
@@ -312,6 +315,9 @@ async function generateAnalysisPlots() {
             case 'organelle_umap':
                 renderOrganelleUMAP(foundGenes, plotContainer);
                 break;
+                case 'screen_analysis':
+                renderGeneScreenAnalysis(foundGenes, plotContainer);
+                break;
             default:
                 plotContainer.innerHTML = `<p class="status-message">Plot type "${plotType}" is not yet implemented.</p>`;
                 break;
@@ -372,6 +378,17 @@ function updatePlotInfo(plotType) {
             break;
         case 'organelle_umap':
             infoHTML = `<strong>Organellar Projection (UMAP):</strong> This scatter plot shows a 2D representation of the entire organellar proteome, where proteins with similar abundance profiles cluster together. Your input genes are highlighted to show where they fall within these defined organellar clusters.`;
+            break;
+        case 'screen_analysis':
+            infoHTML = `<strong>Gene Screen Data (Bubble):</strong> Bubble plot showing quantitative functional screening data for your selected genes. 
+                        <ul>
+                        <li>Data sources: Cilia-related RNAi or CRISPR screens from published papers.</li>
+                        <li>X-axis: Screen dataset.</li>
+                        <li>Y-axis: Mean % ciliated cells (or measured phenotype).</li>
+                        <li>Bubble size: Z-score (effect size).</li>
+                        <li>Bubble color: Classification (positive/negative regulator).</li>
+                        <li>Tooltip: Gene name, dataset, mean phenotype, and paper link.</li>
+                        </ul>`;
             break;
         default:
             infoHTML = `Select a plot type to see a description.`;
@@ -2175,4 +2192,65 @@ function kernelEpanechnikov(k) {
     return function(v) {
         return Math.abs(v /= k) <= 1 ? 0.75 * (1 - v * v) / k : 0;
     };
+}
+
+
+/**
+ * Generates a bar/bubble plot for screen data of selected genes.
+ */
+function renderGeneScreenAnalysis(foundGenes, container) {
+    clearPreviousPlot();
+    container.innerHTML = `<canvas></canvas>`;
+    const ctx = container.querySelector('canvas').getContext('2d');
+    
+    if (!foundGenes.length) {
+        container.innerHTML = '<p class="status-message">No genes found.</p>';
+        return;
+    }
+
+    // Flatten screens for all genes
+    const screenData = foundGenes.flatMap(gene => 
+        gene.screens.map(screen => ({
+            gene: gene.gene,
+            dataset: screen.dataset,
+            mean: screen.mean_percent_ciliated !== "NA" ? screen.mean_percent_ciliated : null,
+            z: screen.z_score !== "NA" ? screen.z_score : null,
+            classification: screen.classification,
+            paper: screen.paper_link
+        }))
+    ).filter(d => d.mean !== null || d.z !== null);
+
+    if (!screenData.length) {
+        container.innerHTML = '<p class="status-message">No numeric screen data available for these genes.</p>';
+        return;
+    }
+
+    const datasets = screenData.map(d => ({
+        x: d.dataset,
+        y: d.mean,
+        r: Math.abs(d.z) * 2 || 5,
+        backgroundColor: d.classification === "Negative regulator" ? "#E74C3C" : "#3498DB",
+        gene: d.gene,
+        paper: d.paper
+    }));
+
+    currentPlotInstance = new Chart(ctx, {
+        type: 'bubble',
+        data: { datasets: [{ label: "Screens", data: datasets }] },
+        options: {
+            responsive: true,
+            plugins: {
+                title: { display: true, text: "Gene Screens Analysis" },
+                tooltip: {
+                    callbacks: {
+                        label: c => `${c.raw.gene} | ${c.raw.x}: ${c.raw.y} | ${c.raw.paper}`
+                    }
+                }
+            },
+            scales: {
+                x: { title: { display: true, text: "Dataset" } },
+                y: { title: { display: true, text: "Mean % Ciliated" } }
+            }
+        }
+    });
 }
