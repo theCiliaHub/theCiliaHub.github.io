@@ -15,21 +15,27 @@
 
 
 /**
- * Safely clears the previous plot, handling both Chart.js and D3.js instances.
- */
-function clearPreviousPlot() {
-    if (currentPlotInstance) {
-        // Check if it's a Chart.js instance
-        if (typeof currentPlotInstance.destroy === 'function') {
-            currentPlotInstance.destroy();
-        }
-        // Check if it's a D3.js DOM element (like an SVG)
-        else if (currentPlotInstance.nodeType) {
-            currentPlotInstance.remove();
-        }
-    }
-    document.getElementById('plot-display-area').innerHTML = ''; // Ensure container is empty
-    currentPlotInstance = null; // Reset the variable
+ * Safely clears the previous plot, handling both Chart.js and D3.js instances.
+ * @param {string} [containerId='plot-display-area'] - The ID of the container element to clear.
+ */
+function clearPreviousPlot(containerId = 'plot-display-area') {
+    if (currentPlotInstance) {
+        // Check if it's a Chart.js instance
+        if (typeof currentPlotInstance.destroy === 'function') {
+            currentPlotInstance.destroy();
+        }
+        // Check if it's a D3.js DOM element (like an SVG)
+        else if (currentPlotInstance.nodeType) {
+            currentPlotInstance.remove();
+        }
+    }
+    
+    const container = document.getElementById(containerId);
+    if (container) {
+        container.innerHTML = ''; // Ensure the correct container is emptied
+    }
+    
+    currentPlotInstance = null; // Reset the variable
 }
 
 
@@ -2199,25 +2205,25 @@ function kernelEpanechnikov(k) {
  * Generates a bar/bubble plot for screen data of selected genes.
  */
 function renderGeneScreenAnalysis(foundGenes, container) {
-    clearPreviousPlot();
+    clearPreviousPlot(container.id); // Now correctly uses the container's ID
     container.innerHTML = `<canvas></canvas>`;
     const ctx = container.querySelector('canvas').getContext('2d');
-    
+
     if (!foundGenes.length) {
         container.innerHTML = '<p class="status-message">No genes found.</p>';
         return;
     }
 
-    // Flatten screens for all genes
-    const screenData = foundGenes.flatMap(gene => 
-        gene.screens.map(screen => ({
+    // FIX: Safely flatten screens, handling cases where gene.screens might be null
+    const screenData = foundGenes.flatMap(gene =>
+        gene.screens ? gene.screens.map(screen => ({
             gene: gene.gene,
             dataset: screen.dataset,
             mean: screen.mean_percent_ciliated !== "NA" ? screen.mean_percent_ciliated : null,
             z: screen.z_score !== "NA" ? screen.z_score : null,
             classification: screen.classification,
             paper: screen.paper_link
-        }))
+        })) : [] // Return an empty array for genes without screen data to prevent errors
     ).filter(d => d.mean !== null || d.z !== null);
 
     if (!screenData.length) {
@@ -2243,7 +2249,17 @@ function renderGeneScreenAnalysis(foundGenes, container) {
                 title: { display: true, text: "Gene Screens Analysis" },
                 tooltip: {
                     callbacks: {
-                        label: c => `${c.raw.gene} | ${c.raw.x}: ${c.raw.y} | ${c.raw.paper}`
+                        // IMPROVEMENT: Cleaner tooltip formatting
+                        label: c => {
+                            const gene = c.raw.gene;
+                            const dataset = c.raw.x;
+                            const paper = c.raw.paper;
+                            const meanValue = typeof c.raw.y === 'number'
+                                ? c.raw.y.toFixed(2)
+                                : 'N/A';
+                            
+                            return `${gene} | ${dataset}: ${meanValue} | ${paper}`;
+                        }
                     }
                 }
             },
