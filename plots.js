@@ -2369,8 +2369,8 @@ function renderGeneScreenAnalysis(foundGenes, container) {
                     ticks: {
                         stepSize: 1,
                         callback: (value, index) => geneLabels[Math.round(value)] || '',
-                        maxRotation: 90,
-          _             minRotation: 45,
+                        maxRotation: 90,           
+                        minRotation: 45,
                         font: { size: 10 }
                     },
                     grid: {
