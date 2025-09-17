@@ -2211,10 +2211,10 @@ function kernelEpanechnikov(k) {
 
 
 /**
- * Generates a bar/bubble plot for screen data of selected genes.
+ * Generates a bubble plot for screen data of selected genes.
  */
 function renderGeneScreenAnalysis(foundGenes, container) {
-    clearPreviousPlot(container.id); // Now correctly uses the container's ID
+    clearPreviousPlot(container.id); // Reset previous plot
     container.innerHTML = `<canvas></canvas>`;
     const ctx = container.querySelector('canvas').getContext('2d');
 
@@ -2223,27 +2223,33 @@ function renderGeneScreenAnalysis(foundGenes, container) {
         return;
     }
 
-    // FIX: Safely flatten screens, handling cases where gene.screens might be null
-    const screenData = foundGenes.flatMap(gene =>
-        gene.screens ? gene.screens.map(screen => ({
+    // Normalize and flatten screens safely
+    const screenData = foundGenes.flatMap(gene => {
+        const screensArray = Array.isArray(gene.screens) ? gene.screens : []; // ✅ safe fallback
+        return screensArray.map(screen => ({
             gene: gene.gene,
-            dataset: screen.dataset,
-            mean: screen.mean_percent_ciliated !== "NA" ? screen.mean_percent_ciliated : null,
-            z: screen.z_score !== "NA" ? screen.z_score : null,
-            classification: screen.classification,
-            paper: screen.paper_link
-        })) : [] // Return an empty array for genes without screen data to prevent errors
-    ).filter(d => d.mean !== null || d.z !== null);
+            dataset: screen.dataset ?? "Unknown dataset",
+            mean: (screen.mean_percent_ciliated !== "NA" && screen.mean_percent_ciliated != null)
+                ? screen.mean_percent_ciliated
+                : null,
+            z: (screen.z_score !== "NA" && screen.z_score != null)
+                ? screen.z_score
+                : null,
+            classification: screen.classification ?? "Unclassified",
+            paper: screen.paper_link ?? "#"
+        }));
+    }).filter(d => d.mean !== null || d.z !== null); // Only keep valid numeric data
 
     if (!screenData.length) {
         container.innerHTML = '<p class="status-message">No numeric screen data available for these genes.</p>';
         return;
     }
 
+    // Build bubble dataset
     const datasets = screenData.map(d => ({
         x: d.dataset,
         y: d.mean,
-        r: Math.abs(d.z) * 2 || 5,
+        r: (d.z !== null ? Math.abs(d.z) * 2 : 5), // fallback bubble size
         backgroundColor: d.classification === "Negative regulator" ? "#E74C3C" : "#3498DB",
         gene: d.gene,
         paper: d.paper
@@ -2251,31 +2257,36 @@ function renderGeneScreenAnalysis(foundGenes, container) {
 
     currentPlotInstance = new Chart(ctx, {
         type: 'bubble',
-        data: { datasets: [{ label: "Screens", data: datasets }] },
+        data: {
+            datasets: [{
+                label: "Screens",
+                data: datasets
+            }]
+        },
         options: {
             responsive: true,
             plugins: {
                 title: { display: true, text: "Gene Screens Analysis" },
                 tooltip: {
                     callbacks: {
-                        // IMPROVEMENT: Cleaner tooltip formatting
                         label: c => {
-                            const gene = c.raw.gene;
-                            const dataset = c.raw.x;
-                            const paper = c.raw.paper;
-                            const meanValue = typeof c.raw.y === 'number'
-                                ? c.raw.y.toFixed(2)
+                            const { gene, x, y, paper } = c.raw;
+                            const meanValue = (typeof y === 'number')
+                                ? y.toFixed(2)
                                 : 'N/A';
-                            
-                            return `${gene} | ${dataset}: ${meanValue} | ${paper}`;
+                            return `${gene} | ${x}: ${meanValue}\n${paper}`;
                         }
                     }
                 }
             },
             scales: {
-                x: { title: { display: true, text: "Dataset" } },
+                x: {
+                    title: { display: true, text: "Dataset" },
+                    ticks: { autoSkip: false }
+                },
                 y: { title: { display: true, text: "Mean % Ciliated" } }
             }
         }
     });
 }
+
