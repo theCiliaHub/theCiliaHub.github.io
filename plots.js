@@ -2209,6 +2209,8 @@ function kernelEpanechnikov(k) {
     };
 }
 
+
+
 /**
  * Generates a bubble plot for screen data of selected genes.
  */
@@ -2216,89 +2218,173 @@ function renderGeneScreenAnalysis(foundGenes, container) {
     clearPreviousPlot(container.id); // Reset previous plot instance
     container.innerHTML = `<canvas></canvas>`;
     const ctx = container.querySelector('canvas').getContext('2d');
-
+    
     if (!foundGenes.length) {
         container.innerHTML = '<p class="status-message">No genes found.</p>';
         return;
     }
-
-    // Step 1: Flatten and normalize screen data
+    
+    // Step 1: Flatten and normalize screen data with proper validation
     const rawScreenData = foundGenes.flatMap(gene => {
-        const screensArray = Array.isArray(gene.screens) ? gene.screens : [];
-        return screensArray.map(screen => ({
+        // Handle cases where screens is undefined, null, empty object, or not an array
+        if (!gene.screens || !Array.isArray(gene.screens) || gene.screens.length === 0) {
+            console.warn(`Gene ${gene.gene} has no screen data or invalid screens format:`, gene.screens);
+            return []; // Return empty array for this gene
+        }
+        
+        return gene.screens.map(screen => ({
             gene: gene.gene,
             dataset: screen.dataset ?? "Unknown dataset",
-            mean: (screen.mean_percent_ciliated !== "NA" && screen.mean_percent_ciliated != null)
+            mean: (screen.mean_percent_ciliated !== "NA" && 
+                   screen.mean_percent_ciliated != null && 
+                   screen.mean_percent_ciliated !== undefined)
                 ? Number(screen.mean_percent_ciliated)
                 : null,
-            z: (screen.z_score !== "NA" && screen.z_score != null)
+            z: (screen.z_score !== "NA" && 
+                screen.z_score != null && 
+                screen.z_score !== undefined)
                 ? Number(screen.z_score)
                 : null,
             classification: screen.classification ?? "Unclassified",
             paper: screen.paper_link ?? "#"
         }));
     });
-
+    
     console.log("DEBUG: Raw Screen Data", rawScreenData);
-
+    
     // Step 2: Filter out data with no numeric values
     const screenData = rawScreenData.filter(d => d.mean !== null || d.z !== null);
-
+    
     console.log("DEBUG: Filtered Screen Data", screenData);
-
+    
     if (!screenData.length) {
         container.innerHTML = '<p class="status-message">No numeric screen data available for these genes.</p>';
         return;
     }
-
-    // Step 3: Prepare dataset for Chart.js
-    const datasets = screenData.map(d => ({
-        x: d.dataset,
-        y: d.mean,
-        r: d.z !== null ? Math.max(Math.abs(d.z) * 2, 4) : 5, // Ensure bubble isn't too small
-        backgroundColor: d.classification === "Negative regulator" ? "#E74C3C" : "#3498DB",
-        gene: d.gene,
-        paper: d.paper
-    }));
-
-    // Step 4: Render bubble chart
+    
+    // Step 3: Get unique datasets for better color coding
+    const uniqueDatasets = [...new Set(screenData.map(d => d.dataset))];
+    const datasetColors = {
+        "Kim2016": "#E74C3C",
+        "Roosing2015": "#3498DB", 
+        "Breslow2018": "#2ECC71",
+        "Wheway2015": "#F39C12"
+    };
+    
+    // Step 4: Group data by dataset for better visualization
+    const datasets = uniqueDatasets.map(dataset => {
+        const datasetData = screenData.filter(d => d.dataset === dataset);
+        
+        return {
+            label: dataset,
+            data: datasetData.map(d => ({
+                x: d.gene,
+                y: d.mean,
+                r: d.z !== null ? Math.max(Math.abs(d.z) * 3, 4) : 5, // Ensure bubble isn't too small
+                gene: d.gene,
+                dataset: d.dataset,
+                classification: d.classification,
+                z_score: d.z,
+                paper: d.paper
+            })),
+            backgroundColor: datasetColors[dataset] || "#95A5A6",
+            borderColor: datasetColors[dataset] || "#95A5A6",
+            borderWidth: 1
+        };
+    });
+    
+    // Step 5: Render bubble chart
     currentPlotInstance = new Chart(ctx, {
         type: 'bubble',
         data: {
-            datasets: [{
-                label: "Screens",
-                data: datasets
-            }]
+            datasets: datasets
         },
         options: {
             responsive: true,
+            maintainAspectRatio: false,
             plugins: {
                 title: {
                     display: true,
-                    text: "Gene Screens Analysis"
+                    text: "Gene Screens Analysis",
+                    font: {
+                        size: 16,
+                        weight: 'bold'
+                    }
+                },
+                legend: {
+                    display: true,
+                    position: 'top'
                 },
                 tooltip: {
                     callbacks: {
-                        label: c => {
-                            const { gene, x, y, paper } = c.raw;
-                            const meanValue = (typeof y === 'number' && !isNaN(y))
-                                ? y.toFixed(2)
+                        label: function(context) {
+                            const data = context.raw;
+                            const meanValue = (typeof data.y === 'number' && !isNaN(data.y))
+                                ? data.y.toFixed(2)
                                 : 'N/A';
-                            return `${gene} | ${x}: ${meanValue}\n${paper}`;
+                            const zScore = (typeof data.z_score === 'number' && !isNaN(data.z_score))
+                                ? data.z_score.toFixed(2)
+                                : 'N/A';
+                            
+                            return [
+                                `Gene: ${data.gene}`,
+                                `Dataset: ${data.dataset}`,
+                                `Mean % Ciliated: ${meanValue}`,
+                                `Z-Score: ${zScore}`,
+                                `Classification: ${data.classification}`
+                            ];
+                        },
+                        afterLabel: function(context) {
+                            return `Paper: ${context.raw.paper}`;
                         }
                     }
                 }
             },
             scales: {
                 x: {
-                    title: { display: true, text: "Dataset" },
-                    ticks: { autoSkip: false }
+                    title: { 
+                        display: true, 
+                        text: "Gene",
+                        font: {
+                            size: 14,
+                            weight: 'bold'
+                        }
+                    },
+                    ticks: { 
+                        autoSkip: false,
+                        maxRotation: 45,
+                        minRotation: 45
+                    }
                 },
                 y: {
-                    title: { display: true, text: "Mean % Ciliated" }
+                    title: { 
+                        display: true, 
+                        text: "Mean % Ciliated",
+                        font: {
+                            size: 14,
+                            weight: 'bold'
+                        }
+                    },
+                    beginAtZero: false
+                }
+            },
+            interaction: {
+                intersect: false,
+                mode: 'nearest'
+            },
+            onClick: function(event, elements) {
+                if (elements.length > 0) {
+                    const element = elements[0];
+                    const dataPoint = this.data.datasets[element.datasetIndex].data[element.index];
+                    if (dataPoint.paper && dataPoint.paper !== "#") {
+                        window.open(dataPoint.paper, '_blank');
+                    }
                 }
             }
         }
     });
+    
+    // Set canvas height for better visibility
+    const canvas = container.querySelector('canvas');
+    canvas.style.height = '400px';
 }
-
