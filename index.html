@@ -7,8 +7,10 @@
     <meta name="description" content="The CiliaHub is a comprehensive bioinformatics database for genes with ciliary functions.">
     <link rel="icon" type="image/png" href="CiliaHub_Logo_web.png">
     <link rel="stylesheet" href="styles.css">
+
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
+
     <script src="https://cdn.jsdelivr.net/npm/@panzoom/panzoom@4.5.1/dist/panzoom.min.js"></script>
     <script src="https://unpkg.com/@upsetjs/bundle"></script>
     <script src="https://d3js.org/d3.v7.min.js"></script>
@@ -34,35 +36,7 @@
     </nav>
 
     <main class="main-container">
-        <div class="content-area" id="content-area">
-            <div id="home-page" class="page-content" style="display: none;">
-                <h1>Welcome to CiliaHub</h1>
-                <p>CiliaHub is a comprehensive database for genes with ciliary functions.</p>
-                <div class="search-container">
-                    <div class="search-wrapper">
-                        <input type="text" id="gene-search" placeholder="Search genes..." aria-label="Search genes" list="gene-suggestions">
-                        <datalist id="gene-suggestions">
-                            <option value="ACE2"></option>
-                            <option value="IFT88"></option>
-                            <option value="CEP290"></option>
-                            <option value="BBS1"></option>
-                        </datalist>
-                    </div>
-                    <button class="search-btn" onclick="navigateToGenePage(event, document.querySelector('#gene-search').value)">Search</button>
-                </div>
-            </div>
-            <div id="ciliaplot-page" class="page-content" style="display: none;"></div>
-            <div id="batch-query-page" class="page-content" style="display: none;"></div>
-            <div id="compare-page" class="page-content" style="display: none;"></div>
-            <div id="expression-page" class="page-content" style="display: none;"></div>
-            <div id="download-page" class="page-content" style="display: none;"></div>
-            <div id="contact-page" class="page-content" style="display: none;"></div>
-            <div id="gene" class="page-content" style="display: none;"></div>
-            <div id="notfound-page" class="page-content" style="display: none;">
-                <h1>404 - Page Not Found</h1>
-                <p>The page you are looking for does not exist.</p>
-            </div>
-        </div>
+        <div class="content-area" id="content-area"></div>
 
         <aside class="cilia-panel">
             <div class="panel-header">
@@ -95,7 +69,9 @@
     </footer>
 
     <script defer src="plots.js"></script> 
+    
     <script defer src="script.js"></script> 
+    
     <script defer src="globals.js"></script> 
 </body>
 </html>
