@@ -63,50 +63,54 @@
                 <h3>Interactive Cilium</h3>
             </div>
             <div class="panel-content">
-                <div class="cilia-container interactive-cilium">
-                    <svg viewBox="0 0 300 400" xmlns="http://www.w3.org/2000/svg" style="width: 100%; height: auto;">
-                        <!-- Gradient definitions -->
-                        <defs>
-                            <linearGradient id="cytosolGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                                <stop offset="0%" style="stop-color:#FDB913;stop-opacity:1" />
-                                <stop offset="100%" style="stop-color:#E5A50A;stop-opacity:1" />
-                            </linearGradient>
-                            <radialGradient id="nucleusGradient" cx="50%" cy="50%" r="50%">
-                                <stop offset="0%" style="stop-color:#E85A4F;stop-opacity:1" />
-                                <stop offset="100%" style="stop-color:#A32638;stop-opacity:1" />
-                            </radialGradient>
-                        </defs>
+    <div class="cilia-container interactive-cilium">
+        <svg viewBox="0 0 300 400" xmlns="http://www.w3.org/2000/svg" style="width: 100%; height: auto;">
+            <!-- Gradient definitions -->
+            <defs>
+                <!-- Cytosol (yellow) -->
+                <linearGradient id="cytosolGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" style="stop-color:#FFD700;stop-opacity:1" />
+                    <stop offset="100%" style="stop-color:#E6C200;stop-opacity:1" />
+                </linearGradient>
 
-                        <!-- Cell body (Cytosol) -->
-                        <path id="cell-body" class="cilia-part" tabindex="0"
-                              fill="url(#cytosolGradient)" stroke="#E5A50A" stroke-width="2"
-                              d="M 50,380 C -20,300 20,200 150,200 C 280,200 320,300 250,380 Z"/>
+                <!-- Nucleus (red) -->
+                <radialGradient id="nucleusGradient" cx="50%" cy="50%" r="50%">
+                    <stop offset="0%" style="stop-color:#FF4D4D;stop-opacity:1" />
+                    <stop offset="100%" style="stop-color:#CC0000;stop-opacity:1" />
+                </radialGradient>
+            </defs>
 
-                        <!-- Nucleus -->
-                        <circle id="nucleus" class="cilia-part" tabindex="0"
-                                fill="url(#nucleusGradient)" stroke="#A32638" stroke-width="2"
-                                cx="150" cy="320" r="40"/>
+            <!-- Cell body (Cytosol) -->
+            <path id="cell-body" class="cilia-part" tabindex="0"
+                  fill="url(#cytosolGradient)" stroke="#E6C200" stroke-width="2"
+                  d="M 50,380 C -20,300 20,200 150,200 C 280,200 320,300 250,380 Z"/>
 
-                        <!-- Basal body -->
-                        <rect id="basal-body" class="cilia-part" tabindex="0" fill="#A32638" x="140" y="195" width="20" height="15"/>
+            <!-- Nucleus -->
+            <circle id="nucleus" class="cilia-part" tabindex="0"
+                    fill="url(#nucleusGradient)" stroke="#CC0000" stroke-width="2"
+                    cx="150" cy="320" r="40"/>
 
-                        <!-- Transition zone -->
-                        <path id="transition-zone" class="cilia-part" tabindex="0"
-                              fill="#FDB913" stroke="#E5A50A" stroke-width="2"
-                              d="M 142,195 L 138,180 L 162,180 L 158,195 Z"/>
+            <!-- Basal body -->
+            <rect id="basal-body" class="cilia-part" tabindex="0" fill="#CC0000" x="140" y="195" width="20" height="15"/>
 
-                        <!-- Ciliary membrane -->
-                        <path id="ciliary-membrane" class="cilia-part" tabindex="0"
-                              fill="none" stroke="#FDB913" stroke-width="2" stroke-dasharray="4,4"
-                              d="M 138,180 L 145,10 L 155,10 L 162,180 Z"/>
+            <!-- Transition zone -->
+            <path id="transition-zone" class="cilia-part" tabindex="0"
+                  fill="#FFD700" stroke="#E6C200" stroke-width="2"
+                  d="M 142,195 L 138,180 L 162,180 L 158,195 Z"/>
 
-                        <!-- Axoneme -->
-                        <path id="axoneme" class="cilia-part" tabindex="0"
-                              fill="none" stroke="#A32638" stroke-width="2"
-                              d="M 145,180 L 148,15 L 152,15 L 155,180 Z"/>
-                    </svg>
-                </div>
-                <div class="controls">
+            <!-- Ciliary membrane -->
+            <path id="ciliary-membrane" class="cilia-part" tabindex="0"
+                  fill="none" stroke="#FFD700" stroke-width="2" stroke-dasharray="4,4"
+                  d="M 138,180 L 145,10 L 155,10 L 162,180 Z"/>
+
+            <!-- Axoneme -->
+            <path id="axoneme" class="cilia-part" tabindex="0"
+                  fill="none" stroke="#CC0000" stroke-width="2"
+                  d="M 145,180 L 148,15 L 152,15 L 155,180 Z"/>
+        </svg>
+    </div>
+    <div class="controls">
+
                     <h4>Gene Localization:</h4>
                     <div id="geneButtons" class="gene-buttons"></div>
                 </div>
