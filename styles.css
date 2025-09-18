@@ -98,6 +98,7 @@ body {
     gap: 2rem;
 }
 
+#Galatasaray colors
 .cilia-panel {
     width: 300px;
     background: var(--panel-bg);
@@ -108,7 +109,7 @@ body {
     top: 100px;
 }
 
-.cilia-panel h2 {
+.cilia-panel h2, .cilia-panel h3 {
     font-size: 1.3rem;
     color: var(--primary-dark);
     margin-bottom: 1.5rem;
@@ -123,26 +124,43 @@ body {
     height: auto;
 }
 
+/* Use SVG-defined colors */
 .cilia-part {
-    fill: var(--primary-blue-light);
+    fill: inherit;           /* keep SVG gradients */
+    stroke: inherit;         /* use SVG stroke by default */
     transition: fill 0.3s, stroke 0.3s;
 }
 
+/* Ciliary-specific parts */
 .cilia-part.cilia {
-    fill: var(--accent-green-1);
+    fill: #FFD700;           /* bright yellow for ciliary parts */
 }
 
 .cilia-part.search-gene {
-    fill: var(--accent-green-2);
+    fill: #E6C200;           /* darker yellow for search genes */
 }
 
+/* Highlight selected genes */
 .cilia-part.highlighted {
-    stroke: var(--accent-red);
+    stroke: #FF4D4D;         /* red highlight stroke */
     stroke-width: 2px;
 }
 
+/* Hover effect */
+.cilia-part:hover {
+    filter: brightness(1.2);
+    cursor: pointer;
+}
+
+/* Focus outline */
+.cilia-part:focus {
+    outline: 2px solid #FFD700; /* yellow focus outline */
+    outline-offset: 2px;
+}
+
+/* Ensure main cell and nucleus use SVG gradient fills */
 #cell-body, #nucleus {
-    fill: var(--gray-light);
+    fill: inherit;
 }
 
 #geneButtons {
