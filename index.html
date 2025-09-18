@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CiliaHub: A Database of Genes with Ciliary Functions</title>
-    <meta name="description" content="CiliaHub is a comprehensive bioinformatics database for genes with ciliary functions.">
-    <meta name="keywords" content="CiliaHub, bioinformatics, ciliary genes, gene database, scientific research">
+    <title>The CiliaHub: An Updated Database of Gold Standard Genes with Ciliary Functions</title>
+    <meta name="description" content="The CiliaHub: An Updated Database of Gold Standard Genes with Ciliary Functions.">
+    <meta name="keywords" content="CiliaHub is an advanced bioinformatics platform that hosts a detailed database of gold standard cilia genes and their role in various ciliopathies. Our comprehensive collection includes the most reliable and well-established genes linked to ciliary function, with reference papers also provided. With our user-friendly search tool, researchers can explore genome-wide data, focusing on both known and novel ciliary genes. Discover their contributions to the biology of cilia and the mechanisms behind ciliary-related disorders. Search for a single gene below or use the Batch Query tool to analyze multiple genes.">
     <meta property="og:title" content="CiliaHub: A Database of Genes with Ciliary Functions">
     <meta property="og:description" content="Explore genes with ciliary functions using CiliaHub's interactive tools.">
     <meta property="og:image" content="CiliaHub_Logo_web.png">
@@ -321,16 +321,17 @@
             border: 1px solid var(--border-color);
         }
 
-        .search-container.sticky {
-            position: fixed;
-            top: 100px;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 90%;
-            max-width: 1000px;
-            background: var(--white);
-            box-shadow: var(--shadow-strong);
-            z-index: 999;
+        .batch-query-search {
+            width: 100%;
+            max-width: 640px; /* Matches cilia panel width + localization dropdown */
+        }
+
+        .batch-query-search textarea {
+            width: 320px; /* Matches cilia panel width */
+        }
+
+        .batch-query-search select {
+            width: 200px;
         }
 
         .search-wrapper {
@@ -479,6 +480,7 @@
             cursor: pointer;
             transition: all 0.3s ease;
             border: 1px solid var(--border-color);
+            max-height: 500px; /* Ensure fits within viewport */
         }
 
         .gene-card:hover,
@@ -635,11 +637,25 @@
         }
 
         .ciliaplot-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: var(--spacing-md);
             background: var(--light-blue);
             border: 1px solid var(--border-color);
             border-radius: var(--radius-md);
             padding: var(--spacing-md);
             margin: var(--spacing-md) 0;
+        }
+
+        .ciliaplot-controls {
+            flex: 0 0 30%;
+            max-width: 300px;
+        }
+
+        .ciliaplot-plot {
+            flex: 1;
+            min-width: 400px;
+            max-width: 70%;
         }
 
         .plot-container {
@@ -649,6 +665,13 @@
             border-radius: var(--radius-sm);
             padding: var(--spacing-sm);
             position: relative;
+        }
+
+        .plot-description {
+            font-size: 0.95rem;
+            color: var(--dark-gray);
+            margin-bottom: var(--spacing-md);
+            line-height: 1.5;
         }
 
         .footer {
@@ -674,6 +697,31 @@
             font-size: 0.9rem;
         }
 
+        .autocomplete-list {
+            position: absolute;
+            background: var(--white);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            box-shadow: var(--shadow-light);
+            z-index: 1000;
+            width: 100%;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .autocomplete-list option {
+            padding: var(--spacing-sm);
+            line-height: 1.8;
+            cursor: pointer;
+            color: var(--text-dark);
+        }
+
+        .autocomplete-list option:hover,
+        .autocomplete-list option:focus {
+            background: var(--light-blue);
+            color: var(--primary-blue);
+        }
+
         @media (max-width: 1024px) {
             .main-container {
                 flex-direction: column;
@@ -684,6 +732,15 @@
                 position: static;
                 width: 100%;
                 order: -1;
+            }
+
+            .ciliaplot-container {
+                flex-direction: column;
+            }
+
+            .ciliaplot-controls, .ciliaplot-plot {
+                flex: 1;
+                max-width: 100%;
             }
         }
 
@@ -737,6 +794,14 @@
             .search-container.sticky {
                 position: static;
                 transform: none;
+                width: 100%;
+            }
+
+            .batch-query-search textarea {
+                width: 100%;
+            }
+
+            .batch-query-search select {
                 width: 100%;
             }
         }
@@ -796,17 +861,22 @@
                 <p>CiliaHub is a comprehensive database for genes with ciliary functions, offering interactive tools for visualization, querying, and comparison.</p>
                 <div class="search-container">
                     <div class="search-wrapper">
-                        <input type="text" placeholder="Search genes..." aria-label="Search genes">
+                        <input type="text" placeholder="Search genes..." aria-label="Search genes" list="gene-suggestions">
+                        <datalist id="gene-suggestions">
+                            <option value="IFT88"></option>
+                            <option value="BBS1"></option>
+                            <option value="DYNC2H1"></option>
+                        </datalist>
                     </div>
                     <button class="search-btn">Search</button>
                 </div>
                 <div class="gene-cards">
-                    <div class="gene-card">
+                    <div class="gene-card" onclick="navigateTo(event, '/gene/IFT88')">
                         <div class="gene-name">IFT88</div>
                         <div class="gene-description">Intraflagellar transport protein 88, essential for ciliary assembly.</div>
                         <div class="gene-info"><strong>Localization:</strong> Axoneme</div>
                     </div>
-                    <div class="gene-card">
+                    <div class="gene-card" onclick="navigateTo(event, '/gene/BBS1')">
                         <div class="gene-name">BBS1</div>
                         <div class="gene-description">Bardet-Biedl syndrome 1 protein, involved in ciliary function.</div>
                         <div class="gene-info"><strong>Localization:</strong> Basal Body</div>
@@ -814,50 +884,86 @@
                 </div>
             </div>
 
+            <div id="gene" class="page-content" style="display: none;">
+                <h1>Gene Details</h1>
+                <p>Explore detailed information about specific ciliary genes.</p>
+                <div class="card gene-details">
+                    <h2 id="gene-name">Gene Name</h2>
+                    <div class="gene-info"><strong>Description:</strong> <span id="gene-description">Loading...</span></div>
+                    <div class="gene-info"><strong>Localization:</strong> <span id="gene-localization">Unknown</span></div>
+                    <div class="gene-info"><strong>Expression Level:</strong> <span id="gene-expression">Unknown</span></div>
+                    <div class="gene-info"><strong>Related Publications:</strong> <a id="gene-publication" href="#" target="_blank">View Publication</a></div>
+                </div>
+            </div>
+
             <div id="ciliaplot" class="page-content" style="display: none;">
                 <h1>CiliaPlot</h1>
                 <p>Interactive workspace for visualizing gene expression and ciliary data.</p>
                 <div class="ciliaplot-container">
-                    <div class="search-container">
-                        <div class="search-wrapper">
-                            <input type="text" placeholder="Search genes..." aria-label="Search genes">
+                    <div class="ciliaplot-controls">
+                        <div class="search-container">
+                            <div class="search-wrapper">
+                                <input type="text" placeholder="Search genes..." aria-label="Search genes" list="gene-suggestions">
+                            </div>
+                            <button class="search-btn">Search</button>
                         </div>
-                        <button class="search-btn">Search</button>
+                        <div class="filters">
+                            <select id="plot-type" aria-label="Select plot type">
+                                <option value="chartjs-bar">Chart.js Bar</option>
+                                <option value="chartjs-line">Chart.js Line</option>
+                                <option value="chartjs-scatter">Chart.js Scatter</option>
+                                <option value="plotly">Plotly</option>
+                                <option value="d3">D3</option>
+                                <option value="upset">UpSet.js</option>
+                            </select>
+                            <select id="data-type" aria-label="Select data type">
+                                <option value="expression">Expression Level</option>
+                                <option value="localization">Localization Score</option>
+                            </select>
+                            <button class="btn-primary" onclick="updateCiliaPlot()">Update Plot</button>
+                        </div>
+                        <div class="filters">
+                            <button class="btn-primary" onclick="downloadPlotAsPNG()">Download Plot (PNG)</button>
+                            <button class="btn-secondary" onclick="downloadData('csv')">Download Data (CSV)</button>
+                            <button class="btn-secondary" onclick="downloadData('json')">Download Data (JSON)</button>
+                        </div>
                     </div>
-                    <div class="filters">
-                        <select id="plot-type" aria-label="Select plot type">
-                            <option value="chartjs-bar">Chart.js Bar</option>
-                            <option value="chartjs-line">Chart.js Line</option>
-                            <option value="chartjs-scatter">Chart.js Scatter</option>
-                            <option value="plotly">Plotly</option>
-                            <option value="d3">D3</option>
-                            <option value="upset">UpSet.js</option>
-                        </select>
-                        <select id="data-type" aria-label="Select data type">
-                            <option value="expression">Expression Level</option>
-                            <option value="localization">Localization Score</option>
-                        </select>
-                        <button class="btn-primary" onclick="updateCiliaPlot()">Update Plot</button>
+                    <div class="ciliaplot-plot">
+                        <div class="plot-description">
+                            <strong>Plot Types Explanation:</strong><br>
+                            - <strong>Chart.js Bar/Line/Scatter:</strong> Displays gene expression or localization scores as bars, lines, or points for comparing multiple genes.<br>
+                            - <strong>Plotly:</strong> Interactive plots for dynamic exploration of gene data.<br>
+                            - <strong>D3:</strong> Custom SVG-based visualizations for detailed gene interactions.<br>
+                            - <strong>UpSet.js:</strong> Visualizes intersections of gene sets (e.g., localization categories).
+                        </div>
+                        <div class="plot-container" id="ciliaplot-container">
+                            <canvas id="ciliaplot-chart" style="display: none;"></canvas>
+                            <div id="ciliaplot-plotly" style="display: none;"></div>
+                            <div id="ciliaplot-d3" style="display: none;"></div>
+                            <div id="ciliaplot-upset" style="display: none;"></div>
+                            <div class="error-message" id="plot-error" style="display: none;">Failed to load plot. Please check your network connection.</div>
+                        </div>
                     </div>
-                    <div class="plot-container" id="ciliaplot-container">
-                        <canvas id="ciliaplot-chart" style="display: none;"></canvas>
-                        <div id="ciliaplot-plotly" style="display: none;"></div>
-                        <div id="ciliaplot-d3" style="display: none;"></div>
-                        <div id="ciliaplot-upset" style="display: none;"></div>
-                        <div class="error-message" id="plot-error" style="display: none;">Failed to load plot. Please check your network connection.</div>
-                    </div>
-                    <div class="filters">
-                        <button class="btn-primary" onclick="downloadPlotAsPNG()">Download Plot (PNG)</button>
-                        <button class="btn-secondary" onclick="downloadData('csv')">Download Data (CSV)</button>
-                        <button class="btn-secondary" onclick="downloadData('json')">Download Data (JSON)</button>
-                    </div>
+                </div>
+                <div class="card">
+                    <h3>Plot Data</h3>
+                    <table>
+                        <thead>
+                            <tr><th>Gene</th><th>Localization</th><th>Expression</th></tr>
+                        </thead>
+                        <tbody id="plot-data-table">
+                            <tr><td>IFT88</td><td>Axoneme</td><td>10</td></tr>
+                            <tr><td>BBS1</td><td>Basal Body</td><td>15</td></tr>
+                            <tr><td>DYNC2H1</td><td>Axoneme</td><td>12</td></tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
 
             <div id="batch-query" class="page-content" style="display: none;">
                 <h1>Batch Query</h1>
                 <p>Paste a list of genes and filter by localization to query the database.</p>
-                <div class="search-container">
+                <div class="search-container batch-query-search">
                     <div class="search-wrapper">
                         <textarea placeholder="Paste gene list (one per line)" aria-label="Gene list"></textarea>
                     </div>
@@ -887,7 +993,12 @@
                 <p>Select up to 10 genes to compare their properties side-by-side.</p>
                 <div class="search-container">
                     <div class="search-wrapper">
-                        <input type="text" placeholder="Search genes to compare..." aria-label="Search genes to compare">
+                        <input type="text" placeholder="Search genes to compare..." aria-label="Search genes to compare" list="gene-suggestions">
+                        <datalist id="gene-suggestions">
+                            <option value="IFT88"></option>
+                            <option value="BBS1"></option>
+                            <option value="DYNC2H1"></option>
+                        </datalist>
                     </div>
                     <button class="search-btn">Add Gene</button>
                 </div>
@@ -898,6 +1009,17 @@
             <div id="expression" class="page-content" style="display: none;">
                 <h1>Expression Data</h1>
                 <p>Explore gene expression profiles across different conditions.</p>
+                <div class="search-container">
+                    <div class="search-wrapper">
+                        <input type="text" placeholder="Search genes..." aria-label="Search genes" list="gene-suggestions">
+                        <datalist id="gene-suggestions">
+                            <option value="IFT88"></option>
+                            <option value="BBS1"></option>
+                            <option value="DYNC2H1"></option>
+                        </datalist>
+                    </div>
+                    <button class="search-btn">Search</button>
+                </div>
                 <div class="card">
                     <h3>Expression Profiles</h3>
                     <div class="plot-container" id="expression-plot"></div>
@@ -1071,11 +1193,11 @@
                     d3.select(containers.d3).selectAll('*').remove();
                     const svg = d3.select(containers.d3)
                         .append('svg')
-                        .attr('width', 400)
-                        .attr('height', 300);
+                        .attr('width', '100%')
+                        .attr('height', 400);
                     const margin = { top: 20, right: 20, bottom: 50, left: 50 };
-                    const width = 400 - margin.left - margin.right;
-                    const height = 300 - margin.top - margin.bottom;
+                    const width = containers.d3.clientWidth - margin.left - margin.right;
+                    const height = 400 - margin.top - margin.bottom;
                     const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
                     const x = d3.scaleBand().domain(sampleData.genes).range([0, width]).padding(0.1);
                     const y = d3.scaleLinear().domain([0, Math.max(...sampleData.values)]).range([height, 0]);
@@ -1100,8 +1222,8 @@
                     containers.upset.style.display = 'block';
                     d3.select(containers.upset).selectAll('*').remove();
                     UpSetJS.renderUpSet(containers.upset, sampleData.sets, {
-                        width: 400,
-                        height: 300,
+                        width: containers.upset.clientWidth,
+                        height: 400,
                         theme: 'light'
                     });
                     currentUpSet = containers.upset;
@@ -1163,21 +1285,69 @@
             event.preventDefault();
             const pages = document.querySelectorAll('.page-content');
             pages.forEach(page => page.style.display = 'none');
-            const targetPage = document.getElementById(path.slice(1) || 'home');
+            const pathParts = path.split('/');
+            let targetPageId = pathParts[1] || 'home';
+            if (pathParts[1] === 'gene') {
+                targetPageId = 'gene';
+            }
+            const targetPage = document.getElementById(targetPageId);
             targetPage.style.display = 'block';
 
             document.querySelectorAll('.nav-links a').forEach(link => {
                 link.classList.remove('active');
-                if (link.getAttribute('href') === `#${path}`) {
+                if (link.getAttribute('href') === `#${pathParts[1] || ''}`) {
                     link.classList.add('active');
                 }
             });
 
-            if (path === '/ciliaplot') {
+            if (pathParts[1] === 'gene') {
+                const geneId = pathParts[2];
+                loadGeneDetails(geneId);
+            } else if (path === '/ciliaplot') {
                 initCiliaPlot();
             }
 
             document.querySelector('.nav-links').classList.remove('active');
+        }
+
+        function loadGeneDetails(geneId) {
+            const geneData = {
+                'IFT88': {
+                    name: 'IFT88',
+                    description: 'Intraflagellar transport protein 88, essential for ciliary assembly.',
+                    localization: 'Axoneme',
+                    expression: '10',
+                    publication: 'https://www.example.com/publication/ift88'
+                },
+                'BBS1': {
+                    name: 'BBS1',
+                    description: 'Bardet-Biedl syndrome 1 protein, involved in ciliary function.',
+                    localization: 'Basal Body',
+                    expression: '15',
+                    publication: 'https://www.example.com/publication/bbs1'
+                },
+                'DYNC2H1': {
+                    name: 'DYNC2H1',
+                    description: 'Dynein cytoplasmic 2 heavy chain 1, involved in ciliary transport.',
+                    localization: 'Axoneme',
+                    expression: '12',
+                    publication: 'https://www.example.com/publication/dync2h1'
+                }
+            };
+            const gene = geneData[geneId] || {
+                name: geneId || 'Unknown',
+                description: 'No description available.',
+                localization: 'Unknown',
+                expression: 'Unknown',
+                publication: '#'
+            };
+            document.getElementById('gene-name').textContent = gene.name;
+            document.getElementById('gene-description').textContent = gene.description;
+            document.getElementById('gene-localization').textContent = gene.localization;
+            document.getElementById('gene-expression').textContent = gene.expression;
+            const pubLink = document.getElementById('gene-publication');
+            pubLink.href = gene.publication;
+            pubLink.textContent = gene.publication !== '#' ? 'View Publication' : 'No Publication Available';
         }
 
         document.querySelector('.hamburger').addEventListener('click', () => {
@@ -1220,7 +1390,7 @@
 
         document.querySelector('#home .search-btn')?.addEventListener('click', () => {
             const input = document.querySelector('#home input').value;
-            if (input) alert(`Searching for: ${input}`);
+            if (input) navigateTo(event, `/gene/${input}`);
         });
 
         document.querySelector('#compare .search-btn')?.addEventListener('click', () => {
@@ -1243,8 +1413,16 @@
             }
         });
 
+        document.querySelector('#expression .search-btn')?.addEventListener('click', () => {
+            const input = document.querySelector('#expression input').value;
+            if (input) alert(`Searching for: ${input}`);
+        });
+
         document.addEventListener('DOMContentLoaded', () => {
-            if (window.location.hash === '#/ciliaplot') {
+            if (window.location.hash.startsWith('#/gene/')) {
+                const geneId = window.location.hash.split('/')[2];
+                navigateTo(event, `/gene/${geneId}`);
+            } else if (window.location.hash === '#/ciliaplot') {
                 initCiliaPlot();
             }
         });
