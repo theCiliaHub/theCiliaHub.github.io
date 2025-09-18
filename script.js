@@ -1111,15 +1111,16 @@ function displayContactPage() {
     });
 }
 
+// script.js (partial, focusing on displayIndividualGenePage)
 function displayIndividualGenePage(gene) {
     const contentArea = document.querySelector('.content-area');
     if (!contentArea) return console.warn("⚠️ .content-area not found.");
-    contentArea.className = 'content-area content-area-full'; // Use full width
+    contentArea.className = 'content-area'; // Use standard width to align with cilia-panel
 
     const panel = document.querySelector('.cilia-panel');
     if (panel) panel.style.display = 'block';
 
-    // --- Helper functions remain the same ---
+    // --- Helper functions (unchanged from your code) ---
     const formatAsTags = (data, className = '') => {
         if (!data) return 'Not available';
         const arr = Array.isArray(data) ? data : String(data).split(/[;,]\s*/).filter(Boolean);
@@ -1140,14 +1141,51 @@ function displayIndividualGenePage(gene) {
 
     const formatComplexes = (complexes) => {
         if (!complexes) return 'Not available';
-        const arr = Array.isArray(complexes) ? complexes.join(';').split(/;\s*/) : String(complexes).split(/;\s*/);
+        const arr = Array.isArray(complexes) ? complexes.join(';').split(/;\s*/): String(complexes).split(/;\s*/);
         return arr.map(name => {
             const url = `https://mips.helmholtz-muenchen.de/corum/#search;complex=${encodeURIComponent(name.trim())}`;
             return `<a href="${url}" target="_blank" class="tag">${name.trim()}</a>`;
         }).join(' ');
     };
 
-    // --- Icon SVGs for card titles (with a new icon for screens) ---
+    const formatScreenData = (screens) => {
+        if (!screens || screens.length === 0) {
+            return '<p>No functional screen data available for this gene.</p>';
+        }
+        let tableHTML = `
+            <div class="table-responsive">
+                <table class="data-summary-table">
+                    <thead>
+                        <tr>
+                            <th>Dataset</th>
+                            <th>Mean % Ciliated</th>
+                            <th>Z-Score</th>
+                            <th>Classification</th>
+                            <th>Reference</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+        `;
+        screens.forEach(screen => {
+            const meanCiliated = typeof screen.mean_percent_ciliated === 'number' ? screen.mean_percent_ciliated.toFixed(2) : 'N/A';
+            const zScore = typeof screen.z_score === 'number' ? screen.z_score.toFixed(2) : 'N/A';
+            tableHTML += `
+                <tr>
+                    <td>${screen.dataset || 'N/A'}</td>
+                    <td>${meanCiliated}</td>
+                    <td>${zScore}</td>
+                    <td>${screen.classification || 'N/A'}</td>
+                    <td>
+                        <a href="${screen.paper_link}" target="_blank" rel="noopener noreferrer" class="external-link">View Paper</a>
+                    </td>
+                </tr>
+            `;
+        });
+        tableHTML += `</tbody></table></div>`;
+        return tableHTML;
+    };
+
+    // --- Icon SVGs (unchanged) ---
     const icons = {
         summary: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22h6a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16"></path><path d="M11 7h2"></path><path d="M11 11h4"></path><path d="M11 15h4"></path><path d="M5 22v-5"></path><path d="M3 17h4"></path></svg>`,
         references: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v15H6.5A2.5 2.5 0 0 1 4 14.5V4A2.5 2.5 0 0 1 6.5 2z"></path></svg>`,
@@ -1160,141 +1198,247 @@ function displayIndividualGenePage(gene) {
         screen: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 10.5h-5m5 3h-5m8-10h-8a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V5.5a2 2 0 0 0-2-2z"></path><path d="M4.5 3.5v15"></path></svg>`
     };
 
+    // --- Generate HTML with grid layout ---
     contentArea.innerHTML = `
-      <div class="page-section gene-detail-page">
-        <header class="gene-header">
-          <h1>${gene.gene || "Unknown Gene"}</h1>
-          ${gene.synonym ? `<div class="synonym-tags tags-container">${formatAsTags(gene.synonym)}</div>` : ''}
-          ${gene.description ? `<p>${gene.description}</p>` : ''}
-        </header>
+        <div class="page-section gene-detail-page">
+            <style>
+                .gene-detail-page {
+                    padding: var(--spacing-md);
+                }
+                .gene-header {
+                    margin-bottom: var(--spacing-lg);
+                    text-align: center;
+                }
+                .gene-header h1 {
+                    font-size: 2.2rem;
+                    color: var(--primary-blue);
+                    margin-bottom: var(--spacing-sm);
+                }
+                .synonym-tags {
+                    display: flex;
+                    flex-wrap: wrap;
+                    gap: var(--spacing-xs);
+                    justify-content: center;
+                }
+                .gene-details-grid {
+                    display: grid;
+                    grid-template-columns: 1fr 1fr;
+                    gap: var(--spacing-md);
+                    max-width: 100%;
+                }
+                .details-column {
+                    min-width: 0;
+                }
+                .detail-card {
+                    background: var(--white);
+                    border: 1px solid var(--border-color);
+                    border-radius: var(--radius-md);
+                    padding: var(--spacing-md);
+                    box-shadow: var(--shadow-light);
+                    max-height: 300px;
+                    overflow-y: auto;
+                }
+                .detail-card.screen-data {
+                    max-height: 400px; /* Slightly taller for table */
+                }
+                .card-title {
+                    display: flex;
+                    align-items: center;
+                    gap: var(--spacing-xs);
+                    color: var(--primary-blue);
+                    font-size: 1.2rem;
+                    font-weight: 600;
+                    margin-bottom: var(--spacing-sm);
+                }
+                .card-title svg {
+                    width: 20px;
+                    height: 20px;
+                    stroke: var(--primary-blue);
+                    stroke-width: 2;
+                    fill: none;
+                }
+                .tags-container {
+                    display: flex;
+                    flex-wrap: wrap;
+                    gap: var(--spacing-xs);
+                }
+                .tag {
+                    background: var(--light-blue);
+                    color: var(--primary-blue);
+                    padding: 0.3rem 0.6rem;
+                    border-radius: var(--radius-sm);
+                    font-size: 0.9rem;
+                }
+                .tag-ciliopathy {
+                    background: var(--error-red);
+                    color: var(--text-light);
+                }
+                .tag:hover, .tag:focus {
+                    background: var(--primary-blue);
+                    color: var(--text-light);
+                    cursor: pointer;
+                }
+                .reference-list, .info-list {
+                    list-style: none;
+                    padding: 0;
+                    margin: 0;
+                    font-size: 0.95rem;
+                }
+                .info-list li {
+                    margin-bottom: var(--spacing-xs);
+                }
+                .info-item strong {
+                    color: var(--primary-blue);
+                }
+                .info-item a, .reference-list a {
+                    color: var(--primary-blue);
+                    text-decoration: none;
+                }
+                .info-item a:hover, .reference-list a:hover {
+                    text-decoration: underline;
+                }
+                .data-summary-table {
+                    width: 100%;
+                    border-collapse: collapse;
+                    font-size: 0.9rem;
+                }
+                .data-summary-table th, .data-summary-table td {
+                    padding: var(--spacing-xs) var(--spacing-sm);
+                    border-bottom: 1px solid var(--border-color);
+                    text-align: left;
+                }
+                .data-summary-table th {
+                    background: var(--primary-blue);
+                    color: var(--text-light);
+                    position: sticky;
+                    top: 0;
+                }
+                .data-summary-table tr:nth-child(even) {
+                    background: var(--light-gray);
+                }
+                .data-summary-table tr:hover {
+                    background: var(--light-blue);
+                }
+                .external-link {
+                    color: var(--primary-blue);
+                    text-decoration: none;
+                }
+                .external-link:hover {
+                    text-decoration: underline;
+                }
+                @media (max-width: 1024px) {
+                    .gene-details-grid {
+                        grid-template-columns: 1fr;
+                    }
+                    .detail-card.screen-data {
+                        order: -1; /* Move to top on smaller screens */
+                    }
+                }
+                @media (max-width: 768px) {
+                    .gene-header h1 {
+                        font-size: 1.8rem;
+                    }
+                    .detail-card {
+                        max-height: 250px;
+                    }
+                    .detail-card.screen-data {
+                        max-height: 350px;
+                    }
+                }
+            </style>
 
-        <div class="gene-details-grid">
-          
-          <div class="details-column">
-            <div class="detail-card">
-              <h3 class="card-title">${icons.summary} Functional Summary</h3>
-              <p>${gene.functional_summary || 'No functional summary available.'}</p>
-            </div>
-          </div>
-          
-          <div class="details-column">
-            <div class="detail-card">
-              <h3 class="card-title">${icons.references} References</h3>
-              <ul class="reference-list">${formatReferences(gene)}</ul>
-            </div>
-          </div>
-          
-          <div class="details-column">
-            <div class="detail-card">
-              <h3 class="card-title">${icons.links} Identifiers & External Links</h3>
-              <ul class="info-list">
-                <li class="info-item"><strong>Ensembl ID(s)</strong><span>${gene.ensembl_id ? String(gene.ensembl_id).split(/[;,]\s*/).map(id => `<a href="https://www.ensembl.org/Homo_sapiens/Gene/Summary?g=${id}" target="_blank">${id}</a>`).join('<br>') : 'Not available'}</span></li>
-                ${gene.omim_id ? `<li class="info-item"><strong>OMIM ID</strong><a href="https://www.omim.org/entry/${gene.omim_id}" target="_blank">${gene.omim_id}</a></li>` : ''}
-                ${gene.string_link ? `<li class="info-item"><strong>STRING DB</strong><a href="${gene.string_link}" target="_blank">Protein Interaction Network</a></li>` : ''}
-                ${gene.protein_atlas_link ? `<li class="info-item"><strong>Protein Atlas</strong><a href="${gene.protein_atlas_link}" target="_blank">Subcellular Localization</a></li>` : ''}
-              </ul>
-            </div>
-          </div>
-          
-          <div class="details-column">
-            <div class="detail-card">
-              <h3 class="card-title">${icons.location} Subcellular Localization</h3>
-              <div class="tags-container">${formatAsTags(gene.localization)}</div>
-            </div>
-          </div>
-          
-          <div class="details-column">
-              <div class="detail-card">
-              <h3 class="card-title">${icons.category} Functional Category</h3>
-              <div class="tags-container">${formatAsTags(gene.functional_category)}</div>
-            </div>
-          </div>
-          
-          <div class="details-column">
-            <div class="detail-card">
-              <h3 class="card-title">${icons.ciliopathy} Associated Ciliopathies</h3>
-              <div class="tags-container">${formatAsTags(gene.ciliopathy, 'tag-ciliopathy')}</div>
-            </div>
-          </div>
-          
-          <div class="details-column">
-            <div class="detail-card">
-              <h3 class="card-title">${icons.pfam} PFAM Domains</h3>
-              <div class="tags-container">${formatAsTags(gene.domain_descriptions)}</div>
-            </div>
-          </div>
-            
-          <div class="details-column">
-            <div class="detail-card">
-              <h3 class="card-title">${icons.complex} Protein Complexes</h3>
-              <div class="tags-container">${formatComplexes(gene.complex_names)}</div>
-            </div>
-          </div>
+            <header class="gene-header">
+                <h1>${gene.gene || "Unknown Gene"}</h1>
+                ${gene.synonym ? `<div class="synonym-tags tags-container">${formatAsTags(gene.synonym)}</div>` : ''}
+                ${gene.description ? `<p>${gene.description}</p>` : '<p>No description available.</p>'}
+            </header>
 
-          <div class="details-column full-width">
-            <div class="detail-card">
-              <h3 class="card-title">${icons.screen} Functional Screen Data</h3>
-              ${formatScreenData(gene.screens)}
-            </div>
-          </div>
+            <div class="gene-details-grid">
+                <!-- Functional Screen Data (Top Right) -->
+                <div class="details-column screen-data-column">
+                    <div class="detail-card screen-data">
+                        <h3 class="card-title">${icons.screen} Functional Screen Data</h3>
+                        ${formatScreenData(gene.screens)}
+                    </div>
+                </div>
 
+                <!-- Functional Summary -->
+                <div class="details-column">
+                    <div class="detail-card">
+                        <h3 class="card-title">${icons.summary} Functional Summary</h3>
+                        <p>${gene.functional_summary || 'No functional summary available.'}</p>
+                    </div>
+                </div>
+
+                <!-- References -->
+                <div class="details-column">
+                    <div class="detail-card">
+                        <h3 class="card-title">${icons.references} References</h3>
+                        <ul class="reference-list">${formatReferences(gene)}</ul>
+                    </div>
+                </div>
+
+                <!-- Identifiers & External Links -->
+                <div class="details-column">
+                    <div class="detail-card">
+                        <h3 class="card-title">${icons.links} Identifiers & External Links</h3>
+                        <ul class="info-list">
+                            <li class="info-item"><strong>Ensembl ID(s)</strong><span>${gene.ensembl_id ? String(gene.ensembl_id).split(/[;,]\s*/).map(id => `<a href="https://www.ensembl.org/Homo_sapiens/Gene/Summary?g=${id}" target="_blank">${id}</a>`).join('<br>') : 'Not available'}</span></li>
+                            ${gene.omim_id ? `<li class="info-item"><strong>OMIM ID</strong><a href="https://www.omim.org/entry/${gene.omim_id}" target="_blank">${gene.omim_id}</a></li>` : ''}
+                            ${gene.string_link ? `<li class="info-item"><strong>STRING DB</strong><a href="${gene.string_link}" target="_blank">Protein Interaction Network</a></li>` : ''}
+                            ${gene.protein_atlas_link ? `<li class="info-item"><strong>Protein Atlas</strong><a href="${gene.protein_atlas_link}" target="_blank">Subcellular Localization</a></li>` : ''}
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Subcellular Localization -->
+                <div class="details-column">
+                    <div class="detail-card">
+                        <h3 class="card-title">${icons.location} Subcellular Localization</h3>
+                        <div class="tags-container">${formatAsTags(gene.localization)}</div>
+                    </div>
+                </div>
+
+                <!-- Functional Category -->
+                <div class="details-column">
+                    <div class="detail-card">
+                        <h3 class="card-title">${icons.category} Functional Category</h3>
+                        <div class="tags-container">${formatAsTags(gene.functional_category)}</div>
+                    </div>
+                </div>
+
+                <!-- Associated Ciliopathies -->
+                <div class="details-column">
+                    <div class="detail-card">
+                        <h3 class="card-title">${icons.ciliopathy} Associated Ciliopathies</h3>
+                        <div class="tags-container">${formatAsTags(gene.ciliopathy, 'tag-ciliopathy')}</div>
+                    </div>
+                </div>
+
+                <!-- PFAM Domains -->
+                <div class="details-column">
+                    <div class="detail-card">
+                        <h3 class="card-title">${icons.pfam} PFAM Domains</h3>
+                        <div class="tags-container">${formatAsTags(gene.domain_descriptions)}</div>
+                    </div>
+                </div>
+
+                <!-- Protein Complexes -->
+                <div class="details-column">
+                    <div class="details-card">
+                        <h3 class="card-title">${icons.complex} Protein Complexes</h3>
+                        <div class="tags-container">${formatComplexes(gene.complex_names)}</div>
+                    </div>
+                </div>
+            </div>
         </div>
-      </div>
     `;
 
+    // Update interactive cilium panel
     if (typeof updateGeneButtons === "function") updateGeneButtons([gene], [gene]);
     if (typeof showLocalization === "function") showLocalization(gene.gene, true);
 }
 
-/**
- * Formats screen data into an HTML table.
- * @param {Array} screens - The array of screen objects for a gene.
- * @returns {string} An HTML table string.
- */
-function formatScreenData(screens) {
-    // If there's no screen data or the array is empty, return a message.
-    if (!screens || screens.length === 0) {
-        return '<p>No functional screen data available for this gene.</p>';
-    }
-
-    // Start building the HTML table with appropriate classes for styling
-    let tableHTML = `
-        <div class="table-responsive">
-            <table class="data-summary-table">
-                <thead>
-                    <tr>
-                        <th>Dataset</th>
-                        <th>Mean % Ciliated</th>
-                        <th>Z-Score</th>
-                        <th>Classification</th>
-                        <th>Reference</th>
-                    </tr>
-                </thead>
-                <tbody>
-    `;
-
-    // Create a table row for each screen entry
-    screens.forEach(screen => {
-        // Handle potentially missing numeric data by displaying "N/A"
-        const meanCiliated = typeof screen.mean_percent_ciliated === 'number' ? screen.mean_percent_ciliated.toFixed(2) : 'N/A';
-        const zScore = typeof screen.z_score === 'number' ? screen.z_score.toFixed(2) : 'N/A';
-
-        tableHTML += `
-            <tr>
-                <td>${screen.dataset || 'N/A'}</td>
-                <td>${meanCiliated}</td>
-                <td>${zScore}</td>
-                <td>${screen.classification || 'N/A'}</td>
-                <td>
-                    <a href="${screen.paper_link}" target="_blank" rel="noopener noreferrer" class="external-link">View Paper</a>
-                </td>
-            </tr>
-        `;
-    });
-
-    tableHTML += `</tbody></table></div>`;
-    return tableHTML;
-}
 
 function displayNotFoundPage() {
     const contentArea = document.querySelector('.content-area');
