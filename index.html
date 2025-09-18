@@ -18,6 +18,27 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jstat@latest/dist/jstat.min.js"></script>
+
+    <style>
+        /* Extra Galatasaray Theme Styles */
+        .interactive-cilium {
+            background: linear-gradient(135deg, #FDB913 50%, #A32638 50%);
+            border-radius: 12px;
+            padding: 10px;
+            box-shadow: 0 0 15px rgba(163, 38, 56, 0.4);
+        }
+
+        .gs-logo-pulse {
+            animation: pulse 2s infinite ease-in-out;
+            transform-origin: center;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); filter: drop-shadow(0 0 5px #FDB913); }
+            50% { transform: scale(1.1); filter: drop-shadow(0 0 15px #FDB913); }
+            100% { transform: scale(1); filter: drop-shadow(0 0 5px #FDB913); }
+        }
+    </style>
 </head>
 <body>
     <nav class="navbar">
@@ -44,13 +65,41 @@
             </div>
             <div class="panel-content">
                 <div class="cilia-container interactive-cilium">
-                    <svg viewBox="0 0 300 400" xmlns="http://www.w3.org/2000/svg">
-                        <path id="cell-body" class="cilia-part" tabindex="0" fill="none" d="M 50,380 C -20,300 20,200 150,200 C 280,200 320,300 250,380 Z"/>
-                        <circle id="nucleus" class="cilia-part" tabindex="0" fill="#A7C7E7" cx="150" cy="320" r="40"/>
-                        <rect id="basal-body" class="cilia-part" tabindex="0" fill="#2F2F2F" x="140" y="195" width="20" height="15"/>
-                        <path id="transition-zone" class="ciliaplot-part" tabindex="0" fill="#9B59B6" d="M 142,195 L 138,180 L 162,180 L 158,195 Z"/>
-                        <path id="ciliary-membrane" class="cilia-part" tabindex="0" fill="none" fill-opacity="0.5" d="M 138,180 L 145,10 L 155,10 L 162,180 Z"/>
-                        <path id="axoneme" class="cilia-part" tabindex="0" fill="none" d="M 145,180 L 148,15 L 152,15 L 155,180 Z"/>
+                    <svg viewBox="0 0 300 400" xmlns="http://www.w3.org/2000/svg" style="width: 100%; height: auto;">
+                        <!-- Gradient definition for cell body -->
+                        <defs>
+                            <linearGradient id="galaGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                                <stop offset="0%" style="stop-color:#FDB913;stop-opacity:1" />
+                                <stop offset="100%" style="stop-color:#A32638;stop-opacity:1" />
+                            </linearGradient>
+                        </defs>
+
+                        <!-- Cell body -->
+                        <path id="cell-body" class="cilia-part" tabindex="0"
+                              fill="url(#galaGradient)" stroke="#A32638" stroke-width="3"
+                              d="M 50,380 C -20,300 20,200 150,200 C 280,200 320,300 250,380 Z"/>
+
+                        <!-- Galatasaray Logo inside nucleus -->
+                        <image href="https://upload.wikimedia.org/wikipedia/en/thumb/7/7f/Galatasaray_Sports_Club_Logo.svg/1200px-Galatasaray_Sports_Club_Logo.svg.png"
+                               x="110" y="280" width="80" height="80" class="gs-logo-pulse" />
+
+                        <!-- Basal body -->
+                        <rect id="basal-body" class="cilia-part" tabindex="0" fill="#A32638" x="140" y="195" width="20" height="15"/>
+
+                        <!-- Transition zone -->
+                        <path id="transition-zone" class="ciliaplot-part" tabindex="0"
+                              fill="#FDB913" stroke="#A32638" stroke-width="2"
+                              d="M 142,195 L 138,180 L 162,180 L 158,195 Z"/>
+
+                        <!-- Ciliary membrane -->
+                        <path id="ciliary-membrane" class="cilia-part" tabindex="0"
+                              fill="none" stroke="#FDB913" stroke-width="2" stroke-dasharray="4,4"
+                              d="M 138,180 L 145,10 L 155,10 L 162,180 Z"/>
+
+                        <!-- Axoneme -->
+                        <path id="axoneme" class="cilia-part" tabindex="0"
+                              fill="none" stroke="#A32638" stroke-width="2"
+                              d="M 145,180 L 148,15 L 152,15 L 155,180 Z"/>
                     </svg>
                 </div>
                 <div class="controls">
@@ -69,9 +118,7 @@
     </footer>
 
     <script defer src="plots.js"></script> 
-    
     <script defer src="script.js"></script> 
-    
     <script defer src="globals.js"></script> 
 </body>
 </html>
