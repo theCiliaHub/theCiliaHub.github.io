@@ -1111,34 +1111,31 @@ function displayContactPage() {
     });
 }
 
-```javascript
-// script.js (partial, including navigateToGenePage and related functions)
 
-// Ensure these are defined (e.g., in globals.js or earlier in script.js)
-const homeSearchInput = document.querySelector('#home input[placeholder="Search genes..."]');
-const homeSuggestionsContainer = document.querySelector('#gene-suggestions');
-const staticMode = true; // From globals.js
-
-// Navigate to a gene page
+// Navigate to a specific gene page
 function navigateToGenePage(event, geneName) {
-    if (event) event.preventDefault(); // Prevent default link/form behavior
+    if (event) event.preventDefault();
+
     const selectedGene = allGenes.find(g => g.gene === geneName);
 
     if (selectedGene) {
-        if (homeSearchInput) homeSearchInput.value = selectedGene.gene; // Update input
-        if (homeSuggestionsContainer) homeSuggestionsContainer.style.display = 'none'; // Hide suggestions
+        if (typeof homeSearchInput !== 'undefined' && homeSearchInput) {
+            homeSearchInput.value = selectedGene.gene;
+        }
+        if (typeof homeSuggestionsContainer !== 'undefined' && homeSuggestionsContainer) {
+            homeSuggestionsContainer.style.display = 'none';
+        }
 
-        // Update URL hash to match previous routing
+        // Ensure URL format matches globals.js routing
         window.history.pushState({ gene: geneName }, '', `#gene/${geneName}`);
         updateActiveNavLink(`gene/${geneName}`);
         hideAllPages();
+
         const staticGene = document.getElementById('gene');
         if (staticGene && staticMode) {
             staticGene.style.display = 'block';
-            displayIndividualGenePage(selectedGene); // Pass full gene object
-        } else {
-            displayIndividualGenePage(selectedGene); // Fallback to dynamic
         }
+        displayIndividualGenePage(selectedGene); // Only call once
     } else {
         console.warn(`Navigation failed: No gene found for "${geneName}"`);
         showErrorMessage(`Gene "${geneName}" not found. Please try another gene.`);
@@ -1148,40 +1145,44 @@ function navigateToGenePage(event, geneName) {
 // Main navigation handler
 function navigateTo(event, path) {
     if (event) event.preventDefault();
-    window.history.pushState({}, '', `#${path}`);
-    updateActiveNavLink(path);
+
+    // Normalize path to avoid double slashes
+    const normalizedPath = path.startsWith('/') ? path.slice(1) : path;
+    window.history.pushState({}, '', `#${normalizedPath}`);
+    updateActiveNavLink(normalizedPath);
     hideAllPages();
-    if (path.startsWith('gene/')) {
-        const geneName = path.split('gene/')[1];
+
+    if (normalizedPath.startsWith('gene/')) {
+        const geneName = normalizedPath.split('gene/')[1];
         const selectedGene = allGenes.find(g => g.gene === geneName) || { gene: geneName };
+
         const staticGene = document.getElementById('gene');
         if (staticGene && staticMode) {
             staticGene.style.display = 'block';
-            displayIndividualGenePage(selectedGene);
-        } else {
-            displayIndividualGenePage(selectedGene);
         }
+        displayIndividualGenePage(selectedGene);
     } else {
-        // Handle other pages (e.g., /ciliaplot, /home)
+        // Map for other pages
         const pageMap = {
+            '': displayHomePage,
             '/': displayHomePage,
             'ciliaplot': displayCiliaPlotPage,
             'batch-query': displayBatchQueryTool,
-            'compare': displayCompareGenes,
+            'compare': displayComparePage,
             'expression': displayExpressionPage,
             'download': displayDownloadPage,
             'contact': displayContactPage
         };
-        const pageFunc = pageMap[path] || displayHomePage;
-        const staticPage = document.getElementById(path || 'home');
+
+        const pageFunc = pageMap[normalizedPath] || displayHomePage;
+        const staticPage = document.getElementById(normalizedPath || 'home');
         if (staticPage && staticMode) {
             staticPage.style.display = 'block';
-            pageFunc();
-        } else {
-            pageFunc();
         }
+        pageFunc();
     }
 }
+
 
 function hideAllPages() {
     document.querySelectorAll('.page-content').forEach(page => {
