@@ -1247,26 +1247,43 @@ function displayIndividualGenePage(gene) {
         }).join(' ');
     };
 
-    const formatScreenDataRow = (screens) => {
-        if (!screens || screens.length === 0) return '';
-        let rows = '';
+    const formatScreenDataTable = (screens) => {
+        if (!screens || screens.length === 0) {
+            return '<p>No genome-wide screen data available for this gene.</p>';
+        }
+        let tableHTML = `
+            <table class="data-table screen-table">
+                <thead>
+                    <tr>
+                        <th>Mean % Ciliated</th>
+                        <th>Z-Score</th>
+                        <th>Classification</th>
+                        <th>Reference</th>
+                    </tr>
+                </thead>
+                <tbody>
+        `;
         screens.forEach(screen => {
             const meanCiliated = typeof screen.mean_percent_ciliated === 'number' ? screen.mean_percent_ciliated.toFixed(2) : 'N/A';
             const zScore = typeof screen.z_score === 'number' ? screen.z_score.toFixed(2) : 'N/A';
             const datasetName = screen.dataset || 'Unknown';
             const refLink = `<a href="${screen.paper_link}" target="_blank" rel="noopener noreferrer" class="external-link">${datasetName} et al.</a>`;
-            rows += `
+            tableHTML += `
                 <tr>
-                    <td>Screen Data</td>
-                    <td>${meanCiliated} | ${zScore} | ${screen.classification || 'N/A'} | ${refLink}</td>
+                    <td>${meanCiliated}</td>
+                    <td>${zScore}</td>
+                    <td>${screen.classification || 'N/A'}</td>
+                    <td>${refLink}</td>
                 </tr>
             `;
         });
-        return rows;
+        tableHTML += `</tbody></table>`;
+        return tableHTML;
     };
 
     const icons = {
-        gene: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22h6a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16"></path><path d="M11 7h2"></path><path d="M11 11h4"></path><path d="M11 15h4"></path><path d="M5 22v-5"></path><path d="M3 17h4"></path></svg>`
+        gene: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22h6a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16"></path><path d="M11 7h2"></path><path d="M11 11h4"></path><path d="M11 15h4"></path><path d="M5 22v-5"></path><path d="M3 17h4"></path></svg>`,
+        screen: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 10.5h-5m5 3h-5m8-10h-8a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V5.5a2 2 0 0 0-2-2z"></path><path d="M4.5 3.5v15"></path></svg>`
     };
 
     contentArea.innerHTML = `
@@ -1306,7 +1323,7 @@ function displayIndividualGenePage(gene) {
                     background: var(--white);
                     border: 1px solid var(--border-color);
                     border-radius: var(--radius-md);
-                    padding: var(--spacing-md);
+                    padding: var(--spacing-lg);
                     box-shadow: var(--shadow-light);
                     margin-bottom: var(--spacing-md);
                 }
@@ -1353,7 +1370,7 @@ function displayIndividualGenePage(gene) {
                     font-size: 0.95rem;
                 }
                 .data-table th, .data-table td {
-                    padding: var(--spacing-sm);
+                    padding: var(--spacing-md) var(--spacing-lg);
                     border-bottom: 1px solid var(--border-color);
                     text-align: left;
                     vertical-align: top;
@@ -1363,10 +1380,13 @@ function displayIndividualGenePage(gene) {
                     color: var(--text-light);
                     width: 200px;
                 }
-                .data-table tr:nth-child(even) {
+                .screen-table th, .screen-table td {
+                    padding: var(--spacing-md) var(--spacing-lg);
+                }
+                .data-table tr:nth-child(even), .screen-table tr:nth-child(even) {
                     background: var(--light-gray);
                 }
-                .data-table tr:hover {
+                .data-table tr:hover, .screen-table tr:hover {
                     background: var(--light-blue);
                 }
                 .external-link {
@@ -1381,15 +1401,19 @@ function displayIndividualGenePage(gene) {
                     padding: 0;
                     margin: 0;
                 }
+                .screen-description {
+                    font-size: 0.95rem;
+                    margin-bottom: var(--spacing-sm);
+                }
                 @media (max-width: 768px) {
                     .gene-header h1 {
                         font-size: 1.8rem;
                     }
-                    .data-table th {
+                    .data-table th, .screen-table th {
                         width: 150px;
                     }
-                    .data-table th, .data-table td {
-                        padding: var(--spacing-xs);
+                    .data-table th, .data-table td, .screen-table th, .screen-table td {
+                        padding: var(--spacing-sm) var(--spacing-md);
                     }
                 }
             </style>
@@ -1450,9 +1474,14 @@ function displayIndividualGenePage(gene) {
                             <th>Protein Complexes</th>
                             <td><div class="tags-container">${formatComplexes(gene.complex_names)}</div></td>
                         </tr>
-                        ${formatScreenDataRow(gene.screens)}
                     </tbody>
                 </table>
+            </div>
+
+            <div class="detail-card">
+                <h3 class="card-title">${icons.screen} Genome-Wide Screen Findings</h3>
+                <p class="screen-description">Genome-wide screen findings provide insights into the gene's role in ciliogenesis through high-throughput experiments. Metrics include Mean % Ciliated (percentage of cells with cilia), Z-Score (statistical significance of the effect), Classification (functional impact), and Reference (study source).</p>
+                ${formatScreenDataTable(gene.screens)}
             </div>
         </div>
     `;
@@ -1460,7 +1489,6 @@ function displayIndividualGenePage(gene) {
     if (typeof updateGeneButtons === "function") updateGeneButtons([gene], [gene]);
     if (typeof showLocalization === "function") showLocalization(gene.gene, true);
 }
-
 
 function displayNotFoundPage() {
     const contentArea = document.querySelector('.content-area');
