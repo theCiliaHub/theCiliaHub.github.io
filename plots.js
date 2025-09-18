@@ -66,171 +66,393 @@ function getCleanArray(gene, ...keys) {
 }
 
 /**
- * Displays the main CiliaPlot analysis page with updated plot options.
+ * Displays the main CiliaPlot analysis page with a redesigned layout and new features.
  */
 function displayCiliaPlotPage() {
     const contentArea = document.querySelector('.content-area');
-    contentArea.className = 'content-area content-area-full';
+    // Ensure the content area can take up full width
+    contentArea.className = 'content-area content-area-full'; 
     document.querySelector('.cilia-panel').style.display = 'none';
 
     contentArea.innerHTML = `
-        <section class="page-section ciliaplot-page" aria-labelledby="ciliaplot-title">
-            <header class="ciliaplot-header">
-                <h1 id="ciliaplot-title">CiliaPlot Analysis</h1>
-                <p class="info" id="ciliaplot-plot-info" role="region" aria-live="polite">
-                    Input genes and select a plot type to generate ciliary function visualizations.
-                    <span class="tooltip">
-                        <span class="tooltip-icon">?</span>
-                        <span class="tooltip-text">Enter up to 100 genes (e.g., IFT88, BBS1) and choose a plot type.</span>
-                    </span>
-                </p>
-            </header>
+    <style>
+        /* General Page Styles */
+        .ciliaplot-page-container {
+            font-family: Arial, sans-serif;
+            color: #333;
+            background-color: #f9f9f9;
+            padding: 20px;
+        }
 
-            <div class="ciliaplot-container-pro">
-                <div class="ciliaplot-input-section">
-                    <div class="control-card">
-                        <label for="ciliaplot-genes-input">Gene List</label>
-                        <textarea 
-                            id="ciliaplot-genes-input" 
-                            placeholder="e.g., IFT88, CEP290, BBS1, ARL13B (comma, space, or line-separated)"
-                            aria-describedby="genes-help"
-                        ></textarea>
-                        <p id="genes-help" class="help-text">
-                            Enter up to 100 genes, case-insensitive. Separate with commas, spaces, or new lines.
-                        </p>
+        h1, h2, h3 {
+            color: #1a237e; /* Dark blue for headers */
+        }
+        
+        /* Explanation Section */
+        .explanation-section {
+            background-color: #e8eaf6;
+            border-left: 5px solid #3f51b5;
+            padding: 15px 20px;
+            margin-bottom: 25px;
+            border-radius: 5px;
+        }
+
+        .explanation-section h2 {
+            margin-top: 0;
+            font-size: 1.5em;
+        }
+
+        .explanation-section p {
+            line-height: 1.6;
+        }
+        
+        .explanation-section a {
+            color: #303f9f;
+            text-decoration: none;
+            font-weight: bold;
+        }
+
+        .explanation-section a:hover {
+            text-decoration: underline;
+        }
+
+        /* Main Layout Grid */
+        .ciliaplot-main-layout {
+            display: grid;
+            grid-template-columns: 250px 1fr 2fr; /* Left | Middle | Right */
+            gap: 20px;
+            align-items: start;
+        }
+
+        /* Card Styling for Sections */
+        .control-card {
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.05);
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .control-card h3 {
+            margin-top: 0;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 10px;
+            font-size: 1.2em;
+        }
+
+        /* Left Column: Plot Types */
+        .plot-types-panel .plot-type-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .plot-types-panel .plot-type-list li {
+            margin-bottom: 10px;
+        }
+        
+        .plot-types-panel .plot-type-list label {
+            display: block;
+            padding: 12px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s, color 0.3s;
+            border: 1px solid #ddd;
+        }
+
+        .plot-types-panel .plot-type-list input[type="radio"] {
+            display: none; /* Hide the actual radio button */
+        }
+
+        .plot-types-panel .plot-type-list input[type="radio"]:checked + label {
+            background-color: #3f51b5;
+            color: white;
+            font-weight: bold;
+            border-color: #3f51b5;
+        }
+
+        .plot-types-panel .plot-type-list label:hover {
+            background-color: #e8eaf6;
+        }
+
+        /* Middle Column: Input & Customization */
+        .input-customization-panel label {
+            display: block;
+            font-weight: bold;
+            margin-bottom: 8px;
+            font-size: 0.9em;
+            color: #555;
+        }
+        
+        #ciliaplot-genes-input {
+            width: 100%;
+            height: auto; /* auto height */
+            min-height: 150px; /* Min height to show ~10 lines */
+            padding: 10px;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 1em;
+            resize: vertical;
+        }
+        
+        .customization-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 15px;
+        }
+        
+        .customization-grid .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .customization-grid input[type="number"],
+        .customization-grid select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+
+        .radio-group label {
+            font-weight: normal;
+            display: inline-block;
+            margin-right: 15px;
+        }
+        
+        #generate-plot-btn {
+            width: 100%;
+            padding: 12px;
+            font-size: 1.1em;
+            font-weight: bold;
+            background-color: #4CAF50; /* Green */
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            margin-top: 20px;
+        }
+
+        #generate-plot-btn:hover {
+            background-color: #45a049;
+        }
+
+        /* Right Column: Visualization & Table */
+        .visualization-panel {
+            position: sticky; /* Make the plot stick on scroll */
+            top: 20px;
+        }
+        
+        #plot-display-area {
+            width: 100%;
+            min-height: 450px;
+            background-color: #fff;
+            border: 2px dashed #ccc;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #888;
+            font-size: 1.2em;
+            margin-bottom: 20px;
+        }
+        
+        .gene-input-table-container h3 {
+           margin-bottom: 10px;
+        }
+        
+        .gene-input-table-container table {
+            width: 100%;
+            border-collapse: collapse;
+            background-color: #fff;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        
+        .gene-input-table-container th, .gene-input-table-container td {
+            border: 1px solid #ddd;
+            padding: 10px;
+            text-align: left;
+        }
+        
+        .gene-input-table-container th {
+            background-color: #f2f2f2;
+            color: #333;
+        }
+        
+    </style>
+
+    <section class="ciliaplot-page-container">
+        
+        <div class="explanation-section">
+            <h2>CiliaPlot: Visualize Your Ciliary Gene Sets</h2>
+            <p>
+                The CiliaHub database contains an updated list of over <strong>2200 Gold Standard Genes with Ciliary Functions</strong>.
+                With CiliaPlot, users can perform powerful analyses on their own gene lists, such as those from CRISPR/Cas9 screenings. 
+                You can visualize the subcellular localization of ciliary genes, identify enriched or depleted protein domains, and perform detailed functional analysis.
+            </p>
+            <p>
+                Additionally, we have integrated four seminal genome-wide screens for cilia and Hedgehog pathway functions:
+                <ul>
+                    <li><a href="https://www.sciencedirect.com/science/article/pii/S016748891630074X" target="_blank">Kim et al. 2016</a></li>
+                    <li><a href="https://elifesciences.org/articles/06602#content" target="_blank">Roosing et al. 2015</a></li>
+                    <li><a href="https://www.nature.com/articles/s41588-018-0054-7#Abs1" target="_blank">Breslow et al. 2018</a></li>
+                    <li><a href="https://www.nature.com/articles/ncb3201#Abs1" target="_blank">Wheway et al. 2015</a></li>
+                </ul>
+            </p>
+        </div>
+
+        <div class="ciliaplot-main-layout">
+            
+            <aside class="plot-types-panel">
+                <div class="control-card">
+                    <h3>Plot Types</h3>
+                    <ul class="plot-type-list">
+                        <li><input type="radio" id="plot-bubble" name="plot_type" value="bubble" checked><label for="plot-bubble">Key Localizations</label></li>
+                        <li><input type="radio" id="plot-matrix" name="plot_type" value="matrix"><label for="plot-matrix">Gene-Localization Matrix</label></li>
+                        <li><input type="radio" id="plot-domain" name="plot_type" value="domain_matrix"><label for="plot-domain">Gene-Domain Matrix</label></li>
+                        <li><input type="radio"id="plot-functional" name="plot_type" value="functional_category"><label for="plot-functional">Functional Categories</label></li>
+                        <li><input type="radio" id="plot-heatmap" name="plot_type" value="expression_heatmap"><label for="plot-heatmap">Expression Heatmap</label></li>
+                        <li><input type="radio" id="plot-screen" name="plot_type" value="screen_analysis"><label for="plot-screen">Screen Analysis</label></li>
+                    </ul>
+                </div>
+            </aside>
+
+            <main class="input-customization-panel">
+                <div class="control-card">
+                    <h3>Gene Input</h3>
+                    <textarea id="ciliaplot-genes-input" rows="10" placeholder="Enter up to 100 genes, separated by comma, space, or new line...&#10;e.g., IFT88&#10;CEP290&#10;BBS1&#10;ARL13B"></textarea>
+                </div>
+                
+                <div class="control-card">
+                    <h3>Plot Customization</h3>
+                    <div class="customization-grid">
+                        <div class="form-group">
+                            <label for="fig-width">Figure Width</label>
+                            <input type="number" id="fig-width" value="6.0" step="0.1">
+                        </div>
+                        <div class="form-group">
+                            <label for="fig-height">Figure Height</label>
+                            <input type="number" id="fig-height" value="3.0" step="0.1">
+                        </div>
+                        <div class="form-group">
+                           <label>Sequence Type</label>
+                            <div class="radio-group">
+                                <input type="radio" id="seq-dna" name="seq_type" value="dna" checked><label for="seq-dna">DNA/RNA</label>
+                                <input type="radio" id="seq-aa" name="seq_type" value="aa"><label for="seq-aa">Amino Acid</label>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="color-scheme">Color Scheme</label>
+                            <select id="color-scheme">
+                                <optgroup label="DNA/RNA">
+                                    <option value="auto_dna">auto</option>
+                                    <option value="basepairing">basepairing</option>
+                                    <option value="blindnessSafe">blindnessSafe</option>
+                                </optgroup>
+                                <optgroup label="Amino Acid">
+                                    <option value="auto_aa">auto</option>
+                                    <option value="charge">charge</option>
+                                    <option value="chemistry">chemistry</option>
+                                    <option value="classic">classic</option>
+                                    <option value="hydrophobicity">hydrophobicity</option>
+                                </optgroup>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Scale</label>
+                            <div class="radio-group">
+                                <input type="radio" id="scale-on" name="scale" value="on" checked><label for="scale-on">Scale</label>
+                                <input type="radio" id="scale-off" name="scale" value="off"><label for="scale-off">No Scale</label>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>X-Axis</label>
+                             <div class="radio-group">
+                                <input type="radio" id="xaxis-show" name="xaxis" value="show" checked><label for="xaxis-show">Show</label>
+                                <input type="radio" id="xaxis-hide" name="xaxis" value="hide"><label for="xaxis-hide">Hide</label>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                           <label>Y-Ticks</label>
+                            <div class="radio-group">
+                                <input type="radio" id="yticks-show" name="yticks" value="show" checked><label for="yticks-show">Show</label>
+                                <input type="radio" id="yticks-hide" name="yticks" value="hide"><label for="yticks-hide">Hide</label>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="font-family">Font Family</label>
+                            <select id="font-family">
+                                <option value="Arial">Arial</option>
+                                <option value="Times New Roman">Times New Roman</option>
+                                <option value="Verdana">Verdana</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="title-fontsize">Title Font Size</label>
+                            <input type="number" id="title-fontsize" value="1.5" step="0.1">
+                        </div>
+                        <div class="form-group">
+                            <label for="xaxis-fontsize">X-Axis Font Size</label>
+                            <input type="number" id="xaxis-fontsize" value="1.4" step="0.1">
+                        </div>
+                        <div class="form-group">
+                            <label for="yaxis-fontsize">Y-Axis Font Size</label>
+                            <input type="number" id="yaxis-fontsize" value="1.4" step="0.1">
+                        </div>
                     </div>
                 </div>
-
-                <div class="ciliaplot-settings-section">
-                    <h2>Plot Settings</h2>
-                    <div class="control-card">
-                        <div class="settings-grid">
-                            <div>
-                                <label for="plot-type-select">Plot Type</label>
-                                <select id="plot-type-select" aria-describedby="plot-help">
-                                    <optgroup label="Localization Analysis">
-                                        <option value="bubble">Key Localizations</option>
-                                        <option value="matrix">Gene-Localization Matrix</option>
-                                    </optgroup>
-                                    <optgroup label="Functional Analysis">
-                                        <option value="domain_matrix">Gene-Domain Matrix</option>
-                                        <option value="functional_category">Functional Categories (Bar)</option>
-                                        <option value="complex_chord">Complex Interactions (Chord)</option>
-                                        <option value="network">Protein Complex Network</option>
-                                    </optgroup>
-                                    <optgroup label="Expression Analysis">
-                                        <option value="expression_heatmap">Expression Heatmap</option>
-                                        <option value="tissue_profile">Tissue Expression Profile</option>
-                                        <option value="top_tissues">Top Expressing Tissues</option>
-                                        <option value="expression_violin">Expression Distribution (Violin)</option>
-                                        <option value="expression_localization">Expression vs. Localization</option>
-                                        <option value="expression_domain_bubble">Expression vs. Domains (Bubble)</option>
-                                    </optgroup>
-                                    <optgroup label="Proteomics Analysis">
-                                        <option value="organelle_radar">Organellar Profile (Radar)</option>
-                                        <option value="organelle_umap">Organellar Projection (UMAP)</option>
-                                    </optgroup>
-                                    <optgroup label="Screen Analysis">
-                                        <option value="screen_analysis">Gene Screen Data (Bubble)</option>
-                                    </optgroup>
-                                </select>
-                            </div>
-                            <div>
-                                <label for="setting-font-family">Font Family</label>
-                                <select id="setting-font-family">
-                                    <option value="Arial">Arial</option>
-                                    <option value="Helvetica">Helvetica</option>
-                                    <option value="Verdana">Verdana</option>
-                                    <option value="Times New Roman">Times New Roman</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label for="setting-font-color">Font Color</label>
-                                <input type="color" id="setting-font-color" value="#333333">
-                            </div>
-                            <div>
-                                <label for="setting-bg-color">Background Color</label>
-                                <input type="color" id="setting-bg-color" value="#ffffff">
-                            </div>
-                            <div>
-                                <label for="setting-title-font-size">Title Font Size (px)</label>
-                                <input type="number" id="setting-title-font-size" value="21" min="10" max="40" step="1">
-                            </div>
-                            <div>
-                                <label for="setting-axis-title-font-size">Axis Title Size (px)</label>
-                                <input type="number" id="setting-axis-title-font-size" value="20" min="10" max="30" step="1">
-                            </div>
-                            <div>
-                                <label for="setting-tick-font-size">Axis Tick Size (px)</label>
-                                <input type="number" id="setting-tick-font-size" value="20" min="8" max="24" step="1">
-                            </div>
-                        </div>
-                        <button id="generate-plot-btn" class="btn btn-primary btn-large">Generate Plot</button>
+                 <button id="generate-plot-btn">Generate Plot</button>
+            </main>
+            
+            <aside class="visualization-panel">
+                <div class="control-card">
+                    <h3>Visualization</h3>
+                    <div id="plot-display-area" role="region" aria-live="polite">
+                        Your plot will appear here
                     </div>
                 </div>
-
-                <div class="ciliaplot-visualization-section">
-                    <div class="plot-card">
-                        <div class="plot-card-header">
-                            <h3>Visualization</h3>
-                            <div class="download-controls">
-                                <label for="download-format" class="visually-hidden">Download Format</label>
-                                <select id="download-format">
-                                    <option value="png">PNG (High-res Image)</option>
-                                    <option value="pdf">PDF (Publication-ready)</option>
-                                </select>
-                                <button id="download-plot-btn" class="btn btn-secondary">Download</button>
-                            </div>
-                        </div>
-                        <div id="plot-display-area" class="plot-container-pro" role="region" aria-live="polite">
-                            <p class="status-message">Your visualization will appear here.</p>
-                        </div>
-                        <div id="ciliaplot-legend-container" class="legend"></div>
+                
+                <div class="gene-input-table-container">
+                    <h3>Gene Input Summary</h3>
+                    <div id="gene-table-wrapper">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Gene Symbol</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>1</td>
+                                    <td>IFT88</td>
+                                    <td>Found</td>
+                                </tr>
+                                 <tr>
+                                    <td>2</td>
+                                    <td>CEP290</td>
+                                    <td>Found</td>
+                                </tr>
+                                 <tr>
+                                    <td colspan="3" style="text-align: center;">Enter genes to see summary...</td>
+                                </tr>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
+            </aside>
 
-                <div class="ciliaplot-results-section">
-                    <div class="tab-container">
-                        <div class="tab-buttons" role="tablist">
-                            <button class="tab-button active" data-tab="summary-tab" role="tab" aria-selected="true" aria-controls="summary-tab">Data Summary</button>
-                            <button class="tab-button" data-tab="status-tab" role="tab" aria-selected="false" aria-controls="status-tab">Input Status</button>
-                        </div>
-                        <div class="tab-content">
-                            <div id="summary-tab" class="tab-pane active" role="tabpanel">
-                                <div id="plot-data-table-container" class="table-wrapper"></div>
-                            </div>
-                            <div id="status-tab" class="tab-pane" role="tabpanel">
-                                <div id="ciliaplot-search-results" class="table-wrapper"></div>
-                            </div>
-                        </div>
-                    </div>
-                    <div id="ciliaplot-stats-container" class="stats-container" role="region" aria-live="polite"></div>
-                </div>
-            </div>
-        </section>
+        </div>
+    </section>
     `;
 
-    // Attach event listeners
-    document.getElementById('generate-plot-btn').addEventListener('click', generateAnalysisPlots);
-    document.getElementById('download-plot-btn').addEventListener('click', downloadPlot);
-    document.getElementById('plot-type-select').addEventListener('change', (e) => {
-        updatePlotInfo(e.target.value);
-    });
-
-    // Tab functionality
-    document.querySelectorAll('.tab-button').forEach(button => {
-        button.addEventListener('click', () => {
-            document.querySelectorAll('.tab-button').forEach(btn => {
-                btn.classList.remove('active');
-                btn.setAttribute('aria-selected', 'false');
-            });
-            document.querySelectorAll('.tab-pane').forEach(pane => pane.classList.remove('active'));
-            button.classList.add('active');
-            button.setAttribute('aria-selected', 'true');
-            document.getElementById(button.dataset.tab).classList.add('active');
-        });
-    });
+    // You can re-attach your event listeners here if needed, for example:
+    // document.getElementById('generate-plot-btn').addEventListener('click', generateAnalysisPlots);
 }
+
 
 // In plots.js 
 
