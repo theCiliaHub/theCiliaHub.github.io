@@ -6,11 +6,10 @@
     <title>The CiliaHub: A Database of Genes with Ciliary Functions</title>
     <meta name="description" content="The CiliaHub is a comprehensive bioinformatics database for genes with ciliary functions.">
     <link rel="icon" type="image/png" href="CiliaHub_Logo_web.png">
-    <link rel="stylesheet" href="styles.css">
-
+    
+    <!-- External Libraries -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
-
     <script src="https://cdn.jsdelivr.net/npm/@panzoom/panzoom@4.5.1/dist/panzoom.min.js"></script>
     <script src="https://unpkg.com/@upsetjs/bundle"></script>
     <script src="https://d3js.org/d3.v7.min.js"></script>
@@ -18,6 +17,823 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jstat@latest/dist/jstat.min.js"></script>
+
+    <style>
+        /* Modern Earth-Toned Color Palette */
+        :root {
+            /* Primary Earth Tones */
+            --sage-green: #A8BBA3;
+            --warm-cream: #F7F4EA;
+            --dusty-rose: #EBD9D1;
+            --warm-brown: #B87C4C;
+            
+            /* Extended Palette */
+            --sage-green-dark: #8fa184;
+            --sage-green-light: #c2d1be;
+            --warm-brown-dark: #9a6940;
+            --warm-brown-light: #d4a678;
+            
+            /* Neutral Tones */
+            --text-primary: #2c3e2f;
+            --text-secondary: #6b7c6e;
+            --text-light: #ffffff;
+            --background-primary: #faf8f4;
+            --background-secondary: #f2efe7;
+            --border-color: #d8ccc0;
+            --shadow-color: rgba(44, 62, 47, 0.1);
+            
+            /* Accent Colors */
+            --accent-success: #7fb069;
+            --accent-warning: #e3a857;
+            --accent-error: #c85a54;
+            
+            /* Spacing & Borders */
+            --border-radius-sm: 8px;
+            --border-radius-md: 12px;
+            --border-radius-lg: 20px;
+            --spacing-xs: 0.5rem;
+            --spacing-sm: 1rem;
+            --spacing-md: 1.5rem;
+            --spacing-lg: 2rem;
+            --spacing-xl: 3rem;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', Roboto, sans-serif;
+            background: var(--background-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        /* Navigation */
+        .navbar {
+            background: linear-gradient(135deg, var(--sage-green) 0%, var(--sage-green-dark) 100%);
+            color: var(--text-light);
+            padding: var(--spacing-sm) 0;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            box-shadow: 0 4px 20px var(--shadow-color);
+            backdrop-filter: blur(10px);
+        }
+
+        .nav-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 var(--spacing-lg);
+        }
+
+        .logo {
+            font-size: 2.5rem;
+            font-weight: 800;
+            text-decoration: none;
+            color: var(--text-light);
+            letter-spacing: -0.5px;
+            transition: all 0.3s ease;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .logo:hover {
+            transform: scale(1.05);
+            text-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+
+        .nav-links {
+            list-style: none;
+            display: flex;
+            gap: var(--spacing-xs);
+            margin: 0;
+            padding: 0;
+        }
+
+        .nav-links li a {
+            color: var(--text-light);
+            text-decoration: none;
+            font-size: 1.1rem;
+            font-weight: 500;
+            padding: var(--spacing-sm) var(--spacing-md);
+            border-radius: var(--border-radius-md);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .nav-links li a::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            transition: left 0.5s;
+        }
+
+        .nav-links li a:hover::before {
+            left: 100%;
+        }
+
+        .nav-links li a:hover,
+        .nav-links li a:focus-visible,
+        .nav-links li a.active {
+            background: rgba(255, 255, 255, 0.15);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            outline: none;
+            backdrop-filter: blur(5px);
+        }
+
+        /* Main Layout */
+        .main-container {
+            display: flex;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: var(--spacing-lg);
+            gap: var(--spacing-lg);
+            min-height: calc(100vh - 140px);
+        }
+
+        /* Content Area */
+        .content-area {
+            flex: 1;
+            background: var(--warm-cream);
+            padding: var(--spacing-lg);
+            border-radius: var(--border-radius-lg);
+            box-shadow: 0 8px 32px var(--shadow-color);
+            border: 1px solid var(--border-color);
+            min-height: 600px;
+        }
+
+        /* Sidebar Panel */
+        .cilia-panel {
+            width: 320px;
+            background: var(--warm-cream);
+            border-radius: var(--border-radius-lg);
+            box-shadow: 0 8px 32px var(--shadow-color);
+            position: sticky;
+            top: 120px;
+            height: fit-content;
+            border: 1px solid var(--border-color);
+            overflow: hidden;
+        }
+
+        .panel-header {
+            background: linear-gradient(135deg, var(--dusty-rose), var(--warm-cream));
+            padding: var(--spacing-md);
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .panel-header h3 {
+            color: var(--text-primary);
+            font-size: 1.4rem;
+            font-weight: 700;
+            margin: 0;
+            text-align: center;
+        }
+
+        .panel-content {
+            padding: var(--spacing-md);
+        }
+
+        /* Interactive Cilium */
+        .cilia-container {
+            margin-bottom: var(--spacing-md);
+            text-align: center;
+        }
+
+        .interactive-cilium svg {
+            max-width: 100%;
+            height: auto;
+            border-radius: var(--border-radius-sm);
+            background: var(--background-secondary);
+            padding: var(--spacing-sm);
+        }
+
+        .cilia-part, .ciliaplot-part {
+            cursor: pointer;
+            transition: all 0.3s ease;
+            stroke-width: 2;
+        }
+
+        .cilia-part:hover, .ciliaplot-part:hover {
+            filter: brightness(1.2);
+            stroke: var(--warm-brown);
+        }
+
+        .cilia-part:focus, .ciliaplot-part:focus {
+            outline: 2px solid var(--sage-green);
+            outline-offset: 2px;
+        }
+
+        #cell-body {
+            fill: var(--dusty-rose);
+            stroke: var(--border-color);
+        }
+
+        #nucleus {
+            fill: var(--sage-green-light);
+            stroke: var(--border-color);
+        }
+
+        #basal-body {
+            fill: var(--text-primary);
+        }
+
+        #transition-zone {
+            fill: var(--warm-brown);
+        }
+
+        #ciliary-membrane {
+            stroke: var(--sage-green);
+            stroke-width: 3;
+            fill: none;
+        }
+
+        #axoneme {
+            stroke: var(--warm-brown-dark);
+            stroke-width: 2;
+        }
+
+        /* Gene Buttons */
+        .controls h4 {
+            color: var(--text-primary);
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: var(--spacing-sm);
+            text-align: center;
+        }
+
+        .gene-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: var(--spacing-xs);
+        }
+
+        .gene-btn, .gene-buttons button {
+            padding: var(--spacing-xs) var(--spacing-sm);
+            background: var(--dusty-rose);
+            border: 1px solid var(--border-color);
+            border-radius: var(--border-radius-sm);
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 500;
+            color: var(--text-primary);
+            transition: all 0.3s ease;
+            text-align: left;
+        }
+
+        .gene-btn:hover, 
+        .gene-btn:focus-visible, 
+        .gene-btn.search-gene,
+        .gene-buttons button:hover,
+        .gene-buttons button:focus-visible {
+            background: var(--warm-brown);
+            color: var(--text-light);
+            transform: translateY(-1px);
+            box-shadow: 0 2px 8px rgba(184, 124, 76, 0.3);
+            outline: none;
+        }
+
+        .gene-btn.default,
+        .gene-buttons button.default {
+            background: var(--sage-green);
+            color: var(--text-light);
+        }
+
+        .gene-btn.default:hover,
+        .gene-buttons button.default:hover {
+            background: var(--sage-green-dark);
+        }
+
+        .gene-btn.reset-btn,
+        .gene-buttons button.reset-btn {
+            background: var(--text-secondary);
+            color: var(--text-light);
+            margin-top: var(--spacing-sm);
+        }
+
+        .gene-btn.reset-btn:hover,
+        .gene-buttons button.reset-btn:hover {
+            background: var(--text-primary);
+        }
+
+        /* Buttons */
+        .btn {
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: none;
+            border-radius: var(--border-radius-md);
+            font-weight: 500;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: var(--spacing-xs);
+            font-family: inherit;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--sage-green), var(--sage-green-dark));
+            color: var(--text-light);
+            padding: var(--spacing-sm) var(--spacing-md);
+            box-shadow: 0 4px 12px rgba(168, 187, 163, 0.3);
+        }
+
+        .btn-primary:hover,
+        .btn-primary:focus-visible {
+            background: linear-gradient(135deg, var(--sage-green-dark), var(--sage-green));
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(168, 187, 163, 0.4);
+            outline: none;
+        }
+
+        .btn-secondary {
+            background: var(--dusty-rose);
+            color: var(--text-primary);
+            padding: var(--spacing-xs) var(--spacing-sm);
+            border: 1px solid var(--border-color);
+        }
+
+        .btn-secondary:hover,
+        .btn-secondary:focus-visible {
+            background: var(--warm-brown-light);
+            color: var(--text-light);
+            transform: translateY(-1px);
+            outline: none;
+        }
+
+        /* Search Components */
+        .search-container {
+            display: flex;
+            gap: var(--spacing-sm);
+            margin-bottom: var(--spacing-lg);
+            position: relative;
+            background: var(--dusty-rose);
+            padding: var(--spacing-md);
+            border-radius: var(--border-radius-md);
+            box-shadow: 0 4px 16px var(--shadow-color);
+        }
+
+        .search-wrapper {
+            position: relative;
+            flex: 1;
+        }
+
+        .search-wrapper input {
+            width: 100%;
+            padding: var(--spacing-sm) var(--spacing-md);
+            border: 2px solid var(--border-color);
+            border-radius: var(--border-radius-md);
+            font-size: 1.1rem;
+            background: var(--warm-cream);
+            color: var(--text-primary);
+            transition: all 0.3s ease;
+            font-family: inherit;
+        }
+
+        .search-wrapper input:focus {
+            border-color: var(--sage-green);
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(168, 187, 163, 0.2);
+            transform: translateY(-1px);
+        }
+
+        .search-btn {
+            padding: var(--spacing-sm) var(--spacing-lg);
+            background: linear-gradient(135deg, var(--warm-brown), var(--warm-brown-light));
+            color: var(--text-light);
+            border: none;
+            border-radius: var(--border-radius-md);
+            cursor: pointer;
+            font-size: 1.1rem;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 12px rgba(184, 124, 76, 0.3);
+        }
+
+        .search-btn:hover,
+        .search-btn:focus-visible {
+            background: linear-gradient(135deg, var(--warm-brown-dark), var(--warm-brown));
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(184, 124, 76, 0.4);
+            outline: none;
+        }
+
+        /* Tables */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: var(--spacing-sm);
+            background: var(--warm-cream);
+            border-radius: var(--border-radius-md);
+            overflow: hidden;
+            box-shadow: 0 4px 12px var(--shadow-color);
+        }
+
+        th, td {
+            padding: var(--spacing-sm) var(--spacing-md);
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        th {
+            background: linear-gradient(135deg, var(--sage-green), var(--sage-green-dark));
+            color: var(--text-light);
+            font-weight: 600;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        tr:nth-child(even) {
+            background: var(--background-secondary);
+        }
+
+        tr:hover {
+            background: var(--dusty-rose);
+            transition: background 0.3s ease;
+        }
+
+        td a {
+            color: var(--warm-brown);
+            text-decoration: none;
+            font-weight: 500;
+            transition: color 0.3s ease;
+        }
+
+        td a:hover,
+        td a:focus-visible {
+            color: var(--warm-brown-dark);
+            text-decoration: underline;
+            outline: none;
+        }
+
+        /* Cards */
+        .card {
+            background: var(--warm-cream);
+            border: 1px solid var(--border-color);
+            border-radius: var(--border-radius-md);
+            padding: var(--spacing-md);
+            box-shadow: 0 4px 16px var(--shadow-color);
+            transition: all 0.3s ease;
+            margin-bottom: var(--spacing-md);
+        }
+
+        .card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 32px var(--shadow-color);
+        }
+
+        .card h1, .card h2, .card h3, .card h4 {
+            color: var(--text-primary);
+            margin-bottom: var(--spacing-sm);
+        }
+
+        .card h1 {
+            font-size: 2.5rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, var(--sage-green), var(--warm-brown));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        /* Form Elements */
+        input, select, textarea {
+            background: var(--warm-cream);
+            border: 2px solid var(--border-color);
+            border-radius: var(--border-radius-sm);
+            padding: var(--spacing-xs) var(--spacing-sm);
+            color: var(--text-primary);
+            font-family: inherit;
+            transition: all 0.3s ease;
+        }
+
+        input:focus, select:focus, textarea:focus {
+            border-color: var(--sage-green);
+            box-shadow: 0 0 0 3px rgba(168, 187, 163, 0.2);
+            outline: none;
+        }
+
+        textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+
+        /* Tooltips */
+        .tooltip {
+            position: absolute;
+            background: var(--text-primary);
+            color: var(--text-light);
+            padding: var(--spacing-xs) var(--spacing-sm);
+            border-radius: var(--border-radius-sm);
+            font-size: 0.85rem;
+            pointer-events: none;
+            z-index: 1000;
+            box-shadow: 0 4px 12px var(--shadow-color);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .tooltip.visible {
+            opacity: 1;
+        }
+
+        /* Footer */
+        .footer {
+            background: var(--background-secondary);
+            color: var(--text-secondary);
+            padding: var(--spacing-md);
+            text-align: center;
+            border-top: 1px solid var(--border-color);
+            margin-top: var(--spacing-xl);
+        }
+
+        /* Responsive Design */
+        @media (max-width: 1024px) {
+            .nav-container {
+                padding: 0 var(--spacing-md);
+            }
+            
+            .main-container {
+                flex-direction: column;
+                padding: var(--spacing-md);
+            }
+
+            .cilia-panel {
+                position: static;
+                width: 100%;
+                order: -1;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .navbar {
+                padding: var(--spacing-xs) 0;
+            }
+
+            .nav-container {
+                flex-direction: column;
+                gap: var(--spacing-sm);
+                padding: 0 var(--spacing-sm);
+            }
+
+            .logo {
+                font-size: 2rem;
+            }
+
+            .nav-links {
+                flex-wrap: wrap;
+                justify-content: center;
+                gap: 0.25rem;
+            }
+
+            .nav-links li a {
+                font-size: 0.95rem;
+                padding: var(--spacing-xs) var(--spacing-sm);
+            }
+
+            .main-container {
+                padding: var(--spacing-sm);
+            }
+
+            .content-area,
+            .cilia-panel {
+                padding: var(--spacing-sm);
+            }
+
+            .search-container {
+                flex-direction: column;
+            }
+
+            .interactive-cilium svg {
+                max-height: 300px;
+            }
+        }
+
+        /* Loading States */
+        .loading {
+            position: relative;
+            overflow: hidden;
+        }
+
+        .loading::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(168, 187, 163, 0.2), transparent);
+            animation: loading 1.5s infinite;
+        }
+
+        @keyframes loading {
+            0% { left: -100%; }
+            100% { left: 100%; }
+        }
+
+        /* Animation Classes */
+        .fade-in {
+            animation: fadeIn 0.5s ease-in-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .slide-in {
+            animation: slideIn 0.5s ease-out;
+        }
+
+        @keyframes slideIn {
+            from { transform: translateX(-20px); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        /* Enhanced Focus Styles */
+        *:focus-visible {
+            outline: 2px solid var(--sage-green);
+            outline-offset: 2px;
+        }
+
+        /* Smooth Scrolling */
+        html {
+            scroll-behavior: smooth;
+        }
+
+        /* Print Styles */
+        @media print {
+            .navbar,
+            .cilia-panel,
+            .search-container,
+            .btn {
+                display: none !important;
+            }
+            
+            body {
+                background: white !important;
+                color: black !important;
+            }
+            
+            .content-area {
+                box-shadow: none !important;
+                border: 1px solid #ccc !important;
+                padding: 1rem !important;
+                margin: 0 !important;
+            }
+
+            .main-container {
+                padding: 0 !important;
+                max-width: none !important;
+            }
+        }
+
+        /* CiliaPlot Specific Enhancements */
+        .ciliaplot-container {
+            background: var(--dusty-rose);
+            border: 1px solid var(--border-color);
+            border-radius: var(--border-radius-md);
+            padding: var(--spacing-md);
+            margin: var(--spacing-md) 0;
+        }
+
+        .plot-controls {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: var(--spacing-md);
+            align-items: end;
+            margin-bottom: var(--spacing-md);
+        }
+
+        .plot-area {
+            min-height: 400px;
+            background: var(--warm-cream);
+            border: 2px solid var(--border-color);
+            border-radius: var(--border-radius-sm);
+            padding: var(--spacing-sm);
+            position: relative;
+        }
+
+        /* Status Messages */
+        .status-message {
+            text-align: center;
+            padding: var(--spacing-lg);
+            color: var(--text-secondary);
+            background: var(--background-secondary);
+            border-radius: var(--border-radius-md);
+            margin: var(--spacing-md) 0;
+        }
+
+        .success-message {
+            color: var(--accent-success);
+            background: rgba(127, 176, 105, 0.1);
+            border: 1px solid var(--accent-success);
+        }
+
+        .error-message {
+            color: var(--accent-error);
+            background: rgba(200, 90, 84, 0.1);
+            border: 1px solid var(--accent-error);
+        }
+
+        .warning-message {
+            color: var(--accent-warning);
+            background: rgba(227, 168, 87, 0.1);
+            border: 1px solid var(--accent-warning);
+        }
+
+        /* Additional Utility Classes */
+        .text-center { text-align: center; }
+        .text-left { text-align: left; }
+        .text-right { text-align: right; }
+        
+        .mb-sm { margin-bottom: var(--spacing-sm); }
+        .mb-md { margin-bottom: var(--spacing-md); }
+        .mb-lg { margin-bottom: var(--spacing-lg); }
+        
+        .mt-sm { margin-top: var(--spacing-sm); }
+        .mt-md { margin-top: var(--spacing-md); }
+        .mt-lg { margin-top: var(--spacing-lg); }
+
+        .p-sm { padding: var(--spacing-sm); }
+        .p-md { padding: var(--spacing-md); }
+        .p-lg { padding: var(--spacing-lg); }
+
+        .hidden { display: none; }
+        .visible { display: block; }
+
+        .flex { display: flex; }
+        .flex-col { flex-direction: column; }
+        .flex-wrap { flex-wrap: wrap; }
+        .items-center { align-items: center; }
+        .justify-center { justify-content: center; }
+        .justify-between { justify-content: space-between; }
+        
+        .gap-sm { gap: var(--spacing-sm); }
+        .gap-md { gap: var(--spacing-md); }
+        .gap-lg { gap: var(--spacing-lg); }
+
+        .w-full { width: 100%; }
+        .h-full { height: 100%; }
+
+        /* Ensure CiliaPlot page layout optimization */
+        .ciliaplot-layout {
+            display: grid;
+            grid-template-rows: auto 1fr;
+            gap: var(--spacing-sm);
+            height: 100%;
+            min-height: 70vh;
+        }
+
+        .ciliaplot-header {
+            background: linear-gradient(135deg, var(--dusty-rose), var(--warm-cream));
+            padding: var(--spacing-md);
+            border-radius: var(--border-radius-md);
+            text-align: center;
+            border: 1px solid var(--border-color);
+        }
+
+        .ciliaplot-main {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: var(--spacing-md);
+            overflow: hidden;
+        }
+
+        .ciliaplot-controls {
+            background: var(--dusty-rose);
+            padding: var(--spacing-md);
+            border-radius: var(--border-radius-md);
+            border: 1px solid var(--border-color);
+        }
+
+        .ciliaplot-visualization {
+            background: var(--warm-cream);
+            border: 2px solid var(--border-color);
+            border-radius: var(--border-radius-md);
+            min-height: 500px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        @media (min-width: 768px) {
+            .ciliaplot-main {
+                grid-template-columns: 400px 1fr;
+            }
+        }
+    </style>
 </head>
 <body>
     <nav class="navbar">
@@ -36,42 +852,411 @@
     </nav>
 
     <main class="main-container">
-        <div class="content-area" id="content-area"></div>
+        <div class="content-area fade-in" id="content-area">
+            <!-- Dynamic content will be loaded here -->
+        </div>
 
-        <aside class="cilia-panel">
+        <aside class="cilia-panel slide-in">
             <div class="panel-header">
                 <h3>Interactive Cilium</h3>
             </div>
             <div class="panel-content">
                 <div class="cilia-container interactive-cilium">
                     <svg viewBox="0 0 300 400" xmlns="http://www.w3.org/2000/svg">
-                        <path id="cell-body" class="cilia-part" tabindex="0" fill="none" d="M 50,380 C -20,300 20,200 150,200 C 280,200 320,300 250,380 Z"/>
-                        <circle id="nucleus" class="cilia-part" tabindex="0" fill="#A7C7E7" cx="150" cy="320" r="40"/>
-                        <rect id="basal-body" class="cilia-part" tabindex="0" fill="#2F2F2F" x="140" y="195" width="20" height="15"/>
-                        <path id="transition-zone" class="ciliaplot-part" tabindex="0" fill="#9B59B6" d="M 142,195 L 138,180 L 162,180 L 158,195 Z"/>
-                        <path id="ciliary-membrane" class="cilia-part" tabindex="0" fill="none" fill-opacity="0.5" d="M 138,180 L 145,10 L 155,10 L 162,180 Z"/>
-                        <path id="axoneme" class="cilia-part" tabindex="0" fill="none" d="M 145,180 L 148,15 L 152,15 L 155,180 Z"/>
+                        <!-- Enhanced SVG with better styling -->
+                        <defs>
+                            <linearGradient id="cellGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                                <stop offset="0%" style="stop-color:var(--dusty-rose);stop-opacity:0.8" />
+                                <stop offset="100%" style="stop-color:var(--dusty-rose);stop-opacity:1" />
+                            </linearGradient>
+                            <linearGradient id="nucleusGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                                <stop offset="0%" style="stop-color:var(--sage-green-light);stop-opacity:0.9" />
+                                <stop offset="100%" style="stop-color:var(--sage-green);stop-opacity:1" />
+                            </linearGradient>
+                            <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+                                <feDropShadow dx="2" dy="2" stdDeviation="3" flood-opacity="0.3"/>
+                            </filter>
+                        </defs>
+                        
+                        <!-- Cell body with enhanced styling -->
+                        <path id="cell-body" 
+                              class="cilia-part" 
+                              tabindex="0" 
+                              fill="url(#cellGradient)" 
+                              stroke="var(--border-color)"
+                              stroke-width="2"
+                              filter="url(#shadow)"
+                              d="M 50,380 C -20,300 20,200 150,200 C 280,200 320,300 250,380 Z"/>
+                        
+                        <!-- Nucleus with gradient -->
+                        <circle id="nucleus" 
+                                class="cilia-part" 
+                                tabindex="0" 
+                                fill="url(#nucleusGradient)" 
+                                stroke="var(--sage-green-dark)"
+                                stroke-width="2"
+                                filter="url(#shadow)"
+                                cx="150" cy="320" r="40"/>
+                        
+                        <!-- Basal body -->
+                        <rect id="basal-body" 
+                              class="cilia-part" 
+                              tabindex="0" 
+                              fill="var(--text-primary)" 
+                              stroke="var(--warm-brown)"
+                              stroke-width="1"
+                              rx="2"
+                              x="140" y="195" width="20" height="15"/>
+                        
+                        <!-- Transition zone -->
+                        <path id="transition-zone" 
+                              class="ciliaplot-part" 
+                              tabindex="0" 
+                              fill="var(--warm-brown)"
+                              stroke="var(--warm-brown-dark)"
+                              stroke-width="1"
+                              d="M 142,195 L 138,180 L 162,180 L 158,195 Z"/>
+                        
+                        <!-- Ciliary membrane -->
+                        <path id="ciliary-membrane" 
+                              class="cilia-part" 
+                              tabindex="0" 
+                              fill="none" 
+                              stroke="var(--sage-green)"
+                              stroke-width="3"
+                              stroke-opacity="0.7"
+                              d="M 138,180 L 145,10 L 155,10 L 162,180 Z"/>
+                        
+                        <!-- Axoneme -->
+                        <path id="axoneme" 
+                              class="cilia-part" 
+                              tabindex="0" 
+                              fill="none" 
+                              stroke="var(--warm-brown-dark)"
+                              stroke-width="2"
+                              d="M 145,180 L 148,15 L 152,15 L 155,180 Z"/>
+                        
+                        <!-- Ciliary tip -->
+                        <circle id="ciliary-tip"
+                                class="cilia-part"
+                                tabindex="0"
+                                fill="var(--accent-success)"
+                                stroke="var(--warm-brown)"
+                                stroke-width="2"
+                                cx="150" cy="12" r="8"/>
+                        
+                        <!-- Labels with better positioning -->
+                        <text x="200" y="25" font-size="11" fill="var(--text-primary)" font-weight="600">Ciliary Tip</text>
+                        <line x1="158" y1="12" x2="195" y2="20" stroke="var(--text-secondary)" stroke-width="1"/>
+                        
+                        <text x="200" y="140" font-size="11" fill="var(--text-primary)" font-weight="600">Transition Zone</text>
+                        <line x1="162" y1="187" x2="195" y2="135" stroke="var(--text-secondary)" stroke-width="1"/>
+                        
+                        <text x="200" y="200" font-size="11" fill="var(--text-primary)" font-weight="600">Basal Body</text>
+                        <line x1="160" y1="202" x2="195" y2="195" stroke="var(--text-secondary)" stroke-width="1"/>
+                        
+                        <text x="200" y="325" font-size="11" fill="var(--text-primary)" font-weight="600">Nucleus</text>
+                        <line x1="190" y1="320" x2="195" y2="320" stroke="var(--text-secondary)" stroke-width="1"/>
                     </svg>
                 </div>
                 <div class="controls">
                     <h4>Gene Localization:</h4>
-                    <div id="geneButtons" class="gene-buttons"></div>
+                    <div id="geneButtons" class="gene-buttons">
+                        <!-- Buttons will be populated by JavaScript -->
+                        <button class="gene-btn default" data-localization="all">Featured Genes</button>
+                        <button class="gene-btn" data-localization="ciliary-tip">Ciliary Tip</button>
+                        <button class="gene-btn" data-localization="axoneme">Axoneme</button>
+                        <button class="gene-btn" data-localization="transition-zone">Transition Zone</button>
+                        <button class="gene-btn" data-localization="basal-body">Basal Body</button>
+                        <button class="gene-btn" data-localization="nucleus">Nuclear</button>
+                        <button class="gene-btn reset-btn">Reset View</button>
+                    </div>
                 </div>
             </div>
         </aside>
     </main>
 
+    <!-- Tooltips -->
     <div id="enrichment-tooltip" class="tooltip"></div>
     <div id="multi-dim-tooltip" class="tooltip"></div>
 
-    <footer class="footer" style="text-align: center;">
-        <p>© 2025 CiliaHub. All rights reserved.</p>
+    <!-- Footer -->
+    <footer class="footer">
+        <p>© 2025 CiliaHub. All rights reserved. | 
+           <a href="#/contact" style="color: var(--sage-green);">Contact</a> | 
+           <a href="#/download" style="color: var(--sage-green);">Download</a>
+        </p>
     </footer>
 
+    <!-- JavaScript Files -->
     <script defer src="plots.js"></script> 
-    
     <script defer src="script.js"></script> 
+    <script defer src="globals.js"></script>
     
-    <script defer src="globals.js"></script> 
+    <!-- Additional JavaScript for enhanced functionality -->
+    <script>
+        // Enhanced navigation with smooth transitions
+        document.addEventListener('DOMContentLoaded', function() {
+            // Add active states to navigation
+            const currentPath = window.location.hash || '#/';
+            const navLinks = document.querySelectorAll('.nav-links a');
+            
+            navLinks.forEach(link => {
+                if (link.getAttribute('href') === currentPath) {
+                    link.classList.add('active');
+                }
+            });
+
+            // Enhanced cilium interaction
+            const ciliumParts = document.querySelectorAll('.cilia-part, .ciliaplot-part');
+            ciliumParts.forEach(part => {
+                part.addEventListener('mouseenter', function() {
+                    showTooltip(this, getPartDescription(this.id));
+                });
+                
+                part.addEventListener('mouseleave', function() {
+                    hideTooltip();
+                });
+                
+                part.addEventListener('click', function() {
+                    highlightRelatedGenes(this.id);
+                });
+            });
+
+            // Gene button interactions
+            const geneButtons = document.querySelectorAll('.gene-btn');
+            geneButtons.forEach(button => {
+                button.addEventListener('click', function() {
+                    if (this.classList.contains('reset-btn')) {
+                        resetAllHighlights();
+                    } else {
+                        highlightLocalization(this.dataset.localization);
+                        updateButtonStates(this);
+                    }
+                });
+            });
+
+            // Add loading states to content area
+            const contentArea = document.getElementById('content-area');
+            if (contentArea) {
+                // Add smooth transitions when content changes
+                const observer = new MutationObserver(function(mutations) {
+                    mutations.forEach(function(mutation) {
+                        if (mutation.type === 'childList') {
+                            contentArea.classList.add('fade-in');
+                            setTimeout(() => {
+                                contentArea.classList.remove('fade-in');
+                            }, 500);
+                        }
+                    });
+                });
+                
+                observer.observe(contentArea, {
+                    childList: true,
+                    subtree: true
+                });
+            }
+
+            // Enhanced search functionality
+            addEnhancedSearch();
+            
+            // Initialize responsive features
+            initResponsiveFeatures();
+        });
+
+        // Utility functions for enhanced interactivity
+        function getPartDescription(partId) {
+            const descriptions = {
+                'cell-body': 'Cell Body: The main cellular structure containing organelles',
+                'nucleus': 'Nucleus: Contains genetic material and controls cell functions',
+                'basal-body': 'Basal Body: Anchors and organizes the ciliary structure',
+                'transition-zone': 'Transition Zone: Regulates protein entry into cilium',
+                'ciliary-membrane': 'Ciliary Membrane: Specialized membrane surrounding the cilium',
+                'axoneme': 'Axoneme: Core structural component with microtubules',
+                'ciliary-tip': 'Ciliary Tip: Distal end involved in sensory functions'
+            };
+            return descriptions[partId] || 'Ciliary component';
+        }
+
+        function showTooltip(element, text) {
+            const tooltip = document.getElementById('enrichment-tooltip');
+            const rect = element.getBoundingClientRect();
+            
+            tooltip.textContent = text;
+            tooltip.style.left = (rect.left + rect.width / 2) + 'px';
+            tooltip.style.top = (rect.top - 40) + 'px';
+            tooltip.classList.add('visible');
+        }
+
+        function hideTooltip() {
+            const tooltip = document.getElementById('enrichment-tooltip');
+            tooltip.classList.remove('visible');
+        }
+
+        function highlightRelatedGenes(partId) {
+            // Reset previous highlights
+            resetAllHighlights();
+            
+            // Highlight the selected part
+            const selectedPart = document.getElementById(partId);
+            if (selectedPart) {
+                selectedPart.style.filter = 'brightness(1.3) drop-shadow(0 0 8px var(--warm-brown))';
+            }
+            
+            // Update gene buttons based on localization
+            const localizationMap = {
+                'ciliary-tip': ['ADCY3', 'INPP5E'],
+                'axoneme': ['DNAI1', 'DNAH5', 'IFT88'],
+                'transition-zone': ['CEP290', 'RPGRIP1L', 'TMEM67'],
+                'basal-body': ['CEP164', 'OFD1', 'PCNT'],
+                'nucleus': ['BBS1', 'MKS1']
+            };
+            
+            const relatedGenes = localizationMap[partId] || [];
+            highlightGeneButtons(relatedGenes);
+        }
+
+        function highlightLocalization(localization) {
+            resetAllHighlights();
+            
+            const partMap = {
+                'ciliary-tip': ['ciliary-tip'],
+                'axoneme': ['axoneme', 'ciliary-membrane'],
+                'transition-zone': ['transition-zone'],
+                'basal-body': ['basal-body'],
+                'nucleus': ['nucleus']
+            };
+            
+            const partsToHighlight = partMap[localization] || [];
+            partsToHighlight.forEach(partId => {
+                const part = document.getElementById(partId);
+                if (part) {
+                    part.style.filter = 'brightness(1.2) drop-shadow(0 0 6px var(--sage-green))';
+                }
+            });
+        }
+
+        function resetAllHighlights() {
+            const allParts = document.querySelectorAll('.cilia-part, .ciliaplot-part');
+            allParts.forEach(part => {
+                part.style.filter = '';
+            });
+            
+            const geneButtons = document.querySelectorAll('.gene-btn');
+            geneButtons.forEach(button => {
+                button.classList.remove('search-gene');
+            });
+        }
+
+        function updateButtonStates(activeButton) {
+            const geneButtons = document.querySelectorAll('.gene-btn');
+            geneButtons.forEach(button => {
+                button.classList.remove('search-gene');
+            });
+            activeButton.classList.add('search-gene');
+        }
+
+        function highlightGeneButtons(genes) {
+            // This would integrate with the main application's gene data
+            console.log('Highlighting genes:', genes);
+        }
+
+        function addEnhancedSearch() {
+            // Add search functionality to any search inputs
+            const searchInputs = document.querySelectorAll('input[type="text"]');
+            searchInputs.forEach(input => {
+                let timeout;
+                input.addEventListener('input', function() {
+                    clearTimeout(timeout);
+                    timeout = setTimeout(() => {
+                        if (this.value.length > 2) {
+                            // Add loading state
+                            this.classList.add('loading');
+                            
+                            // Simulate search delay
+                            setTimeout(() => {
+                                this.classList.remove('loading');
+                            }, 500);
+                        }
+                    }, 300);
+                });
+            });
+        }
+
+        function initResponsiveFeatures() {
+            // Handle responsive sidebar toggle
+            const mediaQuery = window.matchMedia('(max-width: 1024px)');
+            
+            function handleTabletChange(e) {
+                const sidebar = document.querySelector('.cilia-panel');
+                if (e.matches) {
+                    // Mobile/tablet view
+                    sidebar.classList.add('mobile-sidebar');
+                } else {
+                    // Desktop view
+                    sidebar.classList.remove('mobile-sidebar');
+                }
+            }
+            
+            mediaQuery.addListener(handleTabletChange);
+            handleTabletChange(mediaQuery);
+
+            // Add touch gestures for mobile
+            if ('ontouchstart' in window) {
+                document.body.classList.add('touch-device');
+            }
+        }
+
+        // Global function to handle navigation (maintains compatibility with existing scripts)
+        function navigateTo(event, path) {
+            event.preventDefault();
+            
+            // Update URL
+            window.location.hash = path;
+            
+            // Update active navigation
+            const navLinks = document.querySelectorAll('.nav-links a');
+            navLinks.forEach(link => {
+                link.classList.remove('active');
+                if (link.getAttribute('href') === '#' + path) {
+                    link.classList.add('active');
+                }
+            });
+            
+            // Add loading state to content area
+            const contentArea = document.getElementById('content-area');
+            contentArea.classList.add('loading');
+            
+            // This will be handled by the main script.js file
+            // The loading class will be removed when content is loaded
+        }
+
+        // Enhanced error handling
+        window.addEventListener('error', function(e) {
+            console.error('JavaScript error:', e.error);
+            // Could show user-friendly error messages here
+        });
+
+        // Performance monitoring
+        if ('performance' in window) {
+            window.addEventListener('load', function() {
+                setTimeout(() => {
+                    const perfData = performance.getEntriesByType('navigation')[0];
+                    console.log('Page load time:', perfData.loadEventEnd - perfData.loadEventStart + 'ms');
+                }, 0);
+            });
+        }
+
+        // Accessibility enhancements
+        document.addEventListener('keydown', function(e) {
+            // Enhanced keyboard navigation
+            if (e.key === 'Tab' && e.shiftKey) {
+                // Handle reverse tab navigation
+            } else if (e.key === 'Escape') {
+                // Close any open modals or tooltips
+                hideTooltip();
+            }
+        });
+    </script>
 </body>
 </html>
