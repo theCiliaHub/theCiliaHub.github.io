@@ -1212,7 +1212,6 @@ function showErrorMessage(message) {
     setTimeout(() => errorDiv.remove(), 3000);
 }
 
-// Existing displayIndividualGenePage (unchanged from previous response)
 function displayIndividualGenePage(gene) {
     const contentArea = document.querySelector('.content-area');
     if (!contentArea) return console.warn("⚠️ .content-area not found.");
@@ -1252,12 +1251,12 @@ function displayIndividualGenePage(gene) {
         if (!screens || screens.length === 0) {
             return '<p>No functional screen data available for this gene.</p>';
         }
+
         let tableHTML = `
             <div class="table-responsive">
                 <table class="data-summary-table">
                     <thead>
                         <tr>
-                            <th>Dataset</th>
                             <th>Mean % Ciliated</th>
                             <th>Z-Score</th>
                             <th>Classification</th>
@@ -1266,270 +1265,109 @@ function displayIndividualGenePage(gene) {
                     </thead>
                     <tbody>
         `;
+
         screens.forEach(screen => {
             const meanCiliated = typeof screen.mean_percent_ciliated === 'number' ? screen.mean_percent_ciliated.toFixed(2) : 'N/A';
             const zScore = typeof screen.z_score === 'number' ? screen.z_score.toFixed(2) : 'N/A';
+            const refName = screen.dataset_name || 'Unknown';
+            const paperLink = screen.paper_link || '#';
+
             tableHTML += `
                 <tr>
-                    <td>${screen.dataset || 'N/A'}</td>
                     <td>${meanCiliated}</td>
                     <td>${zScore}</td>
                     <td>${screen.classification || 'N/A'}</td>
-                    <td>
-                        <a href="${screen.paper_link}" target="_blank" rel="noopener noreferrer" class="external-link">View Paper</a>
-                    </td>
+                    <td><a href="${paperLink}" target="_blank" rel="noopener noreferrer" class="external-link">${refName}</a></td>
                 </tr>
             `;
         });
+
         tableHTML += `</tbody></table></div>`;
         return tableHTML;
     };
 
     const icons = {
-        summary: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22h6a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16"></path><path d="M11 7h2"></path><path d="M11 11h4"></path><path d="M11 15h4"></path><path d="M5 22v-5"></path><path d="M3 17h4"></path></svg>`,
-        references: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v15H6.5A2.5 2.5 0 0 1 4 14.5V4A2.5 2.5 0 0 1 6.5 2z"></path></svg>`,
-        links: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.72"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.72-1.72"></path></svg>`,
-        location: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>`,
-        category: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>`,
-        ciliopathy: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>`,
-        pfam: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>`,
-        complex: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="3"></circle><circle cx="12" cy="19" r="3"></circle><line x1="12" y1="8" x2="12" y2="16"></line><circle cx="5" cy="12" r="3"></circle><line x1="8" y1="12" x2="16" y2="12"></line><circle cx="19" cy="12" r="3"></circle></svg>`,
-        screen: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 10.5h-5m5 3h-5m8-10h-8a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V5.5a2 2 0 0 0-2-2z"></path><path d="M4.5 3.5v15"></path></svg>`
+        screen: '📊',
+        summary: '📝',
+        references: '📚',
+        links: '🔗',
+        category: '🏷️',
+        ciliopathy: '⚠️',
+        pfam: '🔧',
+        complex: '🧩'
     };
 
     contentArea.innerHTML = `
         <div class="page-section gene-detail-page">
             <style>
-                .gene-detail-page {
-                    padding: var(--spacing-md);
-                }
-                .gene-header {
-                    margin-bottom: var(--spacing-md);
-                    text-align: center;
-                }
-                .gene-header h1 {
-                    font-size: 2.2rem;
-                    color: var(--primary-blue);
-                    margin: 0 0 var(--spacing-xs);
-                    display: inline-block;
-                    vertical-align: middle;
-                }
-                .header-tags {
-                    display: inline-flex;
-                    flex-wrap: wrap;
-                    gap: var(--spacing-xs);
-                    vertical-align: middle;
-                    margin-left: var(--spacing-sm);
-                }
-                .synonym-tags {
-                    display: flex;
-                    flex-wrap: wrap;
-                    gap: var(--spacing-xs);
-                    justify-content: center;
-                    margin-top: var(--spacing-sm);
-                }
-                .gene-details-grid {
-                    display: grid;
-                    grid-template-columns: 1fr 1fr;
-                    gap: 0;
-                    max-width: 100%;
-                }
-                .details-column {
-                    min-width: 0;
-                    margin: 0;
-                }
-                .detail-card {
-                    background: var(--white);
-                    border: 1px solid var(--border-color);
-                    border-radius: var(--radius-md);
-                    padding: var(--spacing-md);
-                    box-shadow: var(--shadow-light);
-                    max-height: 300px;
-                    overflow-y: auto;
-                    margin: -1px;
-                }
-                .detail-card.screen-data {
-                    max-height: 400px;
-                }
-                .card-title {
-                    display: flex;
-                    align-items: center;
-                    gap: var(--spacing-xs);
-                    color: var(--primary-blue);
-                    font-size: 1.2rem;
-                    font-weight: 600;
-                    margin-bottom: var(--spacing-sm);
-                }
-                .card-title svg {
-                    width: 20px;
-                    height: 20px;
-                    stroke: var(--primary-blue);
-                    stroke-width: 2;
-                    fill: none;
-                }
-                .tags-container {
-                    display: flex;
-                    flex-wrap: wrap;
-                    gap: var(--spacing-xs);
-                }
-                .tag {
-                    background: var(--light-blue);
-                    color: var(--primary-blue);
-                    padding: 0.3rem 0.6rem;
-                    border-radius: var(--radius-sm);
-                    font-size: 0.9rem;
-                }
-                .tag-ciliopathy {
-                    background: var(--error-red);
-                    color: var(--text-light);
-                }
-                .tag:hover, .tag:focus {
-                    background: var(--primary-blue);
-                    color: var(--text-light);
-                    cursor: pointer;
-                }
-                .reference-list, .info-list {
-                    list-style: none;
-                    padding: 0;
-                    margin: 0;
-                    font-size: 0.95rem;
-                }
-                .info-list li {
-                    margin-bottom: var(--spacing-xs);
-                }
-                .info-item strong {
-                    color: var(--primary-blue);
-                }
-                .info-item a, .reference-list a {
-                    color: var(--primary-blue);
-                    text-decoration: none;
-                }
-                .info-item a:hover, .reference-list a:hover {
-                    text-decoration: underline;
-                }
-                .data-summary-table {
-                    width: 100%;
-                    border-collapse: collapse;
-                    font-size: 0.9rem;
-                }
-                .data-summary-table th, .data-summary-table td {
-                    padding: var(--spacing-xs) var(--spacing-sm);
-                    border-bottom: 1px solid var(--border-color);
-                    text-align: left;
-                }
-                .data-summary-table th {
-                    background: var(--primary-blue);
-                    color: var(--text-light);
-                    position: sticky;
-                    top: 0;
-                }
-                .data-summary-table tr:nth-child(even) {
-                    background: var(--light-gray);
-                }
-                .data-summary-table tr:hover {
-                    background: var(--light-blue);
-                }
-                .external-link {
-                    color: var(--primary-blue);
-                    text-decoration: none;
-                }
-                .external-link:hover {
-                    text-decoration: underline;
-                }
-                @media (max-width: 1024px) {
-                    .gene-details-grid {
-                        grid-template-columns: 1fr;
-                    }
-                    .detail-card {
-                        margin: 0;
-                        border: 1px solid var(--border-color);
-                    }
-                    .detail-card.screen-data {
-                        order: -1;
-                    }
-                    .header-tags {
-                        display: flex;
-                        justify-content: center;
-                        margin-left: 0;
-                        margin-top: var(--spacing-xs);
-                    }
-                }
-                @media (max-width: 768px) {
-                    .gene-header h1 {
-                        font-size: 1.8rem;
-                    }
-                    .detail-card {
-                        max-height: 250px;
-                    }
-                    .detail-card.screen-data {
-                        max-height: 350px;
-                    }
-                }
+                .gene-detail-page { padding: var(--spacing-md); }
+                .gene-header { text-align: center; margin-bottom: var(--spacing-md); }
+                .gene-header h1 { font-size: 2rem; color: var(--primary-blue); margin: 0 0 0.5rem; }
+                .header-tags, .synonym-tags { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.5rem; margin-bottom: 0.5rem; }
+                .detail-card { background: var(--white); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: var(--spacing-md); box-shadow: var(--shadow-light); margin-bottom: 1rem; }
+                .card-title { font-size: 1.2rem; font-weight: 600; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.5rem; color: var(--primary-blue); }
+                .tags-container { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+                .tag { background: var(--light-blue); color: var(--primary-blue); padding: 0.3rem 0.6rem; border-radius: var(--radius-sm); font-size: 0.9rem; }
+                .tag-ciliopathy { background: var(--error-red); color: var(--text-light); }
+                .data-summary-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+                .data-summary-table th, .data-summary-table td { padding: 0.3rem 0.6rem; border-bottom: 1px solid var(--border-color); text-align: left; }
+                .data-summary-table th { background: var(--primary-blue); color: var(--text-light); position: sticky; top: 0; }
+                .data-summary-table tr:nth-child(even) { background: var(--light-gray); }
+                .data-summary-table tr:hover { background: var(--light-blue); }
+                .external-link { color: var(--primary-blue); text-decoration: none; }
+                .external-link:hover { text-decoration: underline; }
             </style>
 
             <header class="gene-header">
-                <div class="gene-title-container">
-                    <h1>${gene.gene || "Unknown Gene"}</h1>
-                    <div class="header-tags tags-container">${formatAsTags(gene.localization)}</div>
-                </div>
-                ${gene.synonym ? `<div class="synonym-tags tags-container">${formatAsTags(gene.synonym)}</div>` : ''}
-                ${gene.description ? `<p>${gene.description}</p>` : '<p>No description available.</p>'}
+                <h1>${gene.gene || "Unknown Gene"}</h1>
+                <div class="header-tags">${formatAsTags(gene.localization)}</div>
+                ${gene.synonym ? `<div class="synonym-tags">${formatAsTags(gene.synonym)}</div>` : ''}
+                <p>${gene.description || 'No description available.'}</p>
             </header>
 
-            <div class="gene-details-grid">
-                <div class="details-column screen-data-column">
-                    <div class="detail-card screen-data">
-                        <h3 class="card-title">${icons.screen} Functional Screen Data</h3>
-                        ${formatScreenData(gene.screens)}
-                    </div>
-                </div>
-                <div class="details-column">
-                    <div class="detail-card">
-                        <h3 class="card-title">${icons.summary} Functional Summary</h3>
-                        <p>${gene.functional_summary || 'No functional summary available.'}</p>
-                    </div>
-                </div>
-                <div class="details-column">
-                    <div class="detail-card">
-                        <h3 class="card-title">${icons.references} References</h3>
-                        <ul class="reference-list">${formatReferences(gene)}</ul>
-                    </div>
-                </div>
-                <div class="details-column">
-                    <div class="detail-card">
-                        <h3 class="card-title">${icons.links} Identifiers & External Links</h3>
-                        <ul class="info-list">
-                            <li class="info-item"><strong>Ensembl ID(s)</strong><span>${gene.ensembl_id ? String(gene.ensembl_id).split(/[;,]\s*/).map(id => `<a href="https://www.ensembl.org/Homo_sapiens/Gene/Summary?g=${id}" target="_blank">${id}</a>`).join('<br>') : 'Not available'}</span></li>
-                            ${gene.omim_id ? `<li class="info-item"><strong>OMIM ID</strong><a href="https://www.omim.org/entry/${gene.omim_id}" target="_blank">${gene.omim_id}</a></li>` : ''}
-                            ${gene.string_link ? `<li class="info-item"><strong>STRING DB</strong><a href="${gene.string_link}" target="_blank">Protein Interaction Network</a></li>` : ''}
-                            ${gene.protein_atlas_link ? `<li class="info-item"><strong>Protein Atlas</strong><a href="${gene.protein_atlas_link}" target="_blank">Subcellular Localization</a></li>` : ''}
-                        </ul>
-                    </div>
-                </div>
-                <div class="details-column">
-                    <div class="detail-card">
-                        <h3 class="card-title">${icons.category} Functional Category</h3>
-                        <div class="tags-container">${formatAsTags(gene.functional_category)}</div>
-                    </div>
-                </div>
-                <div class="details-column">
-                    <div class="detail-card">
-                        <h3 class="card-title">${icons.ciliopathy} Associated Ciliopathies</h3>
-                        <div class="tags-container">${formatAsTags(gene.ciliopathy, 'tag-ciliopathy')}</div>
-                    </div>
-                </div>
-                <div class="details-column">
-                    <div class="detail-card">
-                        <h3 class="card-title">${icons.pfam} PFAM Domains</h3>
-                        <div class="tags-container">${formatAsTags(gene.domain_descriptions)}</div>
-                    </div>
-                </div>
-                <div class="details-column">
-                    <div class="detail-card">
-                        <h3 class="card-title">${icons.complex} Protein Complexes</h3>
-                        <div class="tags-container">${formatComplexes(gene.complex_names)}</div>
-                    </div>
-                </div>
+            <div class="detail-card">
+                <h3 class="card-title">${icons.screen} Functional Screen Data</h3>
+                ${formatScreenData(gene.screens)}
+            </div>
+
+            <div class="detail-card">
+                <h3 class="card-title">${icons.summary} Functional Summary</h3>
+                <p>${gene.functional_summary || 'No functional summary available.'}</p>
+            </div>
+
+            <div class="detail-card">
+                <h3 class="card-title">${icons.references} References</h3>
+                <ul class="reference-list">${formatReferences(gene)}</ul>
+            </div>
+
+            <div class="detail-card">
+                <h3 class="card-title">${icons.links} Identifiers & External Links</h3>
+                <ul class="info-list">
+                    <li><strong>Ensembl ID(s):</strong> ${gene.ensembl_id ? String(gene.ensembl_id).split(/[;,]\s*/).map(id => `<a href="https://www.ensembl.org/Homo_sapiens/Gene/Summary?g=${id}" target="_blank">${id}</a>`).join('<br>') : 'Not available'}</li>
+                    ${gene.omim_id ? `<li><strong>OMIM ID:</strong> <a href="https://www.omim.org/entry/${gene.omim_id}" target="_blank">${gene.omim_id}</a></li>` : ''}
+                    ${gene.string_link ? `<li><strong>STRING DB:</strong> <a href="${gene.string_link}" target="_blank">Protein Interaction Network</a></li>` : ''}
+                    ${gene.protein_atlas_link ? `<li><strong>Protein Atlas:</strong> <a href="${gene.protein_atlas_link}" target="_blank">Subcellular Localization</a></li>` : ''}
+                </ul>
+            </div>
+
+            <div class="detail-card">
+                <h3 class="card-title">${icons.category} Functional Category</h3>
+                <div class="tags-container">${formatAsTags(gene.functional_category)}</div>
+            </div>
+
+            <div class="detail-card">
+                <h3 class="card-title">${icons.ciliopathy} Associated Ciliopathies</h3>
+                <div class="tags-container">${formatAsTags(gene.ciliopathy, 'tag-ciliopathy')}</div>
+            </div>
+
+            <div class="detail-card">
+                <h3 class="card-title">${icons.pfam} PFAM Domains</h3>
+                <div class="tags-container">${formatAsTags(gene.domain_descriptions)}</div>
+            </div>
+
+            <div class="detail-card">
+                <h3 class="card-title">${icons.complex} Protein Complexes</h3>
+                <div class="tags-container">${formatComplexes(gene.complex_names)}</div>
             </div>
         </div>
     `;
@@ -1537,6 +1375,7 @@ function displayIndividualGenePage(gene) {
     if (typeof updateGeneButtons === "function") updateGeneButtons([gene], [gene]);
     if (typeof showLocalization === "function") showLocalization(gene.gene, true);
 }
+
 
 function displayNotFoundPage() {
     const contentArea = document.querySelector('.content-area');
