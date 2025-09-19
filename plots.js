@@ -1,16 +1,3 @@
-// GLOBAL STATE FOR PLOTS (ESPECIALLY EXPRESSION HEATMAP)
-// =============================================================================
-
-// --- Global State for Expression Heatmap ---
-let plotExpressionLoaded = false;
-let plotExpressionData = {};
-let pendingHeatmapRequest = null;
-
-// This variable holds the currently active Chart.js or D3 plot instance
-let currentPlotInstance = null;
-
-
-
 /**
  * Displays the main CiliaPlot analysis page, fully integrating all plotting and UI logic.
  */
@@ -325,82 +312,44 @@ async function generateAnalysisPlots() {
         console.error("generateAnalysisPlots was called before geneMapCache was initialized.");
         return;
     }
-
     const plotContainer = document.getElementById('plot-display-area');
     plotContainer.innerHTML = '<em>Searching genes and generating plot...</em>';
     clearAllPlots('plot-display-area');
-
     const rawInput = document.getElementById('ciliaplot-genes-input').value;
     const originalQueries = rawInput.split(/[\s,;\n\r\t]+/).filter(Boolean);
     if (originalQueries.length === 0) {
         plotContainer.innerHTML = 'Please enter at least one gene.';
         return;
     }
-
     const sanitizedQueries = [...new Set(originalQueries.map(q => q.trim().toUpperCase()))];
     // This assumes a global `findGenes` function is available.
     const { foundGenes } = findGenes(sanitizedQueries);
     
     updateGeneSummaryTable(originalQueries, foundGenes);
-
     if (foundGenes.length === 0) {
         plotContainer.innerHTML = 'None of the provided genes were found.';
         return;
     }
-
     const plotType = document.querySelector('input[name="ciliaplot_type"]:checked').value;
     const custom = getPlotCustomization();
-
     switch (plotType) {
-        case 'localization_bubble':
-            renderBubblePlot(foundGenes, custom);
-            break;
-        case 'functional_bar':
-            renderBarPlot(foundGenes, custom);
-            break;
-        case 'enrichment_bubble':
-            renderEnrichmentBubblePlot(foundGenes, custom);
-            break;
-        case 'balloon_plot':
-            renderBalloonPlot(foundGenes, custom);
-            break;
-        case 'venn_diagram':
-            renderVennDiagram(foundGenes, custom);
-            break;
-        case 'network':
-            renderComplexNetwork(foundGenes, plotContainer, custom);
-            break;
-        case 'organelle_radar':
-            renderOrganelleRadarPlot(foundGenes, plotContainer, custom);
-            break;
-        case 'organelle_umap':
-            renderOrganelleUMAP(foundGenes, plotContainer, custom);
-            break;
-        case 'screen_analysis':
-            renderGeneScreenAnalysis(foundGenes, plotContainer, custom);
-            break;
-        
-        // CORRECTED SECTION
+        case 'localization_bubble': renderBubblePlot(foundGenes, custom); break;
+        case 'functional_bar': renderBarPlot(foundGenes, custom); break;
+        case 'enrichment_bubble': renderEnrichmentBubblePlot(foundGenes, custom); break;
+        case 'balloon_plot': renderBalloonPlot(foundGenes, custom); break;
+        case 'venn_diagram': renderVennDiagram(foundGenes, custom); break;
+        case 'network': renderComplexNetwork(foundGenes, plotContainer, custom); break;
+        case 'organelle_radar': renderOrganelleRadarPlot(foundGenes, plotContainer, custom); break;
+        case 'organelle_umap': renderOrganelleUMAP(foundGenes, plotContainer, custom); break;
+        case 'screen_analysis': renderGeneScreenAnalysis(foundGenes, plotContainer, custom); break;
         case 'expression_heatmap':
-    // ...
-    if (!plotExpressionLoaded || Object.keys(plotExpressionData).length === 0) { // <--- ERROR HAPPENS HERE
-        // ... logic to load data ...
-        return;
-    }
-    renderExpressionHeatmap(plotExpressionData, foundGenes);
-    break;
-            
-            // This assumes plotExpressionLoaded and plotExpressionData are global variables
-            if (!plotExpressionLoaded || Object.keys(plotExpressionData).length === 0) {
-                plotContainer.innerHTML = '<em>Expression data is loading... heatmap will appear automatically once ready.</em>';
-                // This assumes a pendingHeatmapRequest global variable and loadPlotExpressionData function
-                pendingHeatmapRequest = { foundGenes };
-                loadPlotExpressionData(); // Trigger loading if not already loaded
-                return;
+            // This assumes a global `renderExpressionHeatmap` function is available.
+            if (typeof renderExpressionHeatmap === "function") {
+                 renderExpressionHeatmap(foundGenes);
+            } else {
+                 plotContainer.innerHTML = 'Expression heatmap functionality is not loaded.';
             }
-            renderExpressionHeatmap(plotExpressionData, foundGenes);
             break;
-
         default:
             plotContainer.innerHTML = 'This plot type is not yet implemented.';
     }
