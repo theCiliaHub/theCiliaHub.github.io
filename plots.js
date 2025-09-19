@@ -222,12 +222,36 @@ function updateCustomizationPanel() {
     container.innerHTML = html;
 }
 
+/// Utility to wait until a condition is true
+function waitFor(conditionFn, timeout = 5000, interval = 50) {
+    return new Promise((resolve, reject) => {
+        const start = Date.now();
+        const check = () => {
+            if (conditionFn()) return resolve(true);
+            if (Date.now() - start > timeout) return reject(new Error('Timeout waiting for condition'));
+            setTimeout(check, interval);
+        };
+        check();
+    });
+}
+
 // Updated generateAnalysisPlots function
 async function generateAnalysisPlots() {
-    // Check that the gene database is loaded before proceeding.
-    if (typeof geneMapCache === 'undefined' || geneMapCache.size === 0) {
-        alert("Error: The main gene database is not yet loaded. Please wait a moment and try again, or refresh the page.");
-        console.error("generateAnalysisPlots was called before geneMapCache was initialized.");
+    // 1. Wait for geneMapCache to be loaded
+    try {
+        await waitFor(() => typeof geneMapCache !== 'undefined' && geneMapCache.size > 0);
+    } catch (err) {
+        alert("Error: The main gene database is not yet loaded. Please wait a moment and try again.");
+        console.error(err);
+        return;
+    }
+
+    // 2. Wait for expressionData to be loaded
+    try {
+        await waitFor(() => typeof expressionData !== 'undefined' && Object.keys(expressionData).length > 0);
+    } catch (err) {
+        alert("Error: Gene expression data is not yet loaded. Please wait a moment and try again.");
+        console.error(err);
         return;
     }
 
@@ -241,9 +265,11 @@ async function generateAnalysisPlots() {
         plotContainer.innerHTML = 'Please enter at least one gene.';
         return;
     }
+
     const sanitizedQueries = [...new Set(originalQueries.map(sanitize))];
     const { foundGenes } = findGenes(sanitizedQueries);
     updateGeneSummaryTable(originalQueries, foundGenes);
+
     if (foundGenes.length === 0) {
         plotContainer.innerHTML = 'None of the provided genes were found.';
         return;
@@ -272,13 +298,13 @@ async function generateAnalysisPlots() {
             renderGeneScreenAnalysis(foundGenes, plotContainer, custom);
             break;
         case 'expression_heatmap':
-            // FIX: Pass expressionData and foundGenes instead of foundGenes, plotContainer, custom
             renderExpressionHeatmap(expressionData, foundGenes);
             break;
         default:
             plotContainer.innerHTML = 'This plot type is not yet implemented.';
     }
 }
+
 
 
 
