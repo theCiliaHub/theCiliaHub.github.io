@@ -1,12 +1,13 @@
 // =============================================================================
-// CiliaHub Plotting Engine (plots.js) - Final Self-Contained Version
+// CiliaHub Plotting Engine (plots.js) - Final Corrected Version
 // =============================================================================
-// This file contains all logic for the CiliaPlot page. It is self-sufficient,
-// handles its own data loading, and manages its UI state to prevent errors.
+// This file is responsible ONLY for displaying the CiliaPlot page and rendering
+// visualizations. It relies on global variables and functions from script.js,
+// such as findGenes(), and the pre-loaded expressionData object.
 // =============================================================================
 
 /**
- * Displays the main CiliaPlot analysis page and initializes all its functionality.
+ * Displays the main CiliaPlot analysis page, fully integrating all plotting and UI logic.
  */
 function displayCiliaPlotPage() {
     const contentArea = document.querySelector('.content-area');
@@ -15,30 +16,49 @@ function displayCiliaPlotPage() {
 
     contentArea.innerHTML = `
     <style>
+        /* General Page Styles */
         .ciliaplot-page-container { font-family: Arial, sans-serif; color: #333; background-color: #f9f9f9; padding: 20px; }
         h2, h3 { color: #1a237e; }
+
         .explanation-section { background-color: #e8eaf6; border-left: 5px solid #3f51b5; padding: 15px 20px; margin-bottom: 25px; border-radius: 5px; }
-        .ciliaplot-main-layout { display: grid; grid-template-columns: 240px 300px 3fr; gap: 15px; align-items: start; }
+        .explanation-section h2 { margin-top: 0; font-size: 1.5em; }
+        .explanation-section a { color: #303f9f; font-weight: bold; text-decoration: none; }
+        .explanation-section a:hover { text-decoration: underline; }
+
+        .ciliaplot-main-layout {
+            display: grid;
+            grid-template-columns: 240px 300px 3fr; /* Wider visualization */
+            gap: 12px;
+            align-items: start;
+        }
+
         .control-card { background: #fff; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.05); padding: 20px; margin-bottom: 15px; }
         .control-card h3 { margin-top: 0; border-bottom: 2px solid #eee; padding-bottom: 10px; font-size: 1.2em; }
+
         .plot-types-panel .plot-type-list { list-style: none; padding: 0; margin: 0; }
-        .plot-types-panel .plot-type-list label { display: block; padding: 10px 12px; font-size:0.9em; border-radius: 5px; cursor: pointer; transition: background-color 0.3s; border: 1px solid #ddd; }
+        .plot-types-panel .plot-type-list li { margin-bottom: 10px; }
+        .plot-types-panel .plot-type-list label { display: block; padding: 10px 12px; font-size: 0.9em; border-radius: 5px; cursor: pointer; transition: background-color 0.3s; border: 1px solid #ddd; }
         .plot-types-panel .plot-type-list input[type="radio"] { display: none; }
         .plot-types-panel .plot-type-list input[type="radio"]:checked + label { background-color: #3f51b5; color: white; font-weight: bold; border-color: #3f51b5; }
+
         #ciliaplot-genes-input { width: 100%; min-height: 120px; padding: 10px; border-radius: 5px; border: 1px solid #ccc; font-family: 'Courier New', monospace; resize: vertical; margin-bottom: 15px; }
         #generate-ciliaplot-btn { width: 100%; padding: 12px; font-size: 1.1em; font-weight: bold; background-color: #4CAF50; color: white; border: none; border-radius: 5px; cursor: pointer; }
-        #generate-ciliaplot-btn:disabled { background-color: #9E9E9E; cursor: not-allowed; }
         #customization-container { margin-top: 15px; }
         .customization-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; align-items: end; }
         .customization-grid label { font-weight: bold; margin-bottom: 5px; display: block; font-size: 0.9em; }
         .customization-grid input, .customization-grid select { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
+        .customization-grid .form-group { margin-bottom: 10px; }
+        .customization-grid .full-width { grid-column: 1 / -1; }
+
         .visualization-panel { position: sticky; top: 20px; }
         .plot-header { display: flex; justify-content: space-between; align-items: center; }
         .download-controls { display: flex; gap: 10px; align-items: center; }
         #download-format { padding: 8px; }
         #download-plot-btn { background-color: #3f51b5; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; }
-        #plot-display-area { width: 100%; height: 600px; border: 2px dashed #ccc; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #888; margin-top: 10px; overflow: hidden; position: relative; }
-        #plot-display-area > canvas, #plot-display-area > svg { max-width: 100%; max-height: 100%; }
+
+        #plot-display-area { width: 100%; height: 60vh; border: 2px dashed #ccc; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #888; margin-top: 10px; overflow: hidden; }
+        #plot-display-area > div, #plot-display-area > svg, #plot-display-area > canvas { width: 100% !important; height: 100% !important; }
+
         .gene-input-table-container table { width: 100%; border-collapse: collapse; background-color: #fff; }
         .gene-input-table-container th, .gene-input-table-container td { border: 1px solid #ddd; padding: 8px; text-align: left; }
         .gene-input-table-container th { background-color: #f2f2f2; }
@@ -47,8 +67,17 @@ function displayCiliaPlotPage() {
     <section class="ciliaplot-page-container">
         <div class="explanation-section">
             <h2>CiliaPlot: Visualize Your Ciliary Gene Sets</h2>
-            <p>The CiliaHub database contains an updated list of over <strong>2200 Gold Standard Genes with Ciliary Functions</strong>...</p>
+            <p>The CiliaHub database contains an updated list of over <strong>2200 Gold Standard Genes with Ciliary Functions</strong>. With CiliaPlot, users can perform powerful analyses on their own gene lists, such as those from CRISPR/Cas9 screenings. You can visualize the subcellular localization of ciliary genes, identify enriched or depleted protein domains, and perform detailed functional analysis.</p>
+            <p>Additionally, we have integrated four seminal genome-wide screens for cilia and Hedgehog pathway functions:
+                <ul>
+                    <li><a href="https://www.sciencedirect.com/science/article/pii/S016748891630074X" target="_blank">Kim et al. 2016</a></li>
+                    <li><a href="https://elifesciences.org/articles/06602#content" target="_blank">Roosing et al. 2015</a></li>
+                    <li><a href="https://www.nature.com/articles/s41588-018-0054-7#Abs1" target="_blank">Breslow et al. 2018</a></li>
+                    <li><a href="https://www.nature.com/articles/ncb3201#Abs1" target="_blank">Wheway et al. 2015</a></li>
+                </ul>
+            </p>
         </div>
+
         <div class="ciliaplot-main-layout">
             <aside class="plot-types-panel">
                 <div class="control-card">
@@ -56,14 +85,16 @@ function displayCiliaPlotPage() {
                     <ul class="plot-type-list" id="ciliaplot-type-selector"></ul>
                 </div>
             </aside>
+
             <main class="input-panel">
                 <div class="control-card">
                     <h3>Gene Input</h3>
                     <textarea id="ciliaplot-genes-input" rows="8" placeholder="Enter gene symbols..."></textarea>
-                    <button id="generate-ciliaplot-btn" disabled>Loading Database...</button>
+                    <button id="generate-ciliaplot-btn">Generate Plot</button>
                     <div id="customization-container"></div>
                 </div>
             </main>
+
             <aside class="visualization-panel">
                 <div class="control-card">
                     <div class="plot-header">
@@ -80,7 +111,7 @@ function displayCiliaPlotPage() {
                     <table>
                         <thead><tr><th>#</th><th>Query</th><th>Status</th></tr></thead>
                         <tbody id="ciliaplot-gene-summary-tbody">
-                            <tr><td colspan="3" style="text-align: center;">Database is loading...</td></tr>
+                            <tr><td colspan="3" style="text-align: center;">Enter genes to see summary...</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -89,205 +120,162 @@ function displayCiliaPlotPage() {
     </section>
     `;
 
-    // --- Start of Self-Contained Logic for CiliaPlot ---
-    
-    let plotGeneMapCache = new Map();
-    let currentPlotInstance;
+    initializeCiliaPlotPage();
+}
 
-    async function initializeCiliaPlotPage() {
-        const plotButton = document.getElementById('generate-ciliaplot-btn');
-        try {
-            // This page now loads its own data, independent of script.js
-            await loadPlotDatabase();
-            console.log("CiliaPlot database loaded successfully.");
-            plotButton.disabled = false;
-            plotButton.textContent = 'Generate Plot';
-            document.querySelector("#ciliaplot-gene-summary-tbody tr td").textContent = "Enter genes to see summary...";
-        } catch (error) {
-            console.error("Failed to initialize CiliaPlot page:", error);
-            plotButton.textContent = 'Database Error';
-            plotButton.style.backgroundColor = '#E74C3C';
-        }
+// =============================================================================
+// INITIALIZATION
+// =============================================================================
 
-        populatePlotTypes();
-        document.getElementById('ciliaplot-type-selector').addEventListener('change', updateCustomizationPanel);
-        plotButton.addEventListener('click', generateAnalysisPlots);
-        document.getElementById('download-plot-btn').addEventListener('click', downloadPlot);
-        updateCustomizationPanel();
+function initializeCiliaPlotPage() {
+    populatePlotTypes();
+    document.getElementById('ciliaplot-type-selector').addEventListener('change', updateCustomizationPanel);
+    document.getElementById('generate-ciliaplot-btn').addEventListener('click', generateAnalysisPlots);
+    document.getElementById('download-plot-btn').addEventListener('click', downloadPlot);
+    updateCustomizationPanel(); 
+}
+
+// =============================================================================
+// HELPER FUNCTIONS
+// =============================================================================
+
+function getCleanArray(gene, ...keys) {
+    let data = null;
+    for (const key of keys) {
+        if (gene[key] != null) { data = gene[key]; break; }
     }
+    if (data == null) return [];
+    const separatorRegex = /[,;]/;
+    const initialArray = Array.isArray(data) ? data : String(data).split(separatorRegex);
+    return initialArray.filter(Boolean).flatMap(item => String(item).split(separatorRegex)).map(item => item.trim()).filter(Boolean);
+}
 
-    async function loadPlotDatabase() {
-        const response = await fetch('https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/ciliahub_data.json');
-        if (!response.ok) throw new Error(`HTTP Error ${response.status}`);
-        const rawGenes = await response.json();
-
-        rawGenes.forEach(g => {
-            if (!g.gene || typeof g.gene !== 'string') return;
-            const nameKey = g.gene.trim().toUpperCase();
-            plotGeneMapCache.set(nameKey, g);
-            if (g.synonym) {
-                String(g.synonym).split(/[,;]/).forEach(syn => {
-                    const key = syn.trim().toUpperCase();
-                    if (key && !plotGeneMapCache.has(key)) plotGeneMapCache.set(key, g);
-                });
-            }
-            if (g.ensembl_id) {
-                String(g.ensembl_id).split(/[,;]/).forEach(id => {
-                    const key = id.trim().toUpperCase();
-                    if (key) plotGeneMapCache.set(key, g);
-                });
-            }
-        });
+function clearAllPlots(containerId = 'plot-display-area') {
+    if (typeof currentPlotInstance !== 'undefined' && currentPlotInstance && typeof currentPlotInstance.destroy === 'function') {
+        currentPlotInstance.destroy();
+        currentPlotInstance = null;
     }
+    const container = document.getElementById(containerId);
+    if (container) container.innerHTML = '';
+    try { Plotly.purge(containerId); } catch (e) { /* Ignore */ }
+}
 
-    function findGenesInLocalCache(queries) {
-        const foundGenes = new Map();
-        const notFound = [];
-        queries.forEach(query => {
-            const result = plotGeneMapCache.get(query);
-            if (result) {
-                if (!foundGenes.has(result.gene)) {
-                    foundGenes.set(result.gene, result);
-                }
-            } else {
-                notFound.push(query);
-            }
-        });
-        return { foundGenes: Array.from(foundGenes.values()), notFoundGenes: notFound };
-    }
+function updateGeneSummaryTable(originalQueries, foundGenes) {
+    const tbody = document.getElementById('ciliaplot-gene-summary-tbody');
+    tbody.innerHTML = '';
+    const foundGenesSet = new Set(foundGenes.map(g => g.gene.toUpperCase()));
+    foundGenes.forEach(g => {
+        if (g.synonym) String(g.synonym).split(/[,;]/).forEach(s => foundGenesSet.add(sanitize(s)));
+        if (g.ensembl_id) String(g.ensembl_id).split(/[,;]/).forEach(id => foundGenesSet.add(sanitize(id)));
+    });
+    originalQueries.forEach((query, index) => {
+        const status = foundGenesSet.has(sanitize(query)) ? '✅ Found' : '❌ Not Found';
+        tbody.innerHTML += `<tr><td>${index + 1}</td><td>${query}</td><td>${status}</td></tr>`;
+    });
+}
 
-    // --- All other functions are defined within this scope ---
-    // (This includes generateAnalysisPlots, render functions, helpers, etc.)
-
-    const PLOT_CONFIG = {
-        'localization_bubble': { label: 'Gene Localizations (Bubble)', group: 'Plotly Plots' },
-        'functional_bar': { label: 'Functional Categories (Bar)', group: 'Plotly Plots' },
-        'plotly_heatmap': { label: 'Expression Heatmap (Plotly)', group: 'Plotly Plots' },
-        'network': { label: 'Complex Network (D3)', group: 'Advanced Plots' },
-        'organelle_radar': { label: 'Organelle Radar (Chart.js)', group: 'Advanced Plots' },
-        'organelle_umap': { label: 'Organelle UMAP (Chart.js)', group: 'Advanced Plots' },
-        'screen_analysis': { label: 'Screen Analysis (Chart.js)', group: 'Advanced Plots' },
+function getPlotCustomization() {
+    return {
+        title: document.getElementById('custom-title')?.value,
+        titleFontSize: parseInt(document.getElementById('custom-title-fontsize')?.value, 10) || 24,
+        fontFamily: document.getElementById('custom-font-family')?.value || 'Arial',
+        showX: document.getElementById('custom-show-x')?.value === 'true',
+        showY: document.getElementById('custom-show-y')?.value === 'true',
+        axisTitleFont: { size: 20, family: 'Arial', color: '#000', weight: 'bold' }
     };
+}
 
-    function populatePlotTypes() {
-        const container = document.getElementById('ciliaplot-type-selector');
-        const grouped = {};
-        Object.entries(PLOT_CONFIG).forEach(([key, val]) => {
-            if (!grouped[val.group]) grouped[val.group] = [];
-            grouped[val.group].push({key, label: val.label});
-        });
+// =============================================================================
+// DYNAMIC UI & MAIN ORCHESTRATOR
+// =============================================================================
 
-        let html = '';
-        for (const group in grouped) {
-            html += `<li style="font-weight:bold; margin-top:10px; margin-bottom:5px;">${group}</li>`;
-            grouped[group].forEach(({key, label}, index) => {
-                const checked = (group === 'Plotly Plots' && index === 0) ? 'checked' : '';
-                html += `<li><input type="radio" id="plot-${key}" name="ciliaplot_type" value="${key}" ${checked}><label for="plot-${key}">${label}</label></li>`;
-            });
-        }
-        container.innerHTML = html;
-    }
+const PLOT_CONFIG = {
+    'localization_bubble': { label: 'Gene Localizations (Bubble)', group: 'Plotly Plots' },
+    'functional_bar': { label: 'Functional Categories (Bar)', group: 'Plotly Plots' },
+    'plotly_heatmap': { label: 'Expression Heatmap (Plotly)', group: 'Plotly Plots' },
+    'network': { label: 'Complex Network (D3)', group: 'Advanced Plots' },
+    'organelle_radar': { label: 'Organelle Radar (Chart.js)', group: 'Advanced Plots' },
+    'organelle_umap': { label: 'Organelle UMAP (Chart.js)', group: 'Advanced Plots' },
+    'screen_analysis': { label: 'Screen Analysis (Chart.js)', group: 'Advanced Plots' },
+};
 
-    function updateCustomizationPanel() {
-        const container = document.getElementById('customization-container');
-        let html = `<h3>Plot Customization</h3><div class="customization-grid">`;
-        html += `<div class="full-width form-group"><label for="custom-title">Plot Title</label><input type="text" id="custom-title" placeholder="Default Title"></div>`;
-        html += `<div class="form-group"><label for="custom-title-fontsize">Title Font Size</label><input type="number" id="custom-title-fontsize" value="24"></div>`;
-        html += `<div class="form-group"><label for="custom-font-family">Font Family</label><select id="custom-font-family"><option>Arial</option><option>Times New Roman</option></select></div>`;
-        html += `<div class="form-group"><label for="custom-show-x">Show X-Axis</label><select id="custom-show-x"><option value="true">Show</option><option value="false">Hide</option></select></div>`;
-        html += `<div class="form-group"><label for="custom-show-y">Show Y-Axis</label><select id="custom-show-y"><option value="true">Show</option><option value="false">Hide</option></select></div>`;
-        html += `</div>`;
-        container.innerHTML = html;
-    }
-    
-    // All other functions from the previous response are defined here...
-    // I am including them all below for a complete, copy-paste solution.
-    
-    function getCleanArray(gene, ...keys) {
-        let data = null;
-        for (const key of keys) {
-            if (gene[key] != null) { data = gene[key]; break; }
-        }
-        if (data == null) return [];
-        const separatorRegex = /[,;]/;
-        const initialArray = Array.isArray(data) ? data : String(data).split(separatorRegex);
-        return initialArray.filter(Boolean).flatMap(item => String(item).split(separatorRegex)).map(item => item.trim()).filter(Boolean);
-    }
+function populatePlotTypes() {
+    const container = document.getElementById('ciliaplot-type-selector');
+    const grouped = {};
+    Object.entries(PLOT_CONFIG).forEach(([key, val]) => {
+        if (!grouped[val.group]) grouped[val.group] = [];
+        grouped[val.group].push({key, label: val.label});
+    });
 
-    function clearAllPlots(containerId = 'plot-display-area') {
-        if (currentPlotInstance && typeof currentPlotInstance.destroy === 'function') {
-            currentPlotInstance.destroy();
-            currentPlotInstance = null;
-        }
-        const container = document.getElementById(containerId);
-        if (container) container.innerHTML = '';
-        try { Plotly.purge(containerId); } catch (e) { /* Ignore */ }
-    }
-
-    function updateGeneSummaryTable(originalQueries, foundGenes) {
-        const tbody = document.getElementById('ciliaplot-gene-summary-tbody');
-        tbody.innerHTML = '';
-        const foundGeneSymbols = foundGenes.map(g => g.gene.toUpperCase());
-        originalQueries.forEach((query, index) => {
-            const upperQuery = query.toUpperCase();
-            // Check if the query itself is a primary gene name, or if it resolved to one of the found genes
-            const isFound = foundGeneSymbols.includes(upperQuery) || foundGenes.some(g => {
-                const synonyms = getCleanArray(g, 'synonym').map(s => s.toUpperCase());
-                const ensembls = getCleanArray(g, 'ensembl_id').map(e => e.toUpperCase());
-                return synonyms.includes(upperQuery) || ensembls.includes(upperQuery);
-            });
-            const status = isFound ? '✅ Found' : '❌ Not Found';
-            tbody.innerHTML += `<tr><td>${index + 1}</td><td>${query}</td><td>${status}</td></tr>`;
+    let html = '';
+    for (const group in grouped) {
+        html += `<li style="font-weight:bold; margin-top:10px; margin-bottom:5px;">${group}</li>`;
+        grouped[group].forEach(({key, label}, index) => {
+            const checked = (group === 'Plotly Plots' && index === 0) ? 'checked' : '';
+            html += `<li><input type="radio" id="plot-${key}" name="ciliaplot_type" value="${key}" ${checked}><label for="plot-${key}">${label}</label></li>`;
         });
     }
+    container.innerHTML = html;
+}
 
-    function getPlotCustomization() {
-        return {
-            title: document.getElementById('custom-title')?.value,
-            titleFontSize: parseInt(document.getElementById('custom-title-fontsize')?.value, 10) || 24,
-            fontFamily: document.getElementById('custom-font-family')?.value || 'Arial',
-            showX: document.getElementById('custom-show-x')?.value === 'true',
-            showY: document.getElementById('custom-show-y')?.value === 'true',
-            axisTitleFont: { size: 20, family: 'Arial', color: '#000', weight: 'bold' }
-        };
+function updateCustomizationPanel() {
+    const container = document.getElementById('customization-container');
+    let html = `<h3>Plot Customization</h3><div class="customization-grid">`;
+    html += `<div class="full-width form-group"><label for="custom-title">Plot Title</label><input type="text" id="custom-title" placeholder="Default Title"></div>`;
+    html += `<div class="form-group"><label for="custom-title-fontsize">Title Font Size</label><input type="number" id="custom-title-fontsize" value="24"></div>`;
+    html += `<div class="form-group"><label for="custom-font-family">Font Family</label><select id="custom-font-family"><option>Arial</option><option>Times New Roman</option></select></div>`;
+    html += `<div class="form-group"><label for="custom-show-x">Show X-Axis</label><select id="custom-show-x"><option value="true">Show</option><option value="false">Hide</option></select></div>`;
+    html += `<div class="form-group"><label for="custom-show-y">Show Y-Axis</label><select id="custom-show-y"><option value="true">Show</option><option value="false">Hide</option></select></div>`;
+    html += `</div>`;
+    container.innerHTML = html;
+}
+
+async function generateAnalysisPlots() {
+    // FIX: Check that the gene database is loaded before proceeding.
+    if (typeof geneMapCache === 'undefined' || geneMapCache.size === 0) {
+        alert("Error: The main gene database is not yet loaded. Please wait a moment and try again, or refresh the page.");
+        console.error("generateAnalysisPlots was called before geneMapCache was initialized.");
+        return;
     }
 
-    async function generateAnalysisPlots() {
-        const plotContainer = document.getElementById('plot-display-area');
-        plotContainer.innerHTML = '<em>Searching genes and generating plot...</em>';
-        clearAllPlots('plot-display-area');
+    const plotContainer = document.getElementById('plot-display-area');
+    plotContainer.innerHTML = '<em>Searching genes and generating plot...</em>';
+    clearAllPlots('plot-display-area');
 
-        const rawInput = document.getElementById('ciliaplot-genes-input').value;
-        const originalQueries = rawInput.split(/[\s,;\n\r\t]+/).filter(Boolean);
-        if (originalQueries.length === 0) {
-            plotContainer.innerHTML = 'Please enter at least one gene.';
-            return;
-        }
-        const sanitizedQueries = [...new Set(originalQueries.map(q => q.trim().toUpperCase()))];
-        const { foundGenes } = findGenesInLocalCache(sanitizedQueries);
-        updateGeneSummaryTable(originalQueries, foundGenes);
-        if (foundGenes.length === 0) {
-            plotContainer.innerHTML = 'None of the provided genes were found.';
-            return;
-        }
-
-        const plotType = document.querySelector('input[name="ciliaplot_type"]:checked').value;
-        const custom = getPlotCustomization();
-
-        switch (plotType) {
-            case 'localization_bubble': renderBubblePlot(foundGenes, custom); break;
-            case 'functional_bar': renderBarPlot(foundGenes, custom); break;
-            case 'plotly_heatmap': renderHeatmap(foundGenes, custom); break;
-            case 'network': renderComplexNetwork(foundGenes, plotContainer, custom); break;
-            case 'organelle_radar': renderOrganelleRadarPlot(foundGenes, plotContainer, custom); break;
-            case 'organelle_umap': renderOrganelleUMAP(foundGenes, plotContainer, custom); break;
-            case 'screen_analysis': renderGeneScreenAnalysis(foundGenes, plotContainer, custom); break;
-            default: plotContainer.innerHTML = 'This plot type is not yet implemented.';
-        }
+    const rawInput = document.getElementById('ciliaplot-genes-input').value;
+    const originalQueries = rawInput.split(/[\s,;\n\r\t]+/).filter(Boolean);
+    if (originalQueries.length === 0) {
+        plotContainer.innerHTML = 'Please enter at least one gene.';
+        return;
+    }
+    const sanitizedQueries = [...new Set(originalQueries.map(sanitize))];
+    const { foundGenes } = findGenes(sanitizedQueries);
+    updateGeneSummaryTable(originalQueries, foundGenes);
+    if (foundGenes.length === 0) {
+        plotContainer.innerHTML = 'None of the provided genes were found.';
+        return;
     }
 
-    // ... All render functions and download function go here ...
-    function renderBubblePlot(genes, custom) {
+    const plotType = document.querySelector('input[name="ciliaplot_type"]:checked').value;
+    const custom = getPlotCustomization();
+
+    switch (plotType) {
+        case 'localization_bubble': renderBubblePlot(foundGenes, custom); break;
+        case 'functional_bar': renderBarPlot(foundGenes, custom); break;
+        case 'plotly_heatmap': renderHeatmap(foundGenes, custom); break;
+        case 'network': renderComplexNetwork(foundGenes, plotContainer, custom); break;
+        case 'organelle_radar': renderOrganelleRadarPlot(foundGenes, plotContainer, custom); break;
+        case 'organelle_umap': renderOrganelleUMAP(foundGenes, plotContainer, custom); break;
+        case 'screen_analysis': renderGeneScreenAnalysis(foundGenes, plotContainer, custom); break;
+        default: plotContainer.innerHTML = 'This plot type is not yet implemented.';
+    }
+}
+
+
+// =============================================================================
+// PLOTLY.JS RENDERING FUNCTIONS
+// =============================================================================
+function renderBubblePlot(genes, custom) {
     const plotData = [];
     genes.forEach(gene => {
         const localizations = getCleanArray(gene, 'localization');
@@ -303,7 +291,7 @@ function displayCiliaPlotPage() {
         title: { text: custom.title || 'Gene Subcellular Localizations', font: { size: custom.titleFontSize, family: custom.fontFamily } },
         xaxis: { title: { text: 'Localization', font: custom.axisTitleFont }, visible: custom.showX, linecolor: 'black', linewidth: 2, mirror: true, gridcolor: 'white' },
         yaxis: { title: { text: 'Gene', font: custom.axisTitleFont }, visible: custom.showY, linecolor: 'black', linewidth: 2, mirror: true, gridcolor: 'white' },
-        showlegend: false, margin: { l: 120, r: 20, b: 100, t: 80 },
+        showlegend: false, height: 600, margin: { l: 120, r: 20, b: 100, t: 80 },
         plot_bgcolor: 'white', paper_bgcolor: 'white'
     };
     Plotly.newPlot('plot-display-area', plotData, layout, { responsive: true });
@@ -322,7 +310,7 @@ function renderBarPlot(genes, custom) {
         title: { text: custom.title || 'Functional Category Counts', font: { size: custom.titleFontSize, family: custom.fontFamily } },
         xaxis: { title: { text: 'Number of Genes', font: custom.axisTitleFont }, visible: custom.showX, linecolor: 'black', linewidth: 2, mirror: true, gridcolor: 'white' },
         yaxis: { title: { text: 'Category', font: custom.axisTitleFont }, visible: custom.showY, automargin: true, linecolor: 'black', linewidth: 2, mirror: true, gridcolor: 'white' },
-        margin: { l: 250, r: 20, b: 50, t: 80 },
+        height: 600, margin: { l: 250, r: 20, b: 50, t: 80 },
         plot_bgcolor: 'white', paper_bgcolor: 'white'
     };
     Plotly.newPlot('plot-display-area', data, layout, { responsive: true });
@@ -345,11 +333,16 @@ function renderHeatmap(genes, custom) {
         title: { text: custom.title || 'Tissue Expression Heatmap', font: { size: custom.titleFontSize, family: custom.fontFamily } },
         xaxis: { title: { text: 'Tissue', font: custom.axisTitleFont }, visible: custom.showX, tickangle: -45, linecolor: 'black', linewidth: 2, mirror: true },
         yaxis: { title: { text: 'Gene', font: custom.axisTitleFont }, visible: custom.showY, linecolor: 'black', linewidth: 2, mirror: true },
-        margin: { l: 120, r: 20, b: 150, t: 80 },
+        height: 600, margin: { l: 120, r: 20, b: 150, t: 80 },
         plot_bgcolor: 'white', paper_bgcolor: 'white'
     };
     Plotly.newPlot('plot-display-area', data, layout, { responsive: true });
 }
+
+
+// =============================================================================
+// INTEGRATED CHART.JS & D3.JS FUNCTIONS
+// =============================================================================
 
 function computeProteinComplexLinks(foundGenes) {
     const nodes = foundGenes.map(gene => ({ id: gene.gene }));
@@ -383,14 +376,17 @@ function renderComplexNetwork(foundGenes, container, custom) {
     const width = container.clientWidth;
     const height = container.clientHeight;
     const svg = d3.select(container).append("svg").attr("width", width).attr("height", height);
+
     const simulation = d3.forceSimulation(nodes)
         .force("link", d3.forceLink(links).id(d => d.id).distance(120))
         .force("charge", d3.forceManyBody().strength(-500))
         .force("center", d3.forceCenter(width / 2, height / 2));
+
     const link = svg.append("g").selectAll("line").data(links).enter().append("line").style("stroke", "#999").style("stroke-opacity", 0.6);
     const nodeGroup = svg.append("g").selectAll("g").data(nodes).enter().append("g");
     nodeGroup.append("circle").attr("r", 12).style("fill", "#3498db");
     nodeGroup.append("text").text(d => d.id).attr("x", 15).attr("y", 5).style("font-family", custom.fontFamily);
+
     simulation.on("tick", () => {
         link.attr("x1", d => d.source.x).attr("y1", d => d.source.y).attr("x2", d => d.target.x).attr("y2", d => d.target.y);
         nodeGroup.attr("transform", d => `translate(${d.x},${d.y})`);
@@ -419,12 +415,15 @@ function renderOrganelleRadarPlot(foundGenes, container, custom) {
         });
         if (geneAdded) contributingGenes++;
     });
+    
     if (contributingGenes === 0) { container.innerHTML = '<p>No genes mapped to an organellar profile.</p>'; return; }
     userProfile.forEach((val, i) => userProfile[i] /= contributingGenes);
+
     const datasets = Object.entries(organelleMarkerProfiles).map(([name, data], i) => ({
         label: name, data: data, borderColor: d3.schemeTableau10[i], hidden: true
     }));
     datasets.push({ label: 'Your Gene Set', data: userProfile, borderColor: '#e74c3c', borderWidth: 3 });
+
     currentPlotInstance = new Chart(ctx, {
         type: 'radar', data: { labels: fractionLabels, datasets: datasets },
         options: { responsive: true, maintainAspectRatio: false, plugins: { title: { display: true, text: custom.title || "Organellar Profile Comparison", font: { size: custom.titleFontSize } } } }
@@ -437,9 +436,11 @@ function renderOrganelleUMAP(foundGenes, container, custom) {
     clearAllPlots(container.id);
     container.innerHTML = `<canvas></canvas>`;
     const ctx = container.querySelector('canvas').getContext('2d');
+    
     const backgroundDatasets = Object.entries(precomputedUMAP).map(([name, data], i) => ({
         label: name, data: data, backgroundColor: d3.schemeCategory10[i] + '77'
     }));
+    
     const userGeneData = [];
     foundGenes.forEach((gene, i) => {
         const localizations = getCleanArray(gene, 'localization');
@@ -450,11 +451,15 @@ function renderOrganelleUMAP(foundGenes, container, custom) {
             }
         }
     });
+
     if (userGeneData.length === 0) { container.innerHTML = '<p>No genes mapped to the UMAP.</p>'; return; }
     const userDataset = { label: 'Your Genes', data: userGeneData, backgroundColor: '#e74c3c', pointRadius: 8 };
     currentPlotInstance = new Chart(ctx, {
         type: 'scatter', data: { datasets: [...backgroundDatasets, userDataset] },
-        options: { responsive: true, maintainAspectRatio: false, plugins: { title: { display: true, text: custom.title || "UMAP Projection", font: { size: custom.titleFontSize } } } }
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { title: { display: true, text: custom.title || "UMAP Projection", font: { size: custom.titleFontSize } } }
+        }
     });
 }
 
@@ -465,9 +470,11 @@ function renderGeneScreenAnalysis(foundGenes, container, custom) {
     const processedData = [];
     let geneIndex = 0;
     const geneIndexMap = {};
+    
     foundGenes.forEach(gene => {
         if (!gene.screens || !Array.isArray(gene.screens)) return;
         if (!(gene.gene in geneIndexMap)) geneIndexMap[gene.gene] = geneIndex++;
+        
         gene.screens.forEach(screen => {
             const meanValue = parseFloat(screen.mean_percent_ciliated);
             if (!isNaN(meanValue)) {
@@ -475,6 +482,7 @@ function renderGeneScreenAnalysis(foundGenes, container, custom) {
             }
         });
     });
+
     if (processedData.length === 0) { container.innerHTML = '<p>No screen data found for these genes.</p>'; return; }
     const classificationColors = { "Negative regulator": "#E74C3C", "Positive regulator": "#27AE60", "No significant effect": "#3498DB", "Unclassified": "#95A5A6" };
     const groupedData = {};
@@ -482,12 +490,15 @@ function renderGeneScreenAnalysis(foundGenes, container, custom) {
         if (!groupedData[item.classification]) groupedData[item.classification] = [];
         groupedData[item.classification].push(item);
     });
+    
     const datasets = Object.keys(groupedData).map(classification => ({
         label: classification,
         data: groupedData[classification],
         backgroundColor: classificationColors[classification] || "#95A5A6",
     }));
+    
     const geneLabels = Object.keys(geneIndexMap).sort((a, b) => geneIndexMap[a] - geneIndexMap[b]);
+    
     currentPlotInstance = new Chart(ctx, {
         type: 'scatter', data: { datasets },
         options: {
@@ -499,17 +510,23 @@ function renderGeneScreenAnalysis(foundGenes, container, custom) {
                     title: { display: true, text: 'Genes', font: {size: 20, weight: 'bold'} },
                     min: -0.5, max: geneLabels.length - 0.5,
                     ticks: { stepSize: 1, callback: (val) => geneLabels[val] || '' },
-                    grid: { display: false }, border: { display: true, color: 'black', width: 2 }
+                    grid: { display: false },
+                    border: { display: true, color: 'black', width: 2 }
                 },
                 y: { 
                     display: custom.showY,
                     title: { display: true, text: 'Mean % Ciliated', font: {size: 20, weight: 'bold'} },
-                    grid: { display: false }, border: { display: true, color: 'black', width: 2 }
+                    grid: { display: false },
+                    border: { display: true, color: 'black', width: 2 }
                 }
             }
         }
     });
 }
+
+// =============================================================================
+// DOWNLOAD FUNCTION
+// =============================================================================
 async function downloadPlot() {
     const plotArea = document.getElementById('plot-display-area');
     const plotlyDiv = plotArea.querySelector('.plotly');
@@ -517,12 +534,16 @@ async function downloadPlot() {
     const svg = plotArea.querySelector('svg');
     const format = document.getElementById('download-format').value || 'png';
     const fileName = `CiliaPlot_export.${format}`;
+
     let dataUrl;
-    let width = 1200; let height = 900;
+    let width = 1200; 
+    let height = 900;
 
     try {
         if (plotlyDiv) {
-            await Plotly.toImage(plotArea, {format: 'png', width: width, height: height}).then(function(url) { dataUrl = url; });
+            await Plotly.toImage(plotArea, {format: 'png', width: width, height: height}).then(function(url) {
+                dataUrl = url;
+            });
         } else if (canvas) {
             dataUrl = canvas.toDataURL('image/png', 1.0);
             width = canvas.width; height = canvas.height;
@@ -531,8 +552,10 @@ async function downloadPlot() {
             const svgString = serializer.serializeToString(svg);
             const tempCanvas = document.createElement('canvas');
             const ctx = tempCanvas.getContext('2d');
-            width = svg.clientWidth * 2; height = svg.clientHeight * 2;
-            tempCanvas.width = width; tempCanvas.height = height;
+            width = svg.clientWidth * 2;
+            height = svg.clientHeight * 2;
+            tempCanvas.width = width;
+            tempCanvas.height = height;
             const img = new Image();
             await new Promise((resolve) => {
                 img.onload = () => {
@@ -543,10 +566,13 @@ async function downloadPlot() {
                 img.src = 'data:image/svg+xml;base64,' + btoa(svgString);
             });
         }
+
         if (!dataUrl) { throw new Error("Could not generate image data."); }
+
         if (format === 'png') {
             const link = document.createElement('a');
-            link.download = fileName; link.href = dataUrl;
+            link.download = fileName;
+            link.href = dataUrl;
             link.click();
         } else if (format === 'pdf') {
             const { jsPDF } = window.jspdf;
@@ -558,9 +584,4 @@ async function downloadPlot() {
         console.error("Download failed:", e);
         alert("An error occurred during download.");
     }
-}
-
-
-    // The entire logic is now encapsulated and starts when the page is displayed.
-    initializeCiliaPlotPage();
 }
