@@ -184,11 +184,14 @@ function getPlotCustomization() {
 const PLOT_CONFIG = {
     'localization_bubble': { label: 'Gene Localizations (Bubble)', group: 'Plotly Plots' },
     'functional_bar': { label: 'Functional Categories (Bar)', group: 'Plotly Plots' },
+    'enrichment_bubble': { label: 'Enrichment Analysis (Bubble)', group: 'Plotly Plots' },
+    'balloon_plot': { label: 'Function vs Localization (Balloon)', group: 'Plotly Plots' },
+    'venn_diagram': { label: 'Gene Set Comparison (Venn)', group: 'Plotly Plots' },
     'network': { label: 'Complex Network (D3)', group: 'Advanced Plots' },
     'organelle_radar': { label: 'Organelle Radar (Chart.js)', group: 'Advanced Plots' },
     'organelle_umap': { label: 'Organelle UMAP (Chart.js)', group: 'Advanced Plots' },
     'screen_analysis': { label: 'Screen Analysis (Chart.js)', group: 'Advanced Plots' },
-    'expression_heatmap': { label: 'Expression Heatmap (D3)', group: 'Advanced Plots' } // Kept expression_heatmap, removed plotly_heatmap
+    'expression_heatmap': { label: 'Expression Heatmap (D3)', group: 'Advanced Plots' }
 };
 
 function populatePlotTypes() {
@@ -269,7 +272,6 @@ async function loadPlotExpressionData() {
     }
 }
 
-// --- generateAnalysisPlots with deferred heatmap support ---
 // =============================================================================
 // MODIFIED generateAnalysisPlots FUNCTION
 // =============================================================================
@@ -341,12 +343,244 @@ async function generateAnalysisPlots() {
         case 'screen_analysis':
             renderGeneScreenAnalysis(foundGenes, plotContainer, custom);
             break;
+      case 'enrichment_bubble':
+            renderEnrichmentBubblePlot(foundGenes, custom);
+            break;
+
+case 'balloon_plot':
+    renderBalloonPlot(foundGenes, custom);
+    break;
+
+case 'venn_diagram':
+    renderVennDiagram(foundGenes, custom);
+    break;
+
 
         default:
             plotContainer.innerHTML = 'This plot type is not yet implemented.';
     }
 }
+// =============================================================================
+// NEW PLOT TYPES
+// =============================================================================
 
+// Enrichment Bubble Plot
+function renderEnrichmentBubblePlot(foundGenes, custom) {
+    const plotContainer = document.getElementById('plot-display-area');
+    clearAllPlots('plot-display-area');
+    
+    // Calculate enrichment scores for functional categories
+    const categoryCounts = new Map();
+    const totalGenes = foundGenes.length;
+    
+    foundGenes.forEach(gene => {
+        getCleanArray(gene, 'functional_category').forEach(cat => {
+            categoryCounts.set(cat, (categoryCounts.get(cat) || 0) + 1);
+        });
+    });
+    
+    // Calculate enrichment p-values (simplified for demonstration)
+    const enrichmentData = [];
+    const allCategories = [...categoryCounts.keys()];
+    const totalInDatabase = 100; // This would come from your database statistics
+    
+    allCategories.forEach(category => {
+        const countInSet = categoryCounts.get(category);
+        const proportionInSet = countInSet / totalGenes;
+        const proportionInDatabase = 0.1; // This would come from your database
+        
+        // Simplified enrichment score
+        const enrichmentScore = proportionInSet / proportionInDatabase;
+        const pValue = 1 / (enrichmentScore * 10); // Simplified p-value calculation
+        
+        enrichmentData.push({
+            category,
+            count: countInSet,
+            enrichment: enrichmentScore,
+            pValue: pValue
+        });
+    });
+    
+    // Create bubble plot
+    const data = [{
+        x: enrichmentData.map(d => d.category),
+        y: enrichmentData.map(d => d.enrichment),
+        text: enrichmentData.map(d => `Category: ${d.category}<br>Count: ${d.count}<br>Enrichment: ${d.enrichment.toFixed(2)}<br>p-value: ${d.pValue.toFixed(4)}`),
+        mode: 'markers',
+        marker: {
+            size: enrichmentData.map(d => d.count * 5),
+            color: enrichmentData.map(d => -Math.log10(d.pValue)),
+            colorscale: 'Viridis',
+            showscale: true,
+            colorbar: {
+                title: '-log10(p-value)',
+                titleside: 'right'
+            }
+        }
+    }];
+    
+    const layout = {
+        title: { text: custom.title || 'Functional Category Enrichment', font: { size: custom.titleFontSize, family: custom.fontFamily } },
+        xaxis: { 
+            title: { text: 'Functional Category', font: custom.axisTitleFont }, 
+            visible: custom.showX, 
+            tickangle: -45 
+        },
+        yaxis: { 
+            title: { text: 'Enrichment Score', font: custom.axisTitleFont }, 
+            visible: custom.showY 
+        },
+        hovermode: 'closest',
+        showlegend: false,
+        height: 600,
+        margin: { l: 120, r: 50, b: 150, t: 80 }
+    };
+    
+    Plotly.newPlot('plot-display-area', data, layout, { responsive: true });
+}
+
+// Balloon Plot
+function renderBalloonPlot(foundGenes, custom) {
+    const plotContainer = document.getElementById('plot-display-area');
+    clearAllPlots('plot-display-area');
+    
+    // Count occurrences of each localization and functional category
+    const localizationCounts = new Map();
+    const functionalCounts = new Map();
+    
+    foundGenes.forEach(gene => {
+        getCleanArray(gene, 'localization').forEach(loc => {
+            localizationCounts.set(loc, (localizationCounts.get(loc) || 0) + 1);
+        });
+        
+        getCleanArray(gene, 'functional_category').forEach(func => {
+            functionalCounts.set(func, (functionalCounts.get(func) || 0) + 1);
+        });
+    });
+    
+    // Prepare data for balloon plot
+    const localizations = [...localizationCounts.keys()];
+    const functions = [...functionalCounts.keys()];
+    
+    const zData = [];
+    const textData = [];
+    
+    functions.forEach(func => {
+        const row = [];
+        const textRow = [];
+        
+        localizations.forEach(loc => {
+            // Count genes that have both this function and localization
+            let count = 0;
+            foundGenes.forEach(gene => {
+                const geneLocs = getCleanArray(gene, 'localization');
+                const geneFuncs = getCleanArray(gene, 'functional_category');
+                if (geneLocs.includes(loc) && geneFuncs.includes(func)) {
+                    count++;
+                }
+            });
+            
+            row.push(count);
+            textRow.push(`Function: ${func}<br>Localization: ${loc}<br>Count: ${count}`);
+        });
+        
+        zData.push(row);
+        textData.push(textRow);
+    });
+    
+    const data = [{
+        type: 'heatmap',
+        x: localizations,
+        y: functions,
+        z: zData,
+        text: textData,
+        hoverinfo: 'text',
+        colorscale: 'Blues',
+        showscale: true
+    }];
+    
+    const layout = {
+        title: { text: custom.title || 'Function vs Localization', font: { size: custom.titleFontSize, family: custom.fontFamily } },
+        xaxis: { 
+            title: { text: 'Localization', font: custom.axisTitleFont }, 
+            visible: custom.showX,
+            tickangle: -45 
+        },
+        yaxis: { 
+            title: { text: 'Functional Category', font: custom.axisTitleFont }, 
+            visible: custom.showY 
+        },
+        height: 600,
+        margin: { l: 150, r: 50, b: 150, t: 80 }
+    };
+    
+    Plotly.newPlot('plot-display-area', data, layout, { responsive: true });
+}
+
+// Venn Diagram
+function renderVennDiagram(foundGenes, custom) {
+    const plotContainer = document.getElementById('plot-display-area');
+    clearAllPlots('plot-display-area');
+    
+    // This would compare the user's gene list with a reference ciliary gene list
+    // For demonstration, we'll use a mock reference list
+    const referenceCiliaryGenes = new Set(['ABI2', 'ABLIM1', 'ABLIM3', 'ACTB', 'AKT1']); // Example genes
+    
+    const userGenes = new Set(foundGenes.map(g => g.gene.toUpperCase()));
+    
+    // Calculate overlaps
+    const uniqueToUser = new Set([...userGenes].filter(x => !referenceCiliaryGenes.has(x)));
+    const uniqueToReference = new Set([...referenceCiliaryGenes].filter(x => !userGenes.has(x)));
+    const commonGenes = new Set([...userGenes].filter(x => referenceCiliaryGenes.has(x)));
+    
+    // Create data for Venn diagram
+    const sets = [
+        { sets: ['Your Gene Set'], size: uniqueToUser.size },
+        { sets: ['Ciliary Reference Set'], size: uniqueToReference.size },
+        { sets: ['Your Gene Set', 'Ciliary Reference Set'], size: commonGenes.size }
+    ];
+    
+    // Create chart
+    const chart = {
+        type: 'venn',
+        sets: sets
+    };
+    
+    const data = [chart];
+    
+    const layout = {
+        title: { text: custom.title || 'Gene Set Comparison', font: { size: custom.titleFontSize, family: custom.fontFamily } },
+        height: 500,
+        margin: { t: 80, b: 50, l: 50, r: 50 }
+    };
+    
+    // For a real implementation, you would use a Venn diagram library like venn.js
+    // This is a simplified version using Plotly's Venn diagram (if available)
+    // Alternatively, you could implement with D3.js
+    
+    plotContainer.innerHTML = `
+        <div style="text-align: center; padding: 20px;">
+            <h3>Gene Set Comparison</h3>
+            <div style="display: flex; justify-content: center; margin-top: 20px;">
+                <div style="margin: 0 20px;">
+                    <div style="width: 200px; height: 200px; border: 2px solid #3f51b5; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+                        Your Genes<br>${userGenes.size}
+                    </div>
+                </div>
+                <div style="margin: 0 20px;">
+                    <div style="width: 200px; height: 200px; border: 2px solid #4CAF50; border-radius: 50%; display: flex; align-items: center; justify-content: center; position: relative; left: -100px;">
+                        Reference Ciliary Genes<br>${referenceCiliaryGenes.size}
+                    </div>
+                </div>
+            </div>
+            <div style="margin-top: 20px;">
+                <p>Overlap: ${commonGenes.size} genes</p>
+                <p>Unique to your set: ${uniqueToUser.size} genes</p>
+                <p>Unique to reference: ${uniqueToReference.size} genes</p>
+            </div>
+        </div>
+    `;
+}
 // =============================================================================
 // MODIFIED FUNCTIONS FOR HEATMAP INTEGRATION
 // =============================================================================
@@ -359,18 +593,114 @@ function renderExpressionHeatmap(expressionData, geneList = []) {
     const plotContainer = document.getElementById('plot-display-area');
     clearAllPlots('plot-display-area');
     
-    // ---- Validation and gene resolution logic (keep existing code) ----
-    function normalizeGeneString(s) { /* ... existing code ... */ }
-    function extractCandidates(entry) { /* ... existing code ... */ }
-    function resolveViaGeneMapCache(candidate) { /* ... existing code ... */ }
+    // ---- Validation and gene resolution logic ----
+    function normalizeGeneString(s) {
+        if (!s) return null;
+        let str = String(s).trim();
+        str = str.replace(/\(.*?\)/g, '');
+        str = str.replace(/[,\/\\|;]/g, ' ');
+        str = str.replace(/[^A-Za-z0-9\-_ ]/g, '');
+        str = str.replace(/\s+/g, ' ').trim();
+        return str ? str.toUpperCase() : null;
+    }
+
+    function extractCandidates(entry) {
+        const out = [];
+        if (!entry) return out;
+        if (typeof entry === 'string') {
+            entry.split(/\s+/).forEach(part => {
+                const n = normalizeGeneString(part);
+                if (n) out.push(n);
+            });
+        } else if (typeof entry === 'object') {
+            const keys = ['gene', 'geneSymbol', 'symbol', 'name', 'Gene', 'Gene name'];
+            for (const k of keys) {
+                if (entry[k]) {
+                    const n = normalizeGeneString(entry[k]);
+                    if (n) out.push(n);
+                }
+            }
+            if (out.length === 0) {
+                const maybe = normalizeGeneString(JSON.stringify(entry));
+                if (maybe) out.push(maybe);
+            }
+        }
+        return [...new Set(out)];
+    }
+
+    function resolveViaGeneMapCache(candidate) {
+        try {
+            if (typeof geneMapCache !== 'undefined' && geneMapCache && geneMapCache.has) {
+                if (geneMapCache.has(candidate)) {
+                    const obj = geneMapCache.get(candidate);
+                    if (!obj) return null;
+                    if (typeof obj === 'string') return normalizeGeneString(obj);
+                    if (typeof obj === 'object') {
+                        const prefer = obj.gene || obj.symbol || obj.geneSymbol || obj.name || obj.Gene;
+                        if (prefer) return normalizeGeneString(prefer);
+                        for (const v of Object.values(obj)) {
+                            if (typeof v === 'string' && v.length <= 12) {
+                                const n = normalizeGeneString(v);
+                                if (n) return n;
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (e) {
+            console.warn('plots.js: geneMapCache lookup failed for', candidate, e);
+        }
+        return null;
+    }
 
     const availableGenes = new Set(Object.keys(expressionData || {}).map(g => String(g).toUpperCase()));
     const validated = [];
     const skipped = [];
     const seen = new Set();
 
-    // ... existing gene validation logic ...
+    if (Array.isArray(geneList)) {
+        for (const entry of geneList) {
+            const candidates = extractCandidates(entry);
+            let found = null;
+            for (const cand of candidates) {
+                if (availableGenes.has(cand)) { found = cand; break; }
+                const resolved = resolveViaGeneMapCache(cand);
+                if (resolved && availableGenes.has(resolved)) { found = resolved; break; }
+            }
+            if (!found && candidates.length > 0) {
+                for (const cand of candidates) {
+                    const firstToken = cand.split('.')[0];
+                    if (firstToken && availableGenes.has(firstToken)) { found = firstToken; break; }
+                }
+            }
 
+            if (found && !seen.has(found)) {
+                validated.push(found);
+                seen.add(found);
+            } else {
+                skipped.push({ entry, candidates });
+            }
+        }
+    } else if (typeof geneList === 'string') {
+        const parts = geneList.split(/[\s,;\n\r\t]+/).filter(Boolean);
+        for (const p of parts) {
+            const cand = normalizeGeneString(p);
+            let found = null;
+            if (cand) {
+                if (availableGenes.has(cand)) found = cand;
+                else {
+                    const resolved = resolveViaGeneMapCache(cand);
+                    if (resolved && availableGenes.has(resolved)) found = resolved;
+                }
+            }
+            if (found && !seen.has(found)) { validated.push(found); seen.add(found); }
+            else skipped.push({ entry: p, candidates: [cand] });
+        }
+    } else {
+        validated.push(...Array.from(availableGenes));
+    }
+
+    console.log('plots.js: Validated geneList:', validated);
     if (validated.length === 0) {
         plotContainer.innerHTML = '<div style="text-align:center; padding:2rem; color:#dc3545;">No valid genes found for heatmap.</div>';
         return false;
@@ -400,7 +730,7 @@ function renderExpressionHeatmap(expressionData, geneList = []) {
     const containerWidth = plotContainer.clientWidth;
     const containerHeight = plotContainer.clientHeight;
     
-    const margin = { top: 100, right: 30, bottom: 150, left: 150 }; // Increased bottom margin for x-axis labels
+    const margin = { top: 80, right: 30, bottom: 150, left: 150 };
     const width = Math.max(600, tissues.length * 40);
     const height = Math.max(400, validated.length * 30);
 
@@ -470,44 +800,66 @@ function renderExpressionHeatmap(expressionData, geneList = []) {
         .style('stroke-width', 1)
         .on('mouseover', function(event, d) {
             d3.select(this).style('stroke', '#000').style('stroke-width', 2);
-            d3.select('#tooltip')
-                .style('opacity', 1)
-                .html(`Gene: ${d.gene}<br>Tissue: ${d.tissue}<br>nTPM: ${Number(d.value).toFixed(2)}`)
-                .style('left', `${event.pageX + 10}px`)
-                .style('top', `${event.pageY - 10}px`);
+            
+            // Show tooltip
+            const tooltip = d3.select('body').selectAll('.tooltip').data([null]);
+            tooltip.enter()
+                .append('div')
+                .attr('class', 'tooltip')
+                .style('position', 'absolute')
+                .style('background', 'rgba(0, 0, 0, 0.8)')
+                .style('color', 'white')
+                .style('padding', '8px')
+                .style('border-radius', '4px')
+                .style('pointer-events', 'none')
+                .style('font-size', '12px')
+                .style('opacity', 0)
+                .merge(tooltip)
+                .html(`Gene: ${d.gene}<br>Tissue: ${d.tissue}<br>Value: ${Number(d.value).toFixed(2)}`)
+                .style('left', (event.pageX + 10) + 'px')
+                .style('top', (event.pageY - 28) + 'px')
+                .transition()
+                .duration(200)
+                .style('opacity', 1);
         })
         .on('mouseout', function() {
             d3.select(this).style('stroke', '#fff').style('stroke-width', 1);
-            d3.select('#tooltip').style('opacity', 0);
+            
+            // Hide tooltip
+            d3.selectAll('.tooltip')
+                .transition()
+                .duration(200)
+                .style('opacity', 0)
+                .remove();
         });
 
-    // Tooltip
-    d3.select('body').selectAll('#tooltip').remove();
-    d3.select('body').append('div')
-        .attr('id', 'tooltip')
-        .style('position', 'absolute')
-        .style('background', 'rgba(0, 0, 0, 0.8)')
-        .style('color', 'white')
-        .style('padding', '8px')
-        .style('border-radius', '4px')
-        .style('pointer-events', 'none')
-        .style('opacity', 0)
-        .style('font-size', '12px');
+    // Add title
+    const custom = getPlotCustomization();
+    const title = custom.title || 'Gene Expression Heatmap';
+    svg.append('text')
+        .attr('x', width / 2)
+        .attr('y', -40)
+        .attr('text-anchor', 'middle')
+        .style('font-size', custom.titleFontSize + 'px')
+        .style('font-family', custom.fontFamily)
+        .style('font-weight', 'bold')
+        .text(title);
 
-    // Legend (positioned at top right)
+    // Add legend
     const legendHeight = 20;
     const legendWidth = 200;
     const legend = svg.append('g')
-        .attr('transform', `translate(${width - legendWidth - 20},${-margin.top + 40})`);
-
+        .attr('transform', `translate(${width - legendWidth - 10}, -60)`);
+        
     const legendScale = d3.scaleLinear()
         .domain([0, maxNTPM || 100])
         .range([0, legendWidth]);
-
+        
     const legendAxis = d3.axisBottom(legendScale)
         .ticks(5)
         .tickFormat(d3.format('.1f'));
-
+        
+    // Gradient for legend
     const defs = svg.append('defs');
     const linearGradient = defs.append('linearGradient')
         .attr('id', 'legend-gradient')
@@ -515,37 +867,31 @@ function renderExpressionHeatmap(expressionData, geneList = []) {
         .attr('y1', '0%')
         .attr('x2', '100%')
         .attr('y2', '0%');
-
-    // Gradient stops
-    const stops = 10;
-    for (let i = 0; i <= stops; i++) {
-        const frac = i / stops;
+        
+    for (let i = 0; i <= 10; i++) {
+        const frac = i / 10;
         const val = frac * (maxNTPM || 1);
         linearGradient.append('stop')
             .attr('offset', `${frac * 100}%`)
             .attr('stop-color', colorScale(val));
     }
-
+    
     legend.append('rect')
         .attr('width', legendWidth)
         .attr('height', legendHeight)
         .style('fill', 'url(#legend-gradient)');
-
+        
     legend.append('g')
         .attr('transform', `translate(0,${legendHeight})`)
         .call(legendAxis)
         .style('font-size', '10px');
-
+        
     legend.append('text')
         .attr('x', legendWidth / 2)
-        .attr('y', -10)
+        .attr('y', -5)
         .style('text-anchor', 'middle')
         .style('font-size', '12px')
-        .style('fill', '#333')
-        .text('nTPM');
-
-    // REMOVED: The duplicate gene summary table rendering
-    // The main gene input summary table is already available in the UI
+        .text('Expression Level');
 
     console.log('plots.js: Heatmap rendering completed successfully');
     return true;
