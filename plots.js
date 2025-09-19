@@ -19,7 +19,7 @@ function displayCiliaPlotPage() {
         /* General Page Styles */
         .ciliaplot-page-container { font-family: Arial, sans-serif; color: #333; background-color: #f9f9f9; padding: 20px; }
         h2, h3 { color: #1a237e; }
-
+        
         .explanation-section { background-color: #e8eaf6; border-left: 5px solid #3f51b5; padding: 15px 20px; margin-bottom: 25px; border-radius: 5px; }
         .explanation-section h2 { margin-top: 0; font-size: 1.5em; }
         .explanation-section a { color: #303f9f; font-weight: bold; text-decoration: none; }
@@ -27,8 +27,8 @@ function displayCiliaPlotPage() {
 
         .ciliaplot-main-layout {
             display: grid;
-            grid-template-columns: 240px 300px 3fr; /* Wider visualization */
-            gap: 12px;
+            grid-template-columns: 240px 300px 3fr; /* Narrower controls, wider plot */
+            gap: 15px;
             align-items: start;
         }
 
@@ -37,10 +37,10 @@ function displayCiliaPlotPage() {
 
         .plot-types-panel .plot-type-list { list-style: none; padding: 0; margin: 0; }
         .plot-types-panel .plot-type-list li { margin-bottom: 10px; }
-        .plot-types-panel .plot-type-list label { display: block; padding: 10px 12px; font-size: 0.9em; border-radius: 5px; cursor: pointer; transition: background-color 0.3s; border: 1px solid #ddd; }
+        .plot-types-panel .plot-type-list label { display: block; padding: 10px 12px; font-size:0.9em; border-radius: 5px; cursor: pointer; transition: background-color 0.3s; border: 1px solid #ddd; }
         .plot-types-panel .plot-type-list input[type="radio"] { display: none; }
         .plot-types-panel .plot-type-list input[type="radio"]:checked + label { background-color: #3f51b5; color: white; font-weight: bold; border-color: #3f51b5; }
-
+        
         #ciliaplot-genes-input { width: 100%; min-height: 120px; padding: 10px; border-radius: 5px; border: 1px solid #ccc; font-family: 'Courier New', monospace; resize: vertical; margin-bottom: 15px; }
         #generate-ciliaplot-btn { width: 100%; padding: 12px; font-size: 1.1em; font-weight: bold; background-color: #4CAF50; color: white; border: none; border-radius: 5px; cursor: pointer; }
         #customization-container { margin-top: 15px; }
@@ -49,16 +49,15 @@ function displayCiliaPlotPage() {
         .customization-grid input, .customization-grid select { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
         .customization-grid .form-group { margin-bottom: 10px; }
         .customization-grid .full-width { grid-column: 1 / -1; }
-
+        
         .visualization-panel { position: sticky; top: 20px; }
         .plot-header { display: flex; justify-content: space-between; align-items: center; }
         .download-controls { display: flex; gap: 10px; align-items: center; }
         #download-format { padding: 8px; }
         #download-plot-btn { background-color: #3f51b5; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; }
-
-        #plot-display-area { width: 100%; height: 60vh; border: 2px dashed #ccc; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #888; margin-top: 10px; overflow: hidden; }
-        #plot-display-area > div, #plot-display-area > svg, #plot-display-area > canvas { width: 100% !important; height: 100% !important; }
-
+        
+        #plot-display-area { width: 100%; height: 600px; border: 2px dashed #ccc; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #888; margin-top: 10px; overflow: hidden; }
+        
         .gene-input-table-container table { width: 100%; border-collapse: collapse; background-color: #fff; }
         .gene-input-table-container th, .gene-input-table-container td { border: 1px solid #ddd; padding: 8px; text-align: left; }
         .gene-input-table-container th { background-color: #f2f2f2; }
@@ -94,7 +93,7 @@ function displayCiliaPlotPage() {
                     <div id="customization-container"></div>
                 </div>
             </main>
-
+            
             <aside class="visualization-panel">
                 <div class="control-card">
                     <div class="plot-header">
@@ -317,63 +316,27 @@ function renderBarPlot(genes, custom) {
 }
 
 function renderHeatmap(genes, custom) {
-    const plotContainer = document.getElementById('plot-display-area');
-    clearAllPlots('plot-display-area');
-
-    // Ensure expressionData is loaded
-    if (typeof expressionData === 'undefined' || !expressionData || Object.keys(expressionData).length === 0) {
-        plotContainer.innerHTML = '<p>No expression data available.</p>';
-        return;
-    }
-
-    // Filter genes with expression data
-    const genesWithExpr = genes.filter(g => expressionData[g.gene.toUpperCase()]);
+    const genesWithExpr = genes.filter(g => typeof expressionData !== 'undefined' && expressionData[g.gene.toUpperCase()]);
     if (genesWithExpr.length === 0) {
-        plotContainer.innerHTML = '<p>No expression data found for these genes.</p>';
+        document.getElementById('plot-display-area').innerHTML = '<p>No expression data for these genes.</p>';
         return;
     }
-
-    // Get tissue labels from the first gene in expressionData
-    const firstGeneKey = Object.keys(expressionData)[0];
-    const tissues = Object.keys(expressionData[firstGeneKey]);
-    if (!tissues || tissues.length === 0) {
-        plotContainer.innerHTML = '<p>No tissue information found in expression data.</p>';
-        return;
-    }
-
-    // Build z-values for heatmap
+    const tissues = Object.keys(expressionData[Object.keys(expressionData)[0]]);
     const yLabels = genesWithExpr.map(g => g.gene);
     const zValues = yLabels.map(geneName => {
         const expr = expressionData[geneName.toUpperCase()] || {};
-        return tissues.map(tissue => {
-            const val = parseFloat(expr[tissue]);
-            return isNaN(val) ? 0 : val; // fallback to 0 if missing
-        });
+        return tissues.map(tissue => expr[tissue] || 0);
     });
-
-    const data = [{
-        x: tissues,
-        y: yLabels,
-        z: zValues,
-        type: 'heatmap',
-        colorscale: 'Reds',
-        hoverongaps: false,
-        showscale: true
-    }];
-
+    const data = [{ x: tissues, y: yLabels, z: zValues, type: 'heatmap', colorscale: 'Reds' }];
     const layout = {
         title: { text: custom.title || 'Tissue Expression Heatmap', font: { size: custom.titleFontSize, family: custom.fontFamily } },
-        xaxis: { title: { text: 'Tissue', font: custom.axisTitleFont }, tickangle: -45, visible: custom.showX, linecolor: 'black', linewidth: 2, mirror: true },
+        xaxis: { title: { text: 'Tissue', font: custom.axisTitleFont }, visible: custom.showX, tickangle: -45, linecolor: 'black', linewidth: 2, mirror: true },
         yaxis: { title: { text: 'Gene', font: custom.axisTitleFont }, visible: custom.showY, linecolor: 'black', linewidth: 2, mirror: true },
-        height: 600,
-        margin: { l: 120, r: 20, b: 150, t: 80 },
-        plot_bgcolor: 'white',
-        paper_bgcolor: 'white'
+        height: 600, margin: { l: 120, r: 20, b: 150, t: 80 },
+        plot_bgcolor: 'white', paper_bgcolor: 'white'
     };
-
     Plotly.newPlot('plot-display-area', data, layout, { responsive: true });
 }
-
 
 
 // =============================================================================
