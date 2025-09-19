@@ -490,11 +490,7 @@ function mapLocalizationToSVG(localizationArray) {
     }).filter(id => allPartIds.includes(id));
 }
 
-
-let currentData = window.ciliaData || [];
 function displayHomePage() {
-    // Use currentData here
-    console.log("Displaying home page with data:", currentData.length);
     const contentArea = document.querySelector('.content-area');
     contentArea.className = 'content-area';
     document.querySelector('.cilia-panel').style.display = 'block';
@@ -2389,20 +2385,6 @@ document.addEventListener('DOMContentLoaded', () => {
     initGlobalEventListeners();
 });
 
-
-// In script.js
-function initGlobalEventListeners() {
-    // Example: Set up navigation event listeners
-    document.querySelectorAll('.nav-link').forEach(link => {
-        link.addEventListener('click', (e) => {
-            e.preventDefault();
-            const page = e.target.getAttribute('href').substring(1);
-            navigateTo(page); // Assuming navigateTo is defined in script.js
-        });
-    });
-    // Add other global event listeners as needed
-    console.log("Global event listeners initialized.");
-}
 
 // Enhanced renderFoundNotFoundTable with debugging and error handling
 function renderFoundNotFoundTable(geneData, containerId = 'table-container') {
