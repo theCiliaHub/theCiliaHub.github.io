@@ -3,10 +3,7 @@
 // =============================================================================
 // This file is responsible ONLY for displaying the CiliaPlot page and rendering
 // visualizations. It relies on global variables and functions from script.js,
-// such as findGenes() and the pre-loaded expressionData object.
-//
-// Dependencies (must be loaded in the main HTML file):
-// - Plotly.js, D3.js, Chart.js, jsPDF
+// such as findGenes(), and the pre-loaded expressionData object.
 // =============================================================================
 
 /**
@@ -23,13 +20,11 @@ function displayCiliaPlotPage() {
         .ciliaplot-page-container { font-family: Arial, sans-serif; color: #333; background-color: #f9f9f9; padding: 20px; }
         h2, h3 { color: #1a237e; }
         
-        /* Explanation Section */
         .explanation-section { background-color: #e8eaf6; border-left: 5px solid #3f51b5; padding: 15px 20px; margin-bottom: 25px; border-radius: 5px; }
         .explanation-section h2 { margin-top: 0; font-size: 1.5em; }
         .explanation-section a { color: #303f9f; font-weight: bold; text-decoration: none; }
         .explanation-section a:hover { text-decoration: underline; }
 
-        /* Layout */
         .ciliaplot-main-layout {
             display: grid;
             grid-template-columns: 240px 300px 3fr; /* Narrower controls, wider plot */
@@ -37,18 +32,15 @@ function displayCiliaPlotPage() {
             align-items: start;
         }
 
-        /* Card Styling */
         .control-card { background: #fff; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.05); padding: 20px; margin-bottom: 15px; }
         .control-card h3 { margin-top: 0; border-bottom: 2px solid #eee; padding-bottom: 10px; font-size: 1.2em; }
 
-        /* Left Column: Plot Types */
         .plot-types-panel .plot-type-list { list-style: none; padding: 0; margin: 0; }
         .plot-types-panel .plot-type-list li { margin-bottom: 10px; }
         .plot-types-panel .plot-type-list label { display: block; padding: 10px 12px; font-size:0.9em; border-radius: 5px; cursor: pointer; transition: background-color 0.3s; border: 1px solid #ddd; }
         .plot-types-panel .plot-type-list input[type="radio"] { display: none; }
         .plot-types-panel .plot-type-list input[type="radio"]:checked + label { background-color: #3f51b5; color: white; font-weight: bold; border-color: #3f51b5; }
         
-        /* Middle Column: Input & Customization */
         #ciliaplot-genes-input { width: 100%; min-height: 120px; padding: 10px; border-radius: 5px; border: 1px solid #ccc; font-family: 'Courier New', monospace; resize: vertical; margin-bottom: 15px; }
         #generate-ciliaplot-btn { width: 100%; padding: 12px; font-size: 1.1em; font-weight: bold; background-color: #4CAF50; color: white; border: none; border-radius: 5px; cursor: pointer; }
         #customization-container { margin-top: 15px; }
@@ -58,7 +50,6 @@ function displayCiliaPlotPage() {
         .customization-grid .form-group { margin-bottom: 10px; }
         .customization-grid .full-width { grid-column: 1 / -1; }
         
-        /* Right Column: Visualization & Table */
         .visualization-panel { position: sticky; top: 20px; }
         .plot-header { display: flex; justify-content: space-between; align-items: center; }
         .download-controls { display: flex; gap: 10px; align-items: center; }
@@ -90,8 +81,7 @@ function displayCiliaPlotPage() {
             <aside class="plot-types-panel">
                 <div class="control-card">
                     <h3>Plot Types</h3>
-                    <ul class="plot-type-list" id="ciliaplot-type-selector">
-                        </ul>
+                    <ul class="plot-type-list" id="ciliaplot-type-selector"></ul>
                 </div>
             </aside>
 
@@ -133,21 +123,15 @@ function displayCiliaPlotPage() {
 }
 
 // =============================================================================
-// GLOBAL VARIABLE
-// =============================================================================
-let currentPlotInstance;
-
-// =============================================================================
 // INITIALIZATION
 // =============================================================================
 
 function initializeCiliaPlotPage() {
-    // This assumes initExpressionSystem() is called from script.js to load data into the global `expressionData`
     populatePlotTypes();
     document.getElementById('ciliaplot-type-selector').addEventListener('change', updateCustomizationPanel);
     document.getElementById('generate-ciliaplot-btn').addEventListener('click', generateAnalysisPlots);
     document.getElementById('download-plot-btn').addEventListener('click', downloadPlot);
-    updateCustomizationPanel(); // Initial call
+    updateCustomizationPanel(); 
 }
 
 // =============================================================================
@@ -166,7 +150,7 @@ function getCleanArray(gene, ...keys) {
 }
 
 function clearAllPlots(containerId = 'plot-display-area') {
-    if (currentPlotInstance && typeof currentPlotInstance.destroy === 'function') {
+    if (typeof currentPlotInstance !== 'undefined' && currentPlotInstance && typeof currentPlotInstance.destroy === 'function') {
         currentPlotInstance.destroy();
         currentPlotInstance = null;
     }
@@ -234,21 +218,25 @@ function populatePlotTypes() {
 }
 
 function updateCustomizationPanel() {
-    const plotType = document.querySelector('input[name="ciliaplot_type"]:checked').value;
     const container = document.getElementById('customization-container');
     let html = `<h3>Plot Customization</h3><div class="customization-grid">`;
-    
     html += `<div class="full-width form-group"><label for="custom-title">Plot Title</label><input type="text" id="custom-title" placeholder="Default Title"></div>`;
     html += `<div class="form-group"><label for="custom-title-fontsize">Title Font Size</label><input type="number" id="custom-title-fontsize" value="24"></div>`;
     html += `<div class="form-group"><label for="custom-font-family">Font Family</label><select id="custom-font-family"><option>Arial</option><option>Times New Roman</option></select></div>`;
     html += `<div class="form-group"><label for="custom-show-x">Show X-Axis</label><select id="custom-show-x"><option value="true">Show</option><option value="false">Hide</option></select></div>`;
     html += `<div class="form-group"><label for="custom-show-y">Show Y-Axis</label><select id="custom-show-y"><option value="true">Show</option><option value="false">Hide</option></select></div>`;
-    
     html += `</div>`;
     container.innerHTML = html;
 }
 
 async function generateAnalysisPlots() {
+    // FIX: Check that the gene database is loaded before proceeding.
+    if (typeof geneMapCache === 'undefined' || geneMapCache.size === 0) {
+        alert("Error: The main gene database is not yet loaded. Please wait a moment and try again, or refresh the page.");
+        console.error("generateAnalysisPlots was called before geneMapCache was initialized.");
+        return;
+    }
+
     const plotContainer = document.getElementById('plot-display-area');
     plotContainer.innerHTML = '<em>Searching genes and generating plot...</em>';
     clearAllPlots('plot-display-area');
@@ -328,7 +316,7 @@ function renderBarPlot(genes, custom) {
 }
 
 function renderHeatmap(genes, custom) {
-    const genesWithExpr = genes.filter(g => expressionData[g.gene.toUpperCase()]);
+    const genesWithExpr = genes.filter(g => typeof expressionData !== 'undefined' && expressionData[g.gene.toUpperCase()]);
     if (genesWithExpr.length === 0) {
         document.getElementById('plot-display-area').innerHTML = '<p>No expression data for these genes.</p>';
         return;
@@ -349,6 +337,7 @@ function renderHeatmap(genes, custom) {
     };
     Plotly.newPlot('plot-display-area', data, layout, { responsive: true });
 }
+
 
 // =============================================================================
 // INTEGRATED CHART.JS & D3.JS FUNCTIONS
