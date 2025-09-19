@@ -1,3 +1,16 @@
+// GLOBAL STATE FOR PLOTS (ESPECIALLY EXPRESSION HEATMAP)
+// =============================================================================
+
+// --- Global State for Expression Heatmap ---
+let plotExpressionLoaded = false;
+let plotExpressionData = {};
+let pendingHeatmapRequest = null;
+
+// This variable holds the currently active Chart.js or D3 plot instance
+let currentPlotInstance = null;
+
+
+
 /**
  * Displays the main CiliaPlot analysis page, fully integrating all plotting and UI logic.
  */
@@ -369,11 +382,13 @@ async function generateAnalysisPlots() {
         
         // CORRECTED SECTION
         case 'expression_heatmap':
-            // This logic correctly checks if expression data is loaded and calls the heatmap function with two arguments.
-            if (typeof renderExpressionHeatmap !== "function") {
-                plotContainer.innerHTML = 'Expression heatmap functionality is not loaded.';
-                return;
-            }
+    // ...
+    if (!plotExpressionLoaded || Object.keys(plotExpressionData).length === 0) { // <--- ERROR HAPPENS HERE
+        // ... logic to load data ...
+        return;
+    }
+    renderExpressionHeatmap(plotExpressionData, foundGenes);
+    break;
             
             // This assumes plotExpressionLoaded and plotExpressionData are global variables
             if (!plotExpressionLoaded || Object.keys(plotExpressionData).length === 0) {
