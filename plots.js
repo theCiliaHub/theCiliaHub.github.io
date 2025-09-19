@@ -751,12 +751,19 @@ function renderExpressionHeatmap(expressionData, geneList = []) {
     const containerWidth = plotContainer.clientWidth;
     const containerHeight = plotContainer.clientHeight;
     
-    // Define margins that scale appropriately
+    // Calculate dynamic margins based on text length to ensure full visibility
+    const maxGeneNameLength = Math.max(...validated.map(gene => gene.length));
+    const maxTissueNameLength = Math.max(...tissues.map(tissue => tissue.length));
+    
+    // Calculate required margins for full text visibility
+    const leftMarginForGenes = Math.max(80, Math.min(200, maxGeneNameLength * 8 + 20));
+    const bottomMarginForTissues = Math.max(100, Math.min(200, maxTissueNameLength * 6 + 40));
+    
     const margin = { 
         top: Math.min(80, containerHeight * 0.15), 
         right: 30, 
-        bottom: Math.min(150, containerHeight * 0.25), 
-        left: Math.min(150, containerWidth * 0.2) 
+        bottom: Math.min(bottomMarginForTissues, containerHeight * 0.35), 
+        left: Math.min(leftMarginForGenes, containerWidth * 0.3) 
     };
     
     // Calculate available space for the heatmap itself
@@ -802,14 +809,14 @@ function renderExpressionHeatmap(expressionData, geneList = []) {
         .domain(validated)
         .padding(0.05);
 
-    // X-axis with responsive font size and smart label handling
+    // X-axis with full text visibility
     const xAxisGroup = svg.append('g')
         .attr('class', 'x-axis')
         .attr('transform', `translate(0,${height})`)
         .call(d3.axisBottom(xScale));
         
-    // Calculate appropriate font size based on available space
-    const xAxisFontSize = Math.max(8, Math.min(12, xScale.bandwidth() / 3));
+    // Calculate font size that ensures readability while fitting in allocated space
+    const xAxisFontSize = Math.max(9, Math.min(11, Math.min(xScale.bandwidth() / 2, (margin.bottom - 40) / maxTissueNameLength * 8)));
     
     xAxisGroup.selectAll('text')
         .style('text-anchor', 'end')
@@ -818,17 +825,8 @@ function renderExpressionHeatmap(expressionData, geneList = []) {
         .attr('transform', 'rotate(-45)')
         .style('font-size', xAxisFontSize + 'px')
         .style('fill', '#333')
-        .each(function(d) {
-            // Truncate long tissue names if necessary
-            const maxChars = Math.max(8, Math.floor(xScale.bandwidth() / 4));
-            const text = d3.select(this);
-            const originalText = text.text();
-            if (originalText.length > maxChars) {
-                text.text(originalText.substring(0, maxChars - 3) + '...')
-                    .append('title')
-                    .text(originalText);
-            }
-        });
+        .style('font-weight', '500')
+        .text(d => d); // Show full text without truncation
 
     // Y-axis with responsive font size
     const yAxisFontSize = Math.max(8, Math.min(12, yScale.bandwidth() / 2));
@@ -977,6 +975,7 @@ function renderExpressionHeatmap(expressionData, geneList = []) {
     console.log('plots.js: Heatmap rendering completed successfully with container bounds');
     return true;
 }
+
 // =============================================================================
 // PLOTLY.JS RENDERING FUNCTIONS
 // =============================================================================
