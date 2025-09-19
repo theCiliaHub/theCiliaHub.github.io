@@ -310,137 +310,193 @@ function renderBarPlot(genes, custom) {
 }
 
 
-/**
- * Renders an expression heatmap with corrected positioning and tissue extraction for the new dashboard layout.
- */
-function renderExpressionHeatmap(foundGenes, container) {
-    clearAllPlots(); // Changed from clearPreviousPlot to clearAllPlots
-    const settings = getPlotCustomization(); // Changed from getPlotSettings to getPlotCustomization to match existing function
+// Enhanced renderExpressionHeatmap function for D3-based heatmap visualization
+function renderExpressionHeatmap(expressionData, geneList = []) {
+    console.log('=== Starting renderExpressionHeatmap ===');
+    console.log('Expression data:', Object.keys(expressionData).length, 'genes');
+    console.log('Gene list:', geneList);
 
-    if (!foundGenes.length || Object.keys(expressionData).length === 0) {
-        container.innerHTML = '<p class="status-message">No expression data available for selected genes.</p>';
-        return;
+    // 1. Validate inputs
+    if (!expressionData || Object.keys(expressionData).length === 0) {
+        console.error('No expression data provided');
+        return false;
     }
 
-    const genesWithExpression = foundGenes.filter(gene => Object.keys(getGeneExpression(gene.gene)).length > 0);
-
-    if (genesWithExpression.length === 0) {
-        container.innerHTML = '<p class="status-message">None of the selected genes have expression data.</p>';
-        return;
+    // 2. Get the content area and clear any existing heatmap
+    const contentArea = document.querySelector('.content-area');
+    if (!contentArea) {
+        console.error('Content area not found');
+        return false;
     }
 
-    // --- FIX: Extract tissues dynamically from genesWithExpression ---
-    const allTissues = new Set();
-    genesWithExpression.forEach(gene => {
-        const expr = getGeneExpression(gene.gene);
-        Object.keys(expr).forEach(tissue => allTissues.add(tissue));
-    });
-    const tissues = Array.from(allTissues).sort(); // Sort for consistent order
-
-    if (tissues.length === 0) {
-        container.innerHTML = '<p class="status-message">No tissue information found in expression data.</p>';
-        return;
+    const existingHeatmap = contentArea.querySelector('#heatmap-container');
+    if (existingHeatmap) {
+        existingHeatmap.remove();
     }
 
-    // Prepare data and calculate max expression
-    let maxExpression = 0;
-    const heatmapData = [];
-    genesWithExpression.forEach(gene => {
-        const expr = getGeneExpression(gene.gene);
-        const maxGeneExpr = Math.max(0, ...Object.values(expr));
-        maxExpression = Math.max(maxExpression, maxGeneExpr);
+    // 3. Filter genes (use provided geneList or all genes)
+    const genes = geneList.length > 0 ? geneList.filter(g => expressionData[g]) : Object.keys(expressionData);
+    if (genes.length === 0) {
+        console.error('No valid genes found for heatmap');
+        contentArea.innerHTML = '<div style="text-align: center; padding: 2rem; color: #666;">No expression data available for the selected genes.</div>';
+        return false;
+    }
+
+    // 4. Get all unique tissues
+    const tissues = [...new Set(
+        genes.flatMap(gene => Object.keys(expressionData[gene]))
+    )].sort();
+
+    // 5. Create data matrix for heatmap
+    const heatmapData = genes.map(gene => {
+        const row = { gene };
         tissues.forEach(tissue => {
-            heatmapData.push({ gene: gene.gene, tissue: tissue, expression: expr[tissue] || 0 });
+            row[tissue] = expressionData[gene][tissue] || 0; // Default to 0 if no data
         });
+        return row;
     });
 
-    // --- Revised Sizing and Margins for the new layout ---
-    const containerWidth = container.clientWidth;
-    const containerHeight = container.clientHeight;
-    
-    const margin = { top: 60, right: 100, bottom: 150, left: 120 };
-    const width = containerWidth - margin.left - margin.right;
-    const height = containerHeight - margin.top - margin.bottom;
+    // 6. Create container for heatmap and table
+    const heatmapContainer = document.createElement('div');
+    heatmapContainer.id = 'heatmap-container';
+    heatmapContainer.className = 'page-section';
+    heatmapContainer.style.cssText = `
+        padding: 2rem;
+        background: white;
+        border-radius: 15px;
+        box-shadow: 0 8px 32px rgba(44, 90, 160, 0.1);
+        margin-top: 2rem;
+    `;
+    heatmapContainer.innerHTML = `
+        <h2 style="color: #2c5aa0; margin-bottom: 1.5rem; text-align: center;">Gene Expression Heatmap</h2>
+        <div id="heatmap-wrapper" style="position: relative; overflow-x: auto;">
+            <svg id="heatmap-svg"></svg>
+        </div>
+        <div id="table-container" style="margin-top: 2rem;"></div>
+    `;
+    contentArea.appendChild(heatmapContainer);
 
-    const svg = d3.select(container).append('svg')
-        .attr('width', '100%')
-        .attr('height', '100%')
-        .attr('viewBox', `0 0 ${containerWidth} ${containerHeight}`)
+    // 7. Set up D3 heatmap
+    const margin = { top: 100, right: 30, bottom: 30, left: 150 };
+    const width = Math.max(600, tissues.length * 40);
+    const height = Math.max(400, genes.length * 30);
+
+    const svg = d3.select('#heatmap-svg')
+        .attr('width', width + margin.left + margin.right)
+        .attr('height', height + margin.top + margin.bottom)
         .append('g')
-        .attr('transform', `translate(${margin.left}, ${margin.top})`);
+        .attr('transform', `translate(${margin.left},${margin.top})`);
 
-    // Scales
-    const xScale = d3.scaleBand().domain(tissues).range([0, width]).padding(0.05);
-    const yScale = d3.scaleBand().domain(genesWithExpression.map(g => g.gene)).range([0, height]).padding(0.05);
-    const colorScale = d3.scaleSequential(d3.interpolateViridis).domain([0, maxExpression]);
+    // 8. Define color scale
+    const maxNTPM = d3.max(heatmapData, d => d3.max(tissues, t => d[t]));
+    const colorScale = d3.scaleSequential(d3.interpolateGreens)
+        .domain([0, maxNTPM || 100]);
 
-    // Draw heatmap rectangles
-    svg.selectAll('.heatmap-rect')
-       .data(heatmapData)
-       .enter()
-       .append('rect')
-       .attr('class', 'heatmap-rect')
-       .attr('x', d => xScale(d.tissue))
-       .attr('y', d => yScale(d.gene))
-       .attr('width', xScale.bandwidth())
-       .attr('height', yScale.bandwidth())
-       .attr('fill', d => colorScale(d.expression || 0));
+    // 9. Create scales
+    const xScale = d3.scaleBand()
+        .range([0, width])
+        .domain(tissues)
+        .padding(0.05);
 
-    // Draw Axes
-    // X-Axis
+    const yScale = d3.scaleBand()
+        .range([0, height])
+        .domain(genes)
+        .padding(0.05);
+
+    // 10. Add axes
     svg.append('g')
-        .attr('transform', `translate(0, ${height})`)
-        .call(d3.axisBottom(xScale))
+        .attr('class', 'x-axis')
+        .attr('transform', `translate(0,${-10})`)
+        .call(d3.axisTop(xScale))
         .selectAll('text')
-        .attr('transform', 'translate(-10,0)rotate(-45)')
         .style('text-anchor', 'end')
-        .style('font-family', settings.fontFamily || 'Arial')
-        .style('font-size', `${settings.tickFontSize || 12}px`)
-        .style('fill', settings.fontColor || '#333333');
+        .attr('dx', '-.8em')
+        .attr('dy', '-.15em')
+        .attr('transform', 'rotate(-45)')
+        .style('font-size', '12px')
+        .style('fill', '#333');
 
-    // Y-Axis
     svg.append('g')
-       .call(d3.axisLeft(yScale))
-       .selectAll('text')
-       .style('font-family', settings.fontFamily || 'Arial')
-       .style('font-size', `${settings.tickFontSize || 12}px`)
-       .style('fill', settings.fontColor || '#333333');
-       
-    // --- Correctly positioned axis labels ---
-    // X-Axis Label
-    d3.select(container).select('svg').append('text')
-        .attr('text-anchor', 'middle')
-        .attr('x', margin.left + width / 2)
-        .attr('y', containerHeight - margin.bottom / 2 + 30)
-        .text('Tissues')
-        .attr('font-weight', 'bold')
-        .style('font-family', settings.fontFamily || 'Arial')
-        .style('font-size', `${settings.axisTitleFontSize || 14}px`)
-        .style('fill', settings.fontColor || '#333333');
+        .attr('class', 'y-axis')
+        .call(d3.axisLeft(yScale))
+        .selectAll('text')
+        .style('font-size', '12px')
+        .style('fill', '#333');
 
-    // Y-Axis Label
-    d3.select(container).select('svg').append('text')
-        .attr('text-anchor', 'middle')
-        .attr('transform', 'rotate(-90)')
-        .attr('y', margin.left / 2 - 20)
-        .attr('x', -(margin.top + height / 2))
-        .text('Genes')
-        .attr('font-weight', 'bold')
-        .style('font-family', settings.fontFamily || 'Arial')
-        .style('font-size', `${settings.axisTitleFontSize || 14}px`)
-        .style('fill', settings.fontColor || '#333333');
+    // 11. Add heatmap cells
+    svg.selectAll()
+        .data(heatmapData, d => d.gene)
+        .enter()
+        .append('g')
+        .selectAll('rect')
+        .data(d => tissues.map(tissue => ({
+            gene: d.gene,
+            tissue,
+            value: d[tissue]
+        })))
+        .enter()
+        .append('rect')
+        .attr('x', d => xScale(d.tissue))
+        .attr('y', d => yScale(d.gene))
+        .attr('width', xScale.bandwidth())
+        .attr('height', yScale.bandwidth())
+        .style('fill', d => d.value === 0 ? '#f5f5f5' : colorScale(d.value))
+        .style('stroke', '#fff')
+        .style('stroke-width', 1)
+        .on('mouseover', function(event, d) {
+            d3.select(this).style('stroke', '#000').style('stroke-width', 2);
+            d3.select('#tooltip')
+                .style('opacity', 1)
+                .html(`Gene: ${d.gene}<br>Tissue: ${d.tissue}<br>nTPM: ${d.value.toFixed(2)}`)
+                .style('left', `${event.pageX + 10}px`)
+                .style('top', `${event.pageY - 10}px`);
+        })
+        .on('mouseout', function() {
+            d3.select(this).style('stroke', '#fff').style('stroke-width', 1);
+            d3.select('#tooltip').style('opacity', 0);
+        });
 
-    // --- Robust color legend ---
-    const legendWidth = 20, legendHeight = height / 2;
-    const legendX = width + 40; // Position it inside the right margin
-    const legendY = height / 4;
+    // 12. Add tooltip
+    d3.select('body').append('div')
+        .attr('id', 'tooltip')
+        .style('position', 'absolute')
+        .style('background', 'rgba(0, 0, 0, 0.8)')
+        .style('color', 'white')
+        .style('padding', '8px')
+        .style('border-radius', '4px')
+        .style('pointer-events', 'none')
+        .style('opacity', 0)
+        .style('font-size', '12px');
 
-    const legend = svg.append('g').attr('transform', `translate(${legendX}, ${legendY})`);
-    const defs = legend.append('defs');
-    const linearGradient = defs.append('linearGradient').attr('id', 'legend-gradient').attr('gradientTransform', 'rotate(90)');
+    // 13. Add color scale legend
+    const legendHeight = 10;
+    const legendWidth = 200;
+    const legend = svg.append('g')
+        .attr('transform', `translate(${width - legendWidth - 20},${-margin.top + 20})`);
+
+    const legendScale = d3.scaleLinear()
+        .domain([0, maxNTPM || 100])
+        .range([0, legendWidth]);
+
+    const legendAxis = d3.axisBottom(legendScale)
+        .ticks(5)
+        .tickFormat(d3.format('.1f'));
+
+    const defs = svg.append('defs');
+    const linearGradient = defs.append('linearGradient')
+        .attr('id', 'legend-gradient')
+        .attr('x1', '0%')
+        .attr('y1', '0%')
+        .attr('x2', '100%')
+        .attr('y2', '0%');
+
     linearGradient.selectAll('stop')
-        .data(colorScale.ticks().map((t, i, n) => ({ offset: `${100*i/n.length}%`, color: colorScale(t) })))
-        .enter().append('stop')
+        .data(colorScale.ticks().map((t, i, n) => ({
+            offset: `${100 * i / n.length}%`,
+            color: colorScale(t)
+        })))
+        .enter()
+        .append('stop')
         .attr('offset', d => d.offset)
         .attr('stop-color', d => d.color);
 
@@ -449,19 +505,29 @@ function renderExpressionHeatmap(foundGenes, container) {
         .attr('height', legendHeight)
         .style('fill', 'url(#legend-gradient)');
 
-    const legendScale = d3.scaleLinear().domain(colorScale.domain()).range([legendHeight, 0]);
     legend.append('g')
-        .attr('transform', `translate(${legendWidth}, 0)`)
-        .call(d3.axisRight(legendScale).ticks(5))
-        .selectAll('text')
-        .style('font-family', settings.fontFamily || 'Arial')
-        .style('font-size', `${settings.tickFontSize || 12}px`)
-        .style('fill', settings.fontColor || '#333333');
-    
-    currentPlotInstance = d3.select(container).select('svg').node();
+        .attr('transform', `translate(0,${legendHeight})`)
+        .call(legendAxis)
+        .style('font-size', '10px');
+
+    legend.append('text')
+        .attr('x', legendWidth / 2)
+        .attr('y', -10)
+        .style('text-anchor', 'middle')
+        .style('font-size', '12px')
+        .style('fill', '#333')
+        .text('nTPM');
+
+    // 14. Render found/not found table
+    const geneStatusData = geneList.map(gene => ({
+        name: gene,
+        found: expressionData[gene] !== undefined
+    }));
+    const tableSuccess = renderFoundNotFoundTable(geneStatusData, 'table-container');
+
+    console.log('Heatmap rendering completed');
+    return true;
 }
-
-
 // =============================================================================
 // INTEGRATED CHART.JS & D3.JS FUNCTIONS
 // =============================================================================
