@@ -343,101 +343,359 @@ async function generateAnalysisPlots() {
 
 // --- Heatmap rendering with validation ---
 // Replace existing renderExpressionHeatmap with this hardened version
-// =============================================================================
-// Updated plots.js - Move Heatmap to Visualization Container with X-Axis Labels
-// =============================================================================
+function renderExpressionHeatmap(expressionData, geneList = []) {
+    console.log('plots.js: === Starting renderExpressionHeatmap ===');
+    console.log('plots.js: Expression data:', Object.keys(expressionData || {}).length, 'genes');
+    console.log('plots.js: Raw geneList:', geneList);
 
-function renderExpressionHeatmap(geneList) {
-    console.log("plots.js: === Starting renderExpressionHeatmap ===");
-    console.log("plots.js: Expression data:", Object.keys(expressionData).length, "genes");
-    console.log("plots.js: Raw geneList:", geneList);
-
-    if (!Array.isArray(geneList)) {
-        console.warn("plots.js: geneList is not an array, converting to []");
-        geneList = [];
+    // ---- helpers ----
+    function normalizeGeneString(s) {
+        if (!s) return null;
+        let str = String(s).trim();
+        // remove parenthetical content and trailing/leading quotes
+        str = str.replace(/\(.*?\)/g, '');
+        // replace commas, slashes and other separators with space so we can split later
+        str = str.replace(/[,\/\\|;]/g, ' ');
+        // remove any characters that are not letters, digits, dash or underscore
+        str = str.replace(/[^A-Za-z0-9\-_ ]/g, '');
+        // collapse spaces
+        str = str.replace(/\s+/g, ' ').trim();
+        return str ? str.toUpperCase() : null;
     }
 
-    // Validate and sanitize gene names
-    const validatedGeneList = geneList
-        .filter(g => typeof g === "string")
-        .map(g => g.trim().toUpperCase())
-        .filter(g => g.length > 0 && expressionData[g]);
-
-    console.log("plots.js: Validated geneList:", validatedGeneList);
-
-    // Clear previous visualization container
-    const vizContainer = document.getElementById("visualization-container");
-    if (!vizContainer) {
-        console.error("plots.js: Visualization container not found");
-        return;
-    }
-    vizContainer.innerHTML = "";
-
-    if (validatedGeneList.length === 0) {
-        vizContainer.innerHTML = `<p class="text-gray-600 text-sm">No expression data found for selected genes.</p>`;
-        return;
-    }
-
-    // Create heatmap container inside visualization container
-    const heatmapWrapper = document.createElement("div");
-    heatmapWrapper.className = "heatmap-wrapper";
-    heatmapWrapper.style.marginTop = "1rem";
-    heatmapWrapper.style.padding = "1rem";
-    heatmapWrapper.style.background = "white";
-    heatmapWrapper.style.border = "1px solid #ddd";
-    heatmapWrapper.style.borderRadius = "8px";
-    vizContainer.appendChild(heatmapWrapper);
-
-    // Render heatmap with tissue names on X axis
-    drawHeatmap(validatedGeneList, heatmapWrapper, Object.keys(expressionData[validatedGeneList[0]]));
-
-    console.log("plots.js: Heatmap rendering completed, visualization container updated");
-}
-
-function generateAnalysisPlots() {
-    console.log("plots.js: generateAnalysisPlots called");
-
-    if (!expressionData || Object.keys(expressionData).length === 0) {
-        console.warn("plots.js: expression data not loaded yet. Deferring heatmap rendering.");
-        deferredHeatmapRender = true;
-        return;
-    }
-
-    renderExpressionHeatmap(currentGeneList);
-}
-
-function drawHeatmap(geneList, containerElement, tissues) {
-    console.log("plots.js: drawHeatmap invoked for", geneList.length, "genes with", tissues.length, "tissues");
-
-    // Example implementation with Plotly or D3 (pseudo):
-    // Ensure tissues appear on X-axis
-    const xLabels = tissues;
-    const yLabels = geneList;
-    const zValues = yLabels.map(g => xLabels.map(t => expressionData[g][t] ?? 0));
-
-    Plotly.newPlot(containerElement, [{
-        z: zValues,
-        x: xLabels,
-        y: yLabels,
-        type: 'heatmap',
-        colorscale: 'Viridis'
-    }], {
-        margin: { t: 40 },
-        xaxis: { title: "Tissue", tickangle: -45 },
-        yaxis: { title: "Gene" },
-        title: "Gene Expression Heatmap"
-    });
-}
-
-// Ensure second summary section is removed
-document.addEventListener("DOMContentLoaded", () => {
-    const duplicateSummaries = document.querySelectorAll(".gene-input-summary");
-    if (duplicateSummaries.length > 1) {
-        for (let i = 1; i < duplicateSummaries.length; i++) {
-            duplicateSummaries[i].remove();
+    function extractCandidates(entry) {
+        const out = [];
+        if (!entry) return out;
+        if (typeof entry === 'string') {
+            // split on whitespace to capture e.g. "ACTN2, ACTN3"
+            entry.split(/\s+/).forEach(part => {
+                const n = normalizeGeneString(part);
+                if (n) out.push(n);
+            });
+        } else if (typeof entry === 'object') {
+            const keys = ['gene', 'geneSymbol', 'symbol', 'name', 'Gene', 'Gene name'];
+            for (const k of keys) {
+                if (entry[k]) {
+                    const n = normalizeGeneString(entry[k]);
+                    if (n) out.push(n);
+                }
+            }
+            // fallback: try to stringify if object looks simple
+            if (out.length === 0) {
+                const maybe = normalizeGeneString(JSON.stringify(entry));
+                if (maybe) out.push(maybe);
+            }
         }
+        return [...new Set(out)];
     }
-});
+
+    function resolveViaGeneMapCache(candidate) {
+        try {
+            if (typeof geneMapCache !== 'undefined' && geneMapCache && geneMapCache.has) {
+                if (geneMapCache.has(candidate)) {
+                    const obj = geneMapCache.get(candidate);
+                    // obj might be string or object
+                    if (!obj) return null;
+                    if (typeof obj === 'string') return normalizeGeneString(obj);
+                    if (typeof obj === 'object') {
+                        // common fields
+                        const prefer = obj.gene || obj.symbol || obj.geneSymbol || obj.name || obj.Gene;
+                        if (prefer) return normalizeGeneString(prefer);
+                        // fallback to any property that looks like a symbol
+                        for (const v of Object.values(obj)) {
+                            if (typeof v === 'string' && v.length <= 12) {
+                                const n = normalizeGeneString(v);
+                                if (n) return n;
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (e) {
+            console.warn('plots.js: geneMapCache lookup failed for', candidate, e);
+        }
+        return null;
+    }
+
+    // ---- available genes set (uppercase keys) ----
+    const availableGenes = new Set(Object.keys(expressionData || {}).map(g => String(g).toUpperCase()));
+
+    // ---- validate & resolve input geneList into canonical uppercase gene symbols ----
+    const validated = [];
+    const skipped = []; // for debug/logging
+    const seen = new Set();
+
+    if (Array.isArray(geneList)) {
+        for (const entry of geneList) {
+            const candidates = extractCandidates(entry);
+            let found = null;
+            for (const cand of candidates) {
+                if (availableGenes.has(cand)) { found = cand; break; }
+                // try geneMapCache resolution
+                const resolved = resolveViaGeneMapCache(cand);
+                if (resolved && availableGenes.has(resolved)) { found = resolved; break; }
+            }
+            // last-chance: if candidate is like "ACTN2.TMP" try base token before dot
+            if (!found && candidates.length > 0) {
+                for (const cand of candidates) {
+                    const firstToken = cand.split('.')[0];
+                    if (firstToken && availableGenes.has(firstToken)) { found = firstToken; break; }
+                }
+            }
+
+            if (found && !seen.has(found)) {
+                validated.push(found);
+                seen.add(found);
+            } else {
+                skipped.push({ entry, candidates });
+            }
+        }
+    } else if (typeof geneList === 'string') {
+        // split string input
+        const parts = geneList.split(/[\s,;\n\r\t]+/).filter(Boolean);
+        for (const p of parts) {
+            const cand = normalizeGeneString(p);
+            let found = null;
+            if (cand) {
+                if (availableGenes.has(cand)) found = cand;
+                else {
+                    const resolved = resolveViaGeneMapCache(cand);
+                    if (resolved && availableGenes.has(resolved)) found = resolved;
+                }
+            }
+            if (found && !seen.has(found)) { validated.push(found); seen.add(found); }
+            else skipped.push({ entry: p, candidates: [cand] });
+        }
+    } else {
+        // fallback: use all genes in expression data
+        validated.push(...Array.from(availableGenes));
+    }
+
+    console.log('plots.js: Validated geneList:', validated);
+    if (skipped.length > 0) console.log('plots.js: Skipped entries (no match):', skipped.slice(0,20));
+
+    const contentArea = document.querySelector('.content-area') || document.getElementById('plot-display-area');
+    if (!contentArea) {
+        console.error('plots.js: Content area or plot-display-area not found');
+        return false;
+    }
+
+    if (validated.length === 0) {
+        contentArea.innerHTML = '<div style="text-align:center; padding:2rem; color:#dc3545;">No valid genes found for heatmap.</div>';
+        // Optionally render a small found/not-found table if you have renderFoundNotFoundTable
+        try {
+            if (typeof renderFoundNotFoundTable === 'function') {
+                const geneStatusData = (Array.isArray(geneList) ? geneList : (typeof geneList === 'string' ? geneList.split(/[\s,;,\n\r\t]+/) : [])).map(g => {
+                    const display = (typeof g === 'string') ? g : (g.gene || g.geneSymbol || g.symbol || JSON.stringify(g));
+                    const normalizedCandidates = extractCandidates(g);
+                    const matched = normalizedCandidates.some(c => availableGenes.has(c) || (typeof geneMapCache !== 'undefined' && geneMapCache.has(c)));
+                    return { name: display, found: !!matched };
+                });
+                renderFoundNotFoundTable(geneStatusData, 'table-container');
+            }
+        } catch (e) { /* ignore */ }
+        return false;
+    }
+
+    // ---- Proceed to heatmap rendering (uses validated list) ----
+    // Remove existing heatmap container if present
+    const existingHeatmap = contentArea.querySelector('#heatmap-container');
+    if (existingHeatmap) existingHeatmap.remove();
+
+    // get tissues for validated genes
+    const tissues = Object.keys(expressionData).length > 0
+        ? [...new Set(validated.flatMap(g => Object.keys(expressionData[g] || {})))].sort()
+        : ['No tissues available'];
+
+    // create heatmap data rows
+    const heatmapData = validated.map(gene => {
+        const row = { gene };
+        tissues.forEach(tissue => {
+            row[tissue] = (expressionData?.[gene]?.[tissue] !== undefined) ? expressionData[gene][tissue] : 0;
+        });
+        return row;
+    });
+
+    // build container
+    const heatmapContainer = document.createElement('div');
+    heatmapContainer.id = 'heatmap-container';
+    heatmapContainer.className = 'page-section';
+    heatmapContainer.style.cssText = `
+        padding: 2rem;
+        background: white;
+        border-radius: 15px;
+        box-shadow: 0 8px 32px rgba(44, 90, 160, 0.08);
+        margin-top: 2rem;
+    `;
+    heatmapContainer.innerHTML = `
+        <h2 style="color: #2c5aa0; margin-bottom: 1.5rem; text-align: center;">Gene Expression Heatmap</h2>
+        <div id="heatmap-wrapper" style="position: relative; overflow-x: auto;">
+            <svg id="heatmap-svg"></svg>
+        </div>
+        <div id="table-container" style="margin-top: 2rem;"></div>
+    `;
+    contentArea.appendChild(heatmapContainer);
+
+    // D3 rendering (adapted from your prior code)
+    const margin = { top: 100, right: 30, bottom: 30, left: 150 };
+    const width = Math.max(600, tissues.length * 40);
+    const height = Math.max(400, validated.length * 30);
+
+    const svg = d3.select('#heatmap-svg')
+        .attr('width', width + margin.left + margin.right)
+        .attr('height', height + margin.top + margin.bottom)
+        .append('g')
+        .attr('transform', `translate(${margin.left},${margin.top})`);
+
+    const maxNTPM = (heatmapData.length > 0 && tissues.length > 0)
+        ? d3.max(heatmapData, d => d3.max(tissues, t => d[t]))
+        : 1;
+
+    const colorScale = d3.scaleSequential(d3.interpolateGreens)
+        .domain([0, maxNTPM || 100]);
+
+    const xScale = d3.scaleBand()
+        .range([0, width])
+        .domain(tissues)
+        .padding(0.05);
+
+    const yScale = d3.scaleBand()
+        .range([0, height])
+        .domain(validated)
+        .padding(0.05);
+
+    svg.append('g')
+        .attr('class', 'x-axis')
+        .attr('transform', `translate(0,${-10})`)
+        .call(d3.axisTop(xScale))
+        .selectAll('text')
+        .style('text-anchor', 'end')
+        .attr('dx', '-.8em')
+        .attr('dy', '-.15em')
+        .attr('transform', 'rotate(-45)')
+        .style('font-size', '12px')
+        .style('fill', '#333');
+
+    svg.append('g')
+        .attr('class', 'y-axis')
+        .call(d3.axisLeft(yScale))
+        .selectAll('text')
+        .style('font-size', '12px')
+        .style('fill', '#333');
+
+    svg.selectAll()
+        .data(heatmapData, d => d.gene)
+        .enter()
+        .append('g')
+        .selectAll('rect')
+        .data(d => tissues.map(tissue => ({
+            gene: d.gene,
+            tissue,
+            value: d[tissue]
+        })))
+        .enter()
+        .append('rect')
+        .attr('x', d => xScale(d.tissue))
+        .attr('y', d => yScale(d.gene))
+        .attr('width', xScale.bandwidth())
+        .attr('height', yScale.bandwidth())
+        .style('fill', d => d.value === 0 ? '#f5f5f5' : colorScale(d.value))
+        .style('stroke', '#fff')
+        .style('stroke-width', 1)
+        .on('mouseover', function(event, d) {
+            d3.select(this).style('stroke', '#000').style('stroke-width', 2);
+            d3.select('#tooltip')
+                .style('opacity', 1)
+                .html(`Gene: ${d.gene}<br>Tissue: ${d.tissue}<br>nTPM: ${Number(d.value).toFixed(2)}`)
+                .style('left', `${event.pageX + 10}px`)
+                .style('top', `${event.pageY - 10}px`);
+        })
+        .on('mouseout', function() {
+            d3.select(this).style('stroke', '#fff').style('stroke-width', 1);
+            d3.select('#tooltip').style('opacity', 0);
+        });
+
+    d3.select('body').selectAll('#tooltip').remove();
+    d3.select('body').append('div')
+        .attr('id', 'tooltip')
+        .style('position', 'absolute')
+        .style('background', 'rgba(0, 0, 0, 0.8)')
+        .style('color', 'white')
+        .style('padding', '8px')
+        .style('border-radius', '4px')
+        .style('pointer-events', 'none')
+        .style('opacity', 0)
+        .style('font-size', '12px');
+
+    // legend
+    const legendHeight = 10;
+    const legendWidth = 200;
+    const legend = svg.append('g')
+        .attr('transform', `translate(${width - legendWidth - 20},${-margin.top + 20})`);
+
+    const legendScale = d3.scaleLinear()
+        .domain([0, maxNTPM || 100])
+        .range([0, legendWidth]);
+
+    const legendAxis = d3.axisBottom(legendScale)
+        .ticks(5)
+        .tickFormat(d3.format('.1f'));
+
+    const defs = svg.append('defs');
+    const linearGradient = defs.append('linearGradient')
+        .attr('id', 'legend-gradient')
+        .attr('x1', '0%')
+        .attr('y1', '0%')
+        .attr('x2', '100%')
+        .attr('y2', '0%');
+
+    // build gradient stops
+    const stops = 10;
+    for (let i = 0; i <= stops; i++) {
+        const frac = i / stops;
+        const val = frac * (maxNTPM || 1);
+        linearGradient.append('stop')
+            .attr('offset', `${frac * 100}%`)
+            .attr('stop-color', colorScale(val));
+    }
+
+    legend.append('rect')
+        .attr('width', legendWidth)
+        .attr('height', legendHeight)
+        .style('fill', 'url(#legend-gradient)');
+
+    legend.append('g')
+        .attr('transform', `translate(0,${legendHeight})`)
+        .call(legendAxis)
+        .style('font-size', '10px');
+
+    legend.append('text')
+        .attr('x', legendWidth / 2)
+        .attr('y', -10)
+        .style('text-anchor', 'middle')
+        .style('font-size', '12px')
+        .style('fill', '#333')
+        .text('nTPM');
+
+    // render found/not found table if function exists
+    try {
+        const geneStatusData = (Array.isArray(geneList) ? geneList : validated).map(item => {
+            const display = (typeof item === 'string') ? item : (item.gene || item.geneSymbol || item.symbol || JSON.stringify(item));
+            const normCandidates = extractCandidates(item);
+            const found = normCandidates.some(c => availableGenes.has(c) || (typeof geneMapCache !== 'undefined' && geneMapCache.has(c)));
+            return { name: display, found: !!found };
+        });
+        if (typeof renderFoundNotFoundTable === 'function') {
+            renderFoundNotFoundTable(geneStatusData, 'table-container');
+            console.log('plots.js: Heatmap rendering completed, table success: true');
+        }
+    } catch (e) {
+        console.warn('plots.js: Could not render found/not-found table', e);
+    }
+
+    return true;
+}
+
 
 
 // =============================================================================
