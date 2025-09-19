@@ -16,7 +16,6 @@ function displayCiliaPlotPage() {
 
     contentArea.innerHTML = `
     <style>
-        /* General Page Styles */
         .ciliaplot-page-container { font-family: Arial, sans-serif; color: #333; background-color: #f9f9f9; padding: 20px; }
         h2, h3 { color: #1a237e; }
         
@@ -25,12 +24,7 @@ function displayCiliaPlotPage() {
         .explanation-section a { color: #303f9f; font-weight: bold; text-decoration: none; }
         .explanation-section a:hover { text-decoration: underline; }
 
-        .ciliaplot-main-layout {
-            display: grid;
-            grid-template-columns: 240px 300px 3fr; /* Narrower controls, wider plot */
-            gap: 15px;
-            align-items: start;
-        }
+        .ciliaplot-main-layout { display: grid; grid-template-columns: 240px 300px 3fr; gap: 15px; align-items: start; }
 
         .control-card { background: #fff; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.05); padding: 20px; margin-bottom: 15px; }
         .control-card h3 { margin-top: 0; border-bottom: 2px solid #eee; padding-bottom: 10px; font-size: 1.2em; }
@@ -47,8 +41,6 @@ function displayCiliaPlotPage() {
         .customization-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; align-items: end; }
         .customization-grid label { font-weight: bold; margin-bottom: 5px; display: block; font-size: 0.9em; }
         .customization-grid input, .customization-grid select { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
-        .customization-grid .form-group { margin-bottom: 10px; }
-        .customization-grid .full-width { grid-column: 1 / -1; }
         
         .visualization-panel { position: sticky; top: 20px; }
         .plot-header { display: flex; justify-content: space-between; align-items: center; }
@@ -56,7 +48,20 @@ function displayCiliaPlotPage() {
         #download-format { padding: 8px; }
         #download-plot-btn { background-color: #3f51b5; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; }
         
-        #plot-display-area { width: 100%; height: 600px; border: 2px dashed #ccc; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #888; margin-top: 10px; overflow: hidden; }
+        /* FIX: Ensure plots fit the container */
+        #plot-display-area {
+            width: 100%;
+            height: 600px; /* Fixed height for stability */
+            border: 2px dashed #ccc;
+            border-radius: 8px;
+            margin-top: 10px;
+            overflow: hidden; /* Prevent content from spilling out */
+            position: relative; /* Anchor for child elements */
+        }
+        #plot-display-area > canvas, #plot-display-area > svg {
+            max-width: 100%;
+            max-height: 100%;
+        }
         
         .gene-input-table-container table { width: 100%; border-collapse: collapse; background-color: #fff; }
         .gene-input-table-container th, .gene-input-table-container td { border: 1px solid #ddd; padding: 8px; text-align: left; }
@@ -123,6 +128,11 @@ function displayCiliaPlotPage() {
 }
 
 // =============================================================================
+// GLOBAL VARIABLE
+// =============================================================================
+let currentPlotInstance;
+
+// =============================================================================
 // INITIALIZATION
 // =============================================================================
 
@@ -150,7 +160,7 @@ function getCleanArray(gene, ...keys) {
 }
 
 function clearAllPlots(containerId = 'plot-display-area') {
-    if (typeof currentPlotInstance !== 'undefined' && currentPlotInstance && typeof currentPlotInstance.destroy === 'function') {
+    if (currentPlotInstance && typeof currentPlotInstance.destroy === 'function') {
         currentPlotInstance.destroy();
         currentPlotInstance = null;
     }
@@ -230,10 +240,8 @@ function updateCustomizationPanel() {
 }
 
 async function generateAnalysisPlots() {
-    // FIX: Check that the gene database is loaded before proceeding.
     if (typeof geneMapCache === 'undefined' || geneMapCache.size === 0) {
         alert("Error: The main gene database is not yet loaded. Please wait a moment and try again, or refresh the page.");
-        console.error("generateAnalysisPlots was called before geneMapCache was initialized.");
         return;
     }
 
@@ -290,7 +298,7 @@ function renderBubblePlot(genes, custom) {
         title: { text: custom.title || 'Gene Subcellular Localizations', font: { size: custom.titleFontSize, family: custom.fontFamily } },
         xaxis: { title: { text: 'Localization', font: custom.axisTitleFont }, visible: custom.showX, linecolor: 'black', linewidth: 2, mirror: true, gridcolor: 'white' },
         yaxis: { title: { text: 'Gene', font: custom.axisTitleFont }, visible: custom.showY, linecolor: 'black', linewidth: 2, mirror: true, gridcolor: 'white' },
-        showlegend: false, height: 600, margin: { l: 120, r: 20, b: 100, t: 80 },
+        showlegend: false, margin: { l: 120, r: 20, b: 100, t: 80 },
         plot_bgcolor: 'white', paper_bgcolor: 'white'
     };
     Plotly.newPlot('plot-display-area', plotData, layout, { responsive: true });
@@ -309,7 +317,7 @@ function renderBarPlot(genes, custom) {
         title: { text: custom.title || 'Functional Category Counts', font: { size: custom.titleFontSize, family: custom.fontFamily } },
         xaxis: { title: { text: 'Number of Genes', font: custom.axisTitleFont }, visible: custom.showX, linecolor: 'black', linewidth: 2, mirror: true, gridcolor: 'white' },
         yaxis: { title: { text: 'Category', font: custom.axisTitleFont }, visible: custom.showY, automargin: true, linecolor: 'black', linewidth: 2, mirror: true, gridcolor: 'white' },
-        height: 600, margin: { l: 250, r: 20, b: 50, t: 80 },
+        margin: { l: 250, r: 20, b: 50, t: 80 },
         plot_bgcolor: 'white', paper_bgcolor: 'white'
     };
     Plotly.newPlot('plot-display-area', data, layout, { responsive: true });
@@ -332,12 +340,11 @@ function renderHeatmap(genes, custom) {
         title: { text: custom.title || 'Tissue Expression Heatmap', font: { size: custom.titleFontSize, family: custom.fontFamily } },
         xaxis: { title: { text: 'Tissue', font: custom.axisTitleFont }, visible: custom.showX, tickangle: -45, linecolor: 'black', linewidth: 2, mirror: true },
         yaxis: { title: { text: 'Gene', font: custom.axisTitleFont }, visible: custom.showY, linecolor: 'black', linewidth: 2, mirror: true },
-        height: 600, margin: { l: 120, r: 20, b: 150, t: 80 },
+        margin: { l: 120, r: 20, b: 150, t: 80 },
         plot_bgcolor: 'white', paper_bgcolor: 'white'
     };
     Plotly.newPlot('plot-display-area', data, layout, { responsive: true });
 }
-
 
 // =============================================================================
 // INTEGRATED CHART.JS & D3.JS FUNCTIONS
