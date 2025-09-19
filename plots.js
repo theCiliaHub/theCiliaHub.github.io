@@ -48,8 +48,29 @@ function displayCiliaPlotPage() {
         #download-format { padding: 8px; }
         #download-plot-btn { background-color: #3f51b5; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; }
 
-        #plot-display-area { width: 100%; height: 60vh; border: 2px dashed #ccc; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #888; margin-top: 10px; overflow: hidden; }
-        #plot-display-area > div, #plot-display-area > svg, #plot-display-area > canvas { width: 100% !important; height: 100% !important; }
+        /* --- MODIFIED PLOT CONTAINER STYLES --- */
+        #plot-display-area {
+            position: relative; /* Good practice for containing positioned plot elements */
+            width: 100%;
+            height: 60vh;
+            border: 2px dashed #ccc;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #888;
+            margin-top: 10px;
+            overflow: hidden; /* CRITICAL: Prevents content from spilling out */
+        }
+
+        #plot-display-area > div,
+        #plot-display-area > svg,
+        #plot-display-area > canvas {
+            /* CRITICAL: Forces the rendered plot to conform to the container's size */
+            width: 100% !important;
+            height: 100% !important;
+        }
+        /* --- END MODIFIED STYLES --- */
 
         .gene-input-table-container table { width: 100%; border-collapse: collapse; background-color: #fff; }
         .gene-input-table-container th, .gene-input-table-container td { border: 1px solid #ddd; padding: 8px; text-align: left; }
