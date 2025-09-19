@@ -490,7 +490,11 @@ function mapLocalizationToSVG(localizationArray) {
     }).filter(id => allPartIds.includes(id));
 }
 
+
+let currentData = window.ciliaData || [];
 function displayHomePage() {
+    // Use currentData here
+    console.log("Displaying home page with data:", currentData.length);
     const contentArea = document.querySelector('.content-area');
     contentArea.className = 'content-area';
     document.querySelector('.cilia-panel').style.display = 'block';
