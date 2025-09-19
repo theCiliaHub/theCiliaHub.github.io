@@ -235,23 +235,11 @@ function waitFor(conditionFn, timeout = 5000, interval = 50) {
     });
 }
 
-// Updated generateAnalysisPlots function
 async function generateAnalysisPlots() {
-    // 1. Wait for geneMapCache to be loaded
-    try {
-        await waitFor(() => typeof geneMapCache !== 'undefined' && geneMapCache.size > 0);
-    } catch (err) {
-        alert("Error: The main gene database is not yet loaded. Please wait a moment and try again.");
-        console.error(err);
-        return;
-    }
-
-    // 2. Wait for expressionData to be loaded
-    try {
-        await waitFor(() => typeof expressionData !== 'undefined' && Object.keys(expressionData).length > 0);
-    } catch (err) {
-        alert("Error: Gene expression data is not yet loaded. Please wait a moment and try again.");
-        console.error(err);
+    // Wait for geneMapCache for all plots
+    if (typeof geneMapCache === 'undefined' || geneMapCache.size === 0) {
+        alert("Error: The main gene database is not yet loaded. Please wait a moment.");
+        console.error("generateAnalysisPlots was called before geneMapCache was initialized.");
         return;
     }
 
@@ -279,6 +267,15 @@ async function generateAnalysisPlots() {
     const custom = getPlotCustomization();
 
     switch (plotType) {
+        case 'expression_heatmap':
+            // Wait for expressionData only for heatmap
+            if (typeof expressionData === 'undefined' || Object.keys(expressionData).length === 0) {
+                alert("Error: Gene expression data is not yet loaded. Heatmap cannot be generated.");
+                console.warn("generateAnalysisPlots: expressionData not loaded.");
+                return;
+            }
+            renderExpressionHeatmap(expressionData, foundGenes);
+            break;
         case 'localization_bubble':
             renderBubblePlot(foundGenes, custom);
             break;
@@ -296,9 +293,6 @@ async function generateAnalysisPlots() {
             break;
         case 'screen_analysis':
             renderGeneScreenAnalysis(foundGenes, plotContainer, custom);
-            break;
-        case 'expression_heatmap':
-            renderExpressionHeatmap(expressionData, foundGenes);
             break;
         default:
             plotContainer.innerHTML = 'This plot type is not yet implemented.';
