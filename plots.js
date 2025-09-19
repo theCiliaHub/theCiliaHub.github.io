@@ -348,9 +348,16 @@ function renderExpressionHeatmap(expressionData, geneList) {
     console.log("plots.js: Raw geneList:", geneList);
 
     const availableGenes = new Set(Object.keys(expressionData).map(g => g.toUpperCase()));
+
+    // ✅ FIX: Safely extract gene names and filter out invalid entries
     const validatedGeneList = geneList
-        .map(g => g.toUpperCase().trim())
-        .filter(g => availableGenes.has(g));
+        .map(g => {
+            if (!g) return null;
+            if (typeof g === "string") return g.toUpperCase().trim();
+            if (typeof g === "object" && g.geneSymbol) return g.geneSymbol.toUpperCase().trim();
+            return null; // ignore invalid types
+        })
+        .filter(g => g && availableGenes.has(g));
 
     console.log("plots.js: Validated geneList:", validatedGeneList);
 
@@ -362,6 +369,7 @@ function renderExpressionHeatmap(expressionData, geneList) {
 
     drawHeatmap(validatedGeneList, expressionData);
 }
+
 
 // =============================================================================
 // PLOTLY.JS RENDERING FUNCTIONS
