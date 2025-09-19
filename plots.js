@@ -235,6 +235,9 @@ function waitFor(conditionFn, timeout = 5000, interval = 50) {
     });
 }
 
+// Global variable to track pending heatmap requests
+let pendingHeatmapRequest = null;
+
 async function generateAnalysisPlots() {
     // Wait for geneMapCache for all plots
     if (typeof geneMapCache === 'undefined' || geneMapCache.size === 0) {
@@ -268,14 +271,16 @@ async function generateAnalysisPlots() {
 
     switch (plotType) {
         case 'expression_heatmap':
-            // Wait for expressionData only for heatmap
+            // Defer heatmap if expressionData not loaded yet
             if (typeof expressionData === 'undefined' || Object.keys(expressionData).length === 0) {
-                alert("Error: Gene expression data is not yet loaded. Heatmap cannot be generated.");
-                console.warn("generateAnalysisPlots: expressionData not loaded.");
+                pendingHeatmapRequest = { genes: foundGenes.slice() };
+                plotContainer.innerHTML = '<div style="color: #ffc107; text-align:center; padding:1rem;">Expression data is still loading... The heatmap will appear automatically once ready.</div>';
+                console.warn("generateAnalysisPlots: expressionData not loaded. Heatmap deferred.");
                 return;
             }
             renderExpressionHeatmap(expressionData, foundGenes);
             break;
+
         case 'localization_bubble':
             renderBubblePlot(foundGenes, custom);
             break;
@@ -298,8 +303,6 @@ async function generateAnalysisPlots() {
             plotContainer.innerHTML = 'This plot type is not yet implemented.';
     }
 }
-
-
 
 
 // =============================================================================
