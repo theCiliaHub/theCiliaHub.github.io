@@ -1970,15 +1970,12 @@ async function loadExpressionData() {
         const rawData = parseTSV(tsvText);
         expressionData = processExpressionData(rawData);
 
-        const geneSet = new Set();
-        Object.keys(expressionData).forEach(gene => {
-            geneSet.add(gene);
-        });
-        availableGenes = geneSet;
+        // Precompute availableGenes for validation
+        availableGenes = new Set(Object.keys(expressionData).map(g => g.toUpperCase()));
 
-        console.log(`Loaded ${Object.keys(expressionData).length} genes with expression data from TSV`);
+        console.log(`Loaded ${availableGenes.size} genes with expression data from TSV`);
 
-        // ✅ Check if a heatmap was requested while data was loading
+        // Render deferred heatmap if requested
         if (pendingHeatmapRequest) {
             const { genes } = pendingHeatmapRequest;
             pendingHeatmapRequest = null;
