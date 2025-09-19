@@ -1,11 +1,3 @@
-// =============================================================================
-// CiliaHub Plotting Engine (plots.js) - Final Corrected Version
-// =============================================================================
-// This file is responsible ONLY for displaying the CiliaPlot page and rendering
-// visualizations. It relies on global variables and functions from script.js,
-// such as findGenes(), and the pre-loaded expressionData object.
-// =============================================================================
-
 /**
  * Displays the main CiliaPlot analysis page, fully integrating all plotting and UI logic.
  */
@@ -192,12 +184,11 @@ function getPlotCustomization() {
 const PLOT_CONFIG = {
     'localization_bubble': { label: 'Gene Localizations (Bubble)', group: 'Plotly Plots' },
     'functional_bar': { label: 'Functional Categories (Bar)', group: 'Plotly Plots' },
-    'plotly_heatmap': { label: 'Expression Heatmap (Plotly)', group: 'Plotly Plots' },
     'network': { label: 'Complex Network (D3)', group: 'Advanced Plots' },
     'organelle_radar': { label: 'Organelle Radar (Chart.js)', group: 'Advanced Plots' },
     'organelle_umap': { label: 'Organelle UMAP (Chart.js)', group: 'Advanced Plots' },
     'screen_analysis': { label: 'Screen Analysis (Chart.js)', group: 'Advanced Plots' },
-    'expression_heatmap': { label: 'Expression Heatmap (D3)', group: 'Advanced Plots' } // Added new plot type
+    'expression_heatmap': { label: 'Expression Heatmap (D3)', group: 'Advanced Plots' } // Kept expression_heatmap, removed plotly_heatmap
 };
 
 function populatePlotTypes() {
@@ -263,15 +254,17 @@ async function generateAnalysisPlots() {
     switch (plotType) {
         case 'localization_bubble': renderBubblePlot(foundGenes, custom); break;
         case 'functional_bar': renderBarPlot(foundGenes, custom); break;
-        case 'plotly_heatmap': renderHeatmap(foundGenes, custom); break;
         case 'network': renderComplexNetwork(foundGenes, plotContainer, custom); break;
         case 'organelle_radar': renderOrganelleRadarPlot(foundGenes, plotContainer, custom); break;
         case 'organelle_umap': renderOrganelleUMAP(foundGenes, plotContainer, custom); break;
         case 'screen_analysis': renderGeneScreenAnalysis(foundGenes, plotContainer, custom); break;
-        case 'expression_heatmap': renderExpressionHeatmap(foundGenes, plotContainer, custom); break; // Added new case
+        case 'expression_heatmap': renderExpressionHeatmap(foundGenes, plotContainer, custom); break; // Kept expression_heatmap case
         default: plotContainer.innerHTML = 'This plot type is not yet implemented.';
     }
 }
+
+
+
 // =============================================================================
 // PLOTLY.JS RENDERING FUNCTIONS
 // =============================================================================
@@ -321,8 +314,8 @@ function renderBarPlot(genes, custom) {
  * Renders an expression heatmap with corrected positioning and tissue extraction for the new dashboard layout.
  */
 function renderExpressionHeatmap(foundGenes, container) {
-    clearPreviousPlot();
-    const settings = getPlotSettings();
+    clearAllPlots(); // Changed from clearPreviousPlot to clearAllPlots
+    const settings = getPlotCustomization(); // Changed from getPlotSettings to getPlotCustomization to match existing function
 
     if (!foundGenes.length || Object.keys(expressionData).length === 0) {
         container.innerHTML = '<p class="status-message">No expression data available for selected genes.</p>';
@@ -467,6 +460,7 @@ function renderExpressionHeatmap(foundGenes, container) {
     
     currentPlotInstance = d3.select(container).select('svg').node();
 }
+
 
 // =============================================================================
 // INTEGRATED CHART.JS & D3.JS FUNCTIONS
