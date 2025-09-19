@@ -1,15 +1,15 @@
 /**
  * CiliaPlot: plots.js
- * * This script manages the entire CiliaPlot page within the CiliaHub application.
+ * This script manages the entire CiliaPlot page within the CiliaHub application.
  * It handles UI setup, user input, data processing, and the rendering of various
  * interactive plots using Plotly.js, Chart.js, and D3.js.
- * * Assumes the following libraries are loaded globally:
+ * Assumes the following libraries are loaded globally:
  * - Plotly.js
  * - Chart.js
  * - D3.js
  * - venn.js (for Venn diagrams)
  * - jsPDF (for PDF downloads)
- * * Assumes the following data variables are available globally:
+ * Assumes the following data variables are available globally:
  * - window.ciliaData: An array of all gene objects from the database.
  * - window.geneMapCache: A Map for quick gene lookups, created by the main app script.
  */
