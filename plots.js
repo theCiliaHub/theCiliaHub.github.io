@@ -356,31 +356,26 @@ function renderExpressionHeatmap(expressionData, geneList = []) {
     console.log('Expression data:', Object.keys(expressionData || {}).length, 'genes');
     console.log('Raw geneList:', geneList);
 
-    // 1. Validate and sanitize geneList
+    // Validate and sanitize geneList using availableGenes
     let validGeneList = [];
     if (Array.isArray(geneList)) {
         validGeneList = geneList
             .map(g => typeof g === 'string' ? g.trim().toUpperCase() : null)
-            .filter(g => g && expressionData?.[g]);
+            .filter(g => g && availableGenes.has(g)); // use precomputed availableGenes
     } else if (typeof geneList === 'string') {
         validGeneList = geneList
             .split(/[\s,;\n\r\t]+/)
             .map(g => g.trim().toUpperCase())
-            .filter(g => g && expressionData?.[g]);
+            .filter(g => g && availableGenes.has(g));
     } else {
-        console.warn('Invalid geneList format, using all genes in expressionData');
         validGeneList = Object.keys(expressionData || {});
     }
 
     console.log('Validated geneList:', validGeneList);
 
-    // 2. Validate expressionData
-    if (!expressionData || Object.keys(expressionData).length === 0) {
-        console.error('No expression data provided');
+    if (validGeneList.length === 0) {
         const contentArea = document.querySelector('.content-area') || document.getElementById('plot-display-area');
-        if (contentArea) {
-            contentArea.innerHTML = '<div style="text-align: center; padding: 2rem; color: #dc3545;">Error: No expression data available.</div>';
-        }
+        contentArea.innerHTML = '<div style="text-align:center; padding:2rem; color:#dc3545;">No valid genes found for heatmap.</div>';
         return false;
     }
 
