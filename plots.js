@@ -222,8 +222,9 @@ function updateCustomizationPanel() {
     container.innerHTML = html;
 }
 
+// Updated generateAnalysisPlots function
 async function generateAnalysisPlots() {
-    // FIX: Check that the gene database is loaded before proceeding.
+    // Check that the gene database is loaded before proceeding.
     if (typeof geneMapCache === 'undefined' || geneMapCache.size === 0) {
         alert("Error: The main gene database is not yet loaded. Please wait a moment and try again, or refresh the page.");
         console.error("generateAnalysisPlots was called before geneMapCache was initialized.");
@@ -252,14 +253,30 @@ async function generateAnalysisPlots() {
     const custom = getPlotCustomization();
 
     switch (plotType) {
-        case 'localization_bubble': renderBubblePlot(foundGenes, custom); break;
-        case 'functional_bar': renderBarPlot(foundGenes, custom); break;
-        case 'network': renderComplexNetwork(foundGenes, plotContainer, custom); break;
-        case 'organelle_radar': renderOrganelleRadarPlot(foundGenes, plotContainer, custom); break;
-        case 'organelle_umap': renderOrganelleUMAP(foundGenes, plotContainer, custom); break;
-        case 'screen_analysis': renderGeneScreenAnalysis(foundGenes, plotContainer, custom); break;
-        case 'expression_heatmap': renderExpressionHeatmap(foundGenes, plotContainer, custom); break; // Kept expression_heatmap case
-        default: plotContainer.innerHTML = 'This plot type is not yet implemented.';
+        case 'localization_bubble':
+            renderBubblePlot(foundGenes, custom);
+            break;
+        case 'functional_bar':
+            renderBarPlot(foundGenes, custom);
+            break;
+        case 'network':
+            renderComplexNetwork(foundGenes, plotContainer, custom);
+            break;
+        case 'organelle_radar':
+            renderOrganelleRadarPlot(foundGenes, plotContainer, custom);
+            break;
+        case 'organelle_umap':
+            renderOrganelleUMAP(foundGenes, plotContainer, custom);
+            break;
+        case 'screen_analysis':
+            renderGeneScreenAnalysis(foundGenes, plotContainer, custom);
+            break;
+        case 'expression_heatmap':
+            // FIX: Pass expressionData and foundGenes instead of foundGenes, plotContainer, custom
+            renderExpressionHeatmap(expressionData, foundGenes);
+            break;
+        default:
+            plotContainer.innerHTML = 'This plot type is not yet implemented.';
     }
 }
 
@@ -310,22 +327,44 @@ function renderBarPlot(genes, custom) {
 }
 
 
-// Enhanced renderExpressionHeatmap function for D3-based heatmap visualization
+// Updated renderExpressionHeatmap function with robust validation
 function renderExpressionHeatmap(expressionData, geneList = []) {
     console.log('=== Starting renderExpressionHeatmap ===');
-    console.log('Expression data:', Object.keys(expressionData).length, 'genes');
-    console.log('Gene list:', geneList);
+    console.log('Expression data:', Object.keys(expressionData || {}).length, 'genes');
+    console.log('Raw geneList:', geneList);
 
-    // 1. Validate inputs
+    // 1. Validate and sanitize geneList
+    let validGeneList = [];
+    if (Array.isArray(geneList)) {
+        validGeneList = geneList
+            .map(g => typeof g === 'string' ? g.trim().toUpperCase() : null)
+            .filter(g => g && expressionData?.[g]);
+    } else if (typeof geneList === 'string') {
+        validGeneList = geneList
+            .split(/[\s,;\n\r\t]+/)
+            .map(g => g.trim().toUpperCase())
+            .filter(g => g && expressionData?.[g]);
+    } else {
+        console.warn('Invalid geneList format, using all genes in expressionData');
+        validGeneList = Object.keys(expressionData || {});
+    }
+
+    console.log('Validated geneList:', validGeneList);
+
+    // 2. Validate expressionData
     if (!expressionData || Object.keys(expressionData).length === 0) {
         console.error('No expression data provided');
+        const contentArea = document.querySelector('.content-area') || document.getElementById('plot-display-area');
+        if (contentArea) {
+            contentArea.innerHTML = '<div style="text-align: center; padding: 2rem; color: #dc3545;">Error: No expression data available.</div>';
+        }
         return false;
     }
 
-    // 2. Get the content area and clear any existing heatmap
-    const contentArea = document.querySelector('.content-area');
+    // 3. Get the content area and clear existing heatmap
+    const contentArea = document.querySelector('.content-area') || document.getElementById('plot-display-area');
     if (!contentArea) {
-        console.error('Content area not found');
+        console.error('Content area or plot-display-area not found');
         return false;
     }
 
@@ -334,20 +373,20 @@ function renderExpressionHeatmap(expressionData, geneList = []) {
         existingHeatmap.remove();
     }
 
-    // 3. Filter genes (use provided geneList or all genes)
-    const genes = geneList.length > 0 ? geneList.filter(g => expressionData[g]) : Object.keys(expressionData);
+    // 4. Filter genes (use validated geneList or all genes)
+    const genes = validGeneList.length > 0 ? validGeneList : Object.keys(expressionData);
     if (genes.length === 0) {
         console.error('No valid genes found for heatmap');
-        contentArea.innerHTML = '<div style="text-align: center; padding: 2rem; color: #666;">No expression data available for the selected genes.</div>';
+        contentArea.innerHTML = '<div style="text-align: center; padding: 2rem; color: #dc3545;">No expression data available for the selected genes.</div>';
         return false;
     }
 
-    // 4. Get all unique tissues
+    // 5. Get all unique tissues
     const tissues = [...new Set(
         genes.flatMap(gene => Object.keys(expressionData[gene]))
     )].sort();
 
-    // 5. Create data matrix for heatmap
+    // 6. Create data matrix for heatmap
     const heatmapData = genes.map(gene => {
         const row = { gene };
         tissues.forEach(tissue => {
@@ -356,7 +395,7 @@ function renderExpressionHeatmap(expressionData, geneList = []) {
         return row;
     });
 
-    // 6. Create container for heatmap and table
+    // 7. Create container for heatmap and table
     const heatmapContainer = document.createElement('div');
     heatmapContainer.id = 'heatmap-container';
     heatmapContainer.className = 'page-section';
@@ -376,7 +415,7 @@ function renderExpressionHeatmap(expressionData, geneList = []) {
     `;
     contentArea.appendChild(heatmapContainer);
 
-    // 7. Set up D3 heatmap
+    // 8. Set up D3 heatmap
     const margin = { top: 100, right: 30, bottom: 30, left: 150 };
     const width = Math.max(600, tissues.length * 40);
     const height = Math.max(400, genes.length * 30);
@@ -387,12 +426,12 @@ function renderExpressionHeatmap(expressionData, geneList = []) {
         .append('g')
         .attr('transform', `translate(${margin.left},${margin.top})`);
 
-    // 8. Define color scale
+    // 9. Define color scale
     const maxNTPM = d3.max(heatmapData, d => d3.max(tissues, t => d[t]));
     const colorScale = d3.scaleSequential(d3.interpolateGreens)
         .domain([0, maxNTPM || 100]);
 
-    // 9. Create scales
+    // 10. Create scales
     const xScale = d3.scaleBand()
         .range([0, width])
         .domain(tissues)
@@ -403,7 +442,7 @@ function renderExpressionHeatmap(expressionData, geneList = []) {
         .domain(genes)
         .padding(0.05);
 
-    // 10. Add axes
+    // 11. Add axes
     svg.append('g')
         .attr('class', 'x-axis')
         .attr('transform', `translate(0,${-10})`)
@@ -423,7 +462,7 @@ function renderExpressionHeatmap(expressionData, geneList = []) {
         .style('font-size', '12px')
         .style('fill', '#333');
 
-    // 11. Add heatmap cells
+    // 12. Add heatmap cells
     svg.selectAll()
         .data(heatmapData, d => d.gene)
         .enter()
@@ -456,7 +495,8 @@ function renderExpressionHeatmap(expressionData, geneList = []) {
             d3.select('#tooltip').style('opacity', 0);
         });
 
-    // 12. Add tooltip
+    // 13. Add tooltip
+    d3.select('body').selectAll('#tooltip').remove(); // Remove existing tooltip
     d3.select('body').append('div')
         .attr('id', 'tooltip')
         .style('position', 'absolute')
@@ -468,7 +508,7 @@ function renderExpressionHeatmap(expressionData, geneList = []) {
         .style('opacity', 0)
         .style('font-size', '12px');
 
-    // 13. Add color scale legend
+    // 14. Add color scale legend
     const legendHeight = 10;
     const legendWidth = 200;
     const legend = svg.append('g')
@@ -518,16 +558,17 @@ function renderExpressionHeatmap(expressionData, geneList = []) {
         .style('fill', '#333')
         .text('nTPM');
 
-    // 14. Render found/not found table
-    const geneStatusData = geneList.map(gene => ({
-        name: gene,
-        found: expressionData[gene] !== undefined
-    }));
+    // 15. Render found/not found table
+    const geneStatusData = geneList.length > 0 ? geneList.map(gene => ({
+        name: typeof gene === 'string' ? gene : 'Unknown',
+        found: expressionData[typeof gene === 'string' ? gene.toUpperCase() : gene] !== undefined
+    })) : genes.map(gene => ({ name: gene, found: true }));
     const tableSuccess = renderFoundNotFoundTable(geneStatusData, 'table-container');
 
-    console.log('Heatmap rendering completed');
+    console.log('Heatmap rendering completed, table success:', tableSuccess);
     return true;
 }
+
 // =============================================================================
 // INTEGRATED CHART.JS & D3.JS FUNCTIONS
 // =============================================================================
