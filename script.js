@@ -2386,6 +2386,20 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 
+// In script.js
+function initGlobalEventListeners() {
+    // Example: Set up navigation event listeners
+    document.querySelectorAll('.nav-link').forEach(link => {
+        link.addEventListener('click', (e) => {
+            e.preventDefault();
+            const page = e.target.getAttribute('href').substring(1);
+            navigateTo(page); // Assuming navigateTo is defined in script.js
+        });
+    });
+    // Add other global event listeners as needed
+    console.log("Global event listeners initialized.");
+}
+
 // Enhanced renderFoundNotFoundTable with debugging and error handling
 function renderFoundNotFoundTable(geneData, containerId = 'table-container') {
     console.log('=== Table Rendering Debug ===');
