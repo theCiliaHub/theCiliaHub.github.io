@@ -603,7 +603,7 @@ function renderVennDiagram(foundGenes, custom) {
     `;
 }
 // =============================================================================
-// MODIFIED FUNCTIONS FOR HEATMAP INTEGRATION
+// MODIFIED FUNCTIONS FOR HEATMAP INTEGRATION - FIXED CONTAINER BOUNDS
 // =============================================================================
 
 // Replace the existing renderExpressionHeatmap function with this updated version
@@ -729,12 +729,12 @@ function renderExpressionHeatmap(expressionData, geneList = []) {
 
     // ---- Create heatmap container within the visualization area ----
     plotContainer.innerHTML = `
-        <div id="heatmap-wrapper" style="width: 100%; height: 100%; position: relative; overflow: auto;">
+        <div id="heatmap-wrapper" style="width: 100%; height: 100%; position: relative; overflow: hidden;">
             <svg id="heatmap-svg" style="display: block;"></svg>
         </div>
     `;
 
-    // ---- D3 heatmap rendering (with improved X-axis labels) ----
+    // ---- D3 heatmap rendering with constrained dimensions ----
     const tissues = Object.keys(expressionData).length > 0
         ? [...new Set(validated.flatMap(g => Object.keys(expressionData[g] || {})))].sort()
         : ['No tissues available'];
@@ -747,17 +747,41 @@ function renderExpressionHeatmap(expressionData, geneList = []) {
         return row;
     });
 
-    // Calculate dimensions based on container size
+    // Calculate dimensions based on container size with proper constraints
     const containerWidth = plotContainer.clientWidth;
     const containerHeight = plotContainer.clientHeight;
     
-    const margin = { top: 80, right: 30, bottom: 150, left: 150 };
-    const width = Math.max(600, tissues.length * 40);
-    const height = Math.max(400, validated.length * 30);
+    // Define margins that scale appropriately
+    const margin = { 
+        top: Math.min(80, containerHeight * 0.15), 
+        right: 30, 
+        bottom: Math.min(150, containerHeight * 0.25), 
+        left: Math.min(150, containerWidth * 0.2) 
+    };
+    
+    // Calculate available space for the heatmap itself
+    const availableWidth = containerWidth - margin.left - margin.right;
+    const availableHeight = containerHeight - margin.top - margin.bottom;
+    
+    // Ensure minimum viable dimensions
+    const minWidth = Math.max(300, availableWidth);
+    const minHeight = Math.max(200, availableHeight);
+    
+    // Calculate cell sizes based on available space
+    const maxCellWidth = Math.max(15, Math.min(50, availableWidth / tissues.length));
+    const maxCellHeight = Math.max(15, Math.min(40, availableHeight / validated.length));
+    
+    // Final dimensions constrained by container
+    const width = Math.min(availableWidth, tissues.length * maxCellWidth);
+    const height = Math.min(availableHeight, validated.length * maxCellHeight);
+    
+    // Set SVG size to fit exactly within container
+    const totalSVGWidth = Math.min(containerWidth, width + margin.left + margin.right);
+    const totalSVGHeight = Math.min(containerHeight, height + margin.top + margin.bottom);
 
     const svg = d3.select('#heatmap-svg')
-        .attr('width', width + margin.left + margin.right)
-        .attr('height', height + margin.top + margin.bottom)
+        .attr('width', totalSVGWidth)
+        .attr('height', totalSVGHeight)
         .append('g')
         .attr('transform', `translate(${margin.left},${margin.top})`);
 
@@ -778,26 +802,54 @@ function renderExpressionHeatmap(expressionData, geneList = []) {
         .domain(validated)
         .padding(0.05);
 
-    // X-axis with proper tissue names
-    svg.append('g')
+    // X-axis with responsive font size and smart label handling
+    const xAxisGroup = svg.append('g')
         .attr('class', 'x-axis')
         .attr('transform', `translate(0,${height})`)
-        .call(d3.axisBottom(xScale))
-        .selectAll('text')
+        .call(d3.axisBottom(xScale));
+        
+    // Calculate appropriate font size based on available space
+    const xAxisFontSize = Math.max(8, Math.min(12, xScale.bandwidth() / 3));
+    
+    xAxisGroup.selectAll('text')
         .style('text-anchor', 'end')
         .attr('dx', '-.8em')
         .attr('dy', '.15em')
         .attr('transform', 'rotate(-45)')
-        .style('font-size', '12px')
-        .style('fill', '#333');
+        .style('font-size', xAxisFontSize + 'px')
+        .style('fill', '#333')
+        .each(function(d) {
+            // Truncate long tissue names if necessary
+            const maxChars = Math.max(8, Math.floor(xScale.bandwidth() / 4));
+            const text = d3.select(this);
+            const originalText = text.text();
+            if (originalText.length > maxChars) {
+                text.text(originalText.substring(0, maxChars - 3) + '...')
+                    .append('title')
+                    .text(originalText);
+            }
+        });
 
-    // Y-axis
+    // Y-axis with responsive font size
+    const yAxisFontSize = Math.max(8, Math.min(12, yScale.bandwidth() / 2));
+    
     svg.append('g')
         .attr('class', 'y-axis')
         .call(d3.axisLeft(yScale))
         .selectAll('text')
-        .style('font-size', '12px')
-        .style('fill', '#333');
+        .style('font-size', yAxisFontSize + 'px')
+        .style('fill', '#333')
+        .each(function(d) {
+            // Truncate long gene names if necessary
+            const maxChars = Math.max(6, Math.floor(margin.left / 8));
+            const text = d3.select(this);
+            const originalText = text.text();
+            if (originalText.length > maxChars) {
+                text.text(originalText.substring(0, maxChars - 3) + '...')
+                    .append('title')
+                    .text(originalText);
+            }
+        });
 
     // Heatmap cells
     svg.selectAll()
@@ -818,7 +870,7 @@ function renderExpressionHeatmap(expressionData, geneList = []) {
         .attr('height', yScale.bandwidth())
         .style('fill', d => d.value === 0 ? '#f5f5f5' : colorScale(d.value))
         .style('stroke', '#fff')
-        .style('stroke-width', 1)
+        .style('stroke-width', Math.max(0.5, Math.min(1, xScale.bandwidth() / 20)))
         .on('mouseover', function(event, d) {
             d3.select(this).style('stroke', '#000').style('stroke-width', 2);
             
@@ -835,6 +887,7 @@ function renderExpressionHeatmap(expressionData, geneList = []) {
                 .style('pointer-events', 'none')
                 .style('font-size', '12px')
                 .style('opacity', 0)
+                .style('z-index', '1000')
                 .merge(tooltip)
                 .html(`Gene: ${d.gene}<br>Tissue: ${d.tissue}<br>Value: ${Number(d.value).toFixed(2)}`)
                 .style('left', (event.pageX + 10) + 'px')
@@ -844,7 +897,7 @@ function renderExpressionHeatmap(expressionData, geneList = []) {
                 .style('opacity', 1);
         })
         .on('mouseout', function() {
-            d3.select(this).style('stroke', '#fff').style('stroke-width', 1);
+            d3.select(this).style('stroke', '#fff').style('stroke-width', Math.max(0.5, Math.min(1, xScale.bandwidth() / 20)));
             
             // Hide tooltip
             d3.selectAll('.tooltip')
@@ -854,30 +907,37 @@ function renderExpressionHeatmap(expressionData, geneList = []) {
                 .remove();
         });
 
-    // Add title
+    // Add title with responsive positioning and size
     const custom = getPlotCustomization();
     const title = custom.title || 'Gene Expression Heatmap';
+    const titleFontSize = Math.max(12, Math.min(18, containerWidth / 40));
+    
     svg.append('text')
         .attr('x', width / 2)
-        .attr('y', -40)
+        .attr('y', -margin.top / 2)
         .attr('text-anchor', 'middle')
-        .style('font-size', custom.titleFontSize + 'px')
-        .style('font-family', custom.fontFamily)
+        .style('font-size', titleFontSize + 'px')
+        .style('font-family', custom.fontFamily || 'Arial, sans-serif')
         .style('font-weight', 'bold')
         .text(title);
 
-    // Add legend
-    const legendHeight = 20;
-    const legendWidth = 200;
+    // Add legend with responsive sizing and positioning
+    const legendHeight = Math.max(15, Math.min(25, containerHeight / 30));
+    const legendWidth = Math.max(150, Math.min(250, width * 0.4));
+    
+    // Position legend based on available space
+    const legendX = width > legendWidth + 20 ? width - legendWidth - 10 : 10;
+    const legendY = margin.top > 80 ? -margin.top + 10 : -60;
+    
     const legend = svg.append('g')
-        .attr('transform', `translate(${width - legendWidth - 10}, -60)`);
+        .attr('transform', `translate(${legendX}, ${legendY})`);
         
     const legendScale = d3.scaleLinear()
         .domain([0, maxNTPM || 100])
         .range([0, legendWidth]);
         
     const legendAxis = d3.axisBottom(legendScale)
-        .ticks(5)
+        .ticks(Math.min(5, Math.floor(legendWidth / 40)))
         .tickFormat(d3.format('.1f'));
         
     // Gradient for legend
@@ -905,19 +965,18 @@ function renderExpressionHeatmap(expressionData, geneList = []) {
     legend.append('g')
         .attr('transform', `translate(0,${legendHeight})`)
         .call(legendAxis)
-        .style('font-size', '10px');
+        .style('font-size', Math.max(8, Math.min(12, legendHeight / 2)) + 'px');
         
     legend.append('text')
         .attr('x', legendWidth / 2)
         .attr('y', -5)
         .style('text-anchor', 'middle')
-        .style('font-size', '12px')
+        .style('font-size', Math.max(10, Math.min(14, legendHeight * 0.8)) + 'px')
         .text('Expression Level');
 
-    console.log('plots.js: Heatmap rendering completed successfully');
+    console.log('plots.js: Heatmap rendering completed successfully with container bounds');
     return true;
 }
-
 // =============================================================================
 // PLOTLY.JS RENDERING FUNCTIONS
 // =============================================================================
