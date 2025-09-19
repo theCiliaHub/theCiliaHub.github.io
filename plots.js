@@ -316,44 +316,64 @@ function renderBarPlot(genes, custom) {
     Plotly.newPlot('plot-display-area', data, layout, { responsive: true });
 }
 
-function renderExpressionPlot(genes) {
-    const plotDiv = document.getElementById('plot-display-area');
-    console.log("renderExpressionPlot() called with genes:", genes);
+function renderHeatmap(genes, custom) {
+    const plotContainer = document.getElementById('plot-display-area');
+    clearAllPlots('plot-display-area');
 
-    if (!window.expressionData || window.expressionData.length === 0) {
-        console.error("Expression data is missing or not loaded.");
-        plotDiv.innerHTML = "<p style='color:red'>Error: Expression data not loaded.</p>";
+    // Ensure expressionData is loaded
+    if (typeof expressionData === 'undefined' || !expressionData || Object.keys(expressionData).length === 0) {
+        plotContainer.innerHTML = '<p>No expression data available.</p>';
         return;
     }
 
-    if (!genes || genes.length === 0) {
-        console.warn("No genes provided for expression plotting.");
-        plotDiv.innerHTML = "<p style='color:orange'>Please enter genes to see expression data.</p>";
+    // Filter genes with expression data
+    const genesWithExpr = genes.filter(g => expressionData[g.gene.toUpperCase()]);
+    if (genesWithExpr.length === 0) {
+        plotContainer.innerHTML = '<p>No expression data found for these genes.</p>';
         return;
     }
 
-    const filtered = window.expressionData.filter(row => genes.includes(row.gene));
-    console.log("Filtered data size:", filtered.length);
-
-    if (filtered.length === 0) {
-        plotDiv.innerHTML = "<p>No expression data available for the selected genes.</p>";
+    // Get tissue labels from the first gene in expressionData
+    const firstGeneKey = Object.keys(expressionData)[0];
+    const tissues = Object.keys(expressionData[firstGeneKey]);
+    if (!tissues || tissues.length === 0) {
+        plotContainer.innerHTML = '<p>No tissue information found in expression data.</p>';
         return;
     }
 
-    const trace = {
-        x: filtered.map(r => r.gene),
-        y: filtered.map(r => r.tpm ?? r.expression ?? 0),
-        type: 'bar',
-        marker: { color: '#3f51b5' }
+    // Build z-values for heatmap
+    const yLabels = genesWithExpr.map(g => g.gene);
+    const zValues = yLabels.map(geneName => {
+        const expr = expressionData[geneName.toUpperCase()] || {};
+        return tissues.map(tissue => {
+            const val = parseFloat(expr[tissue]);
+            return isNaN(val) ? 0 : val; // fallback to 0 if missing
+        });
+    });
+
+    const data = [{
+        x: tissues,
+        y: yLabels,
+        z: zValues,
+        type: 'heatmap',
+        colorscale: 'Reds',
+        hoverongaps: false,
+        showscale: true
+    }];
+
+    const layout = {
+        title: { text: custom.title || 'Tissue Expression Heatmap', font: { size: custom.titleFontSize, family: custom.fontFamily } },
+        xaxis: { title: { text: 'Tissue', font: custom.axisTitleFont }, tickangle: -45, visible: custom.showX, linecolor: 'black', linewidth: 2, mirror: true },
+        yaxis: { title: { text: 'Gene', font: custom.axisTitleFont }, visible: custom.showY, linecolor: 'black', linewidth: 2, mirror: true },
+        height: 600,
+        margin: { l: 120, r: 20, b: 150, t: 80 },
+        plot_bgcolor: 'white',
+        paper_bgcolor: 'white'
     };
 
-    Plotly.newPlot(plotDiv, [trace], {
-        title: `Expression Plot (${filtered.length} genes)`,
-        xaxis: { title: 'Gene', automargin: true },
-        yaxis: { title: 'Expression (TPM)', rangemode: 'tozero' },
-        margin: { t: 50 }
-    });
+    Plotly.newPlot('plot-display-area', data, layout, { responsive: true });
 }
+
 
 
 // =============================================================================
