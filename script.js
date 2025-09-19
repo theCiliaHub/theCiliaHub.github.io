@@ -1972,11 +1972,19 @@ async function loadExpressionData() {
 
         const geneSet = new Set();
         Object.keys(expressionData).forEach(gene => {
-            geneSet.add(gene); // Gene names are now already uppercase
+            geneSet.add(gene);
         });
         availableGenes = geneSet;
 
         console.log(`Loaded ${Object.keys(expressionData).length} genes with expression data from TSV`);
+
+        // ✅ Check if a heatmap was requested while data was loading
+        if (pendingHeatmapRequest) {
+            const { genes } = pendingHeatmapRequest;
+            pendingHeatmapRequest = null;
+            console.log('Rendering deferred heatmap now that expression data is ready.');
+            renderExpressionHeatmap(expressionData, genes);
+        }
     } catch (error) {
         console.error('Error loading expression data:', error);
     }
