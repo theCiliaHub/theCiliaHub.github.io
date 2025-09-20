@@ -1,6 +1,3 @@
-/**
- * Enhanced CiliaPlot analysis page with improved visualizations and features
- */
 function displayCiliaPlotPage() {
     const contentArea = document.querySelector('.content-area');
     contentArea.className = 'content-area content-area-full';
@@ -13,23 +10,24 @@ function displayCiliaPlotPage() {
             font-family: Arial, sans-serif; 
             color: #333; 
             background-color: #f9f9f9; 
-            padding: 20px; 
+            padding: 10px 20px; /* reduce top padding to bring everything up */
         }
-        h2, h3 { color: #1a237e; }
+        h2, h3 { color: #1a237e; margin-top: 8px; margin-bottom: 8px; }
 
         .ciliaplot-main-layout {
             display: grid;
             grid-template-columns: 260px 3fr; /* left narrow column for input, right wide for plots */
-            gap: 16px;
+            gap: 12px; /* tighter gap to bring layout up */
             align-items: start;
+            margin-top: 5px; /* move layout closer to top */
         }
 
         .control-card { 
             background: #fff; 
             border-radius: 8px; 
             box-shadow: 0 4px 8px rgba(0,0,0,0.05); 
-            padding: 20px; 
-            margin-bottom: 15px; 
+            padding: 16px; 
+            margin-bottom: 10px; 
         }
         .control-card h3 { 
             margin-top: 0; 
@@ -38,11 +36,18 @@ function displayCiliaPlotPage() {
             font-size: 1.2em; 
         }
 
-        /* Plot types panel moved to top */
+        /* Plot types panel moved higher */
         .plot-types-panel {
-            margin-bottom: 20px;
+            margin-bottom: 10px;
         }
-        .plot-types-panel .plot-type-list { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+        .plot-types-panel .plot-type-list { 
+            list-style: none; 
+            padding: 0; 
+            margin: 0; 
+            display: flex; 
+            flex-wrap: wrap; 
+            gap: 8px; 
+        }
         .plot-types-panel .plot-type-list li { margin: 0; }
         .plot-types-panel .plot-type-list label { 
             display: inline-block; 
@@ -110,14 +115,14 @@ function displayCiliaPlotPage() {
         #plot-display-area {
             position: relative;
             width: 100%;
-            height: 65vh;
+            height: 75vh; /* increased height to make X-axis labels visible */
             border: 2px dashed #ccc;
             border-radius: 8px;
             display: flex;
             align-items: center;
             justify-content: center;
             color: #888;
-            margin-top: 10px;
+            margin-top: 5px;
             overflow: hidden;
         }
 
