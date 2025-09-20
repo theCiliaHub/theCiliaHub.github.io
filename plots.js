@@ -115,7 +115,7 @@ function displayCiliaPlotPage() {
         #plot-display-area {
             position: relative;
             width: 100%;
-            height: 75vh; /* increased height to make X-axis labels visible */
+            height: 80vh; /* increased height to make X-axis labels visible */
             border: 2px dashed #ccc;
             border-radius: 8px;
             display: flex;
