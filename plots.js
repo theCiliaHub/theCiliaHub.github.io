@@ -351,6 +351,7 @@ function updateCustomizationPanel() {
 }
 
 // =============================================================================
+// =============================================================================
 // ENHANCED ORGANELLE PROFILES
 // =============================================================================
 
@@ -364,6 +365,9 @@ const organelleMarkerProfiles = {
     "Centrosome": [0.1, 0.2, 0.7, 0.9, 0.8, 0.3, 0.1, 0.1],
     "Golgi": [0.1, 0.2, 0.5, 0.2, 0.2, 0.2, 0.8, 0.9],
     "Autophagosomes": [0.1, 0.1, 0.4, 0.7, 0.8, 0.6, 0.3, 0.2],
+    "Cilia": [0.9, 0.9, 0.8, 0.7, 0.5, 0.3, 0.3, 0.2],
+    "Transition zone": [0.8, 0.8, 0.9, 0.7, 0.4, 0.2, 0.2, 0.1],
+    "Basal body": [0.85, 0.85, 0.8, 0.6, 0.3, 0.2, 0.1, 0.1],
     "Ciliary associated gene": [0.1, 0.1, 0.2, 0.8, 0.9, 0.6, 0.2, 0.1],
     "Peroxisome": [0.3, 0.4, 0.6, 0.5, 0.4, 0.3, 0.7, 0.8]
 };
@@ -378,9 +382,13 @@ const precomputedUMAP = {
     "Centrosome": Array.from({length: 40}, (_, i) => ({gene: `CENT${i}`, x: 6 + Math.random()*2, y: 7 + Math.random()*2})),
     "Golgi": Array.from({length: 35}, (_, i) => ({gene: `GOLGI${i}`, x: 4 + Math.random()*2, y: 8 + Math.random()*2})),
     "Autophagosomes": Array.from({length: 30}, (_, i) => ({gene: `AUTO${i}`, x: 2 + Math.random()*2, y: 6 + Math.random()*2})),
+    "Cilia": Array.from({length: 50}, (_, i) => ({gene: `CILIA${i}`, x: 8 + Math.random()*1.5, y: 9 + Math.random()*1.5})),
+    "Transition zone": Array.from({length: 30}, (_, i) => ({gene: `TZ${i}`, x: 8 + Math.random()*1.5, y: 7 + Math.random()*1.5})),
+    "Basal body": Array.from({length: 30}, (_, i) => ({gene: `BB${i}`, x: 7 + Math.random()*1.5, y: 6 + Math.random()*1.5})),
     "Ciliary associated gene": Array.from({length: 50}, (_, i) => ({gene: `CIL${i}`, x: 8 + Math.random()*2, y: 8 + Math.random()*2})),
     "Peroxisome": Array.from({length: 25}, (_, i) => ({gene: `PEROX${i}`, x: 6 + Math.random()*2, y: 3 + Math.random()*2}))
 };
+
 
 // =============================================================================
 // ENHANCED PLOTLY.JS RENDERING FUNCTIONS
@@ -598,12 +606,22 @@ function renderBalloonPlot(genes, custom) {
     Plotly.newPlot('plot-display-area', data, layout, { responsive: true });
 }
 
-function renderVennDiagram(genes, custom) {
+async function renderVennDiagram(genes, custom = {}) {
     const plotContainer = document.getElementById('plot-display-area');
     clearAllPlots('plot-display-area');
 
-    // Ensure gold standard genes are a Set
-    const referenceCiliaryGenes = new Set(CILIAHUB_GOLD_STANDARD_GENES);
+    // Ensure database is loaded before accessing genes
+    const dbLoaded = await loadAndPrepareDatabase();
+    if (!dbLoaded || !allGenes || !Array.isArray(allGenes)) {
+        console.error("Failed to load gene database for Venn diagram.");
+        plotContainer.innerHTML = `<div style="text-align:center; color:red; font-weight:bold;">Error: Unable to load gene database</div>`;
+        return;
+    }
+
+    // Build reference set from the loaded database (2200 genes)
+    const referenceCiliaryGenes = new Set(allGenes.map(g => g.gene.toUpperCase()));
+
+    // Build user gene set
     const userGenes = new Set(genes.map(g => g.gene.toUpperCase()));
 
     // Calculate overlaps
@@ -614,7 +632,7 @@ function renderVennDiagram(genes, custom) {
     // Helper for formatting big numbers
     const fmt = n => n.toLocaleString();
 
-    // Counts for clarity
+    // Counts
     const totalUserGenes = userGenes.size;
     const foundGenes = commonGenes.size;
     const notFoundGenes = uniqueToUser.size;
@@ -626,7 +644,6 @@ function renderVennDiagram(genes, custom) {
         <div style="text-align: center; padding: 20px; display: flex; flex-direction: column; justify-content: center;">
             <h3 style="margin-bottom: 10px;">${custom.title || 'Gene Set Comparison'}</h3>
 
-            <!-- Counts summary -->
             <div style="display: flex; flex-wrap: wrap; justify-content: center; gap: 20px; margin-bottom: 20px; font-size: 18px; font-weight: bold;">
                 <span>Your Genes: ${fmt(totalUserGenes)}</span>
                 <span>Found (Overlap): ${fmt(foundGenes)}</span>
@@ -635,25 +652,20 @@ function renderVennDiagram(genes, custom) {
                 <span>Gold Standard Not in Your List: ${fmt(referenceNotInUser)}</span>
             </div>
 
-            <!-- Venn diagram -->
             <div style="position: relative; width: 400px; height: 300px; margin: 0 auto;">
-                <!-- Left circle (User genes) -->
                 <div style="position: absolute; left: 50px; top: 50px; width: 200px; height: 200px; border: 3px solid #3f51b5; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: rgba(63, 81, 181, 0.1);">
                     <div style="font-size: 24px; font-weight: bold;">${fmt(uniqueToUser.size)}</div>
                 </div>
 
-                <!-- Right circle (Gold Standard genes) -->
                 <div style="position: absolute; right: 50px; top: 50px; width: 200px; height: 200px; border: 3px solid #4CAF50; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: rgba(76, 175, 80, 0.1);">
                     <div style="font-size: 24px; font-weight: bold;">${fmt(uniqueToReference.size)}</div>
                 </div>
 
-                <!-- Overlap -->
                 <div style="position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); display: flex; align-items: center; justify-content: center; font-weight: bold; color: #333; font-size: 24px;">
                     ${fmt(commonGenes.size)}
                 </div>
             </div>
 
-            <!-- Circle labels -->
             <div style="display: flex; justify-content: space-between; width: 400px; margin: 10px auto 0 auto; font-weight: bold;">
                 <span>Your Genes</span>
                 <span>Gold Standard Ciliary Genes</span>
@@ -664,6 +676,8 @@ function renderVennDiagram(genes, custom) {
             </div>
         </div>`;
 }
+
+
 
 // =============================================================================
 // NETWORK VISUALIZATION WITH CONTAINER BOUNDS
@@ -837,15 +851,19 @@ function renderOrganelleRadarPlot(genes, container, custom) {
     
     userProfile.forEach((val, i) => userProfile[i] /= contributingGenes);
     
-    const datasets = Object.entries(organelleMarkerProfiles).map(([name, data], i) => ({
+    const datasets = Object.entries(organelleMarkerProfiles).map(([name, data], i) => {
+    const isCiliary = ["Cilia", "Transition zone", "Basal body"].includes(name);
+    return {
         label: name,
         data: data,
-        borderColor: d3.schemeTableau10[i % 10],
-        backgroundColor: d3.schemeTableau10[i % 10] + '20',
-        borderWidth: 2,
-        hidden: true,
+        borderColor: isCiliary ? "#1abc9c" : d3.schemeTableau10[i % 10],
+        backgroundColor: isCiliary ? "#1abc9c20" : d3.schemeTableau10[i % 10] + '20',
+        borderWidth: isCiliary ? 3 : 2,
+        hidden: false,
         pointRadius: 3
-    }));
+    };
+});
+
     
     datasets.push({
         label: 'Your Gene Set',
