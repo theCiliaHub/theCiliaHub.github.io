@@ -575,7 +575,7 @@ function renderEnrichmentBubblePlot(genes, custom) {
     Plotly.newPlot('plot-display-area', data, layout, { responsive: true });
 }
 
-unction renderBalloonPlot(genes, custom) {
+function renderBalloonPlot(genes, custom) {
     const localizationCounts = new Map();
     const functionalCounts = new Map();
     genes.forEach(gene => {
