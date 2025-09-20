@@ -850,7 +850,10 @@ async function renderVennDiagram(genes, custom = {}) {
                 <span>Gold Standard Not in Your List: ${fmt(referenceNotInUser)}</span>
             </div>
 
-            <div style="position: relative; width: 400px; height: 300px; margin: 0 auto;">
+            <div style="position: relative; width: 400px; height: 300px; margin: 20px auto 0 auto;">
+                <div style="position: absolute; left: 50px; top: 20px; width: 200px; text-align: center; font-weight: bold;">Your Genes</div>
+                <div style="position: absolute; right: 50px; top: 20px; width: 200px; text-align: center; font-weight: bold;">Gold Standard Ciliary Genes</div>
+
                 <div style="position: absolute; left: 50px; top: 50px; width: 200px; height: 200px; border: 3px solid ${custom.vennColors[0]}; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: ${custom.vennColors[0]}20;">
                     <div style="font-size: 24px; font-weight: bold;">${fmt(uniqueToUser.size)}</div>
                 </div>
@@ -862,11 +865,6 @@ async function renderVennDiagram(genes, custom = {}) {
                 <div style="position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); display: flex; align-items: center; justify-content: center; font-weight: bold; color: #333; font-size: 24px;">
                     ${fmt(commonGenes.size)}
                 </div>
-            </div>
-
-            <div style="display: flex; justify-content: space-between; width: 400px; margin: 10px auto 0 auto; font-weight: bold;">
-                <span>Your Genes</span>
-                <span>Gold Standard Ciliary Genes</span>
             </div>
 
             <div style="margin-top: 20px; font-size: 0.85em; color: #666;">
