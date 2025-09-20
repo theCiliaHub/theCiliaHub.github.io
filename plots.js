@@ -148,6 +148,41 @@ function displayCiliaPlotPage() {
             line-height: 1.5;
             color: #495057;
         }
+        
+        /* Customization options */
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        
+        .form-group label {
+            font-weight: bold;
+            font-size: 0.9em;
+        }
+        
+        .form-group input, .form-group select {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        
+        .full-width {
+            grid-column: 1 / -1;
+        }
+        
+        .color-picker {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .color-preview {
+            width: 20px;
+            height: 20px;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+        }
     </style>
 
     <section class="ciliaplot-page-container">
@@ -192,6 +227,14 @@ function displayCiliaPlotPage() {
                 </div>
                 <div class="visualization-footer">
                     <p>The CiliaHub database contains an updated list of over <strong>2200 Gold Standard Genes with Ciliary Functions</strong>. You can visualize subcellular localization, protein domain enrichment, and more using the plots above.</p>
+                    <p>We have catalogued the 2200 ciliary genes, with their functional categories, subcellular localizations, domains, protein complexes, where they are found, and gene expression from The Human Protein Atlas. Furthermore, we also integrated genome-wide screens for cilia and Hedgehog pathway functions.</p>
+                    <p>Relevant papers:</p>
+                    <ul>
+                        <li><a href="https://www.sciencedirect.com/science/article/pii/S016748891630074X" target="_blank">Kim et al. 2016</a></li>
+                        <li><a href="https://elifesciences.org/articles/06602#content" target="_blank">Roosing et al. 2015</a></li>
+                        <li><a href="https://www.nature.com/articles/s41588-018-0054-7#Abs1" target="_blank">Breslow et al. 2018</a></li>
+                        <li><a href="https://www.nature.com/articles/ncb3201#Abs1" target="_blank">Wheway et al. 2015</a></li>
+                    </ul>
                 </div>
             </aside>
         </div>
@@ -200,7 +243,6 @@ function displayCiliaPlotPage() {
 
     initializeCiliaPlotPage();
 }
-
 
 // =============================================================================
 // INITIALIZATION
@@ -257,7 +299,7 @@ function updateGeneSummaryTable(originalQueries, foundGenes) {
 }
 
 function getPlotCustomization() {
-    return {
+    const custom = {
         title: document.getElementById('custom-title')?.value,
         titleFontSize: parseInt(document.getElementById('custom-title-fontsize')?.value, 10) || 24,
         fontFamily: document.getElementById('custom-font-family')?.value || 'Arial',
@@ -265,8 +307,47 @@ function getPlotCustomization() {
         showY: document.getElementById('custom-show-y')?.value === 'true',
         bubbleSize: parseInt(document.getElementById('custom-bubble-size')?.value, 10) || 15,
         barWidth: parseFloat(document.getElementById('custom-bar-width')?.value) || 0.8,
-        axisTitleFont: { size: 20, family: 'Arial', color: '#000', weight: 'bold' }
+        axisTitleFont: { 
+            size: parseInt(document.getElementById('custom-axis-fontsize')?.value, 10) || 16, 
+            family: document.getElementById('custom-font-family')?.value || 'Arial', 
+            color: document.getElementById('custom-axis-color')?.value || '#000', 
+            weight: 'bold' 
+        },
+        rowFontSize: parseInt(document.getElementById('custom-row-fontsize')?.value, 10) || 16,
+        columnFontSize: parseInt(document.getElementById('custom-column-fontsize')?.value, 10) || 16,
+        fontColor: document.getElementById('custom-font-color')?.value || '#000',
+        figureWidth: parseInt(document.getElementById('custom-figure-width')?.value, 10) || 800,
+        figureHeight: parseInt(document.getElementById('custom-figure-height')?.value, 10) || 600,
+        displayNames: document.getElementById('custom-display-names')?.value || 'both',
+        border: document.getElementById('custom-border')?.checked || false,
+        borderColor: document.getElementById('custom-border-color')?.value || '#ccc',
+        vennColors: [
+            document.getElementById('venn-color-1')?.value || '#3f51b5',
+            document.getElementById('venn-color-2')?.value || '#4CAF50',
+            document.getElementById('venn-color-3')?.value || '#FFC107',
+            document.getElementById('venn-color-4')?.value || '#E91E63',
+            document.getElementById('venn-color-5')?.value || '#9C27B0',
+            document.getElementById('venn-color-6')?.value || '#00BCD4',
+            document.getElementById('venn-color-7')?.value || '#FF5722',
+            document.getElementById('venn-color-8')?.value || '#607D8B',
+            document.getElementById('venn-color-9')?.value || '#795548',
+            document.getElementById('venn-color-10')?.value || '#009688'
+        ],
+        ribbonColors: [
+            document.getElementById('ribbon-color-1')?.value || '#1f77b4',
+            document.getElementById('ribbon-color-2')?.value || '#ff7f0e',
+            document.getElementById('ribbon-color-3')?.value || '#2ca02c',
+            document.getElementById('ribbon-color-4')?.value || '#d62728',
+            document.getElementById('ribbon-color-5')?.value || '#9467bd',
+            document.getElementById('ribbon-color-6')?.value || '#8c564b',
+            document.getElementById('ribbon-color-7')?.value || '#e377c2',
+            document.getElementById('ribbon-color-8')?.value || '#7f7f7f',
+            document.getElementById('ribbon-color-9')?.value || '#bcbd22',
+            document.getElementById('ribbon-color-10')?.value || '#17becf'
+        ]
     };
+    
+    return custom;
 }
 
 // =============================================================================
@@ -275,73 +356,60 @@ function getPlotCustomization() {
 
 const PLOT_CONFIG = {
     'localization_bubble': { 
-        label: 'Gene Localizations (Bubble)', 
-        group: 'Plotly Plots',
+        label: 'Gene Localizations', 
         explanation: 'Displays the subcellular localizations of your genes as bubbles. Each bubble represents a gene-localization pair, helping you visualize where your genes are found within the cell.'
     },
     'functional_bar': { 
-        label: 'Functional Categories (Bar)', 
-        group: 'Plotly Plots',
+        label: 'Functional Categories', 
         explanation: 'Shows the distribution of functional categories among your genes. Bars represent the count of genes in each functional category, revealing the primary functions of your gene set.'
     },
     'enrichment_bubble': { 
-        label: 'Enrichment Analysis (Bubble)', 
-        group: 'Plotly Plots',
+        label: 'Enrichment Analysis', 
         explanation: 'Analyzes functional category enrichment in your gene set compared to the background. Bubble size indicates gene count, color represents significance (p-value).'
     },
     'balloon_plot': { 
-        label: 'Function vs Localization (Balloon)', 
-        group: 'Plotly Plots',
+        label: 'Function vs Localization', 
         explanation: 'Creates a heatmap showing the relationship between functional categories and subcellular localizations. Color intensity represents the number of genes with both properties.'
     },
     'venn_diagram': { 
-        label: 'Gene Set Comparison (Venn)', 
-        group: 'Plotly Plots',
+        label: 'Gene Set Comparison', 
         explanation: 'Compares your gene list with the ciliary reference gene set, showing overlaps and unique genes. Numbers represent exact gene matches only.'
     },
     'network': { 
-        label: 'Complex Network (D3)', 
-        group: 'Advanced Plots',
+        label: 'Complex Network', 
         explanation: 'Visualizes protein-protein interactions and complex associations among your genes. Connected nodes indicate genes that participate in the same protein complexes.'
     },
     'organelle_radar': { 
-        label: 'Organelle Radar (Chart.js)', 
-        group: 'Advanced Plots',
+        label: 'Organelle Radar', 
         explanation: 'Compares the organellar profile of your gene set against known organellar markers. Each axis represents a different subcellular compartment.'
     },
     'organelle_umap': { 
-        label: 'Organelle UMAP (Chart.js)', 
-        group: 'Advanced Plots',
+        label: 'Organelle UMAP', 
         explanation: 'Projects genes onto a 2D UMAP based on their organellar localization patterns. Genes with similar localization profiles cluster together.'
     },
     'screen_analysis': { 
-        label: 'Screen Analysis (Chart.js)', 
-        group: 'Advanced Plots',
+        label: 'Screen Analysis', 
         explanation: 'Displays results from genome-wide screens, showing how each gene affects ciliary function. Data sources are indicated at the top of the plot.'
     },
     'expression_heatmap': { 
-        label: 'Expression Heatmap (D3)', 
-        group: 'Advanced Plots',
+        label: 'Expression Heatmap', 
         explanation: 'Shows tissue-specific expression patterns of your genes. Color intensity represents expression levels across different tissues and cell types.'
+    },
+    'screen_bar_chart': {
+        label: 'Screen Bar Chart',
+        explanation: 'Alternative visualization for genome-wide screen results, showing gene effects on ciliary function as bars with error indicators.'
     }
 };
 
 function populatePlotTypes() {
     const container = document.getElementById('ciliaplot-type-selector');
-    const grouped = {};
-    Object.entries(PLOT_CONFIG).forEach(([key, val]) => {
-        if (!grouped[val.group]) grouped[val.group] = [];
-        grouped[val.group].push({key, label: val.label});
-    });
-
     let html = '';
-    for (const group in grouped) {
-        html += `<li style="font-weight:bold; margin-top:10px; margin-bottom:5px;">${group}</li>`;
-        grouped[group].forEach(({key, label}, index) => {
-            const checked = (group === 'Plotly Plots' && index === 0) ? 'checked' : '';
-            html += `<li><input type="radio" id="plot-${key}" name="ciliaplot_type" value="${key}" ${checked}><label for="plot-${key}">${label}</label></li>`;
-        });
-    }
+    
+    Object.entries(PLOT_CONFIG).forEach(([key, val], index) => {
+        const checked = index === 0 ? 'checked' : '';
+        html += `<li><input type="radio" id="plot-${key}" name="ciliaplot_type" value="${key}" ${checked}><label for="plot-${key}">${val.label}</label></li>`;
+    });
+    
     container.innerHTML = html;
 }
 
@@ -361,11 +429,21 @@ function updateCustomizationPanel() {
     const container = document.getElementById('customization-container');
     
     let html = `<h3>Plot Customization</h3><div class="customization-grid">`;
+    
+    // Basic customization options
     html += `<div class="full-width form-group"><label for="custom-title">Plot Title</label><input type="text" id="custom-title" placeholder="Default Title"></div>`;
-    html += `<div class="form-group"><label for="custom-title-fontsize">Title Font Size</label><input type="number" id="custom-title-fontsize" value="24"></div>`;
-    html += `<div class="form-group"><label for="custom-font-family">Font Family</label><select id="custom-font-family"><option>Arial</option><option>Times New Roman</option></select></div>`;
+    html += `<div class="form-group"><label for="custom-title-fontsize">Title Font Size</label><input type="number" id="custom-title-fontsize" value="24" min="10" max="36"></div>`;
+    html += `<div class="form-group"><label for="custom-font-family">Font Family</label><select id="custom-font-family"><option>Arial</option><option>Times New Roman</option><option>Helvetica</option><option>Verdana</option></select></div>`;
+    html += `<div class="form-group"><label for="custom-font-color">Font Color</label><input type="color" id="custom-font-color" value="#000000"></div>`;
     html += `<div class="form-group"><label for="custom-show-x">Show X-Axis</label><select id="custom-show-x"><option value="true">Show</option><option value="false">Hide</option></select></div>`;
     html += `<div class="form-group"><label for="custom-show-y">Show Y-Axis</label><select id="custom-show-y"><option value="true">Show</option><option value="false">Hide</option></select></div>`;
+    html += `<div class="form-group"><label for="custom-axis-fontsize">Axis Font Size</label><input type="number" id="custom-axis-fontsize" value="16" min="8" max="24"></div>`;
+    html += `<div class="form-group"><label for="custom-axis-color">Axis Color</label><input type="color" id="custom-axis-color" value="#000000"></div>`;
+    html += `<div class="form-group"><label for="custom-figure-width">Figure Width</label><input type="number" id="custom-figure-width" value="800" min="400" max="2000"></div>`;
+    html += `<div class="form-group"><label for="custom-figure-height">Figure Height</label><input type="number" id="custom-figure-height" value="600" min="300" max="2000"></div>`;
+    html += `<div class="form-group"><label for="custom-display-names">Display Names</label><select id="custom-display-names"><option value="both">Both</option><option value="row">Row Only</option><option value="column">Column Only</option><option value="none">None</option></select></div>`;
+    html += `<div class="form-group"><label for="custom-border">Show Border</label><input type="checkbox" id="custom-border"></div>`;
+    html += `<div class="form-group"><label for="custom-border-color">Border Color</label><input type="color" id="custom-border-color" value="#cccccc"></div>`;
     
     // Plot-specific customizations
     if (selectedPlot === 'localization_bubble' || selectedPlot === 'enrichment_bubble') {
@@ -376,13 +454,59 @@ function updateCustomizationPanel() {
         html += `<div class="form-group"><label for="custom-bar-width">Bar Width</label><input type="number" id="custom-bar-width" value="0.8" min="0.1" max="1.0" step="0.1"></div>`;
     }
     
+    if (selectedPlot === 'venn_diagram') {
+        html += `<div class="full-width"><h4>Venn Diagram Colors</h4></div>`;
+        for (let i = 1; i <= 10; i++) {
+            html += `<div class="form-group color-picker">
+                <label for="venn-color-${i}">Color ${i}</label>
+                <div class="color-picker">
+                    <input type="color" id="venn-color-${i}" value="${['#3f51b5', '#4CAF50', '#FFC107', '#E91E63', '#9C27B0', '#00BCD4', '#FF5722', '#607D8B', '#795548', '#009688'][i-1]}">
+                    <div class="color-preview" style="background-color: ${['#3f51b5', '#4CAF50', '#FFC107', '#E91E63', '#9C27B0', '#00BCD4', '#FF5722', '#607D8B', '#795548', '#009688'][i-1]}"></div>
+                </div>
+            </div>`;
+        }
+    }
+    
+    if (selectedPlot === 'network') {
+        html += `<div class="full-width"><h4>Chord Plot Ribbon Colors</h4></div>`;
+        for (let i = 1; i <= 10; i++) {
+            html += `<div class="form-group color-picker">
+                <label for="ribbon-color-${i}">Ribbon ${i}</label>
+                <div class="color-picker">
+                    <input type="color" id="ribbon-color-${i}" value="${['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf'][i-1]}">
+                    <div class="color-preview" style="background-color: ${['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf'][i-1]}"></div>
+                </div>
+            </div>`;
+        }
+    }
+    
     html += `</div>`;
     container.innerHTML = html;
+    
+    // Add event listeners for color pickers
+    for (let i = 1; i <= 10; i++) {
+        const colorPicker = document.getElementById(`venn-color-${i}`);
+        const colorPreview = colorPicker?.nextElementSibling;
+        if (colorPicker && colorPreview) {
+            colorPicker.addEventListener('input', function() {
+                colorPreview.style.backgroundColor = this.value;
+            });
+        }
+    }
+    
+    for (let i = 1; i <= 10; i++) {
+        const colorPicker = document.getElementById(`ribbon-color-${i}`);
+        const colorPreview = colorPicker?.nextElementSibling;
+        if (colorPicker && colorPreview) {
+            colorPicker.addEventListener('input', function() {
+                colorPreview.style.backgroundColor = this.value;
+            });
+        }
+    }
     
     updatePlotExplanation();
 }
 
-// =============================================================================
 // =============================================================================
 // ENHANCED ORGANELLE PROFILES
 // =============================================================================
@@ -421,7 +545,6 @@ const precomputedUMAP = {
     "Peroxisome": Array.from({length: 25}, (_, i) => ({gene: `PEROX${i}`, x: 6 + Math.random()*2, y: 3 + Math.random()*2}))
 };
 
-
 // =============================================================================
 // ENHANCED PLOTLY.JS RENDERING FUNCTIONS
 // =============================================================================
@@ -450,7 +573,7 @@ function renderBubblePlot(genes, custom) {
     const layout = {
         title: { 
             text: custom.title || 'Gene Subcellular Localizations', 
-            font: { size: custom.titleFontSize, family: custom.fontFamily } 
+            font: { size: custom.titleFontSize, family: custom.fontFamily, color: custom.fontColor } 
         },
         xaxis: { 
             title: { text: 'Localization', font: custom.axisTitleFont }, 
@@ -459,7 +582,8 @@ function renderBubblePlot(genes, custom) {
             linewidth: 2, 
             mirror: true,
             showgrid: false,
-            zeroline: false
+            zeroline: false,
+            tickfont: { size: custom.columnFontSize, family: custom.fontFamily, color: custom.fontColor }
         },
         yaxis: { 
             title: { text: 'Gene', font: custom.axisTitleFont }, 
@@ -468,10 +592,12 @@ function renderBubblePlot(genes, custom) {
             linewidth: 2, 
             mirror: true,
             showgrid: false,
-            zeroline: false
+            zeroline: false,
+            tickfont: { size: custom.rowFontSize, family: custom.fontFamily, color: custom.fontColor }
         },
         showlegend: false, 
-        height: 600, 
+        width: custom.figureWidth,
+        height: custom.figureHeight,
         margin: { l: 120, r: 20, b: 100, t: 80 },
         plot_bgcolor: 'white', 
         paper_bgcolor: 'white'
@@ -501,7 +627,7 @@ function renderBarPlot(genes, custom) {
     const layout = {
         title: { 
             text: custom.title || 'Functional Category Counts', 
-            font: { size: custom.titleFontSize, family: custom.fontFamily } 
+            font: { size: custom.titleFontSize, family: custom.fontFamily, color: custom.fontColor } 
         },
         xaxis: { 
             title: { text: 'Number of Genes', font: custom.axisTitleFont }, 
@@ -510,7 +636,8 @@ function renderBarPlot(genes, custom) {
             linewidth: 2, 
             mirror: true,
             showgrid: false,
-            zeroline: false
+            zeroline: false,
+            tickfont: { size: custom.columnFontSize, family: custom.fontFamily, color: custom.fontColor }
         },
         yaxis: { 
             title: { text: 'Category', font: custom.axisTitleFont }, 
@@ -520,9 +647,11 @@ function renderBarPlot(genes, custom) {
             linewidth: 2, 
             mirror: true,
             showgrid: false,
-            zeroline: false
+            zeroline: false,
+            tickfont: { size: custom.rowFontSize, family: custom.fontFamily, color: custom.fontColor }
         },
-        height: 600, 
+        width: custom.figureWidth,
+        height: custom.figureHeight,
         margin: { l: 250, r: 20, b: 50, t: 80 },
         plot_bgcolor: 'white', 
         paper_bgcolor: 'white'
@@ -583,7 +712,7 @@ function renderEnrichmentBubblePlot(genes, custom) {
     const layout = {
         title: { 
             text: custom.title || 'Functional Category Enrichment', 
-            font: { size: custom.titleFontSize, family: custom.fontFamily } 
+            font: { size: custom.titleFontSize, family: custom.fontFamily, color: custom.fontColor } 
         },
         xaxis: { 
             title: { text: 'Functional Category', font: custom.axisTitleFont }, 
@@ -593,7 +722,8 @@ function renderEnrichmentBubblePlot(genes, custom) {
             linewidth: 2, 
             mirror: true,
             showgrid: false,
-            zeroline: false
+            zeroline: false,
+            tickfont: { size: custom.columnFontSize, family: custom.fontFamily, color: custom.fontColor }
         },
         yaxis: { 
             title: { text: 'Enrichment Score', font: custom.axisTitleFont }, 
@@ -602,11 +732,13 @@ function renderEnrichmentBubblePlot(genes, custom) {
             linewidth: 2, 
             mirror: true,
             showgrid: false,
-            zeroline: false
+            zeroline: false,
+            tickfont: { size: custom.rowFontSize, family: custom.fontFamily, color: custom.fontColor }
         },
         hovermode: 'closest',
         showlegend: false,
-        height: 600,
+        width: custom.figureWidth,
+        height: custom.figureHeight,
         margin: { l: 120, r: 50, b: 150, t: 80 },
         plot_bgcolor: 'white', 
         paper_bgcolor: 'white'
@@ -616,26 +748,60 @@ function renderEnrichmentBubblePlot(genes, custom) {
 }
 
 function renderBalloonPlot(genes, custom) {
-    const localizationCounts = new Map();
-    const functionalCounts = new Map();
-    genes.forEach(gene => {
-        getCleanArray(gene, 'localization').forEach(loc => localizationCounts.set(loc, (localizationCounts.get(loc) || 0) + 1));
-        getCleanArray(gene, 'functional_category').forEach(func => functionalCounts.set(func, (functionalCounts.get(func) || 0) + 1));
-    });
-    const localizations = [...localizationCounts.keys()];
-    const functions = [...functionalCounts.keys()];
-    const zData = functions.map(func => {
-        return localizations.map(loc => {
-            return genes.filter(gene => {
-                const geneLocs = getCleanArray(gene, 'localization');
-                const geneFuncs = getCleanArray(gene, 'functional_category');
-                return geneLocs.includes(loc) && geneFuncs.includes(func);
-            }).length;
-        });
-    });
-    const data = [{ type: 'heatmap', x: localizations, y: functions, z: zData, colorscale: 'Blues', showscale: true }];
-    const layout = { title: { text: custom.title || 'Function vs Localization', font: { size: custom.titleFontSize, family: custom.fontFamily }, y: 0.95 }, xaxis: { title: { text: 'Localization', font: custom.axisTitleFont }, visible: custom.showX, tickangle: -45, automargin: true }, yaxis: { title: { text: 'Functional Category', font: custom.axisTitleFont }, visible: custom.showY, automargin: true }, height: 700, margin: { l: 200, r: 50, b: 180, t: 80 }, plot_bgcolor: 'white', paper_bgcolor: 'white' };
-    Plotly.newPlot('plot-display-area', data, layout, { responsive: true });
+    const localizationCounts = new Map();
+    const functionalCounts = new Map();
+    genes.forEach(gene => {
+        getCleanArray(gene, 'localization').forEach(loc => localizationCounts.set(loc, (localizationCounts.get(loc) || 0) + 1));
+        getCleanArray(gene, 'functional_category').forEach(func => functionalCounts.set(func, (functionalCounts.get(func) || 0) + 1));
+    });
+    const localizations = [...localizationCounts.keys()];
+    const functions = [...functionalCounts.keys()];
+    const zData = functions.map(func => {
+        return localizations.map(loc => {
+            return genes.filter(gene => {
+                const geneLocs = getCleanArray(gene, 'localization');
+                const geneFuncs = getCleanArray(gene, 'functional_category');
+                return geneLocs.includes(loc) && geneFuncs.includes(func);
+            }).length;
+        });
+    });
+    
+    const data = [{ 
+        type: 'heatmap', 
+        x: localizations, 
+        y: functions, 
+        z: zData, 
+        colorscale: 'Blues', 
+        showscale: true 
+    }];
+    
+    const layout = { 
+        title: { 
+            text: custom.title || 'Function vs Localization', 
+            font: { size: custom.titleFontSize, family: custom.fontFamily, color: custom.fontColor },
+            y: 0.95 
+        }, 
+        xaxis: { 
+            title: { text: 'Localization', font: custom.axisTitleFont }, 
+            visible: custom.showX, 
+            tickangle: -45, 
+            automargin: true,
+            tickfont: { size: custom.columnFontSize, family: custom.fontFamily, color: custom.fontColor }
+        }, 
+        yaxis: { 
+            title: { text: 'Functional Category', font: custom.axisTitleFont }, 
+            visible: custom.showY, 
+            automargin: true,
+            tickfont: { size: custom.rowFontSize, family: custom.fontFamily, color: custom.fontColor }
+        }, 
+        width: custom.figureWidth,
+        height: custom.figureHeight,
+        margin: { l: 200, r: 50, b: 180, t: 80 }, 
+        plot_bgcolor: 'white', 
+        paper_bgcolor: 'white'
+    };
+    
+    Plotly.newPlot('plot-display-area', data, layout, { responsive: true });
 }
 
 async function renderVennDiagram(genes, custom = {}) {
@@ -674,7 +840,7 @@ async function renderVennDiagram(genes, custom = {}) {
     // Render Venn diagram
     plotContainer.innerHTML = `
         <div style="text-align: center; padding: 20px; display: flex; flex-direction: column; justify-content: center;">
-            <h3 style="margin-bottom: 10px;">${custom.title || 'Gene Set Comparison'}</h3>
+            <h3 style="margin-bottom: 10px; font-family: ${custom.fontFamily || 'Arial'}; font-size: ${custom.titleFontSize || 24}px; color: ${custom.fontColor || '#000'};">${custom.title || 'Gene Set Comparison'}</h3>
 
             <div style="display: flex; flex-wrap: wrap; justify-content: center; gap: 20px; margin-bottom: 20px; font-size: 18px; font-weight: bold;">
                 <span>Your Genes: ${fmt(totalUserGenes)}</span>
@@ -685,11 +851,11 @@ async function renderVennDiagram(genes, custom = {}) {
             </div>
 
             <div style="position: relative; width: 400px; height: 300px; margin: 0 auto;">
-                <div style="position: absolute; left: 50px; top: 50px; width: 200px; height: 200px; border: 3px solid #3f51b5; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: rgba(63, 81, 181, 0.1);">
+                <div style="position: absolute; left: 50px; top: 50px; width: 200px; height: 200px; border: 3px solid ${custom.vennColors[0]}; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: ${custom.vennColors[0]}20;">
                     <div style="font-size: 24px; font-weight: bold;">${fmt(uniqueToUser.size)}</div>
                 </div>
 
-                <div style="position: absolute; right: 50px; top: 50px; width: 200px; height: 200px; border: 3px solid #4CAF50; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: rgba(76, 175, 80, 0.1);">
+                <div style="position: absolute; right: 50px; top: 50px; width: 200px; height: 200px; border: 3px solid ${custom.vennColors[1]}; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: ${custom.vennColors[1]}20;">
                     <div style="font-size: 24px; font-weight: bold;">${fmt(uniqueToReference.size)}</div>
                 </div>
 
@@ -708,8 +874,6 @@ async function renderVennDiagram(genes, custom = {}) {
             </div>
         </div>`;
 }
-
-
 
 // =============================================================================
 // NETWORK VISUALIZATION WITH CONTAINER BOUNDS
@@ -754,8 +918,8 @@ function renderComplexNetwork(genes, container, custom) {
     }
     
     const containerRect = container.getBoundingClientRect();
-    const width = containerRect.width - 20;
-    const height = containerRect.height - 20;
+    const width = custom.figureWidth || (containerRect.width - 20);
+    const height = custom.figureHeight || (containerRect.height - 20);
     const margin = 20;
     
     const svg = d3.select(container)
@@ -763,15 +927,17 @@ function renderComplexNetwork(genes, container, custom) {
         .attr("width", width)
         .attr("height", height)
         .attr("viewBox", `0 0 ${width} ${height}`)
-        .style("border", "1px solid #ddd");
+        .style("border", custom.border ? `1px solid ${custom.borderColor}` : "none");
     
     // Add title
     svg.append("text")
         .attr("x", width / 2)
         .attr("y", 20)
         .attr("text-anchor", "middle")
-        .style("font-size", "16px")
+        .style("font-size", custom.titleFontSize + "px")
+        .style("font-family", custom.fontFamily)
         .style("font-weight", "bold")
+        .style("fill", custom.fontColor)
         .text(custom.title || "Protein Complex Network");
     
     const simulation = d3.forceSimulation(nodes)
@@ -824,7 +990,7 @@ function renderComplexNetwork(genes, container, custom) {
         .attr("y", 5)
         .style("font-family", custom.fontFamily || "Arial")
         .style("font-size", "11px")
-        .style("fill", "#333");
+        .style("fill", custom.fontColor || "#333");
     
     simulation.on("tick", () => {
         // Keep nodes within bounds
@@ -920,11 +1086,21 @@ function renderOrganelleRadarPlot(genes, container, custom) {
                 title: {
                     display: true,
                     text: custom.title || "Organellar Profile Comparison",
-                    font: { size: custom.titleFontSize || 16 }
+                    font: { 
+                        size: custom.titleFontSize || 16,
+                        family: custom.fontFamily,
+                        color: custom.fontColor
+                    }
                 },
                 legend: {
                     position: 'bottom',
-                    labels: { usePointStyle: true }
+                    labels: { 
+                        usePointStyle: true,
+                        font: {
+                            family: custom.fontFamily,
+                            size: 12
+                        }
+                    }
                 }
             },
             scales: {
@@ -997,11 +1173,21 @@ function renderOrganelleUMAP(genes, container, custom) {
                 title: {
                     display: true,
                     text: custom.title || "Organellar UMAP Projection",
-                    font: { size: custom.titleFontSize || 16 }
+                    font: { 
+                        size: custom.titleFontSize || 16,
+                        family: custom.fontFamily,
+                        color: custom.fontColor
+                    }
                 },
                 legend: {
                     position: 'bottom',
-                    labels: { usePointStyle: true }
+                    labels: { 
+                        usePointStyle: true,
+                        font: {
+                            family: custom.fontFamily,
+                            size: 12
+                        }
+                    }
                 },
                 tooltip: {
                     callbacks: {
@@ -1021,14 +1207,24 @@ function renderOrganelleUMAP(genes, container, custom) {
                     display: true,
                     title: {
                         display: true,
-                        text: 'UMAP 1'
+                        text: 'UMAP 1',
+                        font: {
+                            family: custom.fontFamily,
+                            size: custom.axisTitleFont.size,
+                            color: custom.axisTitleFont.color
+                        }
                     }
                 },
                 y: {
                     display: true,
                     title: {
                         display: true,
-                        text: 'UMAP 2'
+                        text: 'UMAP 2',
+                        font: {
+                            family: custom.fontFamily,
+                            size: custom.axisTitleFont.size,
+                            color: custom.axisTitleFont.color
+                        }
                     }
                 }
             }
@@ -1102,11 +1298,21 @@ function renderGeneScreenAnalysis(genes, container, custom) {
                 title: {
                     display: true,
                     text: `${custom.title || 'Gene Screen Analysis'}${dataSources.size > 0 ? '\nData sources: ' + Array.from(dataSources).join(', ') : ''}`,
-                    font: { size: custom.titleFontSize || 16 }
+                    font: { 
+                        size: custom.titleFontSize || 16,
+                        family: custom.fontFamily,
+                        color: custom.fontColor
+                    }
                 },
                 legend: {
                     position: 'bottom',
-                    labels: { usePointStyle: true }
+                    labels: { 
+                        usePointStyle: true,
+                        font: {
+                            family: custom.fontFamily,
+                            size: 12
+                        }
+                    }
                 },
                 tooltip: {
                     callbacks: {
@@ -1123,7 +1329,12 @@ function renderGeneScreenAnalysis(genes, container, custom) {
                     title: {
                         display: true,
                         text: 'Genes',
-                        font: { size: 14, weight: 'bold' }
+                        font: { 
+                            size: custom.axisTitleFont.size,
+                            family: custom.fontFamily,
+                            color: custom.axisTitleFont.color,
+                            weight: 'bold' 
+                        }
                     },
                     min: -0.5,
                     max: geneLabels.length - 0.5,
@@ -1131,6 +1342,11 @@ function renderGeneScreenAnalysis(genes, container, custom) {
                         stepSize: 1,
                         callback: function(value) {
                             return geneLabels[value] || '';
+                        },
+                        font: {
+                            family: custom.fontFamily,
+                            size: custom.columnFontSize,
+                            color: custom.fontColor
                         }
                     },
                     grid: { display: false },
@@ -1141,10 +1357,172 @@ function renderGeneScreenAnalysis(genes, container, custom) {
                     title: {
                         display: true,
                         text: 'Mean % Ciliated',
-                        font: { size: 14, weight: 'bold' }
+                        font: { 
+                            size: custom.axisTitleFont.size,
+                            family: custom.fontFamily,
+                            color: custom.axisTitleFont.color,
+                            weight: 'bold' 
+                        }
                     },
                     grid: { display: false },
-                    border: { display: true, color: 'black', width: 2 }
+                    border: { display: true, color: 'black', width: 2 },
+                    ticks: {
+                        font: {
+                            family: custom.fontFamily,
+                            size: custom.rowFontSize,
+                            color: custom.fontColor
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+// =============================================================================
+// ALTERNATIVE SCREEN VISUALIZATION - BAR CHART
+// =============================================================================
+
+function renderScreenBarChart(genes, container, custom) {
+    clearAllPlots(container.id);
+    container.innerHTML = `<canvas style="max-width: 100%; max-height: 100%;"></canvas>`;
+    const ctx = container.querySelector('canvas').getContext('2d');
+    
+    const screenData = [];
+    const dataSources = new Set();
+    
+    genes.forEach(gene => {
+        if (!gene.screens || !Array.isArray(gene.screens)) return;
+        
+        gene.screens.forEach(screen => {
+            const meanValue = parseFloat(screen.mean_percent_ciliated);
+            if (!isNaN(meanValue)) {
+                screenData.push({
+                    gene: gene.gene,
+                    mean: meanValue,
+                    classification: screen.classification || "Unclassified",
+                    source: screen.source || "Unknown"
+                });
+                if (screen.source) dataSources.add(screen.source);
+            }
+        });
+    });
+    
+    if (screenData.length === 0) {
+        container.innerHTML = '<p style="text-align: center; padding: 50px;">No screen data found for these genes.</p>';
+        return;
+    }
+    
+    // Group by gene and calculate average
+    const geneAverages = {};
+    screenData.forEach(item => {
+        if (!geneAverages[item.gene]) {
+            geneAverages[item.gene] = {
+                gene: item.gene,
+                mean: 0,
+                count: 0,
+                classification: item.classification
+            };
+        }
+        geneAverages[item.gene].mean += item.mean;
+        geneAverages[item.gene].count += 1;
+    });
+    
+    // Calculate averages
+    Object.keys(geneAverages).forEach(gene => {
+        geneAverages[gene].mean /= geneAverages[gene].count;
+    });
+    
+    // Convert to array and sort
+    const sortedData = Object.values(geneAverages).sort((a, b) => b.mean - a.mean);
+    
+    const classificationColors = {
+        "Negative regulator": "#E74C3C",
+        "Positive regulator": "#27AE60",
+        "No significant effect": "#3498DB",
+        "Unclassified": "#95A5A6"
+    };
+    
+    const datasets = [{
+        label: 'Mean % Ciliated',
+        data: sortedData.map(d => d.mean),
+        backgroundColor: sortedData.map(d => classificationColors[d.classification] || "#95A5A6"),
+        borderColor: sortedData.map(d => classificationColors[d.classification] || "#95A5A6"),
+        borderWidth: 1
+    }];
+    
+    currentPlotInstance = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: sortedData.map(d => d.gene),
+            datasets: datasets
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                title: {
+                    display: true,
+                    text: `${custom.title || 'Screen Results - Bar Chart'}${dataSources.size > 0 ? '\nData sources: ' + Array.from(dataSources).join(', ') : ''}`,
+                    font: { 
+                        size: custom.titleFontSize || 16,
+                        family: custom.fontFamily,
+                        color: custom.fontColor
+                    }
+                },
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const index = context.dataIndex;
+                            const classification = sortedData[index].classification;
+                            return `${context.dataset.label}: ${context.parsed.y.toFixed(2)}% (${classification})`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    display: custom.showX !== false,
+                    title: {
+                        display: true,
+                        text: 'Genes',
+                        font: { 
+                            size: custom.axisTitleFont.size,
+                            family: custom.fontFamily,
+                            color: custom.axisTitleFont.color,
+                            weight: 'bold' 
+                        }
+                    },
+                    ticks: {
+                        font: {
+                            family: custom.fontFamily,
+                            size: custom.columnFontSize,
+                            color: custom.fontColor
+                        }
+                    }
+                },
+                y: {
+                    display: custom.showY !== false,
+                    title: {
+                        display: true,
+                        text: 'Mean % Ciliated',
+                        font: { 
+                            size: custom.axisTitleFont.size,
+                            family: custom.fontFamily,
+                            color: custom.axisTitleFont.color,
+                            weight: 'bold' 
+                        }
+                    },
+                    ticks: {
+                        font: {
+                            family: custom.fontFamily,
+                            size: custom.rowFontSize,
+                            color: custom.fontColor
+                        }
+                    }
                 }
             }
         }
@@ -1264,8 +1642,9 @@ function renderExpressionHeatmap(expressionData, geneList = []) {
         return row;
     });
 
-    const containerWidth = plotContainer.clientWidth;
-    const containerHeight = plotContainer.clientHeight;
+    const custom = getPlotCustomization();
+    const containerWidth = custom.figureWidth || plotContainer.clientWidth;
+    const containerHeight = custom.figureHeight || plotContainer.clientHeight;
     
     const maxGeneNameLength = Math.max(...validated.map(gene => gene.length));
     const maxTissueNameLength = Math.max(...tissues.map(tissue => tissue.length));
@@ -1329,7 +1708,8 @@ function renderExpressionHeatmap(expressionData, geneList = []) {
         .attr('dy', '.15em')
         .attr('transform', 'rotate(-45)')
         .style('font-size', xAxisFontSize + 'px')
-        .style('fill', '#333')
+        .style('font-family', custom.fontFamily)
+        .style('fill', custom.fontColor)
         .style('font-weight', '500')
         .text(d => d);
 
@@ -1341,7 +1721,8 @@ function renderExpressionHeatmap(expressionData, geneList = []) {
         .call(d3.axisLeft(yScale))
         .selectAll('text')
         .style('font-size', yAxisFontSize + 'px')
-        .style('fill', '#333')
+        .style('font-family', custom.fontFamily)
+        .style('fill', custom.fontColor)
         .each(function(d) {
             const maxChars = Math.max(6, Math.floor(margin.left / 8));
             const text = d3.select(this);
@@ -1408,7 +1789,6 @@ function renderExpressionHeatmap(expressionData, geneList = []) {
         });
 
     // Add title
-    const custom = getPlotCustomization();
     const title = custom.title || 'Gene Expression Heatmap';
     const titleFontSize = Math.max(12, Math.min(18, containerWidth / 40));
     
@@ -1417,8 +1797,9 @@ function renderExpressionHeatmap(expressionData, geneList = []) {
         .attr('y', -margin.top / 2)
         .attr('text-anchor', 'middle')
         .style('font-size', titleFontSize + 'px')
-        .style('font-family', custom.fontFamily || 'Arial, sans-serif')
+        .style('font-family', custom.fontFamily)
         .style('font-weight', 'bold')
+        .style('fill', custom.fontColor)
         .text(title);
 
     // Add legend
@@ -1545,6 +1926,10 @@ async function generateAnalysisPlots() {
 
         case 'screen_analysis':
             renderGeneScreenAnalysis(foundGenes, plotContainer, custom);
+            break;
+            
+        case 'screen_bar_chart':
+            renderScreenBarChart(foundGenes, plotContainer, custom);
             break;
 
         case 'enrichment_bubble':
