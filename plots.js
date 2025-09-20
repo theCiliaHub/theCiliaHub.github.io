@@ -9,61 +9,108 @@ function displayCiliaPlotPage() {
     contentArea.innerHTML = `
     <style>
         /* General Page Styles */
-        .ciliaplot-page-container { font-family: Arial, sans-serif; color: #333; background-color: #f9f9f9; padding: 20px; }
+        .ciliaplot-page-container { 
+            font-family: Arial, sans-serif; 
+            color: #333; 
+            background-color: #f9f9f9; 
+            padding: 20px; 
+        }
         h2, h3 { color: #1a237e; }
-
-        .explanation-section { background-color: #e8eaf6; border-left: 5px solid #3f51b5; padding: 15px 20px; margin-bottom: 25px; border-radius: 5px; }
-        .explanation-section h2 { margin-top: 0; font-size: 1.5em; }
-        .explanation-section a { color: #303f9f; font-weight: bold; text-decoration: none; }
-        .explanation-section a:hover { text-decoration: underline; }
 
         .ciliaplot-main-layout {
             display: grid;
-            grid-template-columns: 240px 300px 3fr;
-            gap: 12px;
+            grid-template-columns: 260px 3fr; /* left narrow column for input, right wide for plots */
+            gap: 16px;
             align-items: start;
         }
 
-        .control-card { background: #fff; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.05); padding: 20px; margin-bottom: 15px; }
-        .control-card h3 { margin-top: 0; border-bottom: 2px solid #eee; padding-bottom: 10px; font-size: 1.2em; }
-
-        .plot-types-panel .plot-type-list { list-style: none; padding: 0; margin: 0; }
-        .plot-types-panel .plot-type-list li { margin-bottom: 10px; }
-        .plot-types-panel .plot-type-list label { display: block; padding: 10px 12px; font-size: 0.9em; border-radius: 5px; cursor: pointer; transition: background-color 0.3s; border: 1px solid #ddd; }
-        .plot-types-panel .plot-type-list input[type="radio"] { display: none; }
-        .plot-types-panel .plot-type-list input[type="radio"]:checked + label { background-color: #3f51b5; color: white; font-weight: bold; border-color: #3f51b5; }
-
-        /* Plot explanation styles */
-        .plot-explanation {
-            background-color: #f0f7ff;
-            border: 1px solid #c8d9ed;
-            border-radius: 5px;
-            padding: 10px;
-            margin-top: 10px;
-            font-size: 0.85em;
-            color: #333;
-            line-height: 1.4;
+        .control-card { 
+            background: #fff; 
+            border-radius: 8px; 
+            box-shadow: 0 4px 8px rgba(0,0,0,0.05); 
+            padding: 20px; 
+            margin-bottom: 15px; 
+        }
+        .control-card h3 { 
+            margin-top: 0; 
+            border-bottom: 2px solid #eee; 
+            padding-bottom: 10px; 
+            font-size: 1.2em; 
         }
 
-        #ciliaplot-genes-input { width: 100%; min-height: 120px; padding: 10px; border-radius: 5px; border: 1px solid #ccc; font-family: 'Courier New', monospace; resize: vertical; margin-bottom: 15px; }
-        #generate-ciliaplot-btn { width: 100%; padding: 12px; font-size: 1.1em; font-weight: bold; background-color: #4CAF50; color: white; border: none; border-radius: 5px; cursor: pointer; }
-        #customization-container { margin-top: 15px; }
-        .customization-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; align-items: end; }
-        .customization-grid label { font-weight: bold; margin-bottom: 5px; display: block; font-size: 0.9em; }
-        .customization-grid input, .customization-grid select { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
-        .customization-grid .form-group { margin-bottom: 10px; }
-        .customization-grid .full-width { grid-column: 1 / -1; }
+        /* Plot types panel moved to top */
+        .plot-types-panel {
+            margin-bottom: 20px;
+        }
+        .plot-types-panel .plot-type-list { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+        .plot-types-panel .plot-type-list li { margin: 0; }
+        .plot-types-panel .plot-type-list label { 
+            display: inline-block; 
+            padding: 8px 12px; 
+            font-size: 0.9em; 
+            border-radius: 5px; 
+            cursor: pointer; 
+            transition: background-color 0.3s; 
+            border: 1px solid #ddd; 
+            background: #fafafa;
+        }
+        .plot-types-panel .plot-type-list input[type="radio"] { display: none; }
+        .plot-types-panel .plot-type-list input[type="radio"]:checked + label { 
+            background-color: #3f51b5; 
+            color: white; 
+            font-weight: bold; 
+            border-color: #3f51b5; 
+        }
 
-        .visualization-panel { position: sticky; top: 20px; }
+        #ciliaplot-genes-input { 
+            width: 100%; 
+            min-height: 140px; 
+            padding: 10px; 
+            border-radius: 5px; 
+            border: 1px solid #ccc; 
+            font-family: 'Courier New', monospace; 
+            resize: vertical; 
+            margin-bottom: 15px; 
+        }
+        #generate-ciliaplot-btn { 
+            width: 100%; 
+            padding: 12px; 
+            font-size: 1.1em; 
+            font-weight: bold; 
+            background-color: #4CAF50; 
+            color: white; 
+            border: none; 
+            border-radius: 5px; 
+            cursor: pointer; 
+        }
+
+        #customization-container { margin-top: 15px; }
+        .customization-grid { 
+            display: grid; 
+            grid-template-columns: 1fr 1fr; 
+            gap: 15px; 
+            align-items: end; 
+        }
+
+        .visualization-panel { 
+            position: relative; 
+        }
         .plot-header { display: flex; justify-content: space-between; align-items: center; }
         .download-controls { display: flex; gap: 10px; align-items: center; }
         #download-format { padding: 8px; }
-        #download-plot-btn { background-color: #3f51b5; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; }
+        #download-plot-btn { 
+            background-color: #3f51b5; 
+            color: white; 
+            border: none; 
+            padding: 8px 12px; 
+            border-radius: 4px; 
+            cursor: pointer; 
+        }
 
         #plot-display-area {
             position: relative;
             width: 100%;
-            height: 60vh;
+            height: 65vh;
             border: 2px dashed #ccc;
             border-radius: 8px;
             display: flex;
@@ -96,42 +143,28 @@ function displayCiliaPlotPage() {
             line-height: 1.5;
             color: #495057;
         }
-
-        .visualization-footer a {
-            color: #303f9f;
-            font-weight: bold;
-            text-decoration: none;
-        }
-
-        .visualization-footer a:hover {
-            text-decoration: underline;
-        }
     </style>
 
     <section class="ciliaplot-page-container">
-        <div class="explanation-section">
-            <h2>CiliaPlot: Visualize Your Ciliary Gene Sets</h2>
-            <p>The CiliaHub database contains an updated list of over <strong>2200 Gold Standard Genes with Ciliary Functions</strong>. With CiliaPlot, users can perform powerful analyses on their own gene lists, such as those from CRISPR/Cas9 screenings. You can visualize the subcellular localization of ciliary genes, identify enriched or depleted protein domains, and perform detailed functional analysis.</p>
+        <!-- ✅ Plot Types moved to top -->
+        <div class="plot-types-panel control-card">
+            <h3>CiliaPlotTypes: Visualize Ciliary Gene Sets</h3>
+            <ul class="plot-type-list" id="ciliaplot-type-selector"></ul>
+            <div id="plot-explanation"></div>
         </div>
 
         <div class="ciliaplot-main-layout">
-            <aside class="plot-types-panel">
-                <div class="control-card">
-                    <h3>Plot Types</h3>
-                    <ul class="plot-type-list" id="ciliaplot-type-selector"></ul>
-                    <div id="plot-explanation"></div>
-                </div>
-            </aside>
-
-            <main class="input-panel">
+            <!-- ✅ Gene input moved to far left -->
+            <aside class="input-panel">
                 <div class="control-card">
                     <h3>Gene Input</h3>
-                    <textarea id="ciliaplot-genes-input" rows="8" placeholder="Enter gene symbols (e.g., BBS1, AHI1, CEP290)..."></textarea>
+                    <textarea id="ciliaplot-genes-input" placeholder="Enter gene symbols (e.g., BBS1, AHI1, CEP290)..."></textarea>
                     <button id="generate-ciliaplot-btn">Generate Plot</button>
                     <div id="customization-container"></div>
                 </div>
-            </main>
+            </aside>
 
+            <!-- Visualization & summary occupy rest of space -->
             <aside class="visualization-panel">
                 <div class="control-card">
                     <div class="plot-header">
@@ -153,14 +186,7 @@ function displayCiliaPlotPage() {
                     </table>
                 </div>
                 <div class="visualization-footer">
-                    <p>The CiliaHub database contains an updated list of over <strong>2200 Gold Standard Genes with Ciliary Functions</strong>. With CiliaPlot, users can perform powerful analyses on their own gene lists, such as those from CRISPR/Cas9 screenings. You can visualize the subcellular localization of ciliary genes, identify enriched or depleted protein domains, and perform detailed functional analysis.</p>
-                    <p>Additionally, we have integrated four seminal genome-wide screens for cilia and Hedgehog pathway functions:</p>
-                    <ul>
-                        <li><a href="https://www.sciencedirect.com/science/article/pii/S016748891630074X" target="_blank">Kim et al. 2016</a></li>
-                        <li><a href="https://elifesciences.org/articles/06602#content" target="_blank">Roosing et al. 2015</a></li>
-                        <li><a href="https://www.nature.com/articles/s41588-018-0054-7#Abs1" target="_blank">Breslow et al. 2018</a></li>
-                        <li><a href="https://www.nature.com/articles/ncb3201#Abs1" target="_blank">Wheway et al. 2015</a></li>
-                    </ul>
+                    <p>The CiliaHub database contains an updated list of over <strong>2200 Gold Standard Genes with Ciliary Functions</strong>. You can visualize subcellular localization, protein domain enrichment, and more using the plots above.</p>
                 </div>
             </aside>
         </div>
@@ -169,6 +195,7 @@ function displayCiliaPlotPage() {
 
     initializeCiliaPlotPage();
 }
+
 
 // =============================================================================
 // INITIALIZATION
