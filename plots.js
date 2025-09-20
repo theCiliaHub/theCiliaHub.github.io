@@ -76,7 +76,7 @@ function displayCiliaPlotPage() {
 
         #plot-display-area > div,
         #plot-display-area > svg,
-        #plot-display-area > canvas {
+        #plot-display-area > canvas, {
             width: 100% !important;
             height: 100% !important;
         }
@@ -674,10 +674,7 @@ function renderBalloonPlot(genes, custom) {
     };
     
     Plotly.newPlot('plot-display-area', data, layout, { responsive: true });
-}'localization').forEach(loc => {
-            localizationCounts.set(loc, (localizationCounts.get(loc) || 0) + 1);
-        });
-        
+    
         getCleanArray(gene, 'functional_category').forEach(func => {
             functionalCounts.set(func, (functionalCounts.get(func) || 0) + 1);
         });
