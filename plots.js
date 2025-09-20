@@ -63,7 +63,7 @@ function displayCiliaPlotPage() {
         #plot-display-area {
             position: relative;
             width: 100%;
-            height: 60vh;
+            height: 70vh; /* Increased height to accommodate X-axis labels */
             border: 2px dashed #ccc;
             border-radius: 8px;
             display: flex;
@@ -365,7 +365,8 @@ const organelleMarkerProfiles = {
     "Golgi": [0.1, 0.2, 0.5, 0.2, 0.2, 0.2, 0.8, 0.9],
     "Autophagosomes": [0.1, 0.1, 0.4, 0.7, 0.8, 0.6, 0.3, 0.2],
     "Ciliary associated gene": [0.1, 0.1, 0.2, 0.8, 0.9, 0.6, 0.2, 0.1],
-    "Peroxisome": [0.3, 0.4, 0.6, 0.5, 0.4, 0.3, 0.7, 0.8]
+    "Peroxisome": [0.3, 0.4, 0.6, 0.5, 0.4, 0.3, 0.7, 0.8],
+    "Cilia": [0.05, 0.1, 0.15, 0.9, 0.95, 0.8, 0.3, 0.1]
 };
 
 const precomputedUMAP = {
@@ -379,7 +380,8 @@ const precomputedUMAP = {
     "Golgi": Array.from({length: 35}, (_, i) => ({gene: `GOLGI${i}`, x: 4 + Math.random()*2, y: 8 + Math.random()*2})),
     "Autophagosomes": Array.from({length: 30}, (_, i) => ({gene: `AUTO${i}`, x: 2 + Math.random()*2, y: 6 + Math.random()*2})),
     "Ciliary associated gene": Array.from({length: 50}, (_, i) => ({gene: `CIL${i}`, x: 8 + Math.random()*2, y: 8 + Math.random()*2})),
-    "Peroxisome": Array.from({length: 25}, (_, i) => ({gene: `PEROX${i}`, x: 6 + Math.random()*2, y: 3 + Math.random()*2}))
+    "Peroxisome": Array.from({length: 25}, (_, i) => ({gene: `PEROX${i}`, x: 6 + Math.random()*2, y: 3 + Math.random()*2})),
+    "Cilia": Array.from({length: 45}, (_, i) => ({gene: `CILIA${i}`, x: 8.5 + Math.random()*1.5, y: 8.5 + Math.random()*1.5}))
 };
 
 // =============================================================================
@@ -410,7 +412,8 @@ function renderBubblePlot(genes, custom) {
     const layout = {
         title: { 
             text: custom.title || 'Gene Subcellular Localizations', 
-            font: { size: custom.titleFontSize, family: custom.fontFamily } 
+            font: { size: custom.titleFontSize, family: custom.fontFamily },
+            y: 0.95
         },
         xaxis: { 
             title: { text: 'Localization', font: custom.axisTitleFont }, 
@@ -419,7 +422,9 @@ function renderBubblePlot(genes, custom) {
             linewidth: 2, 
             mirror: true,
             showgrid: false,
-            zeroline: false
+            zeroline: false,
+            tickangle: -45,
+            automargin: true
         },
         yaxis: { 
             title: { text: 'Gene', font: custom.axisTitleFont }, 
@@ -428,11 +433,12 @@ function renderBubblePlot(genes, custom) {
             linewidth: 2, 
             mirror: true,
             showgrid: false,
-            zeroline: false
+            zeroline: false,
+            automargin: true
         },
         showlegend: false, 
-        height: 600, 
-        margin: { l: 120, r: 20, b: 100, t: 80 },
+        height: 650, 
+        margin: { l: 120, r: 20, b: 120, t: 80 },
         plot_bgcolor: 'white', 
         paper_bgcolor: 'white'
     };
@@ -461,7 +467,8 @@ function renderBarPlot(genes, custom) {
     const layout = {
         title: { 
             text: custom.title || 'Functional Category Counts', 
-            font: { size: custom.titleFontSize, family: custom.fontFamily } 
+            font: { size: custom.titleFontSize, family: custom.fontFamily },
+            y: 0.95
         },
         xaxis: { 
             title: { text: 'Number of Genes', font: custom.axisTitleFont }, 
@@ -470,7 +477,8 @@ function renderBarPlot(genes, custom) {
             linewidth: 2, 
             mirror: true,
             showgrid: false,
-            zeroline: false
+            zeroline: false,
+            automargin: true
         },
         yaxis: { 
             title: { text: 'Category', font: custom.axisTitleFont }, 
@@ -482,8 +490,8 @@ function renderBarPlot(genes, custom) {
             showgrid: false,
             zeroline: false
         },
-        height: 600, 
-        margin: { l: 250, r: 20, b: 50, t: 80 },
+        height: 650, 
+        margin: { l: 300, r: 20, b: 80, t: 80 },
         plot_bgcolor: 'white', 
         paper_bgcolor: 'white'
     };
@@ -543,7 +551,8 @@ function renderEnrichmentBubblePlot(genes, custom) {
     const layout = {
         title: { 
             text: custom.title || 'Functional Category Enrichment', 
-            font: { size: custom.titleFontSize, family: custom.fontFamily } 
+            font: { size: custom.titleFontSize, family: custom.fontFamily },
+            y: 0.95
         },
         xaxis: { 
             title: { text: 'Functional Category', font: custom.axisTitleFont }, 
@@ -553,7 +562,8 @@ function renderEnrichmentBubblePlot(genes, custom) {
             linewidth: 2, 
             mirror: true,
             showgrid: false,
-            zeroline: false
+            zeroline: false,
+            automargin: true
         },
         yaxis: { 
             title: { text: 'Enrichment Score', font: custom.axisTitleFont }, 
@@ -562,12 +572,13 @@ function renderEnrichmentBubblePlot(genes, custom) {
             linewidth: 2, 
             mirror: true,
             showgrid: false,
-            zeroline: false
+            zeroline: false,
+            automargin: true
         },
         hovermode: 'closest',
         showlegend: false,
-        height: 600,
-        margin: { l: 120, r: 50, b: 150, t: 80 },
+        height: 650,
+        margin: { l: 120, r: 80, b: 160, t: 80 },
         plot_bgcolor: 'white', 
         paper_bgcolor: 'white'
     };
@@ -584,6 +595,86 @@ function renderBalloonPlot(genes, custom) {
     
     genes.forEach(gene => {
         getCleanArray(gene, 'localization').forEach(loc => {
+            localizationCounts.set(loc, (localizationCounts.get(loc) || 0) + 1);
+        });
+        
+        getCleanArray(gene, 'functional_category').forEach(func => {
+            functionalCounts.set(func, (functionalCounts.get(func) || 0) + 1);
+        });
+    });
+    
+    const localizations = [...localizationCounts.keys()];
+    const functions = [...functionalCounts.keys()];
+    
+    const zData = [];
+    const textData = [];
+    
+    functions.forEach(func => {
+        const row = [];
+        const textRow = [];
+        
+        localizations.forEach(loc => {
+            let count = 0;
+            genes.forEach(gene => {
+                const geneLocs = getCleanArray(gene, 'localization');
+                const geneFuncs = getCleanArray(gene, 'functional_category');
+                if (geneLocs.includes(loc) && geneFuncs.includes(func)) {
+                    count++;
+                }
+            });
+            
+            row.push(count);
+            textRow.push(`Function: ${func}<br>Localization: ${loc}<br>Count: ${count}`);
+        });
+        
+        zData.push(row);
+        textData.push(textRow);
+    });
+    
+    const data = [{
+        type: 'heatmap',
+        x: localizations,
+        y: functions,
+        z: zData,
+        text: textData,
+        hoverinfo: 'text',
+        colorscale: 'Blues',
+        showscale: true
+    }];
+    
+    const layout = {
+        title: { 
+            text: custom.title || 'Function vs Localization', 
+            font: { size: custom.titleFontSize, family: custom.fontFamily },
+            y: 0.95
+        },
+        xaxis: { 
+            title: { text: 'Localization', font: custom.axisTitleFont }, 
+            visible: custom.showX,
+            tickangle: -45,
+            linecolor: '#000', 
+            linewidth: 2, 
+            mirror: true,
+            showgrid: false,
+            automargin: true
+        },
+        yaxis: { 
+            title: { text: 'Functional Category', font: custom.axisTitleFont }, 
+            visible: custom.showY,
+            linecolor: '#000', 
+            linewidth: 2, 
+            mirror: true,
+            showgrid: false,
+            automargin: true
+        },
+        height: 650,
+        margin: { l: 180, r: 50, b: 160, t: 80 },
+        plot_bgcolor: 'white', 
+        paper_bgcolor: 'white'
+    };
+    
+    Plotly.newPlot('plot-display-area', data, layout, { responsive: true });
+}'localization').forEach(loc => {
             localizationCounts.set(loc, (localizationCounts.get(loc) || 0) + 1);
         });
         
@@ -679,29 +770,29 @@ function renderVennDiagram(genes, custom) {
     
     plotContainer.innerHTML = `
         <div style="text-align: center; padding: 20px; height: 100%; display: flex; flex-direction: column; justify-content: center;">
-            <h3 style="margin-bottom: 30px;">${custom.title || 'Gene Set Comparison (Exact Matches Only)'}</h3>
+            <h3 style="margin-bottom: 10px;">${custom.title || 'Gene Set Comparison'}</h3>
+            <div style="display: flex; justify-content: center; gap: 20px; margin-bottom: 20px; font-size: 18px; font-weight: bold;">
+                <span>Your Genes: ${userGenes.size}</span>
+                <span>Overlap: ${commonGenes.size}</span>
+                <span>Ciliary Reference: ${referenceCiliaryGenes.size}</span>
+            </div>
             <div style="position: relative; width: 400px; height: 300px; margin: 0 auto;">
                 <div style="position: absolute; left: 50px; top: 50px; width: 200px; height: 200px; border: 3px solid #3f51b5; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: rgba(63, 81, 181, 0.1);">
-                    <div style="text-align: center;">
-                        <strong>Your Genes</strong><br>
-                        ${userGenes.size} total<br>
-                        <small>${uniqueToUser.size} unique</small>
+                    <div style="text-align: center; font-size: 24px; font-weight: bold;">
+                        ${uniqueToUser.size}
                     </div>
                 </div>
                 <div style="position: absolute; right: 50px; top: 50px; width: 200px; height: 200px; border: 3px solid #4CAF50; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: rgba(76, 175, 80, 0.1);">
-                    <div style="text-align: center;">
-                        <strong>Ciliary Reference</strong><br>
-                        ${referenceCiliaryGenes.size} total<br>
-                        <small>${uniqueToReference.size} unique</small>
+                    <div style="text-align: center; font-size: 24px; font-weight: bold;">
+                        ${uniqueToReference.size}
                     </div>
                 </div>
-                <div style="position: absolute; left: 150px; top: 120px; width: 100px; height: 60px; display: flex; align-items: center; justify-content: center; font-weight: bold; color: #333; background: rgba(255, 255, 255, 0.9); border-radius: 10px; border: 2px solid #333;">
-                    ${commonGenes.size} overlap
+                <div style="position: absolute; left: 150px; top: 120px; width: 100px; height: 60px; display: flex; align-items: center; justify-content: center; font-weight: bold; color: #333; background: rgba(255, 255, 255, 0.9); border-radius: 10px; border: 2px solid #333; font-size: 24px;">
+                    ${commonGenes.size}
                 </div>
             </div>
-            <div style="margin-top: 30px; font-size: 0.9em; color: #666;">
-                <p><strong>Note:</strong> Comparison based on exact gene symbol matches only.</p>
-                <p>Common genes: ${Array.from(commonGenes).join(', ') || 'None'}</p>
+            <div style="margin-top: 20px; font-size: 0.85em; color: #666;">
+                <p>Exact gene symbol matches only</p>
             </div>
         </div>
     `;
@@ -860,10 +951,23 @@ function renderOrganelleRadarPlot(genes, container, custom) {
         const localizations = getCleanArray(gene, 'localization');
         let geneAdded = false;
         localizations.forEach(loc => {
-            const matchedProfile = Object.keys(organelleMarkerProfiles).find(key => 
+            // Enhanced matching for cilia-related terms
+            let matchedProfile = null;
+            
+            // Direct organelle matching
+            matchedProfile = Object.keys(organelleMarkerProfiles).find(key => 
                 loc.toLowerCase().includes(key.toLowerCase()) || 
                 key.toLowerCase().includes(loc.toLowerCase())
             );
+            
+            // Special matching for cilia-related terms
+            if (!matchedProfile) {
+                const ciliaTerms = ['basal body', 'transition zone', 'cilia', 'cilium', 'ciliary'];
+                if (ciliaTerms.some(term => loc.toLowerCase().includes(term))) {
+                    matchedProfile = 'Cilia';
+                }
+            }
+            
             if (matchedProfile) {
                 organelleMarkerProfiles[matchedProfile].forEach((val, i) => userProfile[i] += val);
                 geneAdded = true;
@@ -885,7 +989,7 @@ function renderOrganelleRadarPlot(genes, container, custom) {
         borderColor: d3.schemeTableau10[i % 10],
         backgroundColor: d3.schemeTableau10[i % 10] + '20',
         borderWidth: 2,
-        hidden: true,
+        hidden: true, // All organelles hidden by default
         pointRadius: 3
     }));
     
@@ -896,7 +1000,7 @@ function renderOrganelleRadarPlot(genes, container, custom) {
         backgroundColor: '#e74c3c20',
         borderWidth: 3,
         pointRadius: 4,
-        hidden: false
+        hidden: false // Only user gene set visible by default
     });
     
     currentPlotInstance = new Chart(ctx, {
@@ -947,10 +1051,27 @@ function renderOrganelleUMAP(genes, container, custom) {
     genes.forEach((gene, i) => {
         const localizations = getCleanArray(gene, 'localization');
         for (const organelle in precomputedUMAP) {
+            let isMatch = false;
+            
+            // Standard organelle matching
             if (localizations.some(loc => 
                 organelle.toLowerCase().includes(loc.toLowerCase()) || 
                 loc.toLowerCase().includes(organelle.toLowerCase())
             )) {
+                isMatch = true;
+            }
+            
+            // Special matching for Cilia organelle
+            if (organelle === 'Cilia') {
+                const ciliaTerms = ['basal body', 'transition zone', 'cilia', 'cilium', 'ciliary'];
+                if (localizations.some(loc => 
+                    ciliaTerms.some(term => loc.toLowerCase().includes(term))
+                )) {
+                    isMatch = true;
+                }
+            }
+            
+            if (isMatch) {
                 const basePoint = precomputedUMAP[organelle][i % precomputedUMAP[organelle].length];
                 userGeneData.push({
                     ...basePoint,
@@ -1121,7 +1242,9 @@ function renderGeneScreenAnalysis(genes, container, custom) {
                     max: geneLabels.length - 0.5,
                     ticks: {
                         stepSize: 1,
-                        callback: function(value) {
+                        maxRotation: 45,
+                        minRotation: 45,
+                        callback: function(value, index) {
                             return geneLabels[value] || '';
                         }
                     },
@@ -1626,32 +1749,3 @@ async function downloadPlot() {
     }
 }
 
-// =============================================================================
-// EVENT LISTENERS FOR DYNAMIC UPDATES
-// =============================================================================
-
-// Add event listeners for plot type changes to update explanations
-document.addEventListener('DOMContentLoaded', function() {
-    const plotTypeSelector = document.getElementById('ciliaplot-type-selector');
-    if (plotTypeSelector) {
-        plotTypeSelector.addEventListener('change', function(e) {
-            if (e.target.name === 'ciliaplot_type') {
-                updateCustomizationPanel();
-                updatePlotExplanation();
-            }
-        });
-    }
-});
-
-// Utility function to wait for conditions
-function waitFor(conditionFn, timeout = 5000, interval = 50) {
-    return new Promise((resolve, reject) => {
-        const start = Date.now();
-        const check = () => {
-            if (conditionFn()) return resolve(true);
-            if (Date.now() - start > timeout) return reject(new Error('Timeout waiting for condition'));
-            setTimeout(check, interval);
-        };
-        check();
-    });
-}
