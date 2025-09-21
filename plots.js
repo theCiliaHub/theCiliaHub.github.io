@@ -300,68 +300,67 @@ function updateGeneSummaryTable(originalQueries, foundGenes) {
 
 function getPlotCustomization() {
     const custom = {
+        // Generic properties (preserved)
         title: document.getElementById('custom-title')?.value,
-        
-        // Bubble plots
-        bubble: {
-            size: parseInt(document.getElementById('bubble-size')?.value, 10) || 15,
-            color: document.getElementById('bubble-color')?.value || '#c8d9ed',
+        titleFontSize: parseInt(document.getElementById('custom-title-fontsize')?.value, 10) || 24,
+        fontFamily: document.getElementById('custom-font-family')?.value || 'Arial',
+        showX: document.getElementById('custom-show-x')?.value === 'true',
+        showY: document.getElementById('custom-show-y')?.value === 'true',
+        axisTitleFont: { 
+            size: parseInt(document.getElementById('custom-axis-fontsize')?.value, 10) || 16, 
+            family: document.getElementById('custom-font-family')?.value || 'Arial', 
+            color: document.getElementById('custom-axis-color')?.value || '#000', 
+            weight: 'bold' 
         },
-        
-        // Bar plot
-        bar: {
-            width: parseFloat(document.getElementById('bar-width')?.value) || 0.8,
-            color: document.getElementById('bar-color')?.value || '#4CAF50',
-        },
+        fontColor: document.getElementById('custom-font-color')?.value || '#000',
+        figureWidth: parseInt(document.getElementById('custom-figure-width')?.value, 10) || 800,
+        figureHeight: parseInt(document.getElementById('custom-figure-height')?.value, 10) || 600,
+        displayNames: document.getElementById('custom-display-names')?.value || 'both',
+        border: document.getElementById('custom-border')?.checked || false,
+        borderColor: document.getElementById('custom-border-color')?.value || '#ccc',
 
-        // Balloon plot
-        balloon: {
-            colorscale: document.getElementById('balloon-colorscale')?.value || 'Blues',
-        },
-
-        // Venn diagram
+        // Other plot-specific properties (preserved)
+        bubbleSize: parseInt(document.getElementById('custom-bubble-size')?.value, 10) || 15,
+        barWidth: parseFloat(document.getElementById('custom-bar-width')?.value) || 0.8,
+        
+        // === START: Updated Venn Diagram Property ===
+        // The old `vennColors` array is replaced by this structured object.
         venn: {
-            label1: { text: document.getElementById('venn-label-1')?.value || 'Gene Input', color: document.getElementById('venn-label-color-1')?.value || '#000000' },
-            circle1: { color: document.getElementById('venn-circle-color-1')?.value || '#3f51b5' },
-            label2: { text: document.getElementById('venn-label-2')?.value || 'Gold Standard Ciliary Genes', color: document.getElementById('venn-label-color-2')?.value || '#000000' },
-            circle2: { color: document.getElementById('venn-circle-color-2')?.value || '#4CAF50' },
+            label1: {
+                text: document.getElementById('venn-label-1')?.value || 'Gene Input',
+                color: document.getElementById('venn-label-color-1')?.value || '#000000',
+            },
+            circle1: {
+                color: document.getElementById('venn-circle-color-1')?.value || '#3f51b5',
+            },
+            label2: {
+                text: document.getElementById('venn-label-2')?.value || 'Gold Standard Ciliary Genes',
+                color: document.getElementById('venn-label-color-2')?.value || '#000000',
+            },
+            circle2: {
+                color: document.getElementById('venn-circle-color-2')?.value || '#4CAF50',
+            },
             numberColor: document.getElementById('venn-number-color')?.value || '#333333',
         },
+        // === END: Updated Venn Diagram Property ===
 
-        // Network plot
-        network: {
-            nodeColor: document.getElementById('network-node-color')?.value || '#3498db',
-            linkColor: document.getElementById('network-link-color')?.value || '#999999',
-        },
-
-        // Organelle Radar plot
-        radar: {
-            userSetColor: document.getElementById('radar-user-set-color')?.value || '#e74c3c',
-        },
-
-        // Organelle UMAP plot
-        umap: {
-            userSetColor: document.getElementById('umap-user-set-color')?.value || '#e74c3c',
-            userSetSize: parseInt(document.getElementById('umap-user-set-size')?.value, 10) || 8,
-        },
-
-        // Screen analysis plots
-        screen: {
-            negRegColor: document.getElementById('screen-neg-reg-color')?.value || '#E74C3C',
-            posRegColor: document.getElementById('screen-pos-reg-color')?.value || '#27AE60',
-            noEffectColor: document.getElementById('screen-no-effect-color')?.value || '#3498DB',
-            unclassifiedColor: document.getElementById('screen-unclassified-color')?.value || '#95A5A6',
-        },
-
-        // Expression Heatmap
-        heatmap: {
-            colorscale: document.getElementById('heatmap-colorscale')?.value || 'interpolateGreens',
-        }
+        // Network plot properties (preserved)
+        ribbonColors: [
+            document.getElementById('ribbon-color-1')?.value || '#1f77b4',
+            document.getElementById('ribbon-color-2')?.value || '#ff7f0e',
+            document.getElementById('ribbon-color-3')?.value || '#2ca02c',
+            document.getElementById('ribbon-color-4')?.value || '#d62728',
+            document.getElementById('ribbon-color-5')?.value || '#9467bd',
+            document.getElementById('ribbon-color-6')?.value || '#8c564b',
+            document.getElementById('ribbon-color-7')?.value || '#e377c2',
+            document.getElementById('ribbon-color-8')?.value || '#7f7f7f',
+            document.getElementById('ribbon-color-9')?.value || '#bcbd22',
+            document.getElementById('ribbon-color-10')?.value || '#17becf'
+        ]
     };
+    
     return custom;
 }
-
-
 // =============================================================================
 // PLOT CONFIGURATION AND EXPLANATIONS
 // =============================================================================
@@ -440,76 +439,94 @@ function updateCustomizationPanel() {
     const selectedPlot = document.querySelector('input[name="ciliaplot_type"]:checked')?.value;
     const container = document.getElementById('customization-container');
     
-    // Start with a generic title input, as most plots have a title.
-    let html = `<h3>Plot Customization</h3><div class="customization-grid">
-        <div class="full-width form-group">
-            <label for="custom-title">Plot Title</label>
-            <input type="text" id="custom-title" placeholder="Default Title">
-        </div>`;
-
+    let html = `<h3>Plot Customization</h3><div class="customization-grid">`;
+    
+    // Basic customization options (preserved)
+    html += `<div class="full-width form-group"><label for="custom-title">Plot Title</label><input type="text" id="custom-title" placeholder="Default Title"></div>`;
+    html += `<div class="form-group"><label for="custom-title-fontsize">Title Font Size</label><input type="number" id="custom-title-fontsize" value="24" min="10" max="36"></div>`;
+    html += `<div class="form-group"><label for="custom-font-family">Font Family</label><select id="custom-font-family"><option>Arial</option><option>Times New Roman</option><option>Helvetica</option><option>Verdana</option></select></div>`;
+    html += `<div class="form-group"><label for="custom-font-color">Font Color</label><input type="color" id="custom-font-color" value="#000000"></div>`;
+    html += `<div class="form-group"><label for="custom-show-x">Show X-Axis</label><select id="custom-show-x"><option value="true">Show</option><option value="false">Hide</option></select></div>`;
+    html += `<div class="form-group"><label for="custom-show-y">Show Y-Axis</label><select id="custom-show-y"><option value="true">Show</option><option value="false">Hide</option></select></div>`;
+    html += `<div class="form-group"><label for="custom-axis-fontsize">Axis Font Size</label><input type="number" id="custom-axis-fontsize" value="16" min="8" max="24"></div>`;
+    html += `<div class="form-group"><label for="custom-axis-color">Axis Color</label><input type="color" id="custom-axis-color" value="#000000"></div>`;
+    html += `<div class="form-group"><label for="custom-figure-width">Figure Width</label><input type="number" id="custom-figure-width" value="800" min="400" max="2000"></div>`;
+    html += `<div class="form-group"><label for="custom-figure-height">Figure Height</label><input type="number" id="custom-figure-height" value="600" min="300" max="2000"></div>`;
+    html += `<div class="form-group"><label for="custom-display-names">Display Names</label><select id="custom-display-names"><option value="both">Both</option><option value="row">Row Only</option><option value="column">Column Only</option><option value="none">None</option></select></div>`;
+    html += `<div class="form-group"><label for="custom-border">Show Border</label><input type="checkbox" id="custom-border"></div>`;
+    html += `<div class="form-group"><label for="custom-border-color">Border Color</label><input type="color" id="custom-border-color" value="#cccccc"></div>`;
+    
     // Plot-specific customizations
     if (selectedPlot === 'localization_bubble' || selectedPlot === 'enrichment_bubble') {
-        html += `<div class="form-group"><label for="bubble-size">Bubble Size</label><input type="number" id="bubble-size" value="15" min="5" max="50"></div>`;
-        html += `<div class="form-group"><label for="bubble-color">Bubble Color</label><input type="color" id="bubble-color" value="#c8d9ed"></div>`;
+        html += `<div class="form-group"><label for="custom-bubble-size">Bubble Size</label><input type="number" id="custom-bubble-size" value="15" min="5" max="50"></div>`;
     }
     
     if (selectedPlot === 'functional_bar') {
-        html += `<div class="form-group"><label for="bar-width">Bar Width</label><input type="number" id="bar-width" value="0.8" min="0.1" max="1.0" step="0.1"></div>`;
-        html += `<div class="form-group"><label for="bar-color">Bar Color</label><input type="color" id="bar-color" value="#4CAF50"></div>`;
-    }
-
-    if (selectedPlot === 'balloon_plot') {
-        html += `<div class="form-group"><label for="balloon-colorscale">Color Scale</label><select id="balloon-colorscale">
-            <option value="Blues">Blues</option><option value="Greens">Greens</option><option value="Reds">Reds</option><option value="Viridis">Viridis</option><option value="Plasma">Plasma</option>
-        </select></div>`;
+        html += `<div class="form-group"><label for="custom-bar-width">Bar Width</label><input type="number" id="custom-bar-width" value="0.8" min="0.1" max="1.0" step="0.1"></div>`;
     }
     
+    // === START: Updated Venn Diagram Section ===
     if (selectedPlot === 'venn_diagram') {
         html += `<div class="full-width"><h4>Venn Diagram Customization</h4></div>
-            <div class="form-group"><label for="venn-label-1">Left Label Text</label><input type="text" id="venn-label-1" value="Gene Input"></div>
-            <div class="form-group"><label for="venn-label-color-1">Left Label Color</label><input type="color" id="venn-label-color-1" value="#000000"></div>
-            <div class="form-group"><label for="venn-circle-color-1">Left Circle Color</label><input type="color" id="venn-circle-color-1" value="#3f51b5"></div>
-            <div class="form-group"><label for="venn-label-2">Right Label Text</label><input type="text" id="venn-label-2" value="Gold Standard Ciliary Genes"></div>
-            <div class="form-group"><label for="venn-label-color-2">Right Label Color</label><input type="color" id="venn-label-color-2" value="#000000"></div>
-            <div class="form-group"><label for="venn-circle-color-2">Right Circle Color</label><input type="color" id="venn-circle-color-2" value="#4CAF50"></div>
-            <div class="form-group"><label for="venn-number-color">Number Color</label><input type="color" id="venn-number-color" value="#333333"></div>`;
+            <div class="form-group">
+                <label for="venn-label-1">Left Label Text</label>
+                <input type="text" id="venn-label-1" value="Gene Input">
+            </div>
+            <div class="form-group">
+                <label for="venn-label-color-1">Left Label Color</label>
+                <input type="color" id="venn-label-color-1" value="#000000">
+            </div>
+            <div class="form-group">
+                <label for="venn-circle-color-1">Left Circle Color</label>
+                <input type="color" id="venn-circle-color-1" value="#3f51b5">
+            </div>
+
+            <div class="form-group">
+                <label for="venn-label-2">Right Label Text</label>
+                <input type="text" id="venn-label-2" value="Gold Standard Ciliary Genes">
+            </div>
+            <div class="form-group">
+                <label for="venn-label-color-2">Right Label Color</label>
+                <input type="color" id="venn-label-color-2" value="#000000">
+            </div>
+            <div class="form-group">
+                <label for="venn-circle-color-2">Right Circle Color</label>
+                <input type="color" id="venn-circle-color-2" value="#4CAF50">
+            </div>
+
+            <div class="form-group">
+                <label for="venn-number-color">Number Color</label>
+                <input type="color" id="venn-number-color" value="#333333">
+            </div>`;
     }
+    // === END: Updated Venn Diagram Section ===
     
     if (selectedPlot === 'network') {
-        html += `<div class="full-width"><h4>Network Customization</h4></div>
-            <div class="form-group"><label for="network-node-color">Node Color</label><input type="color" id="network-node-color" value="#3498db"></div>
-            <div class="form-group"><label for="network-link-color">Link Color</label><input type="color" id="network-link-color" value="#999999"></div>`;
-    }
-
-    if (selectedPlot === 'organelle_radar') {
-         html += `<div class="form-group"><label for="radar-user-set-color">Your Gene Set Color</label><input type="color" id="radar-user-set-color" value="#e74c3c"></div>`;
-    }
-
-    if (selectedPlot === 'organelle_umap') {
-        html += `<div class="form-group"><label for="umap-user-set-color">Your Genes Color</label><input type="color" id="umap-user-set-color" value="#e74c3c"></div>`;
-        html += `<div class="form-group"><label for="umap-user-set-size">Your Genes Size</label><input type="number" id="umap-user-set-size" value="8" min="2" max="20"></div>`;
-    }
-
-    if (selectedPlot === 'screen_analysis' || selectedPlot === 'screen_bar_chart') {
-        html += `<div class="full-width"><h4>Screen Classification Colors</h4></div>
-            <div class="form-group"><label for="screen-neg-reg-color">Negative Regulator</label><input type="color" id="screen-neg-reg-color" value="#E74C3C"></div>
-            <div class="form-group"><label for="screen-pos-reg-color">Positive Regulator</label><input type="color" id="screen-pos-reg-color" value="#27AE60"></div>
-            <div class="form-group"><label for="screen-no-effect-color">No Effect</label><input type="color" id="screen-no-effect-color" value="#3498DB"></div>
-            <div class="form-group"><label for="screen-unclassified-color">Unclassified</label><input type="color" id="screen-unclassified-color" value="#95A5A6"></div>`;
-    }
-
-    if (selectedPlot === 'expression_heatmap') {
-        html += `<div class="form-group"><label for="heatmap-colorscale">Color Scale</label><select id="heatmap-colorscale">
-            <option value="interpolateGreens">Greens</option><option value="interpolateBlues">Blues</option><option value="interpolateReds">Reds</option><option value="interpolateViridis">Viridis</option><option value="interpolatePlasma">Plasma</option>
-        </select></div>`;
+        html += `<div class="full-width"><h4>Chord Plot Ribbon Colors</h4></div>`;
+        for (let i = 1; i <= 10; i++) {
+            html += `<div class="form-group color-picker">
+                <label for="ribbon-color-${i}">Ribbon ${i}</label>
+                <input type="color" id="ribbon-color-${i}" value="${['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f0f', '#bcbd22', '#17becf'][i-1]}">
+            </div>`;
+        }
     }
     
     html += `</div>`;
     container.innerHTML = html;
+    
+    // Add event listeners ONLY for plots that need them (like the network plot)
+    // The old Venn listeners are removed as they are no longer needed.
+    if (selectedPlot === 'network') {
+        for (let i = 1; i <= 10; i++) {
+            const colorPicker = document.getElementById(`ribbon-color-${i}`);
+            if (colorPicker) {
+                // Add listener logic here if needed, e.g., for live preview
+            }
+        }
+    }
+    
     updatePlotExplanation();
 }
-
-
 
 // =============================================================================
 // ENHANCED ORGANELLE PROFILES
@@ -565,10 +582,10 @@ function renderBubblePlot(genes, custom) {
                 type: 'scatter', 
                 name: gene.gene,
                 marker: { 
-                size: custom.bubble.size || 15, 
-                color: custom.bubble.color || '#c8d9ed',
-                line: { color: '#3f51b5', width: 1 }
-            },
+                    size: custom.bubbleSize || 15, 
+                    color: '#c8d9ed',
+                    line: { color: '#3f51b5', width: 1 }
+                }, 
                 hoverinfo: 'x+y'
             });
         }
@@ -624,8 +641,8 @@ function renderBarPlot(genes, custom) {
         y: sorted.map(e => e[0]), 
         type: 'bar', 
         orientation: 'h', 
-       marker: { color: custom.bar.color || '#4CAF50' },
-        width: custom.bar.width || 0.8
+        marker: { color: '#4CAF50' },
+        width: custom.barWidth || 0.8
     }];
     
     const layout = {
@@ -775,7 +792,7 @@ function renderBalloonPlot(genes, custom) {
         x: localizations, 
         y: functions, 
         z: zData, 
-        colorscale: custom.balloon.colorscale || 'Blues', 
+        colorscale: 'Blues', 
         showscale: true 
     }];
     
@@ -944,7 +961,7 @@ function renderComplexNetwork(genes, container, custom) {
         .data(links)
         .enter()
         .append("line")
-        .style("stroke", custom.network.linkColor || "#999")
+        .style("stroke", "#999")
         .style("stroke-opacity", 0.8)
         .style("stroke-width", 2);
     
@@ -969,11 +986,10 @@ function renderComplexNetwork(genes, container, custom) {
                 d.fy = null;
             }));
     
-       // Update node styling
     nodeGroup.append("circle")
         .attr("r", 12)
-        .style("fill", custom.network.nodeColor || "#3498db")
-        .style("stroke", d3.color(custom.network.nodeColor || "#3498db").darker(0.5))
+        .style("fill", "#3498db")
+        .style("stroke", "#2980b9")
         .style("stroke-width", 2);
     
     nodeGroup.append("text")
@@ -1055,12 +1071,11 @@ function renderOrganelleRadarPlot(genes, container, custom) {
 });
 
     
-    // Update the 'Your Gene Set' dataset:
     datasets.push({
         label: 'Your Gene Set',
         data: userProfile,
-        borderColor: custom.radar.userSetColor || '#e74c3c',
-        backgroundColor: (custom.radar.userSetColor || '#e74c3c') + '20',
+        borderColor: '#e74c3c',
+        backgroundColor: '#e74c3c20',
         borderWidth: 3,
         pointRadius: 4,
         hidden: false
@@ -1144,14 +1159,13 @@ function renderOrganelleUMAP(genes, container, custom) {
         return;
     }
     
-    // Update the userDataset object:
     const userDataset = {
         label: 'Your Genes',
         data: userGeneData,
-        backgroundColor: custom.umap.userSetColor || '#e74c3c',
-        borderColor: d3.color(custom.umap.userSetColor || '#e74c3c').darker(0.5),
-        pointRadius: custom.umap.userSetSize || 8,
-        pointHoverRadius: (custom.umap.userSetSize || 8) + 2,
+        backgroundColor: '#e74c3c',
+        borderColor: '#c0392b',
+        pointRadius: 8,
+        pointHoverRadius: 10,
         borderWidth: 2
     };
     
@@ -1260,10 +1274,10 @@ function renderGeneScreenAnalysis(genes, container, custom) {
     }
     
     const classificationColors = {
-        "Negative regulator": custom.screen.negRegColor || "#E74C3C",
-        "Positive regulator": custom.screen.posRegColor || "#27AE60",
-        "No significant effect": custom.screen.noEffectColor || "#3498DB",
-        "Unclassified": custom.screen.unclassifiedColor || "#95A5A6"
+        "Negative regulator": "#E74C3C",
+        "Positive regulator": "#27AE60",
+        "No significant effect": "#3498DB",
+        "Unclassified": "#95A5A6"
     };
     
     const groupedData = {};
@@ -1431,10 +1445,10 @@ function renderScreenBarChart(genes, container, custom) {
     const sortedData = Object.values(geneAverages).sort((a, b) => b.mean - a.mean);
     
     const classificationColors = {
-        "Negative regulator": custom.screen.negRegColor || "#E74C3C",
-        "Positive regulator": custom.screen.posRegColor || "#27AE60",
-        "No significant effect": custom.screen.noEffectColor || "#3498DB",
-        "Unclassified": custom.screen.unclassifiedColor || "#95A5A6"
+        "Negative regulator": "#E74C3C",
+        "Positive regulator": "#27AE60",
+        "No significant effect": "#3498DB",
+        "Unclassified": "#95A5A6"
     };
     
     const datasets = [{
@@ -1674,16 +1688,10 @@ function renderExpressionHeatmap(expressionData, geneList = []) {
     const maxNTPM = (heatmapData.length > 0 && tissues.length > 0)
         ? d3.max(heatmapData, d => d3.max(tissues, t => d[t]))
         : 1;
-// Just before creating the colorScale, add this lookup:
-    const d3ColorScales = {
-        'interpolateGreens': d3.interpolateGreens,
-        'interpolateBlues': d3.interpolateBlues,
-        'interpolateReds': d3.interpolateReds,
-        'interpolateViridis': d3.interpolateViridis,
-        'interpolatePlasma': d3.interpolatePlasma,
-    };
-const colorScale = d3.scaleSequential(d3ColorScales[custom.heatmap.colorscale] || d3.interpolateGreens)
+
+    const colorScale = d3.scaleSequential(d3.interpolateGreens)
         .domain([0, maxNTPM || 100]);
+
     const xScale = d3.scaleBand()
         .range([0, width])
         .domain(tissues)
