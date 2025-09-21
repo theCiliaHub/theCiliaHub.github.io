@@ -409,6 +409,10 @@ const PLOT_CONFIG = {
     'screen_bar_chart': {
         label: 'Screen Bar Chart',
         explanation: 'Alternative visualization for genome-wide screen results, showing gene effects on ciliary function as bars with error indicators.'
+    },
+    'ciliopathy_associations': { 
+        label: 'Genes vs Ciliopathies', 
+        explanation: 'Displays the associations between genes and ciliopathies as markers. Each marker represents a gene-ciliopathy association, helping visualize disease links.'
     }
 };
 
@@ -457,7 +461,7 @@ function updateCustomizationPanel() {
     html += `<div class="form-group"><label for="custom-border-color">Border Color</label><input type="color" id="custom-border-color" value="#cccccc"></div>`;
     
     // Plot-specific customizations
-    if (selectedPlot === 'localization_bubble' || selectedPlot === 'enrichment_bubble') {
+    if (selectedPlot === 'localization_bubble' || selectedPlot === 'enrichment_bubble' || selectedPlot === 'ciliopathy_associations') {
         html += `<div class="form-group"><label for="custom-bubble-size">Bubble Size</label><input type="number" id="custom-bubble-size" value="15" min="5" max="50"></div>`;
     }
     
@@ -881,6 +885,67 @@ async function renderVennDiagram(genes, custom = {}) {
                 Exact gene symbol matches only
             </div>
         </div>`;
+}
+
+// =============================================================================
+// NEW PLOT FUNCTION: GENES VS CILIOPATHY ASSOCIATIONS
+// =============================================================================
+
+function renderCiliopathyPlot(genes, custom) {
+    const plotData = [];
+    genes.forEach(gene => {
+        const ciliopathies = getCleanArray(gene, 'ciliopathy');
+        if (ciliopathies.length > 0) {
+            plotData.push({
+                x: ciliopathies, 
+                y: Array(ciliopathies.length).fill(gene.gene),
+                mode: 'markers', 
+                type: 'scatter', 
+                name: gene.gene,
+                marker: { 
+                    size: custom.bubbleSize || 15, 
+                    color: '#ffd9d9',
+                    line: { color: '#d62728', width: 1 }
+                }, 
+                hoverinfo: 'x+y'
+            });
+        }
+    });
+    
+    const layout = {
+        title: { 
+            text: custom.title || 'Gene vs Ciliopathy Associations', 
+            font: { size: custom.titleFontSize, family: custom.fontFamily, color: custom.fontColor } 
+        },
+        xaxis: { 
+            title: { text: 'Ciliopathy', font: custom.axisTitleFont }, 
+            visible: custom.showX, 
+            linecolor: '#000', 
+            linewidth: 2, 
+            mirror: true,
+            showgrid: false,
+            zeroline: false,
+            tickfont: { size: custom.columnFontSize, family: custom.fontFamily, color: custom.fontColor }
+        },
+        yaxis: { 
+            title: { text: 'Gene', font: custom.axisTitleFont }, 
+            visible: custom.showY, 
+            linecolor: '#000', 
+            linewidth: 2, 
+            mirror: true,
+            showgrid: false,
+            zeroline: false,
+            tickfont: { size: custom.rowFontSize, family: custom.fontFamily, color: custom.fontColor }
+        },
+        showlegend: false, 
+        width: custom.figureWidth,
+        height: custom.figureHeight,
+        margin: { l: 120, r: 20, b: 100, t: 80 },
+        plot_bgcolor: 'white', 
+        paper_bgcolor: 'white'
+    };
+    
+    Plotly.newPlot('plot-display-area', plotData, layout, { responsive: true });
 }
 
 // =============================================================================
@@ -1950,6 +2015,10 @@ async function generateAnalysisPlots() {
 
         case 'venn_diagram':
             renderVennDiagram(foundGenes, custom);
+            break;
+
+        case 'ciliopathy_associations':
+            renderCiliopathyPlot(foundGenes, custom);
             break;
 
         default:
