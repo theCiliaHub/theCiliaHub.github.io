@@ -281,22 +281,52 @@ function clearAllPlots(containerId = 'plot-display-area') {
     try { Plotly.purge(containerId); } catch (e) { /* Ignore */ }
 }
 
+/**
+ * Updates the gene summary table with found/not-found status for each original query.
+ */
 function updateGeneSummaryTable(originalQueries, foundGenes) {
     const tbody = document.getElementById('ciliaplot-gene-summary-tbody');
+    if (!tbody) return; // Guard clause if the element doesn't exist
     tbody.innerHTML = '';
-    const foundGenesSet = new Set(foundGenes.map(g => g.gene.toUpperCase()));
-    
-    // Add synonyms and Ensembl IDs to found genes set
-    foundGenes.forEach(g => {
-        if (g.synonym) String(g.synonym).split(/[,;]/).forEach(s => foundGenesSet.add(s.trim().toUpperCase()));
-        if (g.ensembl_id) String(g.ensembl_id).split(/[,;]/).forEach(id => foundGenesSet.add(id.trim().toUpperCase()));
+
+    // Create a comprehensive set of all identifiers for the genes that were found.
+    // This includes the main gene name, all synonyms, and all Ensembl IDs.
+    const foundIds = new Set();
+    foundGenes.forEach(gene => {
+        // Use sanitize() to ensure all identifiers are clean before adding to the set
+        if (gene.gene) foundIds.add(sanitize(gene.gene));
+        
+        if (gene.synonym) {
+            String(gene.synonym).split(/[,;]/).forEach(s => {
+                const key = sanitize(s);
+                if (key) foundIds.add(key);
+            });
+        }
+        
+        if (gene.ensembl_id) {
+            String(gene.ensembl_id).split(/[,;]/).forEach(id => {
+                const key = sanitize(id);
+                if (key) foundIds.add(key);
+            });
+        }
     });
-    
+
+    // Iterate through the user's original, raw queries
     originalQueries.forEach((query, index) => {
-    // This line ONLY uses .trim() and fails to remove the invisible characters
-    const status = foundGenesSet.has(query.trim().toUpperCase()) ? 'Found' : 'Not Found';
-    tbody.innerHTML += `<tr><td>${index + 1}</td><td>${query}</td><td>${status}</td></tr>`;
-});
+        // ✅ CRITICAL FIX: Sanitize the original query before checking its status.
+        const sanitizedQuery = sanitize(query);
+        const status = foundIds.has(sanitizedQuery) ? 'Found' : 'Not Found';
+        const statusColor = status === 'Found' ? '#28a745' : '#dc3545';
+        
+        // Append a new row to the table
+        tbody.innerHTML += `
+            <tr>
+                <td>${index + 1}</td>
+                <td>${query}</td>
+                <td style="color: ${statusColor}; font-weight: bold;">${status}</td>
+            </tr>
+        `;
+    });
 }
 
 function getPlotCustomization() {
