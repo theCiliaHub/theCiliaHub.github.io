@@ -410,6 +410,10 @@ const PLOT_CONFIG = {
         label: 'Screen Bar Chart',
         explanation: 'Alternative visualization for genome-wide screen results, showing gene effects on ciliary function as bars with error indicators.'
     },
+    'manhattan_plot': { 
+        label: 'Gene Feature Manhattan', 
+        explanation: 'Visualizes gene features across subcellular localizations, mimicking a Manhattan plot. The Y-axis represents a score based on the number of associated domains, complexes, and ciliopathies.'
+    },
     'ciliopathy_associations': { 
         label: 'Genes vs Ciliopathies', 
         explanation: 'Displays the associations between genes and ciliopathies as markers. Each marker represents a gene-ciliopathy association, helping visualize disease links.'
@@ -460,10 +464,10 @@ function updateCustomizationPanel() {
     html += `<div class="form-group"><label for="custom-border">Show Border</label><input type="checkbox" id="custom-border"></div>`;
     html += `<div class="form-group"><label for="custom-border-color">Border Color</label><input type="color" id="custom-border-color" value="#cccccc"></div>`;
     
-    // Plot-specific customizations
-    if (selectedPlot === 'localization_bubble' || selectedPlot === 'enrichment_bubble' || selectedPlot === 'ciliopathy_associations') {
-        html += `<div class="form-group"><label for="custom-bubble-size">Bubble Size</label><input type="number" id="custom-bubble-size" value="15" min="5" max="50"></div>`;
-    }
+   // Plot-specific customizations
+if (selectedPlot === 'localization_bubble' || selectedPlot === 'enrichment_bubble' || selectedPlot === 'ciliopathy_associations' || selectedPlot === 'manhattan_plot') {
+    html += `<div class="form-group"><label for="custom-bubble-size">Bubble Size</label><input type="number" id="custom-bubble-size" value="15" min="5" max="50"></div>`;
+}
     
     if (selectedPlot === 'functional_bar') {
         html += `<div class="form-group"><label for="custom-bar-width">Bar Width</label><input type="number" id="custom-bar-width" value="0.8" min="0.1" max="1.0" step="0.1"></div>`;
@@ -569,6 +573,127 @@ const precomputedUMAP = {
     "Ciliary associated gene": Array.from({length: 50}, (_, i) => ({gene: `CIL${i}`, x: 8 + Math.random()*2, y: 8 + Math.random()*2})),
     "Peroxisome": Array.from({length: 25}, (_, i) => ({gene: `PEROX${i}`, x: 6 + Math.random()*2, y: 3 + Math.random()*2}))
 };
+
+
+// =============================================================================
+// NEW PLOT FUNCTION: MANHATTAN PLOT
+// =============================================================================
+
+function renderManhattanPlot(genes, custom) {
+    clearAllPlots('plot-display-area');
+
+    const plotPoints = [];
+    const allLocalizations = new Set();
+
+    // 1. Process genes to create plottable points
+    genes.forEach(gene => {
+        const localizations = getCleanArray(gene, 'localization');
+        const domains = getCleanArray(gene, 'domain_descriptions');
+        const complexes = getCleanArray(gene, 'complex_names');
+        const ciliopathies = getCleanArray(gene, 'ciliopathy');
+
+        // Calculate a synthetic score for the Y-axis
+        const score = 1 + domains.length + complexes.length + ciliopathies.length;
+        const yValue = Math.max(0, Math.log10(score)); // Use log10 for a classic Manhattan look
+
+        localizations.forEach(loc => {
+            allLocalizations.add(loc);
+            plotPoints.push({
+                gene: gene.gene,
+                localization: loc,
+                yValue: yValue,
+                // Store details for the tooltip
+                details: {
+                    domains: domains.join(', ') || 'N/A',
+                    complexes: complexes.join(', ') || 'N/A',
+                    ciliopathies: ciliopathies.join(', ') || 'N/A'
+                }
+            });
+        });
+    });
+
+    if (plotPoints.length === 0) {
+        document.getElementById('plot-display-area').innerHTML = '<p style="text-align: center; padding: 50px;">No genes with localization data found.</p>';
+        return;
+    }
+
+    // 2. Set up the X-axis categories (our "chromosomes")
+    const sortedLocalizations = Array.from(allLocalizations).sort();
+    const chromWidth = 100; // Arbitrary width for each category block
+    const chromMap = {};
+    const tickVals = [];
+    const tickText = [];
+
+    sortedLocalizations.forEach((loc, i) => {
+        const start = i * chromWidth;
+        chromMap[loc] = { start: start, genes: [] };
+        tickVals.push(start + chromWidth / 2); // Tick position is the middle of the block
+        tickText.push(loc);
+    });
+    
+    // Distribute genes within each category block to create positions
+    plotPoints.forEach(p => {
+        if (!chromMap[p.localization].genes.includes(p.gene)) {
+            chromMap[p.localization].genes.push(p.gene);
+        }
+    });
+
+    plotPoints.forEach(p => {
+        const chrom = chromMap[p.localization];
+        const geneIndex = chrom.genes.indexOf(p.gene);
+        const positionInChrom = (geneIndex + 1) / (chrom.genes.length + 1) * chromWidth;
+        p.xValue = chrom.start + positionInChrom;
+    });
+
+    // 3. Create a separate trace for each localization for distinct coloring
+    const dataTraces = sortedLocalizations.map((loc, i) => {
+        const pointsForLoc = plotPoints.filter(p => p.localization === loc);
+        return {
+            x: pointsForLoc.map(p => p.xValue),
+            y: pointsForLoc.map(p => p.yValue),
+            text: pointsForLoc.map(p => `<b>Gene:</b> ${p.gene}<br><b>Localization:</b> ${p.localization}<br><b>Score:</b> ${p.yValue.toFixed(2)}<br><b>Complexes:</b> ${p.details.complexes}<br><b>Domains:</b> ${p.details.domains}<br><b>Ciliopathies:</b> ${p.details.ciliopathies}`),
+            hoverinfo: 'text',
+            type: 'scatter',
+            mode: 'markers',
+            name: loc,
+            marker: {
+                size: custom.bubbleSize || 10,
+                color: d3.schemeCategory10[i % 10] // Use a categorical color scheme
+            }
+        };
+    });
+
+    // 4. Define the plot layout
+    const layout = {
+        title: {
+            text: custom.title || 'Gene Feature Manhattan Plot',
+            font: { size: custom.titleFontSize, family: custom.fontFamily, color: custom.fontColor }
+        },
+        xaxis: {
+            title: { text: 'Subcellular Localization', font: custom.axisTitleFont },
+            tickvals: tickVals,
+            ticktext: tickText,
+            tickangle: -45,
+            showgrid: false,
+            zeroline: false,
+            range: [0, sortedLocalizations.length * chromWidth]
+        },
+        yaxis: {
+            title: { text: 'log10(Feature Score)', font: custom.axisTitleFont },
+            showgrid: true,
+            zeroline: true
+        },
+        showlegend: true,
+        legend: { orientation: 'h', y: -0.3 },
+        width: custom.figureWidth,
+        height: custom.figureHeight,
+        margin: { l: 80, r: 40, b: 150, t: 80 },
+        plot_bgcolor: 'white',
+        paper_bgcolor: 'white'
+    };
+
+    Plotly.newPlot('plot-display-area', dataTraces, layout, { responsive: true });
+}
 
 // =============================================================================
 // ENHANCED PLOTLY.JS RENDERING FUNCTIONS
@@ -2016,7 +2141,9 @@ async function generateAnalysisPlots() {
         case 'venn_diagram':
             renderVennDiagram(foundGenes, custom);
             break;
-
+        case 'manhattan_plot': //  <-- ADD THIS CASE
+            renderManhattanPlot(foundGenes, custom);
+            break;
         case 'ciliopathy_associations':
             renderCiliopathyPlot(foundGenes, custom);
             break;
