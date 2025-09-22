@@ -2077,7 +2077,7 @@ async function generateAnalysisPlots() {
         return;
     }
 
-    const sanitizedQueries = [...new Set(originalQueries.map(q => q.trim()))];
+    const sanitizedQueries = [...new Set(originalQueries.map(sanitize))];
     const { foundGenes } = findGenes(sanitizedQueries);
     
     updateGeneSummaryTable(originalQueries, foundGenes);
