@@ -441,9 +441,9 @@ const PLOT_CONFIG = {
         label: 'Screen Bar Chart',
         explanation: 'Alternative visualization for genome-wide screen results, showing gene effects on ciliary function as bars with error indicators.'
     },
-    'manhattan_plot': { 
-        label: 'Gene Feature Manhattan', 
-        explanation: 'Visualizes gene features across subcellular localizations, mimicking a Manhattan plot. The Y-axis represents a score based on the number of associated domains, complexes, and ciliopathies.'
+    'multi_category_manhattan': { 
+        label: 'Gene Feature Overview', 
+        explanation: 'A comprehensive plot showing gene associations across five major categories: Subcellular Localization, Protein Complexes, Protein Domains, Ciliopathies, and Ciliogenesis Screens.'
     },
     'ciliopathy_associations': { 
         label: 'Genes vs Ciliopathies', 
@@ -495,11 +495,10 @@ function updateCustomizationPanel() {
     html += `<div class="form-group"><label for="custom-border">Show Border</label><input type="checkbox" id="custom-border"></div>`;
     html += `<div class="form-group"><label for="custom-border-color">Border Color</label><input type="color" id="custom-border-color" value="#cccccc"></div>`;
     
-   // Plot-specific customizations
-if (selectedPlot === 'localization_bubble' || selectedPlot === 'enrichment_bubble' || selectedPlot === 'ciliopathy_associations' || selectedPlot === 'manhattan_plot') {
-    html += `<div class="form-group"><label for="custom-bubble-size">Bubble Size</label><input type="number" id="custom-bubble-size" value="15" min="5" max="50"></div>`;
-}
-    
+// Plot-specific customizations
+if (['localization_bubble', 'enrichment_bubble', 'ciliopathy_associations', 'multi_category_manhattan'].includes(selectedPlot)) {
+    html += `<div class="form-group"><label for="custom-bubble-size">Point Size</label><input type="number" id="custom-bubble-size" value="15" min="5" max="50"></div>`;
+}  
     if (selectedPlot === 'functional_bar') {
         html += `<div class="form-group"><label for="custom-bar-width">Bar Width</label><input type="number" id="custom-bar-width" value="0.8" min="0.1" max="1.0" step="0.1"></div>`;
     }
@@ -605,126 +604,119 @@ const precomputedUMAP = {
     "Peroxisome": Array.from({length: 25}, (_, i) => ({gene: `PEROX${i}`, x: 6 + Math.random()*2, y: 3 + Math.random()*2}))
 };
 
-
 // =============================================================================
-// NEW PLOT FUNCTION: MANHATTAN PLOT
+// NEW PLOT FUNCTION: MULTI-CATEGORY GENE OVERVIEW
 // =============================================================================
 
-function renderManhattanPlot(genes, custom) {
+function renderMultiCategoryPlot(genes, custom) {
     clearAllPlots('plot-display-area');
 
+    const categories = {
+        'Subcellular Localization': { data: new Set(), color: '#1f77b4', key: 'localization' },
+        'Complex Names': { data: new Set(), color: '#ff7f0e', key: 'complex_names' },
+        'Protein Domains': { data: new Set(), color: '#2ca02c', key: 'domain_descriptions' },
+        'Ciliopathy': { data: new Set(), color: '#d62728', key: 'ciliopathy' },
+        'Ciliogenesis Screen': { data: new Set(), color: '#9467bd', key: 'screens' }
+    };
+
     const plotPoints = [];
-    const allLocalizations = new Set();
-
-    // 1. Process genes to create plottable points
+    const geneSet = new Set(genes.map(g => g.gene));
+    const sortedGenes = Array.from(geneSet).sort();
+    
+    // 1. Process genes to extract all associations
     genes.forEach(gene => {
-        const localizations = getCleanArray(gene, 'localization');
-        const domains = getCleanArray(gene, 'domain_descriptions');
-        const complexes = getCleanArray(gene, 'complex_names');
-        const ciliopathies = getCleanArray(gene, 'ciliopathy');
-
-        // Calculate a synthetic score for the Y-axis
-        const score = 1 + domains.length + complexes.length + ciliopathies.length;
-        const yValue = Math.max(0, Math.log10(score)); // Use log10 for a classic Manhattan look
-
-        localizations.forEach(loc => {
-            allLocalizations.add(loc);
-            plotPoints.push({
-                gene: gene.gene,
-                localization: loc,
-                yValue: yValue,
-                // Store details for the tooltip
-                details: {
-                    domains: domains.join(', ') || 'N/A',
-                    complexes: complexes.join(', ') || 'N/A',
-                    ciliopathies: ciliopathies.join(', ') || 'N/A'
-                }
+        // Handle string-based categories
+        ['Subcellular Localization', 'Complex Names', 'Protein Domains', 'Ciliopathy'].forEach(catName => {
+            const config = categories[catName];
+            getCleanArray(gene, config.key).forEach(item => {
+                config.data.add(item);
+                plotPoints.push({ gene: gene.gene, category: catName, item: item });
             });
         });
-    });
-
-    if (plotPoints.length === 0) {
-        document.getElementById('plot-display-area').innerHTML = '<p style="text-align: center; padding: 50px;">No genes with localization data found.</p>';
-        return;
-    }
-
-    // 2. Set up the X-axis categories (our "chromosomes")
-    const sortedLocalizations = Array.from(allLocalizations).sort();
-    const chromWidth = 100; // Arbitrary width for each category block
-    const chromMap = {};
-    const tickVals = [];
-    const tickText = [];
-
-    sortedLocalizations.forEach((loc, i) => {
-        const start = i * chromWidth;
-        chromMap[loc] = { start: start, genes: [] };
-        tickVals.push(start + chromWidth / 2); // Tick position is the middle of the block
-        tickText.push(loc);
-    });
-    
-    // Distribute genes within each category block to create positions
-    plotPoints.forEach(p => {
-        if (!chromMap[p.localization].genes.includes(p.gene)) {
-            chromMap[p.localization].genes.push(p.gene);
+        
+        // Handle the "screens" category, which is an array of objects
+        if (gene.screens && gene.screens.length > 0) {
+            const screenItem = "Associated with Screen Data";
+            categories['Ciliogenesis Screen'].data.add(screenItem);
+            plotPoints.push({ gene: gene.gene, category: 'Ciliogenesis Screen', item: screenItem });
         }
     });
 
-    plotPoints.forEach(p => {
-        const chrom = chromMap[p.localization];
-        const geneIndex = chrom.genes.indexOf(p.gene);
-        const positionInChrom = (geneIndex + 1) / (chrom.genes.length + 1) * chromWidth;
-        p.xValue = chrom.start + positionInChrom;
+    if (plotPoints.length === 0) {
+        document.getElementById('plot-display-area').innerHTML = '<p style="text-align: center; padding: 50px;">No associations found for the given genes.</p>';
+        return;
+    }
+
+    // 2. Build the X-axis layout with sections for each category
+    let xOffset = 0;
+    const chromMap = {};
+    const sectionTicks = [];
+
+    Object.keys(categories).forEach(catName => {
+        const config = categories[catName];
+        const items = Array.from(config.data).sort();
+        if (items.length > 0) {
+            sectionTicks.push({ pos: xOffset + (items.length / 2), name: catName });
+            items.forEach((item, index) => {
+                chromMap[`${catName}-${item}`] = xOffset + index;
+            });
+            xOffset += items.length + 5; // Add padding between sections
+        }
     });
 
-    // 3. Create a separate trace for each localization for distinct coloring
-    const dataTraces = sortedLocalizations.map((loc, i) => {
-        const pointsForLoc = plotPoints.filter(p => p.localization === loc);
+    // 3. Create a trace for each major category
+    const dataTraces = Object.keys(categories).map(catName => {
+        const config = categories[catName];
+        const pointsForCat = plotPoints.filter(p => p.category === catName);
+        
         return {
-            x: pointsForLoc.map(p => p.xValue),
-            y: pointsForLoc.map(p => p.yValue),
-            text: pointsForLoc.map(p => `<b>Gene:</b> ${p.gene}<br><b>Localization:</b> ${p.localization}<br><b>Score:</b> ${p.yValue.toFixed(2)}<br><b>Complexes:</b> ${p.details.complexes}<br><b>Domains:</b> ${p.details.domains}<br><b>Ciliopathies:</b> ${p.details.ciliopathies}`),
+            x: pointsForCat.map(p => chromMap[`${p.category}-${p.item}`]),
+            y: pointsForCat.map(p => p.gene),
+            text: pointsForCat.map(p => `<b>Gene:</b> ${p.gene}<br><b>Category:</b> ${p.category}<br><b>Item:</b> ${p.item}`),
             hoverinfo: 'text',
             type: 'scatter',
             mode: 'markers',
-            name: loc,
+            name: catName,
             marker: {
-                size: custom.bubbleSize || 10,
-                color: d3.schemeCategory10[i % 10] // Use a categorical color scheme
+                size: custom.bubbleSize || 12,
+                color: config.color,
+                line: { width: 1, color: 'white' }
             }
         };
     });
 
-    // 4. Define the plot layout
+    // 4. Define plot layout
     const layout = {
         title: {
-            text: custom.title || 'Gene Feature Manhattan Plot',
+            text: custom.title || 'Gene Feature Overview',
             font: { size: custom.titleFontSize, family: custom.fontFamily, color: custom.fontColor }
         },
         xaxis: {
-            title: { text: 'Subcellular Localization', font: custom.axisTitleFont },
-            tickvals: tickVals,
-            ticktext: tickText,
-            tickangle: -45,
+            title: { text: 'Feature Categories', font: custom.axisTitleFont },
+            tickvals: sectionTicks.map(t => t.pos),
+            ticktext: sectionTicks.map(t => t.name),
+            showticklabels: true,
             showgrid: false,
-            zeroline: false,
-            range: [0, sortedLocalizations.length * chromWidth]
+            zeroline: false
         },
         yaxis: {
-            title: { text: 'log10(Feature Score)', font: custom.axisTitleFont },
-            showgrid: true,
-            zeroline: true
+            title: { text: 'Gene', font: custom.axisTitleFont },
+            categoryorder: 'array',
+            categoryarray: sortedGenes.reverse() // Show A at the top
         },
         showlegend: true,
-        legend: { orientation: 'h', y: -0.3 },
+        legend: { orientation: 'h', y: -0.2 },
         width: custom.figureWidth,
         height: custom.figureHeight,
-        margin: { l: 80, r: 40, b: 150, t: 80 },
+        margin: { l: 120, r: 20, b: 120, t: 80 },
         plot_bgcolor: 'white',
         paper_bgcolor: 'white'
     };
 
     Plotly.newPlot('plot-display-area', dataTraces, layout, { responsive: true });
 }
+
+
 
 // =============================================================================
 // ENHANCED PLOTLY.JS RENDERING FUNCTIONS
@@ -2172,8 +2164,8 @@ async function generateAnalysisPlots() {
         case 'venn_diagram':
             renderVennDiagram(foundGenes, custom);
             break;
-        case 'manhattan_plot': //  <-- ADD THIS CASE
-            renderManhattanPlot(foundGenes, custom);
+        case 'multi_category_manhattan': //  <-- ADD THIS CASE
+            renderMultiCategoryPlot(foundGenes, custom);
             break;
         case 'ciliopathy_associations':
             renderCiliopathyPlot(foundGenes, custom);
