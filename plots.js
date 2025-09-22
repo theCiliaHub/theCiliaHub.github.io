@@ -620,13 +620,12 @@ function renderMultiCategoryPlot(genes, custom = {}) {
     };
 
     const softColors = {
-        localization: ['#8dd3c7','#ffffb3','#bebada','#fb8072','#80b1d3','#fdb462','#b3de69','#fccde5','#d9d9d9','#bc80bd'],
-        ciliopathy:   ['#fbb4ae','#b3cde3','#ccebc5','#decbe4','#fed9a6','#ffffcc','#e5d8bd','#fddaec','#f2f2f2'],
-        default:      ['#AEC6CF','#77DD77','#FDFD96','#FFB347','#FF6961','#CBAACB','#FFDAC1']
+        localization: ['#8dd3c7','#bebada','#fb8072','#80b1d3','#fdb462','#b3de69','#fccde5','#d9d9d9','#bc80bd','#a6cee3'],
+        ciliopathy:   ['#fbb4ae','#b3cde3','#ccebc5','#decbe4','#fed9a6','#e5d8bd','#fddaec','#f2f2f2','#cab2d6','#ffff99'],
+        default:      ['#AEC6CF','#77DD77','#FFB347','#FF6961','#CBAACB','#FFDAC1','#98FB98']
     };
 
     const categories = {
-        'Input Gene Set':        { key: null, data: new Set(), color: [softColors.default[0]] },
         'Subcellular Localization': { key: 'localization', data: new Set(), color: softColors.localization },
         'Complex Names':         { key: 'complex_names', data: new Set(), color: [softColors.default[1]] },
         'Protein Domains':       { key: 'domain_descriptions', data: new Set(), color: [softColors.default[2]] },
