@@ -608,47 +608,50 @@ const precomputedUMAP = {
 // REVISED PLOT FUNCTION: MULTI-CATEGORY GENE OVERVIEW (V3 - FINAL)
 // =============================================================================
 
-function renderMultiCategoryPlot(genes, custom) {
+function renderMultiCategoryPlot(genes, custom = {}) {
     clearAllPlots('plot-display-area');
 
-    // Helper to capitalize first letters of words
+    // Helper: capitalize first letter of words
     const capitalize = (s) => s ? s.replace(/\b\w/g, c => c.toUpperCase()) : '';
 
-    // FIX 7: Use softer, distinct color palettes
-    const softColors = {
-        localization: ['#8dd3c7','#ffffb3','#bebada','#fb8072','#80b1d3','#fdb462','#b3de69','#fccde5','#d9d9d9','#bc80bd'],
-        ciliopathy: ['#fbb4ae','#b3cde3','#ccebc5','#decbe4','#fed9a6','#ffffcc','#e5d8bd','#fddaec','#f2f2f2'],
-        default: ['#AEC6CF', '#77DD77', '#FDFD96', '#FFB347', '#FF6961']
+    // Helper: safely extract array from gene object
+    const getCleanArray = (gene, key) => {
+        if (!key || !gene[key]) return [];
+        return Array.isArray(gene[key]) ? gene[key] : [gene[key]];
     };
 
-    // Define the 6 major categories, including the new "Input Gene Set"
+    const softColors = {
+        localization: ['#8dd3c7','#ffffb3','#bebada','#fb8072','#80b1d3','#fdb462','#b3de69','#fccde5','#d9d9d9','#bc80bd'],
+        ciliopathy:   ['#fbb4ae','#b3cde3','#ccebc5','#decbe4','#fed9a6','#ffffcc','#e5d8bd','#fddaec','#f2f2f2'],
+        default:      ['#AEC6CF','#77DD77','#FDFD96','#FFB347','#FF6961','#CBAACB','#FFDAC1']
+    };
+
     const categories = {
-        'Input Gene Set': { key: null, data: new Set(), color: [softColors.default[0]] },
+        'Input Gene Set':        { key: null, data: new Set(), color: [softColors.default[0]] },
         'Subcellular Localization': { key: 'localization', data: new Set(), color: softColors.localization },
-        'Complex Names': { key: 'complex_names', data: new Set(), color: [softColors.default[1]] },
-        'Protein Domains': { key: 'domain_descriptions', data: new Set(), color: [softColors.default[2]] },
-        'Ciliopathy': { key: 'ciliopathy', data: new Set(), color: softColors.ciliopathy },
-        'Ciliogenesis Screen': { key: 'screens', data: new Set(), color: [softColors.default[3]] }
+        'Complex Names':         { key: 'complex_names', data: new Set(), color: [softColors.default[1]] },
+        'Protein Domains':       { key: 'domain_descriptions', data: new Set(), color: [softColors.default[2]] },
+        'Ciliopathy':            { key: 'ciliopathy', data: new Set(), color: softColors.ciliopathy },
+        'Ciliogenesis Screen':   { key: 'screens', data: new Set(), color: [softColors.default[3]] }
     };
 
     const plotPoints = [];
     const allFoundGenes = [...new Set(genes.map(g => g.gene))].sort();
 
-    // 1. Process genes to extract all associations
+    // 1. Process genes → populate categories & points
     genes.forEach(gene => {
         const geneName = gene.gene;
-        // FIX 1: Add every gene to the "Input Gene Set" category to ensure it's plotted
         categories['Input Gene Set'].data.add(geneName);
         plotPoints.push({ gene: geneName, category: 'Input Gene Set', item: geneName });
 
-        ['Subcellular Localization', 'Complex Names', 'Protein Domains', 'Ciliopathy'].forEach(catName => {
+        ['Subcellular Localization','Complex Names','Protein Domains','Ciliopathy'].forEach(catName => {
             getCleanArray(gene, categories[catName].key).forEach(item => {
                 categories[catName].data.add(item);
-                plotPoints.push({ gene: geneName, category: catName, item: item });
+                plotPoints.push({ gene: geneName, category: catName, item });
             });
         });
 
-        if (gene.screens && gene.screens.length > 0) {
+        if (gene.screens?.length > 0) {
             const screenItem = "Associated with Screen";
             categories['Ciliogenesis Screen'].data.add(screenItem);
             plotPoints.push({ gene: geneName, category: 'Ciliogenesis Screen', item: screenItem });
@@ -657,7 +660,7 @@ function renderMultiCategoryPlot(genes, custom) {
 
     if (plotPoints.length === 0) return;
 
-    // 2. Build the X-axis layout with wider spacing and store section boundaries
+    // 2. Build X-axis mapping
     let xOffset = 0;
     const itemToXPos = new Map();
     const sectionTicks = [];
@@ -668,33 +671,32 @@ function renderMultiCategoryPlot(genes, custom) {
     Object.keys(categories).forEach(catName => {
         const items = Array.from(categories[catName].data).sort();
         if (items.length > 0) {
-            const sectionWidth = (items.length - 1) * pointSpacing;
+            const sectionWidth = Math.max((items.length - 1) * pointSpacing, 1); // ✅ Fix for single item section
             sectionTicks.push({ pos: xOffset + sectionWidth / 2, name: catName });
-            items.forEach((item, index) => {
-                itemToXPos.set(`${catName}-${item}`, xOffset + (index * pointSpacing));
+            items.forEach((item, idx) => {
+                itemToXPos.set(`${catName}-${item}`, xOffset + (idx * pointSpacing));
             });
             xOffset += sectionWidth + sectionPadding;
-            // FIX 6: Store position for a separator line
-            if (catName !== 'Ciliogenesis Screen') sectionLines.push({ x: xOffset - sectionPadding / 2, color: categories[catName].color[0] });
+            if (catName !== 'Ciliogenesis Screen') {
+                sectionLines.push({ x: xOffset - sectionPadding / 2, color: categories[catName].color[0] });
+            }
         }
     });
 
-    // 3. Create Plotly traces
+    // 3. Build traces
     const dataTraces = [];
     const createTrace = (config) => dataTraces.push(config);
 
     Object.keys(categories).forEach(catName => {
         const config = categories[catName];
         const items = Array.from(config.data).sort();
-        
-        // FIX 4: Add dummy traces to create legend subheadings
+
         if (items.length > 0 && (catName === 'Subcellular Localization' || catName === 'Ciliopathy')) {
-            createTrace({ name: `--- ${catName} ---`, type: 'scatter', mode: 'markers', marker: { color: 'rgba(0,0,0,0)', size: 0 } });
+            createTrace({ name: `--- ${catName} ---`, type: 'scatter', mode: 'markers', showlegend: false, marker: { size: 0, color: 'rgba(0,0,0,0)' } });
         }
 
-        // Create individual traces for items needing unique colors
         if (catName === 'Subcellular Localization' || catName === 'Ciliopathy') {
-            items.forEach((item, itemIndex) => {
+            items.forEach((item, idx) => {
                 const pointsForItem = plotPoints.filter(p => p.item === item && p.category === catName);
                 createTrace({
                     x: pointsForItem.map(p => itemToXPos.get(`${p.category}-${p.item}`)),
@@ -703,17 +705,17 @@ function renderMultiCategoryPlot(genes, custom) {
                     hoverinfo: 'text',
                     type: 'scatter',
                     mode: 'markers',
-                    name: capitalize(item), // FIX 5: Capitalize legend labels
-                    marker: { size: custom.bubbleSize || 7, color: config.color[itemIndex % config.color.length] }
+                    name: capitalize(item),
+                    marker: { size: custom.bubbleSize || 7, color: config.color[idx % config.color.length] }
                 });
             });
-        } else { // Create a single trace for other categories
+        } else {
             const pointsForCat = plotPoints.filter(p => p.category === catName);
             if (pointsForCat.length > 0) {
                 createTrace({
                     x: pointsForCat.map(p => itemToXPos.get(`${p.category}-${p.item}`)),
                     y: pointsForCat.map(p => p.gene),
-                    text: pointsForCat.map(p => `<b>Gene:</b> ${p.gene}`),
+                    text: pointsForCat.map(p => `<b>Gene:</b> ${p.gene}<br><b>${catName}:</b> ${p.item}`),
                     hoverinfo: 'text',
                     type: 'scatter',
                     mode: 'markers',
@@ -724,29 +726,27 @@ function renderMultiCategoryPlot(genes, custom) {
         }
     });
 
-    // 4. Check for missing categories and prepare annotations
+    // 4. Missing category annotations
     const annotations = [];
-    ['Ciliogenesis Screen'].forEach(catName => {
-        if (categories[catName].data.size === 0) {
-            annotations.push({
-                text: `${catName} data not found for this gene set`,
-                showarrow: false,
-                xref: 'paper', yref: 'paper',
-                x: 0.5, y: -0.3, font: { color: '#999', size: 10 }
-            });
-        }
-    });
+    if (categories['Ciliogenesis Screen'].data.size === 0) {
+        annotations.push({
+            text: `No ${'Ciliogenesis Screen'} data for this set`,
+            showarrow: false,
+            xref: 'paper', yref: 'paper',
+            x: 0.5, y: -0.15, font: { color: '#999', size: 10 }
+        });
+    }
 
-    // 5. Define plot layout
+    // 5. Layout
     const layout = {
-        title: { text: custom.title || 'Gene Feature Overview', font: { size: custom.titleFontSize, ...custom.axisTitleFont } },
+        title: { text: custom.title || 'Gene Feature Overview', font: { size: custom.titleFontSize || 18, ...custom.axisTitleFont } },
         xaxis: {
             title: { text: 'Feature Categories', font: { ...custom.axisTitleFont, weight: 'bold' } },
             tickvals: sectionTicks.map(t => t.pos),
             ticktext: sectionTicks.map(t => `<b>${t.name}</b>`),
             showticklabels: true,
             showgrid: false,
-            zeroline: false,
+            zeroline: false
         },
         yaxis: {
             title: { text: 'Gene', font: { ...custom.axisTitleFont, weight: 'bold' } },
@@ -758,17 +758,16 @@ function renderMultiCategoryPlot(genes, custom) {
             linewidth: 2,
             linecolor: 'black'
         },
-        showlegend: true,
-        margin: { l: 120, r: 20, b: 200, t: 80 },
-        legend: { orientation: 'h', y: -0.5, x: 0.5, xanchor: 'center' },
+        margin: { l: 120, r: 20, b: 180, t: 80 },
+        legend: { orientation: 'h', y: -0.4, x: 0.5, xanchor: 'center' },
         plot_bgcolor: 'rgba(0,0,0,0)',
         paper_bgcolor: 'rgba(0,0,0,0)',
-        shapes: sectionLines.map(line => ({ // FIX 6: Add separator lines
+        shapes: sectionLines.map(line => ({
             type: 'line', xref: 'x', yref: 'paper',
             x0: line.x, y0: 0, x1: line.x, y1: 1,
             line: { color: line.color, width: 1, dash: 'dot' }
         })),
-        annotations: annotations // FIX 2: Add message for missing screen data
+        annotations: annotations
     };
 
     Plotly.newPlot('plot-display-area', dataTraces, layout, { responsive: true });
