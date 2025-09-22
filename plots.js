@@ -607,7 +607,6 @@ const precomputedUMAP = {
 /// =============================================================================
 // REVISED PLOT FUNCTION: MULTI-CATEGORY GENE OVERVIEW (V3 - FINAL)
 // =============================================================================
-
 function renderMultiCategoryPlot(genes, custom = {}) {
     clearAllPlots('plot-display-area');
 
@@ -636,25 +635,64 @@ function renderMultiCategoryPlot(genes, custom = {}) {
     };
 
     const plotPoints = [];
-    const allFoundGenes = [...new Set(genes.map(g => g.gene))].sort();
+    
+    // FIX: Create unique gene identifiers to handle duplicates
+    const geneTracker = new Map();
+    const processedGenes = [];
+    
+    genes.forEach((gene, index) => {
+        const geneName = gene.gene;
+        let uniqueGeneName = geneName;
+        
+        // If we've seen this gene name before, make it unique
+        if (geneTracker.has(geneName)) {
+            const count = geneTracker.get(geneName) + 1;
+            geneTracker.set(geneName, count);
+            uniqueGeneName = `${geneName}_${count}`;
+        } else {
+            geneTracker.set(geneName, 1);
+        }
+        
+        processedGenes.push({...gene, uniqueGeneName, originalGeneName: geneName});
+    });
+    
+    // Get all unique gene names for Y-axis (now all 27 will show)
+    const allFoundGenes = processedGenes.map(g => g.uniqueGeneName).sort();
 
     // 1. Process genes → populate categories & points
-    genes.forEach(gene => {
-        const geneName = gene.gene;
-        categories['Input Gene Set'].data.add(geneName);
-        plotPoints.push({ gene: geneName, category: 'Input Gene Set', item: geneName });
+    processedGenes.forEach(gene => {
+        const uniqueGeneName = gene.uniqueGeneName;
+        const originalGeneName = gene.originalGeneName;
+        
+        categories['Input Gene Set'].data.add(originalGeneName);
+        plotPoints.push({ 
+            gene: uniqueGeneName, 
+            originalGene: originalGeneName,
+            category: 'Input Gene Set', 
+            item: originalGeneName 
+        });
 
         ['Subcellular Localization','Complex Names','Protein Domains','Ciliopathy'].forEach(catName => {
             getCleanArray(gene, categories[catName].key).forEach(item => {
                 categories[catName].data.add(item);
-                plotPoints.push({ gene: geneName, category: catName, item });
+                plotPoints.push({ 
+                    gene: uniqueGeneName, 
+                    originalGene: originalGeneName,
+                    category: catName, 
+                    item 
+                });
             });
         });
 
         if (gene.screens?.length > 0) {
             const screenItem = "Associated with Screen";
             categories['Ciliogenesis Screen'].data.add(screenItem);
-            plotPoints.push({ gene: geneName, category: 'Ciliogenesis Screen', item: screenItem });
+            plotPoints.push({ 
+                gene: uniqueGeneName, 
+                originalGene: originalGeneName,
+                category: 'Ciliogenesis Screen', 
+                item: screenItem 
+            });
         }
     });
 
@@ -671,7 +709,7 @@ function renderMultiCategoryPlot(genes, custom = {}) {
     Object.keys(categories).forEach(catName => {
         const items = Array.from(categories[catName].data).sort();
         if (items.length > 0) {
-            const sectionWidth = Math.max((items.length - 1) * pointSpacing, 1); // ✅ Fix for single item section
+            const sectionWidth = Math.max((items.length - 1) * pointSpacing, 1); // Fix for single item section
             sectionTicks.push({ pos: xOffset + sectionWidth / 2, name: catName });
             items.forEach((item, idx) => {
                 itemToXPos.set(`${catName}-${item}`, xOffset + (idx * pointSpacing));
@@ -700,8 +738,8 @@ function renderMultiCategoryPlot(genes, custom = {}) {
                 const pointsForItem = plotPoints.filter(p => p.item === item && p.category === catName);
                 createTrace({
                     x: pointsForItem.map(p => itemToXPos.get(`${p.category}-${p.item}`)),
-                    y: pointsForItem.map(p => p.gene),
-                    text: pointsForItem.map(p => `<b>Gene:</b> ${p.gene}<br><b>${p.category}:</b> ${p.item}`),
+                    y: pointsForItem.map(p => p.gene), // Using unique gene names
+                    text: pointsForItem.map(p => `<b>Gene:</b> ${p.originalGene}<br><b>${p.category}:</b> ${p.item}`), // Show original gene name in hover
                     hoverinfo: 'text',
                     type: 'scatter',
                     mode: 'markers',
@@ -714,8 +752,8 @@ function renderMultiCategoryPlot(genes, custom = {}) {
             if (pointsForCat.length > 0) {
                 createTrace({
                     x: pointsForCat.map(p => itemToXPos.get(`${p.category}-${p.item}`)),
-                    y: pointsForCat.map(p => p.gene),
-                    text: pointsForCat.map(p => `<b>Gene:</b> ${p.gene}<br><b>${catName}:</b> ${p.item}`),
+                    y: pointsForCat.map(p => p.gene), // Using unique gene names
+                    text: pointsForCat.map(p => `<b>Gene:</b> ${p.originalGene}<br><b>${catName}:</b> ${p.item}`), // Show original gene name in hover
                     hoverinfo: 'text',
                     type: 'scatter',
                     mode: 'markers',
@@ -737,7 +775,13 @@ function renderMultiCategoryPlot(genes, custom = {}) {
         });
     }
 
-    // 5. Layout
+    // 5. Layout with custom tick labels to show original gene names
+    const customTickLabels = allFoundGenes.map(uniqueName => {
+        // Find the original gene name for this unique name
+        const gene = processedGenes.find(g => g.uniqueGeneName === uniqueName);
+        return gene ? gene.originalGeneName : uniqueName;
+    });
+
     const layout = {
         title: { text: custom.title || 'Gene Feature Overview', font: { size: custom.titleFontSize || 18, ...custom.axisTitleFont } },
         xaxis: {
@@ -752,7 +796,9 @@ function renderMultiCategoryPlot(genes, custom = {}) {
             title: { text: 'Gene', font: { ...custom.axisTitleFont, weight: 'bold' } },
             tickfont: { weight: 'bold' },
             categoryorder: 'array',
-            categoryarray: allFoundGenes.reverse(),
+            categoryarray: allFoundGenes.reverse(), // Use unique names for internal processing
+            tickvals: allFoundGenes, // Map to unique names
+            ticktext: customTickLabels.reverse(), // But display original names
             showgrid: false,
             showline: true,
             linewidth: 2,
