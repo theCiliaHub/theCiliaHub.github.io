@@ -658,40 +658,49 @@ function renderMultiCategoryPlot(genes, custom = {}) {
     // Get all unique gene names for Y-axis (now all 27 will show)
     const allFoundGenes = processedGenes.map(g => g.uniqueGeneName).sort();
 
+    // Debug: Log first gene structure
+    if (processedGenes.length > 0) {
+        console.log('First gene structure:', JSON.stringify(processedGenes[0], null, 2));
+    }
+
     // 1. Process genes → populate categories & points
-    processedGenes.forEach(gene => {
+    processedGenes.forEach((gene, index) => {
         const uniqueGeneName = gene.uniqueGeneName;
         const originalGeneName = gene.originalGeneName;
-        
-        categories['Input Gene Set'].data.add(originalGeneName);
-        plotPoints.push({ 
-            gene: uniqueGeneName, 
-            originalGene: originalGeneName,
-            category: 'Input Gene Set', 
-            item: originalGeneName 
-        });
 
         ['Subcellular Localization','Complex Names','Protein Domains','Ciliopathy'].forEach(catName => {
-            getCleanArray(gene, categories[catName].key).forEach(item => {
-                categories[catName].data.add(item);
+            const categoryConfig = categories[catName];
+            if (!categoryConfig) {
+                console.error(`Category ${catName} not found in categories object`);
+                return;
+            }
+
+            const items = getCleanArray(gene, categoryConfig.key);
+            items.forEach(item => {
+                if (item && item.trim()) { // Only add non-empty items
+                    categoryConfig.data.add(item.trim());
+                    plotPoints.push({ 
+                        gene: uniqueGeneName, 
+                        originalGene: originalGeneName,
+                        category: catName, 
+                        item: item.trim()
+                    });
+                }
+            });
+        });
+
+        if (gene.screens && gene.screens.length > 0) {
+            const screenItem = "Associated with Screen";
+            const screenCategory = categories['Ciliogenesis Screen'];
+            if (screenCategory) {
+                screenCategory.data.add(screenItem);
                 plotPoints.push({ 
                     gene: uniqueGeneName, 
                     originalGene: originalGeneName,
-                    category: catName, 
-                    item 
+                    category: 'Ciliogenesis Screen', 
+                    item: screenItem 
                 });
-            });
-        });
-
-        if (gene.screens?.length > 0) {
-            const screenItem = "Associated with Screen";
-            categories['Ciliogenesis Screen'].data.add(screenItem);
-            plotPoints.push({ 
-                gene: uniqueGeneName, 
-                originalGene: originalGeneName,
-                category: 'Ciliogenesis Screen', 
-                item: screenItem 
-            });
+            }
         }
     });
 
@@ -706,73 +715,114 @@ function renderMultiCategoryPlot(genes, custom = {}) {
     const sectionPadding = 25;
 
     Object.keys(categories).forEach(catName => {
-        const items = Array.from(categories[catName].data).sort();
+        const categoryConfig = categories[catName];
+        if (!categoryConfig || !categoryConfig.data) {
+            console.error(`Category ${catName} missing data property`);
+            return;
+        }
+        
+        const items = Array.from(categoryConfig.data).sort();
         if (items.length > 0) {
-            const sectionWidth = Math.max((items.length - 1) * pointSpacing, 1); // Fix for single item section
+            const sectionWidth = Math.max((items.length - 1) * pointSpacing, 1);
             sectionTicks.push({ pos: xOffset + sectionWidth / 2, name: catName });
             items.forEach((item, idx) => {
                 itemToXPos.set(`${catName}-${item}`, xOffset + (idx * pointSpacing));
             });
             xOffset += sectionWidth + sectionPadding;
             if (catName !== 'Ciliogenesis Screen') {
-                sectionLines.push({ x: xOffset - sectionPadding / 2, color: categories[catName].color[0] });
+                sectionLines.push({ x: xOffset - sectionPadding / 2, color: categoryConfig.color[0] });
             }
         }
     });
 
-    // 3. Build traces
+    // 3. Build traces with organized legend
     const dataTraces = [];
     const createTrace = (config) => dataTraces.push(config);
+    
+    // Track items to limit legend entries
+    const maxLegendItems = 12;
+    let totalLegendItems = 0;
 
     Object.keys(categories).forEach(catName => {
         const config = categories[catName];
+        if (!config || !config.data) {
+            console.error(`Category ${catName} missing data property`);
+            return;
+        }
+        
         const items = Array.from(config.data).sort();
 
-        if (items.length > 0 && (catName === 'Subcellular Localization' || catName === 'Ciliopathy')) {
-            createTrace({ name: `--- ${catName} ---`, type: 'scatter', mode: 'markers', showlegend: false, marker: { size: 0, color: 'rgba(0,0,0,0)' } });
+        // Add section headers only for multi-item categories
+        if (items.length > 1 && (catName === 'Subcellular Localization' || catName === 'Ciliopathy')) {
+            createTrace({ 
+                name: `━━━ ${catName} ━━━`, 
+                type: 'scatter', 
+                mode: 'markers', 
+                showlegend: true, 
+                marker: { size: 0, color: 'rgba(0,0,0,0)' },
+                x: [null], y: [null] // Dummy data points
+            });
+            totalLegendItems++;
         }
 
         if (catName === 'Subcellular Localization' || catName === 'Ciliopathy') {
             items.forEach((item, idx) => {
                 const pointsForItem = plotPoints.filter(p => p.item === item && p.category === catName);
-                createTrace({
-                    x: pointsForItem.map(p => itemToXPos.get(`${p.category}-${p.item}`)),
-                    y: pointsForItem.map(p => p.gene), // Using unique gene names
-                    text: pointsForItem.map(p => `<b>Gene:</b> ${p.originalGene}<br><b>${p.category}:</b> ${p.item}`), // Show original gene name in hover
-                    hoverinfo: 'text',
-                    type: 'scatter',
-                    mode: 'markers',
-                    name: capitalize(item),
-                    marker: { size: custom.bubbleSize || 7, color: config.color[idx % config.color.length] }
-                });
+                if (pointsForItem.length > 0) {
+                    const showInLegend = totalLegendItems < maxLegendItems;
+                    createTrace({
+                        x: pointsForItem.map(p => itemToXPos.get(`${p.category}-${p.item}`)),
+                        y: pointsForItem.map(p => p.gene),
+                        text: pointsForItem.map(p => `<b>Gene:</b> ${p.originalGene}<br><b>${p.category}:</b> ${p.item}`),
+                        hoverinfo: 'text',
+                        type: 'scatter',
+                        mode: 'markers',
+                        name: showInLegend ? capitalize(item) : '',
+                        showlegend: showInLegend,
+                        legendgroup: catName,
+                        marker: { size: custom.bubbleSize || 8, color: config.color[idx % config.color.length] }
+                    });
+                    if (showInLegend) totalLegendItems++;
+                }
             });
         } else {
             const pointsForCat = plotPoints.filter(p => p.category === catName);
             if (pointsForCat.length > 0) {
+                const showInLegend = totalLegendItems < maxLegendItems;
                 createTrace({
                     x: pointsForCat.map(p => itemToXPos.get(`${p.category}-${p.item}`)),
-                    y: pointsForCat.map(p => p.gene), // Using unique gene names
-                    text: pointsForCat.map(p => `<b>Gene:</b> ${p.originalGene}<br><b>${catName}:</b> ${p.item}`), // Show original gene name in hover
+                    y: pointsForCat.map(p => p.gene),
+                    text: pointsForCat.map(p => `<b>Gene:</b> ${p.originalGene}<br><b>${catName}:</b> ${p.item}`),
                     hoverinfo: 'text',
                     type: 'scatter',
                     mode: 'markers',
-                    name: catName,
-                    marker: { size: custom.bubbleSize || 7, color: config.color[0] }
+                    name: showInLegend ? catName : '',
+                    showlegend: showInLegend,
+                    marker: { size: custom.bubbleSize || 8, color: config.color[0] }
                 });
+                if (showInLegend) totalLegendItems++;
             }
         }
     });
 
     // 4. Missing category annotations
     const annotations = [];
-    if (categories['Ciliogenesis Screen'].data.size === 0) {
+    const screenCategory = categories['Ciliogenesis Screen'];
+    if (screenCategory && screenCategory.data && screenCategory.data.size === 0) {
         annotations.push({
-            text: `No ${'Ciliogenesis Screen'} data for this set`,
+            text: `No Ciliogenesis Screen data for this set`,
             showarrow: false,
             xref: 'paper', yref: 'paper',
             x: 0.5, y: -0.15, font: { color: '#999', size: 10 }
         });
     }
+
+    // Debug: Log final state
+    console.log('Plot points created:', plotPoints.length);
+    console.log('Categories with data:', Object.keys(categories).map(k => ({
+        name: k, 
+        count: categories[k].data ? categories[k].data.size : 0
+    })));
 
     // 5. Layout with custom tick labels to show original gene names
     const customTickLabels = allFoundGenes.map(uniqueName => {
@@ -793,18 +843,30 @@ function renderMultiCategoryPlot(genes, custom = {}) {
         },
         yaxis: {
             title: { text: 'Gene', font: { ...custom.axisTitleFont, weight: 'bold' } },
-            tickfont: { weight: 'bold' },
+            tickfont: { weight: 'bold', size: 10 },
             categoryorder: 'array',
-            categoryarray: allFoundGenes.reverse(), // Use unique names for internal processing
-            tickvals: allFoundGenes, // Map to unique names
-            ticktext: customTickLabels.reverse(), // But display original names
-            showgrid: false,
+            categoryarray: allFoundGenes.reverse(),
+            tickvals: allFoundGenes,
+            ticktext: customTickLabels.reverse(),
+            showgrid: true,
+            gridcolor: 'rgba(200,200,200,0.3)',
             showline: true,
             linewidth: 2,
-            linecolor: 'black'
+            linecolor: 'black',
+            tickmode: 'array',
+            automargin: true
         },
-        margin: { l: 120, r: 20, b: 180, t: 80 },
-        legend: { orientation: 'h', y: -0.4, x: 0.5, xanchor: 'center' },
+        margin: { l: 150, r: 20, b: 220, t: 80 },
+        height: Math.max(600, allFoundGenes.length * 25), // Dynamic height based on number of genes
+        legend: { 
+            orientation: 'h', 
+            y: -0.35, 
+            x: 0.5, 
+            xanchor: 'center',
+            font: { size: 10 },
+            itemwidth: 30,
+            tracegroupgap: 5
+        },
         plot_bgcolor: 'rgba(0,0,0,0)',
         paper_bgcolor: 'rgba(0,0,0,0)',
         shapes: sectionLines.map(line => ({
