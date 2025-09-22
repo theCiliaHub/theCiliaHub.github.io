@@ -605,18 +605,19 @@ const precomputedUMAP = {
 };
 
 // =============================================================================
-// NEW PLOT FUNCTION: MULTI-CATEGORY GENE OVERVIEW
+// REVISED PLOT FUNCTION: MULTI-CATEGORY GENE OVERVIEW
 // =============================================================================
 
 function renderMultiCategoryPlot(genes, custom) {
     clearAllPlots('plot-display-area');
 
+    // Define the 5 major categories and their base colors/data keys
     const categories = {
-        'Subcellular Localization': { data: new Set(), color: '#1f77b4', key: 'localization' },
-        'Complex Names': { data: new Set(), color: '#ff7f0e', key: 'complex_names' },
-        'Protein Domains': { data: new Set(), color: '#2ca02c', key: 'domain_descriptions' },
-        'Ciliopathy': { data: new Set(), color: '#d62728', key: 'ciliopathy' },
-        'Ciliogenesis Screen': { data: new Set(), color: '#9467bd', key: 'screens' }
+        'Subcellular Localization': { key: 'localization', data: new Set(), color: d3.schemeTableau10 },
+        'Complex Names': { key: 'complex_names', data: new Set(), color: ['#fd7f6f'] },
+        'Protein Domains': { key: 'domain_descriptions', data: new Set(), color: ['#7eb0d5'] },
+        'Ciliopathy': { key: 'ciliopathy', data: new Set(), color: d3.schemeAccent },
+        'Ciliogenesis Screen': { key: 'screens', data: new Set(), color: ['#bd7ebe'] }
     };
 
     const plotPoints = [];
@@ -625,7 +626,7 @@ function renderMultiCategoryPlot(genes, custom) {
     
     // 1. Process genes to extract all associations
     genes.forEach(gene => {
-        // Handle string-based categories
+        // Handle categories that contain arrays of strings
         ['Subcellular Localization', 'Complex Names', 'Protein Domains', 'Ciliopathy'].forEach(catName => {
             const config = categories[catName];
             getCleanArray(gene, config.key).forEach(item => {
@@ -634,9 +635,9 @@ function renderMultiCategoryPlot(genes, custom) {
             });
         });
         
-        // Handle the "screens" category, which is an array of objects
+        // FIX 3: Handle the 'screens' category specifically
         if (gene.screens && gene.screens.length > 0) {
-            const screenItem = "Associated with Screen Data";
+            const screenItem = "Associated with Screen";
             categories['Ciliogenesis Screen'].data.add(screenItem);
             plotPoints.push({ gene: gene.gene, category: 'Ciliogenesis Screen', item: screenItem });
         }
@@ -649,73 +650,99 @@ function renderMultiCategoryPlot(genes, custom) {
 
     // 2. Build the X-axis layout with sections for each category
     let xOffset = 0;
-    const chromMap = {};
-    const sectionTicks = [];
+    const itemToXPos = new Map(); // Maps each specific item (e.g., 'Cilia') to an X-coordinate
+    const sectionTicks = []; // For labeling the main sections
 
     Object.keys(categories).forEach(catName => {
-        const config = categories[catName];
-        const items = Array.from(config.data).sort();
+        const items = Array.from(categories[catName].data).sort();
         if (items.length > 0) {
-            sectionTicks.push({ pos: xOffset + (items.length / 2), name: catName });
+            // Add a tick in the middle of the section for the main category label
+            sectionTicks.push({ pos: xOffset + (items.length - 1) / 2, name: catName });
             items.forEach((item, index) => {
-                chromMap[`${catName}-${item}`] = xOffset + index;
+                itemToXPos.set(`${catName}-${item}`, xOffset + index);
             });
-            xOffset += items.length + 5; // Add padding between sections
+            xOffset += items.length + 10; // Add padding between sections
         }
     });
 
-    // 3. Create a trace for each major category
-    const dataTraces = Object.keys(categories).map(catName => {
+    // 3. Create Plotly traces. Some categories will have multiple traces (one per item)
+    const dataTraces = [];
+    Object.keys(categories).forEach((catName, catIndex) => {
         const config = categories[catName];
-        const pointsForCat = plotPoints.filter(p => p.category === catName);
-        
-        return {
-            x: pointsForCat.map(p => chromMap[`${p.category}-${p.item}`]),
-            y: pointsForCat.map(p => p.gene),
-            text: pointsForCat.map(p => `<b>Gene:</b> ${p.gene}<br><b>Category:</b> ${p.category}<br><b>Item:</b> ${p.item}`),
-            hoverinfo: 'text',
-            type: 'scatter',
-            mode: 'markers',
-            name: catName,
-            marker: {
-                size: custom.bubbleSize || 12,
-                color: config.color,
-                line: { width: 1, color: 'white' }
+        const items = Array.from(config.data).sort();
+
+        // FIX 1 & 2: Give each organelle and disease its own color and trace
+        if (catName === 'Subcellular Localization' || catName === 'Ciliopathy') {
+            items.forEach((item, itemIndex) => {
+                const pointsForItem = plotPoints.filter(p => p.item === item && p.category === catName);
+                dataTraces.push({
+                    x: pointsForItem.map(p => itemToXPos.get(`${p.category}-${p.item}`)),
+                    y: pointsForItem.map(p => p.gene),
+                    text: pointsForItem.map(p => `<b>Gene:</b> ${p.gene}<br><b>${p.category}:</b> ${p.item}`),
+                    hoverinfo: 'text',
+                    type: 'scatter',
+                    mode: 'markers',
+                    name: item, // Legend entry will be the specific item (e.g., 'Cilia')
+                    marker: {
+                        size: custom.bubbleSize || 12,
+                        color: config.color[itemIndex % config.color.length], // Cycle through color scheme
+                    }
+                });
+            });
+        } else { // For other categories, use a single trace
+            const pointsForCat = plotPoints.filter(p => p.category === catName);
+            if (pointsForCat.length > 0) {
+                dataTraces.push({
+                    x: pointsForCat.map(p => itemToXPos.get(`${p.category}-${p.item}`)),
+                    y: pointsForCat.map(p => p.gene),
+                    text: pointsForCat.map(p => `<b>Gene:</b> ${p.gene}<br><b>Category:</b> ${p.item}`),
+                    hoverinfo: 'text',
+                    type: 'scatter',
+                    mode: 'markers',
+                    name: catName,
+                    marker: { size: custom.bubbleSize || 12, color: config.color[0] }
+                });
             }
-        };
+        }
     });
 
-    // 4. Define plot layout
+    // 4. Define plot layout with all visual fixes
     const layout = {
         title: {
             text: custom.title || 'Gene Feature Overview',
             font: { size: custom.titleFontSize, family: custom.fontFamily, color: custom.fontColor }
         },
         xaxis: {
-            title: { text: 'Feature Categories', font: custom.axisTitleFont },
+            title: { text: 'Feature Categories', font: {...custom.axisTitleFont, weight: 'bold' } },
             tickvals: sectionTicks.map(t => t.pos),
-            ticktext: sectionTicks.map(t => t.name),
+            ticktext: sectionTicks.map(t => `<b>${t.name}</b>`), // Make section labels bold
             showticklabels: true,
             showgrid: false,
-            zeroline: false
+            zeroline: false,
         },
         yaxis: {
-            title: { text: 'Gene', font: custom.axisTitleFont },
+            title: { text: 'Gene', font: {...custom.axisTitleFont, weight: 'bold' } },
+            tickfont: { weight: 'bold' }, // FIX 4: Make gene names on Y-axis bold
             categoryorder: 'array',
-            categoryarray: sortedGenes.reverse() // Show A at the top
+            categoryarray: sortedGenes.reverse(),
+            showgrid: true,
+            gridcolor: '#eef2f7',
+            // FIX 6: Add a visible line to the Y-axis
+            showline: true,
+            linewidth: 2,
+            linecolor: 'black'
         },
         showlegend: true,
-        legend: { orientation: 'h', y: -0.2 },
-        width: custom.figureWidth,
-        height: custom.figureHeight,
-        margin: { l: 120, r: 20, b: 120, t: 80 },
-        plot_bgcolor: 'white',
-        paper_bgcolor: 'white'
+        // FIX 5: Increase bottom margin and move legend down to prevent overlap
+        margin: { l: 120, r: 20, b: 180, t: 80 },
+        legend: { orientation: 'h', y: -0.4, x: 0.5, xanchor: 'center' },
+        // FIX 4: Remove plot background colors
+        plot_bgcolor: 'rgba(0,0,0,0)',
+        paper_bgcolor: 'rgba(0,0,0,0)',
     };
 
     Plotly.newPlot('plot-display-area', dataTraces, layout, { responsive: true });
 }
-
 
 
 // =============================================================================
