@@ -293,9 +293,10 @@ function updateGeneSummaryTable(originalQueries, foundGenes) {
     });
     
     originalQueries.forEach((query, index) => {
-        const status = foundGenesSet.has(query.trim().toUpperCase()) ? 'Found' : 'Not Found';
-        tbody.innerHTML += `<tr><td>${index + 1}</td><td>${query}</td><td>${status}</td></tr>`;
-    });
+    // This line ONLY uses .trim() and fails to remove the invisible characters
+    const status = foundGenesSet.has(query.trim().toUpperCase()) ? 'Found' : 'Not Found';
+    tbody.innerHTML += `<tr><td>${index + 1}</td><td>${query}</td><td>${status}</td></tr>`;
+});
 }
 
 function getPlotCustomization() {
