@@ -511,27 +511,21 @@ function displayHomePage() {
         <div class="page-section">
             <h1>The CiliaHub: An Updated Database of Gold Standard Genes with Ciliary Functions</h1>
 
-            <!-- CiliaHub V0.1 and Stats Section -->
             <div class="ciliahub-stats" style="margin-top: 1rem; margin-bottom: 2rem; display: flex; gap: 1rem; flex-wrap: wrap; font-family: 'Arial', sans-serif;">
                 
-                <!-- Version -->
-                <div style="flex: 1; min-width: 140px; background-color: #007bff; color: #fff; padding: 1rem; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.15); text-align: center;">
+                <div style="flex: 1; min-width: 140px; background-color: #007bff; color: #fff; padding: 1rem; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.15); text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center;">
                     <div style="font-size: 1.2rem; font-weight: 700;">CiliaHub V0.1</div>
+                    <div style="display: flex; align-items: baseline; gap: 0.5rem; margin-top: 0.25rem;">
+                        <div id="gene-count" style="font-size: 1.5rem; font-weight: 700;">0</div>
+                        <div>Genes</div>
+                    </div>
                 </div>
 
-                <!-- Genes -->
-                <div style="flex: 1; min-width: 140px; background-color: #e7f1ff; color: #007bff; padding: 1rem; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); text-align: center;">
-                    <div id="gene-count" style="font-size: 1.5rem; font-weight: 700;">0</div>
-                    <div>Genes</div>
-                </div>
-
-                <!-- Localizations -->
                 <div style="flex: 1; min-width: 140px; background-color: #e7f1ff; color: #007bff; padding: 1rem; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); text-align: center;">
                     <div id="localization-count" style="font-size: 1.5rem; font-weight: 700;">0</div>
                     <div>Localizations</div>
                 </div>
 
-                <!-- References -->
                 <div style="flex: 1; min-width: 140px; background-color: #e7f1ff; color: #007bff; padding: 1rem; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); text-align: center;">
                     <div id="reference-count" style="font-size: 1.5rem; font-weight: 700;">0</div>
                     <div>References</div>
@@ -1811,36 +1805,47 @@ function showLocalization(geneName, isSearchGene = false) {
     if (geneName === 'reset') {
         selectedGenes = [];
     } else {
-        if (!selectedGenes.includes(geneName)) {
-            selectedGenes.push(geneName);
+        const geneIndex = selectedGenes.findIndex(g => g.name === geneName);
+        if (geneIndex === -1) {
+            // Store the gene name and its type (search or default)
+            selectedGenes.push({ name: geneName, isSearch: isSearchGene });
         } else {
-            selectedGenes = selectedGenes.filter(g => g !== geneName);
+            // Remove the gene if it's clicked again
+            selectedGenes.splice(geneIndex, 1);
         }
     }
     
+    // Clear all existing highlights and classes from SVG parts
     const ciliaParts = document.querySelectorAll('.cilia-part');
     ciliaParts.forEach(part => part.classList.remove('highlighted', 'search-gene', 'cilia'));
     
+    // Clear all selections from gene buttons
     document.querySelectorAll('.gene-btn').forEach(btn => btn.classList.remove('selected'));
     
-    selectedGenes.forEach(g => {
-        if (geneLocalizationData[g]) {
-            const isCiliary = geneLocalizationData[g].some(id => ['ciliary-membrane', 'axoneme'].includes(id));
+    // Apply new classes based on the updated selectedGenes array
+    selectedGenes.forEach(geneObject => {
+        if (geneLocalizationData[geneObject.name]) {
+            const isCiliary = geneLocalizationData[geneObject.name].some(id => ['ciliary-membrane', 'axoneme'].includes(id));
             
-            geneLocalizationData[g].forEach(id => {
+            geneLocalizationData[geneObject.name].forEach(id => {
                 const el = document.getElementById(id);
                 if (el && id !== 'cell-body') {
+                    // ALWAYS add the 'highlighted' class for the stroke color
                     el.classList.add('highlighted');
+
+                    // ADDITIVE LOGIC: Add classes based on conditions without 'else'
                     if (isCiliary) {
-                        el.classList.add('cilia');
-                    } else if (isSearchGene) {
-                        el.classList.add('search-gene');
+                        el.classList.add('cilia'); // Applies light blue fill
+                    }
+                    if (geneObject.isSearch) {
+                        el.classList.add('search-gene'); // Applies darker blue fill
                     }
                 }
             });
         }
         
-        const btn = [...document.querySelectorAll('.gene-btn')].find(b => b.textContent === g);
+        // Find and select the corresponding button
+        const btn = [...document.querySelectorAll('.gene-btn')].find(b => b.textContent === geneObject.name);
         if (btn) btn.classList.add('selected');
     });
 }
