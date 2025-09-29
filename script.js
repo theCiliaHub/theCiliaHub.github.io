@@ -1830,29 +1830,37 @@ function updateGeneButtons(genesToDisplay, searchResults = []) {
     container.appendChild(resetButton);
 }
 
+// This should be the ONLY `selectedGenes` variable in your file
 let selectedGenes = [];
+
+/**
+ * This should be the ONLY `showLocalization` function in your file.
+ * It correctly handles applying multiple CSS classes for different colors.
+ */
 function showLocalization(geneName, isSearchGene = false) {
     if (geneName === 'reset') {
         selectedGenes = [];
     } else {
+        // Find if the gene is already selected
         const geneIndex = selectedGenes.findIndex(g => g.name === geneName);
+
         if (geneIndex === -1) {
-            // Store the gene name and its type (search or default)
+            // If not found, add it as an object to remember its type
             selectedGenes.push({ name: geneName, isSearch: isSearchGene });
         } else {
-            // Remove the gene if it's clicked again
+            // If found, remove it so the click acts as a toggle
             selectedGenes.splice(geneIndex, 1);
         }
     }
     
-    // Clear all existing highlights and classes from SVG parts
+    // Clear all existing highlights and classes from the SVG parts
     const ciliaParts = document.querySelectorAll('.cilia-part');
     ciliaParts.forEach(part => part.classList.remove('highlighted', 'search-gene', 'cilia'));
     
-    // Clear all selections from gene buttons
+    // Clear all "selected" styles from the gene buttons
     document.querySelectorAll('.gene-btn').forEach(btn => btn.classList.remove('selected'));
     
-    // Apply new classes based on the updated selectedGenes array
+    // Apply the correct classes based on the updated selectedGenes array
     selectedGenes.forEach(geneObject => {
         if (geneLocalizationData[geneObject.name]) {
             const isCiliary = geneLocalizationData[geneObject.name].some(id => ['ciliary-membrane', 'axoneme'].includes(id));
@@ -1860,21 +1868,21 @@ function showLocalization(geneName, isSearchGene = false) {
             geneLocalizationData[geneObject.name].forEach(id => {
                 const el = document.getElementById(id);
                 if (el && id !== 'cell-body') {
-                    // ALWAYS add the 'highlighted' class for the stroke color
+                    // ALWAYS add 'highlighted' for the stroke color
                     el.classList.add('highlighted');
 
-                    // ADDITIVE LOGIC: Add classes based on conditions without 'else'
+                    // ADDITIVE LOGIC: Apply classes without 'else'
                     if (isCiliary) {
-                        el.classList.add('cilia'); // Applies light blue fill
+                        el.classList.add('cilia'); // Applies the light blue fill
                     }
                     if (geneObject.isSearch) {
-                        el.classList.add('search-gene'); // Applies darker blue fill
+                        el.classList.add('search-gene'); // Applies the darker blue fill, overriding the light blue if needed
                     }
                 }
             });
         }
         
-        // Find and select the corresponding button
+        // Find and apply the 'selected' class to the corresponding button
         const btn = [...document.querySelectorAll('.gene-btn')].find(b => b.textContent === geneObject.name);
         if (btn) btn.classList.add('selected');
     });
