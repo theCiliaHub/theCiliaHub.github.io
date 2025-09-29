@@ -162,23 +162,43 @@ function debugSearch(query) {
 
 // This should be the main entry point of your application
 async function initializeApp() {
-    // First, wait for the database to be fully loaded and prepared.
+    // Wait for the database to be fully loaded and prepared.
     const dataLoaded = await loadAndPrepareDatabase();
 
     if (dataLoaded) {
-        // ONLY after the data is loaded, set up the router
-        // and handle the initial URL.
-        setupRouter(); // This function would handle URL changes
-        handleInitialRoute(); // This function would process the URL on first load
+        // Data is ready, now update the stats on the homepage
+        updateHomepageStats(allGenes); // `allGenes` is the global variable with your data
+        
+        // Now handle routing
+        handleInitialRoute(); 
     } else {
-        // Handle the case where data loading failed
         console.error("Failed to load gene database. App cannot start.");
-        // Maybe display an error message to the user
     }
 }
 
-// Start the entire application
+// Start the app
 initializeApp();
+
+function updateHomepageStats(data) {
+    if (data && data.length > 0) {
+        const geneCount = data.length;
+        const uniqueLocalizations = [...new Set(
+            data
+                .map(g => g.localization)
+                .flat()
+                .filter(Boolean)
+        )].length;
+        const totalReferences = data.reduce((sum, g) => {
+            if (!g.reference) return sum;
+            return sum + (Array.isArray(g.reference) ? g.reference.length : 1);
+        }, 0);
+
+        // Update the numbers in the HTML
+        document.getElementById('gene-count').textContent = geneCount;
+        document.getElementById('localization-count').textContent = uniqueLocalizations;
+        document.getElementById('reference-count').textContent = totalReferences;
+    }
+}
 
 function performBatchSearch() {
     const inputElement = document.getElementById('batch-genes-input');
@@ -1872,146 +1892,6 @@ function handleStickySearch() {
     }
 }
 
-/**
- * Displays a horizontal bar chart of gene counts for key ciliary localizations.
- * This function creates and appends the necessary HTML elements to the content area.
- */
-function displayLocalizationChart() {
-    // Define the primary categories to be displayed on the chart
-    const categories = ['Cilia', 'Basal Body', 'Transition Zone', 'Flagella', 'Ciliary Associated Gene'];
-
-    // Calculate the number of genes associated with each category
-    const localizationCounts = categories.reduce((acc, category) => {
-        acc[category] = allGenes.filter(g => {
-            if (!Array.isArray(g.localization)) {
-                return false;
-            }
-            // Sanitize the localization data for accurate matching
-            const localizations = g.localization
-                .map(l => l?.trim().toLowerCase())
-                .filter(Boolean);
-
-            if (localizations.length === 0) {
-                return false;
-            }
-
-            // Check if the gene's localizations match the current category
-            return localizations.includes(category.toLowerCase()) ||
-                (category === 'Cilia' && localizations.includes('ciliary membrane')) ||
-                (category === 'Flagella' && localizations.includes('axoneme')) ||
-                (category === 'Ciliary Associated Gene' && localizations.includes('ciliary associated gene'));
-        }).length;
-        return acc;
-    }, {});
-
-    // Sort categories to show the most frequent ones on top
-    const sortedCategories = categories.sort((a, b) => localizationCounts[b] - localizationCounts[a]);
-
-    // Prepare the page for the new chart
-    const contentArea = document.querySelector('.content-area');
-    const existingChart = contentArea.querySelector('#locChart');
-    if (existingChart) {
-        existingChart.closest('.page-section').remove();
-    }
-
-    // ✨ FIX: Create the chart's container element dynamically ✨
-    const chartContainer = document.createElement('div');
-    chartContainer.className = 'page-section';
-    chartContainer.innerHTML = `
-        <h2 style="text-align: center; margin-bottom: 1.5rem;">Localization in Ciliary Genes</h2>
-        <div class="chart-wrapper" style="position: relative; height: 400px; width: 100%;">
-            <canvas id="locChart"></canvas>
-        </div>
-    `;
-
-    // Append the newly created container to the page
-    contentArea.appendChild(chartContainer);
-
-    const ctx = document.getElementById('locChart').getContext('2d');
-    
-    // Create gradients for a more modern look
-    const createGradient = (color1, color2) => {
-        const gradient = ctx.createLinearGradient(0, 0, ctx.canvas.width, 0);
-        gradient.addColorStop(0, color1);
-        gradient.addColorStop(1, color2);
-        return gradient;
-    };
-
-    const backgroundColors = [
-        createGradient('rgba(0, 85, 102, 0.8)', 'rgba(0, 128, 153, 0.8)'),
-        createGradient('rgba(102, 194, 165, 0.8)', 'rgba(140, 212, 194, 0.8)'),
-        createGradient('rgba(216, 27, 96, 0.8)', 'rgba(230, 64, 129, 0.8)'),
-        createGradient('rgba(255, 127, 0, 0.8)', 'rgba(255, 159, 64, 0.8)'),
-        createGradient('rgba(107, 174, 214, 0.8)', 'rgba(141, 190, 223, 0.8)')
-    ];
-    
-    // Initialize the new Chart.js instance
-    new Chart(ctx, {
-        type: 'bar',
-        data: {
-            labels: sortedCategories,
-            datasets: [{
-                label: 'Number of Genes',
-                data: sortedCategories.map(category => localizationCounts[category] || 0),
-                backgroundColor: backgroundColors,
-                borderRadius: 5,
-                borderWidth: 0,
-            }]
-        },
-        options: {
-            indexAxis: 'y', // Switch to a horizontal bar chart
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    grid: {
-                        display: false,
-                        drawBorder: false,
-                    },
-                    ticks: {
-                        color: '#333',
-                        font: {
-                            size: 14,
-                            family: "'Helvetica Neue', 'Helvetica', 'Arial', sans-serif"
-                        }
-                    }
-                },
-                x: {
-                    grid: {
-                        display: false,
-                        drawBorder: false,
-                    },
-                    ticks: {
-                        display: false
-                    }
-                }
-            },
-            plugins: {
-                customCanvasBackgroundColor: {
-                    color: 'transparent',
-                },
-                legend: {
-                    display: false
-                },
-                title: {
-                    display: false
-                },
-                tooltip: {
-                    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-                    titleFont: { size: 16 },
-                    bodyFont: { size: 14 },
-                    displayColors: false,
-                    callbacks: {
-                        label: function(context) {
-                            return ` ${context.raw} genes`;
-                        }
-                    }
-                }
-            }
-        }
-    });
-}
 
 // --- Expression Visualization System ---
 let expressionData = {};
