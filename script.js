@@ -108,10 +108,7 @@ if (g.ensembl_id) {
     }
 }
 
-/**
- * Search genes using symbols, synonyms, or ENSG IDs.
- * Handles multiple IDs per gene.
- */
+
 /**
  * Search genes using symbols, synonyms, or Ensembl IDs from the pre-built cache.
  * Handles multiple queries efficiently.
@@ -199,6 +196,35 @@ function updateHomepageStats(geneData) {
     document.getElementById('localization-count').textContent = uniqueLocalizations;
     document.getElementById('reference-count').textContent = totalReferences;
 }
+// Load data, render homepage, and update stats
+function initCiliaHub() {
+    fetch('ciliahub_data.json')
+        .then(response => response.json())
+        .then(data => {
+            console.log(`✅ Loaded ${data.length} genes from ciliahub_data.json`);
+            
+            // Store globally so other functions can use it
+            currentData = data;
+            allGenes = data;
+
+            // Display homepage
+            displayHomePage();
+
+            // ✅ Update homepage stats after data + homepage render
+            updateHomepageStats(currentData);
+        })
+        .catch(error => {
+            console.error('❌ Error loading gene data:', error);
+            const contentArea = document.querySelector('.content-area');
+            if (contentArea) {
+                contentArea.innerHTML = `<p style="color:red;">Error loading gene data. Please try refreshing the page.</p>`;
+            }
+        });
+}
+
+// Call it once page is ready
+document.addEventListener('DOMContentLoaded', initCiliaHub);
+
 
 function performBatchSearch() {
     const inputElement = document.getElementById('batch-genes-input');
