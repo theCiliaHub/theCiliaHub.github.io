@@ -225,7 +225,9 @@ function initCiliaHub() {
 
 // Display limited JSON preview (safe & fast)
 function displayJsonPreview(data) {
-    if (!data || data.length === 0) return;
+    // Only show JSON preview in development mode
+    const isDebugMode = window.location.search.includes('debug=true') || process.env.NODE_ENV === 'development';
+    if (!isDebugMode || !data || data.length === 0) return;
 
     // Remove old preview if it exists (avoid duplicates)
     const oldPreview = document.getElementById('json-preview');
@@ -233,8 +235,8 @@ function displayJsonPreview(data) {
 
     const previewContainer = document.createElement('div');
     previewContainer.id = 'json-preview';
-    previewContainer.style.backgroundColor = '#007bff';
-    previewContainer.style.color = '#fff';
+    previewContainer.style.backgroundColor = 'var(--white, #ffffff)';
+    previewContainer.style.color = 'var(--text-dark, #333)';
     previewContainer.style.fontFamily = 'monospace';
     previewContainer.style.padding = '1rem';
     previewContainer.style.marginTop = '2rem';
@@ -243,6 +245,7 @@ function displayJsonPreview(data) {
     previewContainer.style.wordBreak = 'break-word';
     previewContainer.style.maxHeight = '300px';
     previewContainer.style.overflowY = 'auto';
+    previewContainer.style.border = '1px solid var(--border-color, #ddd)';
 
     // Show only first 50 records for speed
     const previewData = data.slice(0, 50);
@@ -250,7 +253,6 @@ function displayJsonPreview(data) {
 
     document.querySelector('.content-area').appendChild(previewContainer);
 }
-
 
 // Call init when DOM is ready
 document.addEventListener('DOMContentLoaded', initCiliaHub);
