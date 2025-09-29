@@ -160,13 +160,26 @@ function debugSearch(query) {
     }
 }
 
-/**
- * Handles the UI for the Batch Gene Query page.
- */
-/**
- * Handles the UI for the Batch Gene Query page.
- */
-/**
+// This should be the main entry point of your application
+async function initializeApp() {
+    // First, wait for the database to be fully loaded and prepared.
+    const dataLoaded = await loadAndPrepareDatabase();
+
+    if (dataLoaded) {
+        // ONLY after the data is loaded, set up the router
+        // and handle the initial URL.
+        setupRouter(); // This function would handle URL changes
+        handleInitialRoute(); // This function would process the URL on first load
+    } else {
+        // Handle the case where data loading failed
+        console.error("Failed to load gene database. App cannot start.");
+        // Maybe display an error message to the user
+    }
+}
+
+// Start the entire application
+initializeApp();
+
  * Handles the UI for the Batch Gene Query page, supporting all identifier types and filters.
  */
 function performBatchSearch() {
@@ -1248,8 +1261,9 @@ function displayIndividualGenePage(gene) {
     };
 
     const formatScreenDataTable = (screens) => {
-        if (!screens || screens.length === 0) {
-            return '<p>No genome-wide screen data available for this gene.</p>';
+    // FIX: Check if screens is an array before using .forEach
+    if (!Array.isArray(screens) || screens.length === 0) {
+        return '<p>No genome-wide screen data available for this gene.</p>';
         }
         let tableHTML = `
             <table class="data-table screen-table">
