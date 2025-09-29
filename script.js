@@ -1627,22 +1627,37 @@ function displayGeneCards(defaults, searchResults, page = 1, perPage = 10) {
     let uniqueDefaults = defaults.filter(d => !searchResults.some(s => s.gene === d.gene));
     let allGenesToDisplay = [...searchResults, ...uniqueDefaults];
 
-    // ✨ FIX IS HERE: If no genes are provided for the homepage, proactively get the default set.
+    // ✨ FIX: If no genes are provided, check if URL contains a single gene name and display that gene.
     if (allGenesToDisplay.length === 0 && searchResults.length === 0) {
-        allGenesToDisplay = allGenes.filter(g => defaultGenesNames.includes(g.gene));
+        const geneFromURL = window.location.hash.split('/')[1]; // e.g., "#/ABRAXAS2"
+        if (geneFromURL) {
+            const foundGene = allGenes.find(
+                g => g.gene.toUpperCase() === geneFromURL.toUpperCase()
+            );
+            if (foundGene) {
+                allGenesToDisplay = [foundGene];
+            }
+        }
+        // Fallback to homepage default genes if still empty
+        if (allGenesToDisplay.length === 0) {
+            allGenesToDisplay = allGenes.filter(g =>
+                defaultGenesNames.includes(g.gene)
+            );
+        }
     }
-    // End of fix
 
     const start = (page - 1) * perPage;
     const end = start + perPage;
     const paginatedGenes = allGenesToDisplay.slice(start, end);
-    
+
     const observer = new IntersectionObserver((entries) => {
         entries.forEach(entry => {
             if (entry.isIntersecting) {
                 const gene = JSON.parse(entry.target.dataset.gene);
                 const isSearchResult = searchResults.some(s => s.gene === gene.gene);
-                const localizationText = Array.isArray(gene.localization) ? gene.localization.join(', ') : (gene.localization || '');
+                const localizationText = Array.isArray(gene.localization)
+                    ? gene.localization.join(', ')
+                    : (gene.localization || '');
 
                 entry.target.innerHTML = `
                     <div class="gene-name">${gene.gene}</div>
@@ -1670,7 +1685,7 @@ function displayGeneCards(defaults, searchResults, page = 1, perPage = 10) {
                         Click to view detailed information →
                     </div>
                 `;
-                
+
                 entry.target.classList.add(isSearchResult ? 'search-result' : 'default');
                 entry.target.onclick = (e) => navigateTo(e, `/${gene.gene}`);
                 entry.target.setAttribute('aria-label', `View details for ${gene.gene}`);
@@ -1678,20 +1693,20 @@ function displayGeneCards(defaults, searchResults, page = 1, perPage = 10) {
             }
         });
     }, { rootMargin: '100px' });
-    
+
     container.innerHTML = paginatedGenes.map(gene => `
         <div class="gene-card" data-gene='${JSON.stringify(gene)}'></div>
     `).join('');
-    
+
     container.querySelectorAll('.gene-card').forEach(card => observer.observe(card));
-    
+
     const paginationDiv = document.createElement('div');
     paginationDiv.className = 'pagination';
-    
+
     // Stringify the data once to prevent issues in the onclick attribute
     const defaultsStr = JSON.stringify(defaults);
     const searchResultsStr = JSON.stringify(searchResults);
-    
+
     paginationDiv.innerHTML = `
         <button onclick='displayGeneCards(${defaultsStr}, ${searchResultsStr}, ${page - 1}, ${perPage})' ${page === 1 ? 'disabled' : ''}>Previous</button>
         <span>Page ${page} of ${Math.ceil(allGenesToDisplay.length / perPage)}</span>
@@ -1700,7 +1715,7 @@ function displayGeneCards(defaults, searchResults, page = 1, perPage = 10) {
     if (allGenesToDisplay.length > perPage) {
         container.appendChild(paginationDiv);
     }
-    
+
     updateGeneButtons(allGenesToDisplay, searchResults);
 }
 
