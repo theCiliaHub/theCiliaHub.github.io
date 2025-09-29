@@ -299,7 +299,7 @@ function handleHomeSearchKeyDown(event) {
 // --- NAVIGATION FIX ---
 // This robust function navigates to the selected gene's page.
 function navigateToGenePage(geneName) {
-    const selectedGene = allGenes.find(g => g.gene === geneName);
+    const selectedGene = geneMapCache.get(geneName.toUpperCase());
 
     if (selectedGene) {
         homeSearchInput.value = selectedGene.gene; // Update input field
