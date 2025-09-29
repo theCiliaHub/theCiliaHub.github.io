@@ -1624,40 +1624,76 @@ function displayGeneCards(defaults, searchResults, page = 1, perPage = 10) {
     const container = document.getElementById('gene-cards-container');
     if (!container) return;
 
+    // Defensive defaults
+    defaults = Array.isArray(defaults) ? defaults : [];
+    searchResults = Array.isArray(searchResults) ? searchResults : [];
+
+    // Build initial list: searchResults first, then defaults that are not in search results
     let uniqueDefaults = defaults.filter(d => !searchResults.some(s => s.gene === d.gene));
     let allGenesToDisplay = [...searchResults, ...uniqueDefaults];
 
-    // ✨ FIX: If no genes are provided, check if URL contains a single gene name and display that gene.
-    if (allGenesToDisplay.length === 0 && searchResults.length === 0) {
-        const geneFromURL = window.location.hash.split('/')[1]; // e.g., "#/ABRAXAS2"
-        if (geneFromURL) {
-            const foundGene = allGenes.find(
-                g => g.gene.toUpperCase() === geneFromURL.toUpperCase()
-            );
-            if (foundGene) {
-                allGenesToDisplay = [foundGene];
+    // --- Robustly parse gene name from the URL hash (handles #/GENE, #!/GENE, etc.)
+    const hash = (window.location.hash || '');
+    const hashMatch = hash.match(/#(?:\/|!\/)?([^\/\?\&]+)/);
+    const geneFromURL = hashMatch ? decodeURIComponent(hashMatch[1]) : null;
+
+    // If a gene is present in the URL, try to find it in allGenes (case-insensitive),
+    // matching against common fields (gene, symbol, name, synonyms).
+    if (geneFromURL) {
+        const geneUpper = geneFromURL.toUpperCase();
+        const foundGene = allGenes.find(g => {
+            if (!g) return false;
+            if (g.gene && g.gene.toUpperCase() === geneUpper) return true;
+            if (g.symbol && g.symbol.toUpperCase() === geneUpper) return true;
+            if (g.name && g.name.toUpperCase() === geneUpper) return true;
+            // synonyms may be string or array
+            if (g.synonym) {
+                if (Array.isArray(g.synonym) && g.synonym.some(s => String(s).toUpperCase() === geneUpper)) return true;
+                if (typeof g.synonym === 'string' && g.synonym.toUpperCase() === geneUpper) return true;
             }
-        }
-        // Fallback to homepage default genes if still empty
-        if (allGenesToDisplay.length === 0) {
-            allGenesToDisplay = allGenes.filter(g =>
-                defaultGenesNames.includes(g.gene)
-            );
+            return false;
+        });
+
+        if (foundGene) {
+            // ensure the gene is present in the display list (put it at front)
+            if (!allGenesToDisplay.some(g => g.gene === foundGene.gene)) {
+                allGenesToDisplay.unshift(foundGene);
+            }
+        } else {
+            // helpful debugging message if a gene is in the URL but not found in allGenes
+            // eslint-disable-next-line no-console
+            console.warn(`displayGeneCards: gene "${geneFromURL}" is in URL but not found in allGenes.`);
         }
     }
 
+    // If still empty and no search results, fall back to default homepage genes
+    if (allGenesToDisplay.length === 0 && searchResults.length === 0) {
+        allGenesToDisplay = allGenes.filter(g => defaultGenesNames.includes(g.gene));
+    }
+
+    // Pagination safety
+    const totalPages = Math.max(1, Math.ceil(allGenesToDisplay.length / perPage));
+    page = Math.max(1, Math.min(page, totalPages));
     const start = (page - 1) * perPage;
     const end = start + perPage;
     const paginatedGenes = allGenesToDisplay.slice(start, end);
 
+    // IntersectionObserver for lazy rendering
     const observer = new IntersectionObserver((entries) => {
         entries.forEach(entry => {
             if (entry.isIntersecting) {
-                const gene = JSON.parse(entry.target.dataset.gene);
+                let gene;
+                try {
+                    gene = JSON.parse(entry.target.dataset.gene);
+                } catch (err) {
+                    // eslint-disable-next-line no-console
+                    console.error('displayGeneCards: invalid data-gene JSON', err);
+                    observer.unobserve(entry.target);
+                    return;
+                }
+
                 const isSearchResult = searchResults.some(s => s.gene === gene.gene);
-                const localizationText = Array.isArray(gene.localization)
-                    ? gene.localization.join(', ')
-                    : (gene.localization || '');
+                const localizationText = Array.isArray(gene.localization) ? gene.localization.join(', ') : (gene.localization || '');
 
                 entry.target.innerHTML = `
                     <div class="gene-name">${gene.gene}</div>
@@ -1671,15 +1707,15 @@ function displayGeneCards(defaults, searchResults, page = 1, perPage = 10) {
                         </div>` : ''}
                     ${gene.ensembl_id ? `
                         <div class="gene-info"><strong>Ensembl:</strong> 
-                            <a href="https://www.ensembl.org/Homo_sapiens/Gene/Summary?g=${gene.ensembl_id}" target="_blank">
+                            <a href="https://www.ensembl.org/Homo_sapiens/Gene/Summary?g=${gene.ensembl_id}" target="_blank" rel="noopener">
                                 ${gene.ensembl_id}
                             </a>
                         </div>` : ''}
                     ${gene.omim_id ? `
                         <div class="gene-info"><strong>OMIM:</strong> 
-                            <a href="https://www.omim.org/entry/${gene.omim_id}" target="_blank">${gene.omim_id}</a>
+                            <a href="https://www.omim.org/entry/${gene.omim_id}" target="_blank" rel="noopener">${gene.omim_id}</a>
                         </div>` : ''}
-                    ${gene.synonym ? `<div class="gene-info"><strong>Synonym:</strong> ${gene.synonym}</div>` : ''}
+                    ${gene.synonym ? `<div class="gene-info"><strong>Synonym:</strong> ${Array.isArray(gene.synonym) ? gene.synonym.join(', ') : gene.synonym}</div>` : ''}
                     <div style="margin-top: 1rem; padding: 0.5rem; background: ${isSearchResult ? '#d5f4e6' : '#e8f4fd'}; 
                             border-radius: 5px; font-size: 0.9rem; color: ${isSearchResult ? '#27ae60' : '#1e90ff'};">
                         Click to view detailed information →
@@ -1694,23 +1730,26 @@ function displayGeneCards(defaults, searchResults, page = 1, perPage = 10) {
         });
     }, { rootMargin: '100px' });
 
+    // Render placeholders for the paginated genes
     container.innerHTML = paginatedGenes.map(gene => `
         <div class="gene-card" data-gene='${JSON.stringify(gene)}'></div>
     `).join('');
 
     container.querySelectorAll('.gene-card').forEach(card => observer.observe(card));
 
+    // Pagination controls
     const paginationDiv = document.createElement('div');
     paginationDiv.className = 'pagination';
 
-    // Stringify the data once to prevent issues in the onclick attribute
     const defaultsStr = JSON.stringify(defaults);
     const searchResultsStr = JSON.stringify(searchResults);
+    const prevDisabled = page === 1 ? 'disabled' : '';
+    const nextDisabled = page >= totalPages ? 'disabled' : '';
 
     paginationDiv.innerHTML = `
-        <button onclick='displayGeneCards(${defaultsStr}, ${searchResultsStr}, ${page - 1}, ${perPage})' ${page === 1 ? 'disabled' : ''}>Previous</button>
-        <span>Page ${page} of ${Math.ceil(allGenesToDisplay.length / perPage)}</span>
-        <button onclick='displayGeneCards(${defaultsStr}, ${searchResultsStr}, ${page + 1}, ${perPage})' ${end >= allGenesToDisplay.length ? 'disabled' : ''}>Next</button>
+        <button onclick='displayGeneCards(${defaultsStr}, ${searchResultsStr}, ${page - 1}, ${perPage})' ${prevDisabled}>Previous</button>
+        <span>Page ${page} of ${totalPages}</span>
+        <button onclick='displayGeneCards(${defaultsStr}, ${searchResultsStr}, ${page + 1}, ${perPage})' ${nextDisabled}>Next</button>
     `;
     if (allGenesToDisplay.length > perPage) {
         container.appendChild(paginationDiv);
