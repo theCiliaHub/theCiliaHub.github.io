@@ -682,6 +682,26 @@ function displayHomePage() {
 
     // MODIFICATION: The dynamic stats update logic that was here has been moved to 
     // the new updateHomepageStats() function to fix the race condition.
+
+   // --- OPTIONAL DEBUG VIEW: Show all JSON data below homepage ---
+    const jsonContainer = document.createElement('div');
+    jsonContainer.style.backgroundColor = '#007bff';  // Blue background
+    jsonContainer.style.color = '#fff';               // White text
+    jsonContainer.style.fontFamily = 'monospace';
+    jsonContainer.style.padding = '1rem';
+    jsonContainer.style.marginTop = '2rem';
+    jsonContainer.style.overflowX = 'auto';
+    jsonContainer.style.borderRadius = '8px';
+    jsonContainer.style.whiteSpace = 'pre-wrap';
+    jsonContainer.style.wordWrap = 'break-word';
+
+    if (Array.isArray(currentData) && currentData.length > 0) {
+        jsonContainer.textContent = JSON.stringify(currentData, null, 2);
+    } else {
+        jsonContainer.textContent = '⚠️ No gene data available to display.';
+    }
+
+    document.querySelector('.content-area').appendChild(jsonContainer);
 }
 
 function displayBatchQueryTool() {
