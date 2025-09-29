@@ -182,23 +182,66 @@ async function initializeApp() {
 initializeApp();
 
 
-function updateHomepageStats(geneData) {
-    if (!geneData || geneData.length === 0) return;
-
-    const geneCount = geneData.length;
-    const uniqueLocalizations = [...new Set(
-        geneData.map(g => g.localization).flat().filter(Boolean)
-    )].length;
-    const totalReferences = geneData.reduce((sum, g) => {
-        if (!g.reference) return sum;
-        return sum + (Array.isArray(g.reference) ? g.reference.length : 1);
-    }, 0);
-
-    // Update the numbers in the HTML
-    document.getElementById('gene-count').textContent = geneCount;
-    document.getElementById('localization-count').textContent = uniqueLocalizations;
-    document.getElementById('reference-count').textContent = totalReferences;
+// Add this function to your code to update the homepage statistics
+function updateHomepageStats() {
+    // Calculate gene count
+    const geneCount = allGenes ? allGenes.length : 0;
+    
+    // Calculate localization count
+    // Adjust this based on how localizations are stored in your data
+    let localizationCount = 0;
+    if (allGenes && allGenes.length > 0) {
+        allGenes.forEach(gene => {
+            if (gene.localizations && Array.isArray(gene.localizations)) {
+                localizationCount += gene.localizations.length;
+            } else if (gene.localization) {
+                localizationCount += 1;
+            }
+        });
+    }
+    
+    // Calculate reference count
+    // Adjust this based on how references are stored in your data
+    let referenceCount = 0;
+    if (allGenes && allGenes.length > 0) {
+        const uniqueReferences = new Set();
+        allGenes.forEach(gene => {
+            if (gene.references && Array.isArray(gene.references)) {
+                gene.references.forEach(ref => uniqueReferences.add(ref));
+            } else if (gene.reference) {
+                uniqueReferences.add(gene.reference);
+            } else if (gene.pmid) {
+                uniqueReferences.add(gene.pmid);
+            }
+        });
+        referenceCount = uniqueReferences.size;
+    }
+    
+    // Update the DOM elements with counts
+    const geneCountEl = document.getElementById('gene-count');
+    const localizationCountEl = document.getElementById('localization-count');
+    const referenceCountEl = document.getElementById('reference-count');
+    
+    if (geneCountEl) {
+        geneCountEl.textContent = geneCount.toLocaleString();
+    }
+    if (localizationCountEl) {
+        localizationCountEl.textContent = localizationCount.toLocaleString();
+    }
+    if (referenceCountEl) {
+        referenceCountEl.textContent = referenceCount.toLocaleString();
+    }
 }
+
+// Call this function after your data is loaded
+// For example, in your data loading function:
+// fetch('your-data-url')
+//     .then(response => response.json())
+//     .then(data => {
+//         allGenes = data;
+//         updateHomepageStats();
+//     });
+
 
 function performBatchSearch() {
     const inputElement = document.getElementById('batch-genes-input');
