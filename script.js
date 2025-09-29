@@ -583,16 +583,6 @@ function displayHomePage() {
                         <div>Genes</div>
                     </div>
                 </div>
-
-                <div style="flex: 1; min-width: 140px; background-color: #e7f1ff; color: #007bff; padding: 1rem; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); text-align: center;">
-                    <div id="localization-count" style="font-size: 1.5rem; font-weight: 700;">...</div>
-                    <div>Localizations</div>
-                </div>
-
-                <div style="flex: 1; min-width: 140px; background-color: #e7f1ff; color: #007bff; padding: 1rem; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); text-align: center;">
-                    <div id="reference-count" style="font-size: 1.5rem; font-weight: 700;">...</div>
-                    <div>References</div>
-                </div>
             </div>
 
             <p style="font-size: 1.1rem; color: #555;">CiliaHub is an advanced <strong>bioinformatics</strong> platform that hosts a detailed database of <strong>gold standard cilia genes</strong> and their role in various <strong>ciliopathies</strong>. Our comprehensive collection includes the most reliable and well-established genes linked to ciliary function, with reference papers also provided. With our user-friendly search tool, researchers can explore <strong>genome</strong>-wide data, focusing on both known and novel ciliary genes. Discover their contributions to the biology of cilia and the mechanisms behind ciliary-related disorders. Search for a single gene below or use the Batch Query tool to analyze multiple genes.</p>
@@ -704,6 +694,7 @@ function displayHomePage() {
     // MODIFICATION: The dynamic stats update logic that was here has been moved to 
     // the new updateHomepageStats() function to fix the race condition.
 }
+
 
 function displayBatchQueryTool() {
     const contentArea = document.querySelector('.content-area');
