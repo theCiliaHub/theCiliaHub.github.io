@@ -98,40 +98,14 @@ body {
     gap: 2rem;
 }
 
-#Galatasaray colors
-.cilia-panel {
-    width: 300px;
-    background: var(--panel-bg);
-    padding: 2rem;
-    border-radius: var(--border-radius-lg);
-    box-shadow: 0 8px 32px rgba(44, 90, 160, 0.1);
-    position: sticky;
-    top: 100px;
-}
-
-.cilia-panel h2, .cilia-panel h3 {
-    font-size: 1.3rem;
-    color: var(--primary-dark);
-    margin-bottom: 1.5rem;
-}
-
-.cilia-diagram {
-    margin-bottom: 1.5rem;
-}
-
-.cilia-diagram img {
-    max-width: 100%;
-    height: auto;
-}
-
-/* Interactive cilium parts - let SVG fills and strokes define colors */
+/* Interactive cilium parts - CiliaHub Theme */
 .cilia-part {
     transition: fill 0.3s, stroke 0.3s, filter 0.3s;
 }
 
-/* Highlight for selected default genes - uses a vibrant accent green from your theme */
+/* Highlight for selected genes - uses the site's vibrant accent green */
 .cilia-part.highlighted {
-    stroke: #20c997; /* A vibrant, compatible green */
+    stroke: #20c997; /* CiliaHub Accent Green */
     stroke-width: 3px;
 }
 
@@ -147,12 +121,12 @@ body {
     outline-offset: 2px;
 }
 
-/* Fill for ciliary-specific parts - a light, on-palette blue */
+/* Fill for default ciliary parts - a light, on-palette blue */
 .cilia-part.cilia {
     fill: #a8d8ff; 
 }
 
-/* Fill for user-searched genes - a slightly deeper blue for contrast */
+/* Fill for user-searched genes - a deeper blue for clear contrast */
 .cilia-part.search-gene {
     fill: #7ac0ff; 
 }
@@ -161,6 +135,8 @@ body {
 #cell-body, #nucleus {
     /* Do not override fill; let SVG gradient show */
 }
+
+/* --- Gene Button Styles --- */
 #geneButtons {
     display: flex;
     flex-direction: column;
@@ -169,7 +145,6 @@ body {
 
 .gene-btn {
     padding: 0.5rem;
-    background: var(--border-color);
     border: none;
     border-radius: var(--border-radius-sm);
     cursor: pointer;
@@ -177,17 +152,22 @@ body {
     transition: background 0.3s, color 0.3s;
 }
 
-.gene-btn:hover, .gene-btn:focus-visible, .gene-btn.search-gene {
-    background: var(--accent-green-2);
-    color: var(--text-light);
-    outline: none;
-}
-
+/* Default buttons use the site's light primary blue */
 .gene-btn.default {
     background: var(--primary-blue-light);
     color: var(--text-light);
 }
 
+/* Hover and searched genes use the site's accent green */
+.gene-btn:hover,
+.gene-btn:focus-visible,
+.gene-btn.search-gene {
+    background: var(--accent-green-2);
+    color: var(--text-light);
+    outline: none;
+}
+
+/* Reset button uses a neutral gray from the site's theme */
 .gene-btn.reset-btn {
     background: var(--gray-medium);
     color: var(--text-light);
