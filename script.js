@@ -162,42 +162,42 @@ function debugSearch(query) {
 
 // This should be the main entry point of your application
 async function initializeApp() {
-    // Wait for the database to be fully loaded and prepared.
+    // 1. Wait for the database to be fully loaded and prepared
     const dataLoaded = await loadAndPrepareDatabase();
 
     if (dataLoaded) {
-        // Data is ready, now update the stats on the homepage
-        updateHomepageStats(allGenes); // `allGenes` is the global variable with your data
-        
-        // Now handle routing
+        // 2. Data is ready. Now, handle the initial page view.
+        // This will call displayHomePage() among other functions.
         handleInitialRoute(); 
+
+        // 3. Explicitly call the function to update the stats
+        // with the now-loaded `allGenes` data.
+        updateHomepageStats(allGenes);
     } else {
         console.error("Failed to load gene database. App cannot start.");
     }
 }
 
-// Start the app
+// Start the entire application
 initializeApp();
 
-function updateHomepageStats(data) {
-    if (data && data.length > 0) {
-        const geneCount = data.length;
-        const uniqueLocalizations = [...new Set(
-            data
-                .map(g => g.localization)
-                .flat()
-                .filter(Boolean)
-        )].length;
-        const totalReferences = data.reduce((sum, g) => {
-            if (!g.reference) return sum;
-            return sum + (Array.isArray(g.reference) ? g.reference.length : 1);
-        }, 0);
 
-        // Update the numbers in the HTML
-        document.getElementById('gene-count').textContent = geneCount;
-        document.getElementById('localization-count').textContent = uniqueLocalizations;
-        document.getElementById('reference-count').textContent = totalReferences;
-    }
+function updateHomepageStats(geneData) {
+    if (!geneData || geneData.length === 0) return;
+
+    const geneCount = geneData.length;
+    const uniqueLocalizations = [...new Set(
+        geneData.map(g => g.localization).flat().filter(Boolean)
+    )].length;
+    const totalReferences = geneData.reduce((sum, g) => {
+        if (!g.reference) return sum;
+        return sum + (Array.isArray(g.reference) ? g.reference.length : 1);
+    }, 0);
+
+    // Update the numbers in the HTML
+    document.getElementById('gene-count').textContent = geneCount;
+    document.getElementById('localization-count').textContent = uniqueLocalizations;
+    document.getElementById('reference-count').textContent = totalReferences;
 }
 
 function performBatchSearch() {
@@ -525,6 +525,7 @@ function displayHomePage() {
     const contentArea = document.querySelector('.content-area');
     contentArea.className = 'content-area';
     document.querySelector('.cilia-panel').style.display = 'block';
+ 
 
     // --- Initial render with placeholders ---
     contentArea.innerHTML = `
@@ -568,9 +569,9 @@ function displayHomePage() {
 
     // --- Search button ---
     document.getElementById('single-search-btn').onclick = performSingleSearch;
-
     const searchInput = document.getElementById('single-gene-search');
     const suggestionsContainer = document.getElementById('search-suggestions');
+    displayGeneCards(currentData, [], 1, 10);
 
     const hideSuggestions = () => {
         suggestionsContainer.innerHTML = '';
@@ -653,25 +654,8 @@ function displayHomePage() {
     // --- Display gene cards immediately (empty or with placeholder) ---
     displayGeneCards(currentData, [], 1, 10);
 
-    // --- Dynamic stats update after data is loaded ---
-    if (currentData && currentData.length > 0) {
-        const geneCount = currentData.length;
-        const uniqueLocalizations = [...new Set(
-            currentData
-                .map(g => g.localization)
-                .flat()
-                .filter(Boolean)
-        )];
-        const totalReferences = currentData.reduce((sum, g) => {
-            if (!g.reference) return sum;
-            return sum + g.reference.length;
-        }, 0);
-
-        // Update the cards dynamically
-        document.getElementById('gene-count').textContent = geneCount;
-        document.getElementById('localization-count').textContent = uniqueLocalizations.length;
-        document.getElementById('reference-count').textContent = totalReferences;
-    }
+    // MODIFICATION: The dynamic stats update logic that was here has been moved to 
+    // the new updateHomepageStats() function to fix the race condition.
 }
 
 function displayBatchQueryTool() {
