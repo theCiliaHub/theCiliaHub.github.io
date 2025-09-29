@@ -108,7 +108,10 @@ if (g.ensembl_id) {
     }
 }
 
-
+/**
+ * Search genes using symbols, synonyms, or ENSG IDs.
+ * Handles multiple IDs per gene.
+ */
 /**
  * Search genes using symbols, synonyms, or Ensembl IDs from the pre-built cache.
  * Handles multiple queries efficiently.
@@ -196,67 +199,6 @@ function updateHomepageStats(geneData) {
     document.getElementById('localization-count').textContent = uniqueLocalizations;
     document.getElementById('reference-count').textContent = totalReferences;
 }
-// Load data, render homepage, and update stats
-function initCiliaHub() {
-    fetch('ciliahub_data.json')
-        .then(response => response.json())
-        .then(data => {
-            console.log(`✅ Loaded ${data.length} genes from ciliahub_data.json`);
-            
-            currentData = data;
-            allGenes = data;
-
-            displayHomePage();
-
-            // ✅ FIX: Update stats AFTER homepage renders
-            updateHomepageStats(currentData);
-
-            // ✅ OPTIONAL: Show JSON preview (but limit to first 50 items to keep page fast)
-            displayJsonPreview(currentData);
-        })
-        .catch(error => {
-            console.error('❌ Error loading gene data:', error);
-            const contentArea = document.querySelector('.content-area');
-            if (contentArea) {
-                contentArea.innerHTML = `<p style="color:red;">Error loading gene data. Please try refreshing the page.</p>`;
-            }
-        });
-}
-
-// Display limited JSON preview (safe & fast)
-function displayJsonPreview(data) {
-    // Only show JSON preview in development mode
-    const isDebugMode = window.location.search.includes('debug=true') || process.env.NODE_ENV === 'development';
-    if (!isDebugMode || !data || data.length === 0) return;
-
-    // Remove old preview if it exists (avoid duplicates)
-    const oldPreview = document.getElementById('json-preview');
-    if (oldPreview) oldPreview.remove();
-
-    const previewContainer = document.createElement('div');
-    previewContainer.id = 'json-preview';
-    previewContainer.style.backgroundColor = 'var(--white, #ffffff)';
-    previewContainer.style.color = 'var(--text-dark, #333)';
-    previewContainer.style.fontFamily = 'monospace';
-    previewContainer.style.padding = '1rem';
-    previewContainer.style.marginTop = '2rem';
-    previewContainer.style.borderRadius = '8px';
-    previewContainer.style.whiteSpace = 'pre-wrap';
-    previewContainer.style.wordBreak = 'break-word';
-    previewContainer.style.maxHeight = '300px';
-    previewContainer.style.overflowY = 'auto';
-    previewContainer.style.border = '1px solid var(--border-color, #ddd)';
-
-    // Show only first 50 records for speed
-    const previewData = data.slice(0, 50);
-    previewContainer.textContent = JSON.stringify(previewData, null, 2);
-
-    document.querySelector('.content-area').appendChild(previewContainer);
-}
-
-// Call init when DOM is ready
-document.addEventListener('DOMContentLoaded', initCiliaHub);
-
 
 function performBatchSearch() {
     const inputElement = document.getElementById('batch-genes-input');
@@ -1862,37 +1804,29 @@ function updateGeneButtons(genesToDisplay, searchResults = []) {
     container.appendChild(resetButton);
 }
 
-// This should be the ONLY `selectedGenes` variable in your file
 let selectedGenes = [];
-
-/**
- * This should be the ONLY `showLocalization` function in your file.
- * It correctly handles applying multiple CSS classes for different colors.
- */
 function showLocalization(geneName, isSearchGene = false) {
     if (geneName === 'reset') {
         selectedGenes = [];
     } else {
-        // Find if the gene is already selected
         const geneIndex = selectedGenes.findIndex(g => g.name === geneName);
-
         if (geneIndex === -1) {
-            // If not found, add it as an object to remember its type
+            // Store the gene name and its type (search or default)
             selectedGenes.push({ name: geneName, isSearch: isSearchGene });
         } else {
-            // If found, remove it so the click acts as a toggle
+            // Remove the gene if it's clicked again
             selectedGenes.splice(geneIndex, 1);
         }
     }
     
-    // Clear all existing highlights and classes from the SVG parts
+    // Clear all existing highlights and classes from SVG parts
     const ciliaParts = document.querySelectorAll('.cilia-part');
     ciliaParts.forEach(part => part.classList.remove('highlighted', 'search-gene', 'cilia'));
     
-    // Clear all "selected" styles from the gene buttons
+    // Clear all selections from gene buttons
     document.querySelectorAll('.gene-btn').forEach(btn => btn.classList.remove('selected'));
     
-    // Apply the correct classes based on the updated selectedGenes array
+    // Apply new classes based on the updated selectedGenes array
     selectedGenes.forEach(geneObject => {
         if (geneLocalizationData[geneObject.name]) {
             const isCiliary = geneLocalizationData[geneObject.name].some(id => ['ciliary-membrane', 'axoneme'].includes(id));
@@ -1900,21 +1834,21 @@ function showLocalization(geneName, isSearchGene = false) {
             geneLocalizationData[geneObject.name].forEach(id => {
                 const el = document.getElementById(id);
                 if (el && id !== 'cell-body') {
-                    // ALWAYS add 'highlighted' for the stroke color
+                    // ALWAYS add the 'highlighted' class for the stroke color
                     el.classList.add('highlighted');
 
-                    // ADDITIVE LOGIC: Apply classes without 'else'
+                    // ADDITIVE LOGIC: Add classes based on conditions without 'else'
                     if (isCiliary) {
-                        el.classList.add('cilia'); // Applies the light blue fill
+                        el.classList.add('cilia'); // Applies light blue fill
                     }
                     if (geneObject.isSearch) {
-                        el.classList.add('search-gene'); // Applies the darker blue fill, overriding the light blue if needed
+                        el.classList.add('search-gene'); // Applies darker blue fill
                     }
                 }
             });
         }
         
-        // Find and apply the 'selected' class to the corresponding button
+        // Find and select the corresponding button
         const btn = [...document.querySelectorAll('.gene-btn')].find(b => b.textContent === geneObject.name);
         if (btn) btn.classList.add('selected');
     });
@@ -2382,30 +2316,9 @@ function displayExpressionPage() {
 
 
 // Init UI helpers (sticky nav, panzoom, etc.)
-// SINGLE SOURCE OF TRUTH FOR PAGE INIT
 document.addEventListener('DOMContentLoaded', () => {
-    fetch('ciliahub_data.json')
-        .then(res => res.json())
-        .then(data => {
-            currentData = data;
-            allGenes = data;
-
-            // Render homepage AFTER data is ready
-            displayHomePage();
-
-            // Update stats AFTER rendering
-            updateHomepageStats(currentData);
-
-            // Optional: Show limited JSON preview for debugging
-            displayJsonPreview(currentData);
-        })
-        .catch(err => {
-            console.error('❌ Could not load data:', err);
-            document.querySelector('.content-area').innerHTML = 
-                `<p style="color:red;">Failed to load gene data. Please refresh.</p>`;
-        });
+    initGlobalEventListeners();
 });
-
 
 
 // Enhanced renderFoundNotFoundTable with debugging and error handling
