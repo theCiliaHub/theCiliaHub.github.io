@@ -180,8 +180,6 @@ async function initializeApp() {
 // Start the entire application
 initializeApp();
 
- * Handles the UI for the Batch Gene Query page, supporting all identifier types and filters.
- */
 function performBatchSearch() {
     const inputElement = document.getElementById('batch-genes-input');
     const localizationFilter = document.getElementById('localization-filter')?.value;
