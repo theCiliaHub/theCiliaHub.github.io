@@ -126,13 +126,13 @@ body {
 
 /* Interactive cilium parts - let SVG fills and strokes define colors */
 .cilia-part {
-    transition: fill 0.3s, stroke 0.3s;
+    transition: fill 0.3s, stroke 0.3s, filter 0.3s;
 }
 
-/* Highlight selected genes */
+/* Highlight for selected default genes - uses a vibrant accent green from your theme */
 .cilia-part.highlighted {
-    stroke: #FF4D4D; /* red highlight for selected genes */
-    stroke-width: 2px;
+    stroke: #20c997; /* A vibrant, compatible green */
+    stroke-width: 3px;
 }
 
 /* Hover effect */
@@ -141,27 +141,26 @@ body {
     cursor: pointer;
 }
 
-/* Focus outline */
+/* Focus outline for accessibility - uses a standard interactive blue */
 .cilia-part:focus {
-    outline: 2px solid #FFD700; /* yellow focus outline */
+    outline: 2px solid #0d6efd; 
     outline-offset: 2px;
 }
 
-/* Ciliary-specific parts (if dynamically assigned via JS) */
+/* Fill for ciliary-specific parts - a light, on-palette blue */
 .cilia-part.cilia {
-    /* Optionally override fill for ciliary parts */
-    fill: #FFD700; /* bright yellow */
+    fill: #a8d8ff; 
 }
 
+/* Fill for user-searched genes - a slightly deeper blue for contrast */
 .cilia-part.search-gene {
-    fill: #E6C200; /* darker yellow for search genes */
+    fill: #7ac0ff; 
 }
 
 /* Ensure the main cell and nucleus keep their SVG gradients */
 #cell-body, #nucleus {
     /* Do not override fill; let SVG gradient show */
 }
-
 #geneButtons {
     display: flex;
     flex-direction: column;
