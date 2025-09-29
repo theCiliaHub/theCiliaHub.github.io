@@ -225,9 +225,14 @@ function initCiliaHub() {
 
 // Display limited JSON preview (safe & fast)
 function displayJsonPreview(data) {
-    if (!Array.isArray(data) || data.length === 0) return;
+    if (!data || data.length === 0) return;
+
+    // Remove old preview if it exists (avoid duplicates)
+    const oldPreview = document.getElementById('json-preview');
+    if (oldPreview) oldPreview.remove();
 
     const previewContainer = document.createElement('div');
+    previewContainer.id = 'json-preview';
     previewContainer.style.backgroundColor = '#007bff';
     previewContainer.style.color = '#fff';
     previewContainer.style.fontFamily = 'monospace';
@@ -235,23 +240,17 @@ function displayJsonPreview(data) {
     previewContainer.style.marginTop = '2rem';
     previewContainer.style.borderRadius = '8px';
     previewContainer.style.whiteSpace = 'pre-wrap';
-    previewContainer.style.wordWrap = 'break-word';
-    previewContainer.style.maxHeight = '400px';
-    previewContainer.style.overflowY = 'scroll';
+    previewContainer.style.wordBreak = 'break-word';
+    previewContainer.style.maxHeight = '300px';
+    previewContainer.style.overflowY = 'auto';
 
-    // ✅ Limit to first 50 items for performance
-    const limitedData = data.slice(0, 50);
-    previewContainer.textContent = JSON.stringify(limitedData, null, 2);
-
-    // Add a note to user
-    const note = document.createElement('div');
-    note.style.marginBottom = '0.5rem';
-    note.style.fontWeight = 'bold';
-    note.textContent = `📊 Showing first ${limitedData.length} of ${data.length} records (for performance)`;
-    previewContainer.prepend(note);
+    // Show only first 50 records for speed
+    const previewData = data.slice(0, 50);
+    previewContainer.textContent = JSON.stringify(previewData, null, 2);
 
     document.querySelector('.content-area').appendChild(previewContainer);
 }
+
 
 // Call init when DOM is ready
 document.addEventListener('DOMContentLoaded', initCiliaHub);
@@ -2381,9 +2380,30 @@ function displayExpressionPage() {
 
 
 // Init UI helpers (sticky nav, panzoom, etc.)
+// SINGLE SOURCE OF TRUTH FOR PAGE INIT
 document.addEventListener('DOMContentLoaded', () => {
-    initGlobalEventListeners();
+    fetch('ciliahub_data.json')
+        .then(res => res.json())
+        .then(data => {
+            currentData = data;
+            allGenes = data;
+
+            // Render homepage AFTER data is ready
+            displayHomePage();
+
+            // Update stats AFTER rendering
+            updateHomepageStats(currentData);
+
+            // Optional: Show limited JSON preview for debugging
+            displayJsonPreview(currentData);
+        })
+        .catch(err => {
+            console.error('❌ Could not load data:', err);
+            document.querySelector('.content-area').innerHTML = 
+                `<p style="color:red;">Failed to load gene data. Please refresh.</p>`;
+        });
 });
+
 
 
 // Enhanced renderFoundNotFoundTable with debugging and error handling
