@@ -98,14 +98,14 @@ body {
     gap: 2rem;
 }
 
-/* Interactive cilium parts - CiliaHub Theme */
+/* Interactive cilium parts - Blue Theme */
 .cilia-part {
     transition: fill 0.3s, stroke 0.3s, filter 0.3s;
 }
 
-/* Highlight for selected genes - uses the site's vibrant accent green */
+/* Highlight for selected genes - a vibrant cyan for visibility */
 .cilia-part.highlighted {
-    stroke: #20c997; /* CiliaHub Accent Green */
+    stroke: #0dcaf0; /* Bright Cyan Highlight */
     stroke-width: 3px;
 }
 
@@ -115,20 +115,20 @@ body {
     cursor: pointer;
 }
 
-/* Focus outline for accessibility - uses a standard interactive blue */
+/* Focus outline for accessibility - a standard interactive blue */
 .cilia-part:focus {
-    outline: 2px solid #0d6efd; 
+    outline: 2px solid #0d6efd;
     outline-offset: 2px;
 }
 
-/* Fill for default ciliary parts - a light, on-palette blue */
+/* Fill for default ciliary parts - a light, soft blue */
 .cilia-part.cilia {
-    fill: #a8d8ff; 
+    fill: #a8d8ff; /* Light Blue Fill */
 }
 
 /* Fill for user-searched genes - a deeper blue for clear contrast */
 .cilia-part.search-gene {
-    fill: #7ac0ff; 
+    fill: #4191d5; /* Deeper Blue for Contrast */
 }
 
 /* Ensure the main cell and nucleus keep their SVG gradients */
@@ -152,22 +152,22 @@ body {
     transition: background 0.3s, color 0.3s;
 }
 
-/* Default buttons use the site's light primary blue */
+/* Default buttons use the site's main primary blue */
 .gene-btn.default {
-    background: var(--primary-blue-light);
+    background: var(--primary-blue);
     color: var(--text-light);
 }
 
-/* Hover and searched genes use the site's accent green */
+/* Hover and searched genes use the site's lighter blue for feedback */
 .gene-btn:hover,
 .gene-btn:focus-visible,
 .gene-btn.search-gene {
-    background: var(--accent-green-2);
+    background: var(--primary-blue-light);
     color: var(--text-light);
     outline: none;
 }
 
-/* Reset button uses a neutral gray from the site's theme */
+/* Reset button uses a neutral gray for distinction */
 .gene-btn.reset-btn {
     background: var(--gray-medium);
     color: var(--text-light);
