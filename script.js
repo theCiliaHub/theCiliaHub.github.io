@@ -203,15 +203,16 @@ function initCiliaHub() {
         .then(data => {
             console.log(`✅ Loaded ${data.length} genes from ciliahub_data.json`);
             
-            // Store globally so other functions can use it
             currentData = data;
             allGenes = data;
 
-            // Display homepage
             displayHomePage();
 
-            // ✅ Update homepage stats after data + homepage render
+            // ✅ FIX: Update stats AFTER homepage renders
             updateHomepageStats(currentData);
+
+            // ✅ OPTIONAL: Show JSON preview (but limit to first 50 items to keep page fast)
+            displayJsonPreview(currentData);
         })
         .catch(error => {
             console.error('❌ Error loading gene data:', error);
@@ -222,7 +223,37 @@ function initCiliaHub() {
         });
 }
 
-// Call it once page is ready
+// Display limited JSON preview (safe & fast)
+function displayJsonPreview(data) {
+    if (!Array.isArray(data) || data.length === 0) return;
+
+    const previewContainer = document.createElement('div');
+    previewContainer.style.backgroundColor = '#007bff';
+    previewContainer.style.color = '#fff';
+    previewContainer.style.fontFamily = 'monospace';
+    previewContainer.style.padding = '1rem';
+    previewContainer.style.marginTop = '2rem';
+    previewContainer.style.borderRadius = '8px';
+    previewContainer.style.whiteSpace = 'pre-wrap';
+    previewContainer.style.wordWrap = 'break-word';
+    previewContainer.style.maxHeight = '400px';
+    previewContainer.style.overflowY = 'scroll';
+
+    // ✅ Limit to first 50 items for performance
+    const limitedData = data.slice(0, 50);
+    previewContainer.textContent = JSON.stringify(limitedData, null, 2);
+
+    // Add a note to user
+    const note = document.createElement('div');
+    note.style.marginBottom = '0.5rem';
+    note.style.fontWeight = 'bold';
+    note.textContent = `📊 Showing first ${limitedData.length} of ${data.length} records (for performance)`;
+    previewContainer.prepend(note);
+
+    document.querySelector('.content-area').appendChild(previewContainer);
+}
+
+// Call init when DOM is ready
 document.addEventListener('DOMContentLoaded', initCiliaHub);
 
 
@@ -682,26 +713,6 @@ function displayHomePage() {
 
     // MODIFICATION: The dynamic stats update logic that was here has been moved to 
     // the new updateHomepageStats() function to fix the race condition.
-
-   // --- OPTIONAL DEBUG VIEW: Show all JSON data below homepage ---
-    const jsonContainer = document.createElement('div');
-    jsonContainer.style.backgroundColor = '#007bff';  // Blue background
-    jsonContainer.style.color = '#fff';               // White text
-    jsonContainer.style.fontFamily = 'monospace';
-    jsonContainer.style.padding = '1rem';
-    jsonContainer.style.marginTop = '2rem';
-    jsonContainer.style.overflowX = 'auto';
-    jsonContainer.style.borderRadius = '8px';
-    jsonContainer.style.whiteSpace = 'pre-wrap';
-    jsonContainer.style.wordWrap = 'break-word';
-
-    if (Array.isArray(currentData) && currentData.length > 0) {
-        jsonContainer.textContent = JSON.stringify(currentData, null, 2);
-    } else {
-        jsonContainer.textContent = '⚠️ No gene data available to display.';
-    }
-
-    document.querySelector('.content-area').appendChild(jsonContainer);
 }
 
 function displayBatchQueryTool() {
