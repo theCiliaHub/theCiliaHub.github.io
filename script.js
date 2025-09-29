@@ -526,7 +526,6 @@ function displayHomePage() {
     contentArea.className = 'content-area';
     document.querySelector('.cilia-panel').style.display = 'block';
  
-
     // --- Initial render with placeholders ---
     contentArea.innerHTML = `
         <div class="page-section">
@@ -537,18 +536,18 @@ function displayHomePage() {
                 <div style="flex: 1; min-width: 140px; background-color: #007bff; color: #fff; padding: 1rem; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.15); text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center;">
                     <div style="font-size: 1.2rem; font-weight: 700;">CiliaHub V0.1</div>
                     <div style="display: flex; align-items: baseline; gap: 0.5rem; margin-top: 0.25rem;">
-                        <div id="gene-count" style="font-size: 1.5rem; font-weight: 700;">0</div>
+                        <div id="gene-count" style="font-size: 1.5rem; font-weight: 700;">...</div>
                         <div>Genes</div>
                     </div>
                 </div>
 
                 <div style="flex: 1; min-width: 140px; background-color: #e7f1ff; color: #007bff; padding: 1rem; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); text-align: center;">
-                    <div id="localization-count" style="font-size: 1.5rem; font-weight: 700;">0</div>
+                    <div id="localization-count" style="font-size: 1.5rem; font-weight: 700;">...</div>
                     <div>Localizations</div>
                 </div>
 
                 <div style="flex: 1; min-width: 140px; background-color: #e7f1ff; color: #007bff; padding: 1rem; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); text-align: center;">
-                    <div id="reference-count" style="font-size: 1.5rem; font-weight: 700;">0</div>
+                    <div id="reference-count" style="font-size: 1.5rem; font-weight: 700;">...</div>
                     <div>References</div>
                 </div>
             </div>
@@ -654,6 +653,11 @@ function displayHomePage() {
     // --- Display gene cards immediately (empty or with placeholder) ---
     displayGeneCards(currentData, [], 1, 10);
 
+    // --- Update stats immediately if data is already loaded ---
+    if (typeof updateHomepageStats === 'function') {
+        updateHomepageStats();
+    }
+    
     // MODIFICATION: The dynamic stats update logic that was here has been moved to 
     // the new updateHomepageStats() function to fix the race condition.
 }
