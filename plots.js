@@ -494,17 +494,9 @@ const PLOT_CONFIG = {
         label: 'Organelle UMAP', 
         explanation: 'Projects genes onto a 2D UMAP based on their organellar localization patterns. Genes with similar localization profiles cluster together.'
     },
-    'screen_analysis': { 
-        label: 'Screen Analysis', 
-        explanation: 'Displays results from genome-wide screens, showing how each gene affects ciliary function. Data sources are indicated at the top of the plot.'
-    },
     'expression_heatmap': { 
         label: 'Expression Heatmap', 
         explanation: 'Shows tissue-specific expression patterns of your genes. Color intensity represents expression levels across different tissues and cell types.'
-    },
-    'screen_bar_chart': {
-        label: 'Screen Bar Chart',
-        explanation: 'Alternative visualization for genome-wide screen results, showing gene effects on ciliary function as bars with error indicators.'
     },
     'multi_category_manhattan': { 
         label: 'Gene Feature Overview', 
@@ -1749,303 +1741,6 @@ function renderOrganelleUMAP(genes, container, custom) {
     });
 }
 
-function renderGeneScreenAnalysis(genes, container, custom) {
-    clearAllPlots(container.id);
-    container.innerHTML = `<canvas style="max-width: 100%; max-height: 100%;"></canvas>`;
-    const ctx = container.querySelector('canvas').getContext('2d');
-    
-    const processedData = [];
-    let geneIndex = 0;
-    const geneIndexMap = {};
-    const dataSources = new Set();
-    
-    genes.forEach(gene => {
-        if (!gene.screens || !Array.isArray(gene.screens)) return;
-        if (!(gene.gene in geneIndexMap)) geneIndexMap[gene.gene] = geneIndex++;
-        
-        gene.screens.forEach(screen => {
-            const meanValue = parseFloat(screen.mean_percent_ciliated);
-            if (!isNaN(meanValue)) {
-                processedData.push({
-                    x: geneIndexMap[gene.gene],
-                    y: meanValue,
-                    gene: gene.gene,
-                    ...screen
-                });
-                if (screen.source) dataSources.add(screen.source);
-            }
-        });
-    });
-    
-    if (processedData.length === 0) {
-        container.innerHTML = '<p style="text-align: center; padding: 50px;">No screen data found for these genes.</p>';
-        return;
-    }
-    
-    const classificationColors = {
-        "Negative regulator": "#E74C3C",
-        "Positive regulator": "#27AE60",
-        "No significant effect": "#3498DB",
-        "Unclassified": "#95A5A6"
-    };
-    
-    const groupedData = {};
-    processedData.forEach(item => {
-        if (!groupedData[item.classification]) groupedData[item.classification] = [];
-        groupedData[item.classification].push(item);
-    });
-    
-    const datasets = Object.keys(groupedData).map(classification => ({
-        label: classification,
-        data: groupedData[classification],
-        backgroundColor: classificationColors[classification] || "#95A5A6",
-        pointRadius: 6,
-        pointHoverRadius: 8
-    }));
-    
-    const geneLabels = Object.keys(geneIndexMap).sort((a, b) => geneIndexMap[a] - geneIndexMap[b]);
-    
-    currentPlotInstance = new Chart(ctx, {
-        type: 'scatter',
-        data: { datasets },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                title: {
-                    display: true,
-                    text: `${custom.title || 'Gene Screen Analysis'}${dataSources.size > 0 ? '\nData sources: ' + Array.from(dataSources).join(', ') : ''}`,
-                    font: { 
-                        size: custom.titleFontSize || 16,
-                        family: custom.fontFamily,
-                        color: custom.fontColor
-                    }
-                },
-                legend: {
-                    position: 'bottom',
-                    labels: { 
-                        usePointStyle: true,
-                        font: {
-                            family: custom.fontFamily,
-                            size: 12
-                        }
-                    }
-                },
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            const point = context.raw;
-                            return `${point.gene}: ${point.y.toFixed(2)}% (${point.classification})`;
-                        }
-                    }
-                }
-            },
-            scales: {
-                x: {
-                    display: custom.showX !== false,
-                    title: {
-                        display: true,
-                        text: 'Genes',
-                        font: { 
-                            size: custom.axisTitleFont.size,
-                            family: custom.fontFamily,
-                            color: custom.axisTitleFont.color,
-                            weight: 'bold' 
-                        }
-                    },
-                    min: -0.5,
-                    max: geneLabels.length - 0.5,
-                    ticks: {
-                        stepSize: 1,
-                        callback: function(value) {
-                            return geneLabels[value] || '';
-                        },
-                        font: {
-                            family: custom.fontFamily,
-                            size: custom.columnFontSize,
-                            color: custom.fontColor
-                        }
-                    },
-                    grid: { display: false },
-                    border: { display: true, color: 'black', width: 2 }
-                },
-                y: {
-                    display: custom.showY !== false,
-                    title: {
-                        display: true,
-                        text: 'Mean % Ciliated',
-                        font: { 
-                            size: custom.axisTitleFont.size,
-                            family: custom.fontFamily,
-                            color: custom.axisTitleFont.color,
-                            weight: 'bold' 
-                        }
-                    },
-                    grid: { display: false },
-                    border: { display: true, color: 'black', width: 2 },
-                    ticks: {
-                        font: {
-                            family: custom.fontFamily,
-                            size: custom.rowFontSize,
-                            color: custom.fontColor
-                        }
-                    }
-                }
-            }
-        }
-    });
-}
-
-// =============================================================================
-// ALTERNATIVE SCREEN VISUALIZATION - BAR CHART
-// =============================================================================
-
-function renderScreenBarChart(genes, container, custom) {
-    clearAllPlots(container.id);
-    container.innerHTML = `<canvas style="max-width: 100%; max-height: 100%;"></canvas>`;
-    const ctx = container.querySelector('canvas').getContext('2d');
-    
-    const screenData = [];
-    const dataSources = new Set();
-    
-    genes.forEach(gene => {
-        if (!gene.screens || !Array.isArray(gene.screens)) return;
-        
-        gene.screens.forEach(screen => {
-            const meanValue = parseFloat(screen.mean_percent_ciliated);
-            if (!isNaN(meanValue)) {
-                screenData.push({
-                    gene: gene.gene,
-                    mean: meanValue,
-                    classification: screen.classification || "Unclassified",
-                    source: screen.source || "Unknown"
-                });
-                if (screen.source) dataSources.add(screen.source);
-            }
-        });
-    });
-    
-    if (screenData.length === 0) {
-        container.innerHTML = '<p style="text-align: center; padding: 50px;">No screen data found for these genes.</p>';
-        return;
-    }
-    
-    // Group by gene and calculate average
-    const geneAverages = {};
-    screenData.forEach(item => {
-        if (!geneAverages[item.gene]) {
-            geneAverages[item.gene] = {
-                gene: item.gene,
-                mean: 0,
-                count: 0,
-                classification: item.classification
-            };
-        }
-        geneAverages[item.gene].mean += item.mean;
-        geneAverages[item.gene].count += 1;
-    });
-    
-    // Calculate averages
-    Object.keys(geneAverages).forEach(gene => {
-        geneAverages[gene].mean /= geneAverages[gene].count;
-    });
-    
-    // Convert to array and sort
-    const sortedData = Object.values(geneAverages).sort((a, b) => b.mean - a.mean);
-    
-    const classificationColors = {
-        "Negative regulator": "#E74C3C",
-        "Positive regulator": "#27AE60",
-        "No significant effect": "#3498DB",
-        "Unclassified": "#95A5A6"
-    };
-    
-    const datasets = [{
-        label: 'Mean % Ciliated',
-        data: sortedData.map(d => d.mean),
-        backgroundColor: sortedData.map(d => classificationColors[d.classification] || "#95A5A6"),
-        borderColor: sortedData.map(d => classificationColors[d.classification] || "#95A5A6"),
-        borderWidth: 1
-    }];
-    
-    currentPlotInstance = new Chart(ctx, {
-        type: 'bar',
-        data: {
-            labels: sortedData.map(d => d.gene),
-            datasets: datasets
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                title: {
-                    display: true,
-                    text: `${custom.title || 'Screen Results - Bar Chart'}${dataSources.size > 0 ? '\nData sources: ' + Array.from(dataSources).join(', ') : ''}`,
-                    font: { 
-                        size: custom.titleFontSize || 16,
-                        family: custom.fontFamily,
-                        color: custom.fontColor
-                    }
-                },
-                legend: {
-                    display: false
-                },
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            const index = context.dataIndex;
-                            const classification = sortedData[index].classification;
-                            return `${context.dataset.label}: ${context.parsed.y.toFixed(2)}% (${classification})`;
-                        }
-                    }
-                }
-            },
-            scales: {
-                x: {
-                    display: custom.showX !== false,
-                    title: {
-                        display: true,
-                        text: 'Genes',
-                        font: { 
-                            size: custom.axisTitleFont.size,
-                            family: custom.fontFamily,
-                            color: custom.axisTitleFont.color,
-                            weight: 'bold' 
-                        }
-                    },
-                    ticks: {
-                        font: {
-                            family: custom.fontFamily,
-                            size: custom.columnFontSize,
-                            color: custom.fontColor
-                        }
-                    }
-                },
-                y: {
-                    display: custom.showY !== false,
-                    title: {
-                        display: true,
-                        text: 'Mean % Ciliated',
-                        font: { 
-                            size: custom.axisTitleFont.size,
-                            family: custom.fontFamily,
-                            color: custom.axisTitleFont.color,
-                            weight: 'bold' 
-                        }
-                    },
-                    ticks: {
-                        font: {
-                            family: custom.fontFamily,
-                            size: custom.rowFontSize,
-                            color: custom.fontColor
-                        }
-                    }
-                }
-            }
-        }
-    });
-}
-
 // =============================================================================
 // EXPRESSION HEATMAP (MAINTAINED FROM ORIGINAL)
 // =============================================================================
@@ -2374,14 +2069,13 @@ function renderExpressionHeatmap(expressionData, geneList = []) {
     return true;
 }
 /**
- * Renders the Screen Summary Heatmap using Plotly.js.
+ * 🔄 UPDATED: Renders the Screen Summary Heatmap with a new, high-contrast color scheme.
  * @param {object[]} genes - The array of merged gene data from findAndMergeGenes.
  * @param {object} custom - Customization options from the UI.
  */
 function renderScreenSummaryHeatmap(genes, custom = {}) {
     clearAllPlots('plot-display-area');
 
-    // Define the screens and their corresponding data keys
     const screens = {
         'Kim 2016': 'Kim2016',
         'Wheway 2015': 'Wheway2015',
@@ -2391,38 +2085,35 @@ function renderScreenSummaryHeatmap(genes, custom = {}) {
     };
     const screenOrder = Object.keys(screens);
 
-    // Define the mapping from text categories to numbers and colors
+    // 🔄 UPDATED: New color palette for better visibility
     const categoryMap = {
-        "Decreased cilia numbers": { value: 1, color: '#0072B2' },
-        "Decreased Signaling (Positive Regulator)": { value: 1, color: '#0072B2' },
-        "Increased cilia numbers": { value: 2, color: '#D55E00' },
-        "Increased Signaling (Negative Regulator)": { value: 2, color: '#D55E00' },
-        "Causes Supernumerary Cilia": { value: 3, color: '#CC79A7' },
-        "No effect": { value: 4, color: '#d3d3d3' },
-        "No Significant Effect": { value: 4, color: '#d3d3d3' },
-        "Not in Screen": { value: 5, color: '#f5f5f5' },
-        "Not Reported": { value: 6, color: '#bababa' }
+        "Decreased cilia numbers": { value: 1, color: '#0571b0' }, // Darker Blue
+        "Decreased Signaling (Positive Regulator)": { value: 1, color: '#0571b0' },
+        "Increased cilia numbers": { value: 2, color: '#ca0020' }, // Strong Red
+        "Increased Signaling (Negative Regulator)": { value: 2, color: '#ca0020' },
+        "Causes Supernumerary Cilia": { value: 3, color: '#7b3294' }, // Purple
+        "No effect": { value: 4, color: '#e0e0e0' }, // Light Gray
+        "No Significant Effect": { value: 4, color: '#e0e0e0' },
+        "Not in Screen": { value: 5, color: '#f7f7f7' }, // Off-white
+        "Not Reported": { value: 6, color: '#a6a6a6' }  // Darker Gray
     };
 
-    // Process the gene data into a matrix format for the heatmap
     const geneLabels = genes.map(g => g.gene);
-    const zData = []; // Numeric matrix for colors
-    const textData = []; // Original text for hover info
+    const zData = [];
+    const textData = [];
 
     genes.forEach(gene => {
         const rowValues = [];
         const rowText = [];
         screenOrder.forEach(screenName => {
             const screenKey = screens[screenName];
-            let resultText = "Not in Screen"; // Default value
-            
+            let resultText = "Not in Screen";
             if (gene.screens_summary) {
                 const screenResult = gene.screens_summary.find(s => s.source === screenKey);
                 if (screenResult) {
                     resultText = screenResult.result;
                 }
             }
-            
             const mapping = categoryMap[resultText] || categoryMap["Not in Screen"];
             rowValues.push(mapping.value);
             rowText.push(resultText);
@@ -2431,7 +2122,6 @@ function renderScreenSummaryHeatmap(genes, custom = {}) {
         textData.push(rowText);
     });
 
-    // Create the Plotly colorscale from our map
     const plotlyColorscale = [
         [0.0, categoryMap["Decreased cilia numbers"].color], [0.16, categoryMap["Decreased cilia numbers"].color],
         [0.17, categoryMap["Increased cilia numbers"].color], [0.33, categoryMap["Increased cilia numbers"].color],
@@ -2441,33 +2131,21 @@ function renderScreenSummaryHeatmap(genes, custom = {}) {
         [0.85, categoryMap["Not in Screen"].color], [1.0, categoryMap["Not in Screen"].color]
     ];
     
-    // Define the heatmap trace
     const data = [{
-        x: screenOrder,
-        y: geneLabels,
-        z: zData,
-        customdata: textData,
-        type: 'heatmap',
-        colorscale: plotlyColorscale,
-        showscale: false,
+        x: screenOrder, y: geneLabels, z: zData, customdata: textData,
+        type: 'heatmap', colorscale: plotlyColorscale, showscale: false,
         hovertemplate: '<b>Gene:</b> %{y}<br><b>Screen:</b> %{x}<br><b>Result:</b> %{customdata}<extra></extra>'
     }];
 
-    // Define the layout with a custom legend
     const layout = {
-        title: {
-            text: custom.title || 'Summary of Functional Screen Results',
-            font: { size: custom.titleFontSize || 18, family: custom.fontFamily, color: custom.fontColor }
-        },
+        title: { text: custom.title || 'Summary of Functional Screen Results', font: { size: custom.titleFontSize || 18, family: custom.fontFamily, color: custom.fontColor }},
         xaxis: { tickangle: -45, automargin: true },
         yaxis: { automargin: true, tickfont: { size: 10 } },
         margin: { l: 120, r: 150, b: 150, t: 80 },
-        width: custom.figureWidth,
-        height: custom.figureHeight,
+        width: custom.figureWidth, height: custom.figureHeight,
         annotations: []
     };
 
-    // Create a custom legend using annotations
     const legendMap = {
       "Decreased": categoryMap["Decreased cilia numbers"].color,
       "Increased": categoryMap["Increased cilia numbers"].color,
@@ -2479,10 +2157,8 @@ function renderScreenSummaryHeatmap(genes, custom = {}) {
     let y_pos = 1.0;
     Object.keys(legendMap).forEach(key => {
         layout.annotations.push({
-            xref: 'paper', yref: 'paper',
-            x: 1.02, y: y_pos,
-            xanchor: 'left', yanchor: 'middle',
-            text: `█ ${key}`,
+            xref: 'paper', yref: 'paper', x: 1.02, y: y_pos,
+            xanchor: 'left', yanchor: 'middle', text: `█ ${key}`,
             font: { color: legendMap[key], size: 12, family: custom.fontFamily },
             showarrow: false
         });
@@ -2491,6 +2167,7 @@ function renderScreenSummaryHeatmap(genes, custom = {}) {
 
     Plotly.newPlot('plot-display-area', data, layout, { responsive: true });
 }
+
 
 // =============================================================================
 // =============================================================================
@@ -2536,8 +2213,6 @@ async function generateAnalysisPlots() {
         case 'network': renderComplexNetwork(foundGenes, plotContainer, custom); break;
         case 'organelle_radar': renderOrganelleRadarPlot(foundGenes, plotContainer, custom); break;
         case 'organelle_umap': renderOrganelleUMAP(foundGenes, plotContainer, custom); break;
-        case 'screen_analysis': renderGeneScreenAnalysis(foundGenes, plotContainer, custom); break;
-        case 'screen_bar_chart': renderScreenBarChart(foundGenes, plotContainer, custom); break;
         case 'enrichment_bubble': renderEnrichmentBubblePlot(foundGenes, custom); break;
         case 'balloon_plot': renderBalloonPlot(foundGenes, custom); break;
         case 'venn_diagram': renderVennDiagram(foundGenes, custom); break;
