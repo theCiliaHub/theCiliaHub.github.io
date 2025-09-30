@@ -2092,10 +2092,10 @@ function renderScreenSummaryHeatmap(genes, custom = {}) {
     "Increased cilia numbers": { value: 2, color: '#d6604d' }, // Soft Red
     "Increased Signaling (Negative Regulator)": { value: 2, color: '#d6604d' },
     "Causes Supernumerary Cilia": { value: 3, color: '#762a83' }, // Deep Purple
-    "No effect": { value: 4, color: '#f7f7f7' }, // Very Light Gray/White
-    "No Significant Effect": { value: 4, color: '#f7f7f7' },
-    "Not in Screen": { value: 5, color: '#f0f0f0' }, // Slightly darker neutral
-    "Not Reported": { value: 6, color: '#fee08b' }  // Warm Yellow/Orange
+    "No effect": { value: 4, color: '#ffd966' }, // Soft Yellow, visible
+    "No Significant Effect": { value: 4, color: '#ffd966' },
+    "Not in Screen": { value: 5, color: '#a6d96a' }, // Soft Green, visible
+    "Not Reported": { value: 6, color: '#fdae61' }  // Warm Orange
 };
     const geneLabels = genes.map(g => g.gene);
     const zData = [];
