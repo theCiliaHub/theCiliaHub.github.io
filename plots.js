@@ -2052,6 +2052,11 @@ function renderExpressionHeatmap(expressionData, geneList = []) {
     console.log('Heatmap rendering completed successfully with container bounds');
     return true;
 }
+/**
+ * Renders a complex heatmap with two separate sections and properly positioned legends.
+ * @param {object[]} genes - The array of merged gene data.
+ * @param {object} custom - Customization options from the UI.
+ */
 function renderScreenSummaryHeatmap(genes, custom = {}) {
     clearAllPlots('plot-display-area');
     
@@ -2105,19 +2110,6 @@ function renderScreenSummaryHeatmap(genes, custom = {}) {
             signalingRowValues.push(mapping.value);
             signalingRowText.push(resultText);
         });
-const categoryMap = {
-    // === Cilia number/structure ===
-    "Decreased cilia numbers": { value: 1, color: '#0571b0' }, 
-    "Increased cilia numbers": { value: 2, color: '#92c5de' },
-    "Abnormal cilia morphology": { value: 3, color: '#f4a582' },
-
-    // === Hedgehog Signalling ===
-    "Decreased Signaling (Positive Regulator)": { value: 4, color: '#ca0020' },
-    "Increased Signaling (Negative Regulator)": { value: 5, color: '#f7f7f7' }, 
-    "Normal Signaling": { value: 6, color: '#0571b0' },
-    "Not Reported": { value: 7, color: '#d9ef8b' },
-    "Not in Screen": { value: 8, color: '#fee08b' }
-};
 
         zDataNumber.push(numberRowValues);
         textDataNumber.push(numberRowText);
@@ -2138,27 +2130,23 @@ const categoryMap = {
         ],
         showscale: false,
         hovertemplate: '<b>Gene:</b> %{y}<br><b>Screen:</b> %{x}<br><b>Result:</b> %{customdata}<extra></extra>',
-        xgap: custom.lineWidth, ygap: custom.lineWidth
+        xgap: 1, ygap: 1 // Using a small number for a thin line
     };
 
     const trace2 = {
         x: signalingScreenOrder, y: geneLabels, z: zDataSignaling, customdata: textDataSignaling,
         type: 'heatmap',
         colorscale: [
-            [0, signalingCategoryMap["Decreased Signaling (Positive Regulator)"].color],
-            [0.25, signalingCategoryMap["Decreased Signaling (Positive Regulator)"].color],
-            [0.26, signalingCategoryMap["Increased Signaling (Negative Regulator)"].color],
-            [0.5, signalingCategoryMap["Increased Signaling (Negative Regulator)"].color],
-            [0.51, signalingCategoryMap["No Significant Effect"].color],
-            [0.75, signalingCategoryMap["No Significant Effect"].color],
-            [0.76, signalingCategoryMap["Not in Screen"].color],
-            [0.85, signalingCategoryMap["Not Reported"].color],
-            [1.0, signalingCategoryMap["Not Reported"].color]
+            [0, signalingCategoryMap["Decreased Signaling (Positive Regulator)"].color], [0.25, signalingCategoryMap["Decreased Signaling (Positive Regulator)"].color],
+            [0.26, signalingCategoryMap["Increased Signaling (Negative Regulator)"].color], [0.5, signalingCategoryMap["Increased Signaling (Negative Regulator)"].color],
+            [0.51, signalingCategoryMap["No Significant Effect"].color], [0.75, signalingCategoryMap["No Significant Effect"].color],
+            [0.76, signalingCategoryMap["Not Reported"].color], [0.85, signalingCategoryMap["Not Reported"].color], // Adjusted range
+            [0.86, signalingCategoryMap["Not in Screen"].color], [1.0, signalingCategoryMap["Not in Screen"].color]
         ],
         showscale: false,
         hovertemplate: '<b>Gene:</b> %{y}<br><b>Screen:</b> %{x}<br><b>Result:</b> %{customdata}<extra></extra>',
         xaxis: 'x2', yaxis: 'y1',
-        xgap: custom.lineWidth, ygap: custom.lineWidth
+        xgap: 1, ygap: 1 // Using a small number for a thin line
     };
 
     const data = [trace1, trace2];
@@ -2166,38 +2154,47 @@ const categoryMap = {
     const layout = {
         title: { text: custom.title || 'Summary of Functional Screen Results', font: { size: custom.titleFontSize, family: custom.fontFamily, color: custom.fontColor }},
         grid: { rows: 1, columns: 2, pattern: 'independent' },
-        xaxis: { domain: [0, 0.78], tickangle: custom.tickAngle, showticklabels: custom.showX },
-        xaxis2: { domain: [0.8, 1.0], tickangle: custom.tickAngle, showticklabels: custom.showX },
-        yaxis: { automargin: true, tickfont: { size: 10 }, showticklabels: custom.showY },
+        xaxis: { domain: [0, 0.78], tickangle: -45, automargin: true },
+        xaxis2: { domain: [0.8, 1.0], tickangle: -45, automargin: true },
+        yaxis: { automargin: true, tickfont: { size: 10 } },
         margin: { l: 120, r: 220, b: 150, t: 80 },
         width: custom.figureWidth, height: custom.figureHeight,
         annotations: []
     };
 
-    // Legends (Cilia Number)
-    let y_pos1 = 1.0;
-    layout.annotations.push({ xref: 'paper', yref: 'paper', x: 1.02, y: y_pos1 + 0.06, xanchor: 'left', text: '<b>Cilia Number/Structure</b>', showarrow: false });
+    // --- 🔄 CORRECTED LEGEND LOGIC ---
+    const legend_x_pos = 1.02;
+    const legend_spacing = 0.06;
+    let current_y_pos = 1.0;
+
+    // Legend 1: Cilia Number
+    layout.annotations.push({ xref: 'paper', yref: 'paper', x: legend_x_pos, y: current_y_pos + 0.05, xanchor: 'left', text: '<b>Cilia Number/Structure</b>', showarrow: false, font: {size: 13} });
     Object.keys(numberCategoryMap).forEach(key => {
         layout.annotations.push({
-            xref: 'paper', yref: 'paper', x: 1.02, y: y_pos1,
+            xref: 'paper', yref: 'paper', x: legend_x_pos, y: current_y_pos,
             xanchor: 'left', yanchor: 'middle', text: `█ ${key}`,
             font: { color: numberCategoryMap[key].color, size: 12 },
             showarrow: false
         });
-        y_pos1 -= 0.07;
+        current_y_pos -= legend_spacing;
     });
 
-    // Legends (Hedgehog Signaling)
-    let y_pos2 = 1.0; // same spacing as first legend
-    layout.annotations.push({ xref: 'paper', yref: 'paper', x: 1.02, y: y_pos2 + 0.06, xanchor: 'left', text: '<b>Hedgehog Signaling</b>', showarrow: false });
+    // Add a gap between legends
+    current_y_pos -= 0.1;
+
+    // Legend 2: Hedgehog Signaling
+    layout.annotations.push({ xref: 'paper', yref: 'paper', x: legend_x_pos, y: current_y_pos + 0.05, xanchor: 'left', text: '<b>Hedgehog Signaling</b>', showarrow: false, font: {size: 13} });
     Object.keys(signalingCategoryMap).forEach(key => {
-        layout.annotations.push({
-            xref: 'paper', yref: 'paper', x: 1.02, y: y_pos2,
-            xanchor: 'left', yanchor: 'middle', text: `█ ${key}`,
-            font: { color: signalingCategoryMap[key].color, size: 12 },
-            showarrow: false
-        });
-        y_pos2 -= 0.07;
+        // Skip duplicate "Not in Screen" and "Not Reported" to avoid redundancy
+        if (key !== "Not in Screen" && key !== "Not Reported") {
+            layout.annotations.push({
+                xref: 'paper', yref: 'paper', x: legend_x_pos, y: current_y_pos,
+                xanchor: 'left', yanchor: 'middle', text: `█ ${key}`,
+                font: { color: signalingCategoryMap[key].color, size: 12 },
+                showarrow: false
+            });
+            current_y_pos -= legend_spacing;
+        }
     });
 
     Plotly.newPlot('plot-display-area', data, layout, { responsive: true });
