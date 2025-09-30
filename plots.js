@@ -394,40 +394,48 @@ function updateGeneSummaryTable(originalQueries, foundGenes) {
     });
 }
 
-function getPlotCustomization() {
+function getPlotCustomization(plotType) {
     const custom = {
+        // === Generic ===
         title: document.getElementById('custom-title')?.value,
         titleFontSize: parseInt(document.getElementById('custom-title-fontsize')?.value, 10) || 24,
         fontFamily: document.getElementById('custom-font-family')?.value || 'Arial',
         fontColor: document.getElementById('custom-font-color')?.value || '#000',
+        figureWidth: parseInt(document.getElementById('custom-figure-width')?.value, 10) || 800,
+        figureHeight: parseInt(document.getElementById('custom-figure-height')?.value, 10) || 600,
 
-        // Axis visibility
+        // === Axis labels ===
         showX: document.getElementById('custom-show-x')?.value === 'true',
         showY: document.getElementById('custom-show-y')?.value === 'true',
-
-        // Axis customization
         axisTitleFont: { 
             size: parseInt(document.getElementById('custom-axis-fontsize')?.value, 10) || 16, 
             family: document.getElementById('custom-font-family')?.value || 'Arial', 
             color: document.getElementById('custom-axis-color')?.value || '#000', 
             weight: 'bold' 
         },
-        xTickLabels: null, // Can be set dynamically per dataset
-        yTickLabels: null,
-        tickAngle: parseInt(document.getElementById('custom-tick-angle')?.value, 10) || -45,
 
-        // Line properties
-        lineWidth: parseFloat(document.getElementById('custom-linewidth')?.value) || 2,
-        lineColor: document.getElementById('custom-linecolor')?.value || '#000',
-
-        figureWidth: parseInt(document.getElementById('custom-figure-width')?.value, 10) || 800,
-        figureHeight: parseInt(document.getElementById('custom-figure-height')?.value, 10) || 600,
-
-        displayNames: document.getElementById('custom-display-names')?.value || 'both',
-        border: document.getElementById('custom-border')?.checked || false,
-        borderColor: document.getElementById('custom-border-color')?.value || '#ccc'
+        // === Heatmap-specific ===
+        heatmap: {
+            yticklabels: true, // toggle Y axis labels
+            xticklabels: true, // toggle X axis labels
+            tickangle: -45, // rotate to avoid overlap
+            linewidth: 1,   // line thickness
+            linecolor: '#fff', // line color between cells
+            hideTicks: true // optional, hides some labels if overlapping
+        }
     };
-    
+
+    // Ensure consistent spacing for Hedgehog vs Cilia
+    if (plotType === 'renderScreenSummaryHeatmap') {
+        custom.legend = {
+            traceorder: 'normal', // keep input order
+            itemsizing: 'constant',
+            title: { text: "Screen Categories" },
+            itemclick: false,
+            itemdoubleclick: false
+        };
+    }
+
     return custom;
 }
 
@@ -2097,6 +2105,19 @@ function renderScreenSummaryHeatmap(genes, custom = {}) {
             signalingRowValues.push(mapping.value);
             signalingRowText.push(resultText);
         });
+const categoryMap = {
+    // === Cilia number/structure ===
+    "Decreased cilia numbers": { value: 1, color: '#0571b0' }, 
+    "Increased cilia numbers": { value: 2, color: '#92c5de' },
+    "Abnormal cilia morphology": { value: 3, color: '#f4a582' },
+
+    // === Hedgehog Signalling ===
+    "Decreased Signaling (Positive Regulator)": { value: 4, color: '#ca0020' },
+    "Increased Signaling (Negative Regulator)": { value: 5, color: '#f7f7f7' }, 
+    "Normal Signaling": { value: 6, color: '#0571b0' },
+    "Not Reported": { value: 7, color: '#d9ef8b' },
+    "Not in Screen": { value: 8, color: '#fee08b' }
+};
 
         zDataNumber.push(numberRowValues);
         textDataNumber.push(numberRowText);
