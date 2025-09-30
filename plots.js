@@ -396,67 +396,43 @@ function updateGeneSummaryTable(originalQueries, foundGenes) {
 
 function getPlotCustomization() {
     const custom = {
-        // Generic properties (preserved)
         title: document.getElementById('custom-title')?.value,
         titleFontSize: parseInt(document.getElementById('custom-title-fontsize')?.value, 10) || 24,
         fontFamily: document.getElementById('custom-font-family')?.value || 'Arial',
+        fontColor: document.getElementById('custom-font-color')?.value || '#000',
+
+        // Axis visibility
         showX: document.getElementById('custom-show-x')?.value === 'true',
         showY: document.getElementById('custom-show-y')?.value === 'true',
+
+        // Axis customization
         axisTitleFont: { 
             size: parseInt(document.getElementById('custom-axis-fontsize')?.value, 10) || 16, 
             family: document.getElementById('custom-font-family')?.value || 'Arial', 
             color: document.getElementById('custom-axis-color')?.value || '#000', 
             weight: 'bold' 
         },
-        fontColor: document.getElementById('custom-font-color')?.value || '#000',
+        xTickLabels: null, // Can be set dynamically per dataset
+        yTickLabels: null,
+        tickAngle: parseInt(document.getElementById('custom-tick-angle')?.value, 10) || -45,
+
+        // Line properties
+        lineWidth: parseFloat(document.getElementById('custom-linewidth')?.value) || 2,
+        lineColor: document.getElementById('custom-linecolor')?.value || '#000',
+
         figureWidth: parseInt(document.getElementById('custom-figure-width')?.value, 10) || 800,
         figureHeight: parseInt(document.getElementById('custom-figure-height')?.value, 10) || 600,
+
         displayNames: document.getElementById('custom-display-names')?.value || 'both',
         border: document.getElementById('custom-border')?.checked || false,
-        borderColor: document.getElementById('custom-border-color')?.value || '#ccc',
-
-        // Other plot-specific properties (preserved)
-        bubbleSize: parseInt(document.getElementById('custom-bubble-size')?.value, 10) || 15,
-        barWidth: parseFloat(document.getElementById('custom-bar-width')?.value) || 0.8,
-        
-        // === START: Updated Venn Diagram Property ===
-        // The old `vennColors` array is replaced by this structured object.
-        venn: {
-            label1: {
-                text: document.getElementById('venn-label-1')?.value || 'Gene Input',
-                color: document.getElementById('venn-label-color-1')?.value || '#000000',
-            },
-            circle1: {
-                color: document.getElementById('venn-circle-color-1')?.value || '#3f51b5',
-            },
-            label2: {
-                text: document.getElementById('venn-label-2')?.value || 'Gold Standard Ciliary Genes',
-                color: document.getElementById('venn-label-color-2')?.value || '#000000',
-            },
-            circle2: {
-                color: document.getElementById('venn-circle-color-2')?.value || '#4CAF50',
-            },
-            numberColor: document.getElementById('venn-number-color')?.value || '#333333',
-        },
-        // === END: Updated Venn Diagram Property ===
-
-        // Network plot properties (preserved)
-        ribbonColors: [
-            document.getElementById('ribbon-color-1')?.value || '#1f77b4',
-            document.getElementById('ribbon-color-2')?.value || '#ff7f0e',
-            document.getElementById('ribbon-color-3')?.value || '#2ca02c',
-            document.getElementById('ribbon-color-4')?.value || '#d62728',
-            document.getElementById('ribbon-color-5')?.value || '#9467bd',
-            document.getElementById('ribbon-color-6')?.value || '#8c564b',
-            document.getElementById('ribbon-color-7')?.value || '#e377c2',
-            document.getElementById('ribbon-color-8')?.value || '#7f7f7f',
-            document.getElementById('ribbon-color-9')?.value || '#bcbd22',
-            document.getElementById('ribbon-color-10')?.value || '#17becf'
-        ]
+        borderColor: document.getElementById('custom-border-color')?.value || '#ccc'
     };
     
     return custom;
 }
+
+
+
 // =============================================================================
 // PLOT CONFIGURATION AND EXPLANATIONS
 // =============================================================================
@@ -2070,38 +2046,28 @@ function renderExpressionHeatmap(expressionData, geneList = []) {
 }
 function renderScreenSummaryHeatmap(genes, custom = {}) {
     clearAllPlots('plot-display-area');
-
-    // 1. Define the two groups of screens
-    const numberScreens = {
-        'Kim 2016': 'Kim2016',
-        'Wheway 2015': 'Wheway2015',
-        'Roosing 2015': 'Roosing2015',
-        'Basu 2023': 'Basu2023'
-    };
-    const signalingScreens = {
-        'Breslow 2018': 'Breslow2018'
-    };
+    
+    const numberScreens = { 'Kim 2016': 'Kim2016','Wheway 2015': 'Wheway2015','Roosing 2015': 'Roosing2015','Basu 2023': 'Basu2023' };
+    const signalingScreens = { 'Breslow 2018': 'Breslow2018' };
     const numberScreenOrder = Object.keys(numberScreens);
     const signalingScreenOrder = Object.keys(signalingScreens);
 
-    // 2. Define distinct color maps for each data type (avoiding white/gray)
     const numberCategoryMap = {
-        "Decreased cilia numbers": { value: 1, color: '#0571b0' }, // Blue
-        "Increased cilia numbers": { value: 2, color: '#ca0020' }, // Red
-        "Causes Supernumerary Cilia": { value: 3, color: '#fdae61' }, // Orange
-        "No effect": { value: 4, color: '#fee090' }, // Yellow
-        "Not in Screen": { value: 5, color: '#bdbdbd' }, // Light gray
-        "Not Reported": { value: 6, color: '#636363' }  // Dark gray
+        "Decreased cilia numbers": { value: 1, color: '#0571b0' },
+        "Increased cilia numbers": { value: 2, color: '#ca0020' },
+        "Causes Supernumerary Cilia": { value: 3, color: '#fdae61' },
+        "No effect": { value: 4, color: '#fee090' },
+        "Not in Screen": { value: 5, color: '#bdbdbd' },
+        "Not Reported": { value: 6, color: '#636363' }
     };
     const signalingCategoryMap = {
-        "Decreased Signaling (Positive Regulator)": { value: 1, color: '#2166ac' }, // Dark Blue
-        "Increased Signaling (Negative Regulator)": { value: 2, color: '#d73027' }, // Red
-        "No Significant Effect": { value: 3, color: '#fdae61' }, // Orange
-        "Not in Screen": { value: 4, color: '#bdbdbd' }, // Light gray
-        "Not Reported": { value: 5, color: '#636363' }  // Dark gray
+        "Decreased Signaling (Positive Regulator)": { value: 1, color: '#2166ac' },
+        "Increased Signaling (Negative Regulator)": { value: 2, color: '#d73027' },
+        "No Significant Effect": { value: 3, color: '#fdae61' },
+        "Not in Screen": { value: 4, color: '#bdbdbd' },
+        "Not Reported": { value: 5, color: '#636363' }
     };
 
-    // 3. Prepare matrices
     const geneLabels = genes.map(g => g.gene);
     const zDataNumber = [], textDataNumber = [], zDataSignaling = [], textDataSignaling = [];
 
@@ -2138,27 +2104,20 @@ function renderScreenSummaryHeatmap(genes, custom = {}) {
         textDataSignaling.push(signalingRowText);
     });
 
-    // 4. Heatmap traces
     const trace1 = {
         x: numberScreenOrder, y: geneLabels, z: zDataNumber, customdata: textDataNumber,
         type: 'heatmap',
         colorscale: [
-            [0, numberCategoryMap["Decreased cilia numbers"].color],
-            [0.16, numberCategoryMap["Decreased cilia numbers"].color],
-            [0.17, numberCategoryMap["Increased cilia numbers"].color],
-            [0.33, numberCategoryMap["Increased cilia numbers"].color],
-            [0.34, numberCategoryMap["Causes Supernumerary Cilia"].color],
-            [0.50, numberCategoryMap["Causes Supernumerary Cilia"].color],
-            [0.51, numberCategoryMap["No effect"].color],
-            [0.67, numberCategoryMap["No effect"].color],
-            [0.68, numberCategoryMap["Not Reported"].color],
-            [0.84, numberCategoryMap["Not Reported"].color],
-            [0.85, numberCategoryMap["Not in Screen"].color],
-            [1.0, numberCategoryMap["Not in Screen"].color]
+            [0, numberCategoryMap["Decreased cilia numbers"].color],[0.16, numberCategoryMap["Decreased cilia numbers"].color],
+            [0.17, numberCategoryMap["Increased cilia numbers"].color],[0.33, numberCategoryMap["Increased cilia numbers"].color],
+            [0.34, numberCategoryMap["Causes Supernumerary Cilia"].color],[0.50, numberCategoryMap["Causes Supernumerary Cilia"].color],
+            [0.51, numberCategoryMap["No effect"].color],[0.67, numberCategoryMap["No effect"].color],
+            [0.68, numberCategoryMap["Not Reported"].color],[0.84, numberCategoryMap["Not Reported"].color],
+            [0.85, numberCategoryMap["Not in Screen"].color],[1.0, numberCategoryMap["Not in Screen"].color]
         ],
         showscale: false,
         hovertemplate: '<b>Gene:</b> %{y}<br><b>Screen:</b> %{x}<br><b>Result:</b> %{customdata}<extra></extra>',
-        xgap: 2, ygap: 2
+        xgap: custom.lineWidth, ygap: custom.lineWidth
     };
 
     const trace2 = {
@@ -2172,62 +2131,49 @@ function renderScreenSummaryHeatmap(genes, custom = {}) {
             [0.51, signalingCategoryMap["No Significant Effect"].color],
             [0.75, signalingCategoryMap["No Significant Effect"].color],
             [0.76, signalingCategoryMap["Not in Screen"].color],
-            [1.0, signalingCategoryMap["Not in Screen"].color]
+            [0.85, signalingCategoryMap["Not Reported"].color],
+            [1.0, signalingCategoryMap["Not Reported"].color]
         ],
         showscale: false,
         hovertemplate: '<b>Gene:</b> %{y}<br><b>Screen:</b> %{x}<br><b>Result:</b> %{customdata}<extra></extra>',
-        xaxis: 'x2',
-        yaxis: 'y1',
-        xgap: 2, ygap: 2
+        xaxis: 'x2', yaxis: 'y1',
+        xgap: custom.lineWidth, ygap: custom.lineWidth
     };
 
     const data = [trace1, trace2];
 
-    // 5. Layout
     const layout = {
-        title: { text: custom.title || 'Summary of Functional Screen Results', font: { size: custom.titleFontSize || 18, family: custom.fontFamily, color: custom.fontColor }},
+        title: { text: custom.title || 'Summary of Functional Screen Results', font: { size: custom.titleFontSize, family: custom.fontFamily, color: custom.fontColor }},
         grid: { rows: 1, columns: 2, pattern: 'independent' },
-        xaxis: { domain: [0, 0.78], tickangle: -45, automargin: true },
-        xaxis2: { domain: [0.8, 1.0], tickangle: -45, automargin: true },
-        yaxis: { automargin: true, tickfont: { size: 10 } },
+        xaxis: { domain: [0, 0.78], tickangle: custom.tickAngle, showticklabels: custom.showX },
+        xaxis2: { domain: [0.8, 1.0], tickangle: custom.tickAngle, showticklabels: custom.showX },
+        yaxis: { automargin: true, tickfont: { size: 10 }, showticklabels: custom.showY },
         margin: { l: 120, r: 220, b: 150, t: 80 },
         width: custom.figureWidth, height: custom.figureHeight,
         annotations: []
     };
 
-    // Legends
-    const legend1 = {
-      "Decrease in ciliated cells": numberCategoryMap["Decreased cilia numbers"].color,
-      "Increase in ciliated cells": numberCategoryMap["Increased cilia numbers"].color,
-      "Supernumerary cilia": numberCategoryMap["Causes Supernumerary Cilia"].color,
-      "No Effect": numberCategoryMap["No effect"].color,
-      "Not Reported": numberCategoryMap["Not Reported"].color,
-      "Not in Screen": numberCategoryMap["Not in Screen"].color
-    };
+    // Legends (Cilia Number)
     let y_pos1 = 1.0;
     layout.annotations.push({ xref: 'paper', yref: 'paper', x: 1.02, y: y_pos1 + 0.06, xanchor: 'left', text: '<b>Cilia Number/Structure</b>', showarrow: false });
-    Object.keys(legend1).forEach(key => {
+    Object.keys(numberCategoryMap).forEach(key => {
         layout.annotations.push({
             xref: 'paper', yref: 'paper', x: 1.02, y: y_pos1,
             xanchor: 'left', yanchor: 'middle', text: `█ ${key}`,
-            font: { color: legend1[key], size: 12 },
+            font: { color: numberCategoryMap[key].color, size: 12 },
             showarrow: false
         });
         y_pos1 -= 0.07;
     });
 
-    const legend2 = {
-        "Decreased Signaling": signalingCategoryMap["Decreased Signaling (Positive Regulator)"].color,
-        "Increased Signaling": signalingCategoryMap["Increased Signaling (Negative Regulator)"].color,
-        "No Effect": signalingCategoryMap["No Significant Effect"].color
-    };
-    let y_pos2 = y_pos1 - 0.08; 
+    // Legends (Hedgehog Signaling)
+    let y_pos2 = 1.0; // same spacing as first legend
     layout.annotations.push({ xref: 'paper', yref: 'paper', x: 1.02, y: y_pos2 + 0.06, xanchor: 'left', text: '<b>Hedgehog Signaling</b>', showarrow: false });
-    Object.keys(legend2).forEach(key => {
+    Object.keys(signalingCategoryMap).forEach(key => {
         layout.annotations.push({
             xref: 'paper', yref: 'paper', x: 1.02, y: y_pos2,
             xanchor: 'left', yanchor: 'middle', text: `█ ${key}`,
-            font: { color: legend2[key], size: 12 },
+            font: { color: signalingCategoryMap[key].color, size: 12 },
             showarrow: false
         });
         y_pos2 -= 0.07;
@@ -2235,7 +2181,6 @@ function renderScreenSummaryHeatmap(genes, custom = {}) {
 
     Plotly.newPlot('plot-display-area', data, layout, { responsive: true });
 }
-
 
 // =============================================================================
 // =============================================================================
