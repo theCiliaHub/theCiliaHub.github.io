@@ -1,3 +1,65 @@
+// --- Global variables to hold your data ---
+let ciliaryGeneMap = new Map();
+let screenDatabase = {};
+
+/**
+ * This function should be called when your application starts.
+ * It fetches both JSON files and prepares them for fast lookups.
+ */
+async function loadAllData() {
+    try {
+        // Fetch both files in parallel
+        const [ciliaryGenesResponse, screenDataResponse] = await Promise.all([
+            fetch('data/ciliahub_data.json'),
+            fetch('data/cilia_screens_data.json')
+        ]);
+
+        const ciliaryGeneArray = await ciliaryGenesResponse.json();
+        screenDatabase = await screenDataResponse.json();
+        
+        // Convert the ciliary gene array into a Map for instant lookups
+        ciliaryGeneMap = new Map(ciliaryGeneArray.map(gene => [gene.gene.toUpperCase(), gene]));
+
+        console.log(`Successfully loaded ${ciliaryGeneMap.size} ciliary genes.`);
+        console.log(`Successfully loaded screen data for ${Object.keys(screenDatabase).length} genes.`);
+
+    } catch (error) {
+        console.error("Failed to load a required data file:", error);
+        // You could display an error message to the user here
+    }
+}
+
+/**
+ * This function finds genes from user input and merges data from both sources.
+ * @param {string[]} userInputArray - An array of gene symbols from the user.
+ * @returns {object} An object containing the array of found gene data.
+ */
+function findAndMergeGenes(userInputArray) {
+    const foundGenes = [];
+    const seenGenes = new Set();
+
+    userInputArray.forEach(query => {
+        const geneSymbol = query.toUpperCase().trim();
+        if (!geneSymbol || seenGenes.has(geneSymbol)) return;
+
+        // 1. Look up the gene in the main ciliary gene database
+        if (ciliaryGeneMap.has(geneSymbol)) {
+            // Start with the base data from your curated list
+            let geneData = { ...ciliaryGeneMap.get(geneSymbol) };
+            
+            // 2. Augment it with data from the screen database
+            if (screenDatabase[geneSymbol]) {
+                geneData.screens_summary = screenDatabase[geneSymbol];
+            }
+            
+            foundGenes.push(geneData);
+            seenGenes.add(geneSymbol);
+        }
+    });
+    
+    return { foundGenes };
+}
+
 function displayCiliaPlotPage() {
     const contentArea = document.querySelector('.content-area');
     contentArea.className = 'content-area content-area-full';
@@ -249,6 +311,9 @@ function displayCiliaPlotPage() {
 // =============================================================================
 
 function initializeCiliaPlotPage() {
+    // 🔄 UPDATED: Call the main data loading function when the page is initialized
+    loadAllData();
+
     populatePlotTypes();
     document.getElementById('ciliaplot-type-selector').addEventListener('change', updateCustomizationPanel);
     document.getElementById('generate-ciliaplot-btn').addEventListener('click', generateAnalysisPlots);
@@ -445,6 +510,10 @@ const PLOT_CONFIG = {
         label: 'Gene Feature Overview', 
         explanation: 'A comprehensive plot showing gene associations across five major categories: Subcellular Localization, Protein Complexes, Protein Domains, Ciliopathies, and Ciliogenesis Screens.'
     },
+    'screen_summary_heatmap': {
+        label: 'Screen Summary Heatmap',
+        explanation: 'Visualizes results from five key functional genomics screens (Kim, Wheway, Roosing, Breslow, Basu) as a color-coded heatmap.'
+   },
     'ciliopathy_associations': { 
         label: 'Genes vs Ciliopathies', 
         explanation: 'Displays the associations between genes and ciliopathies as markers. Each marker represents a gene-ciliopathy association, helping visualize disease links.'
@@ -2304,15 +2373,134 @@ function renderExpressionHeatmap(expressionData, geneList = []) {
     console.log('Heatmap rendering completed successfully with container bounds');
     return true;
 }
+/**
+ * Renders the Screen Summary Heatmap using Plotly.js.
+ * @param {object[]} genes - The array of merged gene data from findAndMergeGenes.
+ * @param {object} custom - Customization options from the UI.
+ */
+function renderScreenSummaryHeatmap(genes, custom = {}) {
+    clearAllPlots('plot-display-area');
 
+    // Define the screens and their corresponding data keys
+    const screens = {
+        'Kim 2016': 'Kim2016',
+        'Wheway 2015': 'Wheway2015',
+        'Roosing 2015': 'Roosing2015',
+        'Breslow 2018': 'Breslow2018',
+        'Basu 2023': 'Basu2023'
+    };
+    const screenOrder = Object.keys(screens);
+
+    // Define the mapping from text categories to numbers and colors
+    const categoryMap = {
+        "Decreased cilia numbers": { value: 1, color: '#0072B2' },
+        "Decreased Signaling (Positive Regulator)": { value: 1, color: '#0072B2' },
+        "Increased cilia numbers": { value: 2, color: '#D55E00' },
+        "Increased Signaling (Negative Regulator)": { value: 2, color: '#D55E00' },
+        "Causes Supernumerary Cilia": { value: 3, color: '#CC79A7' },
+        "No effect": { value: 4, color: '#d3d3d3' },
+        "No Significant Effect": { value: 4, color: '#d3d3d3' },
+        "Not in Screen": { value: 5, color: '#f5f5f5' },
+        "Not Reported": { value: 6, color: '#bababa' }
+    };
+
+    // Process the gene data into a matrix format for the heatmap
+    const geneLabels = genes.map(g => g.gene);
+    const zData = []; // Numeric matrix for colors
+    const textData = []; // Original text for hover info
+
+    genes.forEach(gene => {
+        const rowValues = [];
+        const rowText = [];
+        screenOrder.forEach(screenName => {
+            const screenKey = screens[screenName];
+            let resultText = "Not in Screen"; // Default value
+            
+            if (gene.screens_summary) {
+                const screenResult = gene.screens_summary.find(s => s.source === screenKey);
+                if (screenResult) {
+                    resultText = screenResult.result;
+                }
+            }
+            
+            const mapping = categoryMap[resultText] || categoryMap["Not in Screen"];
+            rowValues.push(mapping.value);
+            rowText.push(resultText);
+        });
+        zData.push(rowValues);
+        textData.push(rowText);
+    });
+
+    // Create the Plotly colorscale from our map
+    const plotlyColorscale = [
+        [0.0, categoryMap["Decreased cilia numbers"].color], [0.16, categoryMap["Decreased cilia numbers"].color],
+        [0.17, categoryMap["Increased cilia numbers"].color], [0.33, categoryMap["Increased cilia numbers"].color],
+        [0.34, categoryMap["Causes Supernumerary Cilia"].color], [0.50, categoryMap["Causes Supernumerary Cilia"].color],
+        [0.51, categoryMap["No effect"].color], [0.67, categoryMap["No effect"].color],
+        [0.68, categoryMap["Not Reported"].color], [0.84, categoryMap["Not Reported"].color],
+        [0.85, categoryMap["Not in Screen"].color], [1.0, categoryMap["Not in Screen"].color]
+    ];
+    
+    // Define the heatmap trace
+    const data = [{
+        x: screenOrder,
+        y: geneLabels,
+        z: zData,
+        customdata: textData,
+        type: 'heatmap',
+        colorscale: plotlyColorscale,
+        showscale: false,
+        hovertemplate: '<b>Gene:</b> %{y}<br><b>Screen:</b> %{x}<br><b>Result:</b> %{customdata}<extra></extra>'
+    }];
+
+    // Define the layout with a custom legend
+    const layout = {
+        title: {
+            text: custom.title || 'Summary of Functional Screen Results',
+            font: { size: custom.titleFontSize || 18, family: custom.fontFamily, color: custom.fontColor }
+        },
+        xaxis: { tickangle: -45, automargin: true },
+        yaxis: { automargin: true, tickfont: { size: 10 } },
+        margin: { l: 120, r: 150, b: 150, t: 80 },
+        width: custom.figureWidth,
+        height: custom.figureHeight,
+        annotations: []
+    };
+
+    // Create a custom legend using annotations
+    const legendMap = {
+      "Decreased": categoryMap["Decreased cilia numbers"].color,
+      "Increased": categoryMap["Increased cilia numbers"].color,
+      "Supernumerary": categoryMap["Causes Supernumerary Cilia"].color,
+      "No Effect": categoryMap["No effect"].color,
+      "Not Reported": categoryMap["Not Reported"].color,
+      "Not in Screen": categoryMap["Not in Screen"].color,
+    };
+    let y_pos = 1.0;
+    Object.keys(legendMap).forEach(key => {
+        layout.annotations.push({
+            xref: 'paper', yref: 'paper',
+            x: 1.02, y: y_pos,
+            xanchor: 'left', yanchor: 'middle',
+            text: `█ ${key}`,
+            font: { color: legendMap[key], size: 12, family: custom.fontFamily },
+            showarrow: false
+        });
+        y_pos -= 0.06;
+    });
+
+    Plotly.newPlot('plot-display-area', data, layout, { responsive: true });
+}
+
+// =============================================================================
 // =============================================================================
 // MAIN ORCHESTRATOR
 // =============================================================================
 
+// 🔄 UPDATED: This is the new version of the main function
 async function generateAnalysisPlots() {
-    if (typeof geneMapCache === 'undefined' || geneMapCache.size === 0) {
-        alert("Error: The main gene database is not yet loaded. Please wait a moment.");
-        console.error("generateAnalysisPlots was called before geneMapCache was initialized.");
+    if (typeof ciliaryGeneMap === 'undefined' || ciliaryGeneMap.size === 0) {
+        alert("Error: The main gene database is not yet loaded. Please wait a moment and try again.");
         return;
     }
 
@@ -2322,18 +2510,19 @@ async function generateAnalysisPlots() {
 
     const rawInput = document.getElementById('ciliaplot-genes-input').value;
     const originalQueries = rawInput.split(/[\s,;\n\r\t]+/).filter(Boolean);
+    
     if (originalQueries.length === 0) {
         plotContainer.innerHTML = 'Please enter at least one gene.';
+        updateGeneSummaryTable([], []);
         return;
     }
 
-    const sanitizedQueries = [...new Set(originalQueries.map(sanitize))];
-    const { foundGenes } = findGenes(sanitizedQueries);
+    const { foundGenes } = findAndMergeGenes(originalQueries);
     
     updateGeneSummaryTable(originalQueries, foundGenes);
 
     if (foundGenes.length === 0) {
-        plotContainer.innerHTML = 'None of the provided genes were found.';
+        plotContainer.innerHTML = 'None of the provided genes were found in the CiliaHub database.';
         return;
     }
 
@@ -2341,67 +2530,25 @@ async function generateAnalysisPlots() {
     const custom = getPlotCustomization();
 
     switch (plotType) {
-        case 'expression_heatmap':
-            if (!plotExpressionLoaded || Object.keys(plotExpressionData).length === 0) {
-                console.warn("Expression data not loaded yet. Deferring heatmap rendering.");
-                plotContainer.innerHTML = '<em>Expression data is still loading... heatmap will appear automatically once ready.</em>';
-                pendingHeatmapRequest = { foundGenes };
-                loadPlotExpressionData();
-                return;
-            }
-            renderExpressionHeatmap(plotExpressionData, foundGenes);
-            break;
-
-        case 'localization_bubble':
-            renderBubblePlot(foundGenes, custom);
-            break;
-
-        case 'functional_bar':
-            renderBarPlot(foundGenes, custom);
-            break;
-
-        case 'network':
-            renderComplexNetwork(foundGenes, plotContainer, custom);
-            break;
-
-        case 'organelle_radar':
-            renderOrganelleRadarPlot(foundGenes, plotContainer, custom);
-            break;
-
-        case 'organelle_umap':
-            renderOrganelleUMAP(foundGenes, plotContainer, custom);
-            break;
-
-        case 'screen_analysis':
-            renderGeneScreenAnalysis(foundGenes, plotContainer, custom);
-            break;
-            
-        case 'screen_bar_chart':
-            renderScreenBarChart(foundGenes, plotContainer, custom);
-            break;
-
-        case 'enrichment_bubble':
-            renderEnrichmentBubblePlot(foundGenes, custom);
-            break;
-
-        case 'balloon_plot':
-            renderBalloonPlot(foundGenes, custom);
-            break;
-
-        case 'venn_diagram':
-            renderVennDiagram(foundGenes, custom);
-            break;
-        case 'multi_category_manhattan': //  <-- ADD THIS CASE
-            renderMultiCategoryPlot(foundGenes, custom);
-            break;
-        case 'ciliopathy_associations':
-            renderCiliopathyPlot(foundGenes, custom);
-            break;
-
-        default:
-            plotContainer.innerHTML = 'This plot type is not yet implemented.';
+        case 'expression_heatmap': renderExpressionHeatmap(plotExpressionData, foundGenes); break;
+        case 'localization_bubble': renderBubblePlot(foundGenes, custom); break;
+        case 'functional_bar': renderBarPlot(foundGenes, custom); break;
+        case 'network': renderComplexNetwork(foundGenes, plotContainer, custom); break;
+        case 'organelle_radar': renderOrganelleRadarPlot(foundGenes, plotContainer, custom); break;
+        case 'organelle_umap': renderOrganelleUMAP(foundGenes, plotContainer, custom); break;
+        case 'screen_analysis': renderGeneScreenAnalysis(foundGenes, plotContainer, custom); break;
+        case 'screen_bar_chart': renderScreenBarChart(foundGenes, plotContainer, custom); break;
+        case 'enrichment_bubble': renderEnrichmentBubblePlot(foundGenes, custom); break;
+        case 'balloon_plot': renderBalloonPlot(foundGenes, custom); break;
+        case 'venn_diagram': renderVennDiagram(foundGenes, custom); break;
+        case 'multi_category_manhattan': renderMultiCategoryPlot(foundGenes, custom); break;
+        case 'ciliopathy_associations': renderCiliopathyPlot(foundGenes, custom); break;
+        case 'screen_summary_heatmap': renderScreenSummaryHeatmap(foundGenes, custom); break; // Our new plot
+        default: plotContainer.innerHTML = 'This plot type is not yet implemented.';
     }
 }
+
+
 
 // =============================================================================
 // DOWNLOAD FUNCTION
