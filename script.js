@@ -108,10 +108,196 @@ if (g.ensembl_id) {
     }
 }
 
-/**
- * Search genes using symbols, synonyms, or ENSG IDs.
- * Handles multiple IDs per gene.
- */
+function displayHomePage() {
+    const contentArea = document.querySelector('.content-area');
+    contentArea.className = 'content-area';
+    document.querySelector('.cilia-panel').style.display = 'block';
+ 
+    // --- Initial render with placeholders ---
+    contentArea.innerHTML = `
+        <div class="page-section">
+            <h1>The CiliaHub: An Updated Database of Gold Standard Genes with Ciliary Functions</h1>
+
+            <div class="ciliahub-stats" style="margin-top: 1rem; margin-bottom: 2rem; display: flex; gap: 1rem; flex-wrap: wrap; font-family: 'Arial', sans-serif;">
+                
+                <div style="flex: 1; min-width: 180px; background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%); color: #1565c0; padding: 1.25rem; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); border: 1px solid #90caf9; text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; transition: transform 0.2s, box-shadow 0.2s; cursor: default;">
+                    <div style="font-size: 0.85rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.5rem; color: #1976d2;">Current Ciliary Genes</div>
+                    <div id="gene-count" style="font-size: 2.5rem; font-weight: 700; color: #0d47a1;">...</div>
+                </div>
+            </div>
+
+            <p style="font-size: 1.1rem; color: #555;">CiliaHub is an advanced <strong>bioinformatics</strong> platform that hosts a detailed database of <strong>gold standard cilia genes</strong> and their role in various <strong>ciliopathies</strong>. Our comprehensive collection includes the most reliable and well-established genes linked to ciliary function, with reference papers also provided. With our user-friendly search tool, researchers can explore <strong>genome</strong>-wide data, focusing on both known and novel ciliary genes. Discover their contributions to the biology of cilia and the mechanisms behind ciliary-related disorders. Search for a single gene below or use the Batch Query tool to analyze multiple genes.</p>
+
+            <div class="search-container">
+                <div class="search-wrapper" style="flex: 1; position: relative;">
+                    <div style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); display: flex; align-items: center; pointer-events: none; z-index: 1;">
+                        <span style="background: linear-gradient(135deg, #1976d2 0%, #1565c0 100%); color: white; padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.5px; box-shadow: 0 2px 4px rgba(0,0,0,0.15);">CiliaHub V0.1</span>
+                    </div>
+                    <input type="text" id="single-gene-search" placeholder="Search for a single gene (e.g., ACE2, IFT88)" aria-label="Search for a single gene" autocomplete="off" style="padding-left: 140px;">
+                    <div id="search-suggestions"></div>
+                </div>
+                <button id="single-search-btn" class="search-btn btn btn-primary" aria-label="Search for the entered gene name">Search</button>
+            </div>
+
+            <div id="gene-cards-container" class="gene-cards"></div>
+            <div id="status-message" class="status-message" style="display: none;"></div>
+        </div>`;
+
+    // --- Search button ---
+    document.getElementById('single-search-btn').onclick = performSingleSearch;
+    const searchInput = document.getElementById('single-gene-search');
+    const suggestionsContainer = document.getElementById('search-suggestions');
+    displayGeneCards(currentData, [], 1, 10);
+
+    const hideSuggestions = () => {
+        suggestionsContainer.innerHTML = '';
+        suggestionsContainer.style.display = 'none';
+    };
+
+    // --- Search suggestions ---
+    searchInput.addEventListener('input', function() {
+        const query = this.value.trim().toUpperCase();
+        if (query.length < 1) {
+            hideSuggestions();
+            return;
+        }
+
+        const filteredGenes = allGenes.filter(g =>
+            (g.gene && g.gene.toUpperCase().startsWith(query)) ||
+            (g.synonym && g.synonym.toUpperCase().includes(query)) ||
+            (g.ensembl_id && g.ensembl_id.toUpperCase().startsWith(query))
+        ).slice(0, 10);
+
+        if (filteredGenes.length > 0) {
+            suggestionsContainer.innerHTML = '<ul>' +
+                filteredGenes.map(g => {
+                    const details = [g.ensembl_id, g.synonym].filter(Boolean).join(', ');
+                    return `<li data-gene="${g.gene}">${g.gene}${details ? ` (${details})` : ''}</li>`;
+                }).join('') +
+                '</ul>';
+
+            suggestionsContainer.querySelector('ul').addEventListener('click', function(event) {
+                if (event.target && event.target.nodeName === "LI") {
+                    searchInput.value = event.target.dataset.gene;
+                    hideSuggestions();
+                    performSingleSearch();
+                }
+            });
+
+            suggestionsContainer.style.display = 'block';
+        } else {
+            hideSuggestions();
+        }
+    });
+
+    searchInput.addEventListener('keydown', function(event) {
+        const suggestions = suggestionsContainer.querySelectorAll('li');
+        if (suggestions.length === 0 && event.key !== 'Enter') return;
+
+        let activeElement = suggestionsContainer.querySelector('.active');
+
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            if (activeElement) searchInput.value = activeElement.textContent.split(' ')[0];
+            hideSuggestions();
+            performSingleSearch();
+            return;
+        }
+
+        if (event.key === 'ArrowDown') {
+            event.preventDefault();
+            let nextElement = activeElement ? activeElement.nextElementSibling : suggestions[0];
+            if (nextElement) {
+                activeElement?.classList.remove('active');
+                nextElement.classList.add('active');
+            }
+        } else if (event.key === 'ArrowUp') {
+            event.preventDefault();
+            let prevElement = activeElement ? activeElement.previousElementSibling : suggestions[suggestions.length - 1];
+            if (prevElement) {
+                activeElement?.classList.remove('active');
+                prevElement.classList.add('active');
+            }
+        }
+    });
+
+    document.addEventListener('click', function(event) {
+        if (!searchInput.contains(event.target) && !suggestionsContainer.contains(event.target)) {
+            hideSuggestions();
+        }
+    });
+
+    // --- Display gene cards immediately (empty or with placeholder) ---
+    displayGeneCards(currentData, [], 1, 10);
+
+    // --- Update stats immediately if data is already loaded ---
+    if (typeof updateHomepageStats === 'function') {
+        updateHomepageStats();
+    }
+    
+    // Add hover effect to stats card
+    const statsCard = document.querySelector('.ciliahub-stats > div');
+    if (statsCard) {
+        statsCard.addEventListener('mouseenter', function() {
+            this.style.transform = 'translateY(-2px)';
+            this.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
+        });
+        statsCard.addEventListener('mouseleave', function() {
+            this.style.transform = 'translateY(0)';
+            this.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)';
+        });
+    }
+}
+
+// Add this function to your code to update the homepage statistics
+function updateHomepageStats() {
+    // Calculate gene count
+    const geneCount = allGenes ? allGenes.length : 0;
+    
+    // Calculate localization count
+    let localizationCount = 0;
+    if (allGenes && allGenes.length > 0) {
+        allGenes.forEach(gene => {
+            if (gene.localizations && Array.isArray(gene.localizations)) {
+                localizationCount += gene.localizations.length;
+            } else if (gene.localization) {
+                localizationCount += 1;
+            }
+        });
+    }
+    
+    // Calculate reference count
+    let referenceCount = 0;
+    if (allGenes && allGenes.length > 0) {
+        const uniqueReferences = new Set();
+        allGenes.forEach(gene => {
+            if (gene.references && Array.isArray(gene.references)) {
+                gene.references.forEach(ref => uniqueReferences.add(ref));
+            } else if (gene.reference) {
+                uniqueReferences.add(gene.reference);
+            } else if (gene.pmid) {
+                uniqueReferences.add(gene.pmid);
+            }
+        });
+        referenceCount = uniqueReferences.size;
+    }
+    
+    // Update the DOM elements with counts
+    const geneCountEl = document.getElementById('gene-count');
+    const localizationCountEl = document.getElementById('localization-count');
+    const referenceCountEl = document.getElementById('reference-count');
+    
+    if (geneCountEl) {
+        geneCountEl.textContent = geneCount.toLocaleString();
+    }
+    if (localizationCountEl) {
+        localizationCountEl.textContent = localizationCount.toLocaleString();
+    }
+    if (referenceCountEl) {
+        referenceCountEl.textContent = referenceCount.toLocaleString();
+    }
+}
+
 /**
  * Search genes using symbols, synonyms, or Ensembl IDs from the pre-built cache.
  * Handles multiple queries efficiently.
@@ -181,66 +367,6 @@ async function initializeApp() {
 // Start the entire application
 initializeApp();
 
-
-// Add this function to your code to update the homepage statistics
-function updateHomepageStats() {
-    // Calculate gene count
-    const geneCount = allGenes ? allGenes.length : 0;
-    
-    // Calculate localization count
-    // Adjust this based on how localizations are stored in your data
-    let localizationCount = 0;
-    if (allGenes && allGenes.length > 0) {
-        allGenes.forEach(gene => {
-            if (gene.localizations && Array.isArray(gene.localizations)) {
-                localizationCount += gene.localizations.length;
-            } else if (gene.localization) {
-                localizationCount += 1;
-            }
-        });
-    }
-    
-    // Calculate reference count
-    // Adjust this based on how references are stored in your data
-    let referenceCount = 0;
-    if (allGenes && allGenes.length > 0) {
-        const uniqueReferences = new Set();
-        allGenes.forEach(gene => {
-            if (gene.references && Array.isArray(gene.references)) {
-                gene.references.forEach(ref => uniqueReferences.add(ref));
-            } else if (gene.reference) {
-                uniqueReferences.add(gene.reference);
-            } else if (gene.pmid) {
-                uniqueReferences.add(gene.pmid);
-            }
-        });
-        referenceCount = uniqueReferences.size;
-    }
-    
-    // Update the DOM elements with counts
-    const geneCountEl = document.getElementById('gene-count');
-    const localizationCountEl = document.getElementById('localization-count');
-    const referenceCountEl = document.getElementById('reference-count');
-    
-    if (geneCountEl) {
-        geneCountEl.textContent = geneCount.toLocaleString();
-    }
-    if (localizationCountEl) {
-        localizationCountEl.textContent = localizationCount.toLocaleString();
-    }
-    if (referenceCountEl) {
-        referenceCountEl.textContent = referenceCount.toLocaleString();
-    }
-}
-
-// Call this function after your data is loaded
-// For example, in your data loading function:
-// fetch('your-data-url')
-//     .then(response => response.json())
-//     .then(data => {
-//         allGenes = data;
-//         updateHomepageStats();
-//     });
 
 
 function performBatchSearch() {
@@ -564,136 +690,6 @@ function mapLocalizationToSVG(localizationArray) {
     }).filter(id => allPartIds.includes(id));
 }
 
-function displayHomePage() {
-    const contentArea = document.querySelector('.content-area');
-    contentArea.className = 'content-area';
-    document.querySelector('.cilia-panel').style.display = 'block';
- 
-    // --- Initial render with placeholders ---
-    contentArea.innerHTML = `
-        <div class="page-section">
-            <h1>The CiliaHub: An Updated Database of Gold Standard Genes with Ciliary Functions</h1>
-
-            <div class="ciliahub-stats" style="margin-top: 1rem; margin-bottom: 2rem; display: flex; gap: 1rem; flex-wrap: wrap; font-family: 'Arial', sans-serif;">
-                
-                <div style="flex: 1; min-width: 140px; background-color: #007bff; color: #fff; padding: 1rem; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.15); text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center;">
-                    <div style="font-size: 1.2rem; font-weight: 700;">CiliaHub V0.1</div>
-                    <div style="display: flex; align-items: baseline; gap: 0.5rem; margin-top: 0.25rem;">
-                        <div id="gene-count" style="font-size: 1.5rem; font-weight: 700;">...</div>
-                        <div>Genes</div>
-                    </div>
-                </div>
-            </div>
-
-            <p style="font-size: 1.1rem; color: #555;">CiliaHub is an advanced <strong>bioinformatics</strong> platform that hosts a detailed database of <strong>gold standard cilia genes</strong> and their role in various <strong>ciliopathies</strong>. Our comprehensive collection includes the most reliable and well-established genes linked to ciliary function, with reference papers also provided. With our user-friendly search tool, researchers can explore <strong>genome</strong>-wide data, focusing on both known and novel ciliary genes. Discover their contributions to the biology of cilia and the mechanisms behind ciliary-related disorders. Search for a single gene below or use the Batch Query tool to analyze multiple genes.</p>
-
-            <div class="search-container">
-                <div class="search-wrapper" style="flex: 1;">
-                    <input type="text" id="single-gene-search" placeholder="Search for a single gene (e.g., ACE2, IFT88)" aria-label="Search for a single gene" autocomplete="off">
-                    <div id="search-suggestions"></div>
-                </div>
-                <button id="single-search-btn" class="search-btn btn btn-primary" aria-label="Search for the entered gene name">Search</button>
-            </div>
-
-            <div id="gene-cards-container" class="gene-cards"></div>
-            <div id="status-message" class="status-message" style="display: none;"></div>
-        </div>`;
-
-    // --- Search button ---
-    document.getElementById('single-search-btn').onclick = performSingleSearch;
-    const searchInput = document.getElementById('single-gene-search');
-    const suggestionsContainer = document.getElementById('search-suggestions');
-    displayGeneCards(currentData, [], 1, 10);
-
-    const hideSuggestions = () => {
-        suggestionsContainer.innerHTML = '';
-        suggestionsContainer.style.display = 'none';
-    };
-
-    // --- Search suggestions ---
-    searchInput.addEventListener('input', function() {
-        const query = this.value.trim().toUpperCase();
-        if (query.length < 1) {
-            hideSuggestions();
-            return;
-        }
-
-        const filteredGenes = allGenes.filter(g =>
-            (g.gene && g.gene.toUpperCase().startsWith(query)) ||
-            (g.synonym && g.synonym.toUpperCase().includes(query)) ||
-            (g.ensembl_id && g.ensembl_id.toUpperCase().startsWith(query))
-        ).slice(0, 10);
-
-        if (filteredGenes.length > 0) {
-            suggestionsContainer.innerHTML = '<ul>' +
-                filteredGenes.map(g => {
-                    const details = [g.ensembl_id, g.synonym].filter(Boolean).join(', ');
-                    return `<li data-gene="${g.gene}">${g.gene}${details ? ` (${details})` : ''}</li>`;
-                }).join('') +
-                '</ul>';
-
-            suggestionsContainer.querySelector('ul').addEventListener('click', function(event) {
-                if (event.target && event.target.nodeName === "LI") {
-                    searchInput.value = event.target.dataset.gene;
-                    hideSuggestions();
-                    performSingleSearch();
-                }
-            });
-
-            suggestionsContainer.style.display = 'block';
-        } else {
-            hideSuggestions();
-        }
-    });
-
-    searchInput.addEventListener('keydown', function(event) {
-        const suggestions = suggestionsContainer.querySelectorAll('li');
-        if (suggestions.length === 0 && event.key !== 'Enter') return;
-
-        let activeElement = suggestionsContainer.querySelector('.active');
-
-        if (event.key === 'Enter') {
-            event.preventDefault();
-            if (activeElement) searchInput.value = activeElement.textContent.split(' ')[0];
-            hideSuggestions();
-            performSingleSearch();
-            return;
-        }
-
-        if (event.key === 'ArrowDown') {
-            event.preventDefault();
-            let nextElement = activeElement ? activeElement.nextElementSibling : suggestions[0];
-            if (nextElement) {
-                activeElement?.classList.remove('active');
-                nextElement.classList.add('active');
-            }
-        } else if (event.key === 'ArrowUp') {
-            event.preventDefault();
-            let prevElement = activeElement ? activeElement.previousElementSibling : suggestions[suggestions.length - 1];
-            if (prevElement) {
-                activeElement?.classList.remove('active');
-                prevElement.classList.add('active');
-            }
-        }
-    });
-
-    document.addEventListener('click', function(event) {
-        if (!searchInput.contains(event.target) && !suggestionsContainer.contains(event.target)) {
-            hideSuggestions();
-        }
-    });
-
-    // --- Display gene cards immediately (empty or with placeholder) ---
-    displayGeneCards(currentData, [], 1, 10);
-
-    // --- Update stats immediately if data is already loaded ---
-    if (typeof updateHomepageStats === 'function') {
-        updateHomepageStats();
-    }
-    
-    // MODIFICATION: The dynamic stats update logic that was here has been moved to 
-    // the new updateHomepageStats() function to fix the race condition.
-}
 
 
 function displayBatchQueryTool() {
