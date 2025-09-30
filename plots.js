@@ -2087,17 +2087,16 @@ function renderScreenSummaryHeatmap(genes, custom = {}) {
 
     // 🔄 UPDATED: New color palette for better visibility
     const categoryMap = {
-        "Decreased cilia numbers": { value: 1, color: '#0571b0' }, // Darker Blue
-        "Decreased Signaling (Positive Regulator)": { value: 1, color: '#0571b0' },
-        "Increased cilia numbers": { value: 2, color: '#ca0020' }, // Strong Red
-        "Increased Signaling (Negative Regulator)": { value: 2, color: '#ca0020' },
-        "Causes Supernumerary Cilia": { value: 3, color: '#7b3294' }, // Purple
-        "No effect": { value: 4, color: '#e0e0e0' }, // Light Gray
-        "No Significant Effect": { value: 4, color: '#e0e0e0' },
-        "Not in Screen": { value: 5, color: '#f7f7f7' }, // Off-white
-        "Not Reported": { value: 6, color: '#a6a6a6' }  // Darker Gray
-    };
-
+    "Decreased cilia numbers": { value: 1, color: '#2166ac' }, // Medium Blue
+    "Decreased Signaling (Positive Regulator)": { value: 1, color: '#2166ac' },
+    "Increased cilia numbers": { value: 2, color: '#d6604d' }, // Soft Red
+    "Increased Signaling (Negative Regulator)": { value: 2, color: '#d6604d' },
+    "Causes Supernumerary Cilia": { value: 3, color: '#762a83' }, // Deep Purple
+    "No effect": { value: 4, color: '#f7f7f7' }, // Very Light Gray/White
+    "No Significant Effect": { value: 4, color: '#f7f7f7' },
+    "Not in Screen": { value: 5, color: '#f0f0f0' }, // Slightly darker neutral
+    "Not Reported": { value: 6, color: '#fee08b' }  // Warm Yellow/Orange
+};
     const geneLabels = genes.map(g => g.gene);
     const zData = [];
     const textData = [];
