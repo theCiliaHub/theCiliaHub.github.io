@@ -10,9 +10,9 @@ async function loadAllData() {
     try {
         // Fetch both files in parallel
         const [ciliaryGenesResponse, screenDataResponse] = await Promise.all([
-            fetch('data/ciliahub_data.json'),
-            fetch('data/cilia_screens_data.json')
-        ]);
+    fetch('ciliahub_data.json'),
+    fetch('cilia_screens_data.json')
+]);
 
         const ciliaryGeneArray = await ciliaryGenesResponse.json();
         screenDatabase = await screenDataResponse.json();
