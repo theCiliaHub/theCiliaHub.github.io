@@ -2068,12 +2068,6 @@ function renderExpressionHeatmap(expressionData, geneList = []) {
     console.log('Heatmap rendering completed successfully with container bounds');
     return true;
 }
-/**
- * 🔄 UPDATED: Renders a complex heatmap with two separate sections and legends.
- * One section for cilia number/structure screens and another for the Hh signaling screen.
- * @param {object[]} genes - The array of merged gene data.
- * @param {object} custom - Customization options from the UI.
- */
 function renderScreenSummaryHeatmap(genes, custom = {}) {
     clearAllPlots('plot-display-area');
 
@@ -2090,37 +2084,30 @@ function renderScreenSummaryHeatmap(genes, custom = {}) {
     const numberScreenOrder = Object.keys(numberScreens);
     const signalingScreenOrder = Object.keys(signalingScreens);
 
-    // 2. Define distinct color maps for each data type
+    // 2. Define distinct color maps for each data type (avoiding white/gray)
     const numberCategoryMap = {
-        "Decreased cilia numbers": { value: 1, color: '#2166ac' },
-        "Increased cilia numbers": { value: 2, color: '#b2182b' },
-        "Causes Supernumerary Cilia": { value: 3, color: '#762a83' },
-        "No effect": { value: 4, color: '#fddbc7' },
-        "Not in Screen": { value: 5, color: '#ffffff' },
-        "Not Reported": { value: 6, color: '#d9d9d9' }
+        "Decreased cilia numbers": { value: 1, color: '#0571b0' }, // Blue
+        "Increased cilia numbers": { value: 2, color: '#ca0020' }, // Red
+        "Causes Supernumerary Cilia": { value: 3, color: '#fdae61' }, // Orange
+        "No effect": { value: 4, color: '#fee090' }, // Yellow
+        "Not in Screen": { value: 5, color: '#bdbdbd' }, // Light gray
+        "Not Reported": { value: 6, color: '#636363' }  // Dark gray
     };
     const signalingCategoryMap = {
-        "Decreased Signaling (Positive Regulator)": { value: 1, color: '#2166ac' },
-        "Increased Signaling (Negative Regulator)": { value: 2, color: '#b2182b' },
-        "No Significant Effect": { value: 4, color: '#fddbc7' },
-        "Not in Screen": { value: 5, color: '#ffffff' },
-        "Not Reported": { value: 6, color: '#d9d9d9' }
+        "Decreased Signaling (Positive Regulator)": { value: 1, color: '#2166ac' }, // Dark Blue
+        "Increased Signaling (Negative Regulator)": { value: 2, color: '#d73027' }, // Red
+        "No Significant Effect": { value: 3, color: '#fdae61' }, // Orange
+        "Not in Screen": { value: 4, color: '#bdbdbd' }, // Light gray
+        "Not Reported": { value: 5, color: '#636363' }  // Dark gray
     };
 
-    // 3. Process gene data into two separate matrices
+    // 3. Prepare matrices
     const geneLabels = genes.map(g => g.gene);
-    const zDataNumber = [];
-    const textDataNumber = [];
-    const zDataSignaling = [];
-    const textDataSignaling = [];
+    const zDataNumber = [], textDataNumber = [], zDataSignaling = [], textDataSignaling = [];
 
     genes.forEach(gene => {
-        const numberRowValues = [];
-        const numberRowText = [];
-        const signalingRowValues = [];
-        const signalingRowText = [];
+        const numberRowValues = [], numberRowText = [], signalingRowValues = [], signalingRowText = [];
 
-        // Populate the matrix for Cilia Number screens
         numberScreenOrder.forEach(screenName => {
             const screenKey = numberScreens[screenName];
             let resultText = "Not in Screen";
@@ -2133,7 +2120,6 @@ function renderScreenSummaryHeatmap(genes, custom = {}) {
             numberRowText.push(resultText);
         });
 
-        // Populate the matrix for Hh Signaling screens
         signalingScreenOrder.forEach(screenName => {
             const screenKey = signalingScreens[screenName];
             let resultText = "Not in Screen";
@@ -2152,17 +2138,23 @@ function renderScreenSummaryHeatmap(genes, custom = {}) {
         textDataSignaling.push(signalingRowText);
     });
 
-    // 4. Define two separate heatmap traces for the subplots
+    // 4. Heatmap traces
     const trace1 = {
         x: numberScreenOrder, y: geneLabels, z: zDataNumber, customdata: textDataNumber,
         type: 'heatmap',
         colorscale: [
-            [0, numberCategoryMap["Decreased cilia numbers"].color], [0.16, numberCategoryMap["Decreased cilia numbers"].color],
-            [0.17, numberCategoryMap["Increased cilia numbers"].color], [0.33, numberCategoryMap["Increased cilia numbers"].color],
-            [0.34, numberCategoryMap["Causes Supernumerary Cilia"].color], [0.50, numberCategoryMap["Causes Supernumerary Cilia"].color],
-            [0.51, numberCategoryMap["No effect"].color], [0.67, numberCategoryMap["No effect"].color],
-            [0.68, numberCategoryMap["Not Reported"].color], [0.84, numberCategoryMap["Not Reported"].color],
-            [0.85, numberCategoryMap["Not in Screen"].color], [1.0, numberCategoryMap["Not in Screen"].color]
+            [0, numberCategoryMap["Decreased cilia numbers"].color],
+            [0.16, numberCategoryMap["Decreased cilia numbers"].color],
+            [0.17, numberCategoryMap["Increased cilia numbers"].color],
+            [0.33, numberCategoryMap["Increased cilia numbers"].color],
+            [0.34, numberCategoryMap["Causes Supernumerary Cilia"].color],
+            [0.50, numberCategoryMap["Causes Supernumerary Cilia"].color],
+            [0.51, numberCategoryMap["No effect"].color],
+            [0.67, numberCategoryMap["No effect"].color],
+            [0.68, numberCategoryMap["Not Reported"].color],
+            [0.84, numberCategoryMap["Not Reported"].color],
+            [0.85, numberCategoryMap["Not in Screen"].color],
+            [1.0, numberCategoryMap["Not in Screen"].color]
         ],
         showscale: false,
         hovertemplate: '<b>Gene:</b> %{y}<br><b>Screen:</b> %{x}<br><b>Result:</b> %{customdata}<extra></extra>',
@@ -2173,10 +2165,14 @@ function renderScreenSummaryHeatmap(genes, custom = {}) {
         x: signalingScreenOrder, y: geneLabels, z: zDataSignaling, customdata: textDataSignaling,
         type: 'heatmap',
         colorscale: [
-            [0, signalingCategoryMap["Decreased Signaling (Positive Regulator)"].color], [0.25, signalingCategoryMap["Decreased Signaling (Positive Regulator)"].color],
-            [0.26, signalingCategoryMap["Increased Signaling (Negative Regulator)"].color], [0.5, signalingCategoryMap["Increased Signaling (Negative Regulator)"].color],
-            [0.51, signalingCategoryMap["No Significant Effect"].color], [0.75, signalingCategoryMap["No Significant Effect"].color],
-            [0.76, signalingCategoryMap["Not in Screen"].color], [1.0, signalingCategoryMap["Not in Screen"].color]
+            [0, signalingCategoryMap["Decreased Signaling (Positive Regulator)"].color],
+            [0.25, signalingCategoryMap["Decreased Signaling (Positive Regulator)"].color],
+            [0.26, signalingCategoryMap["Increased Signaling (Negative Regulator)"].color],
+            [0.5, signalingCategoryMap["Increased Signaling (Negative Regulator)"].color],
+            [0.51, signalingCategoryMap["No Significant Effect"].color],
+            [0.75, signalingCategoryMap["No Significant Effect"].color],
+            [0.76, signalingCategoryMap["Not in Screen"].color],
+            [1.0, signalingCategoryMap["Not in Screen"].color]
         ],
         showscale: false,
         hovertemplate: '<b>Gene:</b> %{y}<br><b>Screen:</b> %{x}<br><b>Result:</b> %{customdata}<extra></extra>',
@@ -2187,29 +2183,29 @@ function renderScreenSummaryHeatmap(genes, custom = {}) {
 
     const data = [trace1, trace2];
 
-    // 5. Define the layout with subplots and two custom legends
+    // 5. Layout
     const layout = {
         title: { text: custom.title || 'Summary of Functional Screen Results', font: { size: custom.titleFontSize || 18, family: custom.fontFamily, color: custom.fontColor }},
         grid: { rows: 1, columns: 2, pattern: 'independent' },
         xaxis: { domain: [0, 0.78], tickangle: -45, automargin: true },
         xaxis2: { domain: [0.8, 1.0], tickangle: -45, automargin: true },
         yaxis: { automargin: true, tickfont: { size: 10 } },
-        margin: { l: 120, r: 200, b: 150, t: 80 },
+        margin: { l: 120, r: 220, b: 150, t: 80 },
         width: custom.figureWidth, height: custom.figureHeight,
         annotations: []
     };
 
-    // Legend for the first heatmap (Cilia Number)
+    // Legends
     const legend1 = {
       "Decrease in ciliated cells": numberCategoryMap["Decreased cilia numbers"].color,
       "Increase in ciliated cells": numberCategoryMap["Increased cilia numbers"].color,
       "Supernumerary cilia": numberCategoryMap["Causes Supernumerary Cilia"].color,
       "No Effect": numberCategoryMap["No effect"].color,
       "Not Reported": numberCategoryMap["Not Reported"].color,
-      "Not in Screen": numberCategoryMap["Not in Screen"].color,
+      "Not in Screen": numberCategoryMap["Not in Screen"].color
     };
     let y_pos1 = 1.0;
-    layout.annotations.push({ xref: 'paper', yref: 'paper', x: 1.02, y: y_pos1 + 0.05, xanchor: 'left', text: '<b>Cilia Number/Structure</b>', showarrow: false });
+    layout.annotations.push({ xref: 'paper', yref: 'paper', x: 1.02, y: y_pos1 + 0.06, xanchor: 'left', text: '<b>Cilia Number/Structure</b>', showarrow: false });
     Object.keys(legend1).forEach(key => {
         layout.annotations.push({
             xref: 'paper', yref: 'paper', x: 1.02, y: y_pos1,
@@ -2217,17 +2213,16 @@ function renderScreenSummaryHeatmap(genes, custom = {}) {
             font: { color: legend1[key], size: 12 },
             showarrow: false
         });
-        y_pos1 -= 0.06;
+        y_pos1 -= 0.07;
     });
 
-    // Legend for the second heatmap (Hh Signaling)
     const legend2 = {
         "Decreased Signaling": signalingCategoryMap["Decreased Signaling (Positive Regulator)"].color,
         "Increased Signaling": signalingCategoryMap["Increased Signaling (Negative Regulator)"].color,
         "No Effect": signalingCategoryMap["No Significant Effect"].color
     };
-    let y_pos2 = y_pos1 - 0.1; // Add space between legends
-    layout.annotations.push({ xref: 'paper', yref: 'paper', x: 1.02, y: y_pos2 + 0.05, xanchor: 'left', text: '<b>Hedgehog Signaling</b>', showarrow: false });
+    let y_pos2 = y_pos1 - 0.08; 
+    layout.annotations.push({ xref: 'paper', yref: 'paper', x: 1.02, y: y_pos2 + 0.06, xanchor: 'left', text: '<b>Hedgehog Signaling</b>', showarrow: false });
     Object.keys(legend2).forEach(key => {
         layout.annotations.push({
             xref: 'paper', yref: 'paper', x: 1.02, y: y_pos2,
@@ -2235,11 +2230,12 @@ function renderScreenSummaryHeatmap(genes, custom = {}) {
             font: { color: legend2[key], size: 12 },
             showarrow: false
         });
-        y_pos2 -= 0.06;
+        y_pos2 -= 0.07;
     });
 
     Plotly.newPlot('plot-display-area', data, layout, { responsive: true });
 }
+
 
 // =============================================================================
 // =============================================================================
