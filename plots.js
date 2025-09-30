@@ -2069,104 +2069,177 @@ function renderExpressionHeatmap(expressionData, geneList = []) {
     return true;
 }
 /**
- * 🔄 UPDATED: Renders the Screen Summary Heatmap with a new, high-contrast color scheme.
- * @param {object[]} genes - The array of merged gene data from findAndMergeGenes.
+ * 🔄 UPDATED: Renders a complex heatmap with two separate sections and legends.
+ * One section for cilia number/structure screens and another for the Hh signaling screen.
+ * @param {object[]} genes - The array of merged gene data.
  * @param {object} custom - Customization options from the UI.
  */
 function renderScreenSummaryHeatmap(genes, custom = {}) {
     clearAllPlots('plot-display-area');
 
-    const screens = {
+    // 1. Define the two groups of screens
+    const numberScreens = {
         'Kim 2016': 'Kim2016',
         'Wheway 2015': 'Wheway2015',
         'Roosing 2015': 'Roosing2015',
-        'Breslow 2018': 'Breslow2018',
         'Basu 2023': 'Basu2023'
     };
-    const screenOrder = Object.keys(screens);
+    const signalingScreens = {
+        'Breslow 2018': 'Breslow2018'
+    };
+    const numberScreenOrder = Object.keys(numberScreens);
+    const signalingScreenOrder = Object.keys(signalingScreens);
 
-    // 🔄 UPDATED: New color palette for better visibility
-    const categoryMap = {
-    "Decreased cilia numbers": { value: 1, color: '#2166ac' }, // Medium Blue
-    "Decreased Signaling (Positive Regulator)": { value: 1, color: '#2166ac' },
-    "Increased cilia numbers": { value: 2, color: '#d6604d' }, // Soft Red
-    "Increased Signaling (Negative Regulator)": { value: 2, color: '#d6604d' },
-    "Causes Supernumerary Cilia": { value: 3, color: '#762a83' }, // Deep Purple
-    "No effect": { value: 4, color: '#ffd966' }, // Soft Yellow, visible
-    "No Significant Effect": { value: 4, color: '#ffd966' },
-    "Not in Screen": { value: 5, color: '#a6d96a' }, // Soft Green, visible
-    "Not Reported": { value: 6, color: '#fdae61' }  // Warm Orange
-};
+    // 2. Define distinct color maps for each data type
+    const numberCategoryMap = {
+        "Decreased cilia numbers": { value: 1, color: '#2166ac' },
+        "Increased cilia numbers": { value: 2, color: '#b2182b' },
+        "Causes Supernumerary Cilia": { value: 3, color: '#762a83' },
+        "No effect": { value: 4, color: '#fddbc7' },
+        "Not in Screen": { value: 5, color: '#ffffff' },
+        "Not Reported": { value: 6, color: '#d9d9d9' }
+    };
+    const signalingCategoryMap = {
+        "Decreased Signaling (Positive Regulator)": { value: 1, color: '#2166ac' },
+        "Increased Signaling (Negative Regulator)": { value: 2, color: '#b2182b' },
+        "No Significant Effect": { value: 4, color: '#fddbc7' },
+        "Not in Screen": { value: 5, color: '#ffffff' },
+        "Not Reported": { value: 6, color: '#d9d9d9' }
+    };
+
+    // 3. Process gene data into two separate matrices
     const geneLabels = genes.map(g => g.gene);
-    const zData = [];
-    const textData = [];
+    const zDataNumber = [];
+    const textDataNumber = [];
+    const zDataSignaling = [];
+    const textDataSignaling = [];
 
     genes.forEach(gene => {
-        const rowValues = [];
-        const rowText = [];
-        screenOrder.forEach(screenName => {
-            const screenKey = screens[screenName];
+        const numberRowValues = [];
+        const numberRowText = [];
+        const signalingRowValues = [];
+        const signalingRowText = [];
+
+        // Populate the matrix for Cilia Number screens
+        numberScreenOrder.forEach(screenName => {
+            const screenKey = numberScreens[screenName];
             let resultText = "Not in Screen";
             if (gene.screens_summary) {
                 const screenResult = gene.screens_summary.find(s => s.source === screenKey);
-                if (screenResult) {
-                    resultText = screenResult.result;
-                }
+                if (screenResult) resultText = screenResult.result;
             }
-            const mapping = categoryMap[resultText] || categoryMap["Not in Screen"];
-            rowValues.push(mapping.value);
-            rowText.push(resultText);
+            const mapping = numberCategoryMap[resultText] || numberCategoryMap["Not in Screen"];
+            numberRowValues.push(mapping.value);
+            numberRowText.push(resultText);
         });
-        zData.push(rowValues);
-        textData.push(rowText);
+
+        // Populate the matrix for Hh Signaling screens
+        signalingScreenOrder.forEach(screenName => {
+            const screenKey = signalingScreens[screenName];
+            let resultText = "Not in Screen";
+            if (gene.screens_summary) {
+                const screenResult = gene.screens_summary.find(s => s.source === screenKey);
+                if (screenResult) resultText = screenResult.result;
+            }
+            const mapping = signalingCategoryMap[resultText] || signalingCategoryMap["Not in Screen"];
+            signalingRowValues.push(mapping.value);
+            signalingRowText.push(resultText);
+        });
+
+        zDataNumber.push(numberRowValues);
+        textDataNumber.push(numberRowText);
+        zDataSignaling.push(signalingRowValues);
+        textDataSignaling.push(signalingRowText);
     });
 
-    const plotlyColorscale = [
-        [0.0, categoryMap["Decreased cilia numbers"].color], [0.16, categoryMap["Decreased cilia numbers"].color],
-        [0.17, categoryMap["Increased cilia numbers"].color], [0.33, categoryMap["Increased cilia numbers"].color],
-        [0.34, categoryMap["Causes Supernumerary Cilia"].color], [0.50, categoryMap["Causes Supernumerary Cilia"].color],
-        [0.51, categoryMap["No effect"].color], [0.67, categoryMap["No effect"].color],
-        [0.68, categoryMap["Not Reported"].color], [0.84, categoryMap["Not Reported"].color],
-        [0.85, categoryMap["Not in Screen"].color], [1.0, categoryMap["Not in Screen"].color]
-    ];
-    
-    const data = [{
-        x: screenOrder, y: geneLabels, z: zData, customdata: textData,
-        type: 'heatmap', colorscale: plotlyColorscale, showscale: false,
-        hovertemplate: '<b>Gene:</b> %{y}<br><b>Screen:</b> %{x}<br><b>Result:</b> %{customdata}<extra></extra>'
-    }];
+    // 4. Define two separate heatmap traces for the subplots
+    const trace1 = {
+        x: numberScreenOrder, y: geneLabels, z: zDataNumber, customdata: textDataNumber,
+        type: 'heatmap',
+        colorscale: [
+            [0, numberCategoryMap["Decreased cilia numbers"].color], [0.16, numberCategoryMap["Decreased cilia numbers"].color],
+            [0.17, numberCategoryMap["Increased cilia numbers"].color], [0.33, numberCategoryMap["Increased cilia numbers"].color],
+            [0.34, numberCategoryMap["Causes Supernumerary Cilia"].color], [0.50, numberCategoryMap["Causes Supernumerary Cilia"].color],
+            [0.51, numberCategoryMap["No effect"].color], [0.67, numberCategoryMap["No effect"].color],
+            [0.68, numberCategoryMap["Not Reported"].color], [0.84, numberCategoryMap["Not Reported"].color],
+            [0.85, numberCategoryMap["Not in Screen"].color], [1.0, numberCategoryMap["Not in Screen"].color]
+        ],
+        showscale: false,
+        hovertemplate: '<b>Gene:</b> %{y}<br><b>Screen:</b> %{x}<br><b>Result:</b> %{customdata}<extra></extra>',
+        xgap: 2, ygap: 2
+    };
 
+    const trace2 = {
+        x: signalingScreenOrder, y: geneLabels, z: zDataSignaling, customdata: textDataSignaling,
+        type: 'heatmap',
+        colorscale: [
+            [0, signalingCategoryMap["Decreased Signaling (Positive Regulator)"].color], [0.25, signalingCategoryMap["Decreased Signaling (Positive Regulator)"].color],
+            [0.26, signalingCategoryMap["Increased Signaling (Negative Regulator)"].color], [0.5, signalingCategoryMap["Increased Signaling (Negative Regulator)"].color],
+            [0.51, signalingCategoryMap["No Significant Effect"].color], [0.75, signalingCategoryMap["No Significant Effect"].color],
+            [0.76, signalingCategoryMap["Not in Screen"].color], [1.0, signalingCategoryMap["Not in Screen"].color]
+        ],
+        showscale: false,
+        hovertemplate: '<b>Gene:</b> %{y}<br><b>Screen:</b> %{x}<br><b>Result:</b> %{customdata}<extra></extra>',
+        xaxis: 'x2',
+        yaxis: 'y1',
+        xgap: 2, ygap: 2
+    };
+
+    const data = [trace1, trace2];
+
+    // 5. Define the layout with subplots and two custom legends
     const layout = {
         title: { text: custom.title || 'Summary of Functional Screen Results', font: { size: custom.titleFontSize || 18, family: custom.fontFamily, color: custom.fontColor }},
-        xaxis: { tickangle: -45, automargin: true },
+        grid: { rows: 1, columns: 2, pattern: 'independent' },
+        xaxis: { domain: [0, 0.78], tickangle: -45, automargin: true },
+        xaxis2: { domain: [0.8, 1.0], tickangle: -45, automargin: true },
         yaxis: { automargin: true, tickfont: { size: 10 } },
-        margin: { l: 120, r: 150, b: 150, t: 80 },
+        margin: { l: 120, r: 200, b: 150, t: 80 },
         width: custom.figureWidth, height: custom.figureHeight,
         annotations: []
     };
 
-    const legendMap = {
-      "Decreased": categoryMap["Decreased cilia numbers"].color,
-      "Increased": categoryMap["Increased cilia numbers"].color,
-      "Supernumerary": categoryMap["Causes Supernumerary Cilia"].color,
-      "No Effect": categoryMap["No effect"].color,
-      "Not Reported": categoryMap["Not Reported"].color,
-      "Not in Screen": categoryMap["Not in Screen"].color,
+    // Legend for the first heatmap (Cilia Number)
+    const legend1 = {
+      "Decrease in ciliated cells": numberCategoryMap["Decreased cilia numbers"].color,
+      "Increase in ciliated cells": numberCategoryMap["Increased cilia numbers"].color,
+      "Supernumerary cilia": numberCategoryMap["Causes Supernumerary Cilia"].color,
+      "No Effect": numberCategoryMap["No effect"].color,
+      "Not Reported": numberCategoryMap["Not Reported"].color,
+      "Not in Screen": numberCategoryMap["Not in Screen"].color,
     };
-    let y_pos = 1.0;
-    Object.keys(legendMap).forEach(key => {
+    let y_pos1 = 1.0;
+    layout.annotations.push({ xref: 'paper', yref: 'paper', x: 1.02, y: y_pos1 + 0.05, xanchor: 'left', text: '<b>Cilia Number/Structure</b>', showarrow: false });
+    Object.keys(legend1).forEach(key => {
         layout.annotations.push({
-            xref: 'paper', yref: 'paper', x: 1.02, y: y_pos,
+            xref: 'paper', yref: 'paper', x: 1.02, y: y_pos1,
             xanchor: 'left', yanchor: 'middle', text: `█ ${key}`,
-            font: { color: legendMap[key], size: 12, family: custom.fontFamily },
+            font: { color: legend1[key], size: 12 },
             showarrow: false
         });
-        y_pos -= 0.06;
+        y_pos1 -= 0.06;
+    });
+
+    // Legend for the second heatmap (Hh Signaling)
+    const legend2 = {
+        "Decreased Signaling": signalingCategoryMap["Decreased Signaling (Positive Regulator)"].color,
+        "Increased Signaling": signalingCategoryMap["Increased Signaling (Negative Regulator)"].color,
+        "No Effect": signalingCategoryMap["No Significant Effect"].color
+    };
+    let y_pos2 = y_pos1 - 0.1; // Add space between legends
+    layout.annotations.push({ xref: 'paper', yref: 'paper', x: 1.02, y: y_pos2 + 0.05, xanchor: 'left', text: '<b>Hedgehog Signaling</b>', showarrow: false });
+    Object.keys(legend2).forEach(key => {
+        layout.annotations.push({
+            xref: 'paper', yref: 'paper', x: 1.02, y: y_pos2,
+            xanchor: 'left', yanchor: 'middle', text: `█ ${key}`,
+            font: { color: legend2[key], size: 12 },
+            showarrow: false
+        });
+        y_pos2 -= 0.06;
     });
 
     Plotly.newPlot('plot-display-area', data, layout, { responsive: true });
 }
-
 
 // =============================================================================
 // =============================================================================
