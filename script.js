@@ -128,15 +128,15 @@ function displayHomePage() {
 
             <p style="font-size: 1.1rem; color: #555;">CiliaHub is an advanced <strong>bioinformatics</strong> platform that hosts a detailed database of <strong>gold standard cilia genes</strong> and their role in various <strong>ciliopathies</strong>. Our comprehensive collection includes the most reliable and well-established genes linked to ciliary function, with reference papers also provided. With our user-friendly search tool, researchers can explore <strong>genome</strong>-wide data, focusing on both known and novel ciliary genes. Discover their contributions to the biology of cilia and the mechanisms behind ciliary-related disorders. Search for a single gene below or use the Batch Query tool to analyze multiple genes.</p>
 
-            <div class="search-container">
-                <div class="search-wrapper" style="flex: 1; position: relative;">
-                    <div style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); display: flex; align-items: center; pointer-events: none; z-index: 1;">
-                        <span style="background: linear-gradient(135deg, #1976d2 0%, #1565c0 100%); color: white; padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.5px; box-shadow: 0 2px 4px rgba(0,0,0,0.15);">CiliaHub V0.1</span>
+            <div class="search-container" style="display: flex; gap: 0.75rem; align-items: stretch; margin-top: 1.5rem;">
+                <div class="search-wrapper" style="flex: 1; position: relative; display: flex; align-items: center;">
+                    <div style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); display: flex; align-items: center; pointer-events: none; z-index: 2;">
+                        <span style="background: linear-gradient(135deg, #1976d2 0%, #1565c0 100%); color: white; padding: 5px 12px; border-radius: 6px; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.5px; box-shadow: 0 2px 4px rgba(0,0,0,0.15); white-space: nowrap;">CiliaHub V0.1</span>
                     </div>
-                    <input type="text" id="single-gene-search" placeholder="Search for a single gene (e.g., ACE2, IFT88)" aria-label="Search for a single gene" autocomplete="off" style="padding-left: 140px;">
+                    <input type="text" id="single-gene-search" placeholder="Search for a single gene (e.g., ACE2, IFT88)" aria-label="Search for a single gene" autocomplete="off" style="padding-left: 145px; width: 100%; box-sizing: border-box;">
                     <div id="search-suggestions"></div>
                 </div>
-                <button id="single-search-btn" class="search-btn btn btn-primary" aria-label="Search for the entered gene name">Search</button>
+                <button id="single-search-btn" class="search-btn btn btn-primary" aria-label="Search for the entered gene name" style="white-space: nowrap; padding: 0.5rem 1.5rem;">Search</button>
             </div>
 
             <div id="gene-cards-container" class="gene-cards"></div>
