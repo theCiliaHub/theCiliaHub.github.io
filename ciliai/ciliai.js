@@ -55,7 +55,7 @@ function displayCiliAIPage() {
                             </div>
                             <div class="mode-option">
                                 <input type="radio" id="nlp" name="mode" value="nlp">
-                                <label for="nlp" title="Most current data. Performs a live AI-powered search across PubMed abstracts and full-text articles. May be slower but includes the very latest findings.">
+                                <label for="nlp" title="Most current data. Performs a live AI-powered search across PubMed abstracts. May be slower but includes the very latest findings.">
                                     <span class="mode-icon">📚</span>
                                     <div>
                                         <strong>Literature Only</strong><br>
@@ -183,7 +183,11 @@ function displayCiliAIPage() {
                 cursor: pointer;
                 transition: background-color 0.2s;
             }
-            .analyze-btn:hover { background-color: #218838; }
+            .analyze-btn[disabled] {
+                background-color: #a5d6a7;
+                cursor: not-allowed;
+            }
+            .analyze-btn:hover:not([disabled]) { background-color: #218838; }
             .results-section {
                 margin-top: 2rem;
                 padding: 2rem;
@@ -196,10 +200,13 @@ function displayCiliAIPage() {
                 border-radius: 8px;
                 padding: 1.5rem;
                 margin-bottom: 1.5rem;
+                position: relative;
+                overflow: hidden;
             }
             .result-card h3 { margin-top: 0; color: #2c5aa0; font-size: 1.4rem; }
             .result-card .status-found { color: #28a745; }
             .result-card .status-not-found { color: #dc3545; }
+            .result-card .status-searching { color: #007bff; }
             .prediction-grid {
                 display: grid;
                 grid-template-columns: 1fr 1fr;
@@ -234,6 +241,7 @@ function displayCiliAIPage() {
                 cursor: pointer;
                 font-weight: bold;
                 transition: all 0.2s;
+                margin-bottom: 0.5rem;
             }
             .evidence-toggle:hover { background-color: #e8f4fd; }
             .evidence-content {
@@ -251,6 +259,7 @@ function displayCiliAIPage() {
                 color: #333;
             }
             .evidence-snippet strong { color: #0056b3; }
+            .evidence-snippet mark { background-color: #ffeeba; padding: 0.1em 0.2em; border-radius: 3px; }
         </style>
     `;
 
@@ -258,55 +267,133 @@ function displayCiliAIPage() {
     setupCiliAIEventListeners();
 }
 
-// Expanded mock database simulating the output of the Python literature mining pipeline
-const CILI_AI_DATA = {
+// --- Helper Functions ---
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+// Expert-curated internal database (mock)
+const CILI_AI_DB = {
     "HDAC6": {
-        "summary": {
-            "lof_length": "Promotes / Maintains",
-            "percentage_ciliated": "No effect",
-            "source": "Expert DB + Literature Mining"
-        },
+        "summary": { "lof_length": "Promotes / Maintains", "percentage_ciliated": "No effect", "source": "Expert DB" },
         "evidence": [
-            { "id": "21873644", "source": "pubmed", "context": "...loss of HDAC6 results in hyperacetylation of tubulin and leads to the formation of longer, more stable primary cilia in renal epithelial cells." },
-            { "id": "PMC3157642", "source": "pmc", "context": "In contrast, cells treated with HDAC6 inhibitors or HDAC6 knockout MEFs showed a significant increase in cilia length without affecting the frequency of ciliation." }
+            { "id": "21873644", "source": "pubmed", "context": "...loss of HDAC6 results in hyperacetylation of tubulin and leads to the formation of longer, more stable primary cilia in renal epithelial cells." }
         ]
     },
     "IFT88": {
-        "summary": {
-            "lof_length": "Inhibits / Restricts",
-            "percentage_ciliated": "Reduced cilia numbers",
-            "source": "Expert DB"
-        },
+        "summary": { "lof_length": "Inhibits / Restricts", "percentage_ciliated": "Reduced cilia numbers", "source": "Expert DB" },
         "evidence": [
-            { "id": "10882118", "source": "pubmed", "context": "Mutations in IFT88 (polaris) disrupt intraflagellar transport, leading to a failure in cilia assembly and resulting in severely shortened or absent cilia." },
-            { "id": "PMC2912121", "source": "pmc", "context": "Depletion of IFT88 is well-established to impair ciliogenesis across multiple cell types, confirming its essential role in building the ciliary axoneme." }
+            { "id": "10882118", "source": "pubmed", "context": "Mutations in IFT88 (polaris) disrupt intraflagellar transport, leading to a failure in cilia assembly and resulting in severely shortened or absent cilia." }
         ]
     },
     "ARL13B": {
-        "summary": {
-            "lof_length": "Inhibits / Restricts",
-            "percentage_ciliated": "Reduced cilia numbers",
-            "source": "Expert DB + Literature Mining"
-        },
+        "summary": { "lof_length": "Inhibits / Restricts", "percentage_ciliated": "Reduced cilia numbers", "source": "Expert DB" },
         "evidence": [
             { "id": "21940428", "source": "pubmed", "context": "The small GTPase ARL13B is critical for ciliary structure; its absence leads to stunted cilia with abnormal morphology and axonemal defects." }
-        ]
-    },
-    "ARF4": {
-        "summary": {
-            "lof_length": "Inhibits / Restricts",
-            "percentage_ciliated": "No effect",
-            "source": "Literature Mining"
-        },
-        "evidence": [
-            { "id": "PMC4072314", "source": "pmc", "context": "Knockdown of ARF4 in retinal pigment epithelial cells resulted in significantly shorter cilia, suggesting a role for ARF4 in maintaining ciliary length." }
         ]
     }
 };
 
+// --- Live Literature Mining Engine (Client-Side) ---
+
+async function analyzeGeneViaAPI(gene, resultCard) {
+    const ESEARCH_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi";
+    const EFETCH_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi";
+    
+    // The new, comprehensive keyword lists
+    const API_QUERY_KEYWORDS = [
+        "cilia", "ciliary", "cilia length", "ciliogenesis", "ciliation", "loss of cilia",
+        "fewer cilia", "fluid flow", "mucociliary", "multiciliated", "intraflagellar transport", "ciliopathy"
+    ];
+    const LOCAL_ANALYSIS_KEYWORDS = new Set([
+        'cilia', 'ciliary', 'cilium', 'axoneme', 'basal body', 'transition zone', 'centriole', 'ciliogenesis',
+        'ciliation', 'intraflagellar transport', 'ift', 'cilia assembly', 'cilia disassembly', 'ciliary motility',
+        'shorter', 'shortened', 'longer', 'elongated', 'fewer', 'loss of', 'absent cilia', 'reduction', 'reduced',
+        'decrease', 'increased', 'increase', 'abnormal length', 'flow', 'fluid flow', 'cilia-generated',
+        'mechanosensor', 'ciliary signaling', 'bead displacement', 'mucociliary', 'multiciliated', 'kidney tubule',
+        'photoreceptor', 'acls', 'acrocallosal syndrome', 'alms', 'alström syndrome',
+        'autosomal dominant polycystic kidney disease', 'adpkd', 'autosomal recessive polycystic kidney disease', 'arpkd',
+        'bardet–biedl syndrome', 'bbs', 'joubert syndrome', 'jbts', 'kallmann syndrome',
+        'leber congenital amaurosis', 'lca', 'meckel–gruber syndrome', 'mks',
+        'nephronophthisis', 'nphp', 'orofaciodigital syndrome', 'ofd', 'polycystic kidney disease', 'pkd',
+        'senior-løken syndrome', 'slsn', 'short-rib thoracic dysplasia', 'srtd', 'ciliopathy'
+    ]);
+
+    const geneRegex = new RegExp(`\\b${gene}\\b`, 'i');
+    const sentSplitRegex = /(?<=[.!?])\s+/;
+    let foundEvidence = [];
+
+    try {
+        // 1. Search PubMed
+        const kwClause = API_QUERY_KEYWORDS.map(k => `"${k}"[Title/Abstract]`).join(" OR ");
+        const query = `("${gene}"[Title/Abstract]) AND (${kwClause})`;
+        const searchParams = new URLSearchParams({ db: 'pubmed', term: query, retmode: 'json', retmax: '25' });
+        
+        const searchResp = await fetch(`${ESEARCH_URL}?${searchParams}`);
+        if (!searchResp.ok) throw new Error(`NCBI ESearch failed: ${searchResp.statusText}`);
+        const searchData = await searchResp.json();
+        const pmids = searchData.esearchresult?.idlist || [];
+
+        if (pmids.length === 0) {
+            return []; // No articles found
+        }
+        
+        // 2. Fetch Abstracts
+        await sleep(350); // Be polite to NCBI API
+        const fetchParams = new URLSearchParams({ db: 'pubmed', id: pmids.join(','), retmode: 'xml', rettype: 'abstract' });
+        const fetchResp = await fetch(`${EFETCH_URL}?${fetchParams}`);
+        if (!fetchResp.ok) throw new Error(`NCBI EFetch failed: ${fetchResp.statusText}`);
+        const xmlText = await fetchResp.text();
+        
+        // 3. Parse XML and Analyze Text
+        const parser = new DOMParser();
+        const xmlDoc = parser.parseFromString(xmlText, "application/xml");
+        const articles = xmlDoc.getElementsByTagName('PubmedArticle');
+
+        for (const article of articles) {
+            const pmid = article.querySelector('MedlineCitation > PMID')?.textContent;
+            const title = article.querySelector('ArticleTitle')?.textContent || '';
+            const abstractNode = article.querySelector('Abstract');
+            let abstractText = '';
+            if (abstractNode) {
+                 abstractText = Array.from(abstractNode.getElementsByTagName('AbstractText')).map(el => el.textContent).join(' ');
+            }
+            
+            const fullText = `${title}. ${abstractText}`;
+            if (!geneRegex.test(fullText)) continue; // Skip if gene not mentioned
+
+            const sentences = fullText.split(sentSplitRegex);
+            for (const sent of sentences) {
+                const sentLower = sent.toLowerCase();
+                if (geneRegex.test(sentLower) && [...LOCAL_ANALYSIS_KEYWORDS].some(kw => sentLower.includes(kw))) {
+                     foundEvidence.push({
+                        id: pmid,
+                        source: 'pubmed',
+                        context: sent.trim().replace(geneRegex, `<mark>${gene}</mark>`)
+                    });
+                }
+            }
+        }
+    } catch (error) {
+        console.error(`Failed to fetch literature for ${gene}:`, error);
+        // Optionally update the card to show an error state
+        const errorEl = resultCard.querySelector('.status-searching');
+        if (errorEl) {
+            errorEl.textContent = 'Literature Search Failed';
+            errorEl.className = 'status-not-found';
+        }
+    }
+    
+    return foundEvidence;
+}
+
+
+// --- UI and Event Handling ---
+
 function setupCiliAIEventListeners() {
-    document.getElementById('analyzeBtn').addEventListener('click', analyzeGenesFromInput);
-    document.getElementById('aiQueryBtn').addEventListener('click', handleAIQuery);
+    const analyzeBtn = document.getElementById('analyzeBtn');
+    const aiQueryBtn = document.getElementById('aiQueryBtn');
+
+    analyzeBtn.addEventListener('click', analyzeGenesFromInput);
+    aiQueryBtn.addEventListener('click', handleAIQuery);
 
     document.getElementById('geneInput').addEventListener('keydown', (e) => {
         if (e.key === 'Enter' && !e.shiftKey) {
@@ -321,27 +408,26 @@ function setupCiliAIEventListeners() {
         }
     });
 
-    // Event delegation for dynamically created "Show Evidence" buttons
     document.getElementById('resultsContainer').addEventListener('click', function(e) {
         if (e.target && e.target.classList.contains('evidence-toggle')) {
             const content = e.target.nextElementSibling;
-            const isVisible = content.style.display === 'block';
-            content.style.display = isVisible ? 'none' : 'block';
-            e.target.textContent = isVisible ? 'Show Evidence ▾' : 'Hide Evidence ▴';
+            if (content) {
+                const isVisible = content.style.display === 'block';
+                content.style.display = isVisible ? 'none' : 'block';
+                e.target.textContent = isVisible ? 'Show Evidence ▾' : 'Hide Evidence ▴';
+            }
         }
     });
 }
 
 function handleAIQuery() {
     const query = document.getElementById('aiQueryInput').value;
-    // Simple regex to extract potential gene symbols (typically uppercase)
     const geneRegex = /\b([A-Z0-9]{3,})\b/g;
     const matches = query.match(geneRegex);
     
     if (matches && matches.length > 0) {
-        // Analyze the first detected gene symbol
         const detectedGene = matches[0];
-        document.getElementById('geneInput').value = detectedGene; // Populate the other box for clarity
+        document.getElementById('geneInput').value = detectedGene;
         runAnalysis([detectedGene]);
     } else {
         const resultsContainer = document.getElementById('resultsContainer');
@@ -352,7 +438,6 @@ function handleAIQuery() {
 
 function analyzeGenesFromInput() {
     const geneInput = document.getElementById('geneInput');
-    // Split by commas, spaces, or newlines, then filter out any empty strings
     const genes = geneInput.value.split(/[\s,]+/).filter(g => g.trim() !== '');
     
     if (genes.length === 0) {
@@ -362,93 +447,130 @@ function analyzeGenesFromInput() {
         return;
     }
     
-    // Convert all to uppercase for matching
-    const sanitizedGenes = genes.map(g => g.trim().toUpperCase());
+    const sanitizedGenes = [...new Set(genes.map(g => g.trim().toUpperCase()))]; // Remove duplicates
     runAnalysis(sanitizedGenes);
 }
 
-function runAnalysis(geneList) {
+async function runAnalysis(geneList) {
     const resultsContainer = document.getElementById('resultsContainer');
     const resultsSection = document.getElementById('resultsSection');
+    const analyzeBtn = document.getElementById('analyzeBtn');
+    const mode = document.querySelector('input[name="mode"]:checked').value;
+
     resultsContainer.innerHTML = ''; // Clear previous results
+    resultsSection.style.display = 'block';
+    analyzeBtn.disabled = true;
+    analyzeBtn.textContent = 'Analyzing...';
 
-    let finalHtml = '';
-
+    // Create placeholder cards for each gene
     geneList.forEach(gene => {
-        const result = CILI_AI_DATA[gene];
-        if (result) {
-            finalHtml += createResultCard(gene, result);
-        } else {
-            finalHtml += createNotFoundCard(gene);
-        }
+        resultsContainer.insertAdjacentHTML('beforeend', createPlaceholderCard(gene, mode));
     });
 
-    resultsContainer.innerHTML = finalHtml;
-    resultsSection.style.display = 'block';
+    for (const gene of geneList) {
+        const resultCard = document.getElementById(`card-${gene}`);
+        let dbData = null;
+        let apiEvidence = [];
+
+        if (mode === 'expert' || mode === 'hybrid') {
+            dbData = CILI_AI_DB[gene] || null;
+        }
+        if (mode === 'nlp' || mode === 'hybrid') {
+            apiEvidence = await analyzeGeneViaAPI(gene, resultCard);
+        }
+        
+        // Render the final card with combined data
+        const finalHtml = createResultCard(gene, dbData, apiEvidence, mode);
+        resultCard.outerHTML = finalHtml;
+    }
+
+    analyzeBtn.disabled = false;
+    analyzeBtn.textContent = '🔍 Analyze Genes';
 }
 
-function createResultCard(gene, resultData) {
-    const { summary, evidence } = resultData;
-    let evidenceHtml = '';
+function createPlaceholderCard(gene, mode) {
+    let statusText = 'Fetching from Expert DB...';
+    if (mode === 'nlp') statusText = 'Searching live literature...';
+    if (mode === 'hybrid') statusText = 'Checking Expert DB & Searching Literature...';
+    return `<div class="result-card" id="card-${gene}"><h3>${gene} - <span class="status-searching">${statusText}</span></h3></div>`;
+}
 
-    if (evidence && evidence.length > 0) {
-        const snippets = evidence.map(ev => 
+function createResultCard(gene, dbData, apiEvidence, mode) {
+    const combinedEvidence = [...(dbData?.evidence || []), ...apiEvidence];
+    const summaryData = dbData?.summary;
+    const hasDbData = !!summaryData;
+    const hasApiData = apiEvidence.length > 0;
+
+    let titleStatus = `<span class="status-not-found">No Data Found</span>`;
+    let sourceText = 'N/A';
+    if (hasDbData && hasApiData) {
+        titleStatus = `<span class="status-found">Prediction Found</span>`;
+        sourceText = 'Expert DB + Literature Mining';
+    } else if (hasDbData) {
+        titleStatus = `<span class="status-found">Prediction Found</span>`;
+        sourceText = 'Expert DB';
+    } else if (hasApiData) {
+        titleStatus = `<span class="status-found">Evidence Found</span>`;
+        sourceText = 'Literature Mining';
+    }
+
+    let evidenceHtml = '';
+    if (combinedEvidence.length > 0) {
+        const uniqueSnippets = [...new Map(combinedEvidence.map(item => [item.context, item])).values()];
+        const snippets = uniqueSnippets.map(ev => 
             `<div class="evidence-snippet">
-                "...${ev.context}"
+                ${ev.context}
                 <br>
                 <strong>Source:</strong> ${ev.source.toUpperCase()} (${ev.id})
              </div>`
         ).join('');
-
         evidenceHtml = `
             <div class="evidence-section">
-                <button class="evidence-toggle">Show Evidence ▾</button>
+                <button class="evidence-toggle">Show Evidence (${uniqueSnippets.length}) ▾</button>
                 <div class="evidence-content">${snippets}</div>
-            </div>
-        `;
+            </div>`;
     }
 
-    return `
-        <div class="result-card">
-            <h3>${gene} - <span class="status-found">Prediction Found</span></h3>
-            <p><strong>Data Source:</strong> ${summary.source}</p>
+    let predictionHtml = `<p>No summary prediction available. Review literature evidence for insights.</p>`;
+    if (summaryData) {
+        predictionHtml = `
+            <p><strong>Data Source:</strong> ${sourceText}</p>
             <div class="prediction-grid">
-                ${createPredictionBox('Cilia Length (LoF)', summary.lof_length)}
-                ${createPredictionBox('Cilia Formation', summary.percentage_ciliated)}
-            </div>
-            ${evidenceHtml}
-        </div>
-    `;
-}
+                ${createPredictionBox('Cilia Length (LoF)', summaryData.lof_length)}
+                ${createPredictionBox('Cilia Formation', summaryData.percentage_ciliated)}
+            </div>`;
+    }
 
-function createNotFoundCard(gene) {
-    return `
-        <div class="result-card">
-            <h3>${gene} - <span class="status-not-found">Prediction Not Found</span></h3>
-            <p>No pre-computed prediction is available for this gene in our database. Choosing the 'Literature Only' mode may yield results for less-studied genes.</p>
-        </div>
-    `;
+    let cardContent = `
+        <h3>${gene} - ${titleStatus}</h3>
+        ${predictionHtml}
+        ${evidenceHtml}`;
+        
+    if (!hasDbData && !hasApiData) {
+        cardContent = `<h3>${gene} - <span class="status-not-found">No Data Found</span></h3><p>No information was found in the expert database or through live literature mining for this gene.</p>`;
+    }
+
+    return `<div class="result-card" id="card-${gene}">${cardContent}</div>`;
 }
 
 function createPredictionBox(title, prediction) {
     let className = 'no-effect';
     let text = prediction;
     
-    const predictionCleaned = (prediction || "").toLowerCase();
-
-    if (predictionCleaned.includes('promotes')) {
-        className = 'promotes';
-        text = 'Promotes / Maintains';
-    } else if (predictionCleaned.includes('inhibits') || predictionCleaned.includes('reduced')) {
-        className = 'inhibits';
-        text = 'Inhibits / Reduces';
-    } else if (predictionCleaned.includes('no effect')) {
-        className = 'no-effect';
-        text = 'No Clear Effect';
-    } else if (predictionCleaned.includes('conflicting')) {
-        className = 'conflicting';
-        text = 'Conflicting Data';
+    if (!prediction) {
+        return `
+        <div class="prediction-box">
+            <h4>${title}</h4>
+            <p>Not Reported</p>
+        </div>
+    `;
     }
+
+    const predictionCleaned = prediction.toLowerCase();
+    if (predictionCleaned.includes('promotes')) className = 'promotes';
+    else if (predictionCleaned.includes('inhibits') || predictionCleaned.includes('reduced')) className = 'inhibits';
+    else if (predictionCleaned.includes('no effect')) className = 'no-effect';
+    else if (predictionCleaned.includes('conflicting')) className = 'conflicting';
 
     return `
         <div class="prediction-box ${className}">
