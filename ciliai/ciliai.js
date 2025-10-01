@@ -52,6 +52,8 @@ const MAX_WORKERS = 4; // used only if running in Node or web worker pool
 const REQUESTS_TIMEOUT = 30000; // ms
 const ENTREZ_SLEEP = 340; // ms polite delay
 
+window.displayCiliAIPage = displayCiliAIPage;
+
 // Utility sleep
 function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
 
