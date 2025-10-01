@@ -1910,11 +1910,20 @@ function handleStickySearch() {
     }
 }
 
+// ============================================
+// GLOBAL VARIABLES - Add at the TOP of script.js
+// ============================================
 
 // --- Expression Visualization System ---
 let expressionData = {};
 let availableGenes = new Set();
+let pendingHeatmapRequest = null;
 const organCache = new Map();
+
+// Make them available globally for plots.js
+window.expressionData = expressionData;
+window.availableGenes = availableGenes;
+window.pendingHeatmapRequest = pendingHeatmapRequest;
 
 async function initExpressionSystem() {
     try {
