@@ -1,14 +1,14 @@
+```javascript
 // This function will be called by the router in globals.js
 function displayCiliAIPage() {
     const contentArea = document.querySelector('.content-area');
     contentArea.className = 'content-area content-area-full';
     document.querySelector('.cilia-panel').style.display = 'none';
 
-    // Inject the updated HTML structure
+    // Inject the updated HTML structure (logo removed)
     contentArea.innerHTML = `
         <div class="ciliai-container">
             <div class="ciliai-header">
-                <img src="https://github.com/theCiliaHub/theCiliaHub.github.io/blob/main/ciliAI_logo.jpg?raw=true" alt="CiliAI Logo" class="ciliai-logo">
                 <h1>CiliAI</h1>
                 <p>Your AI-powered partner for discovering gene-cilia relationships.</p>
             </div>
@@ -34,21 +34,21 @@ function displayCiliAIPage() {
                         <div class="mode-selector">
                             <div class="mode-option">
                                 <input type="radio" id="hybrid" name="mode" value="hybrid" checked>
-                                <label for="hybrid" title="Best for most users. Combines our fast, expert-curated database with real-time AI literature mining for the most comprehensive results.">
+                                <label for="hybrid" title="Best for most users. Combines our fast, expert-curated database, screen data, and real-time AI literature mining for the most comprehensive results.">
                                     <span class="mode-icon">🔬</span>
                                     <div>
                                         <strong>Hybrid</strong><br>
-                                        <small>Expert DB + Literature</small>
+                                        <small>Expert DB + Screen Data + Literature</small>
                                     </div>
                                 </label>
                             </div>
                             <div class="mode-option">
                                 <input type="radio" id="expert" name="mode" value="expert">
-                                <label for="expert" title="Fastest option. Queries only our internal, manually curated database of known gene-cilia interactions.">
+                                <label for="expert" title="Fastest option. Queries only our internal, manually curated database and screen data of known gene-cilia interactions.">
                                     <span class="mode-icon">🏛️</span>
                                     <div>
                                         <strong>Expert Only</strong><br>
-                                        <small>Curated database</small>
+                                        <small>Curated database + Screen Data</small>
                                     </div>
                                 </label>
                             </div>
@@ -90,18 +90,9 @@ function displayCiliAIPage() {
             .ciliai-header h1 {
                 font-size: 2.8rem;
                 color: #2c5aa0;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                gap: 12px;
-                margin-top: 10px; /* Adjust spacing below logo */
+                margin: 0;
             }
-            .ciliai-header p { font-size: 1.2rem; color: #555; }
-            .ciliai-logo {
-                max-width: 250px; /* Adjust as needed */
-                height: auto;
-                margin-bottom: 10px;
-            }
+            .ciliai-header p { font-size: 1.2rem; color: #555; margin-top: 0.5rem; }
             
             .ai-query-section {
                 background-color: #e8f4fd;
@@ -297,6 +288,18 @@ const CILI_AI_DB = {
     }
 };
 
+// --- Fetch Screen Data ---
+async function fetchScreenData() {
+    try {
+        const response = await fetch('https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/cilia_screens_data.json');
+        if (!response.ok) throw new Error(`Failed to fetch screen data: ${response.statusText}`);
+        return await response.json();
+    } catch (error) {
+        console.error('Error fetching screen data:', error);
+        return {};
+    }
+}
+
 // --- Live Literature Mining Engine (Client-Side) ---
 
 async function analyzeGeneViaAPI(gene, resultCard) {
@@ -304,7 +307,6 @@ async function analyzeGeneViaAPI(gene, resultCard) {
     const ELINK_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/elink.fcgi";
     const EFETCH_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi";
     
-    // Updated keyword list to include ciliopathy
     const API_QUERY_KEYWORDS = [
         "cilia", "ciliary", "cilia length", "ciliogenesis", "ciliation", "loss of cilia",
         "fewer cilia", "fluid flow", "mucociliary", "multiciliated", "intraflagellar transport", "ciliopathy"
@@ -343,7 +345,7 @@ async function analyzeGeneViaAPI(gene, resultCard) {
         }
 
         // 2. Map PMIDs to PMCIDs for full-text access
-        await sleep(350); // Be polite to NCBI API
+        await sleep(350);
         const linkParams = new URLSearchParams({
             dbfrom: 'pubmed',
             db: 'pmc',
@@ -364,7 +366,7 @@ async function analyzeGeneViaAPI(gene, resultCard) {
         // 3. Fetch full-text articles from PMC or fall back to abstracts
         let articles = [];
         if (pmcIds.length > 0) {
-            await sleep(350); // Be polite to NCBI API
+            await sleep(350);
             const fetchParams = new URLSearchParams({ db: 'pmc', id: pmcIds.join(','), retmode: 'xml', rettype: 'full' });
             const fetchResp = await fetch(`${EFETCH_URL}?${fetchParams}`);
             if (!fetchResp.ok) throw new Error(`NCBI EFetch failed: ${fetchResp.statusText}`);
@@ -390,14 +392,12 @@ async function analyzeGeneViaAPI(gene, resultCard) {
         for (const article of articles) {
             let pmid, textContent;
             if (article.tagName === 'article') {
-                // PMC full-text article
                 pmid = article.querySelector('article-id[pub-id-type="pmid"]')?.textContent || 
                        article.querySelector('article-id[pub-id-type="pmcid"]')?.textContent;
                 const title = article.querySelector('article-title')?.textContent || '';
                 const body = article.querySelector('body')?.textContent || '';
                 textContent = `${title}. ${body}`;
             } else {
-                // PubMed abstract
                 pmid = article.querySelector('MedlineCitation > PMID')?.textContent;
                 const title = article.querySelector('ArticleTitle')?.textContent || '';
                 const abstractNode = article.querySelector('Abstract');
@@ -408,7 +408,7 @@ async function analyzeGeneViaAPI(gene, resultCard) {
                 textContent = `${title}. ${abstractText}`;
             }
 
-            if (!geneRegex.test(textContent)) continue; // Skip if gene not mentioned
+            if (!geneRegex.test(textContent)) continue;
 
             const sentences = textContent.split(sentSplitRegex);
             for (const sent of sentences) {
@@ -510,6 +510,9 @@ async function runAnalysis(geneList) {
     analyzeBtn.disabled = true;
     analyzeBtn.textContent = 'Analyzing...';
 
+    // Fetch screen data once at the start
+    const screenData = await fetchScreenData();
+
     // Create placeholder cards for each gene
     geneList.forEach(gene => {
         resultsContainer.insertAdjacentHTML('beforeend', createPlaceholderCard(gene, mode));
@@ -519,16 +522,28 @@ async function runAnalysis(geneList) {
         const resultCard = document.getElementById(`card-${gene}`);
         let dbData = null;
         let apiEvidence = [];
+        let screenEvidence = [];
 
         if (mode === 'expert' || mode === 'hybrid') {
             dbData = CILI_AI_DB[gene] || null;
+            // Check screen data for this gene
+            if (screenData[gene]) {
+                screenEvidence = [{
+                    id: `screen-${gene}`,
+                    source: 'screen_data',
+                    context: `Screen data: ${JSON.stringify(screenData[gene], null, 2)}`
+                }];
+            }
         }
         if (mode === 'nlp' || mode === 'hybrid') {
             apiEvidence = await analyzeGeneViaAPI(gene, resultCard);
         }
         
+        // Combine all evidence
+        const allEvidence = [...(dbData?.evidence || []), ...apiEvidence, ...screenEvidence];
+        
         // Render the final card with combined data
-        const finalHtml = createResultCard(gene, dbData, apiEvidence, mode);
+        const finalHtml = createResultCard(gene, dbData, allEvidence, mode);
         resultCard.outerHTML = finalHtml;
     }
 
@@ -537,13 +552,52 @@ async function runAnalysis(geneList) {
 }
 
 function createPlaceholderCard(gene, mode) {
-    let statusText = 'Fetching from Expert DB...';
+    let statusText = 'Fetching from Expert DB and Screen Data...';
     if (mode === 'nlp') statusText = 'Searching live literature...';
-    if (mode === 'hybrid') statusText = 'Checking Expert DB & Searching Literature...';
+    if (mode === 'hybrid') statusText = 'Checking Expert DB, Screen Data & Searching Literature...';
     return `<div class="result-card" id="card-${gene}"><h3>${gene} - <span class="status-searching">${statusText}</span></h3></div>`;
 }
 
-function createResultCard(gene, dbData, apiEvidence, mode) {
-    // Implementation of createResultCard remains unchanged
-    // Add your existing createResultCard function here if needed
+function createResultCard(gene, dbData, allEvidence, mode) {
+    let statusText = allEvidence.length > 0 ? 'Evidence Found' : 'No Data Found';
+    let statusClass = allEvidence.length > 0 ? 'status-found' : 'status-not-found';
+    let summaryHtml = dbData ? `
+        <div class="prediction-grid">
+            <div class="prediction-box ${dbData.summary.lof_length.toLowerCase().replace(/[^a-z]/g, '')}">
+                <h4>Loss-of-Function (Cilia Length)</h4>
+                <p>${dbData.summary.lof_length}</p>
+            </div>
+            <div class="prediction-box ${dbData.summary.percentage_ciliated.toLowerCase().replace(/[^a-z]/g, '')}">
+                <h4>Percentage Ciliated</h4>
+                <p>${dbData.summary.percentage_ciliated}</p>
+            </div>
+        </div>
+    ` : '<p>No summary prediction available. Review literature and screen evidence for insights.</p>';
+
+    let evidenceHtml = '';
+    if (allEvidence.length > 0) {
+        evidenceHtml = `
+            <div class="evidence-section">
+                <button class="evidence-toggle" data-count="${allEvidence.length}">Show Evidence (${allEvidence.length}) ▾</button>
+                <div class="evidence-content">
+                    ${allEvidence.map(ev => `
+                        <div class="evidence-snippet">
+                            ${ev.context}
+                            <br><strong>Source: ${ev.source.toUpperCase()} (${ev.id})</strong>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+    }
+
+    return `
+        <div class="result-card" id="card-${gene}">
+            <h3>${gene} - <span class="${statusClass}">${statusText}</span></h3>
+            ${summaryHtml}
+            ${evidenceHtml}
+        </div>
+    `;
 }
+
+```
