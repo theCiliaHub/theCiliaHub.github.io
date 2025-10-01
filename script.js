@@ -11,7 +11,6 @@ Chart.register({
   }
 });
 
-window.geneDataCache = window.geneDataCache || {};
 
 /**
  * Sanitizes any string by removing invisible characters and normalizing it.
