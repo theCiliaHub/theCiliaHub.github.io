@@ -1,876 +1,832 @@
-// literature_miner_engine.js - Fully functional JavaScript version for CiliAI
-// Replace the existing ciliai.js with this enhanced version
+// ciliai.js - ENHANCED WITH ROBUST LITERATURE MINING ENGINE
 
-class LiteratureMinerEngine {
-    constructor() {
-        // Configuration
-        this.ESEARCH_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi";
-        this.EFETCH_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi";
-        this.USER_AGENT = "CiliaMiner/2.0 (mailto:user@example.com)";
+// ============================================================================
+// CONFIGURATION - Enhanced from literature_miner_engine.py
+// ============================================================================
 
-        this.API_QUERY_KEYWORDS = [
-            "cilia", "ciliary", "cilia length", "ciliary length", "shorter cilia",
-            "longer cilia", "ciliogenesis", "ciliation", "loss of cilia", "fewer cilia",
-            "impaired ciliogenesis", "cilia assembly", "fluid flow", "mucociliary", "multiciliated"
-        ];
+const CONFIG = {
+    ESEARCH_URL: "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi",
+    EFETCH_URL: "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi",
+    USER_EMAIL: "user@example.com", // It's good practice for users to know this can be changed
+    TOOL_NAME: "CiliAI/2.0",
 
-        this.LOCAL_ANALYSIS_KEYWORDS = [...new Set([
-            "cilia", "ciliary", "cilium", "ciliogenesis", "ciliation", "axoneme", "basal body",
-            "cilia length", "shorter", "shortened", "longer", "fewer", "reduction", "reduced",
-            "decrease", "increased", "increase", "flow", "fluid flow", "mucociliary", "multiciliated",
-            "extracellular fluid", "bead", "beads", "displacement", "cilia-generated", "mucociliary clearance"
-        ])];
+    API_QUERY_KEYWORDS: [
+        "cilia", "ciliary", "cilia length", "ciliary length", "shorter cilia",
+        "longer cilia", "ciliogenesis", "ciliation", "loss of cilia", "fewer cilia",
+        "impaired ciliogenesis", "cilia assembly", "fluid flow", "mucociliary",
+        "multiciliated", "primary cilium", "axoneme", "basal body"
+    ],
 
-        this.EFFECT_PATTERNS = {
-            'shorter': /\b(shorter|shortened|decrease in length|reduced length|reduction in length)\b/i,
-            'fewer': /\b(fewer|reduced number|decrease in number|loss of cilia|less cilia)\b/i,
-            'reduced_flow': /\b(reduction in (flow|bead displacement)|reduced flow|decrease in bead displacement|significant reduction in bead)\b/i,
-            'longer': /\b(longer|elongated|increase in length|elongation)\b/i,
-            'no_change': /\b(unchanged|no effect|no difference|not altered|did not affect)\b/i,
-            'increased': /\b(increased|increase|enhanced)\b/i
-        };
+    LOCAL_ANALYSIS_KEYWORDS: [
+        "cilia", "ciliary", "cilium", "ciliogenesis", "ciliation", "axoneme",
+        "basal body", "cilia length", "shorter", "shortened", "longer", "fewer",
+        "reduction", "reduced", "decrease", "increased", "increase", "flow",
+        "fluid flow", "mucociliary", "multiciliated", "extracellular fluid",
+        "bead", "beads", "displacement", "cilia-generated", "mucociliary clearance"
+    ],
 
-        this.INFERENCE_LEXICON = {
-            'MANIPULATION': {
-                'LOSS': ['loss', 'knockout', 'deletion', 'mutation', 'loss-of-function'],
-                'GAIN': ['overexpression', 'gain-of-function', 'activation']
-            },
-            'PHENOTYPE': {
-                'LENGTH_DECREASE': ['shorter', 'shortened', 'decrease in length', 'reduced length'],
-                'LENGTH_INCREASE': ['longer', 'elongated', 'increase in length', 'elongation'],
-                'LENGTH_NEUTRAL': ['unchanged', 'no effect', 'no difference', 'not altered', 'unaltered'],
-                'LENGTH_VARIABLE': ['variable', 'heterogeneous', 'mixed'],
-                'FREQ_DECREASE': ['fewer', 'reduced number', 'loss of cilia', 'less cilia'],
-                'FREQ_INCREASE': ['increased number', 'more cilia', 'hyper-ciliation'],
-                'FREQ_NEUTRAL': ['no change', 'no difference', 'unchanged']
-            }
-        };
+    ARTICLES_PER_GENE: 40,
+    MAX_CONCURRENT: 2,
+    REQUEST_TIMEOUT: 30000,
+    ENTREZ_SLEEP: 350,
+    RETRY_ATTEMPTS: 3,
+    BACKOFF_FACTOR: 500
+};
 
-        this.ARTICLES_PER_GENE = 20; // Reduced for faster testing
-        this.REQUESTS_TIMEOUT = 30000;
-        this.ENTREZ_SLEEP = 340;
+// Remove duplicates from keywords
+CONFIG.LOCAL_ANALYSIS_KEYWORDS = [...new Set(CONFIG.LOCAL_ANALYSIS_KEYWORDS)];
+
+// ============================================================================
+// INFERENCE LEXICON
+// ============================================================================
+
+const INFERENCE_LEXICON = {
+    MANIPULATION: {
+        LOSS: [
+            'depletion', 'deficient', 'loss of', 'knockout', 'ko', 'mutant',
+            'silencing', 'abrogated', 'disruption', 'ablation', 'null',
+            'knockdown', 'kd', 'impaired', 'mutation', 'defects', 'lacking',
+            'deleted', 'frameshift', 'nonsense', 'homozygous', 'truncating',
+            'generated mutants', 'CRISPR/Cas9', 'loss-of-function', 'LOF',
+            'shRNAs targeting'
+        ],
+        GAIN: [
+            'overexpression', 'ectopic expression', 'transfection with wild-type',
+            'rescued', 'restoring', 'treatment with', 'application of', 'expressing',
+            'gain-of-function', 'GOF', 'constitutively active', 'stabilized',
+            'hyperactive', 'induced expression'
+        ]
+    },
+    PHENOTYPE: {
+        LENGTH_DECREASE: [
+            'shorter', 'shortened', 'decrease in length', 'reduced length',
+            'reduction in length', 'decreased the length', 'diminished length',
+            'loss of axonemal length', 'stunted', 'hypoplastic cilia'
+        ],
+        LENGTH_INCREASE: [
+            'longer', 'elongated', 'increase in length', 'increased ciliary length',
+            'elongation of', 'twofold increase in the average length',
+            'hyperelongated', 'over-extended', 'significantly lengthened'
+        ],
+        LENGTH_NEUTRAL: [
+            'length remained unchanged', 'no difference in the primary ciliary length',
+            'length was not altered', 'length was similar',
+            'did not significantly alter cilia length', 'unchanged ciliary length',
+            'not statistically different', 'comparable length',
+            'cilia length remained unchanged'
+        ],
+        LENGTH_VARIABLE: [
+            'altered cilia length', 'abnormal morphology', 'variations in cilia size',
+            'diverse', 'broader length distribution', 'greater variation',
+            'heterogeneous length', 'mixed phenotype', 'inconsistent length changes'
+        ],
+        FREQ_DECREASE: [
+            'fewer', 'reduced number', 'decrease in number', 'loss of cilia',
+            'absence of primary cilia', 'ciliogenesis defect', 'impaired ciliogenesis',
+            'suppresses cilium formation', 'required for cilia formation',
+            'lower rate of ciliated', 'failed to form',
+            'deficit in de novo cilia formation', 'diminished',
+            'abrogated ciliogenesis', 'failure of ciliogenesis',
+            'prevented cilia assembly', 'ciliation was abolished',
+            'significant reduction in ciliation', 'markedly decreased frequency',
+            'number of ciliated cells decreased'
+        ],
+        FREQ_INCREASE: [
+            'increase in the percentage of ciliated',
+            'increased the numbers of ciliated',
+            'increase in the percent of ciliated',
+            'multiciliogenesis', 'induced primary ciliogenesis',
+            'hyper-ciliation', 'enhanced ciliogenesis',
+            'promoted cilium formation', 'stimulated ciliogenesis'
+        ],
+        FREQ_NEUTRAL: [
+            'did not affect ciliation levels', 'normal rate of ciliation',
+            'ciliation unaffected', 'no significant change in ciliation',
+            'comparable fraction of ciliated cells'
+        ]
     }
+};
 
-    // Utility function to sleep
-    sleep(ms) {
-        return new Promise(resolve => setTimeout(resolve, ms));
+// ============================================================================
+// EXPERT DATABASE
+// ============================================================================
+
+const CILI_AI_DB = {
+    "HDAC6": {
+        "evidence": [{
+            "id": "21873644",
+            "source": "pubmed",
+            "context": "...loss of HDAC6 results in hyperacetylation of tubulin and leads to the formation of longer, more stable primary cilia in renal epithelial cells.",
+            "refLink": "https://pubmed.ncbi.nlm.nih.gov/21873644/"
+        }]
+    },
+    "IFT88": {
+        "evidence": [{
+            "id": "10882118",
+            "source": "pubmed",
+            "context": "Mutations in IFT88 (polaris) disrupt intraflagellar transport, leading to a failure in cilia assembly and resulting in severely shortened or absent cilia.",
+            "refLink": "https://pubmed.ncbi.nlm.nih.gov/10882118/"
+        }]
+    },
+    "ARL13B": {
+        "evidence": [{
+            "id": "21940428",
+            "source": "pubmed",
+            "context": "The small GTPase ARL13B is critical for ciliary structure; its absence leads to stunted cilia with abnormal morphology and axonemal defects.",
+            "refLink": "https://pubmed.ncbi.nlm.nih.gov/21940428/"
+        }]
     }
+};
 
-    // Make API request with retry logic
-    async makeApiRequestWithRetry(url, params, desc, retries = 3, backoffFactor = 0.5) {
-        for (let i = 0; i < retries; i++) {
-            try {
-                const urlParams = new URLSearchParams(params);
-                const fullUrl = `${url}?${urlParams}`;
-                
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), this.REQUESTS_TIMEOUT);
-                
-                const response = await fetch(fullUrl, {
-                    method: 'GET',
-                    headers: {
-                        'User-Agent': this.USER_AGENT
-                    },
-                    signal: controller.signal
-                });
+// ============================================================================
+// UTILITY FUNCTIONS
+// ============================================================================
 
-                clearTimeout(timeoutId);
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-                if (response.status === 429) {
-                    const waitTime = backoffFactor * (2 ** i);
-                    console.warn(`[WARN] Rate limited on ${desc}. Sleeping ${waitTime}s...`);
-                    await this.sleep(waitTime * 1000);
-                    continue;
-                }
+async function makeApiRequest(url, params, description, retries = CONFIG.RETRY_ATTEMPTS) {
+    const queryString = new URLSearchParams(params).toString();
+    const fullUrl = `${url}?${queryString}`;
 
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                }
-
-                return response;
-            } catch (error) {
-                if (i === retries - 1) {
-                    throw error;
-                } else {
-                    const waitTime = backoffFactor * (2 ** i);
-                    console.warn(`[WARN] Request error (${desc}): ${error}. Retrying in ${waitTime}s...`);
-                    await this.sleep(waitTime * 1000);
-                }
-            }
-        }
-    }
-
-    // Build queries
-    buildQueryAllFields(gene) {
-        const kwClause = this.API_QUERY_KEYWORDS.map(k => `"${k}"[Title/Abstract]`).join(' OR ');
-        return `("${gene}"[Title/Abstract]) AND (${kwClause})`;
-    }
-
-    buildQueryPmc(gene) {
-        const kwClause = this.API_QUERY_KEYWORDS.join(' OR ');
-        return `${gene} AND (${kwClause})`;
-    }
-
-    // Search PubMed
-    async searchPubmed(gene, retmax = this.ARTICLES_PER_GENE) {
-        const params = {
-            'db': 'pubmed',
-            'term': this.buildQueryAllFields(gene),
-            'retmode': 'json',
-            'retmax': retmax.toString()
-        };
-        
-        const response = await this.makeApiRequestWithRetry(
-            this.ESEARCH_URL, params, `PubMed search ${gene}`
-        );
-        
-        const data = await response.json();
-        const pmids = data?.esearchresult?.idlist || [];
-        
-        await this.sleep(this.ENTREZ_SLEEP);
-        return pmids;
-    }
-
-    // Fetch PubMed abstracts
-    async fetchPubmedAbstracts(pmids) {
-        if (!pmids || pmids.length === 0) return [];
-        
-        const params = {
-            'db': 'pubmed',
-            'id': pmids.join(','),
-            'retmode': 'xml'
-        };
-        
-        const response = await this.makeApiRequestWithRetry(
-            this.EFETCH_URL, params, "PubMed fetch"
-        );
-        
-        const text = await response.text();
-        const articles = this.parsePubmedXml(text);
-        
-        await this.sleep(this.ENTREZ_SLEEP);
-        return articles;
-    }
-
-    // Parse PubMed XML
-    parsePubmedXml(xmlText) {
-        const articles = [];
-        
-        // Simple XML parsing using DOMParser
+    for (let i = 0; i < retries; i++) {
         try {
-            const parser = new DOMParser();
-            const xmlDoc = parser.parseFromString(xmlText, "text/xml");
-            
-            // Check for parsing errors
-            const parseError = xmlDoc.getElementsByTagName("parsererror")[0];
-            if (parseError) {
-                console.error("XML parsing error:", parseError.textContent);
-                return articles;
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), CONFIG.REQUEST_TIMEOUT);
+
+            const response = await fetch(fullUrl, {
+                method: 'GET',
+                signal: controller.signal
+            });
+
+            clearTimeout(timeoutId);
+
+            if (response.status === 429) {
+                const waitTime = CONFIG.BACKOFF_FACTOR * Math.pow(2, i);
+                console.warn(`[WARN] Rate limited on ${description}. Sleeping ${waitTime}ms...`);
+                await sleep(waitTime);
+                continue;
             }
-            
-            const pubmedArticles = xmlDoc.getElementsByTagName('PubmedArticle');
-            
-            for (let i = 0; i < pubmedArticles.length; i++) {
-                const article = pubmedArticles[i];
-                const medlineCitation = article.getElementsByTagName('MedlineCitation')[0];
-                if (!medlineCitation) continue;
-                
-                const articleInfo = medlineCitation.getElementsByTagName('Article')[0];
-                if (!articleInfo) continue;
-                
-                // Get title
-                const titleElem = articleInfo.getElementsByTagName('ArticleTitle')[0];
-                const title = titleElem ? titleElem.textContent : "";
-                
-                // Get abstract
-                let abstractText = "";
-                const abstractElem = articleInfo.getElementsByTagName('Abstract')[0];
-                if (abstractElem) {
-                    const abstractTexts = abstractElem.getElementsByTagName('AbstractText');
-                    for (let j = 0; j < abstractTexts.length; j++) {
-                        if (abstractTexts[j].textContent) {
-                            abstractText += abstractTexts[j].textContent + " ";
-                        }
-                    }
-                }
-                
-                // Get PMID
-                const pmidElem = medlineCitation.getElementsByTagName('PMID')[0];
-                const pmid = pmidElem ? pmidElem.textContent : `unknown-${i}`;
-                
-                articles.push({
-                    pmid: pmid,
-                    source: 'pubmed',
-                    title: title,
-                    text: abstractText.trim()
-                });
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
+
+            return response;
         } catch (error) {
-            console.error("Error parsing PubMed XML:", error);
-        }
-        
-        return articles;
-    }
-
-    // Search PMC
-    async searchPmc(gene, retmax = this.ARTICLES_PER_GENE) {
-        const params = {
-            'db': 'pmc',
-            'term': this.buildQueryPmc(gene),
-            'retmode': 'json',
-            'retmax': retmax.toString()
-        };
-        
-        const response = await this.makeApiRequestWithRetry(
-            this.ESEARCH_URL, params, `PMC search ${gene}`
-        );
-        
-        const data = await response.json();
-        const pmcids = data?.esearchresult?.idlist || [];
-        
-        await this.sleep(this.ENTREZ_SLEEP);
-        return pmcids;
-    }
-
-    // Fetch PMC full text
-    async fetchPmcFullText(pmcids) {
-        if (!pmcids || pmcids.length === 0) return [];
-        
-        const params = {
-            'db': 'pmc',
-            'id': pmcids.join(','),
-            'retmode': 'xml'
-        };
-        
-        const response = await this.makeApiRequestWithRetry(
-            this.EFETCH_URL, params, "PMC fetch"
-        );
-        
-        const text = await response.text();
-        const articles = this.parsePmcXml(text);
-        
-        await this.sleep(this.ENTREZ_SLEEP);
-        return articles;
-    }
-
-    // Parse PMC XML
-    parsePmcXml(xmlText) {
-        const articles = [];
-        
-        try {
-            const parser = new DOMParser();
-            const xmlDoc = parser.parseFromString(xmlText, "text/xml");
-            
-            const parseError = xmlDoc.getElementsByTagName("parsererror")[0];
-            if (parseError) {
-                console.error("PMC XML parsing error:", parseError.textContent);
-                return articles;
+            if (i === retries - 1) {
+                throw new Error(`Failed ${description} after ${retries} retries: ${error.message}`);
             }
-            
-            const articleElements = xmlDoc.getElementsByTagName('article');
-            
-            for (let i = 0; i < articleElements.length; i++) {
-                const article = articleElements[i];
-                
-                // Get PMCID
-                let pmcid = null;
-                const articleIds = article.getElementsByTagName('article-id');
-                for (let j = 0; j < articleIds.length; j++) {
-                    const aid = articleIds[j];
-                    const pubIdType = aid.getAttribute('pub-id-type');
-                    if (pubIdType && pubIdType.toLowerCase().includes('pmc')) {
-                        pmcid = aid.textContent;
-                        break;
-                    }
-                }
-                
-                // Get title
-                const titleElem = article.getElementsByTagName('article-title')[0];
-                const title = titleElem ? titleElem.textContent : "";
-                
-                // Extract paragraphs from body
-                const paragraphs = [];
-                const body = article.getElementsByTagName('body')[0];
-                
-                if (body) {
-                    // Get all paragraph elements
-                    const pElements = body.getElementsByTagName('p');
-                    for (let j = 0; j < pElements.length; j++) {
-                        const text = pElements[j].textContent.trim();
-                        if (text && text.length > 10) { // Minimum length filter
-                            paragraphs.push(text);
-                        }
-                    }
-                    
-                    // Get captions
-                    const captions = body.getElementsByTagName('caption');
-                    for (let j = 0; j < captions.length; j++) {
-                        const text = captions[j].textContent.trim();
-                        if (text && text.length > 10) {
-                            paragraphs.push(text);
-                        }
-                    }
-                }
-                
-                // Fallback: get section text
-                const sections = article.getElementsByTagName('sec');
-                for (let j = 0; j < sections.length; j++) {
-                    const text = sections[j].textContent.trim();
-                    if (text && text.length > 10 && !paragraphs.includes(text)) {
-                        paragraphs.push(text);
-                    }
-                }
-                
-                articles.push({
-                    pmcid: pmcid || `pmc-unknown-${i}`,
-                    source: 'pmc',
-                    title: title,
-                    paragraphs: paragraphs
-                });
-            }
-        } catch (error) {
-            console.error("Error parsing PMC XML:", error);
+            const waitTime = CONFIG.BACKOFF_FACTOR * Math.pow(2, i);
+            console.warn(`[WARN] Request error (${description}): ${error.message}. Retrying in ${waitTime}ms...`);
+            await sleep(waitTime);
         }
-        
-        return articles;
-    }
-
-    // Text analysis functions
-    paragraphMatches(paragraph, gene) {
-        if (!paragraph) return false;
-        
-        const geneRegex = new RegExp('\\b' + this.escapeRegExp(gene) + '\\b', 'i');
-        if (!geneRegex.test(paragraph)) return false;
-        
-        const parLower = paragraph.toLowerCase();
-        return this.LOCAL_ANALYSIS_KEYWORDS.some(kw => parLower.includes(kw.toLowerCase()));
-    }
-
-    sentenceContextMatches(paragraph, gene, windowSentences = 1) {
-        const sents = paragraph.trim().split(/[.!?]+\s+/).filter(s => s);
-        const matches = [];
-        const geneRegex = new RegExp('\\b' + this.escapeRegExp(gene) + '\\b', 'i');
-        
-        for (let i = 0; i < sents.length; i++) {
-            if (geneRegex.test(sents[i])) {
-                const start = Math.max(0, i - windowSentences);
-                const end = Math.min(sents.length, i + windowSentences + 1);
-                const context = sents.slice(start, end).join(' ').trim();
-                
-                if (this.LOCAL_ANALYSIS_KEYWORDS.some(kw => context.toLowerCase().includes(kw.toLowerCase()))) {
-                    matches.push(context);
-                }
-            }
-        }
-        
-        return matches;
-    }
-
-    detectEffect(contextText) {
-        const found = [];
-        for (const [label, pattern] of Object.entries(this.EFFECT_PATTERNS)) {
-            if (pattern.test(contextText)) {
-                found.push(label);
-            }
-        }
-        return found.length > 0 ? found : ['unknown'];
-    }
-
-    paragraphSubjectGenes(paragraph, allGenes) {
-        const mentioned = allGenes.filter(g => {
-            const regex = new RegExp('\\b' + this.escapeRegExp(g) + '\\b', 'i');
-            return regex.test(paragraph);
-        });
-        
-        if (mentioned.length > 0) {
-            return mentioned;
-        }
-        
-        // Check for collective phrases
-        const collectiveRegex = /\b(these (single )?mutants|all mutants|all genes|each mutant)\b/i;
-        if (collectiveRegex.test(paragraph)) {
-            return allGenes;
-        }
-        
-        return [];
-    }
-
-    // Utility function to escape regex characters
-    escapeRegExp(string) {
-        return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    }
-
-    // Main processing function
-    async processGene(gene, allGenesInList = null) {
-        const allGenes = allGenesInList || [gene];
-        console.log(`[INFO] Processing gene: ${gene}`);
-        
-        const results = {
-            gene: gene,
-            articles: [],
-            found_articles: 0
-        };
-        
-        const seenIds = new Set();
-
-        try {
-            // PubMed processing
-            const pmids = await this.searchPubmed(gene);
-            console.log(`[INFO] Found ${pmids.length} PubMed articles for ${gene}`);
-            
-            if (pmids.length > 0) {
-                const pubmedArticles = await this.fetchPubmedAbstracts(pmids);
-                console.log(`[INFO] Fetched ${pubmedArticles.length} PubMed abstracts for ${gene}`);
-                
-                for (const art of pubmedArticles) {
-                    const artId = `pmid:${art.pmid}`;
-                    if (seenIds.has(artId)) continue;
-                    seenIds.add(artId);
-
-                    const combinedText = `${art.title || ''}. ${art.text || ''}`;
-                    const paragraphs = combinedText.split(/\n\s*\n/); // Split by blank lines
-                    
-                    for (const p of paragraphs) {
-                        if (!p || p.length < 10) continue;
-                        
-                        const subjectGenes = this.paragraphSubjectGenes(p, allGenes);
-                        if (subjectGenes.length === 0) continue;
-
-                        const sentContexts = this.sentenceContextMatches(p, gene, 2);
-                        const contexts = sentContexts.length > 0 ? sentContexts : [p];
-
-                        const evidences = [];
-                        for (const c of contexts) {
-                            const effects = this.detectEffect(c);
-                            for (const subjGene of subjectGenes) {
-                                evidences.push({
-                                    gene: subjGene,
-                                    context: c,
-                                    effects: effects,
-                                    source: 'pubmed',
-                                    id: art.pmid,
-                                    article_title: art.title
-                                });
-                            }
-                        }
-                        
-                        if (evidences.length > 0) {
-                            results.articles.push({
-                                id: art.pmid,
-                                source: 'pubmed',
-                                title: art.title,
-                                evidence: evidences
-                            });
-                        }
-                    }
-                }
-            }
-        } catch (error) {
-            console.error(`[ERROR] PubMed handling failed for ${gene}:`, error);
-        }
-
-        try {
-            // PMC processing
-            const pmcids = await this.searchPmc(gene);
-            console.log(`[INFO] Found ${pmcids.length} PMC articles for ${gene}`);
-            
-            if (pmcids.length > 0) {
-                const pmcArticles = await this.fetchPmcFullText(pmcids);
-                console.log(`[INFO] Fetched ${pmcArticles.length} PMC articles for ${gene}`);
-                
-                for (const art of pmcArticles) {
-                    const artId = `pmcid:${art.pmcid}`;
-                    if (seenIds.has(artId)) continue;
-                    seenIds.add(artId);
-
-                    const paragraphs = art.paragraphs || [];
-                    for (const p of paragraphs) {
-                        if (!p || p.length < 10) continue;
-                        
-                        const subjectGenes = this.paragraphSubjectGenes(p, allGenes);
-                        if (subjectGenes.length === 0) continue;
-
-                        const sentContexts = this.sentenceContextMatches(p, gene, 2);
-                        const contexts = sentContexts.length > 0 ? sentContexts : [p];
-
-                        const evidences = [];
-                        for (const c of contexts) {
-                            const effects = this.detectEffect(c);
-                            for (const subjGene of subjectGenes) {
-                                evidences.push({
-                                    gene: subjGene,
-                                    context: c,
-                                    effects: effects,
-                                    source: 'pmc',
-                                    id: art.pmcid,
-                                    article_title: art.title
-                                });
-                            }
-                        }
-                        
-                        if (evidences.length > 0) {
-                            results.articles.push({
-                                id: art.pmcid,
-                                source: 'pmc',
-                                title: art.title,
-                                evidence: evidences
-                            });
-                        }
-                    }
-                }
-            }
-        } catch (error) {
-            console.error(`[ERROR] PMC handling failed for ${gene}:`, error);
-        }
-
-        results.found_articles = results.articles.length;
-        console.log(`[INFO] Done ${gene} -> ${results.found_articles} article(s) with evidence found`);
-        return results;
-    }
-
-    // Inference and interpretation functions
-    interpretEvidence(gene, evidenceText) {
-        const inferredRoles = { length: [], frequency: [] };
-        if (!evidenceText) return inferredRoles;
-
-        const clauses = evidenceText.split(/[.;]|,?\s+(while|whereas|but)\s+/i);
-        
-        for (const clause of clauses) {
-            const context = (clause || "").toLowerCase();
-            const geneRegex = new RegExp('\\b' + this.escapeRegExp(gene.toLowerCase()) + '\\b');
-            if (!geneRegex.test(context)) continue;
-
-            const negation = /\b(no|not|did not|none|unchanged|unaltered|without)\b/.test(context);
-            const isLoss = this.INFERENCE_LEXICON.MANIPULATION.LOSS.some(kw => context.includes(kw.toLowerCase()));
-            const isGain = this.INFERENCE_LEXICON.MANIPULATION.GAIN.some(kw => context.includes(kw.toLowerCase()));
-
-            const inferRole = (phenotypeList, lossRole = 'PROMOTES', gainRole = 'INHIBITS') => {
-                const role = [];
-                for (const kw of phenotypeList) {
-                    if (context.includes(kw.toLowerCase())) {
-                        if (negation) {
-                            role.push('NEUTRAL');
-                        } else {
-                            if (isLoss) role.push(lossRole);
-                            if (isGain) role.push(gainRole);
-                        }
-                    }
-                }
-                return role;
-            };
-
-            inferredRoles.length.push(...inferRole(this.INFERENCE_LEXICON.PHENOTYPE.LENGTH_DECREASE, 'PROMOTES', 'INHIBITS'));
-            inferredRoles.length.push(...inferRole(this.INFERENCE_LEXICON.PHENOTYPE.LENGTH_INCREASE, 'INHIBITS', 'PROMOTES'));
-            inferredRoles.length.push(...inferRole(this.INFERENCE_LEXICON.PHENOTYPE.LENGTH_NEUTRAL, 'NEUTRAL', 'NEUTRAL'));
-            inferredRoles.length.push(...inferRole(this.INFERENCE_LEXICON.PHENOTYPE.LENGTH_VARIABLE, 'VARIABLE', 'VARIABLE'));
-
-            inferredRoles.frequency.push(...inferRole(this.INFERENCE_LEXICON.PHENOTYPE.FREQ_DECREASE, 'PROMOTES', 'INHIBITS'));
-            inferredRoles.frequency.push(...inferRole(this.INFERENCE_LEXICON.PHENOTYPE.FREQ_INCREASE, 'INHIBITS', 'PROMOTES'));
-            inferredRoles.frequency.push(...inferRole(this.INFERENCE_LEXICON.PHENOTYPE.FREQ_NEUTRAL, 'NEUTRAL', 'NEUTRAL'));
-        }
-
-        // Remove duplicates
-        inferredRoles.length = [...new Set(inferredRoles.length)];
-        inferredRoles.frequency = [...new Set(inferredRoles.frequency)];
-
-        return inferredRoles;
-    }
-
-    generateFinalSummary(roles) {
-        if (!roles || roles.length === 0) return "No specific data";
-        
-        const counts = {};
-        roles.forEach(role => {
-            counts[role] = (counts[role] || 0) + 1;
-        });
-
-        const promotes = counts['PROMOTES'] || 0;
-        const inhibits = counts['INHIBITS'] || 0;
-        const neutral = counts['NEUTRAL'] || 0;
-        const variable = counts['VARIABLE'] || 0;
-
-        if (promotes > 0 && inhibits > 0) return "Conflicting Data";
-        if (promotes > 0) return "Promotes / Maintains";
-        if (inhibits > 0) return "Inhibits / Restricts";
-        if (variable > 0) return "Affects Morphology/Variability";
-        if (neutral > 0) return "No clear role";
-
-        return "Unclear";
-    }
-
-    // Main function to process multiple genes
-    async processGenes(genes, progressCallback = null) {
-        const allResults = {};
-        console.log(`[INFO] Starting search and interpretation for ${genes.length} genes...`);
-
-        // Process genes sequentially to respect rate limits
-        for (let i = 0; i < genes.length; i++) {
-            const gene = genes[i];
-            if (progressCallback) {
-                progressCallback(i + 1, genes.length, gene);
-            }
-            
-            try {
-                const result = await this.processGene(gene, genes);
-                allResults[gene] = result;
-            } catch (error) {
-                console.error(`[ERROR] ${gene} generated an exception:`, error);
-                allResults[gene] = {
-                    gene: gene,
-                    articles: [],
-                    found_articles: 0,
-                    error: error.message
-                };
-            }
-        }
-
-        const output = {
-            metadata: {
-                timestamp: new Date().toISOString(),
-                genes_processed: genes.length
-            },
-            results: allResults
-        };
-
-        return output;
     }
 }
 
-// Enhanced CiliAI class that integrates with the existing CiliaHub interface
-class CiliAI {
-    constructor() {
-        this.miner = new LiteratureMinerEngine();
-        this.isProcessing = false;
-        this.results = null;
-        
-        // Initialize UI elements
-        this.initializeUI();
+// ============================================================================
+// QUERY BUILDERS
+// ============================================================================
+
+function buildQueryPubMed(gene) {
+    const kwClause = CONFIG.API_QUERY_KEYWORDS
+        .map(k => `"${k}"[Title/Abstract]`)
+        .join(' OR ');
+    return `("${gene}"[Title/Abstract]) AND (${kwClause})`;
+}
+
+function buildQueryPMC(gene) {
+    const kwClause = CONFIG.API_QUERY_KEYWORDS.join(' OR ');
+    return `${gene} AND (${kwClause})`;
+}
+
+// ============================================================================
+// TEXT ANALYSIS FUNCTIONS
+// ============================================================================
+
+function paragraphSubjectGenes(paragraph, allGenes) {
+    const mentioned = allGenes.filter(g =>
+        new RegExp(`\\b${g}\\b`, 'i').test(paragraph)
+    );
+    if (mentioned.length > 0) return mentioned;
+
+    if (/\b(these (single )?mutants|all mutants|all genes|each mutant|compared to control)\b/i.test(paragraph)) {
+        return allGenes;
     }
+    return [];
+}
 
-    initializeUI() {
-        // Create result containers if they don't exist
-        if (!document.getElementById('resultsContainer')) {
-            const resultsDiv = document.createElement('div');
-            resultsDiv.id = 'resultsContainer';
-            resultsDiv.style.marginTop = '20px';
-            document.body.appendChild(resultsDiv);
-        }
-        
-        if (!document.getElementById('progressContainer')) {
-            const progressDiv = document.createElement('div');
-            progressDiv.id = 'progressContainer';
-            progressDiv.style.margin = '10px 0';
-            document.body.appendChild(progressDiv);
-        }
-    }
+function hasQuantitativeData(text) {
+    return /\b(\d+(\.\d+)?\s?(µm|%|vs|±|twofold))\b/i.test(text);
+}
 
-    async analyzeGenes() {
-        if (this.isProcessing) {
-            this.showError('Analysis already in progress');
-            return;
-        }
+function interpretEvidence(gene, evidenceText) {
+    const inferredRoles = { length: [], frequency: [] };
+    const sentences = evidenceText.split(/(?<=[.!?])\s+/);
 
-        this.isProcessing = true;
-        
-        try {
-            // Get genes from input
-            const genes = this.getGenesFromInput();
-            if (!genes || genes.length === 0) {
-                this.showError('Please enter at least one gene symbol');
-                return;
+    for (const sentence of sentences) {
+        const context = sentence.toLowerCase();
+        if (!new RegExp(`\\b${gene.toLowerCase()}\\b`).test(context)) continue;
+
+        const negation = /\b(no|not|did not|none|unchanged|unaltered|without)\b/i.test(context);
+        const isLoss = INFERENCE_LEXICON.MANIPULATION.LOSS.some(kw =>
+            context.includes(kw.toLowerCase())
+        );
+        const isGain = INFERENCE_LEXICON.MANIPULATION.GAIN.some(kw =>
+            context.includes(kw.toLowerCase())
+        );
+        const weight = hasQuantitativeData(context) ? 3 : 1;
+
+        const pushRole = (phenotypeList, category, lossRole = 'PROMOTES', gainRole = 'INHIBITS') => {
+            for (const kw of phenotypeList) {
+                if (context.includes(kw.toLowerCase())) {
+                    for (let i = 0; i < weight; i++) {
+                        if (negation) {
+                            inferredRoles[category].push('NEUTRAL');
+                        } else {
+                            if (isLoss) inferredRoles[category].push(lossRole);
+                            if (isGain) inferredRoles[category].push(gainRole);
+                        }
+                    }
+                }
             }
+        };
 
-            this.updateStatus(`Starting analysis for ${genes.length} genes...`);
-            this.showProgress(0, 'Initializing...');
+        pushRole(INFERENCE_LEXICON.PHENOTYPE.LENGTH_DECREASE, 'length', 'PROMOTES', 'INHIBITS');
+        pushRole(INFERENCE_LEXICON.PHENOTYPE.LENGTH_INCREASE, 'length', 'INHIBITS', 'PROMOTES');
+        pushRole(INFERENCE_LEXICON.PHENOTYPE.LENGTH_NEUTRAL, 'length', 'NEUTRAL', 'NEUTRAL');
+        pushRole(INFERENCE_LEXICON.PHENOTYPE.LENGTH_VARIABLE, 'length', 'VARIABLE', 'VARIABLE');
+        pushRole(INFERENCE_LEXICON.PHENOTYPE.FREQ_DECREASE, 'frequency', 'PROMOTES', 'INHIBITS');
+        pushRole(INFERENCE_LEXICON.PHENOTYPE.FREQ_INCREASE, 'frequency', 'INHIBITS', 'PROMOTES');
+        pushRole(INFERENCE_LEXICON.PHENOTYPE.FREQ_NEUTRAL, 'frequency', 'NEUTRAL', 'NEUTRAL');
+    }
 
-            const results = await this.miner.processGenes(genes, (current, total, gene) => {
-                const percent = Math.round((current / total) * 100);
-                this.showProgress(percent, `Processing ${gene} (${current}/${total})`);
+    inferredRoles.length = [...new Set(inferredRoles.length)];
+    inferredRoles.frequency = [...new Set(inferredRoles.frequency)];
+    return inferredRoles;
+}
+
+function generateFinalSummary(roles) {
+    if (roles.length === 0) {
+        return `<span class="text-gray-500">No specific data</span>`;
+    }
+
+    const counts = roles.reduce((acc, val) => {
+        acc[val] = (acc[val] || 0) + 1;
+        return acc;
+    }, {});
+
+    const promotes = counts['PROMOTES'] || 0;
+    const inhibits = counts['INHIBITS'] || 0;
+    const neutral = counts['NEUTRAL'] || 0;
+    const variable = counts['VARIABLE'] || 0;
+
+    if (neutral > 0 && promotes === 0 && inhibits === 0 && variable === 0) {
+        return `<span class="font-semibold text-blue-600">No effect / Neutral</span>`;
+    }
+    if (promotes > 0 && inhibits > 0) {
+        return `<span class="font-semibold text-yellow-700">Variable / Mixed Phenotype</span>`;
+    }
+    if (promotes > 0) {
+        return `<span class="font-semibold text-green-600">Promotes / Maintains</span>`;
+    }
+    if (inhibits > 0) {
+        return `<span class="font-semibold text-red-600">Inhibits / Restricts</span>`;
+    }
+    if (variable > 0) {
+        return `<span class="font-semibold text-purple-600">Variable / Mixed phenotype</span>`;
+    }
+
+    return `<span class="text-gray-500">Unclear</span>`;
+}
+
+// ============================================================================
+// ENHANCED LITERATURE RETRIEVAL ENGINE
+// ============================================================================
+
+async function analyzeGeneViaAPI(gene, resultCard, allGenes) {
+    let foundEvidence = [];
+    let seenIds = new Set();
+
+    try {
+        // --- 1. PubMed Search ---
+        console.log(`[DEBUG] Starting PubMed search for ${gene}`);
+        const searchParamsPubMed = {
+            db: 'pubmed',
+            term: buildQueryPubMed(gene),
+            retmode: 'json',
+            retmax: CONFIG.ARTICLES_PER_GENE.toString(),
+            tool: CONFIG.TOOL_NAME,
+            email: CONFIG.USER_EMAIL
+        };
+        const searchRespPubMed = await makeApiRequest(CONFIG.ESEARCH_URL, searchParamsPubMed, `PubMed search ${gene}`);
+        const searchDataPubMed = await searchRespPubMed.json();
+        const pmids = searchDataPubMed?.esearchresult?.idlist || [];
+        console.log(`[DEBUG] Found ${pmids.length} PubMed IDs for ${gene}`);
+
+        if (pmids.length > 0) {
+            await sleep(CONFIG.ENTREZ_SLEEP);
+            const fetchParamsPubMed = {
+                db: 'pubmed',
+                id: pmids.join(','),
+                retmode: 'xml',
+                rettype: 'abstract',
+                tool: CONFIG.TOOL_NAME,
+                email: CONFIG.USER_EMAIL
+            };
+            const fetchRespPubMed = await makeApiRequest(CONFIG.EFETCH_URL, fetchParamsPubMed, `PubMed fetch ${gene}`);
+            const xmlText = await fetchRespPubMed.text();
+            const parser = new DOMParser();
+            const xmlDoc = parser.parseFromString(xmlText, "application/xml");
+            const articles = xmlDoc.querySelectorAll('PubmedArticle');
+
+            articles.forEach(article => {
+                const pmid = article.querySelector('MedlineCitation > PMID')?.textContent;
+                if (seenIds.has(`pmid:${pmid}`)) return;
+                seenIds.add(`pmid:${pmid}`);
+
+                const title = article.querySelector('ArticleTitle')?.textContent || '';
+                const abstractText = Array.from(article.querySelectorAll('Abstract > AbstractText')).map(el => el.textContent).join(' ');
+                const combinedText = `${title}. ${abstractText}`;
+
+                combinedText.split(/\n{2,}/).forEach(p => {
+                    if (paragraphSubjectGenes(p, allGenes).includes(gene) && CONFIG.LOCAL_ANALYSIS_KEYWORDS.some(kw => p.toLowerCase().includes(kw))) {
+                        const inferredRoles = interpretEvidence(gene, p);
+                        if (inferredRoles.length.length > 0 || inferredRoles.frequency.length > 0) {
+                            foundEvidence.push({
+                                id: pmid,
+                                source: 'PubMed',
+                                context: p,
+                                inferredRoles,
+                                refLink: `https://pubmed.ncbi.nlm.nih.gov/${pmid}/`
+                            });
+                        }
+                    }
+                });
             });
+        }
 
-            this.results = results;
-            this.displayResults(results);
-            this.showProgress(100, 'Analysis complete!');
-            
-        } catch (error) {
-            console.error('Analysis failed:', error);
-            this.showError(`Analysis failed: ${error.message}`);
-        } finally {
-            this.isProcessing = false;
+        // --- 2. PMC Search ---
+        console.log(`[DEBUG] Starting PMC search for ${gene}`);
+        await sleep(CONFIG.ENTREZ_SLEEP);
+        const searchParamsPMC = {
+            db: 'pmc',
+            term: buildQueryPMC(gene),
+            retmode: 'json',
+            retmax: CONFIG.ARTICLES_PER_GENE.toString(),
+            tool: CONFIG.TOOL_NAME,
+            email: CONFIG.USER_EMAIL
+        };
+        const searchRespPMC = await makeApiRequest(CONFIG.ESEARCH_URL, searchParamsPMC, `PMC search ${gene}`);
+        const searchDataPMC = await searchRespPMC.json();
+        const pmcids = searchDataPMC?.esearchresult?.idlist || [];
+        console.log(`[DEBUG] Found ${pmcids.length} PMC IDs for ${gene}`);
+
+        if (pmcids.length > 0) {
+            await sleep(CONFIG.ENTREZ_SLEEP);
+            const fetchParamsPMC = {
+                db: 'pmc',
+                id: pmcids.join(','),
+                retmode: 'xml',
+                tool: CONFIG.TOOL_NAME,
+                email: CONFIG.USER_EMAIL
+            };
+            const fetchRespPMC = await makeApiRequest(CONFIG.EFETCH_URL, fetchParamsPMC, `PMC fetch ${gene}`);
+            const xmlText = await fetchRespPMC.text();
+            const parser = new DOMParser();
+            const xmlDoc = parser.parseFromString(xmlText, "application/xml");
+            const articles = xmlDoc.querySelectorAll('article');
+
+            articles.forEach(article => {
+                const pmcidNode = Array.from(article.querySelectorAll('article-id')).find(node => node.getAttribute('pub-id-type') === 'pmc');
+                const pmcid = pmcidNode ? pmcidNode.textContent : null;
+                if (!pmcid || seenIds.has(`pmcid:${pmcid}`)) return;
+                seenIds.add(`pmcid:${pmcid}`);
+
+                const paragraphs = Array.from(article.querySelectorAll('body p, body caption, body sec')).map(el => el.textContent.trim()).filter(Boolean);
+                paragraphs.forEach(p => {
+                    if (paragraphSubjectGenes(p, allGenes).includes(gene) && CONFIG.LOCAL_ANALYSIS_KEYWORDS.some(kw => p.toLowerCase().includes(kw))) {
+                        const inferredRoles = interpretEvidence(gene, p);
+                        if (inferredRoles.length.length > 0 || inferredRoles.frequency.length > 0) {
+                            foundEvidence.push({
+                                id: pmcid,
+                                source: 'PMC',
+                                context: p,
+                                inferredRoles,
+                                refLink: `https://www.ncbi.nlm.nih.gov/pmc/articles/PMC${pmcid}/`
+                            });
+                        }
+                    }
+                });
+            });
+        }
+    } catch (error) {
+        console.error(`[ERROR] Literature search failed for ${gene}:`, error);
+        const errorEl = resultCard?.querySelector('.status-searching');
+        if (errorEl) {
+            errorEl.textContent = 'Literature Search Failed';
+            errorEl.className = 'status-not-found';
         }
     }
 
-    getGenesFromInput() {
-        // Try to get genes from various possible input elements
-        const geneInput = document.getElementById('geneInput') || 
-                         document.querySelector('input[placeholder*="gene"]') ||
-                         document.querySelector('input[type="text"]');
-        
-        if (geneInput && geneInput.value) {
-            return geneInput.value.split(/[\s,]+/).filter(g => g.trim());
-        }
-        
-        // Fallback: return some test genes
-        return ['IFT88', 'KIF3A', 'ARL13B', 'BBS1'];
+    // Deduplicate evidence based on the start of the context string
+    const uniqueContexts = new Set();
+    return foundEvidence.filter(ev => {
+        const contextStart = ev.context.substring(0, 150).trim();
+        if (uniqueContexts.has(contextStart)) return false;
+        uniqueContexts.add(contextStart);
+        return true;
+    });
+}
+
+// ============================================================================
+// SCREEN DATA FETCHER
+// ============================================================================
+
+async function fetchScreenData() {
+    try {
+        const response = await fetch('https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/cilia_screens_data.json');
+        if (!response.ok) throw new Error(`Failed to fetch screen data: ${response.statusText}`);
+        const data = await response.json();
+        console.log('[INFO] Screen data loaded:', Object.keys(data).length, 'genes');
+        return data;
+    } catch (error) {
+        console.error('[ERROR] Fetching screen data:', error);
+        return {};
+    }
+}
+
+// ============================================================================
+// UI DISPLAY FUNCTIONS
+// ============================================================================
+
+function displayCiliAIPage() {
+    const contentArea = document.querySelector('.content-area');
+    if (!contentArea) {
+        console.error('Content area not found');
+        return;
+    }
+    contentArea.className = 'content-area content-area-full';
+    const ciliaPanel = document.querySelector('.cilia-panel');
+    if (ciliaPanel) {
+        ciliaPanel.style.display = 'none';
     }
 
-    updateStatus(message) {
-        console.log(`Status: ${message}`);
-        // Update status in UI
-        const statusElement = document.getElementById('status') || this.createStatusElement();
-        if (statusElement) {
-            statusElement.textContent = message;
-        }
-    }
-
-    showProgress(percent, message) {
-        console.log(`Progress: ${percent}% - ${message}`);
-        
-        const progressContainer = document.getElementById('progressContainer');
-        if (progressContainer) {
-            progressContainer.innerHTML = `
-                <div style="width: 100%; background-color: #f0f0f0; border-radius: 5px; margin: 10px 0;">
-                    <div style="width: ${percent}%; height: 20px; background-color: #4CAF50; border-radius: 5px; transition: width 0.3s;"></div>
-                </div>
-                <div style="text-align: center; font-size: 14px;">${message}</div>
-            `;
-        }
-    }
-
-    displayResults(results) {
-        const resultsContainer = document.getElementById('resultsContainer');
-        if (!resultsContainer) return;
-
-        let html = '<h3>Literature Mining Results</h3>';
-        
-        for (const [gene, data] of Object.entries(results.results)) {
-            html += this.createGeneResultHTML(gene, data);
-        }
-
-        html += `
-            <div style="margin-top: 20px; padding: 10px; background-color: #f9f9f9; border-radius: 5px;">
-                <strong>Summary:</strong> Processed ${Object.keys(results.results).length} genes at ${results.metadata.timestamp}
+    contentArea.innerHTML = `
+        <div class="ciliai-container">
+            <div class="ciliai-header">
+                <h1>CiliAI</h1>
+                <p>Your AI-powered partner for discovering gene-cilia relationships.</p>
             </div>
-        `;
-
-        resultsContainer.innerHTML = html;
-    }
-
-    createGeneResultHTML(gene, data) {
-        let html = `
-            <div style="border: 1px solid #ddd; border-radius: 5px; padding: 15px; margin: 10px 0; background-color: white;">
-                <h4 style="margin-top: 0; color: #2c3e50;">
-                    ${gene} 
-                    <span style="font-size: 14px; color: #7f8c8d;">(${data.found_articles} articles with evidence)</span>
-                </h4>
-        `;
-
-        if (data.error) {
-            html += `<div style="color: red;">Error: ${data.error}</div>`;
-        }
-
-        if (data.articles && data.articles.length > 0) {
-            data.articles.forEach((article, index) => {
-                html += this.createArticleHTML(article, index);
-            });
-        } else {
-            html += `<div style="color: #7f8c8d; font-style: italic;">No relevant evidence found in literature.</div>`;
-        }
-
-        html += `</div>`;
-        return html;
-    }
-
-    createArticleHTML(article, index) {
-        let html = `
-            <div style="border-left: 3px solid #3498db; padding-left: 10px; margin: 10px 0;">
-                <div style="font-weight: bold;">
-                    <a href="https://pubmed.ncbi.nlm.nih.gov/${article.id}/" target="_blank" style="text-decoration: none;">
-                        ${article.title || 'Untitled'}
-                    </a>
-                    <span style="font-size: 12px; color: #7f8c8d; margin-left: 10px;">
-                        (${article.source.toUpperCase()} - ${article.id})
-                    </span>
+            <div class="ciliai-main-content">
+                <div class="ai-query-section">
+                    <h3>Ask a Question</h3>
+                    <div class="ai-input-group">
+                        <input type="text" id="aiQueryInput" class="ai-query-input" placeholder="e.g., What is the role of IFT88 in cilia biology?">
+                        <button class="ai-query-btn" id="aiQueryBtn">Ask CiliAI</button>
+                    </div>
                 </div>
-        `;
-
-        if (article.evidence && article.evidence.length > 0) {
-            article.evidence.forEach((evidence, evIndex) => {
-                const roles = this.miner.interpretEvidence(evidence.gene, evidence.context);
-                const lengthSummary = this.miner.generateFinalSummary(roles.length);
-                const freqSummary = this.miner.generateFinalSummary(roles.frequency);
-                
-                html += `
-                    <div style="margin: 5px 0; padding: 8px; background-color: #f8f9fa; border-radius: 3px;">
-                        <div style="font-size: 14px; color: #2c3e50;">
-                            <strong>Gene:</strong> ${evidence.gene} | 
-                            <strong>Length Role:</strong> ${lengthSummary} | 
-                            <strong>Frequency Role:</strong> ${freqSummary}
-                        </div>
-                        <div style="font-size: 13px; color: #34495e; margin-top: 5px;">
-                            "${evidence.context}"
-                        </div>
-                        <div style="font-size: 12px; color: #7f8c8d; margin-top: 3px;">
-                            Effects: ${evidence.effects.join(', ')}
+                <div class="input-section">
+                    <h3>Analyze Gene Phenotypes</h3>
+                    <div class="input-group">
+                        <label for="geneInput">Gene Symbols:</label>
+                        <textarea id="geneInput" class="gene-input-textarea" placeholder="Enter one or more gene symbols, separated by commas, spaces, or newlines (e.g., HDAC6, IFT88, ARL13B)"></textarea>
+                    </div>
+                    <div class="input-group">
+                        <label>Analysis Mode:</label>
+                        <div class="mode-selector">
+                            <div class="mode-option">
+                                <input type="radio" id="hybrid" name="mode" value="hybrid" checked>
+                                <label for="hybrid" title="Best for most users. Combines our fast, expert-curated database, screen data, and real-time AI literature mining for the most comprehensive results.">
+                                    <span class="mode-icon">🔬</span>
+                                    <div><strong>Hybrid</strong><br><small>Expert DB + Screen Data + Literature</small></div>
+                                </label>
+                            </div>
+                            <div class="mode-option">
+                                <input type="radio" id="expert" name="mode" value="expert">
+                                <label for="expert" title="Fastest option. Queries only our internal, manually curated database and screen data of known gene-cilia interactions.">
+                                    <span class="mode-icon">🏛️</span>
+                                    <div><strong>Expert Only</strong><br><small>Curated database + Screen Data</small></div>
+                                </label>
+                            </div>
+                            <div class="mode-option">
+                                <input type="radio" id="nlp" name="mode" value="nlp">
+                                <label for="nlp" title="Most current data. Performs a live AI-powered search across PubMed full-text articles. May be slower but includes the very latest findings.">
+                                    <span class="mode-icon">📚</span>
+                                    <div><strong>Literature Only</strong><br><small>Live AI text mining</small></div>
+                                </label>
+                            </div>
                         </div>
                     </div>
-                `;
-            });
-        }
+                    <button class="analyze-btn" id="analyzeBtn">🔍 Analyze Genes</button>
+                </div>
+                <div id="resultsSection" class="results-section" style="display: none;">
+                    <h2>Analysis Results</h2>
+                    <div id="resultsContainer"></div>
+                </div>
+            </div>
+        </div>
+        <style>
+            .ciliai-container{font-family:'Arial',sans-serif;max-width:950px;margin:2rem auto;padding:2rem;background-color:#f9f9f9;border-radius:12px}
+            .ciliai-header{text-align:center;margin-bottom:2rem}
+            .ciliai-header h1{font-size:2.8rem;color:#2c5aa0;margin:0}
+            .ciliai-header p{font-size:1.2rem;color:#555;margin-top:.5rem}
+            .ai-query-section{background-color:#e8f4fd;border:1px solid #bbdefb;padding:1.5rem 2rem;border-radius:8px;margin-bottom:2rem}
+            .ai-query-section h3{margin-top:0;color:#2c5aa0}
+            .ai-input-group{display:flex;gap:10px}
+            .ai-query-input{flex-grow:1;padding:.8rem;border:1px solid #ccc;border-radius:4px;font-size:1rem}
+            .ai-query-btn{padding:.8rem 1.2rem;font-size:1rem;background-color:#2c5aa0;color:#fff;border:none;border-radius:4px;cursor:pointer;transition:background-color .2s}
+            .ai-query-btn:hover{background-color:#1e4273}
+            .input-section{background-color:#fff;padding:2rem;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,.05)}
+            .input-section h3{margin-top:0;color:#333}
+            .input-group{margin-bottom:1.5rem}
+            .input-group label{display:block;font-weight:700;margin-bottom:.5rem;color:#333}
+            .gene-input-textarea{width:100%;padding:.8rem;border:1px solid #ccc;border-radius:4px;font-size:1rem;min-height:80px;resize:vertical}
+            .mode-selector{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:1rem}
+            .mode-option input[type=radio]{display:none}
+            .mode-option label{display:flex;align-items:center;gap:10px;padding:1rem;border:2px solid #ddd;border-radius:8px;cursor:pointer;transition:all .2s}
+            .mode-option input[type=radio]:checked+label{border-color:#2c5aa0;background-color:#e8f4fd;box-shadow:0 0 5px rgba(44,90,160,.3)}
+            .mode-icon{font-size:1.8rem}
+            .analyze-btn{width:100%;padding:1rem;font-size:1.1rem;font-weight:700;background-color:#28a745;color:#fff;border:none;border-radius:8px;cursor:pointer;transition:background-color .2s}
+            .analyze-btn[disabled]{background-color:#a5d6a7;cursor:not-allowed}
+            .analyze-btn:hover:not([disabled]){background-color:#218838}
+            .results-section{margin-top:2rem;padding:2rem;background-color:#fff;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,.05)}
+            .result-card{border:1px solid #ddd;border-radius:8px;padding:1.5rem;margin-bottom:1.5rem;position:relative;overflow:hidden}
+            .result-card h3{margin-top:0;color:#2c5aa0;font-size:1.4rem}
+            .result-card .status-found{color:#28a745}
+            .result-card .status-not-found{color:#dc3545}
+            .result-card .status-searching{color:#007bff}
+            .prediction-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-top:1rem}
+            .prediction-box{padding:1rem;border-radius:6px;text-align:center;background-color:#f8f9fa;border:1px solid #dee2e6}
+            .prediction-box.promotes-maintains{background-color:#d4edda;border:1px solid #c3e6cb}
+            .prediction-box.inhibits-restricts{background-color:#f8d7da;border:1px solid #f5c6cb}
+            .prediction-box.no-effect-neutral{background-color:#e2e3e5;border:1px solid #d6d8db}
+            .prediction-box.variable-mixed-phenotype{background-color:#d1c4e9;border:1px solid #b39ddb}
+            .prediction-box.no-specific-data{background-color:#e2e3e5;border:1px solid #d6d8db}
+            .prediction-box.unclear{background-color:#e2e3e5;border:1px solid #d6d8db}
+            .prediction-box p{margin:0;font-size:1.2rem;font-weight:700}
+            .prediction-box h4{margin:0 0 .5rem;color:#495057}
+            .evidence-section{margin-top:1.5rem;border-top:1px solid #eee;padding-top:1rem}
+            .evidence-toggle{background:0 0;border:1px solid #2c5aa0;color:#2c5aa0;padding:.4rem .8rem;border-radius:20px;cursor:pointer;font-weight:700;transition:all .2s;margin-bottom:.5rem}
+            .evidence-toggle:hover{background-color:#e8f4fd}
+            .evidence-content{display:none;margin-top:1rem;padding-left:1rem;border-left:3px solid #bbdefb}
+            .evidence-snippet{background-color:#f1f3f5;padding:.8rem;border-radius:4px;margin-bottom:.8rem;font-size:.9rem;color:#333}
+            .evidence-snippet strong{color:#0056b3}
+            .evidence-snippet mark{background-color:#ffeeba;padding:.1em .2em;border-radius:3px}
+            .evidence-snippet a{color:#2c5aa0;text-decoration:underline;cursor:pointer}
+            .evidence-snippet a:hover{color:#1e4273}
+            .text-gray-500{color:#6c757d}
+            .font-semibold{font-weight:600}
+            .text-blue-600{color:#0056b3}
+            .text-green-600{color:#28a745}
+            .text-red-600{color:#dc3545}
+            .text-yellow-700{color:#856404}
+            .text-purple-600{color:#6f42c1}
+        </style>
+    `;
 
-        html += `</div>`;
-        return html;
+    setupCiliAIEventListeners();
+};
+
+// ============================================================================
+// EVENT HANDLERS
+// ============================================================================
+
+function setupCiliAIEventListeners() {
+    const analyzeBtn = document.getElementById('analyzeBtn');
+    const aiQueryBtn = document.getElementById('aiQueryBtn');
+    const resultsContainer = document.getElementById('resultsContainer');
+
+    if (analyzeBtn) {
+        analyzeBtn.addEventListener('click', analyzeGenesFromInput);
+    }
+    if (aiQueryBtn) {
+        aiQueryBtn.addEventListener('click', handleAIQuery);
     }
 
-    showError(message) {
-        console.error('Error:', message);
-        alert(`Error: ${message}`);
+    const geneInput = document.getElementById('geneInput');
+    if (geneInput) {
+        geneInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                analyzeGenesFromInput();
+            }
+        });
+    }
+    const aiQueryInput = document.getElementById('aiQueryInput');
+    if (aiQueryInput) {
+        aiQueryInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                handleAIQuery();
+            }
+        });
     }
 
-    createStatusElement() {
-        const statusElement = document.createElement('div');
-        statusElement.id = 'status';
-        statusElement.style.margin = '10px 0';
-        statusElement.style.padding = '10px';
-        statusElement.style.backgroundColor = '#e3f2fd';
-        statusElement.style.borderRadius = '5px';
-        document.body.appendChild(statusElement);
-        return statusElement;
+    if (resultsContainer) {
+        resultsContainer.addEventListener('click', function(e) {
+            if (e.target && e.target.classList.contains('evidence-toggle')) {
+                const content = e.target.nextElementSibling;
+                if (content) {
+                    const isVisible = content.style.display === 'block';
+                    content.style.display = isVisible ? 'none' : 'block';
+                    const count = e.target.dataset.count || 0;
+                    e.target.textContent = isVisible ? `Show Evidence (${count}) ▾` : `Hide Evidence (${count}) ▴`;
+                }
+            }
+        });
     }
 }
 
-// Initialize CiliAI when the page loads
-document.addEventListener('DOMContentLoaded', function() {
-    window.ciliai = new CiliAI();
-    
-    // Add analyze button if it doesn't exist
-    if (!document.getElementById('analyzeButton')) {
-        const analyzeButton = document.createElement('button');
-        analyzeButton.id = 'analyzeButton';
-        analyzeButton.textContent = 'Analyze Genes with Literature Miner';
-        analyzeButton.style.backgroundColor = '#4CAF50';
-        analyzeButton.style.color = 'white';
-        analyzeButton.style.padding = '10px 20px';
-        analyzeButton.style.border = 'none';
-        analyzeButton.style.borderRadius = '5px';
-        analyzeButton.style.cursor = 'pointer';
-        analyzeButton.style.margin = '10px 0';
-        analyzeButton.onclick = () => window.ciliai.analyzeGenes();
-        
-        // Try to find a good place to insert the button
-        const geneInput = document.getElementById('geneInput') || 
-                         document.querySelector('input[placeholder*="gene"]');
-        if (geneInput && geneInput.parentNode) {
-            geneInput.parentNode.appendChild(analyzeButton);
-        } else {
-            document.body.insertBefore(analyzeButton, document.body.firstChild);
+function handleAIQuery() {
+    const aiQueryInput = document.getElementById('aiQueryInput');
+    if (!aiQueryInput) return;
+    const query = aiQueryInput.value.trim();
+    const geneRegex = /\b([A-Z0-9]{3,})\b/g;
+    const matches = query.match(geneRegex);
+
+    if (matches && matches.length > 0) {
+        const detectedGene = matches[0].toUpperCase();
+        const geneInput = document.getElementById('geneInput');
+        if (geneInput) geneInput.value = detectedGene;
+        runAnalysis([detectedGene]);
+    } else {
+        const resultsContainer = document.getElementById('resultsContainer');
+        if (resultsContainer) {
+            resultsContainer.innerHTML = `<p class="status-not-found">Could not identify a valid gene symbol. Please try again, e.g., "What does IFT88 do?".</p>`;
+            document.getElementById('resultsSection').style.display = 'block';
         }
     }
-    
-    console.log('CiliAI Literature Miner initialized successfully!');
-});
-
-// Export for use in modules
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { LiteratureMinerEngine, CiliAI };
 }
+
+function analyzeGenesFromInput() {
+    const geneInput = document.getElementById('geneInput');
+    if (!geneInput) return;
+    const genes = geneInput.value.split(/[\s,]+/).map(g => g.trim().toUpperCase()).filter(Boolean);
+
+    if (genes.length === 0) {
+        const resultsContainer = document.getElementById('resultsContainer');
+        if (resultsContainer) {
+            resultsContainer.innerHTML = `<p class="status-not-found">Please enter at least one gene symbol.</p>`;
+            document.getElementById('resultsSection').style.display = 'block';
+        }
+        return;
+    }
+    runAnalysis([...new Set(genes)]);
+}
+
+// ============================================================================
+// MAIN ANALYSIS ORCHESTRATOR
+// ============================================================================
+
+async function runAnalysis(geneList) {
+    const resultsContainer = document.getElementById('resultsContainer');
+    const resultsSection = document.getElementById('resultsSection');
+    const analyzeBtn = document.getElementById('analyzeBtn');
+    if (!resultsContainer || !resultsSection || !analyzeBtn) return;
+
+    const mode = document.querySelector('input[name="mode"]:checked')?.value || 'hybrid';
+    resultsContainer.innerHTML = '';
+    resultsSection.style.display = 'block';
+    analyzeBtn.disabled = true;
+    analyzeBtn.textContent = 'Analyzing...';
+
+    const screenData = (mode === 'hybrid' || mode === 'expert') ? await fetchScreenData() : {};
+
+    for (const gene of geneList) {
+        resultsContainer.insertAdjacentHTML('beforeend', createPlaceholderCard(gene, mode));
+        const resultCard = document.getElementById(`card-${gene}`);
+        let allEvidence = [];
+
+        if (mode === 'expert' || mode === 'hybrid') {
+            if (CILI_AI_DB[gene]) {
+                allEvidence.push(...CILI_AI_DB[gene].evidence.map(ev => ({ ...ev, inferredRoles: interpretEvidence(gene, ev.context) })));
+            }
+            if (screenData[gene]) {
+                const screenInfo = screenData[gene];
+                const context = `Ciliary screen data indicates a length phenotype of "${screenInfo.cilia_length}" and a ciliation frequency phenotype of "${screenInfo.percent_ciliated}".`;
+                allEvidence.push({
+                    id: `Screen-${gene}`,
+                    source: 'Screen Data',
+                    context: context,
+                    inferredRoles: interpretEvidence(gene, context),
+                    refLink: '#'
+                });
+            }
+        }
+
+        if (mode === 'nlp' || mode === 'hybrid') {
+            const apiEvidence = await analyzeGeneViaAPI(gene, resultCard, geneList);
+            allEvidence.push(...apiEvidence);
+        }
+
+        const finalHtml = createResultCard(gene, allEvidence);
+        resultCard.outerHTML = finalHtml;
+    }
+
+    analyzeBtn.disabled = false;
+    analyzeBtn.textContent = '🔍 Analyze Genes';
+}
+
+// ============================================================================
+// RESULT CARD GENERATORS
+// ============================================================================
+
+function createPlaceholderCard(gene, mode) {
+    let statusText = 'Fetching from Expert DB and Screen Data...';
+    if (mode === 'nlp') statusText = 'Searching live literature...';
+    if (mode === 'hybrid') statusText = 'Checking Expert DB, Screen Data & Searching Literature...';
+    return `<div class="result-card" id="card-${gene}"><h3>${gene} - <span class="status-searching">${statusText}</span></h3></div>`;
+}
+
+function createResultCard(gene, allEvidence) {
+    const uniqueContexts = new Set();
+    const uniqueEvidence = allEvidence.filter(ev => {
+        const contextStart = ev.context.substring(0, 150).trim();
+        if (uniqueContexts.has(contextStart)) return false;
+        uniqueContexts.add(contextStart);
+        return true;
+    });
+
+    const statusText = uniqueEvidence.length > 0 ? 'Evidence Found' : 'No Data Found';
+    const statusClass = uniqueEvidence.length > 0 ? 'status-found' : 'status-not-found';
+
+    const allRoles = { length: [], frequency: [] };
+    const references = new Set();
+
+    uniqueEvidence.forEach(ev => {
+        if (ev.inferredRoles) {
+            allRoles.length.push(...ev.inferredRoles.length);
+            allRoles.frequency.push(...ev.inferredRoles.frequency);
+        }
+        if (ev.id && ev.source && ev.refLink) {
+            references.add(`<a href="${ev.refLink}" target="_blank">${ev.source}:${ev.id}</a>`);
+        }
+    });
+
+    const lengthSummary = generateFinalSummary(allRoles.length);
+    const freqSummary = generateFinalSummary(allRoles.frequency);
+    const lofClass = lengthSummary.replace(/<[^>]+>/g, '').toLowerCase().replace(/[^a-z]/g, '-');
+    const percClass = freqSummary.replace(/<[^>]+>/g, '').toLowerCase().replace(/[^a-z]/g, '-');
+
+    const summaryHtml = `
+        <div class="prediction-grid">
+            <div class="prediction-box ${lofClass}">
+                <h4>Loss-of-Function (Cilia Length)</h4>
+                <p>${lengthSummary}</p>
+            </div>
+            <div class="prediction-box ${percClass}">
+                <h4>Percentage Ciliated</h4>
+                <p>${freqSummary}</p>
+            </div>
+        </div>
+    `;
+
+    let evidenceHtml = '';
+    if (uniqueEvidence.length > 0) {
+        evidenceHtml = `
+            <div class="evidence-section">
+                <button class="evidence-toggle" data-count="${uniqueEvidence.length}">Show Evidence (${uniqueEvidence.length}) ▾</button>
+                <div class="evidence-content" style="display: none;">
+                    ${uniqueEvidence.map(ev => {
+                        const geneRegex = new RegExp(`\\b(${gene})\\b`, 'ig');
+                        const highlightedContext = ev.context.replace(geneRegex, `<mark>$1</mark>`);
+                        return `
+                        <div class="evidence-snippet">
+                            ${highlightedContext}
+                            <br><strong><a href="${ev.refLink}" target="_blank">Source: ${ev.source.toUpperCase()} (${ev.id})</a></strong>
+                        </div>`;
+                    }).join('')}
+                </div>
+            </div>
+        `;
+    }
+
+    const refHtml = references.size > 0 ? Array.from(references).join(', ') : 'N/A';
+
+    return `
+        <div class="result-card" id="card-${gene}">
+            <h3>${gene} - <span class="${statusClass}">${statusText}</span></h3>
+            ${summaryHtml}
+            ${evidenceHtml}
+            <div class="references-section" style="margin-top: 1rem; font-size: 0.8rem;">
+                <strong>References:</strong> ${refHtml}
+            </div>
+        </div>
+    `;
+}
+
+// ============================================================================
+// GLOBAL EXPORTS FOR ROUTER COMPATIBILITY
+// ============================================================================
+
+window.displayCiliAIPage = displayCiliAIPage;
+window.setupCiliAIEventListeners = setupCiliAIEventListeners;
+window.handleAIQuery = handleAIQuery;
+window.analyzeGenesFromInput = analyzeGenesFromInput;
+window.runAnalysis = runAnalysis;
+window.analyzeGeneViaAPI = analyzeGeneViaAPI;
+window.fetchScreenData = fetchScreenData;
+window.createResultCard = createResultCard;
+window.createPlaceholderCard = createPlaceholderCard;
+window.interpretEvidence = interpretEvidence;
+window.generateFinalSummary = generateFinalSummary;
+window.paragraphSubjectGenes = paragraphSubjectGenes;
