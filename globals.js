@@ -23,7 +23,7 @@ const defaultGenesNames = [
 ];
 
 // Caches
-window.geneDataCache = window.geneDataCache || {};
+let geneDataCache = null;
 let geneMapCache = null;
 
 function navigateTo(event, path) {
@@ -34,7 +34,7 @@ function navigateTo(event, path) {
 }
 
 // =============================================================================
-// ROUTER (SAFE VERSION)
+// ROUTER (REVISED)
 // =============================================================================
 async function handleRouteChange() {
     let path = window.location.hash.replace(/^#/, '').toLowerCase().trim();
@@ -62,38 +62,38 @@ async function handleRouteChange() {
         if (el) el.style.display = 'none';
     });
 
-    // Gene lookup
+    // REFACTORED: The gene lookup is now inside the `default` case
     let geneToDisplay = null;
 
-    // Show the correct page safely
+    // Show the correct page
     switch (path) {
         case '/':
-            safeCall(window.displayHomePage);
-            safeCall(window.displayLocalizationChart);
+            displayHomePage();
+            setTimeout(displayLocalizationChart, 0);
             break;
         case '/batch-query':
-            safeCall(window.displayBatchQueryTool);
+            displayBatchQueryTool();
             break;
         case '/ciliaplot':
         case '/analysis':
-            safeCall(window.displayCiliaPlotPage);
+            displayCiliaPlotPage();
             break;
         case '/ciliai':
-            safeCall(window.displayCiliAIPage);
+            displayCiliAIPage();
             break;
         case '/expression':
-            safeCall(window.displayExpressionPage);
+            displayExpressionPage();
             break;
         case '/download':
-            safeCall(window.displayDownloadPage);
+            displayDownloadPage();
             break;
         case '/contact':
-            safeCall(window.displayContactPage);
+            displayContactPage();
             break;
         default:
-            // Handle potential gene pages
+            // This block now exclusively handles potential gene pages
             if (geneMapCache) {
-                const geneName = getGeneFromURL();
+                const geneName = getGeneFromURL(); // Get gene name from the unknown path
                 if (geneName) {
                     const safeName = sanitize(geneName);
                     geneToDisplay = geneMapCache.get(safeName);
@@ -103,9 +103,9 @@ async function handleRouteChange() {
             }
 
             if (geneToDisplay) {
-                safeCall(window.displayIndividualGenePage, geneToDisplay);
+                displayIndividualGenePage(geneToDisplay);
             } else {
-                safeCall(window.displayNotFoundPage);
+                displayNotFoundPage();
             }
             break;
     }
@@ -114,36 +114,24 @@ async function handleRouteChange() {
 }
 
 // =============================================================================
-// SAFE CALL HELPER
-// =============================================================================
-function safeCall(fn, ...args) {
-    if (typeof fn === "function") {
-        try {
-            return fn(...args);
-        } catch (err) {
-            console.error(`Error while executing ${fn.name}:`, err);
-        }
-    } else {
-        console.warn(`Function ${fn && fn.name ? fn.name : fn} is not defined.`);
-    }
-    return null;
-}
-
-// =============================================================================
 // URL HELPERS
 // =============================================================================
 function getGeneFromURL() {
+    // Try query string first: /ciliaplot?gene=ACTN2
     const params = new URLSearchParams(window.location.search);
     const fromQuery = params.get('gene');
     if (fromQuery) return fromQuery;
 
+    // Fallback: last part of hash or path: /ciliaplot/ACTN2
     const hashPath = window.location.hash.replace(/^#/, '');
     const pathParts = hashPath.split('/');
     if (pathParts.length > 1 && pathParts[pathParts.length - 1].toLowerCase() !== 'ciliaplot') {
         return pathParts[pathParts.length - 1];
     }
+
     return null;
 }
+
 
 // =============================================================================
 // EVENT LISTENERS
@@ -171,13 +159,14 @@ function initGlobalEventListeners() {
 
     const ciliaSvg = document.querySelector('.interactive-cilium svg');
     if (ciliaSvg) {
-        const panzoom = Panzoom(ciliaSvg, {
+        Panzoom(ciliaSvg, {
             maxZoom: 3,
             minZoom: 0.5,
             contain: 'outside'
         });
         ciliaSvg.parentElement.addEventListener('wheel', (e) => {
             e.preventDefault();
+            const panzoom = Panzoom(ciliaSvg);
             panzoom.zoom(panzoom.getScale() * (e.deltaY > 0 ? 0.9 : 1.1));
         });
     }
