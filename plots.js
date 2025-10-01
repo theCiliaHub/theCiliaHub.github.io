@@ -1,149 +1,64 @@
-// Global variables for plots.js
-// Make sure these reference the same objects as script.js
-let ciliaryGeneMap = window.ciliaryGeneMap || new Map();
-let screenDatabase = window.screenDatabase || {};
-
-// Reference expression data from script.js global scope
-// These should be declared globally in script.js
-if (typeof expressionData === 'undefined') {
-    window.expressionData = {};
-}
-if (typeof availableGenes === 'undefined') {
-    window.availableGenes = new Set();
-}
+// --- Global variables to hold your data ---
+let ciliaryGeneMap = new Map();
+let screenDatabase = {};
 
 /**
- * Load ciliary genes and screen data for plots
- * Note: Expression data loading (loadExpressionData, parseTSV, processExpressionData)
- * is already handled in script.js
+ * This function should be called when your application starts.
+ * It fetches both JSON files and prepares them for fast lookups.
  */
 async function loadAllData() {
     try {
         // Fetch both files in parallel
         const [ciliaryGenesResponse, screenDataResponse] = await Promise.all([
-            fetch('ciliahub_data.json'),
-            fetch('cilia_screens_data.json')
-        ]);
-       
-        // Load ciliary genes
+    fetch('ciliahub_data.json'),
+    fetch('cilia_screens_data.json')
+]);
+
         const ciliaryGeneArray = await ciliaryGenesResponse.json();
-        ciliaryGeneMap = new Map(ciliaryGeneArray.map(gene => [gene.gene.toUpperCase(), gene]));
-        window.ciliaryGeneMap = ciliaryGeneMap;
-        console.log(`[plots.js] Successfully loaded ${ciliaryGeneMap.size} ciliary genes.`);
-       
-        // Load screen data
         screenDatabase = await screenDataResponse.json();
-        window.screenDatabase = screenDatabase;
-        console.log(`[plots.js] Successfully loaded screen data for ${Object.keys(screenDatabase).length} genes.`);
-       
-        // Check if expression data is loaded from script.js
-        console.log(`[plots.js] Expression data available: ${Object.keys(window.expressionData || {}).length} genes`);
-        console.log(`[plots.js] Available genes set size: ${(window.availableGenes || new Set()).size}`);
-       
+        
+        // Convert the ciliary gene array into a Map for instant lookups
+        ciliaryGeneMap = new Map(ciliaryGeneArray.map(gene => [gene.gene.toUpperCase(), gene]));
+
+        console.log(`Successfully loaded ${ciliaryGeneMap.size} ciliary genes.`);
+        console.log(`Successfully loaded screen data for ${Object.keys(screenDatabase).length} genes.`);
+
     } catch (error) {
-        console.error("[plots.js] Failed to load a required data file:", error);
-        showDataLoadError(error);
+        console.error("Failed to load a required data file:", error);
+        // You could display an error message to the user here
     }
 }
 
 /**
  * This function finds genes from user input and merges data from both sources.
- * Uses expressionData from script.js if available
  * @param {string[]} userInputArray - An array of gene symbols from the user.
  * @returns {object} An object containing the array of found gene data.
  */
 function findAndMergeGenes(userInputArray) {
     const foundGenes = [];
     const seenGenes = new Set();
-   
+
     userInputArray.forEach(query => {
         const geneSymbol = query.toUpperCase().trim();
         if (!geneSymbol || seenGenes.has(geneSymbol)) return;
-       
+
         // 1. Look up the gene in the main ciliary gene database
         if (ciliaryGeneMap.has(geneSymbol)) {
             // Start with the base data from your curated list
             let geneData = { ...ciliaryGeneMap.get(geneSymbol) };
-           
+            
             // 2. Augment it with data from the screen database
             if (screenDatabase[geneSymbol]) {
                 geneData.screens_summary = screenDatabase[geneSymbol];
             }
-           
-            // 3. Add expression data if available (from script.js)
-            if (typeof expressionData !== 'undefined' && expressionData[geneSymbol]) {
-                geneData.expression = expressionData[geneSymbol];
-            }
-           
+            
             foundGenes.push(geneData);
             seenGenes.add(geneSymbol);
         }
     });
-   
+    
     return { foundGenes };
 }
-
-/**
- * Display error message when data loading fails
- * @param {Error} error - The error object
- */
-function showDataLoadError(error) {
-    const errorContainer = document.getElementById('error-message') ||
-                          document.querySelector('.content-area');
-   
-    if (errorContainer) {
-        const errorHTML = `
-            <div style="background: #fee; border: 1px solid #c33; color: #c33; padding: 1rem; border-radius: 8px; margin: 1rem 0;">
-                <strong>⚠️ Data Loading Error</strong>
-                <p>Failed to load required data files. Please refresh the page or contact support.</p>
-                <p style="font-size: 0.9em; margin-top: 0.5rem;">Error details: ${error.message}</p>
-            </div>
-        `;
-       
-        if (errorContainer.id === 'error-message') {
-            errorContainer.innerHTML = errorHTML;
-            errorContainer.style.display = 'block';
-        } else {
-            errorContainer.insertAdjacentHTML('afterbegin', errorHTML);
-        }
-    }
-}
-
-/**
- * Check if expression data is loaded and ready
- * Uses expressionData and availableGenes from script.js
- * @returns {boolean} True if expression data is available
- */
-function isExpressionDataReady() {
-    return typeof expressionData !== 'undefined' &&
-           typeof availableGenes !== 'undefined' &&
-           Object.keys(expressionData).length > 0 &&
-           availableGenes.size > 0;
-}
-
-/**
- * Get expression data for a specific gene
- * Uses expressionData from script.js
- * @param {string} geneName - The gene symbol
- * @returns {object|null} Expression data for the gene or null if not found
- */
-function getGeneExpressionData(geneName) {
-    if (typeof expressionData === 'undefined') return null;
-    const upperGeneName = geneName.toUpperCase();
-    return expressionData[upperGeneName] || null;
-}
-
-// Initialize data loading when the module loads
-if (typeof window !== 'undefined') {
-    // Call loadAllData when the page is ready
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', loadAllData);
-    } else {
-        loadAllData();
-    }
-}
-
-
 
 function displayCiliaPlotPage() {
     const contentArea = document.querySelector('.content-area');
