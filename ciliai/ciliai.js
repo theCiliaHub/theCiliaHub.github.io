@@ -1,9 +1,17 @@
-```javascript
-// This function will be called by the router in globals.js
-function displayCiliAIPage() {
+// ciliAI.js - Clean version with fixed syntax and global exposure
+
+// Make functions globally available for router in globals.js
+window.displayCiliAIPage = function displayCiliAIPage() {
     const contentArea = document.querySelector('.content-area');
+    if (!contentArea) {
+        console.error('Content area not found');
+        return;
+    }
     contentArea.className = 'content-area content-area-full';
-    document.querySelector('.cilia-panel').style.display = 'none';
+    const ciliaPanel = document.querySelector('.cilia-panel');
+    if (ciliaPanel) {
+        ciliaPanel.style.display = 'none';
+    }
 
     // Inject the updated HTML structure (logo removed)
     contentArea.innerHTML = `
@@ -86,13 +94,20 @@ function displayCiliAIPage() {
                 background-color: #f9f9f9;
                 border-radius: 12px;
             }
-            .ciliai-header { text-align: center; margin-bottom: 2rem; }
+            .ciliai-header { 
+                text-align: center; 
+                margin-bottom: 2rem; 
+            }
             .ciliai-header h1 {
                 font-size: 2.8rem;
                 color: #2c5aa0;
                 margin: 0;
             }
-            .ciliai-header p { font-size: 1.2rem; color: #555; margin-top: 0.5rem; }
+            .ciliai-header p { 
+                font-size: 1.2rem; 
+                color: #555; 
+                margin-top: 0.5rem; 
+            }
             
             .ai-query-section {
                 background-color: #e8f4fd;
@@ -101,8 +116,14 @@ function displayCiliAIPage() {
                 border-radius: 8px;
                 margin-bottom: 2rem;
             }
-            .ai-query-section h3 { margin-top: 0; color: #2c5aa0; }
-            .ai-input-group { display: flex; gap: 10px; }
+            .ai-query-section h3 { 
+                margin-top: 0; 
+                color: #2c5aa0; 
+            }
+            .ai-input-group { 
+                display: flex; 
+                gap: 10px; 
+            }
             .ai-query-input {
                 flex-grow: 1;
                 padding: 0.8rem;
@@ -120,7 +141,9 @@ function displayCiliAIPage() {
                 cursor: pointer;
                 transition: background-color 0.2s;
             }
-            .ai-query-btn:hover { background-color: #1e4273; }
+            .ai-query-btn:hover { 
+                background-color: #1e4273; 
+            }
 
             .input-section {
                 background-color: #fff;
@@ -128,8 +151,13 @@ function displayCiliAIPage() {
                 border-radius: 8px;
                 box-shadow: 0 2px 8px rgba(0,0,0,0.05);
             }
-            .input-section h3 { margin-top: 0; color: #333; }
-            .input-group { margin-bottom: 1.5rem; }
+            .input-section h3 { 
+                margin-top: 0; 
+                color: #333; 
+            }
+            .input-group { 
+                margin-bottom: 1.5rem; 
+            }
             .input-group label {
                 display: block;
                 font-weight: bold;
@@ -150,7 +178,9 @@ function displayCiliAIPage() {
                 grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
                 gap: 1rem;
             }
-            .mode-option input[type="radio"] { display: none; }
+            .mode-option input[type="radio"] { 
+                display: none; 
+            }
             .mode-option label {
                 display: flex;
                 align-items: center;
@@ -166,7 +196,9 @@ function displayCiliAIPage() {
                 background-color: #e8f4fd;
                 box-shadow: 0 0 5px rgba(44, 90, 160, 0.3);
             }
-            .mode-icon { font-size: 1.8rem; }
+            .mode-icon { 
+                font-size: 1.8rem; 
+            }
             .analyze-btn {
                 width: 100%;
                 padding: 1rem;
@@ -183,7 +215,9 @@ function displayCiliAIPage() {
                 background-color: #a5d6a7;
                 cursor: not-allowed;
             }
-            .analyze-btn:hover:not([disabled]) { background-color: #218838; }
+            .analyze-btn:hover:not([disabled]) { 
+                background-color: #218838; 
+            }
             .results-section {
                 margin-top: 2rem;
                 padding: 2rem;
@@ -199,10 +233,20 @@ function displayCiliAIPage() {
                 position: relative;
                 overflow: hidden;
             }
-            .result-card h3 { margin-top: 0; color: #2c5aa0; font-size: 1.4rem; }
-            .result-card .status-found { color: #28a745; }
-            .result-card .status-not-found { color: #dc3545; }
-            .result-card .status-searching { color: #007bff; }
+            .result-card h3 { 
+                margin-top: 0; 
+                color: #2c5aa0; 
+                font-size: 1.4rem; 
+            }
+            .result-card .status-found { 
+                color: #28a745; 
+            }
+            .result-card .status-not-found { 
+                color: #dc3545; 
+            }
+            .result-card .status-searching { 
+                color: #007bff; 
+            }
             .prediction-grid {
                 display: grid;
                 grid-template-columns: 1fr 1fr;
@@ -216,12 +260,31 @@ function displayCiliAIPage() {
                 background-color: #f8f9fa; 
                 border: 1px solid #dee2e6;
             }
-            .prediction-box.promotes { background-color: #d4edda; border: 1px solid #c3e6cb; }
-            .prediction-box.inhibits { background-color: #f8d7da; border: 1px solid #f5c6cb; }
-            .prediction-box.no-effect { background-color: #e2e3e5; border: 1px solid #d6d8db; }
-            .prediction-box.conflicting { background-color: #fff3cd; border: 1px solid #ffeeba; }
-            .prediction-box h4 { margin: 0 0 0.5rem 0; color: #495057; }
-            .prediction-box p { margin: 0; font-size: 1.2rem; font-weight: bold; }
+            .prediction-box.promotes { 
+                background-color: #d4edda; 
+                border: 1px solid #c3e6cb; 
+            }
+            .prediction-box.inhibits { 
+                background-color: #f8d7da; 
+                border: 1px solid #f5c6cb; 
+            }
+            .prediction-box.no-effect { 
+                background-color: #e2e3e5; 
+                border: 1px solid #d6d8db; 
+            }
+            .prediction-box.conflicting { 
+                background-color: #fff3cd; 
+                border: 1px solid #ffeeba; 
+            }
+            .prediction-box h4 { 
+                margin: 0 0 0.5rem 0; 
+                color: #495057; 
+            }
+            .prediction-box p { 
+                margin: 0; 
+                font-size: 1.2rem; 
+                font-weight: bold; 
+            }
 
             .evidence-section {
                 margin-top: 1.5rem;
@@ -239,7 +302,9 @@ function displayCiliAIPage() {
                 transition: all 0.2s;
                 margin-bottom: 0.5rem;
             }
-            .evidence-toggle:hover { background-color: #e8f4fd; }
+            .evidence-toggle:hover { 
+                background-color: #e8f4fd; 
+            }
             .evidence-content {
                 display: none;
                 margin-top: 1rem;
@@ -254,14 +319,20 @@ function displayCiliAIPage() {
                 font-size: 0.9rem;
                 color: #333;
             }
-            .evidence-snippet strong { color: #0056b3; }
-            .evidence-snippet mark { background-color: #ffeeba; padding: 0.1em 0.2em; border-radius: 3px; }
+            .evidence-snippet strong { 
+                color: #0056b3; 
+            }
+            .evidence-snippet mark { 
+                background-color: #ffeeba; 
+                padding: 0.1em 0.2em; 
+                border-radius: 3px; 
+            }
         </style>
     `;
 
     // Attach event listeners after HTML is injected
     setupCiliAIEventListeners();
-}
+};
 
 // --- Helper Functions ---
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
@@ -293,7 +364,9 @@ async function fetchScreenData() {
     try {
         const response = await fetch('https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/cilia_screens_data.json');
         if (!response.ok) throw new Error(`Failed to fetch screen data: ${response.statusText}`);
-        return await response.json();
+        const data = await response.json();
+        console.log('Screen data loaded successfully:', Object.keys(data).length, 'genes');
+        return data;
     } catch (error) {
         console.error('Error fetching screen data:', error);
         return {};
@@ -301,7 +374,6 @@ async function fetchScreenData() {
 }
 
 // --- Live Literature Mining Engine (Client-Side) ---
-
 async function analyzeGeneViaAPI(gene, resultCard) {
     const ESEARCH_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi";
     const ELINK_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/elink.fcgi";
@@ -369,11 +441,12 @@ async function analyzeGeneViaAPI(gene, resultCard) {
             await sleep(350);
             const fetchParams = new URLSearchParams({ db: 'pmc', id: pmcIds.join(','), retmode: 'xml', rettype: 'full' });
             const fetchResp = await fetch(`${EFETCH_URL}?${fetchParams}`);
-            if (!fetchResp.ok) throw new Error(`NCBI EFetch failed: ${fetchResp.statusText}`);
-            const xmlText = await fetchResp.text();
-            const parser = new DOMParser();
-            const xmlDoc = parser.parseFromString(xmlText, "application/xml");
-            articles = xmlDoc.getElementsByTagName('article');
+            if (fetchResp.ok) {
+                const xmlText = await fetchResp.text();
+                const parser = new DOMParser();
+                const xmlDoc = parser.parseFromString(xmlText, "application/xml");
+                articles = xmlDoc.getElementsByTagName('article');
+            }
         }
 
         // Fallback to abstracts if no full-text articles are available
@@ -381,23 +454,26 @@ async function analyzeGeneViaAPI(gene, resultCard) {
             await sleep(350);
             const fetchParams = new URLSearchParams({ db: 'pubmed', id: pmids.join(','), retmode: 'xml', rettype: 'abstract' });
             const fetchResp = await fetch(`${EFETCH_URL}?${fetchParams}`);
-            if (!fetchResp.ok) throw new Error(`NCBI EFetch failed: ${fetchResp.statusText}`);
-            const xmlText = await fetchResp.text();
-            const parser = new DOMParser();
-            const xmlDoc = parser.parseFromString(xmlText, "application/xml");
-            articles = xmlDoc.getElementsByTagName('PubmedArticle');
+            if (fetchResp.ok) {
+                const xmlText = await fetchResp.text();
+                const parser = new DOMParser();
+                const xmlDoc = parser.parseFromString(xmlText, "application/xml");
+                articles = xmlDoc.getElementsByTagName('PubmedArticle');
+            }
         }
 
         // 4. Parse and analyze text
         for (const article of articles) {
             let pmid, textContent;
             if (article.tagName === 'article') {
+                // PMC full-text
                 pmid = article.querySelector('article-id[pub-id-type="pmid"]')?.textContent || 
                        article.querySelector('article-id[pub-id-type="pmcid"]')?.textContent;
                 const title = article.querySelector('article-title')?.textContent || '';
-                const body = article.querySelector('body')?.textContent || '';
+                const body = article.querySelector('body') ? Array.from(article.querySelectorAll('body p, body sec, body para')).map(el => el.textContent).join(' ') : '';
                 textContent = `${title}. ${body}`;
             } else {
+                // PubMed abstract
                 pmid = article.querySelector('MedlineCitation > PMID')?.textContent;
                 const title = article.querySelector('ArticleTitle')?.textContent || '';
                 const abstractNode = article.querySelector('Abstract');
@@ -408,14 +484,14 @@ async function analyzeGeneViaAPI(gene, resultCard) {
                 textContent = `${title}. ${abstractText}`;
             }
 
-            if (!geneRegex.test(textContent)) continue;
+            if (!textContent || !geneRegex.test(textContent)) continue;
 
-            const sentences = textContent.split(sentSplitRegex);
+            const sentences = textContent.split(sentSplitRegex).filter(s => s.trim());
             for (const sent of sentences) {
                 const sentLower = sent.toLowerCase();
                 if (geneRegex.test(sentLower) && [...LOCAL_ANALYSIS_KEYWORDS].some(kw => sentLower.includes(kw.toLowerCase()))) {
                     foundEvidence.push({
-                        id: pmid,
+                        id: pmid || 'unknown',
                         source: 'pubmed',
                         context: sent.trim().replace(geneRegex, `<mark>${gene}</mark>`)
                     });
@@ -424,7 +500,7 @@ async function analyzeGeneViaAPI(gene, resultCard) {
         }
     } catch (error) {
         console.error(`Failed to fetch literature for ${gene}:`, error);
-        const errorEl = resultCard.querySelector('.status-searching');
+        const errorEl = resultCard ? resultCard.querySelector('.status-searching') : null;
         if (errorEl) {
             errorEl.textContent = 'Literature Search Failed';
             errorEl.className = 'status-not-found';
@@ -435,67 +511,90 @@ async function analyzeGeneViaAPI(gene, resultCard) {
 }
 
 // --- UI and Event Handling ---
-
 function setupCiliAIEventListeners() {
     const analyzeBtn = document.getElementById('analyzeBtn');
     const aiQueryBtn = document.getElementById('aiQueryBtn');
+    const resultsContainer = document.getElementById('resultsContainer');
 
-    analyzeBtn.addEventListener('click', analyzeGenesFromInput);
-    aiQueryBtn.addEventListener('click', handleAIQuery);
+    if (analyzeBtn) {
+        analyzeBtn.addEventListener('click', analyzeGenesFromInput);
+    }
+    if (aiQueryBtn) {
+        aiQueryBtn.addEventListener('click', handleAIQuery);
+    }
 
-    document.getElementById('geneInput').addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            analyzeGenesFromInput();
-        }
-    });
-    
-    document.getElementById('aiQueryInput').addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-            handleAIQuery();
-        }
-    });
-
-    document.getElementById('resultsContainer').addEventListener('click', function(e) {
-        if (e.target && e.target.classList.contains('evidence-toggle')) {
-            const content = e.target.nextElementSibling;
-            if (content) {
-                const isVisible = content.style.display === 'block';
-                content.style.display = isVisible ? 'none' : 'block';
-                e.target.textContent = isVisible ? 'Show Evidence (' + e.target.dataset.count + ') ▾' : 'Hide Evidence (' + e.target.dataset.count + ') ▴';
+    const geneInput = document.getElementById('geneInput');
+    if (geneInput) {
+        geneInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                analyzeGenesFromInput();
             }
-        }
-    });
+        });
+    }
+    
+    const aiQueryInput = document.getElementById('aiQueryInput');
+    if (aiQueryInput) {
+        aiQueryInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                handleAIQuery();
+            }
+        });
+    }
+
+    if (resultsContainer) {
+        resultsContainer.addEventListener('click', function(e) {
+            if (e.target && e.target.classList.contains('evidence-toggle')) {
+                const content = e.target.nextElementSibling;
+                if (content) {
+                    const isVisible = content.style.display === 'block';
+                    content.style.display = isVisible ? 'none' : 'block';
+                    const count = e.target.dataset.count || 0;
+                    e.target.textContent = isVisible ? `Show Evidence (${count}) ▾` : `Hide Evidence (${count}) ▴`;
+                }
+            }
+        });
+    }
 }
 
 function handleAIQuery() {
-    const query = document.getElementById('aiQueryInput').value;
+    const aiQueryInput = document.getElementById('aiQueryInput');
+    if (!aiQueryInput) return;
+    const query = aiQueryInput.value.trim();
     const geneRegex = /\b([A-Z0-9]{3,})\b/g;
     const matches = query.match(geneRegex);
     
     if (matches && matches.length > 0) {
-        const detectedGene = matches[0];
-        document.getElementById('geneInput').value = detectedGene;
+        const detectedGene = matches[0].toUpperCase();
+        const geneInput = document.getElementById('geneInput');
+        if (geneInput) geneInput.value = detectedGene;
         runAnalysis([detectedGene]);
     } else {
         const resultsContainer = document.getElementById('resultsContainer');
-        resultsContainer.innerHTML = `<p class="status-not-found">Could not identify a valid gene symbol in your question. Please try again, e.g., "What does IFT88 do?".</p>`;
-        document.getElementById('resultsSection').style.display = 'block';
+        if (resultsContainer) {
+            resultsContainer.innerHTML = `<p class="status-not-found">Could not identify a valid gene symbol in your question. Please try again, e.g., "What does IFT88 do?".</p>`;
+            const resultsSection = document.getElementById('resultsSection');
+            if (resultsSection) resultsSection.style.display = 'block';
+        }
     }
 }
 
 function analyzeGenesFromInput() {
     const geneInput = document.getElementById('geneInput');
-    const genes = geneInput.value.split(/[\s,]+/).filter(g => g.trim() !== '');
+    if (!geneInput) return;
+    const genes = geneInput.value.split(/[\s,]+/).map(g => g.trim().toUpperCase()).filter(g => g !== '');
     
     if (genes.length === 0) {
         const resultsContainer = document.getElementById('resultsContainer');
-        resultsContainer.innerHTML = '<p class="status-not-found">Please enter at least one gene symbol.</p>';
-        document.getElementById('resultsSection').style.display = 'block';
+        if (resultsContainer) {
+            resultsContainer.innerHTML = '<p class="status-not-found">Please enter at least one gene symbol.</p>';
+            const resultsSection = document.getElementById('resultsSection');
+            if (resultsSection) resultsSection.style.display = 'block';
+        }
         return;
     }
     
-    const sanitizedGenes = [...new Set(genes.map(g => g.trim().toUpperCase()))]; // Remove duplicates
+    const sanitizedGenes = [...new Set(genes)]; // Remove duplicates
     runAnalysis(sanitizedGenes);
 }
 
@@ -503,7 +602,9 @@ async function runAnalysis(geneList) {
     const resultsContainer = document.getElementById('resultsContainer');
     const resultsSection = document.getElementById('resultsSection');
     const analyzeBtn = document.getElementById('analyzeBtn');
-    const mode = document.querySelector('input[name="mode"]:checked').value;
+    if (!resultsContainer || !resultsSection || !analyzeBtn) return;
+    
+    const mode = document.querySelector('input[name="mode"]:checked')?.value || 'hybrid';
 
     resultsContainer.innerHTML = ''; // Clear previous results
     resultsSection.style.display = 'block';
@@ -527,12 +628,24 @@ async function runAnalysis(geneList) {
         if (mode === 'expert' || mode === 'hybrid') {
             dbData = CILI_AI_DB[gene] || null;
             // Check screen data for this gene
-            if (screenData[gene]) {
+            if (screenData && screenData[gene]) {
+                const screenInfo = screenData[gene];
                 screenEvidence = [{
                     id: `screen-${gene}`,
                     source: 'screen_data',
-                    context: `Screen data: ${JSON.stringify(screenData[gene], null, 2)}`
+                    context: `Ciliary screen data for ${gene}: ${JSON.stringify(screenInfo, null, 2)}`
                 }];
+                // Optionally, use screen data to infer summary if no dbData
+                if (!dbData && screenInfo) {
+                    dbData = {
+                        summary: {
+                            lof_length: screenInfo.cilia_length || 'Unknown',
+                            percentage_ciliated: screenInfo.percent_ciliated || 'Unknown',
+                            source: 'Screen Data'
+                        },
+                        evidence: []
+                    };
+                }
             }
         }
         if (mode === 'nlp' || mode === 'hybrid') {
@@ -544,7 +657,9 @@ async function runAnalysis(geneList) {
         
         // Render the final card with combined data
         const finalHtml = createResultCard(gene, dbData, allEvidence, mode);
-        resultCard.outerHTML = finalHtml;
+        if (resultCard) {
+            resultCard.outerHTML = finalHtml;
+        }
     }
 
     analyzeBtn.disabled = false;
@@ -561,18 +676,26 @@ function createPlaceholderCard(gene, mode) {
 function createResultCard(gene, dbData, allEvidence, mode) {
     let statusText = allEvidence.length > 0 ? 'Evidence Found' : 'No Data Found';
     let statusClass = allEvidence.length > 0 ? 'status-found' : 'status-not-found';
-    let summaryHtml = dbData ? `
-        <div class="prediction-grid">
-            <div class="prediction-box ${dbData.summary.lof_length.toLowerCase().replace(/[^a-z]/g, '')}">
-                <h4>Loss-of-Function (Cilia Length)</h4>
-                <p>${dbData.summary.lof_length}</p>
+    
+    let summaryHtml = '';
+    if (dbData && dbData.summary) {
+        const lofClass = dbData.summary.lof_length.toLowerCase().replace(/[^a-z]/g, '-');
+        const percClass = dbData.summary.percentage_ciliated.toLowerCase().replace(/[^a-z]/g, '-');
+        summaryHtml = `
+            <div class="prediction-grid">
+                <div class="prediction-box ${lofClass || 'no-effect'}">
+                    <h4>Loss-of-Function (Cilia Length)</h4>
+                    <p>${dbData.summary.lof_length}</p>
+                </div>
+                <div class="prediction-box ${percClass || 'no-effect'}">
+                    <h4>Percentage Ciliated</h4>
+                    <p>${dbData.summary.percentage_ciliated}</p>
+                </div>
             </div>
-            <div class="prediction-box ${dbData.summary.percentage_ciliated.toLowerCase().replace(/[^a-z]/g, '')}">
-                <h4>Percentage Ciliated</h4>
-                <p>${dbData.summary.percentage_ciliated}</p>
-            </div>
-        </div>
-    ` : '<p>No summary prediction available. Review literature and screen evidence for insights.</p>';
+        `;
+    } else {
+        summaryHtml = '<p>No summary prediction available. Review literature and screen evidence for insights.</p>';
+    }
 
     let evidenceHtml = '';
     if (allEvidence.length > 0) {
@@ -582,7 +705,7 @@ function createResultCard(gene, dbData, allEvidence, mode) {
                 <div class="evidence-content">
                     ${allEvidence.map(ev => `
                         <div class="evidence-snippet">
-                            ${ev.context}
+                            ${ev.context.replace(/<mark>(\w+)<\/mark>/g, '<mark>$1</mark>')}
                             <br><strong>Source: ${ev.source.toUpperCase()} (${ev.id})</strong>
                         </div>
                     `).join('')}
@@ -592,7 +715,7 @@ function createResultCard(gene, dbData, allEvidence, mode) {
     }
 
     return `
-        <div class="result-card" id="card-${gene}">
+        <div class="result-card">
             <h3>${gene} - <span class="${statusClass}">${statusText}</span></h3>
             ${summaryHtml}
             ${evidenceHtml}
@@ -600,4 +723,12 @@ function createResultCard(gene, dbData, allEvidence, mode) {
     `;
 }
 
-```
+// Expose all functions globally for compatibility with globals.js router
+window.setupCiliAIEventListeners = setupCiliAIEventListeners;
+window.handleAIQuery = handleAIQuery;
+window.analyzeGenesFromInput = analyzeGenesFromInput;
+window.runAnalysis = runAnalysis;
+window.analyzeGeneViaAPI = analyzeGeneViaAPI;
+window.fetchScreenData = fetchScreenData;
+window.createResultCard = createResultCard;
+window.createPlaceholderCard = createPlaceholderCard;
