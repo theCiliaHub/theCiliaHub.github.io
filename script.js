@@ -364,19 +364,60 @@ function debugSearch(query) {
 
 // This should be the main entry point of your application
 async function initializeApp() {
-    // 1. Wait for the database to be fully loaded and prepared
-    const dataLoaded = await loadAndPrepareDatabase();
-
-    if (dataLoaded) {
-        // 2. Data is ready. Now, handle the initial page view.
-        // This will call displayHomePage() among other functions.
-        handleInitialRoute(); 
-
-        // 3. Explicitly call the function to update the stats
-        // with the now-loaded `allGenes` data.
-        updateHomepageStats(allGenes);
-    } else {
-        console.error("Failed to load gene database. App cannot start.");
+    try {
+        console.log('Starting application initialization...');
+        
+        // 1. Load expression data first (from script.js)
+        if (typeof loadExpressionData === 'function') {
+            console.log('Loading expression data...');
+            await loadExpressionData();
+            console.log('Expression data loaded successfully');
+        } else {
+            console.warn('loadExpressionData function not found in script.js');
+        }
+        
+        // 2. Wait for the database to be fully loaded and prepared
+        console.log('Loading gene database...');
+        const dataLoaded = await loadAndPrepareDatabase();
+        
+        if (dataLoaded) {
+            console.log('Gene database loaded successfully');
+            
+            // 3. Load plot-specific data (ciliary genes and screen data)
+            console.log('Loading plot data...');
+            await loadAllData();
+            
+            // 4. Data is ready. Now, handle the initial page view.
+            // This will call displayHomePage() among other functions.
+            handleInitialRoute(); 
+            
+            // 5. Explicitly call the function to update the stats
+            // with the now-loaded `allGenes` data.
+            if (typeof updateHomepageStats === 'function') {
+                updateHomepageStats(allGenes);
+            }
+            
+            // 6. Verify expression data is accessible
+            console.log('Final check - Expression data available:', {
+                expressionDataKeys: Object.keys(window.expressionData || {}).length,
+                availableGenesSize: (window.availableGenes || new Set()).size
+            });
+            
+            console.log('✅ Application initialized successfully!');
+        } else {
+            console.error("Failed to load gene database. App cannot start.");
+        }
+    } catch (error) {
+        console.error('Error during application initialization:', error);
+        // Show error to user
+        const errorDiv = document.createElement('div');
+        errorDiv.style.cssText = 'position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: #fee; border: 2px solid #c33; color: #c33; padding: 1rem 2rem; border-radius: 8px; z-index: 10000; max-width: 600px;';
+        errorDiv.innerHTML = `
+            <strong>⚠️ Initialization Error</strong>
+            <p>Failed to load application data. Please refresh the page.</p>
+            <p style="font-size: 0.9em; margin-top: 0.5rem;">Error: ${error.message}</p>
+        `;
+        document.body.appendChild(errorDiv);
     }
 }
 
