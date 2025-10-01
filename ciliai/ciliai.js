@@ -268,17 +268,25 @@ window.displayCiliAIPage = function displayCiliAIPage() {
                 background-color: #f8d7da; 
                 border: 1px solid #f5c6cb; 
             }
-            .prediction-box.no-clear-role { 
+            .prediction-box.no-effect-neutral { 
                 background-color: #e2e3e5; 
                 border: 1px solid #d6d8db; 
             }
-            .prediction-box.conflicting-data { 
+            .prediction-box.overexpression-promotes-loss-inhibits { 
                 background-color: #fff3cd; 
                 border: 1px solid #ffeeba; 
             }
-            .prediction-box.affects-morphology-variability { 
+            .prediction-box.variable-mixed-phenotype { 
                 background-color: #d1c4e9; 
                 border: 1px solid #b39ddb; 
+            }
+            .prediction-box.no-specific-data { 
+                background-color: #e2e3e5; 
+                border: 1px solid #d6d8db; 
+            }
+            .prediction-box.unclear { 
+                background-color: #e2e3e5; 
+                border: 1px solid #d6d8db; 
             }
             .prediction-box p { 
                 margin: 0; 
@@ -330,6 +338,14 @@ window.displayCiliAIPage = function displayCiliAIPage() {
                 background-color: #ffeeba; 
                 padding: 0.1em 0.2em; 
                 border-radius: 3px; 
+            }
+            .evidence-snippet a {
+                color: #2c5aa0;
+                text-decoration: underline;
+                cursor: pointer;
+            }
+            .evidence-snippet a:hover {
+                color: #1e4273;
             }
         </style>
     `;
@@ -515,7 +531,8 @@ async function analyzeGeneViaAPI(gene, resultCard, allGenes) {
                                     id: pmid || 'unknown',
                                     source: 'pubmed',
                                     context: context.replace(geneRegex, `<mark>${gene}</mark>`),
-                                    inferredRoles
+                                    inferredRoles,
+                                    refLink: `https://pubmed.ncbi.nlm.nih.gov/${pmid}/`
                                 });
                             }
                         }
@@ -577,7 +594,8 @@ async function analyzeGeneViaAPI(gene, resultCard, allGenes) {
                                     id: pmcid || 'unknown',
                                     source: 'pmc',
                                     context: context.replace(geneRegex, `<mark>${gene}</mark>`),
-                                    inferredRoles
+                                    inferredRoles,
+                                    refLink: `https://www.ncbi.nlm.nih.gov/pmc/articles/PMC${pmcid}/`
                                 });
                             }
                         }
@@ -634,6 +652,10 @@ function hashCode(str) {
     return hash;
 }
 
+function hasQuantitativeData(text) {
+    return /\b(\d+(\.\d+)?\s?(µm|%|vs|±|twofold))\b/i.test(text);
+}
+
 // --- Advanced Gene Display Algorithm ---
 function interpretEvidence(gene, evidenceText) {
     const inferredRoles = { length: [], frequency: [] };
@@ -643,16 +665,14 @@ function interpretEvidence(gene, evidenceText) {
         const context = clause.toLowerCase();
         if (!new RegExp(`\\b${gene.toLowerCase()}\\b`).test(context)) continue;
 
-        const negation = /\\b(no|not|did not|none|unchanged|unaltered|without)\\b/i.test(context);
         const isLoss = INFERENCE_LEXICON.MANIPULATION.LOSS.some(kw => context.includes(kw.toLowerCase()));
         const isGain = INFERENCE_LEXICON.MANIPULATION.GAIN.some(kw => context.includes(kw.toLowerCase()));
+        const weight = hasQuantitativeData(context) ? 3 : 1;
 
         const pushRole = (phenotypeList, category, lossRole = 'PROMOTES', gainRole = 'INHIBITS') => {
             for (const kw of phenotypeList) {
                 if (context.includes(kw.toLowerCase())) {
-                    if (negation) {
-                        inferredRoles[category].push('NEUTRAL');
-                    } else {
+                    for (let i = 0; i < weight; i++) {
                         if (isLoss) inferredRoles[category].push(lossRole);
                         if (isGain) inferredRoles[category].push(gainRole);
                     }
@@ -675,7 +695,8 @@ function interpretEvidence(gene, evidenceText) {
 }
 
 function generateFinalSummary(roles) {
-    if (!roles.length) return 'No specific data';
+    if (roles.length === 0) return `<span class="text-gray-500">No specific data</span>`;
+
     const counts = roles.reduce((acc, val) => {
         acc[val] = (acc[val] || 0) + 1;
         return acc;
@@ -687,15 +708,16 @@ function generateFinalSummary(roles) {
     const variable = counts['VARIABLE'] || 0;
 
     if (neutral > 0 && promotes === 0 && inhibits === 0 && variable === 0) {
-        return `No clear role (${neutral})`;
+        return `<span class="font-semibold text-blue-600">No effect / Neutral (${neutral})</span>`;
     }
     if (promotes > 0 && inhibits > 0) {
-        return `Conflicting Data`;
+        return `<span class="font-semibold text-yellow-700">Overexpression ➝ Promotes / Elongates;<br>Loss ➝ Inhibits / Causes Loss</span>`;
     }
-    if (promotes > 0) return `Promotes / Maintains (${promotes})`;
-    if (inhibits > 0) return `Inhibits / Restricts (${inhibits})`;
-    if (variable > 0) return `Affects Morphology/Variability (${variable})`;
-    return 'Unclear';
+    if (promotes > 0) return `<span class="font-semibold text-green-600">Promotes / Maintains (${promotes})</span>`;
+    if (inhibits > 0) return `<span class="font-semibold text-red-600">Inhibits / Restricts (${inhibits})</span>`;
+    if (variable > 0) return `<span class="font-semibold text-purple-600">Variable / Mixed phenotype (${variable})</span>`;
+
+    return `<span class="text-gray-500">Unclear</span>`;
 }
 
 // --- UI and Event Handling ---
@@ -821,7 +843,7 @@ async function runAnalysis(geneList) {
                     id: `screen-${gene}`,
                     source: 'screen_data',
                     context: `Ciliary screen data for ${gene}: ${JSON.stringify(screenInfo, null, 2)}`,
-                    inferredRoles: { length: [], frequency: [] }
+                    inferredRoles: { length: ['NEUTRAL'], frequency: ['NEUTRAL'] } // Default for screen data
                 }];
                 if (!dbData && screenInfo) {
                     dbData = {
@@ -864,16 +886,32 @@ function createResultCard(gene, dbData, allEvidence, mode) {
     let statusText = allEvidence.length > 0 ? 'Evidence Found' : 'No Data Found';
     let statusClass = allEvidence.length > 0 ? 'status-found' : 'status-not-found';
     
-    // Aggregate inferred roles from API evidence
+    // Aggregate inferred roles from API and screen evidence
     const inferredRoles = { length: [], frequency: [] };
+    const references = new Set();
     allEvidence.forEach(ev => {
         if (ev.inferredRoles) {
             inferredRoles.length.push(...ev.inferredRoles.length);
             inferredRoles.frequency.push(...ev.inferredRoles.frequency);
         }
+        if (ev.id && ev.source) {
+            let refLink = '#';
+            let displayId = ev.id;
+            if (ev.source === 'pmc') {
+                const numericId = String(ev.id).replace(/PMC/i, '');
+                displayId = `PMC${numericId}`;
+                refLink = ev.refLink || `https://www.ncbi.nlm.nih.gov/pmc/articles/PMC${numericId}/`;
+            } else if (ev.source === 'pubmed') {
+                refLink = ev.refLink || `https://pubmed.ncbi.nlm.nih.gov/${ev.id}/`;
+            } else if (ev.source === 'screen_data') {
+                refLink = '#';
+                displayId = `Screen-${ev.id}`;
+            }
+            references.add(`<a href="${refLink}" target="_blank" class="text-blue-600 hover:underline">${displayId}</a>`);
+        }
     });
 
-    // Use dbData if available, otherwise infer from API evidence
+    // Use dbData if available, otherwise infer from API and screen evidence
     let summaryHtml = '';
     if (dbData && dbData.summary) {
         const lofClass = dbData.summary.lof_length.toLowerCase().replace(/[^a-z]/g, '-');
@@ -893,8 +931,8 @@ function createResultCard(gene, dbData, allEvidence, mode) {
     } else {
         const lengthSummary = generateFinalSummary(inferredRoles.length);
         const freqSummary = generateFinalSummary(inferredRoles.frequency);
-        const lofClass = lengthSummary.toLowerCase().replace(/[^a-z]/g, '-');
-        const percClass = freqSummary.toLowerCase().replace(/[^a-z]/g, '-');
+        const lofClass = lengthSummary.replace(/<[^>]+>/g, '').toLowerCase().replace(/[^a-z]/g, '-');
+        const percClass = freqSummary.replace(/<[^>]+>/g, '').toLowerCase().replace(/[^a-z]/g, '-');
         summaryHtml = `
             <div class="prediction-grid">
                 <div class="prediction-box ${lofClass}">
@@ -926,11 +964,17 @@ function createResultCard(gene, dbData, allEvidence, mode) {
         `;
     }
 
+    const refHtml = references.size > 0 ? Array.from(references).join(', ') : 'N/A';
+
     return `
         <div class="result-card">
             <h3>${gene} - <span class="${statusClass}">${statusText}</span></h3>
             ${summaryHtml}
             ${evidenceHtml}
+            <div class="references-section">
+                <h4>References</h4>
+                <p>${refHtml}</p>
+            </div>
         </div>
     `;
 }
