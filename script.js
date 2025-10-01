@@ -1,3 +1,19 @@
+// ============================================
+// GLOBAL VARIABLES
+// ============================================
+let expressionData = {};
+let availableGenes = new Set();
+let pendingHeatmapRequest = null;
+const organCache = new Map();
+let allGenes = [];
+let currentData = [];
+let geneDataCache = {}; // This fixes your "geneDataCache is not defined" error
+
+// Make them globally accessible
+window.expressionData = expressionData;
+window.availableGenes = availableGenes;
+window.pendingHeatmapRequest = pendingHeatmapRequest;
+window.geneDataCache = geneDataCache;
 
 // ✨ THE NEW PLUGIN CODE RIGHT HERE for PLOT ✨
 Chart.register({
@@ -1910,20 +1926,6 @@ function handleStickySearch() {
     }
 }
 
-// ============================================
-// GLOBAL VARIABLES - Add at the TOP of script.js
-// ============================================
-
-// --- Expression Visualization System ---
-let expressionData = {};
-let availableGenes = new Set();
-let pendingHeatmapRequest = null;
-const organCache = new Map();
-
-// Make them available globally for plots.js
-window.expressionData = expressionData;
-window.availableGenes = availableGenes;
-window.pendingHeatmapRequest = pendingHeatmapRequest;
 
 async function initExpressionSystem() {
     try {
