@@ -78,8 +78,8 @@ async function handleRouteChange() {
         case '/analysis':
             displayCiliaPlotPage();
             break;
-        case '/compare':
-            displayComparePage();
+        case '/ciliai':
+            displayCiliAIPage();
             break;
         case '/expression':
             displayExpressionPage();
