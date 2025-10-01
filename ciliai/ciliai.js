@@ -1,4 +1,4 @@
-// ciliAI.js - Updated with advanced text retrieval and gene display algorithms from literature_miner_engine.py
+// ciliAI.js - Updated with corrected text retrieval logic to match literature_miner_engine.py
 
 // Make functions globally available for router in globals.js
 window.displayCiliAIPage = function displayCiliAIPage() {
@@ -642,7 +642,7 @@ async function analyzeGeneViaAPI(gene, resultCard, allGenes) {
 function paragraphSubjectGenes(paragraph, allGenes) {
     const mentioned = allGenes.filter(g => new RegExp(`\\b${g}\\b`, 'i').test(paragraph));
     if (mentioned.length > 0) return mentioned;
-    if (new RegExp('\\b(these (single )?mutants|all mutants|all genes|each mutant|compared to control)\\b', 'i').test(paragraph)) {
+    if (new RegExp('\\b(these (single )?mutants|all mutants|all genes|each mutant)\\b', 'i').test(paragraph)) {
         return allGenes;
     }
     return [];
@@ -686,7 +686,7 @@ function interpretEvidence(gene, evidenceText) {
 
     for (const clause of clauses) {
         const context = clause.toLowerCase();
-        if (!new RegExp(`\\b${gene.toLowerCase()}\\b`).test(context) && !/compared to control/i.test(context)) continue;
+        if (!new RegExp(`\\b${gene.toLowerCase()}\\b`).test(context)) continue;
 
         const negation = /\\b(no|not|did not|none|unchanged|unaltered|without)\b/i.test(context);
         const isLoss = INFERENCE_LEXICON.MANIPULATION.LOSS.some(kw => context.includes(kw.toLowerCase()));
