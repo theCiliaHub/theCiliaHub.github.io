@@ -1,4 +1,4 @@
-// ciliAI.js - CORRECTED VERSION
+// ciliAI.js - FULLY IMPLEMENTED LIVE LITERATURE RETRIEVAL
 
 // Make functions globally available for router in globals.js
 window.displayCiliAIPage = function displayCiliAIPage() {
@@ -477,63 +477,138 @@ async function analyzeGeneViaAPI(gene, resultCard, allGenes) {
         "extracellular fluid", "bead", "beads", "displacement", "cilia-generated", "mucociliary clearance"
     ]);
 
-    const geneRegex = new RegExp(`\\b${gene}\\b`, 'i');
     let foundEvidence = [];
     let seenIds = new Set();
 
     try {
-        // Live PubMed and PMC searches would go here. They are omitted for this example's clarity.
-        // For instance:
-        // const pmids = await searchPubMed(gene); 
-        // if (pmids.length > 0) { ... process abstracts ... }
-        // const pmcids = await searchPMC(gene);
-        // if (pmcids.length > 0) { ... process full text ... }
-
-        // 3. Mock data for specific text retrieval.
-        const mockText = "Next, we transduced RPE1 cells with shRNAs targeting control, WDR54, TMEM145, ZC2HC1A and ZNF474 to evaluate the effects of their absence on ciliogenesis and cilia length. We stained the cells for the cilium-specific protein ARL13B (green), acetylated tubulin (magenta), and the basal body marker polyglutamylated tubulin (red) (Figure 8D and E). Compared to control shRNAs, the number of ciliated cells decreased in ZC2HC1A deficient cells, while cilia length remained unchanged (Figure 8F and G).";
+        // --- 1. Search PubMed for abstracts ---
+        const kwClausePubMed = API_QUERY_KEYWORDS.map(k => `"${k}"[Title/Abstract]`).join(" OR ");
+        const queryPubMed = `("${gene}"[Title/Abstract]) AND (${kwClausePubMed})`;
+        const searchParamsPubMed = new URLSearchParams({ db: 'pubmed', term: queryPubMed, retmode: 'json', retmax: '40' });
         
-        const targetGenesForMock = ['WDR54', 'TMEM145', 'ZC2HC1A', 'ZNF474'];
+        console.log(`[DEBUG] PubMed query for ${gene}: ${queryPubMed}`);
+        const searchRespPubMed = await fetch(`${ESEARCH_URL}?${searchParamsPubMed}`);
+        if (!searchRespPubMed.ok) throw new Error(`NCBI PubMed ESearch failed: ${searchRespPubMed.statusText}`);
+        const searchDataPubMed = await searchRespPubMed.json();
+        const pmids = searchDataPubMed.esearchresult?.idlist || [];
+        console.log(`[DEBUG] Found ${pmids.length} PubMed IDs for ${gene}`);
 
-        // CORRECTED LOGIC BLOCK
-        if (targetGenesForMock.includes(gene)) {
-            console.log(`[DEBUG] Processing integrated text for ${gene}`);
-            let textToInterpret = mockText;
+        if (pmids.length > 0) {
+            await sleep(350); // Polite delay
+            const fetchParamsPubMed = new URLSearchParams({ db: 'pubmed', id: pmids.join(','), retmode: 'xml', rettype: 'abstract' });
+            const fetchRespPubMed = await fetch(`${EFETCH_URL}?${fetchParamsPubMed}`);
+            if (fetchRespPubMed.ok) {
+                const xmlText = await fetchRespPubMed.text();
+                const parser = new DOMParser();
+                const xmlDoc = parser.parseFromString(xmlText, "application/xml");
+                const articles = xmlDoc.getElementsByTagName('PubmedArticle');
 
-            // For the genes with no explicit result, we infer a neutral outcome from the context.
-            // For ZC2HC1A, the text is already explicit.
-            if (gene === 'ZNF474' || gene === 'WDR54' || gene === 'TMEM145') {
-                // We create a new sentence that explicitly states a neutral outcome for the gene in question.
-                // This allows the `interpretEvidence` function to correctly assign a "NEUTRAL" role.
-                textToInterpret += ` For ${gene}, cilia length and the number of ciliated cells remained unchanged.`;
+                for (const article of articles) {
+                    const pmid = article.querySelector('MedlineCitation > PMID')?.textContent;
+                    const artId = `pmid:${pmid}`;
+                    if (seenIds.has(artId)) continue;
+                    seenIds.add(artId);
+
+                    const title = article.querySelector('ArticleTitle')?.textContent || '';
+                    const abstractText = Array.from(article.querySelectorAll('Abstract > AbstractText')).map(el => el.textContent).join(' ');
+                    const combinedText = `${title}. ${abstractText}`;
+                    
+                    const relevantParagraphs = combinedText.split(/\n{2,}/).filter(p => paragraphSubjectGenes(p, allGenes).includes(gene));
+
+                    for (const p of relevantParagraphs) {
+                         if (LOCAL_ANALYSIS_KEYWORDS.some(kw => p.toLowerCase().includes(kw.toLowerCase()))) {
+                            const inferredRoles = interpretEvidence(gene, p);
+                            if (inferredRoles.length.length > 0 || inferredRoles.frequency.length > 0) {
+                                foundEvidence.push({
+                                    id: pmid,
+                                    source: 'PubMed',
+                                    context: p,
+                                    inferredRoles,
+                                    refLink: `https://pubmed.ncbi.nlm.nih.gov/${pmid}/`
+                                });
+                            }
+                        }
+                    }
+                }
             }
-            
-            const inferredRoles = interpretEvidence(gene, textToInterpret);
-            
-            // Only add this as evidence if the live search didn't find anything, to avoid duplicates.
-            if (foundEvidence.length === 0) {
-                 foundEvidence.push({
-                    id: 'integrated-text',
-                    source: 'PMC',
-                    context: mockText.replace(new RegExp(`\\b(${targetGenesForMock.join('|')})\\b`, 'ig'), (match) => {
-                        return match.toUpperCase() === gene.toUpperCase() ? `<mark>${match}</mark>` : match;
-                    }),
-                    inferredRoles,
-                    refLink: '#'
-                });
+        }
+
+        // --- 2. Search PMC for full-text ---
+        const kwClausePMC = API_QUERY_KEYWORDS.join(" OR ");
+        const queryPMC = `${gene} AND (${kwClausePMC})`;
+        const searchParamsPMC = new URLSearchParams({ db: 'pmc', term: queryPMC, retmode: 'json', retmax: '40' });
+        
+        console.log(`[DEBUG] PMC query for ${gene}: ${queryPMC}`);
+        await sleep(350); // Polite delay
+        const searchRespPMC = await fetch(`${ESEARCH_URL}?${searchParamsPMC}`);
+        if (!searchRespPMC.ok) throw new Error(`NCBI PMC ESearch failed: ${searchRespPMC.statusText}`);
+        const searchDataPMC = await searchRespPMC.json();
+        const pmcids = searchDataPMC.esearchresult?.idlist || [];
+        console.log(`[DEBUG] Found ${pmcids.length} PMC IDs for ${gene}`);
+
+        if (pmcids.length > 0) {
+            await sleep(350);
+            const fetchParamsPMC = new URLSearchParams({ db: 'pmc', id: pmcids.join(','), retmode: 'xml' });
+            const fetchRespPMC = await fetch(`${EFETCH_URL}?${fetchParamsPMC}`);
+            if (fetchRespPMC.ok) {
+                const xmlText = await fetchRespPMC.text();
+                const parser = new DOMParser();
+                const xmlDoc = parser.parseFromString(xmlText, "application/xml");
+                const articles = xmlDoc.getElementsByTagName('article');
+
+                for (const article of articles) {
+                    const pmcidNode = Array.from(article.querySelectorAll('article-id')).find(node => node.getAttribute('pub-id-type') === 'pmc');
+                    const pmcid = pmcidNode ? pmcidNode.textContent : null;
+                    if (!pmcid) continue;
+
+                    const artId = `pmcid:${pmcid}`;
+                    if (seenIds.has(artId)) continue;
+                    seenIds.add(artId);
+
+                    const paragraphs = Array.from(article.querySelectorAll('body p, body caption, body sec'))
+                        .map(el => el.textContent.trim())
+                        .filter(text => text && paragraphSubjectGenes(text, allGenes).includes(gene));
+
+                    for (const p of paragraphs) {
+                        if (LOCAL_ANALYSIS_KEYWORDS.some(kw => p.toLowerCase().includes(kw.toLowerCase()))) {
+                             const inferredRoles = interpretEvidence(gene, p);
+                             if (inferredRoles.length.length > 0 || inferredRoles.frequency.length > 0) {
+                                foundEvidence.push({
+                                    id: pmcid,
+                                    source: 'PMC',
+                                    context: p,
+                                    inferredRoles,
+                                    refLink: `https://www.ncbi.nlm.nih.gov/pmc/articles/PMC${pmcid}/`
+                                });
+                            }
+                        }
+                    }
+                }
             }
         }
 
     } catch (error) {
         console.error(`Failed to fetch literature for ${gene}:`, error);
-        const errorEl = resultCard ? resultCard.querySelector('.status-searching') : null;
+        const errorEl = resultCard.querySelector('.status-searching');
         if (errorEl) {
             errorEl.textContent = 'Literature Search Failed';
             errorEl.className = 'status-not-found';
         }
     }
     
-    console.log(`[DEBUG] Total evidence found for ${gene}: ${foundEvidence.length} items`);
-    return foundEvidence;
+    // Deduplicate evidence based on context
+    const uniqueContexts = new Set();
+    const uniqueEvidence = foundEvidence.filter(ev => {
+        const contextStart = ev.context.substring(0, 100);
+        if (uniqueContexts.has(contextStart)) {
+            return false;
+        }
+        uniqueContexts.add(contextStart);
+        return true;
+    });
+
+    console.log(`[DEBUG] Total unique evidence found for ${gene}: ${uniqueEvidence.length} items`);
+    return uniqueEvidence;
 }
 
 
@@ -547,32 +622,6 @@ function paragraphSubjectGenes(paragraph, allGenes) {
     return [];
 }
 
-function sentenceContextMatches(paragraph, gene, windowSentences = 2) {
-    const sentSplitRegex = /(?<=[.!?])\s+/;
-    const sents = paragraph.split(sentSplitRegex).filter(s => s.trim());
-    const matches = [];
-    const geneRegex = new RegExp(`\\b${gene}\\b`, 'i');
-    
-    for (let i = 0; i < sents.length; i++) {
-        if (geneRegex.test(sents[i])) {
-            const start = Math.max(0, i - windowSentences);
-            const end = Math.min(sents.length, i + windowSentences + 1);
-            const context = sents.slice(start, end).join(' ').trim();
-            matches.push(context);
-        }
-    }
-    return matches;
-}
-
-function hashCode(str) {
-    let hash = 0;
-    for (let i = 0; i < str.length; i++) {
-        const char = str.charCodeAt(i);
-        hash = ((hash << 5) - hash) + char;
-        hash |= 0; // Convert to 32bit integer
-    }
-    return hash;
-}
 
 function hasQuantitativeData(text) {
     return /\b(\d+(\.\d+)?\s?(µm|%|vs|±|twofold))\b/i.test(text);
@@ -581,12 +630,10 @@ function hasQuantitativeData(text) {
 // --- Advanced Gene Display Algorithm ---
 function interpretEvidence(gene, evidenceText) {
     const inferredRoles = { length: [], frequency: [] };
-    // We analyze the full text as a whole, then by sentences for better context.
     const sentences = evidenceText.split(/(?<=[.!?])\s+/);
 
     for (const sentence of sentences) {
         const context = sentence.toLowerCase();
-        // The sentence must contain the gene to be considered.
         if (!new RegExp(`\\b${gene.toLowerCase()}\\b`).test(context)) continue;
 
         const negation = /\b(no|not|did not|none|unchanged|unaltered|without)\b/i.test(context);
@@ -641,7 +688,7 @@ function generateFinalSummary(roles) {
         return `<span class="font-semibold text-blue-600">No effect / Neutral</span>`;
     }
     if (promotes > 0 && inhibits > 0) {
-        return `<span class="font-semibold text-yellow-700">Overexpression ➝ Promotes / Elongates;<br>Loss ➝ Inhibits / Causes Loss</span>`;
+        return `<span class="font-semibold text-yellow-700">Variable / Mixed Phenotype</span>`;
     }
     if (promotes > 0) return `<span class="font-semibold text-green-600">Promotes / Maintains</span>`;
     if (inhibits > 0) return `<span class="font-semibold text-red-600">Inhibits / Restricts</span>`;
@@ -751,54 +798,36 @@ async function runAnalysis(geneList) {
     analyzeBtn.disabled = true;
     analyzeBtn.textContent = 'Analyzing...';
 
-    // Fetch screen data once at the start
-    const screenData = await fetchScreenData();
-
-    // Create placeholder cards for each gene
-    geneList.forEach(gene => {
-        resultsContainer.insertAdjacentHTML('beforeend', createPlaceholderCard(gene, mode));
-    });
+    const screenData = (mode === 'hybrid' || mode === 'expert') ? await fetchScreenData() : {};
 
     for (const gene of geneList) {
+        resultsContainer.insertAdjacentHTML('beforeend', createPlaceholderCard(gene, mode));
         const resultCard = document.getElementById(`card-${gene}`);
-        let dbData = null;
-        let apiEvidence = [];
-        let screenEvidence = [];
+        let allEvidence = [];
 
         if (mode === 'expert' || mode === 'hybrid') {
-            dbData = CILI_AI_DB[gene] || null;
-            if (screenData && screenData[gene]) {
+            if (CILI_AI_DB[gene]) {
+                allEvidence.push(...CILI_AI_DB[gene].evidence.map(ev => ({...ev, inferredRoles: interpretEvidence(gene, ev.context) })));
+            }
+            if (screenData[gene]) {
                 const screenInfo = screenData[gene];
-                screenEvidence = [{
-                    id: `screen-${gene}`,
-                    source: 'screen_data',
-                    context: `Ciliary screen data for ${gene}: ${JSON.stringify(screenInfo, null, 2)}`,
-                    inferredRoles: { length: ['NEUTRAL'], frequency: ['NEUTRAL'] } // Default for screen data
-                }];
-                if (!dbData && screenInfo) {
-                    dbData = {
-                        summary: {
-                            lof_length: screenInfo.cilia_length || 'No specific data',
-                            percentage_ciliated: screenInfo.percent_ciliated || 'No specific data',
-                            source: 'Screen Data'
-                        },
-                        evidence: []
-                    };
-                }
+                const context = `Ciliary screen data indicates a length phenotype of "${screenInfo.cilia_length}" and a ciliation frequency phenotype of "${screenInfo.percent_ciliated}".`;
+                allEvidence.push({
+                    id: `Screen-${gene}`,
+                    source: 'Screen Data',
+                    context: context,
+                    inferredRoles: interpretEvidence(gene, context)
+                });
             }
         }
+        
         if (mode === 'nlp' || mode === 'hybrid') {
-            apiEvidence = await analyzeGeneViaAPI(gene, resultCard, geneList);
+            const apiEvidence = await analyzeGeneViaAPI(gene, resultCard, geneList);
+            allEvidence.push(...apiEvidence);
         }
         
-        // Combine all evidence
-        const allEvidence = [...(dbData?.evidence || []), ...apiEvidence, ...screenEvidence];
-        
-        // Render the final card with combined data
-        const finalHtml = createResultCard(gene, dbData, allEvidence, mode);
-        if (resultCard) {
-            resultCard.outerHTML = finalHtml;
-        }
+        const finalHtml = createResultCard(gene, allEvidence);
+        resultCard.outerHTML = finalHtml;
     }
 
     analyzeBtn.disabled = false;
@@ -812,83 +841,64 @@ function createPlaceholderCard(gene, mode) {
     return `<div class="result-card" id="card-${gene}"><h3>${gene} - <span class="status-searching">${statusText}</span></h3></div>`;
 }
 
-function createResultCard(gene, dbData, allEvidence, mode) {
-    let statusText = allEvidence.length > 0 ? 'Evidence Found' : 'No Data Found';
-    let statusClass = allEvidence.length > 0 ? 'status-found' : 'status-not-found';
+function createResultCard(gene, allEvidence) {
+    const uniqueContexts = new Set();
+    const uniqueEvidence = allEvidence.filter(ev => {
+        const contextStart = ev.context.substring(0, 150).trim();
+        if (uniqueContexts.has(contextStart)) return false;
+        uniqueContexts.add(contextStart);
+        return true;
+    });
+
+    let statusText = uniqueEvidence.length > 0 ? 'Evidence Found' : 'No Data Found';
+    let statusClass = uniqueEvidence.length > 0 ? 'status-found' : 'status-not-found';
     
-    // Aggregate inferred roles from API and screen evidence
-    const inferredRoles = { length: [], frequency: [] };
+    const allRoles = { length: [], frequency: [] };
     const references = new Set();
-    allEvidence.forEach(ev => {
+    
+    uniqueEvidence.forEach(ev => {
         if (ev.inferredRoles) {
-            inferredRoles.length.push(...ev.inferredRoles.length);
-            inferredRoles.frequency.push(...ev.inferredRoles.frequency);
+            allRoles.length.push(...ev.inferredRoles.length);
+            allRoles.frequency.push(...ev.inferredRoles.frequency);
         }
         if (ev.id && ev.source) {
-            let refLink = '#';
-            let displayId = ev.id;
-            if (ev.source === 'pmc' || ev.source === 'PMC') {
-                const numericId = String(ev.id).replace(/PMC/i, '');
-                displayId = `PMC${numericId}`;
-                refLink = ev.refLink || `https://www.ncbi.nlm.nih.gov/pmc/articles/PMC${numericId}/`;
-            } else if (ev.source === 'pubmed') {
-                refLink = ev.refLink || `https://pubmed.ncbi.nlm.nih.gov/${ev.id}/`;
-            } else if (ev.source === 'screen_data') {
-                refLink = '#';
-                displayId = `Screen-${ev.id}`;
-            }
-            references.add(`<a href="${refLink}" target="_blank" class="text-blue-600 hover:underline">${displayId}</a>`);
+            references.add(`<a href="${ev.refLink}" target="_blank">${ev.source}:${ev.id}</a>`);
         }
     });
 
-    // Use dbData if available, otherwise infer from API and screen evidence
-    let summaryHtml = '';
-    if (dbData && dbData.summary && mode !== 'nlp') { // Ensure DB data isn't used in literature-only mode
-        const lofClass = dbData.summary.lof_length.toLowerCase().replace(/[^a-z]/g, '-');
-        const percClass = dbData.summary.percentage_ciliated.toLowerCase().replace(/[^a-z]/g, '-');
-        summaryHtml = `
-            <div class="prediction-grid">
-                <div class="prediction-box ${lofClass}">
-                    <h4>Loss-of-Function (Cilia Length)</h4>
-                    <p>${dbData.summary.lof_length}</p>
-                </div>
-                <div class="prediction-box ${percClass}">
-                    <h4>Percentage Ciliated</h4>
-                    <p>${dbData.summary.percentage_ciliated}</p>
-                </div>
+    const lengthSummary = generateFinalSummary(allRoles.length);
+    const freqSummary = generateFinalSummary(allRoles.frequency);
+    const lofClass = lengthSummary.replace(/<[^>]+>/g, '').toLowerCase().replace(/[^a-z]/g, '-');
+    const percClass = freqSummary.replace(/<[^>]+>/g, '').toLowerCase().replace(/[^a-z]/g, '-');
+    
+    const summaryHtml = `
+        <div class="prediction-grid">
+            <div class="prediction-box ${lofClass}">
+                <h4>Loss-of-Function (Cilia Length)</h4>
+                <p>${lengthSummary}</p>
             </div>
-        `;
-    } else {
-        const lengthSummary = generateFinalSummary(inferredRoles.length);
-        const freqSummary = generateFinalSummary(inferredRoles.frequency);
-        const lofClass = lengthSummary.replace(/<[^>]+>/g, '').toLowerCase().replace(/[^a-z]/g, '-');
-        const percClass = freqSummary.replace(/<[^>]+>/g, '').toLowerCase().replace(/[^a-z]/g, '-');
-        summaryHtml = `
-            <div class="prediction-grid">
-                <div class="prediction-box ${lofClass}">
-                    <h4>Loss-of-Function (Cilia Length)</h4>
-                    <p>${lengthSummary}</p>
-                </div>
-                <div class="prediction-box ${percClass}">
-                    <h4>Percentage Ciliated</h4>
-                    <p>${freqSummary}</p>
-                </div>
+            <div class="prediction-box ${percClass}">
+                <h4>Percentage Ciliated</h4>
+                <p>${freqSummary}</p>
             </div>
-        `;
-    }
+        </div>
+    `;
 
     let evidenceHtml = '';
-    if (allEvidence.length > 0) {
+    if (uniqueEvidence.length > 0) {
         evidenceHtml = `
             <div class="evidence-section">
-                <button class="evidence-toggle" data-count="${allEvidence.length}">Show Evidence (${allEvidence.length}) ▾</button>
-                <div class="evidence-content">
-                    ${allEvidence.map(ev => `
+                <button class="evidence-toggle" data-count="${uniqueEvidence.length}">Show Evidence (${uniqueEvidence.length}) ▾</button>
+                <div class="evidence-content" style="display: none;">
+                    ${uniqueEvidence.map(ev => {
+                        const geneRegex = new RegExp(`\\b(${gene})\\b`, 'ig');
+                        const highlightedContext = ev.context.replace(geneRegex, `<mark>$1</mark>`);
+                        return `
                         <div class="evidence-snippet">
-                            ${ev.context.replace(/<mark>(\w+)<\/mark>/g, '<mark>$1</mark>')}
-                            <br><strong>Source: ${ev.source.toUpperCase()} (${ev.id})</strong>
-                        </div>
-                    `).join('')}
+                            ${highlightedContext}
+                            <br><strong><a href="${ev.refLink}" target="_blank">Source: ${ev.source.toUpperCase()} (${ev.id})</a></strong>
+                        </div>`
+                    }).join('')}
                 </div>
             </div>
         `;
@@ -897,13 +907,12 @@ function createResultCard(gene, dbData, allEvidence, mode) {
     const refHtml = references.size > 0 ? Array.from(references).join(', ') : 'N/A';
 
     return `
-        <div class="result-card">
+        <div class="result-card" id="card-${gene}">
             <h3>${gene} - <span class="${statusClass}">${statusText}</span></h3>
             ${summaryHtml}
             ${evidenceHtml}
-            <div class="references-section">
-                <h4>References</h4>
-                <p>${refHtml}</p>
+            <div class="references-section" style="margin-top: 1rem; font-size: 0.8rem;">
+                <strong>References:</strong> ${refHtml}
             </div>
         </div>
     `;
