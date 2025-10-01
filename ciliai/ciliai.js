@@ -1,4 +1,4 @@
-// ciliAI.js - Clean version with fixed syntax and global exposure
+// ciliAI.js - Clean version with fixed syntax and global exposure, updated with advanced text retrieval and gene display algorithms
 
 // Make functions globally available for router in globals.js
 window.displayCiliAIPage = function displayCiliAIPage() {
@@ -260,30 +260,34 @@ window.displayCiliAIPage = function displayCiliAIPage() {
                 background-color: #f8f9fa; 
                 border: 1px solid #dee2e6;
             }
-            .prediction-box.promotes { 
+            .prediction-box.promotes-maintains { 
                 background-color: #d4edda; 
                 border: 1px solid #c3e6cb; 
             }
-            .prediction-box.inhibits { 
+            .prediction-box.inhibits-restricts { 
                 background-color: #f8d7da; 
                 border: 1px solid #f5c6cb; 
             }
-            .prediction-box.no-effect { 
+            .prediction-box.no-clear-role { 
                 background-color: #e2e3e5; 
                 border: 1px solid #d6d8db; 
             }
-            .prediction-box.conflicting { 
+            .prediction-box.conflicting-data { 
                 background-color: #fff3cd; 
                 border: 1px solid #ffeeba; 
             }
-            .prediction-box h4 { 
-                margin: 0 0 0.5rem 0; 
-                color: #495057; 
+            .prediction-box.affects-morphology-variability { 
+                background-color: #d1c4e9; 
+                border: 1px solid #b39ddb; 
             }
             .prediction-box p { 
                 margin: 0; 
                 font-size: 1.2rem; 
                 font-weight: bold; 
+            }
+            .prediction-box h4 { 
+                margin: 0 0 0.5rem 0; 
+                color: #495057; 
             }
 
             .evidence-section {
@@ -340,21 +344,86 @@ const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 // Expert-curated internal database (mock)
 const CILI_AI_DB = {
     "HDAC6": {
-        "summary": { "lof_length": "Promotes / Maintains", "percentage_ciliated": "No effect", "source": "Expert DB" },
+        "summary": { "lof_length": "Promotes / Maintains", "percentage_ciliated": "No clear role", "source": "Expert DB" },
         "evidence": [
             { "id": "21873644", "source": "pubmed", "context": "...loss of HDAC6 results in hyperacetylation of tubulin and leads to the formation of longer, more stable primary cilia in renal epithelial cells." }
         ]
     },
     "IFT88": {
-        "summary": { "lof_length": "Inhibits / Restricts", "percentage_ciliated": "Reduced cilia numbers", "source": "Expert DB" },
+        "summary": { "lof_length": "Inhibits / Restricts", "percentage_ciliated": "Inhibits / Restricts", "source": "Expert DB" },
         "evidence": [
             { "id": "10882118", "source": "pubmed", "context": "Mutations in IFT88 (polaris) disrupt intraflagellar transport, leading to a failure in cilia assembly and resulting in severely shortened or absent cilia." }
         ]
     },
     "ARL13B": {
-        "summary": { "lof_length": "Inhibits / Restricts", "percentage_ciliated": "Reduced cilia numbers", "source": "Expert DB" },
+        "summary": { "lof_length": "Inhibits / Restricts", "percentage_ciliated": "Inhibits / Restricts", "source": "Expert DB" },
         "evidence": [
             { "id": "21940428", "source": "pubmed", "context": "The small GTPase ARL13B is critical for ciliary structure; its absence leads to stunted cilia with abnormal morphology and axonemal defects." }
+        ]
+    }
+};
+
+// --- NEW, UPGRADED INFERENCE ENGINE LEXICON ---
+const INFERENCE_LEXICON = {
+    MANIPULATION: {
+        LOSS: [
+            'depletion', 'deficient', 'loss of', 'knockout', 'ko', 'mutant', 
+            'silencing', 'abrogated', 'disruption', 'ablation', 'null', 
+            'knockdown', 'kd', 'impaired', 'mutation', 'defects', 'lacking',
+            'deleted', 'frameshift', 'nonsense', 'homozygous', 'truncating',
+            'generated mutants', 'CRISPR/Cas9', 'loss-of-function', 'LOF'
+        ],
+        GAIN: [
+            'overexpression', 'ectopic expression', 'transfection with wild-type', 
+            'rescued', 'restoring', 'treatment with', 'application of', 'expressing',
+            'gain-of-function', 'GOF', 'constitutively active', 'stabilized', 
+            'hyperactive', 'induced expression'
+        ]
+    },
+    PHENOTYPE: {
+        LENGTH_DECREASE: [
+            'shorter', 'shortened', 'decrease in length', 'reduced length', 
+            'reduction in length', 'decreased the length', 'diminished length',
+            'loss of axonemal length', 'stunted', 'hypoplastic cilia'
+        ],
+        LENGTH_INCREASE: [
+            'longer', 'elongated', 'increase in length', 'increased ciliary length', 
+            'elongation of', 'twofold increase in the average length', 
+            'hyperelongated', 'over-extended', 'significantly lengthened'
+        ],
+        LENGTH_NEUTRAL: [
+            'length remained unchanged', 'no difference in the primary ciliary length',
+            'length was not altered', 'length was similar', 
+            'did not significantly alter cilia length', 'unchanged ciliary length',
+            'not statistically different', 'comparable length'
+        ],
+        LENGTH_VARIABLE: [
+            'altered cilia length', 'abnormal morphology', 'variations in cilia size',
+            'diverse', 'broader length distribution', 'greater variation',
+            'heterogeneous length', 'mixed phenotype', 'inconsistent length changes'
+        ],
+        FREQ_DECREASE: [
+            'fewer', 'reduced number', 'decrease in number', 'loss of cilia',
+            'absence of primary cilia', 'ciliogenesis defect', 'impaired ciliogenesis',
+            'suppresses cilium formation', 'required for cilia formation', 
+            'lower rate of ciliated', 'failed to form', 
+            'deficit in de novo cilia formation', 'diminished', 
+            'abrogated ciliogenesis', 'failure of ciliogenesis', 
+            'prevented cilia assembly', 'ciliation was abolished',
+            'significant reduction in ciliation', 'markedly decreased frequency'
+        ],
+        FREQ_INCREASE: [
+            'increase in the percentage of ciliated', 
+            'increased the numbers of ciliated', 
+            'increase in the percent of ciliated', 
+            'multiciliogenesis', 'induced primary ciliogenesis',
+            'hyper-ciliation', 'enhanced ciliogenesis', 
+            'promoted cilium formation', 'stimulated ciliogenesis'
+        ],
+        FREQ_NEUTRAL: [
+            'did not affect ciliation levels', 'normal rate of ciliation',
+            'ciliation unaffected', 'no significant change in ciliation',
+            'comparable fraction of ciliated cells'
         ]
     }
 };
@@ -373,128 +442,146 @@ async function fetchScreenData() {
     }
 }
 
-// --- Live Literature Mining Engine (Client-Side) ---
-async function analyzeGeneViaAPI(gene, resultCard) {
+// --- Advanced Text Retrieval Engine ---
+async function analyzeGeneViaAPI(gene, resultCard, allGenes) {
     const ESEARCH_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi";
-    const ELINK_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/elink.fcgi";
     const EFETCH_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi";
     
     const API_QUERY_KEYWORDS = [
-        "cilia", "ciliary", "cilia length", "ciliogenesis", "ciliation", "loss of cilia",
-        "fewer cilia", "fluid flow", "mucociliary", "multiciliated", "intraflagellar transport", "ciliopathy"
+        "cilia", "ciliary", "cilia length", "ciliary length", "shorter cilia",
+        "longer cilia", "ciliogenesis", "ciliation", "loss of cilia", "fewer cilia",
+        "impaired ciliogenesis", "cilia assembly", "fluid flow", "mucociliary", "multiciliated"
     ];
     const LOCAL_ANALYSIS_KEYWORDS = new Set([
-        'cilia', 'ciliary', 'cilium', 'axoneme', 'basal body', 'transition zone', 'centriole', 'ciliogenesis',
-        'ciliation', 'intraflagellar transport', 'ift', 'cilia assembly', 'cilia disassembly', 'ciliary motility',
-        'shorter', 'shortened', 'longer', 'elongated', 'fewer', 'loss of', 'absent cilia', 'reduction', 'reduced',
-        'decrease', 'increased', 'increase', 'abnormal length', 'flow', 'fluid flow', 'cilia-generated',
-        'mechanosensor', 'ciliary signaling', 'bead displacement', 'mucociliary', 'multiciliated', 'kidney tubule',
-        'photoreceptor', 'acls', 'acrocallosal syndrome', 'alms', 'alström syndrome',
-        'autosomal dominant polycystic kidney disease', 'adpkd', 'autosomal recessive polycystic kidney disease', 'arpkd',
-        'bardet–biedl syndrome', 'bbs', 'joubert syndrome', 'jbts', 'kallmann syndrome',
-        'leber congenital amaurosis', 'lca', 'meckel–gruber syndrome', 'mks',
-        'nephronophthisis', 'nphp', 'orofaciodigital syndrome', 'ofd', 'polycystic kidney disease', 'pkd',
-        'senior-løken syndrome', 'slsn', 'short-rib thoracic dysplasia', 'srtd', 'ciliopathy'
+        "cilia", "ciliary", "cilium", "ciliogenesis", "ciliation", "axoneme", "basal body",
+        "cilia length", "shorter", "shortened", "longer", "fewer", "reduction", "reduced",
+        "decrease", "increased", "increase", "flow", "fluid flow", "mucociliary", "multiciliated",
+        "extracellular fluid", "bead", "beads", "displacement", "cilia-generated", "mucociliary clearance"
     ]);
 
     const geneRegex = new RegExp(`\\b${gene}\\b`, 'i');
     const sentSplitRegex = /(?<=[.!?])\s+/;
+    const paraSplitRegex = /\n{2,}/;
     let foundEvidence = [];
+    let seenIds = new Set();
 
     try {
-        // 1. Search PubMed for relevant articles
-        const kwClause = API_QUERY_KEYWORDS.map(k => `"${k}"[Title/Abstract]`).join(" OR ");
-        const query = `("${gene}"[Title/Abstract]) AND (${kwClause})`;
-        const searchParams = new URLSearchParams({ db: 'pubmed', term: query, retmode: 'json', retmax: '25' });
+        // 1. Search PubMed for abstracts
+        const kwClausePubMed = API_QUERY_KEYWORDS.map(k => `"${k}"[Title/Abstract]`).join(" OR ");
+        const queryPubMed = `("${gene}"[Title/Abstract]) AND (${kwClausePubMed})`;
+        const searchParamsPubMed = new URLSearchParams({ db: 'pubmed', term: queryPubMed, retmode: 'json', retmax: '40' });
         
-        const searchResp = await fetch(`${ESEARCH_URL}?${searchParams}`);
-        if (!searchResp.ok) throw new Error(`NCBI ESearch failed: ${searchResp.statusText}`);
-        const searchData = await searchResp.json();
-        const pmids = searchData.esearchresult?.idlist || [];
+        const searchRespPubMed = await fetch(`${ESEARCH_URL}?${searchParamsPubMed}`);
+        if (!searchRespPubMed.ok) throw new Error(`NCBI PubMed ESearch failed: ${searchRespPubMed.statusText}`);
+        const searchDataPubMed = await searchRespPubMed.json();
+        const pmids = searchDataPubMed.esearchresult?.idlist || [];
 
-        if (pmids.length === 0) {
-            return []; // No articles found
-        }
-
-        // 2. Map PMIDs to PMCIDs for full-text access
-        await sleep(350);
-        const linkParams = new URLSearchParams({
-            dbfrom: 'pubmed',
-            db: 'pmc',
-            id: pmids.join(','),
-            retmode: 'json'
-        });
-        const linkResp = await fetch(`${ELINK_URL}?${linkParams}`);
-        if (!linkResp.ok) throw new Error(`NCBI ELink failed: ${linkResp.statusText}`);
-        const linkData = await linkResp.json();
-        
-        const pmcIds = [];
-        const linkSets = linkData.linksets || [];
-        for (const linkSet of linkSets) {
-            const links = linkSet.linksetdbs?.find(set => set.dbto === 'pmc')?.links || [];
-            pmcIds.push(...links);
-        }
-
-        // 3. Fetch full-text articles from PMC or fall back to abstracts
-        let articles = [];
-        if (pmcIds.length > 0) {
+        if (pmids.length > 0) {
             await sleep(350);
-            const fetchParams = new URLSearchParams({ db: 'pmc', id: pmcIds.join(','), retmode: 'xml', rettype: 'full' });
-            const fetchResp = await fetch(`${EFETCH_URL}?${fetchParams}`);
-            if (fetchResp.ok) {
-                const xmlText = await fetchResp.text();
+            const fetchParamsPubMed = new URLSearchParams({ db: 'pubmed', id: pmids.join(','), retmode: 'xml', rettype: 'abstract' });
+            const fetchRespPubMed = await fetch(`${EFETCH_URL}?${fetchParamsPubMed}`);
+            if (fetchRespPubMed.ok) {
+                const xmlText = await fetchRespPubMed.text();
                 const parser = new DOMParser();
                 const xmlDoc = parser.parseFromString(xmlText, "application/xml");
-                articles = xmlDoc.getElementsByTagName('article');
-            }
-        }
+                const articles = xmlDoc.getElementsByTagName('PubmedArticle');
 
-        // Fallback to abstracts if no full-text articles are available
-        if (articles.length === 0) {
-            await sleep(350);
-            const fetchParams = new URLSearchParams({ db: 'pubmed', id: pmids.join(','), retmode: 'xml', rettype: 'abstract' });
-            const fetchResp = await fetch(`${EFETCH_URL}?${fetchParams}`);
-            if (fetchResp.ok) {
-                const xmlText = await fetchResp.text();
-                const parser = new DOMParser();
-                const xmlDoc = parser.parseFromString(xmlText, "application/xml");
-                articles = xmlDoc.getElementsByTagName('PubmedArticle');
-            }
-        }
+                for (const article of articles) {
+                    const pmid = article.querySelector('MedlineCitation > PMID')?.textContent;
+                    const artId = `pmid:${pmid}`;
+                    if (seenIds.has(artId)) continue;
+                    seenIds.add(artId);
 
-        // 4. Parse and analyze text
-        for (const article of articles) {
-            let pmid, textContent;
-            if (article.tagName === 'article') {
-                // PMC full-text
-                pmid = article.querySelector('article-id[pub-id-type="pmid"]')?.textContent || 
-                       article.querySelector('article-id[pub-id-type="pmcid"]')?.textContent;
-                const title = article.querySelector('article-title')?.textContent || '';
-                const body = article.querySelector('body') ? Array.from(article.querySelectorAll('body p, body sec, body para')).map(el => el.textContent).join(' ') : '';
-                textContent = `${title}. ${body}`;
-            } else {
-                // PubMed abstract
-                pmid = article.querySelector('MedlineCitation > PMID')?.textContent;
-                const title = article.querySelector('ArticleTitle')?.textContent || '';
-                const abstractNode = article.querySelector('Abstract');
-                let abstractText = '';
-                if (abstractNode) {
-                    abstractText = Array.from(abstractNode.getElementsByTagName('AbstractText')).map(el => el.textContent).join(' ');
+                    const title = article.querySelector('ArticleTitle')?.textContent || '';
+                    const abstractNode = article.querySelector('Abstract');
+                    let abstractText = '';
+                    if (abstractNode) {
+                        abstractText = Array.from(abstractNode.getElementsByTagName('AbstractText')).map(el => el.textContent).join(' ');
+                    }
+                    const combinedText = `${title}. ${abstractText}`;
+                    const paragraphs = paraSplitRegex.split(combinedText);
+
+                    for (const p of paragraphs) {
+                        const subjectGenes = paragraphSubjectGenes(p, allGenes);
+                        if (!subjectGenes.includes(gene)) continue;
+
+                        const sentContexts = sentenceContextMatches(p, gene);
+                        const contexts = sentContexts.length > 0 ? sentContexts : [p];
+
+                        for (const context of contexts) {
+                            if (LOCAL_ANALYSIS_KEYWORDS.some(kw => context.toLowerCase().includes(kw.toLowerCase()))) {
+                                const inferredRoles = interpretEvidence(gene, context);
+                                foundEvidence.push({
+                                    id: pmid || 'unknown',
+                                    source: 'pubmed',
+                                    context: context.replace(geneRegex, `<mark>${gene}</mark>`),
+                                    inferredRoles
+                                });
+                            }
+                        }
+                    }
                 }
-                textContent = `${title}. ${abstractText}`;
             }
+        }
 
-            if (!textContent || !geneRegex.test(textContent)) continue;
+        // 2. Search PMC for full-text
+        const kwClausePMC = API_QUERY_KEYWORDS.join(" OR ");
+        const queryPMC = `${gene} AND (${kwClausePMC})`;
+        const searchParamsPMC = new URLSearchParams({ db: 'pmc', term: queryPMC, retmode: 'json', retmax: '40' });
+        
+        await sleep(350);
+        const searchRespPMC = await fetch(`${ESEARCH_URL}?${searchParamsPMC}`);
+        if (!searchRespPMC.ok) throw new Error(`NCBI PMC ESearch failed: ${searchRespPMC.statusText}`);
+        const searchDataPMC = await searchRespPMC.json();
+        const pmcids = searchDataPMC.esearchresult?.idlist || [];
 
-            const sentences = textContent.split(sentSplitRegex).filter(s => s.trim());
-            for (const sent of sentences) {
-                const sentLower = sent.toLowerCase();
-                if (geneRegex.test(sentLower) && [...LOCAL_ANALYSIS_KEYWORDS].some(kw => sentLower.includes(kw.toLowerCase()))) {
-                    foundEvidence.push({
-                        id: pmid || 'unknown',
-                        source: 'pubmed',
-                        context: sent.trim().replace(geneRegex, `<mark>${gene}</mark>`)
-                    });
+        if (pmcids.length > 0) {
+            await sleep(350);
+            const fetchParamsPMC = new URLSearchParams({ db: 'pmc', id: pmcids.join(','), retmode: 'xml' });
+            const fetchRespPMC = await fetch(`${EFETCH_URL}?${fetchParamsPMC}`);
+            if (fetchRespPMC.ok) {
+                const xmlText = await fetchRespPMC.text();
+                const parser = new DOMParser();
+                const xmlDoc = parser.parseFromString(xmlText, "application/xml");
+                const articles = xmlDoc.getElementsByTagName('article');
+
+                for (const article of articles) {
+                    const pmcid = article.querySelector('article-id[pub-id-type="pmc"]')?.textContent || 
+                                  article.querySelector('article-id[pub-id-type="pmcid"]')?.textContent || 
+                                  `hash:${Math.abs(hashCode(article.querySelector('article-title')?.textContent || ''))}`;
+                    const artId = `pmcid:${pmcid}`;
+                    if (seenIds.has(artId)) continue;
+                    seenIds.add(artId);
+
+                    const title = article.querySelector('article-title')?.textContent || '';
+                    const paragraphs = [];
+                    const body = article.querySelector('body');
+                    if (body) {
+                        for (const p of body.querySelectorAll('p, caption, sec')) {
+                            const text = p.textContent.trim();
+                            if (text) paragraphs.push(text);
+                        }
+                    }
+
+                    for (const p of paragraphs) {
+                        const subjectGenes = paragraphSubjectGenes(p, allGenes);
+                        if (!subjectGenes.includes(gene)) continue;
+
+                        const sentContexts = sentenceContextMatches(p, gene);
+                        const contexts = sentContexts.length > 0 ? sentContexts : [p];
+
+                        for (const context of contexts) {
+                            if (LOCAL_ANALYSIS_KEYWORDS.some(kw => context.toLowerCase().includes(kw.toLowerCase()))) {
+                                const inferredRoles = interpretEvidence(gene, context);
+                                foundEvidence.push({
+                                    id: pmcid || 'unknown',
+                                    source: 'pmc',
+                                    context: context.replace(geneRegex, `<mark>${gene}</mark>`),
+                                    inferredRoles
+                                });
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -508,6 +595,107 @@ async function analyzeGeneViaAPI(gene, resultCard) {
     }
     
     return foundEvidence;
+}
+
+// --- Helper Functions for Text Retrieval ---
+function paragraphSubjectGenes(paragraph, allGenes) {
+    const mentioned = allGenes.filter(g => new RegExp(`\\b${g}\\b`, 'i').test(paragraph));
+    if (mentioned.length > 0) return mentioned;
+    if (new RegExp('\\b(these (single )?mutants|all mutants|all genes|each mutant)\\b', 'i').test(paragraph)) {
+        return allGenes;
+    }
+    return [];
+}
+
+function sentenceContextMatches(paragraph, gene, windowSentences = 2) {
+    const sentSplitRegex = /(?<=[.!?])\s+/;
+    const sents = paragraph.split(sentSplitRegex).filter(s => s.trim());
+    const matches = [];
+    const geneRegex = new RegExp(`\\b${gene}\\b`, 'i');
+    
+    for (let i = 0; i < sents.length; i++) {
+        if (geneRegex.test(sents[i])) {
+            const start = Math.max(0, i - windowSentences);
+            const end = Math.min(sents.length, i + windowSentences + 1);
+            const context = sents.slice(start, end).join(' ').trim();
+            matches.push(context);
+        }
+    }
+    return matches;
+}
+
+function hashCode(str) {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+        const char = str.charCodeAt(i);
+        hash = ((hash << 5) - hash) + char;
+        hash |= 0; // Convert to 32bit integer
+    }
+    return hash;
+}
+
+// --- Advanced Gene Display Algorithm ---
+function interpretEvidence(gene, evidenceText) {
+    const inferredRoles = { length: [], frequency: [] };
+    const clauses = evidenceText.split(/,?\s+(while|whereas|but)\s+/i);
+
+    for (const clause of clauses) {
+        const context = clause.toLowerCase();
+        if (!new RegExp(`\\b${gene.toLowerCase()}\\b`).test(context)) continue;
+
+        const negation = /\\b(no|not|did not|none|unchanged|unaltered|without)\\b/i.test(context);
+        const isLoss = INFERENCE_LEXICON.MANIPULATION.LOSS.some(kw => context.includes(kw.toLowerCase()));
+        const isGain = INFERENCE_LEXICON.MANIPULATION.GAIN.some(kw => context.includes(kw.toLowerCase()));
+
+        const pushRole = (phenotypeList, category, lossRole = 'PROMOTES', gainRole = 'INHIBITS') => {
+            for (const kw of phenotypeList) {
+                if (context.includes(kw.toLowerCase())) {
+                    if (negation) {
+                        inferredRoles[category].push('NEUTRAL');
+                    } else {
+                        if (isLoss) inferredRoles[category].push(lossRole);
+                        if (isGain) inferredRoles[category].push(gainRole);
+                    }
+                }
+            }
+        };
+
+        pushRole(INFERENCE_LEXICON.PHENOTYPE.LENGTH_DECREASE, 'length', 'PROMOTES', 'INHIBITS');
+        pushRole(INFERENCE_LEXICON.PHENOTYPE.LENGTH_INCREASE, 'length', 'INHIBITS', 'PROMOTES');
+        pushRole(INFERENCE_LEXICON.PHENOTYPE.LENGTH_NEUTRAL, 'length', 'NEUTRAL', 'NEUTRAL');
+        pushRole(INFERENCE_LEXICON.PHENOTYPE.LENGTH_VARIABLE, 'length', 'VARIABLE', 'VARIABLE');
+        pushRole(INFERENCE_LEXICON.PHENOTYPE.FREQ_DECREASE, 'frequency', 'PROMOTES', 'INHIBITS');
+        pushRole(INFERENCE_LEXICON.PHENOTYPE.FREQ_INCREASE, 'frequency', 'INHIBITS', 'PROMOTES');
+        pushRole(INFERENCE_LEXICON.PHENOTYPE.FREQ_NEUTRAL, 'frequency', 'NEUTRAL', 'NEUTRAL');
+    }
+
+    inferredRoles.length = [...new Set(inferredRoles.length)];
+    inferredRoles.frequency = [...new Set(inferredRoles.frequency)];
+    return inferredRoles;
+}
+
+function generateFinalSummary(roles) {
+    if (!roles.length) return 'No specific data';
+    const counts = roles.reduce((acc, val) => {
+        acc[val] = (acc[val] || 0) + 1;
+        return acc;
+    }, {});
+
+    const promotes = counts['PROMOTES'] || 0;
+    const inhibits = counts['INHIBITS'] || 0;
+    const neutral = counts['NEUTRAL'] || 0;
+    const variable = counts['VARIABLE'] || 0;
+
+    if (neutral > 0 && promotes === 0 && inhibits === 0 && variable === 0) {
+        return `No clear role (${neutral})`;
+    }
+    if (promotes > 0 && inhibits > 0) {
+        return `Conflicting Data`;
+    }
+    if (promotes > 0) return `Promotes / Maintains (${promotes})`;
+    if (inhibits > 0) return `Inhibits / Restricts (${inhibits})`;
+    if (variable > 0) return `Affects Morphology/Variability (${variable})`;
+    return 'Unclear';
 }
 
 // --- UI and Event Handling ---
@@ -627,20 +815,19 @@ async function runAnalysis(geneList) {
 
         if (mode === 'expert' || mode === 'hybrid') {
             dbData = CILI_AI_DB[gene] || null;
-            // Check screen data for this gene
             if (screenData && screenData[gene]) {
                 const screenInfo = screenData[gene];
                 screenEvidence = [{
                     id: `screen-${gene}`,
                     source: 'screen_data',
-                    context: `Ciliary screen data for ${gene}: ${JSON.stringify(screenInfo, null, 2)}`
+                    context: `Ciliary screen data for ${gene}: ${JSON.stringify(screenInfo, null, 2)}`,
+                    inferredRoles: { length: [], frequency: [] }
                 }];
-                // Optionally, use screen data to infer summary if no dbData
                 if (!dbData && screenInfo) {
                     dbData = {
                         summary: {
-                            lof_length: screenInfo.cilia_length || 'Unknown',
-                            percentage_ciliated: screenInfo.percent_ciliated || 'Unknown',
+                            lof_length: screenInfo.cilia_length || 'No specific data',
+                            percentage_ciliated: screenInfo.percent_ciliated || 'No specific data',
                             source: 'Screen Data'
                         },
                         evidence: []
@@ -649,7 +836,7 @@ async function runAnalysis(geneList) {
             }
         }
         if (mode === 'nlp' || mode === 'hybrid') {
-            apiEvidence = await analyzeGeneViaAPI(gene, resultCard);
+            apiEvidence = await analyzeGeneViaAPI(gene, resultCard, geneList);
         }
         
         // Combine all evidence
@@ -677,24 +864,49 @@ function createResultCard(gene, dbData, allEvidence, mode) {
     let statusText = allEvidence.length > 0 ? 'Evidence Found' : 'No Data Found';
     let statusClass = allEvidence.length > 0 ? 'status-found' : 'status-not-found';
     
+    // Aggregate inferred roles from API evidence
+    const inferredRoles = { length: [], frequency: [] };
+    allEvidence.forEach(ev => {
+        if (ev.inferredRoles) {
+            inferredRoles.length.push(...ev.inferredRoles.length);
+            inferredRoles.frequency.push(...ev.inferredRoles.frequency);
+        }
+    });
+
+    // Use dbData if available, otherwise infer from API evidence
     let summaryHtml = '';
     if (dbData && dbData.summary) {
         const lofClass = dbData.summary.lof_length.toLowerCase().replace(/[^a-z]/g, '-');
         const percClass = dbData.summary.percentage_ciliated.toLowerCase().replace(/[^a-z]/g, '-');
         summaryHtml = `
             <div class="prediction-grid">
-                <div class="prediction-box ${lofClass || 'no-effect'}">
+                <div class="prediction-box ${lofClass}">
                     <h4>Loss-of-Function (Cilia Length)</h4>
                     <p>${dbData.summary.lof_length}</p>
                 </div>
-                <div class="prediction-box ${percClass || 'no-effect'}">
+                <div class="prediction-box ${percClass}">
                     <h4>Percentage Ciliated</h4>
                     <p>${dbData.summary.percentage_ciliated}</p>
                 </div>
             </div>
         `;
     } else {
-        summaryHtml = '<p>No summary prediction available. Review literature and screen evidence for insights.</p>';
+        const lengthSummary = generateFinalSummary(inferredRoles.length);
+        const freqSummary = generateFinalSummary(inferredRoles.frequency);
+        const lofClass = lengthSummary.toLowerCase().replace(/[^a-z]/g, '-');
+        const percClass = freqSummary.toLowerCase().replace(/[^a-z]/g, '-');
+        summaryHtml = `
+            <div class="prediction-grid">
+                <div class="prediction-box ${lofClass}">
+                    <h4>Loss-of-Function (Cilia Length)</h4>
+                    <p>${lengthSummary}</p>
+                </div>
+                <div class="prediction-box ${percClass}">
+                    <h4>Percentage Ciliated</h4>
+                    <p>${freqSummary}</p>
+                </div>
+            </div>
+        `;
     }
 
     let evidenceHtml = '';
