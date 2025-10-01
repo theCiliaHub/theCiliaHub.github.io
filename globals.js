@@ -68,27 +68,27 @@ async function handleRouteChange() {
     // Show the correct page safely
     switch (path) {
         case '/':
-            safeCall(displayHomePage);
-            safeCall(displayLocalizationChart);
+            safeCall(window.displayHomePage);
+            safeCall(window.displayLocalizationChart);
             break;
         case '/batch-query':
-            safeCall(displayBatchQueryTool);
+            safeCall(window.displayBatchQueryTool);
             break;
         case '/ciliaplot':
         case '/analysis':
-            safeCall(displayCiliaPlotPage);
+            safeCall(window.displayCiliaPlotPage);
             break;
         case '/ciliai':
-            safeCall(displayCiliAIPage);
+            safeCall(window.displayCiliAIPage);
             break;
         case '/expression':
-            safeCall(displayExpressionPage);
+            safeCall(window.displayExpressionPage);
             break;
         case '/download':
-            safeCall(displayDownloadPage);
+            safeCall(window.displayDownloadPage);
             break;
         case '/contact':
-            safeCall(displayContactPage);
+            safeCall(window.displayContactPage);
             break;
         default:
             // Handle potential gene pages
@@ -103,9 +103,9 @@ async function handleRouteChange() {
             }
 
             if (geneToDisplay) {
-                safeCall(displayIndividualGenePage, geneToDisplay);
+                safeCall(window.displayIndividualGenePage, geneToDisplay);
             } else {
-                safeCall(displayNotFoundPage);
+                safeCall(window.displayNotFoundPage);
             }
             break;
     }
