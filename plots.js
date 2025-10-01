@@ -1,11 +1,20 @@
-// Global variables for plots.js (if not already declared globally in script.js)
-// Only declare these if they're not available from script.js
+// Global variables for plots.js
+// Make sure these reference the same objects as script.js
 let ciliaryGeneMap = window.ciliaryGeneMap || new Map();
 let screenDatabase = window.screenDatabase || {};
 
+// Reference expression data from script.js global scope
+// These should be declared globally in script.js
+if (typeof expressionData === 'undefined') {
+    window.expressionData = {};
+}
+if (typeof availableGenes === 'undefined') {
+    window.availableGenes = new Set();
+}
+
 /**
  * Load ciliary genes and screen data for plots
- * Note: Expression data loading (loadExpressionData, parseTSV, processExpressionData) 
+ * Note: Expression data loading (loadExpressionData, parseTSV, processExpressionData)
  * is already handled in script.js
  */
 async function loadAllData() {
@@ -15,22 +24,24 @@ async function loadAllData() {
             fetch('ciliahub_data.json'),
             fetch('cilia_screens_data.json')
         ]);
-        
+       
         // Load ciliary genes
         const ciliaryGeneArray = await ciliaryGenesResponse.json();
         ciliaryGeneMap = new Map(ciliaryGeneArray.map(gene => [gene.gene.toUpperCase(), gene]));
-        console.log(`Successfully loaded ${ciliaryGeneMap.size} ciliary genes.`);
-        
+        window.ciliaryGeneMap = ciliaryGeneMap;
+        console.log(`[plots.js] Successfully loaded ${ciliaryGeneMap.size} ciliary genes.`);
+       
         // Load screen data
         screenDatabase = await screenDataResponse.json();
-        console.log(`Successfully loaded screen data for ${Object.keys(screenDatabase).length} genes.`);
-        
-        // Make available globally if needed
-        window.ciliaryGeneMap = ciliaryGeneMap;
         window.screenDatabase = screenDatabase;
-        
+        console.log(`[plots.js] Successfully loaded screen data for ${Object.keys(screenDatabase).length} genes.`);
+       
+        // Check if expression data is loaded from script.js
+        console.log(`[plots.js] Expression data available: ${Object.keys(window.expressionData || {}).length} genes`);
+        console.log(`[plots.js] Available genes set size: ${(window.availableGenes || new Set()).size}`);
+       
     } catch (error) {
-        console.error("Failed to load a required data file:", error);
+        console.error("[plots.js] Failed to load a required data file:", error);
         showDataLoadError(error);
     }
 }
@@ -44,31 +55,31 @@ async function loadAllData() {
 function findAndMergeGenes(userInputArray) {
     const foundGenes = [];
     const seenGenes = new Set();
-    
+   
     userInputArray.forEach(query => {
         const geneSymbol = query.toUpperCase().trim();
         if (!geneSymbol || seenGenes.has(geneSymbol)) return;
-        
+       
         // 1. Look up the gene in the main ciliary gene database
         if (ciliaryGeneMap.has(geneSymbol)) {
             // Start with the base data from your curated list
             let geneData = { ...ciliaryGeneMap.get(geneSymbol) };
-            
+           
             // 2. Augment it with data from the screen database
             if (screenDatabase[geneSymbol]) {
                 geneData.screens_summary = screenDatabase[geneSymbol];
             }
-            
+           
             // 3. Add expression data if available (from script.js)
             if (typeof expressionData !== 'undefined' && expressionData[geneSymbol]) {
                 geneData.expression = expressionData[geneSymbol];
             }
-            
+           
             foundGenes.push(geneData);
             seenGenes.add(geneSymbol);
         }
     });
-    
+   
     return { foundGenes };
 }
 
@@ -77,9 +88,9 @@ function findAndMergeGenes(userInputArray) {
  * @param {Error} error - The error object
  */
 function showDataLoadError(error) {
-    const errorContainer = document.getElementById('error-message') || 
+    const errorContainer = document.getElementById('error-message') ||
                           document.querySelector('.content-area');
-    
+   
     if (errorContainer) {
         const errorHTML = `
             <div style="background: #fee; border: 1px solid #c33; color: #c33; padding: 1rem; border-radius: 8px; margin: 1rem 0;">
@@ -88,7 +99,7 @@ function showDataLoadError(error) {
                 <p style="font-size: 0.9em; margin-top: 0.5rem;">Error details: ${error.message}</p>
             </div>
         `;
-        
+       
         if (errorContainer.id === 'error-message') {
             errorContainer.innerHTML = errorHTML;
             errorContainer.style.display = 'block';
@@ -104,9 +115,9 @@ function showDataLoadError(error) {
  * @returns {boolean} True if expression data is available
  */
 function isExpressionDataReady() {
-    return typeof expressionData !== 'undefined' && 
-           typeof availableGenes !== 'undefined' && 
-           Object.keys(expressionData).length > 0 && 
+    return typeof expressionData !== 'undefined' &&
+           typeof availableGenes !== 'undefined' &&
+           Object.keys(expressionData).length > 0 &&
            availableGenes.size > 0;
 }
 
@@ -131,6 +142,9 @@ if (typeof window !== 'undefined') {
         loadAllData();
     }
 }
+
+
+
 function displayCiliaPlotPage() {
     const contentArea = document.querySelector('.content-area');
     contentArea.className = 'content-area content-area-full';
