@@ -1,6 +1,7 @@
 // --- Global variables to hold your data ---
 let ciliaryGeneMap = new Map();
 let screenDatabase = {};
+window.displayLocalizationChart = displayLocalizationChart;
 
 /**
  * This function should be called when your application starts.
