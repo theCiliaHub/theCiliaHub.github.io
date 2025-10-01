@@ -1,4 +1,4 @@
-// ciliAI.js - Clean version with fixed syntax and global exposure, updated with advanced text retrieval and gene display algorithms
+// ciliAI.js - Updated with advanced text retrieval and gene display algorithms from literature_miner_engine.py
 
 // Make functions globally available for router in globals.js
 window.displayCiliAIPage = function displayCiliAIPage() {
@@ -362,19 +362,19 @@ const CILI_AI_DB = {
     "HDAC6": {
         "summary": { "lof_length": "Promotes / Maintains", "percentage_ciliated": "No clear role", "source": "Expert DB" },
         "evidence": [
-            { "id": "21873644", "source": "pubmed", "context": "...loss of HDAC6 results in hyperacetylation of tubulin and leads to the formation of longer, more stable primary cilia in renal epithelial cells." }
+            { "id": "21873644", "source": "pubmed", "context": "...loss of HDAC6 results in hyperacetylation of tubulin and leads to the formation of longer, more stable primary cilia in renal epithelial cells.", "refLink": "https://pubmed.ncbi.nlm.nih.gov/21873644/" }
         ]
     },
     "IFT88": {
         "summary": { "lof_length": "Inhibits / Restricts", "percentage_ciliated": "Inhibits / Restricts", "source": "Expert DB" },
         "evidence": [
-            { "id": "10882118", "source": "pubmed", "context": "Mutations in IFT88 (polaris) disrupt intraflagellar transport, leading to a failure in cilia assembly and resulting in severely shortened or absent cilia." }
+            { "id": "10882118", "source": "pubmed", "context": "Mutations in IFT88 (polaris) disrupt intraflagellar transport, leading to a failure in cilia assembly and resulting in severely shortened or absent cilia.", "refLink": "https://pubmed.ncbi.nlm.nih.gov/10882118/" }
         ]
     },
     "ARL13B": {
         "summary": { "lof_length": "Inhibits / Restricts", "percentage_ciliated": "Inhibits / Restricts", "source": "Expert DB" },
         "evidence": [
-            { "id": "21940428", "source": "pubmed", "context": "The small GTPase ARL13B is critical for ciliary structure; its absence leads to stunted cilia with abnormal morphology and axonemal defects." }
+            { "id": "21940428", "source": "pubmed", "context": "The small GTPase ARL13B is critical for ciliary structure; its absence leads to stunted cilia with abnormal morphology and axonemal defects.", "refLink": "https://pubmed.ncbi.nlm.nih.gov/21940428/" }
         ]
     }
 };
@@ -387,7 +387,7 @@ const INFERENCE_LEXICON = {
             'silencing', 'abrogated', 'disruption', 'ablation', 'null', 
             'knockdown', 'kd', 'impaired', 'mutation', 'defects', 'lacking',
             'deleted', 'frameshift', 'nonsense', 'homozygous', 'truncating',
-            'generated mutants', 'CRISPR/Cas9', 'loss-of-function', 'LOF'
+            'generated mutants', 'CRISPR/Cas9', 'loss-of-function', 'LOF', 'shRNAs targeting'
         ],
         GAIN: [
             'overexpression', 'ectopic expression', 'transfection with wild-type', 
@@ -411,7 +411,7 @@ const INFERENCE_LEXICON = {
             'length remained unchanged', 'no difference in the primary ciliary length',
             'length was not altered', 'length was similar', 
             'did not significantly alter cilia length', 'unchanged ciliary length',
-            'not statistically different', 'comparable length'
+            'not statistically different', 'comparable length', 'cilia length remained unchanged'
         ],
         LENGTH_VARIABLE: [
             'altered cilia length', 'abnormal morphology', 'variations in cilia size',
@@ -426,7 +426,8 @@ const INFERENCE_LEXICON = {
             'deficit in de novo cilia formation', 'diminished', 
             'abrogated ciliogenesis', 'failure of ciliogenesis', 
             'prevented cilia assembly', 'ciliation was abolished',
-            'significant reduction in ciliation', 'markedly decreased frequency'
+            'significant reduction in ciliation', 'markedly decreased frequency',
+            'number of ciliated cells decreased'
         ],
         FREQ_INCREASE: [
             'increase in the percentage of ciliated', 
@@ -521,10 +522,21 @@ async function analyzeGeneViaAPI(gene, resultCard, allGenes) {
                         const subjectGenes = paragraphSubjectGenes(p, allGenes);
                         if (!subjectGenes.includes(gene)) continue;
 
-                        const sentContexts = sentenceContextMatches(p, gene);
-                        const contexts = sentContexts.length > 0 ? sentContexts : [p];
+                        // Process entire paragraph as evidence if it contains keywords
+                        if (LOCAL_ANALYSIS_KEYWORDS.some(kw => p.toLowerCase().includes(kw.toLowerCase()))) {
+                            const inferredRoles = interpretEvidence(gene, p);
+                            foundEvidence.push({
+                                id: pmid || 'unknown',
+                                source: 'pubmed',
+                                context: p.replace(geneRegex, `<mark>${gene}</mark>`),
+                                inferredRoles,
+                                refLink: `https://pubmed.ncbi.nlm.nih.gov/${pmid}/`
+                            });
+                        }
 
-                        for (const context of contexts) {
+                        // Also process sentence-level contexts for more granularity
+                        const sentContexts = sentenceContextMatches(p, gene);
+                        for (const context of sentContexts) {
                             if (LOCAL_ANALYSIS_KEYWORDS.some(kw => context.toLowerCase().includes(kw.toLowerCase()))) {
                                 const inferredRoles = interpretEvidence(gene, context);
                                 foundEvidence.push({
@@ -584,10 +596,21 @@ async function analyzeGeneViaAPI(gene, resultCard, allGenes) {
                         const subjectGenes = paragraphSubjectGenes(p, allGenes);
                         if (!subjectGenes.includes(gene)) continue;
 
-                        const sentContexts = sentenceContextMatches(p, gene);
-                        const contexts = sentContexts.length > 0 ? sentContexts : [p];
+                        // Process entire paragraph as evidence if it contains keywords
+                        if (LOCAL_ANALYSIS_KEYWORDS.some(kw => p.toLowerCase().includes(kw.toLowerCase()))) {
+                            const inferredRoles = interpretEvidence(gene, p);
+                            foundEvidence.push({
+                                id: pmcid || 'unknown',
+                                source: 'pmc',
+                                context: p.replace(geneRegex, `<mark>${gene}</mark>`),
+                                inferredRoles,
+                                refLink: `https://www.ncbi.nlm.nih.gov/pmc/articles/PMC${pmcid}/`
+                            });
+                        }
 
-                        for (const context of contexts) {
+                        // Also process sentence-level contexts for more granularity
+                        const sentContexts = sentenceContextMatches(p, gene);
+                        for (const context of sentContexts) {
                             if (LOCAL_ANALYSIS_KEYWORDS.some(kw => context.toLowerCase().includes(kw.toLowerCase()))) {
                                 const inferredRoles = interpretEvidence(gene, context);
                                 foundEvidence.push({
@@ -619,7 +642,7 @@ async function analyzeGeneViaAPI(gene, resultCard, allGenes) {
 function paragraphSubjectGenes(paragraph, allGenes) {
     const mentioned = allGenes.filter(g => new RegExp(`\\b${g}\\b`, 'i').test(paragraph));
     if (mentioned.length > 0) return mentioned;
-    if (new RegExp('\\b(these (single )?mutants|all mutants|all genes|each mutant)\\b', 'i').test(paragraph)) {
+    if (new RegExp('\\b(these (single )?mutants|all mutants|all genes|each mutant|compared to control)\\b', 'i').test(paragraph)) {
         return allGenes;
     }
     return [];
@@ -663,8 +686,9 @@ function interpretEvidence(gene, evidenceText) {
 
     for (const clause of clauses) {
         const context = clause.toLowerCase();
-        if (!new RegExp(`\\b${gene.toLowerCase()}\\b`).test(context)) continue;
+        if (!new RegExp(`\\b${gene.toLowerCase()}\\b`).test(context) && !/compared to control/i.test(context)) continue;
 
+        const negation = /\\b(no|not|did not|none|unchanged|unaltered|without)\b/i.test(context);
         const isLoss = INFERENCE_LEXICON.MANIPULATION.LOSS.some(kw => context.includes(kw.toLowerCase()));
         const isGain = INFERENCE_LEXICON.MANIPULATION.GAIN.some(kw => context.includes(kw.toLowerCase()));
         const weight = hasQuantitativeData(context) ? 3 : 1;
@@ -673,8 +697,12 @@ function interpretEvidence(gene, evidenceText) {
             for (const kw of phenotypeList) {
                 if (context.includes(kw.toLowerCase())) {
                     for (let i = 0; i < weight; i++) {
-                        if (isLoss) inferredRoles[category].push(lossRole);
-                        if (isGain) inferredRoles[category].push(gainRole);
+                        if (negation) {
+                            inferredRoles[category].push('NEUTRAL');
+                        } else {
+                            if (isLoss) inferredRoles[category].push(lossRole);
+                            if (isGain) inferredRoles[category].push(gainRole);
+                        }
                     }
                 }
             }
