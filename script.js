@@ -1,4 +1,3 @@
-
 // ✨ THE NEW PLUGIN CODE RIGHT HERE for PLOT ✨
 Chart.register({
   id: 'customCanvasBackgroundColor',
@@ -20,9 +19,9 @@ function sanitize(input) {
     if (typeof input !== 'string') return '';
     // Removes zero-width spaces, non-printable characters, trims, and normalizes case
     return input.replace(/[\u200B-\u200D\u2060\uFEFF]/g, '')
-                .replace(/[^\x20-\x7E]/g, '') // Remove non-printable ASCII
-                .trim()
-                .toUpperCase();
+               .replace(/[^\x20-\x7E]/g, '') // Remove non-printable ASCII
+               .trim()
+               .toUpperCase();
 }
 
 /**
@@ -62,13 +61,13 @@ async function loadAndPrepareDatabase() {
             }
 
             // 3. Index by all Ensembl IDs (handles comma or semicolon separators)
-          // This part of your code already handles Ensembl IDs
+        // This part of your code already handles Ensembl IDs
 if (g.ensembl_id) {
     String(g.ensembl_id).split(/[,;]/).forEach(id => {
         const key = sanitize(id);
         if (key) geneMapCache.set(key, g);
     });
-} 
+}
             
             // 4. Prepare localization data for SVG mapping - MODIFIED: Sanitize input to filter non-ciliary terms and add debug logging for ACTN2
             if (g.localization) {
@@ -672,11 +671,11 @@ function mapLocalizationToSVG(localizationArray) {
         "mitochondrion": ["cell-body"],
         "endoplasmic reticulum": ["cell-body"],
         "golgi apparatus": ["cell-body"],
-        "lysosome": ["cell-body"],             // ✨ NEW
-        "microbody": ["cell-body"],             // ✨ NEW
-        "peroxisome": ["cell-body"],            // ✨ NEW
-        "microtubules": ["cell-body"],          // ✨ NEW
-        "autophagosomes": ["cell-body"]         // ✨ NEW
+        "lysosome": ["cell-body"],              // ✨ NEW
+        "microbody": ["cell-body"],              // ✨ NEW
+        "peroxisome": ["cell-body"],             // ✨ NEW
+        "microtubules": ["cell-body"],           // ✨ NEW
+        "autophagosomes": ["cell-body"]          // ✨ NEW
     };
     if (!Array.isArray(localizationArray)) return [];
 
@@ -756,312 +755,6 @@ function exportSearchResults() {
     a.click();
     URL.revokeObjectURL(url);
 }
-
-function displayComparePage() {
-    const contentArea = document.querySelector('.content-area');
-    contentArea.className = 'content-area content-area-full';
-    document.querySelector('.cilia-panel').style.display = 'none';
-    contentArea.innerHTML = `
-        <div class="page-section">
-            <h2>Gene Comparison Tool ⚖️</h2>
-            <p>Search for and select up to 10 genes to generate a side-by-side comparison of their properties, functions, and localizations.</p>
-           
-            <div class="comparison-tool">
-                <div class="gene-selector">
-                    <div class="search-wrapper">
-                        <input type="text" id="compare-gene-search" placeholder="Search by Gene, Synonym, or Ensembl ID" autocomplete="off">
-                        <div id="compare-search-suggestions"></div>
-                    </div>
-                    <div id="selected-genes-tags" class="gene-tags-container"></div>
-                    <div id="gene-limit-message" class="error-message" style="display: none; margin-top: 0.5rem;">Maximum 10 genes can be compared.</div>
-                </div>
-               
-                <div id="comparison-output" style="display:none; margin-top: 2rem;">
-                    <div class="comparison-controls">
-                        <div class="tabs">
-                            <button class="tab-link active" data-tab="table-view">Table View</button>
-                            <button class="tab-link" data-tab="visual-analysis">Visual Analysis</button>
-                            <button class="tab-link" data-tab="functional-comparison">Functional Comparison</button>
-                        </div>
-                        <button id="clear-comparison-btn" class="btn btn-secondary">Clear All</button>
-                    </div>
-
-                    <div id="table-view" class="tab-content active">
-                        <div id="comparison-table-wrapper"></div>
-                    </div>
-                    <div id="visual-analysis" class="tab-content">
-                        <div class="chart-container" style="position: relative; height:400px; width:100%;">
-                            <canvas id="localization-chart"></canvas>
-                        </div>
-                    </div>
-                    <div id="functional-comparison" class="tab-content">
-                        <div id="functional-cards-grid" class="functional-comparison-grid"></div>
-                    </div>
-                </div>
-                <div id="comparison-placeholder" class="status-message">
-                    <p>Add genes to begin comparison.</p>
-                </div>
-            </div>
-        </div>`;
-   
-    let selectedCompareGenes = [];
-    const MAX_GENES = 10;
-    const searchInput = document.getElementById('compare-gene-search');
-    const suggestionsContainer = document.getElementById('compare-search-suggestions');
-    const tagsContainer = document.getElementById('selected-genes-tags');
-    const outputContainer = document.getElementById('comparison-output');
-    const placeholder = document.getElementById('comparison-placeholder');
-    const limitMessage = document.getElementById('gene-limit-message');
-    const clearButton = document.getElementById('clear-comparison-btn');
-
-    searchInput.addEventListener('input', handleSearchInput);
-    clearButton.addEventListener('click', clearComparison);
-    document.addEventListener('click', (e) => {
-        if (!searchInput.contains(e.target)) {
-            suggestionsContainer.style.display = 'none';
-        }
-    });
-
-    // ✨ THIS FUNCTION IS NOW UPDATED ✨
-    function handleSearchInput() {
-        const query = searchInput.value.trim().toUpperCase();
-        if (query.length < 1) {
-            suggestionsContainer.style.display = 'none';
-            return;
-        }
-
-        const filteredGenes = allGenes.filter(g => {
-            // Do not suggest genes that are already selected
-            if (selectedCompareGenes.some(sg => sg.gene === g.gene)) {
-                return false;
-            }
-            // Check for a match in the gene name, synonyms, or Ensembl ID
-            const geneMatch = g.gene && g.gene.toUpperCase().startsWith(query);
-            const synonymMatch = g.synonym && g.synonym.toUpperCase().includes(query);
-            const ensemblMatch = g.ensembl_id && g.ensembl_id.toUpperCase().startsWith(query);
-            return geneMatch || synonymMatch || ensemblMatch;
-        }).slice(0, 10);
-       
-        if (filteredGenes.length > 0) {
-            // Update suggestion display to be more informative
-            suggestionsContainer.innerHTML = filteredGenes.map(g => {
-                const details = [g.ensembl_id, g.synonym].filter(Boolean).join(', ');
-                return `<div data-gene="${g.gene}">${g.gene}${details ? ` (${details})` : ''}</div>`;
-            }).join('');
-
-            suggestionsContainer.style.display = 'block';
-            suggestionsContainer.querySelectorAll('div').forEach(item => {
-                item.addEventListener('click', () => addGeneToComparison(item.dataset.gene));
-            });
-        } else {
-            suggestionsContainer.style.display = 'none';
-        }
-    }
-
-    function addGeneToComparison(geneName) {
-        if (selectedCompareGenes.length >= MAX_GENES) {
-            limitMessage.style.display = 'block';
-            setTimeout(() => { limitMessage.style.display = 'none'; }, 3000);
-            return;
-        }
-        const geneToAdd = allGenes.find(g => g.gene === geneName);
-        if (geneToAdd && !selectedCompareGenes.some(sg => sg.gene === geneName)) {
-            selectedCompareGenes.push(geneToAdd);
-            searchInput.value = '';
-            suggestionsContainer.style.display = 'none';
-            renderComparison();
-        }
-    }
-
-    function removeGeneFromComparison(geneName) {
-        selectedCompareGenes = selectedCompareGenes.filter(g => g.gene !== geneName);
-        renderComparison();
-    }
-
-    function clearComparison() {
-        selectedCompareGenes = [];
-        renderComparison();
-    }
-
-    function renderComparison() {
-        renderTags();
-        if (selectedCompareGenes.length > 0) {
-            outputContainer.style.display = 'block';
-            placeholder.style.display = 'none';
-            renderComparisonTable();
-            renderFunctionalSummaries();
-            renderLocalizationChart();
-            setupTabSwitching();
-        } else {
-            outputContainer.style.display = 'none';
-            placeholder.style.display = 'block';
-        }
-    }
-
-    function renderTags() {
-        tagsContainer.innerHTML = selectedCompareGenes.map(g => `
-            <div class="gene-tag">
-                ${g.gene}
-                <span class="remove-tag" data-gene="${g.gene}" title="Remove ${g.gene}">&times;</span>
-            </div>`).join('');
-        tagsContainer.querySelectorAll('.remove-tag').forEach(tag => {
-            tag.addEventListener('click', (e) => removeGeneFromComparison(e.target.dataset.gene));
-        });
-    }
-   
-   /**
- * Renders the comparison table safely with multiple Ensembl IDs handled properly.
- */
-function renderComparisonTable() {
-    const container = document.getElementById('comparison-table-wrapper');
-    if (!container) return console.warn("⚠️ comparison-table-wrapper not found.");
-
-    if (!Array.isArray(selectedCompareGenes) || selectedCompareGenes.length === 0) {
-        container.innerHTML = "<p>No genes selected for comparison.</p>";
-        return;
-    }
-
-    const features = ['Description', 'Ensembl ID', 'OMIM ID', 'Synonym', 'Localization', 'Functional Summary', 'Reference'];
-    let tableHTML = '<table id="comparison-table"><thead><tr><th>Feature</th>';
-
-    selectedCompareGenes.forEach(g => {
-        tableHTML += `<th><a href="/#/${g.gene}" onclick="navigateTo(event, '/${g.gene}')">${g.gene}</a></th>`;
-    });
-    tableHTML += '</tr></thead><tbody>';
-
-    features.forEach(feature => {
-        tableHTML += `<tr><td>${feature}</td>`;
-        selectedCompareGenes.forEach(gene => {
-            let value = '-';
-            switch (feature) {
-                case 'Description':
-                    value = gene.description || '-';
-                    break;
-                case 'Ensembl ID':
-                    if (gene.ensembl_id) {
-                        const ids = String(gene.ensembl_id).split(/\s*,\s*/).filter(Boolean);
-                        value = ids.map(id =>
-                            `<a href="https://www.ensembl.org/Homo_sapiens/Gene/Summary?g=${id.trim()}" target="_blank" class="text-[#0067A5] hover:underline">${id.trim()}</a>`
-                        ).join('<br>');
-                    }
-                    break;
-                case 'OMIM ID':
-                    value = gene.omim_id
-                        ? `<a href="https://www.omim.org/entry/${gene.omim_id}" target="_blank" class="text-[#0067A5] hover:underline">${gene.omim_id}</a>`
-                        : '-';
-                    break;
-                case 'Synonym':
-                    value = gene.synonym || '-';
-                    break;
-                case 'Localization':
-                    value = Array.isArray(gene.localization)
-                        ? gene.localization.join(', ')
-                        : (gene.localization || '-');
-                    break;
-                case 'Functional Summary':
-                    value = gene.functional_summary || '-';
-                    break;
-                case 'Reference':
-                    if (gene.reference) {
-                        const refs = Array.isArray(gene.reference)
-                            ? gene.reference
-                            : [gene.reference];
-                        value = refs.flatMap(r => String(r).split(/[,;]\s*/))
-                            .filter(Boolean)
-                            .map(ref => {
-                                if (/^\d+$/.test(ref)) {
-                                    return `<a href="https://pubmed.ncbi.nlm.nih.gov/${ref}" target="_blank" class="text-[#0067A5] hover:underline">PMID: ${ref}</a>`;
-                                }
-                                if (ref.toLowerCase().startsWith('http')) {
-                                    return `<a href="${ref}" target="_blank" class="text-[#0067A5] hover:underline">${ref}</a>`;
-                                }
-                                return `<span class="text-[#0067A5]">${ref}</span>`;
-                            }).join('<br>');
-                    }
-                    break;
-            }
-            tableHTML += `<td>${value}</td>`;
-        });
-        tableHTML += '</tr>';
-    });
-
-    tableHTML += '</tbody></table>';
-    container.innerHTML = tableHTML;
-}
-   
-    function renderFunctionalSummaries() {
-        const container = document.getElementById('functional-cards-grid');
-        container.innerHTML = selectedCompareGenes.map(g => `
-            <div class="function-card">
-                <h4>${g.gene}</h4>
-                <p>${g.functional_summary || 'No functional summary available.'}</p>
-            </div>`).join('');
-    }
-   
-    function renderLocalizationChart() {
-        const ctx = document.getElementById('localization-chart').getContext('2d');
-        const localizationCounts = {};
-        selectedCompareGenes.forEach(gene => {
-            if (Array.isArray(gene.localization)) {
-                gene.localization.forEach(loc => {
-                    const term = loc.trim();
-                    if (term) {
-                        const capitalizedTerm = term.charAt(0).toUpperCase() + term.slice(1);
-                        localizationCounts[capitalizedTerm] = (localizationCounts[capitalizedTerm] || 0) + 1;
-                    }
-                });
-            }
-        });
-       
-        const labels = Object.keys(localizationCounts);
-        const data = Object.values(localizationCounts);
-
-        if (localizationChartInstance) {
-            localizationChartInstance.destroy();
-        }
-
-        localizationChartInstance = new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels: labels,
-                datasets: [{
-                    label: 'Number of Genes',
-                    data: data,
-                    backgroundColor: 'rgba(44, 90, 160, 0.7)',
-                    borderColor: 'rgba(44, 90, 160, 1)',
-                    borderWidth: 1
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } },
-                plugins: { 
-                    legend: { display: false }, 
-                    title: { display: true, text: 'Localization Distribution of Selected Genes' },
-                    customCanvasBackgroundColor: { color: '#ffffff' }
-                }
-            }
-        });
-    }
-
-    function setupTabSwitching() {
-        const tabLinks = document.querySelectorAll('.tab-link');
-        const tabContents = document.querySelectorAll('.tab-content');
-        tabLinks.forEach(link => {
-            link.addEventListener('click', () => {
-                tabLinks.forEach(l => l.classList.remove('active'));
-                tabContents.forEach(c => c.classList.remove('active'));
-                link.classList.add('active');
-                document.getElementById(link.dataset.tab).classList.add('active');
-                if (link.dataset.tab === 'visual-analysis') {
-                    renderLocalizationChart();
-                }
-            });
-        });
-    }
-}
-
 
 function displayDownloadPage() {
     const contentArea = document.querySelector('.content-area');
@@ -1211,7 +904,7 @@ function navigateTo(event, path) {
             '/': displayHomePage,
             'ciliaplot': displayCiliaPlotPage,
             'batch-query': displayBatchQueryTool,
-            'compare': displayComparePage,
+            'ciliai': displayCiliAIPage,
             'expression': displayExpressionPage,
             'download': displayDownloadPage,
             'contact': displayContactPage
