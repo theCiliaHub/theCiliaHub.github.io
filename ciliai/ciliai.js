@@ -432,6 +432,7 @@ async function fetchScreenData() {
 }
 
 // --- Render Screen Data Table ---
+// --- Render Screen Data Table ---
 function renderScreenDataTable(gene, screenInfo) {
     let summary = '';
     let tableHtml = '';
@@ -440,14 +441,35 @@ function renderScreenDataTable(gene, screenInfo) {
         return '<p class="status-not-found">No structured screen data available for this gene.</p>';
     }
 
-    const screensObj = screenInfo.screens || {};
+    // --- START: PROPOSED FIX ---
+    // This new block handles both the array format and the original expected object format.
+    let screensObj = {};
+    if (Array.isArray(screenInfo)) {
+        // If screenInfo is an array, transform it into the expected object format.
+        screensObj = screenInfo.reduce((acc, entry) => {
+            if (entry.source && entry.result) {
+                acc[entry.source] = {
+                    // Determine the 'hit' status based on the result text.
+                    hit: entry.result.toLowerCase() !== 'no effect', 
+                    effect: entry.result,
+                    details: 'From raw screen data' 
+                };
+            }
+            return acc;
+        }, {});
+    } else if (screenInfo.screens) {
+        // If it's the old format, use it directly.
+        screensObj = screenInfo.screens;
+    }
+    // --- END: PROPOSED FIX ---
+
+    // The rest of the function can now proceed as it was, using the correctly formatted screensObj
     const screenKeys = Object.keys(screensObj);
-    const numScreens = screenKeys.length || 5;
-    const hitCount = screenKeys.filter(key => screensObj[key].hit === true).length;
+    const numScreens = 5; // Total number of screens displayed in the table
+    const hitCount = screenKeys.filter(key => screensObj[key] && screensObj[key].hit === true).length;
 
     summary = `<p class="screen-summary">According to ${hitCount} out of ${numScreens} ciliary screens, <strong>${gene}</strong> was found to impact cilia (e.g., length or formation).</p>`;
 
-    // Corrected screen names based on cilia biology literature
     const screenNames = [
         { key: 'Kim2016', name: 'Kim et al. (2016) IMCD3 RNAi' },
         { key: 'Wheway2015', name: 'Wheway et al. (2015) RPE1 RNAi' },
@@ -467,10 +489,13 @@ function renderScreenDataTable(gene, screenInfo) {
                 </tr>
             </thead>
             <tbody>
-                ${screenNames.slice(0, numScreens).map(({ key, name }) => {
+                ${screenNames.map(({ key, name }) => {
                     const screenData = screensObj[key] || { hit: false, effect: 'N/A', details: 'Not tested' };
                     const hitIcon = screenData.hit ? '✅' : '❌';
-                    const effectClass = screenData.hit ? (screenData.effect?.toLowerCase().includes('decreas') ? 'inhibits' : 'promotes') : 'no-effect';
+                    // Corrected logic for class name to handle different effect strings
+                    const effectClass = screenData.hit 
+                        ? (screenData.effect?.toLowerCase().includes('decreas') || screenData.effect?.toLowerCase().includes('increase') ? 'promotes' : 'inhibits') 
+                        : 'no-effect';
                     return `
                         <tr>
                             <td>${name}</td>
