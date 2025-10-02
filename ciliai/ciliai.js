@@ -1,9 +1,9 @@
 // ciliAI.js - Consolidated with advanced AI queries, heatmap visualization, and corrected screen names
 
 // --- Global Data Stores & Knowledge Base ---
-
 let CILIAHUB_DATA = null;
 let SCREEN_DATA = null;
+let GENE_DATA_CACHE = {};  // Fixed: Exposed globally as geneDataCache for script.js compatibility
 
 let CILI_AI_DB = {
     "HDAC6": {
@@ -36,99 +36,22 @@ let KNOWLEDGE_BASE = {
     isReady: false
 };
 
-function () {
-  console.log("✅ CiliaAI module loaded");
-
-  // Local state (safe even if globals exist)
-  let localGeneDataCache = {};
-
-  // Prepare knowledge base from genes
-  function prepareKnowledgeBase(genes) {
-    const kb = [];
-
-    genes.forEach((gene) => {
-      const complexName = (typeof gene.complex_names === "string")
-        ? gene.complex_names.trim()
-        : "";
-
-      kb.push({
-        id: gene.gene_id || "",
-        symbol: gene.gene_symbol || "",
-        description: gene.description || "",
-        localization: gene.localization || [],
-        complex: complexName,
-      });
-    });
-
-    console.log("📖 Knowledge base prepared:", kb.length, "entries");
-    return kb;
-  }
-
-  // Load CiliaHub data (mock loader if fetch fails)
-  async function loadCiliaHubData() {
-    try {
-      const response = await fetch("data/ciliahub_genes.json"); // adjust path if needed
-      const genes = await response.json();
-      console.log("✅ CiliaHub main data loaded successfully:", genes.length, "genes");
-      localGeneDataCache.genes = prepareKnowledgeBase(genes);
-    } catch (err) {
-      console.error("❌ Error loading CiliaHub data:", err);
-      localGeneDataCache.genes = [];
-    }
-  }
-
-  // Public render function
-  function displayCiliAIPage() {
-    const container = document.getElementById("ciliai-container");
-    if (!container) {
-      console.warn("⚠️ No #ciliai-container found in DOM.");
-      return;
-    }
-
-    container.innerHTML = `
-      <h2>CiliAI Knowledge Base</h2>
-      <p>Loaded ${localGeneDataCache.genes?.length || 0} genes.</p>
-    `;
-  }
-
-  // Expose only what’s needed
-  window.CiliAI = {
-    loadCiliaHubData,
-    displayCiliAIPage,
-  };
-
-  // Auto-run if this page is opened directly
-  document.addEventListener("DOMContentLoaded", async () => {
-    await loadCiliaHubData();
-    displayCiliAIPage();
-  });
-
-})();
-
 // --- Ciliopathy Classification ---
 const CILIOPATHY_CLASSIFICATION = {
-    "Primary Ciliopathies": [
-        "Acrocallosal Syndrome", "Alström Syndrome", "Autosomal Dominant Polycystic Kidney Disease",
-        "Autosomal Recessive Polycystic Kidney Disease", "Bardet–Biedl Syndrome", "COACH Syndrome",
-        "Cranioectodermal Dysplasia", "Ellis-van Creveld Syndrome", "Hydrolethalus Syndrome",
-        "Infantile Polycystic Kidney Disease", "Joubert Syndrome", "Leber Congenital Amaurosis",
-        "Meckel–Gruber Syndrome", "Nephronophthisis", "Orofaciodigital Syndrome", "Senior-Løken Syndrome",
-        "Short-rib Thoracic Dysplasia", "Skeletal Ciliopathy", "Retinal Ciliopathy", "Syndromic Ciliopathy"
-    ],
-    "Motile Ciliopathies": [
-        "Primary Ciliary Dyskinesia"
-    ],
-    "Secondary Diseases": [
-        "Ataxia-telangiectasia-like Disorder", "Birt-Hogg-Dubé Syndrome", "Cone-Rod Dystrophy",
-        "Cornelia de Lange Syndrome", "Holoprosencephaly", "Juvenile Myoclonic Epilepsy",
-        "Medulloblastoma", "Retinitis Pigmentosa", "Spinocerebellar Ataxia"
-    ],
-    "Atypical Ciliopathies": [
-        "Bazex-Dupré-Christol Syndrome", "Lowe Oculocerebrorenal Syndrome", "McKusick-Kaufman Syndrome",
-        "Pallister-Hall Syndrome", "Simpson-Golabi-Behmel Syndrome", "Townes-Brocks Syndrome",
-        "Usher Syndrome", "Visceral Heterotaxy"
-    ]
-};
+    ​{ "Primary Ciliopathies": [ "Acrocallosal Syndrome", "Alström Syndrome", "Autosomal Dominant Polycystic Kidney Disease", 
+                                "Autosomal Recessive Polycystic Kidney Disease", "Bardet–Biedl Syndrome", "COACH Syndrome", 
+                                "Cranioectodermal Dysplasia", "Ellis-van Creveld Syndrome", "Hydrolethalus Syndrome", "Infantile Polycystic Kidney Disease",
+                                "Joubert Syndrome", "Leber Congenital Amaurosis", "Meckel–Gruber Syndrome", "Nephronophthisis", "Orofaciodigital Syndrome", 
+                                "Senior-Løken Syndrome", "Short-rib Thoracic Dysplasia", "Skeletal Ciliopathy", "Retinal Ciliopathy", "Syndromic Ciliopathy", 
+                                "Al-Gazali-Bakalinova Syndrome", "Bazex-Dupré-Christol Syndrome", "Bilateral Polycystic Kidney Disease", "Biliary, Renal, Neurologic, and Skeletal Syndrome", 
+                                "Caroli Disease", "Carpenter Syndrome", "Complex Lethal Osteochondrodysplasia", "Greig Cephalopolysyndactyly Syndrome", "Kallmann Syndrome", "Lowe Oculocerebrorenal Syndrome", 
+                                "McKusick-Kaufman Syndrome", "Morbid Obesity and Spermatogenic Failure", "Polycystic Kidney Disease", "RHYNS Syndrome", "Renal-hepatic-pancreatic Dysplasia", "Retinal Dystrophy", "STAR Syndrome", 
+                                "Smith-Lemli-Opitz Syndrome", "Spondylometaphyseal Dysplasia", "Stromme Syndrome", "Weyers Acrofacial Dysostosis" ], ,
+    "Motile Ciliopathies": [ "Primary Ciliary Dyskinesia", "Birt-Hogg-Dubé Syndrome", "Juvenile Myoclonic Epilepsy" ], 
+    "Secondary Diseases": [ "Ataxia-telangiectasia-like Disorder", "Birt-Hogg-Dubé Syndrome", "Cone-Rod Dystrophy", "Cornelia de Lange Syndrome", 
+                           "Holoprosencephaly", "Juvenile Myoclonic Epilepsy", "Medulloblastoma", "Retinitis Pigmentosa", "Spinocerebellar Ataxia", "Bazex-Dupré-Christol Syndrome", "Lowe Oculocerebrorenal Syndrome", 
+                           "McKusick-Kaufman Syndrome", "Pallister-Hall Syndrome", "Simpson-Golabi-Behmel Syndrome", "Townes-Brocks Syndrome", "Usher Syndrome", "Visceral Heterotaxy" ], 
+    "Atypical Ciliopathies": [ "Biliary Ciliopathy", "Chronic Obstructive Pulmonary Disease", "Ciliopathy", "Ciliopathy - Retinal dystrophy", "Golgipathies or Ciliopathy", "Hepatic Ciliopathy", "Male Infertility and Ciliopathy", "Male infertility", "Microcephaly and Chorioretinopathy Type 3", "Mucociliary Clearance Disorder", "Notch-mediated Ciliopathy", "Primary Endocardial Fibroelastosis", "Retinal Ciliopathy", "Retinal Degeneration", "Skeletal Ciliopathy", "Syndromic Ciliopathy" ] }
 
 // --- Data Loading and Preparation ---
 
@@ -139,17 +62,23 @@ async function loadCiliaHubData() {
         if (!response.ok) throw new Error('Failed to load CiliaHub main data.');
         CILIAHUB_DATA = await response.json();
         CILIAHUB_DATA = Array.isArray(CILIAHUB_DATA) ? CILIAHUB_DATA : CILIAHUB_DATA.genes || [];
-        console.log("CiliaHub main data loaded successfully:", CILIAHUB_DATA.length, "genes");
-        prepareKnowledgeBase(CILIAHUB_DATA);
+        console.log("✅ CiliaHub main data loaded successfully:", CILIAHUB_DATA.length, "genes");
+        
+        // Cache prepared KB in global for script.js
+        GENE_DATA_CACHE.genes = prepareKnowledgeBase(CILIAHUB_DATA);
+        prepareKnowledgeBase(CILIAHUB_DATA);  // Also mutate global KB
         return CILIAHUB_DATA;
     } catch (error) {
-        console.error("Error loading CiliaHub data:", error);
+        console.error("❌ Error loading CiliaHub data:", error);
+        GENE_DATA_CACHE.genes = [];
         return [];
     }
 }
 
 function prepareKnowledgeBase(allGenes) {
-    if (KNOWLEDGE_BASE.isReady || !allGenes) return;
+    if (KNOWLEDGE_BASE.isReady || !allGenes || allGenes.length === 0) return GENE_DATA_CACHE.genes || [];
+
+    const kb = [];  // Returnable array for cache
     const diseaseToCategory = {};
     for (const category in CILIOPATHY_CLASSIFICATION) {
         CILIOPATHY_CLASSIFICATION[category].forEach(disease => {
@@ -163,41 +92,60 @@ function prepareKnowledgeBase(allGenes) {
         if (geneName && diseaseName && diseaseToCategory[diseaseName.toLowerCase()]) {
             KNOWLEDGE_BASE.classifiedCiliopathyGenes.add(geneName);
         }
+
+        // Localizations
         (gene.SubcellularLocalization || gene.Subcellular_location_Sensor || gene.localization || "").split(',').forEach(loc => {
             if (loc.trim()) KNOWLEDGE_BASE.localizations.add(loc.trim().toLowerCase());
         });
+
+        // Functional categories
         (gene.functional_category || gene.Functional_category || "").split(',').forEach(cat => {
             if (cat.trim()) KNOWLEDGE_BASE.functionalCategories.add(cat.trim().toLowerCase());
         });
-       if (gene.complex_names) {
-    try {
-        const complexName = Array.isArray(gene.complex_names) 
-            ? gene.complex_names.join(', ') 
-            : String(gene.complex_names || '');
-        if (complexName.trim()) {
-            KNOWLEDGE_BASE.complexes.add(complexName.trim().toLowerCase());
+
+        // Complexes
+        if (gene.complex_names) {
+            try {
+                const complexName = Array.isArray(gene.complex_names) 
+                    ? gene.complex_names.join(', ') 
+                    : String(gene.complex_names || '');
+                if (complexName.trim()) {
+                    KNOWLEDGE_BASE.complexes.add(complexName.trim().toLowerCase());
+                }
+            } catch (e) {
+                console.warn(`Could not process complex_names for gene:`, gene, e);
+            }
         }
-    } catch (e) {
-        console.warn(`Could not process complex_names for gene:`, gene, e);
-    }
-}
+
+        // Domains
         try {
-    const domains = gene.domain_descriptions || gene.Protein_families || [];
-    const domainArray = Array.isArray(domains) ? domains : [domains];
-    domainArray.forEach(domain => {
-        if (domain && typeof domain === 'string' && domain.trim()) {
-            KNOWLEDGE_BASE.domains.add(domain.trim().toLowerCase());
+            const domains = gene.domain_descriptions || gene.Protein_families || [];
+            const domainArray = Array.isArray(domains) ? domains : [domains];
+            domainArray.forEach(domain => {
+                if (domain && typeof domain === 'string' && domain.trim()) {
+                    KNOWLEDGE_BASE.domains.add(domain.trim().toLowerCase());
+                }
+            });
+        } catch (e) {
+            console.warn(`Could not process domains for gene:`, gene, e);
         }
-    });
-} catch (e) {
-    console.warn(`Could not process domains for gene:`, gene, e);
-}
-            if (domain) KNOWLEDGE_BASE.domains.add(domain.trim().toLowerCase());
+
+        // Push to returnable KB array
+        const complexName = (typeof gene.complex_names === "string")
+            ? gene.complex_names.trim()
+            : "";
+        kb.push({
+            id: gene.gene_id || "",
+            symbol: gene.gene_symbol || "",
+            description: gene.description || "",
+            localization: gene.localization || [],
+            complex: complexName,
         });
     });
 
     KNOWLEDGE_BASE.isReady = true;
-    console.log("Knowledge base prepared.", `${KNOWLEDGE_BASE.classifiedCiliopathyGenes.size} genes classified.`);
+    console.log("📖 Knowledge base prepared:", kb.length, "entries. Classified genes:", KNOWLEDGE_BASE.classifiedCiliopathyGenes.size);
+    return kb;
 }
 
 async function fetchScreenData() {
@@ -206,20 +154,22 @@ async function fetchScreenData() {
         const response = await fetch('https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/cilia_screens_data.json');
         if (!response.ok) throw new Error(`Failed to fetch screen data: ${response.statusText}`);
         SCREEN_DATA = await response.json();
-        console.log('Screen data loaded successfully:', Object.keys(SCREEN_DATA).length, 'genes');
+        console.log('✅ Screen data loaded successfully:', Object.keys(SCREEN_DATA).length, 'genes');
         return SCREEN_DATA;
     } catch (error) {
-        console.error('Error fetching screen data:', error);
+        console.error('❌ Error fetching screen data:', error);
         return {};
     }
 }
 
 // --- Main UI Function ---
+window.displayCiliAIPage = async function displayCiliAIPage() {
+    // Pre-load data safely
+    await Promise.all([loadCiliaHubData(), fetchScreenData()]);
 
-window.displayCiliAIPage = function displayCiliAIPage() {
     const contentArea = document.querySelector('.content-area');
     if (!contentArea) {
-        console.error('Content area not found');
+        console.error('❌ Content area not found');
         return;
     }
     contentArea.className = 'content-area content-area-full';
@@ -228,16 +178,13 @@ window.displayCiliAIPage = function displayCiliAIPage() {
         ciliaPanel.style.display = 'none';
     }
 
-    // Pre-load data
-    loadCiliaHubData();
-    fetchScreenData();
-
     contentArea.innerHTML = `
         <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
         <div class="ciliai-container">
             <div class="ciliai-header">
                 <h1>CiliAI</h1>
                 <p>Your AI-powered partner for discovering gene-cilia relationships.</p>
+                <p>Loaded ${GENE_DATA_CACHE.genes?.length || 0} genes from CiliaHub.</p>
             </div>
             
             <div class="ciliai-main-content">
@@ -386,15 +333,14 @@ window.displayCiliAIPage = function displayCiliAIPage() {
     `;
 
     setupCiliAIEventListeners();
+    console.log("✅ CiliAI module loaded and page displayed.");
 };
 
 // --- Helper Functions ---
-
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 function capitalize(s) { if (!s) return ""; return s.charAt(0).toUpperCase() + s.slice(1); }
 
 // --- AI Query Engine ---
-
 async function handleAIQuery() {
     const aiQueryInput = document.getElementById('aiQueryInput');
     const query = aiQueryInput.value.trim().toLowerCase();
@@ -438,7 +384,6 @@ async function handleAIQuery() {
 }
 
 // --- Specific AI Query Handlers ---
-
 function createResultTable(results, headers, rowGenerator) {
     const tableHeaders = headers.map(h => `<th>${h}</th>`).join('');
     const tableRows = results.map(rowGenerator).join('');
@@ -539,7 +484,6 @@ function displayAiResults(title, contentHtml) {
 }
 
 // --- Event Listeners ---
-
 function setupCiliAIEventListeners() {
     document.getElementById('analyzeBtn')?.addEventListener('click', runAnalysisFromInput);
     document.getElementById('aiQueryBtn')?.addEventListener('click', handleAIQuery);
@@ -578,7 +522,6 @@ function setupCiliAIEventListeners() {
 }
 
 // --- Gene-Specific Analysis ---
-
 function runAnalysisFromInput() {
     const geneInput = document.getElementById('geneInput').value;
     const genes = [...new Set(geneInput.split(/[\s,]+/).filter(Boolean).map(g => g.toUpperCase()))];
@@ -707,7 +650,6 @@ function createResultCard(gene, dbData, allEvidence) {
 }
 
 // --- Literature Mining ---
-
 async function analyzeGeneViaAPI(gene, resultCard) {
     const ESEARCH_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi";
     const ELINK_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/elink.fcgi";
@@ -836,7 +778,6 @@ async function analyzeGeneViaAPI(gene, resultCard) {
 }
 
 // --- Screen Data & Visualization ---
-
 function renderScreenDataTable(gene, screenInfo) {
     let summary = '';
     let tableHtml = '';
@@ -1055,13 +996,38 @@ function renderScreenSummaryHeatmap(genes, screenData) {
     Plotly.newPlot('plot-display-area', data, layout, { responsive: true });
 }
 
-// Expose all functions globally for compatibility with globals.js router
+// --- Expose Globals ---
+window.CiliAI = {
+    loadCiliaHubData,
+    displayCiliAIPage,
+    GENE_DATA_CACHE,
+    setupCiliAIEventListeners,
+    handleAIQuery,
+    runAnalysisFromInput,
+    runAnalysis,
+    analyzeGeneViaAPI,
+    fetchScreenData,
+    createResultCard,
+    createPlaceholderCard,
+    renderScreenSummaryHeatmap
+};
+
 window.setupCiliAIEventListeners = setupCiliAIEventListeners;
 window.handleAIQuery = handleAIQuery;
-window.analyzeGenesFromInput = runAnalysisFromInput;  // Changed from analyzeGenesFromInput
+window.runAnalysisFromInput = runAnalysisFromInput;
 window.runAnalysis = runAnalysis;
 window.analyzeGeneViaAPI = analyzeGeneViaAPI;
 window.fetchScreenData = fetchScreenData;
 window.createResultCard = createResultCard;
 window.createPlaceholderCard = createPlaceholderCard;
 window.renderScreenSummaryHeatmap = renderScreenSummaryHeatmap;
+
+// Stub for displayLocalizationChart to prevent ReferenceError
+window.displayLocalizationChart = () => console.log("📊 Placeholder for displayLocalizationChart – implement if needed.");
+
+// Auto-init on load
+document.addEventListener("DOMContentLoaded", async () => {
+    console.log("✅ CiliAI module loaded");
+    await loadCiliaHubData();
+    // Don't auto-display; let router handle it
+});
