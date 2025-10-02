@@ -8,6 +8,7 @@ let allGenes = [];
 let currentData = [];
 let searchResults = [];
 const geneLocalizationData = {};
+let geneDataCache = {}
 
 // Plotting - Consolidated into a single instance variable
 let currentPlotInstance = null;
