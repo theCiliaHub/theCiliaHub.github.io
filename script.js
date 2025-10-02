@@ -1,3 +1,4 @@
+
 // ✨ THE NEW PLUGIN CODE RIGHT HERE for PLOT ✨
 Chart.register({
   id: 'customCanvasBackgroundColor',
@@ -24,6 +25,7 @@ function sanitize(input) {
                .toUpperCase();
 }
 
+let geneDataCache = {};
 /**
  * Loads, sanitizes, and prepares the gene database into an efficient lookup map.
  */
