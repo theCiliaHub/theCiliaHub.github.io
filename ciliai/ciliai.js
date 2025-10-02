@@ -36,6 +36,75 @@ let KNOWLEDGE_BASE = {
     isReady: false
 };
 
+function () {
+  console.log("✅ CiliaAI module loaded");
+
+  // Local state (safe even if globals exist)
+  let localGeneDataCache = {};
+
+  // Prepare knowledge base from genes
+  function prepareKnowledgeBase(genes) {
+    const kb = [];
+
+    genes.forEach((gene) => {
+      const complexName = (typeof gene.complex_names === "string")
+        ? gene.complex_names.trim()
+        : "";
+
+      kb.push({
+        id: gene.gene_id || "",
+        symbol: gene.gene_symbol || "",
+        description: gene.description || "",
+        localization: gene.localization || [],
+        complex: complexName,
+      });
+    });
+
+    console.log("📖 Knowledge base prepared:", kb.length, "entries");
+    return kb;
+  }
+
+  // Load CiliaHub data (mock loader if fetch fails)
+  async function loadCiliaHubData() {
+    try {
+      const response = await fetch("data/ciliahub_genes.json"); // adjust path if needed
+      const genes = await response.json();
+      console.log("✅ CiliaHub main data loaded successfully:", genes.length, "genes");
+      localGeneDataCache.genes = prepareKnowledgeBase(genes);
+    } catch (err) {
+      console.error("❌ Error loading CiliaHub data:", err);
+      localGeneDataCache.genes = [];
+    }
+  }
+
+  // Public render function
+  function displayCiliAIPage() {
+    const container = document.getElementById("ciliai-container");
+    if (!container) {
+      console.warn("⚠️ No #ciliai-container found in DOM.");
+      return;
+    }
+
+    container.innerHTML = `
+      <h2>CiliAI Knowledge Base</h2>
+      <p>Loaded ${localGeneDataCache.genes?.length || 0} genes.</p>
+    `;
+  }
+
+  // Expose only what’s needed
+  window.CiliAI = {
+    loadCiliaHubData,
+    displayCiliAIPage,
+  };
+
+  // Auto-run if this page is opened directly
+  document.addEventListener("DOMContentLoaded", async () => {
+    await loadCiliaHubData();
+    displayCiliAIPage();
+  });
+
+})();
+
 // --- Ciliopathy Classification ---
 const CILIOPATHY_CLASSIFICATION = {
     "Primary Ciliopathies": [
