@@ -929,6 +929,405 @@ function createResultCard(gene, allEvidence) {
         </div>
     `;
 }
+/* =========================
+   CiliAI Full-Text Retriever v2
+   - PMC-first, Europe PMC full-text fallback
+   - Ranked + deduplicated evidence
+   - Exposes analyzeGeneViaAPI_FT_v2(gene, resultCard, allGenes)
+   Requires: CONFIG, makeApiRequest, interpretEvidence, paragraphSubjectGenes, hasQuantitativeData, INFERENCE_LEXICON, sleep
+   ========================= */
+
+const FTV2 = {
+    CACHE_ENABLED: true,
+    CACHE_TTL_MS: 1000 * 60 * 60 * 24 * 14,
+    MAX_SNIPPET_LENGTH: 600,
+    MIN_PARAGRAPH_SCORE: 0.35,
+    PROXIMITY_WINDOW: 120,
+    EUROPEPMC_BASE: 'https://www.ebi.ac.uk/europepmc/webservices/rest'
+};
+
+// simple cache (mem + localStorage)
+const FTV2Cache = {
+    _mem: new Map(),
+    get(k) {
+        if (this._mem.has(k)) return this._mem.get(k);
+        if (!FTV2.CACHE_ENABLED) return null;
+        try {
+            const raw = localStorage.getItem(`ciliai_ftv2_${k}`);
+            if (!raw) return null;
+            const parsed = JSON.parse(raw);
+            if (Date.now() - parsed._ts > FTV2.CACHE_TTL_MS) {
+                localStorage.removeItem(`ciliai_ftv2_${k}`);
+                return null;
+            }
+            this._mem.set(k, parsed.value);
+            return parsed.value;
+        } catch (e) { return null; }
+    },
+    set(k, v) {
+        this._mem.set(k, v);
+        if (!FTV2.CACHE_ENABLED) return;
+        try { localStorage.setItem(`ciliai_ftv2_${k}`, JSON.stringify({ _ts: Date.now(), value: v })); } catch {}
+    }
+};
+
+function escapeRegExp(s) { return s.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\$&'); }
+function xmlToDoc(xmlText) { return new DOMParser().parseFromString(xmlText, 'application/xml'); }
+
+/* -----------------------
+   Helper: extract paragraphs from PMC-like XML
+   ----------------------- */
+function extractParagraphsFromXmlDoc(xmlDoc) {
+    const out = [];
+    try {
+        const root = xmlDoc.querySelector('body') || xmlDoc;
+        if (!root) return out;
+        const nodes = root.querySelectorAll('p, sec, caption, title');
+        nodes.forEach(n => {
+            const txt = (n.textContent || '').replace(/\s+/g, ' ').trim();
+            if (txt.length > 30) out.push(txt);
+        });
+    } catch (e) { console.warn('[FTV2] extract paragraphs failed', e); }
+    return out;
+}
+
+/* -----------------------
+   Scoring (same idea as v1 but tuned)
+   ----------------------- */
+function scoreParagraphForGene_v2(paragraph, gene, keywordList = CONFIG.LOCAL_ANALYSIS_KEYWORDS) {
+    const text = paragraph.toLowerCase();
+    const geneLower = gene.toLowerCase();
+
+    const geneMatches = (text.match(new RegExp(`\\b${escapeRegExp(geneLower)}\\b`, 'g')) || []).length;
+    const geneScore = Math.min(3, geneMatches);
+
+    let keywordHits = 0;
+    for (const kw of keywordList) if (text.includes(kw.toLowerCase())) keywordHits++;
+    const keywordScore = Math.min(4, keywordHits); // more weight for keywords present
+
+    let proximityScore = 0;
+    const idx = text.indexOf(geneLower);
+    if (idx !== -1) {
+        for (const kw of keywordList) {
+            const kidx = text.indexOf(kw.toLowerCase());
+            if (kidx !== -1) {
+                const prox = Math.abs(kidx - idx);
+                proximityScore = Math.max(proximityScore, (FTV2.PROXIMITY_WINDOW - prox) / FTV2.PROXIMITY_WINDOW * 2);
+            }
+        }
+    }
+
+    const quantBonus = hasQuantitativeData(text) ? 1.5 : 0;
+    const manipAll = INFERENCE_LEXICON.MANIPULATION.LOSS.concat(INFERENCE_LEXICON.MANIPULATION.GAIN);
+    const manipBonus = manipAll.some(m => text.includes(m.toLowerCase())) ? 1.0 : 0;
+
+    const raw = geneScore + keywordScore + proximityScore + quantBonus + manipBonus;
+    return { raw, normalized: Math.min(1, raw / 9) };
+}
+
+function makeSnippetAroundGene(text, gene, maxLen = FTV2.MAX_SNIPPET_LENGTH) {
+    const idx = text.toLowerCase().indexOf(gene.toLowerCase());
+    if (idx === -1) return text.slice(0, maxLen) + (text.length > maxLen ? '…' : '');
+    const half = Math.floor(maxLen / 2);
+    const start = Math.max(0, idx - half);
+    let snip = text.slice(start, start + maxLen);
+    if (start > 0) snip = '…' + snip;
+    if (start + maxLen < text.length) snip = snip + '…';
+    return snip;
+}
+
+/* -----------------------
+   Fetch PMC XML via NCBI efetch (with caching)
+   ----------------------- */
+async function fetchPMCxmlFromNCBI(pmcid) {
+    const id = pmcid.toString().replace(/^PMC/i, '');
+    const key = `ncbi_pmc_${id}`;
+    const cached = FTV2Cache.get(key);
+    if (cached) return cached;
+
+    const params = { db: 'pmc', id: id, retmode: 'xml', tool: CONFIG.TOOL_NAME, email: CONFIG.USER_EMAIL };
+    const resp = await makeApiRequest(CONFIG.EFETCH_URL, params, `NCBI PMC fetch ${pmcid}`);
+    const xml = await resp.text();
+    FTV2Cache.set(key, xml);
+    return xml;
+}
+
+/* -----------------------
+   Europe PMC: search & fullTextXML fetch
+   ----------------------- */
+async function searchEuropePMC_for_gene(gene) {
+    // construct query: gene AND (cilia OR ciliary OR ciliogenesis ...)
+    const kwClause = CONFIG.API_QUERY_KEYWORDS.join(' OR ');
+    const query = `${gene} AND (${kwClause})`;
+    const params = { query: query, format: 'json', pageSize: CONFIG.ARTICLES_PER_GENE.toString() };
+    const resp = await makeApiRequest(`${FTV2.EUROPEPMC_BASE}/search`, params, `Europe PMC search ${gene}`);
+    const j = await resp.json();
+    return (j?.resultList?.result) || [];
+}
+
+async function fetchEuropePMCFullTextXML(pmcidOrId) {
+    // pmcidOrId should be a PMCID (with or without PMC) or an Europe PMC ID
+    let id = pmcidOrId.toString();
+    id = id.replace(/^PMC/i, '');
+    const key = `epmc_ft_${id}`;
+    const cached = FTV2Cache.get(key);
+    if (cached) return cached;
+
+    // docs: /{PMCID}/fullTextXML
+    const url = `${FTV2.EUROPEPMC_BASE}/${encodeURIComponent(id)}/fullTextXML`;
+    try {
+        const resp = await makeApiRequest(url, {}, `EuropePMC fullTextXML ${id}`);
+        const txt = await resp.text();
+        FTV2Cache.set(key, txt);
+        return txt;
+    } catch (e) {
+        console.warn('[FTV2] EuropePMC fullTextXML failed for', id, e.message || e);
+        return null;
+    }
+}
+
+/* -----------------------
+   Extract evidence from PMC-like XML text (works for NCBI PMC XML and EuropePMC xml)
+   ----------------------- */
+async function extractEvidenceFromXmlText(xmlText, gene, allGenes, sourceTag, articleId, refLink) {
+    const xmlDoc = xmlToDoc(xmlText);
+    const paragraphs = extractParagraphsFromXmlDoc(xmlDoc);
+    const candidates = [];
+    for (const para of paragraphs) {
+        if (!paragraphSubjectGenes(para, allGenes).includes(gene)) continue;
+        if (!CONFIG.LOCAL_ANALYSIS_KEYWORDS.some(kw => para.toLowerCase().includes(kw))) continue;
+        const score = scoreParagraphForGene_v2(para, gene);
+        if (score.normalized < FTV2.MIN_PARAGRAPH_SCORE) continue;
+        const snippet = makeSnippetAroundGene(para, gene);
+        const inferred = interpretEvidence(gene, para);
+        candidates.push({
+            id: articleId,
+            source: sourceTag,
+            context: para,
+            snippet,
+            score,
+            inferredRoles: inferred,
+            refLink
+        });
+    }
+    // rank per-article
+    candidates.sort((a, b) => b.score.raw - a.score.raw);
+    return candidates;
+}
+
+/* -----------------------
+   Map PubMed -> PMC using ELink (if available)
+   ----------------------- */
+async function mapPmidsToPmcids_v2(pmids) {
+    if (!pmids || pmids.length === 0) return [];
+    const params = { dbfrom: 'pubmed', db: 'pmc', id: pmids.join(','), retmode: 'json', tool: CONFIG.TOOL_NAME, email: CONFIG.USER_EMAIL };
+    try {
+        const resp = await makeApiRequest('https://eutils.ncbi.nlm.nih.gov/entrez/eutils/elink.fcgi', params, 'PMID->PMCID mapping');
+        const j = await resp.json();
+        const out = [];
+        const linksets = j?.linksets || [];
+        for (const ls of linksets) {
+            const links = ls?.linksetdbs?.flatMap(ldb => ldb?.links || []) || [];
+            for (const l of links) out.push(String(l).replace(/^PMC/i, ''));
+        }
+        return [...new Set(out)];
+    } catch (e) {
+        console.warn('[FTV2] mapPmidsToPmcids failed', e.message || e);
+        return [];
+    }
+}
+
+/* -----------------------
+   Main orchestrator v2
+   ----------------------- */
+async function analyzeGeneViaAPI_FT_v2(gene, resultCard, allGenes) {
+    const found = [];
+    const seenContexts = new Set();
+    try {
+        // 1) Try PMC esearch (db=pmc) directly using buildQueryPMC
+        const searchParamsPMC = {
+            db: 'pmc',
+            term: buildQueryPMC(gene),
+            retmode: 'json',
+            retmax: CONFIG.ARTICLES_PER_GENE.toString(),
+            tool: CONFIG.TOOL_NAME,
+            email: CONFIG.USER_EMAIL
+        };
+        const searchRespPMC = await makeApiRequest(CONFIG.ESEARCH_URL, searchParamsPMC, `PMC search ${gene}`);
+        const pmcids = (await searchRespPMC.json())?.esearchresult?.idlist || [];
+
+        // If PMC results found, fetch their XML via efetch and extract
+        if (pmcids.length > 0) {
+            for (const pmc of pmcids.slice(0, CONFIG.ARTICLES_PER_GENE)) {
+                try {
+                    await sleep(CONFIG.ENTREZ_SLEEP);
+                    const xmlText = await fetchPMCxmlFromNCBI(pmc);
+                    const evs = await extractEvidenceFromXmlText(xmlText, gene, allGenes, 'PMC', `PMC${pmc}`, `https://www.ncbi.nlm.nih.gov/pmc/articles/PMC${pmc}/`);
+                    for (const ev of evs) {
+                        const key = ev.context.substring(0, 140);
+                        if (!seenContexts.has(key)) {
+                            seenContexts.add(key);
+                            found.push(ev);
+                        }
+                    }
+                } catch (e) {
+                    console.warn('[FTV2] PMC parse fail', pmc, e.message || e);
+                }
+            }
+        }
+
+        // 2) If not enough evidence, use Europe PMC (often indexes publisher OA fulltext not in PMC)
+        if (found.length < 3) {
+            const epmcHits = await searchEuropePMC_for_gene(gene);
+            for (const hit of epmcHits.slice(0, CONFIG.ARTICLES_PER_GENE)) {
+                // Hit fields may include pmcid, pmid, doi, id, fullTextUrlList, isOpenAccess
+                const pmcid = hit.pmcid || hit.id?.startsWith('PMC') ? (hit.pmcid || hit.id.replace(/^PMC/i, '')) : null;
+                const candidateId = hit.pmcid || hit.id || hit.pmid || hit.doi || (hit.source && `${hit.source}:${hit.id}`) || 'europepmc';
+                let xmlText = null;
+                // Prefer Europe PMC fullTextXML if pmcid available
+                if (pmcid) {
+                    try {
+                        xmlText = await fetchEuropePMCFullTextXML(pmcid);
+                    } catch (e) { xmlText = null; }
+                }
+                // If EuropePMC fulltext failed, check fullTextUrlList for xml/html
+                if (!xmlText && hit.fullTextUrlList && Array.isArray(hit.fullTextUrlList.url)) {
+                    // try to fetch the first xml/html url (avoid pdfs here)
+                    for (const uobj of hit.fullTextUrlList.url) {
+                        const u = uobj?.url || uobj;
+                        if (!u) continue;
+                        if (u.endsWith('.xml') || u.includes('/xml')) {
+                            try {
+                                const resp = await makeApiRequest(u, {}, `publisher XML ${u}`);
+                                xmlText = await resp.text();
+                                break;
+                            } catch (e) { continue; }
+                        }
+                        // if it's HTML and not disallowed by CORS, try to fetch and extract text minimally
+                        if (u.includes('html')) {
+                            try {
+                                const resp = await makeApiRequest(u, {}, `publisher HTML ${u}`);
+                                const html = await resp.text();
+                                // Minimal wrapper: put into a DOM and extract <p> text
+                                const doc = new DOMParser().parseFromString(html, 'text/html');
+                                const paras = Array.from(doc.querySelectorAll('p')).map(n => n.textContent.replace(/\s+/g,' ').trim()).filter(Boolean);
+                                xmlText = `<body>${paras.map(p => `<p>${p}</p>`).join('')}</body>`;
+                                break;
+                            } catch (e) { continue; }
+                        }
+                    }
+                }
+
+                // If we got xmlText from Europe PMC or publisher, extract evidence
+                if (xmlText) {
+                    try {
+                        const evs = await extractEvidenceFromXmlText(xmlText, gene, allGenes, 'EuropePMC', candidateId, hit.fullTextUrlList?.url?.[0] || (hit.doi ? `https://doi.org/${hit.doi}` : null));
+                        for (const ev of evs) {
+                            const key = ev.context.substring(0, 140);
+                            if (!seenContexts.has(key)) {
+                                seenContexts.add(key);
+                                found.push(ev);
+                            }
+                        }
+                    } catch (e) {
+                        console.warn('[FTV2] EuropePMC xml parse failed', candidateId, e.message || e);
+                    }
+                }
+                // politeness
+                await sleep(CONFIG.ENTREZ_SLEEP);
+                if (found.length >= CONFIG.ARTICLES_PER_GENE) break;
+            }
+        }
+
+        // 3) Final fallback: PubMed abstracts (if still little evidence)
+        if (found.length < 3) {
+            const searchParamsPubMed = {
+                db: 'pubmed',
+                term: buildQueryPubMed(gene),
+                retmode: 'json',
+                retmax: CONFIG.ARTICLES_PER_GENE.toString(),
+                tool: CONFIG.TOOL_NAME,
+                email: CONFIG.USER_EMAIL
+            };
+            const searchRespPubMed = await makeApiRequest(CONFIG.ESEARCH_URL, searchParamsPubMed, `PubMed search ${gene}`);
+            const pmids = (await searchRespPubMed.json())?.esearchresult?.idlist || [];
+
+            if (pmids.length > 0) {
+                await sleep(CONFIG.ENTREZ_SLEEP);
+                const fetchParams = {
+                    db: 'pubmed',
+                    id: pmids.join(','),
+                    retmode: 'xml',
+                    rettype: 'abstract',
+                    tool: CONFIG.TOOL_NAME,
+                    email: CONFIG.USER_EMAIL
+                };
+                const fetchResp = await makeApiRequest(CONFIG.EFETCH_URL, fetchParams, `PubMed fetch ${gene}`);
+                const xml = await fetchResp.text();
+                const xmlDoc = xmlToDoc(xml);
+                const articles = xmlDoc.querySelectorAll('PubmedArticle');
+                articles.forEach(article => {
+                    const pmid = article.querySelector('PMID')?.textContent || '';
+                    const title = article.querySelector('ArticleTitle')?.textContent || '';
+                    const abstract = Array.from(article.querySelectorAll('AbstractText')).map(n => n.textContent).join(' ');
+                    const combined = `${title}. ${abstract}`;
+                    if (paragraphSubjectGenes(combined, allGenes).includes(gene) && CONFIG.LOCAL_ANALYSIS_KEYWORDS.some(kw => combined.toLowerCase().includes(kw))) {
+                        const inferred = interpretEvidence(gene, combined);
+                        const key = combined.substring(0, 140);
+                        if (!seenContexts.has(key)) {
+                            seenContexts.add(key);
+                            found.push({ id: pmid, source: 'PubMed', context: combined, snippet: makeSnippetAroundGene(combined, gene), score: scoreParagraphForGene_v2(combined, gene), inferredRoles: inferred, refLink: `https://pubmed.ncbi.nlm.nih.gov/${pmid}/` });
+                        }
+                    }
+                });
+            }
+        }
+
+    } catch (err) {
+        console.error(`[FTV2] Literature retrieval failed for ${gene}:`, err);
+        const errEl = resultCard?.querySelector('.status-searching');
+        if (errEl) { errEl.textContent = 'Literature Search Failed'; errEl.className = 'status-not-found'; }
+    }
+
+    // Deduplicate and global ranking
+    //  - group by context start -> unique
+    //  - score = paragraph raw score + log(1 + articleSupportCount)
+    // compute support counts per short context across found items (some contexts will be repeated across articles)
+    const contextToArticles = new Map();
+    for (const ev of found) {
+        const k = ev.context.substring(0, 160).trim();
+        const set = contextToArticles.get(k) || new Set();
+        set.add(`${ev.source}:${ev.id}`);
+        contextToArticles.set(k, set);
+    }
+
+    // create final list with augmented score
+    const final = [];
+    const seenFinalKeys = new Set();
+    for (const ev of found) {
+        const key = ev.context.substring(0, 160).trim();
+        if (seenFinalKeys.has(key)) continue;
+        seenFinalKeys.add(key);
+        const support = (contextToArticles.get(key)?.size) || 1;
+        const artBoost = Math.log(1 + support); // modest boost for multiple supporting articles
+        const paragraphRaw = ev.score?.raw || 0;
+        const totalScore = paragraphRaw + artBoost;
+        final.push({ ...ev, supportCount: support, totalScore });
+    }
+
+    final.sort((a, b) => b.totalScore - a.totalScore);
+    // limit to configured max
+    return final.slice(0, CONFIG.ARTICLES_PER_GENE);
+}
+
+/* Expose function */
+window.analyzeGeneViaAPI_FT_v2 = analyzeGeneViaAPI_FT_v2;
+
+/* Integration note:
+   - In your runAnalysis(), replace analyzeGeneViaAPI(...) or analyzeGeneViaAPI_FT(...) calls with analyzeGeneViaAPI_FT_v2(...)
+   - Example: const apiEvidence = await analyzeGeneViaAPI_FT_v2(gene, resultCard, geneList);
+*/
+
 
 // ============================================================================
 // GLOBAL EXPORTS FOR ROUTER COMPATIBILITY
