@@ -771,33 +771,32 @@ function renderScreenDataTable(gene, screenInfo) {
     ];
 
     tableHtml = `
-        <table class="screen-table">
-            <thead>
-                <tr>
-                    <th>Screen</th>
-                    <th>Hit?</th>
-                    <th>Effect</th>
-                    <th>Details</th>
-                </tr>
-            </thead>
-            <tbody>
-                ${screenNames.slice(0, numScreens).map(({ key, name }) => {
-                    const screenData = screensObj[key] || { hit: false, effect: 'N/A', details: 'Not tested' };
-                    const hitIcon = screenData.hit ? '✅' : '❌';
-                    const effectClass = screenData.hit ? (screenData.effect?.toLowerCase().includes('decreas') ? 'inhibits' : 'promotes') : 'no-effect';
-                    return `
-                        <tr>
-                            <td>${name}</td>
-                            <td>${hitIcon}</td>
-                            <td class="effect-${effectClass}">${screenData.effect || 'N/A'}</td>
-                            <td>${screenData.details || 'N/A'}</td>
-                        </tr>
-                    `;
-                }).join('')}
-            </tbody>
-        </table>
-    `;
-
+    <table class="screen-table">
+        <thead>
+            <tr>
+                <th>Screen</th>
+                <th>Hit?</th>
+                <th>Effect</th>
+                <th>Details</th>
+            </tr>
+        </thead>
+        <tbody>
+            ${screenNames.map(({ key, name }) => {
+                const screenData = screensObj[key] || { hit: false, effect: 'N/A', details: 'Not tested' };
+                const hitIcon = screenData.hit ? '✅' : '❌';
+                const effectClass = screenData.hit ? (screenData.effect?.toLowerCase().includes('decreas') ? 'inhibits' : 'promotes') : 'no-effect';
+                return `
+                    <tr>
+                        <td>${name}</td>
+                        <td>${hitIcon}</td>
+                        <td class="effect-${effectClass}">${screenData.effect || 'N/A'}</td>
+                        <td>${screenData.details || 'N/A'}</td>
+                    </tr>
+                `;
+            }).join('')}
+        </tbody>
+    </table>
+`;
     return `${summary}${tableHtml}`;
 }
 
@@ -969,7 +968,7 @@ function renderScreenSummaryHeatmap(genes, screenData) {
 // Expose all functions globally for compatibility with globals.js router
 window.setupCiliAIEventListeners = setupCiliAIEventListeners;
 window.handleAIQuery = handleAIQuery;
-window.analyzeGenesFromInput = analyzeGenesFromInput;
+window.analyzeGenesFromInput = runAnalysisFromInput;  // Changed from analyzeGenesFromInput
 window.runAnalysis = runAnalysis;
 window.analyzeGeneViaAPI = analyzeGeneViaAPI;
 window.fetchScreenData = fetchScreenData;
