@@ -79,13 +79,8 @@ async function handleRouteChange() {
             displayCiliaPlotPage();
             break;
         case '/ciliai':
-    if (window.CiliAI && typeof window.CiliAI.displayCiliAIPage === "function") {
-        window.CiliAI.displayCiliAIPage();
-    } else {
-        console.warn("⚠️ CiliAI module not loaded or displayCiliAIPage missing.");
-        displayNotFoundPage();
-    }
-    break;
+            displayCiliAIPage();
+            break;
         case '/expression':
             displayExpressionPage();
             break;
