@@ -1052,6 +1052,165 @@ async function fetchPMCxmlFromNCBI(pmcid) {
     return xml;
 }
 
+// ciliai_literature_retriever.js
+// =============================================================================
+// Full-Text First Literature Retriever for CiliAI with Supplementary Data Parsing
+// =============================================================================
+
+// Import / assumes globals: CONFIG, INFERENCE_LEXICON, interpretEvidence, makeApiRequest, sleep
+// =============================================================================
+
+// Europe PMC API endpoint
+const EUROPE_PMC_API = "https://www.ebi.ac.uk/europepmc/webservices/rest/search";
+
+// Utility: Fetch JSON from Europe PMC
+async function fetchEuropePMC(query) {
+  const url = `${EUROPE_PMC_API}?query=${encodeURIComponent(query)}&resultType=core&format=json`;
+  try {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`Europe PMC error: ${response.status}`);
+    return await response.json();
+  } catch (err) {
+    console.error("Europe PMC fetch error:", err);
+    return null;
+  }
+}
+
+// Extract PMCID/PMID list from Europe PMC search results
+function extractEuropePMCIds(json) {
+  if (!json || !json.resultList || !json.resultList.result) return [];
+  return json.resultList.result.map(r => ({
+    pmid: r.pmid || null,
+    pmcid: r.pmcid ? r.pmcid.replace("PMC", "") : null,
+    title: r.title || "",
+    journal: r.journalTitle || ""
+  }));
+}
+
+// Fetch PMC XML full text from NCBI efetch
+async function fetchFullTextPMC(pmcid) {
+  const url = `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pmc&id=${pmcid}&rettype=full&retmode=xml&api_key=${CONFIG.NCBI_API_KEY}`;
+  try {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`PMC efetch failed: ${response.status}`);
+    const text = await response.text();
+    return new window.DOMParser().parseFromString(text, "text/xml");
+  } catch (err) {
+    console.error("fetchFullTextPMC error:", err);
+    return null;
+  }
+}
+
+// Extract text paragraphs, tables, figures, captions, supplementary info from PMC XML
+function extractParagraphsFromPMCXml(xmlDoc) {
+  if (!xmlDoc) return [];
+
+  const paras = [];
+
+  // Body paragraphs
+  paras.push(...[...xmlDoc.querySelectorAll("body p")].map(p => p.textContent.trim()));
+
+  // Table captions and content
+  paras.push(...[...xmlDoc.querySelectorAll("table-wrap caption")].map(c => c.textContent.trim()));
+  paras.push(...[...xmlDoc.querySelectorAll("table-wrap td")].map(td => td.textContent.trim()));
+
+  // Figure captions
+  paras.push(...[...xmlDoc.querySelectorAll("fig caption")].map(c => c.textContent.trim()));
+
+  // Supplementary material (sec type="supplementary-material")
+  paras.push(...[...xmlDoc.querySelectorAll("sec[type='supplementary-material']")].map(s => s.textContent.trim()));
+
+  return paras.filter(Boolean);
+}
+
+// Scoring function for relevance
+function scoreParagraphForGene(gene, para) {
+  let score = 0;
+  const geneRe = new RegExp(`\\b${gene}\\b`, "i");
+  if (geneRe.test(para)) score += 5;
+  if (/cilia|ciliary|ciliogenesis/i.test(para)) score += 5;
+  if (/loss|knockout|depletion|KO|deficient/i.test(para)) score += 3;
+  if (/overexpress|gain|rescue|increase/i.test(para)) score += 3;
+  if (/\\d+\\s*(μm|um|%|percent|p\\s*<)/i.test(para)) score += 2;
+  return score;
+}
+
+// Generate snippet
+function makeSnippetAroundGene(gene, para) {
+  const idx = para.toLowerCase().indexOf(gene.toLowerCase());
+  if (idx === -1) return para.slice(0, 250) + (para.length > 250 ? "..." : "");
+  const start = Math.max(0, idx - 100);
+  const end = Math.min(para.length, idx + 150);
+  return (start > 0 ? "..." : "") + para.slice(start, end) + (end < para.length ? "..." : "");
+}
+
+// Extract evidence from PMC full text
+function extractEvidenceFromPMCArticle(gene, pmcid, xmlDoc) {
+  const paras = extractParagraphsFromPMCXml(xmlDoc);
+  const scored = paras.map(p => ({
+    para: p,
+    score: scoreParagraphForGene(gene, p)
+  })).filter(o => o.score > 0);
+
+  scored.sort((a, b) => b.score - a.score);
+  return scored.slice(0, 5).map(o => ({
+    snippet: makeSnippetAroundGene(gene, o.para),
+    context: o.para,
+    score: o.score,
+    source: `PMC${pmcid}`
+  }));
+}
+
+// Master function: Europe PMC first, fallback to PubMed abstract
+async function analyzeGeneViaAPI_FT(gene) {
+  let evidence = [];
+
+  // Step 1: Europe PMC full-text search
+  const json = await fetchEuropePMC(`${gene} cilia`);
+  const ids = extractEuropePMCIds(json);
+  if (ids.length > 0) {
+    for (const id of ids) {
+      if (!id.pmcid) continue;
+      const xmlDoc = await fetchFullTextPMC(id.pmcid);
+      if (xmlDoc) {
+        const ev = extractEvidenceFromPMCArticle(gene, id.pmcid, xmlDoc);
+        evidence.push(...ev);
+      }
+      await sleep(200);
+    }
+  }
+
+  // Step 2: fallback to PubMed abstract if no evidence
+  if (evidence.length === 0) {
+    const url = `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&term=${gene}+cilia&retmode=json&api_key=${CONFIG.NCBI_API_KEY}`;
+    const res = await fetch(url);
+    const js = await res.json();
+    if (js.esearchresult.idlist.length > 0) {
+      const pmid = js.esearchresult.idlist[0];
+      const fetchUrl = `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pubmed&id=${pmid}&retmode=xml&api_key=${CONFIG.NCBI_API_KEY}`;
+      const xml = await fetch(fetchUrl).then(r => r.text());
+      const doc = new window.DOMParser().parseFromString(xml, "text/xml");
+      const abst = doc.querySelector("Abstract");
+      if (abst) {
+        const text = abst.textContent;
+        evidence.push({
+          snippet: makeSnippetAroundGene(gene, text),
+          context: text,
+          score: 1,
+          source: `PubMed${pmid}`
+        });
+      }
+    }
+  }
+
+  // Rank and return
+  evidence.sort((a, b) => b.score - a.score);
+  return evidence;
+}
+
+// Exported API
+window.analyzeGeneViaAPI_FT = analyzeGeneViaAPI_FT;
+
 /* -----------------------
    Europe PMC: search & fullTextXML fetch
    ----------------------- */
