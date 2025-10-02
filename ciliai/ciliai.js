@@ -100,8 +100,29 @@ function prepareKnowledgeBase(allGenes) {
         (gene.functional_category || gene.Functional_category || "").split(',').forEach(cat => {
             if (cat.trim()) KNOWLEDGE_BASE.functionalCategories.add(cat.trim().toLowerCase());
         });
-        if (gene.complex_names) KNOWLEDGE_BASE.complexes.add(gene.complex_names.trim().toLowerCase());
-        (gene.domain_descriptions || gene.Protein_families || []).forEach(domain => {
+       if (gene.complex_names) {
+    try {
+        const complexName = Array.isArray(gene.complex_names) 
+            ? gene.complex_names.join(', ') 
+            : String(gene.complex_names || '');
+        if (complexName.trim()) {
+            KNOWLEDGE_BASE.complexes.add(complexName.trim().toLowerCase());
+        }
+    } catch (e) {
+        console.warn(`Could not process complex_names for gene:`, gene, e);
+    }
+}
+        try {
+    const domains = gene.domain_descriptions || gene.Protein_families || [];
+    const domainArray = Array.isArray(domains) ? domains : [domains];
+    domainArray.forEach(domain => {
+        if (domain && typeof domain === 'string' && domain.trim()) {
+            KNOWLEDGE_BASE.domains.add(domain.trim().toLowerCase());
+        }
+    });
+} catch (e) {
+    console.warn(`Could not process domains for gene:`, gene, e);
+}
             if (domain) KNOWLEDGE_BASE.domains.add(domain.trim().toLowerCase());
         });
     });
