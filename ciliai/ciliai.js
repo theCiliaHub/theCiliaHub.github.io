@@ -363,7 +363,7 @@ function setupCiliAIEventListeners() {
                     const isVisible = content.style.display === 'block';
                     content.style.display = isVisible ? 'none' : 'block';
                     const count = e.target.dataset.count || 0;
-                    e.target.textContent = isVisible ? `Show Evidence (${count}) ▾` : `Hide Evidence (${count}) ▴`;
+                    e.target.textContent = `Show Evidence (${count}) ▾`;
                 }
             }
         });
