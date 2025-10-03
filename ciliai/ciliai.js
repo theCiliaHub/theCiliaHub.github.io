@@ -276,12 +276,25 @@ async function handleAIQuery() {
             const results = data.filter(g => g.localization && g.localization.toLowerCase().includes(location.toLowerCase()));
             resultHtml = formatSimpleResults(results, title);
         }
-        else if ((match = query.match(/complex(?:es| components)? for\s+([A-Z0-9]+)/i))) {
-            const geneSymbol = match[1].toUpperCase();
-            const gene = data.find(g => g.gene === geneSymbol);
-            title = `Complex Information for ${geneSymbol}`;
-            resultHtml = formatComplexResults(gene, title);
-        }
+       // --- COMPLEX QUERIES (robust handling) ---
+else if (
+    // Matches "complex for X", "complexes for X", "complexes of X", "complexes with X"
+    (match = query.match(/complex(?:es| components)?\s+(?:for|of|with)\s+([A-Z0-9\-]+)/i)) ||
+    // Matches "X complex" or "X complexes"
+    (match = query.match(/^([A-Z0-9\-]+)\s+complex(?:es)?$/i))
+) {
+    const geneSymbol = match[1].toUpperCase();
+
+    // Try exact match or alias match
+    const gene = data.find(g =>
+        g.gene.toUpperCase() === geneSymbol ||
+        (g.aliases && g.aliases.map(a => a.toUpperCase()).includes(geneSymbol))
+    );
+
+    title = `Complex Information for ${geneSymbol}`;
+    resultHtml = formatComplexResults(gene, title);
+}
+
         else if (/^[A-Z0-9]{3,}$/i.test(query.split(' ')[0])) {
              const detectedGene = query.split(' ')[0].toUpperCase();
              document.getElementById('geneInput').value = detectedGene;
