@@ -200,7 +200,6 @@ async function fetchCiliaData() {
         const response = await fetch('https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/ciliahub_data.json');
         if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
         const data = await response.json();
-        // Sanitize domain_descriptions to ensure it's always an array
         ciliaHubDataCache = data.map(gene => ({
             ...gene,
             domain_descriptions: typeof gene.domain_descriptions === 'string' 
@@ -215,14 +214,6 @@ async function fetchCiliaData() {
         console.error("Failed to fetch CiliaHub data:", error);
         return null;
     }
-}
-async function validateCiliaData() {
-    const data = await fetchCiliaData();
-    data.forEach((gene, index) => {
-        if (!gene.domain_descriptions || !Array.isArray(gene.domain_descriptions)) {
-            console.warn(`Invalid domain_descriptions for gene ${gene.gene} at index ${index}:`, gene.domain_descriptions);
-        }
-    });
 }
 
 async function fetchScreenData() {
@@ -266,44 +257,40 @@ async function handleAIQuery() {
     let match;
 
     try {
-    if ((match = query.match(/genes for\s+(.*)/i))) {
-        const disease = match[1].trim().replace(/\s+/g, ' ').toLowerCase();
-        title = `Genes associated with "${disease}"`;
-        const diseaseRegex = new RegExp(disease.replace(/ /g, '[\\s-]*'), 'i');
-        const results = data.filter(g => g.functional_summary && diseaseRegex.test(g.functional_summary));
-        resultHtml = formatSimpleResults(results, title);
-    } else if ((match = query.match(/(?:show me|find)\s+(.*?)\s+domain/i))) {
-        const domain = match[1].trim();
-        title = `Genes with "${domain}" domain`;
-        const results = data.filter(g => 
-            g.domain_descriptions && 
-            Array.isArray(g.domain_descriptions) && 
-            g.domain_descriptions.some(d => d.toLowerCase().includes(domain.toLowerCase()))
-        );
-        resultHtml = formatDomainResults(results, title);
-    } else if ((match = query.match(/genes localizing to the\s+(.*)/i) || query.match(/(.*)\s+localizing genes/i))) {
-        const location = match[1].trim();
-        title = `Genes localizing to "${location}"`;
-        const results = data.filter(g => g.localization && g.localization.toLowerCase().includes(location.toLowerCase()));
-        resultHtml = formatSimpleResults(results, title);
-    } else if ((match = query.match(/complex(?:es| components)? for\s+([A-Z0-9]+)/i))) {
-        const geneSymbol = match[1].toUpperCase();
-        const gene = data.find(g => g.gene === geneSymbol);
-        title = `Complex Information for ${geneSymbol}`;
-        resultHtml = formatComplexResults(gene, title);
-    } else if (/^[A-Z0-9]{3,}$/i.test(query.split(' ')[0])) {
-        const detectedGene = query.split(' ')[0].toUpperCase();
-        document.getElementById('geneInput').value = detectedGene;
-        runAnalysis([detectedGene]);
-        return;
-    } else {
-        resultHtml = `<p>Sorry, I didn't understand that query. Please try asking about a disease, domain, localization, or complex.</p>`;
-    }
-    resultsContainer.innerHTML = resultHtml;
-} catch (e) {
-    resultsContainer.innerHTML = `<p class="status-not-found">An error occurred during the search: Invalid data format. Please contact support or try a different query.</p>`;
-    console.error('Query error in handleAIQuery:', e);
-}
+        if ((match = query.match(/genes for\s+(.*)/i))) {
+            const disease = match[1].trim().replace(/\s+/g, ' ').toLowerCase();
+            title = `Genes associated with "${disease}"`;
+            const diseaseRegex = new RegExp(disease.replace(/ /g, '[\\s-]*'), 'i');
+            const results = data.filter(g => g.functional_summary && diseaseRegex.test(g.functional_summary));
+            resultHtml = formatSimpleResults(results, title);
+        }
+        else if ((match = query.match(/(?:show me|find)\s+(.*?)\s+domain/i))) {
+            const domain = match[1].trim();
+            title = `Genes with "${domain}" domain`;
+            const results = data.filter(g => g.domain_descriptions && g.domain_descriptions.some(d => d.toLowerCase().includes(domain.toLowerCase())));
+            resultHtml = formatDomainResults(results, title);
+        }
+        else if ((match = query.match(/genes localizing to the\s+(.*)/i) || query.match(/(.*)\s+localizing genes/i))) {
+            const location = match[1].trim();
+            title = `Genes localizing to "${location}"`;
+            const results = data.filter(g => g.localization && g.localization.toLowerCase().includes(location.toLowerCase()));
+            resultHtml = formatSimpleResults(results, title);
+        }
+        else if ((match = query.match(/complex(?:es| components)? for\s+([A-Z0-9]+)/i))) {
+            const geneSymbol = match[1].toUpperCase();
+            const gene = data.find(g => g.gene === geneSymbol);
+            title = `Complex Information for ${geneSymbol}`;
+            resultHtml = formatComplexResults(gene, title);
+        }
+        else if (/^[A-Z0-9]{3,}$/i.test(query.split(' ')[0])) {
+             const detectedGene = query.split(' ')[0].toUpperCase();
+             document.getElementById('geneInput').value = detectedGene;
+             runAnalysis([detectedGene]);
+             return;
+        }
+        else {
+            resultHtml = `<p>Sorry, I didn't understand that query. Please try asking about a disease, domain, localization, or complex.</p>`;
+        }
         
         resultsContainer.innerHTML = resultHtml;
 
@@ -328,10 +315,11 @@ function formatDomainResults(results, title) {
     if (results.length === 0) return `<div class="result-card"><h3>${title}</h3><p class="status-not-found">No matching genes found.</p></div>`;
     let html = `<div class="result-card"><h3>${title} (${results.length} found)</h3>`;
     results.forEach(gene => {
+        const domains = Array.isArray(gene.domain_descriptions) ? gene.domain_descriptions.join(', ') : 'None';
         html += `
             <div style="border-bottom: 1px solid #eee; padding: 10px 0; margin-bottom: 10px;">
                 <strong>${gene.gene}</strong>
-                <ul><li>Domains: ${gene.domain_descriptions.join(', ')}</li></ul>
+                <ul><li>Domains: ${domains}</li></ul>
             </div>`;
     });
     return html + '</div>';
