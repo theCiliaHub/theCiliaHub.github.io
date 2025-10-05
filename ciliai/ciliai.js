@@ -38,13 +38,17 @@ window.displayCiliAIPage = async function displayCiliAIPage() {
                             <button class="ai-query-btn" id="aiQueryBtn">Ask CiliAI</button>
                         </div>
                         <div class="example-queries">
-                            <p><strong>Try asking:</strong> 
-                               <span>"genes for Joubert Syndrome"</span>, 
-                               <span>"show me WD40 domain genes"</span>, 
-                               <span>"cilia localizing genes"</span>, or 
-                               <span>"complexes for IFT88"</span>.
-                            </p>
-                        </div>
+    <p><strong>Try asking:</strong> 
+        <span>"genes for Joubert Syndrome"</span>, 
+        <span>"show me WD40 domain genes"</span>, 
+        <span>"cilia localizing genes"</span>, 
+        <span>"complexes for IFT88"</span>, 
+        <span>"Hedgehog signaling genes"</span>, 
+        <span>"genes causing short cilia"</span>, 
+        <span>"genes interacting with ARL13B"</span>, 
+        <span>"ciliopathy genes"</span>.
+    </p>
+</div>
                     </div>
 
                     <div class="input-section">
@@ -232,7 +236,6 @@ async function fetchScreenData() {
 }
 
 // --- Advanced AI Query Engine ---
-
 async function handleAIQuery() {
     const aiQueryInput = document.getElementById('aiQueryInput');
     const resultsContainer = document.getElementById('resultsContainer');
@@ -257,6 +260,7 @@ async function handleAIQuery() {
     let match;
 
     try {
+        // Disease-related genes
         if ((match = query.match(/genes for\s+(.*)/i))) {
             const disease = match[1].trim().replace(/\s+/g, ' ').toLowerCase();
             title = `Genes associated with "${disease}"`;
@@ -264,47 +268,82 @@ async function handleAIQuery() {
             const results = data.filter(g => g.functional_summary && diseaseRegex.test(g.functional_summary));
             resultHtml = formatSimpleResults(results, title);
         }
+        // Domain-related genes
         else if ((match = query.match(/(?:show me|find)\s+(.*?)\s+domain/i))) {
             const domain = match[1].trim();
             title = `Genes with "${domain}" domain`;
             const results = data.filter(g => g.domain_descriptions && g.domain_descriptions.some(d => d.toLowerCase().includes(domain.toLowerCase())));
             resultHtml = formatDomainResults(results, title);
         }
-        else if ((match = query.match(/genes localizing to the\s+(.*)/i) || query.match(/(.*)\s+localizing genes/i))) {
+        // Localization-related genes
+        else if ((match = query.match(/genes localizing to\s+(.*)/i) || query.match(/(.*)\s+localizing genes/i))) {
             const location = match[1].trim();
             title = `Genes localizing to "${location}"`;
             const results = data.filter(g => g.localization && g.localization.toLowerCase().includes(location.toLowerCase()));
             resultHtml = formatSimpleResults(results, title);
         }
-       // --- COMPLEX QUERIES (robust handling) ---
-else if (
-    // Matches "complex for X", "complexes for X", "complexes of X", "complexes with X"
-    (match = query.match(/complex(?:es| components)?\s+(?:for|of|with)\s+([A-Z0-9\-]+)/i)) ||
-    // Matches "X complex" or "X complexes"
-    (match = query.match(/^([A-Z0-9\-]+)\s+complex(?:es)?$/i))
-) {
-    const geneSymbol = match[1].toUpperCase();
-
-    // Try exact match or alias match
-    const gene = data.find(g =>
-        g.gene.toUpperCase() === geneSymbol ||
-        (g.aliases && g.aliases.map(a => a.toUpperCase()).includes(geneSymbol))
-    );
-
-    title = `Complex Information for ${geneSymbol}`;
-    resultHtml = formatComplexResults(gene, title);
-}
-
+        // Protein complex queries
+        else if (
+            (match = query.match(/complex(?:es| components)?\s+(?:for|of|with)\s+([A-Z0-9\-]+)/i)) ||
+            (match = query.match(/^([A-Z0-9\-]+)\s+complex(?:es)?$/i))
+        ) {
+            const geneSymbol = match[1].toUpperCase();
+            const gene = data.find(g =>
+                g.gene.toUpperCase() === geneSymbol ||
+                (g.aliases && g.aliases.map(a => a.toUpperCase()).includes(geneSymbol))
+            );
+            title = `Complex Information for ${geneSymbol}`;
+            resultHtml = formatComplexResults(gene, title);
+        }
+        // Pathway-related genes (new)
+        else if ((match = query.match(/(?:genes|pathway genes)\s+(?:for|in|related to)\s+(.*\s*(?:signaling|pathway))/i))) {
+            const pathway = match[1].trim().toLowerCase();
+            title = `Genes in "${pathway}"`;
+            const pathwayRegex = new RegExp(pathway.replace(/ /g, '[\\s-]*'), 'i');
+            const results = data.filter(g => g.pathways && g.pathways.some(p => pathwayRegex.test(p)));
+            resultHtml = formatSimpleResults(results, title);
+        }
+        // Phenotype-related genes (new)
+        else if ((match = query.match(/genes causing\s+(.*)/i))) {
+            const phenotype = match[1].trim().toLowerCase();
+            title = `Genes causing "${phenotype}"`;
+            const phenotypeRegex = new RegExp(phenotype.replace(/ /g, '[\\s-]*'), 'i');
+            const results = data.filter(g => g.phenotype && phenotypeRegex.test(g.phenotype));
+            resultHtml = formatSimpleResults(results, title);
+        }
+        // Gene interaction or co-expression (new)
+        else if ((match = query.match(/(?:genes interacting with|interactors of|co-expressed with)\s+([A-Z0-9\-]+)/i))) {
+            const geneSymbol = match[1].toUpperCase();
+            title = `Genes interacting with ${geneSymbol}`;
+            const gene = data.find(g =>
+                g.gene.toUpperCase() === geneSymbol ||
+                (g.aliases && g.aliases.map(a => a.toUpperCase()).includes(geneSymbol))
+            );
+            if (gene && gene.interactions) {
+                const results = data.filter(g => gene.interactions.includes(g.gene));
+                resultHtml = formatSimpleResults(results, title);
+            } else {
+                resultHtml = `<div class="result-card"><h3>${title}</h3><p class="status-not-found">No interaction data found for ${geneSymbol}.</p></div>`;
+            }
+        }
+        // Ciliopathy-related genes (new)
+        else if ((match = query.match(/(?:ciliopathy genes|genes for ciliopathy|ciliopathies)/i))) {
+            title = `Genes associated with ciliopathies`;
+            const results = data.filter(g => g.ciliopathy_associated === true);
+            resultHtml = formatSimpleResults(results, title);
+        }
+        // Single gene analysis
         else if (/^[A-Z0-9]{3,}$/i.test(query.split(' ')[0])) {
-             const detectedGene = query.split(' ')[0].toUpperCase();
-             document.getElementById('geneInput').value = detectedGene;
-             runAnalysis([detectedGene]);
-             return;
+            const detectedGene = query.split(' ')[0].toUpperCase();
+            document.getElementById('geneInput').value = detectedGene;
+            runAnalysis([detectedGene]);
+            return;
         }
+        // Fallback for unrecognized queries
         else {
-            resultHtml = `<p>Sorry, I didn't understand that query. Please try asking about a disease, domain, localization, or complex.</p>`;
+            resultHtml = `<p>Sorry, I didn't understand that query. Please try asking about a disease, domain, localization, complex, pathway, phenotype, interactions, or ciliopathies.</p>`;
         }
-        
+
         resultsContainer.innerHTML = resultHtml;
 
     } catch (e) {
