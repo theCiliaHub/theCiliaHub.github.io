@@ -985,7 +985,7 @@ function renderScreenSummaryHeatmap(genes, screenData) {
     Plotly.newPlot('plot-display-area', data, layout, { responsive: true });
 }
 
-// --- Add this entire function to your ciliAI.js file ---
+// Add this entire function to your ciliAI.js file
 
 function setupAutocomplete() {
     const geneInput = document.getElementById('geneInput');
