@@ -433,6 +433,7 @@ function setupCiliAIEventListeners() {
                 analyzeGenesFromInput();
             }
         }, 300));
+    setupAutocomplete(); 
     }
     
     if (aiQueryInput) {
@@ -951,6 +952,64 @@ function renderScreenSummaryHeatmap(genes, screenData) {
     });
 
     Plotly.newPlot('plot-display-area', data, layout, { responsive: true });
+}
+
+function setupAutocomplete() {
+    const geneInput = document.getElementById('geneInput');
+    const suggestionsContainer = document.getElementById('geneSuggestions');
+    if (!geneInput || !suggestionsContainer) return;
+
+    geneInput.addEventListener('input', async () => {
+        // Ensure data is loaded
+        if (!ciliaHubDataCache) await fetchCiliaData();
+        if (!ciliaHubDataCache) return; // Exit if data still not available
+
+        const fullText = geneInput.value;
+        // Find the term being currently typed (after the last comma or space)
+        const currentTerm = fullText.split(/[\s,]+/).pop().trim().toUpperCase();
+
+        if (currentTerm.length < 2) {
+            suggestionsContainer.style.display = 'none';
+            return;
+        }
+
+        // Filter genes that start with the current term
+        const suggestions = ciliaHubDataCache
+            .map(g => g.gene)
+            .filter(geneName => geneName.toUpperCase().startsWith(currentTerm))
+            .slice(0, 10); // Limit to 10 suggestions
+
+        if (suggestions.length > 0) {
+            suggestionsContainer.innerHTML = suggestions
+                .map(gene => `<div class="suggestion-item">${gene}</div>`)
+                .join('');
+            suggestionsContainer.style.display = 'block';
+        } else {
+            suggestionsContainer.style.display = 'none';
+        }
+    });
+
+    // Add a click listener to the container to handle suggestion selection
+    suggestionsContainer.addEventListener('click', (e) => {
+        if (e.target.classList.contains('suggestion-item')) {
+            const selectedGene = e.target.textContent;
+            const existingText = geneInput.value;
+            const terms = existingText.split(/[\s,]+/);
+            terms.pop(); // Remove the term being typed
+            terms.push(selectedGene); // Add the selected gene
+            
+            geneInput.value = terms.join(', ') + ', '; // Append with a comma and space
+            suggestionsContainer.style.display = 'none';
+            geneInput.focus();
+        }
+    });
+
+    // Hide suggestions when clicking outside
+    document.addEventListener('click', (e) => {
+        if (!geneInput.contains(e.target)) {
+            suggestionsContainer.style.display = 'none';
+        }
+    });
 }
 
 // Expose functions globally for router compatibility
