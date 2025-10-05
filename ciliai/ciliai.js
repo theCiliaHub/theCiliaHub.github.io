@@ -486,7 +486,9 @@ function setupCiliAIEventListeners() {
         }
     });
 
-    setupAutocomplete(); 
+    // Activate both autocomplete features
+    setupAutocomplete();   
+    setupAiQueryAutocomplete();
 }
 
 function analyzeGenesFromInput() {
