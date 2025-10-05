@@ -462,7 +462,6 @@ function setupCiliAIEventListeners() {
                 analyzeGenesFromInput();
             }
         }, 300));
-    setupAutocomplete(); 
     }
     
     if (aiQueryInput) {
@@ -484,6 +483,9 @@ function setupCiliAIEventListeners() {
             }
         });
     }
+
+    // Call the autocomplete setup function here
+    setupAutocomplete(); 
 }
 
 function analyzeGenesFromInput() {
@@ -983,6 +985,8 @@ function renderScreenSummaryHeatmap(genes, screenData) {
     Plotly.newPlot('plot-display-area', data, layout, { responsive: true });
 }
 
+// --- Add this entire function to your ciliAI.js file ---
+
 function setupAutocomplete() {
     const geneInput = document.getElementById('geneInput');
     const suggestionsContainer = document.getElementById('geneSuggestions');
@@ -991,7 +995,7 @@ function setupAutocomplete() {
     geneInput.addEventListener('input', async () => {
         // Ensure data is loaded
         if (!ciliaHubDataCache) await fetchCiliaData();
-        if (!ciliaHubDataCache) return; // Exit if data still not available
+        if (!ciliaHubDataCache) return; // Exit if data is not available
 
         const fullText = geneInput.value;
         // Find the term being currently typed (after the last comma or space)
@@ -1018,28 +1022,30 @@ function setupAutocomplete() {
         }
     });
 
-    // Add a click listener to the container to handle suggestion selection
+    // Handle clicking on a suggestion
     suggestionsContainer.addEventListener('click', (e) => {
         if (e.target.classList.contains('suggestion-item')) {
             const selectedGene = e.target.textContent;
             const existingText = geneInput.value;
             const terms = existingText.split(/[\s,]+/);
-            terms.pop(); // Remove the term being typed
-            terms.push(selectedGene); // Add the selected gene
             
-            geneInput.value = terms.join(', ') + ', '; // Append with a comma and space
+            terms.pop(); // Remove the partial term being typed
+            terms.push(selectedGene); // Add the full, selected gene
+            
+            geneInput.value = terms.join(', ') + ', '; // Rebuild the string and add a comma
             suggestionsContainer.style.display = 'none';
-            geneInput.focus();
+            geneInput.focus(); // Return focus to the textarea
         }
     });
 
-    // Hide suggestions when clicking outside
+    // Hide suggestions when clicking anywhere else on the page
     document.addEventListener('click', (e) => {
         if (!geneInput.contains(e.target)) {
             suggestionsContainer.style.display = 'none';
         }
     });
 }
+
 
 // Expose functions globally for router compatibility
 window.setupCiliAIEventListeners = setupCiliAIEventListeners;
