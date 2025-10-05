@@ -38,59 +38,62 @@ window.displayCiliAIPage = async function displayCiliAIPage() {
                             <button class="ai-query-btn" id="aiQueryBtn">Ask CiliAI</button>
                         </div>
                         <div class="example-queries">
-    <p><strong>Try asking:</strong> 
-        <span>"genes for Joubert Syndrome"</span>, 
-        <span>"show me WD40 domain genes"</span>, 
-        <span>"cilia localizing genes"</span>, 
-        <span>"complexes for IFT88"</span>, 
-        <span>"Hedgehog signaling genes"</span>, 
-        <span>"genes causing short cilia"</span>, 
-        <span>"genes interacting with ARL13B"</span>, 
-        <span>"ciliopathy genes"</span>.
-    </p>
-</div>
+                            <p><strong>Try asking:</strong> 
+                                <span>"genes for Joubert Syndrome"</span>, 
+                                <span>"show me WD40 domain genes"</span>, 
+                                <span>"cilia localizing genes"</span>, 
+                                <span>"complexes for IFT88"</span>, 
+                                <span>"Hedgehog signaling genes"</span>, 
+                                <span>"genes causing short cilia"</span>, 
+                                <span>"genes interacting with ARL13B"</span>, 
+                                <span>"ciliopathy genes"</span>.
+                            </p>
+                        </div>
                     </div>
 
                     <div class="input-section">
                         <h3>Analyze Gene Phenotypes</h3>
                         <div class="input-group">
                             <label for="geneInput">Gene Symbols:</label>
-                            <textarea id="geneInput" class="gene-input-textarea" placeholder="Enter one or more gene symbols, separated by commas, spaces, or newlines (e.g., HDAC6, IFT88, ARL13B)"></textarea>
+                            <div class="autocomplete-wrapper">
+                                <textarea id="geneInput" class="gene-input-textarea" placeholder="Enter one or more gene symbols, separated by commas, spaces, or newlines (e.g., HDAC6, IFT88, ARL13B)"></textarea>
+                                <div id="geneSuggestions" class="suggestions-container"></div>
+                            </div>
                         </div>
 
                         <div class="input-group">
                             <label>Analysis Mode:</label>
                             <div class="mode-selector">
-                                 <div class="mode-option">
-                                     <input type="radio" id="hybrid" name="mode" value="hybrid" checked aria-label="Hybrid mode: Combines expert database, screen data, and literature">
-                                     <label for="hybrid" title="Best for most users. Combines our fast, expert-curated database, screen data, and real-time AI literature mining for the most comprehensive results.">
-                                         <span class="mode-icon">🔬</span>
-                                         <div>
-                                             <strong>Hybrid</strong><br>
-                                             <small>Expert DB + Screen Data + Literature</small>
-                                         </div>
-                                     </label>
-                                 </div>
-                                 <div class="mode-option">
-                                     <input type="radio" id="expert" name="mode" value="expert" aria-label="Expert only mode: Queries only our internal, manually curated database and screen data">
-                                     <label for="expert" title="Fastest option. Queries only our internal, manually curated database and screen data of known gene-cilia interactions.">
-                                         <span class="mode-icon">🏛️</span>
-                                         <div>
-                                             <strong>Expert Only</strong><br>
-                                             <small>Curated database + Screen Data</small>
-                                         </div>
-                                     </label>
-                                 </div>
-                                 <div class="mode-option">
-                                     <input type="radio" id="nlp" name="mode" value="nlp" aria-label="Literature only mode: Performs a live AI-powered search across PubMed full-text articles">
-                                     <label for="nlp" title="Most current data. Performs a live AI-powered search across PubMed full-text articles. May be slower but includes the very latest findings.">
-                                         <span class="mode-icon">📚</span>
-                                         <div>
-                                             <strong>Literature Only</strong><br>
-                                             <small>Live AI text mining</small>
-                                         </div>
-                                     </label>
-                                 </div>
+                                <div class="mode-option">
+                                    <input type="radio" id="hybrid" name="mode" value="hybrid" checked aria-label="Hybrid mode: Combines expert database, screen data, and literature">
+                                    <label for="hybrid" title="Best for most users. Combines our fast, expert-curated database, screen data, and real-time AI literature mining for the most comprehensive results.">
+                                        <span class="mode-icon">🔬</span>
+                                        <div>
+                                            <strong>Hybrid</strong><br>
+                                            <small>Expert DB + Screen Data + Literature</small>
+                                        </div>
+                                    </label>
+                                </div>
+                                <div class="mode-option">
+                                    <input type="radio" id="expert" name="mode" value="expert" aria-label="Expert only mode: Queries only our internal, manually curated database and screen data">
+                                    <label for="expert" title="Fastest option. Queries only our internal, manually curated database and screen data of known gene-cilia interactions.">
+                                        <span class="mode-icon">🏛️</span>
+                                        <div>
+                                            <strong>Expert Only</strong><br>
+                                            <small>Curated database + Screen Data</small>
+                                        </div>
+                                    </label>
+                                </div>
+                                <div class="mode-option">
+                                    <input type="radio" id="nlp" name="mode" value="nlp" aria-label="Literature only mode: Performs a live AI-powered search across PubMed full-text articles">
+                                    <label for="nlp" title="Most current data. Performs a live AI-powered search across PubMed full-text articles. May be slower but includes the very latest findings.">
+                                        <span class="mode-icon">📚</span>
+                                        <div>
+                                            <strong>Literature Only</strong><br>
+                                            <small>Live AI text mining</small>
+                                        </div>
+                                    </label>
+                                </div>
                             </div>
                         </div>
 
@@ -166,6 +169,32 @@ window.displayCiliAIPage = async function displayCiliAIPage() {
                 .screen-table .effect-inhibits { color: #dc3545; font-weight: bold; }
                 .screen-table .effect-no-effect { color: #6c757d; }
                 .screen-evidence-container { border: 1px solid #bbdefb; border-radius: 4px; padding: 1rem; background-color: #f8f9fa; }
+                
+                /* ADDED CSS FOR AUTOCOMPLETE */
+                .autocomplete-wrapper {
+                    position: relative;
+                }
+                .suggestions-container {
+                    display: none; /* Hidden by default */
+                    position: absolute;
+                    border: 1px solid #ddd;
+                    background-color: white;
+                    width: 100%;
+                    max-height: 200px;
+                    overflow-y: auto;
+                    z-index: 1000;
+                    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+                    border-radius: 0 0 4px 4px;
+                    box-sizing: border-box;
+                }
+                .suggestion-item {
+                    padding: 10px;
+                    cursor: pointer;
+                    font-size: 0.9rem;
+                }
+                .suggestion-item:hover {
+                    background-color: #f0f0f0;
+                }
             </style>
         `;
     } catch (error) {
