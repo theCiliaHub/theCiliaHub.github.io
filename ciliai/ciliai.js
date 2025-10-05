@@ -32,8 +32,9 @@ window.displayCiliAIPage = async function displayCiliAIPage() {
                 <div class="ciliai-main-content">
                     <div class="ai-query-section">
                         <h3>Ask a Question</h3>
-                        <div class="ai-input-group">
+                        <div class="ai-input-group autocomplete-wrapper">
                             <input type="text" id="aiQueryInput" class="ai-query-input" placeholder="e.g., genes for Joubert Syndrome">
+                            <div id="aiQuerySuggestions" class="suggestions-container"></div>
                             <button class="ai-query-btn" id="aiQueryBtn">Ask CiliAI</button>
                         </div>
                         <div class="example-queries">
@@ -41,9 +42,7 @@ window.displayCiliAIPage = async function displayCiliAIPage() {
                                 <span>"genes for Joubert Syndrome"</span>, 
                                 <span>"show me WD40 domain genes"</span>, 
                                 <span>"cilia localizing genes"</span>, 
-                                <span>"complexes for IFT88"</span>, 
-                                <span>"Hedgehog signaling genes"</span>, 
-                                <span>"genes causing short cilia"</span>.
+                                <span>"complexes for IFT88"</span>.
                             </p>
                         </div>
                     </div>
@@ -115,7 +114,7 @@ window.displayCiliAIPage = async function displayCiliAIPage() {
                 .ciliai-header p { font-size: 1.2rem; color: #555; margin-top: 0.5rem; }
                 .ai-query-section { background-color: #e8f4fd; border: 1px solid #bbdefb; padding: 1.5rem 2rem; border-radius: 8px; margin-bottom: 2rem; }
                 .ai-query-section h3 { margin-top: 0; color: #2c5aa0; }
-                .ai-input-group { display: flex; gap: 10px; }
+                .ai-input-group { position: relative; display: flex; gap: 10px; }
                 .ai-query-input { flex-grow: 1; padding: 0.8rem; border: 1px solid #ccc; border-radius: 4px; font-size: 1rem; }
                 .ai-query-btn { padding: 0.8rem 1.2rem; font-size: 1rem; background-color: #2c5aa0; color: white; border: none; border-radius: 4px; cursor: pointer; transition: background-color 0.2s; }
                 .ai-query-btn:hover { background-color: #1e4273; }
@@ -145,29 +144,10 @@ window.displayCiliAIPage = async function displayCiliAIPage() {
                 .result-card .status-searching { color: #007bff; }
                 .prediction-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem; }
                 .prediction-box { padding: 1rem; border-radius: 6px; text-align: center; background-color: #f8f9fa; border: 1px solid #dee2e6; }
-                .prediction-box.promotes { background-color: #d4edda; border: 1px solid #c3e6cb; }
-                .prediction-box.inhibits { background-color: #f8d7da; border: 1px solid #f5c6cb; }
-                .prediction-box.no-effect { background-color: #e2e3e5; border: 1px solid #d6d8db; }
-                .prediction-box.conflicting { background-color: #fff3cd; border: 1px solid #ffeeba; }
                 .prediction-box h4 { margin: 0 0 0.5rem 0; color: #495057; }
                 .prediction-box p { margin: 0; font-size: 1.2rem; font-weight: bold; }
-                .evidence-section { margin-top: 1.5rem; border-top: 1px solid #eee; padding-top: 1rem; }
-                .evidence-toggle { background: none; border: 1px solid #2c5aa0; color: #2c5aa0; padding: 0.4rem 0.8rem; border-radius: 20px; cursor: pointer; font-weight: bold; transition: all 0.2s; margin-bottom: 0.5rem; }
-                .evidence-toggle:hover { background-color: #e8f4fd; }
-                .evidence-content { display: none; margin-top: 1rem; padding-left: 1rem; border-left: 3px solid #bbdefb; }
-                .evidence-snippet { background-color: #f1f3f5; padding: 0.8rem; border-radius: 4px; margin-bottom: 0.8rem; font-size: 0.9rem; color: #333; }
-                .evidence-snippet strong { color: #0056b3; }
-                .evidence-snippet mark { background-color: #ffeeba; padding: 0.1em 0.2em; border-radius: 3px; }
-                .screen-summary { font-weight: bold; color: #2c5aa0; margin-bottom: 1rem; }
-                .screen-table { width: 100%; border-collapse: collapse; margin-top: 0.5rem; background-color: #fff; }
-                .screen-table th, .screen-table td { border: 1px solid #ddd; padding: 0.8rem; text-align: left; }
-                .screen-table th { background-color: #e8f4fd; font-weight: bold; color: #2c5aa0; }
-                .screen-table .effect-promotes { color: #28a745; font-weight: bold; }
-                .screen-table .effect-inhibits { color: #dc3545; font-weight: bold; }
-                .screen-table .effect-no-effect { color: #6c757d; }
-                .screen-evidence-container { border: 1px solid #bbdefb; border-radius: 4px; padding: 1rem; background-color: #f8f9fa; }
-                .autocomplete-wrapper { position: relative; }
-                .suggestions-container { display: none; position: absolute; border: 1px solid #ddd; background-color: white; width: 100%; max-height: 200px; overflow-y: auto; z-index: 1000; box-shadow: 0 4px 8px rgba(0,0,0,0.1); border-radius: 0 0 4px 4px; box-sizing: border-box; }
+                .autocomplete-wrapper { position: relative; width: 100%; }
+                .suggestions-container { display: none; position: absolute; top: 100%; left: 0; border: 1px solid #ddd; background-color: white; width: 100%; max-height: 200px; overflow-y: auto; z-index: 1000; box-shadow: 0 4px 8px rgba(0,0,0,0.1); border-radius: 0 0 4px 4px; box-sizing: border-box; }
                 .suggestion-item { padding: 10px; cursor: pointer; font-size: 0.9rem; }
                 .suggestion-item:hover { background-color: #f0f0f0; }
             </style>
@@ -178,27 +158,19 @@ window.displayCiliAIPage = async function displayCiliAIPage() {
         return;
     }
 
-    // Pre-fetch data and wait before attaching event listeners
     await Promise.all([fetchCiliaData(), fetchScreenData()]);
-
-    // Attach event listeners after HTML is injected and data is fetched
     setupCiliAIEventListeners();
 };
 
-// --- Helper Functions ---
-
+// --- Helper Functions & Mock DB ---
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-
-function debounce(fn, delay) {
-    let timeout;
-    return function (...args) {
-        clearTimeout(timeout);
-        timeout = setTimeout(() => fn(...args), delay);
-    };
-}
-
-// Expert-curated internal database (mock)
+function debounce(fn, delay) { let timeout; return function (...args) { clearTimeout(timeout); timeout = setTimeout(() => fn(...args), delay); }; }
 const CILI_AI_DB = { "HDAC6": { "summary": { "lof_length": "Promotes / Maintains", "percentage_ciliated": "No effect", "source": "Expert DB" }, "evidence": [{ "id": "21873644", "source": "pubmed", "context": "...loss of HDAC6 results in hyperacetylation of tubulin and leads to the formation of longer, more stable primary cilia in renal epithelial cells." }] }, "IFT88": { "summary": { "lof_length": "Inhibits / Restricts", "percentage_ciliated": "Reduced cilia numbers", "source": "Expert DB" }, "evidence": [{ "id": "10882118", "source": "pubmed", "context": "Mutations in IFT88 (polaris) disrupt intraflagellar transport, leading to a failure in cilia assembly and resulting in severely shortened or absent cilia." }] }, "ARL13B": { "summary": { "lof_length": "Inhibits / Restricts", "percentage_ciliated": "Reduced cilia numbers", "source": "Expert DB" }, "evidence": [{ "id": "21940428", "source": "pubmed", "context": "The small GTPase ARL13B is critical for ciliary structure; its absence leads to stunted cilia with abnormal morphology and axonemal defects." }] } };
+
+// --- Data Fetching and Caching (Abbreviated for brevity) ---
+async function fetchCiliaData() { if (ciliaHubDataCache) return ciliaHubDataCache; try { const response = await fetch('https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/ciliahub_data.json'); if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`); const data = await response.json(); ciliaHubDataCache = data.map(gene => ({...gene, domain_descriptions: typeof gene.domain_descriptions === 'string' ? gene.domain_descriptions.split(',').map(d => d.trim()) : Array.isArray(gene.domain_descriptions) ? gene.domain_descriptions : [] })); console.log('CiliaHub data loaded.'); return ciliaHubDataCache; } catch (error) { console.error("Failed to fetch CiliaHub data:", error); return null; } }
+async function fetchScreenData() { if (screenDataCache) return screenDataCache; try { const response = await fetch('https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/cilia_screens_data.json'); if (!response.ok) throw new Error(`Failed to fetch screen data: ${response.statusText}`); screenDataCache = await response.json(); console.log('Screen data loaded.'); return screenDataCache; } catch (error) { console.error('Error fetching screen data:', error); return {}; } }
+
 
 // --- Data Fetching and Caching ---
 
@@ -351,6 +323,62 @@ function formatComplexResults(gene, title) {
         html += '<p>No complex components listed for this gene.</p>';
     }
     return html + '</div>';
+}
+// --- Autocomplete Logic ---
+
+/**
+ * NEW: Sets up autocomplete for the main "Ask CiliAI" query input.
+ * It suggests a predefined list of example queries.
+ */
+function setupAiQueryAutocomplete() {
+    const aiQueryInput = document.getElementById('aiQueryInput');
+    const suggestionsContainer = document.getElementById('aiQuerySuggestions');
+    if (!aiQueryInput || !suggestionsContainer) return;
+
+    const exampleQueries = [
+        "genes for Joubert Syndrome",
+        "genes for Bardet-Biedl Syndrome",
+        "show me WD40 domain genes",
+        "show me IFT domain genes",
+        "cilia localizing genes",
+        "transition zone localizing genes",
+        "complexes for IFT88",
+        "genes causing short cilia",
+        "genes involved in Hedgehog signaling"
+    ];
+
+    aiQueryInput.addEventListener('input', () => {
+        const inputText = aiQueryInput.value.toLowerCase();
+        if (inputText.length < 2) {
+            suggestionsContainer.style.display = 'none';
+            return;
+        }
+
+        const filteredSuggestions = exampleQueries.filter(q => q.toLowerCase().includes(inputText));
+
+        if (filteredSuggestions.length > 0) {
+            suggestionsContainer.innerHTML = filteredSuggestions
+                .map(q => `<div class="suggestion-item">${q}</div>`)
+                .join('');
+            suggestionsContainer.style.display = 'block';
+        } else {
+            suggestionsContainer.style.display = 'none';
+        }
+    });
+
+    suggestionsContainer.addEventListener('click', (e) => {
+        if (e.target.classList.contains('suggestion-item')) {
+            aiQueryInput.value = e.target.textContent;
+            suggestionsContainer.style.display = 'none';
+            aiQueryInput.focus();
+        }
+    });
+
+    document.addEventListener('click', (e) => {
+        if (!aiQueryInput.contains(e.target)) {
+            suggestionsContainer.style.display = 'none';
+        }
+    });
 }
 
 // --- Gene Analysis Engine & UI ---
