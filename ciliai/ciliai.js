@@ -489,39 +489,40 @@ document.addEventListener('click', async (event) => {
             document.getElementById('visualizeBtn').style.display = 'block';
         }
 
-        if (action === 'phylogeny') {
-            resultsContainer.innerHTML =
-                `<p class="status-searching">Building phylogenetic distribution map...</p>`;
+       if (action === 'phylogeny') {
+    resultsContainer.innerHTML =
+        `<p class="status-searching">Building phylogenetic distribution map...</p>`;
 
-            const phylogeny = await fetchPhylogenyData();
+    const phylogeny = await fetchPhylogenyData();
 
-            // Build a normalized map including synonyms for reliable lookup
-            const phyloMap = {};
-            Object.entries(phylogeny).forEach(([gene, info]) => {
-                const keys = [gene, ...(info.synonyms || [])];
-                keys.forEach(k => {
-                    if (k) phyloMap[k.toUpperCase()] = info;
-                });
-            });
+    // Normalize gene keys: uppercase + include synonyms
+    const phyloMap = {};
+    Object.entries(phylogeny).forEach(([gene, info]) => {
+        const keys = [gene, ...(info.synonyms || [])];
+        keys.forEach(k => {
+            if (k) phyloMap[k.toUpperCase()] = info;
+        });
+    });
 
-            const selectedData = geneList.map(g => ({ gene: g, data: phyloMap[g.toUpperCase()] || {} }));
+    // Lookup using uppercase to match normalized keys
+    const selectedData = geneList.map(g => ({ gene: g, data: phyloMap[g.toUpperCase()] || {} }));
 
-            resultsContainer.innerHTML = `
-                <div class="result-card">
-                    <h3>Phylogenetic Distribution</h3>
-                    ${selectedData.map(({ gene, data }) => `
-                        <div class="phylogeny-entry">
-                            <strong>${gene}</strong><br>
-                            ${data?.presence
-                                ? Object.entries(data.presence)
-                                    .map(([org, val]) => `${org}: ${val ? '✅' : '❌'}`)
-                                    .join('<br>')
-                                : '<em>No phylogeny data available</em>'}
-                            <hr>
-                        </div>`).join('')}
-                </div>
-            `;
-        }
+    resultsContainer.innerHTML = `
+        <div class="result-card">
+            <h3>Phylogenetic Distribution</h3>
+            ${selectedData.map(({ gene, data }) => `
+                <div class="phylogeny-entry">
+                    <strong>${gene}</strong><br>
+                    ${data?.presence
+                        ? Object.entries(data.presence)
+                            .map(([org, val]) => `${org}: ${val ? '✅' : '❌'}`)
+                            .join('<br>')
+                        : '<em>No phylogeny data available</em>'}
+                    <hr>
+                </div>`).join('')}
+        </div>
+    `;
+}
     }
 });
 
