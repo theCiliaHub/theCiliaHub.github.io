@@ -327,39 +327,60 @@ async function handleAIQuery() {
             `;
         }
 
-        // 🧬 Ciliary-only genes
-        else if (/(?:ciliary[-\s]?only|cilia[-\s]?specific|present\s+only\s+in\s+ciliated\s+organisms|exclusive\s+to\s+ciliated)/i.test(query)) {
-            const phylogeny = await fetchPhylogenyData();
-            const ciliaryOnly = Object.entries(phylogeny)
-                .filter(([gene, info]) => info?.category === 'ciliary_only')
-                .map(([gene]) => gene);
+        // --- Genes specific to ciliated organisms ---
+else if (
+    /(?:ciliary[-\s]?only|ciliated\s+organisms\s+specific|genes\s+specific\s+to\s+ciliated|only\s+in\s+ciliated\s+organisms|cilia\s+organisms\s+specific)/i.test(query)
+) {
+    const phylogeny = await fetchPhylogenyData();
+    const ciliaryOnly = Object.entries(phylogeny)
+        .filter(([gene, info]) => info?.category === 'ciliary_only')
+        .map(([gene]) => gene);
 
-            resultHtml = `
-                ${formatSimpleResults(
-                    ciliaryOnly.map(g => ({ gene: g, description: 'Present only in ciliated organisms' })),
-                    'Ciliary-only genes'
-                )}
-                <p class="ai-suggestion">🌀 These genes are exclusive to ciliated organisms — likely core to ciliogenesis or ciliary signaling.  
-                Would you like to visualize their evolutionary conservation or domain structures?</p>
-            `;
-        }
+    if (ciliaryOnly.length > 0) {
+        resultHtml = `
+            <div class="result-card">
+                <h3>Genes specific to ciliated organisms</h3>
+                <p>These genes are conserved across all <strong>ciliated eukaryotes</strong> and absent in non-ciliated lineages. 
+                Would you like to visualize their <strong>domain composition</strong> or <strong>phylogenetic distribution</strong>?</p>
+                <ul>${ciliaryOnly.map(g => `<li>${g}</li>`).join('')}</ul>
+            </div>`;
+    } else {
+        resultHtml = `
+            <div class="result-card">
+                <h3>No genes found</h3>
+                <p>It seems no data were classified as "ciliary-only". Please ensure your <code>phylogeny_summary.json</code> includes <em>category: "ciliary_only"</em> entries.</p>
+            </div>`;
+    }
+}
 
-        // 🌍 Genes present in all organisms
-        else if (/(?:genes\s+present\s+in\s+all\s+organisms|conserved\s+across\s+all|universal\s+ciliary\s+genes|ubiquitous\s+ciliary\s+genes)/i.test(query)) {
-            const phylogeny = await fetchPhylogenyData();
-            const inAll = Object.entries(phylogeny)
-                .filter(([gene, info]) => info?.category === 'in_all_organisms')
-                .map(([gene]) => gene);
+        // --- Genes conserved in all studied organisms ---
+else if (
+    /in[_\s-]*all[_\s-]*organisms\s+genes/i.test(query) || 
+    /conserved\s+across\s+all/i.test(query) || 
+    /genes\s+present\s+in\s+all\s+organisms/i.test(query)
+) {
+    const phylogeny = await fetchPhylogenyData();
+    const inAll = Object.entries(phylogeny)
+        .filter(([gene, info]) => info?.category === 'in_all_organisms')
+        .map(([gene]) => gene);
 
-            resultHtml = `
-                ${formatSimpleResults(
-                    inAll.map(g => ({ gene: g, description: 'Conserved in all studied organisms' })),
-                    'Genes present in all organisms'
-                )}
-                <p class="ai-suggestion">🌐 These genes are conserved across all ciliated eukaryotes.  
-                Would you like to visualize their domain composition or expression diversity?</p>
-            `;
-        }
+    if (inAll.length > 0) {
+        resultHtml = `
+            <div class="result-card">
+                <h3>Genes present in all studied organisms</h3>
+                <p>These genes are <strong>highly conserved</strong> across all species in the dataset — they likely encode core cellular machinery.
+                Would you like to view their <strong>functional summaries</strong> or <strong>ortholog relationships</strong>?</p>
+                <ul>${inAll.map(g => `<li>${g}</li>`).join('')}</ul>
+            </div>`;
+    } else {
+        resultHtml = `
+            <div class="result-card">
+                <h3>No conserved genes found</h3>
+                <p>No genes were marked as "in_all_organisms". Check that your <code>phylogeny_summary.json</code> includes <em>category: "in_all_organisms"</em>.</p>
+            </div>`;
+    }
+}
+
 
         // ❌ Genes lost in non-ciliated organisms
         else if (/(?:genes\s+lost\s+in\s+non[-\s]?ciliated|absent\s+in\s+non[-\s]?ciliated|lost\s+during\s+deciliation)/i.test(query)) {
