@@ -262,7 +262,7 @@ async function fetchPhylogenyData() {
 }
 
 
-// --- Conversational CiliAI Query Engine ---
+// --- Conversational CiliAI Query Engine with Step 2 ---
 async function handleAIQuery() {
     const aiQueryInput = document.getElementById('aiQueryInput');
     const resultsContainer = document.getElementById('resultsContainer');
@@ -277,7 +277,9 @@ async function handleAIQuery() {
     document.getElementById('visualizeBtn').style.display = 'none';
 
     const data = await fetchCiliaData();
-    if (!data) {
+    const phylogeny = await fetchPhylogenyData();
+
+    if (!data || !phylogeny) {
         resultsContainer.innerHTML = `<p class="status-not-found">Error: CiliaHub data could not be loaded. Please check the console.</p>`;
         return;
     }
@@ -287,7 +289,7 @@ async function handleAIQuery() {
     let match;
 
     try {
-        // 🩺 Disease or phenotype related gene search
+        // 🩺 Disease or phenotype search
         if ((match = query.match(/(?:genes for|what genes are linked to|find genes for|genes involved in)\s+(.*)/i))) {
             const disease = match[1].trim().toLowerCase();
             title = `Genes associated with "${disease}"`;
@@ -322,128 +324,110 @@ async function handleAIQuery() {
 
             resultHtml = `
                 ${formatSimpleResults(results, title)}
-                <p class="ai-suggestion">📡 These genes are typically enriched at the ${location}.  
+                <p class="ai-suggestion">📡 These genes are enriched at the ${location}.  
                 Would you like me to compare their expression across species?</p>
             `;
         }
 
-        // --- Genes specific to ciliated organisms (interactive) ---
-else if (
-    /(?:ciliary[-\s]?only|ciliated\s+organisms\s+specific|genes\s+specific\s+to\s+ciliated|only\s+in\s+ciliated\s+organisms|cilia\s+organisms\s+specific)/i.test(query)
-) {
-    const phylogeny = await fetchPhylogenyData();
-    const ciliaryOnly = Object.entries(phylogeny)
-        .filter(([gene, info]) => info?.category === 'ciliary_only')
-        .map(([gene]) => gene);
+        // --- Ciliary-only / ciliated organisms specific ---
+        else if (/(?:ciliary[-\s]?only|ciliated\s+organisms\s+specific|genes\s+specific\s+to\s+ciliated|only\s+in\s+ciliated\s+organisms|cilia\s+organisms\s+specific)/i.test(query)) {
+            // Build a normalized phylogeny map for lookup
+            const phyloMap = {};
+            Object.entries(phylogeny).forEach(([gene, info]) => {
+                const keys = [gene, ...(info.synonyms || [])];
+                keys.forEach(k => {
+                    if (k) phyloMap[k.toUpperCase()] = info;
+                });
+            });
 
-    if (ciliaryOnly.length > 0) {
-        resultHtml = `
-            <div class="result-card">
-                <h3>Genes specific to ciliated organisms</h3>
-                <p>These genes are conserved across all <strong>ciliated eukaryotes</strong> and absent in non-ciliated lineages.</p>
-                <p>
-                    Would you like to visualize their 
-                    <a href="#" class="ai-action" data-action="domain" style="color:#3b82f6;">domain composition</a> 
-                    or 
-                    <a href="#" class="ai-action" data-action="phylogeny" style="color:#3b82f6;">phylogenetic distribution</a>?
-                </p>
-                <ul>${ciliaryOnly.map(g => `<li>${g}</li>`).join('')}</ul>
-            </div>`;
-    } else {
-        resultHtml = `
-            <div class="result-card">
-                <h3>No genes found</h3>
-                <p>It seems no data were classified as "ciliary-only". Please ensure your <code>phylogeny_summary.json</code> includes <em>category: "ciliary_only"</em> entries.</p>
-            </div>`;
-    }
-}
-
-
-        // --- Genes conserved in all studied organisms ---
-else if (
-    /in[_\s-]*all[_\s-]*organisms\s+genes/i.test(query) || 
-    /conserved\s+across\s+all/i.test(query) || 
-    /genes\s+present\s+in\s+all\s+organisms/i.test(query)
-) {
-    const phylogeny = await fetchPhylogenyData();
-    const inAll = Object.entries(phylogeny)
-        .filter(([gene, info]) => info?.category === 'in_all_organisms')
-        .map(([gene]) => gene);
-
-    if (inAll.length > 0) {
-        resultHtml = `
-            <div class="result-card">
-                <h3>Genes present in all studied organisms</h3>
-                <p>These genes are <strong>highly conserved</strong> across all species in the dataset — they likely encode core cellular machinery.
-                Would you like to view their <strong>functional summaries</strong> or <strong>ortholog relationships</strong>?</p>
-                <ul>${inAll.map(g => `<li>${g}</li>`).join('')}</ul>
-            </div>`;
-    } else {
-        resultHtml = `
-            <div class="result-card">
-                <h3>No conserved genes found</h3>
-                <p>No genes were marked as "in_all_organisms". Check that your <code>phylogeny_summary.json</code> includes <em>category: "in_all_organisms"</em>.</p>
-            </div>`;
-    }
-}
-
-
-        // ❌ Genes lost in non-ciliated organisms
-        else if (/(?:genes\s+lost\s+in\s+non[-\s]?ciliated|absent\s+in\s+non[-\s]?ciliated|lost\s+during\s+deciliation)/i.test(query)) {
-            const phylogeny = await fetchPhylogenyData();
-            const lostInNonCiliated = Object.entries(phylogeny)
-                .filter(([gene, info]) => info?.category === 'lost_in_non_ciliated')
+            const ciliaryOnly = Object.entries(phyloMap)
+                .filter(([gene, info]) => info?.category === 'ciliary_only')
                 .map(([gene]) => gene);
 
-            resultHtml = `
-                ${formatSimpleResults(
-                    lostInNonCiliated.map(g => ({ gene: g, description: 'Lost in non-ciliated lineages' })),
-                    'Genes lost in non-ciliated organisms'
-                )}
-                <p class="ai-suggestion">🧫 These genes were lost in lineages that no longer form cilia — a clue to their ancestral ciliary function.  
-                Shall I plot their loss events on a phylogenetic tree?</p>
-            `;
+            if (ciliaryOnly.length > 0) {
+                resultHtml = `
+                    <div class="result-card">
+                        <h3>Genes specific to ciliated organisms</h3>
+                        <p>These genes are conserved across all <strong>ciliated eukaryotes</strong> and absent in non-ciliated lineages.</p>
+                        <p>
+                            Would you like to visualize their 
+                            <a href="#" class="ai-action" data-action="domain" style="color:#3b82f6;">domain composition</a> 
+                            or 
+                            <a href="#" class="ai-action" data-action="phylogeny" style="color:#3b82f6;">phylogenetic distribution</a>?
+                        </p>
+                        <ul>${ciliaryOnly.map(g => `<li>${g}</li>`).join('')}</ul>
+                    </div>`;
+            } else {
+                resultHtml = `<div class="result-card">
+                    <h3>No genes found</h3>
+                    <p>No data were classified as "ciliary-only". Check that your <code>phylogeny_summary.json</code> includes <em>category: "ciliary_only"</em> entries.</p>
+                </div>`;
+            }
         }
 
-        // 🧠 Ciliogenesis-related genes
-        else if (/(?:ciliogenesis[-\s]?genes|genes\s+involved\s+in\s+ciliogenesis|cilium[-\s]?assembly\s+genes)/i.test(query)) {
-            const results = data.filter(g =>
-                g.functional_summary &&
-                /(ciliogenesis|axoneme assembly|cilium biogenesis)/i.test(g.functional_summary)
-            );
+        // --- Genes conserved in all organisms ---
+        else if (/in[_\s-]*all[_\s-]*organisms\s+genes/i.test(query) || /conserved\s+across\s+all/i.test(query) || /genes\s+present\s+in\s+all\s+organisms/i.test(query)) {
+            const phyloMap = {};
+            Object.entries(phylogeny).forEach(([gene, info]) => {
+                const keys = [gene, ...(info.synonyms || [])];
+                keys.forEach(k => {
+                    if (k) phyloMap[k.toUpperCase()] = info;
+                });
+            });
 
-            resultHtml = `
-                ${formatSimpleResults(results, 'Ciliogenesis-related genes')}
-                <p class="ai-suggestion">🧩 These genes participate in ciliogenesis or cilium assembly.  
-                Would you like me to group them by their subcellular localization?</p>
-            `;
+            const inAll = Object.entries(phyloMap)
+                .filter(([gene, info]) => info?.category === 'in_all_organisms')
+                .map(([gene]) => gene);
+
+            if (inAll.length > 0) {
+                resultHtml = `
+                    <div class="result-card">
+                        <h3>Genes present in all studied organisms</h3>
+                        <p>These genes are <strong>highly conserved</strong> across all species in the dataset.  
+                        Would you like to view their <strong>functional summaries</strong> or <strong>ortholog relationships</strong>?</p>
+                        <ul>${inAll.map(g => `<li>${g}</li>`).join('')}</ul>
+                    </div>`;
+            } else {
+                resultHtml = `<div class="result-card">
+                    <h3>No conserved genes found</h3>
+                    <p>No genes were marked as "in_all_organisms". Check your <code>phylogeny_summary.json</code>.</p>
+                </div>`;
+            }
         }
 
-        // 🧬 Gene phylogeny query
+        // --- Direct gene phylogeny ---
         else if (/phylogeny\s+of\s+([A-Z0-9\-]+)/i.test(query)) {
             const matchGene = query.match(/phylogeny\s+of\s+([A-Z0-9\-]+)/i);
-            const gene = matchGene[1].toUpperCase();
-            const phylogeny = await fetchPhylogenyData();
-            const geneData = phylogeny[gene];
+            const geneQuery = matchGene[1].toUpperCase();
+            const phyloMap = {};
+            Object.entries(phylogeny).forEach(([gene, info]) => {
+                const keys = [gene, ...(info.synonyms || [])];
+                keys.forEach(k => {
+                    if (k) phyloMap[k.toUpperCase()] = info;
+                });
+            });
 
+            const geneData = phyloMap[geneQuery];
             if (!geneData) {
-                resultHtml = `<div class="result-card"><h3>Phylogeny of ${gene}</h3><p class="status-not-found">No data found.</p></div>`;
+                resultHtml = `<div class="result-card"><h3>Phylogeny of ${geneQuery}</h3><p class="status-not-found">No data found.</p></div>`;
             } else {
-                const organisms = Object.entries(geneData.presence || {}).map(([org, val]) => `${org}: ${val ? '✅' : '❌'}`).join('<br>');
+                // Map species array to presence object
+                const presence = geneData.presence || (geneData.species ? Object.fromEntries(geneData.species.map(s => [s, true])) : {});
+                const organisms = Object.entries(presence).map(([org, val]) => `${org}: ${val ? '✅' : '❌'}`).join('<br>');
+
                 resultHtml = `
-                    <div class="result-card"><h3>Phylogeny of ${gene}</h3><p>${organisms}</p></div>
-                    <p class="ai-suggestion">🌿 Here’s the phylogenetic presence of ${gene}.  
+                    <div class="result-card"><h3>Phylogeny of ${geneQuery}</h3><p>${organisms}</p></div>
+                    <p class="ai-suggestion">🌿 Here’s the phylogenetic presence of ${geneQuery}.  
                     Would you like to visualize its conservation heatmap or domain evolution?</p>
                 `;
             }
         }
 
-        // ⚛️ Complex or interaction queries
-        else if (
-            (match = query.match(/complex(?:es| components)?\s+(?:for|of|with)\s+([A-Z0-9\-]+)/i)) ||
-            (match = query.match(/^([A-Z0-9\-]+)\s+complex(?:es)?$/i)) ||
-            (match = query.match(/(?:components of the|show me the)\s+(.*)\s+complex/i))
-        ) {
+        // ⚛️ Complex queries
+        else if ((match = query.match(/complex(?:es| components)?\s+(?:for|of|with)\s+([A-Z0-9\-]+)/i)) ||
+                 (match = query.match(/^([A-Z0-9\-]+)\s+complex(?:es)?$/i)) ||
+                 (match = query.match(/(?:components of the|show me the)\s+(.*)\s+complex/i))) {
+
             const complexOrGene = match[1].toUpperCase();
             const gene = data.find(g =>
                 g.gene.toUpperCase() === complexOrGene ||
@@ -491,35 +475,52 @@ document.addEventListener('click', async (event) => {
         const action = event.target.dataset.action;
 
         // Gather displayed genes (parsed from the result list)
-        const geneList = [...document.querySelectorAll('.result-card ul li')].map(li => li.textContent.trim());
+        const geneList = [...document.querySelectorAll('.result-card ul li')]
+            .map(li => li.textContent.trim())
+            .filter(g => g); // remove empty entries
         if (geneList.length === 0) return;
 
+        const resultsContainer = document.getElementById('resultsContainer');
+
         if (action === 'domain') {
-            document.getElementById('resultsContainer').innerHTML =
+            resultsContainer.innerHTML =
                 `<p class="status-searching">Analyzing domain composition for ${geneList.length} genes...</p>`;
             await runAnalysis(geneList); // uses your existing domain visualization
             document.getElementById('visualizeBtn').style.display = 'block';
         }
 
         if (action === 'phylogeny') {
-            document.getElementById('resultsContainer').innerHTML =
+            resultsContainer.innerHTML =
                 `<p class="status-searching">Building phylogenetic distribution map...</p>`;
+
             const phylogeny = await fetchPhylogenyData();
-            const selectedData = geneList.map(g => ({ gene: g, data: phylogeny[g] || {} }));
-            document.getElementById('resultsContainer').innerHTML = `
+
+            // Build a normalized map including synonyms for reliable lookup
+            const phyloMap = {};
+            Object.entries(phylogeny).forEach(([gene, info]) => {
+                const keys = [gene, ...(info.synonyms || [])];
+                keys.forEach(k => {
+                    if (k) phyloMap[k.toUpperCase()] = info;
+                });
+            });
+
+            const selectedData = geneList.map(g => ({ gene: g, data: phyloMap[g.toUpperCase()] || {} }));
+
+            resultsContainer.innerHTML = `
                 <div class="result-card">
                     <h3>Phylogenetic Distribution</h3>
                     ${selectedData.map(({ gene, data }) => `
                         <div class="phylogeny-entry">
                             <strong>${gene}</strong><br>
-                            ${data?.presence 
+                            ${data?.presence
                                 ? Object.entries(data.presence)
                                     .map(([org, val]) => `${org}: ${val ? '✅' : '❌'}`)
                                     .join('<br>')
                                 : '<em>No phylogeny data available</em>'}
                             <hr>
                         </div>`).join('')}
-                </div>`;
+                </div>
+            `;
         }
     }
 });
