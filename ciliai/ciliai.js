@@ -327,7 +327,7 @@ async function handleAIQuery() {
             `;
         }
 
-        // --- Genes specific to ciliated organisms ---
+        // --- Genes specific to ciliated organisms (interactive) ---
 else if (
     /(?:ciliary[-\s]?only|ciliated\s+organisms\s+specific|genes\s+specific\s+to\s+ciliated|only\s+in\s+ciliated\s+organisms|cilia\s+organisms\s+specific)/i.test(query)
 ) {
@@ -340,8 +340,13 @@ else if (
         resultHtml = `
             <div class="result-card">
                 <h3>Genes specific to ciliated organisms</h3>
-                <p>These genes are conserved across all <strong>ciliated eukaryotes</strong> and absent in non-ciliated lineages. 
-                Would you like to visualize their <strong>domain composition</strong> or <strong>phylogenetic distribution</strong>?</p>
+                <p>These genes are conserved across all <strong>ciliated eukaryotes</strong> and absent in non-ciliated lineages.</p>
+                <p>
+                    Would you like to visualize their 
+                    <a href="#" class="ai-action" data-action="domain" style="color:#3b82f6;">domain composition</a> 
+                    or 
+                    <a href="#" class="ai-action" data-action="phylogeny" style="color:#3b82f6;">phylogenetic distribution</a>?
+                </p>
                 <ul>${ciliaryOnly.map(g => `<li>${g}</li>`).join('')}</ul>
             </div>`;
     } else {
@@ -352,6 +357,7 @@ else if (
             </div>`;
     }
 }
+
 
         // --- Genes conserved in all studied organisms ---
 else if (
@@ -477,6 +483,47 @@ else if (
         console.error(e);
     }
 }
+
+// --- Interactive follow-up handlers ---
+document.addEventListener('click', async (event) => {
+    if (event.target.classList.contains('ai-action')) {
+        event.preventDefault();
+        const action = event.target.dataset.action;
+
+        // Gather displayed genes (parsed from the result list)
+        const geneList = [...document.querySelectorAll('.result-card ul li')].map(li => li.textContent.trim());
+        if (geneList.length === 0) return;
+
+        if (action === 'domain') {
+            document.getElementById('resultsContainer').innerHTML =
+                `<p class="status-searching">Analyzing domain composition for ${geneList.length} genes...</p>`;
+            await runAnalysis(geneList); // uses your existing domain visualization
+            document.getElementById('visualizeBtn').style.display = 'block';
+        }
+
+        if (action === 'phylogeny') {
+            document.getElementById('resultsContainer').innerHTML =
+                `<p class="status-searching">Building phylogenetic distribution map...</p>`;
+            const phylogeny = await fetchPhylogenyData();
+            const selectedData = geneList.map(g => ({ gene: g, data: phylogeny[g] || {} }));
+            document.getElementById('resultsContainer').innerHTML = `
+                <div class="result-card">
+                    <h3>Phylogenetic Distribution</h3>
+                    ${selectedData.map(({ gene, data }) => `
+                        <div class="phylogeny-entry">
+                            <strong>${gene}</strong><br>
+                            ${data?.presence 
+                                ? Object.entries(data.presence)
+                                    .map(([org, val]) => `${org}: ${val ? '✅' : '❌'}`)
+                                    .join('<br>')
+                                : '<em>No phylogeny data available</em>'}
+                            <hr>
+                        </div>`).join('')}
+                </div>`;
+        }
+    }
+});
+
 
 // --- AI Result Formatting Helpers ---
 
