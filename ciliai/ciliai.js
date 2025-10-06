@@ -4,6 +4,8 @@
 
 let ciliaHubDataCache = null;
 let screenDataCache = null;
+// --- Phylogeny Summary Integration ---
+let phylogenyDataCache = null;
 
 // --- Main Page Display Function ---
 
@@ -211,6 +213,21 @@ async function fetchScreenData() {
     }
 }
 
+async function fetchPhylogenyData() {
+    if (phylogenyDataCache) return phylogenyDataCache;
+    try {
+        const response = await fetch('https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/phylogeny_summary.json');
+        if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+        const data = await response.json();
+        phylogenyDataCache = data;
+        console.log('Phylogeny data loaded successfully:', Object.keys(data).length, 'genes');
+        return phylogenyDataCache;
+    } catch (error) {
+        console.error('Failed to fetch phylogeny summary data:', error);
+        return {};
+    }
+}
+
 // --- Advanced AI Query Engine ---
 async function handleAIQuery() {
     const aiQueryInput = document.getElementById('aiQueryInput');
@@ -255,6 +272,41 @@ async function handleAIQuery() {
             const results = data.filter(g => g.localization && g.localization.toLowerCase().includes(location.toLowerCase()));
             resultHtml = formatSimpleResults(results, title);
         }
+            else if (/ciliary[-\s]?only\s+genes/i.test(query)) {
+    const phylogeny = await fetchPhylogenyData();
+    const ciliaryOnly = Object.entries(phylogeny)
+        .filter(([gene, info]) => info?.category === 'ciliary_only')
+        .map(([gene]) => gene);
+    resultHtml = formatSimpleResults(
+        ciliaryOnly.map(g => ({ gene: g, description: 'Present only in ciliated organisms' })),
+        'Ciliary-only genes'
+    );
+}
+
+else if (/in[_\s-]*all[_\s-]*organisms\s+genes/i.test(query) || /conserved\s+across\s+all/i.test(query)) {
+    const phylogeny = await fetchPhylogenyData();
+    const inAll = Object.entries(phylogeny)
+        .filter(([gene, info]) => info?.category === 'in_all_organisms')
+        .map(([gene]) => gene);
+    resultHtml = formatSimpleResults(
+        inAll.map(g => ({ gene: g, description: 'Conserved in all studied organisms' })),
+        'Genes present in all organisms'
+    );
+}
+
+else if (/phylogeny\s+of\s+([A-Z0-9\-]+)/i.test(query)) {
+    const matchGene = query.match(/phylogeny\s+of\s+([A-Z0-9\-]+)/i);
+    const gene = matchGene[1].toUpperCase();
+    const phylogeny = await fetchPhylogenyData();
+    const geneData = phylogeny[gene];
+    if (!geneData) {
+        resultHtml = `<div class="result-card"><h3>Phylogeny of ${gene}</h3><p class="status-not-found">No data found.</p></div>`;
+    } else {
+        const organisms = Object.entries(geneData.presence || {}).map(([org, val]) => `${org}: ${val ? '✅' : '❌'}`).join('<br>');
+        resultHtml = `<div class="result-card"><h3>Phylogeny of ${gene}</h3><p>${organisms}</p></div>`;
+    }
+}
+
         else if (
             (match = query.match(/complex(?:es| components)?\s+(?:for|of|with)\s+([A-Z0-9\-]+)/i)) ||
             (match = query.match(/^([A-Z0-9\-]+)\s+complex(?:es)?$/i)) ||
@@ -336,16 +388,16 @@ function setupAiQueryAutocomplete() {
     if (!aiQueryInput || !suggestionsContainer) return;
 
     const exampleQueries = [
-        "genes for Joubert Syndrome",
-        "genes for Bardet-Biedl Syndrome",
-        "show me WD40 domain genes",
-        "show me IFT domain genes",
-        "cilia localizing genes",
-        "transition zone localizing genes",
-        "complexes for IFT88",
-        "genes causing short cilia",
-        "genes involved in Hedgehog signaling"
-    ];
+    "genes for Joubert Syndrome",
+    "genes for Bardet-Biedl Syndrome",
+    "show me WD40 domain genes",
+    "ciliary-only genes",
+    "genes in all organisms",
+    "phylogeny of IFT88",
+    "transition zone localizing genes",
+    "complexes for IFT88",
+    "genes involved in Hedgehog signaling"
+];
 
     aiQueryInput.addEventListener('input', () => {
         const inputText = aiQueryInput.value.toLowerCase();
@@ -455,13 +507,18 @@ function setupCiliAIEventListeners() {
     analyzeBtn.addEventListener('click', analyzeGenesFromInput);
     aiQueryBtn.addEventListener('click', handleAIQuery);
 
-    visualizeBtn.addEventListener('click', async () => {
-        const genes = geneInput.value.split(/[\s,]+/).map(g => g.trim().toUpperCase()).filter(Boolean);
-        if (genes.length > 0) {
+   visualizeBtn.addEventListener('click', async () => {
+    const genes = geneInput.value.split(/[\s,]+/).map(g => g.trim().toUpperCase()).filter(Boolean);
+    if (genes.length > 0) {
+        const mode = document.querySelector('input[name="mode"]:checked').value;
+        if (mode === 'expert' || mode === 'hybrid') {
             const screenData = await fetchScreenData();
             renderScreenSummaryHeatmap(genes, screenData);
+        } else {
+            await renderPhylogenyHeatmap(genes);
         }
-    });
+    }
+});
 
     geneInput.addEventListener('keydown', debounce((e) => {
         if (e.key === 'Enter' && !e.shiftKey) {
@@ -669,6 +726,47 @@ function createResultCard(gene, dbData, allEvidence) {
         </div>
     `;
 }
+async function renderPhylogenyHeatmap(genes) {
+    const phylogeny = await fetchPhylogenyData();
+    if (!phylogeny || Object.keys(phylogeny).length === 0) {
+        console.error('No phylogeny data available');
+        return;
+    }
+
+    const organisms = new Set();
+    genes.forEach(g => {
+        const gData = phylogeny[g];
+        if (gData && gData.presence) {
+            Object.keys(gData.presence).forEach(org => organisms.add(org));
+        }
+    });
+
+    const orgList = Array.from(organisms);
+    const matrix = genes.map(g => orgList.map(org => phylogeny[g]?.presence?.[org] ? 1 : 0));
+
+    const trace = {
+        z: matrix,
+        x: orgList,
+        y: genes,
+        type: 'heatmap',
+        colorscale: [
+            [0, '#f8f9fa'],
+            [1, '#2c5aa0']
+        ],
+        showscale: false
+    };
+
+    const layout = {
+        title: 'Phylogeny Heatmap',
+        xaxis: { title: 'Organisms', tickangle: -45 },
+        yaxis: { title: 'Genes' },
+        margin: { t: 40, l: 100, r: 20, b: 100 },
+        height: Math.max(300, genes.length * 20)
+    };
+
+    Plotly.newPlot('plot-display-area', [trace], layout);
+}
+
 
 // --- Live Literature Mining Engine (Client-Side) ---
 
