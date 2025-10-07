@@ -6,6 +6,7 @@ let ciliaHubDataCache = null;
 let screenDataCache = null;
 // --- Phylogeny Summary Integration ---
 let phylogenyDataCache = null;
+let tissueDataCache = null; // Already defined in the provided code
 
 // --- Main Page Display Function ---
 
@@ -20,7 +21,7 @@ window.displayCiliAIPage = async function displayCiliAIPage() {
     if (ciliaPanel) {
         ciliaPanel.style.display = 'none';
     }
-
+    
     // Inject the updated HTML structure, including the full CSS style block
     try {
         contentArea.innerHTML = `
@@ -153,6 +154,12 @@ window.displayCiliAIPage = async function displayCiliAIPage() {
                 .suggestions-container { display: none; position: absolute; top: 100%; left: 0; border: 1px solid #ddd; background-color: white; width: 100%; max-height: 200px; overflow-y: auto; z-index: 1000; box-shadow: 0 4px 8px rgba(0,0,0,0.1); border-radius: 0 0 4px 4px; box-sizing: border-box; }
                 .suggestion-item { padding: 10px; cursor: pointer; font-size: 0.9rem; }
                 .suggestion-item:hover { background-color: #f0f0f0; }
+                .expression-table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+    .expression-table th, .expression-table td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+    .expression-table th { background-color: #e8f4fd; color: #2c5aa0; }
+    .expression-table tr:nth-child(even) { background-color: #f9f9f9; }
+    .ai-suggestion a { color: #3b82f6; text-decoration: none; }
+    .ai-suggestion a:hover { text-decoration: underline; }
             </style>
         `;
     } catch (error) {
@@ -160,9 +167,11 @@ window.displayCiliAIPage = async function displayCiliAIPage() {
         contentArea.innerHTML = '<p class="status-not-found">Error: Failed to load CiliAI interface.</p>';
         return;
     }
-
-    await Promise.all([fetchCiliaData(), fetchScreenData()]);
+    
+    // Preload all data, including tissue expression data
+    await Promise.all([fetchCiliaData(), fetchScreenData(), fetchPhylogenyData(), fetchTissueData()]);
     setupCiliAIEventListeners();
+};
 };
 
 // --- Helper Functions & Mock DB ---
@@ -300,9 +309,10 @@ async function handleAIQuery() {
 
     const data = await fetchCiliaData();
     const phylogeny = await fetchPhylogenyData();
+    const tissueData = await fetchTissueData();
 
-    if (!data || !phylogeny) {
-        resultsContainer.innerHTML = `<p class="status-not-found">Error: CiliaHub data could not be loaded. Please check the console.</p>`;
+    if (!data || !phylogeny || !tissueData) {
+        resultsContainer.innerHTML = `<p class="status-not-found">Error: Data could not be loaded. Please check the console.</p>`;
         return;
     }
 
@@ -311,7 +321,7 @@ async function handleAIQuery() {
     let match;
 
     try {
-        // 🩺 Disease or phenotype search
+        // 🩺 Disease or phenotype search (unchanged)
         if ((match = query.match(/(?:genes for|what genes are linked to|find genes for|genes involved in)\s+(.*)/i))) {
             const disease = match[1].trim().toLowerCase();
             title = `Genes associated with "${disease}"`;
@@ -323,6 +333,45 @@ async function handleAIQuery() {
                 <p class="ai-suggestion">🧬 These genes show strong associations with ${disease}.  
                 Would you like me to summarize their known pathways or visualize them in a network?</p>
             `;
+        }
+        // 🧬 Gene expression queries
+        else if ((match = query.match(/(?:gene expression|expression levels|expression of)\s+([A-Z0-9\-]+)(?:\s+in\s+(.+))?/i))) {
+            const gene = match[1].toUpperCase();
+            const tissue = match[2] ? match[2].trim().toLowerCase() : null;
+            title = `Expression Data for ${gene}${tissue ? ` in ${tissue}` : ''}`;
+
+            const geneData = tissueData[gene];
+            if (!geneData) {
+                resultHtml = `<div class="result-card"><h3>${title}</h3><p class="status-not-found">No expression data found for ${gene}.</p></div>`;
+            } else {
+                let expressionHtml = '';
+                if (tissue) {
+                    // Filter for specific tissue
+                    const tissueRegex = new RegExp(tissue.replace(/ /g, '[\\s-]*'), 'i');
+                    const matchingTissues = Object.keys(geneData).filter(t => tissueRegex.test(t));
+                    if (matchingTissues.length === 0) {
+                        expressionHtml = `<p class="status-not-found">No expression data found for ${gene} in ${tissue}.</p>`;
+                    } else {
+                        expressionHtml = `
+                            <ul>
+                                ${matchingTissues.map(t => `<li><strong>${t}:</strong> ${geneData[t].toFixed(2)} nTPM</li>`).join('')}
+                            </ul>
+                            <p class="ai-suggestion">📊 Would you like to <a href="#" class="ai-action" data-action="expression-visualize" data-gene="${gene}">visualize expression across tissues</a>?</p>
+                        `;
+                    }
+                } else {
+                    // Show all tissues
+                    expressionHtml = `
+                        <ul>
+                            ${Object.entries(geneData)
+                                .map(([t, val]) => `<li><strong>${t}:</strong> ${val.toFixed(2)} nTPM</li>`)
+                                .join('')}
+                        </ul>
+                        <p class="ai-suggestion">📊 Would you like to <a href="#" class="ai-action" data-action="expression-visualize" data-gene="${gene}">visualize expression across tissues</a>?</p>
+                    `;
+                }
+                resultHtml = `<div class="result-card"><h3>${title}</h3>${expressionHtml}</div>`;
+            }
         }
 
         // 🧩 Domain-based queries
@@ -471,9 +520,10 @@ async function handleAIQuery() {
             return;
         }
 
-        // 🤔 Fallback
+        // Fallback with updated suggestions
         else {
             resultHtml = `<p>Sorry, I didn’t understand that query. Try asking about:  
+            <br>• “Gene expression of IFT88 in kidney”  
             <br>• “Ciliary-only genes”  
             <br>• “Genes present in all organisms”  
             <br>• “Genes lost in non-ciliated organisms”  
@@ -496,55 +546,47 @@ document.addEventListener('click', async (event) => {
         event.preventDefault();
         const action = event.target.dataset.action;
 
-        // Gather displayed genes (parsed from the result list)
         const geneList = [...document.querySelectorAll('.result-card ul li')]
             .map(li => li.textContent.trim())
-            .filter(g => g); // remove empty entries
-        if (geneList.length === 0) return;
+            .filter(g => g); // Remove empty entries
+        const singleGene = event.target.dataset.gene ? [event.target.dataset.gene] : geneList;
 
         const resultsContainer = document.getElementById('resultsContainer');
 
         if (action === 'domain') {
-            resultsContainer.innerHTML =
-                `<p class="status-searching">Analyzing domain composition for ${geneList.length} genes...</p>`;
-            await runAnalysis(geneList); // uses your existing domain visualization
+            resultsContainer.innerHTML = `<p class="status-searching">Analyzing domain composition for ${singleGene.length} genes...</p>`;
+            await runAnalysis(singleGene);
             document.getElementById('visualizeBtn').style.display = 'block';
+        } else if (action === 'phylogeny') {
+            resultsContainer.innerHTML = `<p class="status-searching">Building phylogenetic distribution map...</p>`;
+            const phylogeny = await fetchPhylogenyData();
+            const phyloMap = {};
+            Object.entries(phylogeny).forEach(([gene, info]) => {
+                const keys = [gene, ...(info.synonyms || [])];
+                keys.forEach(k => {
+                    if (k) phyloMap[k.toUpperCase()] = info;
+                });
+            });
+            const selectedData = singleGene.map(g => ({ gene: g, data: phyloMap[g.toUpperCase()] || {} }));
+            resultsContainer.innerHTML = `
+                <div class="result-card">
+                    <h3>Phylogenetic Distribution</h3>
+                    ${selectedData.map(({ gene, data }) => `
+                        <div class="phylogeny-entry">
+                            <strong>${gene}</strong><br>
+                            ${data?.presence
+                                ? Object.entries(data.presence)
+                                    .map(([org, val]) => `${org}: ${val ? '✅' : '❌'}`)
+                                    .join('<br>')
+                                : '<em>No phylogeny data available</em>'}
+                            <hr>
+                        </div>`).join('')}
+                </div>
+            `;
+        } else if (action === 'expression-visualize') {
+            resultsContainer.innerHTML = `<p class="status-searching">Building expression heatmap for ${singleGene.length} gene(s)...</p>`;
+            await renderExpressionHeatmap(singleGene);
         }
-
-       if (action === 'phylogeny') {
-    resultsContainer.innerHTML =
-        `<p class="status-searching">Building phylogenetic distribution map...</p>`;
-
-    const phylogeny = await fetchPhylogenyData();
-
-    // Normalize gene keys: uppercase + include synonyms
-    const phyloMap = {};
-    Object.entries(phylogeny).forEach(([gene, info]) => {
-        const keys = [gene, ...(info.synonyms || [])];
-        keys.forEach(k => {
-            if (k) phyloMap[k.toUpperCase()] = info;
-        });
-    });
-
-    // Lookup using uppercase to match normalized keys
-    const selectedData = geneList.map(g => ({ gene: g, data: phyloMap[g.toUpperCase()] || {} }));
-
-    resultsContainer.innerHTML = `
-        <div class="result-card">
-            <h3>Phylogenetic Distribution</h3>
-            ${selectedData.map(({ gene, data }) => `
-                <div class="phylogeny-entry">
-                    <strong>${gene}</strong><br>
-                    ${data?.presence
-                        ? Object.entries(data.presence)
-                            .map(([org, val]) => `${org}: ${val ? '✅' : '❌'}`)
-                            .join('<br>')
-                        : '<em>No phylogeny data available</em>'}
-                    <hr>
-                </div>`).join('')}
-        </div>
-    `;
-}
     }
 });
 
@@ -599,16 +641,19 @@ function setupAiQueryAutocomplete() {
     if (!aiQueryInput || !suggestionsContainer) return;
 
     const exampleQueries = [
-    "genes for Joubert Syndrome",
-    "genes for Bardet-Biedl Syndrome",
-    "show me WD40 domain genes",
-    "ciliary-only genes",
-    "genes in all organisms",
-    "phylogeny of IFT88",
-    "transition zone localizing genes",
-    "complexes for IFT88",
-    "genes involved in Hedgehog signaling"
-];
+        "genes for Joubert Syndrome",
+        "genes for Bardet-Biedl Syndrome",
+        "show me WD40 domain genes",
+        "ciliary-only genes",
+        "genes in all organisms",
+        "phylogeny of IFT88",
+        "transition zone localizing genes",
+        "complexes for IFT88",
+        "genes involved in Hedgehog signaling",
+        "gene expression of IFT88 in kidney",
+        "expression levels for ARL13B",
+        "gene expression of HDAC6 in brain"
+    ];
 
     aiQueryInput.addEventListener('input', () => {
         const inputText = aiQueryInput.value.toLowerCase();
@@ -825,6 +870,46 @@ async function runAnalysis(geneList) {
     analyzeBtn.disabled = false;
     analyzeBtn.textContent = '🔍 Analyze Genes';
     if (geneList.length > 0) visualizeBtn.style.display = 'block';
+}
+
+async function renderExpressionHeatmap(genes) {
+    const tissueData = await fetchTissueData();
+    if (!tissueData || Object.keys(tissueData).length === 0) {
+        console.error('No tissue expression data available');
+        document.getElementById('plot-display-area').innerHTML = '<p class="status-not-found">Error: No tissue expression data available.</p>';
+        return;
+    }
+
+    const tissues = new Set();
+    genes.forEach(g => {
+        if (tissueData[g]) {
+            Object.keys(tissueData[g]).forEach(t => tissues.add(t));
+        }
+    });
+
+    const tissueList = Array.from(tissues).sort();
+    const matrix = genes.map(g => tissueList.map(t => tissueData[g]?.[t] || 0));
+
+    const trace = {
+        z: matrix,
+        x: tissueList,
+        y: genes,
+        type: 'heatmap',
+        colorscale: 'Viridis',
+        showscale: true,
+        colorbar: { title: 'nTPM' },
+        hovertemplate: '<b>Gene:</b> %{y}<br><b>Tissue:</b> %{x}<br><b>Expression:</b> %{z:.2f} nTPM<extra></extra>'
+    };
+
+    const layout = {
+        title: 'Gene Expression Heatmap (nTPM)',
+        xaxis: { title: 'Tissues', tickangle: -45 },
+        yaxis: { title: 'Genes' },
+        margin: { t: 40, l: 100, r: 20, b: 100 },
+        height: Math.max(300, genes.length * 20 + tissueList.length * 10)
+    };
+
+    Plotly.newPlot('plot-display-area', [trace], layout, { responsive: true });
 }
 
 function renderScreenDataTable(gene, screenInfo) {
@@ -1173,3 +1258,5 @@ window.fetchScreenData = fetchScreenData;
 window.createResultCard = createResultCard;
 window.createPlaceholderCard = createPlaceholderCard;
 window.renderScreenSummaryHeatmap = renderScreenSummaryHeatmap;
+window.renderExpressionHeatmap = renderExpressionHeatmap; // New exposure
+
