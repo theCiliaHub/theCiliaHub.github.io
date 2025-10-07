@@ -21,8 +21,7 @@ window.displayCiliAIPage = async function displayCiliAIPage() {
     if (ciliaPanel) {
         ciliaPanel.style.display = 'none';
     }
-    
-    // Inject the updated HTML structure, including the full CSS style block
+
     try {
         contentArea.innerHTML = `
             <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
@@ -31,7 +30,6 @@ window.displayCiliAIPage = async function displayCiliAIPage() {
                     <h1>CiliAI</h1>
                     <p>Your AI-powered partner for discovering gene-cilia relationships.</p>
                 </div>
-                
                 <div class="ciliai-main-content">
                     <div class="ai-query-section">
                         <h3>Ask a Question</h3>
@@ -45,12 +43,12 @@ window.displayCiliAIPage = async function displayCiliAIPage() {
                                 <span>"show me genes for Joubert Syndrome"</span>, 
                                 <span>"show me WD40 domain genes"</span>, 
                                 <span>"show me cilia localizing genes"</span>, 
-                                <span>"show me complexes for IFT88"</span>.
-                                <span>"show me cilia organisms specific genes"</span>.
+                                <span>"show me complexes for IFT88"</span>,
+                                <span>"show me cilia organisms specific genes"</span>,
+                                <span>"gene expression of IFT88 in kidney"</span>.
                             </p>
                         </div>
                     </div>
-
                     <div class="input-section">
                         <h3>Analyze Gene Phenotypes</h3>
                         <div class="input-group">
@@ -60,7 +58,6 @@ window.displayCiliAIPage = async function displayCiliAIPage() {
                                 <div id="geneSuggestions" class="suggestions-container"></div>
                             </div>
                         </div>
-
                         <div class="input-group">
                             <label>Analysis Mode:</label>
                             <div class="mode-selector">
@@ -96,12 +93,8 @@ window.displayCiliAIPage = async function displayCiliAIPage() {
                                 </div>
                             </div>
                         </div>
-
-                        <button class="analyze-btn" id="analyzeBtn">
-                            🔍 Analyze Genes
-                        </button>
+                        <button class="analyze-btn" id="analyzeBtn">🔍 Analyze Genes</button>
                     </div>
-
                     <div id="resultsSection" class="results-section" style="display: none;">
                         <h2>Analysis Results</h2>
                         <button class="visualize-btn" id="visualizeBtn" style="display: none;">📊 Visualize Results</button>
@@ -110,7 +103,6 @@ window.displayCiliAIPage = async function displayCiliAIPage() {
                     </div>
                 </div>
             </div>
-            
             <style>
                 .ciliai-container { font-family: 'Arial', sans-serif; max-width: 950px; margin: 2rem auto; padding: 2rem; background-color: #f9f9f9; border-radius: 12px; }
                 .ciliai-header { text-align: center; margin-bottom: 2rem; }
@@ -155,11 +147,11 @@ window.displayCiliAIPage = async function displayCiliAIPage() {
                 .suggestion-item { padding: 10px; cursor: pointer; font-size: 0.9rem; }
                 .suggestion-item:hover { background-color: #f0f0f0; }
                 .expression-table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
-    .expression-table th, .expression-table td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-    .expression-table th { background-color: #e8f4fd; color: #2c5aa0; }
-    .expression-table tr:nth-child(even) { background-color: #f9f9f9; }
-    .ai-suggestion a { color: #3b82f6; text-decoration: none; }
-    .ai-suggestion a:hover { text-decoration: underline; }
+                .expression-table th, .expression-table td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                .expression-table th { background-color: #e8f4fd; color: #2c5aa0; }
+                .expression-table tr:nth-child(even) { background-color: #f9f9f9; }
+                .ai-suggestion a { color: #3b82f6; text-decoration: none; }
+                .ai-suggestion a:hover { text-decoration: underline; }
             </style>
         `;
     } catch (error) {
@@ -167,11 +159,10 @@ window.displayCiliAIPage = async function displayCiliAIPage() {
         contentArea.innerHTML = '<p class="status-not-found">Error: Failed to load CiliAI interface.</p>';
         return;
     }
-    
-    // Preload all data, including tissue expression data
+
     await Promise.all([fetchCiliaData(), fetchScreenData(), fetchPhylogenyData(), fetchTissueData()]);
+    console.log('ciliAI.js: All data loaded');
     setupCiliAIEventListeners();
-};
 };
 
 // --- Helper Functions & Mock DB ---
