@@ -300,7 +300,7 @@ async function handleAIQuery() {
             resultHtml = formatTopTissueGenes(results, `Top Expressed Genes in ${tissueName}`, tissueName);
         }
 
-        // C. Domain-based queries (REORDERED TO BE FIRST)
+        // C. Domain-based queries (CORRECTLY ORDERED TO BE FIRST)
         else if ((match = query.match(/compare domain architecture of\s+([A-Z0-9\-]+)\s+and\s+([A-Z0-9\-]+)/i))) {
             const [gene1, gene2] = [match[1].toUpperCase(), match[2].toUpperCase()];
             const gene1Data = data.find(g => g.gene.toUpperCase() === gene1);
@@ -315,7 +315,7 @@ async function handleAIQuery() {
             });
             resultHtml = formatDomainResults(results, `Genes with domains: ${domains.join(' & ')}`);
         }
-        // MODIFIED REGEX to be more flexible (accepts "domain genes")
+        // This Regex is now checked before the general "genes" regex
         else if ((match = query.match(/(?:show me|find|what genes have a)\s+(.*?)\s+domain(?: genes)?/i))) {
             const domain = match[1].trim();
             const results = data.filter(g => (g.domain_descriptions || []).some(d => d.toLowerCase().includes(domain.toLowerCase())));
