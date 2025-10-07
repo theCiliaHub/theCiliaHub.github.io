@@ -279,13 +279,19 @@ async function fetchTissueData() {
         
         const data = {};
         for (let i = 1; i < lines.length; i++) {
-            const [geneSymbol, tissue, nTPMValue] = lines[i].split('\t');
-            if (!geneSymbol || !tissue || !nTPMValue) {
+            const parts = lines[i].split('\t');
+            if (parts.length < 4) {
                 console.warn(`fetchTissueData: Skipping malformed row ${i}:`, lines[i]);
                 continue;
             }
-            const gene = geneSymbol.toUpperCase().trim(); // Ensure uppercase
+
+            // Correct column order: EnsemblID, GeneSymbol, Tissue, Expression
+            const [ensemblID, geneSymbol, tissue, nTPMValue] = parts;
+            if (!geneSymbol || !tissue || !nTPMValue) continue;
+
+            const gene = geneSymbol.toUpperCase().trim();
             const nTPM = parseFloat(nTPMValue.trim());
+
             if (!isNaN(nTPM)) {
                 if (!data[gene]) data[gene] = {};
                 data[gene][tissue.trim()] = nTPM;
@@ -293,41 +299,47 @@ async function fetchTissueData() {
                 console.warn(`fetchTissueData: Invalid nTPM in row ${i}:`, nTPMValue);
             }
         }
-        
-        // Debug: Check for IFT88
-        if (data['IFT88']) {
-            console.debug('fetchTissueData: IFT88 data loaded:', Object.keys(data['IFT88']));
+
+        // Debug check
+        if (data['WDR31']) {
+            console.debug('fetchTissueData: Example WDR31 tissues loaded:', Object.keys(data['WDR31']).slice(0, 5));
         } else {
+            console.warn('fetchTissueData: WDR31 not found in TSV — check file format.');
+        }
+
+        // Fallback check for IFT88
+        if (!data['IFT88']) {
             console.warn('fetchTissueData: IFT88 not found in TSV - adding fallback');
-            // Fallback GTEx data for IFT88
             data['IFT88'] = {
                 'Kidney Cortex': 8.45,
                 'Kidney Medulla': 12.67,
                 'Lung': 5.23,
                 'Liver': 3.12,
                 'Brain': 1.89
-                // Add more as needed
             };
         }
-        
+
         tissueDataCache = data;
-        console.log('Tissue expression data loaded and cached:', Object.keys(data).length, 'genes');
+        console.log('Tissue expression data loaded and cached for', Object.keys(data).length, 'genes');
         return tissueDataCache;
+
     } catch (error) {
         console.error('Failed to fetch tissue data:', error);
-        // Fallback: Minimal data for key genes
+
+        // Minimal fallback dataset
         const fallbackData = {
             'IFT88': {
                 'Kidney Cortex': 8.45,
                 'Kidney Medulla': 12.67
             }
-            // Add other key genes if needed
         };
+
         tissueDataCache = fallbackData;
         console.log('Using fallback tissue data for', Object.keys(fallbackData).length, 'genes');
         return tissueDataCache;
     }
 }
+
 // --- Conversational CiliAI Query Engine with Step 2 ---
 async function handleAIQuery() {
     const aiQueryInput = document.getElementById('aiQueryInput');
