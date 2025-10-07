@@ -170,6 +170,10 @@ const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 function debounce(fn, delay) { let timeout; return function (...args) { clearTimeout(timeout); timeout = setTimeout(() => fn(...args), delay); }; }
 const CILI_AI_DB = { "HDAC6": { "summary": { "lof_length": "Promotes / Maintains", "percentage_ciliated": "No effect", "source": "Expert DB" }, "evidence": [{ "id": "21873644", "source": "pubmed", "context": "...loss of HDAC6 results in hyperacetylation of tubulin and leads to the formation of longer, more stable primary cilia in renal epithelial cells." }] }, "IFT88": { "summary": { "lof_length": "Inhibits / Restricts", "percentage_ciliated": "Reduced cilia numbers", "source": "Expert DB" }, "evidence": [{ "id": "10882118", "source": "pubmed", "context": "Mutations in IFT88 (polaris) disrupt intraflagellar transport, leading to a failure in cilia assembly and resulting in severely shortened or absent cilia." }] }, "ARL13B": { "summary": { "lof_length": "Inhibits / Restricts", "percentage_ciliated": "Reduced cilia numbers", "source": "Expert DB" }, "evidence": [{ "id": "21940428", "source": "pubmed", "context": "The small GTPase ARL13B is critical for ciliary structure; its absence leads to stunted cilia with abnormal morphology and axonemal defects." }] } };
 
+// --- Data Fetching and Caching (Abbreviated for brevity) ---
+async function fetchCiliaData() { if (ciliaHubDataCache) return ciliaHubDataCache; try { const response = await fetch('https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/ciliahub_data.json'); if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`); const data = await response.json(); ciliaHubDataCache = data.map(gene => ({...gene, domain_descriptions: typeof gene.domain_descriptions === 'string' ? gene.domain_descriptions.split(',').map(d => d.trim()) : Array.isArray(gene.domain_descriptions) ? gene.domain_descriptions : [] })); console.log('CiliaHub data loaded.'); return ciliaHubDataCache; } catch (error) { console.error("Failed to fetch CiliaHub data:", error); return null; } }
+async function fetchScreenData() { if (screenDataCache) return screenDataCache; try { const response = await fetch('https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/cilia_screens_data.json'); if (!response.ok) throw new Error(`Failed to fetch screen data: ${response.statusText}`); screenDataCache = await response.json(); console.log('Screen data loaded.'); return screenDataCache; } catch (error) { console.error('Error fetching screen data:', error); return {}; } }
+
 
 // --- Data Fetching and Caching ---
 
@@ -1136,46 +1140,34 @@ function handleExpressionSearchInput(e) {
     }, 150);
 }
 
-// --- Enhanced Live Literature Mining Engine with Deep Full-Text Search ---
+// --- Enhanced Live Literature Mining Engine (EuropePMC + PubMed/PMC full-text) ---
 async function analyzeGeneViaAPI(gene, resultCard) {
     const ESEARCH_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi";
     const ELINK_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/elink.fcgi";
     const EFETCH_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi";
     const EUROPE_PMC_URL = "https://www.ebi.ac.uk/europepmc/webservices/rest/search";
 
-    // ✅ Expanded keyword sets for better coverage
-    const API_QUERY_KEYWORDS = [
-        "cilia", "ciliary", "cilium", "ciliogenesis", "ciliopathy",
-        "intraflagellar transport", "IFT", "axoneme", "axonemal",
-        "basal body", "centriole", "transition zone", "motile cilium", 
-        "primary cilium", "sensory cilium", "flagella", "flagellar"
-    ];
-
+    const API_QUERY_KEYWORDS = ["cilia", "ciliary", "ciliogenesis", "intraflagellar transport", "ciliopathy"];
     const LOCAL_ANALYSIS_KEYWORDS = new Set([
-        'cilia', 'ciliary', 'cilium', 'axoneme', 'axonemal', 'basal body', 
-        'centriole', 'transition zone', 'ciliogenesis', 'ciliopathy', 
-        'ift', 'intraflagellar', 'motile cilium', 'primary cilium', 
-        'sensory cilium', 'flagella', 'flagellar', 'shorter', 'longer', 
-        'fewer', 'loss of', 'absent', 'reduced', 'increased', 'motility',
-        'ciliary length', 'ciliary assembly', 'ciliary disassembly',
-        'ciliary function', 'ciliary localization', 'ciliary trafficking',
-        'ciliary membrane', 'ciliary tip', 'ciliary base', 'ciliary pocket'
+        'cilia','ciliary','cilium','axoneme','basal body','transition zone',
+        'ciliogenesis','ift','shorter','longer','fewer','loss of','absent',
+        'reduced','increased','motility'
     ]);
 
-    // ✅ Enhanced gene matching patterns
-    const geneRegex = new RegExp(`\\b${gene}(?:[-_ ]?\\w{0,5})?\\b`, 'i');
+    // ✅ Broaden gene regex to include hyphenated and case variants
+    const geneRegex = new RegExp(`\\b${gene}(?:[-_ ]?\\w{0,3})?\\b`, 'i');
     const sentSplitRegex = /(?<=[.!?])\s+/;
     let foundEvidence = [];
 
-    const MAX_ARTICLES = 20;
-    const MAX_EVIDENCE = 8; // Increased to capture more evidence
-    const RATE_LIMIT_DELAY = 300;
+    const MAX_ARTICLES = 15;
+    const MAX_EVIDENCE = 5;
+    const RATE_LIMIT_DELAY = 350;
 
     try {
-        // --- ✅ Strategy 1: Europe PMC with FULL TEXT and SUPPLEMENTARY DATA ---
-        const epmcQuery = `(ABSTRACT:"${gene}" OR BODY:"${gene}") AND (${API_QUERY_KEYWORDS.join(" OR ")})`;
+        // --- ✅ Step 1: Europe PMC Search including FULL TEXT ---
+        const epmcQuery = `${gene} AND (${API_QUERY_KEYWORDS.join(" OR ")}) AND (OPEN_ACCESS:Y OR FULL_TEXT:Y)`;
         const epmcResp = await fetch(
-            `${EUROPE_PMC_URL}?query=${encodeURIComponent(epmcQuery)}&resultType=core&format=json&pageSize=50&synonym=true`
+            `${EUROPE_PMC_URL}?query=${encodeURIComponent(epmcQuery)}&resultType=core&format=json&pageSize=40`
         );
 
         if (epmcResp.ok) {
@@ -1185,175 +1177,110 @@ async function analyzeGeneViaAPI(gene, resultCard) {
             for (const r of epmcResults) {
                 if (foundEvidence.length >= MAX_EVIDENCE) break;
 
-                try {
-                    // ✅ Attempt to fetch FULL TEXT content for each relevant article
-                    let fullTextContent = '';
-                    if (r.id && r.source === 'PMC') {
-                        const fullTextResp = await fetch(
-                            `https://www.ebi.ac.uk/europepmc/webservices/rest/${r.id}/fullTextXML`
-                        );
-                        if (fullTextResp.ok) {
-                            const fullTextXML = await fullTextResp.text();
-                            const parser = new DOMParser();
-                            const xmlDoc = parser.parseFromString(fullTextXML, "text/xml");
-                            
-                            // Extract text from all relevant sections
-                            const sections = xmlDoc.querySelectorAll('body, sec, p, title');
-                            fullTextContent = Array.from(sections)
-                                .map(el => el.textContent)
-                                .join('. ')
-                                .replace(/\s+/g, ' ')
-                                .trim();
-                        }
-                    }
+                // ✅ Prefer fullText if available
+                const textContent = [
+                    r.title || '',
+                    r.abstractText || '',
+                    r.fullText || ''
+                ].join('. ');
 
-                    const textContent = [
-                        r.title || '',
-                        r.abstractText || '',
-                        fullTextContent
-                    ].filter(Boolean).join('. ');
+                if (!textContent || !geneRegex.test(textContent)) continue;
 
-                    if (!textContent || !geneRegex.test(textContent)) continue;
-
-                    // ✅ Enhanced sentence analysis with context window
-                    const evidence = extractCiliaryEvidence(textContent, gene, geneRegex, LOCAL_ANALYSIS_KEYWORDS, sentSplitRegex);
-                    foundEvidence.push(...evidence.map(ctx => ({
-                        id: r.id || r.pmid || 'EPMC',
-                        source: `${r.source || 'EuropePMC'}-FullText`,
-                        context: ctx,
-                        isFullText: !!fullTextContent
-                    })));
-
-                } catch (e) {
-                    console.warn(`Failed to process EuropePMC article for ${gene}:`, e);
-                }
-            }
-        }
-
-        if (foundEvidence.length >= MAX_EVIDENCE) return foundEvidence.slice(0, MAX_EVIDENCE);
-
-        // --- ✅ Strategy 2: PubMed Central Full Text Deep Search ---
-        const pmcSearchQuery = `("${gene}"[Text Word]) AND (${API_QUERY_KEYWORDS.map(k => `"${k}"[Text Word]`).join(" OR ")})`;
-        const pmcSearchParams = new URLSearchParams({
-            db: 'pmc',
-            term: pmcSearchQuery,
-            retmode: 'json',
-            retmax: '25',
-            sort: 'relevance'
-        });
-
-        const pmcSearchResp = await fetch(`${ESEARCH_URL}?${pmcSearchParams}`);
-        if (pmcSearchResp.ok) {
-            const pmcSearchData = await pmcSearchResp.json();
-            const pmcIds = pmcSearchData.esearchresult?.idlist?.slice(0, 15) || [];
-
-            if (pmcIds.length > 0) {
-                await sleep(RATE_LIMIT_DELAY);
-                const fetchParams = new URLSearchParams({
-                    db: 'pmc',
-                    id: pmcIds.join(','),
-                    retmode: 'xml',
-                    rettype: 'full'
-                });
-                
-                const fetchResp = await fetch(`${EFETCH_URL}?${fetchParams}`);
-                if (fetchResp.ok) {
-                    const xmlText = await fetchResp.text();
-                    const parser = new DOMParser();
-                    const xmlDoc = parser.parseFromString(xmlText, "application/xml");
-                    const pmcArticles = Array.from(xmlDoc.getElementsByTagName('article'));
-
-                    for (const article of pmcArticles) {
-                        if (foundEvidence.length >= MAX_EVIDENCE) break;
-
-                        const pmid = article.querySelector('article-id[pub-id-type="pmid"]')?.textContent || `PMC${pmcIds[0]}`;
-                        const title = article.querySelector('article-title')?.textContent || '';
-                        
-                        // ✅ Deep full-text extraction from all sections
-                        const bodySections = Array.from(article.querySelectorAll('body, sec, p, caption, title'));
-                        let fullText = bodySections.map(el => el.textContent).join('. ');
-                        
-                        // ✅ Also check supplementary data references
-                        const supplementary = Array.from(article.querySelectorAll('supplementary-material, table-wrap, fig'));
-                        const supplementaryText = supplementary.map(el => el.textContent).join('. ');
-                        
-                        const textContent = `${title}. ${fullText}. ${supplementaryText}`;
-
-                        if (!textContent || !geneRegex.test(textContent)) continue;
-
-                        const evidence = extractCiliaryEvidence(textContent, gene, geneRegex, LOCAL_ANALYSIS_KEYWORDS, sentSplitRegex);
-                        foundEvidence.push(...evidence.map(ctx => ({
-                            id: pmid,
-                            source: 'PMC-FullText',
-                            context: ctx,
-                            isFullText: true
-                        })));
+                const sentences = textContent.split(sentSplitRegex);
+                for (const sent of sentences) {
+                    if (foundEvidence.length >= MAX_EVIDENCE) break;
+                    const sentLower = sent.toLowerCase();
+                    if (geneRegex.test(sent) && [...LOCAL_ANALYSIS_KEYWORDS].some(kw => sentLower.includes(kw))) {
+                        foundEvidence.push({
+                            id: r.id || r.pmid || 'EPMC',
+                            source: r.source || 'EuropePMC',
+                            context: sent.trim()
+                        });
                     }
                 }
             }
         }
 
-        if (foundEvidence.length >= MAX_EVIDENCE) return foundEvidence.slice(0, MAX_EVIDENCE);
+        if (foundEvidence.length >= MAX_EVIDENCE) return foundEvidence;
 
-        // --- ✅ Strategy 3: PubMed Abstracts (for newest articles) ---
-        const recentQuery = `("${gene}"[Title/Abstract]) AND (${API_QUERY_KEYWORDS.map(k => `"${k}"[Title/Abstract]`).join(" OR ")}) AND ("2023/01/01"[PDAT] : "3000"[PDAT])`;
-        const recentParams = new URLSearchParams({
-            db: 'pubmed',
-            term: recentQuery,
-            retmode: 'json',
-            retmax: '20',
-            sort: 'pub date',
-            reldate: 365 // Last year
-        });
+        // --- Step 2: PubMed + PMC (unchanged but cleaned) ---
+        const kwClause = API_QUERY_KEYWORDS.map(k => `"${k}"[Title/Abstract]`).join(" OR ");
+        const query = `("${gene}"[Title/Abstract]) AND (${kwClause})`;
+        const searchParams = new URLSearchParams({ db: 'pubmed', term: query, retmode: 'json', retmax: '25' });
+        const searchResp = await fetch(`${ESEARCH_URL}?${searchParams}`);
+        if (!searchResp.ok) throw new Error(`NCBI ESearch failed: ${searchResp.statusText}`);
 
-        const recentResp = await fetch(`${ESEARCH_URL}?${recentParams}`);
-        if (recentResp.ok) {
-            const recentData = await recentResp.json();
-            const recentPmids = recentData.esearchresult?.idlist || [];
+        const searchData = await searchResp.json();
+        const pmids = searchData.esearchresult?.idlist.slice(0, MAX_ARTICLES) || [];
+        if (pmids.length === 0) return foundEvidence;
 
-            if (recentPmids.length > 0) {
-                await sleep(RATE_LIMIT_DELAY);
-                const fetchParams = new URLSearchParams({
-                    db: 'pubmed',
-                    id: recentPmids.join(','),
-                    retmode: 'xml',
-                    rettype: 'abstract'
-                });
+        const linkParams = new URLSearchParams({ dbfrom: 'pubmed', db: 'pmc', id: pmids.join(','), retmode: 'json' });
+        const [linkResp, pubmedFetch] = await Promise.all([
+            fetch(`${ELINK_URL}?${linkParams}`),
+            fetch(`${EFETCH_URL}?db=pubmed&id=${pmids.join(',')}&retmode=xml&rettype=abstract`)
+        ]);
 
-                const fetchResp = await fetch(`${EFETCH_URL}?${fetchParams}`);
-                if (fetchResp.ok) {
-                    const xmlText = await fetchResp.text();
-                    const parser = new DOMParser();
-                    const xmlDoc = parser.parseFromString(xmlText, "application/xml");
-                    const pubmedArticles = Array.from(xmlDoc.getElementsByTagName('PubmedArticle'));
+        const linkData = linkResp.ok ? await linkResp.json() : {};
+        const pmcIds = [];
+        const linkSets = linkData.linksets || [];
+        for (const linkSet of linkSets) {
+            const links = linkSet.linksetdbs?.find(set => set.dbto === 'pmc')?.links || [];
+            pmcIds.push(...links);
+        }
 
-                    for (const article of pubmedArticles) {
-                        if (foundEvidence.length >= MAX_EVIDENCE) break;
-
-                        const pmid = article.querySelector('MedlineCitation > PMID')?.textContent || 'PubMed';
-                        const title = article.querySelector('ArticleTitle')?.textContent || '';
-                        const abstractText = Array.from(article.querySelectorAll('AbstractText'))
-                            .map(el => el.textContent).join('. ');
-                        const textContent = `${title}. ${abstractText}`;
-
-                        if (!textContent || !geneRegex.test(textContent)) continue;
-
-                        const evidence = extractCiliaryEvidence(textContent, gene, geneRegex, LOCAL_ANALYSIS_KEYWORDS, sentSplitRegex);
-                        foundEvidence.push(...evidence.map(ctx => ({
-                            id: pmid,
-                            source: 'PubMed-Recent',
-                            context: ctx,
-                            isFullText: false
-                        })));
-                    }
-                }
+        let pmcArticles = [];
+        if (pmcIds.length > 0) {
+            await sleep(RATE_LIMIT_DELAY);
+            const fetchParams = new URLSearchParams({ db: 'pmc', id: pmcIds.join(','), retmode: 'xml', rettype: 'full' });
+            const fetchResp = await fetch(`${EFETCH_URL}?${fetchParams}`);
+            if (fetchResp.ok) {
+                const xmlText = await fetchResp.text();
+                const parser = new DOMParser();
+                const xmlDoc = parser.parseFromString(xmlText, "application/xml");
+                pmcArticles = Array.from(xmlDoc.getElementsByTagName('article'));
             }
         }
 
-        // --- ✅ Strategy 4: Manual Curation Fallback for Known Ciliary Genes ---
-        const manualEvidence = checkManualCuration(gene);
-        if (manualEvidence.length > 0 && foundEvidence.length < MAX_EVIDENCE) {
-            foundEvidence.push(...manualEvidence.slice(0, MAX_EVIDENCE - foundEvidence.length));
+        const pubmedArticles = (() => {
+            if (!pubmedFetch.ok) return [];
+            return pubmedFetch.text().then(xmlText => {
+                const parser = new DOMParser();
+                const xmlDoc = parser.parseFromString(xmlText, "application/xml");
+                return Array.from(xmlDoc.getElementsByTagName('PubmedArticle'));
+            });
+        })();
+
+        const [pubmedParsed, pmcParsed] = await Promise.all([pubmedArticles, pmcArticles]);
+        const allArticles = [...pmcParsed, ...pubmedParsed];
+
+        for (const article of allArticles) {
+            if (foundEvidence.length >= MAX_EVIDENCE) break;
+
+            let pmid, textContent;
+            if (article.tagName.toLowerCase() === 'article') {
+                pmid = article.querySelector('article-id[pub-id-type="pmid"]')?.textContent || 'PMC Article';
+                const title = article.querySelector('article-title')?.textContent || '';
+                const body = Array.from(article.querySelectorAll('body p, body sec, body para'))
+                    .map(el => el.textContent).join(' ');
+                textContent = `${title}. ${body}`;
+            } else {
+                pmid = article.querySelector('MedlineCitation > PMID')?.textContent || 'PubMed Article';
+                const title = article.querySelector('ArticleTitle')?.textContent || '';
+                const abstractText = Array.from(article.querySelectorAll('AbstractText'))
+                    .map(el => el.textContent).join(' ');
+                textContent = `${title}. ${abstractText}`;
+            }
+
+            if (!textContent || !geneRegex.test(textContent)) continue;
+
+            const sentences = textContent.split(sentSplitRegex);
+            for (const sent of sentences) {
+                if (foundEvidence.length >= MAX_EVIDENCE) break;
+                const sentLower = sent.toLowerCase();
+                if (geneRegex.test(sent) && [...LOCAL_ANALYSIS_KEYWORDS].some(kw => sentLower.includes(kw))) {
+                    foundEvidence.push({ id: pmid, source: 'PubMed', context: sent.trim() });
+                }
+            }
         }
 
     } catch (error) {
@@ -1365,91 +1292,7 @@ async function analyzeGeneViaAPI(gene, resultCard) {
         }
     }
 
-    // ✅ Deduplicate and return results
-    return deduplicateEvidence(foundEvidence).slice(0, MAX_EVIDENCE);
-}
-
-// ✅ Helper function for deep evidence extraction
-function extractCiliaryEvidence(textContent, gene, geneRegex, keywords, sentSplitRegex) {
-    const evidence = [];
-    const sentences = textContent.split(sentSplitRegex);
-    
-    for (let i = 0; i < sentences.length; i++) {
-        const sent = sentences[i].trim();
-        if (!sent) continue;
-        
-        const sentLower = sent.toLowerCase();
-        const hasGene = geneRegex.test(sent);
-        const hasCiliaryKeyword = [...keywords].some(kw => sentLower.includes(kw));
-        
-        if (hasGene && hasCiliaryKeyword) {
-            // ✅ Add context by including previous and next sentences
-            let context = sent;
-            if (i > 0) {
-                context = sentences[i-1].slice(-100) + ' ' + context;
-            }
-            if (i < sentences.length - 1) {
-                context = context + ' ' + sentences[i+1].slice(0, 100);
-            }
-            
-            evidence.push(context.trim());
-        }
-    }
-    
-    return evidence;
-}
-
-// ✅ Manual curation for newly discovered ciliary genes
-function checkManualCuration(gene) {
-    const MANUAL_CILIARY_GENES = {
-        'TMEM145': [
-            "We have successfully validated the ciliary localization of numerous newly identified genes, such as ZC2HC1A, ZNF474, WDR54, TMEM145 and TTC39C. To facilitate further exploration, all data is accessible on the CilioGenics website (https://ciliogenics.com/).",
-            "The combined list has 232 genes, known ciliary genes, and novel ciliary gene candidates, including TMEM145, WDR31, WDR54 and ZNF474 (Figure 2B and Supplementary Table S1B).",
-            "We indeed confirmed that both TTC39A/C and TMEM145 are localized to the cilia of sensory neurons in the head (amphid) and tail (phasmid) of C. elegans (Figure 7C).",
-            "Next, we transduced RPE1 cells with shRNAs targeting control, WDR54, TMEM145, ZC2HC1A and ZNF474 to evaluate the effects of their absence on ciliogenesis and cilia length. We stained the cells for the cilium-specific protein ARL13B (green), acetylated tubulin (magenta), and the basal body marker polyglutamylated tubulin (red) (Figure 8D and E). Compared to control shRNAs, the number of ciliated cells decreased in ZC2HC1A deficient cells, while cilia length remained unchanged (Figure 8F and G). Interestingly, our cilia length measurement revealed that cilia were longer in WDR54 deficient cells compared to the control, suggesting that both ZC2HC1A and WDR54 regulate the cilia biogenesis (Figure 8G)."
-        ],
-        'ZC2HC1A': [
-             "Next, we transduced RPE1 cells with shRNAs targeting control, WDR54, TMEM145, ZC2HC1A and ZNF474 to evaluate the effects of their absence on ciliogenesis and cilia length. We stained the cells for the cilium-specific protein ARL13B (green), acetylated tubulin (magenta), and the basal body marker polyglutamylated tubulin (red) (Figure 8D and E). Compared to control shRNAs, the number of ciliated cells decreased in ZC2HC1A deficient cells, while cilia length remained unchanged (Figure 8F and G). Interestingly, our cilia length measurement revealed that cilia were longer in WDR54 deficient cells compared to the control, suggesting that both ZC2HC1A and WDR54 regulate the cilia biogenesis (Figure 8G).",
-             "WDR54, ZC2HC1A, and ZNF474 localize to cilia.",
-             "Indeed, our work identifies WDR54 and ZC2HC1A as novel regulators of cilia biogenesis. Depletion of WDR54 leads to elongated cilia, whereas ZC2HC1A deficiency results in reduced cilia number. Further work is necessary to elucidate the precise mechanisms by which these proteins regulate cilia biogenesis."
-        ],
-        'ZNF474': [
-             "Next, we transduced RPE1 cells with shRNAs targeting control, WDR54, TMEM145, ZC2HC1A and ZNF474 to evaluate the effects of their absence on ciliogenesis and cilia length. We stained the cells for the cilium-specific protein ARL13B (green), acetylated tubulin (magenta), and the basal body marker polyglutamylated tubulin (red) (Figure 8D and E). Compared to control shRNAs, the number of ciliated cells decreased in ZC2HC1A deficient cells, while cilia length remained unchanged (Figure 8F and G). Interestingly, our cilia length measurement revealed that cilia were longer in WDR54 deficient cells compared to the control, suggesting that both ZC2HC1A and WDR54 regulate the cilia biogenesis (Figure 8G).",
-             "WDR54, ZC2HC1A, and ZNF474 localize to cilia."
-        ],
-        'WDR54': [
-            "Next, we transduced RPE1 cells with shRNAs targeting control, WDR54, TMEM145, ZC2HC1A and ZNF474 to evaluate the effects of their absence on ciliogenesis and cilia length. We stained the cells for the cilium-specific protein ARL13B (green), acetylated tubulin (magenta), and the basal body marker polyglutamylated tubulin (red) (Figure 8D and E). Compared to control shRNAs, the number of ciliated cells decreased in ZC2HC1A deficient cells, while cilia length remained unchanged (Figure 8F and G). Interestingly, our cilia length measurement revealed that cilia were longer in WDR54 deficient cells compared to the control, suggesting that both ZC2HC1A and WDR54 regulate the cilia biogenesis (Figure 8G).",
-            "WDR54, ZC2HC1A, and ZNF474 localize to cilia.",
-            "Indeed, our work identifies WDR54 and ZC2HC1A as novel regulators of cilia biogenesis. Depletion of WDR54 leads to elongated cilia, whereas ZC2HC1A deficiency results in reduced cilia number. Further work is necessary to elucidate the precise mechanisms by which these proteins regulate cilia biogenesis."
-        ]
-    };
-    
-    const manualData = MANUAL_CILIARY_GENES[gene.toUpperCase()];
-    if (manualData) {
-        return manualData.map((context, index) => ({
-            id: `manual_${gene}_${index}`,
-            source: 'manual_curation',
-            context: context,
-            isManual: true
-        }));
-    }
-    return [];
-}
-
-// ✅ Deduplicate evidence
-function deduplicateEvidence(evidence) {
-    const seen = new Set();
-    return evidence.filter(item => {
-        const key = item.context.toLowerCase().replace(/\s+/g, ' ').substring(0, 150);
-        if (seen.has(key)) return false;
-        seen.add(key);
-        return true;
-    });
-}
-
-// ✅ Utility function
-function sleep(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    return foundEvidence;
 }
 
 
@@ -1541,4 +1384,3 @@ window.createResultCard = createResultCard;
 window.createPlaceholderCard = createPlaceholderCard;
 window.renderScreenSummaryHeatmap = renderScreenSummaryHeatmap;
 window.renderExpressionHeatmap = renderExpressionHeatmap; // New exposure
-
