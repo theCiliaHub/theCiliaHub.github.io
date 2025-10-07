@@ -326,7 +326,7 @@ async function handleAIQuery() {
             `;
         }
         // 🧬 Gene expression queries
-        else if ((match = query.match(/(?:gene expression|expression levels|expression of)\s+([A-Z0-9\-]+)(?:\s+in\s+(.+))?/i))) {
+        else if ((match = query.match(/(?:gene expression|expression levels|expression)\s+(?:of\s+)?([A-Z0-9\-]+)(?:\s+in\s+(.+))?/i))) {
             const gene = match[1].toUpperCase();
             const tissue = match[2] ? match[2].trim().toLowerCase() : null;
             title = `Expression Data for ${gene}${tissue ? ` in ${tissue}` : ''}`;
