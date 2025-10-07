@@ -12,6 +12,38 @@ Chart.register({
 });
 
 
+// script.js - Fixed and Complete Version
+
+// Global Variables Initialization
+let geneDataCache = null;
+let allGenes = null;
+let geneMapCache = new Map();
+let geneLocalizationData = {};
+let currentData = null;
+let searchResults = [];
+let defaultGenesNames = ['IFT88', 'CEP290', 'WDR31', 'ARL13B', 'BBS1', 'ACE2', 'PKD2', 'ACTN2']; // Added ACTN2 for testing
+let homeSearchInput = null;
+let homeSuggestionsContainer = null;
+let staticMode = false; // Fallback if needed
+let allPartIds = ['ciliary-membrane', 'axoneme', 'basal-body', 'transition-zone', 'nucleus', 'cell-body']; // Explicit for filtering
+let expressionData = {}; // For expression visualization
+let availableGenes = new Set(); // Cache for expression gene lookup
+const organCache = new Map(); // For expression organ mapping
+let pendingHeatmapRequest = null; // For deferred heatmap rendering
+
+// ✨ THE NEW PLUGIN CODE RIGHT HERE for PLOT ✨
+Chart.register({
+  id: 'customCanvasBackgroundColor',
+  beforeDraw: (chart, args, options) => {
+    const {ctx} = chart;
+    ctx.save();
+    ctx.globalCompositeOperation = 'destination-over';
+    ctx.fillStyle = options.color || '#ffffff'; // White background
+    ctx.fillRect(0, 0, chart.width, chart.height);
+    ctx.restore();
+  }
+});
+
 /**
  * Sanitizes any string by removing invisible characters and normalizing it.
  */
@@ -41,6 +73,7 @@ async function loadAndPrepareDatabase() {
         geneDataCache = rawGenes;
         allGenes = rawGenes;
         geneMapCache = new Map();
+        geneLocalizationData = {};
 
         allGenes.forEach(g => {
             if (!g.gene || typeof g.gene !== 'string') {
@@ -61,18 +94,16 @@ async function loadAndPrepareDatabase() {
             }
 
             // 3. Index by all Ensembl IDs (handles comma or semicolon separators)
-        // This part of your code already handles Ensembl IDs
-if (g.ensembl_id) {
-    String(g.ensembl_id).split(/[,;]/).forEach(id => {
-        const key = sanitize(id);
-        if (key) geneMapCache.set(key, g);
-    });
-}
+            if (g.ensembl_id) {
+                String(g.ensembl_id).split(/[,;]/).forEach(id => {
+                    const key = sanitize(id);
+                    if (key) geneMapCache.set(key, g);
+                });
+            }
             
-            // 4. Prepare localization data for SVG mapping - MODIFIED: Sanitize input to filter non-ciliary terms and add debug logging for ACTN2
+            // 4. Prepare localization data for SVG mapping - Sanitize and debug for ACTN2
             if (g.localization) {
-                // Sanitize: Only pass valid ciliary localizations to mapLocalizationToSVG to prevent additions like "Cytosol"
-                const validCiliaryLocalizations = ['transition zone', 'cilia', 'basal body', 'axoneme', 'ciliary membrane', 'centrosome', 'autophagosomes', 'endoplasmic reticulum', 'flagella', 'golgi apparatus', 'lysosome', 'microbody', 'microtubules', 'mitochondrion', 'nucleus', 'peroxisome']; // Expanded list based on common terms in plots.js
+                const validCiliaryLocalizations = ['transition zone', 'cilia', 'basal body', 'axoneme', 'ciliary membrane', 'centrosome', 'autophagosomes', 'endoplasmic reticulum', 'flagella', 'golgi apparatus', 'lysosome', 'microbody', 'microtubules', 'mitochondrion', 'nucleus', 'peroxisome'];
                 let sanitizedLocalization = Array.isArray(g.localization) 
                     ? g.localization.map(loc => loc ? loc.trim().toLowerCase() : '').filter(loc => loc && validCiliaryLocalizations.includes(loc))
                     : (g.localization ? g.localization.split(/[,;]/).map(loc => loc ? loc.trim().toLowerCase() : '').filter(loc => loc && validCiliaryLocalizations.includes(loc)) : []);
@@ -83,7 +114,7 @@ if (g.ensembl_id) {
                     console.log('ACTN2 Sanitized localization before mapping:', sanitizedLocalization);
                 }
                 
-                geneLocalizationData[g.gene] = mapLocalizationToSVG(sanitizedLocalization); // Use sanitized input
+                geneLocalizationData[g.gene] = mapLocalizationToSVG(sanitizedLocalization);
                 
                 // Additional debug for mapped output
                 if (g.gene === 'ACTN2') {
@@ -93,15 +124,25 @@ if (g.ensembl_id) {
         });
 
         console.log(`Loaded ${allGenes.length} genes into database`);
+        currentData = allGenes;
         return true;
     } catch (e) {
         console.error('Data load error:', e);
-        // Fallback logic remains the same
+        // Fallback logic
         allGenes = getDefaultGenes();
         currentData = allGenes;
         geneMapCache = new Map();
+        geneLocalizationData = {};
         allGenes.forEach(g => {
             if (g.gene) geneMapCache.set(sanitize(g.gene), g);
+            // Re-process localization in fallback
+            if (g.localization) {
+                const validCiliaryLocalizations = ['transition zone', 'cilia', 'basal body', 'axoneme', 'ciliary membrane', 'centrosome', 'autophagosomes', 'endoplasmic reticulum', 'flagella', 'golgi apparatus', 'lysosome', 'microbody', 'microtubules', 'mitochondrion', 'nucleus', 'peroxisome'];
+                let sanitizedLocalization = Array.isArray(g.localization) 
+                    ? g.localization.map(loc => loc ? loc.trim().toLowerCase() : '').filter(loc => loc && validCiliaryLocalizations.includes(loc))
+                    : (g.localization ? g.localization.split(/[,;]/).map(loc => loc ? loc.trim().toLowerCase() : '').filter(loc => loc && validCiliaryLocalizations.includes(loc)) : []);
+                geneLocalizationData[g.gene] = mapLocalizationToSVG(sanitizedLocalization);
+            }
         });
         return false;
     }
