@@ -254,6 +254,7 @@ async function fetchTissueData() {
 }
 
 // --- Conversational CiliAI Query Engine ---
+// --- Conversational CiliAI Query Engine ---
 async function handleAIQuery() {
     const aiQueryInput = document.getElementById('aiQueryInput');
     const resultsContainer = document.getElementById('resultsContainer');
@@ -299,14 +300,7 @@ async function handleAIQuery() {
             resultHtml = formatTopTissueGenes(results, `Top Expressed Genes in ${tissueName}`, tissueName);
         }
 
-        // B. Functional Category Queries
-        else if ((match = query.match(/(?:show me|find)\s+(.*?)\s+genes/i)) && !match[1].includes("domain")) {
-            const category = match[1].trim().toLowerCase();
-            const results = data.filter(g => g.functional_category && g.functional_category.toLowerCase().includes(category));
-            resultHtml = formatSimpleResults(results, `Genes in Functional Category: "${category}"`);
-        }
-
-        // C. Domain-based queries
+        // C. Domain-based queries (REORDERED TO BE FIRST)
         else if ((match = query.match(/compare domain architecture of\s+([A-Z0-9\-]+)\s+and\s+([A-Z0-9\-]+)/i))) {
             const [gene1, gene2] = [match[1].toUpperCase(), match[2].toUpperCase()];
             const gene1Data = data.find(g => g.gene.toUpperCase() === gene1);
@@ -321,12 +315,20 @@ async function handleAIQuery() {
             });
             resultHtml = formatDomainResults(results, `Genes with domains: ${domains.join(' & ')}`);
         }
-        else if ((match = query.match(/(?:show me|find|what genes have a)\s+(.*?)\s+domain/i))) {
+        // MODIFIED REGEX to be more flexible (accepts "domain genes")
+        else if ((match = query.match(/(?:show me|find|what genes have a)\s+(.*?)\s+domain(?: genes)?/i))) {
             const domain = match[1].trim();
             const results = data.filter(g => (g.domain_descriptions || []).some(d => d.toLowerCase().includes(domain.toLowerCase())));
             resultHtml = formatDomainResults(results, `Genes with "${domain}" domain`);
         }
 
+        // B. Functional Category Queries (NOW AFTER DOMAINS)
+        else if ((match = query.match(/(?:show me|find)\s+(.*?)\s+genes/i))) {
+            const category = match[1].trim().toLowerCase();
+            const results = data.filter(g => g.functional_category && g.functional_category.toLowerCase().includes(category));
+            resultHtml = formatSimpleResults(results, `Genes in Functional Category: "${category}"`);
+        }
+        
         // D. Evolutionary Gain/Loss Queries
         else if (/(ciliary[-\s]?only|ciliated\s+organisms\s+specific|lost in non-ciliated organisms)/i.test(query)) {
             const results = Object.keys(phylogeny).filter(gene => phylogeny[gene]?.category === 'ciliary_only');
