@@ -1054,6 +1054,23 @@ async function renderPhylogenyHeatmap(genes) {
     Plotly.newPlot('plot-display-area', [trace], layout);
 }
 
+function handleExpressionSearchInput(e) {
+    let query = e.target.value.trim().toUpperCase();
+    // Add validation to ensure query matches expected gene format
+    if (!/^[A-Za-z0-9-]+$/.test(query)) {
+        console.warn(`Invalid gene query format: ${query}`);
+        return;
+    }
+    if (query.length < 2) {
+        hideExpressionSuggestions();
+        return;
+    }
+    clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(() => {
+        const suggestions = getExpressionGeneSuggestions(query);
+        showExpressionSuggestions(suggestions);
+    }, 150);
+}
 
 // --- Live Literature Mining Engine (Client-Side) ---
 
