@@ -820,58 +820,6 @@ function createResultCard(gene, dbData, allEvidence) {
         </div>`;
 }
 
-async function analyzeGeneViaAPI(gene, resultCard) {
-    const ESEARCH_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi";
-    const EFETCH_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi";
-    const API_QUERY_KEYWORDS = ["cilia", "ciliary", "ciliogenesis", "intraflagellar transport", "ciliopathy"];
-    const LOCAL_ANALYSIS_KEYWORDS = new Set(['cilia', 'cilium', 'axoneme', 'basal body', 'ciliogenesis', 'ift', 'shorter', 'longer', 'motility']);
-    const geneRegex = new RegExp(`\\b${gene}\\b`, 'i');
-    let foundEvidence = [];
-    const MAX_EVIDENCE = 5;
-
-    try {
-        const kwClause = API_QUERY_KEYWORDS.map(k => `"${k}"[Title/Abstract]`).join(" OR ");
-        const query = `("${gene}"[Title/Abstract]) AND (${kwClause})`;
-        const searchParams = new URLSearchParams({ db: 'pubmed', term: query, retmode: 'json', retmax: '20' });
-        const searchResp = await fetch(`${ESEARCH_URL}?${searchParams}`);
-        if (!searchResp.ok) throw new Error('NCBI ESearch failed');
-
-        const searchData = await searchResp.json();
-        const pmids = searchData.esearchresult?.idlist;
-        if (!pmids || pmids.length === 0) return [];
-        
-        await sleep(350); // Rate limit
-        const fetchResp = await fetch(`${EFETCH_URL}?db=pubmed&id=${pmids.join(',')}&retmode=xml&rettype=abstract`);
-        if (!fetchResp.ok) throw new Error('NCBI EFetch failed');
-        
-        const xmlText = await fetchResp.text();
-        const parser = new DOMParser();
-        const xmlDoc = parser.parseFromString(xmlText, "application/xml");
-        const articles = Array.from(xmlDoc.getElementsByTagName('PubmedArticle'));
-
-        for (const article of articles) {
-            if (foundEvidence.length >= MAX_EVIDENCE) break;
-            const pmid = article.querySelector('MedlineCitation > PMID')?.textContent;
-            const title = article.querySelector('ArticleTitle')?.textContent || '';
-            const abstractEl = article.querySelector('AbstractText');
-            if (!abstractEl) continue;
-            
-            const abstractText = abstractEl.textContent;
-            if (geneRegex.test(abstractText)) {
-                 const sentences = abstractText.split(/(?<=[.!?])\s+/);
-                 for (const sent of sentences) {
-                     if (foundEvidence.length >= MAX_EVIDENCE) break;
-                     if (geneRegex.test(sent) && [...LOCAL_ANALYSIS_KEYWORDS].some(kw => sent.toLowerCase().includes(kw))) {
-                         foundEvidence.push({ id: pmid, source: 'PubMed', context: sent.trim() });
-                     }
-                 }
-            }
-        }
-    } catch (error) {
-        console.error(`Literature search failed for ${gene}:`, error);
-    }
-    return foundEvidence;
-}
 
 // --- NEW: Phylogeny query helper ---
 // Wraps your normalized phylogenyDataCache and provides labeled results for common natural phrases.
