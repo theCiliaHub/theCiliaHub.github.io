@@ -820,6 +820,8 @@ function createResultCard(gene, dbData, allEvidence) {
         </div>`;
 }
 
+
+
 // --- NEW: Phylogeny query helper ---
 // Wraps your normalized phylogenyDataCache and provides labeled results for common natural phrases.
 async function getGenesByPhylogeny(query) {
@@ -923,24 +925,13 @@ async function analyzeGeneViaAPI(gene, resultCard) {
     const EFETCH_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi";
     const EUROPE_PMC_URL = "https://www.ebi.ac.uk/europepmc/webservices/rest/search";
 
-    const API_QUERY_KEYWORDS =  [
-                "cilia", "cilium", "ciliary", "cilia length", "ciliogenesis", "ciliation", "loss of cilia",
-                "fewer cilia", "fluid flow", "mucociliary", "multiciliated", "intraflagellar transport", "ciliopathy"
-            ];
-   const LOCAL_ANALYSIS_KEYWORDS = [
-                'cilia', 'ciliary', 'cilium', 'axoneme', 'basal body', 'transition zone', 'centriole', 'ciliogenesis',
-                'ciliation', 'intraflagellar transport', 'ift', 'cilia assembly', 'cilia disassembly', 'ciliary motility',
-                'shorter', 'shortened', 'longer', 'elongated', 'fewer', 'loss of', 'absent cilia', 'reduction', 'reduced',
-                'decrease', 'increased', 'increase', 'abnormal length', 'flow', 'fluid flow', 'cilia-generated',
-                'mechanosensor', 'ciliary signaling', 'bead displacement', 'mucociliary', 'multiciliated', 'kidney tubule',
-                'photoreceptor', 'acls', 'acrocallosal syndrome', 'alms', 'alström syndrome',
-                'autosomal dominant polycystic kidney disease', 'adpkd', 'autosomal recessive polycystic kidney disease', 'arpkd',
-                'bardet–biedl syndrome', 'bbs', 'joubert syndrome', 'jbts', 'kallmann syndrome',
-                'leber congenital amaurosis', 'lca', 'meckel–gruber syndrome', 'mks',
-                'nephronophthisis', 'nphp', 'orofaciodigital syndrome', 'ofd', 'polycystic kidney disease', 'pkd',
-                'senior-løken syndrome', 'slsn', 'short-rib thoracic dysplasia', 'srtd', 'ciliopathy'
-            ];
-    
+    const API_QUERY_KEYWORDS = ["cilia", "ciliary", "ciliogenesis", "intraflagellar transport", "ciliopathy"];
+    const LOCAL_ANALYSIS_KEYWORDS = new Set([
+        'cilia','ciliary','cilium','axoneme','basal body','transition zone',
+        'ciliogenesis','ift','shorter','longer','fewer','loss of','absent',
+        'reduced','increased','motility'
+    ]);
+
     // ✅ Broaden gene regex to include hyphenated and case variants
     const geneRegex = new RegExp(`\\b${gene}(?:[-_ ]?\\w{0,3})?\\b`, 'i');
     const sentSplitRegex = /(?<=[.!?])\s+/;
