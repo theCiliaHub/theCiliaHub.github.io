@@ -233,13 +233,15 @@ async function fetchPhylogenyData() {
             if (Array.isArray(raw[key])) {
                 const category = key.replace(/_genes$/, '').replace(/_/g, ' ');
                 raw[key].filter(Boolean).forEach(gene => {
-    // Add a check to make sure 'gene' is a string before trimming
-    if (typeof gene === 'string') {
-        const geneUpper = gene.trim().toUpperCase();
-        if (!unified[geneUpper]) unified[geneUpper] = { categories: [], species: [] };
-        unified[geneUpper].categories.push(key);
-    }
-});
+                    // Add a check to make sure 'gene' is a string before trimming
+                    if (typeof gene === 'string') {
+                        const geneUpper = gene.trim().toUpperCase();
+                        if (!unified[geneUpper]) unified[geneUpper] = { categories: [], species: [] };
+                        unified[geneUpper].categories.push(key);
+                    }
+                });
+            } // <-- FIX #1: This closing brace for the 'if' statement was missing.
+        }); // <-- FIX #2: This closing brace for the 'Object.keys.forEach' was missing.
         
         // Add more complex parsing if phylogeny.json contains objects with species info
         // This part needs to be adapted if the JSON structure for species is different
@@ -253,7 +255,6 @@ async function fetchPhylogenyData() {
         return {};
     }
 }
-
 
 async function fetchTissueData() {
     if (tissueDataCache) return tissueDataCache;
