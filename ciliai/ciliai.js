@@ -450,7 +450,7 @@ document.addEventListener('click', async (event) => {
         const gene = event.target.dataset.gene;
         if (action === 'expression-visualize' && gene) {
             document.getElementById('plot-display-area').innerHTML = `<p class="status-searching">Building expression heatmap...</p>`;
-            await renderExpressionHeatmap([gene]);
+            await displayCiliAIExpressionHeatmap([gene]);
         }
     }
 });
@@ -733,10 +733,10 @@ async function runAnalysis(geneList) {
     if (geneList.length > 0) visualizeBtn.style.display = 'block';
 }
 
-async function renderExpressionHeatmap(genes) {
+async function displayCiliAIExpressionHeatmap(genes) {
     const tissueData = await fetchTissueData();
     if (!tissueData || Object.keys(tissueData).length === 0) {
-        document.getElementById('plot-display-area').innerHTML = '<p class="status-not-found">Error: No tissue expression data.</p>';
+        document.getElementById('plot-display-area').innerHTML = '<p class="status-not-found">Error: No tissue expression data could be loaded.</p>';
         return;
     }
     const tissues = new Set();
@@ -747,6 +747,12 @@ async function renderExpressionHeatmap(genes) {
     });
 
     const tissueList = Array.from(tissues).sort();
+
+    if (tissueList.length === 0) {
+        document.getElementById('plot-display-area').innerHTML = `<p class="status-not-found">No tissue expression data found for the gene(s): ${genes.join(', ')}.</p>`;
+        return;
+    }
+
     const matrix = genes.map(g => tissueList.map(t => tissueData[g]?.[t] || 0));
 
     const trace = {
@@ -769,7 +775,22 @@ async function renderExpressionHeatmap(genes) {
 function renderScreenDataTable(gene, screenInfo) {
     if (!screenInfo || typeof screenInfo !== 'object') return '<p class="status-not-found">No structured screen data available.</p>';
     
-    let screensObj = screenInfo.screens || {};
+    let screensObj = {};
+    if (Array.isArray(screenInfo)) {
+        screensObj = screenInfo.reduce((acc, entry) => {
+            if (entry.source && entry.result) {
+                acc[entry.source] = {
+                    hit: entry.result.toLowerCase() !== 'no effect', 
+                    effect: entry.result,
+                    details: 'From raw data' 
+                };
+            }
+            return acc;
+        }, {});
+    } else if (screenInfo.screens) {
+        screensObj = screenInfo.screens;
+    }
+
     const screenKeys = Object.keys(screensObj);
     const hitCount = screenKeys.filter(key => screensObj[key]?.hit).length;
 
@@ -781,15 +802,16 @@ function renderScreenDataTable(gene, screenInfo) {
         'Breslow2018': 'Breslow et al. (2018) Hedgehog Signaling'
     };
 
-    const summary = `<p><b>${gene}</b> was identified as a hit in <strong>${hitCount} out of ${screenKeys.length}</strong> ciliary screens.</p>`;
+    const summary = `<p class="screen-summary">According to ${hitCount} out of ${screenKeys.length} ciliary screens, <strong>${gene}</strong> was found to impact cilia.</p>`;
+
     const tableHtml = `
         <table class="expression-table">
-            <thead><tr><th>Screen</th><th>Hit?</th><th>Effect</th></tr></thead>
+            <thead><tr><th>Screen</th><th>Hit?</th><th>Effect</th><th>Details</th></tr></thead>
             <tbody>
                 ${screenKeys.map(key => {
-                    const d = screensObj[key] || { hit: false, effect: 'N/A' };
+                    const d = screensObj[key] || { hit: false, effect: 'N/A', details: 'Not tested' };
                     const name = screenNames[key] || key;
-                    return `<tr><td>${name}</td><td>${d.hit ? '✅' : '❌'}</td><td>${d.effect}</td></tr>`;
+                    return `<tr><td>${name}</td><td>${d.hit ? '✅' : '❌'}</td><td>${d.effect}</td><td>${d.details}</td></tr>`;
                 }).join('')}
             </tbody>
         </table>`;
@@ -1171,4 +1193,4 @@ window.fetchScreenData = fetchScreenData;
 window.createResultCard = createResultCard;
 window.createPlaceholderCard = createPlaceholderCard;
 window.renderScreenSummaryHeatmap = renderScreenSummaryHeatmap;
-window.renderExpressionHeatmap = renderExpressionHeatmap;
+window.displayCiliAIExpressionHeatmap = displayCiliAIExpressionHeatmap;
