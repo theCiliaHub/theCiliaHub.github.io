@@ -194,21 +194,31 @@ async function fetchCiliaData() {
     }
 }
 
+
 async function fetchScreenData() {
     if (screenDataCache) return screenDataCache;
     try {
         const response = await fetch('https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/cilia_screens_data.json');
         if (!response.ok) throw new Error(`Failed to fetch screen data: ${response.statusText}`);
         const data = await response.json();
-        screenDataCache = data;
-        console.log('Screen data loaded successfully:', Object.keys(data).length, 'genes');
-        return data;
+
+        // Create a new object with all keys converted to uppercase
+        const normalizedData = {};
+        for (const key in data) {
+            if (Object.hasOwnProperty.call(data, key)) {
+                normalizedData[key.toUpperCase()] = data[key];
+            }
+        }
+        
+        screenDataCache = normalizedData; // Use the normalized data
+        
+        console.log('Screen data loaded and normalized:', Object.keys(screenDataCache).length, 'genes');
+        return screenDataCache;
     } catch (error) {
         console.error('Error fetching screen data:', error);
         return {};
     }
 }
-
 async function fetchPhylogenyData() {
     if (phylogenyDataCache) return phylogenyDataCache;
     try {
