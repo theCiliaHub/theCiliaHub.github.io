@@ -40,12 +40,12 @@ window.displayCiliAIPage = async function displayCiliAIPage() {
                         </div>
                         <div class="example-queries">
                             <p><strong>Try asking:</strong> 
-                                <span>"show me genes for Joubert Syndrome"</span>, 
-                                <span>"show me WD40 domain genes"</span>, 
-                                <span>"show me cilia localizing genes"</span>, 
-                                <span>"show me complexes for IFT88"</span>,
-                                <span>"show me cilia organisms specific genes"</span>,
-                                <span>"gene expression of IFT88 in kidney"</span>.
+                                <span>"What is the function of IFT88?"</span>, 
+                                <span>"genes for Bardet-Biedl Syndrome"</span>, 
+                                <span>"show me basal body genes"</span>, 
+                                <span>"what domains are in CEP290?"</span>,
+                                <span>"show me ciliary genes in humans"</span>,
+                                <span>"gene expression of ARL13B"</span>.
                             </p>
                         </div>
                     </div>
@@ -115,7 +115,7 @@ window.displayCiliAIPage = async function displayCiliAIPage() {
                 .ai-query-btn { padding: 0.8rem 1.2rem; font-size: 1rem; background-color: #2c5aa0; color: white; border: none; border-radius: 4px; cursor: pointer; transition: background-color 0.2s; }
                 .ai-query-btn:hover { background-color: #1e4273; }
                 .example-queries { margin-top: 1rem; font-size: 0.9rem; color: #555; }
-                .example-queries span { background-color: #d1e7fd; padding: 2px 6px; border-radius: 4px; font-family: monospace; }
+                .example-queries span { background-color: #d1e7fd; padding: 2px 6px; border-radius: 4px; font-family: monospace; cursor: pointer;}
                 .input-section { background-color: #fff; padding: 2rem; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
                 .input-section h3 { margin-top: 0; color: #333; }
                 .input-group { margin-bottom: 1.5rem; }
@@ -170,11 +170,6 @@ const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 function debounce(fn, delay) { let timeout; return function (...args) { clearTimeout(timeout); timeout = setTimeout(() => fn(...args), delay); }; }
 const CILI_AI_DB = { "HDAC6": { "summary": { "lof_length": "Promotes / Maintains", "percentage_ciliated": "No effect", "source": "Expert DB" }, "evidence": [{ "id": "21873644", "source": "pubmed", "context": "...loss of HDAC6 results in hyperacetylation of tubulin and leads to the formation of longer, more stable primary cilia in renal epithelial cells." }] }, "IFT88": { "summary": { "lof_length": "Inhibits / Restricts", "percentage_ciliated": "Reduced cilia numbers", "source": "Expert DB" }, "evidence": [{ "id": "10882118", "source": "pubmed", "context": "Mutations in IFT88 (polaris) disrupt intraflagellar transport, leading to a failure in cilia assembly and resulting in severely shortened or absent cilia." }] }, "ARL13B": { "summary": { "lof_length": "Inhibits / Restricts", "percentage_ciliated": "Reduced cilia numbers", "source": "Expert DB" }, "evidence": [{ "id": "21940428", "source": "pubmed", "context": "The small GTPase ARL13B is critical for ciliary structure; its absence leads to stunted cilia with abnormal morphology and axonemal defects." }] } };
 
-// --- Data Fetching and Caching (Abbreviated for brevity) ---
-async function fetchCiliaData() { if (ciliaHubDataCache) return ciliaHubDataCache; try { const response = await fetch('https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/ciliahub_data.json'); if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`); const data = await response.json(); ciliaHubDataCache = data.map(gene => ({...gene, domain_descriptions: typeof gene.domain_descriptions === 'string' ? gene.domain_descriptions.split(',').map(d => d.trim()) : Array.isArray(gene.domain_descriptions) ? gene.domain_descriptions : [] })); console.log('CiliaHub data loaded.'); return ciliaHubDataCache; } catch (error) { console.error("Failed to fetch CiliaHub data:", error); return null; } }
-async function fetchScreenData() { if (screenDataCache) return screenDataCache; try { const response = await fetch('https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/cilia_screens_data.json'); if (!response.ok) throw new Error(`Failed to fetch screen data: ${response.statusText}`); screenDataCache = await response.json(); console.log('Screen data loaded.'); return screenDataCache; } catch (error) { console.error('Error fetching screen data:', error); return {}; } }
-
-
 // --- Data Fetching and Caching ---
 
 async function fetchCiliaData() {
@@ -216,42 +211,24 @@ async function fetchScreenData() {
 
 async function fetchPhylogenyData() {
     if (phylogenyDataCache) return phylogenyDataCache;
-
     try {
         const response = await fetch('https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/phylogeny_summary.json');
         if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
         const raw = await response.json();
-
         const unified = {};
 
-        // 1️⃣ Handle top-level arrays like "ciliated_only_genes"
-        if (raw.ciliated_only_genes) {
-            raw.ciliated_only_genes
-                .filter(Boolean)
-                .forEach(g => unified[g.trim().toUpperCase()] = { category: 'ciliary_only' });
-        }
-
-        if (raw.nonciliary_only_genes) {
-            raw.nonciliary_only_genes
-                .filter(Boolean)
-                .forEach(g => unified[g.trim().toUpperCase()] = { category: 'nonciliary_only' });
-        }
-
-        if (raw.in_all_organisms) {
-            raw.in_all_organisms
-                .filter(Boolean)
-                .forEach(g => unified[g.trim().toUpperCase()] = { category: 'in_all_organisms' });
-        }
-
-        // 2️⃣ Handle list of objects like {id, sym, class, species}
-        if (Array.isArray(raw)) {
-            raw.forEach(item => {
-                const gene = (item.sym || '').trim().toUpperCase();
-                const cat = (item.class || '').toLowerCase().replace(/\s+/g, '_');
-                if (gene) unified[gene] = { category: cat, species: item.species || [] };
-            });
-        }
-
+        // Process different formats in the JSON
+        Object.keys(raw).forEach(key => {
+            if (Array.isArray(raw[key])) {
+                const category = key.replace(/_genes$/, '').replace(/_/g, ' ');
+                raw[key].filter(Boolean).forEach(gene => {
+                    const geneUpper = gene.trim().toUpperCase();
+                    if (!unified[geneUpper]) unified[geneUpper] = { categories: [], species: [] };
+                    unified[geneUpper].categories.push(key); // e.g., 'ciliated_only_genes'
+                });
+            }
+        });
+        
         phylogenyDataCache = unified;
         console.log(`Phylogeny data normalized: ${Object.keys(unified).length} entries`);
         return phylogenyDataCache;
@@ -261,141 +238,67 @@ async function fetchPhylogenyData() {
     }
 }
 
+
 async function fetchTissueData() {
     if (tissueDataCache) return tissueDataCache;
     try {
-        console.debug('fetchTissueData: Fetching TSV...');
         const response = await fetch('https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/rna_tissue_consensus.tsv');
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-        
         const tsv = await response.text();
-        console.debug('fetchTissueData: TSV fetched, length:', tsv.length);
-        
         const lines = tsv.trim().split('\n');
-        if (lines.length < 2) {
-            console.warn('fetchTissueData: TSV is empty or malformed (no header/data rows)');
-            throw new Error('Empty TSV file');
-        }
+        if (lines.length < 2) throw new Error('Empty TSV file');
         
         const data = {};
         for (let i = 1; i < lines.length; i++) {
             const parts = lines[i].split('\t');
-            if (parts.length < 4) {
-                console.warn(`fetchTissueData: Skipping malformed row ${i}:`, lines[i]);
-                continue;
-            }
-
-            // Correct column order: EnsemblID, GeneSymbol, Tissue, Expression
-            const [ensemblID, geneSymbol, tissue, nTPMValue] = parts;
+            if (parts.length < 4) continue;
+            const [, geneSymbol, tissue, nTPMValue] = parts;
             if (!geneSymbol || !tissue || !nTPMValue) continue;
-
             const gene = geneSymbol.toUpperCase().trim();
             const nTPM = parseFloat(nTPMValue.trim());
-
             if (!isNaN(nTPM)) {
                 if (!data[gene]) data[gene] = {};
                 data[gene][tissue.trim()] = nTPM;
-            } else {
-                console.warn(`fetchTissueData: Invalid nTPM in row ${i}:`, nTPMValue);
             }
         }
-
-        // Debug check
-        if (data['WDR31']) {
-            console.debug('fetchTissueData: Example WDR31 tissues loaded:', Object.keys(data['WDR31']).slice(0, 5));
-        } else {
-            console.warn('fetchTissueData: WDR31 not found in TSV — check file format.');
-        }
-
-        // Fallback check for IFT88
-        if (!data['IFT88']) {
-            console.warn('fetchTissueData: IFT88 not found in TSV - adding fallback');
-            data['IFT88'] = {
-                'Kidney Cortex': 8.45,
-                'Kidney Medulla': 12.67,
-                'Lung': 5.23,
-                'Liver': 3.12,
-                'Brain': 1.89
-            };
-        }
-
         tissueDataCache = data;
-        console.log('Tissue expression data loaded and cached for', Object.keys(data).length, 'genes');
+        console.log('Tissue expression data loaded for', Object.keys(data).length, 'genes');
         return tissueDataCache;
-
     } catch (error) {
         console.error('Failed to fetch tissue data:', error);
-
-        // Minimal fallback dataset
-        const fallbackData = {
-            'IFT88': {
-                'Kidney Cortex': 8.45,
-                'Kidney Medulla': 12.67
-            }
-        };
-
-        tissueDataCache = fallbackData;
-        console.log('Using fallback tissue data for', Object.keys(fallbackData).length, 'genes');
+        tissueDataCache = { 'IFT88': { 'Kidney Cortex': 8.45, 'Kidney Medulla': 12.67 } };
         return tissueDataCache;
     }
 }
 
-// --- NEW: Functional-category search helper ---
-// Uses ciliaHubDataCache (from fetchCiliaData()) to find genes whose functional_category,
-// functional_summary, localization or description contains the query terms.
 async function getGenesByFunctionalCategory(query) {
     await fetchCiliaData();
-    if (!ciliaHubDataCache || !Array.isArray(ciliaHubDataCache)) return [];
-
+    if (!ciliaHubDataCache) return [];
     if (!query) return [];
-
-    const terms = query.split(/[,&]| and /i).map(t => normalizeTerm(t)).filter(Boolean);
+    const terms = query.toLowerCase().split(/\s+/).filter(Boolean);
     if (terms.length === 0) return [];
 
-    const matches = ciliaHubDataCache.filter(item => {
-        const cat = normalizeTerm(item.functional_category || '');
-        const summary = normalizeTerm(item.functional_summary || '');
-        const loc = normalizeTerm(item.localization || '');
-        const desc = normalizeTerm(item.description || '');
-        // require each term to be present in at least one of the fields
-        return terms.every(term => (cat.includes(term) || summary.includes(term) || loc.includes(term) || desc.includes(term)));
-    }).map(x => x.gene);
-
-    return Array.from(new Set(matches)).sort();
+    return ciliaHubDataCache
+        .filter(item => {
+            const combinedText = [
+                item.functional_category,
+                item.functional_summary,
+                item.localization,
+                item.description
+            ].join(' ').toLowerCase();
+            return terms.every(term => combinedText.includes(term));
+        })
+        .map(item => item.gene)
+        .filter((value, index, self) => self.indexOf(value) === index) // Unique genes
+        .sort();
 }
 
-// --- NEW: Phylogeny query helper ---
-// Wraps your normalized phylogenyDataCache and provides labeled results for common natural phrases.
-async function getGenesByPhylogeny(query) {
-    await fetchPhylogenyData();
-    const phy = phylogenyDataCache || {};
-    const q = normalizeTerm(query || '');
 
-    if (q.includes('in all') || q.includes('all organisms') || q.includes('present in all')) {
-        const genes = Object.entries(phy).filter(([, v]) => v.category === 'in_all_organisms').map(([g]) => g);
-        return { label: 'Present in all organisms', genes: genes.sort() };
-    }
-
-    if (q.includes('non') && (q.includes('cili') || q.includes('ciliary') || q.includes('non-ciliary') || q.includes('non ciliary'))) {
-        const genes = Object.entries(phy).filter(([, v]) => v.category === 'nonciliary_only').map(([g]) => g);
-        return { label: 'Non-ciliary-only genes', genes: genes.sort() };
-    }
-
-    if (q.includes('ciliated-only') || q.includes('ciliary-only') || q.includes('only ciliated') || (q.includes('only') && q.includes('ciliated'))) {
-        const genes = Object.entries(phy).filter(([, v]) => v.category === 'ciliary_only').map(([g]) => g);
-        return { label: 'Ciliary-only genes', genes: genes.sort() };
-    }
-
-    if (q.includes('present in both') || q.includes('both') || q.includes('present-in-both') || q.includes('present in ciliated and non')) {
-        const genes = Object.entries(phy).filter(([, v]) => v.category === 'present_in_both' || v.category === 'present-in-both' || v.category === 'presentinboth').map(([g]) => g);
-        return { label: 'Present in both ciliated and non-ciliated organisms', genes: genes.sort() };
-    }
-
-    // fallback: return empty with hint
-    return { label: 'No phylogeny group matched', genes: [] };
+function normalizeTerm(s) {
+    if (!s) return '';
+    return String(s).toLowerCase().replace(/[_\-\s]+/g, ' ').trim();
 }
 
-// --- Conversational CiliAI Query Engine with Step 2 ---
 async function handleAIQuery() {
     const aiQueryInput = document.getElementById('aiQueryInput');
     const resultsContainer = document.getElementById('resultsContainer');
@@ -413,335 +316,152 @@ async function handleAIQuery() {
     const phylogeny = await fetchPhylogenyData();
     const tissueData = await fetchTissueData();
 
-    if (!data || !phylogeny || !tissueData) {
-        resultsContainer.innerHTML = `<p class="status-not-found">Error: Data could not be loaded. Please check the console.</p>`;
+    if (!data) {
+        resultsContainer.innerHTML = `<p class="status-not-found">Error: Core gene data could not be loaded.</p>`;
         return;
     }
 
-    // NEW: First attempt to match functional-category and phylogeny shorthand queries
-    const qnorm = normalizeTerm(query);
-    // functional keywords to trigger functional_category search
-    const funcKeywords = ['motile', 'motility', 'motile cilium', 'motile cilia', 'trafficking', 'bbsome', 'cytoskeleton', 'actin', 'microtubule', 'traffick', 'vesicular', 'transport', 'sperm', 'reproduction', 'functional category'];
-    for (const k of funcKeywords) {
-        if (qnorm.includes(normalizeTerm(k))) {
-            // try to extract explicit category phrase if present
-            let cat = '';
-            const m1 = query.match(/(?:show|list|find|which|give|display)\s+(.+?)\s+genes/i);
-            if (m1 && m1[1]) cat = m1[1];
-            const m2 = query.match(/functional category\s*[:\-]?\s*(.+)$/i);
-            if (m2 && m2[1]) cat = m2[1];
-            if (!cat) {
-                if (qnorm.includes('motile cilium')) cat = 'motile cilium';
-                else if (qnorm.includes('motility')) cat = 'motility';
-                else if (qnorm.includes('bbsome')) cat = 'bbsome';
-                else {
-                    // fallback to the keyword itself
-                    cat = k;
-                }
-            }
-            const genes = await getGenesByFunctionalCategory(cat);
-            if (genes.length === 0) {
-                resultsContainer.innerHTML = `<div class="result-card"><h3>No genes found</h3><p>No genes matched functional category "${cat}". Try broader keywords (e.g., "trafficking", "motile").</p></div>`;
-            } else {
-                resultsContainer.innerHTML = `<div class="result-card"><h3>Genes matching functional category "${cat}"</h3><p>${genes.length} genes found</p><ul>${genes.map(g => `<li>${g}</li>`).join('')}</ul></div>`;
-            }
-            return;
-        }
-    }
-
-    // phylogeny shorthand triggers
-    const phyloTriggers = ['in all organisms', 'present in all', 'ciliary-only', 'ciliated only', 'non-ciliary', 'nonciliary', 'present in both', 'present-in-both'];
-    for (const t of phyloTriggers) {
-        if (qnorm.includes(normalizeTerm(t))) {
-            const res = await getGenesByPhylogeny(query);
-            if (!res.genes || res.genes.length === 0) {
-                resultsContainer.innerHTML = `<div class="result-card"><h3>${res.label}</h3><p>No genes found for this phylogeny group. Check phylogeny_summary.json format.</p></div>`;
-            } else {
-                resultsContainer.innerHTML = `<div class="result-card"><h3>${res.label}</h3><p>${res.genes.length} genes</p><ul>${res.genes.map(g => `<li>${g}</li>`).join('')}</ul></div>`;
-            }
-            return;
-        }
-    }
-
     let resultHtml = '';
-    let title = `Results for "${query}"`;
     let match;
+    const qLower = query.toLowerCase();
+
     try {
-        // 🩺 Disease or phenotype search (unchanged)
-        if ((match = query.match(/(?:genes for|what genes are linked to|find genes for|genes involved in)\s+(.*)/i))) {
-            const disease = match[1].trim().toLowerCase();
-            title = `Genes associated with "${disease}"`;
-            const diseaseRegex = new RegExp(disease.replace(/ /g, '[\\s-]*'), 'i');
-            const results = data.filter(g => g.functional_summary && diseaseRegex.test(g.functional_summary));
-
-            resultHtml = `
-                ${formatSimpleResults(results, title)}
-                <p class="ai-suggestion">🧬 These genes show strong associations with ${disease}.  
-                Would you like me to summarize their known pathways or visualize them in a network?</p>
-            `;
+        // --- High-priority, specific questions about ONE gene ---
+        if ((match = qLower.match(/(?:function of|what is the function of)\s+([A-Z0-9\-]+)/i))) {
+            const geneSymbol = match[1].toUpperCase();
+            const geneData = data.find(g => g.gene.toUpperCase() === geneSymbol);
+            resultHtml = formatGeneDetail(geneData, geneSymbol, 'Function', geneData?.functional_summary || geneData?.description);
         }
-        // 🧬 Gene expression queries
-        else if ((match = query.match(/(?:gene expression|expression levels|expression)\s+(?:of\s+)?([A-Z0-9\-]+)(?:\s+in\s+(.+))?/i))) {
+        else if ((match = qLower.match(/(?:protein domains|domains in|what domains.*in)\s+([A-Z0-9\-]+)/i))) {
+            const geneSymbol = match[1].toUpperCase();
+            const geneData = data.find(g => g.gene.toUpperCase() === geneSymbol);
+            const domains = Array.isArray(geneData?.domain_descriptions) && geneData.domain_descriptions.length > 0
+                ? geneData.domain_descriptions.join(', ')
+                : 'No domains listed.';
+            resultHtml = formatGeneDetail(geneData, geneSymbol, 'Domains', domains);
+        }
+        else if ((match = qLower.match(/(?:disease linked to|diseases for)\s+([A-Z0-9\-]+)/i))) {
+            const geneSymbol = match[1].toUpperCase();
+            const geneData = data.find(g => g.gene.toUpperCase() === geneSymbol);
+            resultHtml = formatGeneDetail(geneData, geneSymbol, 'Associated Diseases', geneData?.functional_summary);
+        }
+        else if ((match = qLower.match(/(?:phylogeny|phylogenetic distribution)\s+(?:of\s+)?([A-Z0-9\-]+)/i))) {
+             const geneQuery = match[1].toUpperCase();
+             const geneData = phylogeny[geneQuery];
+             if (!geneData || !geneData.categories) {
+                 resultHtml = `<div class="result-card"><h3>Phylogeny of ${geneQuery}</h3><p class="status-not-found">No phylogeny data found.</p></div>`;
+             } else {
+                 const conservation = geneData.categories.join(', ').replace(/_/g, ' ');
+                 resultHtml = `
+                     <div class="result-card"><h3>Phylogeny of ${geneQuery}</h3><p>This gene is classified under: <strong>${conservation}</strong>.</p></div>
+                     <p class="ai-suggestion">🌿 This indicates its evolutionary conservation pattern.</p>`;
+             }
+        }
+        else if ((match = qLower.match(/(?:gene expression|expression)\s+(?:of\s+)?([A-Z0-9\-]+)/i))) {
             const gene = match[1].toUpperCase();
-            const tissue = match[2] ? match[2].trim().toLowerCase() : null;
-            console.debug(`handleAIQuery: Extracted gene "${gene}", tissue "${tissue}" from query "${query}"`);
-
-            title = `Expression Data for ${gene}${tissue ? ` in ${tissue}` : ''}`;
-
-            const geneData = tissueData[gene];
-            console.debug(`handleAIQuery: tissueData for "${gene}":`, geneData ? Object.keys(geneData) : 'undefined');
-
-            if (!geneData || Object.keys(geneData).length === 0) {
-                resultHtml = `<div class="result-card"><h3>${title}</h3><p class="status-not-found">No expression data found for ${gene}. Check console for loading errors.</p></div>`;
+            const geneExprData = tissueData[gene];
+            if (!geneExprData) {
+                resultHtml = `<div class="result-card"><h3>Expression Data for ${gene}</h3><p class="status-not-found">No expression data found.</p></div>`;
             } else {
-                let expressionHtml = '';
-                if (tissue) {
-                    const tissueRegex = new RegExp(tissue.replace(/ /g, '[- ]*'), 'i'); // Allow hyphens or spaces
-                    const matchingTissues = Object.keys(geneData).filter(t => tissueRegex.test(t));
-                    console.debug(`handleAIQuery: Matching tissues for "${tissue}":`, matchingTissues);
-
-                    if (matchingTissues.length === 0) {
-                        expressionHtml = `<p class="status-not-found">No expression data found for ${gene} in ${tissue}. Available tissues: ${Object.keys(geneData).join(', ')}</p>`;
-                    } else {
-                        expressionHtml = `
-                            <table class="expression-table">
-                                <thead><tr><th>Tissue</th><th>nTPM</th></tr></thead>
-                                <tbody>
-                                    ${matchingTissues.map(t => `<tr><td>${t}</td><td>${geneData[t].toFixed(2)}</td></tr>`).join('')}
-                                </tbody>
-                            </table>
-                            <p class="ai-suggestion">📊 Would you like to <a href="#" class="ai-action" data-action="expression-visualize" data-gene="${gene}">visualize expression across tissues</a>?</p>
-                        `;
-                    }
-                } else {
-                    expressionHtml = `
-                        <table class="expression-table">
-                            <thead><tr><th>Tissue</th><th>nTPM</th></tr></thead>
-                            <tbody>
-                                ${Object.entries(geneData).sort(([t1], [t2]) => t1.localeCompare(t2)).map(([t, val]) => `<tr><td>${t}</td><td>${val.toFixed(2)}</td></tr>`).join('')}
-                            </tbody>
-                        </table>
-                        <p class="ai-suggestion">📊 Would you like to <a href="#" class="ai-action" data-action="expression-visualize" data-gene="${gene}">visualize expression across tissues</a>?</p>
-                    `;
-                }
-                resultHtml = `<div class="result-card"><h3>${title}</h3>${expressionHtml}</div>`;
+                const expressionHtml = `
+                    <table class="expression-table">
+                        <thead><tr><th>Tissue</th><th>nTPM</th></tr></thead>
+                        <tbody>
+                            ${Object.entries(geneExprData).sort(([t1], [t2]) => t1.localeCompare(t2)).map(([t, val]) => `<tr><td>${t}</td><td>${val.toFixed(2)}</td></tr>`).join('')}
+                        </tbody>
+                    </table>
+                    <p class="ai-suggestion">📊 Would you like to <a href="#" class="ai-action" data-action="expression-visualize" data-gene="${gene}">visualize this as a heatmap</a>?</p>`;
+                resultHtml = `<div class="result-card"><h3>Expression Data for ${gene}</h3>${expressionHtml}</div>`;
             }
         }
-        // 🧩 Domain-based queries
-        else if ((match = query.match(/(?:show me|find|what genes have a)\s+(.*?)\s+domain/i))) {
-            const domain = match[1].trim();
-            title = `Genes with "${domain}" domain`;
-            const results = data.filter(g => g.domain_descriptions && g.domain_descriptions.some(d => d.toLowerCase().includes(domain.toLowerCase())));
-
-            resultHtml = `
-                ${formatDomainResults(results, title)}
-                <p class="ai-suggestion">✨ These genes share the <strong>${domain}</strong> domain.  
-                Would you like me to highlight conserved motifs or domain architectures?</p>
-            `;
+        // --- Broader list-based queries ---
+        else if (qLower.includes('ciliary genes') && qLower.includes('human')) {
+            const results = data.map(g => g.gene).sort();
+            resultHtml = formatListResult(`Human Ciliary Genes`, results, `Found ${results.length} human-relevant ciliary genes in the database.`);
         }
-
-        // 📍 Localization queries
-        else if ((match = query.match(/(?:genes localizing to the|genes that localize to the|find genes in the)\s+(.*)/i))) {
-            const location = match[1].trim();
-            title = `Genes localizing to "${location}"`;
-            const results = data.filter(g => g.localization && g.localization.toLowerCase().includes(location.toLowerCase()));
-
-            resultHtml = `
-                ${formatSimpleResults(results, title)}
-                <p class="ai-suggestion">📡 These genes are enriched at the ${location}.  
-                Would you like me to compare their expression across species?</p>
-            `;
+        else if (qLower.includes('ciliome') || qLower.includes('ciliary genes')) {
+            const results = data.map(g => g.gene).sort();
+            resultHtml = formatListResult('All Ciliary Genes (Ciliome)', results);
         }
-
-        // --- Ciliary-only / ciliated organisms specific ---
-        else if (/(?:ciliary[-\s]?only|ciliated\s+organisms\s+specific|genes\s+specific\s+to\s+ciliated|only\s+in\s+ciliated\s+organisms|cilia\s+organisms\s+specific)/i.test(query)) {
-            const phyloMap = {};
-            Object.entries(phylogeny).forEach(([gene, info]) => {
-                const keys = [gene, ...(info.synonyms || [])];
-                keys.forEach(k => {
-                    if (k) phyloMap[k.toUpperCase()] = info;
-                });
-            });
-
-            const ciliaryOnly = Object.entries(phyloMap)
-                .filter(([gene, info]) => info?.category === 'ciliary_only')
-                .map(([gene]) => gene);
-
-            if (ciliaryOnly.length > 0) {
-                resultHtml = `
-                    <div class="result-card">
-                        <h3>Genes specific to ciliated organisms</h3>
-                        <p>These genes are conserved across all <strong>ciliated eukaryotes</strong> and absent in non-ciliated lineages.</p>
-                        <p>
-                            Would you like to visualize their 
-                            <a href="#" class="ai-action" data-action="domain" style="color:#3b82f6;">domain composition</a> 
-                            or 
-                            <a href="#" class="ai-action" data-action="phylogeny" style="color:#3b82f6;">phylogenetic distribution</a>?
-                        </p>
-                        <ul>${ciliaryOnly.map(g => `<li>${g}</li>`).join('')}</ul>
-                    </div>`;
-            } else {
-                resultHtml = `<div class="result-card">
-                    <h3>No genes found</h3>
-                    <p>No data were classified as "ciliary-only". Check that your <code>phylogeny_summary.json</code> includes <em>category: "ciliary_only"</em> entries.</p>
-                </div>`;
-            }
+        else if ((match = qLower.match(/(?:genes for|genes related to|show me)\s+(motile cilium|axoneme|basal body|transition zone|ciliogenesis)/i))) {
+            const term = match[1];
+            const results = await getGenesByFunctionalCategory(term);
+            resultHtml = formatListResult(`Genes for: ${term}`, results);
         }
-
-        // --- Genes conserved in all organisms ---
-        else if (/in[_\s-]*all[_\s-]*organisms\s+genes/i.test(query) || /conserved\s+across\s+all/i.test(query) || /genes\s+present\s+in\s+all\s+organisms/i.test(query)) {
-            const phyloMap = {};
-            Object.entries(phylogeny).forEach(([gene, info]) => {
-                const keys = [gene, ...(info.synonyms || [])];
-                keys.forEach(k => {
-                    if (k) phyloMap[k.toUpperCase()] = info;
-                });
-            });
-
-            const inAll = Object.entries(phyloMap)
-                .filter(([gene, info]) => info?.category === 'in_all_organisms')
-                .map(([gene]) => gene);
-
-            if (inAll.length > 0) {
-                resultHtml = `
-                    <div class="result-card">
-                        <h3>Genes present in all studied organisms</h3>
-                        <p>These genes are <strong>highly conserved</strong> across all species in the dataset.  
-                        Would you like to view their <strong>functional summaries</strong> or <strong>ortholog relationships</strong>?</p>
-                        <ul>${inAll.map(g => `<li>${g}</li>`).join('')}</ul>
-                    </div>`;
-            } else {
-                resultHtml = `<div class="result-card">
-                    <h3>No conserved genes found</h3>
-                    <p>No genes were marked as "in_all_organisms". Check your <code>phylogeny_summary.json</code>.</p>
-                </div>`;
-            }
+        else if ((match = qLower.match(/(?:genes for|genes involved in)\s+(.*)/i))) {
+             const disease = match[1].trim();
+             const diseaseRegex = new RegExp(disease.replace(/ /g, '[\\s-]*'), 'i');
+             const results = data.filter(g => g.functional_summary && diseaseRegex.test(g.functional_summary)).map(g => g.gene).sort();
+             resultHtml = formatListResult(`Genes for: ${disease}`, results);
         }
-
-        // --- Direct gene phylogeny ---
-        else if (/phylogeny\s+of\s+([A-Z0-9\-]+)/i.test(query)) {
-            const matchGene = query.match(/phylogeny\s+of\s+([A-Z0-9\-]+)/i);
-            const geneQuery = matchGene[1].toUpperCase();
-            const phyloMap = {};
-            Object.entries(phylogeny).forEach(([gene, info]) => {
-                const keys = [gene, ...(info.synonyms || [])];
-                keys.forEach(k => {
-                    if (k) phyloMap[k.toUpperCase()] = info;
-                });
-            });
-
-            const geneData = phyloMap[geneQuery];
-            if (!geneData) {
-                resultHtml = `<div class="result-card"><h3>Phylogeny of ${geneQuery}</h3><p class="status-not-found">No data found.</p></div>`;
-            } else {
-                const presence = geneData.presence || (geneData.species ? Object.fromEntries(geneData.species.map(s => [s, true])) : {});
-                const organisms = Object.entries(presence).map(([org, val]) => `${org}: ${val ? '✅' : '❌'}`).join('<br>');
-
-                resultHtml = `
-                    <div class="result-card"><h3>Phylogeny of ${geneQuery}</h3><p>${organisms}</p></div>
-                    <p class="ai-suggestion">🌿 Here’s the phylogenetic presence of ${geneQuery}.  
-                    Would you like to visualize its conservation heatmap or domain evolution?</p>
-                `;
-            }
-        }
-
-        // ⚛️ Complex queries
-        else if ((match = query.match(/complex(?:es| components)?\s+(?:for|of|with)\s+([A-Z0-9\-]+)/i)) ||
-            (match = query.match(/^([A-Z0-9\-]+)\s+complex(?:es)?$/i)) ||
-            (match = query.match(/(?:components of the|show me the)\s+(.*)\s+complex/i))) {
-
-            const complexOrGene = match[1].toUpperCase();
-            const gene = data.find(g =>
-                g.gene.toUpperCase() === complexOrGene ||
-                (g.aliases && g.aliases.map(a => a.toUpperCase()).includes(complexOrGene))
-            );
-
-            resultHtml = `
-                ${formatComplexResults(gene, `Complex Information for ${complexOrGene}`)}
-                <p class="ai-suggestion">🔗 This shows the components of the ${complexOrGene} complex.  
-                Would you like me to map their interactions or visualize the structural subunits?</p>
-            `;
-        }
-
-        // 🧬 Direct gene input
-        else if (/^[A-Z0-9]{3,}$/i.test(query.split(' ')[0])) {
-            const detectedGene = query.split(' ')[0].toUpperCase();
-            document.getElementById('geneInput').value = detectedGene;
-            runAnalysis([detectedGene]);
-            return;
-        }
-
-        // Fallback with updated suggestions
+        // --- Fallback ---
         else {
-            resultHtml = `<p>Sorry, I didn’t understand that query. Try asking about:  
-            <br>• “Gene expression of IFT88 in kidney”  
-            <br>• “Ciliary-only genes”  
-            <br>• “Genes present in all organisms”  
-            <br>• “Genes lost in non-ciliated organisms”  
-            <br>• “Ciliogenesis genes”  
-            <br>• “Genes with kinase domain”  
-            <br>• “Genes localizing to the basal body”</p>`;
+            resultHtml = `<p>Sorry, I didn’t understand that. Try asking a more specific question, such as:</p>
+            <ul>
+                <li>"What is the function of IFT88?"</li>
+                <li>"Show me genes for the axoneme."</li>
+                <li>"List genes for Bardet-Biedl Syndrome."</li>
+            </ul>`;
         }
-
         resultsContainer.innerHTML = resultHtml;
 
     } catch (e) {
-        resultsContainer.innerHTML = `<p class="status-not-found">An error occurred during the search. Please check the console.</p>`;
+        resultsContainer.innerHTML = `<p class="status-not-found">An error occurred. Please check the console.</p>`;
         console.error(e);
     }
 }
 
+
 // --- Interactive follow-up handlers ---
 document.addEventListener('click', async (event) => {
+    // Handle clicks on example queries
+    if (event.target.tagName === 'SPAN' && event.target.closest('.example-queries')) {
+        const aiQueryInput = document.getElementById('aiQueryInput');
+        aiQueryInput.value = event.target.textContent.replace(/["']/g, '');
+        handleAIQuery();
+    }
+    
     if (event.target.classList.contains('ai-action')) {
         event.preventDefault();
         const action = event.target.dataset.action;
-
-        const geneList = [...document.querySelectorAll('.result-card ul li')]
-            .map(li => li.textContent.trim())
-            .filter(g => g); // Remove empty entries
-        const singleGene = event.target.dataset.gene ? [event.target.dataset.gene] : geneList;
-
-        const resultsContainer = document.getElementById('resultsContainer');
-
-        if (action === 'domain') {
-            resultsContainer.innerHTML = `<p class="status-searching">Analyzing domain composition for ${singleGene.length} genes...</p>`;
-            await runAnalysis(singleGene);
-            document.getElementById('visualizeBtn').style.display = 'block';
-        } else if (action === 'phylogeny') {
-            resultsContainer.innerHTML = `<p class="status-searching">Building phylogenetic distribution map...</p>`;
-            const phylogeny = await fetchPhylogenyData();
-            const phyloMap = {};
-            Object.entries(phylogeny).forEach(([gene, info]) => {
-                const keys = [gene, ...(info.synonyms || [])];
-                keys.forEach(k => {
-                    if (k) phyloMap[k.toUpperCase()] = info;
-                });
-            });
-            const selectedData = singleGene.map(g => ({ gene: g, data: phyloMap[g.toUpperCase()] || {} }));
-            resultsContainer.innerHTML = `
-                <div class="result-card">
-                    <h3>Phylogenetic Distribution</h3>
-                    ${selectedData.map(({ gene, data }) => `
-                        <div class="phylogeny-entry">
-                            <strong>${gene}</strong><br>
-                            ${data?.presence
-                                ? Object.entries(data.presence)
-                                    .map(([org, val]) => `${org}: ${val ? '✅' : '❌'}`)
-                                    .join('<br>')
-                                : '<em>No phylogeny data available</em>'}
-                            <hr>
-                        </div>`).join('')}
-                </div>
-            `;
-        } else if (action === 'expression-visualize') {
-            resultsContainer.innerHTML = `<p class="status-searching">Building expression heatmap for ${singleGene.length} gene(s)...</p>`;
-            await renderExpressionHeatmap(singleGene);
+        const gene = event.target.dataset.gene;
+        if (action === 'expression-visualize' && gene) {
+            document.getElementById('plot-display-area').innerHTML = `<p class="status-searching">Building expression heatmap...</p>`;
+            await renderExpressionHeatmap([gene]);
         }
     }
 });
 
+
 // --- AI Result Formatting Helpers ---
+function formatGeneDetail(geneData, geneSymbol, detailTitle, detailContent) {
+    if (!geneData) {
+        return `<div class="result-card"><h3>${geneSymbol}</h3><p class="status-not-found">Gene not found in the database.</p></div>`;
+    }
+    return `
+        <div class="result-card">
+            <h3>${geneSymbol}</h3>
+            <h4>${detailTitle}:</h4>
+            <p>${detailContent || 'No information available.'}</p>
+        </div>
+    `;
+}
+
+function formatListResult(title, geneList, message = '') {
+    if (!geneList || geneList.length === 0) {
+        return `<div class="result-card"><h3>${title}</h3><p class="status-not-found">No matching genes found.</p></div>`;
+    }
+    const messageHtml = message ? `<p>${message}</p>` : '';
+    return `
+        <div class="result-card">
+            <h3>${title} (${geneList.length} found)</h3>
+            ${messageHtml}
+            <ul style="column-count: 3; list-style-type: none; padding-left: 0;">
+                ${geneList.map(g => `<li>${g}</li>`).join('')}
+            </ul>
+        </div>
+    `;
+}
 
 function formatSimpleResults(results, title) {
     if (results.length === 0) return `<div class="result-card"><h3>${title}</h3><p class="status-not-found">No matching genes found.</p></div>`;
@@ -779,41 +499,30 @@ function formatComplexResults(gene, title) {
     }
     return html + '</div>';
 }
-// --- Autocomplete Logic ---
 
-/**
- * NEW: Sets up autocomplete for the main "Ask CiliAI" query input.
- * It suggests a predefined list of example queries.
- */
+// --- Autocomplete Logic ---
 function setupAiQueryAutocomplete() {
     const aiQueryInput = document.getElementById('aiQueryInput');
     const suggestionsContainer = document.getElementById('aiQuerySuggestions');
     if (!aiQueryInput || !suggestionsContainer) return;
 
     const exampleQueries = [
+        "function of IFT88",
         "genes for Joubert Syndrome",
-        "genes for Bardet-Biedl Syndrome",
-        "show me WD40 domain genes",
-        "ciliary-only genes",
-        "genes in all organisms",
-        "phylogeny of IFT88",
-        "transition zone localizing genes",
-        "complexes for IFT88",
-        "genes involved in Hedgehog signaling",
-        "gene expression of IFT88 in kidney",
-        "expression levels for ARL13B",
-        "gene expression of HDAC6 in brain"
+        "show me axoneme genes",
+        "what domains are in CEP290",
+        "show me human ciliary genes",
+        "phylogeny of ARL13B",
+        "expression of BBS1"
     ];
 
     aiQueryInput.addEventListener('input', () => {
         const inputText = aiQueryInput.value.toLowerCase();
-        if (inputText.length < 2) {
+        if (inputText.length < 3) {
             suggestionsContainer.style.display = 'none';
             return;
         }
-
         const filteredSuggestions = exampleQueries.filter(q => q.toLowerCase().includes(inputText));
-
         if (filteredSuggestions.length > 0) {
             suggestionsContainer.innerHTML = filteredSuggestions
                 .map(q => `<div class="suggestion-item">${q}</div>`)
@@ -829,6 +538,7 @@ function setupAiQueryAutocomplete() {
             aiQueryInput.value = e.target.textContent;
             suggestionsContainer.style.display = 'none';
             aiQueryInput.focus();
+            handleAIQuery();
         }
     });
 
@@ -839,7 +549,7 @@ function setupAiQueryAutocomplete() {
     });
 }
 
-// --- Gene Analysis Engine & UI ---
+// --- Gene Analysis Engine & UI (largely unchanged) ---
 
 function setupAutocomplete() {
     const geneInput = document.getElementById('geneInput');
@@ -849,21 +559,16 @@ function setupAutocomplete() {
     geneInput.addEventListener('input', async () => {
         if (!ciliaHubDataCache) await fetchCiliaData();
         if (!ciliaHubDataCache) return;
-
         const fullText = geneInput.value;
         const currentTerm = fullText.split(/[\s,]+/).pop().trim().toUpperCase();
-
         if (currentTerm.length < 2) {
             suggestionsContainer.style.display = 'none';
             return;
         }
-
         const suggestions = ciliaHubDataCache
             .map(g => g.gene)
-            // FIX 1: Added 'geneName &&' to prevent errors if a gene name is missing in the data
             .filter(geneName => geneName && geneName.toUpperCase().startsWith(currentTerm))
             .slice(0, 10);
-
         if (suggestions.length > 0) {
             suggestionsContainer.innerHTML = suggestions.map(gene => `<div class="suggestion-item">${gene}</div>`).join('');
             suggestionsContainer.style.display = 'block';
@@ -875,15 +580,12 @@ function setupAutocomplete() {
     suggestionsContainer.addEventListener('click', (e) => {
         if (e.target.classList.contains('suggestion-item')) {
             const selectedGene = e.target.textContent;
-            
-            // FIX 2: More robust logic to replace the currently typed term
             const terms = geneInput.value.split(/[\s,]+/).filter(Boolean);
             const lastChar = geneInput.value.trim().slice(-1);
             if (lastChar && lastChar !== ',') {
                 terms.pop();
             }
             terms.push(selectedGene);
-            
             geneInput.value = terms.join(', ') + ', ';
             suggestionsContainer.style.display = 'none';
             geneInput.focus();
@@ -901,30 +603,23 @@ function setupCiliAIEventListeners() {
     const analyzeBtn = document.getElementById('analyzeBtn');
     const aiQueryBtn = document.getElementById('aiQueryBtn');
     const visualizeBtn = document.getElementById('visualizeBtn');
-    const resultsContainer = document.getElementById('resultsContainer');
     const geneInput = document.getElementById('geneInput');
     const aiQueryInput = document.getElementById('aiQueryInput');
 
-    if (!analyzeBtn || !aiQueryBtn || !visualizeBtn || !resultsContainer || !geneInput || !aiQueryInput) {
-        console.warn('One or more CiliAI elements were not found in the DOM.');
+    if (!analyzeBtn || !aiQueryBtn || !visualizeBtn || !geneInput || !aiQueryInput) {
+        console.warn('One or more CiliAI elements were not found.');
         return;
     }
 
     analyzeBtn.addEventListener('click', analyzeGenesFromInput);
     aiQueryBtn.addEventListener('click', handleAIQuery);
 
-   visualizeBtn.addEventListener('click', async () => {
-    const genes = geneInput.value.split(/[\s,]+/).map(g => g.trim().toUpperCase()).filter(Boolean);
-    if (genes.length > 0) {
-        const mode = document.querySelector('input[name="mode"]:checked').value;
-        if (mode === 'expert' || mode === 'hybrid') {
-            const screenData = await fetchScreenData();
-            renderScreenSummaryHeatmap(genes, screenData);
-        } else {
-            await renderPhylogenyHeatmap(genes);
+    visualizeBtn.addEventListener('click', async () => {
+        const genes = geneInput.value.split(/[\s,]+/).map(g => g.trim().toUpperCase()).filter(Boolean);
+        if (genes.length > 0) {
+            await renderExpressionHeatmap(genes);
         }
-    }
-});
+    });
 
     geneInput.addEventListener('keydown', debounce((e) => {
         if (e.key === 'Enter' && !e.shiftKey) {
@@ -932,42 +627,27 @@ function setupCiliAIEventListeners() {
             analyzeGenesFromInput();
         }
     }, 300));
-    // In setupCiliAIEventListeners
-aiQueryInput.addEventListener('keydown', debounce((e) => {
-    if (e.key === 'Enter') {
-        console.debug('AI Query Button/Enter pressed, raw query:', aiQueryInput.value);
-        handleAIQuery();
-    }
-}, 300));
 
-    resultsContainer.addEventListener('click', function(e) {
-        if (e.target && e.target.classList.contains('evidence-toggle')) {
-            const contentId = e.target.dataset.contentId;
-            const content = document.getElementById(contentId);
-            if (content) {
-                const isVisible = content.style.display === 'block';
-                content.style.display = isVisible ? 'none' : 'block';
-                e.target.textContent = isVisible ? `Show Evidence (${e.target.dataset.count}) ▾` : `Hide Evidence (${e.target.dataset.count}) ▴`;
-            }
+    aiQueryInput.addEventListener('keydown', debounce((e) => {
+        if (e.key === 'Enter') {
+            handleAIQuery();
         }
-    });
-
-    // Activate both autocomplete features
-    setupAutocomplete();   
+    }, 300));
+    
+    // Activate autocompletes
+    setupAutocomplete();    
     setupAiQueryAutocomplete();
 }
 
 function analyzeGenesFromInput() {
     const geneInput = document.getElementById('geneInput');
     const genes = geneInput.value.split(/[\s,]+/).map(g => g.trim().toUpperCase()).filter(Boolean);
-    
     if (genes.length === 0) {
         const resultsContainer = document.getElementById('resultsContainer');
         resultsContainer.innerHTML = '<p class="status-not-found">Please enter at least one gene symbol.</p>';
         document.getElementById('resultsSection').style.display = 'block';
         return;
     }
-    
     runAnalysis([...new Set(genes)]);
 }
 
@@ -978,19 +658,12 @@ async function runAnalysis(geneList) {
     const visualizeBtn = document.getElementById('visualizeBtn');
     const mode = document.querySelector('input[name="mode"]:checked')?.value || 'hybrid';
 
-    if (!screenDataCache) {
-        resultsContainer.innerHTML = '<p class="status-searching">Loading screen data, please wait...</p>';
-        await fetchScreenData();
-    }
-
     resultsContainer.innerHTML = '';
     resultsSection.style.display = 'block';
     analyzeBtn.disabled = true;
     analyzeBtn.textContent = 'Analyzing...';
     visualizeBtn.style.display = 'none';
     document.getElementById('plot-display-area').innerHTML = '';
-
-    const screenData = screenDataCache;
 
     geneList.forEach(gene => {
         resultsContainer.insertAdjacentHTML('beforeend', createPlaceholderCard(gene, mode));
@@ -1003,11 +676,12 @@ async function runAnalysis(geneList) {
         let screenEvidence = [];
 
         if (mode === 'expert' || mode === 'hybrid') {
-            if (screenData && screenData[gene]) {
+            await fetchScreenData();
+            if (screenDataCache && screenDataCache[gene]) {
                 screenEvidence.push({
                     id: `screen-${gene}`,
                     source: 'screen_data',
-                    context: renderScreenDataTable(gene, screenData[gene])
+                    context: renderScreenDataTable(gene, screenDataCache[gene])
                 });
             }
         }
@@ -1016,7 +690,7 @@ async function runAnalysis(geneList) {
         }
         
         const allEvidence = [...(dbData?.evidence || []), ...apiEvidence, ...screenEvidence];
-        const finalHtml = createResultCard(gene, dbData, allEvidence, mode);
+        const finalHtml = createResultCard(gene, dbData, allEvidence);
         if (resultCard) resultCard.outerHTML = finalHtml;
     }
 
@@ -1028,11 +702,9 @@ async function runAnalysis(geneList) {
 async function renderExpressionHeatmap(genes) {
     const tissueData = await fetchTissueData();
     if (!tissueData || Object.keys(tissueData).length === 0) {
-        console.error('No tissue expression data available');
-        document.getElementById('plot-display-area').innerHTML = '<p class="status-not-found">Error: No tissue expression data available.</p>';
+        document.getElementById('plot-display-area').innerHTML = '<p class="status-not-found">Error: No tissue expression data.</p>';
         return;
     }
-
     const tissues = new Set();
     genes.forEach(g => {
         if (tissueData[g]) {
@@ -1049,41 +721,21 @@ async function renderExpressionHeatmap(genes) {
         y: genes,
         type: 'heatmap',
         colorscale: 'Viridis',
-        showscale: true,
         colorbar: { title: 'nTPM' },
-        hovertemplate: '<b>Gene:</b> %{y}<br><b>Tissue:</b> %{x}<br><b>Expression:</b> %{z:.2f} nTPM<extra></extra>'
+        hovertemplate: '<b>Gene:</b> %{y}<br><b>Tissue:</b> %{x}<br><b>nTPM:</b> %{z:.2f}<extra></extra>'
     };
-
     const layout = {
         title: 'Gene Expression Heatmap (nTPM)',
-        xaxis: { title: 'Tissues', tickangle: -45 },
-        yaxis: { title: 'Genes' },
-        margin: { t: 40, l: 100, r: 20, b: 100 },
-        height: Math.max(300, genes.length * 20 + tissueList.length * 10)
+        xaxis: { tickangle: -45 },
+        margin: { l: 100, r: 20, b: 150, t: 50 },
     };
-
     Plotly.newPlot('plot-display-area', [trace], layout, { responsive: true });
 }
 
 function renderScreenDataTable(gene, screenInfo) {
     if (!screenInfo || typeof screenInfo !== 'object') return '<p class="status-not-found">No structured screen data available.</p>';
     
-    let screensObj = {};
-    if (Array.isArray(screenInfo)) {
-        screensObj = screenInfo.reduce((acc, entry) => {
-            if (entry.source && entry.result) {
-                acc[entry.source] = {
-                    hit: entry.result.toLowerCase() !== 'no effect', 
-                    effect: entry.result,
-                    details: 'From raw data' 
-                };
-            }
-            return acc;
-        }, {});
-    } else if (screenInfo.screens) {
-        screensObj = screenInfo.screens;
-    }
-
+    let screensObj = screenInfo.screens || {};
     const screenKeys = Object.keys(screensObj);
     const hitCount = screenKeys.filter(key => screensObj[key]?.hit).length;
 
@@ -1095,16 +747,15 @@ function renderScreenDataTable(gene, screenInfo) {
         'Breslow2018': 'Breslow et al. (2018) Hedgehog Signaling'
     };
 
-    const summary = `<p class="screen-summary">According to ${hitCount} out of ${screenKeys.length} ciliary screens, <strong>${gene}</strong> was found to impact cilia.</p>`;
-
+    const summary = `<p><b>${gene}</b> was identified as a hit in <strong>${hitCount} out of ${screenKeys.length}</strong> ciliary screens.</p>`;
     const tableHtml = `
-        <table class="screen-table">
-            <thead><tr><th>Screen</th><th>Hit?</th><th>Effect</th><th>Details</th></tr></thead>
+        <table class="expression-table">
+            <thead><tr><th>Screen</th><th>Hit?</th><th>Effect</th></tr></thead>
             <tbody>
                 ${screenKeys.map(key => {
-                    const d = screensObj[key] || { hit: false, effect: 'N/A', details: 'Not tested' };
+                    const d = screensObj[key] || { hit: false, effect: 'N/A' };
                     const name = screenNames[key] || key;
-                    return `<tr><td>${name}</td><td>${d.hit ? '✅' : '❌'}</td><td>${d.effect}</td><td>${d.details}</td></tr>`;
+                    return `<tr><td>${name}</td><td>${d.hit ? '✅' : '❌'}</td><td>${d.effect}</td></tr>`;
                 }).join('')}
             </tbody>
         </table>`;
@@ -1112,9 +763,9 @@ function renderScreenDataTable(gene, screenInfo) {
 }
 
 function createPlaceholderCard(gene, mode) {
-    let statusText = 'Fetching from Expert DB and Screen Data...';
+    let statusText = 'Searching...';
     if (mode === 'nlp') statusText = 'Searching live literature...';
-    if (mode === 'hybrid') statusText = 'Checking Expert DB, Screen Data & Searching Literature...';
+    if (mode === 'hybrid') statusText = 'Searching databases & literature...';
     return `<div class="result-card" id="card-${gene}"><h3>${gene} - <span class="status-searching">${statusText}</span></h3></div>`;
 }
 
@@ -1124,45 +775,30 @@ function createResultCard(gene, dbData, allEvidence) {
     
     let summaryHtml = '';
     if (dbData && dbData.summary) {
-        const lofClass = dbData.summary.lof_length.toLowerCase().replace(/[^a-z]/g, '-');
-        const percClass = dbData.summary.percentage_ciliated.toLowerCase().replace(/[^a-z]/g, '-');
         summaryHtml = `
             <div class="prediction-grid">
-                <div class="prediction-box ${lofClass || 'no-effect'}">
-                    <h4>Loss-of-Function (Cilia Length)</h4>
-                    <p>${dbData.summary.lof_length}</p>
-                </div>
-                <div class="prediction-box ${percClass || 'no-effect'}">
-                    <h4>Percentage Ciliated</h4>
-                    <p>${dbData.summary.percentage_ciliated}</p>
-                </div>
-            </div>
-        `;
+                <div class="prediction-box"><h4>Cilia Length (on loss)</h4><p>${dbData.summary.lof_length}</p></div>
+                <div class="prediction-box"><h4>% Ciliated Cells (on loss)</h4><p>${dbData.summary.percentage_ciliated}</p></div>
+            </div>`;
     } else {
-        summaryHtml = '<p>No summary prediction available. Review literature and screen evidence for insights.</p>';
+        summaryHtml = '<p>No summary prediction available. Review evidence for insights.</p>';
     }
 
     let evidenceHtml = '';
     if (allEvidence.length > 0) {
         const screenEv = allEvidence.find(ev => ev.source === 'screen_data');
         const otherEvidence = allEvidence.filter(ev => ev.source !== 'screen_data');
-
-        evidenceHtml = `<div class="evidence-section">`;
+        evidenceHtml = `<div class="evidence-section" style="margin-top:1rem;">`;
         if (screenEv) {
-            evidenceHtml += `<h4>Ciliary Screen Data</h4><div class="screen-evidence-container">${screenEv.context}</div>`;
+            evidenceHtml += `<h4>Ciliary Screen Data</h4>${screenEv.context}`;
         }
         if (otherEvidence.length > 0) {
             const evidenceSnippets = otherEvidence.map(ev => `
-                <div class="evidence-snippet">
-                    ${ev.context.replace(new RegExp(`(${gene})`, 'ig'), `<mark>$1</mark>`)}
-                    <br><strong>Source: ${ev.source.toUpperCase()} (${ev.id})</strong>
-                </div>
-            `).join('');
-
-            evidenceHtml += `
-                <button class="evidence-toggle" data-count="${otherEvidence.length}" data-content-id="evidence-${gene}">Show Other Evidence (${otherEvidence.length}) ▾</button>
-                <div class="evidence-content" id="evidence-${gene}">${evidenceSnippets}</div>
-            `;
+                <div style="border-bottom:1px solid #eee; padding-bottom:0.5rem; margin-bottom:0.5rem;">
+                    <p>${ev.context.replace(new RegExp(`(${gene})`, 'ig'), `<mark>$1</mark>`)}</p>
+                    <small><strong>Source:</strong> ${ev.source.toUpperCase()} (${ev.id})</small>
+                </div>`).join('');
+            evidenceHtml += `<details style="margin-top:1rem;"><summary>Show Literature Evidence (${otherEvidence.length})</summary>${evidenceSnippets}</details>`;
         }
         evidenceHtml += `</div>`;
     }
@@ -1172,9 +808,42 @@ function createResultCard(gene, dbData, allEvidence) {
             <h3>${gene} - <span class="${statusClass}">${statusText}</span></h3>
             ${summaryHtml}
             ${evidenceHtml}
-        </div>
-    `;
+        </div>`;
 }
+
+async function getGenesByPhylogeny(query) {
+    await fetchPhylogenyData();
+    const phy = phylogenyDataCache || {};
+    const q = normalizeTerm(query || '');
+
+    if (q.includes('in all') || q.includes('all organisms') || q.includes('present in all')) {
+        const genes = Object.entries(phy).filter(([, v]) => v.category === 'in_all_organisms').map(([g]) => g);
+        return { label: 'Present in all organisms', genes: genes.sort() };
+    }
+
+    if (q.includes('non') && (q.includes('cili') || q.includes('ciliary') || q.includes('non-ciliary') || q.includes('non ciliary'))) {
+        const genes = Object.entries(phy).filter(([, v]) => v.category === 'nonciliary_only').map(([g]) => g);
+        return { label: 'Non-ciliary-only genes', genes: genes.sort() };
+    }
+
+    if (q.includes('ciliated-only') || q.includes('ciliary-only') || q.includes('only ciliated') || (q.includes('only') && q.includes('ciliated'))) {
+        const genes = Object.entries(phy).filter(([, v]) => v.category === 'ciliary_only').map(([g]) => g);
+        return { label: 'Ciliary-only genes', genes: genes.sort() };
+    }
+
+    if (q.includes('present in both') || q.includes('both') || q.includes('present-in-both') || q.includes('present in ciliated and non')) {
+        const genes = Object.entries(phy).filter(([, v]) => v.category === 'present_in_both' || v.category === 'present-in-both' || v.category === 'presentinboth').map(([g]) => g);
+        return { label: 'Present in both ciliated and non-ciliated organisms', genes: genes.sort() };
+    }
+
+    return { label: 'No phylogeny group matched', genes: [] };
+}
+function normalizeTerm(s) {
+    if (!s) return '';
+    return String(s).toLowerCase().replace(/[_\-\s]+/g, ' ').trim();
+}
+
+
 async function renderPhylogenyHeatmap(genes) {
     const phylogeny = await fetchPhylogenyData();
     if (!phylogeny || Object.keys(phylogeny).length === 0) {
@@ -1218,7 +887,6 @@ async function renderPhylogenyHeatmap(genes) {
 
 function handleExpressionSearchInput(e) {
     let query = e.target.value.trim().toUpperCase();
-    // Add validation to ensure query matches expected gene format
     if (!/^[A-Za-z0-9-]+$/.test(query)) {
         console.warn(`Invalid gene query format: ${query}`);
         return;
@@ -1234,7 +902,6 @@ function handleExpressionSearchInput(e) {
     }, 150);
 }
 
-// --- Enhanced Live Literature Mining Engine (EuropePMC + PubMed/PMC full-text) ---
 async function analyzeGeneViaAPI(gene, resultCard) {
     const ESEARCH_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi";
     const ELINK_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/elink.fcgi";
@@ -1248,7 +915,6 @@ async function analyzeGeneViaAPI(gene, resultCard) {
         'reduced','increased','motility'
     ]);
 
-    // ✅ Broaden gene regex to include hyphenated and case variants
     const geneRegex = new RegExp(`\\b${gene}(?:[-_ ]?\\w{0,3})?\\b`, 'i');
     const sentSplitRegex = /(?<=[.!?])\s+/;
     let foundEvidence = [];
@@ -1258,7 +924,6 @@ async function analyzeGeneViaAPI(gene, resultCard) {
     const RATE_LIMIT_DELAY = 350;
 
     try {
-        // --- ✅ Step 1: Europe PMC Search including FULL TEXT ---
         const epmcQuery = `${gene} AND (${API_QUERY_KEYWORDS.join(" OR ")}) AND (OPEN_ACCESS:Y OR FULL_TEXT:Y)`;
         const epmcResp = await fetch(
             `${EUROPE_PMC_URL}?query=${encodeURIComponent(epmcQuery)}&resultType=core&format=json&pageSize=40`
@@ -1271,7 +936,6 @@ async function analyzeGeneViaAPI(gene, resultCard) {
             for (const r of epmcResults) {
                 if (foundEvidence.length >= MAX_EVIDENCE) break;
 
-                // ✅ Prefer fullText if available
                 const textContent = [
                     r.title || '',
                     r.abstractText || '',
@@ -1297,7 +961,6 @@ async function analyzeGeneViaAPI(gene, resultCard) {
 
         if (foundEvidence.length >= MAX_EVIDENCE) return foundEvidence;
 
-        // --- Step 2: PubMed + PMC (unchanged but cleaned) ---
         const kwClause = API_QUERY_KEYWORDS.map(k => `"${k}"[Title/Abstract]`).join(" OR ");
         const query = `("${gene}"[Title/Abstract]) AND (${kwClause})`;
         const searchParams = new URLSearchParams({ db: 'pubmed', term: query, retmode: 'json', retmax: '25' });
@@ -1389,9 +1052,7 @@ async function analyzeGeneViaAPI(gene, resultCard) {
     return foundEvidence;
 }
 
-
-// --- Heatmap Visualization ---
-
+// --- [INTEGRATED CODE] Heatmap Visualization ---
 function renderScreenSummaryHeatmap(genes, screenData) {
     if (!window.Plotly) {
         console.error('Plotly is not loaded.');
@@ -1465,7 +1126,6 @@ function renderScreenSummaryHeatmap(genes, screenData) {
     Plotly.newPlot('plot-display-area', [trace1, trace2], layout, { responsive: true });
 }
 
-
 // --- Global Exposure for Router ---
 window.displayCiliAIPage = displayCiliAIPage;
 window.setupCiliAIEventListeners = setupCiliAIEventListeners;
@@ -1477,4 +1137,4 @@ window.fetchScreenData = fetchScreenData;
 window.createResultCard = createResultCard;
 window.createPlaceholderCard = createPlaceholderCard;
 window.renderScreenSummaryHeatmap = renderScreenSummaryHeatmap;
-window.renderExpressionHeatmap = renderExpressionHeatmap; // New exposure
+window.renderExpressionHeatmap = renderExpressionHeatmap;
