@@ -918,58 +918,162 @@ function handleExpressionSearchInput(e) {
 }
 
 // --- Enhanced Live Literature Mining Engine (EuropePMC + PubMed/PMC full-text) ---
+
+
 async function analyzeGeneViaAPI(gene, resultCard) {
     const ESEARCH_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi";
+    const ELINK_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/elink.fcgi";
     const EFETCH_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi";
+    const EUROPE_PMC_URL = "https://www.ebi.ac.uk/europepmc/webservices/rest/search";
+
     const API_QUERY_KEYWORDS = ["cilia", "ciliary", "ciliogenesis", "intraflagellar transport", "ciliopathy"];
-    const LOCAL_ANALYSIS_KEYWORDS = new Set(['cilia', 'cilium', 'axoneme', 'basal body', 'ciliogenesis', 'ift', 'shorter', 'longer', 'motility']);
-    const geneRegex = new RegExp(`\\b${gene}\\b`, 'i');
+    const LOCAL_ANALYSIS_KEYWORDS = new Set([
+        'cilia','ciliary','cilium','axoneme','basal body','transition zone',
+        'ciliogenesis','ift','shorter','longer','fewer','loss of','absent',
+        'reduced','increased','motility'
+    ]);
+
+    // ✅ Broaden gene regex to include hyphenated and case variants
+    const geneRegex = new RegExp(`\\b${gene}(?:[-_ ]?\\w{0,3})?\\b`, 'i');
+    const sentSplitRegex = /(?<=[.!?])\s+/;
     let foundEvidence = [];
+
+    const MAX_ARTICLES = 15;
     const MAX_EVIDENCE = 5;
+    const RATE_LIMIT_DELAY = 350;
 
     try {
-        const kwClause = API_QUERY_KEYWORDS.map(k => `"${k}"[Title/Abstract]`).join(" OR ");
-        const query = `("${gene}"[Title/Abstract]) AND (${kwClause})`;
-        const searchParams = new URLSearchParams({ db: 'pubmed', term: query, retmode: 'json', retmax: '20' });
-        const searchResp = await fetch(`${ESEARCH_URL}?${searchParams}`);
-        if (!searchResp.ok) throw new Error('NCBI ESearch failed');
+        // --- ✅ Step 1: Europe PMC Search including FULL TEXT ---
+        const epmcQuery = `${gene} AND (${API_QUERY_KEYWORDS.join(" OR ")}) AND (OPEN_ACCESS:Y OR FULL_TEXT:Y)`;
+        const epmcResp = await fetch(
+            `${EUROPE_PMC_URL}?query=${encodeURIComponent(epmcQuery)}&resultType=core&format=json&pageSize=40`
+        );
 
-        const searchData = await searchResp.json();
-        const pmids = searchData.esearchresult?.idlist;
-        if (!pmids || pmids.length === 0) return [];
-        
-        await sleep(350); // Rate limit
-        const fetchResp = await fetch(`${EFETCH_URL}?db=pubmed&id=${pmids.join(',')}&retmode=xml&rettype=abstract`);
-        if (!fetchResp.ok) throw new Error('NCBI EFetch failed');
-        
-        const xmlText = await fetchResp.text();
-        const parser = new DOMParser();
-        const xmlDoc = parser.parseFromString(xmlText, "application/xml");
-        const articles = Array.from(xmlDoc.getElementsByTagName('PubmedArticle'));
+        if (epmcResp.ok) {
+            const epmcData = await epmcResp.json();
+            const epmcResults = epmcData.resultList?.result || [];
 
-        for (const article of articles) {
-            if (foundEvidence.length >= MAX_EVIDENCE) break;
-            const pmid = article.querySelector('MedlineCitation > PMID')?.textContent;
-            const title = article.querySelector('ArticleTitle')?.textContent || '';
-            const abstractEl = article.querySelector('AbstractText');
-            if (!abstractEl) continue;
-            
-            const abstractText = abstractEl.textContent;
-            if (geneRegex.test(abstractText)) {
-                 const sentences = abstractText.split(/(?<=[.!?])\s+/);
-                 for (const sent of sentences) {
-                     if (foundEvidence.length >= MAX_EVIDENCE) break;
-                     if (geneRegex.test(sent) && [...LOCAL_ANALYSIS_KEYWORDS].some(kw => sent.toLowerCase().includes(kw))) {
-                         foundEvidence.push({ id: pmid, source: 'PubMed', context: sent.trim() });
-                     }
-                 }
+            for (const r of epmcResults) {
+                if (foundEvidence.length >= MAX_EVIDENCE) break;
+
+                // ✅ Prefer fullText if available
+                const textContent = [
+                    r.title || '',
+                    r.abstractText || '',
+                    r.fullText || ''
+                ].join('. ');
+
+                if (!textContent || !geneRegex.test(textContent)) continue;
+
+                const sentences = textContent.split(sentSplitRegex);
+                for (const sent of sentences) {
+                    if (foundEvidence.length >= MAX_EVIDENCE) break;
+                    const sentLower = sent.toLowerCase();
+                    if (geneRegex.test(sent) && [...LOCAL_ANALYSIS_KEYWORDS].some(kw => sentLower.includes(kw))) {
+                        foundEvidence.push({
+                            id: r.id || r.pmid || 'EPMC',
+                            source: r.source || 'EuropePMC',
+                            context: sent.trim()
+                        });
+                    }
+                }
             }
         }
+
+        if (foundEvidence.length >= MAX_EVIDENCE) return foundEvidence;
+
+        // --- Step 2: PubMed + PMC (unchanged but cleaned) ---
+        const kwClause = API_QUERY_KEYWORDS.map(k => `"${k}"[Title/Abstract]`).join(" OR ");
+        const query = `("${gene}"[Title/Abstract]) AND (${kwClause})`;
+        const searchParams = new URLSearchParams({ db: 'pubmed', term: query, retmode: 'json', retmax: '25' });
+        const searchResp = await fetch(`${ESEARCH_URL}?${searchParams}`);
+        if (!searchResp.ok) throw new Error(`NCBI ESearch failed: ${searchResp.statusText}`);
+
+        const searchData = await searchResp.json();
+        const pmids = searchData.esearchresult?.idlist.slice(0, MAX_ARTICLES) || [];
+        if (pmids.length === 0) return foundEvidence;
+
+        const linkParams = new URLSearchParams({ dbfrom: 'pubmed', db: 'pmc', id: pmids.join(','), retmode: 'json' });
+        const [linkResp, pubmedFetch] = await Promise.all([
+            fetch(`${ELINK_URL}?${linkParams}`),
+            fetch(`${EFETCH_URL}?db=pubmed&id=${pmids.join(',')}&retmode=xml&rettype=abstract`)
+        ]);
+
+        const linkData = linkResp.ok ? await linkResp.json() : {};
+        const pmcIds = [];
+        const linkSets = linkData.linksets || [];
+        for (const linkSet of linkSets) {
+            const links = linkSet.linksetdbs?.find(set => set.dbto === 'pmc')?.links || [];
+            pmcIds.push(...links);
+        }
+
+        let pmcArticles = [];
+        if (pmcIds.length > 0) {
+            await sleep(RATE_LIMIT_DELAY);
+            const fetchParams = new URLSearchParams({ db: 'pmc', id: pmcIds.join(','), retmode: 'xml', rettype: 'full' });
+            const fetchResp = await fetch(`${EFETCH_URL}?${fetchParams}`);
+            if (fetchResp.ok) {
+                const xmlText = await fetchResp.text();
+                const parser = new DOMParser();
+                const xmlDoc = parser.parseFromString(xmlText, "application/xml");
+                pmcArticles = Array.from(xmlDoc.getElementsByTagName('article'));
+            }
+        }
+
+        const pubmedArticles = (() => {
+            if (!pubmedFetch.ok) return [];
+            return pubmedFetch.text().then(xmlText => {
+                const parser = new DOMParser();
+                const xmlDoc = parser.parseFromString(xmlText, "application/xml");
+                return Array.from(xmlDoc.getElementsByTagName('PubmedArticle'));
+            });
+        })();
+
+        const [pubmedParsed, pmcParsed] = await Promise.all([pubmedArticles, pmcArticles]);
+        const allArticles = [...pmcParsed, ...pubmedParsed];
+
+        for (const article of allArticles) {
+            if (foundEvidence.length >= MAX_EVIDENCE) break;
+
+            let pmid, textContent;
+            if (article.tagName.toLowerCase() === 'article') {
+                pmid = article.querySelector('article-id[pub-id-type="pmid"]')?.textContent || 'PMC Article';
+                const title = article.querySelector('article-title')?.textContent || '';
+                const body = Array.from(article.querySelectorAll('body p, body sec, body para'))
+                    .map(el => el.textContent).join(' ');
+                textContent = `${title}. ${body}`;
+            } else {
+                pmid = article.querySelector('MedlineCitation > PMID')?.textContent || 'PubMed Article';
+                const title = article.querySelector('ArticleTitle')?.textContent || '';
+                const abstractText = Array.from(article.querySelectorAll('AbstractText'))
+                    .map(el => el.textContent).join(' ');
+                textContent = `${title}. ${abstractText}`;
+            }
+
+            if (!textContent || !geneRegex.test(textContent)) continue;
+
+            const sentences = textContent.split(sentSplitRegex);
+            for (const sent of sentences) {
+                if (foundEvidence.length >= MAX_EVIDENCE) break;
+                const sentLower = sent.toLowerCase();
+                if (geneRegex.test(sent) && [...LOCAL_ANALYSIS_KEYWORDS].some(kw => sentLower.includes(kw))) {
+                    foundEvidence.push({ id: pmid, source: 'PubMed', context: sent.trim() });
+                }
+            }
+        }
+
     } catch (error) {
-        console.error(`Literature search failed for ${gene}:`, error);
+        console.error(`Failed to fetch literature for ${gene}:`, error);
+        const errorEl = resultCard ? resultCard.querySelector('.status-searching') : null;
+        if (errorEl) {
+            errorEl.textContent = 'Literature Search Failed';
+            errorEl.className = 'status-not-found';
+        }
     }
+
     return foundEvidence;
 }
+
 
 
 // --- Heatmap Visualization ---
