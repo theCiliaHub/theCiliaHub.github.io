@@ -209,26 +209,47 @@ async function fetchScreenData() {
     }
 }
 
+
+// =============== START: REPLACED FUNCTION ===============
+// This function from "Code 1" replaces the faulty one from "Code 2" to fix the TypeError.
 async function fetchPhylogenyData() {
     if (phylogenyDataCache) return phylogenyDataCache;
+
     try {
         const response = await fetch('https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/phylogeny_summary.json');
         if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
         const raw = await response.json();
+
         const unified = {};
 
-        // Process different formats in the JSON
-        Object.keys(raw).forEach(key => {
-            if (Array.isArray(raw[key])) {
-                const category = key.replace(/_genes$/, '').replace(/_/g, ' ');
-                raw[key].filter(Boolean).forEach(gene => {
-                    const geneUpper = gene.trim().toUpperCase();
-                    if (!unified[geneUpper]) unified[geneUpper] = { categories: [], species: [] };
-                    unified[geneUpper].categories.push(key); // e.g., 'ciliated_only_genes'
-                });
-            }
-        });
-        
+        // 1. Handle top-level arrays like "ciliated_only_genes"
+        if (raw.ciliated_only_genes) {
+            raw.ciliated_only_genes
+                .filter(gene => typeof gene === 'string') // Ensure it's a string
+                .forEach(g => unified[g.trim().toUpperCase()] = { category: 'ciliary_only' });
+        }
+
+        if (raw.nonciliary_only_genes) {
+            raw.nonciliary_only_genes
+                .filter(gene => typeof gene === 'string') // Ensure it's a string
+                .forEach(g => unified[g.trim().toUpperCase()] = { category: 'nonciliary_only' });
+        }
+
+        if (raw.in_all_organisms) {
+            raw.in_all_organisms
+                .filter(gene => typeof gene === 'string') // Ensure it's a string
+                .forEach(g => unified[g.trim().toUpperCase()] = { category: 'in_all_organisms' });
+        }
+
+        // 2. Handle list of objects like {id, sym, class, species}
+        if (Array.isArray(raw)) {
+            raw.forEach(item => {
+                const gene = (item.sym || '').trim().toUpperCase(); // Safely handles missing 'sym'
+                const cat = (item.class || '').toLowerCase().replace(/\s+/g, '_');
+                if (gene) unified[gene] = { category: cat, species: item.species || [] };
+            });
+        }
+
         phylogenyDataCache = unified;
         console.log(`Phylogeny data normalized: ${Object.keys(unified).length} entries`);
         return phylogenyDataCache;
@@ -237,6 +258,7 @@ async function fetchPhylogenyData() {
         return {};
     }
 }
+// =============== END: REPLACED FUNCTION ===============
 
 
 async function fetchTissueData() {
@@ -348,10 +370,10 @@ async function handleAIQuery() {
         else if ((match = qLower.match(/(?:phylogeny|phylogenetic distribution)\s+(?:of\s+)?([A-Z0-9\-]+)/i))) {
              const geneQuery = match[1].toUpperCase();
              const geneData = phylogeny[geneQuery];
-             if (!geneData || !geneData.categories) {
+             if (!geneData || !geneData.category) {
                  resultHtml = `<div class="result-card"><h3>Phylogeny of ${geneQuery}</h3><p class="status-not-found">No phylogeny data found.</p></div>`;
              } else {
-                 const conservation = geneData.categories.join(', ').replace(/_/g, ' ');
+                 const conservation = geneData.category.replace(/_/g, ' ');
                  resultHtml = `
                      <div class="result-card"><h3>Phylogeny of ${geneQuery}</h3><p>This gene is classified under: <strong>${conservation}</strong>.</p></div>
                      <p class="ai-suggestion">🌿 This indicates its evolutionary conservation pattern.</p>`;
@@ -811,6 +833,7 @@ function createResultCard(gene, dbData, allEvidence) {
         </div>`;
 }
 
+
 async function getGenesByPhylogeny(query) {
     await fetchPhylogenyData();
     const phy = phylogenyDataCache || {};
@@ -1052,7 +1075,6 @@ async function analyzeGeneViaAPI(gene, resultCard) {
     return foundEvidence;
 }
 
-// --- [INTEGRATED CODE] Heatmap Visualization ---
 function renderScreenSummaryHeatmap(genes, screenData) {
     if (!window.Plotly) {
         console.error('Plotly is not loaded.');
