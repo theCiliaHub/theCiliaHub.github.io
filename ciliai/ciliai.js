@@ -6,7 +6,6 @@ let ciliaHubDataCache = null;
 let screenDataCache = null;
 // --- Phylogeny Summary Integration ---
 let phylogenyDataCache = null;
-let tissueDataCache = null; // Already defined in the provided code
 
 // --- Main Page Display Function ---
 
@@ -44,7 +43,7 @@ window.displayCiliAIPage = async function displayCiliAIPage() {
                                 <span>"genes for Bardet-Biedl Syndrome"</span>, 
                                 <span>"show me basal body genes"</span>, 
                                 <span>"what domains are in CEP290?"</span>,
-                                <span>"show me ciliary genes in humans"</span>,
+                                <span>"ciliary-only genes"</span>,
                                 <span>"gene expression of ARL13B"</span>.
                             </p>
                         </div>
@@ -217,23 +216,32 @@ async function fetchPhylogenyData() {
         const raw = await response.json();
         const unified = {};
 
-        // Process different formats in the JSON
-        Object.keys(raw).forEach(key => {
-            if (Array.isArray(raw[key])) {
-                const category = key.replace(/_genes$/, '').replace(/_/g, ' ');
-                raw[key].filter(Boolean).forEach(gene => {
-                    const geneUpper = gene.trim().toUpperCase();
-                    if (!unified[geneUpper]) unified[geneUpper] = { categories: [], species: [] };
-                    unified[geneUpper].categories.push(key); // e.g., 'ciliated_only_genes'
+        // This improved parser handles both simple arrays and the complex object structure
+        const organismOrder = raw.organism_order || [];
+        if (raw.genes && Array.isArray(raw.genes)) {
+            raw.genes.forEach(item => {
+                const gene = (item.sym || item.gene || '').trim().toUpperCase();
+                if (gene) {
+                    unified[gene] = {
+                        category: (item.class || 'N/A').toLowerCase().replace(/\s+/g, '_'),
+                        presence: item.presence || {}
+                    };
+                }
+            });
+        }
+        
+        // Handle simple top-level arrays for backward compatibility
+        ['ciliated_only_genes', 'nonciliary_only_genes', 'in_all_organisms'].forEach(key => {
+            if (raw[key] && Array.isArray(raw[key])) {
+                raw[key].filter(Boolean).forEach(g => {
+                    const gene = g.trim().toUpperCase();
+                    if (!unified[gene]) unified[gene] = { presence: {} };
+                    unified[gene].category = key.replace(/_genes$/, '');
                 });
             }
         });
         
-        // Add more complex parsing if phylogeny.json contains objects with species info
-        // This part needs to be adapted if the JSON structure for species is different
-        // For now, we assume a simple structure or that species info is not robustly available for filtering
-        
-        phylogenyDataCache = unified;
+        phylogenyDataCache = { genes: unified, organism_order: organismOrder };
         console.log(`Phylogeny data normalized: ${Object.keys(unified).length} entries`);
         return phylogenyDataCache;
     } catch (error) {
@@ -350,15 +358,16 @@ async function handleAIQuery() {
             resultHtml = formatGeneDetail(geneData, geneSymbol, 'Associated Diseases', geneData?.functional_summary);
         }
         else if ((match = qLower.match(/(?:phylogeny|phylogenetic distribution)\s+(?:of\s+)?([A-Z0-9\-]+)/i))) {
-             const geneQuery = match[1].toUpperCase();
-             const geneData = phylogeny[geneQuery];
-             if (!geneData || !geneData.categories) {
-                 resultHtml = `<div class="result-card"><h3>Phylogeny of ${geneQuery}</h3><p class="status-not-found">No phylogeny data found.</p></div>`;
+            const geneQuery = match[1].toUpperCase();
+            const geneData = phylogeny.genes[geneQuery];
+             if (!geneData) {
+                 resultHtml = `<div class="result-card"><h3>Phylogeny of ${geneQuery}</h3><p class="status-not-found">No detailed phylogeny data found.</p></div>`;
              } else {
-                 const conservation = geneData.categories.join(', ').replace(/_/g, ' ');
+                 const conservation = geneData.category.replace(/_/g, ' ');
                  resultHtml = `
-                    <div class="result-card"><h3>Phylogeny of ${geneQuery}</h3><p>This gene is classified under: <strong>${conservation}</strong>.</p></div>
-                    <p class="ai-suggestion">🌿 This indicates its evolutionary conservation pattern.</p>`;
+                    <div class="result-card"><h3>Phylogeny of ${geneQuery}</h3><p>This gene is classified under: <strong>${conservation}</strong>.</p>
+                    <p class="ai-suggestion">🌿 You can visualize the conservation of this gene and others by searching for them in the "Analyze Gene Phenotypes" section and clicking "Visualize Results".</p>
+                    </div>`;
              }
         }
         else if ((match = qLower.match(/(?:gene expression|expression)\s+(?:of\s+)?([A-Z0-9\-]+)/i))) {
@@ -371,17 +380,16 @@ async function handleAIQuery() {
                     <table class="expression-table">
                         <thead><tr><th>Tissue</th><th>nTPM</th></tr></thead>
                         <tbody>
-                            ${Object.entries(geneExprData).sort(([t1], [t2]) => t1.localeCompare(t2)).map(([t, val]) => `<tr><td>${t}</td><td>${val.toFixed(2)}</td></tr>`).join('')}
+                            ${Object.entries(geneExprData).sort(([,a],[,b]) => b-a).map(([t, val]) => `<tr><td>${t}</td><td>${val.toFixed(2)}</td></tr>`).join('')}
                         </tbody>
                     </table>
-                    <p class="ai-suggestion">📊 Would you like to <a href="#" class="ai-action" data-action="expression-visualize" data-gene="${gene}">visualize this as a heatmap</a>?</p>`;
+                    <p class="ai-suggestion">📊 Would you like to <a href="#" class="ai-action" data-action="expression-visualize" data-gene="${gene}">visualize this as a bar chart</a>?</p>`;
                 resultHtml = `<div class="result-card"><h3>Expression Data for ${gene}</h3>${expressionHtml}</div>`;
             }
         }
         // --- Broader list-based queries ---
-        else if (qLower.includes('ciliary genes') && qLower.includes('human')) {
-            // NOTE: This is a placeholder. The current data doesn't robustly support species-specific filtering.
-            // This logic assumes all genes in the list are human-relevant unless specified otherwise.
+        else if (qLower.includes('ciliary genes') && (qLower.includes('human') || qLower.includes('h.sapiens'))) {
+            // NOTE: This assumes the core list is human-centric.
             const results = data.map(g => g.gene).sort();
             resultHtml = formatListResult(`Human Ciliary Genes`, results, `Found ${results.length} human-relevant ciliary genes in the database.`);
         }
@@ -389,10 +397,19 @@ async function handleAIQuery() {
             const results = data.map(g => g.gene).sort();
             resultHtml = formatListResult('All Ciliary Genes (Ciliome)', results);
         }
-        else if ((match = qLower.match(/(?:genes for|genes related to|show me)\s+(motile cilium|axoneme|basal body|transition zone|ciliogenesis)/i))) {
+        else if ((match = qLower.match(/(?:genes for|genes related to|show me|list)\s+(motile cilium|axoneme|basal body|transition zone|ciliogenesis|intraflagellar transport|ift)/i))) {
             const term = match[1];
             const results = await getGenesByFunctionalCategory(term);
             resultHtml = formatListResult(`Genes for: ${term}`, results);
+        }
+         else if (/(ciliary-only|ciliated only|non-ciliary|nonciliary|in all organisms)/i.test(qLower)) {
+            const term = qLower.match(/(ciliary-only|ciliated only|non-ciliary|nonciliary|in all organisms)/i)[0];
+            const categoryKey = term.replace(/ /g, '_');
+            const results = Object.entries(phylogeny.genes)
+                .filter(([, info]) => info.category === categoryKey)
+                .map(([gene]) => gene)
+                .sort();
+            resultHtml = formatListResult(`Phylogeny: ${term}`, results, `<p class="ai-suggestion">Would you like to <a href="#" class="ai-action" data-action="phylogeny-visualize" data-genes="${results.join(',')}">visualize the conservation heatmap</a> for these genes?</p>`);
         }
         else if ((match = qLower.match(/(?:genes for|genes involved in)\s+(.*)/i))) {
              const disease = match[1].trim();
@@ -431,9 +448,15 @@ document.addEventListener('click', async (event) => {
         event.preventDefault();
         const action = event.target.dataset.action;
         const gene = event.target.dataset.gene;
+        const genes = event.target.dataset.genes;
+
         if (action === 'expression-visualize' && gene) {
-             document.getElementById('plot-display-area').innerHTML = `<p class="status-searching">Building expression heatmap...</p>`;
-             await renderExpressionHeatmap([gene]);
+             document.getElementById('plot-display-area').innerHTML = `<p class="status-searching">Building expression chart...</p>`;
+             await renderExpressionBarChart([gene]);
+        }
+        if (action === 'phylogeny-visualize' && genes) {
+             document.getElementById('plot-display-area').innerHTML = `<p class="status-searching">Building phylogeny heatmap...</p>`;
+             await renderPhylogenyHeatmap(genes.split(','));
         }
     }
 });
@@ -457,53 +480,16 @@ function formatListResult(title, geneList, message = '') {
     if (!geneList || geneList.length === 0) {
         return `<div class="result-card"><h3>${title}</h3><p class="status-not-found">No matching genes found.</p></div>`;
     }
-    const messageHtml = message ? `<p>${message}</p>` : '';
+    const messageHtml = message ? `<div class="ai-suggestion">${message}</div>` : '';
     return `
         <div class="result-card">
             <h3>${title} (${geneList.length} found)</h3>
             ${messageHtml}
-            <ul style="column-count: 3; list-style-type: none; padding-left: 0;">
+            <ul style="column-count: 3; list-style-type: none; padding-left: 0; margin-top: 1rem;">
                 ${geneList.map(g => `<li>${g}</li>`).join('')}
             </ul>
         </div>
     `;
-}
-
-function formatSimpleResults(results, title) {
-    if (results.length === 0) return `<div class="result-card"><h3>${title}</h3><p class="status-not-found">No matching genes found.</p></div>`;
-    let html = `<div class="result-card"><h3>${title} (${results.length} found)</h3><ul>`;
-    results.forEach(gene => {
-        html += `<li><strong>${gene.gene}</strong>: ${gene.description || 'No description available.'}</li>`;
-    });
-    return html + '</ul></div>';
-}
-
-function formatDomainResults(results, title) {
-    if (results.length === 0) return `<div class="result-card"><h3>${title}</h3><p class="status-not-found">No matching genes found.</p></div>`;
-    let html = `<div class="result-card"><h3>${title} (${results.length} found)</h3>`;
-    results.forEach(gene => {
-        const domains = Array.isArray(gene.domain_descriptions) ? gene.domain_descriptions.join(', ') : 'None';
-        html += `<div style="border-bottom: 1px solid #eee; padding: 10px 0; margin-bottom: 10px;"><strong>${gene.gene}</strong><ul><li>Domains: ${domains}</li></ul></div>`;
-    });
-    return html + '</div>';
-}
-
-function formatComplexResults(gene, title) {
-    if (!gene) return `<div class="result-card"><h3>${title}</h3><p class="status-not-found">Gene not found in the dataset.</p></div>`;
-    let html = `<div class="result-card"><h3>${title}</h3>`;
-    if (gene.complex_names && gene.complex_names.length > 0) {
-        html += '<h4>Complex Names:</h4><ul>';
-        gene.complex_names.forEach(name => { html += `<li>${name}</li>`; });
-        html += '</ul>';
-    } else {
-        html += '<p>No complex names listed for this gene.</p>';
-    }
-    if (gene.complex_components && gene.complex_components.length > 0) {
-        html += `<br><h4>Complex Components:</h4><p>${gene.complex_components.join(', ')}</p>`;
-    } else {
-        html += '<p>No complex components listed for this gene.</p>';
-    }
-    return html + '</div>';
 }
 
 // --- Autocomplete Logic ---
@@ -517,7 +503,7 @@ function setupAiQueryAutocomplete() {
         "genes for Joubert Syndrome",
         "show me axoneme genes",
         "what domains are in CEP290",
-        "show me human ciliary genes",
+        "ciliary-only genes",
         "phylogeny of ARL13B",
         "expression of BBS1"
     ];
@@ -555,7 +541,7 @@ function setupAiQueryAutocomplete() {
     });
 }
 
-// --- Gene Analysis Engine & UI (largely unchanged) ---
+// --- Gene Analysis Engine & UI ---
 
 function setupAutocomplete() {
     const geneInput = document.getElementById('geneInput');
@@ -623,6 +609,7 @@ function setupCiliAIEventListeners() {
     visualizeBtn.addEventListener('click', async () => {
         const genes = geneInput.value.split(/[\s,]+/).map(g => g.trim().toUpperCase()).filter(Boolean);
         if (genes.length > 0) {
+            // Default visualization for gene analysis is now expression heatmap
             await renderExpressionHeatmap(genes);
         }
     });
@@ -682,7 +669,7 @@ async function runAnalysis(geneList) {
         let screenEvidence = [];
 
         if (mode === 'expert' || mode === 'hybrid') {
-            await fetchScreenData();
+            await fetchScreenData(); // Ensure screen data is loaded
             if (screenDataCache && screenDataCache[gene]) {
                 screenEvidence.push({
                     id: `screen-${gene}`,
@@ -738,14 +725,38 @@ async function renderExpressionHeatmap(genes) {
     Plotly.newPlot('plot-display-area', [trace], layout, { responsive: true });
 }
 
-// Other functions (renderScreenDataTable, createPlaceholderCard, createResultCard, etc.) remain the same...
-// Omitting them for brevity, but they should be included in the final file.
+async function renderExpressionBarChart(genes) {
+    const gene = genes[0]; // Bar chart for single gene
+    const tissueData = await fetchTissueData();
+    const geneExprData = tissueData[gene];
+
+    if (!geneExprData) {
+        document.getElementById('plot-display-area').innerHTML = `<p class="status-not-found">No expression data for ${gene}.</p>`;
+        return;
+    }
+
+    const sortedTissues = Object.entries(geneExprData).sort(([,a],[,b]) => b-a);
+    const trace = {
+        x: sortedTissues.map(([t]) => t),
+        y: sortedTissues.map(([,v]) => v),
+        type: 'bar',
+        hovertemplate: '<b>Tissue:</b> %{x}<br><b>nTPM:</b> %{y:.2f}<extra></extra>'
+    };
+    const layout = {
+        title: `Gene Expression for ${gene} (nTPM)`,
+        xaxis: { tickangle: -45 },
+        margin: { b: 150 },
+    };
+    Plotly.newPlot('plot-display-area', [trace], layout, { responsive: true });
+}
 
 function renderScreenDataTable(gene, screenInfo) {
-    if (!screenInfo || typeof screenInfo !== 'object') return '<p class="status-not-found">No structured screen data available.</p>';
+    if (!screenInfo || !screenInfo.screens) return '<p>No screen data available for this gene.</p>';
     
-    let screensObj = screenInfo.screens || {};
+    let screensObj = screenInfo.screens;
     const screenKeys = Object.keys(screensObj);
+    if (screenKeys.length === 0) return '<p>No screen data available for this gene.</p>';
+    
     const hitCount = screenKeys.filter(key => screensObj[key]?.hit).length;
 
     const screenNames = {
@@ -756,7 +767,7 @@ function renderScreenDataTable(gene, screenInfo) {
         'Breslow2018': 'Breslow et al. (2018) Hedgehog Signaling'
     };
 
-    const summary = `<p><b>${gene}</b> was identified as a hit in <strong>${hitCount} out of ${screenKeys.length}</strong> ciliary screens.</p>`;
+    const summary = `<p><b>${gene}</b> was identified as a hit in <strong>${hitCount} out of ${screenKeys.length}</strong> relevant ciliary screens.</p>`;
     const tableHtml = `
         <table class="expression-table">
             <thead><tr><th>Screen</th><th>Hit?</th><th>Effect</th></tr></thead>
@@ -820,338 +831,95 @@ function createResultCard(gene, dbData, allEvidence) {
         </div>`;
 }
 
-
-// --- NEW: Phylogeny query helper ---
-// Wraps your normalized phylogenyDataCache and provides labeled results for common natural phrases.
-async function getGenesByPhylogeny(query) {
-    await fetchPhylogenyData();
-    const phy = phylogenyDataCache || {};
-    const q = normalizeTerm(query || '');
-
-    if (q.includes('in all') || q.includes('all organisms') || q.includes('present in all')) {
-        const genes = Object.entries(phy).filter(([, v]) => v.category === 'in_all_organisms').map(([g]) => g);
-        return { label: 'Present in all organisms', genes: genes.sort() };
-    }
-
-    if (q.includes('non') && (q.includes('cili') || q.includes('ciliary') || q.includes('non-ciliary') || q.includes('non ciliary'))) {
-        const genes = Object.entries(phy).filter(([, v]) => v.category === 'nonciliary_only').map(([g]) => g);
-        return { label: 'Non-ciliary-only genes', genes: genes.sort() };
-    }
-
-    if (q.includes('ciliated-only') || q.includes('ciliary-only') || q.includes('only ciliated') || (q.includes('only') && q.includes('ciliated'))) {
-        const genes = Object.entries(phy).filter(([, v]) => v.category === 'ciliary_only').map(([g]) => g);
-        return { label: 'Ciliary-only genes', genes: genes.sort() };
-    }
-
-    if (q.includes('present in both') || q.includes('both') || q.includes('present-in-both') || q.includes('present in ciliated and non')) {
-        const genes = Object.entries(phy).filter(([, v]) => v.category === 'present_in_both' || v.category === 'present-in-both' || v.category === 'presentinboth').map(([g]) => g);
-        return { label: 'Present in both ciliated and non-ciliated organisms', genes: genes.sort() };
-    }
-
-    // fallback: return empty with hint
-    return { label: 'No phylogeny group matched', genes: [] };
-}
-// --- NEW: Utility normalizer ---
-function normalizeTerm(s) {
-    if (!s) return '';
-    return String(s).toLowerCase().replace(/[_\-\s]+/g, ' ').trim();
-}
-
-
 async function renderPhylogenyHeatmap(genes) {
     const phylogeny = await fetchPhylogenyData();
-    if (!phylogeny || Object.keys(phylogeny).length === 0) {
-        console.error('No phylogeny data available');
+    if (!phylogeny || !phylogeny.genes || Object.keys(phylogeny.genes).length === 0) {
+        document.getElementById('plot-display-area').innerHTML = '<p class="status-not-found">Error: Phylogeny data not available for visualization.</p>';
         return;
     }
+    
+    const orgList = phylogeny.organism_order || [];
+    const matrix = genes
+        .filter(g => phylogeny.genes[g]) // Only include genes present in the phylogeny data
+        .map(g => orgList.map(org => phylogeny.genes[g]?.presence?.[org] ? 1 : 0));
+    
+    const filteredGenes = genes.filter(g => phylogeny.genes[g]);
 
-    const organisms = new Set();
-    genes.forEach(g => {
-        const gData = phylogeny[g];
-        if (gData && gData.presence) {
-            Object.keys(gData.presence).forEach(org => organisms.add(org));
-        }
-    });
-
-    const orgList = Array.from(organisms);
-    const matrix = genes.map(g => orgList.map(org => phylogeny[g]?.presence?.[org] ? 1 : 0));
+    if (matrix.length === 0) {
+        document.getElementById('plot-display-area').innerHTML = '<p class="status-not-found">No genes from your list had detailed phylogeny data to visualize.</p>';
+        return;
+    }
 
     const trace = {
         z: matrix,
         x: orgList,
-        y: genes,
+        y: filteredGenes,
         type: 'heatmap',
-        colorscale: [
-            [0, '#f8f9fa'],
-            [1, '#2c5aa0']
-        ],
-        showscale: false
+        colorscale: [[0, '#e8f4fd'],[1, '#2c5aa0']],
+        showscale: false,
+        hovertemplate: '<b>Gene:</b> %{y}<br><b>Organism:</b> %{x}<br><b>Present:</b> %{z}<extra></extra>'
     };
-
     const layout = {
-        title: 'Phylogeny Heatmap',
+        title: 'Phylogenetic Conservation',
         xaxis: { title: 'Organisms', tickangle: -45 },
         yaxis: { title: 'Genes' },
-        margin: { t: 40, l: 100, r: 20, b: 100 },
-        height: Math.max(300, genes.length * 20)
+        margin: { t: 40, l: 100, r: 20, b: 150 }
     };
 
-    Plotly.newPlot('plot-display-area', [trace], layout);
+    Plotly.newPlot('plot-display-area', [trace], layout, { responsive: true });
 }
-
-function handleExpressionSearchInput(e) {
-    let query = e.target.value.trim().toUpperCase();
-    // Add validation to ensure query matches expected gene format
-    if (!/^[A-Za-z0-9-]+$/.test(query)) {
-        console.warn(`Invalid gene query format: ${query}`);
-        return;
-    }
-    if (query.length < 2) {
-        hideExpressionSuggestions();
-        return;
-    }
-    clearTimeout(searchTimeout);
-    searchTimeout = setTimeout(() => {
-        const suggestions = getExpressionGeneSuggestions(query);
-        showExpressionSuggestions(suggestions);
-    }, 150);
-}
-
-// --- Enhanced Live Literature Mining Engine (EuropePMC + PubMed/PMC full-text) ---
-
 
 async function analyzeGeneViaAPI(gene, resultCard) {
     const ESEARCH_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi";
-    const ELINK_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/elink.fcgi";
     const EFETCH_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi";
-    const EUROPE_PMC_URL = "https://www.ebi.ac.uk/europepmc/webservices/rest/search";
-
     const API_QUERY_KEYWORDS = ["cilia", "ciliary", "ciliogenesis", "intraflagellar transport", "ciliopathy"];
-    const LOCAL_ANALYSIS_KEYWORDS = new Set([
-        'cilia','ciliary','cilium','axoneme','basal body','transition zone',
-        'ciliogenesis','ift','shorter','longer','fewer','loss of','absent',
-        'reduced','increased','motility'
-    ]);
-
-    // ✅ Broaden gene regex to include hyphenated and case variants
-    const geneRegex = new RegExp(`\\b${gene}(?:[-_ ]?\\w{0,3})?\\b`, 'i');
-    const sentSplitRegex = /(?<=[.!?])\s+/;
+    const LOCAL_ANALYSIS_KEYWORDS = new Set(['cilia', 'cilium', 'axoneme', 'basal body', 'ciliogenesis', 'ift', 'shorter', 'longer', 'motility']);
+    const geneRegex = new RegExp(`\\b${gene}\\b`, 'i');
     let foundEvidence = [];
-
-    const MAX_ARTICLES = 15;
     const MAX_EVIDENCE = 5;
-    const RATE_LIMIT_DELAY = 350;
 
     try {
-        // --- ✅ Step 1: Europe PMC Search including FULL TEXT ---
-        const epmcQuery = `${gene} AND (${API_QUERY_KEYWORDS.join(" OR ")}) AND (OPEN_ACCESS:Y OR FULL_TEXT:Y)`;
-        const epmcResp = await fetch(
-            `${EUROPE_PMC_URL}?query=${encodeURIComponent(epmcQuery)}&resultType=core&format=json&pageSize=40`
-        );
-
-        if (epmcResp.ok) {
-            const epmcData = await epmcResp.json();
-            const epmcResults = epmcData.resultList?.result || [];
-
-            for (const r of epmcResults) {
-                if (foundEvidence.length >= MAX_EVIDENCE) break;
-
-                // ✅ Prefer fullText if available
-                const textContent = [
-                    r.title || '',
-                    r.abstractText || '',
-                    r.fullText || ''
-                ].join('. ');
-
-                if (!textContent || !geneRegex.test(textContent)) continue;
-
-                const sentences = textContent.split(sentSplitRegex);
-                for (const sent of sentences) {
-                    if (foundEvidence.length >= MAX_EVIDENCE) break;
-                    const sentLower = sent.toLowerCase();
-                    if (geneRegex.test(sent) && [...LOCAL_ANALYSIS_KEYWORDS].some(kw => sentLower.includes(kw))) {
-                        foundEvidence.push({
-                            id: r.id || r.pmid || 'EPMC',
-                            source: r.source || 'EuropePMC',
-                            context: sent.trim()
-                        });
-                    }
-                }
-            }
-        }
-
-        if (foundEvidence.length >= MAX_EVIDENCE) return foundEvidence;
-
-        // --- Step 2: PubMed + PMC (unchanged but cleaned) ---
         const kwClause = API_QUERY_KEYWORDS.map(k => `"${k}"[Title/Abstract]`).join(" OR ");
         const query = `("${gene}"[Title/Abstract]) AND (${kwClause})`;
-        const searchParams = new URLSearchParams({ db: 'pubmed', term: query, retmode: 'json', retmax: '25' });
+        const searchParams = new URLSearchParams({ db: 'pubmed', term: query, retmode: 'json', retmax: '20' });
         const searchResp = await fetch(`${ESEARCH_URL}?${searchParams}`);
-        if (!searchResp.ok) throw new Error(`NCBI ESearch failed: ${searchResp.statusText}`);
+        if (!searchResp.ok) throw new Error('NCBI ESearch failed');
 
         const searchData = await searchResp.json();
-        const pmids = searchData.esearchresult?.idlist.slice(0, MAX_ARTICLES) || [];
-        if (pmids.length === 0) return foundEvidence;
+        const pmids = searchData.esearchresult?.idlist;
+        if (!pmids || pmids.length === 0) return [];
+        
+        await sleep(350); // Rate limit
+        const fetchResp = await fetch(`${EFETCH_URL}?db=pubmed&id=${pmids.join(',')}&retmode=xml&rettype=abstract`);
+        if (!fetchResp.ok) throw new Error('NCBI EFetch failed');
+        
+        const xmlText = await fetchResp.text();
+        const parser = new DOMParser();
+        const xmlDoc = parser.parseFromString(xmlText, "application/xml");
+        const articles = Array.from(xmlDoc.getElementsByTagName('PubmedArticle'));
 
-        const linkParams = new URLSearchParams({ dbfrom: 'pubmed', db: 'pmc', id: pmids.join(','), retmode: 'json' });
-        const [linkResp, pubmedFetch] = await Promise.all([
-            fetch(`${ELINK_URL}?${linkParams}`),
-            fetch(`${EFETCH_URL}?db=pubmed&id=${pmids.join(',')}&retmode=xml&rettype=abstract`)
-        ]);
-
-        const linkData = linkResp.ok ? await linkResp.json() : {};
-        const pmcIds = [];
-        const linkSets = linkData.linksets || [];
-        for (const linkSet of linkSets) {
-            const links = linkSet.linksetdbs?.find(set => set.dbto === 'pmc')?.links || [];
-            pmcIds.push(...links);
-        }
-
-        let pmcArticles = [];
-        if (pmcIds.length > 0) {
-            await sleep(RATE_LIMIT_DELAY);
-            const fetchParams = new URLSearchParams({ db: 'pmc', id: pmcIds.join(','), retmode: 'xml', rettype: 'full' });
-            const fetchResp = await fetch(`${EFETCH_URL}?${fetchParams}`);
-            if (fetchResp.ok) {
-                const xmlText = await fetchResp.text();
-                const parser = new DOMParser();
-                const xmlDoc = parser.parseFromString(xmlText, "application/xml");
-                pmcArticles = Array.from(xmlDoc.getElementsByTagName('article'));
-            }
-        }
-
-        const pubmedArticles = (() => {
-            if (!pubmedFetch.ok) return [];
-            return pubmedFetch.text().then(xmlText => {
-                const parser = new DOMParser();
-                const xmlDoc = parser.parseFromString(xmlText, "application/xml");
-                return Array.from(xmlDoc.getElementsByTagName('PubmedArticle'));
-            });
-        })();
-
-        const [pubmedParsed, pmcParsed] = await Promise.all([pubmedArticles, pmcArticles]);
-        const allArticles = [...pmcParsed, ...pubmedParsed];
-
-        for (const article of allArticles) {
+        for (const article of articles) {
             if (foundEvidence.length >= MAX_EVIDENCE) break;
-
-            let pmid, textContent;
-            if (article.tagName.toLowerCase() === 'article') {
-                pmid = article.querySelector('article-id[pub-id-type="pmid"]')?.textContent || 'PMC Article';
-                const title = article.querySelector('article-title')?.textContent || '';
-                const body = Array.from(article.querySelectorAll('body p, body sec, body para'))
-                    .map(el => el.textContent).join(' ');
-                textContent = `${title}. ${body}`;
-            } else {
-                pmid = article.querySelector('MedlineCitation > PMID')?.textContent || 'PubMed Article';
-                const title = article.querySelector('ArticleTitle')?.textContent || '';
-                const abstractText = Array.from(article.querySelectorAll('AbstractText'))
-                    .map(el => el.textContent).join(' ');
-                textContent = `${title}. ${abstractText}`;
-            }
-
-            if (!textContent || !geneRegex.test(textContent)) continue;
-
-            const sentences = textContent.split(sentSplitRegex);
-            for (const sent of sentences) {
-                if (foundEvidence.length >= MAX_EVIDENCE) break;
-                const sentLower = sent.toLowerCase();
-                if (geneRegex.test(sent) && [...LOCAL_ANALYSIS_KEYWORDS].some(kw => sentLower.includes(kw))) {
-                    foundEvidence.push({ id: pmid, source: 'PubMed', context: sent.trim() });
-                }
+            const pmid = article.querySelector('MedlineCitation > PMID')?.textContent;
+            const abstractEl = article.querySelector('AbstractText');
+            if (!abstractEl) continue;
+            
+            const abstractText = abstractEl.textContent;
+            if (geneRegex.test(abstractText)) {
+                 const sentences = abstractText.split(/(?<=[.!?])\s+/);
+                 for (const sent of sentences) {
+                     if (foundEvidence.length >= MAX_EVIDENCE) break;
+                     if (geneRegex.test(sent) && [...LOCAL_ANALYSIS_KEYWORDS].some(kw => sent.toLowerCase().includes(kw))) {
+                         foundEvidence.push({ id: pmid, source: 'PubMed', context: sent.trim() });
+                     }
+                 }
             }
         }
-
     } catch (error) {
-        console.error(`Failed to fetch literature for ${gene}:`, error);
-        const errorEl = resultCard ? resultCard.querySelector('.status-searching') : null;
-        if (errorEl) {
-            errorEl.textContent = 'Literature Search Failed';
-            errorEl.className = 'status-not-found';
-        }
+        console.error(`Literature search failed for ${gene}:`, error);
     }
-
     return foundEvidence;
 }
-
-
-
-// --- Heatmap Visualization ---
-
-function renderScreenSummaryHeatmap(genes, screenData) {
-    if (!window.Plotly) {
-        console.error('Plotly is not loaded.');
-        document.getElementById('plot-display-area').innerHTML = '<p class="status-not-found">Error: Plotly library failed to load.</p>';
-        return;
-    }
-
-    const plotArea = document.getElementById('plot-display-area');
-    if (!plotArea) return;
-
-    const numberScreens = { 'Kim et al. (2016) IMCD3 RNAi': 'Kim2016', 'Wheway et al. (2015) RPE1 RNAi': 'Wheway2015', 'Roosing et al. (2015) hTERT-RPE1': 'Roosing2015', 'Basu et al. (2023) MDCK CRISPR': 'Basu2023' };
-    const signalingScreens = { 'Breslow et al. (2018) Hedgehog Signaling': 'Breslow2018' };
-    const numberScreenOrder = Object.keys(numberScreens);
-    const signalingScreenOrder = Object.keys(signalingScreens);
-
-    const numberCategoryMap = { "Decreased cilia numbers": { v: 1, c: '#0571b0' }, "Increased cilia numbers": { v: 2, c: '#ca0020' }, "Causes Supernumerary Cilia": { v: 3, c: '#fdae61' }, "No effect": { v: 4, c: '#fee090' }, "Not in Screen": { v: 5, c: '#bdbdbd' }, "Not Reported": { v: 6, c: '#636363' } };
-    const signalingCategoryMap = { "Decreased Signaling (Positive Regulator)": { v: 1, c: '#2166ac' }, "Increased Signaling (Negative Regulator)": { v: 2, c: '#d73027' }, "No Significant Effect": { v: 3, c: '#fdae61' }, "Not in Screen": { v: 4, c: '#bdbdbd' }, "Not Reported": { v: 5, c: '#636363' } };
-
-    const geneLabels = genes.map(g => g.toUpperCase());
-    const zDataNumber = [], textDataNumber = [], zDataSignaling = [], textDataSignaling = [];
-
-    genes.forEach(gene => {
-        const numberRowValues = [], numberRowText = [], signalingRowValues = [], signalingRowText = [];
-        numberScreenOrder.forEach(screenName => {
-            const screenKey = numberScreens[screenName];
-            let resultText = "Not in Screen";
-            if (screenData[gene]?.screens?.[screenKey]) {
-                resultText = screenData[gene].screens[screenKey].result || "Not Reported";
-            }
-            const mapping = numberCategoryMap[resultText] || numberCategoryMap["Not in Screen"];
-            numberRowValues.push(mapping.v);
-            numberRowText.push(resultText);
-        });
-        signalingScreenOrder.forEach(screenName => {
-            const screenKey = signalingScreens[screenName];
-            let resultText = "Not in Screen";
-            if (screenData[gene]?.screens?.[screenKey]) {
-                resultText = screenData[gene].screens[screenKey].result || "Not Reported";
-            }
-            const mapping = signalingCategoryMap[resultText] || signalingCategoryMap["Not in Screen"];
-            signalingRowValues.push(mapping.v);
-            signalingRowText.push(resultText);
-        });
-        zDataNumber.push(numberRowValues);
-        textDataNumber.push(numberRowText);
-        zDataSignaling.push(signalingRowValues);
-        textDataSignaling.push(signalingRowText);
-    });
-
-    const trace1 = { x: numberScreenOrder, y: geneLabels, z: zDataNumber, customdata: textDataNumber, type: 'heatmap', colorscale: [[0, '#0571b0'], [0.2, '#ca0020'], [0.4, '#fdae61'], [0.6, '#fee090'], [0.8, '#636363'], [1.0, '#bdbdbd']], showscale: false, hovertemplate: '<b>Gene:</b> %{y}<br><b>Screen:</b> %{x}<br><b>Result:</b> %{customdata}<extra></extra>', xgap: 1, ygap: 1 };
-    const trace2 = { x: signalingScreenOrder, y: geneLabels, z: zDataSignaling, customdata: textDataSignaling, type: 'heatmap', colorscale: [[0, '#2166ac'], [0.25, '#d73027'], [0.5, '#fdae61'], [0.75, '#636363'], [1.0, '#bdbdbd']], showscale: false, hovertemplate: '<b>Gene:</b> %{y}<br><b>Screen:</b> %{x}<br><b>Result:</b> %{customdata}<extra></extra>', xaxis: 'x2', yaxis: 'y1', xgap: 1, ygap: 1 };
-    
-    const layout = {
-        title: { text: 'Summary of Ciliary Screen Results', font: { size: 16, family: 'Arial', color: '#2c5aa0' } },
-        grid: { rows: 1, columns: 2, pattern: 'independent' },
-        xaxis: { domain: [0, 0.78], tickangle: -45, automargin: true },
-        xaxis2: { domain: [0.8, 1.0], tickangle: -45, automargin: true },
-        yaxis: { automargin: true, tickfont: { size: 10 } },
-        margin: { l: 120, r: 220, b: 150, t: 80 },
-        height: 400 + (geneLabels.length * 30),
-        annotations: []
-    };
-    
-    let current_y = 1.0;
-    layout.annotations.push({ xref: 'paper', yref: 'paper', x: 1.02, y: current_y + 0.05, xanchor: 'left', text: '<b>Cilia Number/Structure</b>', showarrow: false, font: { size: 13 } });
-    Object.entries(numberCategoryMap).forEach(([key, val]) => { layout.annotations.push({ xref: 'paper', yref: 'paper', x: 1.02, y: current_y, xanchor: 'left', yanchor: 'middle', text: `█ ${key}`, font: { color: val.c, size: 12 }, showarrow: false }); current_y -= 0.06; });
-    current_y -= 0.1;
-    layout.annotations.push({ xref: 'paper', yref: 'paper', x: 1.02, y: current_y + 0.05, xanchor: 'left', text: '<b>Hedgehog Signaling</b>', showarrow: false, font: { size: 13 } });
-    Object.entries(signalingCategoryMap).forEach(([key, val]) => { if (key !== "Not in Screen" && key !== "Not Reported") { layout.annotations.push({ xref: 'paper', yref: 'paper', x: 1.02, y: current_y, xanchor: 'left', yanchor: 'middle', text: `█ ${key}`, font: { color: val.c, size: 12 }, showarrow: false }); current_y -= 0.06; } });
-
-    Plotly.newPlot('plot-display-area', [trace1, trace2], layout, { responsive: true });
-}
-
-
 
 // --- Global Exposure for Router ---
 window.displayCiliAIPage = displayCiliAIPage;
@@ -1159,9 +927,3 @@ window.setupCiliAIEventListeners = setupCiliAIEventListeners;
 window.handleAIQuery = handleAIQuery;
 window.analyzeGenesFromInput = analyzeGenesFromInput;
 window.runAnalysis = runAnalysis;
-window.analyzeGeneViaAPI = analyzeGeneViaAPI;
-window.fetchScreenData = fetchScreenData;
-window.createResultCard = createResultCard;
-window.createPlaceholderCard = createPlaceholderCard;
-window.renderScreenSummaryHeatmap = renderScreenSummaryHeatmap;
-window.renderExpressionHeatmap = renderExpressionHeatmap; // New exposure
