@@ -194,7 +194,6 @@ async function fetchCiliaData() {
     }
 }
 
-
 async function fetchScreenData() {
     if (screenDataCache) return screenDataCache;
     try {
@@ -219,6 +218,8 @@ async function fetchScreenData() {
         return {};
     }
 }
+
+
 async function fetchPhylogenyData() {
     if (phylogenyDataCache) return phylogenyDataCache;
     try {
