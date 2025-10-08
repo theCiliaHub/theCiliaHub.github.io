@@ -1,5 +1,13 @@
 // ciliAI.js - Enhanced with advanced AI query handler, heatmap visualization, corrected screen names, and robust autocomplete
 
+// --- Global Data Cache ---
+
+let ciliaHubDataCache = null;
+let screenDataCache = null;
+// --- Phylogeny Summary Integration ---
+let phylogenyDataCache = null;
+let tissueDataCache = null; // Already defined in the provided code
+
 // --- Main Page Display Function ---
 
 window.displayCiliAIPage = async function displayCiliAIPage() {
