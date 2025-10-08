@@ -394,6 +394,11 @@ async function getGenesByPhylogeny(query) {
     // fallback: return empty with hint
     return { label: 'No phylogeny group matched', genes: [] };
 }
+// --- NEW: Utility normalizer ---
+function normalizeTerm(s) {
+    if (!s) return '';
+    return String(s).toLowerCase().replace(/[_\-\s]+/g, ' ').trim();
+}
 
 // --- Conversational CiliAI Query Engine with Step 2 ---
 async function handleAIQuery() {
