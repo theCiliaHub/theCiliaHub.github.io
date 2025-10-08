@@ -170,10 +170,6 @@ const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 function debounce(fn, delay) { let timeout; return function (...args) { clearTimeout(timeout); timeout = setTimeout(() => fn(...args), delay); }; }
 const CILI_AI_DB = { "HDAC6": { "summary": { "lof_length": "Promotes / Maintains", "percentage_ciliated": "No effect", "source": "Expert DB" }, "evidence": [{ "id": "21873644", "source": "pubmed", "context": "...loss of HDAC6 results in hyperacetylation of tubulin and leads to the formation of longer, more stable primary cilia in renal epithelial cells." }] }, "IFT88": { "summary": { "lof_length": "Inhibits / Restricts", "percentage_ciliated": "Reduced cilia numbers", "source": "Expert DB" }, "evidence": [{ "id": "10882118", "source": "pubmed", "context": "Mutations in IFT88 (polaris) disrupt intraflagellar transport, leading to a failure in cilia assembly and resulting in severely shortened or absent cilia." }] }, "ARL13B": { "summary": { "lof_length": "Inhibits / Restricts", "percentage_ciliated": "Reduced cilia numbers", "source": "Expert DB" }, "evidence": [{ "id": "21940428", "source": "pubmed", "context": "The small GTPase ARL13B is critical for ciliary structure; its absence leads to stunted cilia with abnormal morphology and axonemal defects." }] } };
 
-// --- Data Fetching and Caching (Abbreviated for brevity) ---
-async function fetchCiliaData() { if (ciliaHubDataCache) return ciliaHubDataCache; try { const response = await fetch('https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/ciliahub_data.json'); if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`); const data = await response.json(); ciliaHubDataCache = data.map(gene => ({...gene, domain_descriptions: typeof gene.domain_descriptions === 'string' ? gene.domain_descriptions.split(',').map(d => d.trim()) : Array.isArray(gene.domain_descriptions) ? gene.domain_descriptions : [] })); console.log('CiliaHub data loaded.'); return ciliaHubDataCache; } catch (error) { console.error("Failed to fetch CiliaHub data:", error); return null; } }
-async function fetchScreenData() { if (screenDataCache) return screenDataCache; try { const response = await fetch('https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/cilia_screens_data.json'); if (!response.ok) throw new Error(`Failed to fetch screen data: ${response.statusText}`); screenDataCache = await response.json(); console.log('Screen data loaded.'); return screenDataCache; } catch (error) { console.error('Error fetching screen data:', error); return {}; } }
-
 
 // --- Data Fetching and Caching ---
 
@@ -472,8 +468,11 @@ async function handleAIQuery() {
     let title = `Results for "${query}"`;
     let match;
     try {
-        // 🩺 Disease or phenotype search (unchanged)
-        if ((match = query.match(/(?:genes for|what genes are linked to|find genes for|genes involved in)\s+(.*)/i))) {
+        // --- UPDATED LOGIC ORDER ---
+        // Prioritize structured queries over free-form gene analysis.
+        
+        // 🩺 Disease or phenotype search (Handles "what genes", "which genes", etc.)
+        if ((match = query.match(/(?:genes for|genes linked to|genes involved in|what genes.*for|which genes.*for)\s+(.*)/i))) {
             const disease = match[1].trim().toLowerCase();
             title = `Genes associated with "${disease}"`;
             const diseaseRegex = new RegExp(disease.replace(/ /g, '[\\s-]*'), 'i');
@@ -481,7 +480,7 @@ async function handleAIQuery() {
 
             resultHtml = `
                 ${formatSimpleResults(results, title)}
-                <p class="ai-suggestion">🧬 These genes show strong associations with ${disease}.  
+                <p class="ai-suggestion">🧬 These genes show strong associations with ${disease}. 
                 Would you like me to summarize their known pathways or visualize them in a network?</p>
             `;
         }
@@ -540,7 +539,7 @@ async function handleAIQuery() {
 
             resultHtml = `
                 ${formatDomainResults(results, title)}
-                <p class="ai-suggestion">✨ These genes share the <strong>${domain}</strong> domain.  
+                <p class="ai-suggestion">✨ These genes share the <strong>${domain}</strong> domain. 
                 Would you like me to highlight conserved motifs or domain architectures?</p>
             `;
         }
@@ -553,7 +552,7 @@ async function handleAIQuery() {
 
             resultHtml = `
                 ${formatSimpleResults(results, title)}
-                <p class="ai-suggestion">📡 These genes are enriched at the ${location}.  
+                <p class="ai-suggestion">📡 These genes are enriched at the ${location}. 
                 Would you like me to compare their expression across species?</p>
             `;
         }
@@ -587,8 +586,8 @@ async function handleAIQuery() {
                     </div>`;
             } else {
                 resultHtml = `<div class="result-card">
-                    <h3>No genes found</h3>
-                    <p>No data were classified as "ciliary-only". Check that your <code>phylogeny_summary.json</code> includes <em>category: "ciliary_only"</em> entries.</p>
+                        <h3>No genes found</h3>
+                        <p>No data were classified as "ciliary-only". Check that your <code>phylogeny_summary.json</code> includes <em>category: "ciliary_only"</em> entries.</p>
                 </div>`;
             }
         }
@@ -611,22 +610,21 @@ async function handleAIQuery() {
                 resultHtml = `
                     <div class="result-card">
                         <h3>Genes present in all studied organisms</h3>
-                        <p>These genes are <strong>highly conserved</strong> across all species in the dataset.  
+                        <p>These genes are <strong>highly conserved</strong> across all species in the dataset. 
                         Would you like to view their <strong>functional summaries</strong> or <strong>ortholog relationships</strong>?</p>
                         <ul>${inAll.map(g => `<li>${g}</li>`).join('')}</ul>
                     </div>`;
             } else {
                 resultHtml = `<div class="result-card">
-                    <h3>No conserved genes found</h3>
-                    <p>No genes were marked as "in_all_organisms". Check your <code>phylogeny_summary.json</code>.</p>
+                        <h3>No conserved genes found</h3>
+                        <p>No genes were marked as "in_all_organisms". Check your <code>phylogeny_summary.json</code>.</p>
                 </div>`;
             }
         }
-
-        // --- Direct gene phylogeny ---
-        else if (/phylogeny\s+of\s+([A-Z0-9\-]+)/i.test(query)) {
-            const matchGene = query.match(/phylogeny\s+of\s+([A-Z0-9\-]+)/i);
-            const geneQuery = matchGene[1].toUpperCase();
+        
+        // --- Direct gene phylogeny (Handles "What is the phylogeny of...") ---
+        else if ((match = query.match(/(?:phylogeny|phylogenetic distribution)\s+(?:of\s+)?([A-Z0-9\-]+)/i))) {
+            const geneQuery = match[1].toUpperCase();
             const phyloMap = {};
             Object.entries(phylogeny).forEach(([gene, info]) => {
                 const keys = [gene, ...(info.synonyms || [])];
@@ -644,12 +642,11 @@ async function handleAIQuery() {
 
                 resultHtml = `
                     <div class="result-card"><h3>Phylogeny of ${geneQuery}</h3><p>${organisms}</p></div>
-                    <p class="ai-suggestion">🌿 Here’s the phylogenetic presence of ${geneQuery}.  
+                    <p class="ai-suggestion">🌿 Here’s the phylogenetic presence of ${geneQuery}. 
                     Would you like to visualize its conservation heatmap or domain evolution?</p>
                 `;
             }
         }
-
         // ⚛️ Complex queries
         else if ((match = query.match(/complex(?:es| components)?\s+(?:for|of|with)\s+([A-Z0-9\-]+)/i)) ||
             (match = query.match(/^([A-Z0-9\-]+)\s+complex(?:es)?$/i)) ||
@@ -663,12 +660,12 @@ async function handleAIQuery() {
 
             resultHtml = `
                 ${formatComplexResults(gene, `Complex Information for ${complexOrGene}`)}
-                <p class="ai-suggestion">🔗 This shows the components of the ${complexOrGene} complex.  
+                <p class="ai-suggestion">🔗 This shows the components of the ${complexOrGene} complex. 
                 Would you like me to map their interactions or visualize the structural subunits?</p>
             `;
         }
 
-        // 🧬 Direct gene input
+        // 🧬 Direct gene input (This is now the fallback)
         else if (/^[A-Z0-9]{3,}$/i.test(query.split(' ')[0])) {
             const detectedGene = query.split(' ')[0].toUpperCase();
             document.getElementById('geneInput').value = detectedGene;
@@ -678,13 +675,13 @@ async function handleAIQuery() {
 
         // Fallback with updated suggestions
         else {
-            resultHtml = `<p>Sorry, I didn’t understand that query. Try asking about:  
-            <br>• “Gene expression of IFT88 in kidney”  
-            <br>• “Ciliary-only genes”  
-            <br>• “Genes present in all organisms”  
-            <br>• “Genes lost in non-ciliated organisms”  
-            <br>• “Ciliogenesis genes”  
-            <br>• “Genes with kinase domain”  
+            resultHtml = `<p>Sorry, I didn’t understand that query. Try asking about: 
+            <br>• “Gene expression of IFT88 in kidney” 
+            <br>• “Ciliary-only genes” 
+            <br>• “Genes present in all organisms” 
+            <br>• “Genes lost in non-ciliated organisms” 
+            <br>• “Ciliogenesis genes” 
+            <br>• “Genes with kinase domain” 
             <br>• “Genes localizing to the basal body”</p>`;
         }
 
@@ -695,6 +692,7 @@ async function handleAIQuery() {
         console.error(e);
     }
 }
+
 
 // --- Interactive follow-up handlers ---
 document.addEventListener('click', async (event) => {
@@ -958,7 +956,7 @@ aiQueryInput.addEventListener('keydown', debounce((e) => {
     });
 
     // Activate both autocomplete features
-    setupAutocomplete();   
+    setupAutocomplete();    
     setupAiQueryAutocomplete();
 }
 
