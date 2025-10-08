@@ -399,6 +399,57 @@ function normalizeTerm(s) {
     if (!s) return '';
     return String(s).toLowerCase().replace(/[_\-\s]+/g, ' ').trim();
 }
+// --- CiliAI Enhanced Ciliary Gene Queries ---
+async function handleCiliaryGeneQueries(query, data, phylogeny, tissueData) {
+    let resultHtml = '';
+    const normalizedQuery = query.trim().toLowerCase();
+
+    // Match general ciliary genes
+    if (/show me ciliary genes|display ciliary genes/i.test(normalizedQuery)) {
+        const ciliaryGenes = data.filter(g => g.ciliary === true || g.localization);
+        resultHtml = `
+            <div class="result-card">
+                <h3>Ciliary Genes</h3>
+                <p>Genes associated with cilia:</p>
+                <ul>${ciliaryGenes.map(g => `<li>${g.gene}</li>`).join('')}</ul>
+            </div>`;
+    }
+
+    // Match species-specific ciliary genes
+    else if (/show me h\.?sapiens specific ciliary genes|display h\.?sapiens specific ciliary genes/i.test(normalizedQuery)) {
+        const humanGenes = data.filter(g => g.ciliary === true && g.species?.includes('Homo sapiens'));
+        resultHtml = `
+            <div class="result-card">
+                <h3>H.sapiens Specific Ciliary Genes</h3>
+                <p>Genes conserved in humans and associated with cilia:</p>
+                <ul>${humanGenes.map(g => `<li>${g.gene}</li>`).join('')}</ul>
+            </div>`;
+    }
+
+    // Match genes for specific ciliary structures
+    else if (/show me genes for motile cilium|display genes for motile cilium/i.test(normalizedQuery)) {
+        const motileGenes = data.filter(g => g.localization && g.localization.toLowerCase().includes('motile cilium'));
+        resultHtml = `
+            <div class="result-card">
+                <h3>Motile Cilium Genes</h3>
+                <p>Genes associated with the motile cilium:</p>
+                <ul>${motileGenes.map(g => `<li>${g.gene}</li>`).join('')}</ul>
+            </div>`;
+    }
+
+    else if (/show me genes for axoneme|display genes for axoneme/i.test(normalizedQuery)) {
+        const axonemeGenes = data.filter(g => g.localization && g.localization.toLowerCase().includes('axoneme'));
+        resultHtml = `
+            <div class="result-card">
+                <h3>Axoneme Genes</h3>
+                <p>Genes associated with the axoneme structure:</p>
+                <ul>${axonemeGenes.map(g => `<li>${g.gene}</li>`).join('')}</ul>
+            </div>`;
+    }
+
+    return resultHtml || null; // null if no match
+}
+
 
 // --- Conversational CiliAI Query Engine with Step 2 ---
 async function handleAIQuery() {
@@ -407,7 +458,7 @@ async function handleAIQuery() {
     const resultsSection = document.getElementById('resultsSection');
     const query = aiQueryInput.value.trim();
 
-    if (!query) return;
+     if (!query) return;
 
     resultsSection.style.display = 'block';
     resultsContainer.innerHTML = `<p class="status-searching">CiliAI is thinking...</p>`;
@@ -422,6 +473,14 @@ async function handleAIQuery() {
         resultsContainer.innerHTML = `<p class="status-not-found">Error: Data could not be loaded. Please check the console.</p>`;
         return;
     }
+
+    try {
+        // Check for ciliary gene queries first
+        let resultHtml = await handleCiliaryGeneQueries(query, data, phylogeny, tissueData);
+        if (resultHtml) {
+            resultsContainer.innerHTML = resultHtml;
+            return;
+        }
 
     // NEW: First attempt to match functional-category and phylogeny shorthand queries
     const qnorm = normalizeTerm(query);
@@ -690,7 +749,7 @@ async function handleAIQuery() {
 
         resultsContainer.innerHTML = resultHtml;
 
-    } catch (e) {
+     } catch (e) {
         resultsContainer.innerHTML = `<p class="status-not-found">An error occurred during the search. Please check the console.</p>`;
         console.error(e);
     }
