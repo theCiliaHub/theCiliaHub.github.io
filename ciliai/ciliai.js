@@ -233,12 +233,13 @@ async function fetchPhylogenyData() {
             if (Array.isArray(raw[key])) {
                 const category = key.replace(/_genes$/, '').replace(/_/g, ' ');
                 raw[key].filter(Boolean).forEach(gene => {
-                    const geneUpper = gene.trim().toUpperCase();
-                    if (!unified[geneUpper]) unified[geneUpper] = { categories: [], species: [] };
-                    unified[geneUpper].categories.push(key); // e.g., 'ciliated_only_genes'
-                });
-            }
-        });
+    // Add a check to make sure 'gene' is a string before trimming
+    if (typeof gene === 'string') {
+        const geneUpper = gene.trim().toUpperCase();
+        if (!unified[geneUpper]) unified[geneUpper] = { categories: [], species: [] };
+        unified[geneUpper].categories.push(key);
+    }
+});
         
         // Add more complex parsing if phylogeny.json contains objects with species info
         // This part needs to be adapted if the JSON structure for species is different
