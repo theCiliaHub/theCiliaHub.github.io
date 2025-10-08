@@ -258,6 +258,7 @@ async function fetchPhylogenyData() {
         return {};
     }
 }
+
 // =============== END: REPLACED FUNCTION ===============
 
 
@@ -636,10 +637,20 @@ function setupCiliAIEventListeners() {
     analyzeBtn.addEventListener('click', analyzeGenesFromInput);
     aiQueryBtn.addEventListener('click', handleAIQuery);
 
+    // This is the corrected event listener for the main "Visualize Results" button
     visualizeBtn.addEventListener('click', async () => {
         const genes = geneInput.value.split(/[\s,]+/).map(g => g.trim().toUpperCase()).filter(Boolean);
         if (genes.length > 0) {
-            await renderExpressionHeatmap(genes);
+            const mode = document.querySelector('input[name="mode"]:checked').value;
+            // Logic to show the correct heatmap based on the analysis mode
+            if (mode === 'expert' || mode === 'hybrid') {
+                document.getElementById('plot-display-area').innerHTML = `<p class="status-searching">Building screen results heatmap...</p>`;
+                const screenData = await fetchScreenData();
+                renderScreenSummaryHeatmap(genes, screenData);
+            } else { // 'nlp' mode
+                document.getElementById('plot-display-area').innerHTML = `<p class="status-searching">Building phylogeny heatmap...</p>`;
+                await renderPhylogenyHeatmap(genes);
+            }
         }
     });
 
@@ -656,10 +667,11 @@ function setupCiliAIEventListeners() {
         }
     }, 300));
     
-    // Activate autocompletes
-    setupAutocomplete();    
+    setupAutocomplete();
     setupAiQueryAutocomplete();
 }
+
+
 
 function analyzeGenesFromInput() {
     const geneInput = document.getElementById('geneInput');
