@@ -8,6 +8,13 @@ let allGenes = [];
 let currentData = [];
 let searchResults = [];
 const geneLocalizationData = {};
+// This ensures the variable is truly global and accessible everywhere.
+window.geneDataCache = {};
+window.ciliaHubDataCache = null;
+window.screenDataCache = null;
+window.phylogenyDataCache = null;
+window.tissueDataCache = null;
+
 
 // Plotting - Consolidated into a single instance variable
 let currentPlotInstance = null;
