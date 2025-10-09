@@ -1,4 +1,3 @@
-// globals.js
 // =============================================================================
 // GLOBAL VARIABLES
 // =============================================================================
@@ -8,15 +7,20 @@ let allGenes = [];
 let currentData = [];
 let searchResults = [];
 const geneLocalizationData = {};
-// This ensures the variable is truly global and accessible everywhere.
-window.geneDataCache = {};
-window.ciliaHubDataCache = null;
-window.screenDataCache = null;
-window.phylogenyDataCache = null;
-window.tissueDataCache = null;
 
+// Global caches
+window.geneDataCache = {};          // main gene data cache
+window.ciliaHubDataCache = null;    // curated cilia hub data
+window.screenDataCache = null;      // screen data
+window.phylogenyDataCache = null;   // phylogeny data
+window.tissueDataCache = null;      // tissue expression data
+window.geneMapCache = null;         // mapping gene names to objects
 
-// Plotting - Consolidated into a single instance variable
+// Access global caches locally
+const geneDataCache = window.geneDataCache;
+const tissueDataCache = window.tissueDataCache;
+
+// Plotting - single instance
 let currentPlotInstance = null;
 
 // IDs and defaults
@@ -29,31 +33,23 @@ const defaultGenesNames = [
     "CEP290", "WDR31", "ARL13B", "BBS1"
 ];
 
-// Caches
-let geneDataCache = null;
-let geneMapCache = null;
-
+// =============================================================================
+// NAVIGATION & ROUTING
+// =============================================================================
 function navigateTo(event, path) {
-    if (event) {
-        event.preventDefault();
-    }
+    if (event) event.preventDefault();
     window.location.hash = path;
 }
 
-// =============================================================================
-// ROUTER (REVISED)
-// =============================================================================
 async function handleRouteChange() {
     let path = window.location.hash.replace(/^#/, '').toLowerCase().trim();
-    if (!path || path === '/' || path === '/index.html') {
-        path = '/';
-    }
+    if (!path || path === '/' || path === '/index.html') path = '/';
 
     try {
-        await loadAndPrepareDatabase(); // Ensure database is ready
+        await loadAndPrepareDatabase(); // Ensure DB ready
     } catch (err) {
         console.error("Database loading failed:", err);
-        return; // Stop execution if DB fails
+        return;
     }
 
     updateActiveNav(path);
@@ -69,14 +65,13 @@ async function handleRouteChange() {
         if (el) el.style.display = 'none';
     });
 
-    // REFACTORED: The gene lookup is now inside the `default` case
+    // Determine gene to display if any
     let geneToDisplay = null;
 
-    // Show the correct page
     switch (path) {
         case '/':
             displayHomePage();
-            setTimeout(displayLocalizationChart, 0);
+            setTimeout(() => window.displayLocalizationChart?.(), 0);
             break;
         case '/batch-query':
             displayBatchQueryTool();
@@ -86,7 +81,7 @@ async function handleRouteChange() {
             displayCiliaPlotPage();
             break;
         case '/ciliai':
-            displayCiliAIPage();
+            window.displayCiliAIPage?.();
             break;
         case '/expression':
             displayExpressionPage();
@@ -98,22 +93,18 @@ async function handleRouteChange() {
             displayContactPage();
             break;
         default:
-            // This block now exclusively handles potential gene pages
-            if (geneMapCache) {
-                const geneName = getGeneFromURL(); // Get gene name from the unknown path
+            if (window.geneMapCache) {
+                const geneName = getGeneFromURL();
                 if (geneName) {
                     const safeName = sanitize(geneName);
-                    geneToDisplay = geneMapCache.get(safeName);
+                    geneToDisplay = window.geneMapCache.get(safeName);
                 }
             } else {
                 console.warn("geneMapCache is not initialized yet.");
             }
 
-            if (geneToDisplay) {
-                displayIndividualGenePage(geneToDisplay);
-            } else {
-                displayNotFoundPage();
-            }
+            if (geneToDisplay) displayIndividualGenePage(geneToDisplay);
+            else displayNotFoundPage();
             break;
     }
 
@@ -124,12 +115,10 @@ async function handleRouteChange() {
 // URL HELPERS
 // =============================================================================
 function getGeneFromURL() {
-    // Try query string first: /ciliaplot?gene=ACTN2
     const params = new URLSearchParams(window.location.search);
     const fromQuery = params.get('gene');
     if (fromQuery) return fromQuery;
 
-    // Fallback: last part of hash or path: /ciliaplot/ACTN2
     const hashPath = window.location.hash.replace(/^#/, '');
     const pathParts = hashPath.split('/');
     if (pathParts.length > 1 && pathParts[pathParts.length - 1].toLowerCase() !== 'ciliaplot') {
@@ -138,7 +127,6 @@ function getGeneFromURL() {
 
     return null;
 }
-
 
 // =============================================================================
 // EVENT LISTENERS
@@ -155,6 +143,7 @@ document.addEventListener('DOMContentLoaded', () => {
 // =============================================================================
 function initGlobalEventListeners() {
     window.addEventListener('scroll', handleStickySearch);
+
     document.querySelectorAll('.cilia-part').forEach(part => {
         part.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' || e.key === ' ') {
@@ -166,11 +155,7 @@ function initGlobalEventListeners() {
 
     const ciliaSvg = document.querySelector('.interactive-cilium svg');
     if (ciliaSvg) {
-        Panzoom(ciliaSvg, {
-            maxZoom: 3,
-            minZoom: 0.5,
-            contain: 'outside'
-        });
+        Panzoom(ciliaSvg, { maxZoom: 3, minZoom: 0.5, contain: 'outside' });
         ciliaSvg.parentElement.addEventListener('wheel', (e) => {
             e.preventDefault();
             const panzoom = Panzoom(ciliaSvg);
