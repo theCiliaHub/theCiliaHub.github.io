@@ -754,29 +754,54 @@ function setupCiliAIEventListeners() {
  * Generates both heatmap and suggested questions dynamically
  * @param {Array<string>} genes - Array of gene symbols
  */
+// ===============================================
+// Handle CiliAI gene selection + question generation
+// ===============================================
 async function handleCiliAISelection(genes) {
+    const plotArea = document.getElementById('plot-display-area');
+    const askPanel = document.getElementById('ciliAI-ask-panel');
+
     if (!Array.isArray(genes) || genes.length === 0) {
-        document.getElementById('plot-display-area').innerHTML = '<p class="status-not-found">No gene selected.</p>';
-        document.getElementById('ciliAI-ask-panel').innerHTML = '';
+        if (plotArea) plotArea.innerHTML = '<p class="status-not-found">No gene selected.</p>';
+        if (askPanel) askPanel.innerHTML = '';
         return;
     }
 
-    // 1. Generate expression heatmap
+    // 1️⃣ Build expression heatmap
+    if (plotArea) plotArea.innerHTML = `<p class="status-searching">Building expression heatmap for ${genes.join(', ')}...</p>`;
     await displayCiliAIExpressionHeatmap(genes);
 
-    // 2. Generate suggested CiliAI questions
-    const questions = generateCiliAIQuestions(genes);
+    // 2️⃣ Generate suggested questions dynamically
+    const base = genes[0];
+    const questions = [
+        `What is the function of ${base}?`,
+        `Describe the role of ${base}`,
+        `Show expression of ${base}`,
+        `Where is ${base} expressed?`,
+        `In which tissues is ${base} expressed?`,
+        `Is ${base} a ciliary gene?`,
+        `Show protein domains of ${base}`,
+        `List diseases linked to ${base}`,
+        `What diseases are associated with ${base}?`,
+        `Show localization of ${base}`,
+        `Which organ systems express ${base}?`,
+        `What is the phylogeny of ${base}?`,
+        `Evolutionary conservation of ${base}`,
+        `What are the interacting partners of ${base}?`,
+        `Show all known info about ${base}`
+    ];
 
-    // 3. Render questions in the panel
-    const panel = document.getElementById('ciliAI-ask-panel');
-    if (panel) {
-        panel.innerHTML = questions.map(q => `
-            <div class="ciliAI-question">
-                <span>💡</span> ${q}
-            </div>
-        `).join('');
+    // 3️⃣ Render questions in panel
+    if (askPanel) {
+        askPanel.innerHTML = `
+            <h4>💡 Suggested CiliAI Questions for ${base}</h4>
+            <ul class="ciliAI-question-list" style="padding-left:0; list-style:none;">
+                ${questions.map(q => `<li class="ciliAI-question-item" style="cursor:pointer; color:#0077cc; margin-bottom:4px;">${q}</li>`).join('')}
+            </ul>
+        `;
     }
 }
+
 
 
 
@@ -841,42 +866,70 @@ async function runAnalysis(geneList) {
 }
 
 async function displayCiliAIExpressionHeatmap(genes) {
-    const tissueData = await fetchTissueData();
-    if (!tissueData || Object.keys(tissueData).length === 0) {
-        document.getElementById('plot-display-area').innerHTML = '<p class="status-not-found">Error: No tissue expression data could be loaded.</p>';
-        return;
-    }
-    const tissues = new Set();
-    genes.forEach(g => {
-        if (tissueData[g]) {
-            Object.keys(tissueData[g]).forEach(t => tissues.add(t));
+    const plotArea = document.getElementById('plot-display-area');
+    if (!plotArea) return;
+
+    try {
+        const tissueData = await fetchTissueData();
+        if (!tissueData || Object.keys(tissueData).length === 0) {
+            plotArea.innerHTML = '<p class="status-not-found">⚠️ No tissue expression data could be loaded.</p>';
+            return;
         }
-    });
 
-    const tissueList = Array.from(tissues).sort();
+        // Collect all tissues present across selected genes
+        const tissueSet = new Set();
+        genes.forEach(g => {
+            if (tissueData[g]) {
+                Object.keys(tissueData[g]).forEach(t => tissueSet.add(t));
+            }
+        });
 
-    if (tissueList.length === 0) {
-        document.getElementById('plot-display-area').innerHTML = `<p class="status-not-found">No tissue expression data found for the gene(s): ${genes.join(', ')}.</p>`;
-        return;
+        const tissueList = Array.from(tissueSet).sort();
+        if (tissueList.length === 0) {
+            plotArea.innerHTML = `<p class="status-not-found">No tissue expression data found for the gene(s): ${genes.join(', ')}.</p>`;
+            return;
+        }
+
+        // Build clean numeric matrix (replace NaN or undefined with 0)
+        const matrix = genes.map(g =>
+            tissueList.map(t => {
+                const val = tissueData[g]?.[t];
+                const num = parseFloat(val);
+                return Number.isFinite(num) ? num : 0;
+            })
+        );
+
+        // Ensure matrix rows have equal length
+        const validMatrix = matrix.filter(row => row.length === tissueList.length);
+        if (validMatrix.length === 0) {
+            plotArea.innerHTML = '<p class="status-not-found">⚠️ Expression data incomplete or invalid for heatmap.</p>';
+            return;
+        }
+
+        const trace = {
+            z: validMatrix,
+            x: tissueList,
+            y: genes,
+            type: 'heatmap',
+            colorscale: 'Viridis',
+            colorbar: { title: 'nTPM', tickformat: '.1f' },
+            hovertemplate: '<b>Gene:</b> %{y}<br><b>Tissue:</b> %{x}<br><b>nTPM:</b> %{z:.2f}<extra></extra>'
+        };
+
+        const layout = {
+            title: genes.length > 1 ? 'Gene Expression Heatmap (nTPM)' : `Expression of ${genes[0]}`,
+            xaxis: { tickangle: -45, automargin: true },
+            yaxis: { automargin: true },
+            margin: { l: 100, r: 20, b: 150, t: 50 },
+            paper_bgcolor: '#fafafa',
+            plot_bgcolor: '#ffffff'
+        };
+
+        Plotly.newPlot('plot-display-area', [trace], layout, { responsive: true });
+    } catch (err) {
+        console.error('❌ Heatmap rendering failed:', err);
+        plotArea.innerHTML = '<p class="status-not-found">❌ Failed to render expression heatmap.</p>';
     }
-
-    const matrix = genes.map(g => tissueList.map(t => tissueData[g]?.[t] || 0));
-
-    const trace = {
-        z: matrix,
-        x: tissueList,
-        y: genes,
-        type: 'heatmap',
-        colorscale: 'Viridis',
-        colorbar: { title: 'nTPM' },
-        hovertemplate: '<b>Gene:</b> %{y}<br><b>Tissue:</b> %{x}<br><b>nTPM:</b> %{z:.2f}<extra></extra>'
-    };
-    const layout = {
-        title: 'Gene Expression Heatmap (nTPM)',
-        xaxis: { tickangle: -45 },
-        margin: { l: 100, r: 20, b: 150, t: 50 },
-    };
-    Plotly.newPlot('plot-display-area', [trace], layout, { responsive: true });
 }
 
 function renderScreenDataTable(gene, screenInfo) {
@@ -1300,4 +1353,6 @@ window.fetchScreenData = fetchScreenData;
 window.createResultCard = createResultCard;
 window.createPlaceholderCard = createPlaceholderCard;
 window.renderScreenSummaryHeatmap = renderScreenSummaryHeatmap;
+// Expose globally so other scripts can call them
 window.displayCiliAIExpressionHeatmap = displayCiliAIExpressionHeatmap;
+window.handleCiliAISelection = handleCiliAISelection;
