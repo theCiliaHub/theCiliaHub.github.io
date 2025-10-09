@@ -115,17 +115,27 @@ async function handleRouteChange() {
 // URL HELPERS
 // =============================================================================
 function getGeneFromURL() {
+    const RESERVED_PATHS = [
+        'home', 'batch-query', 'ciliaplot', 'analysis',
+        'ciliai', 'expression', 'download', 'contact', 'notfound'
+    ];
+
+    // Try query string first: /ciliaplot?gene=ACTN2
     const params = new URLSearchParams(window.location.search);
     const fromQuery = params.get('gene');
     if (fromQuery) return fromQuery;
 
+    // Fallback: last part of hash or path: /ciliaplot/ACTN2
     const hashPath = window.location.hash.replace(/^#/, '');
     const pathParts = hashPath.split('/');
-    if (pathParts.length > 1 && pathParts[pathParts.length - 1].toLowerCase() !== 'ciliaplot') {
-        return pathParts[pathParts.length - 1];
+    if (pathParts.length > 1) {
+        const lastPart = pathParts[pathParts.length - 1].toLowerCase();
+        if (!RESERVED_PATHS.includes(lastPart)) {
+            return pathParts[pathParts.length - 1];
+        }
     }
 
-    return null;
+    return null; // nothing to treat as a gene
 }
 
 // =============================================================================
