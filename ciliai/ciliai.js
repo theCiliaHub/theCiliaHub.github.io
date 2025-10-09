@@ -340,50 +340,170 @@ function normalizeTerm(s) {
     return String(s).toLowerCase().replace(/[_\-\s]+/g, ' ').trim();
 }
 
-// -------------------------------
-// Generate dynamic suggested questions
-// -------------------------------
-function generateSuggestedQuestions(geneSymbol) {
-    const suggestions = [
-        `What is the function of ${geneSymbol}?`,
-        `Describe function of ${geneSymbol}`,
-        `Show me expression of ${geneSymbol}`,
-        `Where is ${geneSymbol} expressed?`,
-        `Display ${geneSymbol} expression`,
-        `Which tissues express ${geneSymbol}?`,
-        `List diseases linked to ${geneSymbol}`,
-        `What diseases are associated with ${geneSymbol}?`,
-        `Show protein domains of ${geneSymbol}`,
-        `List domains in ${geneSymbol}`,
-        `What is the phylogeny of ${geneSymbol}?`,
-        `Evolutionary history of ${geneSymbol}`,
-        `Where is ${geneSymbol} conserved?`,
-        `Is ${geneSymbol} a ciliary gene?`,
-        `Show me all info about ${geneSymbol}`
-    ];
+// =============================================================================
+// CiliAI: Main AI Query Handler
+// =============================================================================
+window.handleAIQuery = async function() {
+    const aiQueryInput = document.getElementById('aiQueryInput');
+    const resultsContainer = document.getElementById('resultsContainer');
+    const resultsSection = document.getElementById('resultsSection');
+    const query = aiQueryInput.value.trim();
 
-    const container = document.getElementById('suggestedQuestionsContainer');
-    if (!container) return;
+    if (!query) return;
 
-    container.innerHTML = `<h4>Suggested Questions for ${geneSymbol}:</h4><ul style="padding-left: 0; list-style-type: none;">` +
-        suggestions.map(q => `<li><span class="example-queries" style="cursor:pointer; color:#3498db;">"${q}"</span></li>`).join('') +
-        `</ul>`;
-}
+    // Show results section and clear previous outputs
+    resultsSection.style.display = 'block';
+    resultsContainer.innerHTML = `<p class="status-searching">CiliAI is thinking...</p>`;
+    document.getElementById('plot-display-area').innerHTML = '';
+    document.getElementById('visualizeBtn').style.display = 'none';
 
-// -------------------------------
-// Integrate with CiliAI selection
-// -------------------------------
-async function handleCiliAISelection(selectedGenes) {
-    if (!Array.isArray(selectedGenes) || selectedGenes.length === 0) return;
-    // Generate heatmap if only one gene is selected (can expand for multiple genes)
-    if (selectedGenes.length === 1) {
-        document.getElementById('plot-display-area').innerHTML = `<p class="status-searching">Building expression heatmap for ${selectedGenes[0]}...</p>`;
-        await displayCiliAIExpressionHeatmap(selectedGenes);
+    // Fetch data caches
+    const data = await fetchCiliaData();
+    const phylogeny = await fetchPhylogenyData();
+    const tissueData = await fetchTissueData();
+
+    if (!data) {
+        resultsContainer.innerHTML = `<p class="status-not-found">Error: Core gene data could not be loaded.</p>`;
+        return;
     }
 
-    // Generate dynamic suggested questions for first gene
-    generateSuggestedQuestions(selectedGenes[0]);
-}
+    let resultHtml = '';
+    const qLower = query.toLowerCase();
+    let match;
+
+    try {
+        // --- Single-gene specific questions ---
+        // Function
+        if ((match = qLower.match(/(?:function of|what is the function of|describe function of)\s+([A-Z0-9\-]+)/i))) {
+            const geneSymbol = match[1].toUpperCase();
+            const geneData = data.find(g => g.gene.toUpperCase() === geneSymbol);
+            resultHtml = formatGeneDetail(
+                geneData,
+                geneSymbol,
+                'Function',
+                geneData?.functional_summary || geneData?.description
+            );
+        }
+        // Domains
+        else if ((match = qLower.match(/(?:protein domains|domains in|what domains.*in)\s+([A-Z0-9\-]+)/i))) {
+            const geneSymbol = match[1].toUpperCase();
+            const geneData = data.find(g => g.gene.toUpperCase() === geneSymbol);
+            const domains = Array.isArray(geneData?.domain_descriptions) && geneData.domain_descriptions.length
+                ? geneData.domain_descriptions.join(', ')
+                : 'No domains listed.';
+            resultHtml = formatGeneDetail(geneData, geneSymbol, 'Domains', domains);
+        }
+        // Diseases
+        else if ((match = qLower.match(/(?:disease linked to|diseases for|associated with)\s+([A-Z0-9\-]+)/i))) {
+            const geneSymbol = match[1].toUpperCase();
+            const geneData = data.find(g => g.gene.toUpperCase() === geneSymbol);
+            resultHtml = formatGeneDetail(geneData, geneSymbol, 'Associated Diseases', geneData?.functional_summary);
+        }
+        // Phylogeny
+        else if ((match = qLower.match(/(?:phylogeny|phylogenetic distribution)\s+(?:of\s+)?([A-Z0-9\-]+)/i))) {
+            const geneQuery = match[1].toUpperCase();
+            const geneData = phylogeny[geneQuery];
+            if (!geneData || !geneData.category) {
+                resultHtml = `<div class="result-card"><h3>Phylogeny of ${geneQuery}</h3><p class="status-not-found">No phylogeny data found.</p></div>`;
+            } else {
+                const conservation = geneData.category.replace(/_/g, ' ');
+                resultHtml = `
+                    <div class="result-card"><h3>Phylogeny of ${geneQuery}</h3>
+                        <p>This gene is classified under: <strong>${conservation}</strong>.</p>
+                        <p class="ai-suggestion">🌿 This indicates its evolutionary conservation pattern.</p>
+                    </div>`;
+            }
+        }
+        // Gene expression
+        else if ((match = qLower.match(/(?:gene expression|expression|where is|display|show).*(?:of|for)?\s+([A-Z0-9\-]+)/i))) {
+            const gene = match[1].toUpperCase();
+            const geneExprData = tissueData[gene];
+            if (!geneExprData) {
+                resultHtml = `<div class="result-card"><h3>Expression Data for ${gene}</h3>
+                    <p class="status-not-found">No expression data found.</p></div>`;
+            } else {
+                const expressionHtml = `
+                    <table class="expression-table">
+                        <thead><tr><th>Tissue</th><th>nTPM</th></tr></thead>
+                        <tbody>
+                            ${Object.entries(geneExprData)
+                                .sort(([t1], [t2]) => t1.localeCompare(t2))
+                                .map(([t, val]) => `<tr><td>${t}</td><td>${val.toFixed(2)}</td></tr>`).join('')}
+                        </tbody>
+                    </table>
+                    <p class="ai-suggestion">📊 Would you like to <a href="#" class="ai-action" data-action="expression-visualize" data-gene="${gene}">visualize this as a heatmap</a>?</p>`;
+                resultHtml = `<div class="result-card"><h3>Expression Data for ${gene}</h3>${expressionHtml}</div>`;
+            }
+        }
+        // --- Broad queries ---
+        else if (qLower.includes('ciliary genes') && qLower.includes('human')) {
+            const results = data.map(g => g.gene).sort();
+            resultHtml = formatListResult('Human Ciliary Genes', results, `Found ${results.length} genes.`);
+        }
+        else if (qLower.includes('ciliome') || qLower.includes('ciliary genes')) {
+            const results = data.map(g => g.gene).sort();
+            resultHtml = formatListResult('All Ciliary Genes (Ciliome)', results);
+        }
+        else if ((match = qLower.match(/(?:genes for|genes related to|show me)\s+(motile cilium|axoneme|basal body|transition zone|ciliogenesis)/i))) {
+            const term = match[1];
+            const results = await getGenesByFunctionalCategory(term);
+            resultHtml = formatListResult(`Genes for: ${term}`, results);
+        }
+        else if ((match = qLower.match(/(?:genes for|genes involved in|show me genes for)\s+(.*)/i))) {
+            const disease = match[1].trim();
+            const diseaseRegex = new RegExp(disease.replace(/ /g, '[\\s-]*'), 'i');
+            const results = data.filter(g => g.functional_summary && diseaseRegex.test(g.functional_summary)).map(g => g.gene).sort();
+            resultHtml = formatListResult(`Genes for: ${disease}`, results);
+        }
+        // --- Fallback ---
+        else {
+            resultHtml = `<p>Sorry, I didn’t understand that. Try asking one of the suggested questions below:</p>
+                <ul class="example-queries">
+                    <li><span>"What is the function of IFT88?"</span></li>
+                    <li><span>"Show me genes for the axoneme."</span></li>
+                    <li><span>"List genes for Bardet-Biedl Syndrome."</span></li>
+                    <li><span>"Where is ARL13B expressed?"</span></li>
+                    <li><span>"Display ARL13B expression."</span></li>
+                    <li><span>"Phylogeny of BBS1."</span></li>
+                    <li><span>"Protein domains in CEP290."</span></li>
+                    <li><span>"Diseases linked to WDR31."</span></li>
+                </ul>`;
+        }
+
+        resultsContainer.innerHTML = resultHtml;
+
+        // --- Dynamic suggested questions panel ---
+        if (match && match[1]) {
+            const gene = match[1].toUpperCase();
+            const suggestionsContainer = document.getElementById('suggestedQuestions');
+            if (suggestionsContainer) {
+                const suggested = [
+                    `What is the function of ${gene}?`,
+                    `Where is ${gene} expressed?`,
+                    `Show me protein domains in ${gene}.`,
+                    `Which diseases are linked to ${gene}?`,
+                    `What is the phylogeny of ${gene}?`,
+                    `Display ${gene} expression as a heatmap.`,
+                    `Is ${gene} part of the ciliome?`,
+                    `Genes interacting with ${gene}?`,
+                    `Which ciliary structures involve ${gene}?`,
+                    `Is ${gene} conserved across species?`,
+                    `List pathways involving ${gene}.`,
+                    `Show ${gene} subcellular localization.`,
+                    `Any known mutations in ${gene}?`,
+                    `Highlight ${gene} in the cilium diagram.`,
+                    `Compare ${gene} expression across tissues.`
+                ];
+                suggestionsContainer.innerHTML = suggested.map(q => `<div class="suggested-question"><span>${q}</span></div>`).join('');
+            }
+        }
+
+    } catch (e) {
+        resultsContainer.innerHTML = `<p class="status-not-found">An error occurred. Check console for details.</p>`;
+        console.error(e);
+    }
+};
+
 
 // -------------------------------
 // Click handler for gene selection
