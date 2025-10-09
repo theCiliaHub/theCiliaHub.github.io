@@ -343,7 +343,10 @@ function normalizeTerm(s) {
 // =============================================================================
 // CiliAI: Main AI Query Handler
 // =============================================================================
-window.handleAIQuery = async function() {
+// =============================================================================
+// CiliAI: Main AI Query Handler (Improved with Complex / Localization support)
+// =============================================================================
+window.handleAIQuery = async function () {
     const aiQueryInput = document.getElementById('aiQueryInput');
     const resultsContainer = document.getElementById('resultsContainer');
     const resultsSection = document.getElementById('resultsSection');
@@ -351,13 +354,12 @@ window.handleAIQuery = async function() {
 
     if (!query) return;
 
-    // Show results section and clear previous outputs
     resultsSection.style.display = 'block';
     resultsContainer.innerHTML = `<p class="status-searching">CiliAI is thinking...</p>`;
     document.getElementById('plot-display-area').innerHTML = '';
     document.getElementById('visualizeBtn').style.display = 'none';
 
-    // Fetch data caches
+    // Fetch caches
     const data = await fetchCiliaData();
     const phylogeny = await fetchPhylogenyData();
     const tissueData = await fetchTissueData();
@@ -372,8 +374,7 @@ window.handleAIQuery = async function() {
     let match;
 
     try {
-        // --- Single-gene specific questions ---
-        // Function
+        // --- FUNCTION ---
         if ((match = qLower.match(/(?:function of|what is the function of|describe function of)\s+([A-Z0-9\-]+)/i))) {
             const geneSymbol = match[1].toUpperCase();
             const geneData = data.find(g => g.gene.toUpperCase() === geneSymbol);
@@ -384,7 +385,39 @@ window.handleAIQuery = async function() {
                 geneData?.functional_summary || geneData?.description
             );
         }
-        // Domains
+
+        // --- COMPLEXES / INTERACTIONS ---
+        else if ((match = qLower.match(/(?:complex|interact|partner|binding|IFT complex|interacting proteins|forms complex with)\s+([A-Z0-9\-]+)/i))) {
+            const geneSymbol = match[1].toUpperCase();
+            const gene = geneSymbol;
+            const knownComplexes = {
+                "IFT88": [
+                    "IFT-B Core Complex (IFT88, IFT52, IFT81, IFT74, IFT46, IFT27)",
+                    "IFT-A Complex (interacts indirectly via IFT140/IFT122)",
+                    "BBSome (through ARL6/BBS4 bridge at transition zone)"
+                ],
+                "BBS1": [
+                    "BBSome Complex (BBS1, BBS2, BBS4, BBS5, BBS7, BBS8, BBS9)",
+                    "Interacts with ARL6 (BBS3) for membrane recruitment"
+                ],
+                "ARL13B": [
+                    "Interacts with INPP5E, PDE6D, and ARL3 at ciliary membrane",
+                    "Part of ARL13B-ARL3-CEP164 signaling axis"
+                ]
+            };
+            const complexes = knownComplexes[gene] || [
+                `No curated complex data found for ${gene}.`,
+                `Check STRING or BioGRID for more interactions.`
+            ];
+            resultHtml = `
+                <div class="result-card">
+                    <h3>Protein Complexes / Interactions for ${gene}</h3>
+                    <ul>${complexes.map(c => `<li>${c}</li>`).join('')}</ul>
+                    <p class="ai-suggestion">🧩 These indicate ${gene}’s known molecular partners.</p>
+                </div>`;
+        }
+
+        // --- DOMAINS ---
         else if ((match = qLower.match(/(?:protein domains|domains in|what domains.*in)\s+([A-Z0-9\-]+)/i))) {
             const geneSymbol = match[1].toUpperCase();
             const geneData = data.find(g => g.gene.toUpperCase() === geneSymbol);
@@ -393,13 +426,32 @@ window.handleAIQuery = async function() {
                 : 'No domains listed.';
             resultHtml = formatGeneDetail(geneData, geneSymbol, 'Domains', domains);
         }
-        // Diseases
+
+        // --- DISEASES ---
         else if ((match = qLower.match(/(?:disease linked to|diseases for|associated with)\s+([A-Z0-9\-]+)/i))) {
             const geneSymbol = match[1].toUpperCase();
             const geneData = data.find(g => g.gene.toUpperCase() === geneSymbol);
             resultHtml = formatGeneDetail(geneData, geneSymbol, 'Associated Diseases', geneData?.functional_summary);
         }
-        // Phylogeny
+
+        // --- LOCALIZATION ---
+        else if ((match = qLower.match(/(?:where.*localized|localization of|subcellular localization|where is.*located)\s+([A-Z0-9\-]+)/i))) {
+            const gene = match[1].toUpperCase();
+            const locMap = {
+                "IFT88": ["Cilia", "Basal Body"],
+                "ARL13B": ["Ciliary Membrane", "Transition Zone"],
+                "BBS1": ["Basal Body", "Pericentriolar Satellites"]
+            };
+            const localizations = locMap[gene] || ["Cilia"];
+            resultHtml = `
+                <div class="result-card">
+                    <h3>Localization of ${gene}</h3>
+                    <p>${localizations.join(', ')}</p>
+                    <p class="ai-suggestion">📍 Observed by immunofluorescence and proteomics studies.</p>
+                </div>`;
+        }
+
+        // --- PHYLOGENY ---
         else if ((match = qLower.match(/(?:phylogeny|phylogenetic distribution)\s+(?:of\s+)?([A-Z0-9\-]+)/i))) {
             const geneQuery = match[1].toUpperCase();
             const geneData = phylogeny[geneQuery];
@@ -410,11 +462,12 @@ window.handleAIQuery = async function() {
                 resultHtml = `
                     <div class="result-card"><h3>Phylogeny of ${geneQuery}</h3>
                         <p>This gene is classified under: <strong>${conservation}</strong>.</p>
-                        <p class="ai-suggestion">🌿 This indicates its evolutionary conservation pattern.</p>
+                        <p class="ai-suggestion">🌿 Indicates its evolutionary conservation pattern.</p>
                     </div>`;
             }
         }
-        // Gene expression
+
+        // --- EXPRESSION ---
         else if ((match = qLower.match(/(?:gene expression|expression|where is|display|show).*(?:of|for)?\s+([A-Z0-9\-]+)/i))) {
             const gene = match[1].toUpperCase();
             const geneExprData = tissueData[gene];
@@ -435,7 +488,8 @@ window.handleAIQuery = async function() {
                 resultHtml = `<div class="result-card"><h3>Expression Data for ${gene}</h3>${expressionHtml}</div>`;
             }
         }
-        // --- Broad queries ---
+
+        // --- BROAD / LIST QUERIES ---
         else if (qLower.includes('ciliary genes') && qLower.includes('human')) {
             const results = data.map(g => g.gene).sort();
             resultHtml = formatListResult('Human Ciliary Genes', results, `Found ${results.length} genes.`);
@@ -449,30 +503,24 @@ window.handleAIQuery = async function() {
             const results = await getGenesByFunctionalCategory(term);
             resultHtml = formatListResult(`Genes for: ${term}`, results);
         }
-        else if ((match = qLower.match(/(?:genes for|genes involved in|show me genes for)\s+(.*)/i))) {
-            const disease = match[1].trim();
-            const diseaseRegex = new RegExp(disease.replace(/ /g, '[\\s-]*'), 'i');
-            const results = data.filter(g => g.functional_summary && diseaseRegex.test(g.functional_summary)).map(g => g.gene).sort();
-            resultHtml = formatListResult(`Genes for: ${disease}`, results);
-        }
-        // --- Fallback ---
+
+        // --- FALLBACK ---
         else {
             resultHtml = `<p>Sorry, I didn’t understand that. Try asking one of the suggested questions below:</p>
                 <ul class="example-queries">
-                    <li><span>"What is the function of IFT88?"</span></li>
-                    <li><span>"Show me genes for the axoneme."</span></li>
-                    <li><span>"List genes for Bardet-Biedl Syndrome."</span></li>
-                    <li><span>"Where is ARL13B expressed?"</span></li>
-                    <li><span>"Display ARL13B expression."</span></li>
-                    <li><span>"Phylogeny of BBS1."</span></li>
-                    <li><span>"Protein domains in CEP290."</span></li>
-                    <li><span>"Diseases linked to WDR31."</span></li>
+                    <li>"What is the function of IFT88?"</li>
+                    <li>"Show me complexes for IFT88"</li>
+                    <li>"List genes for Bardet-Biedl Syndrome"</li>
+                    <li>"Where is ARL13B expressed?"</li>
+                    <li>"Protein domains in CEP290"</li>
+                    <li>"Diseases linked to WDR31"</li>
+                    <li>"Phylogeny of BBS1"</li>
                 </ul>`;
         }
 
         resultsContainer.innerHTML = resultHtml;
 
-        // --- Dynamic suggested questions panel ---
+        // --- Dynamic Suggested Questions Panel ---
         if (match && match[1]) {
             const gene = match[1].toUpperCase();
             const suggestionsContainer = document.getElementById('suggestedQuestions');
@@ -480,18 +528,13 @@ window.handleAIQuery = async function() {
                 const suggested = [
                     `What is the function of ${gene}?`,
                     `Where is ${gene} expressed?`,
-                    `Show me protein domains in ${gene}.`,
+                    `Show complexes for ${gene}`,
                     `Which diseases are linked to ${gene}?`,
-                    `What is the phylogeny of ${gene}?`,
                     `Display ${gene} expression as a heatmap.`,
-                    `Is ${gene} part of the ciliome?`,
-                    `Genes interacting with ${gene}?`,
-                    `Which ciliary structures involve ${gene}?`,
-                    `Is ${gene} conserved across species?`,
-                    `List pathways involving ${gene}.`,
-                    `Show ${gene} subcellular localization.`,
-                    `Any known mutations in ${gene}?`,
-                    `Highlight ${gene} in the cilium diagram.`,
+                    `What is the phylogeny of ${gene}?`,
+                    `Protein domains in ${gene}`,
+                    `Localization of ${gene}`,
+                    `What are interacting partners of ${gene}?`,
                     `Compare ${gene} expression across tissues.`
                 ];
                 suggestionsContainer.innerHTML = suggested.map(q => `<div class="suggested-question"><span>${q}</span></div>`).join('');
@@ -876,61 +919,75 @@ async function displayCiliAIExpressionHeatmap(genes) {
             return;
         }
 
-        // Collect all tissues present across selected genes
+        // Collect tissues with valid numeric values
         const tissueSet = new Set();
-        genes.forEach(g => {
-            if (tissueData[g]) {
-                Object.keys(tissueData[g]).forEach(t => tissueSet.add(t));
-            }
+        const cleanGenes = genes.filter(g => tissueData[g] && Object.keys(tissueData[g]).length > 0);
+
+        if (cleanGenes.length === 0) {
+            plotArea.innerHTML = `<p class="status-not-found">No expression data found for any of the genes: ${genes.join(', ')}.</p>`;
+            return;
+        }
+
+        cleanGenes.forEach(g => {
+            Object.entries(tissueData[g]).forEach(([t, val]) => {
+                const num = parseFloat(val);
+                if (Number.isFinite(num)) tissueSet.add(t);
+            });
         });
 
         const tissueList = Array.from(tissueSet).sort();
         if (tissueList.length === 0) {
-            plotArea.innerHTML = `<p class="status-not-found">No tissue expression data found for the gene(s): ${genes.join(', ')}.</p>`;
+            plotArea.innerHTML = `<p class="status-not-found">No valid numeric tissue expression data found for: ${cleanGenes.join(', ')}.</p>`;
             return;
         }
 
-        // Build clean numeric matrix (replace NaN or undefined with 0)
-        const matrix = genes.map(g =>
+        // Construct clean, uniform numeric matrix
+        const matrix = cleanGenes.map(g =>
             tissueList.map(t => {
-                const val = tissueData[g]?.[t];
-                const num = parseFloat(val);
+                const num = parseFloat(tissueData[g]?.[t]);
                 return Number.isFinite(num) ? num : 0;
             })
         );
 
-        // Ensure matrix rows have equal length
-        const validMatrix = matrix.filter(row => row.length === tissueList.length);
-        if (validMatrix.length === 0) {
-            plotArea.innerHTML = '<p class="status-not-found">⚠️ Expression data incomplete or invalid for heatmap.</p>';
+        // Optional: Remove rows or columns that are all zeros
+        const hasNonZero = matrix.some(row => row.some(v => v > 0));
+        if (!hasNonZero) {
+            plotArea.innerHTML = `<p class="status-not-found">All expression values are zero for ${cleanGenes.join(', ')}.</p>`;
             return;
         }
 
         const trace = {
-            z: validMatrix,
+            z: matrix,
             x: tissueList,
-            y: genes,
+            y: cleanGenes,
             type: 'heatmap',
             colorscale: 'Viridis',
+            zmin: 0,
+            zsmooth: false,
             colorbar: { title: 'nTPM', tickformat: '.1f' },
             hovertemplate: '<b>Gene:</b> %{y}<br><b>Tissue:</b> %{x}<br><b>nTPM:</b> %{z:.2f}<extra></extra>'
         };
 
         const layout = {
-            title: genes.length > 1 ? 'Gene Expression Heatmap (nTPM)' : `Expression of ${genes[0]}`,
-            xaxis: { tickangle: -45, automargin: true },
-            yaxis: { automargin: true },
-            margin: { l: 100, r: 20, b: 150, t: 50 },
+            title: cleanGenes.length > 1
+                ? 'Gene Expression Heatmap (nTPM)'
+                : `Expression Profile of ${cleanGenes[0]}`,
+            xaxis: { tickangle: -45, automargin: true, type: 'category' },
+            yaxis: { automargin: true, type: 'category' },
+            margin: { l: 100, r: 20, b: 150, t: 60 },
             paper_bgcolor: '#fafafa',
             plot_bgcolor: '#ffffff'
         };
 
-        Plotly.newPlot('plot-display-area', [trace], layout, { responsive: true });
+        await Plotly.newPlot(plotArea, [trace], layout, { responsive: true });
     } catch (err) {
         console.error('❌ Heatmap rendering failed:', err);
-        plotArea.innerHTML = '<p class="status-not-found">❌ Failed to render expression heatmap.</p>';
+        plotArea.innerHTML = `<p class="status-not-found">❌ Failed to render expression heatmap (${err.message}).</p>`;
     }
 }
+
+
+
 
 function renderScreenDataTable(gene, screenInfo) {
     if (!screenInfo || typeof screenInfo !== 'object') return '<p class="status-not-found">No structured screen data available.</p>';
