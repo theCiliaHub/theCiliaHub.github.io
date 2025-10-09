@@ -6,7 +6,7 @@ let ciliaHubDataCache = null;
 let screenDataCache = null;
 // --- Phylogeny Summary Integration ---
 let phylogenyDataCache = null;
-let tissueDataCache = null; // Already defined in the provided code
+let tissueDataCache = null; // Global cache for tissue expression data
 
 // --- Main Page Display Function ---
 
@@ -261,38 +261,51 @@ async function fetchPhylogenyData() {
 
 // =============== END: REPLACED FUNCTION ===============
 
-
-async function fetchTissueData() {
+sync function fetchTissueData() {
     if (tissueDataCache) return tissueDataCache;
+
+    const TSV_URL = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/rna_tissue_consensus.tsv';
+
     try {
-        const response = await fetch('https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/rna_tissue_consensus.tsv');
+        const response = await fetch(TSV_URL);
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+
         const tsv = await response.text();
         const lines = tsv.trim().split('\n');
         if (lines.length < 2) throw new Error('Empty TSV file');
-        
+
         const data = {};
         for (let i = 1; i < lines.length; i++) {
             const parts = lines[i].split('\t');
             if (parts.length < 4) continue;
             const [, geneSymbol, tissue, nTPMValue] = parts;
             if (!geneSymbol || !tissue || !nTPMValue) continue;
+
             const gene = geneSymbol.toUpperCase().trim();
+            const tissueName = tissue.trim();
             const nTPM = parseFloat(nTPMValue.trim());
+
             if (!isNaN(nTPM)) {
                 if (!data[gene]) data[gene] = {};
-                data[gene][tissue.trim()] = nTPM;
+                data[gene][tissueName] = nTPM;
             }
         }
+
         tissueDataCache = data;
-        console.log('Tissue expression data loaded for', Object.keys(data).length, 'genes');
+        console.log('✅ Tissue expression data loaded for', Object.keys(data).length, 'genes');
         return tissueDataCache;
+
     } catch (error) {
-        console.error('Failed to fetch tissue data:', error);
-        tissueDataCache = { 'IFT88': { 'Kidney Cortex': 8.45, 'Kidney Medulla': 12.67 } };
+        console.error('⚠️ Failed to fetch tissue data:', error);
+        // Provide a small fallback example for demo/testing
+        tissueDataCache = { 
+            'IFT88': { 'Kidney Cortex': 8.45, 'Kidney Medulla': 12.67 },
+            'BBS1': { 'Retina': 15.32, 'Liver': 3.98 }
+        };
         return tissueDataCache;
     }
 }
+
 
 async function getGenesByFunctionalCategory(query) {
     await fetchCiliaData();
