@@ -345,8 +345,8 @@ async function initializeApp() {
 
     if (dataLoaded) {
         // 2. Data is ready. Now, handle the initial page view.
-        // This will call displayHomePage() among other functions.
-        handleInitialRoute(); 
+        // Replacing undefined handleInitialRoute() with the correct router function
+        await handleRouteChange(); 
 
         // 3. Explicitly call the function to update the stats
         // with the now-loaded `allGenes` data.
@@ -358,7 +358,6 @@ async function initializeApp() {
 
 // Start the entire application
 initializeApp();
-
 
 
 function performBatchSearch() {
@@ -1365,10 +1364,20 @@ function displayGeneCards(defaults, searchResults, page = 1, perPage = 10) {
     // --- Robustly parse gene name from the URL hash (handles #/GENE, #!/GENE, etc.)
     const hash = (window.location.hash || '');
     const hashMatch = hash.match(/#(?:\/|!\/)?([^\/\?\&]+)/);
-    const geneFromURL = hashMatch ? decodeURIComponent(hashMatch[1]) : null;
+    let geneFromURL = hashMatch ? decodeURIComponent(hashMatch[1]) : null;
 
-    // If a gene is present in the URL, try to find it in allGenes (case-insensitive),
-    // matching against common fields (gene, symbol, name, synonyms).
+    // Reserved paths (pages) that should never be treated as genes
+    const RESERVED_PATHS = [
+        'home', 'batch-query', 'ciliaplot', 'analysis',
+        'ciliai', 'expression', 'download', 'contact', 'notfound'
+    ];
+
+    // Skip if the hash corresponds to a reserved page
+    if (geneFromURL && RESERVED_PATHS.includes(geneFromURL.toLowerCase())) {
+        geneFromURL = null;
+    }
+
+    // If a gene is present in the URL, try to find it in allGenes (case-insensitive)
     if (geneFromURL) {
         const geneUpper = geneFromURL.toUpperCase();
         const foundGene = allGenes.find(g => {
@@ -1376,7 +1385,6 @@ function displayGeneCards(defaults, searchResults, page = 1, perPage = 10) {
             if (g.gene && g.gene.toUpperCase() === geneUpper) return true;
             if (g.symbol && g.symbol.toUpperCase() === geneUpper) return true;
             if (g.name && g.name.toUpperCase() === geneUpper) return true;
-            // synonyms may be string or array
             if (g.synonym) {
                 if (Array.isArray(g.synonym) && g.synonym.some(s => String(s).toUpperCase() === geneUpper)) return true;
                 if (typeof g.synonym === 'string' && g.synonym.toUpperCase() === geneUpper) return true;
@@ -1385,13 +1393,10 @@ function displayGeneCards(defaults, searchResults, page = 1, perPage = 10) {
         });
 
         if (foundGene) {
-            // ensure the gene is present in the display list (put it at front)
             if (!allGenesToDisplay.some(g => g.gene === foundGene.gene)) {
                 allGenesToDisplay.unshift(foundGene);
             }
         } else {
-            // helpful debugging message if a gene is in the URL but not found in allGenes
-            // eslint-disable-next-line no-console
             console.warn(`displayGeneCards: gene "${geneFromURL}" is in URL but not found in allGenes.`);
         }
     }
@@ -1416,7 +1421,6 @@ function displayGeneCards(defaults, searchResults, page = 1, perPage = 10) {
                 try {
                     gene = JSON.parse(entry.target.dataset.gene);
                 } catch (err) {
-                    // eslint-disable-next-line no-console
                     console.error('displayGeneCards: invalid data-gene JSON', err);
                     observer.unobserve(entry.target);
                     return;
