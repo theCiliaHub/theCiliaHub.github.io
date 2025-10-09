@@ -398,17 +398,17 @@ function normalizeTerm(s) {
 // =============================================================================
 window.handleAIQuery = async function() {
     const aiQueryInput = document.getElementById('aiQueryInput');
-    const resultsContainer = document.getElementById('resultsContainer');
-    const resultsSection = document.getElementById('resultsSection');
+    const resultArea = document.getElementById('ai-result-area'); // CORRECTED: Target for "Ask" results
     const query = aiQueryInput.value.trim();
 
     if (!query) return;
 
-    // Show results section and clear previous outputs
-    resultsSection.style.display = 'block';
-    resultsContainer.innerHTML = `<p class="status-searching">CiliAI is thinking...</p>`;
-    document.getElementById('plot-display-area').innerHTML = '';
-    document.getElementById('visualizeBtn').style.display = 'none';
+    // Show the dedicated result area for "Ask"
+    resultArea.style.display = 'block';
+    resultArea.innerHTML = `<p class="status-searching">CiliAI is thinking...</p>`;
+
+    // Hide the other main results section
+    document.getElementById('resultsSection').style.display = 'none';
 
     // Fetch data caches
     const data = await fetchCiliaData();
@@ -416,33 +416,39 @@ window.handleAIQuery = async function() {
     const tissueData = await fetchTissueData();
 
     if (!data) {
-        resultsContainer.innerHTML = `<p class="status-not-found">Error: Core gene data could not be loaded.</p>`;
+        resultArea.innerHTML = `<p class="status-not-found">Error: Core gene data could not be loaded.</p>`;
         return;
     }
 
     let resultHtml = '';
     const qLower = query.toLowerCase();
     let match;
-try {
-        // --- Single-gene specific questions ---
+
+    try {
+        // --- ADDED: More specific queries go first ---
         
-        // NEW: Multi-gene expression comparison
+        // Multi-gene expression comparison
         if ((match = qLower.match(/(?:compare expression of|compare|expression of)\s+([A-Z0-9\-]+)\s+(?:and|vs)\s+([A-Z0-9\-]+)/i))) {
             const genesToCompare = [match[1].toUpperCase(), match[2].toUpperCase()];
-            resultsContainer.innerHTML = ''; // Clear text results container
-            plotArea.innerHTML = `<p class="status-searching">Building comparative expression heatmap for ${genesToCompare.join(' and ')}...</p>`;
-            // Note: This reuses your existing heatmap function for the main analysis page
-            await displayCiliAIExpressionHeatmap(genesToCompare); 
-            return; // Exit as the visualization is the primary output
+            await displayCiliAIExpressionHeatmap(genesToCompare, resultArea); 
+            return; 
         }
-        // NEW: Interaction Network query
+        // Interaction Network query
         else if ((match = qLower.match(/(?:interaction network|interactions for|interacting partners of)\s+([A-Z0-9\-]+)/i))) {
             const geneSymbol = match[1].toUpperCase();
-            resultsContainer.innerHTML = ''; // Clear text results
-            plotArea.style.height = '450px'; // Ensure container has height
-            await displayInteractionNetwork(geneSymbol, 'plot-display-area');
-            return; // Exit as the visualization is the primary output
+            resultArea.style.height = '450px';
+            await displayInteractionNetwork(geneSymbol, 'ai-result-area');
+            return;
         }
+        // MODIFIED: Single-gene expression now ONLY shows heatmap
+        else if ((match = qLower.match(/(?:gene expression|expression|where is|display|show).*(?:of|for)?\s+([A-Z0-9\-]+)/i))) {
+            const gene = match[1].toUpperCase();
+            await displayCiliAIExpressionHeatmap([gene], resultArea);
+            return; // Exit after displaying the heatmap
+        }
+        
+        // --- Your original question logic (UNCHANGED) ---
+
         // Function
         else if ((match = qLower.match(/(?:function of|what is the function of|describe function of)\s+([A-Z0-9\-]+)/i))) {
             const geneSymbol = match[1].toUpperCase();
@@ -484,27 +490,6 @@ try {
                     </div>`;
             }
         }
-        // Gene expression
-        else if ((match = qLower.match(/(?:gene expression|expression|where is|display|show).*(?:of|for)?\s+([A-Z0-9\-]+)/i))) {
-            const gene = match[1].toUpperCase();
-            const geneExprData = tissueData[gene];
-            if (!geneExprData) {
-                resultHtml = `<div class="result-card"><h3>Expression Data for ${gene}</h3>
-                    <p class="status-not-found">No expression data found.</p></div>`;
-            } else {
-                const expressionHtml = `
-                    <table class="expression-table">
-                        <thead><tr><th>Tissue</th><th>nTPM</th></tr></thead>
-                        <tbody>
-                            ${Object.entries(geneExprData)
-                                .sort(([t1], [t2]) => t1.localeCompare(t2))
-                                .map(([t, val]) => `<tr><td>${t}</td><td>${val.toFixed(2)}</td></tr>`).join('')}
-                        </tbody>
-                    </table>
-                    <p class="ai-suggestion">📊 Would you like to <a href="#" class="ai-action" data-action="expression-visualize" data-gene="${gene}">visualize this as a heatmap</a>?</p>`;
-                resultHtml = `<div class="result-card"><h3>Expression Data for ${gene}</h3>${expressionHtml}</div>`;
-            }
-        }
         // --- Broad queries ---
         else if (qLower.includes('ciliary genes') && qLower.includes('human')) {
             const results = data.map(g => g.gene).sort();
@@ -527,49 +512,13 @@ try {
         }
         // --- Fallback ---
         else {
-            resultHtml = `<p>Sorry, I didn’t understand that. Try asking one of the suggested questions below:</p>
-                <ul class="example-queries">
-                    <li><span>"What is the function of IFT88?"</span></li>
-                    <li><span>"Show me genes for the axoneme."</span></li>
-                    <li><span>"List genes for Bardet-Biedl Syndrome."</span></li>
-                    <li><span>"Where is ARL13B expressed?"</span></li>
-                    <li><span>"Display ARL13B expression."</span></li>
-                    <li><span>"Phylogeny of BBS1."</span></li>
-                    <li><span>"Protein domains in CEP290."</span></li>
-                    <li><span>"Diseases linked to WDR31."</span></li>
-                </ul>`;
+            resultHtml = `<p>Sorry, I didn’t understand that. Try one of the examples.</p>`;
         }
 
-        resultsContainer.innerHTML = resultHtml;
-
-        // --- Dynamic suggested questions panel ---
-        if (match && match[1]) {
-            const gene = match[1].toUpperCase();
-            const suggestionsContainer = document.getElementById('suggestedQuestions');
-            if (suggestionsContainer) {
-                const suggested = [
-                    `What is the function of ${gene}?`,
-                    `Where is ${gene} expressed?`,
-                    `Show me protein domains in ${gene}.`,
-                    `Which diseases are linked to ${gene}?`,
-                    `What is the phylogeny of ${gene}?`,
-                    `Display ${gene} expression as a heatmap.`,
-                    `Is ${gene} part of the ciliome?`,
-                    `Genes interacting with ${gene}?`,
-                    `Which ciliary structures involve ${gene}?`,
-                    `Is ${gene} conserved across species?`,
-                    `List pathways involving ${gene}.`,
-                    `Show ${gene} subcellular localization.`,
-                    `Any known mutations in ${gene}?`,
-                    `Highlight ${gene} in the cilium diagram.`,
-                    `Compare ${gene} expression across tissues.`
-                ];
-                suggestionsContainer.innerHTML = suggested.map(q => `<div class="suggested-question"><span>${q}</span></div>`).join('');
-            }
-        }
+        resultArea.innerHTML = resultHtml;
 
     } catch (e) {
-        resultsContainer.innerHTML = `<p class="status-not-found">An error occurred. Check console for details.</p>`;
+        resultArea.innerHTML = `<p class="status-not-found">An error occurred. Check console for details.</p>`;
         console.error(e);
     }
 };
