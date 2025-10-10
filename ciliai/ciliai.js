@@ -398,76 +398,81 @@ function normalizeTerm(s) {
 // =============================================================================
 window.handleAIQuery = async function() {
     const aiQueryInput = document.getElementById('aiQueryInput');
-    const resultArea = document.getElementById('ai-result-area'); // CORRECTED: Target for "Ask" results
+    const resultArea = document.getElementById('ai-result-area');
     const query = aiQueryInput.value.trim();
-
     if (!query) return;
 
-    // Show the dedicated result area for "Ask"
+    // --- Show active search status ---
     resultArea.style.display = 'block';
-    resultArea.innerHTML = `<p class="status-searching">CiliAI is thinking...</p>`;
+    resultArea.innerHTML = `<p class="status-searching">🧠 CiliAI is thinking...</p>`;
 
-    // Hide the other main results section
-    document.getElementById('resultsSection').style.display = 'none';
+    // Hide the standard results section
+    const resultsSection = document.getElementById('resultsSection');
+    if (resultsSection) resultsSection.style.display = 'none';
 
-    // Fetch data caches
-    const data = await fetchCiliaData();
-    const phylogeny = await fetchPhylogenyData();
-    const tissueData = await fetchTissueData();
+    // --- Load necessary data sources ---
+    let data, phylogeny, tissueData;
+    try {
+        [data, phylogeny, tissueData] = await Promise.all([
+            fetchCiliaData(),
+            fetchPhylogenyData(),
+            fetchTissueData()
+        ]);
+    } catch (err) {
+        resultArea.innerHTML = `<p class="status-not-found">⚠️ Failed to load data sources.</p>`;
+        console.error("Data fetch error:", err);
+        return;
+    }
 
     if (!data) {
         resultArea.innerHTML = `<p class="status-not-found">Error: Core gene data could not be loaded.</p>`;
         return;
     }
-// --- If query was not recognized or missing data ---
-if (!resultHtml && intent && detectedGenes.length > 0) {
-    const alt = suggestSimilarQuery(intent, detectedGenes);
-    if (alt && alt.length > 0) {
-        resultHtml = `<div class="result-card"><p>🤔 Did you mean:</p><ul>${alt.map(a => `<li class="suggestion-item">${a}</li>`).join('')}</ul></div>`;
-    }
-}
-    let resultHtml = '';
+
+    // --- Start parsing user intent ---
     const { normalized: qLower, genes: detectedGenes, intent } = normalizeAndDetectIntent(query, data);
+    let resultHtml = '';
     let match;
 
     try {
-        // --- ADDED: More specific queries go first ---
-        
-        // Multi-gene expression comparison
+        // --- Specific query types first ---
+
+        // Compare expression
         if ((match = qLower.match(/(?:compare expression of|compare|expression of)\s+([A-Z0-9\-]+)\s+(?:and|vs)\s+([A-Z0-9\-]+)/i))) {
             const genesToCompare = [match[1].toUpperCase(), match[2].toUpperCase()];
-            await displayCiliAIExpressionHeatmap(genesToCompare, resultArea); 
-            return; 
+            await displayCiliAIExpressionHeatmap(genesToCompare, resultArea);
+            resultArea.querySelector('.status-searching')?.remove();
+            return;
         }
-        // Interaction Network query
+
+        // Interaction Network
         else if ((match = qLower.match(/(?:interaction network|interactions for|interacting partners of)\s+([A-Z0-9\-]+)/i))) {
             const geneSymbol = match[1].toUpperCase();
             resultArea.style.height = '450px';
             await displayInteractionNetwork(geneSymbol, 'ai-result-area');
+            resultArea.querySelector('.status-searching')?.remove();
             return;
         }
-        // MODIFIED: Single-gene expression now ONLY shows heatmap
+
+        // Single Gene Expression
         else if ((match = qLower.match(/(?:gene expression|expression|where is|display|show).*(?:of|for)?\s+([A-Z0-9\-]+)/i))) {
             const gene = match[1].toUpperCase();
             await displayCiliAIExpressionHeatmap([gene], resultArea);
-            return; // Exit after displaying the heatmap
+            resultArea.querySelector('.status-searching')?.remove();
+            return;
         }
-        
-        // --- Your original question logic (UNCHANGED) ---
+
+        // --- Core intent-based responses ---
 
         // Function
-        else if ((match = qLower.match(/(?:function of|what is the function of|describe function of)\s+([A-Z0-9\-]+)/i))) {
+        else if ((match = qLower.match(/(?:function of|what is the function of|describe function of|what does)\s+([A-Z0-9\-]+)/i))) {
             const geneSymbol = match[1].toUpperCase();
             const geneData = data.find(g => g.gene.toUpperCase() === geneSymbol);
-            resultHtml = formatGeneDetail(
-                geneData,
-                geneSymbol,
-                'Function',
-                geneData?.functional_summary || geneData?.description
-            );
+            resultHtml = formatGeneDetail(geneData, geneSymbol, 'Function', geneData?.functional_summary || geneData?.description);
         }
+
         // Domains
-        else if ((match = qLower.match(/(?:protein domains|domains in|what domains.*in)\s+([A-Z0-9\-]+)/i))) {
+        else if ((match = qLower.match(/(?:protein domains|domains in|what domains.*in|motifs in)\s+([A-Z0-9\-]+)/i))) {
             const geneSymbol = match[1].toUpperCase();
             const geneData = data.find(g => g.gene.toUpperCase() === geneSymbol);
             const domains = Array.isArray(geneData?.domain_descriptions) && geneData.domain_descriptions.length
@@ -475,14 +480,16 @@ if (!resultHtml && intent && detectedGenes.length > 0) {
                 : 'No domains listed.';
             resultHtml = formatGeneDetail(geneData, geneSymbol, 'Domains', domains);
         }
+
         // Diseases
-        else if ((match = qLower.match(/(?:disease linked to|diseases for|associated with)\s+([A-Z0-9\-]+)/i))) {
+        else if ((match = qLower.match(/(?:disease linked to|diseases for|associated with|illnesses linked to)\s+([A-Z0-9\-]+)/i))) {
             const geneSymbol = match[1].toUpperCase();
             const geneData = data.find(g => g.gene.toUpperCase() === geneSymbol);
             resultHtml = formatGeneDetail(geneData, geneSymbol, 'Associated Diseases', geneData?.functional_summary);
         }
+
         // Phylogeny
-        else if ((match = qLower.match(/(?:phylogeny|phylogenetic distribution)\s+(?:of\s+)?([A-Z0-9\-]+)/i))) {
+        else if ((match = qLower.match(/(?:phylogeny|phylogenetic distribution|evolution|orthologs of)\s+(?:of\s+)?([A-Z0-9\-]+)/i))) {
             const geneQuery = match[1].toUpperCase();
             const geneData = phylogeny[geneQuery];
             if (!geneData || !geneData.category) {
@@ -496,7 +503,8 @@ if (!resultHtml && intent && detectedGenes.length > 0) {
                     </div>`;
             }
         }
-        // --- Broad queries ---
+
+        // Broad queries (ciliary lists etc.)
         else if (qLower.includes('ciliary genes') && qLower.includes('human')) {
             const results = data.map(g => g.gene).sort();
             resultHtml = formatListResult('Human Ciliary Genes', results, `Found ${results.length} genes.`);
@@ -513,21 +521,27 @@ if (!resultHtml && intent && detectedGenes.length > 0) {
         else if ((match = qLower.match(/(?:genes for|genes involved in|show me genes for)\s+(.*)/i))) {
             const disease = match[1].trim();
             const diseaseRegex = new RegExp(disease.replace(/ /g, '[\\s-]*'), 'i');
-            const results = data.filter(g => g.functional_summary && diseaseRegex.test(g.functional_summary)).map(g => g.gene).sort();
+            const results = data
+                .filter(g => g.functional_summary && diseaseRegex.test(g.functional_summary))
+                .map(g => g.gene)
+                .sort();
             resultHtml = formatListResult(`Genes for: ${disease}`, results);
         }
-        // --- Fallback ---
+
+        // --- Unknown or unrecognized query ---
         else {
-            resultHtml = `<p>Sorry, I didn’t understand that. Try one of the examples.</p>`;
+            resultHtml = `<div class="result-card"><p>🤔 Sorry, I didn’t understand that. Try one of the example questions or use keywords like <b>function</b>, <b>expression</b>, <b>diseases</b>, or <b>phylogeny</b>.</p></div>`;
         }
 
-        resultArea.innerHTML = resultHtml;
+        // --- Replace thinking message with results ---
+        resultArea.innerHTML = resultHtml || `<p class="status-not-found">No relevant information found.</p>`;
 
-    } catch (e) {
-        resultArea.innerHTML = `<p class="status-not-found">An error occurred. Check console for details.</p>`;
-        console.error(e);
+    } catch (err) {
+        resultArea.innerHTML = `<p class="status-not-found">⚠️ An error occurred. Check console for details.</p>`;
+        console.error(err);
     }
 };
+
 
 // ===============================================================
 // 🌐 Natural Query Normalizer + Intent Parser
@@ -688,54 +702,166 @@ function formatComplexResults(gene, title) {
     return html + '</div>';
 }
 
-// --- Autocomplete Logic ---
+
+const normalizeQuery = (query) => {
+  const q = query.toLowerCase().trim();
+
+  const mappings = [
+    { pattern: /(what does|tell me what|describe).+?(\b[A-Z0-9\-]+\b)/i, intent: "gene_function" },
+    { pattern: /(where|which tissues).+express(ed)?/i, intent: "gene_expression" },
+    { pattern: /(disease|illness|syndrome|linked|associated).+?(\b[A-Z0-9\-]+\b)/i, intent: "ciliopathy_links" },
+    { pattern: /(domain|motif|repeat|region).+?(\b[A-Z0-9\-]+\b)/i, intent: "protein_domains" },
+    { pattern: /(phylogeny|evolution|ortholog)/i, intent: "phylogeny" },
+    { pattern: /(show|list).+(ciliary|cilia-related|cilia genes)/i, intent: "ciliary_gene_list" },
+    { pattern: /(localization|where is|compartment|complex|interact)/i, intent: "localization_complex" },
+  ];
+
+  for (const map of mappings) {
+    if (map.pattern.test(q)) return map.intent;
+  }
+
+  return "unknown";
+};
+
+// --- Autocomplete Logic (Enhanced for Natural Queries + CiliaHub Integration) ---
 function setupAiQueryAutocomplete() {
     const aiQueryInput = document.getElementById('aiQueryInput');
     const suggestionsContainer = document.getElementById('aiQuerySuggestions');
     if (!aiQueryInput || !suggestionsContainer) return;
 
+    // --- Expanded Example Groups (linked to actual CiliaHub datasets) ---
     const groupedExamples = {
-        function: ["function of IFT88", "what does ARL13B do", "role of CEP290"],
-        expression: ["where is BBS1 expressed", "expression of TMEM67", "tissue pattern of IFT81"],
-        domains: ["protein domains in CEP290", "what domains are in OSM-3"],
-        diseases: ["diseases linked to ARL6", "conditions related to BBS10", "syndromes caused by OFD1"],
-        phylogeny: ["phylogeny of ARL13B", "evolution of RPGRIP1L", "orthologs of TMEM231"],
-        ciliome: ["show human ciliary genes", "list ciliome genes", "cilia-related genes in human"],
-        interaction: ["interaction network of BBS4", "interactors of ARL13B", "binding partners of IFT172"]
+        function: [
+            "what does ARL13B do",
+            "function of IFT88",
+            "role of CEP290",
+            "describe KIF3A function",
+            "how does ARL6 work"
+        ],
+        expression: [
+            "where is BBS1 expressed",
+            "expression of TMEM67",
+            "which tissues express ARL13B",
+            "tissue pattern of IFT81"
+        ],
+        domains: [
+            "protein domains in CEP290",
+            "what domains are in OSM-3",
+            "motifs in ARL13B",
+            "show repeats in IFT140"
+        ],
+        diseases: [
+            "diseases linked to ARL6",
+            "conditions related to BBS10",
+            "syndromes caused by OFD1",
+            "is TMEM231 linked to a ciliopathy"
+        ],
+        phylogeny: [
+            "phylogeny of ARL13B",
+            "evolution of RPGRIP1L",
+            "orthologs of TMEM231",
+            "species conservation of OSM-3"
+        ],
+        ciliome: [
+            "show human ciliary genes",
+            "list ciliome genes",
+            "cilia-related genes in human",
+            "which genes form the ciliome"
+        ],
+        interaction: [
+            "interaction network of BBS4",
+            "interactors of ARL13B",
+            "binding partners of IFT172",
+            "which proteins interact with CEP164"
+        ],
+        localization: [
+            "where is IFT88 localized",
+            "subcellular localization of ARL13B",
+            "cilia compartment of BBS4",
+            "in which complex is IFT172 found"
+        ]
     };
 
     const allExamples = Object.values(groupedExamples).flat();
 
+    // --- Autocomplete Input Logic ---
     aiQueryInput.addEventListener('input', () => {
-        const text = aiQueryInput.value.toLowerCase();
+        const text = aiQueryInput.value.toLowerCase().trim();
         if (text.length < 2) {
             suggestionsContainer.style.display = 'none';
             return;
         }
+
+        // Fuzzy match logic: match any substring or partial phrase
         const filtered = allExamples.filter(q => q.toLowerCase().includes(text)).slice(0, 6);
+
         if (filtered.length > 0) {
-            suggestionsContainer.innerHTML = filtered.map(q => `<div class="suggestion-item">${q}</div>`).join('');
+            suggestionsContainer.innerHTML = filtered
+                .map(q => `<div class="suggestion-item">${q}</div>`)
+                .join('');
             suggestionsContainer.style.display = 'block';
         } else {
-            suggestionsContainer.style.display = 'none';
+            // If no matches, suggest closest example or hint
+            const didYouMean = findClosestExample(text, allExamples);
+            if (didYouMean) {
+                suggestionsContainer.innerHTML = `<div class="suggestion-item">Did you mean "<b>${didYouMean}</b>"?</div>`;
+                suggestionsContainer.style.display = 'block';
+            } else {
+                suggestionsContainer.style.display = 'none';
+            }
         }
     });
 
+    // --- Click Behavior ---
     suggestionsContainer.addEventListener('click', (e) => {
         if (e.target.classList.contains('suggestion-item')) {
-            aiQueryInput.value = e.target.textContent;
+            const selected = e.target.textContent.replace(/Did you mean "|"\?/g, '');
+            aiQueryInput.value = selected;
             suggestionsContainer.style.display = 'none';
             aiQueryInput.focus();
-            handleAIQuery();
+            handleAIQuery(); // trigger main handler
         }
     });
 
+    // --- Hide on Outside Click ---
     document.addEventListener('click', (e) => {
-        if (!aiQueryInput.contains(e.target)) {
+        if (!aiQueryInput.contains(e.target) && !suggestionsContainer.contains(e.target)) {
             suggestionsContainer.style.display = 'none';
         }
     });
+
+    // --- Simple "Did You Mean" Helper ---
+    function findClosestExample(query, examples) {
+        const distance = (a, b) => {
+            const dp = Array.from({ length: a.length + 1 }, () => Array(b.length + 1).fill(0));
+            for (let i = 0; i <= a.length; i++) dp[i][0] = i;
+            for (let j = 0; j <= b.length; j++) dp[0][j] = j;
+            for (let i = 1; i <= a.length; i++) {
+                for (let j = 1; j <= b.length; j++) {
+                    const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+                    dp[i][j] = Math.min(
+                        dp[i - 1][j] + 1,
+                        dp[i][j - 1] + 1,
+                        dp[i - 1][j - 1] + cost
+                    );
+                }
+            }
+            return dp[a.length][b.length];
+        };
+
+        let best = null;
+        let minDist = Infinity;
+        for (const ex of examples) {
+            const d = distance(query, ex.toLowerCase());
+            if (d < minDist) {
+                minDist = d;
+                best = ex;
+            }
+        }
+        return minDist <= 6 ? best : null; // only suggest if reasonably close
+    }
 }
+
 
 
 // --- Gene Analysis Engine & UI (largely unchanged) ---
