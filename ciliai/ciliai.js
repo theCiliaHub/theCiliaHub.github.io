@@ -320,18 +320,50 @@ async function getGenesByFunctionalCategory(query) {
     await fetchCiliaData();
     if (!ciliaHubDataCache) return [];
     if (!query) return [];
-    const terms = query.toLowerCase().split(/\s+/).filter(Boolean);
-    if (terms.length === 0) return [];
-
+    
+    // Normalize the query
+    const normalizedQuery = query.toLowerCase().trim();
+    
+    // Create search terms - handle various formats
+    let searchTerms = [];
+    
+    // Map common queries to database terms
+    const termMappings = {
+        'basal body': ['basal body', 'centriole', 'centrosome'],
+        'transition zone': ['transition zone', 'tz'],
+        'axoneme': ['axoneme', 'motile'],
+        'motile cilium': ['motile', 'axoneme'],
+        'ciliogenesis': ['ciliogenesis', 'assembly', 'biogenesis'],
+        'trafficking': ['trafficking', 'transport', 'bbsome'],
+        'motor': ['motor', 'dynein', 'kinesin'],
+        'signaling': ['signaling', 'hedgehog', 'shh']
+    };
+    
+    // Find matching terms
+    for (const [key, terms] of Object.entries(termMappings)) {
+        if (normalizedQuery.includes(key)) {
+            searchTerms.push(...terms);
+            break; // Use first match
+        }
+    }
+    
+    // If no mapping found, use original query
+    if (searchTerms.length === 0) {
+        searchTerms = normalizedQuery.split(/\s+/).filter(Boolean);
+    }
+    
+    // Search through functional_category and localization fields
     return ciliaHubDataCache
         .filter(item => {
             const combinedText = [
-                item.functional_category,
-                item.functional_summary,
-                item.localization,
-                item.description
+                item.functional_category || '',
+                item.localization || '',
+                item.functional_summary || '',
+                item.description || ''
             ].join(' ').toLowerCase();
-            return terms.every(term => combinedText.includes(term));
+            
+            // Match if ANY search term is found
+            return searchTerms.some(term => combinedText.includes(term));
         })
         .map(item => item.gene)
         .filter((value, index, self) => self.indexOf(value) === index) // Unique genes
@@ -388,6 +420,9 @@ async function displayInteractionNetwork(geneSymbol, containerId) {
 }
 
 
+// =============================================================================
+// 🧠 CiliAI: Advanced Intent & Entity Recognition Engine
+// =============================================================================
 // =============================================================================
 // 🧠 CiliAI: Advanced Intent & Entity Recognition Engine
 // =============================================================================
@@ -450,11 +485,19 @@ function parseComplexQuery(rawQuery, allGenes = []) {
         return { intent: 'GET_FUNCTION', entities };
     }
 
-    // Functional categories
-    const categoryMatch = normalizedQuery.match(/(?:genes for|genes in|related to)\s+(motile cilium|axoneme|basal body|transition zone|ciliogenesis)/);
-    if (categoryMatch) {
-        entities.category = categoryMatch[1];
-        return { intent: 'LIST_GENES_BY_CATEGORY', entities };
+    // Functional categories - expanded matching
+    const categoryPatterns = [
+        /(?:genes for|genes in|related to|show me|list)\s+(motile cilium|axoneme|basal body|transition zone|ciliogenesis|trafficking|motors?|signaling)/i,
+        /\b(basal body|transition zone|axoneme|motile cilium|ciliogenesis|trafficking|motor)\s+genes\b/i,
+        /\bgenes\s+(?:involved in|for|related to)\s+(basal body|transition zone|axoneme|motile cilium|ciliogenesis|trafficking|motor)/i
+    ];
+    
+    for (const pattern of categoryPatterns) {
+        const match = normalizedQuery.match(pattern);
+        if (match) {
+            entities.category = match[1];
+            return { intent: 'LIST_GENES_BY_CATEGORY', entities };
+        }
     }
 
     // Ciliome catch-all
@@ -470,6 +513,9 @@ function parseComplexQuery(rawQuery, allGenes = []) {
     return { intent: 'UNKNOWN', entities };
 }
 
+// =============================================================================
+// 🧠 CiliAI: Main AI Query Handler
+// =============================================================================
 // =============================================================================
 // 🧠 CiliAI: Main AI Query Handler
 // =============================================================================
@@ -527,10 +573,30 @@ window.handleAIQuery = async function() {
             case 'GET_DOMAINS': {
                 const geneSymbol = entities.genes[0];
                 const geneData = data.find(g => g.gene === geneSymbol);
-                const domains = Array.isArray(geneData?.domain_descriptions) && geneData.domain_descriptions.length
-                    ? geneData.domain_descriptions.join(', ')
-                    : 'No domains or repeats listed.';
-                resultHtml = formatGeneDetail(geneData, geneSymbol, 'Domains / Repeats', domains);
+                
+                if (!geneData) {
+                    resultHtml = `<div class="result-card"><h3>${geneSymbol}</h3><p class="status-not-found">Gene not found in the database.</p></div>`;
+                    break;
+                }
+                
+                // Extract domains - handle both array and string formats
+                let domains;
+                if (Array.isArray(geneData.domain_descriptions) && geneData.domain_descriptions.length > 0) {
+                    domains = geneData.domain_descriptions.join(', ');
+                } else if (typeof geneData.domain_descriptions === 'string' && geneData.domain_descriptions.trim()) {
+                    domains = geneData.domain_descriptions;
+                } else {
+                    domains = 'No domains or repeats listed in the database.';
+                }
+                
+                resultHtml = `
+                    <div class="result-card">
+                        <h3>${geneSymbol}</h3>
+                        <h4>Protein Domains / Repeats:</h4>
+                        <p>${domains}</p>
+                        ${geneData.pfam_ids ? `<p><small><strong>Pfam IDs:</strong> ${geneData.pfam_ids}</small></p>` : ''}
+                    </div>
+                `;
                 break;
             }
 
@@ -575,7 +641,21 @@ window.handleAIQuery = async function() {
             }
 
             default:
-                resultHtml = `<div class="result-card"><p>🤔 Sorry, I didn’t understand that. Try asking about a gene's <b>function</b>, <b>expression</b>, <b>domains</b>, or <b>associated diseases</b>.</p></div>`;
+                resultHtml = `
+                    <div class="result-card">
+                        <p>🤔 Sorry, I didn't understand that query.</p>
+                        <p><strong>Try asking about:</strong></p>
+                        <ul>
+                            <li><b>Function:</b> "What is the function of CEP290?"</li>
+                            <li><b>Expression:</b> "Where is ARL13B expressed?"</li>
+                            <li><b>Domains:</b> "What domains are in CEP290?"</li>
+                            <li><b>Diseases:</b> "Genes for Joubert Syndrome"</li>
+                            <li><b>Categories:</b> "Show me basal body genes"</li>
+                            <li><b>Phylogeny:</b> "Show phylogeny of IFT88"</li>
+                            <li><b>Interactions:</b> "Interaction network of BBS4"</li>
+                        </ul>
+                    </div>
+                `;
                 break;
         }
 
