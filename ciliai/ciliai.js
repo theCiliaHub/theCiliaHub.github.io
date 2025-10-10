@@ -454,128 +454,147 @@ function parseComplexQuery(rawQuery, allGenes = []) {
 // =============================================================================
 // 🌐 CiliAI: Main Query Handler (FINAL & WORKING)
 // =============================================================================
+// =============================================================================
+// 🧠 CiliAI: Main AI Query Handler (FINAL with Repeat & Domains Fix)
+// =============================================================================
 window.handleAIQuery = async function() {
     const aiQueryInput = document.getElementById('aiQueryInput');
     const resultArea = document.getElementById('ai-result-area');
     const query = aiQueryInput.value.trim();
     if (!query) return;
 
+    // --- Show active search status ---
     resultArea.style.display = 'block';
     resultArea.innerHTML = `<p class="status-searching">🧠 CiliAI is thinking...</p>`;
-    document.getElementById('resultsSection').style.display = 'none';
 
-    const [data, phylogeny] = await Promise.all([
-        fetchCiliaData(),
-        fetchPhylogenyData()
-    ]).catch(err => {
+    // Hide the standard results section
+    const resultsSection = document.getElementById('resultsSection');
+    if (resultsSection) resultsSection.style.display = 'none';
+
+    // --- Load necessary data sources ---
+    let data, phylogeny;
+    try {
+        [data, phylogeny] = await Promise.all([
+            fetchCiliaData(),
+            fetchPhylogenyData()
+        ]);
+    } catch (err) {
         resultArea.innerHTML = `<p class="status-not-found">⚠️ Failed to load data sources.</p>`;
         console.error("Data fetch error:", err);
-        return [null, null];
-    });
-
+        return;
+    }
     if (!data) return;
 
     const allGeneSymbols = data.map(g => g.gene);
-     // --- Early Correction for "repeats" queries (prevents misrouting to expression intent) ---
-    if (/repeat/i.test(query)) {
-        const geneMatch = query.match(/(?:in|of|for)\s+([A-Z0-9\-]+)/i);
-        if (geneMatch) {
-            const geneSymbol = geneMatch[1].toUpperCase();
-            const correctionMsg = `Did you mean: show domains in ${geneSymbol}?`;
-            resultArea.innerHTML = `<p class="ai-suggestion">💡 ${correctionMsg}</p>`;
-            const geneData = data.find(g => g.gene.toUpperCase() === geneSymbol);
-            if (geneData) {
-                const domains = Array.isArray(geneData.domain_descriptions) && geneData.domain_descriptions.length
-                    ? geneData.domain_descriptions.join(', ')
-                    : 'No domains or repeats listed.';
-                const resultHtml = formatGeneDetail(geneData, geneSymbol, 'Domains / Repeats', domains);
-                resultArea.innerHTML += resultHtml;
-            }
-            return; // ✅ stop before expression or function handlers run
-        }
+
+    // --- Parse query and detect intent ---
+    let parsed = parseComplexQuery(query, allGeneSymbols);
+    let { intent, entities } = parsed;
+
+    // --- Special fix: if user asks about repeats, treat as domains ---
+    if (intent === "GET_EXPRESSION" && query.toLowerCase().includes("repeat")) {
+        intent = "GET_DOMAINS";
     }
-    const { intent, entities } = parseComplexQuery(query, allGeneSymbols);
+
     let resultHtml = '';
 
     try {
         switch (intent) {
+
+            // --- Compare expression of two genes ---
             case 'COMPARE_EXPRESSION':
                 await displayCiliAIExpressionHeatmap(entities.genes, resultArea);
                 return;
 
+            // --- Interaction network ---
             case 'GET_INTERACTIONS':
                 resultArea.style.height = '450px';
                 await displayInteractionNetwork(entities.genes[0], 'ai-result-area');
                 return;
 
+            // --- Single gene expression ---
             case 'GET_EXPRESSION':
                 await displayCiliAIExpressionHeatmap(entities.genes, resultArea);
                 return;
 
+            // --- Gene function ---
             case 'GET_FUNCTION': {
                 const geneSymbol = entities.genes[0];
-                const geneData = data.find(g => g.gene === geneSymbol);
-                resultHtml = formatGeneDetail(geneData, geneSymbol, 'Function',
-                    geneData?.functional_summary || geneData?.description);
+                const geneData = data.find(g => g.gene.toUpperCase() === geneSymbol);
+                resultHtml = formatGeneDetail(
+                    geneData,
+                    geneSymbol,
+                    'Function',
+                    geneData?.functional_summary || geneData?.description
+                );
                 break;
             }
 
-            // ✅ “show repeats in IFT140” now triggers here
+            // --- Domains / Repeats ONLY ---
             case 'GET_DOMAINS': {
                 const geneSymbol = entities.genes[0];
-                const geneData = data.find(g => g.gene === geneSymbol);
+                const geneData = data.find(g => g.gene.toUpperCase() === geneSymbol);
+
                 const domains = Array.isArray(geneData?.domain_descriptions) && geneData.domain_descriptions.length
                     ? geneData.domain_descriptions.join(', ')
                     : 'No domains or repeats listed.';
-                resultHtml = formatGeneDetail(geneData, geneSymbol, 'Domains / Repeats', domains);
+
+                resultHtml = `
+                    <div class="result-card">
+                        <h3>Domains / Repeats of ${geneSymbol}</h3>
+                        <p>${domains}</p>
+                    </div>
+                `;
                 break;
             }
 
+            // --- Diseases ---
             case 'GET_DISEASES': {
                 const geneSymbol = entities.genes[0];
-                const geneData = data.find(g => g.gene === geneSymbol);
-                resultHtml = formatGeneDetail(geneData, geneSymbol, 'Associated Diseases',
-                    geneData?.functional_summary);
+                const geneData = data.find(g => g.gene.toUpperCase() === geneSymbol);
+                resultHtml = formatGeneDetail(geneData, geneSymbol, 'Associated Diseases', geneData?.functional_summary);
                 break;
             }
 
+            // --- Phylogeny ---
             case 'GET_PHYLOGENY': {
                 const geneSymbol = entities.genes[0];
                 const geneData = phylogeny[geneSymbol];
-                if (!geneData || !geneData.category)
+                if (!geneData || !geneData.category) {
                     resultHtml = `<div class="result-card"><h3>Phylogeny of ${geneSymbol}</h3><p class="status-not-found">No phylogeny data found.</p></div>`;
-                else {
+                } else {
                     const conservation = geneData.category.replace(/_/g, ' ');
                     resultHtml = `<div class="result-card"><h3>Phylogeny of ${geneSymbol}</h3><p>This gene is classified under: <strong>${conservation}</strong>.</p></div>`;
                 }
                 break;
             }
 
+            // --- List genes by disease ---
             case 'LIST_GENES_BY_DISEASE': {
                 const disease = entities.disease;
                 const diseaseRegex = new RegExp(disease.replace(/ /g, '[\\s-]*'), 'i');
-                const results = data
-                    .filter(g => g.functional_summary && diseaseRegex.test(g.functional_summary))
-                    .map(g => g.gene)
-                    .sort();
+                const results = data.filter(g => g.functional_summary && diseaseRegex.test(g.functional_summary)).map(g => g.gene).sort();
                 resultHtml = formatListResult(`Genes for: ${disease}`, results);
                 break;
             }
 
+            // --- List genes by functional category ---
             case 'LIST_GENES_BY_CATEGORY': {
                 const results = await getGenesByFunctionalCategory(entities.category);
                 resultHtml = formatListResult(`Genes for: ${entities.category}`, results);
                 break;
             }
 
+            // --- List entire ciliome ---
             case 'LIST_CILIOME': {
                 const results = data.map(g => g.gene).sort();
                 resultHtml = formatListResult('All Ciliary Genes (Ciliome)', results);
                 break;
             }
 
+            // --- Unknown intent fallback ---
             default:
-                resultHtml = `<div class="result-card"><p>🤔 Sorry, I didn’t understand that. Try asking about a gene's <b>function</b>, <b>expression</b>, or <b>associated diseases</b>.</p></div>`;
+                resultHtml = `<div class="result-card"><p>🤔 Sorry, I didn’t understand that. Try asking about a gene's <b>function</b>, <b>expression</b>, <b>domains/repeats</b>, or <b>associated diseases</b>.</p></div>`;
                 break;
         }
 
