@@ -419,9 +419,15 @@ window.handleAIQuery = async function() {
         resultArea.innerHTML = `<p class="status-not-found">Error: Core gene data could not be loaded.</p>`;
         return;
     }
-
+// --- If query was not recognized or missing data ---
+if (!resultHtml && intent && detectedGenes.length > 0) {
+    const alt = suggestSimilarQuery(intent, detectedGenes);
+    if (alt && alt.length > 0) {
+        resultHtml = `<div class="result-card"><p>🤔 Did you mean:</p><ul>${alt.map(a => `<li class="suggestion-item">${a}</li>`).join('')}</ul></div>`;
+    }
+}
     let resultHtml = '';
-    const qLower = query.toLowerCase();
+    const { normalized: qLower, genes: detectedGenes, intent } = normalizeAndDetectIntent(query, data);
     let match;
 
     try {
@@ -522,6 +528,68 @@ window.handleAIQuery = async function() {
         console.error(e);
     }
 };
+
+// ===============================================================
+// 🌐 Natural Query Normalizer + Intent Parser
+// ===============================================================
+function normalizeAndDetectIntent(rawQuery, data) {
+    let q = rawQuery.toLowerCase().trim();
+    const intents = {};
+
+    // --- Cleanup ---
+    q = q.replace(/[?!.]/g, ' ');
+    q = q.replace(/\b(please|kindly|can you|could you|would you|show me|tell me|give me|display|list|find|explain|about|information on|info about|details of)\b/g, '');
+    q = q.replace(/\s+/g, ' ').trim();
+
+    // --- Normalize common synonyms ---
+    q = q.replace(/\b(role|job|purpose|activity|functionality)\b/g, 'function');
+    q = q.replace(/\b(where is|where can i find|tissue expression of|in which tissues|expressed in|localization of|found in|pattern of)\b/g, 'expression of');
+    q = q.replace(/\b(domains of|protein regions in|motifs in|contains domains of|domain architecture of)\b/g, 'domains in');
+    q = q.replace(/\b(disease[s]? caused by|illnesses linked to|associated disorders of|mutations in|syndromes linked to|conditions related to)\b/g, 'diseases linked to');
+    q = q.replace(/\b(interaction partners of|binding partners of|interactors of|interactome of|network of)\b/g, 'interacting partners of');
+    q = q.replace(/\b(evolution|evolutionary conservation of|orthologs of|homologs of|present in species|comparative analysis of|species distribution of)\b/g, 'phylogeny of');
+    q = q.replace(/\b(ciliome genes|cilia-related genes|cilia genes|genes with ciliary function|cilia components)\b/g, 'ciliary genes');
+    q = q.replace(/\b(compare expression between|compare expression of|expression comparison of)\b/g, 'compare expression of');
+
+    // --- Detect genes in text ---
+    const geneSymbols = data ? data.map(g => g.gene.toUpperCase()) : [];
+    const foundGenes = [];
+    geneSymbols.forEach(g => {
+        const regex = new RegExp(`\\b${g.toLowerCase()}\\b`);
+        if (regex.test(q)) foundGenes.push(g);
+    });
+
+    // --- Detect intent keywords ---
+    if (q.match(/function of/)) intents.type = 'function';
+    else if (q.match(/expression of|where is/)) intents.type = 'expression';
+    else if (q.match(/domains in/)) intents.type = 'domains';
+    else if (q.match(/diseases linked to|associated with/)) intents.type = 'diseases';
+    else if (q.match(/interacting partners of|interaction network/)) intents.type = 'interaction';
+    else if (q.match(/phylogeny of/)) intents.type = 'phylogeny';
+    else if (q.match(/ciliary genes|ciliome/)) intents.type = 'ciliome';
+    else if (q.match(/genes for|genes involved in|genes related to/)) intents.type = 'category';
+    else intents.type = 'unknown';
+
+    return { normalized: q, genes: foundGenes, intent: intents.type };
+}
+// ===============================================================
+// 💡 Suggestion Engine
+// ===============================================================
+function suggestSimilarQuery(intent, genes) {
+    if (!intent || genes.length === 0) return null;
+    const g = genes[0];
+    const suggestions = {
+        function: [`What is the function of ${g}?`, `Describe the role of ${g}`],
+        expression: [`Where is ${g} expressed?`, `Show expression of ${g}`],
+        domains: [`What domains are in ${g}?`, `Show protein domains of ${g}`],
+        diseases: [`List diseases linked to ${g}`, `What disorders are associated with ${g}?`],
+        interaction: [`Show interacting partners of ${g}`, `Interaction network for ${g}`],
+        phylogeny: [`Show phylogeny of ${g}`, `Evolutionary conservation of ${g}`],
+        ciliome: [`Show all human ciliary genes`, `List ciliome genes`],
+        category: [`Show genes for ciliogenesis`, `Genes related to Joubert syndrome`]
+    };
+    return suggestions[intent] || [];
+}
 
 
 // -------------------------------
@@ -626,27 +694,27 @@ function setupAiQueryAutocomplete() {
     const suggestionsContainer = document.getElementById('aiQuerySuggestions');
     if (!aiQueryInput || !suggestionsContainer) return;
 
-    const exampleQueries = [
-        "function of IFT88",
-        "genes for Joubert Syndrome",
-        "show me axoneme genes",
-        "what domains are in CEP290",
-        "show me human ciliary genes",
-        "phylogeny of ARL13B",
-        "expression of BBS1"
-    ];
+    const groupedExamples = {
+        function: ["function of IFT88", "what does ARL13B do", "role of CEP290"],
+        expression: ["where is BBS1 expressed", "expression of TMEM67", "tissue pattern of IFT81"],
+        domains: ["protein domains in CEP290", "what domains are in OSM-3"],
+        diseases: ["diseases linked to ARL6", "conditions related to BBS10", "syndromes caused by OFD1"],
+        phylogeny: ["phylogeny of ARL13B", "evolution of RPGRIP1L", "orthologs of TMEM231"],
+        ciliome: ["show human ciliary genes", "list ciliome genes", "cilia-related genes in human"],
+        interaction: ["interaction network of BBS4", "interactors of ARL13B", "binding partners of IFT172"]
+    };
+
+    const allExamples = Object.values(groupedExamples).flat();
 
     aiQueryInput.addEventListener('input', () => {
-        const inputText = aiQueryInput.value.toLowerCase();
-        if (inputText.length < 3) {
+        const text = aiQueryInput.value.toLowerCase();
+        if (text.length < 2) {
             suggestionsContainer.style.display = 'none';
             return;
         }
-        const filteredSuggestions = exampleQueries.filter(q => q.toLowerCase().includes(inputText));
-        if (filteredSuggestions.length > 0) {
-            suggestionsContainer.innerHTML = filteredSuggestions
-                .map(q => `<div class="suggestion-item">${q}</div>`)
-                .join('');
+        const filtered = allExamples.filter(q => q.toLowerCase().includes(text)).slice(0, 6);
+        if (filtered.length > 0) {
+            suggestionsContainer.innerHTML = filtered.map(q => `<div class="suggestion-item">${q}</div>`).join('');
             suggestionsContainer.style.display = 'block';
         } else {
             suggestionsContainer.style.display = 'none';
@@ -668,6 +736,7 @@ function setupAiQueryAutocomplete() {
         }
     });
 }
+
 
 // --- Gene Analysis Engine & UI (largely unchanged) ---
 
