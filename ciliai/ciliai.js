@@ -476,6 +476,24 @@ window.handleAIQuery = async function() {
     if (!data) return;
 
     const allGeneSymbols = data.map(g => g.gene);
+     // --- Early Correction for "repeats" queries (prevents misrouting to expression intent) ---
+    if (/repeat/i.test(query)) {
+        const geneMatch = query.match(/(?:in|of|for)\s+([A-Z0-9\-]+)/i);
+        if (geneMatch) {
+            const geneSymbol = geneMatch[1].toUpperCase();
+            const correctionMsg = `Did you mean: show domains in ${geneSymbol}?`;
+            resultArea.innerHTML = `<p class="ai-suggestion">💡 ${correctionMsg}</p>`;
+            const geneData = data.find(g => g.gene.toUpperCase() === geneSymbol);
+            if (geneData) {
+                const domains = Array.isArray(geneData.domain_descriptions) && geneData.domain_descriptions.length
+                    ? geneData.domain_descriptions.join(', ')
+                    : 'No domains or repeats listed.';
+                const resultHtml = formatGeneDetail(geneData, geneSymbol, 'Domains / Repeats', domains);
+                resultArea.innerHTML += resultHtml;
+            }
+            return; // ✅ stop before expression or function handlers run
+        }
+    }
     const { intent, entities } = parseComplexQuery(query, allGeneSymbols);
     let resultHtml = '';
 
