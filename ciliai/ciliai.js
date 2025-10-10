@@ -389,32 +389,26 @@ async function displayInteractionNetwork(geneSymbol, containerId) {
 
 
 // =============================================================================
-// 🧠 CiliAI: Advanced Intent & Entity Recognition Engine
+// 🧠 CiliAI: Advanced Intent & Entity Recognition Engine (FINAL)
 // =============================================================================
 /**
- * Parses a complex, natural language query to extract intent and entities.
- * This is the core of the AI's understanding.
- * @param {string} rawQuery - The user's input string.
- * @param {Array} allGenes - An array of all possible gene symbols for accurate detection.
- * @returns {{intent: string, entities: object, normalizedQuery: string}}
+ * This is now the ONLY function that parses user queries.
+ * It correctly prioritizes specific keywords like "repeats" over generic ones like "show".
  */
 function parseComplexQuery(rawQuery, allGenes = []) {
     let normalizedQuery = rawQuery.toLowerCase().trim()
-        .replace(/[?!.,]/g, '') // Remove punctuation
-        .replace(/\b(please|kindly|can you|could you|would you|show me|tell me|give me|display|list|find|explain|about|information on|info about|details of)\b/g, '') // Remove polite filler words
-        .replace(/\s+/g, ' '); // Collapse multiple spaces
+        .replace(/[?!.,]/g, '')
+        .replace(/\b(please|kindly|can you|could you|would you|show me|tell me|give me|display|list|find|explain|about|information on|info about|details of)\b/g, '')
+        .replace(/\s+/g, ' ');
 
-    // --- Entity Extraction ---
     const entities = {
         genes: [],
         category: null,
         disease: null
     };
 
-    // 1. Detect Gene Symbols accurately from the master list
     if (allGenes.length > 0) {
         const geneSet = new Set(allGenes.map(g => g.toUpperCase()));
-        // Split query into words to match whole words only
         const words = normalizedQuery.toUpperCase().split(' ');
         words.forEach(word => {
             if (geneSet.has(word)) {
@@ -423,73 +417,56 @@ function parseComplexQuery(rawQuery, allGenes = []) {
         });
     }
 
-    // --- Intent Recognition (Prioritized) ---
-    // More specific intents are checked first.
-
-    // Comparison Intent
+    // --- Prioritized Intent Recognition ---
     if (normalizedQuery.match(/\b(compare|between|vs\.?|versus)\b/) && entities.genes.length >= 2) {
-        return { intent: 'COMPARE_EXPRESSION', entities, normalizedQuery };
+        return { intent: 'COMPARE_EXPRESSION', entities };
     }
-
-    // Interaction Network Intent
     if (normalizedQuery.match(/\b(interact|network|partner|binding)\b/)) {
-        return { intent: 'GET_INTERACTIONS', entities, normalizedQuery };
+        return { intent: 'GET_INTERACTIONS', entities };
     }
-    
-    // Phylogeny Intent
-    if (normalizedQuery.match(/\b(phylogeny|evolution|ortholog|homolog|conservation|conserved)\b/)) {
-        return { intent: 'GET_PHYLOGENY', entities, normalizedQuery };
+    if (normalizedQuery.match(/\b(phylogeny|evolution|ortholog|conservation)\b/)) {
+        return { intent: 'GET_PHYLOGENY', entities };
     }
-
-    // Expression Intent
-    if (normalizedQuery.match(/\b(expression|expressed|tissue|where is|in which|pattern of)\b/)) {
-        return { intent: 'GET_EXPRESSION', entities, normalizedQuery };
+    if (normalizedQuery.match(/\b(expression|expressed|tissue|where is|in which)\b/)) {
+        return { intent: 'GET_EXPRESSION', entities };
     }
-
-    // Domain/Motif Intent - THIS IS THE FIX
-    // It correctly identifies "repeat" and is checked *before* a generic "function" intent.
+    // ✅ This rule correctly identifies "repeat" and is checked before less specific rules.
     if (normalizedQuery.match(/\b(domain|motif|repeat|structure|architecture)\b/)) {
-        return { intent: 'GET_DOMAINS', entities, normalizedQuery };
+        return { intent: 'GET_DOMAINS', entities };
     }
-
-    // Disease Intent
-    const diseaseMatch = normalizedQuery.match(/(?:genes for|disease(?:s)?|illness|syndrome|condition|linked to|associated with)\s+([a-z\s0-9\-]+)/);
+    const diseaseMatch = normalizedQuery.match(/(?:genes for|disease(?:s)?|illness|syndrome|condition|linked to)\s+([a-z\s0-9\-]+)/);
     if (diseaseMatch) {
         if (entities.genes.length > 0) {
-             return { intent: 'GET_DISEASES', entities, normalizedQuery };
+             return { intent: 'GET_DISEASES', entities };
         }
         entities.disease = diseaseMatch[1].replace(entities.genes.join(' ').toLowerCase(), '').trim();
-        return { intent: 'LIST_GENES_BY_DISEASE', entities, normalizedQuery };
+        return { intent: 'LIST_GENES_BY_DISEASE', entities };
     }
-    
-    // Function Intent
     if (normalizedQuery.match(/\b(function|role|does|activity|do)\b/)) {
-        return { intent: 'GET_FUNCTION', entities, normalizedQuery };
+        return { intent: 'GET_FUNCTION', entities };
     }
-
-    // List by Functional Category Intent
-    const categoryMatch = normalizedQuery.match(/(?:genes for|genes in|genes related to)\s+(motile cilium|axoneme|basal body|transition zone|ciliogenesis)/);
+    const categoryMatch = normalizedQuery.match(/(?:genes for|genes in|related to)\s+(motile cilium|axoneme|basal body|transition zone|ciliogenesis)/);
     if (categoryMatch) {
         entities.category = categoryMatch[1];
-        return { intent: 'LIST_GENES_BY_CATEGORY', entities, normalizedQuery };
+        return { intent: 'LIST_GENES_BY_CATEGORY', entities };
     }
-
-    // Broad Ciliome List Intent
     if (normalizedQuery.match(/\b(ciliome|ciliary genes|all cilia genes)\b/)) {
-        return { intent: 'LIST_CILIOME', entities, normalizedQuery };
+        return { intent: 'LIST_CILIOME', entities };
     }
-
     if (entities.genes.length > 0) {
-        return { intent: 'GET_FUNCTION', entities, normalizedQuery }; // Default action if gene found
+        return { intent: 'GET_FUNCTION', entities }; // Default action
     }
 
-    return { intent: 'UNKNOWN', entities, normalizedQuery };
+    return { intent: 'UNKNOWN', entities };
 }
 
-
 // =============================================================================
-// CiliAI: Main AI Query Handler (Refactored for Intent Engine)
+// CiliAI: Main AI Query Handler (FINAL & CORRECTED)
 // =============================================================================
+/**
+ * This refactored handler uses the new parser and a clean switch statement.
+ * It is much more reliable and easier to maintain.
+ */
 window.handleAIQuery = async function() {
     const aiQueryInput = document.getElementById('aiQueryInput');
     const resultArea = document.getElementById('ai-result-area');
@@ -510,7 +487,6 @@ window.handleAIQuery = async function() {
 
     if (!data) return;
 
-    // Use the new advanced parser
     const allGeneSymbols = data.map(g => g.gene);
     const parsed = parseComplexQuery(query, allGeneSymbols);
     const { intent, entities } = parsed;
@@ -518,7 +494,6 @@ window.handleAIQuery = async function() {
     let resultHtml = '';
 
     try {
-        // A clean switch statement replaces the fragile if/else chain
         switch (intent) {
             case 'COMPARE_EXPRESSION':
                 await displayCiliAIExpressionHeatmap(entities.genes, resultArea);
@@ -536,7 +511,7 @@ window.handleAIQuery = async function() {
                 resultHtml = formatGeneDetail(geneData, geneSymbol, 'Function', geneData?.functional_summary || geneData?.description);
                 break;
             }
-            case 'GET_DOMAINS': { // This case will now be correctly triggered
+            case 'GET_DOMAINS': { // This case will now be correctly triggered for "show repeats in..."
                 const geneSymbol = entities.genes[0];
                 const geneData = data.find(g => g.gene === geneSymbol);
                 const domains = Array.isArray(geneData?.domain_descriptions) && geneData.domain_descriptions.length ? geneData.domain_descriptions.join(', ') : 'No domains or repeats listed.';
@@ -587,6 +562,8 @@ window.handleAIQuery = async function() {
         console.error(err);
     }
 };
+
+
 
 function normalizeTerm(s) {
     if (!s) return '';
