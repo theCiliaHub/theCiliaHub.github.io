@@ -521,6 +521,9 @@ function parseComplexQuery(rawQuery, allGenes = []) {
 // =============================================================================
 // 🧠 CiliAI: Main AI Query Handler
 // =============================================================================
+// =============================================================================
+// 🧠 CiliAI: Main AI Query Handler (Fully Corrected and Restored)
+// =============================================================================
 window.handleAIQuery = async function() {
     const aiQueryInput = document.getElementById('aiQueryInput');
     const resultArea = document.getElementById('ai-result-area');
@@ -529,18 +532,23 @@ window.handleAIQuery = async function() {
 
     resultArea.style.display = 'block';
     resultArea.innerHTML = `<p class="status-searching">🧠 CiliAI is thinking...</p>`;
-    const resultsSection = document.getElementById('resultsSection');
-    if (resultsSection) resultsSection.style.display = 'none';
+    document.getElementById('resultsSection').style.display = 'none';
 
-    const [data, phylogeny] = await Promise.all([
-        fetchCiliaData(), fetchPhylogenyData()
+    // Ensure all necessary data is loaded
+    const [data, phylogeny, tissueData] = await Promise.all([
+        fetchCiliaData(),
+        fetchPhylogenyData(),
+        fetchTissueData()
     ]).catch(err => {
         resultArea.innerHTML = `<p class="status-not-found">⚠️ Failed to load data sources.</p>`;
         console.error("Data fetch error:", err);
-        return [null, null];
+        return [null, null, null];
     });
 
-    if (!data) return;
+    if (!data) {
+        resultArea.innerHTML = `<p class="status-not-found">⚠️ Failed to load core gene data.</p>`;
+        return;
+    }
 
     const allGeneSymbols = data.map(g => g.gene);
     const { intent, entities } = parseComplexQuery(query, allGeneSymbols);
@@ -551,18 +559,27 @@ window.handleAIQuery = async function() {
         switch (intent) {
             case 'COMPARE_EXPRESSION':
                 await displayCiliAIExpressionHeatmap(entities.genes, resultArea);
-                return;
+                return; // Use return for async functions that take over the display
 
             case 'GET_INTERACTIONS':
                 resultArea.style.height = '450px';
                 await displayInteractionNetwork(entities.genes[0], 'ai-result-area');
-                return;
+                return; // Use return for async functions
 
             case 'GET_EXPRESSION':
                 await displayCiliAIExpressionHeatmap(entities.genes, resultArea);
-                return;
+                return; // Use return for async functions
 
-           case 'GET_LOCALIZATION': {
+            case 'GET_DOMAINS': {
+                const geneSymbol = entities.genes[0];
+                const geneData = data.find(g => g.gene === geneSymbol);
+                const domains = (geneData?.domain_descriptions && geneData.domain_descriptions.length > 0) 
+                    ? geneData.domain_descriptions.join(', ') 
+                    : 'No domains or repeats listed in the database.';
+                resultHtml = formatGeneDetail(geneData, geneSymbol, 'Domains / Repeats', domains);
+                break;
+            }
+            case 'GET_LOCALIZATION': {
                 const geneSymbol = entities.genes[0];
                 const geneData = data.find(g => g.gene === geneSymbol);
                 resultHtml = formatGeneDetail(geneData, geneSymbol, 'Localization', geneData?.localization);
@@ -574,32 +591,15 @@ window.handleAIQuery = async function() {
                 resultHtml = formatGeneDetail(geneData, geneSymbol, 'Function', geneData?.functional_summary);
                 break;
             }
-            case 'LIST_GENES_BY_CATEGORY': {
-                const results = await getGenesByFunctionalCategory(entities.category);
-                resultHtml = formatListResult(`Genes for: ${entities.category}`, results);
-                break;
-            }
-                resultHtml = `
-                    <div class="result-card">
-                        <h3>${geneSymbol}</h3>
-                        <h4>Protein Domains / Repeats:</h4>
-                        <p>${domains}</p>
-                        ${geneData.pfam_ids ? `<p><small><strong>Pfam IDs:</strong> ${geneData.pfam_ids}</small></p>` : ''}
-                    </div>
-                `;
-                break;
-            }
-
             case 'GET_DISEASES': {
                 const geneSymbol = entities.genes[0];
                 const geneData = data.find(g => g.gene === geneSymbol);
-                resultHtml = formatGeneDetail(geneData, geneSymbol, 'Associated Diseases', geneData?.functional_summary);
+                resultHtml = formatGeneDetail(geneData, geneSymbol, 'Associated Diseases', geneData?.ciliopathy || geneData?.functional_summary);
                 break;
             }
-
             case 'GET_PHYLOGENY': {
                 const geneSymbol = entities.genes[0];
-                const geneData = phylogeny[geneSymbol];
+                const geneData = phylogeny[geneSymbol.toUpperCase()]; // Phylogeny data uses uppercase keys
                 if (!geneData || !geneData.category) {
                     resultHtml = `<div class="result-card"><h3>Phylogeny of ${geneSymbol}</h3><p class="status-not-found">No phylogeny data found.</p></div>`;
                 } else {
@@ -608,41 +608,31 @@ window.handleAIQuery = async function() {
                 }
                 break;
             }
-
+            case 'LIST_GENES_BY_DISEASE': {
+                const disease = entities.disease;
+                const diseaseRegex = new RegExp(disease.replace(/ /g, '[\\s-]*'), 'i');
+                const results = data.filter(g => (g.ciliopathy || g.functional_summary || '').match(diseaseRegex))
+                                    .map(g => g.gene).sort();
+                resultHtml = formatListResult(`Genes for: ${disease}`, results);
+                break;
+            }
             case 'LIST_GENES_BY_CATEGORY': {
                 const results = await getGenesByFunctionalCategory(entities.category);
                 resultHtml = formatListResult(`Genes for: ${entities.category}`, results);
                 break;
             }
-
             case 'LIST_CILIOME': {
                 const results = data.map(g => g.gene).sort();
                 resultHtml = formatListResult('All Ciliary Genes (Ciliome)', results);
                 break;
             }
-
-            default:
-                resultHtml = `
-                    <div class="result-card">
-                        <p>🤔 Sorry, I didn't understand that query.</p>
-                        <p><strong>Try asking about:</strong></p>
-                        <ul>
-                            <li><b>Function:</b> "What is the function of CEP290?"</li>
-                            <li><b>Expression:</b> "Where is ARL13B expressed?"</li>
-                            <li><b>Domains:</b> "What domains are in CEP290?"</li>
-                            <li><b>Diseases:</b> "Genes for Joubert Syndrome"</li>
-                            <li><b>Categories:</b> "Show me basal body genes"</li>
-                            <li><b>Phylogeny:</b> "Show phylogeny of IFT88"</li>
-                            <li><b>Interactions:</b> "Interaction network of BBS4"</li>
-                        </ul>
-                    </div>
-                `;
+            default: // UNKNOWN intent
+                resultHtml = `<div class="result-card"><p>🤔 Sorry, I didn’t understand that. Please try rephrasing.</p></div>`;
                 break;
         }
-
         resultArea.innerHTML = resultHtml;
     } catch (err) {
-        resultArea.innerHTML = `<p class="status-not-found">⚠️ An error occurred. Check console for details.</p>`;
+        resultArea.innerHTML = `<p class="status-not-found">⚠️ An error occurred while processing the request.</p>`;
         console.error(err);
     }
 };
