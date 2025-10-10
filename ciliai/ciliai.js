@@ -173,22 +173,30 @@ const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 function debounce(fn, delay) { let timeout; return function (...args) { clearTimeout(timeout); timeout = setTimeout(() => fn(...args), delay); }; }
 const CILI_AI_DB = { "HDAC6": { "summary": { "lof_length": "Promotes / Maintains", "percentage_ciliated": "No effect", "source": "Expert DB" }, "evidence": [{ "id": "21873644", "source": "pubmed", "context": "...loss of HDAC6 results in hyperacetylation of tubulin and leads to the formation of longer, more stable primary cilia in renal epithelial cells." }] }, "IFT88": { "summary": { "lof_length": "Inhibits / Restricts", "percentage_ciliated": "Reduced cilia numbers", "source": "Expert DB" }, "evidence": [{ "id": "10882118", "source": "pubmed", "context": "Mutations in IFT88 (polaris) disrupt intraflagellar transport, leading to a failure in cilia assembly and resulting in severely shortened or absent cilia." }] }, "ARL13B": { "summary": { "lof_length": "Inhibits / Restricts", "percentage_ciliated": "Reduced cilia numbers", "source": "Expert DB" }, "evidence": [{ "id": "21940428", "source": "pubmed", "context": "The small GTPase ARL13B is critical for ciliary structure; its absence leads to stunted cilia with abnormal morphology and axonemal defects." }] } };
 
-// --- Data Fetching and Caching ---
 
+
+// --- Data Fetching and Caching ---
 async function fetchCiliaData() {
     if (ciliaHubDataCache) return ciliaHubDataCache;
     try {
-        const response = await fetch('https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/ciliahub_data.json');
+        const response = await fetch('https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/ciliahub_data.json');
         if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
         const data = await response.json();
-        ciliaHubDataCache = data.map(gene => ({
-            ...gene,
-            domain_descriptions: typeof gene.domain_descriptions === 'string' 
-                ? gene.domain_descriptions.split(',').map(d => d.trim()) 
-                : Array.isArray(gene.domain_descriptions) 
-                ? gene.domain_descriptions 
-                : []
-        }));
+        
+        // This mapping logic is now corrected
+        ciliaHubDataCache = data.map(gene => {
+            let domains = []; // Default to empty array
+            if (Array.isArray(gene.domain_descriptions)) {
+                // If it's already an array (like your CEP290 data), use it directly.
+                domains = gene.domain_descriptions;
+            } else if (typeof gene.domain_descriptions === 'string' && gene.domain_descriptions) {
+                // If it's a string, split it.
+                domains = gene.domain_descriptions.split(',').map(d => d.trim());
+            }
+            // Return the full gene object with the correctly processed domains
+            return { ...gene, domain_descriptions: domains };
+        });
+
         console.log('CiliaHub data loaded and cached successfully.');
         return ciliaHubDataCache;
     } catch (error) {
@@ -419,10 +427,6 @@ async function displayInteractionNetwork(geneSymbol, containerId) {
     });
 }
 
-
-// =============================================================================
-// 🧠 CiliAI: Advanced Intent & Entity Recognition Engine
-// =============================================================================
 // =============================================================================
 // 🧠 CiliAI: Advanced Intent & Entity Recognition Engine
 // =============================================================================
@@ -513,9 +517,7 @@ function parseComplexQuery(rawQuery, allGenes = []) {
     return { intent: 'UNKNOWN', entities };
 }
 
-// =============================================================================
-// 🧠 CiliAI: Main AI Query Handler
-// =============================================================================
+
 // =============================================================================
 // 🧠 CiliAI: Main AI Query Handler
 // =============================================================================
@@ -560,35 +562,23 @@ window.handleAIQuery = async function() {
                 await displayCiliAIExpressionHeatmap(entities.genes, resultArea);
                 return;
 
+           case 'GET_LOCALIZATION': {
+                const geneSymbol = entities.genes[0];
+                const geneData = data.find(g => g.gene === geneSymbol);
+                resultHtml = formatGeneDetail(geneData, geneSymbol, 'Localization', geneData?.localization);
+                break;
+            }
             case 'GET_FUNCTION': {
                 const geneSymbol = entities.genes[0];
                 const geneData = data.find(g => g.gene === geneSymbol);
-                resultHtml = formatGeneDetail(
-                    geneData, geneSymbol, 'Function',
-                    geneData?.functional_summary || geneData?.description
-                );
+                resultHtml = formatGeneDetail(geneData, geneSymbol, 'Function', geneData?.functional_summary);
                 break;
             }
-
-            case 'GET_DOMAINS': {
-                const geneSymbol = entities.genes[0];
-                const geneData = data.find(g => g.gene === geneSymbol);
-                
-                if (!geneData) {
-                    resultHtml = `<div class="result-card"><h3>${geneSymbol}</h3><p class="status-not-found">Gene not found in the database.</p></div>`;
-                    break;
-                }
-                
-                // Extract domains - handle both array and string formats
-                let domains;
-                if (Array.isArray(geneData.domain_descriptions) && geneData.domain_descriptions.length > 0) {
-                    domains = geneData.domain_descriptions.join(', ');
-                } else if (typeof geneData.domain_descriptions === 'string' && geneData.domain_descriptions.trim()) {
-                    domains = geneData.domain_descriptions;
-                } else {
-                    domains = 'No domains or repeats listed in the database.';
-                }
-                
+            case 'LIST_GENES_BY_CATEGORY': {
+                const results = await getGenesByFunctionalCategory(entities.category);
+                resultHtml = formatListResult(`Genes for: ${entities.category}`, results);
+                break;
+            }
                 resultHtml = `
                     <div class="result-card">
                         <h3>${geneSymbol}</h3>
@@ -616,15 +606,6 @@ window.handleAIQuery = async function() {
                     const conservation = geneData.category.replace(/_/g, ' ');
                     resultHtml = `<div class="result-card"><h3>Phylogeny of ${geneSymbol}</h3><p>This gene is classified under: <strong>${conservation}</strong>.</p></div>`;
                 }
-                break;
-            }
-
-            case 'LIST_GENES_BY_DISEASE': {
-                const disease = entities.disease;
-                const diseaseRegex = new RegExp(disease.replace(/ /g, '[\\s-]*'), 'i');
-                const results = data.filter(g => g.functional_summary && diseaseRegex.test(g.functional_summary))
-                                    .map(g => g.gene).sort();
-                resultHtml = formatListResult(`Genes for: ${disease}`, results);
                 break;
             }
 
@@ -806,6 +787,9 @@ function formatGeneDetail(geneData, geneSymbol, detailTitle, detailContent) {
         </div>
     `;
 }
+
+
+
 
 function formatListResult(title, geneList, message = '') {
     if (!geneList || geneList.length === 0) {
