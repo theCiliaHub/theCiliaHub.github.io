@@ -436,24 +436,71 @@ function normalizeTerm(s) {
     return String(s).toLowerCase().replace(/[_\-\s]+/g, ' ').trim();
 }
 
-// =============================================================================
-// CiliAI: Main AI Query Handler - Updated with dynamic ciliopathy filtering
-// =============================================================================
+// --- Helper Function to Format Comprehensive Gene Details ---
+function formatComprehensiveGeneDetails(geneSymbol, geneData) {
+    if (!geneData) {
+        return `<div class="result-card"><h3>${geneSymbol}</h3><p class="status-not-found">Gene not found in the database.</p></div>`;
+    }
+
+    // Extract and format fields
+    const ensemblId = geneData.ensembl_id || 'Not available';
+    const functionalSummary = geneData.functional_summary || geneData.description || 'No functional summary available.';
+    const localization = geneData.localization || 'Not specified';
+    const complexName = Array.isArray(geneData.complex_names) && geneData.complex_names.length
+        ? geneData.complex_names.join(', ')
+        : 'None';
+    const complexComponents = Array.isArray(geneData.complex_components) && geneData.complex_components.length
+        ? geneData.complex_components.join(', ')
+        : 'None';
+    const domainDescriptions = Array.isArray(geneData.domain_descriptions) && geneData.domain_descriptions.length
+        ? geneData.domain_descriptions.join(', ')
+        : 'None';
+    const synonym = geneData.synonym || 'None';
+    const ciliopathy = Array.isArray(geneData.ciliopathy) && geneData.ciliopathy.length
+        ? geneData.ciliopathy.join(', ')
+        : 'None';
+
+    // Fetch screen data
+    let screenHtml = '';
+    if (screenDataCache && screenDataCache[geneSymbol]) {
+        screenHtml = renderScreenDataTable(geneSymbol, screenDataCache[geneSymbol]);
+    } else {
+        screenHtml = '<p class="status-not-found">No screen data available for this gene.</p>';
+    }
+
+    return `
+        <div class="result-card">
+            <h3>${geneSymbol}</h3>
+            <p><strong>Ensembl ID:</strong> ${ensemblId}</p>
+            <p><strong>Functional Summary:</strong> ${functionalSummary}</p>
+            <p><strong>Localization:</strong> ${localization}</p>
+            <p><strong>Complex Name:</strong> ${complexName}</p>
+            <p><strong>Complex Components:</strong> ${complexComponents}</p>
+            <p><strong>Domain Descriptions:</strong> ${domainDescriptions}</p>
+            <p><strong>Synonym:</strong> ${synonym}</p>
+            <p><strong>Ciliopathy:</strong> ${ciliopathy}</p>
+            <h4>Screen Results:</h4>
+            ${screenHtml}
+            <p class="ai-suggestion">
+                <a href="#" class="ai-action" data-action="expression-visualize" data-gene="${geneSymbol}">📊 View expression heatmap</a>
+            </p>
+        </div>
+    `;
+}
+
+// --- Modified handleAIQuery Function ---
 window.handleAIQuery = async function() {
     const aiQueryInput = document.getElementById('aiQueryInput');
-    const resultArea = document.getElementById('ai-result-area'); // CORRECTED: Target for "Ask" results
+    const resultArea = document.getElementById('ai-result-area');
     const query = aiQueryInput.value.trim();
 
     if (!query) return;
 
-    // Show the dedicated result area for "Ask"
     resultArea.style.display = 'block';
     resultArea.innerHTML = `<p class="status-searching">CiliAI is thinking...</p>`;
 
-    // Hide the other main results section
     document.getElementById('resultsSection').style.display = 'none';
 
-    // Fetch data caches
     const data = await fetchCiliaData();
     const phylogeny = await fetchPhylogenyData();
     const tissueData = await fetchTissueData();
@@ -468,43 +515,39 @@ window.handleAIQuery = async function() {
     let match;
 
     try {
-        // --- ADDED: More specific queries go first ---
-        
-        // Multi-gene expression comparison
-        if ((match = qLower.match(/(?:compare expression of|compare|expression of)\s+([A-Z0-9\-]+)\s+(?:and|vs)\s+([A-Z0-9\-]+)/i))) {
-            const genesToCompare = [match[1].toUpperCase(), match[2].toUpperCase()];
-            await displayCiliAIExpressionHeatmap(genesToCompare, resultArea); 
-            return; 
+        // --- NEW: Handle "display" or "show" gene details query ---
+        if ((match = qLower.match(/(?:display|show)\s+([A-Z0-9\-]+)/i))) {
+            const geneSymbol = match[1].toUpperCase();
+            const geneData = data.find(g => g.gene.toUpperCase() === geneSymbol);
+            resultHtml = formatComprehensiveGeneDetails(geneSymbol, geneData);
         }
-        // Interaction Network query
+        // --- Existing query patterns ---
+        else if ((match = qLower.match(/(?:compare expression of|compare|expression of)\s+([A-Z0-9\-]+)\s+(?:and|vs)\s+([A-Z0-9\-]+)/i))) {
+            const genesToCompare = [match[1].toUpperCase(), match[2].toUpperCase()];
+            await displayCiliAIExpressionHeatmap(genesToCompare, resultArea);
+            return;
+        }
         else if ((match = qLower.match(/(?:interaction network|interactions for|interacting partners of)\s+([A-Z0-9\-]+)/i))) {
             const geneSymbol = match[1].toUpperCase();
             resultArea.style.height = '450px';
             await displayInteractionNetwork(geneSymbol, 'ai-result-area');
             return;
         }
-        // MODIFIED: Single-gene expression now ONLY shows heatmap
-        else if ((match = qLower.match(/(?:gene expression|expression|where is|display|show).*(?:of|for)?\s+([A-Z0-9\-]+)/i))) {
+        else if ((match = qLower.match(/(?:gene expression|expression|where is)\s+(?:of|for)?\s+([A-Z0-9\-]+)/i))) {
             const gene = match[1].toUpperCase();
             await displayCiliAIExpressionHeatmap([gene], resultArea);
-            return; // Exit after displaying the heatmap
+            return;
         }
-        
-        // --- UPDATED: General ciliopathy query using dynamic filter ---
         else if ((match = qLower.match(/(?:genes for|genes involved in|show me genes for)\s+(.*)/i))) {
             const disease = match[1].trim();
             const { genes, description } = await getCiliopathyGenes(disease);
             resultHtml = formatListResult(`${disease} Genes`, genes, description);
         }
-        // Basal body / functional categories
         else if ((match = qLower.match(/(?:genes for|genes related to|show me)\s+(motile cilium|axoneme|basal body|transition zone|ciliogenesis)/i))) {
             const term = match[1];
             const results = await getGenesByFunctionalCategory(term);
             resultHtml = formatListResult(`Genes for: ${term}`, results);
         }
-        // Your original question logic (UNCHANGED) ---
-
-        // Function
         else if ((match = qLower.match(/(?:function of|what is the function of|describe function of)\s+([A-Z0-9\-]+)/i))) {
             const geneSymbol = match[1].toUpperCase();
             const geneData = data.find(g => g.gene.toUpperCase() === geneSymbol);
@@ -515,7 +558,6 @@ window.handleAIQuery = async function() {
                 geneData?.functional_summary || geneData?.description
             );
         }
-        // Domains
         else if ((match = qLower.match(/(?:protein domains|domains in|what domains.*in)\s+([A-Z0-9\-]+)/i))) {
             const geneSymbol = match[1].toUpperCase();
             const geneData = data.find(g => g.gene.toUpperCase() === geneSymbol);
@@ -524,13 +566,11 @@ window.handleAIQuery = async function() {
                 : 'No domains listed.';
             resultHtml = formatGeneDetail(geneData, geneSymbol, 'Domains', domains);
         }
-        // Diseases
         else if ((match = qLower.match(/(?:disease linked to|diseases for|associated with)\s+([A-Z0-9\-]+)/i))) {
             const geneSymbol = match[1].toUpperCase();
             const geneData = data.find(g => g.gene.toUpperCase() === geneSymbol);
             resultHtml = formatGeneDetail(geneData, geneSymbol, 'Associated Diseases', geneData?.functional_summary);
         }
-        // Phylogeny
         else if ((match = qLower.match(/(?:phylogeny|phylogenetic distribution)\s+(?:of\s+)?([A-Z0-9\-]+)/i))) {
             const geneQuery = match[1].toUpperCase();
             const geneData = phylogeny[geneQuery];
@@ -545,7 +585,6 @@ window.handleAIQuery = async function() {
                     </div>`;
             }
         }
-        // --- Broad queries ---
         else if (qLower.includes('ciliary genes') && qLower.includes('human')) {
             const results = data.map(g => g.gene).sort();
             resultHtml = formatListResult('Human Ciliary Genes', results, `Found ${results.length} genes.`);
@@ -554,7 +593,6 @@ window.handleAIQuery = async function() {
             const results = data.map(g => g.gene).sort();
             resultHtml = formatListResult('All Ciliary Genes (Ciliome)', results);
         }
-        // --- Fallback ---
         else {
             resultHtml = `<p>Sorry, I didn’t understand that. Try one of the examples.</p>`;
         }
