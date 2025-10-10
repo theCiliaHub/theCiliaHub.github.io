@@ -463,10 +463,6 @@ function parseComplexQuery(rawQuery, allGenes = []) {
 // =============================================================================
 // CiliAI: Main AI Query Handler (FINAL & CORRECTED)
 // =============================================================================
-/**
- * This refactored handler uses the new parser and a clean switch statement.
- * It is much more reliable and easier to maintain.
- */
 window.handleAIQuery = async function() {
     const aiQueryInput = document.getElementById('aiQueryInput');
     const resultArea = document.getElementById('ai-result-area');
@@ -477,6 +473,7 @@ window.handleAIQuery = async function() {
     resultArea.innerHTML = `<p class="status-searching">🧠 CiliAI is thinking...</p>`;
     document.getElementById('resultsSection').style.display = 'none';
 
+    // Await all necessary data before parsing
     const [data, phylogeny] = await Promise.all([
         fetchCiliaData(), fetchPhylogenyData()
     ]).catch(err => {
@@ -485,8 +482,9 @@ window.handleAIQuery = async function() {
         return [null, null];
     });
 
-    if (!data) return;
+    if (!data) return; // Exit if core data is missing
 
+    // Use the single, correct parsing engine
     const allGeneSymbols = data.map(g => g.gene);
     const parsed = parseComplexQuery(query, allGeneSymbols);
     const { intent, entities } = parsed;
@@ -494,6 +492,7 @@ window.handleAIQuery = async function() {
     let resultHtml = '';
 
     try {
+        // This clean switch statement replaces the old, buggy if/else if chain
         switch (intent) {
             case 'COMPARE_EXPRESSION':
                 await displayCiliAIExpressionHeatmap(entities.genes, resultArea);
@@ -511,10 +510,12 @@ window.handleAIQuery = async function() {
                 resultHtml = formatGeneDetail(geneData, geneSymbol, 'Function', geneData?.functional_summary || geneData?.description);
                 break;
             }
-            case 'GET_DOMAINS': { // This case will now be correctly triggered for "show repeats in..."
+            case 'GET_DOMAINS': { // ✅ This case will now be correctly triggered for "show repeats in IFT140"
                 const geneSymbol = entities.genes[0];
                 const geneData = data.find(g => g.gene === geneSymbol);
-                const domains = Array.isArray(geneData?.domain_descriptions) && geneData.domain_descriptions.length ? geneData.domain_descriptions.join(', ') : 'No domains or repeats listed.';
+                const domains = Array.isArray(geneData?.domain_descriptions) && geneData.domain_descriptions.length 
+                    ? geneData.domain_descriptions.join(', ') 
+                    : 'No domains or repeats listed in the database.';
                 resultHtml = formatGeneDetail(geneData, geneSymbol, 'Domains / Repeats', domains);
                 break;
             }
@@ -562,7 +563,6 @@ window.handleAIQuery = async function() {
         console.error(err);
     }
 };
-
 
 
 function normalizeTerm(s) {
