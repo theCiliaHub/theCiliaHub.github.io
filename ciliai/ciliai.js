@@ -1,4 +1,5 @@
 // ciliAI.js - Enhanced with advanced AI query handler, heatmap visualization, corrected screen names, and robust autocomplete
+// Updated to dynamically fetch and filter ciliopathy genes from ciliahub_data.json
 
 // --- Global Data Cache ---
 
@@ -155,6 +156,12 @@ window.displayCiliAIPage = async function displayCiliAIPage() {
                 .expression-table tr:nth-child(even) { background-color: #f9f9f9; }
                 .ai-suggestion a { color: #3b82f6; text-decoration: none; }
                 .ai-suggestion a:hover { text-decoration: underline; }
+                .gene-list { column-count: 3; list-style-type: none; padding-left: 0; }
+                .gene-list li { margin-bottom: 0.5rem; }
+                .ciliopathy-table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+                .ciliopathy-table th, .ciliopathy-table td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                .ciliopathy-table th { background-color: #e8f4fd; color: #2c5aa0; }
+                .ciliopathy-table tr:nth-child(even) { background-color: #f9f9f9; }
             </style>
         `;
     } catch (error) {
@@ -171,7 +178,14 @@ window.displayCiliAIPage = async function displayCiliAIPage() {
 // --- Helper Functions & Mock DB ---
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 function debounce(fn, delay) { let timeout; return function (...args) { clearTimeout(timeout); timeout = setTimeout(() => fn(...args), delay); }; }
-const CILI_AI_DB = { "HDAC6": { "summary": { "lof_length": "Promotes / Maintains", "percentage_ciliated": "No effect", "source": "Expert DB" }, "evidence": [{ "id": "21873644", "source": "pubmed", "context": "...loss of HDAC6 results in hyperacetylation of tubulin and leads to the formation of longer, more stable primary cilia in renal epithelial cells." }] }, "IFT88": { "summary": { "lof_length": "Inhibits / Restricts", "percentage_ciliated": "Reduced cilia numbers", "source": "Expert DB" }, "evidence": [{ "id": "10882118", "source": "pubmed", "context": "Mutations in IFT88 (polaris) disrupt intraflagellar transport, leading to a failure in cilia assembly and resulting in severely shortened or absent cilia." }] }, "ARL13B": { "summary": { "lof_length": "Inhibits / Restricts", "percentage_ciliated": "Reduced cilia numbers", "source": "Expert DB" }, "evidence": [{ "id": "21940428", "source": "pubmed", "context": "The small GTPase ARL13B is critical for ciliary structure; its absence leads to stunted cilia with abnormal morphology and axonemal defects." }] } };
+
+// Updated Mock DB with more entries for demonstration
+const CILI_AI_DB = { 
+    "HDAC6": { "summary": { "lof_length": "Promotes / Maintains", "percentage_ciliated": "No effect", "source": "Expert DB" }, "evidence": [{ "id": "21873644", "source": "pubmed", "context": "...loss of HDAC6 results in hyperacetylation of tubulin and leads to the formation of longer, more stable primary cilia in renal epithelial cells." }] }, 
+    "IFT88": { "summary": { "lof_length": "Inhibits / Restricts", "percentage_ciliated": "Reduced cilia numbers", "source": "Expert DB" }, "evidence": [{ "id": "10882118", "source": "pubmed", "context": "Mutations in IFT88 (polaris) disrupt intraflagellar transport, leading to a failure in cilia assembly and resulting in severely shortened or absent cilia." }] }, 
+    "ARL13B": { "summary": { "lof_length": "Inhibits / Restricts", "percentage_ciliated": "Reduced cilia numbers", "source": "Expert DB" }, "evidence": [{ "id": "21940428", "source": "pubmed", "context": "The small GTPase ARL13B is critical for ciliary structure; its absence leads to stunted cilia with abnormal morphology and axonemal defects." }] },
+    "BBS1": { "summary": { "lof_length": "Inhibits / Restricts", "percentage_ciliated": "Reduced cilia numbers", "source": "Expert DB" }, "evidence": [{ "id": "12118255", "source": "pubmed", "context": "Mutated in Bardet-Biedl syndrome (type 1) OMIM 209901." }] }
+};
 
 // --- Data Fetching and Caching ---
 
@@ -338,6 +352,35 @@ async function getGenesByFunctionalCategory(query) {
         .sort();
 }
 
+// --- UPDATED: Dynamic function to get ciliopathy genes from fetched data ---
+async function getCiliopathyGenes(disease) {
+    await fetchCiliaData();
+    if (!ciliaHubDataCache) {
+        return { genes: [], description: 'No data available. Failed to load CiliaHub data.' };
+    }
+
+    const diseaseLower = disease.toLowerCase().trim();
+    const matchingGenes = ciliaHubDataCache
+        .filter(gene => {
+            if (gene.ciliopathy) {
+                const ciliopathies = typeof gene.ciliopathy === 'string' 
+                    ? gene.ciliopathy.toLowerCase().split(',').map(c => c.trim()) 
+                    : Array.isArray(gene.ciliopathy) 
+                    ? gene.ciliopathy.map(c => c.toLowerCase().trim()) 
+                    : [];
+                return ciliopathies.some(c => c.includes(diseaseLower) || diseaseLower.includes(c));
+            }
+            return false;
+        })
+        .map(gene => gene.gene)
+        .filter((value, index, self) => self.indexOf(value) === index) // Unique
+        .sort();
+
+    const description = `Found ${matchingGenes.length} genes associated with "${disease}" based on ciliopathy annotations in the CiliaHub database. These genes are involved in ciliary functions linked to the disease.`;
+
+    return { genes: matchingGenes, description };
+}
+
 
 /**
  * Renders an interactive protein interaction network using Cytoscape.js.
@@ -394,7 +437,7 @@ function normalizeTerm(s) {
 }
 
 // =============================================================================
-// CiliAI: Main AI Query Handler
+// CiliAI: Main AI Query Handler - Updated with dynamic ciliopathy filtering
 // =============================================================================
 window.handleAIQuery = async function() {
     const aiQueryInput = document.getElementById('aiQueryInput');
@@ -447,7 +490,19 @@ window.handleAIQuery = async function() {
             return; // Exit after displaying the heatmap
         }
         
-        // --- Your original question logic (UNCHANGED) ---
+        // --- UPDATED: General ciliopathy query using dynamic filter ---
+        else if ((match = qLower.match(/(?:genes for|genes involved in|show me genes for)\s+(.*)/i))) {
+            const disease = match[1].trim();
+            const { genes, description } = await getCiliopathyGenes(disease);
+            resultHtml = formatListResult(`${disease} Genes`, genes, description);
+        }
+        // Basal body / functional categories
+        else if ((match = qLower.match(/(?:genes for|genes related to|show me)\s+(motile cilium|axoneme|basal body|transition zone|ciliogenesis)/i))) {
+            const term = match[1];
+            const results = await getGenesByFunctionalCategory(term);
+            resultHtml = formatListResult(`Genes for: ${term}`, results);
+        }
+        // Your original question logic (UNCHANGED) ---
 
         // Function
         else if ((match = qLower.match(/(?:function of|what is the function of|describe function of)\s+([A-Z0-9\-]+)/i))) {
@@ -499,17 +554,6 @@ window.handleAIQuery = async function() {
             const results = data.map(g => g.gene).sort();
             resultHtml = formatListResult('All Ciliary Genes (Ciliome)', results);
         }
-        else if ((match = qLower.match(/(?:genes for|genes related to|show me)\s+(motile cilium|axoneme|basal body|transition zone|ciliogenesis)/i))) {
-            const term = match[1];
-            const results = await getGenesByFunctionalCategory(term);
-            resultHtml = formatListResult(`Genes for: ${term}`, results);
-        }
-        else if ((match = qLower.match(/(?:genes for|genes involved in|show me genes for)\s+(.*)/i))) {
-            const disease = match[1].trim();
-            const diseaseRegex = new RegExp(disease.replace(/ /g, '[\\s-]*'), 'i');
-            const results = data.filter(g => g.functional_summary && diseaseRegex.test(g.functional_summary)).map(g => g.gene).sort();
-            resultHtml = formatListResult(`Genes for: ${disease}`, results);
-        }
         // --- Fallback ---
         else {
             resultHtml = `<p>Sorry, I didn’t understand that. Try one of the examples.</p>`;
@@ -523,7 +567,6 @@ window.handleAIQuery = async function() {
     }
 };
 
-
 // -------------------------------
 // Click handler for gene selection
 // -------------------------------
@@ -534,7 +577,7 @@ document.addEventListener('click', (e) => {
     }
 
     // Handle clicks on suggested questions
-    if (e.target.matches('.example-queries')) {
+    if (e.target.matches('.example-queries span')) {
         const aiQueryInput = document.getElementById('aiQueryInput');
         aiQueryInput.value = e.target.textContent.replace(/["']/g, '');
         handleAIQuery();
@@ -576,7 +619,7 @@ function formatListResult(title, geneList, message = '') {
         <div class="result-card">
             <h3>${title} (${geneList.length} found)</h3>
             ${messageHtml}
-            <ul style="column-count: 3; list-style-type: none; padding-left: 0;">
+            <ul class="gene-list">
                 ${geneList.map(g => `<li>${g}</li>`).join('')}
             </ul>
         </div>
