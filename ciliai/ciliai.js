@@ -428,6 +428,7 @@ function parseComplexQuery(rawQuery, allGenes = []) {
     return { intent: 'UNKNOWN', entities };
 }
 // --- Main Query Handler (FULLY RESTORED & CORRECTED) ---
+// --- Main Query Handler (FULLY RESTORED & CORRECTED) ---
 window.handleAIQuery = async function() {
     const aiQueryInput = document.getElementById('aiQueryInput');
     const resultArea = document.getElementById('ai-result-area');
@@ -529,7 +530,6 @@ window.handleAIQuery = async function() {
         console.error(err);
     }
 };
-
 
 function normalizeTerm(s) {
     if (!s) return '';
