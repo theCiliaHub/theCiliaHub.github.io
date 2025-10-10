@@ -388,118 +388,6 @@ async function displayInteractionNetwork(geneSymbol, containerId) {
 }
 
 
-function normalizeTerm(s) {
-    if (!s) return '';
-    return String(s).toLowerCase().replace(/[_\-\s]+/g, ' ').trim();
-}
-
-// =============================================================================
-// CiliAI: Main AI Query Handler (Refactored for Intent Engine)
-// =============================================================================
-window.handleAIQuery = async function() {
-    const aiQueryInput = document.getElementById('aiQueryInput');
-    const resultArea = document.getElementById('ai-result-area');
-    const query = aiQueryInput.value.trim();
-    if (!query) return;
-
-    resultArea.style.display = 'block';
-    resultArea.innerHTML = `<p class="status-searching">🧠 CiliAI is thinking...</p>`;
-    document.getElementById('resultsSection').style.display = 'none';
-
-    // --- Load necessary data sources ---
-    const [data, phylogeny, tissueData] = await Promise.all([
-        fetchCiliaData(), fetchPhylogenyData(), fetchTissueData()
-    ]).catch(err => {
-        resultArea.innerHTML = `<p class="status-not-found">⚠️ Failed to load data sources.</p>`;
-        console.error("Data fetch error:", err);
-        return [null, null, null];
-    });
-
-    if (!data) return;
-
-    // --- Use the new advanced parser ---
-    const allGeneSymbols = data.map(g => g.gene);
-    const parsed = parseComplexQuery(query, allGeneSymbols);
-    const { intent, entities } = parsed;
-    
-    let resultHtml = '';
-
-    try {
-        // --- Execute action based on intent ---
-        switch (intent) {
-            case 'COMPARE_EXPRESSION':
-                await displayCiliAIExpressionHeatmap(entities.genes, resultArea);
-                return;
-
-            case 'GET_INTERACTIONS':
-                resultArea.style.height = '450px';
-                await displayInteractionNetwork(entities.genes[0], 'ai-result-area');
-                return;
-
-            case 'GET_EXPRESSION':
-                await displayCiliAIExpressionHeatmap(entities.genes, resultArea);
-                return;
-
-            case 'GET_FUNCTION': {
-                const geneSymbol = entities.genes[0];
-                const geneData = data.find(g => g.gene === geneSymbol);
-                resultHtml = formatGeneDetail(geneData, geneSymbol, 'Function', geneData?.functional_summary || geneData?.description);
-                break;
-            }
-            case 'GET_DOMAINS': {
-                const geneSymbol = entities.genes[0];
-                const geneData = data.find(g => g.gene === geneSymbol);
-                const domains = Array.isArray(geneData?.domain_descriptions) && geneData.domain_descriptions.length ? geneData.domain_descriptions.join(', ') : 'No domains listed.';
-                resultHtml = formatGeneDetail(geneData, geneSymbol, 'Domains / Repeats', domains);
-                break;
-            }
-            case 'GET_DISEASES': {
-                const geneSymbol = entities.genes[0];
-                const geneData = data.find(g => g.gene === geneSymbol);
-                resultHtml = formatGeneDetail(geneData, geneSymbol, 'Associated Diseases', geneData?.functional_summary);
-                break;
-            }
-            case 'GET_PHYLOGENY': {
-                const geneSymbol = entities.genes[0];
-                const geneData = phylogeny[geneSymbol];
-                if (!geneData || !geneData.category) {
-                     resultHtml = `<div class="result-card"><h3>Phylogeny of ${geneSymbol}</h3><p class="status-not-found">No phylogeny data found.</p></div>`;
-                } else {
-                     const conservation = geneData.category.replace(/_/g, ' ');
-                     resultHtml = `<div class="result-card"><h3>Phylogeny of ${geneSymbol}</h3><p>This gene is classified under: <strong>${conservation}</strong>.</p></div>`;
-                }
-                break;
-            }
-            case 'LIST_GENES_BY_DISEASE': {
-                const disease = entities.disease;
-                const diseaseRegex = new RegExp(disease.replace(/ /g, '[\\s-]*'), 'i');
-                const results = data.filter(g => g.functional_summary && diseaseRegex.test(g.functional_summary)).map(g => g.gene).sort();
-                resultHtml = formatListResult(`Genes for: ${disease}`, results);
-                break;
-            }
-             case 'LIST_GENES_BY_CATEGORY': {
-                const results = await getGenesByFunctionalCategory(entities.category);
-                resultHtml = formatListResult(`Genes for: ${entities.category}`, results);
-                break;
-            }
-            case 'LIST_CILIOME': {
-                const results = data.map(g => g.gene).sort();
-                resultHtml = formatListResult('All Ciliary Genes (Ciliome)', results);
-                break;
-            }
-            default: // UNKNOWN intent
-                resultHtml = `<div class="result-card"><p>🤔 Sorry, I didn’t understand that. Try asking about a gene's <b>function</b>, <b>expression</b>, or <b>associated diseases</b>.</p></div>`;
-                break;
-        }
-
-        resultArea.innerHTML = resultHtml;
-
-    } catch (err) {
-        resultArea.innerHTML = `<p class="status-not-found">⚠️ An error occurred. Check console for details.</p>`;
-        console.error(err);
-    }
-};
-
 // =============================================================================
 // 🧠 CiliAI: Advanced Intent & Entity Recognition Engine
 // =============================================================================
@@ -558,7 +446,8 @@ function parseComplexQuery(rawQuery, allGenes = []) {
         return { intent: 'GET_EXPRESSION', entities, normalizedQuery };
     }
 
-    // Domain/Motif Intent
+    // Domain/Motif Intent - THIS IS THE FIX
+    // It correctly identifies "repeat" and is checked *before* a generic "function" intent.
     if (normalizedQuery.match(/\b(domain|motif|repeat|structure|architecture)\b/)) {
         return { intent: 'GET_DOMAINS', entities, normalizedQuery };
     }
@@ -566,11 +455,9 @@ function parseComplexQuery(rawQuery, allGenes = []) {
     // Disease Intent
     const diseaseMatch = normalizedQuery.match(/(?:genes for|disease(?:s)?|illness|syndrome|condition|linked to|associated with)\s+([a-z\s0-9\-]+)/);
     if (diseaseMatch) {
-        // If a gene was also detected, the intent is specific to that gene's diseases
         if (entities.genes.length > 0) {
              return { intent: 'GET_DISEASES', entities, normalizedQuery };
         }
-        // Otherwise, it's a request for a list of genes for a disease
         entities.disease = diseaseMatch[1].replace(entities.genes.join(' ').toLowerCase(), '').trim();
         return { intent: 'LIST_GENES_BY_DISEASE', entities, normalizedQuery };
     }
@@ -592,14 +479,120 @@ function parseComplexQuery(rawQuery, allGenes = []) {
         return { intent: 'LIST_CILIOME', entities, normalizedQuery };
     }
 
-    // --- Fallback Intent ---
-    // If we found a gene but no other intent, default to asking for its function.
     if (entities.genes.length > 0) {
-        return { intent: 'GET_FUNCTION', entities, normalizedQuery };
+        return { intent: 'GET_FUNCTION', entities, normalizedQuery }; // Default action if gene found
     }
 
     return { intent: 'UNKNOWN', entities, normalizedQuery };
 }
+
+
+// =============================================================================
+// CiliAI: Main AI Query Handler (Refactored for Intent Engine)
+// =============================================================================
+window.handleAIQuery = async function() {
+    const aiQueryInput = document.getElementById('aiQueryInput');
+    const resultArea = document.getElementById('ai-result-area');
+    const query = aiQueryInput.value.trim();
+    if (!query) return;
+
+    resultArea.style.display = 'block';
+    resultArea.innerHTML = `<p class="status-searching">🧠 CiliAI is thinking...</p>`;
+    document.getElementById('resultsSection').style.display = 'none';
+
+    const [data, phylogeny] = await Promise.all([
+        fetchCiliaData(), fetchPhylogenyData()
+    ]).catch(err => {
+        resultArea.innerHTML = `<p class="status-not-found">⚠️ Failed to load data sources.</p>`;
+        console.error("Data fetch error:", err);
+        return [null, null];
+    });
+
+    if (!data) return;
+
+    // Use the new advanced parser
+    const allGeneSymbols = data.map(g => g.gene);
+    const parsed = parseComplexQuery(query, allGeneSymbols);
+    const { intent, entities } = parsed;
+    
+    let resultHtml = '';
+
+    try {
+        // A clean switch statement replaces the fragile if/else chain
+        switch (intent) {
+            case 'COMPARE_EXPRESSION':
+                await displayCiliAIExpressionHeatmap(entities.genes, resultArea);
+                return;
+            case 'GET_INTERACTIONS':
+                resultArea.style.height = '450px';
+                await displayInteractionNetwork(entities.genes[0], 'ai-result-area');
+                return;
+            case 'GET_EXPRESSION':
+                await displayCiliAIExpressionHeatmap(entities.genes, resultArea);
+                return;
+            case 'GET_FUNCTION': {
+                const geneSymbol = entities.genes[0];
+                const geneData = data.find(g => g.gene === geneSymbol);
+                resultHtml = formatGeneDetail(geneData, geneSymbol, 'Function', geneData?.functional_summary || geneData?.description);
+                break;
+            }
+            case 'GET_DOMAINS': { // This case will now be correctly triggered
+                const geneSymbol = entities.genes[0];
+                const geneData = data.find(g => g.gene === geneSymbol);
+                const domains = Array.isArray(geneData?.domain_descriptions) && geneData.domain_descriptions.length ? geneData.domain_descriptions.join(', ') : 'No domains or repeats listed.';
+                resultHtml = formatGeneDetail(geneData, geneSymbol, 'Domains / Repeats', domains);
+                break;
+            }
+            case 'GET_DISEASES': {
+                const geneSymbol = entities.genes[0];
+                const geneData = data.find(g => g.gene === geneSymbol);
+                resultHtml = formatGeneDetail(geneData, geneSymbol, 'Associated Diseases', geneData?.functional_summary);
+                break;
+            }
+            case 'GET_PHYLOGENY': {
+                const geneSymbol = entities.genes[0];
+                const geneData = phylogeny[geneSymbol];
+                if (!geneData || !geneData.category) {
+                     resultHtml = `<div class="result-card"><h3>Phylogeny of ${geneSymbol}</h3><p class="status-not-found">No phylogeny data found.</p></div>`;
+                } else {
+                     const conservation = geneData.category.replace(/_/g, ' ');
+                     resultHtml = `<div class="result-card"><h3>Phylogeny of ${geneSymbol}</h3><p>This gene is classified under: <strong>${conservation}</strong>.</p></div>`;
+                }
+                break;
+            }
+            case 'LIST_GENES_BY_DISEASE': {
+                const disease = entities.disease;
+                const diseaseRegex = new RegExp(disease.replace(/ /g, '[\\s-]*'), 'i');
+                const results = data.filter(g => g.functional_summary && diseaseRegex.test(g.functional_summary)).map(g => g.gene).sort();
+                resultHtml = formatListResult(`Genes for: ${disease}`, results);
+                break;
+            }
+             case 'LIST_GENES_BY_CATEGORY': {
+                const results = await getGenesByFunctionalCategory(entities.category);
+                resultHtml = formatListResult(`Genes for: ${entities.category}`, results);
+                break;
+            }
+            case 'LIST_CILIOME': {
+                const results = data.map(g => g.gene).sort();
+                resultHtml = formatListResult('All Ciliary Genes (Ciliome)', results);
+                break;
+            }
+            default: // UNKNOWN intent
+                resultHtml = `<div class="result-card"><p>🤔 Sorry, I didn’t understand that. Try asking about a gene's <b>function</b>, <b>expression</b>, or <b>associated diseases</b>.</p></div>`;
+                break;
+        }
+        resultArea.innerHTML = resultHtml;
+    } catch (err) {
+        resultArea.innerHTML = `<p class="status-not-found">⚠️ An error occurred. Check console for details.</p>`;
+        console.error(err);
+    }
+};
+
+function normalizeTerm(s) {
+    if (!s) return '';
+    return String(s).toLowerCase().replace(/[_\-\s]+/g, ' ').trim();
+}
+
 
 function parseUserIntent(query) {
   const q = query.toLowerCase().trim();
