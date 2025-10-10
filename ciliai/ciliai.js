@@ -383,33 +383,31 @@ async function getCiliopathyGenes(disease) {
     if (!ciliaHubDataCache) {
         return { genes: [], description: 'No data available. Failed to load CiliaHub data.' };
     }
-
     const diseaseLower = normalizeTerm(disease);
     let matchingGenes = [];
-
+    let description = '';
     if (diseaseLower === 'ciliopathy') {
         matchingGenes = ciliaHubDataCache
-            .filter(gene => gene.ciliopathy.length > 0)
+            .filter(gene => gene.ciliopathy && gene.ciliopathy.length > 0)
             .map(gene => gene.gene)
             .sort();
         description = `Found ${matchingGenes.length} genes associated with any ciliopathy in the CiliaHub database.`;
     } else {
         matchingGenes = ciliaHubDataCache
-            .filter(gene => gene.ciliopathy.some(c => normalizeTerm(c).includes(diseaseLower)))
+            .filter(gene => gene.ciliopathy && gene.ciliopathy.some(c => normalizeTerm(c).includes(diseaseLower)))
             .map(gene => gene.gene)
             .sort();
-        description = `Found ${matchingGenes.length} genes associated with "${disease}" based on ciliopathy annotations in the CiliaHub database. These genes are involved in ciliary functions linked to the disease.`;
+        description = `Found ${matchingGenes.length} genes associated with "${disease}" based on ciliopathy annotations in the CiliaHub database.`;
     }
-
     return { genes: matchingGenes, description };
 }
+
 
 // --- NEW: Function to get genes by domain descriptions ---
 async function getGenesByDomain(terms) {
     await fetchCiliaData();
     if (!ciliaHubDataCache) return [];
     const lowerTerms = terms.map(normalizeTerm);
-
     return ciliaHubDataCache
         .filter(gene => {
             const domainsLower = gene.domain_descriptions.map(normalizeTerm);
@@ -419,12 +417,13 @@ async function getGenesByDomain(terms) {
         .sort();
 }
 
+
+
 // --- NEW: Function to get genes by localizations ---
 async function getGenesByLocalization(terms) {
     await fetchCiliaData();
     if (!ciliaHubDataCache) return [];
     const lowerTerms = terms.map(normalizeTerm);
-
     return ciliaHubDataCache
         .filter(gene => {
             const locsLower = gene.localization.map(normalizeTerm);
@@ -501,7 +500,6 @@ window.handleAIQuery = async function() {
 
     resultArea.style.display = 'block';
     resultArea.innerHTML = `<p class="status-searching">CiliAI is thinking...</p>`;
-
     document.getElementById('resultsSection').style.display = 'none';
 
     const data = await fetchCiliaData();
@@ -518,39 +516,40 @@ window.handleAIQuery = async function() {
     let match;
 
     try {
-        // --- UPDATED: Handle single gene display with variations (display/show/please display BBS1) ---
+        // Handle single gene display with variations
         if ((match = qLower.match(/(?:please\s+)?(?:display|show)(?:\s+gene)?\s+([A-Z0-9\-]+)/i))) {
             const geneSymbol = match[1].toUpperCase();
             const geneData = data.find(g => g.gene.toUpperCase() === geneSymbol);
             resultHtml = formatComprehensiveGeneDetails(geneSymbol, geneData);
         }
-        // --- NEW: Handle genes with specific domains ---
+        // Handle genes with specific domains
         else if ((match = qLower.match(/(?:please\s+)?(?:display|show)\s+genes\s+with\s+(.+)\s+domains/i))) {
             const domainQuery = match[1].trim();
             const domainTerms = domainQuery.split(/\s+and\s+/i).map(t => t.trim());
             const genes = await getGenesByDomain(domainTerms);
             const title = `Genes with ${domainTerms.join(' and ')} domains`;
-            resultHtml = formatListResult(title, genes, `Found ${genes.length} genes matching the domain criteria.`);
+            resultHtml = formatListResult(title, genes, `Found ${genes.length} genes with ${domainTerms.join(' and ')} domains.`);
         }
-        // --- NEW: Handle genes with specific localizations ---
+        // Handle genes with specific localizations
         else if ((match = qLower.match(/(?:please\s+)?(?:display|show)\s+genes\s+with\s+(.+)\s+localizations/i))) {
             const locQuery = match[1].trim();
             const locTerms = locQuery.split(/\s+and\s+/i).map(t => t.trim());
             const genes = await getGenesByLocalization(locTerms);
             const title = `Genes with ${locTerms.join(' and ')} localizations`;
-            resultHtml = formatListResult(title, genes, `Found ${genes.length} genes matching the localization criteria.`);
+            resultHtml = formatListResult(title, genes, `Found ${genes.length} genes with ${locTerms.join(' and ')} localizations.`);
         }
-        // --- UPDATED: Handle ciliopathy genes and specific disease genes ---
-        else if (qLower.includes('display ciliopathy genes') || qLower.includes('show ciliopathy genes')) {
+        // Handle ciliopathy genes
+        else if (qLower.match(/(?:please\s+)?(?:display|show)\s+ciliopathy\s+genes/i)) {
             const { genes, description } = await getCiliopathyGenes('ciliopathy');
             resultHtml = formatListResult('Ciliopathy Genes', genes, description);
         }
+        // Handle specific disease genes
         else if ((match = qLower.match(/(?:please\s+)?(?:display|show)\s+(.+)\s+genes/i))) {
             const disease = match[1].trim();
             const { genes, description } = await getCiliopathyGenes(disease);
             resultHtml = formatListResult(`${disease} Genes`, genes, description);
         }
-        // --- Existing query patterns ---
+        // Existing query patterns
         else if ((match = qLower.match(/(?:compare expression of|compare|expression of)\s+([A-Z0-9\-]+)\s+(?:and|vs)\s+([A-Z0-9\-]+)/i))) {
             const genesToCompare = [match[1].toUpperCase(), match[2].toUpperCase()];
             await displayCiliAIExpressionHeatmap(genesToCompare, resultArea);
@@ -577,30 +576,23 @@ window.handleAIQuery = async function() {
             const results = await getGenesByFunctionalCategory(term);
             resultHtml = formatListResult(`Genes for: ${term}`, results);
         }
-        else if ((match = qLower.match/(?:function of|what is the function of|describe function of)\s+([A-Z0-9\-]+)/i))) {
+        else if ((match = qLower.match(/(?:function of|what is the function of|describe function of)\s+([A-Z0-9\-]+)/i))) {
             const geneSymbol = match[1].toUpperCase();
             const geneData = data.find(g => g.gene.toUpperCase() === geneSymbol);
-            resultHtml = formatGeneDetail(
-                geneData,
-                geneSymbol,
-                'Function',
-                geneData?.functional_summary || geneData?.description
-            );
+            resultHtml = formatGeneDetail(geneData, geneSymbol, 'Function', geneData ? (geneData.functional_summary || geneData.description) : null);
         }
-        else if ((match = qLower.match/(?:protein domains|domains in|what domains.*in)\s+([A-Z0-9\-]+)/i))) {
+        else if ((match = qLower.match(/(?:protein domains|domains in|what domains.*in)\s+([A-Z0-9\-]+)/i))) {
             const geneSymbol = match[1].toUpperCase();
             const geneData = data.find(g => g.gene.toUpperCase() === geneSymbol);
-            const domains = Array.isArray(geneData?.domain_descriptions) && geneData.domain_descriptions.length
-                ? geneData.domain_descriptions.join(', ')
-                : 'No domains listed.';
+            const domains = geneData && Array.isArray(geneData.domain_descriptions) && geneData.domain_descriptions.length ? geneData.domain_descriptions.join(', ') : 'No domains listed.';
             resultHtml = formatGeneDetail(geneData, geneSymbol, 'Domains', domains);
         }
-        else if ((match = qLower.match/(?:disease linked to|diseases for|associated with)\s+([A-Z0-9\-]+)/i))) {
+        else if ((match = qLower.match(/(?:disease linked to|diseases for|associated with)\s+([A-Z0-9\-]+)/i))) {
             const geneSymbol = match[1].toUpperCase();
             const geneData = data.find(g => g.gene.toUpperCase() === geneSymbol);
-            resultHtml = formatGeneDetail(geneData, geneSymbol, 'Associated Diseases', geneData?.functional_summary);
+            resultHtml = formatGeneDetail(geneData, geneSymbol, 'Associated Diseases', geneData ? geneData.functional_summary : null);
         }
-        else if ((match = qLower.match/(?:phylogeny|phylogenetic distribution)\s+(?:of\s+)?([A-Z0-9\-]+)/i))) {
+        else if ((match = qLower.match(/(?:phylogeny|phylogenetic distribution)\s+(?:of\s+)?([A-Z0-9\-]+)/i))) {
             const geneQuery = match[1].toUpperCase();
             const geneData = phylogeny[geneQuery];
             if (!geneData || !geneData.category) {
@@ -627,20 +619,20 @@ window.handleAIQuery = async function() {
         }
 
         resultArea.innerHTML = resultHtml;
-
     } catch (e) {
         resultArea.innerHTML = `<p class="status-not-found">An error occurred. Check console for details.</p>`;
         console.error(e);
     }
 };
 
+
 // --- UPDATED: Helper Function to Format Comprehensive Gene Details as Table ---
+// --- Helper Function to Format Comprehensive Gene Details as Table ---
 function formatComprehensiveGeneDetails(geneSymbol, geneData) {
     if (!geneData) {
         return `<div class="result-card"><h3>${geneSymbol}</h3><p class="status-not-found">Gene not found in the database.</p></div>`;
     }
 
-    // Extract and format fields
     const ensemblId = geneData.ensembl_id || 'Not available';
     const functionalSummary = geneData.functional_summary || geneData.description || 'No functional summary available.';
     const localization = geneData.localization.join(', ') || 'Not specified';
@@ -650,7 +642,6 @@ function formatComprehensiveGeneDetails(geneSymbol, geneData) {
     const synonym = geneData.synonym || 'None';
     const ciliopathy = geneData.ciliopathy.join(', ') || 'None';
 
-    // Fetch screen data
     let screenHtml = '';
     if (screenDataCache && screenDataCache[geneSymbol]) {
         screenHtml = renderScreenDataTable(geneSymbol, screenDataCache[geneSymbol]);
@@ -671,7 +662,7 @@ function formatComprehensiveGeneDetails(geneSymbol, geneData) {
                 <tr><th>Synonym</th><td>${synonym}</td></tr>
                 <tr><th>Ciliopathy</th><td>${ciliopathy}</td></tr>
             </table>
-            <h4>Screen Results:</h4>
+            <h4>Screen Results</h4>
             ${screenHtml}
             <p class="ai-suggestion">
                 <a href="#" class="ai-action" data-action="expression-visualize" data-gene="${geneSymbol}">📊 View expression heatmap</a>
@@ -710,7 +701,7 @@ document.addEventListener('click', (e) => {
 });
 
 
-// --- AI Result Formatting Helpers ---
+// --- Other Helper Functions (Updated to Remove Optional Chaining) ---
 function formatGeneDetail(geneData, geneSymbol, detailTitle, detailContent) {
     if (!geneData) {
         return `<div class="result-card"><h3>${geneSymbol}</h3><p class="status-not-found">Gene not found in the database.</p></div>`;
@@ -718,7 +709,7 @@ function formatGeneDetail(geneData, geneSymbol, detailTitle, detailContent) {
     return `
         <div class="result-card">
             <h3>${geneSymbol}</h3>
-            <h4>${detailTitle}:</h4>
+            <h4>${detailTitle}</h4>
             <p>${detailContent || 'No information available.'}</p>
         </div>
     `;
@@ -733,9 +724,10 @@ function formatListResult(title, geneList, message = '') {
         <div class="result-card">
             <h3>${title} (${geneList.length} found)</h3>
             ${messageHtml}
-            <ul class="gene-list">
-                ${geneList.map(g => `<li>${g}</li>`).join('')}
-            </ul>
+            <table class="ciliopathy-table">
+                <thead><tr><th>Gene</th></tr></thead>
+                <tbody>${geneList.map(g => `<tr><td>${g}</td></tr>`).join('')}</tbody>
+            </table>
         </div>
     `;
 }
@@ -1003,7 +995,8 @@ async function runAnalysis(geneList) {
     const resultsSection = document.getElementById('resultsSection');
     const analyzeBtn = document.getElementById('analyzeBtn');
     const visualizeBtn = document.getElementById('visualizeBtn');
-    const mode = document.querySelector('input[name="mode"]:checked')?.value || 'hybrid';
+    const checkedInput = document.querySelector('input[name="mode"]:checked');
+    const mode = checkedInput ? checkedInput.value : 'hybrid';
 
     resultsContainer.innerHTML = '';
     resultsSection.style.display = 'block';
@@ -1012,9 +1005,9 @@ async function runAnalysis(geneList) {
     visualizeBtn.style.display = 'none';
     document.getElementById('plot-display-area').innerHTML = '';
 
-    geneList.forEach(gene => {
+    for (const gene of geneList) {
         resultsContainer.insertAdjacentHTML('beforeend', createPlaceholderCard(gene, mode));
-    });
+    }
 
     for (const gene of geneList) {
         const resultCard = document.getElementById(`card-${gene}`);
@@ -1035,8 +1028,8 @@ async function runAnalysis(geneList) {
         if (mode === 'nlp' || mode === 'hybrid') {
             apiEvidence = await analyzeGeneViaAPI(gene, resultCard);
         }
-        
-        const allEvidence = [...(dbData?.evidence || []), ...apiEvidence, ...screenEvidence];
+
+        const allEvidence = [...(dbData && dbData.evidence ? dbData.evidence : []), ...apiEvidence, ...screenEvidence];
         const finalHtml = createResultCard(gene, dbData, allEvidence);
         if (resultCard) resultCard.outerHTML = finalHtml;
     }
