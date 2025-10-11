@@ -264,50 +264,35 @@ async function fetchScreenData() {
 // =============== START: REPLACED FUNCTION ===============
 // This function from "Code 1" replaces the faulty one from "Code 2" to fix the TypeError.
 async function fetchPhylogenyData() {
-    if (phylogenyDataCache) return phylogenyDataCache;
-
-    try {
-        const response = await fetch('https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/phylogeny_summary.json');
-        if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
-        const raw = await response.json();
-
-        const unified = {};
-
-        // 1. Handle top-level arrays like "ciliated_only_genes"
-        if (raw.ciliated_only_genes) {
-            raw.ciliated_only_genes
-                .filter(gene => typeof gene === 'string') // Ensure it's a string
-                .forEach(g => unified[g.trim().toUpperCase()] = { category: 'ciliary_only' });
-        }
-
-        if (raw.nonciliary_only_genes) {
-            raw.nonciliary_only_genes
-                .filter(gene => typeof gene === 'string') // Ensure it's a string
-                .forEach(g => unified[g.trim().toUpperCase()] = { category: 'nonciliary_only' });
-        }
-
-        if (raw.in_all_organisms) {
-            raw.in_all_organisms
-                .filter(gene => typeof gene === 'string') // Ensure it's a string
-                .forEach(g => unified[g.trim().toUpperCase()] = { category: 'in_all_organisms' });
-        }
-
-        // 2. Handle list of objects like {id, sym, class, species}
-        if (Array.isArray(raw)) {
-            raw.forEach(item => {
-                const gene = (item.sym || '').trim().toUpperCase(); // Safely handles missing 'sym'
-                const cat = (item.class || '').toLowerCase().replace(/\s+/g, '_');
-                if (gene) unified[gene] = { category: cat, species: item.species || [] };
-            });
-        }
-
-        phylogenyDataCache = unified;
-        console.log(`Phylogeny data normalized: ${Object.keys(unified).length} entries`);
-        return phylogenyDataCache;
-    } catch (error) {
-        console.error('Failed to fetch phylogeny summary data:', error);
-        return {};
+  if (phylogenyDataCache) return phylogenyDataCache;
+  try {
+    const response = await fetch('https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/phylogeny_summary.json');
+    if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+    const raw = await response.json();
+    const unified = {};
+    if (raw.ciliated_only_genes) {
+      raw.ciliated_only_genes.filter(gene => typeof gene === 'string').forEach(g => unified[g.trim().toUpperCase()] = { category: 'ciliary_only' });
     }
+    if (raw.nonciliary_only_genes) {
+      raw.nonciliary_only_genes.filter(gene => typeof gene === 'string').forEach(g => unified[g.trim().toUpperCase()] = { category: 'nonciliary_only' });
+    }
+    if (raw.in_all_organisms) {
+      raw.in_all_organisms.filter(gene => typeof gene === 'string').forEach(g => unified[g.trim().toUpperCase()] = { category: 'in_all_organisms' });
+    }
+    if (Array.isArray(raw)) {
+      raw.forEach(item => {
+        const gene = (item.sym || '').trim().toUpperCase();
+        const cat = (item.class || '').toLowerCase().replace(/\s+/g, '_');
+        if (gene) unified[gene] = { category: cat, species: item.species || [] };
+      });
+    }
+    phylogenyDataCache = unified;
+    console.log(`Phylogeny data normalized: ${Object.keys(unified).length} entries`);
+    return phylogenyDataCache;
+  } catch (error) {
+    console.error('Failed to fetch phylogeny summary data:', error);
+    return {};
+  }
 }
 
 // =============== END: REPLACED FUNCTION ===============
@@ -609,19 +594,21 @@ window.handleAIQuery = async function() {
       resultHtml = formatGeneDetail(geneData, geneSymbol, 'Associated Diseases', geneData ? geneData.functional_summary : null);
     }
     else if ((match = qLower.match(/(?:phylogeny|phylogenetic distribution)\s+(?:of\s+)?([A-Z0-9\-]+)/i))) {
-      const geneQuery = match[1].toUpperCase();
-      const geneData = phylogeny[geneQuery];
-      if (!geneData || !geneData.category) {
-        resultHtml = `<div class="result-card"><h3>Phylogeny of ${geneQuery}</h3><p class="status-not-found">No phylogeny data found.</p></div>`;
-      } else {
-        const conservation = geneData.category.replace(/_/g, ' ');
-        resultHtml = `
-          <div class="result-card"><h3>Phylogeny of ${geneQuery}</h3>
-            <p>This gene is classified under: <strong>${conservation}</strong>.</p>
-            <p class="ai-suggestion">🌿 This indicates its evolutionary conservation pattern.</p>
-          </div>`;
-      }
-    }
+  const geneQuery = match[1].toUpperCase();
+  const geneData = phylogeny[geneQuery];
+  if (!geneData || !geneData.category) {
+    resultHtml = `<div class="result-card"><h3>Phylogeny of ${geneQuery}</h3><p class="status-not-found">No phylogeny data found.</p></div>`;
+  } else {
+    const conservation = geneData.category.replace(/_/g, ' ');
+    const speciesList = geneData.species && geneData.species.length ? geneData.species.join(', ') : 'No species data available';
+    resultHtml = `
+      <div class="result-card"><h3>Phylogeny of ${geneQuery}</h3>
+        <p>This gene is classified under: <strong>${conservation}</strong>.</p>
+        <p>Present in species: ${speciesList}.</p>
+        <p class="ai-suggestion">🌿 This indicates its evolutionary conservation pattern.</p>
+      </div>`;
+  }
+}
     else {
       resultHtml = `<p>Sorry, I didn’t understand that. Try one of the examples.</p>`;
     }
@@ -1150,34 +1137,9 @@ async function displayCiliAIExpressionHeatmap(genes, container) {
 }
 
 function renderScreenDataTable(gene, screenInfo) {
-  if (!screenInfo || typeof screenInfo !== 'object') return '<p class="status-not-found">No structured screen data available.</p>';
-
-  let screensObj = {};
-  if (Array.isArray(screenInfo)) {
-    screensObj = screenInfo.reduce((acc, entry) => {
-      if (entry.dataset) {
-        acc[entry.dataset] = {
-          hit: entry.classification !== 'No significant effect',
-          effect: entry.classification,
-          details: `Mean % Ciliated: ${entry.mean_percent_ciliated || '-'}, SD: ${entry.sd_percent_ciliated || '-'}, Z-Score: ${entry.z_score || '-'}`
-        };
-      }
-      return acc;
-    }, {});
-  } else if (screenInfo.screens && Array.isArray(screenInfo.screens)) {
-    screenInfo.screens.forEach(entry => {
-      if (entry.dataset) {
-        screensObj[entry.dataset] = {
-          hit: entry.classification !== 'No significant effect',
-          effect: entry.classification,
-          details: `Mean % Ciliated: ${entry.mean_percent_ciliated || '-'}, SD: ${entry.sd_percent_ciliated || '-'}, Z-Score: ${entry.z_score || '-'}`
-        };
-      }
-    });
+  if (!screenInfo || !Array.isArray(screenInfo)) {
+    return '<p class="status-not-found">No structured screen data available.</p>';
   }
-
-  const screenKeys = Object.keys(screensObj);
-  const hitCount = screenKeys.filter(key => screensObj[key].hit).length;
 
   const screenNames = {
     'Kim2016': 'Kim et al. (2016) IMCD3 RNAi',
@@ -1187,27 +1149,22 @@ function renderScreenDataTable(gene, screenInfo) {
     'Breslow2018': 'Breslow et al. (2018) Hedgehog Signaling'
   };
 
-  const summary = `<p class="screen-summary">According to ${hitCount} out of ${screenKeys.length} ciliary screens, <strong>${gene}</strong> was found to impact cilia.</p>`;
+  const hitCount = screenInfo.filter(s => s.result !== 'No effect' && s.result !== 'Not Reported').length;
+  const summary = `<p class="screen-summary">According to ${hitCount} out of ${screenInfo.length} ciliary screens, <strong>${gene}</strong> was found to impact cilia.</p>`;
 
   const tableHtml = `
     <table class="expression-table">
-      <thead><tr><th>Dataset</th><th>Mean % Ciliated</th><th>SD % Ciliated</th><th>Z-Score</th><th>Classification</th><th>Paper Link</th></tr></thead>
+      <thead><tr><th>Source</th><th>Result</th></tr></thead>
       <tbody>
-        ${screenKeys.map(key => {
-          const d = screensObj[key] || { effect: 'N/A', details: '-' };
-          const name = screenNames[key] || key;
-          const detailsParts = d.details.split(', ').reduce((acc, part) => {
-            const [label, value] = part.split(': ');
-            acc[label] = value;
-            return acc;
-          }, {});
-          const paperLink = screenInfo.screens && screenInfo.screens.find(s => s.dataset === key) ? screenInfo.screens.find(s => s.dataset === key).paper_link : '#';
-          return `<tr><td>${name}</td><td>${detailsParts['Mean % Ciliated'] || '-'}</td><td>${detailsParts['SD'] || '-'}</td><td>${detailsParts['Z-Score'] || '-'}</td><td>${d.effect}</td><td><a href="${paperLink}" target="_blank">Link</a></td></tr>`;
+        ${screenInfo.map(s => {
+          const name = screenNames[s.source] || s.source;
+          return `<tr><td>${name}</td><td>${s.result || 'N/A'}</td></tr>`;
         }).join('')}
       </tbody>
     </table>`;
   return summary + tableHtml;
 }
+
 
 function createPlaceholderCard(gene, mode) {
     let statusText = 'Searching...';
@@ -1296,19 +1253,20 @@ async function renderPhylogenyHeatmap(genes) {
     const phylogeny = await fetchPhylogenyData();
     if (!phylogeny || Object.keys(phylogeny).length === 0) {
         console.error('No phylogeny data available');
+        document.getElementById('plot-display-area').innerHTML = '<p class="status-not-found">No phylogeny data available.</p>';
         return;
     }
 
     const organisms = new Set();
     genes.forEach(g => {
         const gData = phylogeny[g];
-        if (gData && gData.presence) {
-            Object.keys(gData.presence).forEach(org => organisms.add(org));
+        if (gData && gData.species) {
+            gData.species.forEach(org => organisms.add(org));
         }
     });
 
-    const orgList = Array.from(organisms);
-    const matrix = genes.map(g => orgList.map(org => phylogeny[g]?.presence?.[org] ? 1 : 0));
+    const orgList = Array.from(organisms).sort();
+    const matrix = genes.map(g => orgList.map(org => phylogeny[g]?.species?.includes(org) ? 1 : 0));
 
     const trace = {
         z: matrix,
@@ -1319,36 +1277,22 @@ async function renderPhylogenyHeatmap(genes) {
             [0, '#f8f9fa'],
             [1, '#2c5aa0']
         ],
-        showscale: false
+        showscale: false,
+        hovertemplate: '<b>Gene:</b> %{y}<br><b>Organism:</b> %{x}<br><b>Present:</b> %{z}<extra></extra>'
     };
 
     const layout = {
-        title: 'Phylogeny Heatmap',
-        xaxis: { title: 'Organisms', tickangle: -45 },
-        yaxis: { title: 'Genes' },
+        title: { text: 'Phylogeny Heatmap', font: { size: 16, family: 'Arial', color: '#2c5aa0' } },
+        xaxis: { title: 'Organisms', tickangle: -45, automargin: true },
+        yaxis: { title: 'Genes', automargin: true },
         margin: { t: 40, l: 100, r: 20, b: 100 },
-        height: Math.max(300, genes.length * 20)
+        height: Math.max(300, genes.length * 30)
     };
 
-    Plotly.newPlot('plot-display-area', [trace], layout);
+    Plotly.newPlot('plot-display-area', [trace], layout, { responsive: true });
 }
 
-function handleExpressionSearchInput(e) {
-    let query = e.target.value.trim().toUpperCase();
-    if (!/^[A-Za-z0-9-]+$/.test(query)) {
-        console.warn(`Invalid gene query format: ${query}`);
-        return;
-    }
-    if (query.length < 2) {
-        hideExpressionSuggestions();
-        return;
-    }
-    clearTimeout(searchTimeout);
-    searchTimeout = setTimeout(() => {
-        const suggestions = getExpressionGeneSuggestions(query);
-        showExpressionSuggestions(suggestions);
-    }, 150);
-}
+
 
 async function analyzeGeneViaAPI(gene, resultCard) {
     const ESEARCH_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi";
@@ -1515,8 +1459,18 @@ function renderScreenSummaryHeatmap(genes, screenData) {
     const numberScreenOrder = Object.keys(numberScreens);
     const signalingScreenOrder = Object.keys(signalingScreens);
 
-    const numberCategoryMap = { "Decreased cilia numbers": { v: 1, c: '#0571b0' }, "Increased cilia numbers": { v: 2, c: '#ca0020' }, "Causes Supernumerary Cilia": { v: 3, c: '#fdae61' }, "No effect": { v: 4, c: '#fee090' }, "Not in Screen": { v: 5, c: '#bdbdbd' }, "Not Reported": { v: 6, c: '#636363' } };
-    const signalingCategoryMap = { "Decreased Signaling (Positive Regulator)": { v: 1, c: '#2166ac' }, "Increased Signaling (Negative Regulator)": { v: 2, c: '#d73027' }, "No Significant Effect": { v: 3, c: '#fdae61' }, "Not in Screen": { v: 4, c: '#bdbdbd' }, "Not Reported": { v: 5, c: '#636363' } };
+    // Updated category maps to match new result values
+    const numberCategoryMap = { 
+        "No effect": { v: 1, c: '#fee090' }, 
+        "Not Reported": { v: 2, c: '#636363' }, 
+        "Not in Screen": { v: 3, c: '#bdbdbd' }
+    };
+    const signalingCategoryMap = { 
+        "Increased Signaling (Negative Regulator)": { v: 1, c: '#d73027' }, 
+        "No effect": { v: 2, c: '#fdae61' }, 
+        "Not Reported": { v: 3, c: '#636363' }, 
+        "Not in Screen": { v: 4, c: '#bdbdbd' }
+    };
 
     const geneLabels = genes.map(g => g.toUpperCase());
     const zDataNumber = [], textDataNumber = [], zDataSignaling = [], textDataSignaling = [];
@@ -1526,8 +1480,9 @@ function renderScreenSummaryHeatmap(genes, screenData) {
         numberScreenOrder.forEach(screenName => {
             const screenKey = numberScreens[screenName];
             let resultText = "Not in Screen";
-            if (screenData[gene]?.screens?.[screenKey]) {
-                resultText = screenData[gene].screens[screenKey].result || "Not Reported";
+            const screenEntry = screenData[gene]?.find(s => s.source === screenKey);
+            if (screenEntry) {
+                resultText = screenEntry.result || "Not Reported";
             }
             const mapping = numberCategoryMap[resultText] || numberCategoryMap["Not in Screen"];
             numberRowValues.push(mapping.v);
@@ -1536,8 +1491,9 @@ function renderScreenSummaryHeatmap(genes, screenData) {
         signalingScreenOrder.forEach(screenName => {
             const screenKey = signalingScreens[screenName];
             let resultText = "Not in Screen";
-            if (screenData[gene]?.screens?.[screenKey]) {
-                resultText = screenData[gene].screens[screenKey].result || "Not Reported";
+            const screenEntry = screenData[gene]?.find(s => s.source === screenKey);
+            if (screenEntry) {
+                resultText = screenEntry.result || "Not Reported";
             }
             const mapping = signalingCategoryMap[resultText] || signalingCategoryMap["Not in Screen"];
             signalingRowValues.push(mapping.v);
@@ -1549,8 +1505,32 @@ function renderScreenSummaryHeatmap(genes, screenData) {
         textDataSignaling.push(signalingRowText);
     });
 
-    const trace1 = { x: numberScreenOrder, y: geneLabels, z: zDataNumber, customdata: textDataNumber, type: 'heatmap', colorscale: [[0, '#0571b0'], [0.2, '#ca0020'], [0.4, '#fdae61'], [0.6, '#fee090'], [0.8, '#636363'], [1.0, '#bdbdbd']], showscale: false, hovertemplate: '<b>Gene:</b> %{y}<br><b>Screen:</b> %{x}<br><b>Result:</b> %{customdata}<extra></extra>', xgap: 1, ygap: 1 };
-    const trace2 = { x: signalingScreenOrder, y: geneLabels, z: zDataSignaling, customdata: textDataSignaling, type: 'heatmap', colorscale: [[0, '#2166ac'], [0.25, '#d73027'], [0.5, '#fdae61'], [0.75, '#636363'], [1.0, '#bdbdbd']], showscale: false, hovertemplate: '<b>Gene:</b> %{y}<br><b>Screen:</b> %{x}<br><b>Result:</b> %{customdata}<extra></extra>', xaxis: 'x2', yaxis: 'y1', xgap: 1, ygap: 1 };
+    const trace1 = { 
+        x: numberScreenOrder, 
+        y: geneLabels, 
+        z: zDataNumber, 
+        customdata: textDataNumber, 
+        type: 'heatmap', 
+        colorscale: [[0, '#fee090'], [0.5, '#636363'], [1.0, '#bdbdbd']], 
+        showscale: false, 
+        hovertemplate: '<b>Gene:</b> %{y}<br><b>Screen:</b> %{x}<br><b>Result:</b> %{customdata}<extra></extra>', 
+        xgap: 1, 
+        ygap: 1 
+    };
+    const trace2 = { 
+        x: signalingScreenOrder, 
+        y: geneLabels, 
+        z: zDataSignaling, 
+        customdata: textDataSignaling, 
+        type: 'heatmap', 
+        colorscale: [[0, '#d73027'], [0.33, '#fdae61'], [0.67, '#636363'], [1.0, '#bdbdbd']], 
+        showscale: false, 
+        hovertemplate: '<b>Gene:</b> %{y}<br><b>Screen:</b> %{x}<br><b>Result:</b> %{customdata}<extra></extra>', 
+        xaxis: 'x2', 
+        yaxis: 'y1', 
+        xgap: 1, 
+        ygap: 1 
+    };
     
     const layout = {
         title: { text: 'Summary of Ciliary Screen Results', font: { size: 16, family: 'Arial', color: '#2c5aa0' } },
@@ -1565,10 +1545,16 @@ function renderScreenSummaryHeatmap(genes, screenData) {
     
     let current_y = 1.0;
     layout.annotations.push({ xref: 'paper', yref: 'paper', x: 1.02, y: current_y + 0.05, xanchor: 'left', text: '<b>Cilia Number/Structure</b>', showarrow: false, font: { size: 13 } });
-    Object.entries(numberCategoryMap).forEach(([key, val]) => { layout.annotations.push({ xref: 'paper', yref: 'paper', x: 1.02, y: current_y, xanchor: 'left', yanchor: 'middle', text: `█ ${key}`, font: { color: val.c, size: 12 }, showarrow: false }); current_y -= 0.06; });
+    Object.entries(numberCategoryMap).forEach(([key, val]) => { 
+        layout.annotations.push({ xref: 'paper', yref: 'paper', x: 1.02, y: current_y, xanchor: 'left', yanchor: 'middle', text: `█ ${key}`, font: { color: val.c, size: 12 }, showarrow: false }); 
+        current_y -= 0.06; 
+    });
     current_y -= 0.1;
     layout.annotations.push({ xref: 'paper', yref: 'paper', x: 1.02, y: current_y + 0.05, xanchor: 'left', text: '<b>Hedgehog Signaling</b>', showarrow: false, font: { size: 13 } });
-    Object.entries(signalingCategoryMap).forEach(([key, val]) => { if (key !== "Not in Screen" && key !== "Not Reported") { layout.annotations.push({ xref: 'paper', yref: 'paper', x: 1.02, y: current_y, xanchor: 'left', yanchor: 'middle', text: `█ ${key}`, font: { color: val.c, size: 12 }, showarrow: false }); current_y -= 0.06; } });
+    Object.entries(signalingCategoryMap).forEach(([key, val]) => { 
+        layout.annotations.push({ xref: 'paper', yref: 'paper', x: 1.02, y: current_y, xanchor: 'left', yanchor: 'middle', text: `█ ${key}`, font: { color: val.c, size: 12 }, showarrow: false }); 
+        current_y -= 0.06; 
+    });
 
     Plotly.newPlot('plot-display-area', [trace1, trace2], layout, { responsive: true });
 }
