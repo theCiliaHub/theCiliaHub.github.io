@@ -238,22 +238,22 @@ async function fetchScreenData() {
     }
 }
 
-  if (phylogenyDataCache) return phylogenyDataCache;
+async function fetchPhylogenyData() {
+    if (phylogenyDataCache) return phylogenyDataCache;
     try {
         const response = await fetch('https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/phylogeny_summary.json');
         if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
         const raw = await response.json();
         const unified = {};
 
-        // This logic now ensures a 'species' array is always present.
         if (raw.ciliated_only_genes) {
-            raw.ciliated_only_genes.filter(g => typeof g === 'string' && g).forEach(g => unified[g.trim().toUpperCase()] = { category: 'ciliary_only', species: [] });
+            raw.ciliated_only_genes.filter(gene => typeof gene === 'string').forEach(g => unified[g.trim().toUpperCase()] = { category: 'ciliary_only' });
         }
         if (raw.nonciliary_only_genes) {
-            raw.nonciliary_only_genes.filter(g => typeof g === 'string' && g).forEach(g => unified[g.trim().toUpperCase()] = { category: 'nonciliary_only', species: [] });
+            raw.nonciliary_only_genes.filter(gene => typeof gene === 'string').forEach(g => unified[g.trim().toUpperCase()] = { category: 'nonciliary_only' });
         }
         if (raw.in_all_organisms) {
-            raw.in_all_organisms.filter(g => typeof g === 'string' && g).forEach(g => unified[g.trim().toUpperCase()] = { category: 'in_all_organisms', species: [] });
+            raw.in_all_organisms.filter(gene => typeof gene === 'string').forEach(g => unified[g.trim().toUpperCase()] = { category: 'in_all_organisms' });
         }
         if (Array.isArray(raw)) {
             raw.forEach(item => {
@@ -405,9 +405,7 @@ async function getGenesByPhylogeny(query) {
 }
 
 
-// =============================================================================
-// NEW CODE: Replace your existing handleAIQuery function with this version.
-// =============================================================================
+// --- Main AI Query Handler ---
 window.handleAIQuery = async function() {
     const aiQueryInput = document.getElementById('aiQueryInput');
     const resultArea = document.getElementById('ai-result-area');
@@ -420,6 +418,7 @@ window.handleAIQuery = async function() {
     const ciliaHubData = await fetchCiliaData();
     const phylogenyData = await fetchPhylogenyData();
     const screenData = await fetchScreenData();
+    const tissueData = await fetchTissueData();
 
     if (!ciliaHubData || ciliaHubData.length === 0) {
         resultArea.innerHTML = `<p class="status-not-found">Error: Core ciliary gene data could not be loaded.</p>`;
@@ -431,72 +430,109 @@ window.handleAIQuery = async function() {
     let match;
 
     try {
-        // --- PRIORITY 1: Highly specific patterns first ---
-        if ((match = qLower.match(/(?:components of)\s+(.+?)\s+complex/i))) {
+        // PRIORITY 1: New complex queries
+        if ((match = qLower.match(/(?:components of|show|display)\s+(?:the\s+)?(.+?)\s+complex/i))) {
             const complexName = match[1].trim();
             const complexRegex = new RegExp(complexName, 'i');
-            const components = ciliaHubData.filter(gene => gene.complex_names.some(cn => cn.match(complexRegex)));
-            resultHtml = formatListResult(`Components of ${complexName.toUpperCase()} Complex`, components.map(g => ({gene: g.gene, description: g.description})));
+            const components = ciliaHubData
+                .filter(gene => gene.complex_names.some(cn => cn.match(complexRegex)))
+                .map(gene => ({ gene: gene.gene, description: `Part of the ${gene.complex_names.join(', ')} complex` }));
+            resultHtml = formatListResult(`Components of ${complexName.toUpperCase()} Complex`, components);
         }
-        else if ((match = qLower.match(/(.+?)\s+domain\s*containing\s*(?:proteins|genes)/i))) {
-            const domainName = match[1].replace(/^(show|display|bring)\s+/, '').trim();
+        else if ((match = qLower.match(/(?:bring|display|show)\s+(.+?)\s+domain\s*containing\s*(?:proteins|genes)/i))) {
+            const domainName = match[1].trim();
             const domainRegex = new RegExp(domainName, 'i');
-            const proteins = ciliaHubData.filter(gene => gene.domain_descriptions.some(dd => dd.match(domainRegex)));
-            resultHtml = formatListResult(`${domainName.toUpperCase()} Domain-Containing Proteins`, proteins.map(g => ({gene: g.gene, description: g.description})));
+            const proteins = ciliaHubData
+                .filter(gene => gene.domain_descriptions.some(dd => dd.match(domainRegex)))
+                .map(gene => ({ gene: gene.gene, description: `Contains a ${domainName.toUpperCase()}-like domain.` }));
+            resultHtml = formatListResult(`${domainName.toUpperCase()} Domain-Containing Proteins`, proteins);
         }
-        else if ((match = qLower.match(/(?:genes\s+in|in)\s+([a-zA-Z\.\s]+)/i)) && qLower.includes('ciliary')) {
+        else if ((match = qLower.match(/(?:display|show)\s+ciliary\s+genes\s+in\s+(.+)/i))) {
             const organismName = match[1].trim();
             const organismMap = { 'c. elegans': 'C.elegans', 'human': 'H.sapiens', 'humans': 'H.sapiens', 'mouse': 'M.musculus', 'zebrafish': 'D.rerio', 'fruit fly': 'D.melanogaster' };
             const speciesCode = organismMap[organismName.toLowerCase()] || organismName;
-            const organismGenes = ciliaHubData.filter(ciliaGene => phylogenyData[ciliaGene.gene.toUpperCase()]?.species.includes(speciesCode));
-            resultHtml = formatListResult(`Ciliary Genes in ${organismName}`, organismGenes.map(g => ({gene: g.gene, description: g.description})), `Found ${organismGenes.length} ciliary genes in ${speciesCode}.`);
+
+            const organismGenes = ciliaHubData
+                .filter(ciliaGene => {
+                    const genePhylo = phylogenyData[ciliaGene.gene.toUpperCase()];
+                    return genePhylo && genePhylo.species && genePhylo.species.includes(speciesCode);
+                })
+                .map(gene => ({ gene: gene.gene, description: `Present in ${speciesCode}` }));
+            resultHtml = formatListResult(`Ciliary Genes in ${organismName}`, organismGenes, `Found ${organismGenes.length} ciliary genes present in ${speciesCode}.`);
         }
-        else if ((match = qLower.match(/(?:tell me about|what is|show|effect of)\s+(?:the\s+)?(length|ciliogenesis|percentage|number|signaling)\s+(?:for|of|from|in)\s+([a-z0-9\-]+)/i)) || (match = qLower.match(/(?:effect of|tell me about)\s+([a-z0-9\-]+)\s+(?:on|and|regarding)\s+(?:cilia\s*)?(length|ciliogenesis|percentage|number|signaling)/i))) {
-            const geneSymbol = (match[2] || match[1]).toUpperCase();
-            const topic = (match[1] || match[2]);
+        else if ((match = qLower.match(/(?:show|display|compare)\s+(?:genes\s+)?(?:highly\s+)?expressed\s+in\s+([a-zA-Z\s]+)\s+vs\.?\s+ciliary\s+genes\s+in\s+\1/i))) {
+            const tissue = match[1].trim();
+            const tissueCapitalized = tissue.charAt(0).toUpperCase() + tissue.slice(1);
+            const HIGH_EXPRESSION_THRESHOLD = 50;
+
+            if (!tissueData || Object.keys(tissueData).length === 0) {
+                resultHtml = `<p class="status-not-found">Cannot perform comparison: Tissue data is not available.</p>`;
+            } else {
+                const allHighlyExpressed = Object.entries(tissueData)
+                    .filter(([, tissues]) => tissues[tissueCapitalized] > HIGH_EXPRESSION_THRESHOLD)
+                    .map(([gene, tissues]) => ({ gene, nTPM: tissues[tissueCapitalized] }));
+
+                const ciliaryInTissue = ciliaHubData
+                    .filter(ciliaGene => tissueData[ciliaGene.gene.toUpperCase()]?.[tissueCapitalized])
+                    .map(ciliaGene => ({
+                        gene: ciliaGene.gene,
+                        nTPM: tissueData[ciliaGene.gene.toUpperCase()][tissueCapitalized]
+                    }));
+
+                allHighlyExpressed.sort((a, b) => b.nTPM - a.nTPM);
+                ciliaryInTissue.sort((a, b) => b.nTPM - a.nTPM);
+                resultHtml = formatComparisonResult(`Gene Expression in ${tissueCapitalized}`, tissueCapitalized, allHighlyExpressed, ciliaryInTissue);
+            }
+        }
+        else if ((match = qLower.match(/(?:effect of|tell me about|show|what is the)\s+([A-Z0-9\-]+)\s+(?:on|and|regarding)\s+(?:cilia\s*)?(length|ciliogenesis|percentage|number|signaling)/i))) {
+            const geneSymbol = match[1].toUpperCase();
             const geneScreenData = screenData ? screenData[geneSymbol] : null;
             if (geneScreenData) {
-                resultHtml = `<div class="result-card"><h3>Screen Data for ${geneSymbol} on ${topic}</h3>${renderScreenDataTable(geneSymbol, geneScreenData)}</div>`;
+                resultHtml = `<div class="result-card"><h3>Screen Data for ${geneSymbol}</h3>${renderScreenDataTable(geneSymbol, geneScreenData)}</div>`;
             } else {
                 resultHtml = `<div class="result-card"><h3>Screen Data for ${geneSymbol}</h3><p class="status-not-found">No ciliary screen data found.</p></div>`;
             }
         }
-        
-        // --- PRIORITY 2: A smarter catch-all for general gene lists ---
-        else if ((match = qLower.match(/^(?:show|display|list|genes for|me)\s+(.*)/i))) {
-             // This logic correctly extracts the true subject of the query
-             let searchTerm = match[1].replace(/\s+genes?$/, '').replace(/^me\s+/, '').trim();
-             
-             // First, check if the search term is a phylogeny group
-             if (/(ciliary.only|non.ciliary|all organisms|present in both)/.test(searchTerm)) {
-                 const { label, genes } = await getGenesByPhylogeny(searchTerm);
-                 resultHtml = formatListResult(label, genes.map(g => ({ gene: g, description: `Phylogeny Group: ${label}` })));
-             } else {
-                 // If not phylogeny, try it as a ciliopathy/disease
-                 const { genes, description } = await getCiliopathyGenes(searchTerm);
-                 if (genes.length > 0) {
-                    const title = searchTerm.charAt(0).toUpperCase() + searchTerm.slice(1);
-                    resultHtml = formatListResult(`${title} Genes`, genes, description);
-                 } else {
-                    // Finally, try it as a functional category (like "basal body")
-                    const results = await getGenesByFunctionalCategory(searchTerm);
-                    resultHtml = formatListResult(`Genes for: ${searchTerm}`, results);
-                 }
-             }
+        else if ((match = qLower.match(/(?:display|show|list)\s+genes\s+(?:found|present)?\s*(only in ciliated|in ciliated only|ciliary only|only in non-ciliary|non-ciliary only|in all organisms|present in both)/i))) {
+            const { label, genes } = await getGenesByPhylogeny(match[1]);
+            resultHtml = formatListResult(label, genes.map(g => ({ gene: g, description: `Phylogeny Group: ${label}` })));
         }
-        
-        // --- FINAL FALLBACK ---
+        else if (qLower.match(/(?:please\s+)?(?:display|show)\s+ciliopathy\s+genes/i)) {
+            const { genes, description } = await getCiliopathyGenes('ciliopathy');
+            resultHtml = formatListResult('Ciliopathy Genes', genes, description);
+        }
+        else if (qLower.includes('ciliary genes') && qLower.includes('human')) {
+            const results = ciliaHubData
+                .filter(g => g.localization.some(l => normalizeTerm(l).includes('cili')) || g.ciliopathy.length > 0)
+                .map(g => ({ gene: g.gene, description: g.description }))
+                .sort((a, b) => a.gene.localeCompare(b.gene));
+            resultHtml = formatListResult('Human Ciliary Genes', results, `Found ${results.length} genes.`);
+        }
+        else if ((match = qLower.match(/(?:please\s+)?(?:display|show|genes for)\s+(.+?)\s+genes/i)) && !match[1].includes('ciliopathy')) {
+            const disease = match[1].trim();
+            const { genes, description } = await getCiliopathyGenes(disease);
+            resultHtml = formatListResult(`${disease} Genes`, genes, description);
+        }
+        else if ((match = qLower.match(/(?:genes for|genes related to|show me)\s+(motile cilium|axoneme|basal body|transition zone|ciliogenesis)/i))) {
+            const term = match[1];
+            const results = await getGenesByFunctionalCategory(term);
+            resultHtml = formatListResult(`Genes for: ${term}`, results);
+        }
+        else if ((match = qLower.match(/(?:gene expression|expression|display the expression of)\s+(?:of|for)?\s+([A-Z0-9\-]+)/i))) {
+            const gene = match[1].toUpperCase();
+            await displayCiliAIExpressionHeatmap([gene], resultArea, tissueData);
+            return;
+        }
+        // ... and so on for all your other else/if blocks
         else {
             resultHtml = `<p>Sorry, I didn’t understand that. Try one of the examples.</p>`;
         }
-
         resultArea.innerHTML = resultHtml;
     } catch (e) {
-        resultArea.innerHTML = `<p class="status-not-found">An error occurred while processing the query. Check the console for details.</p>`;
+        resultArea.innerHTML = `<p class="status-not-found">An error occurred. Check console for details.</p>`;
         console.error("CiliAI Query Error:", e);
     }
 };
-
 
 
 // --- UI and Formatting Helper Functions ---
