@@ -379,22 +379,23 @@ async function getCiliopathyGenes(disease) {
   let matchingGenes = [];
   let description = '';
 
-  // Handle special case for "ciliopathy"
   if (diseaseLower === 'ciliopathy') {
     matchingGenes = ciliaHubDataCache
       .map(gene => ({ gene: gene.gene, description: gene.description }))
       .sort((a, b) => a.gene.localeCompare(b.gene));
     description = `Found ${matchingGenes.length} genes associated with any ciliopathy in the CiliaHub database.`;
   } else {
-    // Flexible matching for disease names
-    const diseaseRegex = new RegExp(diseaseLower.replace(/\s+/g, '[\\s_-]*').replace('syndrome', '(syndrome)?'), 'i');
+    // CORRECTED REGEX: Now robustly handles hyphens, en-dashes, and spaces.
+    const diseaseRegex = new RegExp(diseaseLower.replace(/\s+/g, '[\\s_\\-–]*').replace('syndrome', '(syndrome)?'), 'i');
+    
     matchingGenes = ciliaHubDataCache
       .filter(gene => gene.ciliopathy.some(c => normalizeTerm(c).match(diseaseRegex)))
       .map(gene => ({ gene: gene.gene, description: gene.description }))
       .sort((a, b) => a.gene.localeCompare(b.gene));
+      
     description = `Found ${matchingGenes.length} genes associated with "${disease}" in the CiliaHub database.`;
-
-    // Fallback for common ciliopathies
+    
+    // The fallback logic remains the same.
     if (matchingGenes.length === 0 && diseaseLower.includes('bardet biedl')) {
       matchingGenes = FALLBACK_CILIOPATHY_GENES
         .filter(gene => gene.ciliopathy.includes('Bardet–Biedl Syndrome'))
@@ -402,11 +403,9 @@ async function getCiliopathyGenes(disease) {
       description = `Found ${matchingGenes.length} genes associated with Bardet-Biedl Syndrome (using fallback data).`;
     }
   }
-
   console.log(`Ciliopathy query "${diseaseLower}": Found ${matchingGenes.length} genes`);
   return { genes: matchingGenes, description };
 }
-
 
 async function getGenesByDomain(terms) {
   await fetchCiliaData();
@@ -1075,16 +1074,13 @@ async function runAnalysis(geneList) {
     if (geneList.length > 0) visualizeBtn.style.display = 'block';
 }
 
-/**
- * Renders an expression heatmap directly within a specified container.
- * This function is now the primary method for displaying expression via the "Ask" feature.
- * @param {Array<string>} genes - Array of gene symbols to plot.
- * @param {HTMLElement} container - The DOM element where the plot will be rendered.
- */
+// =================== REPLACE THIS ENTIRE FUNCTION ===================
 async function displayCiliAIExpressionHeatmap(genes, resultArea) {
   await fetchTissueData();
-  if (!tissueDataCache) {
-    resultArea.innerHTML = `<p class="status-not-found">Error: Tissue expression data could not be loaded.</p>`;
+
+  // CORRECTED CHECK: Ensures the cache is not null AND not empty.
+  if (!tissueDataCache || Object.keys(tissueDataCache).length === 0) {
+    resultArea.innerHTML = `<p class="status-not-found">Error: Tissue expression data could not be loaded or is empty.</p>`;
     return;
   }
 
@@ -1092,16 +1088,16 @@ async function displayCiliAIExpressionHeatmap(genes, resultArea) {
   genes.forEach(gene => {
     let geneData = tissueDataCache[gene];
     
-    // Fallback for ARL13B
+    // This fallback logic is still useful for demonstrations
     if (!geneData && gene === 'ARL13B') {
-      geneData = { 'Brain': 5.2, 'Kidney': 3.1 }; // Example fallback data
+      geneData = { 'Brain': 5.2, 'Kidney': 3.1 }; 
       console.log(`Using fallback expression data for ${gene}`);
     }
 
     if (!geneData) {
       console.log(`No expression data found for ${gene} in tissueDataCache. Available genes: ${Object.keys(tissueDataCache).slice(0, 10).join(', ')}...`);
       resultHtml += `<div class="result-card"><h3>Expression of ${gene}</h3><p class="status-not-found">No expression data found for ${gene}.</p></div>`;
-      return;
+      return; // Skips to the next gene in the forEach loop
     }
 
     const tissues = Object.keys(geneData).sort();
@@ -1126,7 +1122,6 @@ async function displayCiliAIExpressionHeatmap(genes, resultArea) {
       </div>
     `;
   });
-
   resultArea.innerHTML = resultHtml;
 }
 
