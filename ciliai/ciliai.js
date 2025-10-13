@@ -356,7 +356,7 @@ async function getGenesByFunctionalCategory(term) {
   if (!ciliaHubDataCache) return [];
 
   const termLower = normalizeTerm(term);
-  // A robust regex to find the term even with different separators (space, -, _)
+  // This regex robustly matches the term with spaces, hyphens, or underscores
   const termRegex = new RegExp(termLower.replace(/\s+/g, '[\\s_-]*'), 'i'); 
 
   const matchingGenes = ciliaHubDataCache
