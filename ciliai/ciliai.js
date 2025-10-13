@@ -313,7 +313,7 @@ async function fetchTissueData() {
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
 
         const tsv = await response.text();
-        // IMPROVED: Using a regex handles different line endings (\n or \r\n)
+        // Using a regex handles different line endings (\n or \r\n)
         const lines = tsv.trim().split(/\r?\n/);
         if (lines.length < 2) throw new Error('Empty or invalid TSV file');
 
@@ -341,17 +341,14 @@ async function fetchTissueData() {
 
    } catch (error) {
        console.error('Failed to fetch tissue data:', error);
-       // The fallback data logic is good and has been preserved
+       // This fallback provides data if the fetch fails
        window.tissueDataCache = {
            'IFT88': { 'Kidney Cortex': 8.45, 'Kidney Medulla': 12.67 },
            'ARL13B': { 'Brain': 5.2, 'Kidney': 3.1, 'Testis': 9.8 }
        };
        return window.tissueDataCache;
    }
-} // FIXED: Added the missing closing brace
-
-// Expose it globally just in case
-
+} // <-- The extra brace that was here has been removed.
 
 window.fetchTissueData = fetchTissueData;
 
