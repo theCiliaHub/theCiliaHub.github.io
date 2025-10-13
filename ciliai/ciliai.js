@@ -333,15 +333,15 @@ async function fetchTissueData() {
         console.log('Tissue expression data loaded for', Object.keys(data).length, 'genes');
         return window.tissueDataCache;
 
-    } catch (error) {
-        console.error('Failed to fetch tissue data:', error);
-
-        // Fallback data
-        window.tissueDataCache = {
-            'IFT88': { 'Kidney Cortex': 8.45, 'Kidney Medulla': 12.67 }
-        };
-        return window.tissueDataCache;
-    }
+   } catch (error) {
+    console.error('Failed to fetch tissue data:', error);
+    // Consolidated fallback data
+    window.tissueDataCache = {
+        'IFT88': { 'Kidney Cortex': 8.45, 'Kidney Medulla': 12.67 },
+        'ARL13B': { 'Brain': 5.2, 'Kidney': 3.1, 'Testis': 9.8 } // Added ARL13B here
+    };
+    return window.tissueDataCache;
+}
 }
 
 // Expose it globally just in case
@@ -428,15 +428,6 @@ async function getGenesByLocalization(terms) {
     .sort();
 }
 
-async function getGenesByFunctionalCategory(term) {
-  await fetchCiliaData();
-  if (!ciliaHubDataCache) return [];
-  const termLower = normalizeTerm(term);
-  return ciliaHubDataCache
-    .filter(gene => normalizeTerm(gene.functional_category).includes(termLower))
-    .map(gene => ({ gene: gene.gene, description: gene.description }))
-    .sort((a, b) => a.gene.localeCompare(b.gene));
-}
 
 /**
  * Renders an interactive protein interaction network using Cytoscape.js.
@@ -552,9 +543,9 @@ window.handleAIQuery = async function() {
       const results = await getGenesByFunctionalCategory(term);
       resultHtml = formatListResult(`Genes for: ${term}`, results);
     }
-    else if (qLower.includes('ciliary genes') && qLower.includes('human')) {
+   else if (qLower.includes('ciliary genes') && qLower.includes('human')) {
   const results = ciliaHubDataCache
-    .filter(g => g.localization.some(l => normalizeTerm(l).includes('cilia')) || g.ciliopathy.length > 0)
+    .filter(g => g.localization.some(l => normalizeTerm(l).includes('cili')) || g.ciliopathy.length > 0) // Corrected line
     .map(g => ({ gene: g.gene, description: g.description }))
     .sort((a, b) => a.gene.localeCompare(b.gene));
   resultHtml = formatListResult('Human Ciliary Genes', results, `Found ${results.length} genes with ciliary localization or ciliopathy annotations.`);
@@ -1246,11 +1237,6 @@ async function getGenesByPhylogeny(query) {
     }
 
     return { label: 'No phylogeny group matched', genes: [] };
-}
-
-function normalizeTerm(s) {
-  if (!s) return '';
-  return String(s).toLowerCase().replace(/[_\-\–\s]+/g, ' ').replace(/syndrome/gi, 'syndrome').trim();
 }
 
 
