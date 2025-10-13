@@ -53,14 +53,14 @@ window.displayCiliAIPage = async function displayCiliAIPage() {
     <div id="ai-result-area" class="results-section" style="display: none; margin-top: 1.5rem; padding: 1rem;"></div>
 </div>
                         <div class="example-queries">
-                            <p><strong>Try asking:</strong> 
-                                <span>"What is the function of IFT88?"</span>, 
-                                <span>"Display genes for Bardet-Biedl Syndrome"</span>, 
-                                <span>"Show me basal body genes"</span>, 
-                                <span>"What domains are in CEP290?"</span>,
-                                <span>"Show me ciliary genes in humans"</span>,
-                                <span>"Display gene expression of ARL13B"</span>.
-                            </p>
+                            p><strong>Try asking:</strong> 
+                            <span>"Display genes for Bardet-Biedl Syndrome"</span>, 
+                            <span>"Show me basal body genes"</span>,
+                            <span>"Effect of ARL13B on cilia length?"</span>,
+                            <span>"Tell me about ciliogenesis for BBS1"</span>,
+                            <span>"Show me ciliary-only genes"</span>,
+                            <span>"List genes found in all organisms"</span>.
+                        </p>
                         </div>
                     </div>
                     <div class="input-section">
@@ -347,24 +347,32 @@ async function fetchTissueData() {
 // Expose it globally just in case
 window.fetchTissueData = fetchTissueData;
 
-
+// =================== REPLACE THIS ENTIRE FUNCTION ===================
+// This is the definitive fix. It correctly searches both the 'localization'
+// and 'functional_category' fields for the requested term.
 
 async function getGenesByFunctionalCategory(term) {
   await fetchCiliaData();
   if (!ciliaHubDataCache) return [];
+
   const termLower = normalizeTerm(term);
-  const termRegex = new RegExp(termLower.replace(/\s+/g, '[\\s_-]*'), 'i'); // Match spaces, underscores, hyphens
+  // A robust regex to find the term even with different separators (space, -, _)
+  const termRegex = new RegExp(termLower.replace(/\s+/g, '[\\s_-]*'), 'i'); 
+
   const matchingGenes = ciliaHubDataCache
-    .filter(gene => {
-      const functionalMatch = normalizeTerm(gene.functional_category).match(termRegex);
-      const localizationMatch = normalizeTerm(gene.localization.join(' ')).match(termRegex);
-      if (!functionalMatch && !localizationMatch) {
-        console.log(`No match for term "${termLower}" in gene ${gene.gene}: functional_category="${gene.functional_category}", localization="${gene.localization.join(', ')}"`);
-      }
+    .filter(geneData => {
+      // SUCCESS CRITERION 1: Check the functional category string
+      const functionalMatch = normalizeTerm(geneData.functional_category).match(termRegex);
+      
+      // SUCCESS CRITERION 2: Check the localization data array
+      const localizationMatch = normalizeTerm(geneData.localization.join(' ')).match(termRegex);
+      
+      // Return true if the term is found in EITHER field
       return functionalMatch || localizationMatch;
     })
-    .map(gene => ({ gene: gene.gene, description: gene.description }))
+    .map(geneData => ({ gene: geneData.gene, description: geneData.description }))
     .sort((a, b) => a.gene.localeCompare(b.gene));
+    
   console.log(`Found ${matchingGenes.length} genes for term "${termLower}"`);
   return matchingGenes;
 }
