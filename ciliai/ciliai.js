@@ -224,27 +224,49 @@ async function fetchPhylogenyData() {
         if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
         const raw = await response.json();
         const unified = {};
-
-        // CORRECTED: This logic now ensures a 'species' array is ALWAYS present for every entry
+        // Map class to query categories
+        const classToCategory = {
+            'Ciliary-only': 'ciliated_only_genes',
+            'Present-in-both': 'in_all_organisms',
+            'Non-ciliary': 'nonciliary_only_genes' // Adjust if class names differ
+        };
+        // Process ciliated_only_genes, nonciliary_only_genes, in_all_organisms if present
         if (raw.ciliated_only_genes) {
-            raw.ciliated_only_genes.filter(g => typeof g === 'string' && g).forEach(g => unified[g.trim().toUpperCase()] = { category: 'ciliary_only', species: [] });
+            raw.ciliated_only_genes
+                .filter(g => typeof g === 'string' && g)
+                .forEach(g => unified[g.trim().toUpperCase()] = { sym: g.trim(), category: 'ciliated_only_genes', species: [] });
         }
         if (raw.nonciliary_only_genes) {
-            raw.nonciliary_only_genes.filter(g => typeof g === 'string' && g).forEach(g => unified[g.trim().toUpperCase()] = { category: 'nonciliary_only', species: [] });
+            raw.nonciliary_only_genes
+                .filter(g => typeof g === 'string' && g)
+                .forEach(g => unified[g.trim().toUpperCase()] = { sym: g.trim(), category: 'nonciliary_only_genes', species: [] });
         }
         if (raw.in_all_organisms) {
-            raw.in_all_organisms.filter(g => typeof g === 'string' && g).forEach(g => unified[g.trim().toUpperCase()] = { category: 'in_all_organisms', species: [] });
+            raw.in_all_organisms
+                .filter(g => typeof g === 'string' && g)
+                .forEach(g => unified[g.trim().toUpperCase()] = { sym: g.trim(), category: 'in_all_organisms', species: [] });
         }
-        if (Array.isArray(raw)) {
-            raw.forEach(item => {
+        // Process summary array
+        if (raw.summary && Array.isArray(raw.summary)) {
+            raw.summary.forEach(item => {
                 const gene = (item.sym || '').trim().toUpperCase();
-                const cat = (item.class || '').toLowerCase().replace(/[\s-]+/g, '_');
-                if (gene) unified[gene] = { category: cat, species: item.species || [] };
+                const cat = (item.class || '').trim();
+                if (gene) {
+                    unified[gene] = {
+                        sym: item.sym, // Retain original sym
+                        category: classToCategory[cat] || cat.toLowerCase().replace(/[\s-]+/g, '_'),
+                        species: Array.isArray(item.species) ? item.species.map(s => s.trim()) : []
+                    };
+                }
             });
         }
-        
         phylogenyDataCache = unified;
         console.log(`Phylogeny data normalized: ${Object.keys(unified).length} entries`);
+        // Log genes with C.elegans
+        const celegansGenes = Object.entries(unified)
+            .filter(([_, data]) => data.species.includes('C.elegans'))
+            .map(([gene, data]) => ({ gene: data.sym, species: data.species, category: data.category }));
+        console.log(`Genes with C.elegans: ${celegansGenes.length}`, celegansGenes.slice(0, 5));
         return phylogenyDataCache;
     } catch (error) {
         console.error('Failed to fetch phylogeny summary data:', error);
@@ -400,28 +422,44 @@ async function getCiliaryGenesForOrganism(organismName) {
         'fly': 'D.melanogaster',
         'drosophila melanogaster': 'D.melanogaster'
     };
+    // Step 3: Gene synonym mapping for C. elegans
+    const geneSynonymMap = {
+        'OSM-5': 'IFT88',
+        'BBS-1': 'BBS1',
+        'CHE-11': 'IFT140',
+        'DHC-1': 'DYNC2H1',
+        'BBS-5': 'BBS5',
+        'XBOX-1': 'BBS4',
+        'DYF-1': 'IFT70'
+    };
     const normalizedOrganism = normalizeTerm(organismName);
     const speciesCode = organismMap[normalizedOrganism] || organismName;
     console.log(`Mapped organism "${organismName}" to species code "${speciesCode}"`);
-    // Step 3: Normalize species codes for comparison
+    // Step 4: Normalize species codes for comparison
     const speciesRegex = new RegExp(`^${normalizeTerm(speciesCode).replace(/\./g, '\\.?').replace(/\s/g, '\\s*')}$`, 'i');
     console.log(`Species regex: ${speciesRegex}`);
-    // Step 4: Filter phylogeny data for genes present in the organism
+    // Step 5: Filter phylogeny data for genes present in the organism
     const genes = Object.entries(phylogenyDataCache)
         .filter(([gene, data]) => {
-            const isCiliary = ciliaryGeneSet.has(data.sym?.toUpperCase() || gene.toUpperCase());
+            const geneName = (data.sym || gene).toUpperCase();
+            const standardGeneName = geneSynonymMap[geneName] || geneName;
+            const isCiliary = ciliaryGeneSet.has(standardGeneName);
             const hasSpecies = Array.isArray(data.species) && data.species.some(s => speciesRegex.test(normalizeTerm(s)));
+            console.log(`Checking gene ${geneName} (standard: ${standardGeneName}): isCiliary=${isCiliary}, hasSpecies=${hasSpecies}`);
             return isCiliary && hasSpecies;
         })
         .map(([gene, data]) => ({ gene: data.sym || gene, description: `Ciliary gene found in ${speciesCode}` }));
     console.log(`Found ${genes.length} ciliary genes for ${speciesCode}`);
-    // Step 5: Fallback if no genes are found
+    // Step 6: Fallback if no genes are found
     if (genes.length === 0) {
-        const knownCiliaryGenes = ['IFT88', 'BBS1', 'ARL13B']; // Known C. elegans ciliary genes
+        const knownCiliaryGenes = [
+            'IFT88', 'BBS1', 'ARL13B', 'BBS10', 'NPHP1', 'AHI1', 'CEP290', 'MKS1', 'TTC8',
+            'OSM-5', 'CHE-11', 'DHC-1', 'BBS-1', 'BBS-5', 'XBOX-1', 'DYF-1'
+        ];
         const fallbackGenes = knownCiliaryGenes
-            .filter(gene => ciliaryGeneSet.has(gene.toUpperCase()))
+            .filter(gene => ciliaryGeneSet.has((geneSynonymMap[gene.toUpperCase()] || gene).toUpperCase()))
             .map(gene => ({ gene, description: `Known ciliary gene (fallback) for ${speciesCode}` }));
-        console.log(`Using fallback: ${fallbackGenes.length} genes`);
+        console.log(`Using fallback: ${fallbackGenes.length} genes (${fallbackGenes.map(g => g.gene).join(', ')})`);
         return {
             genes: fallbackGenes,
             description: `No specific ciliary genes found for ${speciesCode} in phylogeny data. Showing ${fallbackGenes.length} known ciliary genes.`
@@ -432,7 +470,6 @@ async function getCiliaryGenesForOrganism(organismName) {
         description: `Found ${genes.length} ciliary genes present in ${speciesCode}.`
     };
 }
-
 
 // --- Helper: get genes by complex ---
 // Rule 2: Search for genes that are part of a complex
