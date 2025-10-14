@@ -382,33 +382,31 @@ async function getOrganismCiliaryGenes(organismName) {
     await fetchPhylogenyData();
     // Step 1: Get a set of all ciliary gene names for fast lookup
     const ciliaryGeneSet = new Set(ciliaHubDataCache.map(g => g.gene.toUpperCase()));
-    // Step 2: Map user-friendly names to species codes
+    // Step 2: Map user-friendly names to species codes (added space in codes for accuracy)
     const organismMap = {
-        'c. elegans': 'C.elegans',
-        'c.elegans': 'C.elegans',
-        'caenorhabditis elegans': 'C.elegans',
-        'worm': 'C.elegans',
-        'human': 'H.sapiens',
-        'homo sapiens': 'H.sapiens',
-        'mouse': 'M.musculus',
-        'mus musculus': 'M.musculus',
-        'zebrafish': 'D.rerio',
-        'danio rerio': 'D.rerio',
-        'drosophila': 'D.melanogaster',
-        'fly': 'D.melanogaster',
-        'drosophila melanogaster': 'D.melanogaster'
+        'c. elegans': 'C. elegans',
+        'caenorhabditis elegans': 'C. elegans',
+        'worm': 'C. elegans',
+        'human': 'H. sapiens',
+        'homo sapiens': 'H. sapiens',
+        'mouse': 'M. musculus',
+        'mus musculus': 'M. musculus',
+        'zebrafish': 'D. rerio',
+        'danio rerio': 'D. rerio',
+        'drosophila': 'D. melanogaster',
+        'fly': 'D. melanogaster',
+        'drosophila melanogaster': 'D. melanogaster'
     };
     const normalizedOrganism = normalizeTerm(organismName);
     const speciesCode = organismMap[normalizedOrganism] || organismName;
     console.log(`Mapped organism "${organismName}" to species code "${speciesCode}"`);
     // Step 3: Filter phylogeny data based on the two data sources
     const genes = Object.entries(phylogenyDataCache)
-        .filter(([gene, data]) => 
-            ciliaryGeneSet.has(gene.toUpperCase()) && 
-            Array.isArray(data.species) && 
-            data.species.includes(speciesCode)
+        .filter(([gene, data]) =>
+            ciliaryGeneSet.has(gene.toUpperCase()) &&
+            data.species?.some(s => normalizeTerm(s) === normalizeTerm(speciesCode))
         )
-        .map(([gene]) => ({ gene, description: `Ciliary gene found in ${speciesCode}` }));
+        .map(([gene]) => ({ gene: gene, description: `Ciliary gene found in ${speciesCode}` }));
     console.log(`Found ${genes.length} ciliary genes for ${speciesCode}`);
     return {
         genes,
@@ -455,28 +453,28 @@ window.handleAIQuery = async function() {
         // --- PRIORITY 1: The most specific, multi-word patterns go first ---
         if ((match = qLower.match(/compare\s+(?:genes\s+expressed\s+in|gene\s+expression\s+in)\s+(.+?)\s+(?:vs|to)\s+ciliary\s+genes\s+in\s+.+/i))) {
     const tissue = match[1].trim();
-    // Map common tissue name variations
+    // Map common tissue name variations and use lowercase for lookup
     const tissueMap = {
-        'liver': 'Liver',
-        'kidney': 'Kidney',
-        'brain': 'Brain',
-        'testis': 'Testis'
+        'liver': 'liver',
+        'kidney': 'kidney',
+        'brain': 'brain',
+        'testis': 'testis'
     };
     const normalizedTissue = normalizeTerm(tissue);
-    const tissueCapitalized = tissueMap[normalizedTissue] || tissue.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
-    console.log(`Processing comparison for tissue: ${tissueCapitalized}`);
+    const tissueName = tissueMap[normalizedTissue] || normalizedTissue;
+    console.log(`Processing comparison for tissue: ${tissueName}`);
     const EXPRESSION_THRESHOLD = 0.1; // Lowered threshold for broader inclusion
     const allExpressed = Object.entries(tissueData)
-        .filter(([, tissues]) => tissues[tissueCapitalized] > EXPRESSION_THRESHOLD)
-        .map(([gene, tissues]) => ({ gene, nTPM: tissues[tissueCapitalized] }));
+        .filter(([, tissues]) => tissues[tissueName] > EXPRESSION_THRESHOLD)
+        .map(([gene, tissues]) => ({ gene, nTPM: tissues[tissueName] }));
     const ciliaryGeneSet = new Set(ciliaHubDataCache.map(g => g.gene.toUpperCase()));
     const ciliaryInTissue = Object.entries(tissueData)
-        .filter(([gene, tissues]) => ciliaryGeneSet.has(gene.toUpperCase()) && tissues[tissueCapitalized] > EXPRESSION_THRESHOLD)
-        .map(([gene, tissues]) => ({ gene, nTPM: tissues[tissueCapitalized] }));
-    console.log(`Found ${allExpressed.length} expressed genes and ${ciliaryInTissue.length} ciliary genes in ${tissueCapitalized}`);
+        .filter(([gene, tissues]) => ciliaryGeneSet.has(gene.toUpperCase()) && tissues[tissueName] > EXPRESSION_THRESHOLD)
+        .map(([gene, tissues]) => ({ gene, nTPM: tissues[tissueName] }));
+    console.log(`Found ${allExpressed.length} expressed genes and ${ciliaryInTissue.length} ciliary genes in ${tissueName}`);
     allExpressed.sort((a, b) => b.nTPM - a.nTPM);
     ciliaryInTissue.sort((a, b) => b.nTPM - a.nTPM);
-    resultHtml = formatComparisonResult(`Gene Expression Comparison in ${tissueCapitalized}`, tissueCapitalized, allExpressed, ciliaryInTissue);
+    resultHtml = formatComparisonResult(`Gene Expression Comparison in ${tissueName.charAt(0).toUpperCase() + tissueName.slice(1)}`, tissueName.charAt(0).toUpperCase() + tissueName.slice(1), allExpressed, ciliaryInTissue);
 }
         else if ((match = qLower.match(/(?:(?:display|show)\s+)?components of\s+(?:the\s+)?(.+?)\s+complex/i))) {
             const complexName = match[1].trim();
