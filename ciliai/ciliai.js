@@ -377,7 +377,8 @@ async function getGenesWithDomain(domainName) {
 
 
 // Rule 1 & 3: Finds ciliary genes present in a specific organism
-async function getOrganismCiliaryGenes(organismName) {
+
+async function getCiliaryGenesForOrganism(organismName) {
     await fetchCiliaData();
     await fetchPhylogenyData();
     // Step 1: Get a set of all ciliary gene names for fast lookup
@@ -385,19 +386,19 @@ async function getOrganismCiliaryGenes(organismName) {
     console.log(`Ciliary genes in cache: ${ciliaHubDataCache.length}, Sample: ${ciliaHubDataCache.slice(0, 5).map(g => g.gene).join(', ')}`);
     // Step 2: Map user-friendly names to species codes
     const organismMap = {
-        'c. elegans': 'C. elegans',
-        'c.elegans': 'C. elegans',
-        'caenorhabditis elegans': 'C. elegans',
-        'worm': 'C. elegans',
-        'human': 'H. sapiens',
-        'homo sapiens': 'H. sapiens',
-        'mouse': 'M. musculus',
-        'mus musculus': 'M. musculus',
-        'zebrafish': 'D. rerio',
-        'danio rerio': 'D. rerio',
-        'drosophila': 'D. melanogaster',
-        'fly': 'D. melanogaster',
-        'drosophila melanogaster': 'D. melanogaster'
+        'c. elegans': 'C.elegans',
+        'c.elegans': 'C.elegans',
+        'caenorhabditis elegans': 'C.elegans',
+        'worm': 'C.elegans',
+        'human': 'H.sapiens',
+        'homo sapiens': 'H.sapiens',
+        'mouse': 'M.musculus',
+        'mus musculus': 'M.musculus',
+        'zebrafish': 'D.rerio',
+        'danio rerio': 'D.rerio',
+        'drosophila': 'D.melanogaster',
+        'fly': 'D.melanogaster',
+        'drosophila melanogaster': 'D.melanogaster'
     };
     const normalizedOrganism = normalizeTerm(organismName);
     const speciesCode = organismMap[normalizedOrganism] || organismName;
@@ -405,20 +406,21 @@ async function getOrganismCiliaryGenes(organismName) {
     // Step 3: Normalize species codes for comparison
     const speciesRegex = new RegExp(`^${normalizeTerm(speciesCode).replace(/\./g, '\\.?').replace(/\s/g, '\\s*')}$`, 'i');
     console.log(`Species regex: ${speciesRegex}`);
-    // Step 4: Filter phylogeny data
+    // Step 4: Filter phylogeny data for genes present in the organism
     const genes = Object.entries(phylogenyDataCache)
         .filter(([gene, data]) => {
-            const isCiliary = ciliaryGeneSet.has(gene.toUpperCase());
+            const isCiliary = ciliaryGeneSet.has(data.sym?.toUpperCase() || gene.toUpperCase());
             const hasSpecies = Array.isArray(data.species) && data.species.some(s => speciesRegex.test(normalizeTerm(s)));
             return isCiliary && hasSpecies;
         })
-        .map(([gene]) => ({ gene, description: `Ciliary gene found in ${speciesCode}` }));
+        .map(([gene, data]) => ({ gene: data.sym || gene, description: `Ciliary gene found in ${speciesCode}` }));
     console.log(`Found ${genes.length} ciliary genes for ${speciesCode}`);
     // Step 5: Fallback if no genes are found
     if (genes.length === 0) {
-        const fallbackGenes = Object.keys(CILI_AI_DB)
+        const knownCiliaryGenes = ['IFT88', 'BBS1', 'ARL13B']; // Known C. elegans ciliary genes
+        const fallbackGenes = knownCiliaryGenes
             .filter(gene => ciliaryGeneSet.has(gene.toUpperCase()))
-            .map(gene => ({ gene, description: `Ciliary gene (fallback) for ${speciesCode}` }));
+            .map(gene => ({ gene, description: `Known ciliary gene (fallback) for ${speciesCode}` }));
         console.log(`Using fallback: ${fallbackGenes.length} genes`);
         return {
             genes: fallbackGenes,
@@ -494,6 +496,11 @@ window.handleAIQuery = async function() {
     ciliaryInTissue.sort((a, b) => b.nTPM - a.nTPM);
     resultHtml = formatComparisonResult(`Gene Expression Comparison in ${tissueName.charAt(0).toUpperCase() + tissueName.slice(1)}`, tissueName.charAt(0).toUpperCase() + tissueName.slice(1), allExpressed, ciliaryInTissue);
 }
+            else if ((match = qLower.match(/(?:display|show)\s+ciliary\s+genes\s+in\s+(.+)/i))) {
+    const organismName = match[1].trim();
+    const { genes, description } = await getCiliaryGenesForOrganism(organismName);
+    resultHtml = formatListResult(`Ciliary Genes in ${organismName}`, genes, description);
+                 }
         else if ((match = qLower.match(/(?:(?:display|show)\s+)?components of\s+(?:the\s+)?(.+?)\s+complex/i))) {
             const complexName = match[1].trim();
             const results = await getGenesByComplex(complexName);
