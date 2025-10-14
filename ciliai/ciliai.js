@@ -382,9 +382,11 @@ async function getOrganismCiliaryGenes(organismName) {
     await fetchPhylogenyData();
     // Step 1: Get a set of all ciliary gene names for fast lookup
     const ciliaryGeneSet = new Set(ciliaHubDataCache.map(g => g.gene.toUpperCase()));
-    // Step 2: Map user-friendly names to species codes (added space in codes for accuracy)
+    console.log(`Ciliary genes in cache: ${ciliaHubDataCache.length}, Sample: ${ciliaHubDataCache.slice(0, 5).map(g => g.gene).join(', ')}`);
+    // Step 2: Map user-friendly names to species codes
     const organismMap = {
         'c. elegans': 'C. elegans',
+        'c.elegans': 'C. elegans',
         'caenorhabditis elegans': 'C. elegans',
         'worm': 'C. elegans',
         'human': 'H. sapiens',
@@ -400,19 +402,35 @@ async function getOrganismCiliaryGenes(organismName) {
     const normalizedOrganism = normalizeTerm(organismName);
     const speciesCode = organismMap[normalizedOrganism] || organismName;
     console.log(`Mapped organism "${organismName}" to species code "${speciesCode}"`);
-    // Step 3: Filter phylogeny data based on the two data sources
+    // Step 3: Normalize species codes for comparison
+    const speciesRegex = new RegExp(`^${normalizeTerm(speciesCode).replace(/\./g, '\\.?').replace(/\s/g, '\\s*')}$`, 'i');
+    console.log(`Species regex: ${speciesRegex}`);
+    // Step 4: Filter phylogeny data
     const genes = Object.entries(phylogenyDataCache)
-        .filter(([gene, data]) =>
-            ciliaryGeneSet.has(gene.toUpperCase()) &&
-            data.species?.some(s => normalizeTerm(s) === normalizeTerm(speciesCode))
-        )
-        .map(([gene]) => ({ gene: gene, description: `Ciliary gene found in ${speciesCode}` }));
+        .filter(([gene, data]) => {
+            const isCiliary = ciliaryGeneSet.has(gene.toUpperCase());
+            const hasSpecies = Array.isArray(data.species) && data.species.some(s => speciesRegex.test(normalizeTerm(s)));
+            return isCiliary && hasSpecies;
+        })
+        .map(([gene]) => ({ gene, description: `Ciliary gene found in ${speciesCode}` }));
     console.log(`Found ${genes.length} ciliary genes for ${speciesCode}`);
+    // Step 5: Fallback if no genes are found
+    if (genes.length === 0) {
+        const fallbackGenes = Object.keys(CILI_AI_DB)
+            .filter(gene => ciliaryGeneSet.has(gene.toUpperCase()))
+            .map(gene => ({ gene, description: `Ciliary gene (fallback) for ${speciesCode}` }));
+        console.log(`Using fallback: ${fallbackGenes.length} genes`);
+        return {
+            genes: fallbackGenes,
+            description: `No specific ciliary genes found for ${speciesCode} in phylogeny data. Showing ${fallbackGenes.length} known ciliary genes.`
+        };
+    }
     return {
         genes,
         description: `Found ${genes.length} ciliary genes present in ${speciesCode}.`
     };
 }
+
 
 // --- Helper: get genes by complex ---
 // Rule 2: Search for genes that are part of a complex
