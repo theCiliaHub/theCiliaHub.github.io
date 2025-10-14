@@ -163,10 +163,7 @@ window.displayCiliAIPage = async function displayCiliAIPage() {
 // --- Helper Functions ---
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 function debounce(fn, delay) { let timeout; return function(...args) { clearTimeout(timeout); timeout = setTimeout(() => fn(...args), delay); }; }
-function normalizeTerm(s) {
-    if (!s) return '';
-    return String(s).toLowerCase().replace(/[_\-\s]+/g, ' ').trim();
-}
+
 
 // --- Data Fetching and Caching ---
 async function fetchCiliaData() {
@@ -377,21 +374,32 @@ async function getOrganismCiliaryGenes(organismName) {
     return { genes, description: `Found ${genes.length} ciliary genes in ${speciesCode}.` };
 }
 
-// --- Helper: get genes by complex ---
-async function getGenesByComplex(complexName) {
+// --- Get genes by domain ---
+async function getGenesWithDomain(domain) {
     await fetchCiliaData();
+    const domainLower = normalizeTerm(domain);
+    const domainRegex = new RegExp(domainLower.replace(/\s+/g, '[\\s_\\-–]*'), 'i');
 
-    const complexLower = complexName.toLowerCase();
-    const genes = [];
+    const genes = ciliaHubDataCache
+        .filter(g => g.domains && g.domains.some(d => normalizeTerm(d).match(domainRegex)))
+        .map(g => ({ gene: g.gene, description: g.domains.join(', ') }))
+        .sort((a, b) => a.gene.localeCompare(b.gene));
 
-    ciliaHubDataCache.forEach(g => {
-        const matches = g.complex_names.filter(cn => normalizeTerm(cn).includes(complexLower));
-        if (matches.length) {
-            g.complex_components.forEach(comp => genes.push({ gene: comp, description: `Component of ${matches.join(', ')}` }));
-        }
-    });
+    return { genes, description: `Found ${genes.length} genes containing the ${domain} domain.` };
+}
 
-    return genes.sort((a, b) => a.gene.localeCompare(b.gene));
+// --- Helper: get genes by complex ---
+async function getComplexGenes(complexName) {
+    await fetchCiliaData();
+    const nameLower = normalizeTerm(complexName);
+    const nameRegex = new RegExp(nameLower.replace(/\s+/g, '[\\s_\\-–]*'), 'i');
+
+    const genes = ciliaHubDataCache
+        .filter(g => g.complex && g.complex.some(c => normalizeTerm(c).match(nameRegex)))
+        .map(g => ({ gene: g.gene, description: g.complex.join(', ') }))
+        .sort((a, b) => a.gene.localeCompare(b.gene));
+
+    return { genes, description: `Found ${genes.length} genes belonging to the ${complexName} complex.` };
 }
 
 // --- Helper: compare tissue expression vs ciliary genes ---
@@ -412,7 +420,13 @@ async function getGenesByTissueExpression(tissue) {
     return { allGenes, ciliaryGenes, tissue: tissueCapitalized };
 }
 
-// --- Unified organism mapping ---
+// --- Utility: normalize term ---
+function normalizeTerm(s) {
+    if (!s) return '';
+    return String(s).toLowerCase().replace(/[_\-\s]+/g, ' ').trim();
+}
+
+// --- Organism normalization map ---
 const organismMap = {
     'c. elegans': 'C.elegans',
     'caenorhabditis elegans': 'C.elegans',
@@ -428,20 +442,11 @@ const organismMap = {
     'drosophila melanogaster': 'D.melanogaster'
 };
 
-// --- Utility: normalize terms (unified for all contexts) ---
-function normalizeTerm(input) {
-    if (!input) return '';
-
-    // Step 1: Lowercase and clean separators
-    const cleaned = String(input).toLowerCase().replace(/[_\-\s–]+/g, ' ').trim();
-
-    // Step 2: Map organism names (if applicable)
-    const organismKey = organismMap[cleaned];
-    if (organismKey) return organismKey; // Return canonical short form (e.g., "C.elegans")
-
-    // Step 3: Return normalized text
-    return cleaned;
+function normalizeOrganism(term) {
+    const key = normalizeTerm(term);
+    return organismMap[key] || term;
 }
+
 
 // --- Main AI Query Handler ---
 window.handleAIQuery = async function() {
@@ -537,7 +542,18 @@ window.handleAIQuery = async function() {
             await displayCiliAIExpressionHeatmap([gene], resultArea, tissueData);
             return;
         }
-
+// Complex-specific queries
+else if (/bbsome/i.test(lowerQ)) {
+    return await getComplexGenes('BBSome');
+} else if (/ift[\s\-]*b/i.test(lowerQ)) {
+    return await getComplexGenes('IFT-B');
+} else if (/mks/i.test(lowerQ)) {
+    return await getComplexGenes('MKS');
+}
+// Domain-specific queries
+else if (/wd40/i.test(lowerQ)) {
+    return await getGenesWithDomain('WD40');
+}
         // --- PRIORITY 3: General catch-all ---
         else if ((match = qLower.match(/(?:display|show|list)\s+(?:genes\s+for\s+)?(.+)/i))) {
             const searchTerm = match[1].replace(/\s+genes?$/, '').trim();
