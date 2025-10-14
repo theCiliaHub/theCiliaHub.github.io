@@ -378,6 +378,8 @@ async function getGenesWithDomain(domainName) {
 
 // --- Helper: get ciliary genes for a given organism ---
 // Rule 1 & 3: Finds ciliary genes present in a specific organism
+
+// Rule 1 & 3: Finds ciliary genes present in a specific organism
 async function getOrganismCiliaryGenes(organismName) {
     await fetchCiliaData();
     await fetchPhylogenyData();
@@ -402,12 +404,10 @@ async function getOrganismCiliaryGenes(organismName) {
 };
     const speciesCode = organismMap[organismName.toLowerCase()] || organismName;
 
-    // Step 3: Filter phylogeny data
+    // Step 3: Filter phylogeny data based on the two data sources
     const genes = Object.entries(phylogenyDataCache)
         .filter(([gene, data]) => 
-            // Condition 1: The gene must be in our master ciliary gene list
             ciliaryGeneSet.has(gene) &&
-            // Condition 2: The gene must be present in the specified species
             data.species?.includes(speciesCode)
         )
         .map(([gene]) => ({ gene: gene, description: `Ciliary gene found in ${speciesCode}` }));
@@ -417,7 +417,6 @@ async function getOrganismCiliaryGenes(organismName) {
         description: `Found ${genes.length} ciliary genes present in ${speciesCode}.`
     };
 }
-
 
 // --- Helper: get genes by complex ---
 // Rule 2: Search for genes that are part of a complex
@@ -433,7 +432,6 @@ async function getGenesByComplex(complexName) {
     return []; // Return empty if no exact match or no components listed
 }
 
-// --- Main AI Query Handler ---
 // =============================================================================
 // NEW CODE 2: Replace your handleAIQuery function with this version
 // =============================================================================
@@ -621,7 +619,6 @@ function formatComparisonResult(title, tissue, list1, list2) {
         </div>
     `;
 }
-
 
 // -------------------------------
 // Click handler for gene selection
