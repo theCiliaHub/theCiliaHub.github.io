@@ -494,51 +494,39 @@ window.handleAIQuery = async function() {
     const resultArea = document.getElementById('ai-result-area');
     const query = aiQueryInput.value.trim();
     if (!query) return;
+
     resultArea.style.display = 'block';
     resultArea.innerHTML = `<p class="status-searching">CiliAI is thinking...</p>`;
-   
+    
+    // Ensure all data is available
     const ciliaHubData = await fetchCiliaData();
+    const phylogenyData = await fetchPhylogenyData();
     const screenData = await fetchScreenData();
     const tissueData = await fetchTissueData();
+
     if (!ciliaHubData || ciliaHubData.length === 0) {
         resultArea.innerHTML = `<p class="status-not-found">Error: Core ciliary gene data could not be loaded.</p>`;
         return;
     }
+
     let resultHtml = '';
     const qLower = query.toLowerCase();
     let match;
+
     try {
-        // --- PRIORITY 1: The most specific, multi-word patterns go first ---
+        // --- FIX: The order of these rules is now correct from most specific to most general ---
+
+        // PRIORITY 1: The most specific, multi-word patterns are handled first.
         if ((match = qLower.match(/compare\s+(?:genes\s+expressed\s+in|gene\s+expression\s+in)\s+(.+?)\s+(?:vs|to)\s+ciliary\s+genes\s+in\s+.+/i))) {
-    const tissue = match[1].trim();
-    // Map common tissue name variations and use lowercase for lookup
-    const tissueMap = {
-        'liver': 'liver',
-        'kidney': 'kidney',
-        'brain': 'brain',
-        'testis': 'testis'
-    };
-    const normalizedTissue = normalizeTerm(tissue);
-    const tissueName = tissueMap[normalizedTissue] || normalizedTissue;
-    console.log(`Processing comparison for tissue: ${tissueName}`);
-    const EXPRESSION_THRESHOLD = 0.1; // Lowered threshold for broader inclusion
-    const allExpressed = Object.entries(tissueData)
-        .filter(([, tissues]) => tissues[tissueName] > EXPRESSION_THRESHOLD)
-        .map(([gene, tissues]) => ({ gene, nTPM: tissues[tissueName] }));
-    const ciliaryGeneSet = new Set(ciliaHubDataCache.map(g => g.gene.toUpperCase()));
-    const ciliaryInTissue = Object.entries(tissueData)
-        .filter(([gene, tissues]) => ciliaryGeneSet.has(gene.toUpperCase()) && tissues[tissueName] > EXPRESSION_THRESHOLD)
-        .map(([gene, tissues]) => ({ gene, nTPM: tissues[tissueName] }));
-    console.log(`Found ${allExpressed.length} expressed genes and ${ciliaryInTissue.length} ciliary genes in ${tissueName}`);
-    allExpressed.sort((a, b) => b.nTPM - a.nTPM);
-    ciliaryInTissue.sort((a, b) => b.nTPM - a.nTPM);
-    resultHtml = formatComparisonResult(`Gene Expression Comparison in ${tissueName.charAt(0).toUpperCase() + tissueName.slice(1)}`, tissueName.charAt(0).toUpperCase() + tissueName.slice(1), allExpressed, ciliaryInTissue);
-}
-            else if ((match = qLower.match(/(?:display|show)\s+ciliary\s+genes\s+in\s+(.+)/i))) {
-    const organismName = match[1].trim();
-    const { genes, description } = await getCiliaryGenesForOrganism(organismName);
-    resultHtml = formatListResult(`Ciliary Genes in ${organismName}`, genes, description);
-                 }
+             const tissue = match[1].trim();
+             const tissueCapitalized = tissue.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+             const allExpressed = Object.entries(tissueData).filter(([, tissues]) => tissues[tissueName] > 0.1).map(([gene, tissues]) => ({ gene, nTPM: tissues[tissueName] }));
+             const ciliaryGeneSet = new Set(ciliaHubDataCache.map(g => g.gene.toUpperCase()));
+             const ciliaryInTissue = Object.entries(tissueData).filter(([gene, tissues]) => ciliaryGeneSet.has(gene.toUpperCase()) && tissues[tissueName] > 0.1).map(([gene, tissues]) => ({ gene, nTPM: tissues[tissueName] }));
+             allExpressed.sort((a, b) => b.nTPM - a.nTPM);
+             ciliaryInTissue.sort((a, b) => b.nTPM - a.nTPM);
+             resultHtml = formatComparisonResult(`Gene Expression Comparison in ${tissueCapitalized}`, tissueCapitalized, allExpressed, ciliaryInTissue);
+        }
         else if ((match = qLower.match(/(?:(?:display|show)\s+)?components of\s+(?:the\s+)?(.+?)\s+complex/i))) {
             const complexName = match[1].trim();
             const results = await getGenesByComplex(complexName);
@@ -546,7 +534,7 @@ window.handleAIQuery = async function() {
         }
         else if ((match = qLower.match(/(?:display|show)\s+ciliary\s+genes\s+in\s+(.+)/i))) {
             const organismName = match[1].trim();
-            const { genes, description } = await getOrganismCiliaryGenes(organismName);
+            const { genes, description } = await getCiliaryGenesForOrganism(organismName);
             resultHtml = formatListResult(`Ciliary Genes in ${organismName}`, genes, description);
         }
         else if ((match = qLower.match(/(?:effect of|tell me about)\s+([a-z0-9\-]+)\s+on\s+(?:cilia\s*)?(length|ciliogenesis)/i)) || (match = qLower.match(/(?:tell me about|what is)\s+(?:the\s+)?(length|ciliogenesis)\s+(?:for|of|from|in)\s+([a-z0-9\-]+)/i))) {
@@ -568,7 +556,8 @@ window.handleAIQuery = async function() {
             await displayCiliAIExpressionHeatmap([gene], resultArea, tissueData);
             return;
         }
-        // --- PRIORITY 2: Broader, but still specific, list queries ---
+        
+        // PRIORITY 2: Broader, but still specific, keyword-based list queries.
         else if (qLower.includes('ciliary-only genes')) {
             const { label, genes } = await getPhylogenyGenes({ type: 'ciliary_only_list' });
             resultHtml = formatListResult(label, genes);
@@ -590,15 +579,15 @@ window.handleAIQuery = async function() {
             const results = await getGenesWithDomain(domainName);
             resultHtml = formatListResult(`${domainName.toUpperCase()} Domain-Containing Proteins`, results);
         }
-       
-        // --- PRIORITY 3: General "genes for X" catch-all ---
+        
+        // PRIORITY 3: This is the general "genes for X" catch-all. It now runs LAST.
         else if ((match = qLower.match(/(?:display|show|list)\s+(?:genes\s+for\s+)?(.+)/i))) {
             const searchTerm = match[1].replace(/\s+genes?$/, '').trim();
             const { genes, description } = await getCiliopathyGenes(searchTerm);
             resultHtml = formatListResult(`${searchTerm.charAt(0).toUpperCase() + searchTerm.slice(1)} Genes`, genes, description);
         }
-       
-        // --- FINAL FALLBACK ---
+        
+        // FINAL FALLBACK
         else {
             resultHtml = `<p>Sorry, I didn’t understand that. Try one of the examples.</p>`;
         }
@@ -608,26 +597,26 @@ window.handleAIQuery = async function() {
         console.error("CiliAI Query Error:", e);
     }
 };
-
 // Helper for the comparison query (updated titles and threshold)
 function formatComparisonResult(title, tissue, list1, list2) {
     const listToHtml = (geneList, listTitle) => {
         if (!geneList || geneList.length === 0) {
             return `<h4>${listTitle}</h4><p>No matching genes found.</p>`;
         }
-        const limitedList = geneList.slice(0, 50);
+        const limitedList = geneList.slice(0, 50); // Limit display for performance
         return `<h4>${listTitle} (${geneList.length})</h4>
                 <ul class="gene-list" style="column-count: 2; font-size: 0.9em;">
                     ${limitedList.map(g => `<li><strong>${g.gene}</strong> (nTPM: ${g.nTPM.toFixed(2)})</li>`).join('')}
                 </ul>
-                ${geneList.length > 50 ? `<p><small>Showing first 50 genes.</small></p>`: ''}`;
+                ${geneList.length > 50 ? `<p><small>Showing first 50 genes.</small></p>` : ''}`;
     };
+
     return `
         <div class="result-card">
             <h3>${title}</h3>
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
                 <div>
-                    ${listToHtml(list1, `Genes Expressed in ${tissue}`)}
+                    ${listToHtml(list1, `All Genes Highly Expressed in ${tissue}`)}
                 </div>
                 <div>
                     ${listToHtml(list2, `Ciliary Genes Expressed in ${tissue}`)}
@@ -636,6 +625,7 @@ function formatComparisonResult(title, tissue, list1, list2) {
         </div>
     `;
 }
+
 // --- UI and Formatting Helper Functions ---
 function formatComprehensiveGeneDetails(geneSymbol, geneData) {
     if (!geneData) {
