@@ -363,16 +363,53 @@ async function getPhylogenyGenes({ type }) {
 }
 
 
-
-
-// Rule 6: Search for genes that contain a specific domain
-async function getGenesWithDomain(domainName) {
+// --- Helper: get ciliary genes for a given organism ---
+async function getOrganismCiliaryGenes(organismName) {
     await fetchCiliaData();
-    const domainRegex = new RegExp(domainName, 'i');
-    return ciliaHubDataCache
-        .filter(gene => gene.domain_descriptions.some(dd => dd.match(domainRegex)))
-        .map(gene => ({ gene: gene.gene, description: gene.domain_descriptions.join(', ') }))
-        .sort((a, b) => a.gene.localeCompare(b.gene));
+    await fetchPhylogenyData();
+
+    const speciesCode = organismMap[organismName.toLowerCase()] || organismName;
+
+    const genes = ciliaHubDataCache
+        .filter(g => g.phylogeny && g.phylogeny.includes(speciesCode))
+        .map(g => ({ gene: g.gene, description: g.ciliopathy.join(', ') }));
+
+    return { genes, description: `Found ${genes.length} ciliary genes in ${speciesCode}.` };
+}
+
+// --- Helper: get genes by complex ---
+async function getGenesByComplex(complexName) {
+    await fetchCiliaData();
+
+    const complexLower = complexName.toLowerCase();
+    const genes = [];
+
+    ciliaHubDataCache.forEach(g => {
+        const matches = g.complex_names.filter(cn => normalizeTerm(cn).includes(complexLower));
+        if (matches.length) {
+            g.complex_components.forEach(comp => genes.push({ gene: comp, description: `Component of ${matches.join(', ')}` }));
+        }
+    });
+
+    return genes.sort((a, b) => a.gene.localeCompare(b.gene));
+}
+
+// --- Helper: compare tissue expression vs ciliary genes ---
+async function getGenesByTissueExpression(tissue) {
+    const tissueCapitalized = tissue.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+
+    const allGenes = Object.entries(window.tissueDataCache)
+        .filter(([, tissues]) => tissues[tissueCapitalized] !== undefined)
+        .map(([gene, tissues]) => ({ gene, nTPM: tissues[tissueCapitalized] }));
+
+    const ciliaryGenes = ciliaHubDataCache
+        .filter(g => window.tissueDataCache[g.gene.toUpperCase()]?.[tissueCapitalized] !== undefined)
+        .map(g => ({ gene: g.gene, nTPM: window.tissueDataCache[g.gene.toUpperCase()][tissueCapitalized] }));
+
+    allGenes.sort((a, b) => b.nTPM - a.nTPM);
+    ciliaryGenes.sort((a, b) => b.nTPM - a.nTPM);
+
+    return { allGenes, ciliaryGenes, tissue: tissueCapitalized };
 }
 
 // --- Unified organism mapping ---
@@ -391,34 +428,19 @@ const organismMap = {
     'drosophila melanogaster': 'D.melanogaster'
 };
 
-// --- Helper: get ciliary genes for a given organism ---
-async function getOrganismCiliaryGenes(organismName) {
-    const ciliaHubData = await fetchCiliaData();
-    const phylogenyData = await fetchPhylogenyData();
+// --- Utility: normalize terms (unified for all contexts) ---
+function normalizeTerm(input) {
+    if (!input) return '';
 
-    const speciesCode = organismMap[organismName.toLowerCase()] || organismName;
-    const ciliaryGenesSet = new Set(ciliaHubData.map(g => g.gene.toUpperCase()));
+    // Step 1: Lowercase and clean separators
+    const cleaned = String(input).toLowerCase().replace(/[_\-\s–]+/g, ' ').trim();
 
-    const genes = Object.entries(phylogenyData)
-        .filter(([gene, info]) => info.species.includes(speciesCode) && ciliaryGenesSet.has(gene))
-        .map(([gene]) => ({ gene, description: `Ciliary gene present in ${speciesCode}` }));
+    // Step 2: Map organism names (if applicable)
+    const organismKey = organismMap[cleaned];
+    if (organismKey) return organismKey; // Return canonical short form (e.g., "C.elegans")
 
-    return { genes, description: `Found ${genes.length} ciliary genes in ${speciesCode}.` };
-}
-
-// --- Helper: get genes by complex ---
-async function getGenesByComplex(complexName) {
-    const ciliaHubData = await fetchCiliaData();
-    const results = [];
-    ciliaHubData.forEach(g => {
-        if (g.complex_names && g.complex_components) {
-            const match = g.complex_names.some(cn => cn.toLowerCase().includes(complexName.toLowerCase()));
-            if (match) {
-                g.complex_components.forEach(comp => results.push({ gene: comp, description: `Component of ${complexName}` }));
-            }
-        }
-    });
-    return results;
+    // Step 3: Return normalized text
+    return cleaned;
 }
 
 // --- Main AI Query Handler ---
