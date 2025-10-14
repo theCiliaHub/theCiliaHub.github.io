@@ -289,31 +289,16 @@ async function fetchTissueData() {
 }
 window.fetchTissueData = fetchTissueData;
 
-// --- Query Helper Functions ---
-async function getGenesByFunctionalCategory(term) {
-    console.log("Running the CORRECT getGenesByFunctionalCategory function!");
-    await fetchCiliaData();
-    if (!ciliaHubDataCache) return [];
 
-    const termLower = normalizeTerm(term);
-    const termRegex = new RegExp(termLower.replace(/\s+/g, '[\\s_-]*'), 'i');
 
-    const matchingGenes = ciliaHubDataCache
-        .filter(geneData => {
-            const functionalMatch = geneData.functional_category.some(fc => normalizeTerm(fc).match(termRegex));
-            const localizationMatch = geneData.localization.some(l => normalizeTerm(l).match(termRegex));
-            return functionalMatch || localizationMatch;
-        })
-        .map(geneData => ({ gene: geneData.gene, description: geneData.description }))
-        .sort((a, b) => a.gene.localeCompare(b.gene));
-    
-    console.log(`Found ${matchingGenes.length} genes for term "${termLower}"`);
-    return matchingGenes;
-}
+// --- Main AI Query Handler ---
+// =============================================================================
+// NEW CODE: Replace all functions from here down to the end of handleAIQuery
+// =============================================================================
 
 // --- Query Helper Functions ---
 
-// Handles Rule 1: Search for genes by ciliopathy/disease name
+// Rule 1: Search for genes by ciliopathy/disease name
 async function getCiliopathyGenes(disease) {
     await fetchCiliaData();
     const diseaseLower = normalizeTerm(disease);
@@ -327,7 +312,7 @@ async function getCiliopathyGenes(disease) {
     return { genes, description: `Found ${genes.length} genes associated with "${disease}".` };
 }
 
-// Handles Rule 2: Search for genes by one or more localizations
+// Rule 2: Search for genes by one or more localizations
 async function getGenesByLocalization(locations) {
     await fetchCiliaData();
     const locationTerms = locations.split(/\s+or\s+/).map(normalizeTerm);
@@ -337,7 +322,7 @@ async function getGenesByLocalization(locations) {
         .sort((a, b) => a.gene.localeCompare(b.gene));
 }
 
-// Handles Rule 5 & 7: All phylogeny-related queries
+// Rule 5 & 7: All phylogeny-related queries
 async function getPhylogenyGenes({ type, organism }) {
     await fetchPhylogenyData();
     const phy = phylogenyDataCache || {};
@@ -381,7 +366,7 @@ async function getPhylogenyGenes({ type, organism }) {
     }
 }
 
-// Handles Rule 6: Search for genes that are part of a complex
+// Rule 6: Search for genes that are part of a complex
 async function getGenesByComplex(complexName) {
     await fetchCiliaData();
     const complexRegex = new RegExp(complexName, 'i');
@@ -391,7 +376,7 @@ async function getGenesByComplex(complexName) {
         .sort((a, b) => a.gene.localeCompare(b.gene));
 }
 
-// Handles Rule 6: Search for genes that contain a specific domain
+// Rule 6: Search for genes that contain a specific domain
 async function getGenesWithDomain(domainName) {
     await fetchCiliaData();
     const domainRegex = new RegExp(domainName, 'i');
@@ -401,11 +386,7 @@ async function getGenesWithDomain(domainName) {
         .sort((a, b) => a.gene.localeCompare(b.gene));
 }
 
-
 // --- Main AI Query Handler ---
-// =============================================================================
-// NEW CODE 1: Replace your handleAIQuery function
-// =============================================================================
 window.handleAIQuery = async function() {
     const aiQueryInput = document.getElementById('aiQueryInput');
     const resultArea = document.getElementById('ai-result-area');
@@ -415,10 +396,10 @@ window.handleAIQuery = async function() {
     resultArea.style.display = 'block';
     resultArea.innerHTML = `<p class="status-searching">CiliAI is thinking...</p>`;
     
-    // Ensure all data is available
     const ciliaHubData = await fetchCiliaData();
     const phylogenyData = await fetchPhylogenyData();
     const screenData = await fetchScreenData();
+    const tissueData = await fetchTissueData(); // Fetch for expression queries
 
     if (!ciliaHubData || ciliaHubData.length === 0) {
         resultArea.innerHTML = `<p class="status-not-found">Error: Core ciliary gene data could not be loaded.</p>`;
@@ -430,78 +411,92 @@ window.handleAIQuery = async function() {
     let match;
 
     try {
-        // Rule 6: Complex Components
-        if ((match = qLower.match(/(?:components of|show|display)\s+(?:the\s+)?(.+?)\s+complex/i))) {
+        // --- PRIORITY 1: The most specific, multi-word patterns go first ---
+        if ((match = qLower.match(/compare genes expressed in (.+) vs ciliary genes in .+/i))) {
+             const tissue = match[1].trim();
+             const tissueCapitalized = tissue.charAt(0).toUpperCase() + tissue.slice(1);
+             const HIGH_EXPRESSION_THRESHOLD = 50;
+             const allHighlyExpressed = Object.entries(tissueData).filter(([,t]) => t[tissueCapitalized] > HIGH_EXPRESSION_THRESHOLD).map(([g,t]) => ({gene: g, nTPM: t[tissueCapitalized]}));
+             const ciliaryInTissue = ciliaHubData.filter(cg => tissueData[cg.gene.toUpperCase()]?.[tissueCapitalized]).map(cg => ({gene: cg.gene, nTPM: tissueData[cg.gene.toUpperCase()][tissueCapitalized]}));
+             allHighlyExpressed.sort((a,b) => b.nTPM - a.nTPM);
+             ciliaryInTissue.sort((a,b) => b.nTPM - a.nTPM);
+             resultHtml = formatComparisonResult(`Gene Expression in ${tissueCapitalized}`, tissueCapitalized, allHighlyExpressed, ciliaryInTissue);
+        }
+        else if ((match = qLower.match(/(?:components of|show|display)\s+(?:the\s+)?(.+?)\s+complex/i))) {
             const complexName = match[1].trim();
             const results = await getGenesByComplex(complexName);
             resultHtml = formatListResult(`Genes in the ${complexName.toUpperCase()} Complex`, results);
         }
-        // Rule 6: Domain Containing Proteins
         else if ((match = qLower.match(/(?:show|display|bring)\s+(.+?)\s+domain\s*containing\s*(?:proteins|genes)/i))) {
             const domainName = match[1].trim();
             const results = await getGenesWithDomain(domainName);
             resultHtml = formatListResult(`${domainName.toUpperCase()} Domain-Containing Proteins`, results);
         }
-        // Rule 7: Ciliary genes in a specific organism
         else if ((match = qLower.match(/(?:display|show)\s+ciliary\s+genes\s+in\s+(.+)/i))) {
             const organismName = match[1].trim();
             const { genes, description } = await getPhylogenyGenes({ type: 'ciliary_in_organism', organism: organismName });
             resultHtml = formatListResult(`Ciliary Genes in ${organismName}`, genes, description);
         }
-        // Rule 5: Phylogeny Group - Ciliary organism specific
-        else if (qLower.includes('ciliary organism specific genes')) {
-            const { label, genes } = await getPhylogenyGenes({ type: 'ciliary_only_list' });
-            resultHtml = formatListResult(label, genes);
-        }
-        // Rule 5: Phylogeny Group - All organisms
-        else if (qLower.includes('genes found in all organisms')) {
-            const { label, genes } = await getPhylogenyGenes({ type: 'in_all_organisms' });
-            resultHtml = formatListResult(label, genes);
-        }
-        // Rule 5: Phylogeny Group - Nonciliary organisms
-        else if (qLower.includes('genes in nonciliary organisms')) {
-            const { label, genes } = await getPhylogenyGenes({ type: 'nonciliary_only_genes' });
-            resultHtml = formatListResult(label, genes);
-        }
-        // Rule 5: Phylogeny Group - Human specific
-        else if (qLower.includes('human specific genes')) {
-            const { label, genes } = await getPhylogenyGenes({ type: 'human_specific' });
-            resultHtml = formatListResult(label, genes);
-        }
-        // Rule 3 & 4: Screen data queries
-        else if ((match = qLower.match(/(?:effect of|tell me about)\s+([a-z0-9\-]+)\s+(?:on|regarding)\s+(?:cilia\s*)?(length|ciliogenesis)/i)) || (match = qLower.match(/(?:tell me about|what is|show)\s+(?:the\s+)?(length|ciliogenesis)\s+(?:for|of|from|in)\s+([a-z0-9\-]+)/i))) {
-            const geneSymbol = (match[1].length > 1 && isNaN(match[1])) ? match[1].toUpperCase() : match[2].toUpperCase();
-            const topic = (match[2] === geneSymbol.toLowerCase()) ? match[1] : match[2];
+        else if ((match = qLower.match(/(?:effect of|tell me about)\s+([a-z0-9\-]+)\s+on\s+(?:cilia\s*)?(length|ciliogenesis)/i)) || (match = qLower.match(/(?:tell me about|what is)\s+(?:the\s+)?(length|ciliogenesis)\s+(?:for|of|from|in)\s+([a-z0-9\-]+)/i))) {
+            const geneSymbol = (match[1].length > 2 && isNaN(match[1])) ? match[1].toUpperCase() : match[2].toUpperCase();
             const geneScreenData = screenData ? screenData[geneSymbol] : null;
             if (geneScreenData) {
                 resultHtml = `<div class="result-card"><h3>Screen Data for ${geneSymbol}</h3>${renderScreenDataTable(geneSymbol, geneScreenData)}</div>`;
             } else {
-                resultHtml = `<div class="result-card"><h3>Screen Data for ${geneSymbol}</h3><p class="status-not-found">No ciliary screen data found.</p></div>`;
+                resultHtml = `<div class="result-card"><h3>Screen Data for ${geneSymbol}</h3><p>No ciliary screen data found.</p></div>`;
             }
         }
-        // Rule 2: Localization queries
         else if ((match = qLower.match(/(?:show|display)\s+(?:me\s+)?(.+?)\s+localizing\s+genes/i))) {
             const locations = match[1].trim();
             const results = await getGenesByLocalization(locations);
             resultHtml = formatListResult(`Genes Localizing to ${locations}`, results);
         }
-        // Rule 1: Ciliopathy / Disease queries
+        else if ((match = qLower.match(/expression of\s+([a-z0-9\-]+)/i))) {
+            const gene = match[1].toUpperCase();
+            await displayCiliAIExpressionHeatmap([gene], resultArea, tissueData);
+            return;
+        }
+
+        // --- PRIORITY 2: Broader, but still specific, list queries ---
+        else if (qLower.includes('ciliary-only genes')) {
+            const { label, genes } = await getPhylogenyGenes({ type: 'ciliary_only_list' });
+            resultHtml = formatListResult(label, genes);
+        }
+        else if (qLower.includes('genes found in all organisms')) {
+            const { label, genes } = await getPhylogenyGenes({ type: 'in_all_organisms' });
+            resultHtml = formatListResult(label, genes);
+        }
+        else if (qLower.includes('genes in nonciliary organisms')) {
+            const { label, genes } = await getPhylogenyGenes({ type: 'nonciliary_only_genes' });
+            resultHtml = formatListResult(label, genes);
+        }
+        else if (qLower.includes('human specific genes')) {
+            const { label, genes } = await getPhylogenyGenes({ type: 'human_specific' });
+            resultHtml = formatListResult(label, genes);
+        }
+        
+        // --- PRIORITY 3: General catch-all for diseases and functional categories ---
         else if ((match = qLower.match(/(?:display|show|list)\s+(?:genes\s+for\s+)?(.+)/i))) {
             const searchTerm = match[1].replace(/\s+genes?$/, '').trim();
             const { genes, description } = await getCiliopathyGenes(searchTerm);
-            resultHtml = formatListResult(`${searchTerm.charAt(0).toUpperCase() + searchTerm.slice(1)} Genes`, genes, description);
+            if (genes.length > 0) {
+                 resultHtml = formatListResult(`${searchTerm.charAt(0).toUpperCase() + searchTerm.slice(1)} Genes`, genes, description);
+            } else {
+                 const results = await getGenesByFunctionalCategory(searchTerm); // Not in the original but useful
+                 resultHtml = formatListResult(`Genes for: ${searchTerm}`, results);
+            }
         }
+        
+        // --- FINAL FALLBACK ---
         else {
             resultHtml = `<p>Sorry, I didn’t understand that. Try one of the examples.</p>`;
         }
-
         resultArea.innerHTML = resultHtml;
     } catch (e) {
-        resultArea.innerHTML = `<p class="status-not-found">An error occurred. Check the console for details.</p>`;
+        resultArea.innerHTML = `<p class="status-not-found">An error occurred. Check console for details.</p>`;
         console.error("CiliAI Query Error:", e);
     }
 };
-
 
 // --- UI and Formatting Helper Functions ---
 function formatComprehensiveGeneDetails(geneSymbol, geneData) {
