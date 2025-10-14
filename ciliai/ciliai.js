@@ -453,21 +453,31 @@ window.handleAIQuery = async function() {
     let match;
     try {
         // --- PRIORITY 1: The most specific, multi-word patterns go first ---
-        if ((match = qLower.match(/compare genes expressed in (.+) vs ciliary genes in .+/i))) {
-             const tissue = match[1].trim();
-             const tissueCapitalized = tissue.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
-             const EXPRESSION_THRESHOLD = 1;
-             const allExpressed = Object.entries(tissueData)
-                 .filter(([, tissues]) => tissues[tissueCapitalized] > EXPRESSION_THRESHOLD)
-                 .map(([gene, tissues]) => ({ gene, nTPM: tissues[tissueCapitalized] }));
-             const ciliaryGeneSet = new Set(ciliaHubData.map(g => g.gene.toUpperCase()));
-             const ciliaryInTissue = Object.entries(tissueData)
-                .filter(([gene, tissues]) => ciliaryGeneSet.has(gene.toUpperCase()) && tissues[tissueCapitalized] > EXPRESSION_THRESHOLD)
-                .map(([gene, tissues]) => ({ gene, nTPM: tissues[tissueCapitalized] }));
-             allExpressed.sort((a, b) => b.nTPM - a.nTPM);
-             ciliaryInTissue.sort((a, b) => b.nTPM - a.nTPM);
-             resultHtml = formatComparisonResult(`Gene Expression in ${tissueCapitalized}`, tissueCapitalized, allExpressed, ciliaryInTissue);
-        }
+        if ((match = qLower.match(/compare\s+(?:genes\s+expressed\s+in|gene\s+expression\s+in)\s+(.+?)\s+(?:vs|to)\s+ciliary\s+genes\s+in\s+.+/i))) {
+    const tissue = match[1].trim();
+    // Map common tissue name variations
+    const tissueMap = {
+        'liver': 'Liver',
+        'kidney': 'Kidney',
+        'brain': 'Brain',
+        'testis': 'Testis'
+    };
+    const normalizedTissue = normalizeTerm(tissue);
+    const tissueCapitalized = tissueMap[normalizedTissue] || tissue.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+    console.log(`Processing comparison for tissue: ${tissueCapitalized}`);
+    const EXPRESSION_THRESHOLD = 0.1; // Lowered threshold for broader inclusion
+    const allExpressed = Object.entries(tissueData)
+        .filter(([, tissues]) => tissues[tissueCapitalized] > EXPRESSION_THRESHOLD)
+        .map(([gene, tissues]) => ({ gene, nTPM: tissues[tissueCapitalized] }));
+    const ciliaryGeneSet = new Set(ciliaHubDataCache.map(g => g.gene.toUpperCase()));
+    const ciliaryInTissue = Object.entries(tissueData)
+        .filter(([gene, tissues]) => ciliaryGeneSet.has(gene.toUpperCase()) && tissues[tissueCapitalized] > EXPRESSION_THRESHOLD)
+        .map(([gene, tissues]) => ({ gene, nTPM: tissues[tissueCapitalized] }));
+    console.log(`Found ${allExpressed.length} expressed genes and ${ciliaryInTissue.length} ciliary genes in ${tissueCapitalized}`);
+    allExpressed.sort((a, b) => b.nTPM - a.nTPM);
+    ciliaryInTissue.sort((a, b) => b.nTPM - a.nTPM);
+    resultHtml = formatComparisonResult(`Gene Expression Comparison in ${tissueCapitalized}`, tissueCapitalized, allExpressed, ciliaryInTissue);
+}
         else if ((match = qLower.match(/(?:(?:display|show)\s+)?components of\s+(?:the\s+)?(.+?)\s+complex/i))) {
             const complexName = match[1].trim();
             const results = await getGenesByComplex(complexName);
