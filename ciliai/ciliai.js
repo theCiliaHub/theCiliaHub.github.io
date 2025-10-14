@@ -376,42 +376,40 @@ async function getGenesWithDomain(domainName) {
 }
 
 
-// --- Helper: get ciliary genes for a given organism ---
-// Rule 1 & 3: Finds ciliary genes present in a specific organism
-
 // Rule 1 & 3: Finds ciliary genes present in a specific organism
 async function getOrganismCiliaryGenes(organismName) {
     await fetchCiliaData();
     await fetchPhylogenyData();
-
     // Step 1: Get a set of all ciliary gene names for fast lookup
     const ciliaryGeneSet = new Set(ciliaHubDataCache.map(g => g.gene.toUpperCase()));
-
     // Step 2: Map user-friendly names to species codes
     const organismMap = {
-    'c. elegans': 'C.elegans',
-    'caenorhabditis elegans': 'C.elegans',
-    'worm': 'C.elegans',
-    'human': 'H.sapiens',
-    'homo sapiens': 'H.sapiens',
-    'mouse': 'M.musculus',
-    'mus musculus': 'M.musculus',
-    'zebrafish': 'D.rerio',
-    'danio rerio': 'D.rerio',
-    'drosophila': 'D.melanogaster',
-    'fly': 'D.melanogaster',
-    'drosophila melanogaster': 'D.melanogaster'
-};
-    const speciesCode = organismMap[organismName.toLowerCase()] || organismName;
-
+        'c. elegans': 'C.elegans',
+        'c.elegans': 'C.elegans',
+        'caenorhabditis elegans': 'C.elegans',
+        'worm': 'C.elegans',
+        'human': 'H.sapiens',
+        'homo sapiens': 'H.sapiens',
+        'mouse': 'M.musculus',
+        'mus musculus': 'M.musculus',
+        'zebrafish': 'D.rerio',
+        'danio rerio': 'D.rerio',
+        'drosophila': 'D.melanogaster',
+        'fly': 'D.melanogaster',
+        'drosophila melanogaster': 'D.melanogaster'
+    };
+    const normalizedOrganism = normalizeTerm(organismName);
+    const speciesCode = organismMap[normalizedOrganism] || organismName;
+    console.log(`Mapped organism "${organismName}" to species code "${speciesCode}"`);
     // Step 3: Filter phylogeny data based on the two data sources
     const genes = Object.entries(phylogenyDataCache)
         .filter(([gene, data]) => 
-            ciliaryGeneSet.has(gene) &&
-            data.species?.includes(speciesCode)
+            ciliaryGeneSet.has(gene.toUpperCase()) && 
+            Array.isArray(data.species) && 
+            data.species.includes(speciesCode)
         )
-        .map(([gene]) => ({ gene: gene, description: `Ciliary gene found in ${speciesCode}` }));
-
+        .map(([gene]) => ({ gene, description: `Ciliary gene found in ${speciesCode}` }));
+    console.log(`Found ${genes.length} ciliary genes for ${speciesCode}`);
     return {
         genes,
         description: `Found ${genes.length} ciliary genes present in ${speciesCode}.`
