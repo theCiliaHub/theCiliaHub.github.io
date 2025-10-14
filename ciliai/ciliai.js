@@ -344,7 +344,7 @@ async function getGenesByLocalization(locations) {
         .sort((a, b) => a.gene.localeCompare(b.gene));
 }
 
-// Rule 5 & 7: General phylogeny-related queries (keep this simplified version)
+// Rule 5 & 7: General phylogeny-related queries
 async function getPhylogenyGenes({ type }) {
     await fetchPhylogenyData();
     const phy = phylogenyDataCache || {};
@@ -355,24 +355,28 @@ async function getPhylogenyGenes({ type }) {
             return {
                 label: 'Ciliary-Only Genes',
                 genes: phyArray
-                    .filter(([, v]) => v.category === 'ciliary_only')
+                    // FIX: Changed v.category to v.phylogeny_profile
+                    .filter(([, v]) => v.phylogeny_profile === 'ciliary_only') 
                     .map(([g]) => ({ gene: g, description: 'Ciliary-only gene' }))
             };
         case 'in_all_organisms':
             return {
                 label: 'Genes Found in All Organisms',
                 genes: phyArray
-                    .filter(([, v]) => v.category === 'in_all_organisms')
+                    // FIX: Changed v.category to v.phylogeny_profile
+                    .filter(([, v]) => v.phylogeny_profile === 'in_all_organisms')
                     .map(([g]) => ({ gene: g, description: 'Present in all species analyzed' }))
             };
         case 'nonciliary_only_genes':
             return {
                 label: 'Non-Ciliary-Only Genes',
                 genes: phyArray
-                    .filter(([, v]) => v.category === 'nonciliary_only')
+                     // FIX: Changed v.category to v.phylogeny_profile
+                    .filter(([, v]) => v.phylogeny_profile === 'nonciliary_only')
                     .map(([g]) => ({ gene: g, description: 'Non-ciliary-only gene' }))
             };
         case 'human_specific':
+            // This case was correct as it does not use the phylogeny_profile property.
             return {
                 label: 'Human-Specific Genes',
                 genes: phyArray
@@ -383,8 +387,6 @@ async function getPhylogenyGenes({ type }) {
             return { label: 'Unknown Query', genes: [] };
     }
 }
-
-
 
 
 // Rule 6: Search for genes that contain a specific domain
