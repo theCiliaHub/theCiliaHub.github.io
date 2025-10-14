@@ -345,47 +345,46 @@ async function getGenesByLocalization(locations) {
 }
 
 // Rule 5 & 7: General phylogeny-related queries
+
 async function getPhylogenyGenes({ type }) {
     await fetchPhylogenyData();
     const phy = phylogenyDataCache || {};
     const phyArray = Object.entries(phy);
-
     switch (type) {
         case 'ciliary_only_list':
             return {
                 label: 'Ciliary-Only Genes',
                 genes: phyArray
-                    // FIX: Changed v.category to v.phylogeny_profile
-                    .filter(([, v]) => v.phylogeny_profile === 'ciliary_only') 
+                    .filter(([, v]) => v.category === 'ciliary_only')
                     .map(([g]) => ({ gene: g, description: 'Ciliary-only gene' }))
             };
         case 'in_all_organisms':
             return {
                 label: 'Genes Found in All Organisms',
                 genes: phyArray
-                    // FIX: Changed v.category to v.phylogeny_profile
-                    .filter(([, v]) => v.phylogeny_profile === 'in_all_organisms')
+                    .filter(([, v]) => v.category === 'in_all_organisms')
                     .map(([g]) => ({ gene: g, description: 'Present in all species analyzed' }))
             };
         case 'nonciliary_only_genes':
             return {
                 label: 'Non-Ciliary-Only Genes',
                 genes: phyArray
-                     // FIX: Changed v.category to v.phylogeny_profile
-                    .filter(([, v]) => v.phylogeny_profile === 'nonciliary_only')
+                    .filter(([, v]) => v.category === 'nonciliary_only')
                     .map(([g]) => ({ gene: g, description: 'Non-ciliary-only gene' }))
             };
         case 'human_specific':
-            // This case was correct as it does not use the phylogeny_profile property.
             return {
                 label: 'Human-Specific Genes',
                 genes: phyArray
                     .filter(([, v]) => Array.isArray(v.species) && v.species.length === 1 && v.species[0] === 'H.sapiens')
+
                     .map(([g]) => ({ gene: g, description: 'Human-specific gene' }))
             };
         default:
             return { label: 'Unknown Query', genes: [] };
+
     }
+
 }
 
 
