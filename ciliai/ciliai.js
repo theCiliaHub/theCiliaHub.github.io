@@ -163,7 +163,10 @@ window.displayCiliAIPage = async function displayCiliAIPage() {
 // --- Helper Functions ---
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 function debounce(fn, delay) { let timeout; return function(...args) { clearTimeout(timeout); timeout = setTimeout(() => fn(...args), delay); }; }
-
+function normalizeTerm(s) {
+    if (!s) return '';
+    return String(s).toLowerCase().replace(/[_\-\s]+/g, ' ').trim();
+}
 
 // --- Data Fetching and Caching ---
 async function fetchCiliaData() {
@@ -360,73 +363,19 @@ async function getPhylogenyGenes({ type }) {
 }
 
 
-// --- Helper: get ciliary genes for a given organism ---
-async function getOrganismCiliaryGenes(organismName) {
+
+
+// Rule 6: Search for genes that contain a specific domain
+async function getGenesWithDomain(domainName) {
     await fetchCiliaData();
-    await fetchPhylogenyData();
-
-    const speciesCode = organismMap[organismName.toLowerCase()] || organismName;
-
-    const genes = ciliaHubDataCache
-        .filter(g => g.phylogeny && g.phylogeny.includes(speciesCode))
-        .map(g => ({ gene: g.gene, description: g.ciliopathy.join(', ') }));
-
-    return { genes, description: `Found ${genes.length} ciliary genes in ${speciesCode}.` };
-}
-
-// --- Get genes by domain ---
-async function getGenesWithDomain(domain) {
-    await fetchCiliaData();
-    const domainLower = normalizeTerm(domain);
-    const domainRegex = new RegExp(domainLower.replace(/\s+/g, '[\\s_\\-–]*'), 'i');
-
-    const genes = ciliaHubDataCache
-        .filter(g => g.domains && g.domains.some(d => normalizeTerm(d).match(domainRegex)))
-        .map(g => ({ gene: g.gene, description: g.domains.join(', ') }))
+    const domainRegex = new RegExp(domainName, 'i');
+    return ciliaHubDataCache
+        .filter(gene => gene.domain_descriptions.some(dd => dd.match(domainRegex)))
+        .map(gene => ({ gene: gene.gene, description: gene.domain_descriptions.join(', ') }))
         .sort((a, b) => a.gene.localeCompare(b.gene));
-
-    return { genes, description: `Found ${genes.length} genes containing the ${domain} domain.` };
 }
 
-// --- Helper: get genes by complex ---
-async function getComplexGenes(complexName) {
-    await fetchCiliaData();
-    const nameLower = normalizeTerm(complexName);
-    const nameRegex = new RegExp(nameLower.replace(/\s+/g, '[\\s_\\-–]*'), 'i');
-
-    const genes = ciliaHubDataCache
-        .filter(g => g.complex && g.complex.some(c => normalizeTerm(c).match(nameRegex)))
-        .map(g => ({ gene: g.gene, description: g.complex.join(', ') }))
-        .sort((a, b) => a.gene.localeCompare(b.gene));
-
-    return { genes, description: `Found ${genes.length} genes belonging to the ${complexName} complex.` };
-}
-
-// --- Helper: compare tissue expression vs ciliary genes ---
-async function getGenesByTissueExpression(tissue) {
-    const tissueCapitalized = tissue.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
-
-    const allGenes = Object.entries(window.tissueDataCache)
-        .filter(([, tissues]) => tissues[tissueCapitalized] !== undefined)
-        .map(([gene, tissues]) => ({ gene, nTPM: tissues[tissueCapitalized] }));
-
-    const ciliaryGenes = ciliaHubDataCache
-        .filter(g => window.tissueDataCache[g.gene.toUpperCase()]?.[tissueCapitalized] !== undefined)
-        .map(g => ({ gene: g.gene, nTPM: window.tissueDataCache[g.gene.toUpperCase()][tissueCapitalized] }));
-
-    allGenes.sort((a, b) => b.nTPM - a.nTPM);
-    ciliaryGenes.sort((a, b) => b.nTPM - a.nTPM);
-
-    return { allGenes, ciliaryGenes, tissue: tissueCapitalized };
-}
-
-// --- Utility: normalize term ---
-function normalizeTerm(s) {
-    if (!s) return '';
-    return String(s).toLowerCase().replace(/[_\-\s]+/g, ' ').trim();
-}
-
-// --- Organism normalization map ---
+// --- Unified organism mapping ---
 const organismMap = {
     'c. elegans': 'C.elegans',
     'caenorhabditis elegans': 'C.elegans',
@@ -442,11 +391,35 @@ const organismMap = {
     'drosophila melanogaster': 'D.melanogaster'
 };
 
-function normalizeOrganism(term) {
-    const key = normalizeTerm(term);
-    return organismMap[key] || term;
+// --- Helper: get ciliary genes for a given organism ---
+async function getOrganismCiliaryGenes(organismName) {
+    const ciliaHubData = await fetchCiliaData();
+    const phylogenyData = await fetchPhylogenyData();
+
+    const speciesCode = organismMap[organismName.toLowerCase()] || organismName;
+    const ciliaryGenesSet = new Set(ciliaHubData.map(g => g.gene.toUpperCase()));
+
+    const genes = Object.entries(phylogenyData)
+        .filter(([gene, info]) => info.species.includes(speciesCode) && ciliaryGenesSet.has(gene))
+        .map(([gene]) => ({ gene, description: `Ciliary gene present in ${speciesCode}` }));
+
+    return { genes, description: `Found ${genes.length} ciliary genes in ${speciesCode}.` };
 }
 
+// --- Helper: get genes by complex ---
+async function getGenesByComplex(complexName) {
+    const ciliaHubData = await fetchCiliaData();
+    const results = [];
+    ciliaHubData.forEach(g => {
+        if (g.complex_names && g.complex_components) {
+            const match = g.complex_names.some(cn => cn.toLowerCase().includes(complexName.toLowerCase()));
+            if (match) {
+                g.complex_components.forEach(comp => results.push({ gene: comp, description: `Component of ${complexName}` }));
+            }
+        }
+    });
+    return results;
+}
 
 // --- Main AI Query Handler ---
 window.handleAIQuery = async function() {
@@ -542,18 +515,7 @@ window.handleAIQuery = async function() {
             await displayCiliAIExpressionHeatmap([gene], resultArea, tissueData);
             return;
         }
-// Complex-specific queries
-else if (/bbsome/i.test(lowerQ)) {
-    return await getComplexGenes('BBSome');
-} else if (/ift[\s\-]*b/i.test(lowerQ)) {
-    return await getComplexGenes('IFT-B');
-} else if (/mks/i.test(lowerQ)) {
-    return await getComplexGenes('MKS');
-}
-// Domain-specific queries
-else if (/wd40/i.test(lowerQ)) {
-    return await getGenesWithDomain('WD40');
-}
+
         // --- PRIORITY 3: General catch-all ---
         else if ((match = qLower.match(/(?:display|show|list)\s+(?:genes\s+for\s+)?(.+)/i))) {
             const searchTerm = match[1].replace(/\s+genes?$/, '').trim();
