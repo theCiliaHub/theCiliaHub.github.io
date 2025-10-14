@@ -489,9 +489,6 @@ async function getGenesByComplex(complexName) {
 // =============================================================================
 // UPDATED CODE: Replace your handleAIQuery function with this version
 // =============================================================================
-// =============================================================================
-// NEW CODE: Replace your handleAIQuery function with this streamlined version
-// =============================================================================
 window.handleAIQuery = async function() {
     const aiQueryInput = document.getElementById('aiQueryInput');
     const resultArea = document.getElementById('ai-result-area');
@@ -760,6 +757,42 @@ function formatListResult(title, geneList, message = '') {
   `;
 }
 
+function formatSimpleResults(results, title) {
+    if (results.length === 0) return `<div class="result-card"><h3>${title}</h3><p class="status-not-found">No matching genes found.</p></div>`;
+    let html = `<div class="result-card"><h3>${title} (${results.length} found)</h3><ul>`;
+    results.forEach(gene => {
+        html += `<li><strong>${gene.gene}</strong>: ${gene.description || 'No description available.'}</li>`;
+    });
+    return html + '</ul></div>';
+}
+
+function formatDomainResults(results, title) {
+    if (results.length === 0) return `<div class="result-card"><h3>${title}</h3><p class="status-not-found">No matching genes found.</p></div>`;
+    let html = `<div class="result-card"><h3>${title} (${results.length} found)</h3>`;
+    results.forEach(gene => {
+        const domains = Array.isArray(gene.domain_descriptions) ? gene.domain_descriptions.join(', ') : 'None';
+        html += `<div style="border-bottom: 1px solid #eee; padding: 10px 0; margin-bottom: 10px;"><strong>${gene.gene}</strong><ul><li>Domains: ${domains}</li></ul></div>`;
+    });
+    return html + '</div>';
+}
+
+function formatComplexResults(gene, title) {
+    if (!gene) return `<div class="result-card"><h3>${title}</h3><p class="status-not-found">Gene not found in the dataset.</p></div>`;
+    let html = `<div class="result-card"><h3>${title}</h3>`;
+    if (gene.complex_names && gene.complex_names.length > 0) {
+        html += '<h4>Complex Names:</h4><ul>';
+        gene.complex_names.forEach(name => { html += `<li>${name}</li>`; });
+        html += '</ul>';
+    } else {
+        html += '<p>No complex names listed for this gene.</p>';
+    }
+    if (gene.complex_components && gene.complex_components.length > 0) {
+        html += `<br><h4>Complex Components:</h4><p>${gene.complex_components.join(', ')}</p>`;
+    } else {
+        html += '<p>No complex components listed for this gene.</p>';
+    }
+    return html + '</div>';
+}
 
 // --- Autocomplete Logic ---
 function setupAiQueryAutocomplete() {
