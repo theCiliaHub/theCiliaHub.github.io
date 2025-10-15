@@ -61,6 +61,8 @@ window.displayCiliAIPage = async function displayCiliAIPage() {
                             <span>"Show me basal body localizing genes"</span>,
                             <span>"Effect of ARL13B on cilia length?"</span>,
                             <span>"Show me ciliary-only genes"</span>,
+                            <span>"Show me nonciliary-only genes"</span>,
+                            <span>"Show me genes found in all organisms"</span>,
                             <span>"Display ciliary genes in C. elegans"</span>,
                             <span>"Display components of BBSome complex"</span>,
                             <span>"Show WD40 domain containing proteins"</span>,
@@ -350,43 +352,48 @@ async function getPhylogenyGenes({ type }) {
     await fetchPhylogenyData();
     const phy = phylogenyDataCache || {};
     const phyArray = Object.entries(phy);
+
     switch (type) {
         case 'ciliary_only_list':
             return {
                 label: 'Ciliary-Only Genes',
                 genes: phyArray
-                    .filter(([, v]) => v.category === 'ciliary_only')
-                    .map(([g]) => ({ gene: g, description: 'Ciliary-only gene' }))
+                    .filter(([, v]) => v.category === 'ciliated_only_genes')
+                    .map(([g, v]) => ({ gene: v.sym, description: 'Ciliary-only gene' }))
             };
+
         case 'in_all_organisms':
             return {
                 label: 'Genes Found in All Organisms',
                 genes: phyArray
                     .filter(([, v]) => v.category === 'in_all_organisms')
-                    .map(([g]) => ({ gene: g, description: 'Present in all species analyzed' }))
+                    .map(([g, v]) => ({ gene: v.sym, description: 'Present in all species analyzed' }))
             };
+
         case 'nonciliary_only_genes':
             return {
                 label: 'Non-Ciliary-Only Genes',
                 genes: phyArray
-                    .filter(([, v]) => v.category === 'nonciliary_only')
-                    .map(([g]) => ({ gene: g, description: 'Non-ciliary-only gene' }))
+                    .filter(([, v]) => v.category === 'nonciliary_only_genes')
+                    .map(([g, v]) => ({ gene: v.sym, description: 'Non-ciliary-only gene' }))
             };
+
         case 'human_specific':
             return {
                 label: 'Human-Specific Genes',
                 genes: phyArray
-                    .filter(([, v]) => Array.isArray(v.species) && v.species.length === 1 && v.species[0] === 'H.sapiens')
-
-                    .map(([g]) => ({ gene: g, description: 'Human-specific gene' }))
+                    .filter(([, v]) =>
+                        Array.isArray(v.species) &&
+                        v.species.length === 1 &&
+                        v.species[0] === 'H.sapiens'
+                    )
+                    .map(([g, v]) => ({ gene: v.sym, description: 'Human-specific gene' }))
             };
+
         default:
             return { label: 'Unknown Query', genes: [] };
-
     }
-
 }
-
 
 // Rule 6: Search for genes that contain a specific domain
 async function getGenesWithDomain(domainName) {
