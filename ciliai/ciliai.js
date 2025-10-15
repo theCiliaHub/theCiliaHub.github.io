@@ -532,7 +532,7 @@ async function getGenesByComplex(complexName) {
 }
 
 // =============================================================================
-// UPDATED FULL handleAIQuery FUNCTION (all branches kept, fixed logic)
+// CLEANED & UPDATED handleAIQuery FUNCTION
 // =============================================================================
 window.handleAIQuery = async function() {
     const aiQueryInput = document.getElementById('aiQueryInput');
@@ -557,31 +557,25 @@ window.handleAIQuery = async function() {
     let match;
 
     try {
-        // --- PRIORITY 1: Specific multi-word patterns ---
+        // =============================
+        // PRIORITY 1: Specific multi-word patterns
+        // =============================
         if (qLower.includes('ciliary-only genes')) {
-            // ✅ FIXED: use getPhylogenyGenes instead of getGenesByPhylogeny
             const { label, genes } = await getPhylogenyGenes({ type: 'ciliary_only_list' });
             resultHtml = formatListResult(label, genes);
         }
-        else if (qLower.includes('genes in "in_all_organisms"') || qLower.includes('genes found in all organisms')) {
+        else if (qLower.includes('genes found in all organisms')) {
             const { label, genes } = await getPhylogenyGenes({ type: 'in_all_organisms' });
             resultHtml = formatListResult(label, genes);
         }
-        else if (qLower.includes('nonciliary-only genes') || qLower.includes('nonciliary_only_genes')) {
+        else if (qLower.includes('nonciliary-only genes')) {
             const { label, genes } = await getPhylogenyGenes({ type: 'nonciliary_only_genes' });
             resultHtml = formatListResult(label, genes);
         }
         else if ((match = qLower.match(/compare\s+(?:genes\s+expressed\s+in|gene\s+expression\s+in)\s+(.+?)\s+(?:vs|to)\s+ciliary\s+genes\s+in\s+.+/i))) {
-            const tissue = match[1].trim();
-            const tissueMap = {
-                'liver': 'liver',
-                'kidney': 'kidney',
-                'brain': 'brain',
-                'testis': 'testis'
-            };
-            const normalizedTissue = normalizeTerm(tissue);
-            const tissueName = tissueMap[normalizedTissue] || normalizedTissue;
-            console.log(`Processing comparison for tissue: ${tissueName}`);
+            const tissue = normalizeTerm(match[1].trim());
+            const tissueMap = { liver:'liver', kidney:'kidney', brain:'brain', testis:'testis' };
+            const tissueName = tissueMap[tissue] || tissue;
 
             const EXPRESSION_THRESHOLD = 0.1;
             const allExpressed = Object.entries(tissueData)
@@ -593,13 +587,11 @@ window.handleAIQuery = async function() {
                 .filter(([gene, tissues]) => ciliaryGeneSet.has(gene.toUpperCase()) && tissues[tissueName] > EXPRESSION_THRESHOLD)
                 .map(([gene, tissues]) => ({ gene, nTPM: tissues[tissueName] }));
 
-            console.log(`Found ${allExpressed.length} expressed genes and ${ciliaryInTissue.length} ciliary genes in ${tissueName}`);
-
-            allExpressed.sort((a, b) => b.nTPM - a.nTPM);
-            ciliaryInTissue.sort((a, b) => b.nTPM - a.nTPM);
+            allExpressed.sort((a,b)=>b.nTPM - a.nTPM);
+            ciliaryInTissue.sort((a,b)=>b.nTPM - a.nTPM);
 
             resultHtml = formatComparisonResult(
-                `Gene Expression Comparison in ${tissueName.charAt(0).toUpperCase() + tissueName.slice(1)}`,
+                `Gene Expression Comparison in ${tissueName.charAt(0).toUpperCase()+tissueName.slice(1)}`,
                 tissueName.charAt(0).toUpperCase() + tissueName.slice(1),
                 allExpressed,
                 ciliaryInTissue
@@ -619,11 +611,9 @@ window.handleAIQuery = async function() {
                  (match = qLower.match(/(?:tell me about|what is)\s+(?:the\s+)?(length|ciliogenesis)\s+(?:for|of|from|in)\s+([a-z0-9\-]+)/i))) {
             const geneSymbol = (match[1].length > 2 && isNaN(match[1])) ? match[1].toUpperCase() : match[2].toUpperCase();
             const geneScreenData = screenData ? screenData[geneSymbol] : null;
-            if (geneScreenData) {
-                resultHtml = `<div class="result-card"><h3>Screen Data for ${geneSymbol}</h3>${renderScreenDataTable(geneSymbol, geneScreenData)}</div>`;
-            } else {
-                resultHtml = `<div class="result-card"><h3>Screen Data for ${geneSymbol}</h3><p>No ciliary screen data found.</p></div>`;
-            }
+            resultHtml = geneScreenData
+                ? `<div class="result-card"><h3>Screen Data for ${geneSymbol}</h3>${renderScreenDataTable(geneSymbol, geneScreenData)}</div>`
+                : `<div class="result-card"><h3>Screen Data for ${geneSymbol}</h3><p>No ciliary screen data found.</p></div>`;
         }
         else if ((match = qLower.match(/(?:show|display)\s+(?:me\s+)?(.+?)\s+localizing\s+genes/i))) {
             const locations = match[1].trim();
@@ -635,40 +625,24 @@ window.handleAIQuery = async function() {
             await displayCiliAIExpressionHeatmap([gene], resultArea, tissueData);
             return;
         }
-
-        // --- PRIORITY 2: Broader list queries ---
-        else if (qLower.includes('ciliary-only genes')) {
-            const { label, genes } = await getPhylogenyGenes({ type: 'ciliary_only_list' });
-            resultHtml = formatListResult(label, genes);
-        }
-        else if (qLower.includes('genes found in all organisms')) {
-            const { label, genes } = await getPhylogenyGenes({ type: 'in_all_organisms' });
-            resultHtml = formatListResult(label, genes);
-        }
-        else if (qLower.includes('nonciliary-only genes') || qLower.includes('genes in nonciliary organisms')) {
-            const { label, genes } = await getPhylogenyGenes({ type: 'nonciliary_only_genes' });
-            resultHtml = formatListResult(label, genes);
-        }
-        else if (qLower.includes('human specific genes')) {
-            const { label, genes } = await getPhylogenyGenes({ type: 'human_specific' });
-            resultHtml = formatListResult(label, genes);
-        }
         else if ((match = qLower.match(/(?:show|display|bring)\s+(.+?)\s+domain\s*containing\s*(?:proteins|genes)/i))) {
             const domainName = match[1].trim();
             const results = await getGenesWithDomain(domainName);
             resultHtml = formatListResult(`${domainName.toUpperCase()} Domain-Containing Proteins`, results);
         }
-
-        // --- PRIORITY 3: General fallback ---
+        // =============================
+        // GENERAL FALLBACK: ciliopathy & other genes
+        // =============================
         else if ((match = qLower.match(/(?:display|show|list)\s+(?:genes\s+for\s+)?(.+)/i))) {
             const searchTerm = match[1].replace(/\s+genes?$/, '').trim();
             const { genes, description } = await getCiliopathyGenes(searchTerm);
-            resultHtml = formatListResult(`${searchTerm.charAt(0).toUpperCase() + searchTerm.slice(1)} Genes`, genes, description);
+            resultHtml = formatListResult(`${searchTerm.charAt(0).toUpperCase()+searchTerm.slice(1)} Genes`, genes, description);
         }
-
-        // --- FINAL FALLBACK ---
+        // =============================
+        // FINAL FALLBACK
+        // =============================
         else {
-            resultHtml = `<p>Sorry, I didn’t understand that. Try one of the examples.</p>`;
+            resultHtml = `<p>Sorry, I didn’t understand that. Try one of the example queries.</p>`;
         }
 
         resultArea.innerHTML = resultHtml;
@@ -678,6 +652,7 @@ window.handleAIQuery = async function() {
         console.error("CiliAI Query Error:", e);
     }
 };
+
 
 // Helper for the comparison query (updated titles and threshold)
 function formatComparisonResult(title, tissue, list1, list2) {
