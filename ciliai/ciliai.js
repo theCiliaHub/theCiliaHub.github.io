@@ -494,7 +494,7 @@ async function getGenesByComplex(complexName) {
 }
 
 // =============================================================================
-// UPDATED CODE: Replace your handleAIQuery function with this version
+// UPDATED FULL handleAIQuery FUNCTION (all branches kept, fixed logic)
 // =============================================================================
 window.handleAIQuery = async function() {
     const aiQueryInput = document.getElementById('aiQueryInput');
@@ -521,15 +521,16 @@ window.handleAIQuery = async function() {
     try {
         // --- PRIORITY 1: Specific multi-word patterns ---
         if (qLower.includes('ciliary-only genes')) {
-            const { label, genes } = await getGenesByPhylogeny('ciliated_only_genes');
+            // ✅ FIXED: use getPhylogenyGenes instead of getGenesByPhylogeny
+            const { label, genes } = await getPhylogenyGenes({ type: 'ciliary_only_list' });
             resultHtml = formatListResult(label, genes);
         }
         else if (qLower.includes('genes in "in_all_organisms"') || qLower.includes('genes found in all organisms')) {
-            const { label, genes } = await getGenesByPhylogeny('in_all_organisms');
+            const { label, genes } = await getPhylogenyGenes({ type: 'in_all_organisms' });
             resultHtml = formatListResult(label, genes);
         }
-        else if (qLower.includes('nonciliary_only_genes')) {
-            const { label, genes } = await getGenesByPhylogeny('nonciliary_only_genes');
+        else if (qLower.includes('nonciliary-only genes') || qLower.includes('nonciliary_only_genes')) {
+            const { label, genes } = await getPhylogenyGenes({ type: 'nonciliary_only_genes' });
             resultHtml = formatListResult(label, genes);
         }
         else if ((match = qLower.match(/compare\s+(?:genes\s+expressed\s+in|gene\s+expression\s+in)\s+(.+?)\s+(?:vs|to)\s+ciliary\s+genes\s+in\s+.+/i))) {
@@ -596,6 +597,7 @@ window.handleAIQuery = async function() {
             await displayCiliAIExpressionHeatmap([gene], resultArea, tissueData);
             return;
         }
+
         // --- PRIORITY 2: Broader list queries ---
         else if (qLower.includes('ciliary-only genes')) {
             const { label, genes } = await getPhylogenyGenes({ type: 'ciliary_only_list' });
@@ -605,7 +607,7 @@ window.handleAIQuery = async function() {
             const { label, genes } = await getPhylogenyGenes({ type: 'in_all_organisms' });
             resultHtml = formatListResult(label, genes);
         }
-        else if (qLower.includes('genes in nonciliary organisms')) {
+        else if (qLower.includes('nonciliary-only genes') || qLower.includes('genes in nonciliary organisms')) {
             const { label, genes } = await getPhylogenyGenes({ type: 'nonciliary_only_genes' });
             resultHtml = formatListResult(label, genes);
         }
@@ -618,12 +620,14 @@ window.handleAIQuery = async function() {
             const results = await getGenesWithDomain(domainName);
             resultHtml = formatListResult(`${domainName.toUpperCase()} Domain-Containing Proteins`, results);
         }
+
         // --- PRIORITY 3: General fallback ---
         else if ((match = qLower.match(/(?:display|show|list)\s+(?:genes\s+for\s+)?(.+)/i))) {
             const searchTerm = match[1].replace(/\s+genes?$/, '').trim();
             const { genes, description } = await getCiliopathyGenes(searchTerm);
             resultHtml = formatListResult(`${searchTerm.charAt(0).toUpperCase() + searchTerm.slice(1)} Genes`, genes, description);
         }
+
         // --- FINAL FALLBACK ---
         else {
             resultHtml = `<p>Sorry, I didn’t understand that. Try one of the examples.</p>`;
