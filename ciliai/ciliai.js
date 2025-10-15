@@ -22,10 +22,10 @@ const CILI_AI_DB = {
 
 // NEW: Intent Parser - The "Brain" of CiliAI
 // =============================================================================
-// REPLACEMENT: The "Brain" of CiliAI, updated with the full disease list.
+// REPLACEMENT: The definitive "Brain" of CiliAI, merging all features correctly.
 // =============================================================================
 function createIntentParser() {
-    // NEW: Diseases are now structured by classification.
+    // Correctly classified diseases are preserved.
     const classifiedDiseases = {
         "Primary Ciliopathies": [
             "Acrocallosal Syndrome", "Alström Syndrome", "Autosomal Dominant Polycystic Kidney Disease",
@@ -45,15 +45,17 @@ function createIntentParser() {
             "Biliary Ciliopathy", "Chronic Obstructive Pulmonary Disease", "Ciliopathy", "Ciliopathy - Retinal dystrophy", "Golgipathies or Ciliopathy", "Hepatic Ciliopathy", "Male Infertility and Ciliopathy", "Male infertility", "Microcephaly and Chorioretinopathy Type 3", "Mucociliary Clearance Disorder", "Notch-mediated Ciliopathy", "Primary Endocardial Fibroelastosis", "Retinal Degeneration"
         ]
     };
-
-    // Aliases are kept separate for clarity and are added to the final flat list.
     const aliases = ["BBS", "Joubert", "NPHP", "MKS"];
-    
-    // Create a single, flat list of all diseases for keyword matching.
     const allDiseases = [...Object.values(classifiedDiseases).flat(), ...aliases];
 
-
     const entityKeywords = [
+        // ADDED: The new functional categories are now correctly included.
+        { 
+            type: 'FUNCTIONAL_CATEGORY',
+            keywords: ['kinesin motors', 'dynein motors', 'Ciliary assembly/disassembly', 'Signaling', 'Motile cilium', 'Motor protein', 'Transport', 'Protein modification', 'Cytoskeletal'],
+            handler: async (term) => getGenesByFunction(term),
+            autocompleteTemplate: (term) => `Show me ${term} genes`
+        },
         { 
             type: 'COMPLEX', 
             keywords: ['BBSome', 'IFT-A', 'IFT-B', 'Transition Zone Complex', 'MKS Complex', 'NPHP Complex'],
@@ -65,7 +67,7 @@ function createIntentParser() {
         },
         { 
             type: 'CILIOPATHY', 
-            keywords: [...new Set(allDiseases)], // Use the comprehensive, deduplicated list
+            keywords: [...new Set(allDiseases)],
             handler: async (term) => {
                 const titleTerm = term.toUpperCase() === 'BBS' ? 'Bardet–Biedl Syndrome' : 
                                   term.toUpperCase() === 'MKS' ? 'Meckel–Gruber Syndrome' : term;
@@ -76,7 +78,7 @@ function createIntentParser() {
         },
         {
             type: 'LOCALIZATION',
-            keywords: ['basal body', 'axoneme', 'transition zone', 'centrosome', 'cilium'],
+            keywords: ['basal body', 'axoneme', 'transition zone', 'centrosome', 'cilium', 'lysosome'],
             handler: async (term) => {
                 const results = await getGenesByLocalization(term);
                 return formatListResult(`Genes localizing to ${term}`, results);
@@ -85,6 +87,7 @@ function createIntentParser() {
         },
         {
             type: 'ORGANISM',
+            // PRESERVED: The full, comprehensive list of organisms is correctly included.
             keywords: [
                 "Prokaryote", "E.cuniculi", "E.histolytica", "E.dispar", "G.lamblia", "T.vaginalis", "T.brucei", "T.cruzi", "L.infantum", 
                 "L.major", "L.braziliensis", "T.gondii", "C.hominis", "C.parvum", "B.bovis", "T.annulata", "T.parva", "P.knowlesi", "P.vivax", 
@@ -140,7 +143,6 @@ function createIntentParser() {
         getAllComplexes: () => entityKeywords.find(e => e.type === 'COMPLEX').keywords
     };
 }
-
 const intentParser = createIntentParser();
 
 // =============================================================================
@@ -668,8 +670,19 @@ window.handleAIQuery = async function() {
     let match;
 
     try {
-        // PRIORITY 1: Check for conversational queries like "Tell me about..."
-        if ((match = qLower.match(/(?:tell me about|what is|describe)\s+(.+)/i))) {
+        // PRIORITY 1: Handle complex patterns with regex first
+        if ((match = qLower.match(/genes localizing (?:to|in)\s+(?:both\s+)?(.+?)\s+and\s+(.+)/i))) {
+            const locations = [match[1].trim(), match[2].trim()];
+            resultHtml = await getGenesByMultipleLocalizations(locations);
+        }
+        else if ((match = qLower.match(/(?:show me|find|list)\s+(.+?)\s+genes/i)) && normalizeTerm(match[1]).includes('kinase')) {
+             resultHtml = await getGenesByDomainDescription('kinase');
+        }
+        // ADDED BACK: Logic for querying screen data phenotypes.
+        else if ((match = qLower.match(/(?:which genes cause|find genes that)\s+(.+)/i))) {
+            resultHtml = await getGenesByScreenPhenotype(match[1].trim());
+        }
+        else if ((match = qLower.match(/(?:tell me about|what is|describe)\s+(.+)/i))) {
             const term = match[1].trim();
             resultHtml = await getComprehensiveDetails(term);
         }
@@ -677,10 +690,9 @@ window.handleAIQuery = async function() {
         else {
             const intent = intentParser.parse(query);
             if (intent && typeof intent.handler === 'function') {
-                console.log(`Intent detected: ${intent.intent} for entity: ${intent.entity}`);
                 resultHtml = await intent.handler(intent.entity);
             } 
-            // PRIORITY 3: Fallback to regex for other specific sentence structures
+            // PRIORITY 3: Fallback for remaining specific phrases
             else if ((match = qLower.match(/expression of\s+([a-z0-9\-]+)/i))) {
                 const gene = match[1].toUpperCase();
                 await displayCiliAIExpressionHeatmap([gene], resultArea, window.tissueDataCache);
@@ -703,6 +715,7 @@ window.handleAIQuery = async function() {
         console.error("CiliAI Query Error:", e);
     }
 };
+
 
 
 
@@ -914,6 +927,24 @@ function formatComplexResults(gene, title) {
     return html + '</div>';
 }
 
+// =============================================================================
+// ADDITION: New helper function for domain description queries (e.g., "kinase").
+// =============================================================================
+async function getGenesByDomainDescription(domainKeyword) {
+    if (!ciliaHubDataCache) await fetchCiliaData();
+    const keywordRegex = new RegExp(domainKeyword, 'i');
+    const results = ciliaHubDataCache
+        .filter(gene => 
+            Array.isArray(gene.domain_descriptions) && 
+            gene.domain_descriptions.some(desc => desc.match(keywordRegex))
+        )
+        .map(gene => ({ 
+            gene: gene.gene, 
+            description: `Domain: ${gene.domain_descriptions.join(', ')}` 
+        }));
+    return formatListResult(`Genes with "${domainKeyword}" domain description`, results);
+}
+
 // --- Autocomplete Logic (REPLACEMENT) ---
 // =============================================================================
 // REPLACEMENT: Autocomplete now handles both prefixes and keywords
@@ -923,14 +954,25 @@ function setupAiQueryAutocomplete() {
     const suggestionsContainer = document.getElementById('aiQuerySuggestions');
     if (!aiQueryInput || !suggestionsContainer) return;
 
-    // Fetch all known entities from the parser just once.
-    const allDiseases = intentParser.getAllDiseases();
-    const allComplexes = intentParser.getAllComplexes();
     const knownKeywords = intentParser.getKnownKeywords();
+    
+    // NEW: Expanded list of prefixes and new question templates
+    const prefixes = ['display', 'tell', 'tell me', 'show me', 'please let me know', 'what is', 'what are', 'list', 'find', 'which genes'];
+    const questionTemplates = [
+        "Show me genes for Joubert Syndrome",
+        "Display genes for Joubert Syndrome",
+        "Tell me about genes for Joubert Syndrome",
+        "Show me genes for JBardet-Biedl Syndrome",
+        "Display components of the BBSome complex",
+        "List ciliary genes in C. elegans",
+        "Find genes in the basal body and axoneme",
+        "Which genes cause longer cilia?",
+        "Show me motor proteins",
+        "Tell me about ARL13B"
+    ];
 
-    aiQueryInput.addEventListener('input', debounce(async () => {
+    aiQueryInput.addEventListener('input', debounce(() => {
         const inputText = aiQueryInput.value.toLowerCase();
-        // A Set automatically handles duplicate suggestions.
         const suggestions = new Set();
 
         if (inputText.length < 2) {
@@ -938,40 +980,20 @@ function setupAiQueryAutocomplete() {
             return;
         }
 
-        // --- Suggestion Provider 1: Direct Keyword Matching ---
-        // This is the most common case, for terms like "Joubert", "BBSome", etc.
+        // --- Suggestion Provider 1: Prefix-based General Questions ---
+        if (prefixes.some(p => inputText.startsWith(p))) {
+            questionTemplates
+                .filter(q => q.toLowerCase().includes(inputText))
+                .forEach(q => suggestions.add(q));
+        }
+
+        // --- Suggestion Provider 2: Direct Keyword Matching ---
         knownKeywords
             .filter(item => item.keyword.toLowerCase().startsWith(inputText))
             .forEach(item => suggestions.add(item.suggestion));
-
-        // --- Suggestion Provider 2: "Tell me about..." Pattern ---
-        // Matches conversational queries for genes and complexes.
-        const tellMeMatch = inputText.match(/^(?:tell me about|what is|describe)\s+(.*)/);
-        if (tellMeMatch && tellMeMatch[1]) {
-            const term = tellMeMatch[1];
-            if (term.length >= 2) {
-                if (!ciliaHubDataCache) await fetchCiliaData();
-                ciliaHubDataCache.map(g => g.gene)
-                    .filter(gene => gene.toLowerCase().startsWith(term))
-                    .slice(0, 3)
-                    .forEach(gene => suggestions.add(`Tell me about ${gene}`));
-                
-                allComplexes.filter(c => c.toLowerCase().startsWith(term))
-                    .forEach(c => suggestions.add(`Tell me about ${c}`));
-            }
-        }
-
-        // --- Suggestion Provider 3: "Display/Show genes for..." Pattern ---
-        // Specifically helps users find genes for diseases.
-        const displayGenesMatch = inputText.match(/^(?:display|show)\s+genes\s+for\s+(.*)/);
-        if (displayGenesMatch && displayGenesMatch[1]) {
-            const term = displayGenesMatch[1];
-            allDiseases.filter(d => d.toLowerCase().includes(term))
-                .forEach(d => suggestions.add(`Display genes for ${d}`));
-        }
-
-        // --- Display the aggregated results ---
-        const finalSuggestions = Array.from(suggestions).slice(0, 5);
+        
+        // --- Display aggregated results ---
+        const finalSuggestions = Array.from(suggestions).slice(0, 6);
 
         if (finalSuggestions.length > 0) {
             suggestionsContainer.innerHTML = finalSuggestions
@@ -981,9 +1003,9 @@ function setupAiQueryAutocomplete() {
         } else {
             suggestionsContainer.style.display = 'none';
         }
-    }, 250)); // A 250ms delay feels responsive without overloading.
+    }, 250));
 
-    // --- Event listeners for interaction ---
+    // --- Event listeners remain the same ---
     suggestionsContainer.addEventListener('click', (e) => {
         if (e.target.classList.contains('suggestion-item')) {
             aiQueryInput.value = e.target.textContent;
@@ -992,13 +1014,13 @@ function setupAiQueryAutocomplete() {
             handleAIQuery();
         }
     });
-
     document.addEventListener('click', (e) => {
         if (!aiQueryInput.contains(e.target) && !suggestionsContainer.contains(e.target)) {
             suggestionsContainer.style.display = 'none';
         }
     });
 }
+
 
 // --- Gene Analysis Engine & UI (largely unchanged) ---
 
@@ -1385,7 +1407,25 @@ async function getGenesByPhylogeny(type) {
     }
 }
 
-
+// =============================================================================
+// ADDITION: New keywords are added to the FUNCTIONAL_CATEGORY entity.
+// The function body itself remains the same.
+// =============================================================================
+async function getGenesByFunction(functionalCategory) {
+    if (!ciliaHubDataCache) await fetchCiliaData();
+    // A more flexible regex to catch terms like "kinesin" within "Motors (dynein/kinesin)"
+    const categoryRegex = new RegExp(functionalCategory.replace('motors', ''), 'i');
+    const results = ciliaHubDataCache
+        .filter(gene => 
+            Array.isArray(gene.functional_category) && 
+            gene.functional_category.some(cat => cat.match(categoryRegex))
+        )
+        .map(gene => ({ 
+            gene: gene.gene, 
+            description: `Functional Category: ${gene.functional_category.join(', ')}` 
+        }));
+    return formatListResult(`Genes in Functional Category: ${functionalCategory}`, results);
+}
 async function renderPhylogenyHeatmap(genes) {
     const phylogeny = await fetchPhylogenyData();
     if (!phylogeny || Object.keys(phylogeny).length === 0) {
