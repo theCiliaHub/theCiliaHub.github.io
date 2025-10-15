@@ -25,25 +25,33 @@ const CILI_AI_DB = {
 // REPLACEMENT: The "Brain" of CiliAI, updated with the full disease list.
 // =============================================================================
 function createIntentParser() {
-    // UPDATED: Added all Primary, Motile, and Atypical Ciliopathies from the user's list.
-    const diseases = [
-        // Aliases for common queries
-        "BBS", "Joubert", "NPHP", "BBS", "MKS", 
-        // Primary Ciliopathies
-        "Acrocallosal Syndrome", "Alström Syndrome", "Autosomal Dominant Polycystic Kidney Disease",
-        "Autosomal Recessive Polycystic Kidney Disease", "Bardet–Biedl Syndrome", "COACH Syndrome",
-        "Cranioectodermal Dysplasia", "Ellis-van Creveld Syndrome", "Hydrolethalus Syndrome", "Infantile Polycystic Kidney Disease",
-        "Joubert Syndrome", "Leber Congenital Amaurosis", "Meckel–Gruber Syndrome", "Nephronophthisis", "Orofaciodigital Syndrome",
-        "Senior-Løken Syndrome", "Short-rib Thoracic Dysplasia", "Skeletal Ciliopathy", "Retinal Ciliopathy", "Syndromic Ciliopathy",
-        "Al-Gazali-Bakalinova Syndrome", "Bazex-Dupré-Christol Syndrome", "Bilateral Polycystic Kidney Disease", "Biliary, Renal, Neurologic, and Skeletal Syndrome",
-        "Caroli Disease", "Carpenter Syndrome", "Complex Lethal Osteochondrodysplasia", "Greig Cephalopolysyndactyly Syndrome", "Kallmann Syndrome", "Lowe Oculocerebrorenal Syndrome",
-        "McKusick-Kaufman Syndrome", "Morbid Obesity and Spermatogenic Failure", "Polycystic Kidney Disease", "RHYNS Syndrome", "Renal-hepatic-pancreatic Dysplasia", "Retinal Dystrophy", "STAR Syndrome",
-        "Smith-Lemli-Opitz Syndrome", "Spondylometaphyseal Dysplasia", "Stromme Syndrome", "Weyers Acrofacial Dysostosis",
-        // Motile Ciliopathies
-        "Primary Ciliary Dyskinesia", "Birt-Hogg-Dubé Syndrome", "Juvenile Myoclonic Epilepsy",
-        // Atypical Ciliopathies
-        "Biliary Ciliopathy", "Chronic Obstructive Pulmonary Disease", "Ciliopathy", "Ciliopathy - Retinal dystrophy", "Golgipathies or Ciliopathy", "Hepatic Ciliopathy", "Male Infertility and Ciliopathy", "Male infertility", "Microcephaly and Chorioretinopathy Type 3", "Mucociliary Clearance Disorder", "Notch-mediated Ciliopathy", "Primary Endocardial Fibroelastosis", "Retinal Degeneration"
-    ];
+    // NEW: Diseases are now structured by classification.
+    const classifiedDiseases = {
+        "Primary Ciliopathies": [
+            "Acrocallosal Syndrome", "Alström Syndrome", "Autosomal Dominant Polycystic Kidney Disease",
+            "Autosomal Recessive Polycystic Kidney Disease", "Bardet–Biedl Syndrome", "COACH Syndrome",
+            "Cranioectodermal Dysplasia", "Ellis-van Creveld Syndrome", "Hydrolethalus Syndrome", "Infantile Polycystic Kidney Disease",
+            "Joubert Syndrome", "Leber Congenital Amaurosis", "Meckel–Gruber Syndrome", "Nephronophthisis", "Orofaciodigital Syndrome",
+            "Senior-Løken Syndrome", "Short-rib Thoracic Dysplasia", "Skeletal Ciliopathy", "Retinal Ciliopathy", "Syndromic Ciliopathy",
+            "Al-Gazali-Bakalinova Syndrome", "Bazex-Dupré-Christol Syndrome", "Bilateral Polycystic Kidney Disease", "Biliary, Renal, Neurologic, and Skeletal Syndrome",
+            "Caroli Disease", "Carpenter Syndrome", "Complex Lethal Osteochondrodysplasia", "Greig Cephalopolysyndactyly Syndrome", "Kallmann Syndrome", "Lowe Oculocerebrorenal Syndrome",
+            "McKusick-Kaufman Syndrome", "Morbid Obesity and Spermatogenic Failure", "Polycystic Kidney Disease", "RHYNS Syndrome", "Renal-hepatic-pancreatic Dysplasia", "Retinal Dystrophy", "STAR Syndrome",
+            "Smith-Lemli-Opitz Syndrome", "Spondylometaphyseal Dysplasia", "Stromme Syndrome", "Weyers Acrofacial Dysostosis"
+        ],
+        "Motile Ciliopathies": [
+            "Primary Ciliary Dyskinesia", "Birt-Hogg-Dubé Syndrome", "Juvenile Myoclonic Epilepsy"
+        ],
+        "Atypical Ciliopathies": [
+            "Biliary Ciliopathy", "Chronic Obstructive Pulmonary Disease", "Ciliopathy", "Ciliopathy - Retinal dystrophy", "Golgipathies or Ciliopathy", "Hepatic Ciliopathy", "Male Infertility and Ciliopathy", "Male infertility", "Microcephaly and Chorioretinopathy Type 3", "Mucociliary Clearance Disorder", "Notch-mediated Ciliopathy", "Primary Endocardial Fibroelastosis", "Retinal Degeneration"
+        ]
+    };
+
+    // Aliases are kept separate for clarity and are added to the final flat list.
+    const aliases = ["BBS", "Joubert", "NPHP", "MKS"];
+    
+    // Create a single, flat list of all diseases for keyword matching.
+    const allDiseases = [...Object.values(classifiedDiseases).flat(), ...aliases];
+
 
     const entityKeywords = [
         { 
@@ -57,10 +65,10 @@ function createIntentParser() {
         },
         { 
             type: 'CILIOPATHY', 
-            keywords: [...new Set(diseases)], // Use the expanded and deduplicated list
+            keywords: [...new Set(allDiseases)], // Use the comprehensive, deduplicated list
             handler: async (term) => {
-                // Use a more general term for the title if an alias was used
-                const titleTerm = term.toUpperCase() === 'BBS' ? 'Bardet–Biedl Syndrome' : term;
+                const titleTerm = term.toUpperCase() === 'BBS' ? 'Bardet–Biedl Syndrome' : 
+                                  term.toUpperCase() === 'MKS' ? 'Meckel–Gruber Syndrome' : term;
                 const { genes, description } = await getCiliopathyGenes(term);
                 return formatListResult(`Genes for ${titleTerm}`, genes, description);
             },
@@ -77,10 +85,28 @@ function createIntentParser() {
         },
         {
             type: 'ORGANISM',
-            keywords: ['c. elegans', 'worm', 'human', 'mouse', 'zebrafish', 'drosophila', 'fly'],
+            keywords: [
+                "Prokaryote", "E.cuniculi", "E.histolytica", "E.dispar", "G.lamblia", "T.vaginalis", "T.brucei", "T.cruzi", "L.infantum", 
+                "L.major", "L.braziliensis", "T.gondii", "C.hominis", "C.parvum", "B.bovis", "T.annulata", "T.parva", "P.knowlesi", "P.vivax", 
+                "P.falciparum", "P.chabaudi", "P.berghei", "P.yoelii", "P.tetraurelia", "T.thermophila", "P.infestans", "T.pseudonana", 
+                "P.tricornutum", "C.merolae", "N.gruberi", "O.lucimarinus", "O.tauri", "C.reinhardtii", "V.carteri", "P.patens", 
+                "S.moellendorffii", "S.bicolor", "Z.mays", "O.sativa", "B.distachyon", "A.lyrata", "A.thaliana", "L.japonicus", "M.truncatula", 
+                "V.vinifera", "P.trichocarpa", "R.communis", "T.trahens", "D.discoideum", "A.macrogynus", "S.punctatus", "M.globosa", "U.maydis", 
+                "C.neoformans", "P.chrysosporium", "S.commune", "C.cinerea", "L.bicolor", "S.pombe", "B.fuckeliana", "S.sclerotiorum", 
+                "F.graminearum", "M.grisea", "N.crassa", "P.anserina", "P.chrysogenum", "A.clavatus", "A.fumigatus", "N.fischeri", "A.flavus", 
+                "A.oryzae", "A.niger", "A.nidulans", "U.reesii", "C.immitis", "C.posadasii", "P.nodorum", "T.melanosporum", "Y.lipolytica", 
+                "P.pastoris", "C.lusitaniae", "D.hansenii", "M.guilliermondii", "S.stipitis", "L.elongisporus", "C.tropicalis", "C.albicans", 
+                "C.dubliniensis", "K.lactis", "A.gossypii", "K.waltii", "L.thermotolerans", "Z.rouxii", "V.polyspora", "C.glabrata", "S.bayanus", 
+                "S.mikatae", "S.cerevisiae", "S.paradoxus", "S.arctica", "C.owczarzaki", "M.brevicollis", "S.rosetta", "S.mansoni", "B.malayi", 
+                "C.briggsae", "C.elegans", "D.pulex", "A.pisum", "P.humanus", "A.mellifera", "N.vitripennis", "B.mori", "T.castaneum", 
+                "D.melanogaster", "D.pseudoobscura", "A.gambiae", "A.aegypti", "C.quinquefasciatus", "B.floridae", "T.adhaerens", "S.purpuratus", 
+                "H.magnipapillata", "N.vectensis", "C.intestinalis", "D.rerio", "O.latipes", "F.rubripes", "T.nigroviridis", "X.tropicalis", 
+                "G.gallus", "M.gallopavo", "O.anatinus", "M.domestica", "S.scrofa", "M.musculus", "C.familiaris", "B.taurus", "H.sapiens",
+                "worm", "human", "mouse", "zebrafish", "fly", "yeast"
+            ],
             handler: async (term) => {
-                const { genes, description } = await getCiliaryGenesForOrganism(term);
-                return formatListResult(`Ciliary genes in ${term}`, genes, description);
+                const { genes, description, speciesCode } = await getCiliaryGenesForOrganism(term);
+                return formatListResult(`Ciliary genes in ${speciesCode}`, genes, description);
             },
             autocompleteTemplate: (term) => `Display ciliary genes in ${term}`
         },
@@ -99,30 +125,22 @@ function createIntentParser() {
         parse: (query) => {
             const normalizedQuery = normalizeTerm(query);
             for (const entityType of entityKeywords) {
-                // Find the longest keyword that matches to be more specific
                 const sortedKeywords = [...entityType.keywords].sort((a, b) => b.length - a.length);
                 for (const keyword of sortedKeywords) {
                     const keywordRegex = new RegExp(`\\b${normalizeTerm(keyword).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`);
                     if (keywordRegex.test(normalizedQuery)) {
-                         return {
-                            intent: entityType.type,
-                            entity: keyword, // Return the original keyword for accurate fetching
-                            handler: entityType.handler,
-                            autocomplete: entityType.autocompleteTemplate(keyword)
-                        };
+                         return { intent: entityType.type, entity: keyword, handler: entityType.handler };
                     }
                 }
             }
-            return null; // No direct entity match found
+            return null;
         },
-        getKnownKeywords: () => entityKeywords.flatMap(e => e.keywords.map(k => ({
-            keyword: k,
-            suggestion: e.autocompleteTemplate(k)
-        }))),
-        getAllDiseases: () => diseases,
+        getKnownKeywords: () => entityKeywords.flatMap(e => e.keywords.map(k => ({ keyword: k, suggestion: e.autocompleteTemplate(k) }))),
+        getAllDiseases: () => [...new Set(allDiseases)],
         getAllComplexes: () => entityKeywords.find(e => e.type === 'COMPLEX').keywords
     };
 }
+
 const intentParser = createIntentParser();
 
 // =============================================================================
@@ -534,26 +552,29 @@ async function getGenesWithDomain(domainName) {
 async function getCiliaryGenesForOrganism(organismName) {
     await fetchCiliaData();
     await fetchPhylogenyData();
-    // Step 1: Get a set of all ciliary gene names for fast lookup
+    
+    // Step 1: Get a set of all ciliary gene names for fast lookup (Existing Feature)
     const ciliaryGeneSet = new Set(ciliaHubDataCache.map(g => g.gene.toUpperCase()));
     console.log(`Ciliary genes in cache: ${ciliaHubDataCache.length}, Sample: ${ciliaHubDataCache.slice(0, 5).map(g => g.gene).join(', ')}`);
-    // Step 2: Map user-friendly names to species codes
+
+    // Step 2: Map user-friendly names to species codes (NEW FEATURE: Greatly expanded map)
     const organismMap = {
-        'c. elegans': 'C.elegans',
-        'c.elegans': 'C.elegans',
-        'caenorhabditis elegans': 'C.elegans',
-        'worm': 'C.elegans',
-        'human': 'H.sapiens',
-        'homo sapiens': 'H.sapiens',
-        'mouse': 'M.musculus',
-        'mus musculus': 'M.musculus',
-        'zebrafish': 'D.rerio',
-        'danio rerio': 'D.rerio',
-        'drosophila': 'D.melanogaster',
-        'fly': 'D.melanogaster',
-        'drosophila melanogaster': 'D.melanogaster'
+        'human': 'H.sapiens', 'homo sapiens': 'H.sapiens',
+        'mouse': 'M.musculus', 'mus musculus': 'M.musculus',
+        'worm': 'C.elegans', 'c. elegans': 'C.elegans', 'caenorhabditis elegans': 'C.elegans',
+        'fly': 'D.melanogaster', 'drosophila': 'D.melanogaster', 'drosophila melanogaster': 'D.melanogaster',
+        'zebrafish': 'D.rerio', 'danio rerio': 'D.rerio',
+        'yeast': 'S.cerevisiae', 'saccharomyces cerevisiae': 'S.cerevisiae',
+        'arabidopsis': 'A.thaliana', 'a. thaliana': 'A.thaliana',
+        'chicken': 'G.gallus', 'gallus gallus': 'G.gallus',
+        'chlamydomonas': 'C.reinhardtii', 'c. reinhardtii': 'C.reinhardtii',
+        'tetrahymena': 'T.thermophila', 't. thermophila': 'T.thermophila',
+        'plasmodium falciparum': 'P.falciparum'
+        // This map handles common names. The logic below will fall back to use the direct input 
+        // (e.g., "X.tropicalis") if a common name is not found here.
     };
-    // Step 3: Gene synonym mapping for C. elegans
+    
+    // Step 3: Gene synonym mapping for C. elegans (Existing Feature)
     const geneSynonymMap = {
         'OSM-5': 'IFT88',
         'BBS-1': 'BBS1',
@@ -563,25 +584,32 @@ async function getCiliaryGenesForOrganism(organismName) {
         'XBOX-1': 'BBS4',
         'DYF-1': 'IFT70'
     };
+
     const normalizedOrganism = normalizeTerm(organismName);
+    // Use the expanded map first, then fall back to the user's input directly
     const speciesCode = organismMap[normalizedOrganism] || organismName;
     console.log(`Mapped organism "${organismName}" to species code "${speciesCode}"`);
-    // Step 4: Normalize species codes for comparison
+    
+    // Step 4: Normalize species codes for comparison (Existing Feature)
     const speciesRegex = new RegExp(`^${normalizeTerm(speciesCode).replace(/\./g, '\\.?').replace(/\s/g, '\\s*')}$`, 'i');
     console.log(`Species regex: ${speciesRegex}`);
-    // Step 5: Filter phylogeny data for genes present in the organism
+
+    // Step 5: Filter phylogeny data for genes present in the organism (Existing Feature)
     const genes = Object.entries(phylogenyDataCache)
         .filter(([gene, data]) => {
             const geneName = (data.sym || gene).toUpperCase();
             const standardGeneName = geneSynonymMap[geneName] || geneName;
             const isCiliary = ciliaryGeneSet.has(standardGeneName);
             const hasSpecies = Array.isArray(data.species) && data.species.some(s => speciesRegex.test(normalizeTerm(s)));
-            console.log(`Checking gene ${geneName} (standard: ${standardGeneName}): isCiliary=${isCiliary}, hasSpecies=${hasSpecies}`);
+            // The detailed console.log is preserved from your original code
+            // console.log(`Checking gene ${geneName} (standard: ${standardGeneName}): isCiliary=${isCiliary}, hasSpecies=${hasSpecies}`);
             return isCiliary && hasSpecies;
         })
         .map(([gene, data]) => ({ gene: data.sym || gene, description: `Ciliary gene found in ${speciesCode}` }));
+    
     console.log(`Found ${genes.length} ciliary genes for ${speciesCode}`);
-    // Step 6: Fallback if no genes are found
+
+    // Step 6: Fallback if no genes are found (Existing Feature)
     if (genes.length === 0) {
         const knownCiliaryGenes = [
             'IFT88', 'BBS1', 'ARL13B', 'BBS10', 'NPHP1', 'AHI1', 'CEP290', 'MKS1', 'TTC8',
@@ -590,18 +618,22 @@ async function getCiliaryGenesForOrganism(organismName) {
         const fallbackGenes = knownCiliaryGenes
             .filter(gene => ciliaryGeneSet.has((geneSynonymMap[gene.toUpperCase()] || gene).toUpperCase()))
             .map(gene => ({ gene, description: `Known ciliary gene (fallback) for ${speciesCode}` }));
+        
         console.log(`Using fallback: ${fallbackGenes.length} genes (${fallbackGenes.map(g => g.gene).join(', ')})`);
+        
         return {
             genes: fallbackGenes,
-            description: `No specific ciliary genes found for ${speciesCode} in phylogeny data. Showing ${fallbackGenes.length} known ciliary genes.`
+            description: `No specific ciliary genes found for ${speciesCode} in phylogeny data. Showing ${fallbackGenes.length} known ciliary genes.`,
+            speciesCode: speciesCode // NEW FEATURE: Returning the resolved species code
         };
     }
+    
     return {
         genes,
-        description: `Found ${genes.length} ciliary genes present in ${speciesCode}.`
+        description: `Found ${genes.length} ciliary genes present in ${speciesCode}.`,
+        speciesCode: speciesCode // NEW FEATURE: Returning the resolved species code
     };
 }
-
 // --- Helper: get genes by complex ---
 // Rule 2: Search for genes that are part of a complex
 async function getGenesByComplex(complexName) {
@@ -874,48 +906,54 @@ function setupAiQueryAutocomplete() {
     const suggestionsContainer = document.getElementById('aiQuerySuggestions');
     if (!aiQueryInput || !suggestionsContainer) return;
 
+    // Fetch all known entities from the parser just once.
     const allDiseases = intentParser.getAllDiseases();
     const allComplexes = intentParser.getAllComplexes();
+    const knownKeywords = intentParser.getKnownKeywords();
 
     aiQueryInput.addEventListener('input', debounce(async () => {
         const inputText = aiQueryInput.value.toLowerCase();
-        let suggestions = new Set();
+        // A Set automatically handles duplicate suggestions.
+        const suggestions = new Set();
 
         if (inputText.length < 2) {
             suggestionsContainer.style.display = 'none';
             return;
         }
 
-        // --- Suggest "Tell me about..." for genes and complexes ---
-        if (inputText.startsWith('tell me') || inputText.startsWith('what is') || inputText.startsWith('describe')) {
-            if (!ciliaHubDataCache) await fetchCiliaData();
-            const term = inputText.split(' ').slice(-1)[0];
+        // --- Suggestion Provider 1: Direct Keyword Matching ---
+        // This is the most common case, for terms like "Joubert", "BBSome", etc.
+        knownKeywords
+            .filter(item => item.keyword.toLowerCase().startsWith(inputText))
+            .forEach(item => suggestions.add(item.suggestion));
+
+        // --- Suggestion Provider 2: "Tell me about..." Pattern ---
+        // Matches conversational queries for genes and complexes.
+        const tellMeMatch = inputText.match(/^(?:tell me about|what is|describe)\s+(.*)/);
+        if (tellMeMatch && tellMeMatch[1]) {
+            const term = tellMeMatch[1];
             if (term.length >= 2) {
-                // Suggest genes
+                if (!ciliaHubDataCache) await fetchCiliaData();
                 ciliaHubDataCache.map(g => g.gene)
                     .filter(gene => gene.toLowerCase().startsWith(term))
                     .slice(0, 3)
                     .forEach(gene => suggestions.add(`Tell me about ${gene}`));
-                // Suggest complexes
+                
                 allComplexes.filter(c => c.toLowerCase().startsWith(term))
                     .forEach(c => suggestions.add(`Tell me about ${c}`));
             }
         }
-        // --- Suggest diseases for "Display genes for..." ---
-        else if (inputText.startsWith('display genes') || inputText.startsWith('show genes')) {
-            const term = inputText.replace(/display genes for|show genes for/i, '').trim();
+
+        // --- Suggestion Provider 3: "Display/Show genes for..." Pattern ---
+        // Specifically helps users find genes for diseases.
+        const displayGenesMatch = inputText.match(/^(?:display|show)\s+genes\s+for\s+(.*)/);
+        if (displayGenesMatch && displayGenesMatch[1]) {
+            const term = displayGenesMatch[1];
             allDiseases.filter(d => d.toLowerCase().includes(term))
-                .slice(0, 5)
                 .forEach(d => suggestions.add(`Display genes for ${d}`));
         }
-        // --- General keyword matching for diseases, complexes, etc. ---
-        else {
-            const directMatches = intentParser.getKnownKeywords()
-                .filter(item => item.keyword.toLowerCase().startsWith(inputText))
-                .map(item => item.suggestion);
-            directMatches.forEach(s => suggestions.add(s));
-        }
 
+        // --- Display the aggregated results ---
         const finalSuggestions = Array.from(suggestions).slice(0, 5);
 
         if (finalSuggestions.length > 0) {
@@ -926,8 +964,9 @@ function setupAiQueryAutocomplete() {
         } else {
             suggestionsContainer.style.display = 'none';
         }
-    }, 250));
+    }, 250)); // A 250ms delay feels responsive without overloading.
 
+    // --- Event listeners for interaction ---
     suggestionsContainer.addEventListener('click', (e) => {
         if (e.target.classList.contains('suggestion-item')) {
             aiQueryInput.value = e.target.textContent;
