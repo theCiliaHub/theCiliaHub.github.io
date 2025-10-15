@@ -128,6 +128,7 @@ function createIntentParser() {
         parse: (query) => {
             const normalizedQuery = normalizeTerm(query);
             for (const entityType of entityKeywords) {
+                // Sort keywords by length descending to match longer phrases first (e.g., "Primary Ciliary Dyskinesia" before "Ciliary")
                 const sortedKeywords = [...entityType.keywords].sort((a, b) => b.length - a.length);
                 for (const keyword of sortedKeywords) {
                     const keywordRegex = new RegExp(`\\b${normalizeTerm(keyword).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`);
@@ -140,31 +141,27 @@ function createIntentParser() {
         },
         getKnownKeywords: () => entityKeywords.flatMap(e => e.keywords.map(k => ({ keyword: k, suggestion: e.autocompleteTemplate(k) }))),
         getAllDiseases: () => [...new Set(allDiseases)],
-        getAllComplexes: () => entityKeywords.find(e => e.type === 'COMPLEX').keywords
+        getAllComplexes: () => entityKeywords.find(e => e.type === 'COMPLEX').keywords,
+        getAllGenes: () => ciliaHubDataCache ? ciliaHubDataCache.map(g => g.gene) : []
     };
 }
 const intentParser = createIntentParser();
+
 
 // =============================================================================
 // NEW: Helper function to get comprehensive details for "Tell me about..." queries
 // =============================================================================
 async function getComprehensiveDetails(term) {
     const upperTerm = term.toUpperCase();
-    
-    // Check if it's a known complex
     const isComplex = intentParser.getAllComplexes().some(c => c.toUpperCase() === upperTerm);
     if (isComplex) {
         const results = await getGenesByComplex(term);
         return formatListResult(`Components of ${term}`, results);
     }
-
-    // Otherwise, assume it's a gene
-    if (!ciliaHubDataCache) await fetchCiliaData();
+    await fetchCiliaData();
     const geneData = ciliaHubDataCache.find(g => g.gene.toUpperCase() === upperTerm);
-    
-    return formatComprehensiveGeneDetails(upperTerm, geneData); // Re-use the existing detailed formatter
+    return formatComprehensiveGeneDetails(upperTerm, geneData);
 }
-
 
 
 // --- Main Page Display Function (REPLACEMENT) ---
@@ -460,12 +457,6 @@ async function fetchTissueData() {
 window.fetchTissueData = fetchTissueData;
 
 
-
-// --- Main AI Query Handler ---
-// =============================================================================
-// NEW CODE: Replace all functions from here down to the end of handleAIQuery
-// =============================================================================
-
 // --- Query Helper Functions ---
 
 // Rule 1: Search for genes by ciliopathy/disease name
@@ -557,12 +548,7 @@ async function getGenesWithDomain(domainName) {
 async function getCiliaryGenesForOrganism(organismName) {
     await fetchCiliaData();
     await fetchPhylogenyData();
-    
-    // Step 1: Get a set of all ciliary gene names for fast lookup (Existing Feature)
     const ciliaryGeneSet = new Set(ciliaHubDataCache.map(g => g.gene.toUpperCase()));
-    console.log(`Ciliary genes in cache: ${ciliaHubDataCache.length}, Sample: ${ciliaHubDataCache.slice(0, 5).map(g => g.gene).join(', ')}`);
-
-    // Step 2: Map user-friendly names to species codes (NEW FEATURE: Greatly expanded map)
     const organismMap = {
         'human': 'H.sapiens', 'homo sapiens': 'H.sapiens',
         'mouse': 'M.musculus', 'mus musculus': 'M.musculus',
@@ -578,67 +564,19 @@ async function getCiliaryGenesForOrganism(organismName) {
         // This map handles common names. The logic below will fall back to use the direct input 
         // (e.g., "X.tropicalis") if a common name is not found here.
     };
-    
-    // Step 3: Gene synonym mapping for C. elegans (Existing Feature)
-    const geneSynonymMap = {
-        'OSM-5': 'IFT88',
-        'BBS-1': 'BBS1',
-        'CHE-11': 'IFT140',
-        'DHC-1': 'DYNC2H1',
-        'BBS-5': 'BBS5',
-        'XBOX-1': 'BBS4',
-        'DYF-1': 'IFT70'
-    };
-
     const normalizedOrganism = normalizeTerm(organismName);
-    // Use the expanded map first, then fall back to the user's input directly
     const speciesCode = organismMap[normalizedOrganism] || organismName;
-    console.log(`Mapped organism "${organismName}" to species code "${speciesCode}"`);
-    
-    // Step 4: Normalize species codes for comparison (Existing Feature)
     const speciesRegex = new RegExp(`^${normalizeTerm(speciesCode).replace(/\./g, '\\.?').replace(/\s/g, '\\s*')}$`, 'i');
-    console.log(`Species regex: ${speciesRegex}`);
-
-    // Step 5: Filter phylogeny data for genes present in the organism (Existing Feature)
-    const genes = Object.entries(phylogenyDataCache)
-        .filter(([gene, data]) => {
-            const geneName = (data.sym || gene).toUpperCase();
-            const standardGeneName = geneSynonymMap[geneName] || geneName;
-            const isCiliary = ciliaryGeneSet.has(standardGeneName);
+    const genes = Object.values(phylogenyDataCache)
+        .filter(data => {
+            const isCiliary = ciliaryGeneSet.has((data.sym || '').toUpperCase());
             const hasSpecies = Array.isArray(data.species) && data.species.some(s => speciesRegex.test(normalizeTerm(s)));
-            // The detailed console.log is preserved from your original code
-            // console.log(`Checking gene ${geneName} (standard: ${standardGeneName}): isCiliary=${isCiliary}, hasSpecies=${hasSpecies}`);
             return isCiliary && hasSpecies;
         })
-        .map(([gene, data]) => ({ gene: data.sym || gene, description: `Ciliary gene found in ${speciesCode}` }));
-    
-    console.log(`Found ${genes.length} ciliary genes for ${speciesCode}`);
-
-    // Step 6: Fallback if no genes are found (Existing Feature)
-    if (genes.length === 0) {
-        const knownCiliaryGenes = [
-            'IFT88', 'BBS1', 'ARL13B', 'BBS10', 'NPHP1', 'AHI1', 'CEP290', 'MKS1', 'TTC8',
-            'OSM-5', 'CHE-11', 'DHC-1', 'BBS-1', 'BBS-5', 'XBOX-1', 'DYF-1'
-        ];
-        const fallbackGenes = knownCiliaryGenes
-            .filter(gene => ciliaryGeneSet.has((geneSynonymMap[gene.toUpperCase()] || gene).toUpperCase()))
-            .map(gene => ({ gene, description: `Known ciliary gene (fallback) for ${speciesCode}` }));
-        
-        console.log(`Using fallback: ${fallbackGenes.length} genes (${fallbackGenes.map(g => g.gene).join(', ')})`);
-        
-        return {
-            genes: fallbackGenes,
-            description: `No specific ciliary genes found for ${speciesCode} in phylogeny data. Showing ${fallbackGenes.length} known ciliary genes.`,
-            speciesCode: speciesCode // NEW FEATURE: Returning the resolved species code
-        };
-    }
-    
-    return {
-        genes,
-        description: `Found ${genes.length} ciliary genes present in ${speciesCode}.`,
-        speciesCode: speciesCode // NEW FEATURE: Returning the resolved species code
-    };
+        .map(data => ({ gene: data.sym, description: `Ciliary gene found in ${speciesCode}` }));
+    return { genes, description: `Found ${genes.length} ciliary genes present in ${speciesCode}.`, speciesCode };
 }
+
 // --- Helper: get genes by complex ---
 // Rule 2: Search for genes that are part of a complex
 async function getGenesByComplex(complexName) {
@@ -662,61 +600,34 @@ window.handleAIQuery = async function() {
 
     resultArea.style.display = 'block';
     resultArea.innerHTML = `<p class="status-searching">CiliAI is thinking...</p>`;
-
     await Promise.all([fetchCiliaData(), fetchScreenData(), fetchTissueData()]);
 
     let resultHtml = '';
     const qLower = query.toLowerCase();
     let match;
-
+    
     try {
-        // PRIORITY 1: Handle complex patterns with regex first
-        if ((match = qLower.match(/genes localizing (?:to|in)\s+(?:both\s+)?(.+?)\s+and\s+(.+)/i))) {
-            const locations = [match[1].trim(), match[2].trim()];
-            resultHtml = await getGenesByMultipleLocalizations(locations);
-        }
-        else if ((match = qLower.match(/(?:show me|find|list)\s+(.+?)\s+genes/i)) && normalizeTerm(match[1]).includes('kinase')) {
-             resultHtml = await getGenesByDomainDescription('kinase');
-        }
-        // ADDED BACK: Logic for querying screen data phenotypes.
-        else if ((match = qLower.match(/(?:which genes cause|find genes that)\s+(.+)/i))) {
-            resultHtml = await getGenesByScreenPhenotype(match[1].trim());
-        }
-        else if ((match = qLower.match(/(?:tell me about|what is|describe)\s+(.+)/i))) {
+        if ((match = qLower.match(/(?:tell me about|what is|describe)\s+(.+)/i))) {
             const term = match[1].trim();
             resultHtml = await getComprehensiveDetails(term);
-        }
-        // PRIORITY 2: Use the intent parser for keyword-based queries
-        else {
+        } else {
             const intent = intentParser.parse(query);
             if (intent && typeof intent.handler === 'function') {
                 resultHtml = await intent.handler(intent.entity);
-            } 
-            // PRIORITY 3: Fallback for remaining specific phrases
-            else if ((match = qLower.match(/expression of\s+([a-z0-9\-]+)/i))) {
+            } else if ((match = qLower.match(/expression of\s+([a-z0-9\-]+)/i))) {
                 const gene = match[1].toUpperCase();
                 await displayCiliAIExpressionHeatmap([gene], resultArea, window.tissueDataCache);
                 return;
-            }
-            else if (qLower.includes('ciliary-only genes')) {
-                const { label, genes } = await getPhylogenyGenes({ type: 'ciliary_only_list' });
-                resultHtml = formatListResult(label, genes);
-            }
-            // FINAL FALLBACK
-            else {
+            } else {
                 resultHtml = `<p>Sorry, I didn’t understand that. Try asking about a specific disease, complex, or gene.</p>`;
             }
         }
-
         resultArea.innerHTML = resultHtml;
-
     } catch (e) {
         resultArea.innerHTML = `<p class="status-not-found">An error occurred. Check console for details.</p>`;
         console.error("CiliAI Query Error:", e);
     }
 };
-
-
 
 
 // Helper for the comparison query (updated titles and threshold)
@@ -954,58 +865,39 @@ function setupAiQueryAutocomplete() {
     const suggestionsContainer = document.getElementById('aiQuerySuggestions');
     if (!aiQueryInput || !suggestionsContainer) return;
 
-    const knownKeywords = intentParser.getKnownKeywords();
-    
-    // NEW: Expanded list of prefixes and new question templates
-    const prefixes = ['display', 'tell', 'tell me', 'show me', 'please let me know', 'what is', 'what are', 'list', 'find', 'which genes'];
-    const questionTemplates = [
-        "Show me genes for Joubert Syndrome",
-        "Display genes for Joubert Syndrome",
-        "Tell me about genes for Joubert Syndrome",
-        "Show me genes for JBardet-Biedl Syndrome",
-        "Display components of the BBSome complex",
-        "List ciliary genes in C. elegans",
-        "Find genes in the basal body and axoneme",
-        "Which genes cause longer cilia?",
-        "Show me motor proteins",
-        "Tell me about ARL13B"
-    ];
+    const allKeywords = intentParser.getKnownKeywords();
 
-    aiQueryInput.addEventListener('input', debounce(() => {
+    aiQueryInput.addEventListener('input', debounce(async () => {
         const inputText = aiQueryInput.value.toLowerCase();
-        const suggestions = new Set();
+        let suggestions = new Set();
 
-        if (inputText.length < 2) {
+        if (inputText.length < 3) {
             suggestionsContainer.style.display = 'none';
             return;
         }
 
-        // --- Suggestion Provider 1: Prefix-based General Questions ---
-        if (prefixes.some(p => inputText.startsWith(p))) {
-            questionTemplates
-                .filter(q => q.toLowerCase().includes(inputText))
-                .forEach(q => suggestions.add(q));
+        // Handle "Tell me about..." queries
+        if (inputText.startsWith('tell me') || inputText.startsWith('what is') || inputText.startsWith('describe')) {
+            const term = inputText.split(/\s+/).pop();
+            if (term.length >= 2) {
+                const genes = intentParser.getAllGenes();
+                genes.filter(gene => gene.toLowerCase().startsWith(term)).slice(0, 3).forEach(gene => suggestions.add(`Tell me about ${gene}`));
+                intentParser.getAllComplexes().filter(c => c.toLowerCase().startsWith(term)).forEach(c => suggestions.add(`Tell me about ${c}`));
+            }
+        } else {
+            // General keyword matching for all other intents
+            allKeywords.filter(item => item.keyword.toLowerCase().startsWith(inputText)).slice(0, 5).forEach(item => suggestions.add(item.suggestion));
         }
 
-        // --- Suggestion Provider 2: Direct Keyword Matching ---
-        knownKeywords
-            .filter(item => item.keyword.toLowerCase().startsWith(inputText))
-            .forEach(item => suggestions.add(item.suggestion));
-        
-        // --- Display aggregated results ---
-        const finalSuggestions = Array.from(suggestions).slice(0, 6);
-
+        const finalSuggestions = Array.from(suggestions).slice(0, 5);
         if (finalSuggestions.length > 0) {
-            suggestionsContainer.innerHTML = finalSuggestions
-                .map(suggestion => `<div class="suggestion-item">${suggestion}</div>`)
-                .join('');
+            suggestionsContainer.innerHTML = finalSuggestions.map(s => `<div class="suggestion-item">${s}</div>`).join('');
             suggestionsContainer.style.display = 'block';
         } else {
             suggestionsContainer.style.display = 'none';
         }
     }, 250));
 
-    // --- Event listeners remain the same ---
     suggestionsContainer.addEventListener('click', (e) => {
         if (e.target.classList.contains('suggestion-item')) {
             aiQueryInput.value = e.target.textContent;
@@ -1014,12 +906,67 @@ function setupAiQueryAutocomplete() {
             handleAIQuery();
         }
     });
+
     document.addEventListener('click', (e) => {
         if (!aiQueryInput.contains(e.target) && !suggestionsContainer.contains(e.target)) {
             suggestionsContainer.style.display = 'none';
         }
     });
 }
+
+const questionRegistry = [
+  // --- Gene-specific ---
+  { text: "Tell me about ARL13B", handler: () => getComprehensiveDetails("ARL13B") },
+  { text: "Tell me about IFT88", handler: () => getComprehensiveDetails("IFT88") },
+  { text: "Show interactors of IFT88", handler: () => getProteinInteractions("IFT88") },
+  
+  // --- Disease-related ---
+  { text: "Show genes for Joubert Syndrome", handler: () => getCiliopathyGenes("Joubert Syndrome") },
+  { text: "Show genes for Bardet-Biedl Syndrome", handler: () => getCiliopathyGenes("Bardet-Biedl Syndrome") },
+  { text: "Display genes associated with Meckel-Gruber Syndrome", handler: () => getCiliopathyGenes("Meckel-Gruber Syndrome") },
+  { text: "List genes for Primary Ciliary Dyskinesia", handler: () => getCiliopathyGenes("Primary Ciliary Dyskinesia") },
+  { text: "Find genes linked to Leber congenital amaurosis", handler: () => getCiliopathyGenes("Leber congenital amaurosis") },
+  { text: "Which genes cause cystic kidney disease?", handler: () => getGenesByScreenPhenotype("cystic kidney disease") },
+  { text: "Show genes for cranioectodermal dysplasia", handler: () => getCiliopathyGenes("Cranioectodermal Dysplasia") },
+  { text: "Tell me genes causing short-rib thoracic dysplasia", handler: () => getCiliopathyGenes("Short-rib thoracic dysplasia") },
+  { text: "Display genes related to hydrocephalus", handler: () => getCiliopathyGenes("Hydrocephalus") },
+
+  // --- Localization-based ---
+  { text: "Find genes localized to basal body", handler: () => getGenesByLocalization("Basal body") },
+  { text: "Show proteins in transition zone", handler: () => getGenesByLocalization("Transition zone") },
+  { text: "List components of the BBSome complex", handler: () => getGenesByComplex("BBSome") },
+  { text: "Display genes at ciliary tip", handler: () => getGenesByLocalization("Ciliary tip") },
+  { text: "Which genes localize to axoneme?", handler: () => getGenesByLocalization("Axoneme") },
+  { text: "Show transition fiber proteins", handler: () => getGenesByLocalization("Transition fiber") },
+
+  // --- Mechanism-based ---
+  { text: "Show me motor genes", handler: () => getGenesWithDomain("motor") },
+  { text: "Display kinases regulating cilia length", handler: () => getGenesByDomainDescription("kinase") },
+  { text: "List intraflagellar transport (IFT) components", handler: () => getGenesByComplex("IFT") },
+  { text: "Find IFT-A and IFT-B complex genes", handler: () => getGenesByMultipleComplexes(["IFT-A", "IFT-B"]) },
+  { text: "Which genes are involved in cilium assembly?", handler: () => getGenesByFunction("cilium assembly") },
+
+  // --- Organism-specific ---
+  { text: "List ciliary genes in C. elegans", handler: () => getCiliaryGenesForOrganism("C. elegans") },
+  { text: "Display conserved ciliary proteins between mouse and human", handler: () => getConservedGenes(["Mouse", "Human"]) },
+
+  // --- Structure / Morphology ---
+  { text: "Which genes cause longer cilia?", handler: () => getGenesByScreenPhenotype("long cilia") },
+  { text: "Find genes causing short cilia", handler: () => getGenesByScreenPhenotype("short cilia") }
+];
+
+// --- NEW: Placeholder Handlers for Registry ---
+// These functions are placeholders for the new features in your registry.
+function notImplementedYet(feature) {
+    return `<div class="result-card"><h3>Feature In Development</h3><p>The handler for "${feature}" is not yet implemented. Stay tuned for future updates!</p></div>`;
+}
+const getGenesByScreenPhenotype = async (phenotype) => notImplementedYet(`Genes by screen phenotype: ${phenotype}`);
+const getGenesByDomainDescription = async (desc) => notImplementedYet(`Genes by domain description: ${desc}`);
+const getGenesByMultipleComplexes = async (complexes) => notImplementedYet(`Genes by multiple complexes: ${complexes.join(', ')}`);
+const getGenesByFunction = async (func) => notImplementedYet(`Genes by function: ${func}`);
+const getConservedGenes = async (organisms) => notImplementedYet(`Conserved genes between: ${organisms.join(' & ')}`);
+const getProteinInteractions = async (gene) => notImplementedYet(`Protein interactions for: ${gene}`);
+
 
 
 // --- Gene Analysis Engine & UI (largely unchanged) ---
@@ -1411,21 +1358,16 @@ async function getGenesByPhylogeny(type) {
 // ADDITION: New keywords are added to the FUNCTIONAL_CATEGORY entity.
 // The function body itself remains the same.
 // =============================================================================
-async function getGenesByFunction(functionalCategory) {
-    if (!ciliaHubDataCache) await fetchCiliaData();
-    // A more flexible regex to catch terms like "kinesin" within "Motors (dynein/kinesin)"
-    const categoryRegex = new RegExp(functionalCategory.replace('motors', ''), 'i');
+async function getGenesByFunction(func) {
+    await fetchCiliaData();
+    const funcLower = normalizeTerm(func);
     const results = ciliaHubDataCache
-        .filter(gene => 
-            Array.isArray(gene.functional_category) && 
-            gene.functional_category.some(cat => cat.match(categoryRegex))
-        )
-        .map(gene => ({ 
-            gene: gene.gene, 
-            description: `Functional Category: ${gene.functional_category.join(', ')}` 
-        }));
-    return formatListResult(`Genes in Functional Category: ${functionalCategory}`, results);
+        .filter(gene => gene.functional_category.some(cat => normalizeTerm(cat).includes(funcLower)))
+        .map(gene => ({ gene: gene.gene, description: gene.functional_category.join(', ') }))
+        .sort((a, b) => a.gene.localeCompare(b.gene));
+    return formatListResult(`Genes in Functional Category: ${func}`, results);
 }
+
 async function renderPhylogenyHeatmap(genes) {
     const phylogeny = await fetchPhylogenyData();
     if (!phylogeny || Object.keys(phylogeny).length === 0) {
