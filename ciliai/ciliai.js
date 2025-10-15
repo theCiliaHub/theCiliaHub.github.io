@@ -306,10 +306,13 @@ window.displayCiliAIPage = async function displayCiliAIPage() {
 // --- Helper Functions ---
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 function debounce(fn, delay) { let timeout; return function(...args) { clearTimeout(timeout); timeout = setTimeout(() => fn(...args), delay); }; }
+
 function normalizeTerm(s) {
     if (!s) return '';
-    return String(s).toLowerCase().replace(/[_\-\s]+/g, ' ').trim();
+    // UPDATED: Now replaces periods, hyphens, underscores, and spaces with a single space.
+    return String(s).toLowerCase().replace(/[._\-\s]+/g, ' ').trim();
 }
+
 
 // --- Data Fetching and Caching ---
 async function fetchCiliaData() {
