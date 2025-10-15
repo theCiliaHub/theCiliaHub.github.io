@@ -193,6 +193,7 @@ function notImplementedYet(feature) {
     return `<div class="result-card"><h3>Feature In Development</h3><p>The query handler for "<strong>${feature}</strong>" is not yet implemented. Stay tuned for future updates!</p></div>`;
 }
 const getGenesByScreenPhenotype = async (phenotype) => notImplementedYet(`Genes by screen phenotype: ${phenotype}`);
+
 const getGenesByDomainDescription = async (desc) => {
     if (!ciliaHubDataCache) await fetchCiliaData();
     const keywordRegex = new RegExp(desc, 'i');
@@ -201,6 +202,7 @@ const getGenesByDomainDescription = async (desc) => {
         .map(gene => ({ gene: gene.gene, description: `Domain: ${gene.domain_descriptions.join(', ')}` }));
     return formatListResult(`Genes with "${desc}" domain description`, results);
 };
+
 const getGenesByMultipleComplexes = async (complexes) => notImplementedYet(`Genes by multiple complexes: ${complexes.join(', ')}`);
 const getConservedGenes = async (organisms) => notImplementedYet(`Conserved genes between: ${organisms.join(' & ')}`);
 const getProteinInteractions = async (gene) => notImplementedYet(`Protein interactions for: ${gene}`);
@@ -976,24 +978,6 @@ function formatComplexResults(gene, title) {
         html += '<p>No complex components listed for this gene.</p>';
     }
     return html + '</div>';
-}
-
-// =============================================================================
-// ADDITION: New helper function for domain description queries (e.g., "kinase").
-// =============================================================================
-async function getGenesByDomainDescription(domainKeyword) {
-    if (!ciliaHubDataCache) await fetchCiliaData();
-    const keywordRegex = new RegExp(domainKeyword, 'i');
-    const results = ciliaHubDataCache
-        .filter(gene => 
-            Array.isArray(gene.domain_descriptions) && 
-            gene.domain_descriptions.some(desc => desc.match(keywordRegex))
-        )
-        .map(gene => ({ 
-            gene: gene.gene, 
-            description: `Domain: ${gene.domain_descriptions.join(', ')}` 
-        }));
-    return formatListResult(`Genes with "${domainKeyword}" domain description`, results);
 }
 
 // --- Autocomplete Logic (REPLACEMENT) ---
