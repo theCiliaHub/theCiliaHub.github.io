@@ -22,15 +22,27 @@ const CILI_AI_DB = {
 
 // NEW: Intent Parser - The "Brain" of CiliAI
 // =============================================================================
-// REPLACEMENT: The "Brain" of CiliAI, updated with a comprehensive disease list.
+// REPLACEMENT: The "Brain" of CiliAI, updated with the full disease list.
 // =============================================================================
 function createIntentParser() {
-    // NEW: Expanded list of diseases from user data.
+    // UPDATED: Added all Primary, Motile, and Atypical Ciliopathies from the user's list.
     const diseases = [
-        "Acrocallosal Syndrome", "Alström Syndrome", "Autosomal Dominant Polycystic Kidney Disease", "Autosomal Recessive Polycystic Kidney Disease", 
-        "Bardet–Biedl Syndrome", "BBS", "Joubert Syndrome", "COACH Syndrome", "Cranioectodermal Dysplasia", "Ellis-van Creveld Syndrome", "Hydrolethalus Syndrome", 
-        "Infantile Polycystic Kidney Disease", "Leber Congenital Amaurosis", "Meckel–Gruber Syndrome", "Nephronophthisis", "NPHP", "Orofaciodigital Syndrome", 
-        "Senior-Løken Syndrome", "Short-rib Thoracic Dysplasia", "Primary Ciliary Dyskinesia", "Retinitis Pigmentosa", "Usher Syndrome"
+        // Aliases for common queries
+        "BBS", "Joubert", "NPHP", "BBS", "MKS", 
+        // Primary Ciliopathies
+        "Acrocallosal Syndrome", "Alström Syndrome", "Autosomal Dominant Polycystic Kidney Disease",
+        "Autosomal Recessive Polycystic Kidney Disease", "Bardet–Biedl Syndrome", "COACH Syndrome",
+        "Cranioectodermal Dysplasia", "Ellis-van Creveld Syndrome", "Hydrolethalus Syndrome", "Infantile Polycystic Kidney Disease",
+        "Joubert Syndrome", "Leber Congenital Amaurosis", "Meckel–Gruber Syndrome", "Nephronophthisis", "Orofaciodigital Syndrome",
+        "Senior-Løken Syndrome", "Short-rib Thoracic Dysplasia", "Skeletal Ciliopathy", "Retinal Ciliopathy", "Syndromic Ciliopathy",
+        "Al-Gazali-Bakalinova Syndrome", "Bazex-Dupré-Christol Syndrome", "Bilateral Polycystic Kidney Disease", "Biliary, Renal, Neurologic, and Skeletal Syndrome",
+        "Caroli Disease", "Carpenter Syndrome", "Complex Lethal Osteochondrodysplasia", "Greig Cephalopolysyndactyly Syndrome", "Kallmann Syndrome", "Lowe Oculocerebrorenal Syndrome",
+        "McKusick-Kaufman Syndrome", "Morbid Obesity and Spermatogenic Failure", "Polycystic Kidney Disease", "RHYNS Syndrome", "Renal-hepatic-pancreatic Dysplasia", "Retinal Dystrophy", "STAR Syndrome",
+        "Smith-Lemli-Opitz Syndrome", "Spondylometaphyseal Dysplasia", "Stromme Syndrome", "Weyers Acrofacial Dysostosis",
+        // Motile Ciliopathies
+        "Primary Ciliary Dyskinesia", "Birt-Hogg-Dubé Syndrome", "Juvenile Myoclonic Epilepsy",
+        // Atypical Ciliopathies
+        "Biliary Ciliopathy", "Chronic Obstructive Pulmonary Disease", "Ciliopathy", "Ciliopathy - Retinal dystrophy", "Golgipathies or Ciliopathy", "Hepatic Ciliopathy", "Male Infertility and Ciliopathy", "Male infertility", "Microcephaly and Chorioretinopathy Type 3", "Mucociliary Clearance Disorder", "Notch-mediated Ciliopathy", "Primary Endocardial Fibroelastosis", "Retinal Degeneration"
     ];
 
     const entityKeywords = [
@@ -47,8 +59,10 @@ function createIntentParser() {
             type: 'CILIOPATHY', 
             keywords: [...new Set(diseases)], // Use the expanded and deduplicated list
             handler: async (term) => {
+                // Use a more general term for the title if an alias was used
+                const titleTerm = term.toUpperCase() === 'BBS' ? 'Bardet–Biedl Syndrome' : term;
                 const { genes, description } = await getCiliopathyGenes(term);
-                return formatListResult(`Genes for ${term}`, genes, description);
+                return formatListResult(`Genes for ${titleTerm}`, genes, description);
             },
             autocompleteTemplate: (term) => `Display genes for ${term}`
         },
@@ -85,14 +99,21 @@ function createIntentParser() {
         parse: (query) => {
             const normalizedQuery = normalizeTerm(query);
             for (const entityType of entityKeywords) {
-                for (const keyword of entityType.keywords) {
-                    const keywordRegex = new RegExp(`\\b${normalizeTerm(keyword)}\\b`);
+                // Find the longest keyword that matches to be more specific
+                const sortedKeywords = [...entityType.keywords].sort((a, b) => b.length - a.length);
+                for (const keyword of sortedKeywords) {
+                    const keywordRegex = new RegExp(`\\b${normalizeTerm(keyword).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`);
                     if (keywordRegex.test(normalizedQuery)) {
-                         return { intent: entityType.type, entity: keyword, handler: entityType.handler };
+                         return {
+                            intent: entityType.type,
+                            entity: keyword, // Return the original keyword for accurate fetching
+                            handler: entityType.handler,
+                            autocomplete: entityType.autocompleteTemplate(keyword)
+                        };
                     }
                 }
             }
-            return null;
+            return null; // No direct entity match found
         },
         getKnownKeywords: () => entityKeywords.flatMap(e => e.keywords.map(k => ({
             keyword: k,
