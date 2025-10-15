@@ -56,20 +56,24 @@ window.displayCiliAIPage = async function displayCiliAIPage() {
                         <div id="ai-result-area" class="results-section" style="display: none; margin-top: 1.5rem; padding: 1rem;"></div>
                     </div>
                     <div class="example-queries">
-                        <p><strong>Try asking:</strong> 
-                            <span>"Display genes for Bardet-Biedl Syndrome"</span>, 
-                            <span>"Show me basal body localizing genes"</span>,
-                            <span>"Effect of ARL13B on cilia length?"</span>,
-                            <span>"Show me ciliary-only genes"</span>,
-                            <span>"Show me nonciliary-only genes"</span>,
-                            <span>"Show me genes found in all organisms"</span>,
-                            <span>"Display ciliary genes in C. elegans"</span>,
-                            <span>"Display components of BBSome complex"</span>,
-                            <span>"Show WD40 domain containing proteins"</span>,
-                            <span>"Compare genes expressed in liver vs ciliary genes in liver"</span>,
-                            <span>"Expression of ARL13B"</span>.
-                        </p>
+                        <p><strong>Try asking:</strong></p>
+                        <div id="try-asking" class="try-asking-container">
+                            <span class="try-asking-item">BBS genes</span>
+                            <span class="try-asking-item">Joubert genes</span>
+                            <span class="try-asking-item">Basal body genes</span>
+                            <span class="try-asking-item">Transition zone proteins</span>
+                            <span class="try-asking-item">Ciliary-only genes</span>
+                            <span class="try-asking-item">Non-ciliary-only genes</span>
+                            <span class="try-asking-item">Genes found in all organisms</span>
+                            <span class="try-asking-item">Ciliary genes in C. elegans</span>
+                            <span class="try-asking-item">BBSome complex components</span>
+                            <span class="try-asking-item">WD40 domain proteins</span>
+                            <span class="try-asking-item">ARL13B expression</span>
+                            <span class="try-asking-item">Effect of ARL13B on cilia length</span>
+                            <span class="try-asking-item">Liver vs ciliary genes</span>
+                        </div>
                     </div>
+
                     <div class="input-section">
                         <h3>Analyze Gene Phenotypes</h3>
                         <div class="input-group">
@@ -128,6 +132,30 @@ window.displayCiliAIPage = async function displayCiliAIPage() {
                 .ai-query-btn:hover { background-color: #1e4273; }
                 .example-queries { margin-top: 0; margin-bottom: 2rem; font-size: 0.9rem; color: #555; text-align: center; }
                 .example-queries span { background-color: #d1e7fd; padding: 3px 8px; border-radius: 4px; font-family: monospace; cursor: pointer; margin: 4px; display: inline-block; line-height: 1.5; }
+
+                /* --- Added Try Asking Section Styles --- */
+                .try-asking-container {
+                    display: flex;
+                    flex-wrap: wrap;
+                    justify-content: center;
+                    gap: 8px;
+                    margin-top: 0.8rem;
+                }
+                .try-asking-item {
+                    background-color: #e3f2fd;
+                    color: #1a3f8b;
+                    padding: 6px 12px;
+                    border-radius: 8px;
+                    font-size: 0.9rem;
+                    cursor: pointer;
+                    transition: all 0.2s ease-in-out;
+                    user-select: none;
+                }
+                .try-asking-item:hover {
+                    background-color: #bbdefb;
+                    transform: scale(1.05);
+                }
+
                 .input-section { background-color: #fff; padding: 2rem; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
                 .input-group { margin-bottom: 1.5rem; }
                 .input-group label { display: block; font-weight: bold; margin-bottom: 0.5rem; color: #333; }
@@ -156,12 +184,22 @@ window.displayCiliAIPage = async function displayCiliAIPage() {
     await Promise.all([fetchCiliaData(), fetchScreenData(), fetchPhylogenyData(), fetchTissueData()]);
     console.log('ciliAI.js: All data loaded');
 
-    // FIX: Use setTimeout to push listener setup to the end of the event queue.
-    // This ensures the DOM is fully rendered before trying to find elements.
-    setTimeout(setupCiliAIEventListeners, 0);
+    // --- Setup all event listeners ---
+    setTimeout(() => {
+        setupCiliAIEventListeners(); // existing listener setup
+
+        // Add interactivity for "Try asking" keywords
+        document.querySelectorAll('.try-asking-item').forEach(item => {
+            item.addEventListener('click', () => {
+                const aiQueryInput = document.getElementById('aiQueryInput');
+                aiQueryInput.value = item.textContent;
+                handleAIQuery(); // triggers the main query handler
+            });
+        });
+    }, 0);
 };
 
-
+    
 // --- Helper Functions ---
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 function debounce(fn, delay) { let timeout; return function(...args) { clearTimeout(timeout); timeout = setTimeout(() => fn(...args), delay); }; }
