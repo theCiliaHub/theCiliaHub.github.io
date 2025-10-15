@@ -719,6 +719,12 @@ function formatComparisonResult(title, tissue, list1, list2) {
                 </ul>
                 ${geneList.length > 50 ? `<p><small>Showing first 50 genes.</small></p>`: ''}`;
     };
+
+    // NEW FEATURE: Reference for expression data
+    const referenceHtml = `<p style="font-size: 0.8em; color: #666; margin-top: 1rem; border-top: 1px solid #eee; padding-top: 0.5rem;">
+        Consensus tissue expression data from: Uhlén, M. et al. (2015) <em>Science</em>, 347(6220). <a href="https://pubmed.ncbi.nlm.nih.gov/25613900/" target="_blank" title="View on PubMed">PMID: 25613900</a>.
+    </p>`;
+
     return `
         <div class="result-card">
             <h3>${title}</h3>
@@ -730,9 +736,12 @@ function formatComparisonResult(title, tissue, list1, list2) {
                     ${listToHtml(list2, `Ciliary Genes Expressed in ${tissue}`)}
                 </div>
             </div>
+            ${referenceHtml}
         </div>
     `;
 }
+
+
 // --- UI and Formatting Helper Functions ---
 function formatComprehensiveGeneDetails(geneSymbol, geneData) {
     if (!geneData) {
@@ -830,12 +839,12 @@ function formatGeneDetail(geneData, geneSymbol, detailTitle, detailContent) {
 
 // --- Table Formatting ---
 function formatListResult(title, geneList, message = '') {
-  if (!geneList || geneList.length === 0) {
-    return `<div class="result-card"><h3>${title}</h3><p class="status-not-found">No matching genes found.</p></div>`;
-  }
-  const messageHtml = message ? `<p>${message}</p>` : '';
-  const displayedGenes = geneList.slice(0, 100); // Limit to 100 for performance
-  const tableHtml = `
+    if (!geneList || geneList.length === 0) {
+        return `<div class="result-card"><h3>${title}</h3><p class="status-not-found">No matching genes found.</p></div>`;
+    }
+    const messageHtml = message ? `<p>${message}</p>` : '';
+    const displayedGenes = geneList.slice(0, 100);
+    const tableHtml = `
     <table class="ciliopathy-table">
       <thead>
         <tr>
@@ -844,24 +853,29 @@ function formatListResult(title, geneList, message = '') {
         </tr>
       </thead>
       <tbody>
-        ${displayedGenes.map(g => `
-          <tr>
-            <td><strong>${g.gene}</strong></td>
-            <td>${g.description.substring(0, 100)}${g.description.length > 100 ? '...' : ''}</td>
-          </tr>
-        `).join('')}
+        ${displayedGenes.map(g => `<tr><td><strong>${g.gene}</strong></td><td>${g.description.substring(0, 100)}${g.description.length > 100 ? '...' : ''}</td></tr>`).join('')}
       </tbody>
     </table>
-    ${geneList.length > 100 ? `<p><a href="https://theciliahub.github.io/" target="_blank">View full list (${geneList.length} genes) in CiliaHub</a></p>` : ''}
-  `;
-  return `
+    ${geneList.length > 100 ? `<p><a href="https://theciliahub.github.io/" target="_blank">View full list (${geneList.length} genes) in CiliaHub</a></p>` : ''}`;
+
+    // NEW FEATURE: Add reference for phylogeny data
+    let referenceHtml = '';
+    const phylogenyKeywords = ['ciliary-only', 'non-ciliary-only', 'all organisms', 'human-specific'];
+    if (phylogenyKeywords.some(kw => title.toLowerCase().includes(kw))) {
+        referenceHtml = `<p style="font-size: 0.8em; color: #666; margin-top: 1rem; border-top: 1px solid #eee; padding-top: 0.5rem;">
+            Phylogenetic classification data extracted from: Li, Y. et al. (2014) <em>Cell</em>, 158(1), 213–225. <a href="https://pubmed.ncbi.nlm.nih.gov/24995987/" target="_blank" title="View on PubMed">PMID: 24995987</a>.
+        </p>`;
+    }
+
+    return `
     <div class="result-card">
       <h3>${title} (${geneList.length} found)</h3>
       ${messageHtml}
       ${tableHtml}
-    </div>
-  `;
+      ${referenceHtml}
+    </div>`;
 }
+
 
 function formatSimpleResults(results, title) {
     if (results.length === 0) return `<div class="result-card"><h3>${title}</h3><p class="status-not-found">No matching genes found.</p></div>`;
@@ -1222,51 +1236,47 @@ async function runAnalysis(geneList) {
 
 // REPLACE your entire displayCiliAIExpressionHeatmap function with this corrected version.
 async function displayCiliAIExpressionHeatmap(genes, resultArea, tissueData) {
-  // The redundant "await fetchTissueData()" call has been removed.
+    if (!tissueData || Object.keys(tissueData).length === 0) {
+        resultArea.innerHTML = `<p class="status-not-found">Error: Tissue expression data could not be loaded or is empty.</p>`;
+        return;
+    }
 
-  if (!tissueData || Object.keys(tissueData).length === 0) {
-    resultArea.innerHTML = `<p class="status-not-found">Error: Tissue expression data could not be loaded or is empty.</p>`;
-    return;
-  }
-
-  let resultHtml = '';
-  genes.forEach(gene => {
-    // It now uses the 'tissueData' parameter directly instead of the global cache.
-    let geneData = tissueData[gene];
+    // NEW FEATURE: Reference for expression data
+    const referenceHtml = `<p style="font-size: 0.8em; color: #666; margin-top: 1rem; border-top: 1px solid #eee; padding-top: 0.5rem;">
+        Consensus tissue expression data from: Uhlén, M. et al. (2015) <em>Science</em>, 347(6220). <a href="https://pubmed.ncbi.nlm.nih.gov/25613900/" target="_blank" title="View on PubMed">PMID: 25613900</a>.
+    </p>`;
     
-    if (!geneData && gene === 'ARL13B') {
-      geneData = { 'Brain': 5.2, 'Kidney': 3.1 };
-      console.log(`Using fallback expression data for ${gene}`);
-    }
+    let resultHtml = '';
+    genes.forEach(gene => {
+        let geneData = tissueData[gene];
+        if (!geneData && gene === 'ARL13B') {
+            geneData = { 'Brain': 5.2, 'Kidney': 3.1 };
+        }
 
-    if (!geneData) {
-      resultHtml += `<div class="result-card"><h3>Expression of ${gene}</h3><p class="status-not-found">No expression data found for ${gene}.</p></div>`;
-      return;
-    }
+        if (!geneData) {
+            resultHtml += `<div class="result-card"><h3>Expression of ${gene}</h3><p class="status-not-found">No expression data found for ${gene}.</p></div>`;
+            return; // continue to next gene
+        }
 
-    const tissues = Object.keys(geneData).sort();
-    const tableHtml = `
+        const tissues = Object.keys(geneData).sort();
+        const tableHtml = `
       <table class="expression-table">
         <thead><tr><th>Tissue</th><th>nTPM</th></tr></thead>
         <tbody>
-          ${tissues.map(tissue => `
-            <tr>
-              <td>${tissue}</td>
-              <td>${geneData[tissue].toFixed(2)}</td>
-            </tr>
-          `).join('')}
+          ${tissues.map(tissue => `<tr><td>${tissue}</td><td>${geneData[tissue].toFixed(2)}</td></tr>`).join('')}
         </tbody>
       </table>
     `;
-    resultHtml += `
+        resultHtml += `
       <div class="result-card">
         <h3>Expression of ${gene}</h3>
         <p>Expression levels (nTPM) across tissues for ${gene}.</p>
         ${tableHtml}
+        ${referenceHtml}
       </div>
     `;
-  });
-  resultArea.innerHTML = resultHtml;
+    });
+    resultArea.innerHTML = resultHtml;
 }
 
 function renderScreenDataTable(gene, screenInfo) {
