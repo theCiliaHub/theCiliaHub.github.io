@@ -622,15 +622,21 @@ async function getGeneLocalization(geneSymbol) {
     return formatGeneDetail(geneData, geneSymbol, 'Subcellular Localization', content);
 }
 
-// --- NEW: Interactive UI and Plotting for Evolutionary Conservation ---
+// --- REPLACEMENT: Interactive UI and Plotting with Plotly safeguard ---
 async function displayEvolutionaryHeatmapUI(initialGenes = [], resultArea) {
+    // FIX: Add a guard to ensure Plotly is loaded
+    if (!window.Plotly) {
+        resultArea.innerHTML = `<div class="result-card"><p class="status-not-found">Error: The plotting library could not be loaded. Please try again.</p></div>`;
+        console.error('Plotly.js is not available.');
+        return;
+    }
+
     await fetchPhylogenyData();
     if (!phylogenyDataCache || Object.keys(phylogenyDataCache).length === 0) {
         resultArea.innerHTML = `<div class="result-card"><p class="status-not-found">Phylogeny data is not available.</p></div>`;
         return;
     }
-
-    // Define the full list of selectable organisms, classified
+    // ... rest of the function remains the same ...
     const classifiedOrganisms = {
         "Ciliary": ["H.sapiens", "M.musculus", "G.gallus", "X.tropicalis", "D.rerio", "O.anatinus", "B.floridae", "C.intestinalis", "S.purpuratus", "N.vectensis", "D.melanogaster", "C.elegans", "T.adhaerens", "M.brevicollis", "N.gruberi", "C.reinhardtii", "P.patens", "T.thermophila", "P.tetraurelia", "L.major"],
         "Non-Ciliary": ["A.thaliana", "O.sativa", "V.vinifera", "P.trichocarpa", "S.pombe", "N.crassa", "A.nidulans", "U.maydis", "Y.lipolytica", "C.albicans", "K.lactis", "A.gossypii", "C.glabrata", "D.discoideum", "E.cuniculi", "T.melanosporum", "F.graminearum", "P.chrysosporium", "C.immitis", "S.cerevisiae"]
@@ -638,7 +644,6 @@ async function displayEvolutionaryHeatmapUI(initialGenes = [], resultArea) {
     
     const defaultOrganisms = [...classifiedOrganisms["Ciliary"].slice(0, 10), ...classifiedOrganisms["Non-Ciliary"].slice(-2)];
 
-    // --- Create UI Elements ---
     let uiHtml = `
         <div class="result-card" id="evo-heatmap-controls">
             <h3>Evolutionary Conservation Analysis</h3>
@@ -669,7 +674,6 @@ async function displayEvolutionaryHeatmapUI(initialGenes = [], resultArea) {
     `;
     resultArea.innerHTML = uiHtml;
 
-    // --- Plotting Logic ---
     const plotHeatmap = () => {
         const geneInput = document.getElementById('evoGeneInput');
         const plotContainer = document.getElementById('evo-plot-container');
@@ -682,7 +686,7 @@ async function displayEvolutionaryHeatmapUI(initialGenes = [], resultArea) {
         }
 
         const ciliarySet = new Set(classifiedOrganisms.Ciliary);
-        const organismColors = selectedOrganisms.map(org => ciliarySet.has(org) ? '#0D47A1' : '#B71C1C'); // Blue for ciliary, Red for non-ciliary
+        const organismColors = selectedOrganisms.map(org => ciliarySet.has(org) ? '#0D47A1' : '#B71C1C');
 
         const matrix = genes.map(gene => {
             const geneData = phylogenyDataCache[gene];
@@ -710,7 +714,6 @@ async function displayEvolutionaryHeatmapUI(initialGenes = [], resultArea) {
 
         Plotly.newPlot('evo-plot-container', [trace], layout, { 
             responsive: true,
-            // Add download button
             toImageButtonOptions: {
                 format: 'png',
                 filename: 'evolutionary_conservation_heatmap',
@@ -721,13 +724,95 @@ async function displayEvolutionaryHeatmapUI(initialGenes = [], resultArea) {
         });
     };
 
-    // --- Event Listener ---
     document.getElementById('generateEvoHeatmapBtn').addEventListener('click', plotHeatmap);
     
-    // Initial plot if genes are provided
     if (initialGenes.length > 0) {
         plotHeatmap();
     }
+}
+
+// --- NEW: Data structure for Trigger-Based Autocomplete ---
+const CiliAI_Suggestions = {
+    'evolutionary': {
+        triggers: ['evolutionary', 'conserved', 'homolog', 'ortholog', 'paralog', 'phylogenetic', 'species', 'evolution'],
+        questions: [
+            'Show evolutionary conservation of IFT88 across species.',
+            'List conserved ciliary genes between C. elegans and humans.',
+            'Which cilia-related genes are conserved in mammals?',
+            'Display evolutionary tree of OSM-3 orthologs.',
+        ]
+    },
+    'list': {
+        triggers: ['list', 'show', 'display', 'give', 'let me know', 'find', 'tell me'],
+        questions: [
+            'List all genes localized to the transition zone.',
+            'Show genes expressed in ciliated neurons.',
+            'Display the list of BBSome components.',
+            'Find all genes involved in intraflagellar transport (IFT).',
+            'List all disease genes causing Joubert syndrome.',
+        ]
+    },
+    'describe': {
+        triggers: ['describe', 'what is', 'explain', 'function', 'role', 'responsible for', 'does'],
+        questions: [
+            'Describe the function of OSM-3.',
+            'What is the role of CC2D1A in cilia?',
+            'Explain how CILK1 regulates cilia length.',
+            'What does ARL13B do in ciliary signaling?',
+            'Explain how the BBSome complex is assembled.',
+        ]
+    },
+    'domain': {
+        triggers: ['domain', 'motif', 'localization', 'structure', 'architecture', 'region'],
+        questions: [
+            'Show cilia-specific domains of OSM-3.',
+            'Which domains of ARL13B mediate ciliary localization?',
+            'List proteins with ciliary targeting sequences (CTS).',
+            'Describe structural domains of IFT172.',
+        ]
+    },
+    'pathway': {
+        triggers: ['pathway', 'process', 'mechanism', 'category', 'involved in', 'participate'],
+        questions: [
+            'List genes involved in ciliary signaling pathways.',
+            'Show components of the Hedgehog signaling in cilia.',
+            'Which genes function in retrograde IFT?',
+            'Display genes required for basal body docking.',
+        ]
+    },
+    'disease': {
+        triggers: ['disease', 'syndrome', 'defect', 'mutation', 'phenotype', 'associated', 'linked'],
+        questions: [
+            'List genes associated with Bardet–Biedl syndrome.',
+            'Show mutations in CILK1 causing cranioectodermal dysplasia.',
+            'Display phenotypes observed in ift88 mutants.',
+            'Which ciliary diseases are linked to transition zone defects?',
+        ]
+    },
+    'compare': {
+        triggers: ['compare', 'difference', 'similar', 'vs', 'versus'],
+        questions: [
+            'Compare IFT-A and IFT-B complex composition.',
+            "What's the difference between OSM-3 and KLP-11 functions?",
+            'Compare cilia gene expression in C. elegans and mouse.',
+        ]
+    },
+    'predict': {
+        triggers: ['predict', 'potential', 'candidate', 'identify', 'novel', 'unknown'],
+        questions: [
+            'Predict potential ciliary genes using co-expression data.',
+            'Identify candidate ciliary kinases.',
+            'List novel ciliary proteins not yet annotated.',
+        ]
+    }
+};
+// Create a flat map for quick trigger lookup
+const triggerMap = new Map();
+for (const category in CiliAI_Suggestions) {
+    CiliAI_Suggestions[category].triggers.forEach(trigger => {
+        if (!triggerMap.has(trigger)) triggerMap.set(trigger, []);
+        triggerMap.get(trigger).push(...CiliAI_Suggestions[category].questions);
+    });
 }
 
 async function getInteractingPartners(geneSymbol) {
@@ -935,6 +1020,7 @@ async function getGenesByComplex(complexName) {
 }
 
 // --- Main AI Query Handler (REPLACEMENT) ---
+// --- REPLACEMENT: Final, Comprehensive AI Query Handler ---
 window.handleAIQuery = async function() {
     const aiQueryInput = document.getElementById('aiQueryInput');
     const resultArea = document.getElementById('ai-result-area');
@@ -950,59 +1036,53 @@ window.handleAIQuery = async function() {
     let match;
 
     try {
-        const perfectMatch = questionRegistry.find(item => item.text.toLowerCase().replace(/[.?]$/, '') === qLower);
-        if (perfectMatch) {
-            console.log(`Registry match found: "${perfectMatch.text}"`);
-            resultHtml = await perfectMatch.handler();
+        // --- High Priority & Specific Queries ---
+        if ((match = qLower.match(/conserved ciliary genes between\s+(\w+\.?\s?\w*)\s+and\s+(\w+)/i))) {
+            resultHtml = await getConservedGenesBetweenOrganisms(match[1].trim(), match[2].trim());
+        }
+        else if ((match = qLower.match(/compare\s+([\w\-]+)\s+(?:and|vs|versus)\s+([\w\-]+)/i))) {
+            resultHtml = await compareComplexes(match[1].toUpperCase(), match[2].toUpperCase());
+        }
+        else if ((match = qLower.match(/(?:evolutionary\s+conservation\s+of|show\s+phylogeny\s+for|display\s+evolutionary\s+tree\s+of)\s+([\w\-]+)/i))) {
+             const gene = match[1].toUpperCase();
+             await displayEvolutionaryHeatmapUI([gene], resultArea);
+             return;
+        }
+        else if ((match = qLower.match(/(predict|identify|novel|candidate)/i)) && !qLower.includes('disease')) {
+             resultHtml = notImplementedYet('Predictive analysis');
         }
         else if ((match = qLower.match(/^is\s+([a-z0-9\-]+)\s+a\s+ciliary\s+gene$/i))) {
-            const gene = match[1].toUpperCase();
-            resultHtml = await isCiliaryGene(gene);
+            resultHtml = await isCiliaryGene(match[1].toUpperCase());
         }
-        else if ((match = qLower.match(/(?:show|list|describe)\s+(?:protein\s+)?domains\s+of\s+([a-z0-9\-]+)/i))) {
-            const gene = match[1].toUpperCase();
-            resultHtml = await getProteinDomains(gene);
+        else if ((match = qLower.match(/(?:show|list|describe)\s+(?:protein\s+)?domains\s+of\s+([\w\-]+)/i))) {
+            resultHtml = await getProteinDomains(match[1].toUpperCase());
         }
-        else if ((match = qLower.match(/(?:what\s+diseases\s+are\s+associated\s+with|list\s+diseases\s+linked\s+to|provide\s+a\s+list\s+of\s+diseases\s+associated\s+with)\s+([a-z0-9\-]+)/i))) {
-            const gene = match[1].toUpperCase();
-            resultHtml = await getDiseasesForGene(gene);
+        else if ((match = qLower.match(/(?:diseases\s+.*linked\s+to|list\s+genes\s+.*(?:for|causing|associated with))\s+([\w\s\-]+)/i))) {
+            const { genes, description } = await getCiliopathyGenes(match[1].trim());
+            resultHtml = formatListResult(`Genes for ${match[1].trim()}`, genes, description);
         }
-        // FIX: Made localization query more specific by requiring the word "localization" or "localized"
-        else if ((match = qLower.match(/(?:show\s+localization\s+of|where\s+is\s+([a-z0-9\-]+)\s+localized)/i))) {
-            const gene = match[1] || qLower.split(' ').pop();
-            resultHtml = await getGeneLocalization(gene.toUpperCase());
-        }
-        // FIX: Made expression query more flexible to catch "Where is...expressed?"
-        else if ((match = qLower.match(/(?:which\s+organ\s+systems?\s+express|show\s+expression\s+of|where\s+is\s+([a-z0-9\-]+)\s+expressed)/i))) {
-            const gene = (match[1] || qLower.split(' ')[2]).toUpperCase();
+        else if ((match = qLower.match(/(?:where\s+is\s+([\w\-]+)\s+expressed|expression\s+of\s+([\w\-]+))/i))) {
+            const gene = (match[1] || match[2]).toUpperCase();
             await displayCiliAIExpressionHeatmap([gene], resultArea, window.tissueDataCache);
             return;
         }
-       // FIX: This now correctly calls the new INTERACTIVE heatmap UI function
-        else if ((match = qLower.match(/(?:evolutionary\s+conservation\s+of|show\s+phylogeny\s+for)\s+([a-z0-9\-]+)/i))) {
-             const gene = match[1].toUpperCase();
-             await displayEvolutionaryHeatmapUI([gene], resultArea); // Pass the gene and result area
-             return; // Return because the function renders its own UI
-        }
-        else if ((match = qLower.match(/(?:what\s+are\s+the\s+interacting\s+partners\s+of|interacting\s+partners\s+for)\s+([a-z0-9\-]+)/i))) {
-            const gene = match[1].toUpperCase();
-            resultHtml = await getInteractingPartners(gene);
-        }
-        else if ((match = qLower.match(/(?:show\s+all\s+(?:known\s+)?info\s+about|tell me about|what is|describe|let me know about|function of|role of)\s+(?:the\s+)?([a-z0-9\-\_]+)\b/i))) {
+        // --- Broad / General Queries ---
+        else if ((match = qLower.match(/(?:show\s+all\s+info|tell me about|what is|describe|function of|role of)\s+([\w\-]+)/i))) {
             const term = match[1].trim();
             resultHtml = await getComprehensiveDetails(term);
         }
+        // --- Fallback to Intent Parser for keywords ---
         else {
             const intent = intentParser.parse(query);
             if (intent && typeof intent.handler === 'function') {
                 resultHtml = await intent.handler(intent.entity);
             } else {
-                resultHtml = `<p>Sorry, I didn’t understand that. Please try one of the suggested questions or a known keyword.</p>`;
+                resultHtml = `<p>Sorry, I didn’t understand that. Please try a different question.</p>`;
             }
         }
         resultArea.innerHTML = resultHtml;
     } catch (e) {
-        resultArea.innerHTML = `<p class="status-not-found">An error occurred during your query. Check the console for details.</p>`;
+        resultArea.innerHTML = `<p class="status-not-found">An error occurred. Check the console for details.</p>`;
         console.error("CiliAI Query Error:", e);
     }
 };
@@ -1204,7 +1284,56 @@ function formatDomainResults(results, title) {
     });
     return html + '</div>';
 }
+// --- ADDITION: New Helper Functions for Advanced Queries ---
 
+async function getConservedGenesBetweenOrganisms(org1, org2) {
+    await fetchPhylogenyData();
+    const organismMap = {
+        'human': 'H.sapiens', 'humans': 'H.sapiens',
+        'mouse': 'M.musculus', 'mice': 'M.musculus',
+        'worm': 'C.elegans', 'c. elegans': 'C.elegans',
+        'fly': 'D.melanogaster', 'drosophila': 'D.melanogaster',
+        'zebrafish': 'D.rerio',
+        'yeast': 'S.cerevisiae'
+    };
+    const speciesCode1 = organismMap[org1.toLowerCase()] || org1;
+    const speciesCode2 = organismMap[org2.toLowerCase()] || org2;
+
+    const conservedGenes = Object.values(phylogenyDataCache).filter(geneData => {
+        const species = new Set(geneData.species || []);
+        return species.has(speciesCode1) && species.has(speciesCode2);
+    }).map(g => ({ gene: g.sym, description: `Conserved in ${speciesCode1} and ${speciesCode2}` }));
+    
+    return formatListResult(`Genes Conserved Between ${speciesCode1} and ${speciesCode2}`, conservedGenes);
+}
+
+async function compareComplexes(complex1, complex2) {
+    const c1 = await getGenesByComplex(complex1);
+    const c2 = await getGenesByComplex(complex2);
+
+    const c1Set = new Set(c1.map(g => g.gene));
+    const c2Set = new Set(c2.map(g => g.gene));
+    
+    const shared = c1.filter(g => c2Set.has(g.gene));
+    const uniqueTo1 = c1.filter(g => !c2Set.has(g.gene));
+    const uniqueTo2 = c2.filter(g => !c1Set.has(g.gene));
+    
+    const listToHtml = (genes, title) => `
+        <h4>${title} (${genes.length})</h4>
+        <ul>${genes.map(g => `<li>${g.gene}</li>`).join('')}</ul>`;
+
+    let html = `
+        <div class="result-card">
+            <h3>Comparison: ${complex1} vs ${complex2}</h3>
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;">
+                <div>${listToHtml(uniqueTo1, `Unique to ${complex1}`)}</div>
+                <div>${listToHtml(shared, 'Shared Components')}</div>
+                <div>${listToHtml(uniqueTo2, `Unique to ${complex2}`)}</div>
+            </div>
+        </div>
+    `;
+    return html;
+}
 function formatComplexResults(gene, title) {
     if (!gene) return `<div class="result-card"><h3>${title}</h3><p class="status-not-found">Gene not found in the dataset.</p></div>`;
     let html = `<div class="result-card"><h3>${title}</h3>`;
@@ -1223,61 +1352,46 @@ function formatComplexResults(gene, title) {
     return html + '</div>';
 }
 
-// --- Autocomplete Logic (REPLACEMENT with Expanded Questions) ---
+// --- REPLACEMENT: New Autocomplete function using the trigger-word system ---
 function setupAiQueryAutocomplete() {
     const aiQueryInput = document.getElementById('aiQueryInput');
     const suggestionsContainer = document.getElementById('aiQuerySuggestions');
     if (!aiQueryInput || !suggestionsContainer) return;
-    
-    // Expanded and refined set of question templates
-    const questionTemplates = [
-        'Tell me about {GENE}',
-        'Describe the function of {GENE}',
-        'Show all known info about {GENE}',
-        'Where is {GENE} expressed?',
-        'Display tissue expression for {GENE}',
-        'Is {GENE} a ciliary gene?',
-        'Describe protein domains of {GENE}',
-        'List diseases linked to {GENE}',
-        'Provide a list of diseases associated with {GENE}',
-        'Show localization of {GENE}',
-        'Where is {GENE} localized?',
-        'What are the interacting partners of {GENE}?',
-        'Show evolutionary conservation of {GENE}'
-    ];
 
     aiQueryInput.addEventListener('input', debounce(async () => {
         const inputText = aiQueryInput.value.toLowerCase();
-        let suggestions = new Set();
+        const suggestions = new Set();
 
-        if (inputText.length < 2) {
+        if (inputText.length < 3) {
             suggestionsContainer.style.display = 'none';
             return;
         }
 
-        questionRegistry
-            .filter(item => item.text.toLowerCase().includes(inputText))
-            .forEach(item => suggestions.add(item.text));
+        // 1. Add suggestions based on trigger words in the input
+        const typedWords = new Set(inputText.match(/\b(\w{3,})\b/g) || []);
+        typedWords.forEach(word => {
+            if (triggerMap.has(word)) {
+                triggerMap.get(word).forEach(q => suggestions.add(q));
+            }
+        });
 
-        intentParser.getKnownKeywords()
-            .filter(item => item.keyword.toLowerCase().startsWith(inputText))
-            .forEach(item => suggestions.add(item.suggestion));
-
-        if (!ciliaHubDataCache) await fetchCiliaData();
+        // 2. Add dynamic gene-specific suggestions for the last typed word
+        if (!ciliaHubDataCache) await fetchCiliData();
         const lastWord = inputText.split(/[\s,]+/).pop();
         if (lastWord.length >= 3) {
             const potentialGene = lastWord.toUpperCase();
             ciliaHubDataCache
                 .filter(g => g.gene.startsWith(potentialGene))
-                .slice(0, 1) 
+                .slice(0, 1)
                 .forEach(g => {
-                    questionTemplates.forEach(template => {
-                         suggestions.add(template.replace('{GENE}', g.gene));
-                    });
+                    suggestions.add(`Tell me about ${g.gene}`);
+                    suggestions.add(`Show evolutionary conservation of ${g.gene}`);
+                    suggestions.add(`List diseases linked to ${g.gene}`);
                 });
         }
 
-        const finalSuggestions = Array.from(suggestions).slice(0, 10);
+        // 3. Render suggestions
+        const finalSuggestions = Array.from(suggestions).slice(0, 8);
         if (finalSuggestions.length > 0) {
             suggestionsContainer.innerHTML = finalSuggestions.map(s => `<div class="suggestion-item">${s}</div>`).join('');
             suggestionsContainer.style.display = 'block';
@@ -1286,7 +1400,7 @@ function setupAiQueryAutocomplete() {
         }
     }, 250));
 
-    // Event listeners
+    // Event listeners remain the same
     suggestionsContainer.addEventListener('click', (e) => {
         if (e.target.classList.contains('suggestion-item')) {
             aiQueryInput.value = e.target.textContent;
