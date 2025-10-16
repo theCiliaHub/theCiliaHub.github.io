@@ -529,7 +529,15 @@ window.fetchTissueData = fetchTissueData;
 // =============================================================================
 
 // --- Query Helper Functions ---
-
+// --- New Query Helper for Gene-Specific Complex Info ---
+async function getComplexesForGene(geneSymbol) {
+    await fetchCiliaData();
+    const upperTerm = geneSymbol.toUpperCase();
+    const geneData = ciliaHubDataCache.find(g => g.gene.toUpperCase() === upperTerm);
+    
+    // This reuses your existing formatter to display the complex data for the found gene.
+    return formatComplexResults(geneData, `Complex Information for ${geneSymbol}`);
+}
 // Rule 1: Search for genes by ciliopathy/disease name
 async function getCiliopathyGenes(disease) {
     await fetchCiliaData();
@@ -717,61 +725,67 @@ async function getGenesByComplex(complexName) {
 
 // --- Main AI Query Handler (REPLACEMENT) ---
 // --- Main AI Query Handler (REPLACEMENT) ---
+// --- Main AI Query Handler (REPLACEMENT) ---
 window.handleAIQuery = async function() {
-    const aiQueryInput = document.getElementById('aiQueryInput');
-    const resultArea = document.getElementById('ai-result-area');
-    const query = aiQueryInput.value.trim();
-    if (!query) return;
+    const aiQueryInput = document.getElementById('aiQueryInput');
+    const resultArea = document.getElementById('ai-result-area');
+    const query = aiQueryInput.value.trim();
+    if (!query) return;
 
-    resultArea.style.display = 'block';
-    resultArea.innerHTML = `<p class="status-searching">CiliAI is thinking...</p>`;
-    await Promise.all([fetchCiliaData(), fetchScreenData(), fetchTissueData()]);
+    resultArea.style.display = 'block';
+    resultArea.innerHTML = `<p class="status-searching">CiliAI is thinking...</p>`;
+    await Promise.all([fetchCiliaData(), fetchScreenData(), fetchTissueData()]);
 
-    let resultHtml = '';
-    const qLower = query.toLowerCase();
-    let match;
+    let resultHtml = '';
+    const qLower = query.toLowerCase();
+    let match;
 
-    try {
-        // PRIORITY 1: Check for an exact match in the question registry first.
-        const perfectMatch = questionRegistry.find(item => item.text.toLowerCase() === qLower);
-        if (perfectMatch) {
-            console.log(`Registry match found: "${perfectMatch.text}"`);
-            resultHtml = await perfectMatch.handler();
-        }
-        // PRIORITY 2: Handle conversational "Tell me about...", "function of...", etc. queries. (UPDATED)
-        else if ((match = qLower.match(/(?:tell me about|what is|describe|let me know about|function of|role of)\s+(?:the\s+)?([a-z0-9\-\_]+)\b/i))) {
-            const term = match[1].trim();
-            console.log(`Conversational query matched for term: "${term}"`);
-            resultHtml = await getComprehensiveDetails(term);
-        }
-        // PRIORITY 3: Use the existing intent parser for keyword-based queries.
-        else {
-            const intent = intentParser.parse(query);
-            if (intent && typeof intent.handler === 'function') {
-                console.log(`Intent parser match found: ${intent.intent} for entity: ${intent.entity}`);
-                resultHtml = await intent.handler(intent.entity);
-            }
-            // PRIORITY 4: Fallback for any remaining specific patterns.
-            else if ((match = qLower.match(/expression of\s+([a-z0-9\-]+)/i))) {
-                const gene = match[1].toUpperCase();
-                await displayCiliAIExpressionHeatmap([gene], resultArea, window.tissueDataCache);
-                return;
-            } else if (qLower.includes('ciliary-only genes')) {
-                const { label, genes } = await getPhylogenyGenes({ type: 'ciliary_only_list' });
-                resultHtml = formatListResult(label, genes);
-            }
-            // FINAL FALLBACK
-            else {
-                resultHtml = `<p>Sorry, I didn’t understand that. Please try one of the suggested questions or a known keyword.</p>`;
-            }
-        }
-        resultArea.innerHTML = resultHtml;
-    } catch (e) {
-        resultArea.innerHTML = `<p class="status-not-found">An error occurred during your query. Check the console for details.</p>`;
-        console.error("CiliAI Query Error:", e);
-    }
+    try {
+        // PRIORITY 1: Check for an exact match in the question registry first.
+        const perfectMatch = questionRegistry.find(item => item.text.toLowerCase() === qLower);
+        if (perfectMatch) {
+            console.log(`Registry match found: "${perfectMatch.text}"`);
+            resultHtml = await perfectMatch.handler();
+        }
+        // PRIORITY 2: Handle conversational "Tell me about...", "function of...", etc. queries.
+        else if ((match = qLower.match(/(?:tell me about|what is|describe|let me know about|function of|role of)\s+(?:the\s+)?([a-z0-9\-\_]+)\b/i))) {
+            const term = match[1].trim();
+            console.log(`Conversational query matched for term: "${term}"`);
+            resultHtml = await getComprehensiveDetails(term);
+        }
+        // PRIORITY 3: Use the existing intent parser for keyword-based queries.
+        else {
+            const intent = intentParser.parse(query);
+            if (intent && typeof intent.handler === 'function') {
+                console.log(`Intent parser match found: ${intent.intent} for entity: ${intent.entity}`);
+                resultHtml = await intent.handler(intent.entity);
+            }
+            // PRIORITY 4: Fallback for more specific, non-keyword patterns.
+            else if ((match = qLower.match(/(?:show me complexes for|list complexes for|complexes of|complex for)\s+([a-z0-9\-]+)/i))) {
+                // FIX for "show me complexes for IFT88"
+                const gene = match[1].toUpperCase();
+                resultHtml = await getComplexesForGene(gene); 
+            }
+            else if ((match = qLower.match(/expression of\s+([a-z0-9\-]+)/i))) {
+                const gene = match[1].toUpperCase();
+                await displayCiliAIExpressionHeatmap([gene], resultArea, window.tissueDataCache);
+                return;
+            } else if (qLower.match(/(ciliary-only|cilia organisms? specific)\s+genes?/i)) {
+                // FIX for "show me cilia organisms specific genes"
+                const { label, genes } = await getPhylogenyGenes({ type: 'ciliary_only_list' });
+                resultHtml = formatListResult(label, genes);
+            }
+            // FINAL FALLBACK
+            else {
+                resultHtml = `<p>Sorry, I didn’t understand that. Please try one of the suggested questions or a known keyword.</p>`;
+            }
+        }
+        resultArea.innerHTML = resultHtml;
+    } catch (e) {
+        resultArea.innerHTML = `<p class="status-not-found">An error occurred during your query. Check the console for details.</p>`;
+        console.error("CiliAI Query Error:", e);
+    }
 };
-
 
 // Helper for the comparison query (updated titles and threshold)
 function formatComparisonResult(title, tissue, list1, list2) {
