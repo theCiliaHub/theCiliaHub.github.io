@@ -172,8 +172,8 @@ const baseQuestions = [
 
     // --- Phylogeny & Organism ---
     { text: "Show me ciliary-only genes", handler: async () => { const { label, genes } = await getPhylogenyGenes({ type: 'ciliary_only_list' }); return formatListResult(label, genes); }},
-    { text: "Display conserved ciliary proteins between mouse and human", handler: () => getConservedGenes(["Mouse", "Human"]) }, // COMMA ADDED HERE
-    { text: "List ciliary genes in C. elegans", handler: async () => { const result = await getCiliopathyGenesForOrganism("C. elegans"); return formatListResult(`Ciliary genes in C. elegans`, result.genes, result.description); }},
+    { text: "Display conserved ciliary proteins between mouse and human", handler: () => getConservedGenes(["Mouse", "Human"]) },
+    { text: "List ciliary genes in C. elegans", handler: async () => { const result = await getCiliaryGenesForOrganism("C. elegans"); return formatListResult(`Ciliary genes in C. elegans`, result.genes, result.description); }},
 
     // --- Structure / Morphology ---
     { text: "Which genes cause longer cilia?", handler: () => getGenesByScreenPhenotype("long cilia") },
@@ -203,6 +203,7 @@ baseQuestions.forEach(q => {
         }
     });
 });
+
 
 // NEW: More accurate handler for functional queries like "kinases"
 // IMPLEMENTED: Handles queries for conserved genes between organisms
