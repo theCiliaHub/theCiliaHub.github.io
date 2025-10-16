@@ -716,60 +716,61 @@ async function getGenesByComplex(complexName) {
 }
 
 // --- Main AI Query Handler (REPLACEMENT) ---
+// --- Main AI Query Handler (REPLACEMENT) ---
 window.handleAIQuery = async function() {
-    const aiQueryInput = document.getElementById('aiQueryInput');
-    const resultArea = document.getElementById('ai-result-area');
-    const query = aiQueryInput.value.trim();
-    if (!query) return;
+    const aiQueryInput = document.getElementById('aiQueryInput');
+    const resultArea = document.getElementById('ai-result-area');
+    const query = aiQueryInput.value.trim();
+    if (!query) return;
 
-    resultArea.style.display = 'block';
-    resultArea.innerHTML = `<p class="status-searching">CiliAI is thinking...</p>`;
-    await Promise.all([fetchCiliaData(), fetchScreenData(), fetchTissueData()]);
+    resultArea.style.display = 'block';
+    resultArea.innerHTML = `<p class="status-searching">CiliAI is thinking...</p>`;
+    await Promise.all([fetchCiliaData(), fetchScreenData(), fetchTissueData()]);
 
-    let resultHtml = '';
-    const qLower = query.toLowerCase();
-    let match;
+    let resultHtml = '';
+    const qLower = query.toLowerCase();
+    let match;
 
-    try {
-        // PRIORITY 1: Check for an exact match in the question registry first.
-        const perfectMatch = questionRegistry.find(item => item.text.toLowerCase() === qLower);
-        if (perfectMatch) {
-            console.log(`Registry match found: "${perfectMatch.text}"`);
-            resultHtml = await perfectMatch.handler();
-        }
-        // PRIORITY 2: Handle conversational "Tell me about..." queries.
-        else if ((match = qLower.match(/(?:tell me about|what is|describe)\s+(.+)/i))) {
-            const term = match[1].trim();
-            resultHtml = await getComprehensiveDetails(term);
-        }
-        // PRIORITY 3: Use the existing intent parser for keyword-based queries.
-        else {
-            const intent = intentParser.parse(query);
-            if (intent && typeof intent.handler === 'function') {
-                console.log(`Intent parser match found: ${intent.intent} for entity: ${intent.entity}`);
-                resultHtml = await intent.handler(intent.entity);
-            }
-            // PRIORITY 4: Fallback for any remaining specific patterns.
-            else if ((match = qLower.match(/expression of\s+([a-z0-9\-]+)/i))) {
-                const gene = match[1].toUpperCase();
-                await displayCiliAIExpressionHeatmap([gene], resultArea, window.tissueDataCache);
-                return;
-            } else if (qLower.includes('ciliary-only genes')) {
-                const { label, genes } = await getPhylogenyGenes({ type: 'ciliary_only_list' });
-                resultHtml = formatListResult(label, genes);
-            }
-            // FINAL FALLBACK
-            else {
-                resultHtml = `<p>Sorry, I didn’t understand that. Please try one of the suggested questions or a known keyword.</p>`;
-            }
-        }
-        resultArea.innerHTML = resultHtml;
-    } catch (e) {
-        resultArea.innerHTML = `<p class="status-not-found">An error occurred during your query. Check the console for details.</p>`;
-        console.error("CiliAI Query Error:", e);
-    }
+    try {
+        // PRIORITY 1: Check for an exact match in the question registry first.
+        const perfectMatch = questionRegistry.find(item => item.text.toLowerCase() === qLower);
+        if (perfectMatch) {
+            console.log(`Registry match found: "${perfectMatch.text}"`);
+            resultHtml = await perfectMatch.handler();
+        }
+        // PRIORITY 2: Handle conversational "Tell me about...", "function of...", etc. queries. (UPDATED)
+        else if ((match = qLower.match(/(?:tell me about|what is|describe|let me know about|function of|role of)\s+(?:the\s+)?([a-z0-9\-\_]+)\b/i))) {
+            const term = match[1].trim();
+            console.log(`Conversational query matched for term: "${term}"`);
+            resultHtml = await getComprehensiveDetails(term);
+        }
+        // PRIORITY 3: Use the existing intent parser for keyword-based queries.
+        else {
+            const intent = intentParser.parse(query);
+            if (intent && typeof intent.handler === 'function') {
+                console.log(`Intent parser match found: ${intent.intent} for entity: ${intent.entity}`);
+                resultHtml = await intent.handler(intent.entity);
+            }
+            // PRIORITY 4: Fallback for any remaining specific patterns.
+            else if ((match = qLower.match(/expression of\s+([a-z0-9\-]+)/i))) {
+                const gene = match[1].toUpperCase();
+                await displayCiliAIExpressionHeatmap([gene], resultArea, window.tissueDataCache);
+                return;
+            } else if (qLower.includes('ciliary-only genes')) {
+                const { label, genes } = await getPhylogenyGenes({ type: 'ciliary_only_list' });
+                resultHtml = formatListResult(label, genes);
+            }
+            // FINAL FALLBACK
+            else {
+                resultHtml = `<p>Sorry, I didn’t understand that. Please try one of the suggested questions or a known keyword.</p>`;
+            }
+        }
+        resultArea.innerHTML = resultHtml;
+    } catch (e) {
+        resultArea.innerHTML = `<p class="status-not-found">An error occurred during your query. Check the console for details.</p>`;
+        console.error("CiliAI Query Error:", e);
+    }
 };
-
 
 
 // Helper for the comparison query (updated titles and threshold)
@@ -854,40 +855,46 @@ function formatGeneDetail(geneData, geneSymbol, detailTitle, detailContent) {
 // Click handler for gene selection
 // -------------------------------
 document.addEventListener('click', (e) => {
-    // 1. Handle clicks on gene cards/names from analysis results
-    if (e.target.matches('.gene-card, .gene-name')) {
-        const geneName = e.target.dataset.geneName || e.target.textContent.trim();
-        if (geneName) handleCiliAISelection([geneName]);
-    }
+    // 1. Handle clicks on gene cards/names from analysis results
+    if (e.target.matches('.gene-card, .gene-name')) {
+        const geneName = e.target.dataset.geneName || e.target.textContent.trim();
+        if (geneName) handleCiliAISelection([geneName]);
+    }
 
-    // 2. Handle clicks on the example questions (e.g., "BBSome", "Joubert")
-    if (e.target.matches('.example-queries span')) {
+    // 2. Handle clicks on the example questions (e.g., "BBSome", "Joubert")
+    if (e.target.matches('.example-queries span')) {
+        const aiQueryInput = document.getElementById('aiQueryInput');
+        aiQueryInput.value = e.target.dataset.question || e.target.textContent;
+        handleAIQuery();
+    }
+
+    // 3. Handle clicks on special action links within results, like visualizing a heatmap
+    if (e.target.classList.contains('ai-action')) {
+        e.preventDefault();
+        const action = e.target.dataset.action;
+        const gene = e.target.dataset.gene;
+        if (action === 'expression-visualize' && gene) {
+            const resultArea = document.getElementById('ai-result-area');
+            resultArea.innerHTML = `<p class="status-searching">Building expression heatmap...</p>`;
+            if (window.tissueDataCache) {
+                displayCiliAIExpressionHeatmap([gene], resultArea, window.tissueDataCache);
+            } else {
+                fetchTissueData().then(tissueData => {
+                    displayCiliAIExpressionHeatmap([gene], resultArea, tissueData);
+                });
+            }
+        }
+    }
+    
+    // 4. NEW: Handle clicks on suggested questions from the CiliAI panel
+    if (e.target.matches('.ciliAI-question-item')) {
         const aiQueryInput = document.getElementById('aiQueryInput');
-        // Use the data-question attribute for the full query
-        aiQueryInput.value = e.target.dataset.question || e.target.textContent;
-        handleAIQuery();
-    }
-
-    // 3. Handle clicks on special action links within results, like visualizing a heatmap
-    if (e.target.classList.contains('ai-action')) {
-        e.preventDefault();
-        const action = e.target.dataset.action;
-        const gene = e.target.dataset.gene;
-        if (action === 'expression-visualize' && gene) {
-            const resultArea = document.getElementById('ai-result-area');
-            resultArea.innerHTML = `<p class="status-searching">Building expression heatmap...</p>`;
-            // Ensure tissue data is available before calling
-            if (window.tissueDataCache) {
-                 displayCiliAIExpressionHeatmap([gene], resultArea, window.tissueDataCache);
-            } else {
-                 fetchTissueData().then(tissueData => {
-                     displayCiliAIExpressionHeatmap([gene], resultArea, tissueData);
-                 });
-            }
+        if (aiQueryInput) {
+            aiQueryInput.value = e.target.textContent;
+            handleAIQuery();
         }
     }
 });
-
 
 // --- Other Helper Functions (Updated to Remove Optional Chaining) ---
 function formatGeneDetail(geneData, geneSymbol, detailTitle, detailContent) {
