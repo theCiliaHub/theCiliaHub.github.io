@@ -149,85 +149,98 @@ const intentParser = createIntentParser();
 // Place this code block after your CILI_AI_DB object.
 const questionRegistry = [
   // --- Gene-specific ---
-  { text: "Tell me about ARL13B", handler: () => getComprehensiveDetails("ARL13B") },
-  { text: "Show interactors of IFT88", handler: () => getProteinInteractions("IFT88") },
-  
-  // --- Disease-related (Corrected Handlers) ---
-  { text: "Show genes for Joubert Syndrome", handler: async () => {
-      const { genes, description } = await getCiliopathyGenes("Joubert Syndrome");
-      return formatListResult('Genes for Joubert Syndrome', genes, description);
-  }},
-  { text: "Show genes for Bardet-Biedl Syndrome", handler: async () => {
-      const { genes, description } = await getCiliopathyGenes("Bardet-Biedl Syndrome");
-      return formatListResult('Genes for Bardet–Biedl Syndrome', genes, description);
-  }},
-  { text: "Display genes associated with Meckel-Gruber Syndrome", handler: async () => {
-      const { genes, description } = await getCiliopathyGenes("Meckel-Gruber Syndrome");
-      return formatListResult('Genes for Meckel–Gruber Syndrome', genes, description);
-  }},
-  { text: "List genes for Primary Ciliary Dyskinesia", handler: async () => {
-      const { genes, description } = await getCiliopathyGenes("Primary Ciliary Dyskinesia");
-      return formatListResult('Genes for Primary Ciliary Dyskinesia', genes, description);
-  }},
-  { text: "Find genes linked to Leber congenital amaurosis", handler: async () => {
-      const { genes, description } = await getCiliopathyGenes("Leber congenital amaurosis");
-      return formatListResult('Genes for Leber congenital amaurosis', genes, description);
-  }},
-  { text: "Which genes cause cystic kidney disease?", handler: () => getGenesByScreenPhenotype("cystic kidney disease") },
-  { text: "Show genes for cranioectodermal dysplasia", handler: async () => {
-      const { genes, description } = await getCiliopathyGenes("Cranioectodermal Dysplasia");
-      return formatListResult('Genes for Cranioectodermal Dysplasia', genes, description);
-  }},
-  { text: "Tell me genes causing short-rib thoracic dysplasia", handler: async () => {
-      const { genes, description } = await getCiliopathyGenes("Short-rib thoracic dysplasia");
-      return formatListResult('Genes for Short-rib thoracic dysplasia', genes, description);
-  }},
-  { text: "Display genes related to hydrocephalus", handler: async () => {
-      const { genes, description } = await getCiliopathyGenes("Hydrocephalus");
-      return formatListResult('Genes related to Hydrocephalus', genes, description);
-  }},
+{ text: "Describe the function of BBS1", handler: () => getComprehensiveDetails("BBS1") },
+{ text: "Explain what CEP290 does", handler: () => getComprehensiveDetails("CEP290") },
+{ text: "Tell me the role of ARL13B in ciliary signaling", handler: () => getComprehensiveDetails("ARL13B") },
+{ text: "Let me know about IFT88", handler: () => getComprehensiveDetails("IFT88") },
+{ text: "What is the function of NPHP1?", handler: () => getComprehensiveDetails("NPHP1") },
+{ text: "How does MKS1 affect cilia?", handler: () => getComprehensiveDetails("MKS1") },
 
-  // --- Localization-based (Corrected Handlers) ---
-  { text: "Find genes localized to basal body", handler: async () => {
-      const results = await getGenesByLocalization("Basal body");
-      return formatListResult('Genes Localized to Basal Body', results);
-  }},
-  { text: "Show proteins in transition zone", handler: async () => {
-      const results = await getGenesByLocalization("Transition zone");
-      return formatListResult('Proteins in the Transition Zone', results);
-  }},
-  { text: "List components of the BBSome complex", handler: async () => {
-      const results = await getGenesByComplex("BBSome");
-      return formatListResult('Components of the BBSome Complex', results);
-  }},
-  { text: "Display genes at ciliary tip", handler: async () => {
-      const results = await getGenesByLocalization("Ciliary tip");
-      return formatListResult('Genes at the Ciliary Tip', results);
-  }},
-  { text: "Which genes localize to axoneme?", handler: async () => {
-      const results = await getGenesByLocalization("Axoneme");
-      return formatListResult('Genes Localized to the Axoneme', results);
-  }},
-  { text: "Show transition fiber proteins", handler: async () => {
-      const results = await getGenesByLocalization("Transition fiber");
-      return formatListResult('Transition Fiber Proteins', results);
-  }},
+// --- Expanded Disease-Related ---
+{ text: "Display genes for Nephronophthisis", handler: async () => {
+    const { genes, description } = await getCiliopathyGenes("Nephronophthisis");
+    return formatListResult('Genes for Nephronophthisis', genes, description);
+}},
+{ text: "Show me genes associated with Bardet-Biedl Syndrome", handler: async () => {
+    const { genes, description } = await getCiliopathyGenes("Bardet-Biedl Syndrome");
+    return formatListResult('Genes for Bardet–Biedl Syndrome', genes, description);
+}},
+{ text: "Tell me genes for Meckel-Gruber Syndrome", handler: async () => {
+    const { genes, description } = await getCiliopathyGenes("Meckel-Gruber Syndrome");
+    return formatListResult('Genes for Meckel–Gruber Syndrome', genes, description);
+}},
+{ text: "List genes linked to Primary Ciliary Dyskinesia", handler: async () => {
+    const { genes, description } = await getCiliopathyGenes("Primary Ciliary Dyskinesia");
+    return formatListResult('Genes for Primary Ciliary Dyskinesia', genes, description);
+}},
+{ text: "What genes cause Leber Congenital Amaurosis?", handler: async () => {
+    const { genes, description } = await getCiliopathyGenes("Leber Congenital Amaurosis");
+    return formatListResult('Genes for Leber Congenital Amaurosis', genes, description);
+}},
+{ text: "Find genes for cystic kidney disease", handler: () => getGenesByScreenPhenotype("cystic kidney disease") },
+{ text: "Let me know genes causing cranioectodermal dysplasia", handler: async () => {
+    const { genes, description } = await getCiliopathyGenes("Cranioectodermal Dysplasia");
+    return formatListResult('Genes for Cranioectodermal Dysplasia', genes, description);
+}},
+{ text: "Describe genes related to short-rib thoracic dysplasia", handler: async () => {
+    const { genes, description } = await getCiliopathyGenes("Short-rib Thoracic Dysplasia");
+    return formatListResult('Genes for Short-rib Thoracic Dysplasia', genes, description);
+}},
+{ text: "Explain genes for hydrocephalus", handler: async () => {
+    const { genes, description } = await getCiliopathyGenes("Hydrocephalus");
+    return formatListResult('Genes for Hydrocephalus', genes, description);
+}},
 
-  // --- Mechanism-based ---
-  { text: "Show me motor genes", handler: () => getGenesWithDomain("motor") },
-  { text: "Display kinases regulating cilia length", handler: () => getGenesByDomainDescription("kinase") },
-  { text: "List intraflagellar transport (IFT) components", handler: () => getGenesByComplex("IFT") },
-  { text: "Find IFT-A and IFT-B complex genes", handler: () => getGenesByMultipleComplexes(["IFT-A", "IFT-B"]) },
-  { text: "Which genes are involved in cilium assembly?", handler: () => getGenesByFunction("cilium assembly") },
+// --- Expanded Localization-Based ---
+{ text: "Show genes localized to basal body", handler: async () => {
+    const results = await getGenesByLocalization("Basal body");
+    return formatListResult('Genes Localized to Basal Body', results);
+}},
+{ text: "Display proteins in transition zone", handler: async () => {
+    const results = await getGenesByLocalization("Transition zone");
+    return formatListResult('Proteins in the Transition Zone', results);
+}},
+{ text: "Tell me components of the BBSome complex", handler: async () => {
+    const results = await getGenesByComplex("BBSome");
+    return formatListResult('Components of the BBSome Complex', results);
+}},
+{ text: "Let me know genes at ciliary tip", handler: async () => {
+    const results = await getGenesByLocalization("Ciliary tip");
+    return formatListResult('Genes at the Ciliary Tip', results);
+}},
+{ text: "Which proteins localize to axoneme?", handler: async () => {
+    const results = await getGenesByLocalization("Axoneme");
+    return formatListResult('Genes Localized to the Axoneme', results);
+}},
+{ text: "Find transition fiber genes", handler: async () => {
+    const results = await getGenesByLocalization("Transition fiber");
+    return formatListResult('Transition Fiber Proteins', results);
+}},
 
-  // --- Organism-specific ---
-  { text: "List ciliary genes in C. elegans", handler: () => getCiliaryGenesForOrganism("C. elegans").then(result => formatListResult(`Ciliary genes in C. elegans`, result.genes, result.description)) },
-  { text: "Display conserved ciliary proteins between mouse and human", handler: () => getConservedGenes(["Mouse", "Human"]) },
+// --- Expanded Mechanism-Based ---
+{ text: "Display motor genes", handler: () => getGenesWithDomain("motor") },
+{ text: "Show kinases regulating cilia length", handler: () => getGenesByDomainDescription("kinase") },
+{ text: "List intraflagellar transport (IFT) components", handler: () => getGenesByComplex("IFT") },
+{ text: "Tell me IFT-A and IFT-B complex genes", handler: () => getGenesByMultipleComplexes(["IFT-A", "IFT-B"]) },
+{ text: "Which genes are involved in cilium assembly?", handler: () => getGenesByFunction("cilium assembly") },
 
-  // --- Structure / Morphology ---
-  { text: "Which genes cause longer cilia?", handler: () => getGenesByScreenPhenotype("long cilia") },
-  { text: "Find genes causing short cilia", handler: () => getGenesByScreenPhenotype("short cilia") }
+// --- Expanded Organism-Specific ---
+{ text: "Show ciliary genes in C. elegans", handler: () => getCiliaryGenesForOrganism("C. elegans").then(result => formatListResult(`Ciliary genes in C. elegans`, result.genes, result.description)) },
+{ text: "Display conserved ciliary proteins between mouse and human", handler: () => getConservedGenes(["Mouse", "Human"]) },
+
+// --- Expanded Structure / Morphology ---
+{ text: "What genes cause longer cilia?", handler: () => getGenesByScreenPhenotype("long cilia") },
+{ text: "Find genes causing short cilia", handler: () => getGenesByScreenPhenotype("short cilia") },
+
+// --- New Phenotype and Comparison Queries ---
+{ text: "What happens when IFT88 is knocked down?", handler: () => getGenesByScreenPhenotype("IFT88 knockdown") },
+{ text: "Explain the effects of silencing KIF3A", handler: () => getGenesByScreenPhenotype("KIF3A silencing") },
+{ text: "Compare localization of BBS1 and ARL13B", handler: () => compareGenesByLocalization(["BBS1", "ARL13B"]) } // New handler needed for comparisons
 ];
+
+
+
+
 // Placeholder functions to support the new registry without errors
 function notImplementedYet(feature) {
     return `<div class="result-card"><h3>Feature In Development</h3><p>The query handler for "<strong>${feature}</strong>" is not yet implemented. Stay tuned for future updates!</p></div>`;
@@ -735,46 +748,92 @@ async function displayEvolutionaryHeatmapUI(initialGenes = [], resultArea) {
 if (typeof window.CiliAI_Suggestions === 'undefined') {
     // Attach to the window object to make it globally accessible and prevent redeclaration.
     window.CiliAI_Suggestions = {
-        'evolutionary': {
-            triggers: ['evolutionary', 'conserved', 'homolog', 'ortholog', 'paralog', 'phylogenetic', 'species', 'evolution'],
-            questions: [
-                'Show evolutionary conservation of IFT88 across species.',
-                'List conserved ciliary genes between C. elegans and humans.',
-                'Which cilia-related genes are conserved in mammals?',
-            ]
-        },
-        'list': {
-            triggers: ['list', 'show', 'display', 'give', 'find', 'let me know', 'tell me'],
-            questions: [
-                'List all genes localized to the transition zone.',
-                'Show genes expressed in ciliated neurons.',
-                'Display the list of BBSome components.',
-                'Find all genes involved in intraflagellar transport (IFT).',
-                'List all disease genes causing Joubert syndrome.',
-            ]
-        },
-        'describe': {
-            triggers: ['describe', 'what is', 'explain', 'function', 'role', 'responsible for', 'does'],
-            questions: [
-                'Describe the function of OSM-3.',
-                'What is the role of CC2D1A in cilia?',
-                'Explain how CILK1 regulates cilia length.',
-                'What does ARL13B do in ciliary signaling?',
-            ]
-        }
-        // ... other categories can be added here
-    };
-
-    // Also attach the triggerMap to the window object.
-    window.triggerMap = new Map();
-    for (const category in window.CiliAI_Suggestions) {
-        window.CiliAI_Suggestions[category].triggers.forEach(trigger => {
-            if (!window.triggerMap.has(trigger)) window.triggerMap.set(trigger, new Set());
-            window.CiliAI_Suggestions[category].questions.forEach(q => window.triggerMap.get(trigger).add(q));
-        });
+    'describe': {
+        triggers: ['describe', 'explain', 'what is', 'what does', 'how does', 'role of', 'function of'],
+        questions: [
+            'Describe the function of ARL13B.',
+            'Explain the role of IFT88 in cilia.',
+            'What is the function of BBS1?',
+            'How does CEP290 affect ciliary structure?',
+            'What does NPHP1 do in the transition zone?'
+        ]
+    },
+    'tell': {
+        triggers: ['tell', 'tell me', 'let me know', 'inform me about'],
+        questions: [
+            'Tell me about ARL13B.',
+            'Tell me the role of BBS1 in ciliopathies.',
+            'Let me know where IFT88 is localized.',
+            'Tell me the diseases linked to MKS1.',
+            'Let me know the protein domains of WDR35.'
+        ]
+    },
+    'show': {
+        triggers: ['show', 'display', 'view', 'present'],
+        questions: [
+            'Show the evolutionary conservation of BBS1.',
+            'Display genes for Bardet-Biedl Syndrome.',
+            'Show all genes at the transition zone.',
+            'Display the expression pattern of ARL13B.',
+            'Show protein domains of IFT88.'
+        ]
+    },
+    'list': {
+        triggers: ['list', 'find', 'give me', 'which genes', 'what are'],
+        questions: [
+            'List all components of the BBSome complex.',
+            'Find genes causing longer cilia.',
+            'List diseases linked to NPHP1.',
+            'Which genes are conserved in C. elegans?',
+            'What are the genes for Joubert Syndrome?'
+        ]
+    },
+    'compare': {
+        triggers: ['compare', 'versus', 'difference between', 'similarity of'],
+        questions: [
+            'Compare the expression of IFT88 and OFD1 in brain versus retina.',
+            'Compare evolutionary conservation of BBS1 and ARL13B.',
+            'What is the difference between IFT-A and IFT-B complexes?',
+            'Compare phenotypic effects of KIF3A and DYNC2H1 knockdown.'
+        ]
+    },
+    'is': {
+        triggers: ['is', 'does', 'are'],
+        questions: [
+            'Is DYNC2H1 a ciliary gene?',
+            'Is IFT88 conserved in C. elegans?',
+            'Does BBS1 affect Hedgehog signaling?',
+            'Are there genes localized to both basal body and axoneme?'
+        ]
+    },
+    'evolutionary': {
+        triggers: ['evolutionary', 'conserved', 'ortholog', 'phylogeny', 'across species'],
+        questions: [
+            'Show the evolutionary conservation of BBS1.',
+            'Which ciliary genes are conserved between humans and zebrafish?',
+            'Display orthologs of IFT88 in Chlamydomonas.',
+            'Find conserved genes in motile ciliopathies.'
+        ]
+    },
+    // Add more categories as needed, e.g., 'phenotype' for screen-related queries
+    'phenotype': {
+        triggers: ['what happens', 'effects of', 'impact on', 'phenotype'],
+        questions: [
+            'What happens to cilia when KIF3A is knocked down?',
+            'What is the phenotypic effect of silencing IFT88?',
+            'Show the impact of BBS1 on cilia length.'
+        ]
     }
-}
+};
 
+// Rebuild triggerMap
+window.triggerMap = new Map();
+for (const category in window.CiliAI_Suggestions) {
+    window.CiliAI_Suggestions[category].triggers.forEach(trigger => {
+        if (!window.triggerMap.has(trigger)) window.triggerMap.set(trigger, new Set());
+        window.CiliAI_Suggestions[category].questions.forEach(q => window.triggerMap.get(trigger).add(q));
+    });
+}
 
 
 async function getInteractingPartners(geneSymbol) {
