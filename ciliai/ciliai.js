@@ -173,7 +173,7 @@ const baseQuestions = [
     // --- Phylogeny & Organism ---
     { text: "Show me ciliary-only genes", handler: async () => { const { label, genes } = await getPhylogenyGenes({ type: 'ciliary_only_list' }); return formatListResult(label, genes); }},
     { text: "Display conserved ciliary proteins between mouse and human", handler: () => getConservedGenes(["Mouse", "Human"]) }, // COMMA ADDED HERE
-    { text: "List ciliary genes in C. elegans", handler: async () => { const result = await getCiliaryGenesForOrganism("C. elegans"); return formatListResult(`Ciliary genes in C. elegans`, result.genes, result.description); }}, // TYPO FIX: getCiliaryGenesForOrganism
+    { text: "List ciliary genes in C. elegans", handler: async () => { const result = await getCiliopathyGenesForOrganism("C. elegans"); return formatListResult(`Ciliary genes in C. elegans`, result.genes, result.description); }},
 
     // --- Structure / Morphology ---
     { text: "Which genes cause longer cilia?", handler: () => getGenesByScreenPhenotype("long cilia") },
@@ -193,10 +193,9 @@ baseQuestions.forEach(q => {
     // Generate prefixed versions, avoiding redundancy
     const coreText = q.text.replace(/^(Show|Display|List|Find|Tell me|Which|What|Describe|Compare|Identify)\s*(me|about|the)?\s*/i, '').trim();
     prefixes.forEach(prefix => {
-        // Avoid creating awkward phrases like "Describe tell me about ARL13B"
+        // Avoid creating awkward phrases
         if (q.text.toLowerCase().startsWith("tell me") || q.text.toLowerCase().startsWith("describe")) return;
 
-        // Create a new question text
         const newText = `${prefix} ${coreText}`;
         if (!processedQuestions.has(newText.toLowerCase())) {
             questionRegistry.push({ text: newText, handler: q.handler });
@@ -204,11 +203,6 @@ baseQuestions.forEach(q => {
         }
     });
 });
-
-// =============================================================================
-// ADDITION: New and Corrected Handler Functions
-// Place this block after your questionRegistry
-// =============================================================================
 
 // NEW: More accurate handler for functional queries like "kinases"
 // IMPLEMENTED: Handles queries for conserved genes between organisms
