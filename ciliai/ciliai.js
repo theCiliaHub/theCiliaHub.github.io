@@ -144,7 +144,7 @@ const intentParser = createIntentParser();
 
 
 // =============================================================================
-// REPLACEMENT: Fully corrected Question Registry
+// REPLACEMENT: Fully updated Question Registry
 // =============================================================================
 const questionRegistry = [];
 const baseQuestions = [
@@ -182,20 +182,14 @@ const baseQuestions = [
 
 const prefixes = ["Describe", "Tell me about", "Let me know", "Display", "Show", "List", "Find"];
 const processedQuestions = new Set();
-
 baseQuestions.forEach(q => {
-    // Add the original question first
     if (!processedQuestions.has(q.text.toLowerCase())) {
         questionRegistry.push(q);
         processedQuestions.add(q.text.toLowerCase());
     }
-
-    // Generate prefixed versions, avoiding redundancy
     const coreText = q.text.replace(/^(Show|Display|List|Find|Tell me|Which|What|Describe|Compare|Identify)\s*(me|about|the)?\s*/i, '').trim();
     prefixes.forEach(prefix => {
-        // Avoid creating awkward phrases
         if (q.text.toLowerCase().startsWith("tell me") || q.text.toLowerCase().startsWith("describe")) return;
-
         const newText = `${prefix} ${coreText}`;
         if (!processedQuestions.has(newText.toLowerCase())) {
             questionRegistry.push({ text: newText, handler: q.handler });
@@ -204,6 +198,11 @@ baseQuestions.forEach(q => {
     });
 });
 
+
+// =============================================================================
+// ADDITION: New and Corrected Handler Functions
+// Place this block after your questionRegistry
+// =============================================================================
 
 // NEW: More accurate handler for functional queries like "kinases"
 // IMPLEMENTED: Handles queries for conserved genes between organisms
