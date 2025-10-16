@@ -622,74 +622,112 @@ async function getGeneLocalization(geneSymbol) {
     return formatGeneDetail(geneData, geneSymbol, 'Subcellular Localization', content);
 }
 
-// --- REPLACEMENT: Function to generate an evolutionary heatmap for a single gene ---
-async function getEvolutionaryInfo(geneSymbol, resultArea) {
+// --- NEW: Interactive UI and Plotting for Evolutionary Conservation ---
+async function displayEvolutionaryHeatmapUI(initialGenes = [], resultArea) {
     await fetchPhylogenyData();
-    const upperTerm = geneSymbol.toUpperCase();
-    const geneData = phylogenyDataCache[upperTerm];
-
-    if (!geneData || !geneData.species || geneData.species.length === 0) {
-        resultArea.innerHTML = `<div class="result-card"><h3>Evolutionary Conservation of ${geneSymbol}</h3><p class="status-not-found">No phylogeny data found for ${geneSymbol}.</p></div>`;
+    if (!phylogenyDataCache || Object.keys(phylogenyDataCache).length === 0) {
+        resultArea.innerHTML = `<div class="result-card"><p class="status-not-found">Phylogeny data is not available.</p></div>`;
         return;
     }
 
-    // UPDATED: Added key non-ciliary model organisms (A. thaliana, S. cerevisiae)
-    const organismOrder = [
-        "H.sapiens", "M.musculus", "G.gallus", "X.tropicalis", "D.rerio", 
-        "D.melanogaster", "C.elegans", "C.reinhardtii", "T.thermophila", 
-        "A.thaliana", "S.cerevisiae" 
-    ];
-    
-    // UPDATED: Added friendly names for the new organisms
-    const friendlyNames = {
-        "H.sapiens": "Human", "M.musculus": "Mouse", "G.gallus": "Chicken", "X.tropicalis": "Frog",
-        "D.rerio": "Zebrafish", "D.melanogaster": "Fly", "C.elegans": "Worm", 
-        "C.reinhardtii": "Chlamy", "T.thermophila": "Tetrahymena", 
-        "A.thaliana": "Arabidopsis", "S.cerevisiae": "Yeast"
-    };
-
-    const geneSpeciesSet = new Set(geneData.species);
-    const zData = [organismOrder.map(org => geneSpeciesSet.has(org) ? 1 : 0)];
-
-    const trace = {
-        z: zData,
-        x: organismOrder.map(org => friendlyNames[org] || org),
-        y: [geneSymbol],
-        type: 'heatmap',
-        colorscale: [[0, '#e0e0e0'], [1, '#2c5aa0']], // Grey for absent, Blue for present
-        showscale: false,
-        hoverinfo: 'text',
-        text: [organismOrder.map(org => `<b>${friendlyNames[org] || org}</b><br>Present: ${geneSpeciesSet.has(org) ? 'Yes' : 'No'}`)]
-    };
-
-    const layout = {
-        title: { text: `Evolutionary Conservation of ${geneSymbol}`, font: { size: 18, family: 'Arial', color: '#2c5aa0' } },
-        xaxis: { tickangle: -45 },
-        yaxis: {
-            title: { text: 'Non-Ciliary | Ciliary Species', standoff: 20 },
-            // Add a line to visually separate ciliary and non-ciliary organisms
-            shapes: [{
-                type: 'line',
-                xref: 'paper',
-                x0: 0,
-                x1: 1,
-                yref: 'y',
-                y0: 8.5,
-                y1: 8.5,
-                line: {
-                    color: 'grey',
-                    width: 1,
-                    dash: 'dot'
-                }
-            }]
-        },
-        margin: { t: 50, b: 100, l: 120 },
-        height: 350
+    // Define the full list of selectable organisms, classified
+    const classifiedOrganisms = {
+        "Ciliary": ["H.sapiens", "M.musculus", "G.gallus", "X.tropicalis", "D.rerio", "O.anatinus", "B.floridae", "C.intestinalis", "S.purpuratus", "N.vectensis", "D.melanogaster", "C.elegans", "T.adhaerens", "M.brevicollis", "N.gruberi", "C.reinhardtii", "P.patens", "T.thermophila", "P.tetraurelia", "L.major"],
+        "Non-Ciliary": ["A.thaliana", "O.sativa", "V.vinifera", "P.trichocarpa", "S.pombe", "N.crassa", "A.nidulans", "U.maydis", "Y.lipolytica", "C.albicans", "K.lactis", "A.gossypii", "C.glabrata", "D.discoideum", "E.cuniculi", "T.melanosporum", "F.graminearum", "P.chrysosporium", "C.immitis", "S.cerevisiae"]
     };
     
-    // Render the plot directly into the result area
-    resultArea.innerHTML = `<div id="plot-container"></div>`;
-    Plotly.newPlot('plot-container', [trace], layout, { responsive: true });
+    const defaultOrganisms = [...classifiedOrganisms["Ciliary"].slice(0, 10), ...classifiedOrganisms["Non-Ciliary"].slice(-2)];
+
+    // --- Create UI Elements ---
+    let uiHtml = `
+        <div class="result-card" id="evo-heatmap-controls">
+            <h3>Evolutionary Conservation Analysis</h3>
+            <div class="input-group">
+                <label for="evoGeneInput">Gene Symbols (comma-separated):</label>
+                <input type="text" id="evoGeneInput" class="ai-query-input" value="${initialGenes.join(', ')}">
+            </div>
+            <div class="input-group">
+                <label>Select Organisms:</label>
+                <div id="organism-selector" style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                    <div>
+                        <h4>Ciliary Species</h4>
+                        ${classifiedOrganisms.Ciliary.map(org => `
+                            <label style="display: block;"><input type="checkbox" class="org-checkbox" value="${org}" ${defaultOrganisms.includes(org) ? 'checked' : ''}> ${org}</label>
+                        `).join('')}
+                    </div>
+                    <div>
+                        <h4>Non-Ciliary Species</h4>
+                        ${classifiedOrganisms.Non-Ciliary.map(org => `
+                            <label style="display: block;"><input type="checkbox" class="org-checkbox" value="${org}" ${defaultOrganisms.includes(org) ? 'checked' : ''}> ${org}</label>
+                        `).join('')}
+                    </div>
+                </div>
+            </div>
+            <button class="analyze-btn" id="generateEvoHeatmapBtn" style="width: auto; padding: 10px 15px;">📊 Generate Heatmap</button>
+        </div>
+        <div id="evo-plot-container" style="margin-top: 1rem;"></div>
+    `;
+    resultArea.innerHTML = uiHtml;
+
+    // --- Plotting Logic ---
+    const plotHeatmap = () => {
+        const geneInput = document.getElementById('evoGeneInput');
+        const plotContainer = document.getElementById('evo-plot-container');
+        const genes = geneInput.value.split(/[\s,]+/).map(g => g.trim().toUpperCase()).filter(Boolean);
+        
+        const selectedOrganisms = Array.from(document.querySelectorAll('.org-checkbox:checked')).map(cb => cb.value);
+        if (genes.length === 0 || selectedOrganisms.length === 0) {
+            plotContainer.innerHTML = '<p class="status-not-found">Please enter at least one gene and select at least one organism.</p>';
+            return;
+        }
+
+        const ciliarySet = new Set(classifiedOrganisms.Ciliary);
+        const organismColors = selectedOrganisms.map(org => ciliarySet.has(org) ? '#0D47A1' : '#B71C1C'); // Blue for ciliary, Red for non-ciliary
+
+        const matrix = genes.map(gene => {
+            const geneData = phylogenyDataCache[gene];
+            const speciesSet = new Set(geneData ? geneData.species : []);
+            return selectedOrganisms.map(org => speciesSet.has(org) ? 1 : 0);
+        });
+
+        const trace = {
+            z: matrix,
+            x: selectedOrganisms,
+            y: genes,
+            type: 'heatmap',
+            colorscale: [[0, '#f8f9fa'], [1, '#2c5aa0']],
+            showscale: false,
+            hovertemplate: '<b>Gene:</b> %{y}<br><b>Organism:</b> %{x}<br><b>Present:</b> %{z}<extra></extra>'
+        };
+
+        const layout = {
+            title: 'Gene Presence Across Species',
+            xaxis: { tickangle: -45, automargin: true, tickfont: { color: organismColors } },
+            yaxis: { automargin: true },
+            margin: { t: 50, b: 120, l: 100 },
+            height: Math.max(400, genes.length * 30 + 150)
+        };
+
+        Plotly.newPlot('evo-plot-container', [trace], layout, { 
+            responsive: true,
+            // Add download button
+            toImageButtonOptions: {
+                format: 'png',
+                filename: 'evolutionary_conservation_heatmap',
+                height: 700,
+                width: 1000,
+                scale: 1
+            }
+        });
+    };
+
+    // --- Event Listener ---
+    document.getElementById('generateEvoHeatmapBtn').addEventListener('click', plotHeatmap);
+    
+    // Initial plot if genes are provided
+    if (initialGenes.length > 0) {
+        plotHeatmap();
+    }
 }
 
 async function getInteractingPartners(geneSymbol) {
@@ -940,11 +978,11 @@ window.handleAIQuery = async function() {
             await displayCiliAIExpressionHeatmap([gene], resultArea, window.tissueDataCache);
             return;
         }
-        // FIX: This now correctly calls the new heatmap function
+       // FIX: This now correctly calls the new INTERACTIVE heatmap UI function
         else if ((match = qLower.match(/(?:evolutionary\s+conservation\s+of|show\s+phylogeny\s+for)\s+([a-z0-9\-]+)/i))) {
              const gene = match[1].toUpperCase();
-             await getEvolutionaryInfo(gene, resultArea);
-             return; // Return because the function renders directly
+             await displayEvolutionaryHeatmapUI([gene], resultArea); // Pass the gene and result area
+             return; // Return because the function renders its own UI
         }
         else if ((match = qLower.match(/(?:what\s+are\s+the\s+interacting\s+partners\s+of|interacting\s+partners\s+for)\s+([a-z0-9\-]+)/i))) {
             const gene = match[1].toUpperCase();
@@ -1191,9 +1229,9 @@ function setupAiQueryAutocomplete() {
     const suggestionsContainer = document.getElementById('aiQuerySuggestions');
     if (!aiQueryInput || !suggestionsContainer) return;
     
+    // Expanded and refined set of question templates
     const questionTemplates = [
         'Tell me about {GENE}',
-        'Let me know about {GENE}',
         'Describe the function of {GENE}',
         'Show all known info about {GENE}',
         'Where is {GENE} expressed?',
@@ -1203,6 +1241,7 @@ function setupAiQueryAutocomplete() {
         'List diseases linked to {GENE}',
         'Provide a list of diseases associated with {GENE}',
         'Show localization of {GENE}',
+        'Where is {GENE} localized?',
         'What are the interacting partners of {GENE}?',
         'Show evolutionary conservation of {GENE}'
     ];
@@ -1247,6 +1286,7 @@ function setupAiQueryAutocomplete() {
         }
     }, 250));
 
+    // Event listeners
     suggestionsContainer.addEventListener('click', (e) => {
         if (e.target.classList.contains('suggestion-item')) {
             aiQueryInput.value = e.target.textContent;
@@ -1261,7 +1301,6 @@ function setupAiQueryAutocomplete() {
         }
     });
 }
-
 
 
 // --- Gene Analysis Engine & UI (largely unchanged) ---
