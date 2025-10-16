@@ -730,58 +730,52 @@ async function displayEvolutionaryHeatmapUI(initialGenes = [], resultArea) {
         plotHeatmap();
     }
 }
+// --- REPLACEMENT: Idempotent Declaration of Autocomplete Triggers ---
+// This prevents the "Identifier has already been declared" error on script re-load.
+if (typeof window.CiliAI_Suggestions === 'undefined') {
+    // Attach to the window object to make it globally accessible and prevent redeclaration.
+    window.CiliAI_Suggestions = {
+        'evolutionary': {
+            triggers: ['evolutionary', 'conserved', 'homolog', 'ortholog', 'paralog', 'phylogenetic', 'species', 'evolution'],
+            questions: [
+                'Show evolutionary conservation of IFT88 across species.',
+                'List conserved ciliary genes between C. elegans and humans.',
+                'Which cilia-related genes are conserved in mammals?',
+            ]
+        },
+        'list': {
+            triggers: ['list', 'show', 'display', 'give', 'find', 'let me know', 'tell me'],
+            questions: [
+                'List all genes localized to the transition zone.',
+                'Show genes expressed in ciliated neurons.',
+                'Display the list of BBSome components.',
+                'Find all genes involved in intraflagellar transport (IFT).',
+                'List all disease genes causing Joubert syndrome.',
+            ]
+        },
+        'describe': {
+            triggers: ['describe', 'what is', 'explain', 'function', 'role', 'responsible for', 'does'],
+            questions: [
+                'Describe the function of OSM-3.',
+                'What is the role of CC2D1A in cilia?',
+                'Explain how CILK1 regulates cilia length.',
+                'What does ARL13B do in ciliary signaling?',
+            ]
+        }
+        // ... other categories can be added here
+    };
 
-// --- NEW: Data structure for Trigger-Based Autocomplete ---
-// --- NEW: Data structure for Trigger-Based Autocomplete ---
-const CiliAI_Suggestions = {
-    'evolutionary': {
-        triggers: ['evolutionary', 'conserved', 'homolog', 'ortholog', 'paralog', 'phylogenetic', 'species', 'evolution'],
-        questions: [
-            'Show evolutionary conservation of IFT88 across species.',
-            'List conserved ciliary genes between C. elegans and humans.',
-            'Which cilia-related genes are conserved in mammals?',
-        ]
-    },
-    'list': {
-        triggers: ['list', 'show', 'display', 'give', 'find', 'let me know', 'tell me'],
-        questions: [
-            'List all genes localized to the transition zone.',
-            'Show genes expressed in ciliated neurons.',
-            'Display the list of BBSome components.',
-            'Find all genes involved in intraflagellar transport (IFT).',
-            'List all disease genes causing Joubert syndrome.',
-        ]
-    },
-    'describe': {
-        triggers: ['describe', 'what is', 'explain', 'function', 'role', 'responsible for', 'does'],
-        questions: [
-            'Describe the function of OSM-3.',
-            'What is the role of CC2D1A in cilia?',
-            'Explain how CILK1 regulates cilia length.',
-            'What does ARL13B do in ciliary signaling?',
-        ]
+    // Also attach the triggerMap to the window object.
+    window.triggerMap = new Map();
+    for (const category in window.CiliAI_Suggestions) {
+        window.CiliAI_Suggestions[category].triggers.forEach(trigger => {
+            if (!window.triggerMap.has(trigger)) window.triggerMap.set(trigger, new Set());
+            window.CiliAI_Suggestions[category].questions.forEach(q => window.triggerMap.get(trigger).add(q));
+        });
     }
-    // ... other categories from your design can be added here
-};
-
-// Create a flat map for quick trigger lookup from the structure above
-const triggerMap = new Map();
-for (const category in CiliAI_Suggestions) {
-    CiliAI_Suggestions[category].triggers.forEach(trigger => {
-        if (!triggerMap.has(trigger)) triggerMap.set(trigger, new Set());
-        CiliAI_Suggestions[category].questions.forEach(q => triggerMap.get(trigger).add(q));
-    });
 }
 
 
-// Create a flat map for quick trigger lookup
-const triggerMap = new Map();
-for (const category in CiliAI_Suggestions) {
-    CiliAI_Suggestions[category].triggers.forEach(trigger => {
-        if (!triggerMap.has(trigger)) triggerMap.set(trigger, []);
-        triggerMap.get(trigger).push(...CiliAI_Suggestions[category].questions);
-    });
-}
 
 async function getInteractingPartners(geneSymbol) {
     await fetchCiliaData();
@@ -1317,8 +1311,8 @@ function formatComplexResults(gene, title) {
     return html + '</div>';
 }
 
-// --- REPLACEMENT: New Autocomplete function using the trigger-word system ---
-// --- REPLACEMENT: New Autocomplete function using the trigger-word system ---
+
+// --- REPLACEMENT: Autocomplete using the globally-scoped triggerMap ---
 function setupAiQueryAutocomplete() {
     const aiQueryInput = document.getElementById('aiQueryInput');
     const suggestionsContainer = document.getElementById('aiQuerySuggestions');
@@ -1335,8 +1329,9 @@ function setupAiQueryAutocomplete() {
 
         // --- Provider 1: Trigger Word Suggestions ---
         const firstWord = inputText.split(' ')[0];
-        if (triggerMap.has(firstWord)) {
-            triggerMap.get(firstWord).forEach(q => suggestions.add(q));
+        // Use the globally-scoped window.triggerMap
+        if (window.triggerMap && window.triggerMap.has(firstWord)) {
+            window.triggerMap.get(firstWord).forEach(q => suggestions.add(q));
         }
 
         // --- Provider 2: Dynamic Gene-Specific Suggestions ---
@@ -1364,7 +1359,7 @@ function setupAiQueryAutocomplete() {
         }
     }, 250));
 
-    // Event listeners for suggestion click and hiding the box
+    // Event listeners
     suggestionsContainer.addEventListener('click', (e) => {
         if (e.target.classList.contains('suggestion-item')) {
             aiQueryInput.value = e.target.textContent;
@@ -1379,7 +1374,6 @@ function setupAiQueryAutocomplete() {
         }
     });
 }
-
 
 
 // --- Gene Analysis Engine & UI (largely unchanged) ---
