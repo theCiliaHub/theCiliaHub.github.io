@@ -538,6 +538,81 @@ async function getComplexesForGene(geneSymbol) {
     // This reuses your existing formatter to display the complex data for the found gene.
     return formatComplexResults(geneData, `Complex Information for ${geneSymbol}`);
 }
+
+// --- NEW: Specific Gene-Query Helper Functions ---
+
+async function isCiliaryGene(geneSymbol) {
+    await fetchCiliaData();
+    const upperTerm = geneSymbol.toUpperCase();
+    const geneData = ciliaHubDataCache.find(g => g.gene.toUpperCase() === upperTerm);
+    let html = `<div class="result-card"><h3>Is ${geneSymbol} a ciliary gene?</h3>`;
+    if (geneData) {
+        html += `<p><strong>Yes</strong>, ${geneSymbol} is classified as a ciliary gene in CiliaHub.</p>`;
+        if (geneData.ciliopathy && geneData.ciliopathy.length > 0) {
+            html += `<p>It is associated with ciliopathies such as: <strong>${geneData.ciliopathy.join(', ')}</strong>.</p>`;
+        }
+    } else {
+        html += `<p><strong>No</strong>, ${geneSymbol} was not found in the CiliaHub database of ciliary genes.</p>`;
+    }
+    html += `</div>`;
+    return html;
+}
+
+async function getProteinDomains(geneSymbol) {
+    await fetchCiliaData();
+    const upperTerm = geneSymbol.toUpperCase();
+    const geneData = ciliaHubDataCache.find(g => g.gene.toUpperCase() === upperTerm);
+    const content = geneData?.domain_descriptions?.join(', ') || 'No protein domain information available.';
+    return formatGeneDetail(geneData, geneSymbol, 'Protein Domains', content);
+}
+
+async function getDiseasesForGene(geneSymbol) {
+    await fetchCiliaData();
+    const upperTerm = geneSymbol.toUpperCase();
+    const geneData = ciliaHubDataCache.find(g => g.gene.toUpperCase() === upperTerm);
+    const content = geneData?.ciliopathy?.join(', ') || 'No associated diseases listed in the database.';
+    return formatGeneDetail(geneData, geneSymbol, 'Associated Diseases (Ciliopathies)', content);
+}
+
+async function getGeneLocalization(geneSymbol) {
+    await fetchCiliaData();
+    const upperTerm = geneSymbol.toUpperCase();
+    const geneData = ciliaHubDataCache.find(g => g.gene.toUpperCase() === upperTerm);
+    const content = geneData?.localization?.join(', ') || 'No localization data available.';
+    return formatGeneDetail(geneData, geneSymbol, 'Subcellular Localization', content);
+}
+
+async function getEvolutionaryInfo(geneSymbol) {
+    await fetchCiliaData();
+    const upperTerm = geneSymbol.toUpperCase();
+    const geneData = ciliaHubDataCache.find(g => g.gene.toUpperCase() === upperTerm);
+    if (!geneData) {
+        return `<div class="result-card"><h3>Evolutionary Info for ${geneSymbol}</h3><p class="status-not-found">Gene not found in the database.</p></div>`;
+    }
+    const stringLink = geneData.string_link ? `<a href="${geneData.string_link}" target="_blank">View on STRING DB</a>` : 'Not available';
+    const content = `For detailed evolutionary conservation and orthologs, please see the gene's entry in the STRING database. ${stringLink}`;
+    return formatGeneDetail(geneData, geneSymbol, 'Evolutionary Conservation & Phylogeny', content);
+}
+
+async function getInteractingPartners(geneSymbol) {
+    await fetchCiliaData();
+    const upperTerm = geneSymbol.toUpperCase();
+    const geneData = ciliaHubDataCache.find(g => g.gene.toUpperCase() === upperTerm);
+     if (!geneData) {
+        return `<div class="result-card"><h3>Interacting Partners for ${geneSymbol}</h3><p class="status-not-found">Gene not found in the database.</p></div>`;
+    }
+    let content = '';
+    if (geneData.complex_components && geneData.complex_components.length > 0) {
+        content += `This gene is a known component of the <strong>${geneData.complex_names.join(', ')}</strong> complex(es), which include(s): ${geneData.complex_components.join(', ')}. `;
+    } else {
+        content += 'No stable complex data is available in CiliaHub. ';
+    }
+    const stringLink = geneData.string_link ? `<a href="${geneData.string_link}" target="_blank">View detailed functional and physical interactions on STRING DB</a>` : 'STRING DB link not available.';
+    content += stringLink;
+    return formatGeneDetail(geneData, geneSymbol, 'Interacting Partners', content);
+}
+
+
 // Rule 1: Search for genes by ciliopathy/disease name
 async function getCiliopathyGenes(disease) {
     await fetchCiliaData();
@@ -724,12 +799,11 @@ async function getGenesByComplex(complexName) {
 }
 
 // --- Main AI Query Handler (REPLACEMENT) ---
-// --- Main AI Query Handler (REPLACEMENT) ---
-// --- Main AI Query Handler (REPLACEMENT) ---
 window.handleAIQuery = async function() {
     const aiQueryInput = document.getElementById('aiQueryInput');
     const resultArea = document.getElementById('ai-result-area');
-    const query = aiQueryInput.value.trim();
+    // Sanitize query by removing trailing punctuation
+    const query = aiQueryInput.value.trim().replace(/[.?]$/, '');
     if (!query) return;
 
     resultArea.style.display = 'block';
@@ -742,36 +816,58 @@ window.handleAIQuery = async function() {
 
     try {
         // PRIORITY 1: Check for an exact match in the question registry first.
-        const perfectMatch = questionRegistry.find(item => item.text.toLowerCase() === qLower);
+        const perfectMatch = questionRegistry.find(item => item.text.toLowerCase().replace(/[.?]$/, '') === qLower);
         if (perfectMatch) {
             console.log(`Registry match found: "${perfectMatch.text}"`);
             resultHtml = await perfectMatch.handler();
         }
-        // PRIORITY 2: Handle conversational "Tell me about...", "function of...", etc. queries.
-        else if ((match = qLower.match(/(?:tell me about|what is|describe|let me know about|function of|role of)\s+(?:the\s+)?([a-z0-9\-\_]+)\b/i))) {
+        // PRIORITY 2: New, specific, gene-centric queries
+        else if ((match = qLower.match(/^is\s+([a-z0-9\-]+)\s+a\s+ciliary\s+gene$/i))) {
+            const gene = match[1].toUpperCase();
+            resultHtml = await isCiliaryGene(gene);
+        }
+        else if ((match = qLower.match(/(?:show|list)\s+(?:protein\s+)?domains\s+of\s+([a-z0-9\-]+)/i))) {
+            const gene = match[1].toUpperCase();
+            resultHtml = await getProteinDomains(gene);
+        }
+        else if ((match = qLower.match(/(?:what\s+diseases\s+are\s+associated\s+with|list\s+diseases\s+linked\s+to)\s+([a-z0-9\-]+)/i))) {
+            const gene = match[1].toUpperCase();
+            resultHtml = await getDiseasesForGene(gene);
+        }
+        else if ((match = qLower.match(/(?:show\s+localization\s+of|where\s+is)\s+([a-z0-9\-]+)/i))) {
+            const gene = match[1].toUpperCase();
+            resultHtml = await getGeneLocalization(gene);
+        }
+        else if ((match = qLower.match(/(?:which\s+organ\s+systems?\s+express|show\s+expression\s+of)\s+([a-z0-9\-]+)/i))) {
+            const gene = match[1].toUpperCase();
+            await displayCiliAIExpressionHeatmap([gene], resultArea, window.tissueDataCache);
+            return;
+        }
+        else if ((match = qLower.match(/(?:evolutionary\s+conservation\s+of)\s+([a-z0-9\-]+)/i))) {
+             const gene = match[1].toUpperCase();
+             resultHtml = await getEvolutionaryInfo(gene);
+        }
+        else if ((match = qLower.match(/(?:what\s+are\s+the\s+interacting\s+partners\s+of|interacting\s+partners\s+for)\s+([a-z0-9\-]+)/i))) {
+            const gene = match[1].toUpperCase();
+            resultHtml = await getInteractingPartners(gene);
+        }
+        else if ((match = qLower.match(/(?:show\s+all\s+(?:known\s+)?info\s+about|tell me about|what is|describe|let me know about|function of|role of)\s+(?:the\s+)?([a-z0-9\-\_]+)\b/i))) {
+             // PRIORITY 3: Broad, comprehensive queries (catch-all for gene info)
             const term = match[1].trim();
-            console.log(`Conversational query matched for term: "${term}"`);
             resultHtml = await getComprehensiveDetails(term);
         }
-        // PRIORITY 3: Use the existing intent parser for keyword-based queries.
+        // PRIORITY 4: Use the existing intent parser for keyword-based queries.
         else {
             const intent = intentParser.parse(query);
             if (intent && typeof intent.handler === 'function') {
                 console.log(`Intent parser match found: ${intent.intent} for entity: ${intent.entity}`);
                 resultHtml = await intent.handler(intent.entity);
             }
-            // PRIORITY 4: Fallback for more specific, non-keyword patterns.
+            // PRIORITY 5: Fallback for other specific patterns.
             else if ((match = qLower.match(/(?:show me complexes for|list complexes for|complexes of|complex for)\s+([a-z0-9\-]+)/i))) {
-                // FIX for "show me complexes for IFT88"
                 const gene = match[1].toUpperCase();
-                resultHtml = await getComplexesForGene(gene); 
-            }
-            else if ((match = qLower.match(/expression of\s+([a-z0-9\-]+)/i))) {
-                const gene = match[1].toUpperCase();
-                await displayCiliAIExpressionHeatmap([gene], resultArea, window.tissueDataCache);
-                return;
+                resultHtml = await getComplexesForGene(gene);
             } else if (qLower.match(/(ciliary-only|cilia organisms? specific)\s+genes?/i)) {
-                // FIX for "show me cilia organisms specific genes"
                 const { label, genes } = await getPhylogenyGenes({ type: 'ciliary_only_list' });
                 resultHtml = formatListResult(label, genes);
             }
@@ -1001,49 +1097,62 @@ function formatComplexResults(gene, title) {
     return html + '</div>';
 }
 
+// =============================================================================
 // --- Autocomplete Logic (REPLACEMENT) ---
-// =============================================================================
-// REPLACEMENT: Autocomplete now handles both prefixes and keywords
-// =============================================================================
 function setupAiQueryAutocomplete() {
     const aiQueryInput = document.getElementById('aiQueryInput');
     const suggestionsContainer = document.getElementById('aiQuerySuggestions');
     if (!aiQueryInput || !suggestionsContainer) return;
+    
+    // Define templates for dynamic suggestions
+    const questionTemplates = [
+        'Tell me about {GENE}',
+        'Show expression of {GENE}',
+        'Is {GENE} a ciliary gene?',
+        'Show protein domains of {GENE}',
+        'What diseases are associated with {GENE}?',
+        'Show localization of {GENE}',
+        'What are the interacting partners of {GENE}?',
+    ];
 
     aiQueryInput.addEventListener('input', debounce(async () => {
         const inputText = aiQueryInput.value.toLowerCase();
         let suggestions = new Set();
 
-        if (inputText.length < 3) {
+        if (inputText.length < 2) {
             suggestionsContainer.style.display = 'none';
             return;
         }
 
-        // --- Provider 1: Full questions from the registry ---
+        // --- Provider 1: Full questions from the static registry ---
         questionRegistry
             .filter(item => item.text.toLowerCase().includes(inputText))
             .forEach(item => suggestions.add(item.text));
 
-        // --- Provider 2: "Tell me about..." for genes and complexes ---
-        if (inputText.startsWith('tell me') || inputText.startsWith('what is') || inputText.startsWith('describe')) {
-            const term = inputText.split(/\s+/).pop();
-            if (term.length >= 2) {
-                const genes = intentParser.getAllGenes();
-                if (genes.length > 0) {
-                    genes.filter(gene => gene.toLowerCase().startsWith(term)).slice(0, 2).forEach(gene => suggestions.add(`Tell me about ${gene}`));
-                }
-                intentParser.getAllComplexes().filter(c => c.toLowerCase().startsWith(term)).forEach(c => suggestions.add(`Tell me about ${c}`));
-            }
-        }
-        // --- Provider 3: Direct keyword suggestions from the intent parser ---
-        else {
-            intentParser.getKnownKeywords()
-                .filter(item => item.keyword.toLowerCase().startsWith(inputText))
-                .forEach(item => suggestions.add(item.suggestion));
+        // --- Provider 2: Keyword suggestions from the intent parser ---
+        intentParser.getKnownKeywords()
+            .filter(item => item.keyword.toLowerCase().startsWith(inputText))
+            .forEach(item => suggestions.add(item.suggestion));
+
+        // --- Provider 3: DYNAMIC gene-based suggestions ---
+        // Find the last word typed to see if it's a potential gene symbol
+        if (!ciliaHubDataCache) await fetchCiliaData();
+        const lastWord = inputText.split(/[\s,]+/).pop();
+        if (lastWord.length >= 3) {
+            const potentialGene = lastWord.toUpperCase();
+            ciliaHubDataCache
+                .filter(g => g.gene.startsWith(potentialGene))
+                .slice(0, 2) // Limit to avoid flooding suggestions
+                .forEach(g => {
+                    // Populate templates with the found gene name
+                    questionTemplates.forEach(template => {
+                         suggestions.add(template.replace('{GENE}', g.gene));
+                    });
+                });
         }
 
         // Display combined and deduplicated suggestions
-        const finalSuggestions = Array.from(suggestions).slice(0, 6);
+        const finalSuggestions = Array.from(suggestions).slice(0, 8);
         if (finalSuggestions.length > 0) {
             suggestionsContainer.innerHTML = finalSuggestions.map(s => `<div class="suggestion-item">${s}</div>`).join('');
             suggestionsContainer.style.display = 'block';
@@ -1052,7 +1161,7 @@ function setupAiQueryAutocomplete() {
         }
     }, 250));
 
-    // Event listeners remain the same
+    // Event listeners for suggestion click and hiding the box
     suggestionsContainer.addEventListener('click', (e) => {
         if (e.target.classList.contains('suggestion-item')) {
             aiQueryInput.value = e.target.textContent;
@@ -1067,6 +1176,8 @@ function setupAiQueryAutocomplete() {
         }
     });
 }
+
+
 
 // --- Gene Analysis Engine & UI (largely unchanged) ---
 
