@@ -980,68 +980,66 @@ async function getGenesByComplex(complexName) {
 }
 
 // --- Main AI Query Handler (REPLACEMENT) ---
+// --- REPLACEMENT: Final, Comprehensive AI Query Handler ---
 window.handleAIQuery = async function() {
-    const aiQueryInput = document.getElementById('aiQueryInput');
-    const resultArea = document.getElementById('ai-result-area');
-    const query = aiQueryInput.value.trim().replace(/[.?]$/, '');
-    if (!query) return;
+    const aiQueryInput = document.getElementById('aiQueryInput');
+    const resultArea = document.getElementById('ai-result-area');
+    const query = aiQueryInput.value.trim().replace(/[.?]$/, '');
+    if (!query) return;
 
-    resultArea.style.display = 'block';
-    resultArea.innerHTML = `<p class="status-searching">CiliAI is thinking...</p>`;
-    await Promise.all([fetchCiliaData(), fetchScreenData(), fetchTissueData(), fetchPhylogenyData()]);
+    resultArea.style.display = 'block';
+    resultArea.innerHTML = `<p class="status-searching">CiliAI is thinking...</p>`;
+    await Promise.all([fetchCiliaData(), fetchScreenData(), fetchTissueData(), fetchPhylogenyData()]);
 
-    let resultHtml = '';
-    const qLower = query.toLowerCase();
-    let match;
+    let resultHtml = '';
+    const qLower = query.toLowerCase();
+    let match;
 
-    try {
-        // --- PRIORITY 1: Specific, complex queries that need custom logic ---
-        if ((match = qLower.match(/conserved ciliary genes between\s+([\w\.\s]+)\s+and\s+([\w\.\s]+)/i))) {
-            resultHtml = await getConservedGenesBetweenOrganisms(match[1].trim(), match[2].trim());
-        }
-        else if ((match = qLower.match(/(?:evolutionary\s+conservation\s+of|show\s+phylogeny\s+for|display\s+evolutionary\s+tree\s+of)\s+([\w\-]+)/i))) {
-             await displayEvolutionaryHeatmapUI([match[1].toUpperCase()], resultArea);
-             return;
-        }
-        else if ((match = qLower.match(/compare\s+([\w\-]+)\s+(?:and|vs|versus)\s+([\w\-]+)/i))) {
-            resultHtml = await compareComplexes(match[1].toUpperCase(), match[2].toUpperCase());
-        }
-        // --- PRIORITY 2: Broad "describe/explain/what is" queries for a single gene or complex ---
-        else if ((match = qLower.match(/(?:explain\s+how|what\s+does|what\s+is\s+the\s+(?:function|role)\s+of|describe\s+the\s+(?:function|role)\s+of)\s+(?:the\s+)?([\w\-]+)/i))) {
-            resultHtml = await getComprehensiveDetails(match[1].trim());
-        }
-        // --- PRIORITY 3: Phylum-level queries ---
-        else if (qLower.match(/\b(ciliary-only|cilia-specific)\s+genes?\b/i)) {
-             const { label, genes } = await getPhylogenyGenes({ type: 'ciliary_only_list' });
-             resultHtml = formatListResult(label, genes);
-        }
-        // --- PRIORITY 4: Standard "Show me X for gene Y" queries ---
-        else if ((match = qLower.match(/(?:where\s+is\s+([\w\-]+)\s+expressed|expression\s+of\s+([\w\-]+))/i))) {
-            const gene = (match[1] || match[2]).toUpperCase();
-            // --- FIX: Changed the function call on the next line ---
-            await displayCiliAIExpressionHeatmap([gene], resultArea, window.tissueDataCache);
-            return;
-        }
-        // --- PRIORITY 5: Fallback to the keyword-based Intent Parser ---
-        else {
-            const intent = intentParser.parse(query);
-            if (intent && typeof intent.handler === 'function') {
-                resultHtml = await intent.handler(intent.entity);
-            } else {
-                // Final fallback: try to extract a gene/complex name and give a summary
-                const potentialTerm = qLower.split(' ').pop().toUpperCase();
-                if (ciliaHubDataCache.some(g => g.gene === potentialTerm) || intentParser.getAllComplexes().includes(potentialTerm)) {
-                     resultHtml = await getComprehensiveDetails(potentialTerm);
-                } else {
-                     resultHtml = `<p>Sorry, I didn’t understand that. Please try a different question.</p>`;
-                }
-            }
-        }
-        resultArea.innerHTML = resultHtml;
-    } catch (e) {
-        resultArea.innerHTML = `<p class="status-not-found">An error occurred. Check the console for details.</p>`;
-        console.error("CiliAI Query Error:", e);
-    }
+    try {
+        // --- PRIORITY 1: Check for an exact match in the static question registry ---
+        const perfectMatch = questionRegistry.find(item => item.text.toLowerCase().replace(/[.?]$/, '') === qLower);
+        if (perfectMatch) {
+            resultHtml = await perfectMatch.handler();
+        }
+        // --- PRIORITY 2: Handle specific, complex queries with custom logic ---
+        else if ((match = qLower.match(/conserved ciliary genes between\s+([\w\.\s]+)\s+and\s+([\w\.\s]+)/i))) {
+            resultHtml = await getConservedGenesBetweenOrganisms(match[1].trim(), match[2].trim());
+        }
+        else if ((match = qLower.match(/(?:evolutionary\s+conservation\s+of|show\s+phylogeny\s+for|display\s+evolutionary\s+tree\s+of)\s+([\w\-]+)/i))) {
+             await displayEvolutionaryHeatmapUI([match[1].toUpperCase()], resultArea);
+             return;
+        }
+        else if ((match = qLower.match(/compare\s+([\w\-]+)\s+(?:and|vs|versus)\s+([\w\-]+)/i))) {
+            resultHtml = await compareComplexes(match[1].toUpperCase(), match[2].toUpperCase());
+        }
+        // --- PRIORITY 3: Handle specific question patterns before falling back to general keywords ---
+        else if ((match = qLower.match(/(?:where\s+is\s+([\w\-]+)\s+expressed|expression\s+of\s+([\w\-]+))/i))) {
+            const gene = (match[1] || match[2]).toUpperCase();
+            await displayCiliAIExpressionHeatmap([gene], resultArea, window.tissueDataCache);
+            return;
+        }
+        else if (qLower.match(/\b(ciliary-only|cilia-specific)\s+genes?\b/i)) {
+             const { label, genes } = await getPhylogenyGenes({ type: 'ciliary_only_list' });
+             resultHtml = formatListResult(label, genes);
+        }
+        else if ((match = qLower.match(/(?:explain\s+how|what\s+does|what\s+is\s+the\s+(?:function|role)\s+of|describe\s+the\s+(?:function|role)\s+of)\s+(?:the\s+)?([\w\-]+)/i))) {
+            resultHtml = await getComprehensiveDetails(match[1].trim());
+        }
+        // --- PRIORITY 4: Fallback to the keyword-based Intent Parser for broader terms ---
+        else {
+            const intent = intentParser.parse(query);
+            if (intent && typeof intent.handler === 'function') {
+                resultHtml = await intent.handler(intent.entity);
+            } else {
+                // Final fallback if no other rule matches
+                resultHtml = `<p>Sorry, I didn’t understand that. Please try a different question.</p>`;
+            }
+        }
+        resultArea.innerHTML = resultHtml;
+    } catch (e) {
+        resultArea.innerHTML = `<p class="status-not-found">An error occurred. Check the console for details.</p>`;
+        console.error("CiliAI Query Error:", e);
+    }
 };
 
 
