@@ -147,47 +147,87 @@ const intentParser = createIntentParser();
 // =============================================================================
 // ADDITION: The new Question Registry and its required placeholder functions.
 // Place this code block after your CILI_AI_DB object.
-// =============================================================================
 const questionRegistry = [
-  // --- Gene-specific ---
-  { text: "Tell me about ARL13B", handler: () => getComprehensiveDetails("ARL13B") },
-  { text: "Show interactors of IFT88", handler: () => getProteinInteractions("IFT88") },
-  
-  // --- Disease-related ---
-  { text: "Show genes for Joubert Syndrome", handler: () => getCiliopathyGenes("Joubert Syndrome") },
-  { text: "Show genes for Bardet-Biedl Syndrome", handler: () => getCiliopathyGenes("Bardet-Biedl Syndrome") },
-  { text: "Display genes associated with Meckel-Gruber Syndrome", handler: () => getCiliopathyGenes("Meckel-Gruber Syndrome") },
-  { text: "List genes for Primary Ciliary Dyskinesia", handler: () => getCiliopathyGenes("Primary Ciliary Dyskinesia") },
-  { text: "Find genes linked to Leber congenital amaurosis", handler: () => getCiliopathyGenes("Leber congenital amaurosis") },
-  { text: "Which genes cause cystic kidney disease?", handler: () => getGenesByScreenPhenotype("cystic kidney disease") },
-  { text: "Show genes for cranioectodermal dysplasia", handler: () => getCiliopathyGenes("Cranioectodermal Dysplasia") },
-  { text: "Tell me genes causing short-rib thoracic dysplasia", handler: () => getCiliopathyGenes("Short-rib thoracic dysplasia") },
-  { text: "Display genes related to hydrocephalus", handler: () => getCiliopathyGenes("Hydrocephalus") },
+  // --- Gene-specific ---
+  { text: "Tell me about ARL13B", handler: () => getComprehensiveDetails("ARL13B") },
+  { text: "Show interactors of IFT88", handler: () => getProteinInteractions("IFT88") },
+  
+  // --- Disease-related (Corrected Handlers) ---
+  { text: "Show genes for Joubert Syndrome", handler: async () => {
+      const { genes, description } = await getCiliopathyGenes("Joubert Syndrome");
+      return formatListResult('Genes for Joubert Syndrome', genes, description);
+  }},
+  { text: "Show genes for Bardet-Biedl Syndrome", handler: async () => {
+      const { genes, description } = await getCiliopathyGenes("Bardet-Biedl Syndrome");
+      return formatListResult('Genes for Bardet–Biedl Syndrome', genes, description);
+  }},
+  { text: "Display genes associated with Meckel-Gruber Syndrome", handler: async () => {
+      const { genes, description } = await getCiliopathyGenes("Meckel-Gruber Syndrome");
+      return formatListResult('Genes for Meckel–Gruber Syndrome', genes, description);
+  }},
+  { text: "List genes for Primary Ciliary Dyskinesia", handler: async () => {
+      const { genes, description } = await getCiliopathyGenes("Primary Ciliary Dyskinesia");
+      return formatListResult('Genes for Primary Ciliary Dyskinesia', genes, description);
+  }},
+  { text: "Find genes linked to Leber congenital amaurosis", handler: async () => {
+      const { genes, description } = await getCiliopathyGenes("Leber congenital amaurosis");
+      return formatListResult('Genes for Leber congenital amaurosis', genes, description);
+  }},
+  { text: "Which genes cause cystic kidney disease?", handler: () => getGenesByScreenPhenotype("cystic kidney disease") },
+  { text: "Show genes for cranioectodermal dysplasia", handler: async () => {
+      const { genes, description } = await getCiliopathyGenes("Cranioectodermal Dysplasia");
+      return formatListResult('Genes for Cranioectodermal Dysplasia', genes, description);
+  }},
+  { text: "Tell me genes causing short-rib thoracic dysplasia", handler: async () => {
+      const { genes, description } = await getCiliopathyGenes("Short-rib thoracic dysplasia");
+      return formatListResult('Genes for Short-rib thoracic dysplasia', genes, description);
+  }},
+  { text: "Display genes related to hydrocephalus", handler: async () => {
+      const { genes, description } = await getCiliopathyGenes("Hydrocephalus");
+      return formatListResult('Genes related to Hydrocephalus', genes, description);
+  }},
 
-  // --- Localization-based ---
-  { text: "Find genes localized to basal body", handler: () => getGenesByLocalization("Basal body") },
-  { text: "Show proteins in transition zone", handler: () => getGenesByLocalization("Transition zone") },
-  { text: "List components of the BBSome complex", handler: () => getGenesByComplex("BBSome") },
-  { text: "Display genes at ciliary tip", handler: () => getGenesByLocalization("Ciliary tip") },
-  { text: "Which genes localize to axoneme?", handler: () => getGenesByLocalization("Axoneme") },
-  { text: "Show transition fiber proteins", handler: () => getGenesByLocalization("Transition fiber") },
+  // --- Localization-based (Corrected Handlers) ---
+  { text: "Find genes localized to basal body", handler: async () => {
+      const results = await getGenesByLocalization("Basal body");
+      return formatListResult('Genes Localized to Basal Body', results);
+  }},
+  { text: "Show proteins in transition zone", handler: async () => {
+      const results = await getGenesByLocalization("Transition zone");
+      return formatListResult('Proteins in the Transition Zone', results);
+  }},
+  { text: "List components of the BBSome complex", handler: async () => {
+      const results = await getGenesByComplex("BBSome");
+      return formatListResult('Components of the BBSome Complex', results);
+  }},
+  { text: "Display genes at ciliary tip", handler: async () => {
+      const results = await getGenesByLocalization("Ciliary tip");
+      return formatListResult('Genes at the Ciliary Tip', results);
+  }},
+  { text: "Which genes localize to axoneme?", handler: async () => {
+      const results = await getGenesByLocalization("Axoneme");
+      return formatListResult('Genes Localized to the Axoneme', results);
+  }},
+  { text: "Show transition fiber proteins", handler: async () => {
+      const results = await getGenesByLocalization("Transition fiber");
+      return formatListResult('Transition Fiber Proteins', results);
+  }},
 
-  // --- Mechanism-based ---
-  { text: "Show me motor genes", handler: () => getGenesWithDomain("motor") },
-  { text: "Display kinases regulating cilia length", handler: () => getGenesByDomainDescription("kinase") },
-  { text: "List intraflagellar transport (IFT) components", handler: () => getGenesByComplex("IFT") },
-  { text: "Find IFT-A and IFT-B complex genes", handler: () => getGenesByMultipleComplexes(["IFT-A", "IFT-B"]) },
-  { text: "Which genes are involved in cilium assembly?", handler: () => getGenesByFunction("cilium assembly") },
+  // --- Mechanism-based ---
+  { text: "Show me motor genes", handler: () => getGenesWithDomain("motor") },
+  { text: "Display kinases regulating cilia length", handler: () => getGenesByDomainDescription("kinase") },
+  { text: "List intraflagellar transport (IFT) components", handler: () => getGenesByComplex("IFT") },
+  { text: "Find IFT-A and IFT-B complex genes", handler: () => getGenesByMultipleComplexes(["IFT-A", "IFT-B"]) },
+  { text: "Which genes are involved in cilium assembly?", handler: () => getGenesByFunction("cilium assembly") },
 
-  // --- Organism-specific ---
-  { text: "List ciliary genes in C. elegans", handler: () => getCiliaryGenesForOrganism("C. elegans").then(result => formatListResult(`Ciliary genes in C. elegans`, result.genes, result.description)) },
-  { text: "Display conserved ciliary proteins between mouse and human", handler: () => getConservedGenes(["Mouse", "Human"]) },
+  // --- Organism-specific ---
+  { text: "List ciliary genes in C. elegans", handler: () => getCiliaryGenesForOrganism("C. elegans").then(result => formatListResult(`Ciliary genes in C. elegans`, result.genes, result.description)) },
+  { text: "Display conserved ciliary proteins between mouse and human", handler: () => getConservedGenes(["Mouse", "Human"]) },
 
-  // --- Structure / Morphology ---
-  { text: "Which genes cause longer cilia?", handler: () => getGenesByScreenPhenotype("long cilia") },
-  { text: "Find genes causing short cilia", handler: () => getGenesByScreenPhenotype("short cilia") }
+  // --- Structure / Morphology ---
+  { text: "Which genes cause longer cilia?", handler: () => getGenesByScreenPhenotype("long cilia") },
+  { text: "Find genes causing short cilia", handler: () => getGenesByScreenPhenotype("short cilia") }
 ];
-
 // Placeholder functions to support the new registry without errors
 function notImplementedYet(feature) {
     return `<div class="result-card"><h3>Feature In Development</h3><p>The query handler for "<strong>${feature}</strong>" is not yet implemented. Stay tuned for future updates!</p></div>`;
@@ -802,7 +842,6 @@ async function getGenesByComplex(complexName) {
 window.handleAIQuery = async function() {
     const aiQueryInput = document.getElementById('aiQueryInput');
     const resultArea = document.getElementById('ai-result-area');
-    // Sanitize query by removing trailing punctuation
     const query = aiQueryInput.value.trim().replace(/[.?]$/, '');
     if (!query) return;
 
@@ -815,22 +854,22 @@ window.handleAIQuery = async function() {
     let match;
 
     try {
-        // PRIORITY 1: Check for an exact match in the question registry first.
         const perfectMatch = questionRegistry.find(item => item.text.toLowerCase().replace(/[.?]$/, '') === qLower);
         if (perfectMatch) {
             console.log(`Registry match found: "${perfectMatch.text}"`);
             resultHtml = await perfectMatch.handler();
         }
-        // PRIORITY 2: New, specific, gene-centric queries
-        else if ((match = qLower.match(/^is\s+([a-z0-9\-]+)\s+a\s+ciliary\s+gene$/i))) {
-            const gene = match[1].toUpperCase();
+        // UPDATED: Regex now handles "is...ciliary gene?" and "list...associated with cilia"
+        else if ((match = qLower.match(/(?:^is\s+([a-z0-9\-]+)\s+a\s+ciliary\s+gene$)|(?:(?:list|show|display|provide\s+a\s+list\s+of)\s+([a-z0-9\-]+)\s+associated\s+with\s+cilia)/i))) {
+            const gene = (match[1] || match[2]).toUpperCase();
             resultHtml = await isCiliaryGene(gene);
         }
         else if ((match = qLower.match(/(?:show|list)\s+(?:protein\s+)?domains\s+of\s+([a-z0-9\-]+)/i))) {
             const gene = match[1].toUpperCase();
             resultHtml = await getProteinDomains(gene);
         }
-        else if ((match = qLower.match(/(?:what\s+diseases\s+are\s+associated\s+with|list\s+diseases\s+linked\s+to)\s+([a-z0-9\-]+)/i))) {
+        // UPDATED: Regex now handles "what diseases...", "list diseases...", and "provide a list of diseases..."
+        else if ((match = qLower.match(/(?:what\s+diseases\s+are\s+associated\s+with|list\s+diseases\s+(?:are\s+associated\s+with|linked\s+to)|provide\s+a\s+list\s+of\s+diseases\s+associated\s+with)\s+([a-z0-9\-]+)/i))) {
             const gene = match[1].toUpperCase();
             resultHtml = await getDiseasesForGene(gene);
         }
@@ -852,27 +891,14 @@ window.handleAIQuery = async function() {
             resultHtml = await getInteractingPartners(gene);
         }
         else if ((match = qLower.match(/(?:show\s+all\s+(?:known\s+)?info\s+about|tell me about|what is|describe|let me know about|function of|role of)\s+(?:the\s+)?([a-z0-9\-\_]+)\b/i))) {
-             // PRIORITY 3: Broad, comprehensive queries (catch-all for gene info)
             const term = match[1].trim();
             resultHtml = await getComprehensiveDetails(term);
         }
-        // PRIORITY 4: Use the existing intent parser for keyword-based queries.
         else {
             const intent = intentParser.parse(query);
             if (intent && typeof intent.handler === 'function') {
-                console.log(`Intent parser match found: ${intent.intent} for entity: ${intent.entity}`);
                 resultHtml = await intent.handler(intent.entity);
-            }
-            // PRIORITY 5: Fallback for other specific patterns.
-            else if ((match = qLower.match(/(?:show me complexes for|list complexes for|complexes of|complex for)\s+([a-z0-9\-]+)/i))) {
-                const gene = match[1].toUpperCase();
-                resultHtml = await getComplexesForGene(gene);
-            } else if (qLower.match(/(ciliary-only|cilia organisms? specific)\s+genes?/i)) {
-                const { label, genes } = await getPhylogenyGenes({ type: 'ciliary_only_list' });
-                resultHtml = formatListResult(label, genes);
-            }
-            // FINAL FALLBACK
-            else {
+            } else {
                 resultHtml = `<p>Sorry, I didn’t understand that. Please try one of the suggested questions or a known keyword.</p>`;
             }
         }
@@ -882,6 +908,7 @@ window.handleAIQuery = async function() {
         console.error("CiliAI Query Error:", e);
     }
 };
+
 
 // Helper for the comparison query (updated titles and threshold)
 function formatComparisonResult(title, tissue, list1, list2) {
@@ -1097,22 +1124,25 @@ function formatComplexResults(gene, title) {
     return html + '</div>';
 }
 
-// =============================================================================
 // --- Autocomplete Logic (REPLACEMENT) ---
 function setupAiQueryAutocomplete() {
     const aiQueryInput = document.getElementById('aiQueryInput');
     const suggestionsContainer = document.getElementById('aiQuerySuggestions');
     if (!aiQueryInput || !suggestionsContainer) return;
     
-    // Define templates for dynamic suggestions
+    // Define an expanded and refined set of templates for dynamic suggestions
     const questionTemplates = [
         'Tell me about {GENE}',
+        'Let me know about {GENE}',
+        'Describe the role of {GENE}',
         'Show expression of {GENE}',
         'Is {GENE} a ciliary gene?',
         'Show protein domains of {GENE}',
-        'What diseases are associated with {GENE}?',
+        'List diseases linked to {GENE}',
+        'Provide a list of diseases associated with {GENE}',
         'Show localization of {GENE}',
         'What are the interacting partners of {GENE}?',
+        'Show all known info about {GENE}'
     ];
 
     aiQueryInput.addEventListener('input', debounce(async () => {
@@ -1124,27 +1154,25 @@ function setupAiQueryAutocomplete() {
             return;
         }
 
-        // --- Provider 1: Full questions from the static registry ---
+        // Provider 1: Full questions from the static registry
         questionRegistry
             .filter(item => item.text.toLowerCase().includes(inputText))
             .forEach(item => suggestions.add(item.text));
 
-        // --- Provider 2: Keyword suggestions from the intent parser ---
+        // Provider 2: Keyword suggestions from the intent parser
         intentParser.getKnownKeywords()
             .filter(item => item.keyword.toLowerCase().startsWith(inputText))
             .forEach(item => suggestions.add(item.suggestion));
 
-        // --- Provider 3: DYNAMIC gene-based suggestions ---
-        // Find the last word typed to see if it's a potential gene symbol
+        // Provider 3: DYNAMIC gene-based suggestions
         if (!ciliaHubDataCache) await fetchCiliaData();
         const lastWord = inputText.split(/[\s,]+/).pop();
         if (lastWord.length >= 3) {
             const potentialGene = lastWord.toUpperCase();
             ciliaHubDataCache
                 .filter(g => g.gene.startsWith(potentialGene))
-                .slice(0, 2) // Limit to avoid flooding suggestions
+                .slice(0, 1) // Only suggest for the top match to avoid clutter
                 .forEach(g => {
-                    // Populate templates with the found gene name
                     questionTemplates.forEach(template => {
                          suggestions.add(template.replace('{GENE}', g.gene));
                     });
@@ -1152,7 +1180,7 @@ function setupAiQueryAutocomplete() {
         }
 
         // Display combined and deduplicated suggestions
-        const finalSuggestions = Array.from(suggestions).slice(0, 8);
+        const finalSuggestions = Array.from(suggestions).slice(0, 10);
         if (finalSuggestions.length > 0) {
             suggestionsContainer.innerHTML = finalSuggestions.map(s => `<div class="suggestion-item">${s}</div>`).join('');
             suggestionsContainer.style.display = 'block';
@@ -1161,7 +1189,7 @@ function setupAiQueryAutocomplete() {
         }
     }, 250));
 
-    // Event listeners for suggestion click and hiding the box
+    // Event listeners remain the same
     suggestionsContainer.addEventListener('click', (e) => {
         if (e.target.classList.contains('suggestion-item')) {
             aiQueryInput.value = e.target.textContent;
@@ -1176,9 +1204,6 @@ function setupAiQueryAutocomplete() {
         }
     });
 }
-
-
-
 // --- Gene Analysis Engine & UI (largely unchanged) ---
 
 function setupAutocomplete() {
