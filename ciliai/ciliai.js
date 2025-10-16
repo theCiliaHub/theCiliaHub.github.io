@@ -207,6 +207,414 @@ const getGenesByMultipleComplexes = async (complexes) => notImplementedYet(`Gene
 const getConservedGenes = async (organisms) => notImplementedYet(`Conserved genes between: ${organisms.join(' & ')}`);
 const getProteinInteractions = async (gene) => notImplementedYet(`Protein interactions for: ${gene}`);
 
+// Add this after the questionRegistry array definition
+
+// =============================================================================
+// COMPREHENSIVE QUESTION EXPANSION FOR CiliAI ASK
+// =============================================================================
+
+// Add these new questions to your existing questionRegistry array
+questionRegistry.push(
+  // --- Core Functional Questions ---
+  { text: "What is the function of BBS1?", handler: () => getGeneFunction("BBS1") },
+  { text: "Describe the role of ARL13B in ciliary signaling", handler: () => getGeneRole("ARL13B", "ciliary signaling") },
+  { text: "Explain what CEP290 does", handler: () => getGeneFunction("CEP290") },
+  
+  // --- Localization Questions ---
+  { text: "Where is IFT88 localized in the cell?", handler: () => getGeneLocalization("IFT88") },
+  { text: "Show all genes found at the transition zone", handler: () => getGenesByLocalization("transition zone") },
+  { text: "Find genes localized to basal body", handler: () => getGenesByLocalization("basal body") },
+  { text: "Show proteins in transition zone", handler: () => getGenesByLocalization("transition zone") },
+  { text: "Display genes at ciliary tip", handler: () => getGenesByLocalization("ciliary tip") },
+  { text: "Which genes localize to axoneme?", handler: () => getGenesByLocalization("axoneme") },
+  { text: "Show transition fiber proteins", handler: () => getGenesByLocalization("transition fiber") },
+  
+  // --- Disease Association Questions ---
+  { text: "List all diseases linked to NPHP1", handler: () => getGeneDiseases("NPHP1") },
+  { text: "What ciliopathies are associated with mutations in MKS1?", handler: () => getGeneDiseases("MKS1") },
+  { text: "Show genes for Joubert Syndrome", handler: () => getCiliopathyGenes("Joubert Syndrome") },
+  { text: "Show genes for Bardet-Biedl Syndrome", handler: () => getCiliopathyGenes("Bardet-Biedl Syndrome") },
+  { text: "Display genes associated with Meckel-Gruber Syndrome", handler: () => getCiliopathyGenes("Meckel-Gruber Syndrome") },
+  { text: "List genes for Primary Ciliary Dyskinesia", handler: () => getCiliopathyGenes("Primary Ciliary Dyskinesia") },
+  { text: "Find genes linked to Leber congenital amaurosis", handler: () => getCiliopathyGenes("Leber congenital amaurosis") },
+  { text: "Which genes cause cystic kidney disease?", handler: () => getGenesByScreenPhenotype("cystic kidney disease") },
+  { text: "Show genes for cranioectodermal dysplasia", handler: () => getCiliopathyGenes("Cranioectodermal Dysplasia") },
+  { text: "Tell me genes causing short-rib thoracic dysplasia", handler: () => getCiliopathyGenes("Short-rib thoracic dysplasia") },
+  { text: "Display genes related to hydrocephalus", handler: () => getCiliopathyGenes("Hydrocephalus") },
+  
+  // --- Protein Structure & Complexes ---
+  { text: "Show protein domains of WDR35", handler: () => getGeneDomains("WDR35") },
+  { text: "List all components of the BBSome complex", handler: () => getGenesByComplex("BBSome") },
+  { text: "Display components of IFT-A complex", handler: () => getGenesByComplex("IFT-A") },
+  { text: "Display components of IFT-B complex", handler: () => getGenesByComplex("IFT-B") },
+  { text: "Show components of Transition Zone Complex", handler: () => getGenesByComplex("Transition Zone Complex") },
+  { text: "Display components of MKS Complex", handler: () => getGenesByComplex("MKS Complex") },
+  { text: "Show components of NPHP Complex", handler: () => getGenesByComplex("NPHP Complex") },
+  
+  // --- Ciliary Status ---
+  { text: "Is DYNC2H1 a ciliary gene?", handler: () => checkCiliaryStatus("DYNC2H1") },
+  { text: "Show me all ciliary genes", handler: () => getAllCiliaryGenes() },
+  
+  // --- Functional Genomics Screen Results ---
+  { text: "What happens to cilia when KIF3A is knocked down?", handler: () => getKnockdownEffect("KIF3A") },
+  { text: "Which genes cause longer cilia when silenced?", handler: () => getGenesByScreenPhenotype("long cilia") },
+  { text: "Show me the results for IFT88 in the Kim2016 screen", handler: () => getScreenResults("IFT88", "Kim2016") },
+  { text: "Find all genes that act as negative regulators of Hedgehog signaling", handler: () => getHedgehogRegulators("negative") },
+  { text: "Display genes that had 'No effect' in the Wheway2015 screen", handler: () => getNoEffectGenes("Wheway2015") },
+  { text: "Find genes causing short cilia", handler: () => getGenesByScreenPhenotype("short cilia") },
+  
+  // --- Gene Expression Data ---
+  { text: "Where is ARL13B expressed?", handler: () => getGeneExpression("ARL13B") },
+  { text: "Show the expression pattern of BBS1 across all tissues", handler: () => getGeneExpressionPattern("BBS1") },
+  { text: "Which ciliary genes are most highly expressed in the kidney?", handler: () => getTissueSpecificGenes("kidney") },
+  { text: "Compare the expression of IFT88 and OFD1 in the brain versus the retina", handler: () => compareGeneExpression(["IFT88", "OFD1"], ["brain", "retina"]) },
+  { text: "Show expression of ARL13B", handler: () => getGeneExpression("ARL13B") },
+  { text: "Where is BBS1 expressed?", handler: () => getGeneExpression("BBS1") },
+  { text: "In which tissues is IFT88 expressed?", handler: () => getGeneExpression("IFT88") },
+  { text: "Which organ systems express CEP290?", handler: () => getGeneExpression("CEP290") },
+  
+  // --- Evolutionary Conservation Data ---
+  { text: "Show the evolutionary conservation of BBS1", handler: () => getGeneConservation("BBS1") },
+  { text: "Is IFT88 conserved in C. elegans?", handler: () => checkConservation("IFT88", "C. elegans") },
+  { text: "List all ciliary-only genes", handler: () => getCiliaryOnlyGenes() },
+  { text: "Display the ciliary genes that are conserved between humans and zebrafish", handler: () => getConservedGenesBetween(["Human", "Zebrafish"]) },
+  { text: "Which human ciliary genes have orthologs in Chlamydomonas?", handler: () => getOrthologsInOrganism("Chlamydomonas") },
+  { text: "List ciliary genes in C. elegans", handler: () => getCiliaryGenesForOrganism("C. elegans") },
+  { text: "Display conserved ciliary proteins between mouse and human", handler: () => getConservedGenes(["Mouse", "Human"]) },
+  { text: "What is the phylogeny of IFT88?", handler: () => getGeneConservation("IFT88") },
+  { text: "Evolutionary conservation of ARL13B", handler: () => getGeneConservation("ARL13B") },
+  
+  // --- Mechanism & Functional Categories ---
+  { text: "Show me motor genes", handler: () => getGenesByFunction("motor") },
+  { text: "Display kinesin motors", handler: () => getGenesByFunction("kinesin motors") },
+  { text: "Show me dynein motors", handler: () => getGenesByFunction("dynein motors") },
+  { text: "Display kinases regulating cilia length", handler: () => getGenesByDomainDescription("kinase") },
+  { text: "List intraflagellar transport (IFT) components", handler: () => getGenesByComplex("IFT") },
+  { text: "Find IFT-A and IFT-B complex genes", handler: () => getGenesByMultipleComplexes(["IFT-A", "IFT-B"]) },
+  { text: "Which genes are involved in cilium assembly?", handler: () => getGenesByFunction("cilium assembly") },
+  { text: "Show me Ciliary assembly/disassembly genes", handler: () => getGenesByFunction("Ciliary assembly/disassembly") },
+  { text: "Display Signaling genes", handler: () => getGenesByFunction("Signaling") },
+  { text: "Show me Motile cilium genes", handler: () => getGenesByFunction("Motile cilium") },
+  { text: "Display Motor protein genes", handler: () => getGenesByFunction("Motor protein") },
+  { text: "Show Transport genes", handler: () => getGenesByFunction("Transport") },
+  { text: "Display Protein modification genes", handler: () => getGenesByFunction("Protein modification") },
+  { text: "Show Cytoskeletal genes", handler: () => getGenesByFunction("Cytoskeletal") },
+  
+  // --- Protein Domain Questions ---
+  { text: "Show WD40 domain containing proteins", handler: () => getGenesWithDomain("WD40") },
+  { text: "Display Leucine-rich repeat domain proteins", handler: () => getGenesWithDomain("Leucine-rich repeat") },
+  { text: "Show IQ motif containing proteins", handler: () => getGenesWithDomain("IQ motif") },
+  { text: "Display calmodulin-binding proteins", handler: () => getGenesWithDomain("calmodulin-binding") },
+  { text: "Show EF-hand domain proteins", handler: () => getGenesWithDomain("EF-hand") },
+  
+  // --- Organism-Specific Questions ---
+  { text: "Display ciliary genes in human", handler: () => getCiliaryGenesForOrganism("human") },
+  { text: "Show ciliary genes in mouse", handler: () => getCiliaryGenesForOrganism("mouse") },
+  { text: "List ciliary genes in zebrafish", handler: () => getCiliaryGenesForOrganism("zebrafish") },
+  { text: "Display ciliary genes in fly", handler: () => getCiliaryGenesForOrganism("fly") },
+  { text: "Show ciliary genes in yeast", handler: () => getCiliaryGenesForOrganism("yeast") },
+  { text: "List ciliary genes in Chlamydomonas", handler: () => getCiliaryGenesForOrganism("Chlamydomonas") },
+  
+  // --- Comprehensive Gene Information ---
+  { text: "Show all known info about IFT88", handler: () => getComprehensiveDetails("IFT88") },
+  { text: "Tell me about BBS1", handler: () => getComprehensiveDetails("BBS1") },
+  { text: "Tell me about ARL13B", handler: () => getComprehensiveDetails("ARL13B") },
+  { text: "Show interactors of IFT88", handler: () => getProteinInteractions("IFT88") },
+  { text: "What are the interacting partners of BBS1?", handler: () => getProteinInteractions("BBS1") }
+);
+
+// =============================================================================
+// ADDITIONAL QUERY HANDLER FUNCTIONS
+// =============================================================================
+
+// Add these new handler functions after the existing placeholder functions
+
+async function getGeneFunction(gene) {
+    if (!ciliaHubDataCache) await fetchCiliaData();
+    const geneData = ciliaHubDataCache.find(g => g.gene.toUpperCase() === gene.toUpperCase());
+    return formatGeneDetail(geneData, gene, "Function", geneData?.functional_summary || geneData?.description || "No functional information available.");
+}
+
+async function getGeneRole(gene, context) {
+    if (!ciliaHubDataCache) await fetchCiliaData();
+    const geneData = ciliaHubDataCache.find(g => g.gene.toUpperCase() === gene.toUpperCase());
+    const roleInfo = geneData?.functional_summary || geneData?.description || "No specific role information available.";
+    return formatGeneDetail(geneData, gene, `Role in ${context}`, roleInfo);
+}
+
+async function getGeneLocalization(gene) {
+    if (!ciliaHubDataCache) await fetchCiliaData();
+    const geneData = ciliaHubDataCache.find(g => g.gene.toUpperCase() === gene.toUpperCase());
+    const localization = geneData?.localization?.join(", ") || "No localization data available.";
+    return formatGeneDetail(geneData, gene, "Subcellular Localization", localization);
+}
+
+async function getGeneDiseases(gene) {
+    if (!ciliaHubDataCache) await fetchCiliaData();
+    const geneData = ciliaHubDataCache.find(g => g.gene.toUpperCase() === gene.toUpperCase());
+    const diseases = geneData?.ciliopathy?.join(", ") || "No disease associations found.";
+    return formatGeneDetail(geneData, gene, "Disease Associations", diseases);
+}
+
+async function getGeneDomains(gene) {
+    if (!ciliaHubDataCache) await fetchCiliaData();
+    const geneData = ciliaHubDataCache.find(g => g.gene.toUpperCase() === gene.toUpperCase());
+    const domains = geneData?.domain_descriptions?.join(", ") || "No domain information available.";
+    return formatGeneDetail(geneData, gene, "Protein Domains", domains);
+}
+
+async function checkCiliaryStatus(gene) {
+    if (!ciliaHubDataCache) await fetchCiliaData();
+    const geneData = ciliaHubDataCache.find(g => g.gene.toUpperCase() === gene.toUpperCase());
+    const status = geneData ? "Yes, this is a ciliary gene." : "No, this gene is not in the ciliary database.";
+    return formatGeneDetail(geneData, gene, "Ciliary Status", status);
+}
+
+async function getAllCiliaryGenes() {
+    if (!ciliaHubDataCache) await fetchCiliaData();
+    const genes = ciliaHubDataCache.map(g => ({ gene: g.gene, description: g.functional_summary || "Ciliary gene" }));
+    return formatListResult("All Ciliary Genes", genes);
+}
+
+async function getKnockdownEffect(gene) {
+    await fetchScreenData();
+    const screenInfo = screenDataCache[gene];
+    if (!screenInfo || !Array.isArray(screenInfo)) {
+        return `<div class="result-card"><h3>Knockdown Effects for ${gene}</h3><p class="status-not-found">No screen data available for this gene.</p></div>`;
+    }
+    
+    const effects = screenInfo.map(s => `${s.source}: ${s.result}`).join("; ");
+    return formatGeneDetail(null, gene, "Knockdown Effects", effects);
+}
+
+async function getScreenResults(gene, screenName) {
+    await fetchScreenData();
+    const screenInfo = screenDataCache[gene];
+    if (!screenInfo) {
+        return `<div class="result-card"><h3>Screen Results for ${gene}</h3><p class="status-not-found">No screen data available for this gene.</p></div>`;
+    }
+    
+    const specificResult = screenInfo.find(s => s.source === screenName);
+    if (!specificResult) {
+        return `<div class="result-card"><h3>Screen Results for ${gene} in ${screenName}</h3><p class="status-not-found">No data found for this screen.</p></div>`;
+    }
+    
+    return formatGeneDetail(null, gene, `${screenName} Results`, specificResult.result || "No specific result reported");
+}
+
+async function getHedgehogRegulators(regulationType) {
+    await fetchScreenData();
+    const hedgehogGenes = [];
+    
+    Object.entries(screenDataCache).forEach(([gene, screens]) => {
+        const hedgehogScreen = screens.find(s => s.source === "Breslow2018");
+        if (hedgehogScreen) {
+            const result = hedgehogScreen.result?.toLowerCase() || "";
+            if (regulationType === "negative" && result.includes("increased")) {
+                hedgehogGenes.push({ gene, description: result });
+            } else if (regulationType === "positive" && result.includes("decreased")) {
+                hedgehogGenes.push({ gene, description: result });
+            }
+        }
+    });
+    
+    const title = regulationType === "negative" ? 
+        "Negative Regulators of Hedgehog Signaling" : 
+        "Positive Regulators of Hedgehog Signaling";
+    
+    return formatListResult(title, hedgehogGenes);
+}
+
+async function getNoEffectGenes(screenName) {
+    await fetchScreenData();
+    const noEffectGenes = [];
+    
+    Object.entries(screenDataCache).forEach(([gene, screens]) => {
+        const targetScreen = screens.find(s => s.source === screenName);
+        if (targetScreen && targetScreen.result === "No effect") {
+            noEffectGenes.push({ gene, description: `No effect in ${screenName}` });
+        }
+    });
+    
+    return formatListResult(`Genes with No Effect in ${screenName}`, noEffectGenes);
+}
+
+async function getGeneExpression(gene) {
+    await fetchTissueData();
+    const expressionData = window.tissueDataCache[gene];
+    
+    if (!expressionData) {
+        return `<div class="result-card"><h3>Expression of ${gene}</h3><p class="status-not-found">No expression data available.</p></div>`;
+    }
+    
+    const tissues = Object.entries(expressionData)
+        .sort(([,a], [,b]) => b - a)
+        .slice(0, 10)
+        .map(([tissue, value]) => `${tissue}: ${value.toFixed(2)} nTPM`)
+        .join("; ");
+    
+    return formatGeneDetail(null, gene, "Tissue Expression", tissues);
+}
+
+async function getGeneExpressionPattern(gene) {
+    await fetchTissueData();
+    const expressionData = window.tissueDataCache[gene];
+    
+    if (!expressionData) {
+        return `<div class="result-card"><h3>Expression Pattern of ${gene}</h3><p class="status-not-found">No expression data available.</p></div>`;
+    }
+    
+    // Return the data for heatmap visualization
+    const resultArea = document.getElementById('ai-result-area');
+    displayCiliAIExpressionHeatmap([gene], resultArea, window.tissueDataCache);
+    return ""; // The heatmap function handles the display
+}
+
+async function getTissueSpecificGenes(tissue) {
+    await fetchTissueData();
+    await fetchCiliaData();
+    
+    const ciliaryGenes = new Set(ciliaHubDataCache.map(g => g.gene.toUpperCase()));
+    const tissueGenes = [];
+    
+    Object.entries(window.tissueDataCache).forEach(([gene, tissues]) => {
+        if (ciliaryGenes.has(gene.toUpperCase()) && tissues[tissue]) {
+            tissueGenes.push({
+                gene,
+                description: `nTPM: ${tissues[tissue].toFixed(2)}`,
+                nTPM: tissues[tissue]
+            });
+        }
+    });
+    
+    tissueGenes.sort((a, b) => b.nTPM - a.nTPM);
+    const topGenes = tissueGenes.slice(0, 50).map(g => ({ gene: g.gene, description: g.description }));
+    
+    return formatListResult(`Ciliary Genes Highly Expressed in ${tissue}`, topGenes);
+}
+
+async function compareGeneExpression(genes, tissues) {
+    await fetchTissueData();
+    
+    let comparisonHtml = `<div class="result-card"><h3>Expression Comparison</h3>`;
+    
+    genes.forEach(gene => {
+        comparisonHtml += `<h4>${gene}</h4>`;
+        const expressionData = window.tissueDataCache[gene];
+        
+        if (!expressionData) {
+            comparisonHtml += `<p>No expression data available</p>`;
+        } else {
+            tissues.forEach(tissue => {
+                const value = expressionData[tissue] || 0;
+                comparisonHtml += `<p>${tissue}: ${value.toFixed(2)} nTPM</p>`;
+            });
+        }
+    });
+    
+    comparisonHtml += `</div>`;
+    return comparisonHtml;
+}
+
+async function getGeneConservation(gene) {
+    await fetchPhylogenyData();
+    const conservationData = phylogenyDataCache[gene.toUpperCase()];
+    
+    if (!conservationData) {
+        return `<div class="result-card"><h3>Conservation of ${gene}</h3><p class="status-not-found">No conservation data available.</p></div>`;
+    }
+    
+    const speciesList = conservationData.species?.join(", ") || "No species data";
+    const category = conservationData.category || "Unknown category";
+    
+    return formatGeneDetail(null, gene, "Evolutionary Conservation", 
+        `Category: ${category}<br>Species: ${speciesList}`);
+}
+
+async function checkConservation(gene, organism) {
+    await fetchPhylogenyData();
+    const conservationData = phylogenyDataCache[gene.toUpperCase()];
+    
+    if (!conservationData) {
+        return `<div class="result-card"><h3>Conservation of ${gene}</h3><p class="status-not-found">No conservation data available.</p></div>`;
+    }
+    
+    const isConserved = conservationData.species?.some(s => 
+        s.toLowerCase().includes(organism.toLowerCase())
+    ) || false;
+    
+    const status = isConserved ? 
+        `Yes, ${gene} is conserved in ${organism}` : 
+        `No, ${gene} is not conserved in ${organism}`;
+    
+    return formatGeneDetail(null, gene, `Conservation in ${organism}`, status);
+}
+
+async function getCiliaryOnlyGenes() {
+    const result = await getPhylogenyGenes({ type: 'ciliary_only_list' });
+    return formatListResult(result.label, result.genes);
+}
+
+async function getConservedGenesBetween(organisms) {
+    await fetchPhylogenyData();
+    await fetchCiliaData();
+    
+    const ciliaryGenes = new Set(ciliaHubDataCache.map(g => g.gene.toUpperCase()));
+    const conservedGenes = [];
+    
+    Object.entries(phylogenyDataCache).forEach(([gene, data]) => {
+        if (ciliaryGenes.has(gene.toUpperCase()) && data.species) {
+            const hasAllOrganisms = organisms.every(org => 
+                data.species.some(s => s.toLowerCase().includes(org.toLowerCase()))
+            );
+            
+            if (hasAllOrganisms) {
+                conservedGenes.push({
+                    gene: data.sym || gene,
+                    description: `Conserved in ${organisms.join(" and ")}`
+                });
+            }
+        }
+    });
+    
+    return formatListResult(`Ciliary Genes Conserved Between ${organisms.join(" and ")}`, conservedGenes);
+}
+
+async function getOrthologsInOrganism(organism) {
+    const result = await getCiliaryGenesForOrganism(organism);
+    return formatListResult(`Human Ciliary Genes with Orthologs in ${organism}`, result.genes, result.description);
+}
+
+// =============================================================================
+// UPDATE INTENT PARSER WITH ADDITIONAL KEYWORDS
+// =============================================================================
+
+// Update the intent parser to include the new question types
+function updateIntentParser() {
+    // Add new keywords to existing entity types
+    const functionalCategory = intentParser.getKnownKeywords().find(e => e.type === 'FUNCTIONAL_CATEGORY');
+    if (functionalCategory) {
+        functionalCategory.keywords.push(
+            'cilium assembly', 'motility', 'trafficking', 'membrane composition',
+            'post-translational modification', 'cell cycle', 'development'
+        );
+    }
+    
+    // Add new complex types
+    const complexType = intentParser.getKnownKeywords().find(e => e.type === 'COMPLEX');
+    if (complexType) {
+        complexType.keywords.push(
+            'IFT-A', 'IFT-B', 'MKS Complex', 'NPHP Complex', 'Transition Zone Complex'
+        );
+    }
+    
+    console.log('Intent parser updated with new question keywords');
+}
+
+// Call this after setting up the intent parser
+setTimeout(updateIntentParser, 1000);
+
+
 // =============================================================================
 // NEW: Helper function to get comprehensive details for "Tell me about..." queries
 // =============================================================================
