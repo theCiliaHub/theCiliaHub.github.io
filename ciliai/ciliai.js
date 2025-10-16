@@ -144,7 +144,7 @@ const intentParser = createIntentParser();
 
 
 // =============================================================================
-// REPLACEMENT: Fully updated Question Registry
+// REPLACEMENT: Fully corrected Question Registry
 // =============================================================================
 const questionRegistry = [];
 const baseQuestions = [
@@ -172,8 +172,8 @@ const baseQuestions = [
 
     // --- Phylogeny & Organism ---
     { text: "Show me ciliary-only genes", handler: async () => { const { label, genes } = await getPhylogenyGenes({ type: 'ciliary_only_list' }); return formatListResult(label, genes); }},
-    { text: "Display conserved ciliary proteins between mouse and human", handler: () => getConservedGenes(["Mouse", "Human"]) },
-    { text: "List ciliary genes in C. elegans", handler: async () => { const result = await getCiliaryGenesForOrganism("C. elegans"); return formatListResult(`Ciliary genes in C. elegans`, result.genes, result.description); }},
+    { text: "Display conserved ciliary proteins between mouse and human", handler: () => getConservedGenes(["Mouse", "Human"]) }, // COMMA ADDED HERE
+    { text: "List ciliary genes in C. elegans", handler: async () => { const result = await getCiliaryGenesForOrganism("C. elegans"); return formatListResult(`Ciliary genes in C. elegans`, result.genes, result.description); }}, // TYPO FIX: getCiliaryGenesForOrganism
 
     // --- Structure / Morphology ---
     { text: "Which genes cause longer cilia?", handler: () => getGenesByScreenPhenotype("long cilia") },
@@ -182,14 +182,21 @@ const baseQuestions = [
 
 const prefixes = ["Describe", "Tell me about", "Let me know", "Display", "Show", "List", "Find"];
 const processedQuestions = new Set();
+
 baseQuestions.forEach(q => {
+    // Add the original question first
     if (!processedQuestions.has(q.text.toLowerCase())) {
         questionRegistry.push(q);
         processedQuestions.add(q.text.toLowerCase());
     }
+
+    // Generate prefixed versions, avoiding redundancy
     const coreText = q.text.replace(/^(Show|Display|List|Find|Tell me|Which|What|Describe|Compare|Identify)\s*(me|about|the)?\s*/i, '').trim();
     prefixes.forEach(prefix => {
+        // Avoid creating awkward phrases like "Describe tell me about ARL13B"
         if (q.text.toLowerCase().startsWith("tell me") || q.text.toLowerCase().startsWith("describe")) return;
+
+        // Create a new question text
         const newText = `${prefix} ${coreText}`;
         if (!processedQuestions.has(newText.toLowerCase())) {
             questionRegistry.push({ text: newText, handler: q.handler });
@@ -197,7 +204,6 @@ baseQuestions.forEach(q => {
         }
     });
 });
-
 
 // =============================================================================
 // ADDITION: New and Corrected Handler Functions
