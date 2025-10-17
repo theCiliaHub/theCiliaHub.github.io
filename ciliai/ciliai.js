@@ -3,6 +3,8 @@ let ciliaHubDataCache = null;
 let screenDataCache = null;
 let phylogenyDataCache = null;
 // Note: tissueDataCache is attached to the window object in its function
+// --- ADDITION: New function to fetch and parse Cellxgene data ---
+let cellxgeneDataCache = null;
 
 // --- Fallback Data ---
 const FALLBACK_CILIOPATHY_GENES = [
@@ -204,7 +206,9 @@ const questionRegistry = [
     // --- 8. Predict / Identify ---
     { text: "Predict potential ciliary genes using co-expression data", handler: async () => notImplementedYet("Prediction of ciliary genes") },
     { text: "Identify candidate ciliary kinases", handler: async () => notImplementedYet("Identification of candidate kinases") },
-    { text: "List novel ciliary proteins not yet annotated", handler: async () => notImplementedYet("Discovery of novel ciliary proteins") }
+    { text: "List novel ciliary proteins not yet annotated", handler: async () => notImplementedYet("Discovery of novel ciliary proteins") },
+    {text: "What is the expression of ARL13B in ciliated cells?", handler: async () => getGeneExpressionInCellType("ARL13B", "ciliated cell")},
+    {text: "Show expression of FOXJ1 in ciliated cells", handler: async () => getGeneExpressionInCellType("FOXJ1", "ciliated cell")}
 ];
 
 
@@ -960,7 +964,7 @@ window.displayCiliAIPage = async function displayCiliAIPage() {
         return;
     }
 
-    await Promise.all([fetchCiliaData(), fetchScreenData(), fetchPhylogenyData(), fetchTissueData()]);
+    await Promise.all([fetchCiliaData(), fetchScreenData(), fetchPhylogenyData(), fetchTissueData(), fetchCellxgeneData()]);
     console.log('ciliAI.js: All data loaded');
     
     setTimeout(setupCiliAIEventListeners, 0);
@@ -1120,6 +1124,32 @@ async function fetchTissueData() {
 }
 window.fetchTissueData = fetchTissueData;
 
+async function fetchCellxgeneData() {
+    // Check if data is already in cache
+    if (cellxgeneDataCache) return cellxgeneDataCache;
+
+    // Use the correct Raw URL you've provided
+    const dataUrl = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/cellxgene_data.json';
+
+    try {
+        console.log('Fetching Cellxgene single-cell data...');
+        const response = await fetch(dataUrl);
+        if (!response.ok) {
+            throw new Error(`HTTP error! Status: ${response.status}`);
+        }
+        const jsonData = await response.json();
+        
+        cellxgeneDataCache = jsonData;
+        
+        console.log(`✅ Cellxgene data loaded successfully for ${Object.keys(jsonData).length} genes.`);
+        return cellxgeneDataCache;
+
+    } catch (error) {
+        console.error('Failed to fetch or parse Cellxgene data:', error);
+        cellxgeneDataCache = null; // Set to null on failure
+        return null;
+    }
+}
 
 
 // --- Main AI Query Handler ---
@@ -1369,7 +1399,7 @@ window.handleAIQuery = async function() {
 
     resultArea.style.display = 'block';
     resultArea.innerHTML = `<p class="status-searching">CiliAI is thinking...</p>`;
-    await Promise.all([fetchCiliaData(), fetchScreenData(), fetchTissueData()]);
+    await Promise.all([fetchCiliaData(), fetchScreenData(), fetchPhylogenyData(), fetchTissueData(), fetchCellxgeneData()]);
 
     let resultHtml = '';
     const qLower = query.toLowerCase();
@@ -1856,6 +1886,44 @@ function setupCiliAIEventListeners() {
     }
   });
 }
+
+// --- ADDITION: New handler to query gene expression in specific cell types ---
+async function getGeneExpressionInCellType(gene, cellType) {
+    if (!cellxgeneDataCache) await fetchCellxgeneData();
+    
+    if (!cellxgeneDataCache) {
+        return `<div class="result-card"><h3>Cell-Specific Expression</h3><p class="status-not-found">Could not load the single-cell expression dataset. Please check the console for errors.</p></div>`;
+    }
+
+    const geneUpper = gene.toUpperCase();
+    const geneData = cellxgeneDataCache[geneUpper];
+
+    if (!geneData) {
+        return `<div class="result-card"><h3>${gene} in ${cellType}</h3><p class="status-not-found">Gene "${gene}" was not found in the single-cell dataset.</p></div>`;
+    }
+
+    // Find the closest matching cell type (case-insensitive)
+    const queryCellTypeLower = cellType.toLowerCase();
+    let bestMatch = Object.keys(geneData).find(
+        key => key.toLowerCase().includes(queryCellTypeLower)
+    );
+
+    if (!bestMatch) {
+        return `<div class="result-card"><h3>${gene} in ${cellType}</h3><p class="status-not-found">Cell type containing "${cellType}" was not found for this gene. Available types include: ${Object.keys(geneData).slice(0, 3).join(', ')}...</p></div>`;
+    }
+
+    const expressionValue = geneData[bestMatch];
+
+    return `
+    <div class="result-card">
+        <h3>Expression of ${gene} in ${bestMatch}</h3>
+        <p><strong>Normalized Expression:</strong> ${expressionValue.toFixed(4)}</p>
+        <p style="font-size: 0.8em; color: #666; margin-top: 1rem; border-top: 1px solid #eee; padding-top: 0.5rem;">
+            Data from Cellxgene dataset: a2011f35-04c4-427f-80d1-27ee0670251d
+        </p>
+    </div>`;
+}
+
 
 /**
  * Main handler when a gene (or list of genes) is selected in CiliAI
