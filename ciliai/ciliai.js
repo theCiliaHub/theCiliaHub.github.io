@@ -25,7 +25,7 @@ const CILI_AI_DB = {
 // REPLACEMENT: The definitive "Brain" of CiliAI, merging all features correctly.
 // =============================================================================
 function createIntentParser() {
-    // Correctly classified diseases are preserved.
+    // RESTORED: Your full, comprehensive list of diseases.
     const classifiedDiseases = {
         "Primary Ciliopathies": [
             "Acrocallosal Syndrome", "Alström Syndrome", "Autosomal Dominant Polycystic Kidney Disease",
@@ -36,7 +36,7 @@ function createIntentParser() {
             "Al-Gazali-Bakalinova Syndrome", "Bazex-Dupré-Christol Syndrome", "Bilateral Polycystic Kidney Disease", "Biliary, Renal, Neurologic, and Skeletal Syndrome",
             "Caroli Disease", "Carpenter Syndrome", "Complex Lethal Osteochondrodysplasia", "Greig Cephalopolysyndactyly Syndrome", "Kallmann Syndrome", "Lowe Oculocerebrorenal Syndrome",
             "McKusick-Kaufman Syndrome", "Morbid Obesity and Spermatogenic Failure", "Polycystic Kidney Disease", "RHYNS Syndrome", "Renal-hepatic-pancreatic Dysplasia", "Retinal Dystrophy", "STAR Syndrome",
-            "Smith-Lemli-Opitz Syndrome", "Spondylometaphyseal Dysplasia", "Stromme Syndrome", "Weyers Acrofacial Dysostosis"
+            "Smith-Lemli-Opitz Syndrome", "Spondylometaphyseal Dysplasia", "Stromme Syndrome", "Weyers Acrofacial Dysostosis", "Hydrocephalus"
         ],
         "Motile Ciliopathies": [
             "Primary Ciliary Dyskinesia", "Birt-Hogg-Dubé Syndrome", "Juvenile Myoclonic Epilepsy"
@@ -49,15 +49,17 @@ function createIntentParser() {
     const allDiseases = [...Object.values(classifiedDiseases).flat(), ...aliases];
 
     const entityKeywords = [
-        // ADDED: The new functional categories are now correctly included.
-        { 
+        {
             type: 'FUNCTIONAL_CATEGORY',
             keywords: ['kinesin motors', 'dynein motors', 'Ciliary assembly/disassembly', 'Signaling', 'Motile cilium', 'Motor protein', 'Transport', 'Protein modification', 'Cytoskeletal'],
-            handler: async (term) => getGenesByFunction(term),
+            handler: async (term) => {
+                const results = await getGenesByFunction(term);
+                return formatListResult(`Genes in Functional Category: ${term}`, results);
+            },
             autocompleteTemplate: (term) => `Show me ${term} genes`
         },
-        { 
-            type: 'COMPLEX', 
+        {
+            type: 'COMPLEX',
             keywords: ['BBSome', 'IFT-A', 'IFT-B', 'Transition Zone Complex', 'MKS Complex', 'NPHP Complex'],
             handler: async (term) => {
                 const results = await getGenesByComplex(term);
@@ -65,11 +67,11 @@ function createIntentParser() {
             },
             autocompleteTemplate: (term) => `Display components of ${term} complex`
         },
-        { 
-            type: 'CILIOPATHY', 
-            keywords: [...new Set(allDiseases)],
+        {
+            type: 'CILIOPATHY',
+            keywords: [...new Set(allDiseases)], // Using the full, restored disease list
             handler: async (term) => {
-                const titleTerm = term.toUpperCase() === 'BBS' ? 'Bardet–Biedl Syndrome' : 
+                const titleTerm = term.toUpperCase() === 'BBS' ? 'Bardet–Biedl Syndrome' :
                                   term.toUpperCase() === 'MKS' ? 'Meckel–Gruber Syndrome' : term;
                 const { genes, description } = await getCiliopathyGenes(term);
                 return formatListResult(`Genes for ${titleTerm}`, genes, description);
@@ -87,23 +89,22 @@ function createIntentParser() {
         },
         {
             type: 'ORGANISM',
-            // PRESERVED: The full, comprehensive list of organisms is correctly included.
             keywords: [
-                "Prokaryote", "E.cuniculi", "E.histolytica", "E.dispar", "G.lamblia", "T.vaginalis", "T.brucei", "T.cruzi", "L.infantum", 
-                "L.major", "L.braziliensis", "T.gondii", "C.hominis", "C.parvum", "B.bovis", "T.annulata", "T.parva", "P.knowlesi", "P.vivax", 
-                "P.falciparum", "P.chabaudi", "P.berghei", "P.yoelii", "P.tetraurelia", "T.thermophila", "P.infestans", "T.pseudonana", 
-                "P.tricornutum", "C.merolae", "N.gruberi", "O.lucimarinus", "O.tauri", "C.reinhardtii", "V.carteri", "P.patens", 
-                "S.moellendorffii", "S.bicolor", "Z.mays", "O.sativa", "B.distachyon", "A.lyrata", "A.thaliana", "L.japonicus", "M.truncatula", 
-                "V.vinifera", "P.trichocarpa", "R.communis", "T.trahens", "D.discoideum", "A.macrogynus", "S.punctatus", "M.globosa", "U.maydis", 
-                "C.neoformans", "P.chrysosporium", "S.commune", "C.cinerea", "L.bicolor", "S.pombe", "B.fuckeliana", "S.sclerotiorum", 
-                "F.graminearum", "M.grisea", "N.crassa", "P.anserina", "P.chrysogenum", "A.clavatus", "A.fumigatus", "N.fischeri", "A.flavus", 
-                "A.oryzae", "A.niger", "A.nidulans", "U.reesii", "C.immitis", "C.posadasii", "P.nodorum", "T.melanosporum", "Y.lipolytica", 
-                "P.pastoris", "C.lusitaniae", "D.hansenii", "M.guilliermondii", "S.stipitis", "L.elongisporus", "C.tropicalis", "C.albicans", 
-                "C.dubliniensis", "K.lactis", "A.gossypii", "K.waltii", "L.thermotolerans", "Z.rouxii", "V.polyspora", "C.glabrata", "S.bayanus", 
-                "S.mikatae", "S.cerevisiae", "S.paradoxus", "S.arctica", "C.owczarzaki", "M.brevicollis", "S.rosetta", "S.mansoni", "B.malayi", 
-                "C.briggsae", "C.elegans", "D.pulex", "A.pisum", "P.humanus", "A.mellifera", "N.vitripennis", "B.mori", "T.castaneum", 
-                "D.melanogaster", "D.pseudoobscura", "A.gambiae", "A.aegypti", "C.quinquefasciatus", "B.floridae", "T.adhaerens", "S.purpuratus", 
-                "H.magnipapillata", "N.vectensis", "C.intestinalis", "D.rerio", "O.latipes", "F.rubripes", "T.nigroviridis", "X.tropicalis", 
+                "Prokaryote", "E.cuniculi", "E.histolytica", "E.dispar", "G.lamblia", "T.vaginalis", "T.brucei", "T.cruzi", "L.infantum",
+                "L.major", "L.braziliensis", "T.gondii", "C.hominis", "C.parvum", "B.bovis", "T.annulata", "T.parva", "P.knowlesi", "P.vivax",
+                "P.falciparum", "P.chabaudi", "P.berghei", "P.yoelii", "P.tetraurelia", "T.thermophila", "P.infestans", "T.pseudonana",
+                "P.tricornutum", "C.merolae", "N.gruberi", "O.lucimarinus", "O.tauri", "C.reinhardtii", "V.carteri", "P.patens",
+                "S.moellendorffii", "S.bicolor", "Z.mays", "O.sativa", "B.distachyon", "A.lyrata", "A.thaliana", "L.japonicus", "M.truncatula",
+                "V.vinifera", "P.trichocarpa", "R.communis", "T.trahens", "D.discoideum", "A.macrogynus", "S.punctatus", "M.globosa", "U.maydis",
+                "C.neoformans", "P.chrysosporium", "S.commune", "C.cinerea", "L.bicolor", "S.pombe", "B.fuckeliana", "S.sclerotiorum",
+                "F.graminearum", "M.grisea", "N.crassa", "P.anserina", "P.chrysogenum", "A.clavatus", "A.fumigatus", "N.fischeri", "A.flavus",
+                "A.oryzae", "A.niger", "A.nidulans", "U.reesii", "C.immitis", "C.posadasii", "P.nodorum", "T.melanosporum", "Y.lipolytica",
+                "P.pastoris", "C.lusitaniae", "D.hansenii", "M.guilliermondii", "S.stipitis", "L.elongisporus", "C.tropicalis", "C.albicans",
+                "C.dubliniensis", "K.lactis", "A.gossypii", "K.waltii", "L.thermotolerans", "Z.rouxii", "V.polyspora", "C.glabrata", "S.bayanus",
+                "S.mikatae", "S.cerevisiae", "S.paradoxus", "S.arctica", "C.owczarzaki", "M.brevicollis", "S.rosetta", "S.mansoni", "B.malayi",
+                "C.briggsae", "C.elegans", "D.pulex", "A.pisum", "P.humanus", "A.mellifera", "N.vitripennis", "B.mori", "T.castaneum",
+                "D.melanogaster", "D.pseudoobscura", "A.gambiae", "A.aegypti", "C.quinquefasciatus", "B.floridae", "T.adhaerens", "S.purpuratus",
+                "H.magnipapillata", "N.vectensis", "C.intestinalis", "D.rerio", "O.latipes", "F.rubripes", "T.nigroviridis", "X.tropicalis",
                 "G.gallus", "M.gallopavo", "O.anatinus", "M.domestica", "S.scrofa", "M.musculus", "C.familiaris", "B.taurus", "H.sapiens",
                 "worm", "human", "mouse", "zebrafish", "fly", "yeast"
             ],
@@ -132,7 +133,7 @@ function createIntentParser() {
                 for (const keyword of sortedKeywords) {
                     const keywordRegex = new RegExp(`\\b${normalizeTerm(keyword).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`);
                     if (keywordRegex.test(normalizedQuery)) {
-                         return { intent: entityType.type, entity: keyword, handler: entityType.handler };
+                        return { intent: entityType.type, entity: keyword, handler: entityType.handler };
                     }
                 }
             }
@@ -143,59 +144,74 @@ function createIntentParser() {
         getAllComplexes: () => entityKeywords.find(e => e.type === 'COMPLEX').keywords
     };
 }
+
 const intentParser = createIntentParser();
+
 // =============================================================================
 // ADDITION: The new Question Registry and its required placeholder functions.
 // Place this code block after your CILI_AI_DB object.
 // =============================================================================
-// =============================================================================
-// REPLACEMENT: Corrected Question Registry
-// All handlers now await data and then call a formatting function.
-// =============================================================================
 const questionRegistry = [
-    // --- Localization Questions ---
-    { text: "Show all genes found at the transition zone", handler: async () => formatListResult("Genes at Transition Zone", await getGenesByLocalization("transition zone")) },
-    { text: "Show proteins in transition zone", handler: async () => formatListResult("Proteins in Transition Zone", await getGenesByLocalization("transition zone")) },
-    { text: "Which genes localize to axoneme?", handler: async () => formatListResult("Genes Localizing to Axoneme", await getGenesByLocalization("axoneme")) },
-    { text: "Find genes localized to basal body", handler: async () => formatListResult("Genes Localizing to Basal Body", await getGenesByLocalization("basal body")) },
-    { text: "Show transition fiber proteins", handler: async () => formatListResult("Transition Fiber Proteins", await getGenesByLocalization("transition fiber")) },
-    { text: "Display genes at ciliary tip", handler: async () => formatListResult("Genes at Ciliary Tip", await getGenesByLocalization("ciliary tip")) },
+    // --- 1. Evolutionary / Conserved ---
+    { text: "Show evolutionary conservation of IFT88", handler: async () => getGeneConservation("IFT88") },
+    { text: "List conserved ciliary genes between C. elegans and humans", handler: async () => getConservedGenesBetween(["C. elegans", "H.sapiens"]) },
+    { text: "Which cilia-related genes are conserved in mammals?", handler: async () => getConservedGenesBetween(["H.sapiens", "M.musculus"]) },
+    { text: "Describe the conservation level of CC2D1A in vertebrates", handler: async () => getGeneConservation("CC2D1A") },
+    { text: "Which ciliary proteins have nematode and vertebrate homologs?", handler: async () => getConservedGenesBetween(["C. elegans", "H.sapiens", "M.musculus", "D.rerio"]) },
+    { text: "What is the phylogeny of IFT88?", handler: async () => getGeneConservation("IFT88") },
+    { text: "Evolutionary conservation of ARL13B", handler: async () => getGeneConservation("ARL13B") },
+
+    // --- 2. List / Show / Display ---
+    { text: "List all genes localized to the transition zone", handler: async () => formatListResult("Genes at Transition Zone", await getGenesByLocalization("transition zone")) },
+    { text: "Show genes expressed in ciliated neurons", handler: async () => notImplementedYet("Genes expressed in ciliated neurons (requires cell-type specific expression data)") },
+    { text: "Display ciliary transport genes in C. elegans", handler: async () => { const { genes, description, speciesCode } = await getCiliaryGenesForOrganism("C. elegans", "Transport"); return formatListResult(`Transport genes in ${speciesCode}`, genes, description); }},
+    { text: "Give me the list of BBSome components", handler: async () => formatListResult("Components of BBSome", await getGenesByComplex("BBSome")) },
+    { text: "Let me know which genes affect cilia length", handler: async () => getGenesByScreenPhenotype("cilia length") },
+    { text: "Find all genes involved in intraflagellar transport (IFT)", handler: async () => formatListResult("IFT Genes", await getGenesByFunction("Transport")) },
+    { text: "Tell me which kinases are associated with cilia", handler: async () => formatListResult("Ciliary Kinases", await getGenesByDomainDescription("kinase")) },
+    { text: "List all disease genes causing Joubert syndrome", handler: async () => { const { genes, description } = await getCiliopathyGenes("Joubert Syndrome"); return formatListResult("Genes for Joubert Syndrome", genes, description); }},
     
-    // --- Disease Association Questions ---
-    { text: "Show genes for Joubert Syndrome", handler: async () => { const { genes, description } = await getCiliopathyGenes("Joubert Syndrome"); return formatListResult("Genes for Joubert Syndrome", genes, description); }},
-    { text: "Show genes for Bardet-Biedl Syndrome", handler: async () => { const { genes, description } = await getCiliopathyGenes("Bardet-Biedl Syndrome"); return formatListResult("Genes for Bardet-Biedl Syndrome", genes, description); }},
-    { text: "Display genes associated with Meckel-Gruber Syndrome", handler: async () => { const { genes, description } = await getCiliopathyGenes("Meckel-Gruber Syndrome"); return formatListResult("Genes for Meckel-Gruber Syndrome", genes, description); }},
-    { text: "List genes for Primary Ciliary Dyskinesia", handler: async () => { const { genes, description } = await getCiliopathyGenes("Primary Ciliary Dyskinesia"); return formatListResult("Genes for Primary Ciliary Dyskinesia", genes, description); }},
-    { text: "Find genes linked to Leber congenital amaurosis", handler: async () => { const { genes, description } = await getCiliopathyGenes("Leber congenital amaurosis"); return formatListResult("Genes for Leber congenital amaurosis", genes, description); }},
-    { text: "List all diseases linked to NPHP1", handler: async () => getGeneDiseases("NPHP1") },
-    { text: "What ciliopathies are associated with mutations in MKS1?", handler: async () => getGeneDiseases("MKS1") },
+    // --- 3. Describe / What is / Explain ---
+    { text: "Describe the function of KIF17", handler: async () => getGeneFunction("KIF17") }, // OSM-3 homolog
+    { text: "What is the role of CC2D1A in cilia?", handler: async () => getGeneFunction("CC2D1A") },
+    { text: "Explain how CILK1 regulates cilia length", handler: async () => getGeneFunction("CILK1") },
+    { text: "What does ARL13B do in ciliary signaling?", handler: async () => getGeneRole("ARL13B", "ciliary signaling") },
+    { text: "Describe the localization of EFCAB7", handler: async () => getGeneLocalization("EFCAB7") },
+    { text: "Explain how the BBSome complex is assembled", handler: async () => notImplementedYet("Detailed mechanism of BBSome assembly") },
+    { text: "What is the function of IFT-A and IFT-B complexes?", handler: async () => compareComplexes("IFT-A", "IFT-B") },
+
+    // --- 4. Cilia-specific domain / Structure ---
+    { text: "Show cilia-specific domains of KIF17", handler: async () => getGeneDomains("KIF17") }, // OSM-3 homolog
+    { text: "Which domains of ARL13B mediate ciliary localization?", handler: async () => getGeneDomains("ARL13B") },
+    { text: "List proteins with ciliary targeting sequences (CTS)", handler: async () => formatListResult("Proteins with CTS", await getGenesWithDomain("CTS")) },
+    { text: "Describe structural domains of IFT172", handler: async () => getGeneDomains("IFT172") },
+    { text: "Which genes contain coiled-coil domains involved in ciliogenesis?", handler: async () => formatListResult("Ciliogenesis Genes with Coiled-Coil Domains", await getGenesWithDomain("coiled-coil")) },
     
-    // --- Protein Structure & Complexes ---
-    { text: "List all components of the BBSome complex", handler: async () => formatListResult("Components of BBSome", await getGenesByComplex("BBSome")) },
-    { text: "Display components of IFT-A complex", handler: async () => formatListResult("Components of IFT-A", await getGenesByComplex("IFT-A")) },
-    { text: "Display components of IFT-B complex", handler: async () => formatListResult("Components of IFT-B", await getGenesByComplex("IFT-B")) },
-    { text: "Show components of Transition Zone Complex", handler: async () => formatListResult("Components of Transition Zone Complex", await getGenesByComplex("Transition Zone Complex")) },
-    { text: "Display components of MKS Complex", handler: async () => formatListResult("Components of MKS Complex", await getGenesByComplex("MKS Complex")) },
-    { text: "Show components of NPHP Complex", handler: async () => formatListResult("Components of NPHP Complex", await getGenesByComplex("NPHP Complex")) },
-    { text: "Show protein domains of WDR35", handler: async () => getGeneDomains("WDR35") },
+    // --- 5. Functional category / Pathway ---
+    { text: "List genes involved in ciliary signaling pathways", handler: async () => formatListResult("Ciliary Signaling Genes", await getGenesByFunction("Signaling")) },
+    { text: "Show components of the Hedgehog signaling in cilia", handler: async () => getHedgehogRegulators("all") },
+    { text: "Which genes function in retrograde IFT?", handler: async () => formatListResult("Retrograde IFT Genes", await getGenesByFunction("retrograde IFT")) },
+    { text: "Display genes required for basal body docking", handler: async () => formatListResult("Basal Body Docking Genes", await getGenesByFunction("basal body docking")) },
+    { text: "List proteins involved in cilia assembly and maintenance", handler: async () => formatListResult("Cilia Assembly/Maintenance Genes", await getGenesByFunction("Ciliary assembly")) },
+    { text: "Which genes are part of the ciliogenesis pathway?", handler: async () => formatListResult("Ciliogenesis Pathway Genes", await getGenesByFunction("Ciliary assembly")) },
+
+    // --- 6. Ciliary disease / Syndrome / Phenotype ---
+    { text: "List genes associated with Bardet–Biedl syndrome", handler: async () => { const { genes, description } = await getCiliopathyGenes("Bardet–Biedl syndrome"); return formatListResult("Genes for Bardet–Biedl syndrome", genes, description); }},
+    { text: "Show mutations in CILK1 causing cranioectodermal dysplasia", handler: async () => getGeneDiseases("CILK1") },
+    { text: "Display phenotypes observed in ift88 mutants", handler: async () => getKnockdownEffect("IFT88") },
+    { text: "Which ciliary diseases are linked to transition zone defects?", handler: async () => notImplementedYet("Diseases linked to TZ defects") },
+    { text: "Describe the phenotype of efcab7 loss in C. elegans", handler: async () => notImplementedYet("Phenotype of efcab7 loss in C. elegans") },
+    { text: "Find all genes associated with ciliopathies", handler: async () => { const { genes, description } = await getCiliopathyGenes("ciliopathy"); return formatListResult("All Ciliopathy-Associated Genes", genes, description); }},
+
+    // --- 7. Comparison / Difference ---
+    { text: "Compare IFT-A and IFT-B complex composition", handler: async () => compareComplexes("IFT-A", "IFT-B") },
+    { text: "What’s the difference between KIF17 and KIF3A functions?", handler: async () => compareGenes("KIF17", "KIF3A") },
+    { text: "Compare cilia gene expression in C. elegans and mouse", handler: async () => notImplementedYet("Cross-species expression comparison") },
     
-    // --- Functional Categories ---
-    { text: "Show me motor genes", handler: async () => formatListResult("Motor Genes", await getGenesByFunction("motor")) },
-    { text: "Display kinesin motors", handler: async () => formatListResult("Kinesin Motors", await getGenesByFunction("kinesin motors")) },
-    { text: "Show me dynein motors", handler: async () => formatListResult("Dynein Motors", await getGenesByFunction("dynein motors")) },
-    { text: "Show me Ciliary assembly/disassembly genes", handler: async () => formatListResult("Ciliary Assembly/Disassembly Genes", await getGenesByFunction("Ciliary assembly/disassembly")) },
-    { text: "Display Signaling genes", handler: async () => formatListResult("Signaling Genes", await getGenesByFunction("Signaling")) },
-    { text: "Show me Motile cilium genes", handler: async () => formatListResult("Motile Cilium Genes", await getGenesByFunction("Motile cilium")) },
-    
-    // --- Protein Domain Questions ---
-    { text: "Show WD40 domain containing proteins", handler: async () => formatListResult("WD40 Domain Proteins", await getGenesWithDomain("WD40")) },
-    { text: "Display Leucine-rich repeat domain proteins", handler: async () => formatListResult("Leucine-Rich Repeat Proteins", await getGenesWithDomain("Leucine-rich repeat")) },
-    { text: "Show IQ motif containing proteins", handler: async () => formatListResult("IQ Motif Proteins", await getGenesWithDomain("IQ motif")) },
-    
-    // --- Organism-Specific Questions ---
-    { text: "List ciliary genes in C. elegans", handler: async () => { const { genes, description, speciesCode } = await getCiliaryGenesForOrganism("C. elegans"); return formatListResult(`Ciliary genes in ${speciesCode}`, genes, description); }},
-    { text: "Display ciliary genes in human", handler: async () => { const { genes, description, speciesCode } = await getCiliaryGenesForOrganism("human"); return formatListResult(`Ciliary genes in ${speciesCode}`, genes, description); }},
-    { text: "Show ciliary genes in mouse", handler: async () => { const { genes, description, speciesCode } = await getCiliaryGenesForOrganism("mouse"); return formatListResult(`Ciliary genes in ${speciesCode}`, genes, description); }},
+    // --- 8. Predict / Identify ---
+    { text: "Predict potential ciliary genes using co-expression data", handler: async () => notImplementedYet("Prediction of ciliary genes") },
+    { text: "Identify candidate ciliary kinases", handler: async () => notImplementedYet("Identification of candidate kinases") },
+    { text: "List novel ciliary proteins not yet annotated", handler: async () => notImplementedYet("Discovery of novel ciliary proteins") }
 ];
 
 // Placeholder functions to support the new registry without errors
