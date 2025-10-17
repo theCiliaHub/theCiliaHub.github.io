@@ -148,45 +148,56 @@ const intentParser = createIntentParser();
 // ADDITION: The new Question Registry and its required placeholder functions.
 // Place this code block after your CILI_AI_DB object.
 // =============================================================================
-const questionRegistry = [
-  // --- Gene-specific ---
-  { text: "Tell me about ARL13B", handler: () => getComprehensiveDetails("ARL13B") },
-  { text: "Show interactors of IFT88", handler: () => getProteinInteractions("IFT88") },
-  
-  // --- Disease-related ---
-  { text: "Show genes for Joubert Syndrome", handler: () => getCiliopathyGenes("Joubert Syndrome") },
-  { text: "Show genes for Bardet-Biedl Syndrome", handler: () => getCiliopathyGenes("Bardet-Biedl Syndrome") },
-  { text: "Display genes associated with Meckel-Gruber Syndrome", handler: () => getCiliopathyGenes("Meckel-Gruber Syndrome") },
-  { text: "List genes for Primary Ciliary Dyskinesia", handler: () => getCiliopathyGenes("Primary Ciliary Dyskinesia") },
-  { text: "Find genes linked to Leber congenital amaurosis", handler: () => getCiliopathyGenes("Leber congenital amaurosis") },
-  { text: "Which genes cause cystic kidney disease?", handler: () => getGenesByScreenPhenotype("cystic kidney disease") },
-  { text: "Show genes for cranioectodermal dysplasia", handler: () => getCiliopathyGenes("Cranioectodermal Dysplasia") },
-  { text: "Tell me genes causing short-rib thoracic dysplasia", handler: () => getCiliopathyGenes("Short-rib thoracic dysplasia") },
-  { text: "Display genes related to hydrocephalus", handler: () => getCiliopathyGenes("Hydrocephalus") },
-
-  // --- Localization-based ---
-  { text: "Find genes localized to basal body", handler: () => getGenesByLocalization("Basal body") },
-  { text: "Show proteins in transition zone", handler: () => getGenesByLocalization("Transition zone") },
-  { text: "List components of the BBSome complex", handler: () => getGenesByComplex("BBSome") },
-  { text: "Display genes at ciliary tip", handler: () => getGenesByLocalization("Ciliary tip") },
-  { text: "Which genes localize to axoneme?", handler: () => getGenesByLocalization("Axoneme") },
-  { text: "Show transition fiber proteins", handler: () => getGenesByLocalization("Transition fiber") },
-
-  // --- Mechanism-based ---
-  { text: "Show me motor genes", handler: () => getGenesWithDomain("motor") },
-  { text: "Display kinases regulating cilia length", handler: () => getGenesByDomainDescription("kinase") },
-  { text: "List intraflagellar transport (IFT) components", handler: () => getGenesByComplex("IFT") },
-  { text: "Find IFT-A and IFT-B complex genes", handler: () => getGenesByMultipleComplexes(["IFT-A", "IFT-B"]) },
-  { text: "Which genes are involved in cilium assembly?", handler: () => getGenesByFunction("cilium assembly") },
-
-  // --- Organism-specific ---
-  { text: "List ciliary genes in C. elegans", handler: () => getCiliaryGenesForOrganism("C. elegans").then(result => formatListResult(`Ciliary genes in C. elegans`, result.genes, result.description)) },
-  { text: "Display conserved ciliary proteins between mouse and human", handler: () => getConservedGenes(["Mouse", "Human"]) },
-
-  // --- Structure / Morphology ---
-  { text: "Which genes cause longer cilia?", handler: () => getGenesByScreenPhenotype("long cilia") },
-  { text: "Find genes causing short cilia", handler: () => getGenesByScreenPhenotype("short cilia") }
+const fixedQuestionRegistry = [
+    // --- Localization Questions ---
+    { text: "Show all genes found at the transition zone", handler: () => getGenesByLocalization("transition zone") },
+    { text: "Show proteins in transition zone", handler: () => getGenesByLocalization("transition zone") },
+    { text: "Which genes localize to axoneme?", handler: () => getGenesByLocalization("axoneme") },
+    { text: "Find genes localized to basal body", handler: () => getGenesByLocalization("basal body") },
+    { text: "Show transition fiber proteins", handler: () => getGenesByLocalization("transition fiber") },
+    { text: "Display genes at ciliary tip", handler: () => getGenesByLocalization("ciliary tip") },
+    
+    // --- Disease Association Questions ---
+    { text: "Show genes for Joubert Syndrome", handler: () => getCiliopathyGenes("Joubert Syndrome") },
+    { text: "Show genes for Bardet-Biedl Syndrome", handler: () => getCiliopathyGenes("Bardet-Biedl Syndrome") },
+    { text: "Display genes associated with Meckel-Gruber Syndrome", handler: () => getCiliopathyGenes("Meckel-Gruber Syndrome") },
+    { text: "List genes for Primary Ciliary Dyskinesia", handler: () => getCiliopathyGenes("Primary Ciliary Dyskinesia") },
+    { text: "Find genes linked to Leber congenital amaurosis", handler: () => getCiliopathyGenes("Leber congenital amaurosis") },
+    { text: "List all diseases linked to NPHP1", handler: () => getGeneDiseases("NPHP1") },
+    { text: "What ciliopathies are associated with mutations in MKS1?", handler: () => getGeneDiseases("MKS1") },
+    
+    // --- Protein Structure & Complexes ---
+    { text: "List all components of the BBSome complex", handler: () => getGenesByComplex("BBSome") },
+    { text: "Display components of IFT-A complex", handler: () => getGenesByComplex("IFT-A") },
+    { text: "Display components of IFT-B complex", handler: () => getGenesByComplex("IFT-B") },
+    { text: "Show components of Transition Zone Complex", handler: () => getGenesByComplex("Transition Zone Complex") },
+    { text: "Display components of MKS Complex", handler: () => getGenesByComplex("MKS Complex") },
+    { text: "Show components of NPHP Complex", handler: () => getGenesByComplex("NPHP Complex") },
+    { text: "Show protein domains of WDR35", handler: () => getGeneDomains("WDR35") },
+    
+    // --- Functional Categories ---
+    { text: "Show me motor genes", handler: () => getGenesByFunction("motor") },
+    { text: "Display kinesin motors", handler: () => getGenesByFunction("kinesin motors") },
+    { text: "Show me dynein motors", handler: () => getGenesByFunction("dynein motors") },
+    { text: "Show me Ciliary assembly/disassembly genes", handler: () => getGenesByFunction("Ciliary assembly/disassembly") },
+    { text: "Display Signaling genes", handler: () => getGenesByFunction("Signaling") },
+    { text: "Show me Motile cilium genes", handler: () => getGenesByFunction("Motile cilium") },
+    
+    // --- Protein Domain Questions ---
+    { text: "Show WD40 domain containing proteins", handler: () => getGenesWithDomain("WD40") },
+    { text: "Display Leucine-rich repeat domain proteins", handler: () => getGenesWithDomain("Leucine-rich repeat") },
+    { text: "Show IQ motif containing proteins", handler: () => getGenesWithDomain("IQ motif") },
+    
+    // --- Organism-Specific Questions ---
+    { text: "List ciliary genes in C. elegans", handler: () => getCiliaryGenesForOrganism("C. elegans") },
+    { text: "Display ciliary genes in human", handler: () => getCiliaryGenesForOrganism("human") },
+    { text: "Show ciliary genes in mouse", handler: () => getCiliaryGenesForOrganism("mouse") },
 ];
+
+// Replace the existing question registry with the fixed one
+questionRegistry.length = 0; // Clear the existing array
+fixedQuestionRegistry.forEach(q => questionRegistry.push(q));
+
 
 // Placeholder functions to support the new registry without errors
 function notImplementedYet(feature) {
@@ -945,21 +956,29 @@ async function getCiliopathyGenes(disease) {
     const diseaseRegex = new RegExp(diseaseLower.replace(/\s+/g, '[\\s_\\-–]*').replace('syndrome', '(syndrome)?'), 'i');
     
     const genes = ciliaHubDataCache
-        .filter(g => g.ciliopathy.some(c => normalizeTerm(c).match(diseaseRegex)))
-        .map(g => ({ gene: g.gene, description: g.ciliopathy.join(', ') }))
+        .filter(g => g.ciliopathy && g.ciliopathy.some(c => normalizeTerm(c).match(diseaseRegex)))
+        .map(g => ({ gene: g.gene, description: g.ciliopathy?.join(', ') || 'No ciliopathy data' }))
         .sort((a, b) => a.gene.localeCompare(b.gene));
     
-    return { genes, description: `Found ${genes.length} genes associated with "${disease}".` };
+    return formatListResult(`Genes associated with ${disease}`, genes, `Found ${genes.length} genes associated with "${disease}".`);
 }
+
 
 // Rule 2: Search for genes by one or more localizations
 async function getGenesByLocalization(locations) {
     await fetchCiliaData();
     const locationTerms = locations.split(/\s+or\s+/).map(normalizeTerm);
-    return ciliaHubDataCache
-        .filter(gene => gene.localization.some(loc => locationTerms.includes(normalizeTerm(loc))))
-        .map(gene => ({ gene: gene.gene, description: gene.localization.join(', ') }))
+    const results = ciliaHubDataCache
+        .filter(gene => gene.localization && gene.localization.some(loc => 
+            locationTerms.some(term => normalizeTerm(loc).includes(term))
+        ))
+        .map(gene => ({ 
+            gene: gene.gene, 
+            description: gene.localization?.join(', ') || 'No localization data' 
+        }))
         .sort((a, b) => a.gene.localeCompare(b.gene));
+    
+    return formatListResult(`Genes localizing to ${locations}`, results);
 }
 
 // Rule 5 & 7: General phylogeny-related queries
@@ -1014,13 +1033,21 @@ async function getPhylogenyGenes({ type }) {
 // Rule 6: Search for genes that contain a specific domain
 async function getGenesWithDomain(domainName) {
     await fetchCiliaData();
-    const domainRegex = new RegExp(domainName, 'i');
-    return ciliaHubDataCache
-        .filter(gene => gene.domain_descriptions.some(dd => dd.match(domainRegex)))
-        .map(gene => ({ gene: gene.gene, description: gene.domain_descriptions.join(', ') }))
+    const domainRegex = new RegExp(domainName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+    
+    const results = ciliaHubDataCache
+        .filter(gene => 
+            Array.isArray(gene.domain_descriptions) && 
+            gene.domain_descriptions.some(dd => dd.match(domainRegex))
+        )
+        .map(gene => ({ 
+            gene: gene.gene, 
+            description: `Domains: ${gene.domain_descriptions?.join(', ') || 'No domain data'}` 
+        }))
         .sort((a, b) => a.gene.localeCompare(b.gene));
+    
+    return formatListResult(`${domainName} domain-containing proteins`, results);
 }
-
 
 // Rule 1 & 3: Finds ciliary genes present in a specific organism
 
@@ -1028,101 +1055,69 @@ async function getCiliaryGenesForOrganism(organismName) {
     await fetchCiliaData();
     await fetchPhylogenyData();
     
-    // Step 1: Get a set of all ciliary gene names for fast lookup (Existing Feature)
     const ciliaryGeneSet = new Set(ciliaHubDataCache.map(g => g.gene.toUpperCase()));
-    console.log(`Ciliary genes in cache: ${ciliaHubDataCache.length}, Sample: ${ciliaHubDataCache.slice(0, 5).map(g => g.gene).join(', ')}`);
-
-    // Step 2: Map user-friendly names to species codes (NEW FEATURE: Greatly expanded map)
+    
     const organismMap = {
         'human': 'H.sapiens', 'homo sapiens': 'H.sapiens',
         'mouse': 'M.musculus', 'mus musculus': 'M.musculus',
         'worm': 'C.elegans', 'c. elegans': 'C.elegans', 'caenorhabditis elegans': 'C.elegans',
         'fly': 'D.melanogaster', 'drosophila': 'D.melanogaster', 'drosophila melanogaster': 'D.melanogaster',
         'zebrafish': 'D.rerio', 'danio rerio': 'D.rerio',
-        'yeast': 'S.cerevisiae', 'saccharomyces cerevisiae': 'S.cerevisiae',
-        'arabidopsis': 'A.thaliana', 'a. thaliana': 'A.thaliana',
-        'chicken': 'G.gallus', 'gallus gallus': 'G.gallus',
-        'chlamydomonas': 'C.reinhardtii', 'c. reinhardtii': 'C.reinhardtii',
-        'tetrahymena': 'T.thermophila', 't. thermophila': 'T.thermophila',
-        'plasmodium falciparum': 'P.falciparum'
-        // This map handles common names. The logic below will fall back to use the direct input 
-        // (e.g., "X.tropicalis") if a common name is not found here.
+        'yeast': 'S.cerevisiae', 'saccharomyces cerevisiae': 'S.cerevisiae'
     };
     
-    // Step 3: Gene synonym mapping for C. elegans (Existing Feature)
-    const geneSynonymMap = {
-        'OSM-5': 'IFT88',
-        'BBS-1': 'BBS1',
-        'CHE-11': 'IFT140',
-        'DHC-1': 'DYNC2H1',
-        'BBS-5': 'BBS5',
-        'XBOX-1': 'BBS4',
-        'DYF-1': 'IFT70'
-    };
-
     const normalizedOrganism = normalizeTerm(organismName);
-    // Use the expanded map first, then fall back to the user's input directly
     const speciesCode = organismMap[normalizedOrganism] || organismName;
-    console.log(`Mapped organism "${organismName}" to species code "${speciesCode}"`);
-    
-    // Step 4: Normalize species codes for comparison (Existing Feature)
     const speciesRegex = new RegExp(`^${normalizeTerm(speciesCode).replace(/\./g, '\\.?').replace(/\s/g, '\\s*')}$`, 'i');
-    console.log(`Species regex: ${speciesRegex}`);
 
-    // Step 5: Filter phylogeny data for genes present in the organism (Existing Feature)
     const genes = Object.entries(phylogenyDataCache)
         .filter(([gene, data]) => {
             const geneName = (data.sym || gene).toUpperCase();
-            const standardGeneName = geneSynonymMap[geneName] || geneName;
-            const isCiliary = ciliaryGeneSet.has(standardGeneName);
+            const isCiliary = ciliaryGeneSet.has(geneName);
             const hasSpecies = Array.isArray(data.species) && data.species.some(s => speciesRegex.test(normalizeTerm(s)));
-            // The detailed console.log is preserved from your original code
-            // console.log(`Checking gene ${geneName} (standard: ${standardGeneName}): isCiliary=${isCiliary}, hasSpecies=${hasSpecies}`);
             return isCiliary && hasSpecies;
         })
-        .map(([gene, data]) => ({ gene: data.sym || gene, description: `Ciliary gene found in ${speciesCode}` }));
-    
-    console.log(`Found ${genes.length} ciliary genes for ${speciesCode}`);
+        .map(([gene, data]) => ({ 
+            gene: data.sym || gene, 
+            description: `Ciliary gene found in ${speciesCode}` 
+        }));
 
-    // Step 6: Fallback if no genes are found (Existing Feature)
-    if (genes.length === 0) {
-        const knownCiliaryGenes = [
-            'IFT88', 'BBS1', 'ARL13B', 'BBS10', 'NPHP1', 'AHI1', 'CEP290', 'MKS1', 'TTC8',
-            'OSM-5', 'CHE-11', 'DHC-1', 'BBS-1', 'BBS-5', 'XBOX-1', 'DYF-1'
-        ];
-        const fallbackGenes = knownCiliaryGenes
-            .filter(gene => ciliaryGeneSet.has((geneSynonymMap[gene.toUpperCase()] || gene).toUpperCase()))
-            .map(gene => ({ gene, description: `Known ciliary gene (fallback) for ${speciesCode}` }));
-        
-        console.log(`Using fallback: ${fallbackGenes.length} genes (${fallbackGenes.map(g => g.gene).join(', ')})`);
-        
-        return {
-            genes: fallbackGenes,
-            description: `No specific ciliary genes found for ${speciesCode} in phylogeny data. Showing ${fallbackGenes.length} known ciliary genes.`,
-            speciesCode: speciesCode // NEW FEATURE: Returning the resolved species code
-        };
-    }
-    
-    return {
-        genes,
-        description: `Found ${genes.length} ciliary genes present in ${speciesCode}.`,
-        speciesCode: speciesCode // NEW FEATURE: Returning the resolved species code
-    };
+    return formatListResult(`Ciliary genes in ${speciesCode}`, genes, `Found ${genes.length} ciliary genes present in ${speciesCode}.`);
 }
+
 // --- Helper: get genes by complex ---
 // Rule 2: Search for genes that are part of a complex
 async function getGenesByComplex(complexName) {
     await fetchCiliaData();
-    const complexRegex = new RegExp(`^${complexName}$`, 'i'); // Exact match for the complex name
-    const representativeGene = ciliaHubDataCache.find(gene => gene.complex_names.some(cn => cn.match(complexRegex)));
+    const complexRegex = new RegExp(complexName, 'i');
     
-    // If a gene matches the complex name and lists components, return those components
-    if (representativeGene && representativeGene.complex_components.length > 0) {
-        return representativeGene.complex_components.map(c => ({ gene: c, description: `Component of ${representativeGene.complex_names.join(', ')}` }));
+    // First, try to find genes that list this complex in their complex_names
+    const complexGenes = ciliaHubDataCache.filter(gene => 
+        gene.complex_names && gene.complex_names.some(cn => cn.match(complexRegex))
+    );
+    
+    if (complexGenes.length > 0) {
+        const results = complexGenes.map(gene => ({
+            gene: gene.gene,
+            description: `Complex: ${gene.complex_names?.join(', ') || 'Unknown'}`
+        }));
+        return formatListResult(`Genes in ${complexName} complex`, results);
     }
-    return []; // Return empty if no exact match or no components listed
+    
+    // If no direct complex matches, look for genes that mention the complex in descriptions
+    const relatedGenes = ciliaHubDataCache.filter(gene => 
+        gene.functional_summary && gene.functional_summary.toLowerCase().includes(complexName.toLowerCase())
+    ).map(gene => ({
+        gene: gene.gene,
+        description: gene.functional_summary?.substring(0, 100) + '...' || 'No description'
+    }));
+    
+    if (relatedGenes.length > 0) {
+        return formatListResult(`Genes related to ${complexName}`, relatedGenes);
+    }
+    
+    return formatListResult(`Genes in ${complexName} complex`, []);
 }
-
 // --- Main AI Query Handler (REPLACEMENT) ---
 window.handleAIQuery = async function() {
     const aiQueryInput = document.getElementById('aiQueryInput');
@@ -1132,32 +1127,61 @@ window.handleAIQuery = async function() {
 
     resultArea.style.display = 'block';
     resultArea.innerHTML = `<p class="status-searching">CiliAI is thinking...</p>`;
-    await Promise.all([fetchCiliaData(), fetchScreenData(), fetchTissueData()]);
-
-    let resultHtml = '';
-    const qLower = query.toLowerCase();
-    let match;
-
+    
     try {
-        // PRIORITY 1: Check for an exact match in the question registry first.
+        await Promise.all([fetchCiliaData(), fetchScreenData(), fetchTissueData()]);
+
+        let resultHtml = '';
+        const qLower = query.toLowerCase();
+        let match;
+
+        // Check for exact match in question registry
         const perfectMatch = questionRegistry.find(item => item.text.toLowerCase() === qLower);
         if (perfectMatch) {
             console.log(`Registry match found: "${perfectMatch.text}"`);
-            resultHtml = await perfectMatch.handler();
+            try {
+                const handlerResult = await perfectMatch.handler();
+                // Ensure the result is properly formatted HTML
+                if (typeof handlerResult === 'string') {
+                    resultHtml = handlerResult;
+                } else {
+                    console.warn('Handler returned non-string result:', handlerResult);
+                    resultHtml = formatListResult('Query Results', 
+                        Array.isArray(handlerResult) ? handlerResult : [handlerResult],
+                        'Results from your query'
+                    );
+                }
+            } catch (handlerError) {
+                console.error('Handler error:', handlerError);
+                resultHtml = `<div class="result-card"><h3>Error</h3><p>Failed to process query: ${handlerError.message}</p></div>`;
+            }
         }
-        // PRIORITY 2: Handle conversational "Tell me about..." queries.
+        // Handle conversational queries
         else if ((match = qLower.match(/(?:tell me about|what is|describe)\s+(.+)/i))) {
             const term = match[1].trim();
             resultHtml = await getComprehensiveDetails(term);
         }
-        // PRIORITY 3: Use the existing intent parser for keyword-based queries.
+        // Use intent parser
         else {
             const intent = intentParser.parse(query);
             if (intent && typeof intent.handler === 'function') {
                 console.log(`Intent parser match found: ${intent.intent} for entity: ${intent.entity}`);
-                resultHtml = await intent.handler(intent.entity);
+                try {
+                    const handlerResult = await intent.handler(intent.entity);
+                    if (typeof handlerResult === 'string') {
+                        resultHtml = handlerResult;
+                    } else {
+                        resultHtml = formatListResult('Query Results', 
+                            Array.isArray(handlerResult) ? handlerResult : [handlerResult],
+                            'Results from your query'
+                        );
+                    }
+                } catch (handlerError) {
+                    console.error('Intent handler error:', handlerError);
+                    resultHtml = `<div class="result-card"><h3>Error</h3><p>Failed to process query: ${handlerError.message}</p></div>`;
+                }
             }
-            // PRIORITY 4: Fallback for any remaining specific patterns.
+            // Fallback patterns
             else if ((match = qLower.match(/expression of\s+([a-z0-9\-]+)/i))) {
                 const gene = match[1].toUpperCase();
                 await displayCiliAIExpressionHeatmap([gene], resultArea, window.tissueDataCache);
@@ -1166,19 +1190,37 @@ window.handleAIQuery = async function() {
                 const { label, genes } = await getPhylogenyGenes({ type: 'ciliary_only_list' });
                 resultHtml = formatListResult(label, genes);
             }
-            // FINAL FALLBACK
+            // Final fallback
             else {
-                resultHtml = `<p>Sorry, I didn’t understand that. Please try one of the suggested questions or a known keyword.</p>`;
+                resultHtml = `<p>Sorry, I didn't understand that. Please try one of the suggested questions or a known keyword.</p>`;
             }
         }
+        
         resultArea.innerHTML = resultHtml;
     } catch (e) {
-        resultArea.innerHTML = `<p class="status-not-found">An error occurred during your query. Check the console for details.</p>`;
         console.error("CiliAI Query Error:", e);
+        resultArea.innerHTML = `<p class="status-not-found">An error occurred during your query: ${e.message}. Check the console for details.</p>`;
     }
 };
 
+// Add data validation to ensure we have the required data
+async function validateData() {
+    if (!ciliaHubDataCache || ciliaHubDataCache.length === 0) {
+        console.warn('CiliaHub data not loaded properly');
+        await fetchCiliaData();
+    }
+    if (!screenDataCache || Object.keys(screenDataCache).length === 0) {
+        console.warn('Screen data not loaded properly');
+        await fetchScreenData();
+    }
+    if (!phylogenyDataCache || Object.keys(phylogenyDataCache).length === 0) {
+        console.warn('Phylogeny data not loaded properly');
+        await fetchPhylogenyData();
+    }
+}
 
+// Call this during initialization
+setTimeout(validateData, 2000);
 
 // Helper for the comparison query (updated titles and threshold)
 function formatComparisonResult(title, tissue, list1, list2) {
@@ -1316,37 +1358,45 @@ function formatListResult(title, geneList, message = '') {
     if (!geneList || geneList.length === 0) {
         return `<div class="result-card"><h3>${title}</h3><p class="status-not-found">No matching genes found.</p></div>`;
     }
+    
+    // Ensure geneList is properly formatted
+    const formattedGeneList = geneList.map(item => {
+        if (typeof item === 'string') {
+            return { gene: item, description: 'No description available' };
+        }
+        return {
+            gene: item.gene || item.sym || 'Unknown',
+            description: item.description || item.functional_summary || 'No description available'
+        };
+    });
+    
     const messageHtml = message ? `<p>${message}</p>` : '';
-    const displayedGenes = geneList.slice(0, 100);
+    const displayedGenes = formattedGeneList.slice(0, 100);
+    
     const tableHtml = `
     <table class="ciliopathy-table">
       <thead>
         <tr>
           <th class="sortable">Gene</th>
-          <th>Description (Snippet)</th>
+          <th>Description</th>
         </tr>
       </thead>
       <tbody>
-        ${displayedGenes.map(g => `<tr><td><strong>${g.gene}</strong></td><td>${g.description.substring(0, 100)}${g.description.length > 100 ? '...' : ''}</td></tr>`).join('')}
+        ${displayedGenes.map(g => `
+          <tr>
+            <td><strong>${g.gene}</strong></td>
+            <td>${g.description ? (g.description.substring(0, 100) + (g.description.length > 100 ? '...' : '')) : 'No description available'}</td>
+          </tr>
+        `).join('')}
       </tbody>
     </table>
-    ${geneList.length > 100 ? `<p><a href="https://theciliahub.github.io/" target="_blank">View full list (${geneList.length} genes) in CiliaHub</a></p>` : ''}`;
-
-    // NEW FEATURE: Add reference for phylogeny data
-    let referenceHtml = '';
-    const phylogenyKeywords = ['ciliary-only', 'non-ciliary-only', 'all organisms', 'human-specific'];
-    if (phylogenyKeywords.some(kw => title.toLowerCase().includes(kw))) {
-        referenceHtml = `<p style="font-size: 0.8em; color: #666; margin-top: 1rem; border-top: 1px solid #eee; padding-top: 0.5rem;">
-            Phylogenetic classification data extracted from: Li, Y. et al. (2014) <em>Cell</em>, 158(1), 213–225. <a href="https://pubmed.ncbi.nlm.nih.gov/24995987/" target="_blank" title="View on PubMed">PMID: 24995987</a>.
-        </p>`;
-    }
+    ${formattedGeneList.length > 100 ? `<p><small>Showing first 100 genes out of ${formattedGeneList.length}. Use more specific search terms to see fewer results.</small></p>` : ''}`;
 
     return `
     <div class="result-card">
-      <h3>${title} (${geneList.length} found)</h3>
+      <h3>${title} (${formattedGeneList.length} found)</h3>
       ${messageHtml}
       ${tableHtml}
-      ${referenceHtml}
     </div>`;
 }
 
@@ -1846,8 +1896,8 @@ async function getGenesByPhylogeny(type) {
 // =============================================================================
 async function getGenesByFunction(functionalCategory) {
     if (!ciliaHubDataCache) await fetchCiliaData();
-    // A more flexible regex to catch terms like "kinesin" within "Motors (dynein/kinesin)"
-    const categoryRegex = new RegExp(functionalCategory.replace('motors', ''), 'i');
+    const categoryRegex = new RegExp(functionalCategory.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+    
     const results = ciliaHubDataCache
         .filter(gene => 
             Array.isArray(gene.functional_category) && 
@@ -1855,10 +1905,13 @@ async function getGenesByFunction(functionalCategory) {
         )
         .map(gene => ({ 
             gene: gene.gene, 
-            description: `Functional Category: ${gene.functional_category.join(', ')}` 
+            description: `Functional Category: ${gene.functional_category?.join(', ') || 'Unknown'}` 
         }));
+    
     return formatListResult(`Genes in Functional Category: ${functionalCategory}`, results);
 }
+
+
 async function renderPhylogenyHeatmap(genes) {
     const phylogeny = await fetchPhylogenyData();
     if (!phylogeny || Object.keys(phylogeny).length === 0) {
