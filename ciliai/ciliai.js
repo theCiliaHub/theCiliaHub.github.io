@@ -146,17 +146,40 @@ async function tellAboutCiliAI() {
     const html = `
     <div class="result-card">
         <h3>About CiliAI 🤖</h3>
-        <p>I am CiliAI, an AI-powered assistant designed to help you explore and analyze ciliary gene data. I can integrate information from multiple biological datasets to answer complex questions. Here's what I can do:</p>
+        <p>I am CiliAI, an AI-powered assistant designed to help you explore and analyze ciliary gene data. I can integrate information from five different datasets to answer complex questions. Here's what I can do:</p>
         <ul>
-            <li><strong>Query by Category:</strong> Find genes based on disease (e.g., "Joubert syndrome"), protein complex ("BBSome"), cellular localization ("transition zone"), or organism ("C. elegans").</li>
-            <li><strong>Get Gene Details:</strong> Ask for comprehensive information about a specific gene (e.g., "Tell me about ARL13B").</li>
+            <li><strong>Query by Category:</strong> Find genes based on disease ("Joubert syndrome"), protein complex ("BBSome"), cellular localization ("transition zone"), or organism ("C. elegans").</li>
+            <li><strong>Get Gene Details:</strong> Ask for comprehensive information about a specific gene by typing its name (e.g., "ARL13B").</li>
             <li><strong>Visualize Expression Data:</strong> Generate plots for gene expression, including tissue-specific heatmaps, single-cell bar charts, and UMAPs colored by expression.</li>
             <li><strong>Compare Genes & Complexes:</strong> Directly compare functions or expression levels (e.g., "Compare IFT-A and IFT-B" or "Compare ARL13B and FOXJ1").</li>
             <li><strong>Explore Evolutionary Data:</strong> Find information on gene conservation across species (e.g., "Show evolutionary conservation of IFT88").</li>
-            <li><strong>Integrate Multiple Datasets:</strong> Answer complex questions that require combining data, such as "Which Joubert Syndrome genes are expressed in ciliated cells?".</li>
+            <li><strong>Integrate Multiple Datasets:</strong> Answer complex questions that combine data, such as "Which Joubert Syndrome genes are expressed in ciliated cells?".</li>
         </ul>
     </div>`;
     return html;
+}
+
+/**
+ * New handler to get live literature evidence for a gene.
+ */
+async function getLiteratureEvidence(gene) {
+    const evidence = await analyzeGeneViaAPI(gene);
+    if (!evidence || evidence.length === 0) {
+        return `<div class="result-card"><h3>Literature Evidence for ${gene}</h3><p class="status-not-found">No relevant sentences found in a search of recent literature.</p></div>`;
+    }
+
+    const evidenceSnippets = evidence.map(ev => `
+        <div style="border-bottom:1px solid #eee; padding-bottom:0.5rem; margin-bottom:0.5rem;">
+            <p>${ev.context.replace(new RegExp(`(${gene})`, 'ig'), `<mark>$1</mark>`)}</p>
+            <small><strong>Source:</strong> ${ev.source.toUpperCase()} (${ev.id})</small>
+        </div>`
+    ).join('');
+
+    return `
+        <div class="result-card">
+            <h3>Literature Evidence for ${gene}</h3>
+            ${evidenceSnippets}
+        </div>`;
 }
 
 // =============================================================================
@@ -287,6 +310,94 @@ async function compareComplexes(complexA, complexB) {
 // --- ADDITION: New Plotting and Complex Query Functions ---
 
 /**
+ * Displays a UMAP plot where each cell is colored by the expression of a specific gene.
+ * @param {string} geneSymbol The gene to visualize.
+ */
+async function displayUmapGeneExpression(geneSymbol) {
+    const [umapData, cellData] = await Promise.all([fetchUmapData(), fetchCellxgeneData()]);
+    const resultArea = document.getElementById('ai-result-area');
+
+    if (!umapData || !cellData) {
+        return `<div class="result-card"><h3>UMAP Expression Plot</h3><p class="status-not-found">Could not load UMAP or Cellxgene data. Check console for errors.</p></div>`;
+    }
+
+    const geneUpper = geneSymbol.toUpperCase();
+    const geneExpressionMap = cellData[geneUpper];
+
+    if (!geneExpressionMap) {
+        return `<div class="result-card"><h3>${geneSymbol} Expression</h3><p class="status-not-found">Gene "${geneSymbol}" not found in the single-cell expression dataset.</p></div>`;
+    }
+
+    const expressionValues = umapData.map(cell => geneExpressionMap[cell.cell_type] || 0);
+
+    const plotData = [{
+        x: umapData.map(p => p.x),
+        y: umapData.map(p => p.y),
+        mode: 'markers',
+        type: 'scattergl',
+        hovertext: umapData.map((p, i) => `Cell Type: ${p.cell_type}<br>Expression: ${expressionValues[i].toFixed(4)}`),
+        hoverinfo: 'text',
+        marker: {
+            color: expressionValues,
+            colorscale: 'Viridis',
+            showscale: true,
+            colorbar: { title: 'Expression' },
+            size: 4,
+            opacity: 0.7
+        }
+    }];
+
+    const layout = {
+        title: `UMAP Colored by ${geneSymbol} Expression`,
+        xaxis: { title: 'UMAP 1' },
+        yaxis: { title: 'UMAP 2' },
+        hovermode: 'closest'
+    };
+
+    resultArea.innerHTML = `<div class="result-card"><div id="umap-expression-plot-div"></div></div>`;
+    Plotly.newPlot('umap-expression-plot-div', plotData, layout, { responsive: true });
+    return "";
+}
+
+/**
+ * Displays a UMAP plot colored by cell type.
+ */
+async function displayUmapPlot() {
+    const data = await fetchUmapData();
+    const resultArea = document.getElementById('ai-result-area');
+    
+    if (!data) {
+        return `<div class="result-card"><h3>UMAP Plot</h3><p class="status-not-found">Could not load pre-computed UMAP data.</p></div>`;
+    }
+
+    const cellTypes = [...new Set(data.map(d => d.cell_type))];
+    const plotData = [];
+
+    for (const cellType of cellTypes) {
+        const points = data.filter(d => d.cell_type === cellType);
+        plotData.push({
+            x: points.map(p => p.x),
+            y: points.map(p => p.y),
+            name: cellType,
+            mode: 'markers',
+            type: 'scattergl',
+            marker: { size: 4, opacity: 0.7 }
+        });
+    }
+
+    const layout = {
+        title: 'UMAP of Single-Cell Gene Expression by Cell Type',
+        xaxis: { title: 'UMAP 1' },
+        yaxis: { title: 'UMAP 2' },
+        hovermode: 'closest'
+    };
+
+    resultArea.innerHTML = `<div class="result-card"><div id="umap-plot-div"></div></div>`;
+    Plotly.newPlot('umap-plot-div', plotData, layout, { responsive: true });
+    return "";
+}
+
+/**
  * Displays a grouped bar chart of multiple genes' expression across cell types.
  * @param {string[]} geneSymbols An array of genes to plot.
  */
@@ -302,7 +413,6 @@ async function displayCellxgeneBarChart(geneSymbols) {
     const allCellTypes = new Set();
     
     for (const gene of geneSymbols) {
-        // CORRECTED: Convert gene symbol to uppercase for lookup
         const geneUpper = gene.toUpperCase();
         const geneData = cellxgeneDataCache[geneUpper];
 
@@ -311,7 +421,7 @@ async function displayCellxgeneBarChart(geneSymbols) {
             plotData.push({
                 x: Object.keys(geneData),
                 y: Object.values(geneData),
-                name: gene, // Keep original casing for the legend
+                name: gene,
                 type: 'bar'
             });
         }
@@ -331,9 +441,7 @@ async function displayCellxgeneBarChart(geneSymbols) {
             categoryorder: 'array',
             categoryarray: Array.from(allCellTypes).sort()
         },
-        yaxis: {
-            title: 'Normalized Expression'
-        },
+        yaxis: { title: 'Normalized Expression' },
         margin: { b: 150 }
     };
     
@@ -350,59 +458,8 @@ async function displayCellxgeneBarChart(geneSymbols) {
     return "";
 }
 
-/**
- * Displays a UMAP plot where each cell is colored by the expression of a specific gene.
- * @param {string} geneSymbol The gene to visualize.
- */
-async function displayUmapGeneExpression(geneSymbol) {
-    // Ensure both UMAP coordinates and cell expression data are loaded
-    const [umapData, cellData] = await Promise.all([fetchUmapData(), fetchCellxgeneData()]);
-    const resultArea = document.getElementById('ai-result-area');
 
-    if (!umapData || !cellData) {
-        return `<div class="result-card"><h3>UMAP Expression Plot</h3><p class="status-not-found">Could not load UMAP or Cellxgene data. Check console for errors.</p></div>`;
-    }
 
-    const geneUpper = geneSymbol.toUpperCase();
-    const geneExpressionMap = cellData[geneUpper];
-
-    if (!geneExpressionMap) {
-        return `<div class="result-card"><h3>${geneSymbol} Expression</h3><p class="status-not-found">Gene "${geneSymbol}" not found in the single-cell expression dataset.</p></div>`;
-    }
-
-    // Create an array of expression values for each cell based on its type
-    const expressionValues = umapData.map(cell => geneExpressionMap[cell.cell_type] || 0);
-
-    const plotData = [{
-        x: umapData.map(p => p.x),
-        y: umapData.map(p => p.y),
-        mode: 'markers',
-        type: 'scattergl', // Use WebGL for performance with many points
-        hovertext: umapData.map((p, i) => `Cell Type: ${p.cell_type}<br>Expression: ${expressionValues[i].toFixed(4)}`),
-        hoverinfo: 'text',
-        marker: {
-            color: expressionValues,
-            colorscale: 'Viridis', // A colorblind-friendly scale
-            showscale: true,
-            colorbar: {
-                title: 'Expression'
-            },
-            size: 4,
-            opacity: 0.7
-        }
-    }];
-
-    const layout = {
-        title: `UMAP Colored by ${geneSymbol} Expression`,
-        xaxis: { title: 'UMAP 1' },
-        yaxis: { title: 'UMAP 2' },
-        hovermode: 'closest'
-    };
-
-    resultArea.innerHTML = `<div class="result-card"><div id="umap-expression-plot-div"></div></div>`;
-    Plotly.newPlot('umap-expression-plot-div', plotData, layout, { responsive: true });
-    return ""; // The function handles its own rendering
-}
 /**
  * Finds genes associated with a specific disease that are highly expressed in a given cell type.
  * @param {string} disease The name of the ciliopathy.
