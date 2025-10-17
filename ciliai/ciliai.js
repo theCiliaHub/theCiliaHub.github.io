@@ -328,27 +328,48 @@ async function displayUmapGeneExpression(geneSymbol) {
         return `<div class="result-card"><h3>${geneSymbol} Expression</h3><p class="status-not-found">Gene "${geneSymbol}" not found in the single-cell expression dataset.</p></div>`;
     }
 
-    const expressionValues = umapData.map(cell => geneExpressionMap[cell.cell_type] || 0);
+    // --- FIX: Randomly sample the data for performance ---
+    const sampleSize = 10000;
+    const sampledData = [];
+    const usedIndices = new Set();
+    if (umapData.length > sampleSize) {
+        while (sampledData.length < sampleSize) {
+            const randomIndex = Math.floor(Math.random() * umapData.length);
+            if (!usedIndices.has(randomIndex)) {
+                sampledData.push(umapData[randomIndex]);
+                usedIndices.add(randomIndex);
+            }
+        }
+    } else {
+        // If the dataset is smaller than the sample size, just use it all
+        sampledData.push(...umapData);
+    }
+    // --- END FIX ---
+
+    // Create an array of expression values for each SAMPLED cell
+    const expressionValues = sampledData.map(cell => geneExpressionMap[cell.cell_type] || 0);
 
     const plotData = [{
-        x: umapData.map(p => p.x),
-        y: umapData.map(p => p.y),
+        x: sampledData.map(p => p.x),
+        y: sampledData.map(p => p.y),
         mode: 'markers',
-        type: 'scattergl',
-        hovertext: umapData.map((p, i) => `Cell Type: ${p.cell_type}<br>Expression: ${expressionValues[i].toFixed(4)}`),
+        type: 'scattergl', // Use WebGL for performance
+        hovertext: sampledData.map((p, i) => `Cell Type: ${p.cell_type}<br>Expression: ${expressionValues[i].toFixed(4)}`),
         hoverinfo: 'text',
         marker: {
             color: expressionValues,
             colorscale: 'Viridis',
             showscale: true,
-            colorbar: { title: 'Expression' },
-            size: 4,
-            opacity: 0.7
+            colorbar: {
+                title: 'Expression'
+            },
+            size: 5,
+            opacity: 0.8
         }
     }];
 
     const layout = {
-        title: `UMAP Colored by ${geneSymbol} Expression`,
+        title: `UMAP Colored by ${geneSymbol} Expression (Sample of ${sampleSize} cells)`,
         xaxis: { title: 'UMAP 1' },
         yaxis: { title: 'UMAP 2' },
         hovermode: 'closest'
@@ -356,7 +377,7 @@ async function displayUmapGeneExpression(geneSymbol) {
 
     resultArea.innerHTML = `<div class="result-card"><div id="umap-expression-plot-div"></div></div>`;
     Plotly.newPlot('umap-expression-plot-div', plotData, layout, { responsive: true });
-    return "";
+    return ""; // The function handles its own rendering
 }
 
 /**
@@ -370,23 +391,40 @@ async function displayUmapPlot() {
         return `<div class="result-card"><h3>UMAP Plot</h3><p class="status-not-found">Could not load pre-computed UMAP data.</p></div>`;
     }
 
-    const cellTypes = [...new Set(data.map(d => d.cell_type))];
+    // --- FIX: Randomly sample the data for performance ---
+    const sampleSize = 10000;
+    const sampledData = [];
+    if (data.length > sampleSize) {
+         const usedIndices = new Set();
+         while (sampledData.length < sampleSize) {
+            const randomIndex = Math.floor(Math.random() * data.length);
+            if (!usedIndices.has(randomIndex)) {
+                sampledData.push(data[randomIndex]);
+                usedIndices.add(randomIndex);
+            }
+        }
+    } else {
+        sampledData.push(...data);
+    }
+    // --- END FIX ---
+    
+    const cellTypes = [...new Set(sampledData.map(d => d.cell_type))];
     const plotData = [];
 
     for (const cellType of cellTypes) {
-        const points = data.filter(d => d.cell_type === cellType);
+        const points = sampledData.filter(d => d.cell_type === cellType);
         plotData.push({
             x: points.map(p => p.x),
             y: points.map(p => p.y),
             name: cellType,
             mode: 'markers',
             type: 'scattergl',
-            marker: { size: 4, opacity: 0.7 }
+            marker: { size: 5, opacity: 0.8 }
         });
     }
 
     const layout = {
-        title: 'UMAP of Single-Cell Gene Expression by Cell Type',
+        title: `UMAP of Single-Cell Gene Expression (Sample of ${sampleSize} cells)`,
         xaxis: { title: 'UMAP 1' },
         yaxis: { title: 'UMAP 2' },
         hovermode: 'closest'
