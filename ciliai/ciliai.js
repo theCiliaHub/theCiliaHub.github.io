@@ -5,6 +5,8 @@ let phylogenyDataCache = null;
 // Note: tissueDataCache is attached to the window object in its function
 // --- ADDITION: New function to fetch and parse Cellxgene data ---
 let cellxgeneDataCache = null;
+// --- ADDITION: UMAP Plotting Functions ---
+let umapDataCache = null;
 
 // --- Fallback Data ---
 const FALLBACK_CILIOPATHY_GENES = [
@@ -207,8 +209,34 @@ const questionRegistry = [
     { text: "Predict potential ciliary genes using co-expression data", handler: async () => notImplementedYet("Prediction of ciliary genes") },
     { text: "Identify candidate ciliary kinases", handler: async () => notImplementedYet("Identification of candidate kinases") },
     { text: "List novel ciliary proteins not yet annotated", handler: async () => notImplementedYet("Discovery of novel ciliary proteins") },
+      // --- 9. single cell RNA-seq ---
     {text: "What is the expression of ARL13B in ciliated cells?", handler: async () => getGeneExpressionInCellType("ARL13B", "ciliated cell")},
-    {text: "Show expression of FOXJ1 in ciliated cells", handler: async () => getGeneExpressionInCellType("FOXJ1", "ciliated cell")}
+    {text: "Show expression of FOXJ1 in ciliated cells", handler: async () => getGeneExpressionInCellType("FOXJ1", "ciliated cell")},
+    {text: "Show single-cell expression of ARL13B",handler: async () => displayCellxgeneBarChart("ARL13B")},
+    {text: "Plot single-cell expression for FOXJ1",handler: async () => displayCellxgeneBarChart("FOXJ1")},
+    {text: "Compare expression of ARL13B and FOXJ1 in single cells",handler: async () => displayCellxgeneBarChart(["ARL13B", "FOXJ1"])},
+    {text: "Show the UMAP plot of all cell types",handler: async () => displayUmapPlot()},
+    {text: "Which Joubert Syndrome genes are expressed in ciliated cells?",handler: async () => {const results = await findDiseaseGenesByCellExpression("Joubert Syndrome", "ciliated cell");
+        return formatListResult("Joubert Genes Expressed in Ciliated Cells", results);}},
+    {text: "List top expressed ciliary genes in ciliated cells",handler: async () => {
+        // This is a simplified version for demonstration. A more robust function could be written.
+        const allCiliary = await getAllCiliaryGenes(); // This returns a formatted string, we need raw data 
+        if (!cellxgeneDataCache) await fetchCellxgeneData();
+        const ciliaryGeneSet = new Set(ciliaHubDataCache.map(g => g.gene.toUpperCase()));
+        const expressedCiliaryGenes = [];
+        Object.entries(cellxgeneDataCache).forEach(([gene, cellData]) => {
+            if (ciliaryGeneSet.has(gene) && cellData["ciliated cell"] > 0.01) {
+                expressedCiliaryGenes.push({
+                    gene: gene,
+                    description: `Expression: ${cellData["ciliated cell"].toFixed(4)}`,
+                    expression: cellData["ciliated cell"]
+                });
+            }
+        });
+        expressedCiliaryGenes.sort((a, b) => b.expression - a.expression);
+        return formatListResult("Top Ciliary Genes in Ciliated Cells", expressedCiliaryGenes.slice(0, 50));
+    }
+}
 ];
 
 
@@ -236,6 +264,111 @@ async function compareComplexes(complexA, complexB) {
             <div>${listToHtml(componentsB, complexB)}</div>
         </div>
     </div>`;
+}
+
+
+// --- ADDITION: New Plotting and Complex Query Functions ---
+
+/**
+ * Displays a grouped bar chart of multiple genes' expression across cell types.
+ * @param {string[]} geneSymbols An array of genes to plot.
+ */
+async function displayCellxgeneBarChart(geneSymbols) {
+    if (!cellxgeneDataCache) await fetchCellxgeneData();
+    const resultArea = document.getElementById('ai-result-area');
+
+    if (!cellxgeneDataCache) {
+        return `<div class="result-card"><h3>Cell-Specific Expression</h3><p class="status-not-found">Could not load the single-cell expression dataset.</p></div>`;
+    }
+
+    const plotData = [];
+    const allCellTypes = new Set();
+    
+    // Create a "trace" for each gene
+    for (const gene of geneSymbols) {
+        const geneUpper = gene.toUpperCase();
+        const geneData = cellxgeneDataCache[geneUpper];
+
+        if (geneData) {
+            const sortedData = Object.entries(geneData).sort((a, b) => a[0].localeCompare(b[0]));
+            const cellTypes = sortedData.map(([cell]) => cell);
+            const expressionValues = sortedData.map(([, value]) => value);
+            
+            cellTypes.forEach(ct => allCellTypes.add(ct));
+
+            plotData.push({
+                x: cellTypes,
+                y: expressionValues,
+                name: gene,
+                type: 'bar'
+            });
+        }
+    }
+
+    if (plotData.length === 0) {
+        return `<div class="result-card"><h3>Expression Plot</h3><p class="status-not-found">None of the specified genes were found in the single-cell dataset.</p></div>`;
+    }
+
+    const layout = {
+        title: `Single-Cell Expression Comparison`,
+        barmode: 'group', // This is the key to creating a grouped chart
+        xaxis: {
+            title: 'Cell Type',
+            tickangle: -45,
+            automargin: true,
+            categoryorder: 'array',
+            categoryarray: Array.from(allCellTypes).sort()
+        },
+        yaxis: {
+            title: 'Normalized Expression'
+        },
+        margin: { b: 150 }
+    };
+    
+    resultArea.innerHTML = `
+        <div class="result-card">
+            <div id="cellxgene-plot-div"></div>
+            <p style="font-size: 0.8em; color: #666; margin-top: 1rem; border-top: 1px solid #eee; padding-top: 0.5rem;">
+                Data from Cellxgene dataset: a2011f35-04c4-427f-80d1-27ee0670251d
+            </p>
+        </div>
+    `;
+    Plotly.newPlot('cellxgene-plot-div', plotData, layout, { responsive: true });
+    return ""; // The function handles its own rendering
+}
+
+/**
+ * Finds genes associated with a specific disease that are highly expressed in a given cell type.
+ * @param {string} disease The name of the ciliopathy.
+ * @param {string} cellType The cell type to check expression in.
+ * @param {number} [threshold=0.01] The minimum expression level to be considered "highly expressed".
+ */
+async function findDiseaseGenesByCellExpression(disease, cellType, threshold = 0.01) {
+    await fetchCiliaData();
+    await fetchCellxgeneData();
+
+    if (!cellxgeneDataCache) return [];
+
+    // 1. Get all genes for the specified disease
+    const { genes: diseaseGenes } = await getCiliopathyGenes(disease);
+    const diseaseGeneSet = new Set(diseaseGenes.map(g => g.gene.toUpperCase()));
+
+    // 2. Filter them by expression in the target cell type
+    const expressedGenes = [];
+    for (const gene of diseaseGeneSet) {
+        const geneExpressionData = cellxgeneDataCache[gene];
+        if (geneExpressionData && geneExpressionData[cellType] && geneExpressionData[cellType] > threshold) {
+            expressedGenes.push({
+                gene: gene,
+                description: `Expression in ${cellType}: ${geneExpressionData[cellType].toFixed(4)}`,
+                expression: geneExpressionData[cellType]
+            });
+        }
+    }
+
+    // 3. Sort by expression level
+    expressedGenes.sort((a, b) => b.expression - a.expression);
+    return expressedGenes;
 }
 
 async function compareGenes(geneA, geneB) {
@@ -964,7 +1097,7 @@ window.displayCiliAIPage = async function displayCiliAIPage() {
         return;
     }
 
-    await Promise.all([fetchCiliaData(), fetchScreenData(), fetchPhylogenyData(), fetchTissueData(), fetchCellxgeneData()]);
+    await Promise.all([fetchCiliaData(), fetchScreenData(), fetchPhylogenyData(), fetchTissueData(), fetchCellxgeneData(), fetchUmapData()]);
     console.log('ciliAI.js: All data loaded');
     
     setTimeout(setupCiliAIEventListeners, 0);
@@ -1123,6 +1256,25 @@ async function fetchTissueData() {
     }
 }
 window.fetchTissueData = fetchTissueData;
+
+async function fetchUmapData() {
+    if (umapDataCache) return umapDataCache;
+
+    // Use the correct Raw URL you've provided
+    const dataUrl = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/umap_data.json';
+
+    try {
+        console.log('Fetching pre-computed UMAP data...');
+        const response = await fetch(dataUrl);
+        if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+        umapDataCache = await response.json();
+        console.log(`✅ UMAP data loaded with ${umapDataCache.length} points.`);
+        return umapDataCache;
+    } catch (error) {
+        console.error('Failed to fetch UMAP data:', error);
+        return null;
+    }
+}
 
 async function fetchCellxgeneData() {
     // Check if data is already in cache
@@ -1390,6 +1542,43 @@ async function getCiliaryGenesForOrganism(organismName) {
     };
 }
 
+async function displayUmapPlot() {
+    const data = await fetchUmapData();
+    const resultArea = document.getElementById('ai-result-area');
+    
+    if (!data) {
+        return `<div class="result-card"><h3>UMAP Plot</h3><p class="status-not-found">Could not load pre-computed UMAP data.</p></div>`;
+    }
+
+    const cellTypes = [...new Set(data.map(d => d.cell_type))];
+    const plotData = [];
+
+    // Create a separate trace for each cell type to color them differently
+    for (const cellType of cellTypes) {
+        const points = data.filter(d => d.cell_type === cellType);
+        plotData.push({
+            x: points.map(p => p.x),
+            y: points.map(p => p.y),
+            name: cellType,
+            mode: 'markers',
+            type: 'scatter',
+            marker: { size: 4, opacity: 0.7 }
+        });
+    }
+
+    const layout = {
+        title: 'UMAP of Single-Cell Gene Expression',
+        xaxis: { title: 'UMAP 1' },
+        yaxis: { title: 'UMAP 2' },
+        hovermode: 'closest'
+    };
+    
+    resultArea.innerHTML = `<div class="result-card"><div id="umap-plot-div"></div></div>`;
+    Plotly.newPlot('umap-plot-div', plotData, layout, { responsive: true });
+    return ""; // The function handles its own rendering
+}
+
+
 // --- Main AI Query Handler (REPLACEMENT) ---
 window.handleAIQuery = async function() {
     const aiQueryInput = document.getElementById('aiQueryInput');
@@ -1399,7 +1588,7 @@ window.handleAIQuery = async function() {
 
     resultArea.style.display = 'block';
     resultArea.innerHTML = `<p class="status-searching">CiliAI is thinking...</p>`;
-    await Promise.all([fetchCiliaData(), fetchScreenData(), fetchPhylogenyData(), fetchTissueData(), fetchCellxgeneData()]);
+    await Promise.all([fetchCiliaData(), fetchScreenData(), fetchPhylogenyData(), fetchTissueData(), fetchCellxgeneData(), fetchUmapData()]);
 
     let resultHtml = '';
     const qLower = query.toLowerCase();
