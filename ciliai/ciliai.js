@@ -139,93 +139,108 @@ function createIntentParser() {
 
 
 const intentParser = createIntentParser();
+/**
+ * ADDITION: New function to describe CiliAI's capabilities.
+ */
+async function tellAboutCiliAI() {
+    const html = `
+    <div class="result-card">
+        <h3>About CiliAI 🤖</h3>
+        <p>I am CiliAI, an AI-powered assistant designed to help you explore and analyze ciliary gene data. I can integrate information from multiple biological datasets to answer complex questions. Here's what I can do:</p>
+        <ul>
+            <li><strong>Query by Category:</strong> Find genes based on disease (e.g., "Joubert syndrome"), protein complex ("BBSome"), cellular localization ("transition zone"), or organism ("C. elegans").</li>
+            <li><strong>Get Gene Details:</strong> Ask for comprehensive information about a specific gene (e.g., "Tell me about ARL13B").</li>
+            <li><strong>Visualize Expression Data:</strong> Generate plots for gene expression, including tissue-specific heatmaps, single-cell bar charts, and UMAPs colored by expression.</li>
+            <li><strong>Compare Genes & Complexes:</strong> Directly compare functions or expression levels (e.g., "Compare IFT-A and IFT-B" or "Compare ARL13B and FOXJ1").</li>
+            <li><strong>Explore Evolutionary Data:</strong> Find information on gene conservation across species (e.g., "Show evolutionary conservation of IFT88").</li>
+            <li><strong>Integrate Multiple Datasets:</strong> Answer complex questions that require combining data, such as "Which Joubert Syndrome genes are expressed in ciliated cells?".</li>
+        </ul>
+    </div>`;
+    return html;
+}
 
 // =============================================================================
 // ADDITION: The new Question Registry and its required placeholder functions.
 // Place this code block after your CILI_AI_DB object.
+// =============================================================================
+// REPLACEMENT: The definitive and corrected Question Registry
+// =============================================================================
 const questionRegistry = [
-    // --- 1. Evolutionary / Conserved ---
+    // --- 1. Meta & Introduction ---
+    { text: "What can you do?", handler: async () => tellAboutCiliAI() },
+    { text: "Tell me about yourself", handler: async () => tellAboutCiliAI() },
+
+    // --- 2. Evolutionary / Conserved ---
     { text: "Show evolutionary conservation of IFT88", handler: async () => getGeneConservation("IFT88") },
     { text: "List conserved ciliary genes between C. elegans and humans", handler: async () => getConservedGenesBetween(["C. elegans", "H.sapiens"]) },
     { text: "Which cilia-related genes are conserved in mammals?", handler: async () => getConservedGenesBetween(["H.sapiens", "M.musculus"]) },
     { text: "Describe the conservation level of CC2D1A in vertebrates", handler: async () => getGeneConservation("CC2D1A") },
-    { text: "Compare conservation between nematode and vertebrate ciliary genes", handler: async () => getConservedGenesBetween(["C. elegans", "H.sapiens", "M.musculus", "D.rerio"]) },
+    { text: "Which ciliary proteins have nematode and vertebrate homologs?", handler: async () => getConservedGenesBetween(["C. elegans", "H.sapiens", "M.musculus", "D.rerio"]) },
     { text: "What is the phylogeny of IFT88?", handler: async () => getGeneConservation("IFT88") },
-    { text: "Give evolutionary data for ARL13B", handler: async () => getGeneConservation("ARL13B") },
-    { text: "Tell me about evolutionary conservation of ARL13B", handler: async () => getGeneConservation("ARL13B") },
-    { text: "Let me know which ciliary genes are evolutionarily conserved", handler: async () => notImplementedYet("Evolutionary conserved genes") },
+    { text: "Evolutionary conservation of ARL13B", handler: async () => getGeneConservation("ARL13B") },
+    { text: "Is IFT88 conserved in C. elegans?", handler: async () => checkConservation("IFT88", "C. elegans") },
+    { text: "List all ciliary-only genes", handler: async () => getCiliaryOnlyGenes() },
 
-    // --- 2. List / Show / Display ---
+    // --- 3. List / Show / Display (General) ---
     { text: "List all genes localized to the transition zone", handler: async () => formatListResult("Genes at Transition Zone", await getGenesByLocalization("transition zone")) },
-    { text: "Display genes expressed in ciliated neurons", handler: async () => notImplementedYet("Genes expressed in ciliated neurons") },
-    { text: "Show ciliary transport genes in C. elegans", handler: async () => { const { genes, description, speciesCode } = await getCiliaryGenesForOrganism("C. elegans", "Transport"); return formatListResult(`Transport genes in ${speciesCode}`, genes, description); }},
     { text: "Give me the list of BBSome components", handler: async () => formatListResult("Components of BBSome", await getGenesByComplex("BBSome")) },
-    { text: "Provide genes that affect cilia length", handler: async () => getGenesByScreenPhenotype("cilia length") },
-    { text: "Let me know which genes affect cilia length", handler: async () => getGenesByScreenPhenotype("cilia length") },
-    { text: "Identify ciliary transport-related genes", handler: async () => formatListResult("IFT Genes", await getGenesByFunction("Transport")) },
+    { text: "Find all genes involved in intraflagellar transport (IFT)", handler: async () => formatListResult("IFT Genes", await getGenesByFunction("Transport")) },
     { text: "Tell me which kinases are associated with cilia", handler: async () => formatListResult("Ciliary Kinases", await getGenesByDomainDescription("kinase")) },
-    { text: "List all disease genes causing Joubert syndrome", handler: async () => { const { genes, description } = await getCiliopathyGenes("Joubert Syndrome"); return formatListResult("Genes for Joubert Syndrome", genes, description); }},
-    { text: "Show genes for Joubert syndrome", handler: async () => getCiliopathyGenes("Joubert Syndrome") },
-    { text: "What genes are involved in Joubert syndrome?", handler: async () => getCiliopathyGenes("Joubert Syndrome") },
+    { text: "Show me all ciliary genes", handler: async () => getAllCiliaryGenes() },
 
-    // --- 3. Describe / What is / Explain ---
+    // --- 4. Describe / What is / Explain (Gene Specific) ---
     { text: "Describe the function of KIF17", handler: async () => getGeneFunction("KIF17") },
     { text: "What is the role of CC2D1A in cilia?", handler: async () => getGeneFunction("CC2D1A") },
-    { text: "Show how CILK1 regulates cilia length", handler: async () => getGeneFunction("CILK1") },
-    { text: "Tell me about ARL13B in ciliary signaling", handler: async () => getGeneRole("ARL13B", "ciliary signaling") },
+    { text: "Explain how CILK1 regulates cilia length", handler: async () => getGeneFunction("CILK1") },
+    { text: "What does ARL13B do in ciliary signaling?", handler: async () => getGeneRole("ARL13B", "ciliary signaling") },
     { text: "Describe the localization of EFCAB7", handler: async () => getGeneLocalization("EFCAB7") },
-    { text: "Provide explanation for BBSome complex assembly", handler: async () => notImplementedYet("BBSome assembly mechanism") },
-    { text: "Compare IFT-A and IFT-B complexes", handler: async () => compareComplexes("IFT-A", "IFT-B") },
+    { text: "Explain what CEP290 does", handler: async () => getGeneFunction("CEP290") },
+    { text: "Where is IFT88 localized in the cell?", handler: async () => getGeneLocalization("IFT88") },
+    { text: "Show protein domains of WDR35", handler: async () => getGeneDomains("WDR35") },
+    { text: "Is DYNC2H1 a ciliary gene?", handler: async () => checkCiliaryStatus("DYNC2H1") },
 
-    // --- 4. Cilia-specific domain / Structure ---
+    // --- 5. Cilia-specific domain / Structure ---
     { text: "Show cilia-specific domains of KIF17", handler: async () => getGeneDomains("KIF17") },
     { text: "List domains of ARL13B mediating ciliary localization", handler: async () => getGeneDomains("ARL13B") },
     { text: "Identify proteins with ciliary targeting sequences (CTS)", handler: async () => formatListResult("Proteins with CTS", await getGenesWithDomain("CTS")) },
     { text: "Describe structural domains of IFT172", handler: async () => getGeneDomains("IFT172") },
     { text: "Which genes contain coiled-coil domains involved in ciliogenesis?", handler: async () => formatListResult("Ciliogenesis Genes with Coiled-Coil Domains", await getGenesWithDomain("coiled-coil")) },
 
-    // --- 5. Functional category / Pathway ---
+    // --- 6. Functional category / Pathway ---
     { text: "List genes involved in ciliary signaling pathways", handler: async () => formatListResult("Ciliary Signaling Genes", await getGenesByFunction("Signaling")) },
     { text: "Display components of Hedgehog signaling in cilia", handler: async () => getHedgehogRegulators("all") },
     { text: "Which genes function in retrograde IFT?", handler: async () => formatListResult("Retrograde IFT Genes", await getGenesByFunction("retrograde IFT")) },
-    { text: "Show genes required for basal body docking", handler: async () => formatListResult("Basal Body Docking Genes", await getGenesByFunction("basal body docking")) },
-    { text: "Provide proteins involved in cilia assembly and maintenance", handler: async () => formatListResult("Cilia Assembly/Maintenance Genes", await getGenesByFunction("Ciliary assembly")) },
-    { text: "What genes are part of the ciliogenesis pathway?", handler: async () => formatListResult("Ciliogenesis Pathway Genes", await getGenesByFunction("Ciliary assembly")) },
+    { text: "Display genes required for basal body docking", handler: async () => formatListResult("Basal Body Docking Genes", await getGenesByFunction("basal body docking")) },
+    { text: "List proteins involved in cilia assembly and maintenance", handler: async () => formatListResult("Cilia Assembly/Maintenance Genes", await getGenesByFunction("Ciliary assembly")) },
 
-    // --- 6. Ciliary disease / Syndrome / Phenotype ---
+    // --- 7. Ciliary disease / Syndrome / Phenotype ---
     { text: "List genes associated with Bardet–Biedl syndrome", handler: async () => { const { genes, description } = await getCiliopathyGenes("Bardet–Biedl syndrome"); return formatListResult("Genes for Bardet–Biedl syndrome", genes, description); }},
-    { text: "Show mutations in CILK1 causing cranioectodermal dysplasia", handler: async () => getGeneDiseases("CILK1") },
-    { text: "Display phenotypes observed in ift88 mutants", handler: async () => getKnockdownEffect("IFT88") },
     { text: "Which ciliary diseases are linked to transition zone defects?", handler: async () => notImplementedYet("Diseases linked to TZ defects") },
-    { text: "Describe phenotype of efcab7 loss in C. elegans", handler: async () => notImplementedYet("Phenotype of efcab7 loss") },
-    { text: "Identify all genes associated with ciliopathies", handler: async () => { const { genes, description } = await getCiliopathyGenes("ciliopathy"); return formatListResult("All Ciliopathy-Associated Genes", genes, description); }},
+    { text: "Find all genes associated with ciliopathies", handler: async () => { const { genes, description } = await getCiliopathyGenes("ciliopathy"); return formatListResult("All Ciliopathy-Associated Genes", genes, description); }},
+    { text: "Show genes for Joubert syndrome", handler: async () => { const { genes, description } = await getCiliopathyGenes("Joubert Syndrome"); return formatListResult("Genes for Joubert Syndrome", genes, description); }},
+    { text: "What genes are involved in Meckel-Gruber Syndrome?", handler: async () => { const { genes, description } = await getCiliopathyGenes("Meckel-Gruber Syndrome"); return formatListResult("Genes for Meckel-Gruber Syndrome", genes, description); }},
 
-    // --- 7. Comparison / Difference ---
+    // --- 8. Comparison / Difference ---
     { text: "Compare IFT-A and IFT-B complex composition", handler: async () => compareComplexes("IFT-A", "IFT-B") },
     { text: "What’s the difference between KIF17 and KIF3A functions?", handler: async () => compareGenes("KIF17", "KIF3A") },
-    { text: "Show comparison of cilia gene expression between C. elegans and mouse", handler: async () => notImplementedYet("Cross-species expression comparison") },
 
-    // --- 8. Predict / Identify ---
-    { text: "Predict potential ciliary genes using co-expression data", handler: async () => notImplementedYet("Prediction of ciliary genes") },
-    { text: "Identify candidate ciliary kinases", handler: async () => notImplementedYet("Identification of candidate kinases") },
-    { text: "List novel ciliary proteins not yet annotated", handler: async () => notImplementedYet("Discovery of novel ciliary proteins") },
-      // --- 9. single cell RNA-seq ---
-    {text: "What is the expression of ARL13B in ciliated cells?", handler: async () => getGeneExpressionInCellType("ARL13B", "ciliated cell")},
-    {text: "Show expression of FOXJ1 in ciliated cells", handler: async () => getGeneExpressionInCellType("FOXJ1", "ciliated cell")},
-    {text: "Show single-cell expression of ARL13B",handler: async () => displayCellxgeneBarChart(["ARL13b"])},
-    {text: "Plot single-cell expression for FOXJ1",handler: async () => displayCellxgeneBarChart(["FOXJ1"])},
-    {text: "Compare expression of ARL13B and FOXJ1 in single cells",handler: async () => displayCellxgeneBarChart(["ARL13B", "FOXJ1"])},
-    {text: "Show the UMAP plot of all cell types",handler: async () => displayUmapPlot()},
-    {text: "Which Joubert Syndrome genes are expressed in ciliated cells?",handler: async () => {const results = await findDiseaseGenesByCellExpression("Joubert Syndrome", "ciliated cell");
-        return formatListResult("Joubert Genes Expressed in Ciliated Cells", results);}},
-    {text: "List top expressed ciliary genes in ciliated cells",handler: async () => {
-        // This is a simplified version for demonstration. A more robust function could be written.
-        const allCiliary = await getAllCiliaryGenes(); // This returns a formatted string, we need raw data 
+    // --- 9. Single-Cell RNA-seq ---
+    { text: "What is the expression of ARL13B in ciliated cells?", handler: async () => getGeneExpressionInCellType("ARL13B", "ciliated cell")},
+    { text: "Show expression of FOXJ1 in ciliated cells", handler: async () => getGeneExpressionInCellType("FOXJ1", "ciliated cell")},
+    { text: "Show single-cell expression of ARL13B", handler: async () => displayCellxgeneBarChart(["ARL13B"])},
+    { text: "Plot single-cell expression for FOXJ1", handler: async () => displayCellxgeneBarChart(["FOXJ1"])},
+    { text: "Compare expression of ARL13B and FOXJ1 in single cells", handler: async () => displayCellxgeneBarChart(["ARL13B", "FOXJ1"])},
+    { text: "Plot UMAP expression for FOXJ1", handler: async () => displayUmapGeneExpression("FOXJ1")},
+    { text: "Show ARL13B expression on the UMAP", handler: async () => displayUmapGeneExpression("ARL13B")},
+    { text: "Show the UMAP plot of all cell types", handler: async () => displayUmapPlot() },
+    { text: "Which Joubert Syndrome genes are expressed in ciliated cells?", handler: async () => { const results = await findDiseaseGenesByCellExpression("Joubert Syndrome", "ciliated cell"); return formatListResult("Joubert Genes Expressed in Ciliated Cells", results); }},
+    { text: "List top expressed ciliary genes in ciliated cells", handler: async () => {
         if (!cellxgeneDataCache) await fetchCellxgeneData();
+        if (!ciliaHubDataCache) await fetchCiliaData();
         const ciliaryGeneSet = new Set(ciliaHubDataCache.map(g => g.gene.toUpperCase()));
         const expressedCiliaryGenes = [];
         Object.entries(cellxgeneDataCache).forEach(([gene, cellData]) => {
-            if (ciliaryGeneSet.has(gene) && cellData["ciliated cell"] > 0.01) {
+            if (ciliaryGeneSet.has(gene) && cellData["ciliated cell"] && cellData["ciliated cell"] > 0.01) {
                 expressedCiliaryGenes.push({
                     gene: gene,
                     description: `Expression: ${cellData["ciliated cell"].toFixed(4)}`,
@@ -234,12 +249,14 @@ const questionRegistry = [
             }
         });
         expressedCiliaryGenes.sort((a, b) => b.expression - a.expression);
-        return formatListResult("Top Ciliary Genes in Ciliated Cells", expressedCiliaryGenes.slice(0, 50));
-    }
-}
+        return formatListResult("Top 50 Ciliary Genes in Ciliated Cells", expressedCiliaryGenes.slice(0, 50));
+    }},
+    
+    // --- 10. Predict / Identify (Placeholders) ---
+    { text: "Predict potential ciliary genes using co-expression data", handler: async () => notImplementedYet("Prediction of ciliary genes") },
+    { text: "Identify candidate ciliary kinases", handler: async () => notImplementedYet("Identification of candidate kinases") },
+    { text: "List novel ciliary proteins not yet annotated", handler: async () => notImplementedYet("Discovery of novel ciliary proteins") }
 ];
-
-
 // --- ADDITION: New Helper Functions for Expanded Questions ---
 function notImplementedYet(feature) {
     return `<div class="result-card"><h3>Feature In Development</h3><p>The query handler for "<strong>${feature}</strong>" is not yet implemented. Stay tuned for future updates!</p></div>`;
@@ -284,22 +301,16 @@ async function displayCellxgeneBarChart(geneSymbols) {
     const plotData = [];
     const allCellTypes = new Set();
     
-    // Create a "trace" for each gene
     for (const gene of geneSymbols) {
         // CORRECTED: Convert gene symbol to uppercase for lookup
         const geneUpper = gene.toUpperCase();
         const geneData = cellxgeneDataCache[geneUpper];
 
         if (geneData) {
-            const sortedData = Object.entries(geneData).sort((a, b) => a[0].localeCompare(b[0]));
-            const cellTypes = sortedData.map(([cell]) => cell);
-            const expressionValues = sortedData.map(([, value]) => value);
-            
-            cellTypes.forEach(ct => allCellTypes.add(ct));
-
+            Object.keys(geneData).forEach(ct => allCellTypes.add(ct));
             plotData.push({
-                x: cellTypes,
-                y: expressionValues,
+                x: Object.keys(geneData),
+                y: Object.values(geneData),
                 name: gene, // Keep original casing for the legend
                 type: 'bar'
             });
@@ -339,7 +350,59 @@ async function displayCellxgeneBarChart(geneSymbols) {
     return "";
 }
 
+/**
+ * Displays a UMAP plot where each cell is colored by the expression of a specific gene.
+ * @param {string} geneSymbol The gene to visualize.
+ */
+async function displayUmapGeneExpression(geneSymbol) {
+    // Ensure both UMAP coordinates and cell expression data are loaded
+    const [umapData, cellData] = await Promise.all([fetchUmapData(), fetchCellxgeneData()]);
+    const resultArea = document.getElementById('ai-result-area');
 
+    if (!umapData || !cellData) {
+        return `<div class="result-card"><h3>UMAP Expression Plot</h3><p class="status-not-found">Could not load UMAP or Cellxgene data. Check console for errors.</p></div>`;
+    }
+
+    const geneUpper = geneSymbol.toUpperCase();
+    const geneExpressionMap = cellData[geneUpper];
+
+    if (!geneExpressionMap) {
+        return `<div class="result-card"><h3>${geneSymbol} Expression</h3><p class="status-not-found">Gene "${geneSymbol}" not found in the single-cell expression dataset.</p></div>`;
+    }
+
+    // Create an array of expression values for each cell based on its type
+    const expressionValues = umapData.map(cell => geneExpressionMap[cell.cell_type] || 0);
+
+    const plotData = [{
+        x: umapData.map(p => p.x),
+        y: umapData.map(p => p.y),
+        mode: 'markers',
+        type: 'scattergl', // Use WebGL for performance with many points
+        hovertext: umapData.map((p, i) => `Cell Type: ${p.cell_type}<br>Expression: ${expressionValues[i].toFixed(4)}`),
+        hoverinfo: 'text',
+        marker: {
+            color: expressionValues,
+            colorscale: 'Viridis', // A colorblind-friendly scale
+            showscale: true,
+            colorbar: {
+                title: 'Expression'
+            },
+            size: 4,
+            opacity: 0.7
+        }
+    }];
+
+    const layout = {
+        title: `UMAP Colored by ${geneSymbol} Expression`,
+        xaxis: { title: 'UMAP 1' },
+        yaxis: { title: 'UMAP 2' },
+        hovermode: 'closest'
+    };
+
+    resultArea.innerHTML = `<div class="result-card"><div id="umap-expression-plot-div"></div></div>`;
+    Plotly.newPlot('umap-expression-plot-div', plotData, layout, { responsive: true });
+    return ""; // The function handles its own rendering
+}
 /**
  * Finds genes associated with a specific disease that are highly expressed in a given cell type.
  * @param {string} disease The name of the ciliopathy.
@@ -966,8 +1029,6 @@ async function getComprehensiveDetails(term) {
     return formatComprehensiveGeneDetails(upperTerm, geneData); // Re-use the existing detailed formatter
 }
 
-
-
 // --- Main Page Display Function (REPLACEMENT) ---
 window.displayCiliAIPage = async function displayCiliAIPage() {
     const contentArea = document.querySelector('.content-area');
@@ -994,71 +1055,29 @@ window.displayCiliAIPage = async function displayCiliAIPage() {
                     <div class="ai-query-section">
                         <h3>Ask a Question</h3>
                         <div class="ai-input-group autocomplete-wrapper">
-                            <input type="text" id="aiQueryInput" class="ai-query-input" placeholder="e.g., Joubert or BBSome...">
+                            <input type="text" id="aiQueryInput" class="ai-query-input" placeholder="What's on your mind? e.g., Joubert or BBSome...">
                             <div id="aiQuerySuggestions" class="suggestions-container"></div>
                             <button class="ai-query-btn" id="aiQueryBtn">Ask CiliAI</button>
                         </div>
                         <div class="example-queries">
                             <p>
                                 <strong>Try asking:</strong> 
-                                <span data-question="BBSome">BBSome</span>, 
-                                <span data-question="Joubert">Joubert</span>, 
-                                <span data-question="basal body">basal body</span>,
-                                <span data-question="c. elegans">c. elegans</span>,
-                                <span data-question="WD40">WD40</span>,
-                                <span data-question="Expression of ARL13B">Expression of ARL13B</span>,
-                                <span data-question="ciliary-only genes">ciliary-only genes</span>
+                                <span data-question="Joubert syndrome">Joubert syndrome</span>, 
+                                <span data-question="c. elegans">c. elegans</span>, 
+                                <span data-question="Plot UMAP expression for FOXJ1">UMAP plot for FOXJ1</span>,
+                                <span data-question="Compare ARL13B and FOXJ1 expression in lung scRNA-seq">Compare ARL13B vs FOXJ1</span>,
+                                <span data-question="Which Joubert Syndrome genes are expressed in ciliated cells?">Joubert genes in ciliated cells</span>,
+                                <span data-question="Tell me about yourself">About CiliAI</span>
                             </p>
                         </div>
                         <div id="ai-result-area" class="results-section" style="display: none; margin-top: 1.5rem; padding: 1rem;"></div>
                     </div>
                     
                     <div class="input-section">
-                        <h3>Analyze Gene Phenotypes</h3>
-                        <div class="input-group">
-                            <label for="geneInput">Gene Symbols:</label>
-                            <div class="autocomplete-wrapper">
-                                <textarea id="geneInput" class="gene-input-textarea" placeholder="Start typing a gene symbol (e.g., IFT88)..."></textarea>
-                                <div id="geneSuggestions" class="suggestions-container"></div>
-                            </div>
                         </div>
-                        <div class="input-group">
-                            <label>Analysis Mode:</label>
-                            <div class="mode-selector">
-                                <div class="mode-option">
-                                    <input type="radio" id="hybrid" name="mode" value="hybrid" checked aria-label="Hybrid mode">
-                                    <label for="hybrid" title="Combines database, screen data, and real-time AI literature mining.">
-                                        <span class="mode-icon">🔬</span>
-                                        <div><strong>Hybrid</strong><br><small>DB + Screens + Literature</small></div>
-                                    </label>
-                                </div>
-                                <div class="mode-option">
-                                    <input type="radio" id="expert" name="mode" value="expert" aria-label="Expert only mode">
-                                    <label for="expert" title="Queries only our internal database and screen data.">
-                                        <span class="mode-icon">🏛️</span>
-                                        <div><strong>Expert Only</strong><br><small>Curated DB + Screens</small></div>
-                                    </label>
-                                </div>
-                                <div class="mode-option">
-                                    <input type="radio" id="nlp" name="mode" value="nlp" aria-label="Literature only mode">
-                                    <label for="nlp" title="Performs a live AI-powered search across PubMed.">
-                                        <span class="mode-icon">📚</span>
-                                        <div><strong>Literature Only</strong><br><small>Live AI text mining</small></div>
-                                    </label>
-                                </div>
-                            </div>
-                        </div>
-                        <button class="analyze-btn" id="analyzeBtn">🔍 Analyze Genes</button>
-                    </div>
-                    <div id="resultsSection" class="results-section" style="display: none;">
-                        <h2>Analysis Results</h2>
-                        <button class="visualize-btn" id="visualizeBtn" style="display: none;">📊 Visualize Results</button>
-                        <div id="plot-display-area" style="margin-top: 1rem;"></div>
-                        <div id="resultsContainer"></div>
-                    </div>
                 </div>
             </div>
-            <style>
+            <style>                
                 .ciliai-container { font-family: 'Arial', sans-serif; max-width: 950px; margin: 2rem auto; padding: 2rem; background-color: #f9f9f9; border-radius: 12px; }
                 .ciliai-header { text-align: center; margin-bottom: 2rem; }
                 .ciliai-header h1 { font-size: 2.8rem; color: #2c5aa0; margin: 0; }
@@ -1093,7 +1112,7 @@ window.displayCiliAIPage = async function displayCiliAIPage() {
                 .suggestion-item { padding: 10px; cursor: pointer; }
                 .suggestion-item:hover { background-color: #f0f0f0; }
             </style>
-        `;
+       `;
     } catch (error) {
         console.error('Failed to inject CiliAI HTML:', error);
         contentArea.innerHTML = '<p>Error: Failed to load CiliAI interface.</p>';
@@ -1545,42 +1564,6 @@ async function getCiliaryGenesForOrganism(organismName) {
     };
 }
 
-async function displayUmapPlot() {
-    const data = await fetchUmapData();
-    const resultArea = document.getElementById('ai-result-area');
-    
-    if (!data) {
-        return `<div class="result-card"><h3>UMAP Plot</h3><p class="status-not-found">Could not load pre-computed UMAP data.</p></div>`;
-    }
-
-    const cellTypes = [...new Set(data.map(d => d.cell_type))];
-    const plotData = [];
-
-    // Create a separate trace for each cell type to color them differently
-    for (const cellType of cellTypes) {
-        const points = data.filter(d => d.cell_type === cellType);
-        plotData.push({
-            x: points.map(p => p.x),
-            y: points.map(p => p.y),
-            name: cellType,
-            mode: 'markers',
-            type: 'scatter',
-            marker: { size: 4, opacity: 0.7 }
-        });
-    }
-
-    const layout = {
-        title: 'UMAP of Single-Cell Gene Expression',
-        xaxis: { title: 'UMAP 1' },
-        yaxis: { title: 'UMAP 2' },
-        hovermode: 'closest'
-    };
-    
-    resultArea.innerHTML = `<div class="result-card"><div id="umap-plot-div"></div></div>`;
-    Plotly.newPlot('umap-plot-div', plotData, layout, { responsive: true });
-    return ""; // The function handles its own rendering
-}
-
 
 // --- Main AI Query Handler (REPLACEMENT) ---
 window.handleAIQuery = async function() {
@@ -1590,40 +1573,37 @@ window.handleAIQuery = async function() {
     if (!query) return;
 
     resultArea.style.display = 'block';
-    resultArea.innerHTML = `<p class="status-searching">CiliAI is thinking...</p>`;
-    await Promise.all([fetchCiliaData(), fetchScreenData(), fetchPhylogenyData(), fetchTissueData(), fetchCellxgeneData(), fetchUmapData()]);
-
-    let resultHtml = '';
-    const qLower = query.toLowerCase();
-    let match;
-
+    resultArea.innerHTML = `<p class="status-searching">CiliAI is thinking... 🧠</p>`;
+    
     try {
-        // PRIORITY 1: Check for an exact match in the question registry first.
+        await Promise.all([fetchCiliaData(), fetchScreenData(), fetchPhylogenyData(), fetchTissueData(), fetchCellxgeneData(), fetchUmapData()]);
+
+        let resultHtml = '';
+        const qLower = query.toLowerCase();
+        let match;
+
+        // PRIORITY 1: Check for an exact match in the question registry
         const perfectMatch = questionRegistry.find(item => item.text.toLowerCase() === qLower);
         if (perfectMatch) {
             console.log(`Registry match found: "${perfectMatch.text}"`);
             resultHtml = await perfectMatch.handler();
         }
-        // PRIORITY 2: Handle conversational "Tell me about..." queries.
+        // PRIORITY 2: Handle conversational queries
         else if ((match = qLower.match(/(?:tell me about|what is|describe)\s+(.+)/i))) {
             const term = match[1].trim();
             resultHtml = await getComprehensiveDetails(term);
         }
-        // PRIORITY 3: Use the existing intent parser for keyword-based queries.
+        // PRIORITY 3: Use the intent parser for keywords
         else {
             const intent = intentParser.parse(query);
             if (intent && typeof intent.handler === 'function') {
                 console.log(`Intent parser match found: ${intent.intent} for entity: ${intent.entity}`);
                 resultHtml = await intent.handler(intent.entity);
             }
-            // PRIORITY 4: Fallback for any remaining specific patterns.
-            else if ((match = qLower.match(/expression of\s+([a-z0-9\-]+)/i))) {
-                const gene = match[1].toUpperCase();
-                await displayCiliAIExpressionHeatmap([gene], resultArea, window.tissueDataCache);
-                return;
-            } else if (qLower.includes('ciliary-only genes')) {
-                const { label, genes } = await getPhylogenyGenes({ type: 'ciliary_only_list' });
-                resultHtml = formatListResult(label, genes);
+            // PRIORITY 4: ADDITION - Handle standalone gene name query
+            else if (ciliaHubDataCache.some(g => g.gene.toUpperCase() === query.toUpperCase())) {
+                console.log(`Standalone gene match found: "${query}"`);
+                resultHtml = await getComprehensiveDetails(query);
             }
             // FINAL FALLBACK
             else {
@@ -1632,12 +1612,10 @@ window.handleAIQuery = async function() {
         }
         resultArea.innerHTML = resultHtml;
     } catch (e) {
-        resultArea.innerHTML = `<p class="status-not-found">An error occurred during your query. Check the console for details.</p>`;
+        resultArea.innerHTML = `<p class="status-not-found">An error occurred during your query: ${e.message}. Check the console for details.</p>`;
         console.error("CiliAI Query Error:", e);
     }
 };
-
-
 
 // Helper for the comparison query (updated titles and threshold)
 function formatComparisonResult(title, tissue, list1, list2) {
