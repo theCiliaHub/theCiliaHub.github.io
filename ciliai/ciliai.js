@@ -212,8 +212,8 @@ const questionRegistry = [
       // --- 9. single cell RNA-seq ---
     {text: "What is the expression of ARL13B in ciliated cells?", handler: async () => getGeneExpressionInCellType("ARL13B", "ciliated cell")},
     {text: "Show expression of FOXJ1 in ciliated cells", handler: async () => getGeneExpressionInCellType("FOXJ1", "ciliated cell")},
-    {text: "Show single-cell expression of ARL13B",handler: async () => displayCellxgeneBarChart("ARL13B")},
-    {text: "Plot single-cell expression for FOXJ1",handler: async () => displayCellxgeneBarChart("FOXJ1")},
+    {text: "Show single-cell expression of ARL13B",handler: async () => displayCellxgeneBarChart(["ARL13b"])},
+    {text: "Plot single-cell expression for FOXJ1",handler: async () => displayCellxgeneBarChart(["FOXJ1"])},
     {text: "Compare expression of ARL13B and FOXJ1 in single cells",handler: async () => displayCellxgeneBarChart(["ARL13B", "FOXJ1"])},
     {text: "Show the UMAP plot of all cell types",handler: async () => displayUmapPlot()},
     {text: "Which Joubert Syndrome genes are expressed in ciliated cells?",handler: async () => {const results = await findDiseaseGenesByCellExpression("Joubert Syndrome", "ciliated cell");
@@ -286,6 +286,7 @@ async function displayCellxgeneBarChart(geneSymbols) {
     
     // Create a "trace" for each gene
     for (const gene of geneSymbols) {
+        // CORRECTED: Convert gene symbol to uppercase for lookup
         const geneUpper = gene.toUpperCase();
         const geneData = cellxgeneDataCache[geneUpper];
 
@@ -299,19 +300,19 @@ async function displayCellxgeneBarChart(geneSymbols) {
             plotData.push({
                 x: cellTypes,
                 y: expressionValues,
-                name: gene,
+                name: gene, // Keep original casing for the legend
                 type: 'bar'
             });
         }
     }
 
     if (plotData.length === 0) {
-        return `<div class="result-card"><h3>Expression Plot</h3><p class="status-not-found">None of the specified genes were found in the single-cell dataset.</p></div>`;
+        return `<div class="result-card"><h3>Expression Plot</h3><p class="status-not-found">None of the specified genes (${geneSymbols.join(', ')}) were found in the single-cell dataset.</p></div>`;
     }
 
     const layout = {
         title: `Single-Cell Expression Comparison`,
-        barmode: 'group', // This is the key to creating a grouped chart
+        barmode: 'group',
         xaxis: {
             title: 'Cell Type',
             tickangle: -45,
@@ -333,9 +334,11 @@ async function displayCellxgeneBarChart(geneSymbols) {
             </p>
         </div>
     `;
+
     Plotly.newPlot('cellxgene-plot-div', plotData, layout, { responsive: true });
-    return ""; // The function handles its own rendering
+    return "";
 }
+
 
 /**
  * Finds genes associated with a specific disease that are highly expressed in a given cell type.
@@ -1852,6 +1855,14 @@ function setupAiQueryAutocomplete() {
     const aiQueryInput = document.getElementById('aiQueryInput');
     const suggestionsContainer = document.getElementById('aiQuerySuggestions');
     if (!aiQueryInput || !suggestionsContainer) return;
+
+    // CORRECTED: Moved triggerWords to the top-level scope of the function
+    const triggerWords = [
+        "list", "compare", "identify", "which", "what", "predict",
+        "display", "describe", "show", "give", "provide", "tell me",
+        "evolutionary", "let me"
+    ];
+
     aiQueryInput.addEventListener('input', debounce(async () => {
         const inputText = aiQueryInput.value.toLowerCase();
         let suggestions = new Set();
@@ -1859,20 +1870,15 @@ function setupAiQueryAutocomplete() {
         if (inputText.length < 3) {
             suggestionsContainer.style.display = 'none';
             return;
-            const triggerWords = [
-    "list", "compare", "identify", "which", "what", "predict",
-    "display", "describe", "show", "give", "provide", "tell me",
-    "evolutionary", "let me"
-];
         }
 
         // --- Provider 1: Full questions from the registry ---
-       questionRegistry
-    .filter(item =>
-        item.text.toLowerCase().includes(inputText) ||
-        triggerWords.some(word => inputText.startsWith(word))
-    )
-    .forEach(item => suggestions.add(item.text));
+        questionRegistry
+            .filter(item =>
+                item.text.toLowerCase().includes(inputText) ||
+                triggerWords.some(word => inputText.startsWith(word))
+            )
+            .forEach(item => suggestions.add(item.text));
 
         // --- Provider 2: "Tell me about..." for genes and complexes ---
         if (inputText.startsWith('tell me') || inputText.startsWith('what is') || inputText.startsWith('describe')) {
@@ -1917,6 +1923,7 @@ function setupAiQueryAutocomplete() {
         }
     });
 }
+
 
 // Weighted keyword ranking for smarter autocomplete
 function rankQuestions(query, questions) {
