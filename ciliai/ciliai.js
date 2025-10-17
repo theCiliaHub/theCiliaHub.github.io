@@ -148,6 +148,7 @@ const intentParser = createIntentParser();
 // ADDITION: The new Question Registry and its required placeholder functions.
 // Place this code block after your CILI_AI_DB object.
 // =============================================================================
+let questionRegistry = [];
 const fixedQuestionRegistry = [
     // --- Localization Questions ---
     { text: "Show all genes found at the transition zone", handler: () => getGenesByLocalization("transition zone") },
