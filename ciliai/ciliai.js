@@ -50,25 +50,19 @@ function createIntentParser() {
     const entityKeywords = [
         {
             type: 'FUNCTIONAL_CATEGORY',
-            keywords: ['kinesin motors', 'dynein motors', 'Ciliary assembly/disassembly', 'Signaling', 'Motile cilium', 'Motor protein', 'Transport', 'Protein modification', 'Cytoskeletal'],
-            handler: async (term) => {
-                const results = await getGenesByFunction(term);
-                return formatListResult(`Genes in Functional Category: ${term}`, results);
-            },
+            keywords: ['kinesin motors', 'dynein motors', 'Ciliary assembly/disassembly', 'Signaling', 'Motile cilium', 'Motor protein', 'Transport', 'Protein modification', 'Cytoskeletal', 'cilium assembly', 'basal body docking', 'retrograde IFT'],
+            handler: async (term) => formatListResult(`Genes in Functional Category: ${term}`, await getGenesByFunction(term)),
             autocompleteTemplate: (term) => `Show me ${term} genes`
         },
         {
             type: 'COMPLEX',
             keywords: ['BBSome', 'IFT-A', 'IFT-B', 'Transition Zone Complex', 'MKS Complex', 'NPHP Complex'],
-            handler: async (term) => {
-                const results = await getGenesByComplex(term);
-                return formatListResult(`Components of ${term}`, results);
-            },
+            handler: async (term) => formatListResult(`Components of ${term}`, await getGenesByComplex(term)),
             autocompleteTemplate: (term) => `Display components of ${term} complex`
         },
         {
             type: 'CILIOPATHY',
-            keywords: [...new Set(allDiseases)], // Using the full, restored disease list
+            keywords: [...new Set(allDiseases)],
             handler: async (term) => {
                 const titleTerm = term.toUpperCase() === 'BBS' ? 'Bardet–Biedl Syndrome' :
                                   term.toUpperCase() === 'MKS' ? 'Meckel–Gruber Syndrome' : term;
@@ -79,11 +73,8 @@ function createIntentParser() {
         },
         {
             type: 'LOCALIZATION',
-            keywords: ['basal body', 'axoneme', 'transition zone', 'centrosome', 'cilium', 'lysosome'],
-            handler: async (term) => {
-                const results = await getGenesByLocalization(term);
-                return formatListResult(`Genes localizing to ${term}`, results);
-            },
+            keywords: ['basal body', 'axoneme', 'transition zone', 'centrosome', 'cilium', 'lysosome', 'ciliary tip', 'transition fiber'],
+            handler: async (term) => formatListResult(`Genes localizing to ${term}`, await getGenesByLocalization(term)),
             autocompleteTemplate: (term) => `Show me ${term} localizing genes`
         },
         {
@@ -115,11 +106,8 @@ function createIntentParser() {
         },
         {
             type: 'DOMAIN',
-            keywords: ['WD40', 'Leucine-rich repeat', 'IQ motif', 'calmodulin-binding', 'EF-hand'],
-            handler: async (term) => {
-                const results = await getGenesWithDomain(term);
-                return formatListResult(`${term} domain-containing proteins`, results);
-            },
+            keywords: ['WD40', 'Leucine-rich repeat', 'IQ motif', 'calmodulin-binding', 'EF-hand', 'coiled-coil', 'CTS', 'ciliary targeting sequences', 'ciliary localization signals'],
+            handler: async (term) => formatListResult(`${term} domain-containing proteins`, await getGenesWithDomain(term)),
             autocompleteTemplate: (term) => `Show ${term} domain containing proteins`
         }
     ];
@@ -130,7 +118,7 @@ function createIntentParser() {
             for (const entityType of entityKeywords) {
                 const sortedKeywords = [...entityType.keywords].sort((a, b) => b.length - a.length);
                 for (const keyword of sortedKeywords) {
-                    const keywordRegex = new RegExp(`\\b${normalizeTerm(keyword).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`);
+                    const keywordRegex = new RegExp(`\\b${normalizeTerm(keyword).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
                     if (keywordRegex.test(normalizedQuery)) {
                         return { intent: entityType.type, entity: keyword, handler: entityType.handler };
                     }
@@ -140,76 +128,79 @@ function createIntentParser() {
         },
         getKnownKeywords: () => entityKeywords.flatMap(e => e.keywords.map(k => ({ keyword: k, suggestion: e.autocompleteTemplate(k) }))),
         getAllDiseases: () => [...new Set(allDiseases)],
-        getAllComplexes: () => entityKeywords.find(e => e.type === 'COMPLEX').keywords
+        getAllComplexes: () => entityKeywords.find(e => e.type === 'COMPLEX').keywords,
+        getAllGenes: () => ciliaHubDataCache ? ciliaHubDataCache.map(g => g.gene) : []
     };
 }
+
 
 const intentParser = createIntentParser();
 
 // =============================================================================
 // ADDITION: The new Question Registry and its required placeholder functions.
 // Place this code block after your CILI_AI_DB object.
-// =============================================================================
-// =============================================================================
-// REPLACEMENT: Comprehensive Question Registry & New Helper Functions
-// =============================================================================
 const questionRegistry = [
     // --- 1. Evolutionary / Conserved ---
     { text: "Show evolutionary conservation of IFT88", handler: async () => getGeneConservation("IFT88") },
     { text: "List conserved ciliary genes between C. elegans and humans", handler: async () => getConservedGenesBetween(["C. elegans", "H.sapiens"]) },
     { text: "Which cilia-related genes are conserved in mammals?", handler: async () => getConservedGenesBetween(["H.sapiens", "M.musculus"]) },
     { text: "Describe the conservation level of CC2D1A in vertebrates", handler: async () => getGeneConservation("CC2D1A") },
-    { text: "Which ciliary proteins have nematode and vertebrate homologs?", handler: async () => getConservedGenesBetween(["C. elegans", "H.sapiens", "M.musculus", "D.rerio"]) },
+    { text: "Compare conservation between nematode and vertebrate ciliary genes", handler: async () => getConservedGenesBetween(["C. elegans", "H.sapiens", "M.musculus", "D.rerio"]) },
     { text: "What is the phylogeny of IFT88?", handler: async () => getGeneConservation("IFT88") },
-    { text: "Evolutionary conservation of ARL13B", handler: async () => getGeneConservation("ARL13B") },
+    { text: "Give evolutionary data for ARL13B", handler: async () => getGeneConservation("ARL13B") },
+    { text: "Tell me about evolutionary conservation of ARL13B", handler: async () => getGeneConservation("ARL13B") },
+    { text: "Let me know which ciliary genes are evolutionarily conserved", handler: async () => notImplementedYet("Evolutionary conserved genes") },
 
     // --- 2. List / Show / Display ---
     { text: "List all genes localized to the transition zone", handler: async () => formatListResult("Genes at Transition Zone", await getGenesByLocalization("transition zone")) },
-    { text: "Show genes expressed in ciliated neurons", handler: async () => notImplementedYet("Genes expressed in ciliated neurons (requires cell-type specific expression data)") },
-    { text: "Display ciliary transport genes in C. elegans", handler: async () => { const { genes, description, speciesCode } = await getCiliaryGenesForOrganism("C. elegans", "Transport"); return formatListResult(`Transport genes in ${speciesCode}`, genes, description); }},
+    { text: "Display genes expressed in ciliated neurons", handler: async () => notImplementedYet("Genes expressed in ciliated neurons") },
+    { text: "Show ciliary transport genes in C. elegans", handler: async () => { const { genes, description, speciesCode } = await getCiliaryGenesForOrganism("C. elegans", "Transport"); return formatListResult(`Transport genes in ${speciesCode}`, genes, description); }},
     { text: "Give me the list of BBSome components", handler: async () => formatListResult("Components of BBSome", await getGenesByComplex("BBSome")) },
+    { text: "Provide genes that affect cilia length", handler: async () => getGenesByScreenPhenotype("cilia length") },
     { text: "Let me know which genes affect cilia length", handler: async () => getGenesByScreenPhenotype("cilia length") },
-    { text: "Find all genes involved in intraflagellar transport (IFT)", handler: async () => formatListResult("IFT Genes", await getGenesByFunction("Transport")) },
+    { text: "Identify ciliary transport-related genes", handler: async () => formatListResult("IFT Genes", await getGenesByFunction("Transport")) },
     { text: "Tell me which kinases are associated with cilia", handler: async () => formatListResult("Ciliary Kinases", await getGenesByDomainDescription("kinase")) },
     { text: "List all disease genes causing Joubert syndrome", handler: async () => { const { genes, description } = await getCiliopathyGenes("Joubert Syndrome"); return formatListResult("Genes for Joubert Syndrome", genes, description); }},
-    
+    { text: "Show genes for Joubert syndrome", handler: async () => getCiliopathyGenes("Joubert Syndrome") },
+    { text: "What genes are involved in Joubert syndrome?", handler: async () => getCiliopathyGenes("Joubert Syndrome") },
+
     // --- 3. Describe / What is / Explain ---
     { text: "Describe the function of KIF17", handler: async () => getGeneFunction("KIF17") },
     { text: "What is the role of CC2D1A in cilia?", handler: async () => getGeneFunction("CC2D1A") },
-    { text: "Explain how CILK1 regulates cilia length", handler: async () => getGeneFunction("CILK1") },
-    { text: "What does ARL13B do in ciliary signaling?", handler: async () => getGeneRole("ARL13B", "ciliary signaling") },
+    { text: "Show how CILK1 regulates cilia length", handler: async () => getGeneFunction("CILK1") },
+    { text: "Tell me about ARL13B in ciliary signaling", handler: async () => getGeneRole("ARL13B", "ciliary signaling") },
     { text: "Describe the localization of EFCAB7", handler: async () => getGeneLocalization("EFCAB7") },
-    { text: "Explain how the BBSome complex is assembled", handler: async () => notImplementedYet("Detailed mechanism of BBSome assembly") },
-    { text: "What is the function of IFT-A and IFT-B complexes?", handler: async () => compareComplexes("IFT-A", "IFT-B") },
+    { text: "Provide explanation for BBSome complex assembly", handler: async () => notImplementedYet("BBSome assembly mechanism") },
+    { text: "Compare IFT-A and IFT-B complexes", handler: async () => compareComplexes("IFT-A", "IFT-B") },
 
     // --- 4. Cilia-specific domain / Structure ---
     { text: "Show cilia-specific domains of KIF17", handler: async () => getGeneDomains("KIF17") },
-    { text: "Which domains of ARL13B mediate ciliary localization?", handler: async () => getGeneDomains("ARL13B") },
-    { text: "List proteins with ciliary targeting sequences (CTS)", handler: async () => formatListResult("Proteins with CTS", await getGenesWithDomain("CTS")) },
+    { text: "List domains of ARL13B mediating ciliary localization", handler: async () => getGeneDomains("ARL13B") },
+    { text: "Identify proteins with ciliary targeting sequences (CTS)", handler: async () => formatListResult("Proteins with CTS", await getGenesWithDomain("CTS")) },
     { text: "Describe structural domains of IFT172", handler: async () => getGeneDomains("IFT172") },
     { text: "Which genes contain coiled-coil domains involved in ciliogenesis?", handler: async () => formatListResult("Ciliogenesis Genes with Coiled-Coil Domains", await getGenesWithDomain("coiled-coil")) },
-    
+
     // --- 5. Functional category / Pathway ---
     { text: "List genes involved in ciliary signaling pathways", handler: async () => formatListResult("Ciliary Signaling Genes", await getGenesByFunction("Signaling")) },
-    { text: "Show components of the Hedgehog signaling in cilia", handler: async () => getHedgehogRegulators("all") },
+    { text: "Display components of Hedgehog signaling in cilia", handler: async () => getHedgehogRegulators("all") },
     { text: "Which genes function in retrograde IFT?", handler: async () => formatListResult("Retrograde IFT Genes", await getGenesByFunction("retrograde IFT")) },
-    { text: "Display genes required for basal body docking", handler: async () => formatListResult("Basal Body Docking Genes", await getGenesByFunction("basal body docking")) },
-    { text: "List proteins involved in cilia assembly and maintenance", handler: async () => formatListResult("Cilia Assembly/Maintenance Genes", await getGenesByFunction("Ciliary assembly")) },
-    { text: "Which genes are part of the ciliogenesis pathway?", handler: async () => formatListResult("Ciliogenesis Pathway Genes", await getGenesByFunction("Ciliary assembly")) },
+    { text: "Show genes required for basal body docking", handler: async () => formatListResult("Basal Body Docking Genes", await getGenesByFunction("basal body docking")) },
+    { text: "Provide proteins involved in cilia assembly and maintenance", handler: async () => formatListResult("Cilia Assembly/Maintenance Genes", await getGenesByFunction("Ciliary assembly")) },
+    { text: "What genes are part of the ciliogenesis pathway?", handler: async () => formatListResult("Ciliogenesis Pathway Genes", await getGenesByFunction("Ciliary assembly")) },
 
     // --- 6. Ciliary disease / Syndrome / Phenotype ---
     { text: "List genes associated with Bardet–Biedl syndrome", handler: async () => { const { genes, description } = await getCiliopathyGenes("Bardet–Biedl syndrome"); return formatListResult("Genes for Bardet–Biedl syndrome", genes, description); }},
     { text: "Show mutations in CILK1 causing cranioectodermal dysplasia", handler: async () => getGeneDiseases("CILK1") },
     { text: "Display phenotypes observed in ift88 mutants", handler: async () => getKnockdownEffect("IFT88") },
     { text: "Which ciliary diseases are linked to transition zone defects?", handler: async () => notImplementedYet("Diseases linked to TZ defects") },
-    { text: "Describe the phenotype of efcab7 loss in C. elegans", handler: async () => notImplementedYet("Phenotype of efcab7 loss in C. elegans") },
-    { text: "Find all genes associated with ciliopathies", handler: async () => { const { genes, description } = await getCiliopathyGenes("ciliopathy"); return formatListResult("All Ciliopathy-Associated Genes", genes, description); }},
+    { text: "Describe phenotype of efcab7 loss in C. elegans", handler: async () => notImplementedYet("Phenotype of efcab7 loss") },
+    { text: "Identify all genes associated with ciliopathies", handler: async () => { const { genes, description } = await getCiliopathyGenes("ciliopathy"); return formatListResult("All Ciliopathy-Associated Genes", genes, description); }},
 
     // --- 7. Comparison / Difference ---
     { text: "Compare IFT-A and IFT-B complex composition", handler: async () => compareComplexes("IFT-A", "IFT-B") },
     { text: "What’s the difference between KIF17 and KIF3A functions?", handler: async () => compareGenes("KIF17", "KIF3A") },
-    { text: "Compare cilia gene expression in C. elegans and mouse", handler: async () => notImplementedYet("Cross-species expression comparison") },
-    
+    { text: "Show comparison of cilia gene expression between C. elegans and mouse", handler: async () => notImplementedYet("Cross-species expression comparison") },
+
     // --- 8. Predict / Identify ---
     { text: "Predict potential ciliary genes using co-expression data", handler: async () => notImplementedYet("Prediction of ciliary genes") },
     { text: "Identify candidate ciliary kinases", handler: async () => notImplementedYet("Identification of candidate kinases") },
@@ -439,12 +430,125 @@ async function getGeneDiseases(gene) {
 
 async function getGeneDomains(gene) {
     if (!ciliaHubDataCache) await fetchCiliaData();
+
     const geneData = ciliaHubDataCache.find(g => g.gene.toUpperCase() === gene.toUpperCase());
-    if (!geneData) return `<div class="result-card"><h3>${gene}</h3><p class="status-not-found">Gene not found in the database.</p></div>`;
-    
+    if (!geneData) {
+        return `<div class="result-card"><h3>${gene}</h3><p class="status-not-found">Gene not found in the database.</p></div>`;
+    }
+
     const domains = geneData.domain_descriptions?.join(", ") || "No domain information available.";
-    return formatGeneDetail(geneData, gene, "Protein Domains", domains);
+
+    // Detect domain categories
+    const domainText = domains.toLowerCase();
+    const categories = [];
+
+    if (/kinase|phosphorylase|serine-threonine|tyrosine-protein/.test(domainText))
+        categories.push("Kinase");
+    if (/phosphatase/.test(domainText))
+        categories.push("Phosphatase");
+    if (/actin/.test(domainText))
+        categories.push("Actin-related");
+    if (/ef-hand/.test(domainText))
+        categories.push("EF-hand calcium-binding protein");
+    if (/zinc\s*finger/.test(domainText))
+        categories.push("Zinc finger protein");
+    if (/atpase|nucleotide binding/.test(domainText))
+        categories.push("ATPase / Motor protein");
+
+    // Add categories to formatted output
+    const domainCategorySummary = categories.length
+        ? `<p><strong>Functional Domain Category:</strong> ${categories.join(", ")}</p>`
+        : "";
+
+    return `
+        <div class="result-card">
+            <h3>${gene}</h3>
+            <p><strong>Description:</strong> ${geneData.description || "No description available."}</p>
+            <p><strong>Domains:</strong> ${domains}</p>
+            ${domainCategorySummary}
+            <p><strong>Localization:</strong> ${geneData.localization || "Unknown"}</p>
+            <p><strong>Functional Summary:</strong> ${geneData.functional_summary || "Not available."}</p>
+        </div>
+    `;
 }
+
+async function generateDomainBasedQuestions() {
+    if (!ciliaHubDataCache) await fetchCiliaData();
+
+    const keywords = ["kinase", "phosphatase", "actin", "ef-hand", "zinc finger", "atpase"];
+    const questionTemplates = [];
+
+    for (const keyword of keywords) {
+        const matchedGenes = ciliaHubDataCache.filter(g =>
+            g.domain_descriptions?.some(d => d.toLowerCase().includes(keyword))
+        ).map(g => g.gene);
+
+        if (matchedGenes.length) {
+            questionTemplates.push({
+                trigger: keyword,
+                text: `List all ${keyword}-related genes`,
+                weight: 0.95,
+                relatedGenes: matchedGenes
+            });
+        }
+    }
+
+    return questionTemplates;
+}
+
+
+// --- ADDITION: Dynamic Domain-Based Questions ---
+async function extendQuestionRegistryWithDomains() {
+    if (!ciliaHubDataCache) await fetchCiliaData();
+
+    const domainKeywords = [
+        { keyword: "kinase", label: "Ciliary Kinase" },
+        { keyword: "phosphatase", label: "Ciliary Phosphatase" },
+        { keyword: "actin", label: "Actin-related Protein" },
+        { keyword: "ef-hand", label: "EF-hand Calcium-Binding Protein" },
+        { keyword: "zinc finger", label: "Zinc Finger Protein" },
+        { keyword: "atpase", label: "ATPase / Motor Protein" }
+    ];
+
+    const newQuestions = [];
+
+    for (const { keyword, label } of domainKeywords) {
+        const genes = ciliaHubDataCache.filter(g =>
+            g.domain_descriptions?.some(d => d.toLowerCase().includes(keyword))
+        );
+
+        if (genes.length > 0) {
+            const capitalized = keyword.charAt(0).toUpperCase() + keyword.slice(1);
+
+            newQuestions.push(
+                {
+                    text: `List all ${capitalized}-related ciliary genes`,
+                    handler: async () => formatListResult(`${label}s`, await getGenesByDomainDescription(keyword))
+                },
+                {
+                    text: `Show ${capitalized}-containing proteins localized to cilia`,
+                    handler: async () => formatListResult(`${label}s`, await getGenesByDomainDescription(keyword))
+                },
+                {
+                    text: `Display ${capitalized} domain proteins involved in ciliogenesis`,
+                    handler: async () => formatListResult(`${label}s`, await getGenesByDomainDescription(keyword))
+                },
+                {
+                    text: `Identify ${capitalized} genes in cilia`,
+                    handler: async () => formatListResult(`${label}s`, await getGenesByDomainDescription(keyword))
+                }
+            );
+        }
+    }
+
+    // Merge with main registry
+    questionRegistry.push(...newQuestions);
+    console.log(`✅ Added ${newQuestions.length} domain-based questions to registry.`);
+}
+
+// Call this after your data has been fetched
+extendQuestionRegistryWithDomains();
+
 
 async function checkCiliaryStatus(gene) {
     if (!ciliaHubDataCache) await fetchCiliaData();
@@ -1529,7 +1633,6 @@ function setupAiQueryAutocomplete() {
     const aiQueryInput = document.getElementById('aiQueryInput');
     const suggestionsContainer = document.getElementById('aiQuerySuggestions');
     if (!aiQueryInput || !suggestionsContainer) return;
-
     aiQueryInput.addEventListener('input', debounce(async () => {
         const inputText = aiQueryInput.value.toLowerCase();
         let suggestions = new Set();
@@ -1537,12 +1640,20 @@ function setupAiQueryAutocomplete() {
         if (inputText.length < 3) {
             suggestionsContainer.style.display = 'none';
             return;
+            const triggerWords = [
+    "list", "compare", "identify", "which", "what", "predict",
+    "display", "describe", "show", "give", "provide", "tell me",
+    "evolutionary", "let me"
+];
         }
 
         // --- Provider 1: Full questions from the registry ---
-        questionRegistry
-            .filter(item => item.text.toLowerCase().includes(inputText))
-            .forEach(item => suggestions.add(item.text));
+       questionRegistry
+    .filter(item =>
+        item.text.toLowerCase().includes(inputText) ||
+        triggerWords.some(word => inputText.startsWith(word))
+    )
+    .forEach(item => suggestions.add(item.text));
 
         // --- Provider 2: "Tell me about..." for genes and complexes ---
         if (inputText.startsWith('tell me') || inputText.startsWith('what is') || inputText.startsWith('describe')) {
@@ -1587,6 +1698,59 @@ function setupAiQueryAutocomplete() {
         }
     });
 }
+
+// Weighted keyword ranking for smarter autocomplete
+function rankQuestions(query, questions) {
+  const normalizedQuery = query.toLowerCase().trim();
+
+  // Define important domain and trigger keywords
+  const triggerWords = ["show", "list", "display", "describe", "evolutionary", "cilia", "cilia-specific", "conserved", "genes", "domain"];
+  const domainKeywords = ["cilia", "cilia-specific", "ift", "axoneme", "transition zone", "b basal body", "bbsome", "microtubule", "motile", "sensory"];
+
+  return questions
+    .map(q => {
+      const text = q.text.toLowerCase();
+      let score = 0;
+
+      // 1. Exact match boost
+      if (text === normalizedQuery) score += 100;
+
+      // 2. Starts-with trigger (e.g., "show", "list")
+      if (triggerWords.some(w => text.startsWith(w))) score += 60;
+
+      // 3. Contains query anywhere
+      if (text.includes(normalizedQuery)) score += 30;
+
+      // 4. Contains important domain terms
+      domainKeywords.forEach(w => {
+        if (text.includes(w)) score += 10;
+      });
+
+      // 5. Partial fuzzy match bonus (loosely)
+      const words = normalizedQuery.split(" ");
+      const matchedWords = words.filter(w => text.includes(w)).length;
+      score += matchedWords * 5;
+
+      // 6. Length penalty (shorter = higher)
+      score -= Math.min(text.length / 50, 10);
+
+      return { ...q, score };
+    })
+    .sort((a, b) => b.score - a.score);
+}
+
+// Example usage
+const questionRegistry = [
+  { text: "show ciliary gene list" },
+  { text: "describe cilia-specific domains" },
+  { text: "list conserved genes in evolution" },
+  { text: "how do cilia form in human cells?" },
+  { text: "cilia length regulation mechanisms" }
+];
+
+console.log(rankQuestions("show", questionRegistry));
+
+
 
 // --- Gene Analysis Engine & UI (largely unchanged) ---
 
