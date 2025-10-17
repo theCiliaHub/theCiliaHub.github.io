@@ -1030,6 +1030,7 @@ async function getComprehensiveDetails(term) {
 }
 
 // --- Main Page Display Function (REPLACEMENT) ---
+// --- Main Page Display Function (REPLACEMENT) ---
 window.displayCiliAIPage = async function displayCiliAIPage() {
     const contentArea = document.querySelector('.content-area');
     if (!contentArea) {
@@ -1055,7 +1056,7 @@ window.displayCiliAIPage = async function displayCiliAIPage() {
                     <div class="ai-query-section">
                         <h3>Ask a Question</h3>
                         <div class="ai-input-group autocomplete-wrapper">
-                            <input type="text" id="aiQueryInput" class="ai-query-input" placeholder="What's on your mind? e.g., Joubert or BBSome...">
+                            <input type="text" id="aiQueryInput" class="ai-query-input" placeholder="What's on your mind? Try a gene name or a question...">
                             <div id="aiQuerySuggestions" class="suggestions-container"></div>
                             <button class="ai-query-btn" id="aiQueryBtn">Ask CiliAI</button>
                         </div>
@@ -1074,10 +1075,51 @@ window.displayCiliAIPage = async function displayCiliAIPage() {
                     </div>
                     
                     <div class="input-section">
+                        <h3>Analyze Gene Phenotypes</h3>
+                        <div class="input-group">
+                            <label for="geneInput">Gene Symbols:</label>
+                            <div class="autocomplete-wrapper">
+                                <textarea id="geneInput" class="gene-input-textarea" placeholder="Start typing a gene symbol (e.g., IFT88)..."></textarea>
+                                <div id="geneSuggestions" class="suggestions-container"></div>
+                            </div>
                         </div>
+                        <div class="input-group">
+                            <label>Analysis Mode:</label>
+                            <div class="mode-selector">
+                                <div class="mode-option">
+                                    <input type="radio" id="hybrid" name="mode" value="hybrid" checked aria-label="Hybrid mode">
+                                    <label for="hybrid" title="Combines database, screen data, and real-time AI literature mining.">
+                                        <span class="mode-icon">🔬</span>
+                                        <div><strong>Hybrid</strong><br><small>DB + Screens + Literature</small></div>
+                                    </label>
+                                </div>
+                                <div class="mode-option">
+                                    <input type="radio" id="expert" name="mode" value="expert" aria-label="Expert only mode">
+                                    <label for="expert" title="Queries only our internal database and screen data.">
+                                        <span class="mode-icon">🏛️</span>
+                                        <div><strong>Expert Only</strong><br><small>Curated DB + Screens</small></div>
+                                    </label>
+                                </div>
+                                <div class="mode-option">
+                                    <input type="radio" id="nlp" name="mode" value="nlp" aria-label="Literature only mode">
+                                    <label for="nlp" title="Performs a live AI-powered search across PubMed.">
+                                        <span class="mode-icon">📚</span>
+                                        <div><strong>Literature Only</strong><br><small>Live AI text mining</small></div>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                        <button class="analyze-btn" id="analyzeBtn">🔍 Analyze Genes</button>
+                    </div>
+                    <div id="resultsSection" class="results-section" style="display: none;">
+                        <h2>Analysis Results</h2>
+                        <button class="visualize-btn" id="visualizeBtn" style="display: none;">📊 Visualize Results</button>
+                        <div id="plot-display-area" style="margin-top: 1rem;"></div>
+                        <div id="resultsContainer"></div>
+                    </div>
                 </div>
             </div>
-            <style>                
+            <style>
                 .ciliai-container { font-family: 'Arial', sans-serif; max-width: 950px; margin: 2rem auto; padding: 2rem; background-color: #f9f9f9; border-radius: 12px; }
                 .ciliai-header { text-align: center; margin-bottom: 2rem; }
                 .ciliai-header h1 { font-size: 2.8rem; color: #2c5aa0; margin: 0; }
@@ -1112,7 +1154,7 @@ window.displayCiliAIPage = async function displayCiliAIPage() {
                 .suggestion-item { padding: 10px; cursor: pointer; }
                 .suggestion-item:hover { background-color: #f0f0f0; }
             </style>
-       `;
+        `;
     } catch (error) {
         console.error('Failed to inject CiliAI HTML:', error);
         contentArea.innerHTML = '<p>Error: Failed to load CiliAI interface.</p>';
@@ -1124,7 +1166,6 @@ window.displayCiliAIPage = async function displayCiliAIPage() {
     
     setTimeout(setupCiliAIEventListeners, 0);
 };
-
 // --- Helper Functions ---
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 function debounce(fn, delay) { let timeout; return function(...args) { clearTimeout(timeout); timeout = setTimeout(() => fn(...args), delay); }; }
