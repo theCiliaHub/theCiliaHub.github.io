@@ -20,7 +20,6 @@ const CILI_AI_DB = {
     "BBS1": { "summary": { "lof_length": "Inhibits / Restricts", "percentage_ciliated": "Reduced cilia numbers", "source": "Expert DB" }, "evidence": [{ "id": "12118255", "source": "pubmed", "context": "Mutated in Bardet-Biedl syndrome (type 1) OMIM 209901." }] }
 };
 
-// NEW: Intent Parser - The "Brain" of CiliAI
 // =============================================================================
 // REPLACEMENT: The definitive "Brain" of CiliAI, merging all features correctly.
 // =============================================================================
@@ -151,6 +150,9 @@ const intentParser = createIntentParser();
 // ADDITION: The new Question Registry and its required placeholder functions.
 // Place this code block after your CILI_AI_DB object.
 // =============================================================================
+// =============================================================================
+// REPLACEMENT: Comprehensive Question Registry & New Helper Functions
+// =============================================================================
 const questionRegistry = [
     // --- 1. Evolutionary / Conserved ---
     { text: "Show evolutionary conservation of IFT88", handler: async () => getGeneConservation("IFT88") },
@@ -172,7 +174,7 @@ const questionRegistry = [
     { text: "List all disease genes causing Joubert syndrome", handler: async () => { const { genes, description } = await getCiliopathyGenes("Joubert Syndrome"); return formatListResult("Genes for Joubert Syndrome", genes, description); }},
     
     // --- 3. Describe / What is / Explain ---
-    { text: "Describe the function of KIF17", handler: async () => getGeneFunction("KIF17") }, // OSM-3 homolog
+    { text: "Describe the function of KIF17", handler: async () => getGeneFunction("KIF17") },
     { text: "What is the role of CC2D1A in cilia?", handler: async () => getGeneFunction("CC2D1A") },
     { text: "Explain how CILK1 regulates cilia length", handler: async () => getGeneFunction("CILK1") },
     { text: "What does ARL13B do in ciliary signaling?", handler: async () => getGeneRole("ARL13B", "ciliary signaling") },
@@ -181,7 +183,7 @@ const questionRegistry = [
     { text: "What is the function of IFT-A and IFT-B complexes?", handler: async () => compareComplexes("IFT-A", "IFT-B") },
 
     // --- 4. Cilia-specific domain / Structure ---
-    { text: "Show cilia-specific domains of KIF17", handler: async () => getGeneDomains("KIF17") }, // OSM-3 homolog
+    { text: "Show cilia-specific domains of KIF17", handler: async () => getGeneDomains("KIF17") },
     { text: "Which domains of ARL13B mediate ciliary localization?", handler: async () => getGeneDomains("ARL13B") },
     { text: "List proteins with ciliary targeting sequences (CTS)", handler: async () => formatListResult("Proteins with CTS", await getGenesWithDomain("CTS")) },
     { text: "Describe structural domains of IFT172", handler: async () => getGeneDomains("IFT172") },
@@ -214,11 +216,56 @@ const questionRegistry = [
     { text: "List novel ciliary proteins not yet annotated", handler: async () => notImplementedYet("Discovery of novel ciliary proteins") }
 ];
 
-// Placeholder functions to support the new registry without errors
+
+// --- ADDITION: New Helper Functions for Expanded Questions ---
 function notImplementedYet(feature) {
     return `<div class="result-card"><h3>Feature In Development</h3><p>The query handler for "<strong>${feature}</strong>" is not yet implemented. Stay tuned for future updates!</p></div>`;
 }
+
 const getGenesByScreenPhenotype = async (phenotype) => notImplementedYet(`Genes by screen phenotype: ${phenotype}`);
+
+async function compareComplexes(complexA, complexB) {
+    const componentsA = await getGenesByComplex(complexA);
+    const componentsB = await getGenesByComplex(complexB);
+
+    const listToHtml = (geneList, title) => {
+        if (!geneList || geneList.length === 0) return `<h4>${title}</h4><p>No components found.</p>`;
+        return `<h4>${title} (${geneList.length})</h4><ul class="gene-list" style="list-style-type: none; padding-left: 0;">${geneList.map(g => `<li>${g.gene}</li>`).join('')}</ul>`;
+    };
+
+    return `
+    <div class="result-card">
+        <h3>Comparison: ${complexA} vs ${complexB}</h3>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+            <div>${listToHtml(componentsA, complexA)}</div>
+            <div>${listToHtml(componentsB, complexB)}</div>
+        </div>
+    </div>`;
+}
+
+async function compareGenes(geneA, geneB) {
+    if (!ciliaHubDataCache) await fetchCiliaData();
+    const dataA = ciliaHubDataCache.find(g => g.gene.toUpperCase() === geneA.toUpperCase());
+    const dataB = ciliaHubDataCache.find(g => g.gene.toUpperCase() === geneB.toUpperCase());
+
+    const detailToHtml = (geneData) => {
+        if (!geneData) return "<p>Gene not found in CiliaHub DB.</p>";
+        return `
+            <p><strong>Function:</strong> ${geneData.functional_summary || 'N/A'}</p>
+            <p><strong>Localization:</strong> ${geneData.localization?.join(', ') || 'N/A'}</p>
+            <p><strong>Complex:</strong> ${geneData.complex_names?.join(', ') || 'N/A'}</p>
+        `;
+    };
+
+    return `
+    <div class="result-card">
+        <h3>Comparison: ${geneA} vs ${geneB}</h3>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; border-top: 1px solid #eee; padding-top: 1rem;">
+            <div><h4>${geneA}</h4>${detailToHtml(dataA)}</div>
+            <div><h4>${geneB}</h4>${detailToHtml(dataB)}</div>
+        </div>
+    </div>`;
+}
 
 
 const getGenesByDomainDescription = async (desc) => {
@@ -351,42 +398,51 @@ questionRegistry.push(
 );
 
 // =============================================================================
-// ADDITIONAL QUERY HANDLER FUNCTIONS
+// REPLACEMENT: Corrected Query Handler Functions
+// These functions now format their own HTML to prevent incorrect error messages.
 // =============================================================================
-
-// Add these new handler functions after the existing placeholder functions
 
 async function getGeneFunction(gene) {
     if (!ciliaHubDataCache) await fetchCiliaData();
     const geneData = ciliaHubDataCache.find(g => g.gene.toUpperCase() === gene.toUpperCase());
-    return formatGeneDetail(geneData, gene, "Function", geneData?.functional_summary || geneData?.description || "No functional information available.");
+    if (!geneData) return `<div class="result-card"><h3>${gene}</h3><p class="status-not-found">Gene not found in the database.</p></div>`;
+    
+    return formatGeneDetail(geneData, gene, "Function", geneData.functional_summary || geneData.description || "No functional information available.");
 }
 
 async function getGeneRole(gene, context) {
     if (!ciliaHubDataCache) await fetchCiliaData();
     const geneData = ciliaHubDataCache.find(g => g.gene.toUpperCase() === gene.toUpperCase());
-    const roleInfo = geneData?.functional_summary || geneData?.description || "No specific role information available.";
+    if (!geneData) return `<div class="result-card"><h3>${gene}</h3><p class="status-not-found">Gene not found in the database.</p></div>`;
+
+    const roleInfo = geneData.functional_summary || geneData.description || "No specific role information available.";
     return formatGeneDetail(geneData, gene, `Role in ${context}`, roleInfo);
 }
 
 async function getGeneLocalization(gene) {
     if (!ciliaHubDataCache) await fetchCiliaData();
     const geneData = ciliaHubDataCache.find(g => g.gene.toUpperCase() === gene.toUpperCase());
-    const localization = geneData?.localization?.join(", ") || "No localization data available.";
+    if (!geneData) return `<div class="result-card"><h3>${gene}</h3><p class="status-not-found">Gene not found in the database.</p></div>`;
+
+    const localization = geneData.localization?.join(", ") || "No localization data available.";
     return formatGeneDetail(geneData, gene, "Subcellular Localization", localization);
 }
 
 async function getGeneDiseases(gene) {
     if (!ciliaHubDataCache) await fetchCiliaData();
     const geneData = ciliaHubDataCache.find(g => g.gene.toUpperCase() === gene.toUpperCase());
-    const diseases = geneData?.ciliopathy?.join(", ") || "No disease associations found.";
+    if (!geneData) return `<div class="result-card"><h3>${gene}</h3><p class="status-not-found">Gene not found in the database.</p></div>`;
+
+    const diseases = geneData.ciliopathy?.join(", ") || "No disease associations found.";
     return formatGeneDetail(geneData, gene, "Disease Associations", diseases);
 }
 
 async function getGeneDomains(gene) {
     if (!ciliaHubDataCache) await fetchCiliaData();
     const geneData = ciliaHubDataCache.find(g => g.gene.toUpperCase() === gene.toUpperCase());
-    const domains = geneData?.domain_descriptions?.join(", ") || "No domain information available.";
+    if (!geneData) return `<div class="result-card"><h3>${gene}</h3><p class="status-not-found">Gene not found in the database.</p></div>`;
+    
+    const domains = geneData.domain_descriptions?.join(", ") || "No domain information available.";
     return formatGeneDetail(geneData, gene, "Protein Domains", domains);
 }
 
@@ -394,7 +450,7 @@ async function checkCiliaryStatus(gene) {
     if (!ciliaHubDataCache) await fetchCiliaData();
     const geneData = ciliaHubDataCache.find(g => g.gene.toUpperCase() === gene.toUpperCase());
     const status = geneData ? "Yes, this is a ciliary gene." : "No, this gene is not in the ciliary database.";
-    return formatGeneDetail(geneData, gene, "Ciliary Status", status);
+    return `<div class="result-card"><h3>${gene}</h3><h4>Ciliary Status</h4><p>${status}</p></div>`;
 }
 
 async function getAllCiliaryGenes() {
@@ -405,18 +461,18 @@ async function getAllCiliaryGenes() {
 
 async function getKnockdownEffect(gene) {
     await fetchScreenData();
-    const screenInfo = screenDataCache[gene];
+    const screenInfo = screenDataCache[gene.toUpperCase()];
     if (!screenInfo || !Array.isArray(screenInfo)) {
         return `<div class="result-card"><h3>Knockdown Effects for ${gene}</h3><p class="status-not-found">No screen data available for this gene.</p></div>`;
     }
     
-    const effects = screenInfo.map(s => `${s.source}: ${s.result}`).join("; ");
-    return formatGeneDetail(null, gene, "Knockdown Effects", effects);
+    const effects = screenInfo.map(s => `<li><strong>${s.source}:</strong> ${s.result}</li>`).join("");
+    return `<div class="result-card"><h3>Knockdown Effects for ${gene}</h3><ul>${effects}</ul></div>`;
 }
 
 async function getScreenResults(gene, screenName) {
     await fetchScreenData();
-    const screenInfo = screenDataCache[gene];
+    const screenInfo = screenDataCache[gene.toUpperCase()];
     if (!screenInfo) {
         return `<div class="result-card"><h3>Screen Results for ${gene}</h3><p class="status-not-found">No screen data available for this gene.</p></div>`;
     }
@@ -426,7 +482,7 @@ async function getScreenResults(gene, screenName) {
         return `<div class="result-card"><h3>Screen Results for ${gene} in ${screenName}</h3><p class="status-not-found">No data found for this screen.</p></div>`;
     }
     
-    return formatGeneDetail(null, gene, `${screenName} Results`, specificResult.result || "No specific result reported");
+    return `<div class="result-card"><h3>${screenName} Results for ${gene}</h3><p>${specificResult.result || "No specific result reported"}</p></div>`;
 }
 
 async function getHedgehogRegulators(regulationType) {
@@ -437,17 +493,17 @@ async function getHedgehogRegulators(regulationType) {
         const hedgehogScreen = screens.find(s => s.source === "Breslow2018");
         if (hedgehogScreen) {
             const result = hedgehogScreen.result?.toLowerCase() || "";
-            if (regulationType === "negative" && result.includes("increased")) {
-                hedgehogGenes.push({ gene, description: result });
-            } else if (regulationType === "positive" && result.includes("decreased")) {
-                hedgehogGenes.push({ gene, description: result });
+            if ((regulationType === "negative" || regulationType === "all") && result.includes("increased")) {
+                hedgehogGenes.push({ gene, description: "Negative Regulator (Increased Signaling)" });
+            } else if ((regulationType === "positive" || regulationType === "all") && result.includes("decreased")) {
+                hedgehogGenes.push({ gene, description: "Positive Regulator (Decreased Signaling)" });
             }
         }
     });
     
-    const title = regulationType === "negative" ? 
-        "Negative Regulators of Hedgehog Signaling" : 
-        "Positive Regulators of Hedgehog Signaling";
+    const title = regulationType === "all" ? "Hedgehog Signaling Regulators" :
+                  regulationType === "negative" ? "Negative Regulators of Hedgehog Signaling" : 
+                  "Positive Regulators of Hedgehog Signaling";
     
     return formatListResult(title, hedgehogGenes);
 }
@@ -468,7 +524,7 @@ async function getNoEffectGenes(screenName) {
 
 async function getGeneExpression(gene) {
     await fetchTissueData();
-    const expressionData = window.tissueDataCache[gene];
+    const expressionData = window.tissueDataCache[gene.toUpperCase()];
     
     if (!expressionData) {
         return `<div class="result-card"><h3>Expression of ${gene}</h3><p class="status-not-found">No expression data available.</p></div>`;
@@ -477,24 +533,23 @@ async function getGeneExpression(gene) {
     const tissues = Object.entries(expressionData)
         .sort(([,a], [,b]) => b - a)
         .slice(0, 10)
-        .map(([tissue, value]) => `${tissue}: ${value.toFixed(2)} nTPM`)
-        .join("; ");
+        .map(([tissue, value]) => `<li><strong>${tissue}:</strong> ${value.toFixed(2)} nTPM</li>`)
+        .join("");
     
-    return formatGeneDetail(null, gene, "Tissue Expression", tissues);
+    return `<div class="result-card"><h3>Top 10 Tissues for ${gene} Expression</h3><ul>${tissues}</ul></div>`;
 }
 
 async function getGeneExpressionPattern(gene) {
     await fetchTissueData();
-    const expressionData = window.tissueDataCache[gene];
+    const expressionData = window.tissueDataCache[gene.toUpperCase()];
     
     if (!expressionData) {
         return `<div class="result-card"><h3>Expression Pattern of ${gene}</h3><p class="status-not-found">No expression data available.</p></div>`;
     }
     
-    // Return the data for heatmap visualization
     const resultArea = document.getElementById('ai-result-area');
     displayCiliAIExpressionHeatmap([gene], resultArea, window.tissueDataCache);
-    return ""; // The heatmap function handles the display
+    return "";
 }
 
 async function getTissueSpecificGenes(tissue) {
@@ -517,7 +572,7 @@ async function getTissueSpecificGenes(tissue) {
     tissueGenes.sort((a, b) => b.nTPM - a.nTPM);
     const topGenes = tissueGenes.slice(0, 50).map(g => ({ gene: g.gene, description: g.description }));
     
-    return formatListResult(`Ciliary Genes Highly Expressed in ${tissue}`, topGenes);
+    return formatListResult(`Top 50 Ciliary Genes Expressed in ${tissue}`, topGenes);
 }
 
 async function compareGeneExpression(genes, tissues) {
@@ -527,14 +582,14 @@ async function compareGeneExpression(genes, tissues) {
     
     genes.forEach(gene => {
         comparisonHtml += `<h4>${gene}</h4>`;
-        const expressionData = window.tissueDataCache[gene];
+        const expressionData = window.tissueDataCache[gene.toUpperCase()];
         
         if (!expressionData) {
             comparisonHtml += `<p>No expression data available</p>`;
         } else {
             tissues.forEach(tissue => {
                 const value = expressionData[tissue] || 0;
-                comparisonHtml += `<p>${tissue}: ${value.toFixed(2)} nTPM</p>`;
+                comparisonHtml += `<p><strong>${tissue}:</strong> ${value.toFixed(2)} nTPM</p>`;
             });
         }
     });
@@ -554,8 +609,12 @@ async function getGeneConservation(gene) {
     const speciesList = conservationData.species?.join(", ") || "No species data";
     const category = conservationData.category || "Unknown category";
     
-    return formatGeneDetail(null, gene, "Evolutionary Conservation", 
-        `Category: ${category}<br>Species: ${speciesList}`);
+    return `
+    <div class="result-card">
+        <h3>Evolutionary Conservation of ${gene}</h3>
+        <p><strong>Category:</strong> ${category}</p>
+        <p><strong>Found in:</strong> ${speciesList}</p>
+    </div>`;
 }
 
 async function checkConservation(gene, organism) {
@@ -572,9 +631,9 @@ async function checkConservation(gene, organism) {
     
     const status = isConserved ? 
         `Yes, ${gene} is conserved in ${organism}` : 
-        `No, ${gene} is not conserved in ${organism}`;
+        `No, ${gene} does not appear to be conserved in ${organism} based on available data.`;
     
-    return formatGeneDetail(null, gene, `Conservation in ${organism}`, status);
+    return `<div class="result-card"><h3>Conservation of ${gene} in ${organism}</h3><p>${status}</p></div>`;
 }
 
 async function getCiliaryOnlyGenes() {
@@ -592,7 +651,7 @@ async function getConservedGenesBetween(organisms) {
     Object.entries(phylogenyDataCache).forEach(([gene, data]) => {
         if (ciliaryGenes.has(gene.toUpperCase()) && data.species) {
             const hasAllOrganisms = organisms.every(org => 
-                data.species.some(s => s.toLowerCase().includes(org.toLowerCase()))
+                data.species.some(s => s.toLowerCase().includes(normalizeTerm(org)))
             );
             
             if (hasAllOrganisms) {
@@ -608,9 +667,10 @@ async function getConservedGenesBetween(organisms) {
 }
 
 async function getOrthologsInOrganism(organism) {
-    const result = await getCiliaryGenesForOrganism(organism);
-    return formatListResult(`Human Ciliary Genes with Orthologs in ${organism}`, result.genes, result.description);
+    const { genes, description } = await getCiliaryGenesForOrganism(organism);
+    return formatListResult(`Human Ciliary Genes with Orthologs in ${organism}`, genes, description);
 }
+
 
 // =============================================================================
 // UPDATE INTENT PARSER WITH ADDITIONAL KEYWORDS
