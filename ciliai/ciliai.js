@@ -1739,18 +1739,6 @@ function rankQuestions(query, questions) {
     .sort((a, b) => b.score - a.score);
 }
 
-// Example usage
-const questionRegistry = [
-  { text: "show ciliary gene list" },
-  { text: "describe cilia-specific domains" },
-  { text: "list conserved genes in evolution" },
-  { text: "how do cilia form in human cells?" },
-  { text: "cilia length regulation mechanisms" }
-];
-
-console.log(rankQuestions("show", questionRegistry));
-
-
 
 // --- Gene Analysis Engine & UI (largely unchanged) ---
 
