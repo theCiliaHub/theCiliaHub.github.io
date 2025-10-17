@@ -139,8 +139,9 @@ function createIntentParser() {
 
 
 const intentParser = createIntentParser();
+
 /**
- * ADDITION: New function to describe CiliAI's capabilities.
+ * New function to describe CiliAI's capabilities.
  */
 async function tellAboutCiliAI() {
     const html = `
@@ -180,6 +181,123 @@ async function getLiteratureEvidence(gene) {
             <h3>Literature Evidence for ${gene}</h3>
             ${evidenceSnippets}
         </div>`;
+}
+
+/**
+ * Displays a UMAP plot where each cell is colored by the expression of a specific gene.
+ */
+async function displayUmapGeneExpression(geneSymbol) {
+    const [umapData, cellData] = await Promise.all([fetchUmapData(), fetchCellxgeneData()]);
+    const resultArea = document.getElementById('ai-result-area');
+
+    if (!umapData || !cellData) {
+        return `<div class="result-card"><h3>UMAP Expression Plot</h3><p class="status-not-found">Could not load UMAP or Cellxgene data.</p></div>`;
+    }
+
+    const geneUpper = geneSymbol.toUpperCase();
+    const geneExpressionMap = cellData[geneUpper];
+
+    if (!geneExpressionMap) {
+        return `<div class="result-card"><h3>${geneSymbol} Expression</h3><p class="status-not-found">Gene "${geneSymbol}" not found in the single-cell expression dataset.</p></div>`;
+    }
+
+    const sampleSize = 15000;
+    const sampledData = [];
+    if (umapData.length > sampleSize) {
+        const usedIndices = new Set();
+        while (sampledData.length < sampleSize) {
+            const randomIndex = Math.floor(Math.random() * umapData.length);
+            if (!usedIndices.has(randomIndex)) {
+                sampledData.push(umapData[randomIndex]);
+                usedIndices.add(randomIndex);
+            }
+        }
+    } else {
+        sampledData.push(...umapData);
+    }
+
+    const expressionValues = sampledData.map(cell => geneExpressionMap[cell.cell_type] || 0);
+
+    const plotData = [{
+        x: sampledData.map(p => p.x),
+        y: sampledData.map(p => p.y),
+        mode: 'markers',
+        type: 'scattergl',
+        hovertext: sampledData.map((p, i) => `Cell Type: ${p.cell_type}<br>Expression: ${expressionValues[i].toFixed(4)}`),
+        hoverinfo: 'text',
+        marker: {
+            color: expressionValues,
+            colorscale: 'Viridis',
+            showscale: true,
+            colorbar: { title: 'Expression' },
+            size: 5,
+            opacity: 0.8
+        }
+    }];
+
+    const layout = {
+        title: `UMAP Colored by ${geneSymbol} Expression (Sample of ${sampleSize} cells)`,
+        xaxis: { title: 'UMAP 1' },
+        yaxis: { title: 'UMAP 2' },
+        hovermode: 'closest'
+    };
+
+    resultArea.innerHTML = `<div class="result-card"><div id="umap-expression-plot-div"></div></div>`;
+    Plotly.newPlot('umap-expression-plot-div', plotData, layout, { responsive: true });
+    return "";
+}
+
+/**
+ * Displays a UMAP plot colored by cell type.
+ */
+async function displayUmapPlot() {
+    const data = await fetchUmapData();
+    const resultArea = document.getElementById('ai-result-area');
+    
+    if (!data) {
+        return `<div class="result-card"><h3>UMAP Plot</h3><p class="status-not-found">Could not load pre-computed UMAP data.</p></div>`;
+    }
+
+    const sampleSize = 15000;
+    const sampledData = [];
+    if (data.length > sampleSize) {
+         const usedIndices = new Set();
+         while (sampledData.length < sampleSize) {
+            const randomIndex = Math.floor(Math.random() * data.length);
+            if (!usedIndices.has(randomIndex)) {
+                sampledData.push(data[randomIndex]);
+                usedIndices.add(randomIndex);
+            }
+        }
+    } else {
+        sampledData.push(...data);
+    }
+    
+    const cellTypes = [...new Set(sampledData.map(d => d.cell_type))];
+    const plotData = [];
+
+    for (const cellType of cellTypes) {
+        const points = sampledData.filter(d => d.cell_type === cellType);
+        plotData.push({
+            x: points.map(p => p.x),
+            y: points.map(p => p.y),
+            name: cellType,
+            mode: 'markers',
+            type: 'scattergl',
+            marker: { size: 5, opacity: 0.8 }
+        });
+    }
+
+    const layout = {
+        title: `UMAP of Single-Cell Gene Expression (Sample of ${sampleSize} cells)`,
+        xaxis: { title: 'UMAP 1' },
+        yaxis: { title: 'UMAP 2' },
+        hovermode: 'closest'
+    };
+
+    resultArea.innerHTML = `<div class="result-card"><div id="umap-plot-div"></div></div>`;
+    Plotly.newPlot('umap-plot-div', plotData, layout, { responsive: true });
+    return "";
 }
 
 // =============================================================================
@@ -288,132 +406,6 @@ async function compareComplexes(complexA, complexB) {
         </div>
     </div>`;
 }
-
-
-// --- ADDITION: New Plotting and Complex Query Functions ---
-
-/**
- * Displays a UMAP plot where each cell is colored by the expression of a specific gene.
- * @param {string} geneSymbol The gene to visualize.
- */
-async function displayUmapGeneExpression(geneSymbol) {
-    const [umapData, cellData] = await Promise.all([fetchUmapData(), fetchCellxgeneData()]);
-    const resultArea = document.getElementById('ai-result-area');
-
-    if (!umapData || !cellData) {
-        return `<div class="result-card"><h3>UMAP Expression Plot</h3><p class="status-not-found">Could not load UMAP or Cellxgene data.</p></div>`;
-    }
-
-    const geneUpper = geneSymbol.toUpperCase();
-    const geneExpressionMap = cellData[geneUpper];
-
-    if (!geneExpressionMap) {
-        return `<div class="result-card"><h3>${geneSymbol} Expression</h3><p class="status-not-found">Gene "${geneSymbol}" not found in the single-cell expression dataset.</p></div>`;
-    }
-
-    // --- FIX: Randomly sample the data for performance ---
-    const sampleSize = 15000;
-    const sampledData = [];
-    if (umapData.length > sampleSize) {
-        const usedIndices = new Set();
-        while (sampledData.length < sampleSize) {
-            const randomIndex = Math.floor(Math.random() * umapData.length);
-            if (!usedIndices.has(randomIndex)) {
-                sampledData.push(umapData[randomIndex]);
-                usedIndices.add(randomIndex);
-            }
-        }
-    } else {
-        sampledData.push(...umapData);
-    }
-    // --- END FIX ---
-
-    const expressionValues = sampledData.map(cell => geneExpressionMap[cell.cell_type] || 0);
-
-    const plotData = [{
-        x: sampledData.map(p => p.x),
-        y: sampledData.map(p => p.y),
-        mode: 'markers',
-        type: 'scattergl',
-        hovertext: sampledData.map((p, i) => `Cell Type: ${p.cell_type}<br>Expression: ${expressionValues[i].toFixed(4)}`),
-        hoverinfo: 'text',
-        marker: {
-            color: expressionValues,
-            colorscale: 'Viridis',
-            showscale: true,
-            colorbar: { title: 'Expression' },
-            size: 5,
-            opacity: 0.8
-        }
-    }];
-
-    const layout = {
-        title: `UMAP Colored by ${geneSymbol} Expression (Sample of ${sampleSize} cells)`,
-        xaxis: { title: 'UMAP 1' },
-        yaxis: { title: 'UMAP 2' },
-        hovermode: 'closest'
-    };
-
-    resultArea.innerHTML = `<div class="result-card"><div id="umap-expression-plot-div"></div></div>`;
-    Plotly.newPlot('umap-expression-plot-div', plotData, layout, { responsive: true });
-    return "";
-}
-
-/**
- * Displays a UMAP plot colored by cell type.
- */
-async function displayUmapPlot() {
-    const data = await fetchUmapData();
-    const resultArea = document.getElementById('ai-result-area');
-    
-    if (!data) {
-        return `<div class="result-card"><h3>UMAP Plot</h3><p class="status-not-found">Could not load pre-computed UMAP data.</p></div>`;
-    }
-
-    // --- FIX: Randomly sample the data for performance ---
-    const sampleSize = 15000;
-    const sampledData = [];
-    if (data.length > sampleSize) {
-         const usedIndices = new Set();
-         while (sampledData.length < sampleSize) {
-            const randomIndex = Math.floor(Math.random() * data.length);
-            if (!usedIndices.has(randomIndex)) {
-                sampledData.push(data[randomIndex]);
-                usedIndices.add(randomIndex);
-            }
-        }
-    } else {
-        sampledData.push(...data);
-    }
-    // --- END FIX ---
-    
-    const cellTypes = [...new Set(sampledData.map(d => d.cell_type))];
-    const plotData = [];
-
-    for (const cellType of cellTypes) {
-        const points = sampledData.filter(d => d.cell_type === cellType);
-        plotData.push({
-            x: points.map(p => p.x),
-            y: points.map(p => p.y),
-            name: cellType,
-            mode: 'markers',
-            type: 'scattergl', // Use WebGL for performance
-            marker: { size: 5, opacity: 0.8 }
-        });
-    }
-
-    const layout = {
-        title: `UMAP of Single-Cell Gene Expression (Sample of ${sampleSize} cells)`,
-        xaxis: { title: 'UMAP 1' },
-        yaxis: { title: 'UMAP 2' },
-        hovermode: 'closest'
-    };
-
-    resultArea.innerHTML = `<div class="result-card"><div id="umap-plot-div"></div></div>`;
-    Plotly.newPlot('umap-plot-div', plotData, layout, { responsive: true });
-    return "";
-}
-
 
 /**
  * Displays a grouped bar chart of multiple genes' expression across cell types.
@@ -1704,32 +1696,41 @@ window.handleAIQuery = async function() {
         const qLower = query.toLowerCase();
         let match;
 
-        // PRIORITY 1: Check for an exact match in the question registry
         const perfectMatch = questionRegistry.find(item => item.text.toLowerCase() === qLower);
         if (perfectMatch) {
             console.log(`Registry match found: "${perfectMatch.text}"`);
             resultHtml = await perfectMatch.handler();
-        }
-        // PRIORITY 2: Handle conversational queries
-        else if ((match = qLower.match(/(?:tell me about|what is|describe)\s+(.+)/i))) {
+        } else if ((match = qLower.match(/(?:tell me about|what is|describe)\s+(.+)/i))) {
             const term = match[1].trim();
             resultHtml = await getComprehensiveDetails(term);
-        }
-        // PRIORITY 3: Use the intent parser for keywords
-        else {
+        } else {
             const intent = intentParser.parse(query);
             if (intent && typeof intent.handler === 'function') {
                 console.log(`Intent parser match found: ${intent.intent} for entity: ${intent.entity}`);
                 resultHtml = await intent.handler(intent.entity);
             }
-            // PRIORITY 4: ADDITION - Handle standalone gene name query
-            else if (ciliaHubDataCache.some(g => g.gene.toUpperCase() === query.toUpperCase())) {
-                console.log(`Standalone gene match found: "${query}"`);
-                resultHtml = await getComprehensiveDetails(query);
-            }
-            // FINAL FALLBACK
+            // --- NEW: Smarter Fallback Logic ---
             else {
-                resultHtml = `<p>Sorry, I didn’t understand that. Please try one of the suggested questions or a known keyword.</p>`;
+                // Case-insensitive regex to find gene-like words
+                const potentialGenes = (query.match(/\b([A-Z0-9\-\.]{3,})\b/gi) || []);
+                const genes = potentialGenes.filter(g => ciliaHubDataCache.some(hubGene => hubGene.gene.toUpperCase() === g.toUpperCase()));
+                
+                if (genes.length === 2 && (qLower.includes('compare') || qLower.includes('vs'))) {
+                    console.log(`Smart match: Comparing two genes: ${genes.join(' and ')}`);
+                    resultHtml = await displayCellxgeneBarChart(genes);
+                } else if (genes.length === 1 && (qLower.includes('plot') || qLower.includes('show expression') || qLower.includes('visualize'))) {
+                    console.log(`Smart match: Plotting single gene: ${genes[0]}`);
+                    if (qLower.includes('umap')) {
+                        resultHtml = await displayUmapGeneExpression(genes[0]);
+                    } else {
+                        resultHtml = await displayCellxgeneBarChart(genes);
+                    }
+                } else if (genes.length === 1 && qLower.length < (genes[0].length + 5)) {
+                    console.log(`Standalone gene match found: "${query}"`);
+                    resultHtml = await getComprehensiveDetails(query);
+                } else {
+                    resultHtml = `<p>Sorry, I didn’t understand that. Please try one of the suggested questions or a known keyword.</p>`;
+                }
             }
         }
         resultArea.innerHTML = resultHtml;
