@@ -140,6 +140,242 @@ function createIntentParser() {
 
 const intentParser = createIntentParser();
 
+/**
+ * New function to describe CiliAI's capabilities.
+ */
+async function tellAboutCiliAI() {
+    const html = `
+    <div class="result-card">
+        <h3>About CiliAI 🤖</h3>
+        <p>I am CiliAI, an AI-powered assistant designed to help you explore and analyze ciliary gene data. I can integrate information from five different datasets to answer complex questions. Here's what I can do:</p>
+        <ul>
+            <li><strong>Query by Category:</strong> Find genes based on disease ("Joubert syndrome"), protein complex ("BBSome"), cellular localization ("transition zone"), or organism ("C. elegans").</li>
+            <li><strong>Get Gene Details:</strong> Ask for comprehensive information about a specific gene by typing its name (e.g., "ARL13B").</li>
+            <li><strong>Visualize Expression Data:</strong> Generate plots for gene expression, including tissue-specific heatmaps, single-cell bar charts, and UMAPs colored by expression.</li>
+            <li><strong>Compare Genes & Complexes:</strong> Directly compare functions or expression levels (e.g., "Compare IFT-A and IFT-B" or "Compare ARL13B and FOXJ1").</li>
+            <li><strong>Explore Evolutionary Data:</strong> Find information on gene conservation across species (e.g., "Show evolutionary conservation of IFT88").</li>
+            <li><strong>Integrate Multiple Datasets:</strong> Answer complex questions that combine data, such as "Which Joubert Syndrome genes are expressed in ciliated cells?".</li>
+        </ul>
+    </div>`;
+    return html;
+}
+
+/**
+ * New handler to get live literature evidence for a gene.
+ */
+async function getLiteratureEvidence(gene) {
+    const evidence = await analyzeGeneViaAPI(gene);
+    if (!evidence || evidence.length === 0) {
+        return `<div class="result-card"><h3>Literature Evidence for ${gene}</h3><p class="status-not-found">No relevant sentences found in a search of recent literature.</p></div>`;
+    }
+
+    const evidenceSnippets = evidence.map(ev => `
+        <div style="border-bottom:1px solid #eee; padding-bottom:0.5rem; margin-bottom:0.5rem;">
+            <p>${ev.context.replace(new RegExp(`(${gene})`, 'ig'), `<mark>$1</mark>`)}</p>
+            <small><strong>Source:</strong> ${ev.source.toUpperCase()} (${ev.id})</small>
+        </div>`
+    ).join('');
+
+    return `
+        <div class="result-card">
+            <h3>Literature Evidence for ${gene}</h3>
+            ${evidenceSnippets}
+        </div>`;
+}
+
+/**
+ * Displays a UMAP plot where each cell is colored by the expression of a specific gene,
+ * AND clusters are labeled by cell type.
+ */
+async function displayUmapGeneExpression(geneSymbol) {
+    const [umapData, cellData] = await Promise.all([fetchUmapData(), fetchCellxgeneData()]);
+    const resultArea = document.getElementById('ai-result-area');
+
+    if (!umapData || !cellData) {
+        return `<div class="result-card"><h3>UMAP Expression Plot</h3><p class="status-not-found">Could not load UMAP or Cellxgene data.</p></div>`;
+    }
+
+    const geneUpper = geneSymbol.toUpperCase();
+    const geneExpressionMap = cellData[geneUpper];
+
+    if (!geneExpressionMap) {
+        return `<div class="result-card"><h3>${geneSymbol} Expression</h3><p class="status-not-found">Gene "${geneSymbol}" not found in the single-cell expression dataset.</p></div>`;
+    }
+
+    const sampleSize = 15000;
+    const sampledData = []; 
+
+    if (umapData.length > sampleSize) {
+        const usedIndices = new Set();
+        while (sampledData.length < sampleSize) {
+            const randomIndex = Math.floor(Math.random() * umapData.length);
+            if (!usedIndices.has(randomIndex)) {
+                sampledData.push(umapData[randomIndex]);
+                usedIndices.add(randomIndex);
+            }
+        }
+    } else {
+        sampledData.push(...umapData);
+    }
+
+    const expressionValues = sampledData.map(cell => geneExpressionMap[cell.cell_type] || 0);
+
+    // --- NEW: Calculate cluster labels ---
+    const cellTypes = [...new Set(sampledData.map(d => d.cell_type))];
+    const annotations = [];
+
+    // Helper to find the median (center) of a cluster
+    const median = (arr) => {
+        const mid = Math.floor(arr.length / 2);
+        const nums = [...arr].sort((a, b) => a - b);
+        return arr.length % 2 !== 0 ? nums[mid] : (nums[mid - 1] + nums[mid]) / 2;
+    };
+
+    for (const cellType of cellTypes) {
+        const points = sampledData.filter(d => d.cell_type === cellType);
+        if (points.length > 0) {
+            const xCoords = points.map(p => p.x);
+            const yCoords = points.map(p => p.y);
+            
+            annotations.push({
+                x: median(xCoords), // Use median for a more central position
+                y: median(yCoords),
+                text: cellType,
+                showarrow: false,
+                font: {
+                    color: '#FFFFFF', // White text
+                    size: 10,
+                    family: 'Arial, sans-serif'
+                },
+                bgcolor: 'rgba(0,0,0,0.4)', // Faint black background for readability
+                borderpad: 2,
+                bordercolor: 'rgba(0,0,0,0.4)',
+                borderwidth: 1,
+                xref: 'x',
+                yref: 'y'
+            });
+        }
+    }
+    // --- END NEW ---
+
+    const plotData = [{
+        x: sampledData.map(p => p.x),
+        y: sampledData.map(p => p.y),
+        mode: 'markers',
+        type: 'scattergl',
+        hovertext: sampledData.map((p, i) => `Cell Type: ${p.cell_type}<br>Expression: ${expressionValues[i].toFixed(4)}`),
+        hoverinfo: 'text',
+        marker: {
+            color: expressionValues,
+            colorscale: 'Plasma', // Kept the scale you liked
+            showscale: true,
+            colorbar: { 
+                title: { 
+                    text: 'Expression',
+                    side: 'right' 
+                } 
+            },
+            size: 5,
+            opacity: 0.8
+        }
+    }];
+
+    const layout = {
+        title: `UMAP Colored by ${geneSymbol} Expression (Sample of ${sampleSize} cells)`,
+        xaxis: { title: 'UMAP 1', zeroline: false, showgrid: false },
+        yaxis: { title: 'UMAP 2', zeroline: false, showgrid: false },
+        hovermode: 'closest',
+        margin: { t: 50, b: 50, l: 50, r: 50 },
+        plot_bgcolor: '#FFFFFF', // White plot background
+        paper_bgcolor: '#FFFFFF', // White paper background
+        annotations: annotations, // Add the new cluster labels
+        showlegend: false // Don't need a legend for the continuous scale
+    };
+
+    const plotDivId = 'umap-expression-plot-div';
+    resultArea.innerHTML = `
+        <div class="result-card">
+            <div id="${plotDivId}"></div>
+            <button class="download-button" onclick="downloadPlot('${plotDivId}', 'UMAP_${geneSymbol}_Expression')">Download Plot</button>
+        </div>`;
+    
+    Plotly.newPlot(plotDivId, plotData, layout, { responsive: true, displayModeBar: false });
+    return "";
+}
+
+/**
+ * Displays a UMAP plot colored by cell type.
+ */
+async function displayUmapPlot() {
+    const data = await fetchUmapData();
+    const resultArea = document.getElementById('ai-result-area');
+    
+    if (!data) {
+        return `<div class="result-card"><h3>UMAP Plot</h3><p class="status-not-found">Could not load pre-computed UMAP data.</p></div>`;
+    }
+
+    const sampleSize = 15000;
+    const sampledData = []; // Declare sampledData here
+
+    if (data.length > sampleSize) {
+         const usedIndices = new Set();
+         while (sampledData.length < sampleSize) {
+            const randomIndex = Math.floor(Math.random() * data.length);
+            if (!usedIndices.has(randomIndex)) {
+                sampledData.push(data[randomIndex]);
+                usedIndices.add(randomIndex);
+            }
+        }
+    } else {
+        sampledData.push(...data);
+    }
+    
+    const cellTypes = [...new Set(sampledData.map(d => d.cell_type))];
+    const plotData = [];
+
+    // Use a categorical color scale for distinct cell types
+    const colorPalette = Plotly.d3.scale.category10(); // D3's category10 for distinct colors
+
+    for (let i = 0; i < cellTypes.length; i++) {
+        const cellType = cellTypes[i];
+        const points = sampledData.filter(d => d.cell_type === cellType);
+        plotData.push({
+            x: points.map(p => p.x),
+            y: points.map(p => p.y),
+            name: cellType,
+            mode: 'markers',
+            type: 'scattergl',
+            marker: { 
+                size: 5, 
+                opacity: 0.8,
+                color: colorPalette(i) // Assign a distinct color
+            },
+            hovertext: points.map(p => `Cell Type: ${p.cell_type}`),
+            hoverinfo: 'text'
+        });
+    }
+
+    const layout = {
+        title: `UMAP of Single-Cell Gene Expression (Sample of ${sampleSize} cells)`,
+        xaxis: { title: 'UMAP 1' },
+        yaxis: { title: 'UMAP 2' },
+        hovermode: 'closest',
+        margin: { t: 50, b: 50, l: 50, r: 50 } // Adjust margins for better fit
+    };
+
+    const plotDivId = 'umap-plot-div';
+    resultArea.innerHTML = `
+        <div class="result-card">
+            <div id="${plotDivId}"></div>
+            <button class="download-button" onclick="downloadPlot('${plotDivId}', 'UMAP_CellTypes')">Download Plot</button>
+        </div>`;
+    
+    Plotly.newPlot(plotDivId, plotData, layout, { responsive: true, displayModeBar: false });
+    return "";
+}
+// =============================================================================
+// REPLACEMENT: The definitive and corrected Question Registry
+// =============================================================================
 // =============================================================================
 // REPLACEMENT: The definitive and corrected Question Registry (Consolidated & Expanded)
 // Total questions including synonyms and new patterns.
@@ -428,240 +664,11 @@ const questionRegistry = [
     { text: "Show interactors of IFT88", handler: async () => getProteinInteractions("IFT88") }, // Placeholder
     { text: "What are the interacting partners of BBS1?", handler: async () => getProteinInteractions("BBS1") } // Placeholder
 ];
-
-/**
- * New function to describe CiliAI's capabilities.
- */
-async function tellAboutCiliAI() {
-    const html = `
-    <div class="result-card">
-        <h3>About CiliAI 🤖</h3>
-        <p>I am CiliAI, an AI-powered assistant designed to help you explore and analyze ciliary gene data. I can integrate information from five different datasets to answer complex questions. Here's what I can do:</p>
-        <ul>
-            <li><strong>Query by Category:</strong> Find genes based on disease ("Joubert syndrome"), protein complex ("BBSome"), cellular localization ("transition zone"), or organism ("C. elegans").</li>
-            <li><strong>Get Gene Details:</strong> Ask for comprehensive information about a specific gene by typing its name (e.g., "ARL13B").</li>
-            <li><strong>Visualize Expression Data:</strong> Generate plots for gene expression, including tissue-specific heatmaps, single-cell bar charts, and UMAPs colored by expression.</li>
-            <li><strong>Compare Genes & Complexes:</strong> Directly compare functions or expression levels (e.g., "Compare IFT-A and IFT-B" or "Compare ARL13B and FOXJ1").</li>
-            <li><strong>Explore Evolutionary Data:</strong> Find information on gene conservation across species (e.g., "Show evolutionary conservation of IFT88").</li>
-            <li><strong>Integrate Multiple Datasets:</strong> Answer complex questions that combine data, such as "Which Joubert Syndrome genes are expressed in ciliated cells?".</li>
-        </ul>
-    </div>`;
-    return html;
+// --- ADDITION: New Helper Functions for Expanded Questions ---
+function notImplementedYet(feature) {
+    return `<div class="result-card"><h3>Feature In Development</h3><p>The query handler for "<strong>${feature}</strong>" is not yet implemented. Stay tuned for future updates!</p></div>`;
 }
 
-/**
- * New handler to get live literature evidence for a gene.
- */
-async function getLiteratureEvidence(gene) {
-    const evidence = await analyzeGeneViaAPI(gene);
-    if (!evidence || evidence.length === 0) {
-        return `<div class="result-card"><h3>Literature Evidence for ${gene}</h3><p class="status-not-found">No relevant sentences found in a search of recent literature.</p></div>`;
-    }
-
-    const evidenceSnippets = evidence.map(ev => `
-        <div style="border-bottom:1px solid #eee; padding-bottom:0.5rem; margin-bottom:0.5rem;">
-            <p>${ev.context.replace(new RegExp(`(${gene})`, 'ig'), `<mark>$1</mark>`)}</p>
-            <small><strong>Source:</strong> ${ev.source.toUpperCase()} (${ev.id})</small>
-        </div>`
-    ).join('');
-
-    return `
-        <div class="result-card">
-            <h3>Literature Evidence for ${gene}</h3>
-            ${evidenceSnippets}
-        </div>`;
-}
-
-/**
- * Displays a UMAP plot where each cell is colored by the expression of a specific gene,
- * AND clusters are labeled by cell type.
- */
-async function displayUmapGeneExpression(geneSymbol) {
-    const [umapData, cellData] = await Promise.all([fetchUmapData(), fetchCellxgeneData()]);
-    const resultArea = document.getElementById('ai-result-area');
-
-    if (!umapData || !cellData) {
-        return `<div class="result-card"><h3>UMAP Expression Plot</h3><p class="status-not-found">Could not load UMAP or Cellxgene data.</p></div>`;
-    }
-
-    const geneUpper = geneSymbol.toUpperCase();
-    const geneExpressionMap = cellData[geneUpper];
-
-    if (!geneExpressionMap) {
-        return `<div class="result-card"><h3>${geneSymbol} Expression</h3><p class="status-not-found">Gene "${geneSymbol}" not found in the single-cell expression dataset.</p></div>`;
-    }
-
-    const sampleSize = 15000;
-    const sampledData = []; 
-
-    if (umapData.length > sampleSize) {
-        const usedIndices = new Set();
-        while (sampledData.length < sampleSize) {
-            const randomIndex = Math.floor(Math.random() * umapData.length);
-            if (!usedIndices.has(randomIndex)) {
-                sampledData.push(umapData[randomIndex]);
-                usedIndices.add(randomIndex);
-            }
-        }
-    } else {
-        sampledData.push(...umapData);
-    }
-
-    const expressionValues = sampledData.map(cell => geneExpressionMap[cell.cell_type] || 0);
-
-    // --- NEW: Calculate cluster labels ---
-    const cellTypes = [...new Set(sampledData.map(d => d.cell_type))];
-    const annotations = [];
-
-    // Helper to find the median (center) of a cluster
-    const median = (arr) => {
-        const mid = Math.floor(arr.length / 2);
-        const nums = [...arr].sort((a, b) => a - b);
-        return arr.length % 2 !== 0 ? nums[mid] : (nums[mid - 1] + nums[mid]) / 2;
-    };
-
-    for (const cellType of cellTypes) {
-        const points = sampledData.filter(d => d.cell_type === cellType);
-        if (points.length > 0) {
-            const xCoords = points.map(p => p.x);
-            const yCoords = points.map(p => p.y);
-            
-            annotations.push({
-                x: median(xCoords), // Use median for a more central position
-                y: median(yCoords),
-                text: cellType,
-                showarrow: false,
-                font: {
-                    color: '#FFFFFF', // White text
-                    size: 10,
-                    family: 'Arial, sans-serif'
-                },
-                bgcolor: 'rgba(0,0,0,0.4)', // Faint black background for readability
-                borderpad: 2,
-                bordercolor: 'rgba(0,0,0,0.4)',
-                borderwidth: 1,
-                xref: 'x',
-                yref: 'y'
-            });
-        }
-    }
-    // --- END NEW ---
-
-    const plotData = [{
-        x: sampledData.map(p => p.x),
-        y: sampledData.map(p => p.y),
-        mode: 'markers',
-        type: 'scattergl',
-        hovertext: sampledData.map((p, i) => `Cell Type: ${p.cell_type}<br>Expression: ${expressionValues[i].toFixed(4)}`),
-        hoverinfo: 'text',
-        marker: {
-            color: expressionValues,
-            colorscale: 'Plasma', // Kept the scale you liked
-            showscale: true,
-            colorbar: { 
-                title: { 
-                    text: 'Expression',
-                    side: 'right' 
-                } 
-            },
-            size: 5,
-            opacity: 0.8
-        }
-    }];
-
-    const layout = {
-        title: `UMAP Colored by ${geneSymbol} Expression (Sample of ${sampleSize} cells)`,
-        xaxis: { title: 'UMAP 1', zeroline: false, showgrid: false },
-        yaxis: { title: 'UMAP 2', zeroline: false, showgrid: false },
-        hovermode: 'closest',
-        margin: { t: 50, b: 50, l: 50, r: 50 },
-        plot_bgcolor: '#FFFFFF', // White plot background
-        paper_bgcolor: '#FFFFFF', // White paper background
-        annotations: annotations, // Add the new cluster labels
-        showlegend: false // Don't need a legend for the continuous scale
-    };
-
-    const plotDivId = 'umap-expression-plot-div';
-    resultArea.innerHTML = `
-        <div class="result-card">
-            <div id="${plotDivId}"></div>
-            <button class="download-button" onclick="downloadPlot('${plotDivId}', 'UMAP_${geneSymbol}_Expression')">Download Plot</button>
-        </div>`;
-    
-    Plotly.newPlot(plotDivId, plotData, layout, { responsive: true, displayModeBar: false });
-    return "";
-}
-
-/**
- * Displays a UMAP plot colored by cell type.
- */
-async function displayUmapPlot() {
-    const data = await fetchUmapData();
-    const resultArea = document.getElementById('ai-result-area');
-    
-    if (!data) {
-        return `<div class="result-card"><h3>UMAP Plot</h3><p class="status-not-found">Could not load pre-computed UMAP data.</p></div>`;
-    }
-
-    const sampleSize = 15000;
-    const sampledData = []; // Declare sampledData here
-
-    if (data.length > sampleSize) {
-         const usedIndices = new Set();
-         while (sampledData.length < sampleSize) {
-            const randomIndex = Math.floor(Math.random() * data.length);
-            if (!usedIndices.has(randomIndex)) {
-                sampledData.push(data[randomIndex]);
-                usedIndices.add(randomIndex);
-            }
-        }
-    } else {
-        sampledData.push(...data);
-    }
-    
-    const cellTypes = [...new Set(sampledData.map(d => d.cell_type))];
-    const plotData = [];
-
-    // Use a categorical color scale for distinct cell types
-    const colorPalette = Plotly.d3.scale.category10(); // D3's category10 for distinct colors
-
-    for (let i = 0; i < cellTypes.length; i++) {
-        const cellType = cellTypes[i];
-        const points = sampledData.filter(d => d.cell_type === cellType);
-        plotData.push({
-            x: points.map(p => p.x),
-            y: points.map(p => p.y),
-            name: cellType,
-            mode: 'markers',
-            type: 'scattergl',
-            marker: { 
-                size: 5, 
-                opacity: 0.8,
-                color: colorPalette(i) // Assign a distinct color
-            },
-            hovertext: points.map(p => `Cell Type: ${p.cell_type}`),
-            hoverinfo: 'text'
-        });
-    }
-
-    const layout = {
-        title: `UMAP of Single-Cell Gene Expression (Sample of ${sampleSize} cells)`,
-        xaxis: { title: 'UMAP 1' },
-        yaxis: { title: 'UMAP 2' },
-        hovermode: 'closest',
-        margin: { t: 50, b: 50, l: 50, r: 50 } // Adjust margins for better fit
-    };
-
-    const plotDivId = 'umap-plot-div';
-    resultArea.innerHTML = `
-        <div class="result-card">
-            <div id="${plotDivId}"></div>
-            <button class="download-button" onclick="downloadPlot('${plotDivId}', 'UMAP_CellTypes')">Download Plot</button>
-        </div>`;
-    
-    Plotly.newPlot(plotDivId, plotData, layout, { responsive: true, displayModeBar: false });
-    return "";
-}
 const getGenesByScreenPhenotype = async (phenotype) => notImplementedYet(`Genes by screen phenotype: ${phenotype}`);
 
 async function compareComplexes(complexA, complexB) {
@@ -2176,6 +2183,20 @@ function formatComprehensiveGeneDetails(geneSymbol, geneData) {
             </p>
         </div>
     `;
+}
+
+function formatGeneDetail(geneData, geneSymbol, detailTitle, detailContent) {
+    if (!geneData) {
+        return `<div class="result-card"><h3>${geneSymbol}</h3><p class="status-not-found">Gene not found in the database.</p></div>`;
+    }
+    return `
+        <div class="result-card">
+            <h3>${geneSymbol}</h3>
+            <h4>${detailTitle}</h4>
+            <p>${detailContent || 'No information available.'}</p>
+        </div>
+    `;
+}
 
 // -------------------------------
 // Click handler for gene selection
