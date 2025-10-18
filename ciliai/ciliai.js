@@ -8,6 +8,16 @@ let cellxgeneDataCache = null;
 // --- ADDITION: UMAP Plotting Functions ---
 let umapDataCache = null;
 
+// --- NEW: Reusable scRNA-seq Data Reference ---
+const SC_RNA_SEQ_REFERENCE_HTML = `
+<p style="font-size: 0.8em; color: #666; margin-top: 1rem; border-top: 1px solid #eee; padding-top: 0.5rem;">
+    <strong>Data Source:</strong> human lung organoid cell atlas (AnnData v0.10).
+    <a href="https://datasets.cellxgene.cziscience.com/a2011f35-04c4-427f-80d1-27ee0670251d.h5ad" target="_blank">
+        [Download Source H5AD]
+    </a>
+</p>
+`;
+
 // --- Fallback Data ---
 const FALLBACK_CILIOPATHY_GENES = [
     { gene: 'BBS10', ciliopathy: 'Bardet–Biedl Syndrome', description: 'Bardet-Biedl syndrome 10, chaperonin-like protein.' },
