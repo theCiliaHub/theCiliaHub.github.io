@@ -1410,10 +1410,6 @@ async function fetchCellxgeneData() {
 }
 
 
-// --- Main AI Query Handler ---
-// =============================================================================
-// NEW CODE: Replace all functions from here down to the end of handleAIQuery
-// =============================================================================
 
 // --- Query Helper Functions ---
 
@@ -1648,13 +1644,18 @@ async function getCiliaryGenesForOrganism(organismName) {
     };
 }
 
-
 // --- Main AI Query Handler (REPLACEMENT) ---
 window.handleAIQuery = async function() {
     const aiQueryInput = document.getElementById('aiQueryInput');
     const resultArea = document.getElementById('ai-result-area');
     const query = aiQueryInput.value.trim();
     if (!query) return;
+
+    // --- FIX 1: Purge any existing Plotly plots from the result area ---
+    // This frees up WebGL contexts and prevents the "Too many active contexts" warning.
+    // It MUST run before the .innerHTML is overwritten by the "Thinking" message.
+    Plotly.purge(resultArea);
+    // --- END OF FIX 1 ---
 
     resultArea.style.display = 'block';
     resultArea.innerHTML = `<p class="status-searching">CiliAI is thinking... 🧠</p>`;
@@ -1703,7 +1704,15 @@ window.handleAIQuery = async function() {
                 }
             }
         }
-        resultArea.innerHTML = resultHtml;
+
+        // --- FIX 2: Only update innerHTML if the handler returned HTML ---
+        // Plotting functions (like displayUmapPlot) return "" on purpose
+        // so they aren't erased by this line.
+        if (resultHtml !== "") {
+            resultArea.innerHTML = resultHtml;
+        }
+        // --- END OF FIX 2 ---
+
     } catch (e) {
         resultArea.innerHTML = `<p class="status-not-found">An error occurred during your query: ${e.message}. Check the console for details.</p>`;
         console.error("CiliAI Query Error:", e);
