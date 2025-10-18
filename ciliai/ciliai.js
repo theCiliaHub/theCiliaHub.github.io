@@ -184,7 +184,8 @@ async function getLiteratureEvidence(gene) {
 }
 
 /**
- * Displays a UMAP plot where each cell is colored by the expression of a specific gene.
+ * Displays a UMAP plot where each cell is colored by the expression of a specific gene,
+ * AND clusters are labeled by cell type.
  */
 async function displayUmapGeneExpression(geneSymbol) {
     const [umapData, cellData] = await Promise.all([fetchUmapData(), fetchCellxgeneData()]);
@@ -202,7 +203,7 @@ async function displayUmapGeneExpression(geneSymbol) {
     }
 
     const sampleSize = 15000;
-    const sampledData = []; // Declare sampledData here
+    const sampledData = []; 
 
     if (umapData.length > sampleSize) {
         const usedIndices = new Set();
@@ -219,6 +220,44 @@ async function displayUmapGeneExpression(geneSymbol) {
 
     const expressionValues = sampledData.map(cell => geneExpressionMap[cell.cell_type] || 0);
 
+    // --- NEW: Calculate cluster labels ---
+    const cellTypes = [...new Set(sampledData.map(d => d.cell_type))];
+    const annotations = [];
+
+    // Helper to find the median (center) of a cluster
+    const median = (arr) => {
+        const mid = Math.floor(arr.length / 2);
+        const nums = [...arr].sort((a, b) => a - b);
+        return arr.length % 2 !== 0 ? nums[mid] : (nums[mid - 1] + nums[mid]) / 2;
+    };
+
+    for (const cellType of cellTypes) {
+        const points = sampledData.filter(d => d.cell_type === cellType);
+        if (points.length > 0) {
+            const xCoords = points.map(p => p.x);
+            const yCoords = points.map(p => p.y);
+            
+            annotations.push({
+                x: median(xCoords), // Use median for a more central position
+                y: median(yCoords),
+                text: cellType,
+                showarrow: false,
+                font: {
+                    color: '#FFFFFF', // White text
+                    size: 10,
+                    family: 'Arial, sans-serif'
+                },
+                bgcolor: 'rgba(0,0,0,0.4)', // Faint black background for readability
+                borderpad: 2,
+                bordercolor: 'rgba(0,0,0,0.4)',
+                borderwidth: 1,
+                xref: 'x',
+                yref: 'y'
+            });
+        }
+    }
+    // --- END NEW ---
+
     const plotData = [{
         x: sampledData.map(p => p.x),
         y: sampledData.map(p => p.y),
@@ -228,9 +267,7 @@ async function displayUmapGeneExpression(geneSymbol) {
         hoverinfo: 'text',
         marker: {
             color: expressionValues,
-            // --- UPDATED COLOR SCALE ---
-            colorscale: 'Plasma', // A distinct purple-to-yellow gradient
-            // --- END UPDATE ---
+            colorscale: 'Plasma', // Kept the scale you liked
             showscale: true,
             colorbar: { 
                 title: { 
@@ -245,10 +282,14 @@ async function displayUmapGeneExpression(geneSymbol) {
 
     const layout = {
         title: `UMAP Colored by ${geneSymbol} Expression (Sample of ${sampleSize} cells)`,
-        xaxis: { title: 'UMAP 1' },
-        yaxis: { title: 'UMAP 2' },
+        xaxis: { title: 'UMAP 1', zeroline: false, showgrid: false },
+        yaxis: { title: 'UMAP 2', zeroline: false, showgrid: false },
         hovermode: 'closest',
-        margin: { t: 50, b: 50, l: 50, r: 50 }
+        margin: { t: 50, b: 50, l: 50, r: 50 },
+        plot_bgcolor: '#FFFFFF', // White plot background
+        paper_bgcolor: '#FFFFFF', // White paper background
+        annotations: annotations, // Add the new cluster labels
+        showlegend: false // Don't need a legend for the continuous scale
     };
 
     const plotDivId = 'umap-expression-plot-div';
@@ -261,7 +302,6 @@ async function displayUmapGeneExpression(geneSymbol) {
     Plotly.newPlot(plotDivId, plotData, layout, { responsive: true, displayModeBar: false });
     return "";
 }
-
 
 /**
  * Displays a UMAP plot colored by cell type.
@@ -442,6 +482,7 @@ async function compareComplexes(complexA, complexB) {
 
 /**
  * Displays a grouped bar chart of multiple genes' expression across cell types.
+ * Uses "Nature-like" colors, solid axis lines, and no grid.
  * @param {string[]} geneSymbols An array of genes to plot.
  */
 async function displayCellxgeneBarChart(geneSymbols) {
@@ -453,8 +494,8 @@ async function displayCellxgeneBarChart(geneSymbols) {
     }
 
     const uniqueCellTypes = new Set();
-    const geneExpressionData = {}; // Stores expression data per gene
-    let genesFound = []; // Keep track of genes that are actually found
+    const geneExpressionData = {}; 
+    let genesFound = []; 
 
     for (const gene of geneSymbols) {
         const geneUpper = gene.toUpperCase();
@@ -463,14 +504,12 @@ async function displayCellxgeneBarChart(geneSymbols) {
         if (expressionMap) {
             geneExpressionData[geneUpper] = expressionMap;
             Object.keys(expressionMap).forEach(cellType => uniqueCellTypes.add(cellType));
-            genesFound.push(gene); // Add found gene to the list
+            genesFound.push(gene); 
         } else {
             console.warn(`Gene "${geneUpper}" not found in cellxgene_data.json`);
-            // Don't return here; allow the plot to show the genes that *were* found.
         }
     }
     
-    // If NO genes were found, then return an error
     if (genesFound.length === 0) {
         return `<div class="result-card"><h3>Expression Chart</h3><p class="status-not-found">None of the requested genes (${geneSymbols.join(', ')}) were found in the single-cell expression dataset.</p></div>`;
     }
@@ -478,31 +517,25 @@ async function displayCellxgeneBarChart(geneSymbols) {
     const sortedCellTypes = Array.from(uniqueCellTypes).sort();
     const plotData = [];
 
-    // --- THIS IS THE ROBUST FIX ---
-    // Stop relying on Plotly.colors or Plotly.d3. Define our own color list.
-    const qualitativeColors = [
-        '#1f77b4',  // Muted blue
-        '#ff7f0e',  // Safety orange
-        '#2ca02c',  // Cooked asparagus green
-        '#d62728',  // Brick red
-        '#9467bd',  // Muted purple
-        '#8c564b',  // Chestnut brown
-        '#e377c2',  // Raspberry yogurt pink
-        '#7f7f7f',  // Middle gray
-        '#bcbd22',  // Curry yellow-green
-        '#17becf'   // Muted cyan
+    // --- NEW: "Nature paper-like" color palette ---
+    const NATURE_COLORS = [
+        '#0C5DA5', // Blue
+        '#00B945', // Green
+        '#FF9500', // Orange
+        '#FF2C00', // Red
+        '#845B97', // Purple
+        '#474747', // Dark Gray
+        '#17BECF'  // Cyan
     ];
-    // --- END OF FIX ---
+    // --- END NEW ---
     
     const geneColorMap = {};
     genesFound.forEach((gene, i) => {
-        geneColorMap[gene.toUpperCase()] = qualitativeColors[i % qualitativeColors.length];
+        geneColorMap[gene.toUpperCase()] = NATURE_COLORS[i % NATURE_COLORS.length];
     });
 
-    // Only loop over the genes that were actually found
     for (const gene of genesFound) {
         const geneUpper = gene.toUpperCase();
-        // Get the expression values, defaulting to 0 for any cell type where the gene might be missing
         const yValues = sortedCellTypes.map(cellType => (geneExpressionData[geneUpper] && geneExpressionData[geneUpper][cellType]) || 0);
 
         plotData.push({
@@ -517,18 +550,34 @@ async function displayCellxgeneBarChart(geneSymbols) {
         });
     }
 
+    // --- NEW: Updated layout with axis lines and no grid ---
     const layout = {
         title: `Single-Cell Expression of ${genesFound.join(' vs ')}`,
         barmode: 'group',
+        plot_bgcolor: '#FFFFFF', // White background
+        paper_bgcolor: '#FFFFFF', // White paper
         xaxis: {
             title: 'Cell Type',
             tickangle: -45,
             automargin: true,
+            showline: true, // Show X-axis line
+            linewidth: 1,
+            linecolor: '#000000',
+            zeroline: false, // Hide the zero line
+            showgrid: false  // Hide X-axis grid lines
         },
-        yaxis: { title: 'Normalized Expression' },
+        yaxis: { 
+            title: 'Normalized Expression',
+            showline: true, // Show Y-axis line
+            linewidth: 1,
+            linecolor: '#000000',
+            zeroline: false, // Hide the zero line
+            showgrid: false  // Hide Y-axis grid lines
+        },
         margin: { b: 150, t: 70, l: 50, r: 50 },
         legend: { x: 1, y: 1, xanchor: 'right' }
     };
+    // --- END NEW ---
     
     const plotDivId = 'cellxgene-plot-div';
     resultArea.innerHTML = `
@@ -544,6 +593,8 @@ async function displayCellxgeneBarChart(geneSymbols) {
     Plotly.newPlot(plotDivId, plotData, layout, { responsive: true, displayModeBar: false });
     return "";
 }
+
+
 /**
  * Downloads a Plotly plot as a PNG image.
  * @param {string} divId The ID of the div containing the Plotly plot.
