@@ -201,16 +201,33 @@ async function displayUmapGeneExpression(geneSymbol) {
         return `<div class="result-card"><h3>${geneSymbol} Expression</h3><p class="status-not-found">Gene "${geneSymbol}" not found in the single-cell expression dataset.</p></div>`;
     }
 
-    // ... (all your data sampling logic remains the same) ...
     const sampleSize = 15000;
-    // ... (sampledData logic) ...
+    
+    // --- THIS IS THE FIX ---
+    // 'sampledData' must be declared out here, in the main function scope.
+    const sampledData = []; 
+    // --- END OF FIX ---
+
+    if (umapData.length > sampleSize) {
+        const usedIndices = new Set();
+        while (sampledData.length < sampleSize) {
+            const randomIndex = Math.floor(Math.random() * umapData.length);
+            if (!usedIndices.has(randomIndex)) {
+                sampledData.push(umapData[randomIndex]);
+                usedIndices.add(randomIndex);
+            }
+        }
+    } else {
+        sampledData.push(...umapData);
+    }
+
     const expressionValues = sampledData.map(cell => geneExpressionMap[cell.cell_type] || 0);
 
     const plotData = [{
         x: sampledData.map(p => p.x),
         y: sampledData.map(p => p.y),
         mode: 'markers',
-        type: 'scattergl', // This requires WebGL
+        type: 'scattergl',
         hovertext: sampledData.map((p, i) => `Cell Type: ${p.cell_type}<br>Expression: ${expressionValues[i].toFixed(4)}`),
         hoverinfo: 'text',
         marker: {
@@ -230,17 +247,69 @@ async function displayUmapGeneExpression(geneSymbol) {
         hovermode: 'closest'
     };
 
-    // --- FIX IS HERE ---
-    // 1. Purge any existing plot from the target area FIRST to free WebGL resources.
-    Plotly.purge(resultArea);
-
-    // 2. Now, set the new HTML.
     resultArea.innerHTML = `<div class="result-card"><div id="umap-expression-plot-div"></div></div>`;
-    
-    // 3. Finally, create the new plot.
     Plotly.newPlot('umap-expression-plot-div', plotData, layout, { responsive: true });
     return "";
 }
+
+/**
+ * Displays a UMAP plot colored by cell type.
+ */
+async function displayUmapPlot() {
+    const data = await fetchUmapData();
+    const resultArea = document.getElementById('ai-result-area');
+    
+    if (!data) {
+        return `<div class="result-card"><h3>UMAP Plot</h3><p class="status-not-found">Could not load pre-computed UMAP data.</p></div>`;
+    }
+
+    const sampleSize = 15000;
+
+    // --- THIS IS THE FIX ---
+    // 'sampledData' must be declared out here, in the main function scope.
+    const sampledData = []; 
+    // --- END OF FIX ---
+
+    if (data.length > sampleSize) {
+         const usedIndices = new Set();
+         while (sampledData.length < sampleSize) {
+            const randomIndex = Math.floor(Math.random() * data.length);
+            if (!usedIndices.has(randomIndex)) {
+                sampledData.push(data[randomIndex]);
+                usedIndices.add(randomIndex);
+            }
+        }
+    } else {
+        sampledData.push(...data);
+    }
+    
+    const cellTypes = [...new Set(sampledData.map(d => d.cell_type))];
+    const plotData = [];
+
+    for (const cellType of cellTypes) {
+        const points = sampledData.filter(d => d.cell_type === cellType);
+        plotData.push({
+            x: points.map(p => p.x),
+            y: points.map(p => p.y),
+            name: cellType,
+            mode: 'markers',
+            type: 'scattergl',
+            marker: { size: 5, opacity: 0.8 }
+        });
+    }
+
+    const layout = {
+        title: `UMAP of Single-Cell Gene Expression (Sample of ${sampleSize} cells)`,
+        xaxis: { title: 'UMAP 1' },
+        yaxis: { title: 'UMAP 2' },
+        hovermode: 'closest'
+    };
+
+    resultArea.innerHTML = `<div class="result-card"><div id="umap-plot-div"></div></div>`;
+    Plotly.newPlot('umap-plot-div', plotData, layout, { responsive: true });
+    return "";
+}
+
 
 /**
  * Displays a UMAP plot colored by cell type.
@@ -1653,7 +1722,6 @@ window.handleAIQuery = async function() {
 
     // --- FIX 1: Purge any existing Plotly plots from the result area ---
     // This frees up WebGL contexts and prevents the "Too many active contexts" warning.
-    // It MUST run before the .innerHTML is overwritten by the "Thinking" message.
     Plotly.purge(resultArea);
     // --- END OF FIX 1 ---
 
@@ -1718,6 +1786,8 @@ window.handleAIQuery = async function() {
         console.error("CiliAI Query Error:", e);
     }
 };
+
+
 
 // Helper for the comparison query (updated titles and threshold)
 function formatComparisonResult(title, tissue, list1, list2) {
