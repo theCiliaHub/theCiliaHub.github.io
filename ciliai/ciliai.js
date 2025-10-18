@@ -459,8 +459,9 @@ async function displayCellxgeneBarChart(geneSymbols) {
 
         if (!expressionMap) {
             console.warn(`Gene "${geneUpper}" not found in cellxgene_data.json`);
-            // Optionally, you might return an error or skip this gene
-            return `<div class="result-card"><h3>Expression Chart</h3><p class="status-not-found">Gene "${geneUpper}" not found in the single-cell expression dataset.</p></div>`;
+            // If any gene is not found, return an error message for all requested genes
+            // or modify to show data only for found genes. For now, returning an error.
+            return `<div class="result-card"><h3>Expression Chart</h3><p class="status-not-found">One or more genes (${geneSymbols.join(', ')}) not found in the single-cell expression dataset.</p></div>`;
         }
         geneExpressionData[geneUpper] = expressionMap;
         Object.keys(expressionMap).forEach(cellType => uniqueCellTypes.add(cellType));
@@ -473,11 +474,13 @@ async function displayCellxgeneBarChart(geneSymbols) {
     const sortedCellTypes = Array.from(uniqueCellTypes).sort();
     const plotData = [];
 
-    // Define a color palette for the genes
-    const geneColorPalette = {};
-    const d3Colors = Plotly.d3.scale.category10(); 
-    geneSymbols.forEach((gene, i) => geneColorPalette[gene.toUpperCase()] = d3Colors(i));
-
+    // --- FIX IS HERE: Use Plotly's built-in qualitative color array ---
+    const qualitativeColors = Plotly.colors.qualitative.Plotly; // A good default qualitative palette
+    const geneColorMap = {};
+    geneSymbols.forEach((gene, i) => {
+        geneColorMap[gene.toUpperCase()] = qualitativeColors[i % qualitativeColors.length];
+    });
+    // --- END FIX ---
 
     for (const gene of geneSymbols) {
         const geneUpper = gene.toUpperCase();
@@ -489,9 +492,9 @@ async function displayCellxgeneBarChart(geneSymbols) {
             name: geneUpper,
             type: 'bar',
             marker: {
-                color: geneColorPalette[geneUpper]
+                color: geneColorMap[geneUpper]
             },
-            hoverinfo: 'x+y+name' // Show cell type, expression, and gene name on hover
+            hoverinfo: 'x+y+name'
         });
     }
 
@@ -505,7 +508,7 @@ async function displayCellxgeneBarChart(geneSymbols) {
         },
         yaxis: { title: 'Normalized Expression' },
         margin: { b: 150, t: 70, l: 50, r: 50 },
-        legend: { x: 1, y: 1, xanchor: 'right' } // Place legend at top right
+        legend: { x: 1, y: 1, xanchor: 'right' }
     };
     
     const plotDivId = 'cellxgene-plot-div';
