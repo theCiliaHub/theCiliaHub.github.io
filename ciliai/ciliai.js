@@ -202,11 +202,7 @@ async function displayUmapGeneExpression(geneSymbol) {
     }
 
     const sampleSize = 15000;
-    
-    // --- THIS IS THE FIX ---
-    // 'sampledData' must be declared out here, in the main function scope.
-    const sampledData = []; 
-    // --- END OF FIX ---
+    const sampledData = []; // Declare sampledData here
 
     if (umapData.length > sampleSize) {
         const usedIndices = new Set();
@@ -221,6 +217,7 @@ async function displayUmapGeneExpression(geneSymbol) {
         sampledData.push(...umapData);
     }
 
+    // Prepare data for coloring by expression, with cell type in hover info
     const expressionValues = sampledData.map(cell => geneExpressionMap[cell.cell_type] || 0);
 
     const plotData = [{
@@ -232,9 +229,14 @@ async function displayUmapGeneExpression(geneSymbol) {
         hoverinfo: 'text',
         marker: {
             color: expressionValues,
-            colorscale: 'Viridis',
+            colorscale: 'Viridis', // A good distinct color scale for continuous data
             showscale: true,
-            colorbar: { title: 'Expression' },
+            colorbar: { 
+                title: { 
+                    text: 'Expression',
+                    side: 'right' 
+                } 
+            },
             size: 5,
             opacity: 0.8
         }
@@ -244,11 +246,18 @@ async function displayUmapGeneExpression(geneSymbol) {
         title: `UMAP Colored by ${geneSymbol} Expression (Sample of ${sampleSize} cells)`,
         xaxis: { title: 'UMAP 1' },
         yaxis: { title: 'UMAP 2' },
-        hovermode: 'closest'
+        hovermode: 'closest',
+        margin: { t: 50, b: 50, l: 50, r: 50 } // Adjust margins for better fit
     };
 
-    resultArea.innerHTML = `<div class="result-card"><div id="umap-expression-plot-div"></div></div>`;
-    Plotly.newPlot('umap-expression-plot-div', plotData, layout, { responsive: true });
+    const plotDivId = 'umap-expression-plot-div';
+    resultArea.innerHTML = `
+        <div class="result-card">
+            <div id="${plotDivId}"></div>
+            <button class="download-button" onclick="downloadPlot('${plotDivId}', 'UMAP_${geneSymbol}_Expression')">Download Plot</button>
+        </div>`;
+    
+    Plotly.newPlot(plotDivId, plotData, layout, { responsive: true, displayModeBar: false }); // displayModeBar: false hides Plotly's default toolbar
     return "";
 }
 
@@ -264,11 +273,7 @@ async function displayUmapPlot() {
     }
 
     const sampleSize = 15000;
-
-    // --- THIS IS THE FIX ---
-    // 'sampledData' must be declared out here, in the main function scope.
-    const sampledData = []; 
-    // --- END OF FIX ---
+    const sampledData = []; // Declare sampledData here
 
     if (data.length > sampleSize) {
          const usedIndices = new Set();
@@ -286,7 +291,11 @@ async function displayUmapPlot() {
     const cellTypes = [...new Set(sampledData.map(d => d.cell_type))];
     const plotData = [];
 
-    for (const cellType of cellTypes) {
+    // Use a categorical color scale for distinct cell types
+    const colorPalette = Plotly.d3.scale.category10(); // D3's category10 for distinct colors
+
+    for (let i = 0; i < cellTypes.length; i++) {
+        const cellType = cellTypes[i];
         const points = sampledData.filter(d => d.cell_type === cellType);
         plotData.push({
             x: points.map(p => p.x),
@@ -294,7 +303,13 @@ async function displayUmapPlot() {
             name: cellType,
             mode: 'markers',
             type: 'scattergl',
-            marker: { size: 5, opacity: 0.8 }
+            marker: { 
+                size: 5, 
+                opacity: 0.8,
+                color: colorPalette(i) // Assign a distinct color
+            },
+            hovertext: points.map(p => `Cell Type: ${p.cell_type}`),
+            hoverinfo: 'text'
         });
     }
 
@@ -302,64 +317,20 @@ async function displayUmapPlot() {
         title: `UMAP of Single-Cell Gene Expression (Sample of ${sampleSize} cells)`,
         xaxis: { title: 'UMAP 1' },
         yaxis: { title: 'UMAP 2' },
-        hovermode: 'closest'
+        hovermode: 'closest',
+        margin: { t: 50, b: 50, l: 50, r: 50 } // Adjust margins for better fit
     };
 
-    resultArea.innerHTML = `<div class="result-card"><div id="umap-plot-div"></div></div>`;
-    Plotly.newPlot('umap-plot-div', plotData, layout, { responsive: true });
+    const plotDivId = 'umap-plot-div';
+    resultArea.innerHTML = `
+        <div class="result-card">
+            <div id="${plotDivId}"></div>
+            <button class="download-button" onclick="downloadPlot('${plotDivId}', 'UMAP_CellTypes')">Download Plot</button>
+        </div>`;
+    
+    Plotly.newPlot(plotDivId, plotData, layout, { responsive: true, displayModeBar: false });
     return "";
 }
-
-
-/**
- * Displays a UMAP plot colored by cell type.
- */
-async function displayUmapPlot() {
-    const data = await fetchUmapData();
-    const resultArea = document.getElementById('ai-result-area');
-    
-    if (!data) {
-        return `<div class="result-card"><h3>UMAP Plot</h3><p class="status-not-found">Could not load pre-computed UMAP data.</p></div>`;
-    }
-
-    // ... (all your data sampling logic remains the same) ...
-    const sampleSize = 15000;
-    // ... (sampledData logic) ...
-    
-    const cellTypes = [...new Set(sampledData.map(d => d.cell_type))];
-    const plotData = [];
-
-    for (const cellType of cellTypes) {
-        const points = sampledData.filter(d => d.cell_type === cellType);
-        plotData.push({
-            x: points.map(p => p.x),
-            y: points.map(p => p.y),
-            name: cellType,
-            mode: 'markers',
-            type: 'scattergl', // This requires WebGL
-            marker: { size: 5, opacity: 0.8 }
-        });
-    }
-
-    const layout = {
-        title: `UMAP of Single-Cell Gene Expression (Sample of ${sampleSize} cells)`,
-        xaxis: { title: 'UMAP 1' },
-        yaxis: { title: 'UMAP 2' },
-        hovermode: 'closest'
-    };
-
-    // --- FIX IS HERE ---
-    // 1. Purge any existing plot from the target area FIRST.
-    Plotly.purge(resultArea);
-
-    // 2. Now, set the new HTML.
-    resultArea.innerHTML = `<div class="result-card"><div id="umap-plot-div"></div></div>`;
-    
-    // 3. Finally, create the new plot.
-    Plotly.newPlot('umap-plot-div', plotData, layout, { responsive: true });
-    return "";
-}
-
 // =============================================================================
 // REPLACEMENT: The definitive and corrected Question Registry
 // =============================================================================
@@ -479,12 +450,53 @@ async function displayCellxgeneBarChart(geneSymbols) {
         return `<div class="result-card"><h3>Cell-Specific Expression</h3><p class="status-not-found">Could not load the single-cell expression dataset.</p></div>`;
     }
 
-    // ... (all your data processing logic remains the same) ...
+    const uniqueCellTypes = new Set();
+    const geneExpressionData = {}; // Stores expression data per gene
+
+    for (const gene of geneSymbols) {
+        const geneUpper = gene.toUpperCase();
+        const expressionMap = cellxgeneDataCache[geneUpper];
+
+        if (!expressionMap) {
+            console.warn(`Gene "${geneUpper}" not found in cellxgene_data.json`);
+            // Optionally, you might return an error or skip this gene
+            return `<div class="result-card"><h3>Expression Chart</h3><p class="status-not-found">Gene "${geneUpper}" not found in the single-cell expression dataset.</p></div>`;
+        }
+        geneExpressionData[geneUpper] = expressionMap;
+        Object.keys(expressionMap).forEach(cellType => uniqueCellTypes.add(cellType));
+    }
+
+    if (Object.keys(geneExpressionData).length === 0) {
+        return `<div class="result-card"><h3>Expression Chart</h3><p class="status-not-found">No valid gene expression data found for the requested genes.</p></div>`;
+    }
+
+    const sortedCellTypes = Array.from(uniqueCellTypes).sort();
     const plotData = [];
-    // ... (logic to build plotData) ...
+
+    // Define a color palette for the genes
+    const geneColorPalette = {};
+    const d3Colors = Plotly.d3.scale.category10(); 
+    geneSymbols.forEach((gene, i) => geneColorPalette[gene.toUpperCase()] = d3Colors(i));
+
+
+    for (const gene of geneSymbols) {
+        const geneUpper = gene.toUpperCase();
+        const yValues = sortedCellTypes.map(cellType => geneExpressionData[geneUpper][cellType] || 0);
+
+        plotData.push({
+            x: sortedCellTypes,
+            y: yValues,
+            name: geneUpper,
+            type: 'bar',
+            marker: {
+                color: geneColorPalette[geneUpper]
+            },
+            hoverinfo: 'x+y+name' // Show cell type, expression, and gene name on hover
+        });
+    }
 
     const layout = {
-        title: `Single-Cell Expression Comparison`,
+        title: `Single-Cell Expression of ${geneSymbols.join(' vs ')}`,
         barmode: 'group',
         xaxis: {
             title: 'Cell Type',
@@ -492,26 +504,37 @@ async function displayCellxgeneBarChart(geneSymbols) {
             automargin: true,
         },
         yaxis: { title: 'Normalized Expression' },
-        margin: { b: 150 }
+        margin: { b: 150, t: 70, l: 50, r: 50 },
+        legend: { x: 1, y: 1, xanchor: 'right' } // Place legend at top right
     };
     
-    // --- FIX IS HERE ---
-    // 1. Purge any existing plot from the target area FIRST.
-    Plotly.purge(resultArea);
-
-    // 2. Now, set the new HTML.
+    const plotDivId = 'cellxgene-plot-div';
     resultArea.innerHTML = `
         <div class="result-card">
-            <div id="cellxgene-plot-div"></div>
+            <div id="${plotDivId}"></div>
+            <button class="download-button" onclick="downloadPlot('${plotDivId}', 'Gene_Expression_Comparison')">Download Plot</button>
             <p style="font-size: 0.8em; color: #666; margin-top: 1rem; border-top: 1px solid #eee; padding-top: 0.5rem;">
                 Data from Cellxgene dataset: a2011f35-04c4-427f-80d1-27ee0670251d
             </p>
         </div>
     `;
 
-    // 3. Finally, create the new plot.
-    Plotly.newPlot('cellxgene-plot-div', plotData, layout, { responsive: true });
+    Plotly.newPlot(plotDivId, plotData, layout, { responsive: true, displayModeBar: false });
     return "";
+}
+
+/**
+ * Downloads a Plotly plot as a PNG image.
+ * @param {string} divId The ID of the div containing the Plotly plot.
+ * @param {string} filename The desired filename for the downloaded image (without extension).
+ */
+function downloadPlot(divId, filename) {
+    const plotDiv = document.getElementById(divId);
+    if (plotDiv) {
+        Plotly.downloadImage(plotDiv, { format: 'png', filename: filename, width: 1000, height: 700 });
+    } else {
+        console.error(`Plot div with ID "${divId}" not found for download.`);
+    }
 }
 
 
@@ -1142,7 +1165,6 @@ async function getComprehensiveDetails(term) {
 }
 
 // --- Main Page Display Function (REPLACEMENT) ---
-// --- Main Page Display Function (REPLACEMENT) ---
 window.displayCiliAIPage = async function displayCiliAIPage() {
     const contentArea = document.querySelector('.content-area');
     if (!contentArea) {
@@ -1265,6 +1287,33 @@ window.displayCiliAIPage = async function displayCiliAIPage() {
                 .suggestions-container { position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid #ccc; z-index: 1000; max-height: 200px; overflow-y: auto; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
                 .suggestion-item { padding: 10px; cursor: pointer; }
                 .suggestion-item:hover { background-color: #f0f0f0; }
+
+                /* --- ADDED CSS FOR DOWNLOAD BUTTON AND PLOT CARD --- */
+                .download-button {
+                    background-color: #28a745; /* Green */
+                    color: white;
+                    padding: 8px 14px;
+                    border: none;
+                    border-radius: 4px;
+                    cursor: pointer;
+                    font-size: 0.9em;
+                    font-weight: bold;
+                    margin-top: 15px;
+                    transition: background-color 0.3s ease;
+                }
+                .download-button:hover {
+                    background-color: #218838;
+                }
+                /* This re-defines .result-card to ensure it has the correct padding for plots */
+                .result-card {
+                    padding: 20px;
+                    background-color: #fff;
+                    border-radius: 8px;
+                    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+                    margin-top: 1.5rem;
+                    border: 1px solid #ddd; /* Kept original border */
+                    margin-bottom: 1.5rem; /* Kept original margin-bottom */
+                }
             </style>
         `;
     } catch (error) {
