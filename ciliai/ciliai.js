@@ -373,8 +373,6 @@ async function displayUmapPlot() {
     Plotly.newPlot(plotDivId, plotData, layout, { responsive: true, displayModeBar: false });
     return "";
 }
-
-import { questionRegistry } from './questionRegistry.js';
 const getGenesByScreenPhenotype = async (phenotype) => notImplementedYet(`Genes by screen phenotype: ${phenotype}`);
 
 async function compareComplexes(complexA, complexB) {
@@ -1889,20 +1887,6 @@ function formatComprehensiveGeneDetails(geneSymbol, geneData) {
             </p>
         </div>
     `;
-}
-
-function formatGeneDetail(geneData, geneSymbol, detailTitle, detailContent) {
-    if (!geneData) {
-        return `<div class="result-card"><h3>${geneSymbol}</h3><p class="status-not-found">Gene not found in the database.</p></div>`;
-    }
-    return `
-        <div class="result-card">
-            <h3>${geneSymbol}</h3>
-            <h4>${detailTitle}</h4>
-            <p>${detailContent || 'No information available.'}</p>
-        </div>
-    `;
-}
 
 // -------------------------------
 // Click handler for gene selection
