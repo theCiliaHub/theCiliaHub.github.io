@@ -119,7 +119,15 @@
     </footer>
 <script src="script.js"></script>  <!-- Main app, define geneDataCache here -->
 <script src="plots.js"></script>   <!-- For displayLocalizationChart -->
-<script src="ciliai/ciliai.js"></script>  <!-- CiliAI functions (load before globals) -->
+<!-- Load question registry as ES module -->
+<script type="module">
+  import { questionRegistry } from './ciliai/questionRegistry.js';
+  import { initializeCiliAI } from './ciliai/ciliai.js';
+
+  document.addEventListener("DOMContentLoaded", () => {
+      initializeCiliAI(questionRegistry);
+  });
+</script>
 <script src="globals.js"></script> <!-- Router -->
 
 </body>
