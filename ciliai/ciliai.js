@@ -140,6 +140,295 @@ function createIntentParser() {
 
 const intentParser = createIntentParser();
 
+// =============================================================================
+// REPLACEMENT: The definitive and corrected Question Registry (Consolidated & Expanded)
+// Total questions including synonyms and new patterns.
+// =============================================================================
+const questionRegistry = [
+    // --- 1. Meta / General ---
+    { text: "What can you do?", handler: async () => tellAboutCiliAI() },
+    { text: "Tell me about yourself", handler: async () => tellAboutCiliAI() },
+    { text: "What information do you have?", handler: async () => tellAboutCiliAI() }, // Synonym
+    { text: "What datasets are you using?", handler: async () => tellAboutCiliAI() }, // Synonym
+    { text: "Explain CiliAI's capabilities.", handler: async () => tellAboutCiliAI() }, // Synonym
+
+    // --- 2. Gene Details & Function ---
+    { text: "Describe the function of KIF17", handler: async () => getGeneFunction("KIF17") },
+    { text: "What is the function of KIF17?", handler: async () => getGeneFunction("KIF17") }, // Synonym
+    { text: "What does KIF17 do?", handler: async () => getGeneFunction("KIF17") }, // Synonym
+    { text: "Tell me the function of KIF17.", handler: async () => getGeneFunction("KIF17") }, // Synonym
+    { text: "Describe the function of BBS1", handler: async () => getGeneFunction("BBS1") },
+    { text: "What is the function of BBS1?", handler: async () => getGeneFunction("BBS1") }, // Synonym
+    { text: "What is the role of CC2D1A in cilia?", handler: async () => getGeneFunction("CC2D1A") },
+    { text: "Explain CC2D1A's role in ciliary processes.", handler: async () => getGeneFunction("CC2D1A") }, // Synonym
+    { text: "How does CC2D1A contribute to cilia?", handler: async () => getGeneFunction("CC2D1A") }, // Synonym
+    { text: "Explain how CILK1 regulates cilia length", handler: async () => getGeneFunction("CILK1") },
+    { text: "What does ARL13B do in ciliary signaling?", handler: async () => getGeneRole("ARL13B", "ciliary signaling") },
+    { text: "Describe the role of ARL13B in ciliary signaling", handler: async () => getGeneRole("ARL13B", "ciliary signaling") },
+    { text: "Explain what CEP290 does", handler: async () => getGeneFunction("CEP290") },
+    { text: "Show all known info about IFT88", handler: async () => getComprehensiveDetails("IFT88") },
+    { text: "Tell me about IFT88", handler: async () => getComprehensiveDetails("IFT88") }, // Synonym
+    { text: "Give me details for IFT88.", handler: async () => getComprehensiveDetails("IFT88") }, // Synonym
+    { text: "Summarize information for IFT88.", handler: async () => getComprehensiveDetails("IFT88") }, // Synonym
+    { text: "Show all known info about BBS1", handler: async () => getComprehensiveDetails("BBS1") },
+    { text: "Tell me about BBS1", handler: async () => getComprehensiveDetails("BBS1") },
+    { text: "Show all known info about ARL13B", handler: async () => getComprehensiveDetails("ARL13B") },
+    { text: "Tell me about ARL13B", handler: async () => getComprehensiveDetails("ARL13B") },
+
+    // --- 3. Ciliary Status ---
+    { text: "Is DYNC2H1 a ciliary gene?", handler: async () => checkCiliaryStatus("DYNC2H1") },
+    { text: "Is DYNC2H1 related to cilia?", handler: async () => checkCiliaryStatus("DYNC2H1") }, // Synonym
+    { text: "Confirm if DYNC2H1 is ciliary.", handler: async () => checkCiliaryStatus("DYNC2H1") }, // Synonym
+    { text: "Show me all ciliary genes", handler: async () => getAllCiliaryGenes() },
+    { text: "List all ciliary genes.", handler: async () => getAllCiliaryGenes() }, // Synonym
+
+    // --- 4. Localization ---
+    { text: "Describe the localization of EFCAB7", handler: async () => getGeneLocalization("EFCAB7") },
+    { text: "Where is EFCAB7 localized in the cell?", handler: async () => getGeneLocalization("EFCAB7") }, // Synonym
+    { text: "Where is EFCAB7 found in the cell?", handler: async () => getGeneLocalization("EFCAB7") }, // Synonym
+    { text: "Cellular location of EFCAB7.", handler: async () => getGeneLocalization("EFCAB7") }, // Synonym
+    { text: "Subcellular localization of EFCAB7.", handler: async () => getGeneLocalization("EFCAB7") }, // Synonym
+    { text: "Where is IFT88 localized in the cell?", handler: async () => getGeneLocalization("IFT88") },
+    { text: "Show all genes found at the transition zone", handler: async () => formatListResult("Genes localizing to transition zone", await getGenesByLocalization("transition zone")) },
+    { text: "Find genes localized to basal body", handler: async () => formatListResult("Genes localizing to basal body", await getGenesByLocalization("basal body")) },
+    { text: "Show proteins in transition zone", handler: async () => formatListResult("Proteins localizing to transition zone", await getGenesByLocalization("transition zone")) },
+    { text: "List proteins in the transition zone.", handler: async () => formatListResult("Proteins localizing to transition zone", await getGenesByLocalization("transition zone")) }, // Synonym
+    { text: "What genes are present in the transition zone?", handler: async () => formatListResult("Genes localizing to transition zone", await getGenesByLocalization("transition zone")) }, // Synonym
+    { text: "Display genes at ciliary tip", handler: async () => formatListResult("Genes localizing to ciliary tip", await getGenesByLocalization("ciliary tip")) },
+    { text: "Which genes localize to axoneme?", handler: async () => formatListResult("Genes localizing to axoneme", await getGenesByLocalization("axoneme")) },
+    { text: "Show transition fiber proteins", handler: async () => formatListResult("Proteins localizing to transition fiber", await getGenesByLocalization("transition fiber")) },
+
+    // --- 5. Protein Domains ---
+    { text: "Show protein domains of WDR35", handler: async () => getGeneDomains("WDR35") },
+    { text: "What domains does WDR35 have?", handler: async () => getGeneDomains("WDR35") }, // Synonym
+    { text: "List domains found in WDR35.", handler: async () => getGeneDomains("WDR35") }, // Synonym
+    { text: "Show WD40 domain containing proteins", handler: async () => formatListResult("WD40 domain-containing proteins", await getGenesWithDomain("WD40")) },
+    { text: "Display Leucine-rich repeat domain proteins", handler: async () => formatListResult("Leucine-rich repeat domain-containing proteins", await getGenesWithDomain("Leucine-rich repeat")) },
+    { text: "Show IQ motif containing proteins", handler: async () => formatListResult("IQ motif-containing proteins", await getGenesWithDomain("IQ motif")) },
+    { text: "Display calmodulin-binding proteins", handler: async () => formatListResult("Calmodulin-binding proteins", await getGenesWithDomain("calmodulin-binding")) },
+    { text: "Show EF-hand domain proteins", handler: async () => formatListResult("EF-hand domain-containing proteins", await getGenesWithDomain("EF-hand")) },
+    { text: "Find genes with EF-hand motifs.", handler: async () => formatListResult("EF-hand motif-containing genes", await getGenesWithDomain("EF-hand")) }, // Synonym
+    // Dynamic Domain Questions integrated directly
+    { text: "List all Kinase-related ciliary genes", handler: async () => formatListResult("Ciliary Kinases", await getGenesByDomainDescription("kinase")) },
+    { text: "Show Kinase-containing proteins localized to cilia", handler: async () => formatListResult("Ciliary Kinases", await getGenesByDomainDescription("kinase")) },
+    { text: "Display Kinase domain proteins involved in ciliogenesis", handler: async () => formatListResult("Ciliary Kinases", await getGenesByDomainDescription("kinase")) },
+    { text: "Identify Kinase genes in cilia", handler: async () => formatListResult("Ciliary Kinases", await getGenesByDomainDescription("kinase")) },
+    { text: "List all Phosphatase-related ciliary genes", handler: async () => formatListResult("Ciliary Phosphatases", await getGenesByDomainDescription("phosphatase")) },
+    { text: "Show Phosphatase-containing proteins localized to cilia", handler: async () => formatListResult("Ciliary Phosphatases", await getGenesByDomainDescription("phosphatase")) },
+    { text: "Display Phosphatase domain proteins involved in ciliogenesis", handler: async () => formatListResult("Ciliary Phosphatases", await getGenesByDomainDescription("phosphatase")) },
+    { text: "Identify Phosphatase genes in cilia", handler: async () => formatListResult("Ciliary Phosphatases", await getGenesByDomainDescription("phosphatase")) },
+    { text: "List all Actin-related ciliary genes", handler: async () => formatListResult("Actin-related Proteins", await getGenesByDomainDescription("actin")) },
+    { text: "Show Actin-containing proteins localized to cilia", handler: async () => formatListResult("Actin-related Proteins", await getGenesByDomainDescription("actin")) },
+    { text: "Display Actin domain proteins involved in ciliogenesis", handler: async () => formatListResult("Actin-related Proteins", await getGenesByDomainDescription("actin")) },
+    { text: "Identify Actin genes in cilia", handler: async () => formatListResult("Actin-related Proteins", await getGenesByDomainDescription("actin")) },
+    { text: "List all Ef-hand-related ciliary genes", handler: async () => formatListResult("EF-hand Proteins", await getGenesByDomainDescription("ef-hand")) },
+    { text: "Show Ef-hand-containing proteins localized to cilia", handler: async () => formatListResult("EF-hand Proteins", await getGenesByDomainDescription("ef-hand")) },
+    { text: "Display Ef-hand domain proteins involved in ciliogenesis", handler: async () => formatListResult("EF-hand Proteins", await getGenesByDomainDescription("ef-hand")) },
+    { text: "Identify Ef-hand genes in cilia", handler: async () => formatListResult("EF-hand Proteins", await getGenesByDomainDescription("ef-hand")) },
+    { text: "List all Zinc finger-related ciliary genes", handler: async () => formatListResult("Zinc Finger Proteins", await getGenesByDomainDescription("zinc finger")) },
+    { text: "Show Zinc finger-containing proteins localized to cilia", handler: async () => formatListResult("Zinc Finger Proteins", await getGenesByDomainDescription("zinc finger")) },
+    { text: "Display Zinc finger domain proteins involved in ciliogenesis", handler: async () => formatListResult("Zinc Finger Proteins", await getGenesByDomainDescription("zinc finger")) },
+    { text: "Identify Zinc finger genes in cilia", handler: async () => formatListResult("Zinc Finger Proteins", await getGenesByDomainDescription("zinc finger")) },
+    { text: "List all Atpase-related ciliary genes", handler: async () => formatListResult("ATPase/Motor Proteins", await getGenesByDomainDescription("atpase")) },
+    { text: "Show Atpase-containing proteins localized to cilia", handler: async () => formatListResult("ATPase/Motor Proteins", await getGenesByDomainDescription("atpase")) },
+    { text: "Display Atpase domain proteins involved in ciliogenesis", handler: async () => formatListResult("ATPase/Motor Proteins", await getGenesByDomainDescription("atpase")) },
+    { text: "Identify Atpase genes in cilia", handler: async () => formatListResult("ATPase/Motor Proteins", await getGenesByDomainDescription("atpase")) },
+
+    // --- 6. Protein Complexes ---
+    { text: "Give me the list of BBSome components", handler: async () => formatListResult("Components of BBSome", await getGenesByComplex("BBSome")) },
+    { text: "List all components of the BBSome complex", handler: async () => formatListResult("Components of BBSome", await getGenesByComplex("BBSome")) },
+    { text: "What proteins are in the BBSome?", handler: async () => formatListResult("Components of BBSome", await getGenesByComplex("BBSome")) }, // Synonym
+    { text: "Members of the BBSome.", handler: async () => formatListResult("Components of BBSome", await getGenesByComplex("BBSome")) }, // Synonym
+    { text: "Display components of IFT-A complex", handler: async () => formatListResult("Components of IFT-A", await getGenesByComplex("IFT-A")) },
+    { text: "Display components of IFT-B complex", handler: async () => formatListResult("Components of IFT-B", await getGenesByComplex("IFT-B")) },
+    { text: "Show components of Transition Zone Complex", handler: async () => formatListResult("Components of Transition Zone Complex", await getGenesByComplex("Transition Zone Complex")) },
+    { text: "Display components of MKS Complex", handler: async () => formatListResult("Components of MKS Complex", await getGenesByComplex("MKS Complex")) },
+    { text: "Show components of NPHP Complex", handler: async () => formatListResult("Components of NPHP Complex", await getGenesByComplex("NPHP Complex")) },
+    { text: "Compare IFT-A and IFT-B complex composition", handler: async () => compareComplexes("IFT-A", "IFT-B") },
+    { text: "Compare composition of IFT-A vs IFT-B.", handler: async () => compareComplexes("IFT-A", "IFT-B") }, // Synonym
+    { text: "What's the difference between IFT-A and IFT-B?", handler: async () => compareComplexes("IFT-A", "IFT-B") }, // Synonym
+    { text: "Find IFT-A and IFT-B complex genes", handler: async () => getGenesByMultipleComplexes(["IFT-A", "IFT-B"]) }, // Placeholder
+    { text: "List intraflagellar transport (IFT) components", handler: async () => formatListResult("IFT Components", await getGenesByComplex("IFT")) },
+
+    // --- 7. Ciliopathies & Diseases ---
+    { text: "List genes associated with Bardet–Biedl syndrome", handler: async () => { const { genes, description } = await getCiliopathyGenes("Bardet–Biedl syndrome"); return formatListResult("Genes for Bardet–Biedl syndrome", genes, description); }},
+    { text: "Show genes for Bardet-Biedl Syndrome", handler: async () => { const { genes, description } = await getCiliopathyGenes("Bardet-Biedl Syndrome"); return formatListResult("Genes for Bardet-Biedl Syndrome", genes, description); } },
+    { text: "Show genes for Joubert syndrome", handler: async () => { const { genes, description } = await getCiliopathyGenes("Joubert Syndrome"); return formatListResult("Genes for Joubert Syndrome", genes, description); }},
+    { text: "What genes are involved in Joubert syndrome?", handler: async () => { const { genes, description } = await getCiliopathyGenes("Joubert Syndrome"); return formatListResult("Genes for Joubert Syndrome", genes, description); }},
+    { text: "Show genes for Joubert Syndrome", handler: async () => { const { genes, description } = await getCiliopathyGenes("Joubert Syndrome"); return formatListResult("Genes for Joubert Syndrome", genes, description); } },
+    { text: "What genes are involved in Meckel-Gruber Syndrome?", handler: async () => { const { genes, description } = await getCiliopathyGenes("Meckel-Gruber Syndrome"); return formatListResult("Genes for Meckel-Gruber Syndrome", genes, description); }},
+    { text: "Display genes associated with Meckel-Gruber Syndrome", handler: async () => { const { genes, description } = await getCiliopathyGenes("Meckel-Gruber Syndrome"); return formatListResult("Genes for Meckel-Gruber Syndrome", genes, description); } },
+    { text: "List genes for Primary Ciliary Dyskinesia", handler: async () => { const { genes, description } = await getCiliopathyGenes("Primary Ciliary Dyskinesia"); return formatListResult("Genes for Primary Ciliary Dyskinesia", genes, description); } },
+    { text: "Find genes linked to Leber congenital amaurosis", handler: async () => { const { genes, description } = await getCiliopathyGenes("Leber congenital amaurosis"); return formatListResult("Genes for Leber congenital amaurosis", genes, description); } },
+    { text: "Which genes cause cystic kidney disease?", handler: async () => getGenesByScreenPhenotype("cystic kidney disease") }, // Placeholder
+    { text: "Show genes for cranioectodermal dysplasia", handler: async () => { const { genes, description } = await getCiliopathyGenes("Cranioectodermal Dysplasia"); return formatListResult("Genes for Cranioectodermal Dysplasia", genes, description); } },
+    { text: "Tell me genes causing short-rib thoracic dysplasia", handler: async () => { const { genes, description } = await getCiliopathyGenes("Short-rib thoracic dysplasia"); return formatListResult("Genes for Short-rib thoracic dysplasia", genes, description); } },
+    { text: "Display genes related to hydrocephalus", handler: async () => { const { genes, description } = await getCiliopathyGenes("Hydrocephalus"); return formatListResult("Genes for Hydrocephalus", genes, description); } },
+    { text: "Which genes cause Joubert Syndrome?", handler: async () => { const { genes, description } = await getCiliopathyGenes("Joubert Syndrome"); return formatListResult("Genes for Joubert Syndrome", genes, description); } }, // Synonym
+    { text: "Find all genes associated with ciliopathies", handler: async () => { const { genes, description } = await getCiliopathyGenes("ciliopathy"); return formatListResult("All Ciliopathy-Associated Genes", genes, description); }},
+    { text: "List all ciliopathy genes.", handler: async () => { const { genes, description } = await getCiliopathyGenes("ciliopathy"); return formatListResult("All Ciliopathy-Associated Genes", genes, description); } }, // Synonym
+    { text: "Show genes involved in any ciliopathy.", handler: async () => { const { genes, description } = await getCiliopathyGenes("ciliopathy"); return formatListResult("All Ciliopathy-Associated Genes", genes, description); } }, // Synonym
+    { text: "List all diseases linked to NPHP1", handler: async () => getGeneDiseases("NPHP1") },
+    { text: "Which diseases involve NPHP1?", handler: async () => getGeneDiseases("NPHP1") }, // Synonym
+    { text: "NPHP1 disease association.", handler: async () => getGeneDiseases("NPHP1") }, // Synonym
+    { text: "What conditions are caused by NPHP1?", handler: async () => getGeneDiseases("NPHP1") }, // Synonym
+    { text: "What ciliopathies are associated with mutations in MKS1?", handler: async () => getGeneDiseases("MKS1") },
+
+    // --- 8. Evolutionary Conservation & Phylogeny ---
+    { text: "Show evolutionary conservation of IFT88", handler: async () => getGeneConservation("IFT88") },
+    { text: "Evolutionary conservation of IFT88", handler: async () => getGeneConservation("IFT88") }, // Synonym
+    { text: "How conserved is IFT88?", handler: async () => getGeneConservation("IFT88") }, // Synonym
+    { text: "Describe the conservation level of CC2D1A in vertebrates", handler: async () => getGeneConservation("CC2D1A") },
+    { text: "What is the phylogeny of IFT88?", handler: async () => getGeneConservation("IFT88") },
+    { text: "Phylogenetic profile of IFT88.", handler: async () => getGeneConservation("IFT88") }, // Synonym
+    { text: "Evolutionary conservation of ARL13B", handler: async () => getGeneConservation("ARL13B") },
+    { text: "Show the evolutionary conservation of BBS1", handler: async () => getGeneConservation("BBS1") },
+    { text: "Is IFT88 conserved in C. elegans?", handler: async () => checkConservation("IFT88", "C. elegans") },
+    { text: "Is IFT88 present in C. elegans?", handler: async () => checkConservation("IFT88", "C. elegans") }, // Synonym
+    { text: "Does C. elegans have IFT88?", handler: async () => checkConservation("IFT88", "C. elegans") }, // Synonym
+    { text: "List conserved ciliary genes between C. elegans and humans", handler: async () => getConservedGenesBetween(["C. elegans", "H.sapiens"]) },
+    { text: "Which cilia-related genes are conserved in mammals?", handler: async () => getConservedGenesBetween(["H.sapiens", "M.musculus"]) },
+    { text: "Compare conservation between nematode and vertebrate ciliary genes", handler: async () => getConservedGenesBetween(["C. elegans", "H.sapiens", "M.musculus", "D.rerio"]) },
+    { text: "Display the ciliary genes that are conserved between humans and zebrafish", handler: async () => getConservedGenesBetween(["Human", "Zebrafish"]) },
+    { text: "Display conserved ciliary proteins between mouse and human", handler: async () => getConservedGenesBetween(["Mouse", "Human"]) },
+    { text: "List all ciliary-only genes", handler: async () => getCiliaryOnlyGenes() },
+    { text: "Show genes found only in ciliated organisms.", handler: async () => getCiliaryOnlyGenes() }, // Synonym
+    { text: "Which human ciliary genes have orthologs in Chlamydomonas?", handler: async () => getOrthologsInOrganism("Chlamydomonas") },
+    { text: "Find human orthologs in Chlamydomonas.", handler: async () => getOrthologsInOrganism("Chlamydomonas") }, // Synonym
+
+    // --- 9. Organism-Specific Gene Lists ---
+    { text: "List ciliary genes in C. elegans", handler: async () => getCiliaryGenesForOrganism("C. elegans") },
+    { text: "What are the ciliary genes in C. elegans?", handler: async () => getCiliaryGenesForOrganism("C. elegans") }, // Synonym
+    { text: "Display ciliary genes in human", handler: async () => getCiliaryGenesForOrganism("human") },
+    { text: "Show ciliary genes in mouse", handler: async () => getCiliaryGenesForOrganism("mouse") },
+    { text: "List ciliary genes in zebrafish", handler: async () => getCiliaryGenesForOrganism("zebrafish") },
+    { text: "Display ciliary genes in fly", handler: async () => getCiliaryGenesForOrganism("fly") },
+    { text: "Show ciliary genes in yeast", handler: async () => getCiliaryGenesForOrganism("yeast") },
+    { text: "List ciliary genes in Chlamydomonas", handler: async () => getCiliaryGenesForOrganism("Chlamydomonas") },
+
+    // --- 10. Functional Genomics Screen Results ---
+    { text: "What happens to cilia when KIF3A is knocked down?", handler: async () => getKnockdownEffect("KIF3A") },
+    { text: "Effect of silencing KIF3A on cilia.", handler: async () => getKnockdownEffect("KIF3A") }, // Synonym
+    { text: "Show me the results for IFT88 in the Kim2016 screen", handler: async () => getScreenResults("IFT88", "Kim2016") },
+    { text: "What was the result for IFT88 in Kim2016?", handler: async () => getScreenResults("IFT88", "Kim2016") }, // Synonym
+    { text: "Which genes cause longer cilia when silenced?", handler: async () => getGenesByScreenPhenotype("long cilia") }, // Placeholder
+    { text: "List genes that result in long cilia upon knockdown.", handler: async () => getGenesByScreenPhenotype("long cilia") }, // Synonym (placeholder)
+    { text: "Find genes causing short cilia", handler: async () => getGenesByScreenPhenotype("short cilia") }, // Placeholder
+    { text: "Display genes that had 'No effect' in the Wheway2015 screen", handler: async () => getNoEffectGenes("Wheway2015") },
+    { text: "Genes with no phenotype in Wheway2015.", handler: async () => getNoEffectGenes("Wheway2015") }, // Synonym
+    { text: "Find all genes that act as negative regulators of Hedgehog signaling", handler: async () => getHedgehogRegulators("negative") },
+    { text: "Which genes inhibit Hedgehog signaling?", handler: async () => getHedgehogRegulators("negative") }, // Synonym
+    { text: "Find positive regulators of Hedgehog signaling.", handler: async () => getHedgehogRegulators("positive") },
+    { text: "Which genes activate Hedgehog signaling?", handler: async () => getHedgehogRegulators("positive") }, // Synonym
+    { text: "Display components of Hedgehog signaling in cilia", handler: async () => getHedgehogRegulators("all") }, // Existing handler, adjusted query
+
+    // --- 11. Bulk Gene Expression (Tissues) ---
+    { text: "Where is ARL13B expressed?", handler: async () => getGeneExpression("ARL13B") },
+    { text: "Tissue expression pattern for ARL13B.", handler: async () => getGeneExpression("ARL13B") }, // Synonym
+    { text: "Show expression of ARL13B", handler: async () => getGeneExpression("ARL13B") },
+    { text: "Where is BBS1 expressed?", handler: async () => getGeneExpression("BBS1") },
+    { text: "In which tissues is IFT88 expressed?", handler: async () => getGeneExpression("IFT88") },
+    { text: "Which organ systems express CEP290?", handler: async () => getGeneExpression("CEP290") },
+    { text: "Show the expression pattern of BBS1 across all tissues", handler: async () => getGeneExpressionPattern("BBS1") }, // heatmap
+    { text: "Visualize tissue expression for BBS1.", handler: async () => getGeneExpressionPattern("BBS1") }, // Synonym (heatmap)
+    { text: "Which ciliary genes are most highly expressed in the kidney?", handler: async () => getTissueSpecificGenes("kidney") },
+    { text: "Top ciliary genes in kidney.", handler: async () => getTissueSpecificGenes("kidney") }, // Synonym
+    { text: "Compare the expression of IFT88 and OFD1 in the brain versus the retina", handler: async () => compareGeneExpression(["IFT88", "OFD1"], ["brain", "retina"]) },
+    { text: "Compare IFT88 vs OFD1 expression in brain and retina.", handler: async () => compareGeneExpression(["IFT88", "OFD1"], ["brain", "retina"]) }, // Synonym
+
+    // --- 12. Single-Cell Gene Expression (scRNA-seq) ---
+    { text: "What is the expression of ARL13B in ciliated cells?", handler: async () => getGeneExpressionInCellType("ARL13B", "ciliated cell")},
+    { text: "How much ARL13B is in ciliated cells?", handler: async () => getGeneExpressionInCellType("ARL13B", "ciliated cell") }, // Synonym
+    { text: "Show expression of FOXJ1 in ciliated cells", handler: async () => getGeneExpressionInCellType("FOXJ1", "ciliated cell")},
+    { text: "Show single-cell expression of ARL13B", handler: async () => displayCellxgeneBarChart(["ARL13B"])}, // Bar chart
+    { text: "Visualize scRNA expression for ARL13B.", handler: async () => displayCellxgeneBarChart(["ARL13B"]) }, // Synonym (Bar chart)
+    { text: "Plot single-cell expression for FOXJ1", handler: async () => displayCellxgeneBarChart(["FOXJ1"])}, // Bar chart
+    { text: "Compare ARL13B and FOXJ1 expression in lung scRNA-seq", handler: async () => displayCellxgeneBarChart(["ARL13B", "FOXJ1"])}, // Bar chart
+    { text: "Plot ARL13B vs FOXJ1 single-cell expression.", handler: async () => displayCellxgeneBarChart(["ARL13B", "FOXJ1"]) }, // Synonym (Bar chart)
+    { text: "Plot UMAP expression for FOXJ1", handler: async () => displayUmapGeneExpression("FOXJ1") }, // UMAP Expression
+    { text: "Visualize FOXJ1 expression UMAP.", handler: async () => displayUmapGeneExpression("FOXJ1") }, // Synonym (UMAP Expression)
+    { text: "Show ARL13B expression on the UMAP", handler: async () => displayUmapGeneExpression("ARL13B") }, // UMAP Expression
+    { text: "Show the UMAP plot of all cell types", handler: async () => displayUmapPlot() }, // UMAP Cell Type
+    { text: "Display the cell type UMAP.", handler: async () => displayUmapPlot() }, // Synonym (UMAP Cell Type)
+    { text: "Which Joubert Syndrome genes are expressed in ciliated cells?", handler: async () => { const results = await findDiseaseGenesByCellExpression("Joubert Syndrome", "ciliated cell"); return formatListResult("Joubert Genes Expressed in Ciliated Cells", results); }},
+    { text: "Find Joubert Syndrome genes active in ciliated cells.", handler: async () => { const results = await findDiseaseGenesByCellExpression("Joubert Syndrome", "ciliated cell"); return formatListResult("Joubert Genes Expressed in Ciliated Cells", results); } }, // Synonym
+    { text: "List top expressed ciliary genes in ciliated cells", handler: async () => { /* Handler from original code */
+        if (!cellxgeneDataCache) await fetchCellxgeneData();
+        if (!ciliaHubDataCache) await fetchCiliaData();
+        const ciliaryGeneSet = new Set(ciliaHubDataCache.map(g => g.gene.toUpperCase()));
+        const expressedCiliaryGenes = [];
+        Object.entries(cellxgeneDataCache).forEach(([gene, cellData]) => {
+            if (ciliaryGeneSet.has(gene) && cellData["ciliated cell"] && cellData["ciliated cell"] > 0.01) {
+                expressedCiliaryGenes.push({
+                    gene: gene,
+                    description: `Expression: ${cellData["ciliated cell"].toFixed(4)}`,
+                    expression: cellData["ciliated cell"]
+                });
+            }
+        });
+        expressedCiliaryGenes.sort((a, b) => b.expression - a.expression);
+        return formatListResult("Top 50 Ciliary Genes in Ciliated Cells", expressedCiliaryGenes.slice(0, 50));
+     }},
+    { text: "Highest expressed ciliary genes in ciliated cells.", handler: async () => { /* Handler from original code */
+        if (!cellxgeneDataCache) await fetchCellxgeneData();
+        if (!ciliaHubDataCache) await fetchCiliaData();
+        const ciliaryGeneSet = new Set(ciliaHubDataCache.map(g => g.gene.toUpperCase()));
+        const expressedCiliaryGenes = [];
+        Object.entries(cellxgeneDataCache).forEach(([gene, cellData]) => {
+            if (ciliaryGeneSet.has(gene) && cellData["ciliated cell"] && cellData["ciliated cell"] > 0.01) {
+                expressedCiliaryGenes.push({
+                    gene: gene,
+                    description: `Expression: ${cellData["ciliated cell"].toFixed(4)}`,
+                    expression: cellData["ciliated cell"]
+                });
+            }
+        });
+        expressedCiliaryGenes.sort((a, b) => b.expression - a.expression);
+        return formatListResult("Top 50 Ciliary Genes in Ciliated Cells", expressedCiliaryGenes.slice(0, 50));
+     }}, // Synonym
+
+    // --- 13. Mechanism & Functional Categories ---
+    { text: "List genes involved in ciliary signaling pathways", handler: async () => formatListResult("Ciliary Signaling Genes", await getGenesByFunction("Signaling")) },
+    { text: "Show me motor genes", handler: async () => formatListResult("Motor Genes", await getGenesByFunction("motor")) },
+    { text: "List genes involved in motor activity.", handler: async () => formatListResult("Motor Genes", await getGenesByFunction("motor")) }, // Synonym
+    { text: "Display kinesin motors", handler: async () => formatListResult("Kinesin Motors", await getGenesByFunction("kinesin motors")) },
+    { text: "Show me dynein motors", handler: async () => formatListResult("Dynein Motors", await getGenesByFunction("dynein motors")) },
+    { text: "Display kinases regulating cilia length", handler: async () => formatListResult("Kinases Regulating Cilia Length", await getGenesByDomainDescription("kinase")) },
+    { text: "Which genes are involved in cilium assembly?", handler: async () => formatListResult("Cilium Assembly Genes", await getGenesByFunction("cilium assembly")) },
+    { text: "Show genes related to cilium assembly.", handler: async () => formatListResult("Cilium Assembly Genes", await getGenesByFunction("cilium assembly")) }, // Synonym
+    { text: "Show me Ciliary assembly/disassembly genes", handler: async () => formatListResult("Ciliary Assembly/Disassembly Genes", await getGenesByFunction("Ciliary assembly/disassembly")) },
+    { text: "Display Signaling genes", handler: async () => formatListResult("Signaling Genes", await getGenesByFunction("Signaling")) },
+    { text: "Show me Motile cilium genes", handler: async () => formatListResult("Motile Cilium Genes", await getGenesByFunction("Motile cilium")) },
+    { text: "Display Motor protein genes", handler: async () => formatListResult("Motor Protein Genes", await getGenesByFunction("Motor protein")) },
+    { text: "Show Transport genes", handler: async () => formatListResult("Transport Genes", await getGenesByFunction("Transport")) },
+    { text: "Display Protein modification genes", handler: async () => formatListResult("Protein Modification Genes", await getGenesByFunction("Protein modification")) },
+    { text: "Show Cytoskeletal genes", handler: async () => formatListResult("Cytoskeletal Genes", await getGenesByFunction("Cytoskeletal")) },
+
+    // --- 14. Literature Search ---
+    { text: "Find literature on ARL13B and cilia", handler: async () => getLiteratureEvidence("ARL13B") },
+    { text: "Search literature for IFT88", handler: async () => getLiteratureEvidence("IFT88") },
+    { text: "Find papers about ARL13B and cilia.", handler: async () => getLiteratureEvidence("ARL13B") }, // Synonym
+    { text: "Show recent research on IFT88.", handler: async () => getLiteratureEvidence("IFT88") }, // Synonym
+
+    // --- 15. Combined Queries (Placeholders) ---
+    // Note: These require new, dedicated handler functions combining logic from existing ones.
+    { text: "Which BBSome components are at the transition zone?", handler: async () => notImplementedYet("Combined query: BBSome AND transition zone") },
+    { text: "List Joubert syndrome genes found in the axoneme.", handler: async () => notImplementedYet("Combined query: Joubert AND axoneme") },
+    { text: "Show signaling proteins located at the ciliary tip.", handler: async () => notImplementedYet("Combined query: Signaling AND ciliary tip") },
+    { text: "Which IFT-B components cause short cilia when knocked down?", handler: async () => notImplementedYet("Combined query: IFT-B AND short cilia screen") },
+    { text: "Do any Bardet-Biedl Syndrome genes cause long cilia in screens?", handler: async () => notImplementedYet("Combined query: BBS AND long cilia screen") },
+    { text: "Which transition zone genes are ciliary-only?", handler: async () => notImplementedYet("Combined query: Transition Zone AND ciliary-only") },
+    { text: "Compare expression of transition zone genes ARL13B and CEP290 in single cells.", handler: async () => notImplementedYet("Combined query: TZ genes AND single-cell compare") },
+    { text: "Plot expression of motor proteins KIF3A and DYNC2H1 in single cells.", handler: async () => notImplementedYet("Combined query: Motor proteins AND single-cell plot") },
+    { text: "Which ciliary genes expressed in the kidney are also found in C. elegans?", handler: async () => notImplementedYet("Combined query: Kidney expression AND C. elegans conservation") },
+    { text: "List basal body proteins associated with Polycystic Kidney Disease.", handler: async () => notImplementedYet("Combined query: Basal body AND PKD") },
+
+    // --- 16. Placeholder / Future ---
+    { text: "Predict potential ciliary genes using co-expression data", handler: async () => notImplementedYet("Prediction of ciliary genes") },
+    { text: "Show interactors of IFT88", handler: async () => getProteinInteractions("IFT88") }, // Placeholder
+    { text: "What are the interacting partners of BBS1?", handler: async () => getProteinInteractions("BBS1") } // Placeholder
+];
+
 /**
  * New function to describe CiliAI's capabilities.
  */
