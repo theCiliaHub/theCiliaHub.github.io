@@ -217,7 +217,6 @@ async function displayUmapGeneExpression(geneSymbol) {
         sampledData.push(...umapData);
     }
 
-    // Prepare data for coloring by expression, with cell type in hover info
     const expressionValues = sampledData.map(cell => geneExpressionMap[cell.cell_type] || 0);
 
     const plotData = [{
@@ -229,7 +228,9 @@ async function displayUmapGeneExpression(geneSymbol) {
         hoverinfo: 'text',
         marker: {
             color: expressionValues,
-            colorscale: 'Viridis', // A good distinct color scale for continuous data
+            // --- UPDATED COLOR SCALE ---
+            colorscale: 'Plasma', // A distinct purple-to-yellow gradient
+            // --- END UPDATE ---
             showscale: true,
             colorbar: { 
                 title: { 
@@ -247,7 +248,7 @@ async function displayUmapGeneExpression(geneSymbol) {
         xaxis: { title: 'UMAP 1' },
         yaxis: { title: 'UMAP 2' },
         hovermode: 'closest',
-        margin: { t: 50, b: 50, l: 50, r: 50 } // Adjust margins for better fit
+        margin: { t: 50, b: 50, l: 50, r: 50 }
     };
 
     const plotDivId = 'umap-expression-plot-div';
@@ -257,9 +258,10 @@ async function displayUmapGeneExpression(geneSymbol) {
             <button class="download-button" onclick="downloadPlot('${plotDivId}', 'UMAP_${geneSymbol}_Expression')">Download Plot</button>
         </div>`;
     
-    Plotly.newPlot(plotDivId, plotData, layout, { responsive: true, displayModeBar: false }); // displayModeBar: false hides Plotly's default toolbar
+    Plotly.newPlot(plotDivId, plotData, layout, { responsive: true, displayModeBar: false });
     return "";
 }
+
 
 /**
  * Displays a UMAP plot colored by cell type.
@@ -452,39 +454,56 @@ async function displayCellxgeneBarChart(geneSymbols) {
 
     const uniqueCellTypes = new Set();
     const geneExpressionData = {}; // Stores expression data per gene
+    let genesFound = []; // Keep track of genes that are actually found
 
     for (const gene of geneSymbols) {
         const geneUpper = gene.toUpperCase();
         const expressionMap = cellxgeneDataCache[geneUpper];
 
-        if (!expressionMap) {
+        if (expressionMap) {
+            geneExpressionData[geneUpper] = expressionMap;
+            Object.keys(expressionMap).forEach(cellType => uniqueCellTypes.add(cellType));
+            genesFound.push(gene); // Add found gene to the list
+        } else {
             console.warn(`Gene "${geneUpper}" not found in cellxgene_data.json`);
-            // If any gene is not found, return an error message for all requested genes
-            // or modify to show data only for found genes. For now, returning an error.
-            return `<div class="result-card"><h3>Expression Chart</h3><p class="status-not-found">One or more genes (${geneSymbols.join(', ')}) not found in the single-cell expression dataset.</p></div>`;
+            // Don't return here; allow the plot to show the genes that *were* found.
         }
-        geneExpressionData[geneUpper] = expressionMap;
-        Object.keys(expressionMap).forEach(cellType => uniqueCellTypes.add(cellType));
     }
-
-    if (Object.keys(geneExpressionData).length === 0) {
-        return `<div class="result-card"><h3>Expression Chart</h3><p class="status-not-found">No valid gene expression data found for the requested genes.</p></div>`;
+    
+    // If NO genes were found, then return an error
+    if (genesFound.length === 0) {
+        return `<div class="result-card"><h3>Expression Chart</h3><p class="status-not-found">None of the requested genes (${geneSymbols.join(', ')}) were found in the single-cell expression dataset.</p></div>`;
     }
 
     const sortedCellTypes = Array.from(uniqueCellTypes).sort();
     const plotData = [];
 
-    // --- FIX IS HERE: Use Plotly's built-in qualitative color array ---
-    const qualitativeColors = Plotly.colors.qualitative.Plotly; // A good default qualitative palette
+    // --- THIS IS THE ROBUST FIX ---
+    // Stop relying on Plotly.colors or Plotly.d3. Define our own color list.
+    const qualitativeColors = [
+        '#1f77b4',  // Muted blue
+        '#ff7f0e',  // Safety orange
+        '#2ca02c',  // Cooked asparagus green
+        '#d62728',  // Brick red
+        '#9467bd',  // Muted purple
+        '#8c564b',  // Chestnut brown
+        '#e377c2',  // Raspberry yogurt pink
+        '#7f7f7f',  // Middle gray
+        '#bcbd22',  // Curry yellow-green
+        '#17becf'   // Muted cyan
+    ];
+    // --- END OF FIX ---
+    
     const geneColorMap = {};
-    geneSymbols.forEach((gene, i) => {
+    genesFound.forEach((gene, i) => {
         geneColorMap[gene.toUpperCase()] = qualitativeColors[i % qualitativeColors.length];
     });
-    // --- END FIX ---
 
-    for (const gene of geneSymbols) {
+    // Only loop over the genes that were actually found
+    for (const gene of genesFound) {
         const geneUpper = gene.toUpperCase();
-        const yValues = sortedCellTypes.map(cellType => geneExpressionData[geneUpper][cellType] || 0);
+        // Get the expression values, defaulting to 0 for any cell type where the gene might be missing
+        const yValues = sortedCellTypes.map(cellType => (geneExpressionData[geneUpper] && geneExpressionData[geneUpper][cellType]) || 0);
 
         plotData.push({
             x: sortedCellTypes,
@@ -499,7 +518,7 @@ async function displayCellxgeneBarChart(geneSymbols) {
     }
 
     const layout = {
-        title: `Single-Cell Expression of ${geneSymbols.join(' vs ')}`,
+        title: `Single-Cell Expression of ${genesFound.join(' vs ')}`,
         barmode: 'group',
         xaxis: {
             title: 'Cell Type',
@@ -525,7 +544,6 @@ async function displayCellxgeneBarChart(geneSymbols) {
     Plotly.newPlot(plotDivId, plotData, layout, { responsive: true, displayModeBar: false });
     return "";
 }
-
 /**
  * Downloads a Plotly plot as a PNG image.
  * @param {string} divId The ID of the div containing the Plotly plot.
