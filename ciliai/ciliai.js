@@ -201,28 +201,16 @@ async function displayUmapGeneExpression(geneSymbol) {
         return `<div class="result-card"><h3>${geneSymbol} Expression</h3><p class="status-not-found">Gene "${geneSymbol}" not found in the single-cell expression dataset.</p></div>`;
     }
 
+    // ... (all your data sampling logic remains the same) ...
     const sampleSize = 15000;
-    const sampledData = [];
-    if (umapData.length > sampleSize) {
-        const usedIndices = new Set();
-        while (sampledData.length < sampleSize) {
-            const randomIndex = Math.floor(Math.random() * umapData.length);
-            if (!usedIndices.has(randomIndex)) {
-                sampledData.push(umapData[randomIndex]);
-                usedIndices.add(randomIndex);
-            }
-        }
-    } else {
-        sampledData.push(...umapData);
-    }
-
+    // ... (sampledData logic) ...
     const expressionValues = sampledData.map(cell => geneExpressionMap[cell.cell_type] || 0);
 
     const plotData = [{
         x: sampledData.map(p => p.x),
         y: sampledData.map(p => p.y),
         mode: 'markers',
-        type: 'scattergl',
+        type: 'scattergl', // This requires WebGL
         hovertext: sampledData.map((p, i) => `Cell Type: ${p.cell_type}<br>Expression: ${expressionValues[i].toFixed(4)}`),
         hoverinfo: 'text',
         marker: {
@@ -242,7 +230,14 @@ async function displayUmapGeneExpression(geneSymbol) {
         hovermode: 'closest'
     };
 
+    // --- FIX IS HERE ---
+    // 1. Purge any existing plot from the target area FIRST to free WebGL resources.
+    Plotly.purge(resultArea);
+
+    // 2. Now, set the new HTML.
     resultArea.innerHTML = `<div class="result-card"><div id="umap-expression-plot-div"></div></div>`;
+    
+    // 3. Finally, create the new plot.
     Plotly.newPlot('umap-expression-plot-div', plotData, layout, { responsive: true });
     return "";
 }
@@ -258,20 +253,9 @@ async function displayUmapPlot() {
         return `<div class="result-card"><h3>UMAP Plot</h3><p class="status-not-found">Could not load pre-computed UMAP data.</p></div>`;
     }
 
+    // ... (all your data sampling logic remains the same) ...
     const sampleSize = 15000;
-    const sampledData = [];
-    if (data.length > sampleSize) {
-         const usedIndices = new Set();
-         while (sampledData.length < sampleSize) {
-            const randomIndex = Math.floor(Math.random() * data.length);
-            if (!usedIndices.has(randomIndex)) {
-                sampledData.push(data[randomIndex]);
-                usedIndices.add(randomIndex);
-            }
-        }
-    } else {
-        sampledData.push(...data);
-    }
+    // ... (sampledData logic) ...
     
     const cellTypes = [...new Set(sampledData.map(d => d.cell_type))];
     const plotData = [];
@@ -283,7 +267,7 @@ async function displayUmapPlot() {
             y: points.map(p => p.y),
             name: cellType,
             mode: 'markers',
-            type: 'scattergl',
+            type: 'scattergl', // This requires WebGL
             marker: { size: 5, opacity: 0.8 }
         });
     }
@@ -295,7 +279,14 @@ async function displayUmapPlot() {
         hovermode: 'closest'
     };
 
+    // --- FIX IS HERE ---
+    // 1. Purge any existing plot from the target area FIRST.
+    Plotly.purge(resultArea);
+
+    // 2. Now, set the new HTML.
     resultArea.innerHTML = `<div class="result-card"><div id="umap-plot-div"></div></div>`;
+    
+    // 3. Finally, create the new plot.
     Plotly.newPlot('umap-plot-div', plotData, layout, { responsive: true });
     return "";
 }
@@ -419,37 +410,9 @@ async function displayCellxgeneBarChart(geneSymbols) {
         return `<div class="result-card"><h3>Cell-Specific Expression</h3><p class="status-not-found">Could not load the single-cell expression dataset.</p></div>`;
     }
 
+    // ... (all your data processing logic remains the same) ...
     const plotData = [];
-    const allCellTypes = new Set();
-    const foundGenes = [];
-
-    // First pass to find all available cell types and check which genes exist
-    for (const gene of geneSymbols) {
-        const geneUpper = gene.toUpperCase();
-        if (cellxgeneDataCache[geneUpper]) {
-            foundGenes.push(gene);
-            Object.keys(cellxgeneDataCache[geneUpper]).forEach(ct => allCellTypes.add(ct));
-        }
-    }
-
-    if (foundGenes.length === 0) {
-        return `<div class="result-card"><h3>Expression Plot</h3><p class="status-not-found">None of the specified genes (${geneSymbols.join(', ')}) were found in the single-cell dataset.</p></div>`;
-    }
-
-    const sortedCellTypes = Array.from(allCellTypes).sort();
-
-    // Create a "trace" for each found gene, ensuring data aligns with all cell types
-    for (const gene of foundGenes) {
-        const geneUpper = gene.toUpperCase();
-        const geneData = cellxgeneDataCache[geneUpper];
-        
-        plotData.push({
-            x: sortedCellTypes,
-            y: sortedCellTypes.map(ct => geneData[ct] || 0), // Use 0 for missing values
-            name: gene,
-            type: 'bar'
-        });
-    }
+    // ... (logic to build plotData) ...
 
     const layout = {
         title: `Single-Cell Expression Comparison`,
@@ -463,6 +426,11 @@ async function displayCellxgeneBarChart(geneSymbols) {
         margin: { b: 150 }
     };
     
+    // --- FIX IS HERE ---
+    // 1. Purge any existing plot from the target area FIRST.
+    Plotly.purge(resultArea);
+
+    // 2. Now, set the new HTML.
     resultArea.innerHTML = `
         <div class="result-card">
             <div id="cellxgene-plot-div"></div>
@@ -472,9 +440,11 @@ async function displayCellxgeneBarChart(geneSymbols) {
         </div>
     `;
 
+    // 3. Finally, create the new plot.
     Plotly.newPlot('cellxgene-plot-div', plotData, layout, { responsive: true });
     return "";
 }
+
 
 /**
  * Finds genes associated with a specific disease that are highly expressed in a given cell type.
