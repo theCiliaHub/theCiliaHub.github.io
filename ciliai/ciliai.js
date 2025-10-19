@@ -562,20 +562,19 @@ const questionRegistry = [
     { text: "List all Actin-related ciliary genes", handler: async () => findGenesByDomain("actin") },
     { text: "List all Zinc finger-related ciliary genes", handler: async () => findGenesByDomain("zinc finger") },
     { text: "List all Atpase-related ciliary genes", handler: async () => findGenesByDomain("atpase") }
-    // Specific gene domains
-    { text: "Show protein domains of WDR35", handler: async () => getGeneDomains("WDR35") },
-    { text: "What domains does WDR35 have?",handler: async () => getGeneDomains("WDR35") },
-    { text: "List domains found in WDR35.", handler: async () => getGeneDomains("WDR35") },
-    { text: "WDR35 domain structure", handler: async () => getGeneDomains("WDR35") },
-    { text: "Describe WDR35 domains", handler: async () => getGeneDomains("WDR35") },
-    
-    // Additional genes
-    { text: "What domains does BBS1 have?", handler: async () => getGeneDomains("BBS1") },
-    { text: "Show IFT88 domains", handler: async () => getGeneDomains("IFT88") },
-    { text: "CEP290 domain structure",handler: async () => getGeneDomains("CEP290") },
-    { text: "What domains are in NPHP1?", handler: async () => getGeneDomains("NPHP1") },
-    
+   // Specific gene domains
+{ text: "Show protein domains of WDR35", handler: async () => displayDomainsForGene("WDR35") },
+{ text: "What domains does WDR35 have?", handler: async () => displayDomainsForGene("WDR35") },
+{ text: "List domains found in WDR35.", handler: async () => displayDomainsForGene("WDR35") },
+{ text: "WDR35 domain structure", handler: async () => displayDomainsForGene("WDR35") },
+{ text: "Describe WDR35 domains", handler: async () => displayDomainsForGene("WDR35") },
 
+// Additional genes
+{ text: "What domains does BBS1 have?", handler: async () => displayDomainsForGene("BBS1") },
+{ text: "Show IFT88 domains", handler: async () => displayDomainsForGene("IFT88") },
+{ text: "CEP290 domain structure", handler: async () => displayDomainsForGene("CEP290") },
+{ text: "What domains are in NPHP1?", handler: async () => displayDomainsForGene("NPHP1") },
+    
     // ==================== PROTEIN COMPLEXES ====================
     // BBSome
     { text: "Give me the list of BBSome components", handler: async () => formatListResult("Components of BBSome", await getGenesByComplex("BBSome")) },
@@ -1080,10 +1079,9 @@ const questionRegistry = [
     { text: "Cilia assembly and disassembly genes", handler: async () => formatListResult("Ciliary Assembly/Disassembly Genes", await getGenesByFunction("Ciliary assembly/disassembly")) },
     
     // Length regulation
-    { text: "Display kinases regulating cilia length", handler: async () => formatListResult("Kinases Regulating Cilia Length", await getGenesByDomainDescription("kinase")) },
-    { text: "Cilia length control genes", handler: async () => formatListResult("Cilia Length Regulation Genes", await getGenesByFunction("cilia length")) },
-    { text: "Which genes regulate ciliary length?", handler: async () => formatListResult("Cilia Length Regulation Genes", await getGenesByFunction("cilia length")) },
-    
+    { text: "Display kinases regulating cilia length", handler: async () => findGenesByDomain("kinase") }, 
+    { text: "Show kinases that could be therapeutic targets", handler: async () => findGenesByDomain("kinase") },
+
     // Motile cilium
     { text: "Show me Motile cilium genes", handler: async () => formatListResult("Motile Cilium Genes", await getGenesByFunction("Motile cilium")) },
     { text: "Genes specific to motile cilia", handler: async () => formatListResult("Motile Cilium Genes", await getGenesByFunction("Motile cilium")) },
@@ -2606,6 +2604,8 @@ async function fetchTissueData() {
 }
 window.fetchTissueData = fetchTissueData;
 
+
+
 async function fetchUmapData() {
     if (umapDataCache) return umapDataCache;
 
@@ -2733,7 +2733,40 @@ async function getGenesByComplex(complexName) {
     
     return relatedGenes;
 }
+/**
+ * CiliAI ASK function to display domains for a specific gene.
+ * @param {string} geneSymbol - The gene symbol.
+ * @returns {Promise<string>} An HTML string for the result card.
+ */
+async function displayDomainsForGene(geneSymbol) {
+    const db = await getDomainData();
+    // const resultArea = document.getElementById('ai-result-area'); // Or return HTML directly
+    const geneUpper = geneSymbol.toUpperCase();
 
+    if (!db || !db.gene_domain_map) {
+        return `<div class="result-card"><h3>${geneSymbol} Domains</h3><p class="status-not-found">Could not load gene-domain map.</p></div>`;
+    }
+
+    const domains = db.gene_domain_map[geneUpper]; // Direct lookup
+
+    if (!domains || domains.length === 0) {
+        return `<div class="result-card"><h3>${geneSymbol} Domains</h3><p class="status-not-found">No domain information found for ${geneSymbol} in the database.</p></div>`;
+    }
+
+    // Format the domain list
+    let listHtml = '<ul>';
+    domains.forEach(domain => {
+        listHtml += `<li><strong>${domain.domain_id}</strong>: ${domain.description || 'N/A'}</li>`;
+    });
+    listHtml += '</ul>';
+
+    // Return HTML
+     return `
+        <div class="result-card">
+            <h3>Domains found in ${geneSymbol}</h3>
+            ${listHtml}
+        </div>`;
+}
 async function getGenesByFunction(functionalCategory) {
     await fetchCiliaData();
     const categoryRegex = new RegExp(functionalCategory.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
