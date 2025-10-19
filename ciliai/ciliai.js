@@ -117,16 +117,21 @@ function createIntentParser() {
                 return formatListResult(`Ciliary genes in ${speciesCode}`, genes, description);
             },
             autocompleteTemplate: (term) => `Display ciliary genes in ${term}`
-        },
+       { // Start of the DOMAIN object definition
+        type: 'DOMAIN',
         keywords: [
-                // Keywords from your previous list + PFAM IDs if needed
-                'WD40', 'Leucine-rich repeat', 'IQ motif', 'calmodulin-binding',
-                'EF-hand', 'coiled-coil', 'CTS', 'ciliary targeting sequences',
-                'ciliary localization signals', 'PF00069', 'PF00225', 'PF03028',
-                'PF13853', 'PF01352', 'kinase', 'phosphatase', 'actin', 'zinc finger', 'atpase',
-                'IFT complex domain', 'Dynein light chain', 'BBS2', 'Chaperonin', 'PKD domain',
-                'Myosin head', 'rhodopsin', 'G-patch', 'Homeobox' // Add more specific names/IDs
-            ],
+            // Keywords from your previous list + PFAM IDs if needed
+            'WD40', 'Leucine-rich repeat', 'IQ motif', 'calmodulin-binding',
+            'EF-hand', 'coiled-coil', 'CTS', 'ciliary targeting sequences',
+            'ciliary localization signals', 'PF00069', 'PF00225', 'PF03028',
+            'PF13853', 'PF01352', 'kinase', 'phosphatase', 'actin', 'zinc finger', 'atpase',
+            'IFT complex domain', 'Dynein light chain', 'BBS2', 'Chaperonin', 'PKD domain',
+            'Myosin head', 'rhodopsin', 'G-patch', 'Homeobox' // Add more specific names/IDs
+        ],
+        // Use the new, correct handler function
+        handler: async (term) => findGenesByDomain(term),
+        autocompleteTemplate: (term) => `Show genes with ${term} domain`
+    } // End of the DOMAIN object definition
             // --- UPDATED HANDLER ---
             handler: async (term) => findGenesByDomain(term), // Use the new function
             autocompleteTemplate: (term) => `Show genes with ${term} domain`
@@ -538,42 +543,71 @@ const questionRegistry = [
     { text: "Show flagellar genes", handler: async () => formatListResult("Genes localizing to flagella", await getGenesByLocalization("flagella")) },
     { text: "List flagellar proteins", handler: async () => formatListResult("Genes localizing to flagella", await getGenesByLocalization("flagella")) },
 
-    // --- NEW DOMAIN QUESTIONS ---
-    { text: "Show enriched domains in ciliary genes", handler: async () => displayEnrichedDomains() },
-    { text: "List the most enriched protein domains", handler: async () => displayEnrichedDomains() },
-    { text: "What domains are enriched in cilia?", handler: async () => displayEnrichedDomains() },
-    { text: "Show depleted domains in ciliary genes", handler: async () => displayDepletedDomains() },
-    { text: "List domains absent or rare in ciliary genes", handler: async () => displayDepletedDomains() },
-    { text: "What domains are depleted in cilia?", handler: async () => displayDepletedDomains() },
-    // Existing domain questions now use the new handler via intentParser
+   // --- REPLACE THIS SECTION ---
+    // Protein Domain Questions (using findGenesByDomain)
     { text: "Show WD40 domain containing proteins", handler: async () => findGenesByDomain("WD40") },
     { text: "List WD40 repeat proteins", handler: async () => findGenesByDomain("WD40") },
     { text: "Which genes have WD40 domains?", handler: async () => findGenesByDomain("WD40") },
+    { text: "WD40 repeat containing genes", handler: async () => findGenesByDomain("WD40") },
+
     { text: "Display Leucine-rich repeat domain proteins", handler: async () => findGenesByDomain("Leucine-rich repeat") },
+    { text: "LRR domain proteins", handler: async () => findGenesByDomain("Leucine-rich repeat") },
     { text: "Show LRR containing genes", handler: async () => findGenesByDomain("Leucine-rich repeat") },
+
     { text: "Show IQ motif containing proteins", handler: async () => findGenesByDomain("IQ motif") },
+    { text: "List IQ motif proteins", handler: async () => findGenesByDomain("IQ motif") },
     { text: "Which genes have IQ motifs?", handler: async () => findGenesByDomain("IQ motif") },
+
     { text: "Display calmodulin-binding proteins", handler: async () => findGenesByDomain("calmodulin-binding") },
+    { text: "Show calmodulin-binding domains", handler: async () => findGenesByDomain("calmodulin-binding") },
+    { text: "List calmodulin interacting proteins", handler: async () => findGenesByDomain("calmodulin-binding") },
+
     { text: "Show EF-hand domain proteins", handler: async () => findGenesByDomain("EF-hand") },
     { text: "Find genes with EF-hand motifs.", handler: async () => findGenesByDomain("EF-hand") },
-    { text: "List all Kinase-related ciliary genes", handler: async () => findGenesByDomain("kinase") },
-    { text: "Which kinases are ciliary?", handler: async () => findGenesByDomain("kinase") },
-    { text: "List all Phosphatase-related ciliary genes", handler: async () => findGenesByDomain("phosphatase") },
-    { text: "List all Actin-related ciliary genes", handler: async () => findGenesByDomain("actin") },
-    { text: "List all Zinc finger-related ciliary genes", handler: async () => findGenesByDomain("zinc finger") },
-    { text: "List all Atpase-related ciliary genes", handler: async () => findGenesByDomain("atpase") }
-   // Specific gene domains
-{ text: "Show protein domains of WDR35", handler: async () => displayDomainsForGene("WDR35") },
-{ text: "What domains does WDR35 have?", handler: async () => displayDomainsForGene("WDR35") },
-{ text: "List domains found in WDR35.", handler: async () => displayDomainsForGene("WDR35") },
-{ text: "WDR35 domain structure", handler: async () => displayDomainsForGene("WDR35") },
-{ text: "Describe WDR35 domains", handler: async () => displayDomainsForGene("WDR35") },
+    { text: "List EF-hand proteins", handler: async () => findGenesByDomain("EF-hand") },
+    { text: "EF-hand containing genes", handler: async () => findGenesByDomain("EF-hand") },
 
-// Additional genes
-{ text: "What domains does BBS1 have?", handler: async () => displayDomainsForGene("BBS1") },
-{ text: "Show IFT88 domains", handler: async () => displayDomainsForGene("IFT88") },
-{ text: "CEP290 domain structure", handler: async () => displayDomainsForGene("CEP290") },
-{ text: "What domains are in NPHP1?", handler: async () => displayDomainsForGene("NPHP1") },
+    { text: "List all Kinase-related ciliary genes", handler: async () => findGenesByDomain("kinase") },
+    { text: "Show Kinase-containing proteins localized to cilia", handler: async () => findGenesByDomain("kinase") },
+    { text: "Display Kinase domain proteins involved in ciliogenesis", handler: async () => findGenesByDomain("kinase") },
+    { text: "Identify Kinase genes in cilia", handler: async () => findGenesByDomain("kinase") },
+    { text: "Which kinases are ciliary?", handler: async () => findGenesByDomain("kinase") },
+    { text: "Show me all ciliary kinases", handler: async () => findGenesByDomain("kinase") },
+
+    { text: "List all Phosphatase-related ciliary genes", handler: async () => findGenesByDomain("phosphatase") },
+    { text: "Show Phosphatase-containing proteins localized to cilia", handler: async () => findGenesByDomain("phosphatase") },
+    { text: "Display Phosphatase domain proteins involved in ciliogenesis", handler: async () => findGenesByDomain("phosphatase") },
+    { text: "Identify Phosphatase genes in cilia", handler: async () => findGenesByDomain("phosphatase") },
+    { text: "Ciliary phosphatases", handler: async () => findGenesByDomain("phosphatase") },
+
+    { text: "List all Actin-related ciliary genes", handler: async () => findGenesByDomain("actin") },
+    { text: "Show Actin-containing proteins localized to cilia", handler: async () => findGenesByDomain("actin") },
+    { text: "Display Actin domain proteins involved in ciliogenesis", handler: async () => findGenesByDomain("actin") },
+    { text: "Identify Actin genes in cilia", handler: async () => findGenesByDomain("actin") },
+
+    { text: "List all Zinc finger-related ciliary genes", handler: async () => findGenesByDomain("zinc finger") },
+    { text: "Show Zinc finger-containing proteins localized to cilia", handler: async () => findGenesByDomain("zinc finger") },
+    { text: "Display Zinc finger domain proteins involved in ciliogenesis", handler: async () => findGenesByDomain("zinc finger") },
+    { text: "Identify Zinc finger genes in cilia", handler: async () => findGenesByDomain("zinc finger") },
+
+    { text: "List all Atpase-related ciliary genes", handler: async () => findGenesByDomain("atpase") },
+    { text: "Show Atpase-containing proteins localized to cilia", handler: async () => findGenesByDomain("atpase") },
+    { text: "Display Atpase domain proteins involved in ciliogenesis", handler: async () => findGenesByDomain("atpase") },
+    { text: "Identify Atpase genes in cilia", handler: async () => findGenesByDomain("atpase") },
+
+    // Additional domain queries
+    { text: "Show coiled-coil domain proteins", handler: async () => findGenesByDomain("coiled-coil") },
+    { text: "List tetratricopeptide repeat proteins", handler: async () => findGenesByDomain("tetratricopeptide") },
+    { text: "Show GTPase domain proteins", handler: async () => findGenesByDomain("GTPase") },
+    { text: "List AAA domain proteins", handler: async () => findGenesByDomain("AAA") },
+    { text: "Calcium-binding proteins in cilia", handler: async () => findGenesByDomain("calcium-binding") }, // Corrected handler
+
+    // --- END REPLACEMENT SECTION ---
+
+    // --- Also update these specific entries later in the registry ---
+    { text: "Display kinases regulating cilia length", handler: async () => findGenesByDomain("kinase") }, // Corrected handler
+    { text: "Which kinases control cilia length?", handler: async () => findGenesByDomain("kinase") }, // Corrected handler
+    { text: "Show kinases that could be therapeutic targets", handler: async () => findGenesByDomain("kinase") }, // Corrected handler
     
     // ==================== PROTEIN COMPLEXES ====================
     // BBSome
@@ -1566,139 +1600,9 @@ async function compareGenes(geneA, geneB) {
 }
 
 
-const getGenesByDomainDescription = async (desc) => {
-    if (!ciliaHubDataCache) await fetchCiliaData();
-    const keywordRegex = new RegExp(desc, 'i');
-    const results = ciliaHubDataCache
-        .filter(gene => Array.isArray(gene.domain_descriptions) && gene.domain_descriptions.some(d => d.match(keywordRegex)))
-        .map(gene => ({ gene: gene.gene, description: `Domain: ${gene.domain_descriptions.join(', ')}` }));
-    return formatListResult(`Genes with "${desc}" domain description`, results);
-};
-
 const getGenesByMultipleComplexes = async (complexes) => notImplementedYet(`Genes by multiple complexes: ${complexes.join(', ')}`);
 const getConservedGenes = async (organisms) => notImplementedYet(`Conserved genes between: ${organisms.join(' & ')}`);
 const getProteinInteractions = async (gene) => notImplementedYet(`Protein interactions for: ${gene}`);
-
-// Add this after the questionRegistry array definition
-
-// =============================================================================
-// COMPREHENSIVE QUESTION EXPANSION FOR CiliAI ASK
-// =============================================================================
-
-// Add these new questions to your existing questionRegistry array
-questionRegistry.push(
-  // --- Core Functional Questions ---
-  { text: "What is the function of BBS1?", handler: () => getGeneFunction("BBS1") },
-  { text: "Describe the role of ARL13B in ciliary signaling", handler: () => getGeneRole("ARL13B", "ciliary signaling") },
-  { text: "Explain what CEP290 does", handler: () => getGeneFunction("CEP290") },
-  
-  // --- Localization Questions ---
-  { text: "Where is IFT88 localized in the cell?", handler: () => getGeneLocalization("IFT88") },
-  { text: "Show all genes found at the transition zone", handler: () => getGenesByLocalization("transition zone") },
-  { text: "Find genes localized to basal body", handler: () => getGenesByLocalization("basal body") },
-  { text: "Show proteins in transition zone", handler: () => getGenesByLocalization("transition zone") },
-  { text: "Display genes at ciliary tip", handler: () => getGenesByLocalization("ciliary tip") },
-  { text: "Which genes localize to axoneme?", handler: () => getGenesByLocalization("axoneme") },
-  { text: "Show transition fiber proteins", handler: () => getGenesByLocalization("transition fiber") },
-  
-  // --- Disease Association Questions ---
-  { text: "List all diseases linked to NPHP1", handler: () => getGeneDiseases("NPHP1") },
-  { text: "What ciliopathies are associated with mutations in MKS1?", handler: () => getGeneDiseases("MKS1") },
-  { text: "Show genes for Joubert Syndrome", handler: () => getCiliopathyGenes("Joubert Syndrome") },
-  { text: "Show genes for Bardet-Biedl Syndrome", handler: () => getCiliopathyGenes("Bardet-Biedl Syndrome") },
-  { text: "Display genes associated with Meckel-Gruber Syndrome", handler: () => getCiliopathyGenes("Meckel-Gruber Syndrome") },
-  { text: "List genes for Primary Ciliary Dyskinesia", handler: () => getCiliopathyGenes("Primary Ciliary Dyskinesia") },
-  { text: "Find genes linked to Leber congenital amaurosis", handler: () => getCiliopathyGenes("Leber congenital amaurosis") },
-  { text: "Which genes cause cystic kidney disease?", handler: () => getGenesByScreenPhenotype("cystic kidney disease") },
-  { text: "Show genes for cranioectodermal dysplasia", handler: () => getCiliopathyGenes("Cranioectodermal Dysplasia") },
-  { text: "Tell me genes causing short-rib thoracic dysplasia", handler: () => getCiliopathyGenes("Short-rib thoracic dysplasia") },
-  { text: "Display genes related to hydrocephalus", handler: () => getCiliopathyGenes("Hydrocephalus") },
-  
-  // --- Protein Structure & Complexes ---
-  { text: "Show protein domains of WDR35", handler: () => getGeneDomains("WDR35") },
-  { text: "List all components of the BBSome complex", handler: () => getGenesByComplex("BBSome") },
-  { text: "Display components of IFT-A complex", handler: () => getGenesByComplex("IFT-A") },
-  { text: "Display components of IFT-B complex", handler: () => getGenesByComplex("IFT-B") },
-  { text: "Show components of Transition Zone Complex", handler: () => getGenesByComplex("Transition Zone Complex") },
-  { text: "Display components of MKS Complex", handler: () => getGenesByComplex("MKS Complex") },
-  { text: "Show components of NPHP Complex", handler: () => getGenesByComplex("NPHP Complex") },
-  
-  // --- Ciliary Status ---
-  { text: "Is DYNC2H1 a ciliary gene?", handler: () => checkCiliaryStatus("DYNC2H1") },
-  { text: "Show me all ciliary genes", handler: () => getAllCiliaryGenes() },
-  
-  // --- Functional Genomics Screen Results ---
-  { text: "What happens to cilia when KIF3A is knocked down?", handler: () => getKnockdownEffect("KIF3A") },
-  { text: "Which genes cause longer cilia when silenced?", handler: () => getGenesByScreenPhenotype("long cilia") },
-  { text: "Show me the results for IFT88 in the Kim2016 screen", handler: () => getScreenResults("IFT88", "Kim2016") },
-  { text: "Find all genes that act as negative regulators of Hedgehog signaling", handler: () => getHedgehogRegulators("negative") },
-  { text: "Display genes that had 'No effect' in the Wheway2015 screen", handler: () => getNoEffectGenes("Wheway2015") },
-  { text: "Find genes causing short cilia", handler: () => getGenesByScreenPhenotype("short cilia") },
-  
-  // --- Gene Expression Data ---
-  { text: "Where is ARL13B expressed?", handler: () => getGeneExpression("ARL13B") },
-  { text: "Show the expression pattern of BBS1 across all tissues", handler: () => getGeneExpressionPattern("BBS1") },
-  { text: "Which ciliary genes are most highly expressed in the kidney?", handler: () => getTissueSpecificGenes("kidney") },
-  { text: "Compare the expression of IFT88 and OFD1 in the brain versus the retina", handler: () => compareGeneExpression(["IFT88", "OFD1"], ["brain", "retina"]) },
-  { text: "Show expression of ARL13B", handler: () => getGeneExpression("ARL13B") },
-  { text: "Where is BBS1 expressed?", handler: () => getGeneExpression("BBS1") },
-  { text: "In which tissues is IFT88 expressed?", handler: () => getGeneExpression("IFT88") },
-  { text: "Which organ systems express CEP290?", handler: () => getGeneExpression("CEP290") },
-  
-  // --- Evolutionary Conservation Data ---
-  { text: "Show the evolutionary conservation of BBS1", handler: () => getGeneConservation("BBS1") },
-  { text: "Is IFT88 conserved in C. elegans?", handler: () => checkConservation("IFT88", "C. elegans") },
-  { text: "List all ciliary-only genes", handler: () => getCiliaryOnlyGenes() },
-  { text: "Display the ciliary genes that are conserved between humans and zebrafish", handler: () => getConservedGenesBetween(["Human", "Zebrafish"]) },
-  { text: "Which human ciliary genes have orthologs in Chlamydomonas?", handler: () => getOrthologsInOrganism("Chlamydomonas") },
-  { text: "List ciliary genes in C. elegans", handler: () => getCiliaryGenesForOrganism("C. elegans") },
-  { text: "Display conserved ciliary proteins between mouse and human", handler: () => getConservedGenes(["Mouse", "Human"]) },
-  { text: "What is the phylogeny of IFT88?", handler: () => getGeneConservation("IFT88") },
-  { text: "Evolutionary conservation of ARL13B", handler: () => getGeneConservation("ARL13B") },
-  
-  // --- Mechanism & Functional Categories ---
-  { text: "Show me motor genes", handler: () => getGenesByFunction("motor") },
-  { text: "Display kinesin motors", handler: () => getGenesByFunction("kinesin motors") },
-  { text: "Show me dynein motors", handler: () => getGenesByFunction("dynein motors") },
-  { text: "Display kinases regulating cilia length", handler: () => getGenesByDomainDescription("kinase") },
-  { text: "List intraflagellar transport (IFT) components", handler: () => getGenesByComplex("IFT") },
-  { text: "Find IFT-A and IFT-B complex genes", handler: () => getGenesByMultipleComplexes(["IFT-A", "IFT-B"]) },
-  { text: "Which genes are involved in cilium assembly?", handler: () => getGenesByFunction("cilium assembly") },
-  { text: "Show me Ciliary assembly/disassembly genes", handler: () => getGenesByFunction("Ciliary assembly/disassembly") },
-  { text: "Display Signaling genes", handler: () => getGenesByFunction("Signaling") },
-  { text: "Show me Motile cilium genes", handler: () => getGenesByFunction("Motile cilium") },
-  { text: "Display Motor protein genes", handler: () => getGenesByFunction("Motor protein") },
-  { text: "Show Transport genes", handler: () => getGenesByFunction("Transport") },
-  { text: "Display Protein modification genes", handler: () => getGenesByFunction("Protein modification") },
-  { text: "Show Cytoskeletal genes", handler: () => getGenesByFunction("Cytoskeletal") },
-  
-  // --- Protein Domain Questions ---
-  { text: "Show WD40 domain containing proteins", handler: () => getGenesWithDomain("WD40") },
-  { text: "Display Leucine-rich repeat domain proteins", handler: () => getGenesWithDomain("Leucine-rich repeat") },
-  { text: "Show IQ motif containing proteins", handler: () => getGenesWithDomain("IQ motif") },
-  { text: "Display calmodulin-binding proteins", handler: () => getGenesWithDomain("calmodulin-binding") },
-  { text: "Show EF-hand domain proteins", handler: () => getGenesWithDomain("EF-hand") },
-  
-  // --- Organism-Specific Questions ---
-  { text: "Display ciliary genes in human", handler: () => getCiliaryGenesForOrganism("human") },
-  { text: "Show ciliary genes in mouse", handler: () => getCiliaryGenesForOrganism("mouse") },
-  { text: "List ciliary genes in zebrafish", handler: () => getCiliaryGenesForOrganism("zebrafish") },
-  { text: "Display ciliary genes in fly", handler: () => getCiliaryGenesForOrganism("fly") },
-  { text: "Show ciliary genes in yeast", handler: () => getCiliaryGenesForOrganism("yeast") },
-  { text: "List ciliary genes in Chlamydomonas", handler: () => getCiliaryGenesForOrganism("Chlamydomonas") },
-  
-  // --- Comprehensive Gene Information ---
-  { text: "Show all known info about IFT88", handler: () => getComprehensiveDetails("IFT88") },
-  { text: "Tell me about BBS1", handler: () => getComprehensiveDetails("BBS1") },
-  { text: "Tell me about ARL13B", handler: () => getComprehensiveDetails("ARL13B") },
-  { text: "Show interactors of IFT88", handler: () => getProteinInteractions("IFT88") },
-  { text: "What are the interacting partners of BBS1?", handler: () => getProteinInteractions("BBS1") }
-);
-
-// =============================================================================
-// REPLACEMENT: Corrected Query Handler Functions
-// These functions now format their own HTML to prevent incorrect error messages.
-// =============================================================================
 
 async function getGeneFunction(gene) {
     if (!ciliaHubDataCache) await fetchCiliaData();
@@ -1735,50 +1639,6 @@ async function getGeneDiseases(gene) {
     return formatGeneDetail(geneData, gene, "Disease Associations", diseases);
 }
 
-async function getGeneDomains(gene) {
-    if (!ciliaHubDataCache) await fetchCiliaData();
-
-    const geneData = ciliaHubDataCache.find(g => g.gene.toUpperCase() === gene.toUpperCase());
-    if (!geneData) {
-        return `<div class="result-card"><h3>${gene}</h3><p class="status-not-found">Gene not found in the database.</p></div>`;
-    }
-
-    const domains = geneData.domain_descriptions?.join(", ") || "No domain information available.";
-
-    // Detect domain categories
-    const domainText = domains.toLowerCase();
-    const categories = [];
-
-    if (/kinase|phosphorylase|serine-threonine|tyrosine-protein/.test(domainText))
-        categories.push("Kinase");
-    if (/phosphatase/.test(domainText))
-        categories.push("Phosphatase");
-    if (/actin/.test(domainText))
-        categories.push("Actin-related");
-    if (/ef-hand/.test(domainText))
-        categories.push("EF-hand calcium-binding protein");
-    if (/zinc\s*finger/.test(domainText))
-        categories.push("Zinc finger protein");
-    if (/atpase|nucleotide binding/.test(domainText))
-        categories.push("ATPase / Motor protein");
-
-    // Add categories to formatted output
-    const domainCategorySummary = categories.length
-        ? `<p><strong>Functional Domain Category:</strong> ${categories.join(", ")}</p>`
-        : "";
-
-    return `
-        <div class="result-card">
-            <h3>${gene}</h3>
-            <p><strong>Description:</strong> ${geneData.description || "No description available."}</p>
-            <p><strong>Domains:</strong> ${domains}</p>
-            ${domainCategorySummary}
-            <p><strong>Localization:</strong> ${geneData.localization || "Unknown"}</p>
-            <p><strong>Functional Summary:</strong> ${geneData.functional_summary || "Not available."}</p>
-        </div>
-    `;
-}
-
 async function generateDomainBasedQuestions() {
     if (!ciliaHubDataCache) await fetchCiliaData();
 
@@ -1804,57 +1664,6 @@ async function generateDomainBasedQuestions() {
 }
 
 
-// --- ADDITION: Dynamic Domain-Based Questions ---
-async function extendQuestionRegistryWithDomains() {
-    if (!ciliaHubDataCache) await fetchCiliaData();
-
-    const domainKeywords = [
-        { keyword: "kinase", label: "Ciliary Kinase" },
-        { keyword: "phosphatase", label: "Ciliary Phosphatase" },
-        { keyword: "actin", label: "Actin-related Protein" },
-        { keyword: "ef-hand", label: "EF-hand Calcium-Binding Protein" },
-        { keyword: "zinc finger", label: "Zinc Finger Protein" },
-        { keyword: "atpase", label: "ATPase / Motor Protein" }
-    ];
-
-    const newQuestions = [];
-
-    for (const { keyword, label } of domainKeywords) {
-        const genes = ciliaHubDataCache.filter(g =>
-            g.domain_descriptions?.some(d => d.toLowerCase().includes(keyword))
-        );
-
-        if (genes.length > 0) {
-            const capitalized = keyword.charAt(0).toUpperCase() + keyword.slice(1);
-
-            newQuestions.push(
-                {
-                    text: `List all ${capitalized}-related ciliary genes`,
-                    handler: async () => formatListResult(`${label}s`, await getGenesByDomainDescription(keyword))
-                },
-                {
-                    text: `Show ${capitalized}-containing proteins localized to cilia`,
-                    handler: async () => formatListResult(`${label}s`, await getGenesByDomainDescription(keyword))
-                },
-                {
-                    text: `Display ${capitalized} domain proteins involved in ciliogenesis`,
-                    handler: async () => formatListResult(`${label}s`, await getGenesByDomainDescription(keyword))
-                },
-                {
-                    text: `Identify ${capitalized} genes in cilia`,
-                    handler: async () => formatListResult(`${label}s`, await getGenesByDomainDescription(keyword))
-                }
-            );
-        }
-    }
-
-    // Merge with main registry
-    questionRegistry.push(...newQuestions);
-    console.log(`✅ Added ${newQuestions.length} domain-based questions to registry.`);
-}
-
-// Call this after your data has been fetched
-extendQuestionRegistryWithDomains();
 
 
 async function checkCiliaryStatus(gene) {
@@ -2691,23 +2500,6 @@ async function getGenesByLocalization(locations) {
     return results;
 }
 
-async function getGenesWithDomain(domainName) {
-    await fetchCiliaData();
-    const domainRegex = new RegExp(domainName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
-    
-    const results = ciliaHubDataCache
-        .filter(gene => 
-            Array.isArray(gene.domain_descriptions) && 
-            gene.domain_descriptions.some(dd => dd.match(domainRegex))
-        )
-        .map(gene => ({ 
-            gene: gene.gene, 
-            description: `Domains: ${gene.domain_descriptions?.join(', ') || 'No domain data'}` 
-        }))
-        .sort((a, b) => a.gene.localeCompare(b.gene));
-    
-    return results;
-}
 
 async function getGenesByComplex(complexName) {
     await fetchCiliaData();
@@ -2733,6 +2525,7 @@ async function getGenesByComplex(complexName) {
     
     return relatedGenes;
 }
+
 /**
  * CiliAI ASK function to display domains for a specific gene.
  * @param {string} geneSymbol - The gene symbol.
@@ -2767,6 +2560,8 @@ async function displayDomainsForGene(geneSymbol) {
             ${listHtml}
         </div>`;
 }
+
+
 async function getGenesByFunction(functionalCategory) {
     await fetchCiliaData();
     const categoryRegex = new RegExp(functionalCategory.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
