@@ -167,17 +167,16 @@ async function fetchCiliaData() {
             if (Array.isArray(field)) return field;
             return [];
         };
-
         ciliaHubDataCache = data.map(gene => ({
-            ...gene,
-            functional_category: processToArray(gene.functional_category),
-            #domain_descriptions: processToArray(gene.domain_descriptions),#
-            ciliopathy: processToArray(gene.ciliopathy),
-            localization: processToArray(gene.localization),
-            complex_names: processToArray(gene.complex_names),
-            complex_components: processToArray(gene.complex_components)
-        }));
-        
+    ...gene,
+    functional_category: processToArray(gene.functional_category),
+    domain_descriptions: processToArray(gene.domain_descriptions),
+    ciliopathy: processToArray(gene.ciliopathy),
+    localization: processToArray(gene.localization),
+    complex_names: processToArray(gene.complex_names),
+    complex_components: processToArray(gene.complex_components)
+}));
+
         console.log('CiliaHub data loaded and formatted successfully.');
         return ciliaHubDataCache;
     } catch (error) {
