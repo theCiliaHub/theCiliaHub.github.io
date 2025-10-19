@@ -2854,10 +2854,6 @@ window.handleAIQuery = async function() {
 
 
 // Helper for the comparison query (updated titles and threshold)
-
-//**
- * [NEW HANDLER] CiliAI ASK function to display enriched domains from the new DB.
- */
 async function displayEnrichedDomains() {
     const db = await getDomainData();
     
