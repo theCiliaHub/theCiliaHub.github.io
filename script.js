@@ -26,76 +26,129 @@ function sanitize(input) {
 
 /**
  * Loads, sanitizes, and prepares the gene database into an efficient lookup map.
+ * ✨ NOW INCLUDES ORTHOLOG SYMBOLS ✨
  */
 async function loadAndPrepareDatabase() {
-    if (window.geneDataCache && Object.keys(window.geneDataCache).length) return true;
+    // Check if data is already loaded
+    if (window.geneDataCache && Object.keys(window.geneDataCache).length > 0 && window.geneMapCache && window.geneMapCache.size > 0) {
+        console.log("Database already loaded and prepared.");
+        return true;
+    }
 
     try {
+        console.log("Fetching CiliaHub data...");
         const resp = await fetch('https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/ciliahub_data.json');
         if (!resp.ok) throw new Error(`HTTP Error ${resp.status}`);
         const rawGenes = await resp.json();
+        console.log("Raw data fetched successfully.");
 
         if (!Array.isArray(rawGenes)) throw new Error('Invalid data format: expected array');
 
-        window.geneDataCache = rawGenes;       // <--- assign to global explicitly
-        allGenes = rawGenes;
-        window.geneMapCache = new Map();       // also make global
+        window.geneDataCache = rawGenes;       // Assign to global explicitly
+        allGenes = rawGenes;                   // Update global allGenes
+        window.geneMapCache = new Map();       // Initialize global map
 
-        allGenes.forEach(g => {
-            if (!g.gene || typeof g.gene !== 'string') return;
+        console.log(`Processing ${allGenes.length} genes for the search map...`);
 
+        allGenes.forEach((g, index) => {
+            if (!g || !g.gene || typeof g.gene !== 'string') {
+                console.warn(`Skipping invalid gene entry at index ${index}:`, g);
+                return;
+            }
+
+            const humanGeneObject = g; // Reference to the complete human gene data
+
+            // 1. Add Human Gene Symbol
             const nameKey = sanitize(g.gene);
-            if (nameKey) window.geneMapCache.set(nameKey, g);
+            if (nameKey && !window.geneMapCache.has(nameKey)) {
+                window.geneMapCache.set(nameKey, humanGeneObject);
+            } else if (nameKey && window.geneMapCache.has(nameKey)) {
+                 // Optionally log if a primary gene name conflicts (shouldn't happen with unique primary names)
+                 // console.warn(`Duplicate primary gene name key found: ${nameKey}`);
+            }
 
+            // 2. Add Human Synonyms
             if (g.synonym) {
-                 String(g.synonym).split(/[,;]/).forEach(syn => {
-                     const key = sanitize(syn);
-                     if (key && !window.geneMapCache.has(key)) window.geneMapCache.set(key, g);
-                 });
+                String(g.synonym).split(/[,;]/).forEach(syn => {
+                    const key = sanitize(syn);
+                    // Add only if the key is valid and not already mapped (to avoid overwriting primary mapping)
+                    if (key && !window.geneMapCache.has(key)) {
+                        window.geneMapCache.set(key, humanGeneObject);
+                    }
+                });
             }
 
+            // 3. Add Human Ensembl IDs
             if (g.ensembl_id) {
-                 String(g.ensembl_id).split(/[,;]/).forEach(id => {
-                     const key = sanitize(id);
-                     if (key) window.geneMapCache.set(key, g);
-                 });
+                String(g.ensembl_id).split(/[,;]/).forEach(id => {
+                    const key = sanitize(id);
+                    if (key && !window.geneMapCache.has(key)) {
+                        window.geneMapCache.set(key, humanGeneObject);
+                    }
+                });
             }
 
+            // ✨ 4. Add Ortholog Symbols ✨
+            const orthologFields = [
+                'ortholog_mouse',
+                'ortholog_c_elegans',
+                'ortholog_xenopus',
+                'ortholog_zebrafish',
+                'ortholog_drosophila'
+            ];
+
+            orthologFields.forEach(field => {
+                if (g[field]) {
+                    // Split potentially comma/space-separated orthologs
+                    String(g[field]).split(/[,;\s]+/).forEach(orthoSymbol => {
+                        const key = sanitize(orthoSymbol);
+                        // Add only if the key is valid and not already mapped
+                        if (key && !window.geneMapCache.has(key)) {
+                            window.geneMapCache.set(key, humanGeneObject);
+                        } else if (key && window.geneMapCache.has(key) && window.geneMapCache.get(key).gene !== humanGeneObject.gene) {
+                            // Optional: Log if an ortholog symbol clashes with another gene's identifier
+                            // console.warn(`Ortholog symbol '${key}' from ${g.gene} clashes with existing entry for ${window.geneMapCache.get(key).gene}`);
+                        }
+                    });
+                }
+            });
+
+            // --- Localization mapping (remains the same) ---
             if (g.localization) {
                 const validCiliaryLocalizations = [
                     'transition zone', 'cilia', 'basal body', 'axoneme', 'ciliary membrane',
                     'centrosome', 'autophagosomes', 'endoplasmic reticulum', 'flagella',
                     'golgi apparatus', 'lysosome', 'microbody', 'microtubules', 'mitochondrion', 'nucleus', 'peroxisome'
                 ];
-                let sanitizedLocalization = Array.isArray(g.localization) 
+                let sanitizedLocalization = Array.isArray(g.localization)
                     ? g.localization.map(loc => loc ? loc.trim().toLowerCase() : '').filter(loc => loc && validCiliaryLocalizations.includes(loc))
                     : (g.localization ? g.localization.split(/[,;]/).map(loc => loc ? loc.trim().toLowerCase() : '').filter(loc => loc && validCiliaryLocalizations.includes(loc)) : []);
 
-                if (g.gene === 'ACTN2') {
-                    console.log('ACTN2 Raw localization from JSON:', g.localization);
-                    console.log('ACTN2 Sanitized localization before mapping:', sanitizedLocalization);
-                }
-
                 geneLocalizationData[g.gene] = mapLocalizationToSVG(sanitizedLocalization);
+            }
+            // --- End Localization mapping ---
 
-                if (g.gene === 'ACTN2') {
-                    console.log('ACTN2 Mapped localization from mapLocalizationToSVG:', geneLocalizationData[g.gene]);
-                }
+        }); // End forEach gene
+
+        console.log(`Finished processing. Search map contains ${window.geneMapCache.size} unique keys.`);
+        return true;
+
+    } catch (e) {
+        console.error('Data load or preparation error:', e);
+
+        // Fallback to default genes if loading fails
+        allGenes = getDefaultGenes();
+        currentData = allGenes; // Assuming currentData should also be reset
+        window.geneMapCache = new Map(); // Reset map
+        // Populate map with default genes (minimal mapping)
+        allGenes.forEach(g => {
+            if (g.gene) {
+                 const key = sanitize(g.gene);
+                 if (key) window.geneMapCache.set(key, g);
             }
         });
-
-        console.log(`Loaded ${allGenes.length} genes into database`);
-        return true;
-    } catch (e) {
-        console.error('Data load error:', e);
-
-        allGenes = getDefaultGenes();
-        currentData = allGenes;
-        window.geneMapCache = new Map();
-        allGenes.forEach(g => {
-            if (g.gene) window.geneMapCache.set(sanitize(g.gene), g);
-        });
-        return false;
+        console.warn(`Fallback: Loaded ${allGenes.length} default genes into map.`);
+        return false; // Indicate failure
     }
 }
 
@@ -943,62 +996,81 @@ function showErrorMessage(message) {
 function displayIndividualGenePage(gene) {
     const contentArea = document.querySelector('.content-area');
     if (!contentArea) return console.warn("⚠️ .content-area not found.");
-    contentArea.className = 'content-area';
+    contentArea.className = 'content-area'; // Reset class name if needed
 
     const panel = document.querySelector('.cilia-panel');
-    if (panel) panel.style.display = 'block';
+    if (panel) panel.style.display = 'block'; // Ensure cilia panel is visible
 
+    // --- Helper Functions ---
     const formatAsTags = (data, className = '') => {
-        if (!data) return 'Not available';
+        if (!data) return '<span class="not-available">Not available</span>';
         const arr = Array.isArray(data) ? data : String(data).split(/[;,]\s*/).filter(Boolean);
-        return arr.map(item => `<span class="tag ${className}">${item}</span>`).join('');
+        if (arr.length === 0) return '<span class="not-available">Not available</span>';
+        return arr.map(item => `<span class="tag ${className}">${item.trim()}</span>`).join('');
     };
 
     const formatReferences = (gene) => {
         if (!gene.reference) return '<li>No reference information available.</li>';
         const allRefs = Array.isArray(gene.reference) ? gene.reference : [gene.reference];
-        return allRefs
-            .flatMap(item => String(item).split(/[,;]\s*/)).map(s => s.trim()).filter(Boolean)
-            .map(ref => {
-                if (/^\d+$/.test(ref)) return `<li><a href="https://pubmed.ncbi.nlm.nih.gov/${ref}" target="_blank">PMID: ${ref}</a></li>`;
-                if (ref.toLowerCase().startsWith('http')) return `<li><a href="${ref}" target="_blank">${ref}</a></li>`;
-                return `<li>${ref}</li>`;
-            }).join('');
+        const uniqueRefs = [...new Set(
+            allRefs
+            .flatMap(item => String(item).split(/[,;]\s*/))
+            .map(s => s.trim())
+            .filter(Boolean)
+        )];
+
+        if (uniqueRefs.length === 0) return '<li>No reference information available.</li>';
+
+        return uniqueRefs.map(ref => {
+            if (/^\d+$/.test(ref)) return `<li><a href="https://pubmed.ncbi.nlm.nih.gov/${ref}" target="_blank" rel="noopener noreferrer">PMID:${ref}</a></li>`;
+            if (ref.toLowerCase().startsWith('http')) return `<li><a href="${ref}" target="_blank" rel="noopener noreferrer">${ref}</a></li>`;
+            return `<li>${ref}</li>`; // Plain text if not PMID or URL
+        }).join('');
     };
 
     const formatComplexes = (complexes) => {
-        if (!complexes) return 'Not available';
-        const arr = Array.isArray(complexes) ? complexes.join(';').split(/;\s*/): String(complexes).split(/;\s*/);
+        if (!complexes) return '<span class="not-available">Not available</span>';
+        const arr = Array.isArray(complexes) ? complexes : String(complexes).split(/;\s*/);
+        if (arr.length === 0 || arr[0] === '') return '<span class="not-available">Not available</span>';
         return arr.map(name => {
-            const url = `https://mips.helmholtz-muenchen.de/corum/#search;complex=${encodeURIComponent(name.trim())}`;
-            return `<a href="${url}" target="_blank" class="tag">${name.trim()}</a>`;
-        }).join(' ');
+            const trimmedName = name.trim();
+            if (!trimmedName) return '';
+            const url = `https://mips.helmholtz-muenchen.de/corum/#search;query=${encodeURIComponent(trimmedName)}`;
+            return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="tag complex-tag">${trimmedName}</a>`;
+        }).filter(Boolean).join(' ');
     };
 
-    const formatScreenDataTable = (screens) => {
-    // FIX: Check if screens is an array before using .forEach
-    if (!Array.isArray(screens) || screens.length === 0) {
-        return '<p>No genome-wide screen data available for this gene.</p>';
+     const formatScreenDataTable = (screens) => {
+        if (!Array.isArray(screens) || screens.length === 0) {
+            return '<p style="margin-top: 1rem; color: #555;">No detailed genome-wide screen data available for this gene.</p>';
         }
         let tableHTML = `
-            <table class="data-table screen-table">
-                <thead>
-                    <tr>
-                        <th>Mean % Ciliated</th>
-                        <th>Z-Score</th>
-                        <th>Classification</th>
-                        <th>Reference</th>
-                    </tr>
-                </thead>
-                <tbody>
+            <h4 style="margin-top: 2rem; margin-bottom: 0.5rem; color: #333;">Detailed Genome-Wide Screen Findings</h4>
+            <p class="screen-description">High-throughput screen results showing effects on ciliation.</p>
+            <div class="table-wrapper" style="overflow-x: auto;">
+                <table class="data-table screen-table">
+                    <thead>
+                        <tr>
+                            <th>Dataset</th>
+                            <th>Mean % Ciliated</th>
+                            <th>Z-Score</th>
+                            <th>Classification</th>
+                            <th>Reference</th>
+                        </tr>
+                    </thead>
+                    <tbody>
         `;
         screens.forEach(screen => {
             const meanCiliated = typeof screen.mean_percent_ciliated === 'number' ? screen.mean_percent_ciliated.toFixed(2) : 'N/A';
             const zScore = typeof screen.z_score === 'number' ? screen.z_score.toFixed(2) : 'N/A';
-            const datasetName = screen.dataset || 'Unknown';
-            const refLink = `<a href="${screen.paper_link}" target="_blank" rel="noopener noreferrer" class="external-link">${datasetName} et al.</a>`;
+            const datasetName = screen.dataset || 'Unknown Dataset';
+            // Use paper_link if available, otherwise just show dataset name
+            const refLink = screen.paper_link
+                ? `<a href="${screen.paper_link}" target="_blank" rel="noopener noreferrer" class="external-link">${datasetName}</a>`
+                : datasetName;
             tableHTML += `
                 <tr>
+                    <td>${datasetName}</td>
                     <td>${meanCiliated}</td>
                     <td>${zScore}</td>
                     <td>${screen.classification || 'N/A'}</td>
@@ -1006,261 +1078,194 @@ function displayIndividualGenePage(gene) {
                 </tr>
             `;
         });
-        tableHTML += `</tbody></table>`;
+        tableHTML += `</tbody></table></div>`;
         return tableHTML;
     };
 
-    // ✨ ADDED NEW ICON FOR ORTHOLOGS ✨
+
+    // --- Icons --- (Ensure these SVGs are defined or adjust as needed)
     const icons = {
-        gene: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22h6a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16"></path><path d="M11 7h2"></path><path d="M11 11h4"></path><path d="M11 15h4"></path><path d="M5 22v-5"></path><path d="M3 17h4"></path></svg>`,
-        screen: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 10.5h-5m5 3h-5m8-10h-8a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V5.5a2 2 0 0 0-2-2z"></path><path d="M4.5 3.5v15"></path></svg>`,
-        ortholog: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 18l-6-6 6-6"></path><path d="M8 18l-6-6 6-6"></path></svg>`
+        gene: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22h6a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16"></path><path d="M11 7h2"></path><path d="M11 11h4"></path><path d="M11 15h4"></path><path d="M5 22v-5"></path><path d="M3 17h4"></path></svg>`,
+        screen: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 10.5h-5m5 3h-5m8-10h-8a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V5.5a2 2 0 0 0-2-2z"></path><path d="M4.5 3.5v15"></path></svg>`,
+        ortholog: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 15v4a3 3 0 0 0 3 3l4-4a3 3 0 0 0-3-3v-4a3 3 0 0 0-3-3l-4 4a3 3 0 0 0 3 3z"></path></svg>`, // DNA icon
+        effects: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>` // Bar chart icon
     };
 
+
+    // --- Main HTML Structure ---
     contentArea.innerHTML = `
         <div class="page-section gene-detail-page">
             <style>
-                .gene-detail-page {
-                    padding: var(--spacing-md);
-                    max-width: 1200px;
-                    margin: 0 auto;
-                }
-                .gene-header {
-                    margin-bottom: var(--spacing-md);
-                    text-align: center;
-                }
-                .gene-header h1 {
-                    font-size: 2.2rem;
-                    color: var(--primary-blue);
-                    margin: 0 0 var(--spacing-xs);
-                    display: inline-block;
-                    vertical-align: middle;
-                }
-                .header-tags {
-                    display: inline-flex;
-                    flex-wrap: wrap;
-                    gap: var(--spacing-xs);
-                    vertical-align: middle;
-                    margin-left: var(--spacing-sm);
-                }
-                .synonym-tags {
-                    display: flex;
-                    flex-wrap: wrap;
-                    gap: var(--spacing-xs);
-                    justify-content: center;
-                    margin-top: var(--spacing-sm);
-                }
-                .detail-card {
-                    background: var(--white);
-                    border: 1px solid var(--border-color);
-                    border-radius: var(--radius-md);
-                    padding: var(--spacing-lg);
-                    box-shadow: var(--shadow-light);
-                    margin-bottom: var(--spacing-md);
-                }
-                .card-title {
-                    display: flex;
-                    align-items: center;
-                    gap: var(--spacing-xs);
-                    color: var(--primary-blue);
-                    font-size: 1.5rem;
-                    font-weight: 600;
-                    margin-bottom: var(--spacing-sm);
-                }
-                .card-title svg {
-                    width: 24px;
-                    height: 24px;
-                    stroke: var(--primary-blue);
-                    stroke-width: 2;
-                    fill: none;
-                }
-                .tags-container {
-                    display: flex;
-                    flex-wrap: wrap;
-                    gap: var(--spacing-xs);
-                }
-                .tag {
-                    background: var(--light-blue);
-                    color: var(--primary-blue);
-                    padding: 0.3rem 0.6rem;
-                    border-radius: var(--radius-sm);
-                    font-size: 0.9rem;
-                }
-                .tag-ciliopathy {
-                    background: var(--error-red);
-                    color: var(--text-light);
-                }
-                .tag:hover, .tag:focus {
-                    background: var(--primary-blue);
-                    color: var(--text-light);
-                    cursor: pointer;
-                }
-                .data-table {
-                    width: 100%;
-                    border-collapse: collapse;
-                    font-size: 0.95rem;
-                }
-                .data-table th, .data-table td {
-                    padding: var(--spacing-md) var(--spacing-lg);
-                    border-bottom: 1px solid var(--border-color);
-                    text-align: left;
-                    vertical-align: top;
-                }
-                .data-table th {
-                    background: var(--primary-blue);
-                    color: var(--text-light);
-                    width: 200px;
-                }
-                .screen-table th, .screen-table td {
-                    padding: var(--spacing-md) var(--spacing-lg);
-                }
-                .data-table tr:nth-child(even), .screen-table tr:nth-child(even) {
-                    background: var(--light-gray);
-                }
-                .data-table tr:hover, .screen-table tr:hover {
-                    background: var(--light-blue);
-                }
-                .external-link {
-                    color: var(--primary-blue);
-                    text-decoration: none;
-                }
-                .external-link:hover {
-                    text-decoration: underline;
-                }
-                .reference-list {
-                    list-style: none;
-                    padding: 0;
-                    margin: 0;
-                }
-                .screen-description {
-                    font-size: 0.95rem;
-                    margin-bottom: var(--spacing-sm);
-                }
+                /* (Keep your existing styles here) */
+                .gene-detail-page { padding: var(--spacing-md); max-width: 1200px; margin: 0 auto; }
+                .gene-header { margin-bottom: var(--spacing-lg); text-align: center; border-bottom: 1px solid var(--border-color); padding-bottom: var(--spacing-md); }
+                .gene-header h1 { font-size: 2.5rem; color: var(--primary-blue); margin: 0 0 var(--spacing-xs); }
+                .gene-title-container { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: var(--spacing-sm); }
+                .header-tags { display: flex; flex-wrap: wrap; gap: var(--spacing-xs); }
+                .synonym-tags { display: flex; flex-wrap: wrap; gap: var(--spacing-xs); justify-content: center; margin-top: var(--spacing-sm); }
+                .gene-description { color: #555; margin-top: var(--spacing-sm); font-size: 1.1rem; }
+
+                .detail-card { background: var(--white); border: 1px solid var(--border-color); border-radius: var(--radius-lg); padding: var(--spacing-lg); box-shadow: var(--shadow-subtle); margin-bottom: var(--spacing-lg); }
+                .card-title { display: flex; align-items: center; gap: var(--spacing-sm); color: var(--primary-blue); font-size: 1.6rem; font-weight: 600; margin-bottom: var(--spacing-md); border-bottom: 2px solid var(--light-blue); padding-bottom: var(--spacing-xs); }
+                .card-title svg { width: 28px; height: 28px; stroke: var(--primary-blue); stroke-width: 2; fill: none; }
+
+                .tags-container { display: flex; flex-wrap: wrap; gap: var(--spacing-xs); }
+                .tag { background: #eaf2fa; color: #2c5aa0; padding: 0.35rem 0.7rem; border-radius: var(--radius-full); font-size: 0.85rem; border: 1px solid #c9dff0; white-space: nowrap; }
+                .tag-ciliopathy { background: #fdecea; color: #c0392b; border-color: #f7cac9; font-weight: 500;}
+                .complex-tag { background: #e8f5e9; color: #2e7d32; border-color: #c8e6c9;}
+                .tag:hover { opacity: 0.8; }
+                .not-available { color: #888; font-style: italic; font-size: 0.9rem; }
+
+                .data-table { width: 100%; border-collapse: collapse; font-size: 0.95rem; }
+                .data-table th, .data-table td { padding: var(--spacing-sm) var(--spacing-md); border-bottom: 1px solid var(--border-color); text-align: left; vertical-align: top; }
+                .data-table th { background: none; color: #333; font-weight: 600; width: 220px; border-right: 1px solid var(--border-color); }
+                .data-table tr:last-child th, .data-table tr:last-child td { border-bottom: none; }
+                .data-table a { color: var(--primary-blue); text-decoration: none; }
+                .data-table a:hover { text-decoration: underline; }
+
+                .screen-table { margin-top: 1rem; }
+                .screen-table thead { background-color: #f8f9fa; }
+                .screen-table th { background: none; color: #333; font-weight: 600; border-right: none; width: auto; text-align: center; }
+                 .screen-table td { text-align: center; }
+                .screen-table th, .screen-table td { padding: var(--spacing-sm) var(--spacing-md); }
+
+                .reference-list { list-style: none; padding: 0; margin: 0; }
+                .reference-list li { margin-bottom: var(--spacing-xs); }
+                .screen-description { font-size: 0.95rem; margin-bottom: 1rem; color: #555; }
+                .table-wrapper { overflow-x: auto; }
+
                 @media (max-width: 768px) {
-                    .gene-header h1 {
-                        font-size: 1.8rem;
-                    }
-                    .data-table th, .screen-table th {
-                        width: 150px;
-                    }
-                    .data-table th, .data-table td, .screen-table th, .screen-table td {
-                        padding: var(--spacing-sm) var(--spacing-md);
-                    }
+                    .gene-header h1 { font-size: 2rem; }
+                    .card-title { font-size: 1.4rem; }
+                    .data-table th { width: 150px; }
                 }
             </style>
 
             <header class="gene-header">
                 <div class="gene-title-container">
                     <h1>${gene.gene || "Unknown Gene"}</h1>
-                    <div class="header-tags tags-container">${formatAsTags(gene.localization)}</div>
                 </div>
-                ${gene.synonym ? `<div class="synonym-tags tags-container">${formatAsTags(gene.synonym)}</div>` : ''}
-                ${gene.description ? `<p>${gene.description}</p>` : '<p>No description available.</p>'}
+                ${gene.synonym ? `<div class="synonym-tags tags-container" title="Synonyms">${formatAsTags(gene.synonym)}</div>` : ''}
+                ${gene.description ? `<p class="gene-description">${gene.description}</p>` : '<p class="gene-description">No description available.</p>'}
             </header>
 
             <div class="detail-card">
                 <h3 class="card-title">${icons.gene} Gene Information</h3>
-                <table class="data-table">
-                    <tbody>
-                        <tr>
-                            <th>Functional Summary</th>
-                            <td>${gene.functional_summary || 'Not available'}</td>
-                        </tr>
-                        
-                        <tr>
-                            <th>Overexpression Effects</th>
-                            <td>${gene.overexpression_effects || 'Not available'}</td>
-                        </tr>
-                        <tr>
-                            <th>Loss-of-Function (LoF) Effects</th>
-                            <td>${gene.lof_effects || 'Not available'}</td>
-                        </tr>
-                        <tr>
-                            <th>Ciliation Percentage Effects</th>
-                            <td>${gene.percent_ciliated_cells_effects || 'Not available'}</td>
-                        </tr>
-                        
-                        <tr>
-                            <th>References</th>
-                            <td><ul class="reference-list">${formatReferences(gene)}</ul></td>
-                        </tr>
-                        <tr>
-                            <th>Ensembl ID(s)</th>
-                            <td>${gene.ensembl_id ? String(gene.ensembl_id).split(/[;,]\s*/).map(id => `<a href="https://www.ensembl.org/Homo_sapiens/Gene/Summary?g=${id}" target="_blank">${id}</a>`).join('<br>') : 'Not available'}</td>
-                        </tr>
-                        ${gene.omim_id ? `
-                        <tr>
-                            <th>OMIM ID</th>
-                            <td><a href="https://www.omim.org/entry/${gene.omim_id}" target="_blank">${gene.omim_id}</a></td>
-                        </tr>` : ''}
-                        ${gene.string_link ? `
-                        <tr>
-                            <th>STRING DB</th>
-                            <td><a href="${gene.string_link}" target="_blank">Protein Interaction Network</a></td>
-                        </tr>` : ''}
-                        ${gene.protein_atlas_link ? `
-                        <tr>
-                            <th>Protein Atlas</th>
-                            <td><a href="${gene.protein_atlas_link}" target="_blank">Subcellular Localization</a></td>
-                        </tr>` : ''}
-                        <tr>
-                            <th>Functional Category</th>
-                            <td><div class="tags-container">${formatAsTags(gene.functional_category)}</div></td>
-                        </tr>
-                        <tr>
-                            <th>Associated Ciliopathies</th>
-                            <td><div class="tags-container">${formatAsTags(gene.ciliopathy, 'tag-ciliopathy')}</div></td>
-                        </tr>
-                        <tr>
-                            <th>PFAM Domains</th>
-                            <td><div class="tags-container">${formatAsTags(gene.domain_descriptions)}</div></td>
-                        </tr>
-                        <tr>
-                            <th>Protein Complexes</th>
-                            <td><div class="tags-container">${formatComplexes(gene.complex_names)}</div></td>
-                        </tr>
-                    </tbody>
-                </table>
+                <div class="table-wrapper">
+                    <table class="data-table">
+                        <tbody>
+                            <tr>
+                                <th>Full Name / Description</th>
+                                <td>${gene.description || '<span class="not-available">Not available</span>'}</td>
+                            </tr>
+                            <tr>
+                                <th>Functional Summary</th>
+                                <td>${gene.functional_summary || '<span class="not-available">Not available</span>'}</td>
+                            </tr>
+                            <tr>
+                                <th>Subcellular Localization</th>
+                                <td><div class="tags-container">${formatAsTags(gene.localization)}</div></td>
+                            </tr>
+                            <tr>
+                                <th>Functional Category</th>
+                                <td><div class="tags-container">${formatAsTags(gene.functional_category)}</div></td>
+                            </tr>
+                             <tr>
+                                <th>Ensembl ID(s)</th>
+                                <td>${gene.ensembl_id ? String(gene.ensembl_id).split(/[;,]\s*/).filter(Boolean).map(id => `<a href="https://www.ensembl.org/Homo_sapiens/Gene/Summary?g=${id.trim()}" target="_blank" rel="noopener noreferrer">${id.trim()}</a>`).join('<br>') : '<span class="not-available">Not available</span>'}</td>
+                            </tr>
+                             ${gene.omim_id ? `
+                            <tr>
+                                <th>OMIM ID</th>
+                                <td><a href="https://www.omim.org/entry/${gene.omim_id}" target="_blank" rel="noopener noreferrer">${gene.omim_id}</a></td>
+                            </tr>` : ''}
+                            <tr>
+                                <th>Associated Ciliopathies</th>
+                                <td><div class="tags-container">${formatAsTags(gene.ciliopathy, 'tag-ciliopathy')}</div></td>
+                            </tr>
+                             <tr>
+                                <th>PFAM Domains</th>
+                                <td><div class="tags-container">${formatAsTags(gene.domain_descriptions)}</div></td>
+                            </tr>
+                            <tr>
+                                <th>Protein Complexes (CORUM)</th>
+                                <td><div class="tags-container">${formatComplexes(gene.complex_names)}</div></td>
+                            </tr>
+                            ${gene.string_link ? `
+                            <tr>
+                                <th>Protein Interactions (STRING)</th>
+                                <td><a href="${gene.string_link}" target="_blank" rel="noopener noreferrer">View Interaction Network</a></td>
+                            </tr>` : ''}
+                             <tr>
+                                <th>References</th>
+                                <td><ul class="reference-list">${formatReferences(gene)}</ul></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
 
             <div class="detail-card">
                 <h3 class="card-title">${icons.ortholog} Orthologs</h3>
-                <table class="data-table">
-                    <tbody>
-                        <tr>
-                            <th>Mouse (<i>M. musculus</i>)</th>
-                            <td>${gene.ortholog_mouse || 'Not available'}</td>
-                        </tr>
-                        <tr>
-                            <th>Zebrafish (<i>D. rerio</i>)</th>
-                            <td>${gene.ortholog_zebrafish || 'Not available'}</td>
-                        </tr>
-                        <tr>
-                            <th>Fly (<i>D. melanogaster</i>)</th>
-                            <td>${gene.ortholog_drosophila || 'Not available'}</td>
-                        </tr>
-                        <tr>
-                            <th>Worm (<i>C. elegans</i>)</th>
-                            <td>${gene.ortholog_c_elegans || 'Not available'}</td>
-                        </tr>
-                        <tr>
-                            <th>Frog (<i>X. tropicalis</i>)</th>
-                            <td>${gene.ortholog_xenopus || 'Not available'}</td>
-                        </tr>
-                    </tbody>
-                </table>
+                 <div class="table-wrapper">
+                    <table class="data-table">
+                        <tbody>
+                            <tr>
+                                <th>Mouse (<i>M. musculus</i>)</th>
+                                <td>${gene.ortholog_mouse || '<span class="not-available">Not available</span>'}</td>
+                            </tr>
+                            <tr>
+                                <th>Zebrafish (<i>D. rerio</i>)</th>
+                                <td>${gene.ortholog_zebrafish || '<span class="not-available">Not available</span>'}</td>
+                            </tr>
+                            <tr>
+                                <th>Fly (<i>D. melanogaster</i>)</th>
+                                <td>${gene.ortholog_drosophila || '<span class="not-available">Not available</span>'}</td>
+                            </tr>
+                            <tr>
+                                <th>Worm (<i>C. elegans</i>)</th>
+                                <td>${gene.ortholog_c_elegans || '<span class="not-available">Not available</span>'}</td>
+                            </tr>
+                            <tr>
+                                <th>Frog (<i>X. tropicalis</i>)</th>
+                                <td>${gene.ortholog_xenopus || '<span class="not-available">Not available</span>'}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
+
             <div class="detail-card">
-                <h3 class="card-title">${icons.screen} Genome-Wide Screen Findings</h3>
-                <p class="screen-description">Genome-wide screen findings provide insights into the gene's role in ciliogenesis through high-throughput experiments. Metrics include Mean % Ciliated (percentage of cells with cilia), Z-Score (statistical significance of the effect), Classification (functional impact), and Reference (study source).</p>
+                <h3 class="card-title">${icons.effects} Effects on Cilia</h3>
+                <div class="table-wrapper">
+                    <table class="data-table">
+                         <tbody>
+                            <tr>
+                                <th>Overexpression Effects (Cilia Length)</th>
+                                <td>${gene.overexpression_effects || '<span class="not-available">Not Reported</span>'}</td>
+                            </tr>
+                            <tr>
+                                <th>Loss-of-Function (LoF) Effects (Cilia Length)</th>
+                                <td>${gene.lof_effects || '<span class="not-available">Not Reported</span>'}</td>
+                            </tr>
+                            <tr>
+                                <th>Effects on % Ciliated Cells</th>
+                                <td>${gene.percent_ciliated_cells_effects || '<span class="not-available">Not Reported</span>'}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
                 ${formatScreenDataTable(gene.screens)}
             </div>
-        </div>
-    `;
 
+        </div> `;
+
+    // Update buttons and localization map (if functions exist)
     if (typeof updateGeneButtons === "function") updateGeneButtons([gene], [gene]);
     if (typeof showLocalization === "function") showLocalization(gene.gene, true);
 }
+
+
 
 function displayNotFoundPage() {
     const contentArea = document.querySelector('.content-area');
