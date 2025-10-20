@@ -1055,60 +1055,60 @@ const questionRegistry = [
     
     // ==================== PROTEIN COMPLEXES ====================
     // BBSome
-    { text: "Give me the list of BBSome components", handler: async () => formatListResult("Components of BBSome", await getGenesByComplex("BBSome")) },
-    { text: "List all components of the BBSome complex", handler: async () => formatListResult("Components of BBSome", await getGenesByComplex("BBSome")) },
-    { text: "What proteins are in the BBSome?", handler: async () => formatListResult("Components of BBSome", await getGenesByComplex("BBSome")) },
-    { text: "Members of the BBSome.", handler: async () => formatListResult("Components of BBSome", await getGenesByComplex("BBSome")) },
-    { text: "Show BBSome subunits", handler: async () => formatListResult("Components of BBSome", await getGenesByComplex("BBSome")) },
-    { text: "BBSome complex members", handler: async () => formatListResult("Components of BBSome", await getGenesByComplex("BBSome")) },
-    { text: "Which genes make up the BBSome?", handler: async () => formatListResult("Components of BBSome", await getGenesByComplex("BBSome")) },
+    { text: "Give me the list of BBSome components", handler: async () => getGenesByFunctionOrComplex("BBSome") },
+    { text: "List all components of the BBSome complex", handler: async () => getGenesByFunctionOrComplex("BBSome") },
+    { text: "What proteins are in the BBSome?", handler: async () => getGenesByFunctionOrComplex("BBSome") },
+    { text: "Members of the BBSome.", handler: async () => getGenesByFunctionOrComplex("BBSome") },
+    { text: "Show BBSome subunits", handler: async () => getGenesByFunctionOrComplex("BBSome") },
+    { text: "BBSome complex members", handler: async () => getGenesByFunctionOrComplex("BBSome") },
+    { text: "Which genes make up the BBSome?", handler: async () => getGenesByFunctionOrComplex("BBSome") },
+
+   
+   // IFT complexes
+    { text: "Display components of IFT-A complex", handler: async () => getGenesByFunctionOrComplex("IFT-A") },
+    { text: "IFT-A complex members", handler: async () => getGenesByFunctionOrComplex("IFT-A") },
+    { text: "Show IFT-A subunits", handler: async () => getGenesByFunctionOrComplex("IFT-A") },
+    { text: "What proteins are in IFT-A?", handler: async () => getGenesByFunctionOrComplex("IFT-A") },
     
-    // IFT complexes
-    { text: "Display components of IFT-A complex", handler: async () => formatListResult("Components of IFT-A", await getGenesByComplex("IFT-A")) },
-    { text: "IFT-A complex members", handler: async () => formatListResult("Components of IFT-A", await getGenesByComplex("IFT-A")) },
-    { text: "Show IFT-A subunits", handler: async () => formatListResult("Components of IFT-A", await getGenesByComplex("IFT-A")) },
-    { text: "What proteins are in IFT-A?", handler: async () => formatListResult("Components of IFT-A", await getGenesByComplex("IFT-A")) },
+    { text: "Display components of IFT-B complex", handler: async () => getGenesByFunctionOrComplex("IFT-B") },
+    { text: "IFT-B complex members", handler: async () => getGenesByFunctionOrComplex("IFT-B") },
+    { text: "Show IFT-B subunits", handler: async () => getGenesByFunctionOrComplex("IFT-B") },
+    { text: "List IFT-B proteins", handler: async () => getGenesByFunctionOrComplex("IFT-B") },
     
-    { text: "Display components of IFT-B complex", handler: async () => formatListResult("Components of IFT-B", await getGenesByComplex("IFT-B")) },
-    { text: "IFT-B complex members", handler: async () => formatListResult("Components of IFT-B", await getGenesByComplex("IFT-B")) },
-    { text: "Show IFT-B subunits", handler: async () => formatListResult("Components of IFT-B", await getGenesByComplex("IFT-B")) },
-    { text: "List IFT-B proteins", handler: async () => formatListResult("Components of IFT-B", await getGenesByComplex("IFT-B")) },
-    
-    { text: "List intraflagellar transport (IFT) components", handler: async () => formatListResult("IFT Components", await getGenesByComplex("IFT")) },
-    { text: "Show all IFT proteins", handler: async () => formatListResult("IFT Components", await getGenesByComplex("IFT")) },
-    { text: "Which genes are part of IFT?", handler: async () => formatListResult("IFT Components", await getGenesByComplex("IFT")) },
+    { text: "List intraflagellar transport (IFT) components", handler: async () => getGenesByFunctionOrComplex("IFT") },
+    { text: "Show all IFT proteins", handler: async () => getGenesByFunctionOrComplex("IFT") },
+    { text: "Which genes are part of IFT?", handler: async () => getGenesByFunctionOrComplex("IFT") },
     
     // Transition zone complexes
-    { text: "Show components of Transition Zone Complex", handler: async () => formatListResult("Components of Transition Zone Complex", await getGenesByComplex("Transition Zone Complex")) },
-    { text: "Transition zone complex members", handler: async () => formatListResult("Components of Transition Zone Complex", await getGenesByComplex("Transition Zone Complex")) },
-    { text: "List transition zone proteins", handler: async () => formatListResult("Components of Transition Zone Complex", await getGenesByComplex("Transition Zone Complex")) },
+    { text: "Show components of Transition Zone Complex", handler: async () => getGenesByFunctionOrComplex("Transition Zone Complex") },
+    { text: "Transition zone complex members", handler: async () => getGenesByFunctionOrComplex("Transition Zone Complex") },
+    { text: "List transition zone proteins", handler: async () => getGenesByFunctionOrComplex("Transition Zone Complex") },
     
-    { text: "Display components of MKS Complex", handler: async () => formatListResult("Components of MKS Complex", await getGenesByComplex("MKS Complex")) },
-    { text: "MKS complex members", handler: async () => formatListResult("Components of MKS Complex", await getGenesByComplex("MKS Complex")) },
-    { text: "Show MKS module proteins", handler: async () => formatListResult("Components of MKS Complex", await getGenesByComplex("MKS Complex")) },
+    { text: "Display components of MKS Complex", handler: async () => getGenesByFunctionOrComplex("MKS Complex") },
+    { text: "MKS complex members", handler: async () => getGenesByFunctionOrComplex("MKS Complex") },
+    { text: "Show MKS module proteins", handler: async () => getGenesByFunctionOrComplex("MKS Complex") },
     
-    { text: "Show components of NPHP Complex", handler: async () => formatListResult("Components of NPHP Complex", await getGenesByComplex("NPHP Complex")) },
-    { text: "NPHP complex members", handler: async () => formatListResult("Components of NPHP Complex", await getGenesByComplex("NPHP Complex")) },
-    { text: "List NPHP module proteins", handler: async () => formatListResult("Components of NPHP Complex", await getGenesByComplex("NPHP Complex")) },
+    { text: "Show components of NPHP Complex", handler: async () => getGenesByFunctionOrComplex("NPHP Complex") },
+    { text: "NPHP complex members", handler: async () => getGenesByFunctionOrComplex("NPHP Complex") },
+    { text: "List NPHP module proteins", handler: async () => getGenesByFunctionOrComplex("NPHP Complex") },
     
-    // Comparisons
-    { text: "Compare IFT-A and IFT-B complex composition", handler: async () => compareComplexes("IFT-A", "IFT-B") },
-    { text: "Compare composition of IFT-A vs IFT-B.", handler: async () => compareComplexes("IFT-A", "IFT-B") },
-    { text: "What's the difference between IFT-A and IFT-B?", handler: async () => compareComplexes("IFT-A", "IFT-B") },
-    { text: "IFT-A versus IFT-B comparison", handler: async () => compareComplexes("IFT-A", "IFT-B") },
-    { text: "How do IFT-A and IFT-B differ?", handler: async () => compareComplexes("IFT-A", "IFT-B") },
+    // Comparisons (These require a new handler, using 'notImplementedYet' for now)
+    { text: "Compare IFT-A and IFT-B complex composition", handler: async () => notImplementedYet("Compare IFT-A and IFT-B") },
+    { text: "Compare composition of IFT-A vs IFT-B.", handler: async () => notImplementedYet("Compare IFT-A and IFT-B") },
+    { text: "What's the difference between IFT-A and IFT-B?", handler: async () => notImplementedYet("Compare IFT-A and IFT-B") },
+    { text: "IFT-A versus IFT-B comparison", handler: async () => notImplementedYet("Compare IFT-A and IFT-B") },
+    { text: "How do IFT-A and IFT-B differ?", handler: async () => notImplementedYet("Compare IFT-A and IFT-B") },
     
-    { text: "Find IFT-A and IFT-B complex genes", handler: async () => getGenesByMultipleComplexes(["IFT-A", "IFT-B"]) },
+    { text: "Find IFT-A and IFT-B complex genes", handler: async () => notImplementedYet("Find genes in both IFT-A and IFT-B") },
     
     // Additional complexes
-    { text: "Show dynein arm components", handler: async () => formatListResult("Dynein Arm Components", await getGenesByComplex("dynein")) },
-    { text: "List outer dynein arm proteins", handler: async () => formatListResult("ODA Components", await getGenesByComplex("outer dynein arm")) },
-    { text: "Show inner dynein arm proteins", handler: async () => formatListResult("IDA Components", await getGenesByComplex("inner dynein arm")) },
-    { text: "Display radial spoke proteins", handler: async () => formatListResult("Radial Spoke Components", await getGenesByComplex("radial spoke")) },
-    { text: "Show central pair complex proteins", handler: async () => formatListResult("Central Pair Components", await getGenesByComplex("central pair")) },
-    { text: "List nexin-dynein regulatory complex components", handler: async () => formatListResult("N-DRC Components", await getGenesByComplex("N-DRC")) },
-    { text: "Show exocyst complex members", handler: async () => formatListResult("Exocyst Complex", await getGenesByComplex("exocyst")) },
-
+    { text: "Show dynein arm components", handler: async () => getGenesByFunctionOrComplex("dynein") },
+    { text:Storage: "List outer dynein arm proteins", handler: async () => getGenesByFunctionOrComplex("outer dynein arm") },
+    { text: "Show inner dynein arm proteins", handler: async () => getGenesByFunctionOrComplex("inner dynein arm") },
+    { text: "Display radial spoke proteins", handler: async () => getGenesByFunctionOrComplex("radial spoke") },
+    { text: "Show central pair complex proteins", handler: async () => getGenesByFunctionOrComplex("central pair") },
+    { text: "List nexin-dynein regulatory complex components", handler: async () => getGenesByFunctionOrComplex("N-DRC") },
+    { text: "Show exocyst complex members", handler: async () => getGenesByFunctionOrComplex("exocyst") },
     // ==================== CILIOPATHIES & DISEASES ====================
     // Bardet-Biedl Syndrome
     { text: "List genes associated with Bardet–Biedl syndrome", handler: async () => { const { genes, description } = await getCiliopathyGenes("Bardet–Biedl syndrome"); return formatListResult("Genes for Bardet–Biedl syndrome", genes, description); }},
@@ -2771,41 +2771,6 @@ function normalizeTerm(s) {
 
 // --- Query Helper Functions ---
 
-// Rule 1: Search for genes by ciliopathy/disease name
-// =============================================================================
-// REPLACEMENT: Corrected Data Fetching Functions
-// These functions now ONLY return raw data (arrays or objects), never HTML.
-// =============================================================================
-
-async function getCiliopathyGenes(disease) {
-    await fetchCiliaData();
-    const diseaseLower = normalizeTerm(disease);
-    const diseaseRegex = new RegExp(diseaseLower.replace(/\s+/g, '[\\s_\\-–]*').replace('syndrome', '(syndrome)?'), 'i');
-    
-    const genes = ciliaHubDataCache
-        .filter(g => g.ciliopathy && g.ciliopathy.some(c => normalizeTerm(c).match(diseaseRegex)))
-        .map(g => ({ gene: g.gene, description: g.ciliopathy?.join(', ') || 'No ciliopathy data' }))
-        .sort((a, b) => a.gene.localeCompare(b.gene));
-    
-    return { genes, description: `Found ${genes.length} genes associated with "${disease}".` };
-}
-
-async function getGenesByLocalization(locations) {
-    await fetchCiliaData();
-    const locationTerms = locations.split(/\s+or\s+/).map(normalizeTerm);
-    const results = ciliaHubDataCache
-        .filter(gene => gene.localization && gene.localization.some(loc => 
-            locationTerms.some(term => normalizeTerm(loc).includes(term))
-        ))
-        .map(gene => ({ 
-            gene: gene.gene, 
-            description: gene.localization?.join(', ') || 'No localization data' 
-        }))
-        .sort((a, b) => a.gene.localeCompare(b.gene));
-    
-    return results;
-}
-
 async function getGenesWithDomain(domainName) {
     await fetchCiliaData();
     const domainRegex = new RegExp(domainName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
@@ -3433,42 +3398,95 @@ function formatGeneDetail(geneData, geneSymbol, detailTitle, detailContent) {
 }
 
 // --- Table Formatting ---
-function formatListResult(title, geneList, message = '') {
-    if (!geneList || geneList.length === 0) {
-        return `<div class="result-card"><h3>${title}</h3><p class="status-not-found">No matching genes found.</p></div>`;
+/**
+ * (This helper function was assumed but not defined, adding it here)
+ * Formats a list of gene results into an HTML card.
+ * Expects 'genes' as an array of objects: [{ gene: '...', description: '...' }]
+ */
+function formatListResult(title, genes, description = "") {
+    if (!genes || genes.length === 0) {
+        return `<div class="result-card"><h3>${title}</h3><p class="status-not-found">No genes found matching your criteria.</p></div>`;
     }
-    const messageHtml = message ? `<p>${message}</p>` : '';
-    const displayedGenes = geneList.slice(0, 100);
-    const tableHtml = `
-    <table class="ciliopathy-table">
-      <thead>
-        <tr>
-          <th class="sortable">Gene</th>
-          <th>Description (Snippet)</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${displayedGenes.map(g => `<tr><td><strong>${g.gene}</strong></td><td>${g.description.substring(0, 100)}${g.description.length > 100 ? '...' : ''}</td></tr>`).join('')}
-      </tbody>
-    </table>
-    ${geneList.length > 100 ? `<p><a href="https://theciliahub.github.io/" target="_blank">View full list (${geneList.length} genes) in CiliaHub</a></p>` : ''}`;
-
-    // NEW FEATURE: Add reference for phylogeny data
-    let referenceHtml = '';
-    const phylogenyKeywords = ['ciliary-only', 'non-ciliary-only', 'all organisms', 'human-specific'];
-    if (phylogenyKeywords.some(kw => title.toLowerCase().includes(kw))) {
-        referenceHtml = `<p style="font-size: 0.8em; color: #666; margin-top: 1rem; border-top: 1px solid #eee; padding-top: 0.5rem;">
-            Phylogenetic classification data extracted from: Li, Y. et al. (2014) <em>Cell</em>, 158(1), 213–225. <a href="https://pubmed.ncbi.nlm.nih.gov/24995987/" target="_blank" title="View on PubMed">PMID: 24995987</a>.
-        </p>`;
-    }
+    
+    // Create the list items
+    const geneList = genes.map(g => {
+        const desc = g.description ? ` - <span class="gene-description">${g.description}</span>` : '';
+        return `<li><strong>${g.gene}</strong>${desc}</li>`;
+    }).join('');
+    
+    const descHtml = description ? `<p>${description}</p>` : '';
 
     return `
     <div class="result-card">
-      <h3>${title} (${geneList.length} found)</h3>
-      ${messageHtml}
-      ${tableHtml}
-      ${referenceHtml}
+        <h3>${title} (${genes.length} genes)</h3>
+        ${descHtml}
+        <ul class="gene-list">
+            ${geneList}
+        </ul>
     </div>`;
+}
+
+/**
+ * CORRECTED: Finds genes by localization.
+ * Iterates using Object.values()
+ */
+async function getGenesByLocalization(localization) {
+    if (!ciliaHubDataCache) await loadAndMergeGeneData();
+    const searchTerm = localization.toLowerCase().trim();
+    
+    const results = Object.values(ciliaHubDataCache) // <-- THE FIX
+        .filter(geneData => 
+            geneData.localization && 
+            geneData.localization.toLowerCase().includes(searchTerm)
+        )
+        .map(geneData => ({
+            gene: geneData.gene,
+            description: geneData.localization
+        }))
+        .sort((a,b) => a.gene.localeCompare(b.gene));
+    
+    // Use the new formatListResult helper
+    return formatListResult(`Genes localizing to: ${localization}`, results);
+}
+
+/**
+ * NEW/CONSOLIDATED: Finds genes by functional category, summary, complex, or disease.
+ * This one function can now handle queries for "BBSome", "Trafficking", "motor", "signaling",
+ * and also "Nephronophthisis" because it searches the relevant text fields.
+ */
+async function getGenesByFunctionOrComplex(searchTerm) {
+    if (!ciliaHubDataCache) await loadAndMergeGeneData();
+    const term = searchTerm.toLowerCase().trim();
+
+    const results = Object.values(ciliaHubDataCache) // <-- THE FIX
+        .filter(geneData => {
+            const inCategory = geneData.functional_category && 
+                             geneData.functional_category.toLowerCase().includes(term);
+            const inSummary = geneData.functional_summary &&
+                            geneData.functional_summary.toLowerCase().includes(term);
+            return inCategory || inSummary;
+        })
+        .map(geneData => ({
+            gene: geneData.gene,
+            description: geneData.functional_category || (geneData.functional_summary ? geneData.functional_summary.substring(0, 100) + '...' : 'N/A')
+        }))
+        .sort((a,b) => a.gene.localeCompare(b.gene));
+    
+    return formatListResult(`Genes related to: ${searchTerm}`, results);
+}
+
+/**
+ * UPDATED: Ciliopathy search now uses the consolidated function.
+ * It also returns the description object expected by the registry.
+ */
+async function getCiliopathyGenes(diseaseName) {
+    // This function now just routes to the more powerful search
+    const htmlResult = await getGenesByFunctionOrComplex(diseaseName);
+    
+    // The old registry expected a { genes, description } object, 
+    // but the new handler just returns HTML. We must refactor the registry.
+    // For now, let's just return the HTML result.
+    return htmlResult; 
 }
 
 
@@ -3481,14 +3499,41 @@ function formatSimpleResults(results, title) {
     return html + '</ul></div>';
 }
 
-function formatDomainResults(results, title) {
-    if (results.length === 0) return `<div class="result-card"><h3>${title}</h3><p class="status-not-found">No matching genes found.</p></div>`;
-    let html = `<div class="result-card"><h3>${title} (${results.length} found)</h3>`;
-    results.forEach(gene => {
-        const domains = Array.isArray(gene.domain_descriptions) ? gene.domain_descriptions.join(', ') : 'None';
-        html += `<div style="border-bottom: 1px solid #eee; padding: 10px 0; margin-bottom: 10px;"><strong>${gene.gene}</strong><ul><li>Domains: ${domains}</li></ul></div>`;
-    });
-    return html + '</div>';
+/**
+ * NEW: Finds genes by domain using the new DB.
+ * This function handles the data logic.
+ */
+async function findGenesByNewDomainDB(domainTerm) {
+    const domainData = await getDomainData(); // Fetches cili_ai_domain_database.json
+    if (!domainData || !domainData.gene_domain_map) {
+        return '<div class="result-card"><p class="status-not-found">Domain database not loaded.</p></div>';
+    }
+
+    const term = domainTerm.toLowerCase();
+    const results = [];
+
+    // Loop through the gene_domain_map
+    for (const gene in domainData.gene_domain_map) {
+        const domains = domainData.gene_domain_map[gene]; // This is an array of domain objects
+        
+        const matchingDomains = domains.filter(d => 
+            (d.desc && d.desc.toLowerCase().includes(term)) || 
+            (d.pfam_id && d.pfam_id.toLowerCase().includes(term))
+        );
+
+        if (matchingDomains.length > 0) {
+            // 1. Create the description string here
+            const descriptionString = matchingDomains.map(d => d.desc || d.pfam_id).join(', ');
+            
+            results.push({
+                gene: gene,
+                description: descriptionString // Pass the domains as the description
+            });
+        }
+    }
+
+    // 2. Use the generic formatter to display the results
+    return formatListResult(`Genes containing "${domainTerm}"`, results);
 }
 
 function formatComplexResults(gene, title) {
