@@ -1092,7 +1092,7 @@ const questionRegistry = [
     { text: "NPHP complex members", handler: async () => getGenesByFunctionOrComplex("NPHP Complex") },
     { text: "List NPHP module proteins", handler: async () => getGenesByFunctionOrComplex("NPHP Complex") },
     
-    // Comparisons (These require a new handler, using 'notImplementedYet' for now)
+   // Comparisons (These require a new handler, using 'notImplementedYet' for now)
     { text: "Compare IFT-A and IFT-B complex composition", handler: async () => notImplementedYet("Compare IFT-A and IFT-B") },
     { text: "Compare composition of IFT-A vs IFT-B.", handler: async () => notImplementedYet("Compare IFT-A and IFT-B") },
     { text: "What's the difference between IFT-A and IFT-B?", handler: async () => notImplementedYet("Compare IFT-A and IFT-B") },
@@ -1101,9 +1101,9 @@ const questionRegistry = [
     
     { text: "Find IFT-A and IFT-B complex genes", handler: async () => notImplementedYet("Find genes in both IFT-A and IFT-B") },
     
-    // Additional complexes
+  // Additional complexes
     { text: "Show dynein arm components", handler: async () => getGenesByFunctionOrComplex("dynein") },
-    { text:Storage: "List outer dynein arm proteins", handler: async () => getGenesByFunctionOrComplex("outer dynein arm") },
+    { text: "List outer dynein arm proteins", handler: async () => getGenesByFunctionOrComplex("outer dynein arm") },
     { text: "Show inner dynein arm proteins", handler: async () => getGenesByFunctionOrComplex("inner dynein arm") },
     { text: "Display radial spoke proteins", handler: async () => getGenesByFunctionOrComplex("radial spoke") },
     { text: "Show central pair complex proteins", handler: async () => getGenesByFunctionOrComplex("central pair") },
