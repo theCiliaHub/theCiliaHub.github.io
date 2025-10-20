@@ -155,45 +155,53 @@ function createIntentParser() {
 const intentParser = createIntentParser();
 
 // --- Data Fetching and Caching ---
+/**
+ * NEW: Fetches the main CiliaHub gene database.
+ * This file contains the structure you provided (phenotype summaries, orthologs, etc.)
+ */
 async function fetchCiliaData() {
     if (ciliaHubDataCache) return ciliaHubDataCache;
+    // URL from user context
+    const dataUrl = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/ciliahub_data.json'; 
     try {
-        const response = await fetch('https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/ciliahub_data.json');
+        const response = await fetch(dataUrl);
         if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
         const data = await response.json();
-
-        const processToArray = (field) => {
-            if (typeof field === 'string') return field.split(',').map(item => item.trim()).filter(Boolean);
-            if (Array.isArray(field)) return field;
-            return [];
-        };
-        ciliaHubDataCache = data.map(gene => ({
-    ...gene,
-    functional_category: processToArray(gene.functional_category),
-    domain_descriptions: processToArray(gene.domain_descriptions),
-    ciliopathy: processToArray(gene.ciliopathy),
-    localization: processToArray(gene.localization),
-    complex_names: processToArray(gene.complex_names),
-    complex_components: processToArray(gene.complex_components)
-}));
-
-        console.log('CiliaHub data loaded and formatted successfully.');
+        
+        // Index by gene symbol (UPPERCASE) for fast lookup
+        const indexedData = {};
+        for (const geneEntry of data) {
+            if (geneEntry.gene) {
+                const geneUpper = geneEntry.gene.toUpperCase();
+                // Ensure 'screens' array exists
+                if (!geneEntry.screens) {
+                    geneEntry.screens = [];
+                }
+                indexedData[geneUpper] = geneEntry;
+            }
+        }
+        ciliaHubDataCache = indexedData;
+        console.log(`✅ Main CiliaHub data loaded: ${Object.keys(ciliaHubDataCache).length} genes`);
         return ciliaHubDataCache;
     } catch (error) {
-        console.error("Failed to fetch CiliaHub data:", error);
-        ciliaHubDataCache = []; 
-        return ciliaHubDataCache;
+        console.error('Failed to fetch main CiliaHub data:', error);
+        return null;
     }
 }
 
+/**
+ * MODIFIED: Fetches the supplementary screen data.
+ * This will now be merged into the main ciliaHubDataCache.
+ */
 async function fetchScreenData() {
+    // No change to the fetch logic itself
     if (screenDataCache) return screenDataCache;
     try {
         const response = await fetch('https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/cilia_screens_data.json');
         if (!response.ok) throw new Error(`Failed to fetch screen data: ${response.statusText}`);
         const data = await response.json();
-        screenDataCache = data;
-        console.log('Screen data loaded successfully:', Object.keys(data).length, 'genes');
+        screenDataCache = data; // This is an object with gene symbols as keys
+        console.log('Supplementary screen data loaded successfully:', Object.keys(data).length, 'genes');
         return screenDataCache;
     } catch (error) {
         console.error('Error fetching screen data:', error);
@@ -202,6 +210,57 @@ async function fetchScreenData() {
     }
 }
 
+/**
+ * NEW: Master data loader to fetch and merge all gene-centric data.
+ * This should be called before any query is run.
+ */
+async function loadAndMergeGeneData() {
+    // Fetch both datasets in parallel
+    const [mainData, screenData] = await Promise.all([
+        fetchCiliaData(),
+        fetchScreenData()
+    ]);
+
+    if (!mainData || !screenData) {
+        console.error("Failed to load one or more essential datasets. Merging skipped.");
+        return mainData; // Return whatever data we have
+    }
+
+    // --- Merge Logic ---
+    // Merge supplementary screenData into the mainData (ciliaHubDataCache)
+    let mergedCount = 0;
+    for (const geneUpper in screenData) {
+        if (mainData[geneUpper]) {
+            // Gene exists in both. Merge the 'screens' arrays.
+            const mainScreens = mainData[geneUpper].screens;
+            const extraScreens = screenData[geneUpper]; // This is already an array
+            
+            // Add only screens that are not already present (e.g., based on 'dataset')
+            const mainDatasetNames = new Set(mainScreens.map(s => s.dataset));
+            for (const extraScreen of extraScreens) {
+                if (!mainDatasetNames.has(extraScreen.dataset)) {
+                    mainScreens.push(extraScreen);
+                    mergedCount++;
+                }
+            }
+        } else {
+            // Gene only in supplementary data; create a new entry
+            // (This is less likely if ciliahub_data.json is comprehensive)
+            mainData[geneUpper] = {
+                gene: geneUpper, 
+                screens: screenData[geneUpper],
+                // ...other fields will be default/missing
+            };
+        }
+    }
+    
+    if (mergedCount > 0) {
+        console.log(`Merged ${mergedCount} supplementary screen results into main data.`);
+    }
+    
+    ciliaHubDataCache = mainData; // Store the final merged data
+    return ciliaHubDataCache;
+}
 async function fetchPhylogenyData() {
     if (phylogenyDataCache) return phylogenyDataCache;
     try {
@@ -424,6 +483,133 @@ async function tellAboutCiliAI() {
         </ul>
     </div>`;
     return html;
+}
+
+/**
+ * NEW: Gets the summary of LOF/Overexpression effects for a gene.
+ */
+async function getPhenotypeEffects(geneSymbol) {
+    if (!ciliaHubDataCache) await loadAndMergeGeneData();
+    const gene = geneSymbol.toUpperCase();
+    const data = ciliaHubDataCache[gene];
+
+    if (!data) {
+        return `<div class="result-card"><p class="status-not-found">No data found for ${geneSymbol}.</p></div>`;
+    }
+
+    // Helper to format the effect
+    const formatEffect = (effect) => {
+        if (!effect || effect.toLowerCase() === "not reported") {
+            return '<span style="color: #888;">Not Reported</span>';
+        }
+        if (effect.toLowerCase() === "no effect") {
+            return `<span style="color: #4CAF50;">${effect}</span>`; // Green
+        }
+        // Effects like "Reduced cilia numbers" or "Shorter cilia"
+        return `<span style="color: #E53935;">${effect}</span>`; // Red
+    };
+
+    return `
+    <div class="result-card">
+        <h3>Phenotype Summary for ${data.gene}</h3>
+        <table class="data-table">
+            <tbody>
+                <tr>
+                    <td><strong>Loss-of-Function (LOF)</strong></td>
+                    <td>${formatEffect(data.lof_effects)}</td>
+                </tr>
+                <tr>
+                    <td><strong>Overexpression</strong></td>
+                    <td>${formatEffect(data.overexpression_effects)}</td>
+                </tr>
+                <tr>
+                    <td><strong>Ciliated Cell %</strong></td>
+                    <td>${formatEffect(data.percent_ciliated_cells_effects)}</td>
+                </tr>
+            </tbody>
+        </table>
+        <small>Note: These are high-level summaries. Individual screens may vary.</small>
+    </div>`;
+}
+
+/**
+ * NEW: Gets the list of orthologs for a gene.
+ */
+async function getGeneOrthologs(geneSymbol) {
+    if (!ciliaHubDataCache) await loadAndMergeGeneData();
+    const gene = geneSymbol.toUpperCase();
+    const data = ciliaHubDataCache[gene];
+
+    if (!data) {
+        return `<div class="result-card"><p class="status-not-found">No ortholog data found for ${geneSymbol}.</p></div>`;
+    }
+
+    const orthologs = [
+        { name: 'Mouse (<i>M. musculus</i>)', value: data.ortholog_mouse },
+        { name: 'Zebrafish (<i>D. rerio</i>)', value: data.ortholog_zebrafish },
+        { name: 'Frog (<i>X. tropicalis</i>)', value: data.ortholog_xenopus },
+        { name: 'Fly (<i>D. melanogaster</i>)', value: data.ortholog_drosophila },
+        { name: 'Worm (<i>C. elegans</i>)', value: data.ortholog_c_elegans }
+    ];
+
+    let rows = '';
+    for (const org of orthologs) {
+        rows += `
+        <tr>
+            <td>${org.name}</td>
+            <td><strong>${org.value || '<span style="color: #888;">Not Found</span>'}</strong></td>
+        </tr>`;
+    }
+
+    return `
+    <div class="result-card">
+        <h3>Orthologs for ${data.gene}</h3>
+        <table class="data-table">
+            <thead>
+                <tr><th>Organism</th><th>Ortholog(s)</th></tr>
+            </thead>
+            <tbody>
+                ${rows}
+            </tbody>
+        </table>
+    </div>`;
+}
+
+/**
+ * NEW: Finds all human genes that have a registered ortholog in a specific organism.
+ */
+async function getGenesByOrganism(organism) {
+    if (!ciliaHubDataCache) await loadAndMergeGeneData();
+    
+    const organismKeyMap = {
+        'mouse': 'ortholog_mouse',
+        'zebrafish': 'ortholog_zebrafish',
+        'xenopus': 'ortholog_xenopus',
+        'drosophila': 'ortholog_drosophila',
+        'c. elegans': 'ortholog_c_elegans',
+        'worm': 'ortholog_c_elegans',
+        'fly': 'ortholog_drosophila',
+        'frog': 'ortholog_xenopus'
+    };
+    
+    const key = organismKeyMap[organism.toLowerCase()];
+    if (!key) {
+        return `<div class="result-card"><p class="status-not-found">Organism "${organism}" not recognized. Try: mouse, zebrafish, xenopus, drosophila, or c. elegans.</p></div>`;
+    }
+
+    const genes = [];
+    for (const geneUpper in ciliaHubDataCache) {
+        const geneData = ciliaHubDataCache[geneUpper];
+        if (geneData[key]) {
+            genes.push({ 
+                gene: geneData.gene, 
+                description: `Ortholog: ${geneData[key]}` 
+            });
+        }
+    }
+    
+    genes.sort((a, b) => a.gene.localeCompare(b.gene));
+    return formatListResult(`Human Genes with Orthologs in ${organism}`, genes);
 }
 
 /**
@@ -1538,6 +1724,27 @@ const questionRegistry = [
     { text: "Explain the transition zone", handler: async () => formatListResult("Transition Zone Genes", await getGenesByLocalization("transition zone")) },
     { text: "What are ciliopathies?", handler: async () => { const { genes, description } = await getCiliopathyGenes("ciliopathy"); return formatListResult("All Ciliopathy-Associated Genes", genes, description); }},
     
+    // --- Phenotype Summary Queries ---
+    { text: "What are the loss-of-function effects for AATF?", handler: async () => getPhenotypeEffects("AATF") },
+    { text: "Show phenotype summary for AAAS", handler: async () => getPhenotypeEffects("AAAS") },
+    { text: "What happens if you overexpress AAMP?", handler: async () => getPhenotypeEffects("AAMP") },
+    { text: "Show LOF and overexpression effects for IFT88", handler: async () => getPhenotypeEffects("IFT88") },
+    { text: "What happens to ciliated cells with AATF loss?", handler: async () => getPhenotypeEffects("AATF") },
+
+    // --- Ortholog Queries ---
+    { text: "Show orthologs for AAMP", handler: async () => getGeneOrthologs("AAMP") },
+    { text: "List orthologs for IFT88", handler: async () => getGeneOrthologs("IFT88") },
+    { text: "What is the C. elegans ortholog of AATF?", handler: async () => getGeneOrthologs("AATF") },
+    { text: "What is the mouse ortholog of BBS1?", handler: async () => getGeneOrthologs("BBS1") },
+    { text: "Does CEP290 have a fly ortholog?", handler: async () => getGeneOrthologs("CEP290") },
+
+    // --- Reverse Ortholog Queries ---
+    { text: "List all genes with a C. elegans ortholog", handler: async () => getGenesByOrganism("C. elegans") },
+    { text: "Show human genes with orthologs in worm", handler: async () => getGenesByOrganism("worm") },
+    { text: "Which genes have orthologs in zebrafish?", handler: async () => getGenesByOrganism("zebrafish") },
+    { text: "Show all genes with fly orthologs", handler: async () => getGenesByOrganism("fly") },
+    { text: "List human genes with mouse orthologs", handler: async () => getGenesByOrganism("mouse") },
+    
     // ==================== SYNONYM VARIATIONS ====================
     // More natural language variants
     { text: "Tell me everything about IFT88", handler: async () => getComprehensiveDetails("IFT88") },
@@ -2085,17 +2292,46 @@ async function getAllCiliaryGenes() {
     const genes = ciliaHubDataCache.map(g => ({ gene: g.gene, description: g.functional_summary || "Ciliary gene" }));
     return formatListResult("All Ciliary Genes", genes);
 }
+/**
+ * REVISED: Implements getKnockdownEffect using the new 'lof_effects' field
+ * and falling back to the 'screens' array.
+ */
+async function getKnockdownEffect(geneSymbol) {
+    if (!ciliaHubDataCache) await loadAndMergeGeneData();
+    const gene = geneSymbol.toUpperCase();
+    const data = ciliaHubDataCache[gene];
 
-async function getKnockdownEffect(gene) {
-    await fetchScreenData();
-    const screenInfo = screenDataCache[gene.toUpperCase()];
-    if (!screenInfo || !Array.isArray(screenInfo)) {
-        return `<div class="result-card"><h3>Knockdown Effects for ${gene}</h3><p class="status-not-found">No screen data available for this gene.</p></div>`;
+    if (!data) {
+        return `<div class="result-card"><p class="status-not-found">No knockdown data found for ${geneSymbol}.</p></div>`;
     }
-    
-    const effects = screenInfo.map(s => `<li><strong>${s.source}:</strong> ${s.result}</li>`).join("");
-    return `<div class="result-card"><h3>Knockdown Effects for ${gene}</h3><ul>${effects}</ul></div>`;
+
+    let summaryEffect = data.lof_effects;
+    if (!summaryEffect || summaryEffect.toLowerCase() === "not reported") {
+        summaryEffect = "No summary reported. See individual screens.";
+    }
+
+    let screenDetails = '';
+    if (data.screens && data.screens.length > 0) {
+        screenDetails = data.screens
+            .map(s => `<li><strong>${s.dataset}:</strong> ${s.classification || 'No classification'}</li>`)
+            .join('');
+        screenDetails = `<h4>Individual Screen Results:</h4><ul>${screenDetails}</ul>`;
+    } else {
+        screenDetails = "<p>No individual screen data available in the database.</p>";
+    }
+
+    return `
+    <div class="result-card">
+        <h3>Knockdown (LOF) Effects for ${data.gene}</h3>
+        <p><strong>Summary Effect:</strong> ${summaryEffect}</p>
+        <hr>
+        ${screenDetails}
+    </div>`;
 }
+
+// NOW, you can update the questionRegistry entry:
+// { text: "What happens when IFT88 is knocked down?", handler: async () => getKnockdownEffect("IFT88") },
+// This will now call the *new* function instead of 'notImplementedYet'.
 
 async function getScreenResults(gene, screenName) {
     await fetchScreenData();
