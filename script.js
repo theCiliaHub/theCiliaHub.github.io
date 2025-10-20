@@ -19,9 +19,9 @@ function sanitize(input) {
     if (typeof input !== 'string') return '';
     // Removes zero-width spaces, non-printable characters, trims, and normalizes case
     return input.replace(/[\u200B-\u200D\u2060\uFEFF]/g, '')
-               .replace(/[^\x20-\x7E]/g, '') // Remove non-printable ASCII
-               .trim()
-               .toUpperCase();
+                .replace(/[^\x20-\x7E]/g, '') // Remove non-printable ASCII
+                .trim()
+                .toUpperCase();
 }
 
 /**
@@ -39,7 +39,7 @@ async function loadAndPrepareDatabase() {
 
         window.geneDataCache = rawGenes;       // <--- assign to global explicitly
         allGenes = rawGenes;
-        window.geneMapCache = new Map();        // also make global
+        window.geneMapCache = new Map();       // also make global
 
         allGenes.forEach(g => {
             if (!g.gene || typeof g.gene !== 'string') return;
@@ -48,17 +48,17 @@ async function loadAndPrepareDatabase() {
             if (nameKey) window.geneMapCache.set(nameKey, g);
 
             if (g.synonym) {
-                String(g.synonym).split(/[,;]/).forEach(syn => {
-                    const key = sanitize(syn);
-                    if (key && !window.geneMapCache.has(key)) window.geneMapCache.set(key, g);
-                });
+                 String(g.synonym).split(/[,;]/).forEach(syn => {
+                     const key = sanitize(syn);
+                     if (key && !window.geneMapCache.has(key)) window.geneMapCache.set(key, g);
+                 });
             }
 
             if (g.ensembl_id) {
-                String(g.ensembl_id).split(/[,;]/).forEach(id => {
-                    const key = sanitize(id);
-                    if (key) window.geneMapCache.set(key, g);
-                });
+                 String(g.ensembl_id).split(/[,;]/).forEach(id => {
+                     const key = sanitize(id);
+                     if (key) window.geneMapCache.set(key, g);
+                 });
             }
 
             if (g.localization) {
@@ -663,11 +663,11 @@ function mapLocalizationToSVG(localizationArray) {
         "mitochondrion": ["cell-body"],
         "endoplasmic reticulum": ["cell-body"],
         "golgi apparatus": ["cell-body"],
-        "lysosome": ["cell-body"],              // ✨ NEW
-        "microbody": ["cell-body"],              // ✨ NEW
-        "peroxisome": ["cell-body"],             // ✨ NEW
-        "microtubules": ["cell-body"],           // ✨ NEW
-        "autophagosomes": ["cell-body"]          // ✨ NEW
+        "lysosome": ["cell-body"],
+        "microbody": ["cell-body"],
+        "peroxisome": ["cell-body"],
+        "microtubules": ["cell-body"],
+        "autophagosomes": ["cell-body"]
     };
     if (!Array.isArray(localizationArray)) return [];
 
@@ -735,9 +735,9 @@ function displayBatchQueryTool() {
 
 function exportSearchResults() {
     const results = searchResults.length > 0 ? searchResults : currentData;
-    // ✨ FIX: Use .join() to correctly handle arrays for CSV output
-    const csv = ['Gene,Description,Localization,Ensembl ID,OMIM ID,Functional Summary,Reference']
-        .concat(results.map(g => `"${g.gene}","${g.description || ''}","${Array.isArray(g.localization) ? g.localization.join('; ') : (g.localization || '')}","${g.ensembl_id || ''}","${g.omim_id || ''}","${g.functional_summary || ''}","${Array.isArray(g.reference) ? g.reference.join('; ') : (g.reference || '')}"`))
+    // ✨ Updated CSV header and data row
+    const csv = ['Gene,Description,Localization,Ensembl ID,OMIM ID,Functional Summary,Reference,Overexpression Effects,LoF Effects,Ciliation Percentage Effects']
+        .concat(results.map(g => `"${g.gene}","${g.description || ''}","${Array.isArray(g.localization) ? g.localization.join('; ') : (g.localization || '')}","${g.ensembl_id || ''}","${g.omim_id || ''}","${g.functional_summary || ''}","${Array.isArray(g.reference) ? g.reference.join('; ') : (g.reference || '')}","${g.overexpression_effects || ''}","${g.lof_effects || ''}","${g.percent_ciliated_cells_effects || ''}"`))
         .join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
@@ -764,9 +764,9 @@ function displayDownloadPage() {
         </div>`;
     
     document.getElementById('download-csv').onclick = () => {
-        // ✨ FIX: Use .join() to correctly handle arrays for CSV output
-        const csv = ['Gene,Ensembl ID,Description,Synonym,OMIM ID,Functional Summary,Localization,Reference']
-            .concat(allGenes.map(g => `"${g.gene}","${g.ensembl_id || ''}","${g.description || ''}","${g.synonym || ''}","${g.omim_id || ''}","${g.functional_summary || ''}","${Array.isArray(g.localization) ? g.localization.join('; ') : (g.localization || '')}","${Array.isArray(g.reference) ? g.reference.join('; ') : (g.reference || '')}"`))
+        // ✨ Updated CSV header and data row
+        const csv = ['Gene,Ensembl ID,Description,Synonym,OMIM ID,Functional Summary,Localization,Reference,Overexpression Effects,LoF Effects,Ciliation Percentage Effects']
+            .concat(allGenes.map(g => `"${g.gene}","${g.ensembl_id || ''}","${g.description || ''}","${g.synonym || ''}","${g.omim_id || ''}","${g.functional_summary || ''}","${Array.isArray(g.localization) ? g.localization.join('; ') : (g.localization || '')}","${Array.isArray(g.reference) ? g.reference.join('; ') : (g.reference || '')}","${g.overexpression_effects || ''}","${g.lof_effects || ''}","${g.percent_ciliated_cells_effects || ''}"`))
             .join('\n');
         const blob = new Blob([csv], { type: 'text/csv' });
         const url = URL.createObjectURL(blob);
@@ -1010,9 +1010,11 @@ function displayIndividualGenePage(gene) {
         return tableHTML;
     };
 
+    // ✨ ADDED NEW ICON FOR ORTHOLOGS ✨
     const icons = {
         gene: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22h6a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16"></path><path d="M11 7h2"></path><path d="M11 11h4"></path><path d="M11 15h4"></path><path d="M5 22v-5"></path><path d="M3 17h4"></path></svg>`,
-        screen: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 10.5h-5m5 3h-5m8-10h-8a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V5.5a2 2 0 0 0-2-2z"></path><path d="M4.5 3.5v15"></path></svg>`
+        screen: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 10.5h-5m5 3h-5m8-10h-8a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V5.5a2 2 0 0 0-2-2z"></path><path d="M4.5 3.5v15"></path></svg>`,
+        ortholog: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 18l-6-6 6-6"></path><path d="M8 18l-6-6 6-6"></path></svg>`
     };
 
     contentArea.innerHTML = `
@@ -1164,6 +1166,20 @@ function displayIndividualGenePage(gene) {
                             <th>Functional Summary</th>
                             <td>${gene.functional_summary || 'Not available'}</td>
                         </tr>
+                        
+                        <tr>
+                            <th>Overexpression Effects</th>
+                            <td>${gene.overexpression_effects || 'Not available'}</td>
+                        </tr>
+                        <tr>
+                            <th>Loss-of-Function (LoF) Effects</th>
+                            <td>${gene.lof_effects || 'Not available'}</td>
+                        </tr>
+                        <tr>
+                            <th>Ciliation Percentage Effects</th>
+                            <td>${gene.percent_ciliated_cells_effects || 'Not available'}</td>
+                        </tr>
+                        
                         <tr>
                             <th>References</th>
                             <td><ul class="reference-list">${formatReferences(gene)}</ul></td>
@@ -1207,6 +1223,33 @@ function displayIndividualGenePage(gene) {
                 </table>
             </div>
 
+            <div class="detail-card">
+                <h3 class="card-title">${icons.ortholog} Orthologs</h3>
+                <table class="data-table">
+                    <tbody>
+                        <tr>
+                            <th>Mouse (<i>M. musculus</i>)</th>
+                            <td>${gene.ortholog_mouse || 'Not available'}</td>
+                        </tr>
+                        <tr>
+                            <th>Zebrafish (<i>D. rerio</i>)</th>
+                            <td>${gene.ortholog_zebrafish || 'Not available'}</td>
+                        </tr>
+                        <tr>
+                            <th>Fly (<i>D. melanogaster</i>)</th>
+                            <td>${gene.ortholog_drosophila || 'Not available'}</td>
+                        </tr>
+                        <tr>
+                            <th>Worm (<i>C. elegans</i>)</th>
+                            <td>${gene.ortholog_c_elegans || 'Not available'}</td>
+                        </tr>
+                        <tr>
+                            <th>Frog (<i>X. tropicalis</i>)</th>
+                            <td>${gene.ortholog_xenopus || 'Not available'}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
             <div class="detail-card">
                 <h3 class="card-title">${icons.screen} Genome-Wide Screen Findings</h3>
                 <p class="screen-description">Genome-wide screen findings provide insights into the gene's role in ciliogenesis through high-throughput experiments. Metrics include Mean % Ciliated (percentage of cells with cilia), Z-Score (statistical significance of the effect), Classification (functional impact), and Reference (study source).</p>
