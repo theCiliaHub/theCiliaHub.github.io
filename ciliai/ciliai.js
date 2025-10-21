@@ -903,12 +903,9 @@ async function displayUmapPlot() {
 }
 
 
-/**
- * Retrieves human ciliary genes that have an identified ortholog based on
- * the large-scale phylogeny screen data (Li et al. 2014, phylogeny_summary.json).
- */
+// --- UPDATED getPhylogenyGenesForOrganism (to enrich data with C. elegans orthologs) ---
 async function getPhylogenyGenesForOrganism(organismName) {
-    await fetchCiliaData();
+    await fetchCiliaData(); // Ensures ciliaHubDataCache is ready
     await fetchPhylogenyData();
 
     // 1. Get the initial list from the phylogeny function
@@ -919,9 +916,10 @@ async function getPhylogenyGenesForOrganism(organismName) {
         const humanGeneUpper = geneEntry.gene.toUpperCase();
         const hubData = ciliaHubDataCache.find(g => g.gene.toUpperCase() === humanGeneUpper);
         
-        // Add the ortholog name to the object if it exists
+        // Add the ortholog name to the object under a specific key
         return {
             ...geneEntry,
+            // Use the curated ortholog name from the main Hub data
             ortholog_c_elegans: hubData ? (hubData.ortholog_c_elegans || 'N/A') : 'N/A'
         };
     });
@@ -932,12 +930,17 @@ async function getPhylogenyGenesForOrganism(organismName) {
         <a href="https://pubmed.ncbi.nlm.nih.gov/24995987/" target="_blank">[PMID: 24995987]</a>
     </p>`;
     
+    // Check if the current organism is C. elegans to trigger special column display
+    const isCelegans = speciesCode.toLowerCase().includes('c.elegans') || speciesCode.toLowerCase().includes('worm');
+    
     return formatListResult(
         `Ciliary Genes Conserved in ${speciesCode} (Phylogeny Screen)`, 
-        enrichedGenes, // Use the enriched list
-        citationHtml
+        enrichedGenes, // Pass the enriched list
+        citationHtml,
+        isCelegans // Pass a flag to signal the formatter to show the C. elegans column
     );
 }
+
 
 // Function already defined but repeated here for context:
 async function getHubOrthologsForGene(gene) {
@@ -3915,23 +3918,21 @@ function formatGeneDetail(geneData, geneSymbol, detailTitle, detailContent) {
 }
 
 // --- Table Formatting ---
-function formatListResult(title, geneList, citationHtml = '') {
+// Note: Changed function signature to accept a fourth argument for the C. elegans flag
+function formatListResult(title, geneList, citationHtml = '', showCelegansColumn = false) {
     if (!geneList || geneList.length === 0) {
         return `<div class="result-card"><h3>${title}</h3><p class="status-not-found">No matching genes found.</p></div>`;
     }
 
     const displayedGenes = geneList.slice(0, 100);
     
-    // --- Determine if C. elegans column is needed ---
-    // Check if the input geneList objects have the 'ortholog_c_elegans' property
-    const hasCelegansData = displayedGenes.some(g => g.ortholog_c_elegans && g.ortholog_c_elegans !== 'N/A');
-    
     // --- Build Table Rows ---
     const tableRows = displayedGenes.map(g => {
         let cells = `<td><strong>${g.gene}</strong></td>`;
         
-        // Add C. elegans ortholog column if data is available
-        if (hasCelegansData) {
+        // Add C. elegans ortholog column if the flag is true
+        if (showCelegansColumn) {
+            // Assumes 'g' contains the enriched field 'ortholog_c_elegans'
             cells += `<td>${g.ortholog_c_elegans || 'N/A'}</td>`;
         }
         
@@ -3945,7 +3946,7 @@ function formatListResult(title, geneList, citationHtml = '') {
         <tr>
             <th class="sortable">Human Gene</th>`;
     
-    if (hasCelegansData) {
+    if (showCelegansColumn) {
         tableHeader += `<th class="sortable">C. elegans Ortholog</th>`;
     }
     
@@ -3963,15 +3964,18 @@ function formatListResult(title, geneList, citationHtml = '') {
     ${geneList.length > 100 ? `<p><a href="https://theciliahub.github.io/" target="_blank">View full list (${geneList.length} genes) in CiliaHub</a></p>` : ''}`;
     
     const titleHtml = `<h3>${title} (${geneList.length} found)</h3>`;
+    const downloadButtonHtml = `<button class="download-button" onclick="downloadTable('download-table-content', '${title.replace(/[^a-z0-9]/gi, '_')}')">Download CSV</button>`;
+
 
     return `
     <div class="result-card">
         ${titleHtml}
         ${tableHtml}
-        <button class="download-button" onclick="downloadTable('download-table-content', '${title.replace(/[^a-z0-9]/gi, '_')}')">Download CSV</button>
+        ${downloadButtonHtml}
         ${citationHtml}
     </div>`;
 }
+
 
 // ----------------------------------------------------------------------
 // NEW FUNCTIONALITY: CLIENT-SIDE CSV DOWNLOAD
