@@ -2126,70 +2126,92 @@ async function getAllCiliopathyGenesRaw() {
     };
 }
 
-// --- UPDATED getDiseaseGenesInOrganism (Final Version) ---
+// --- FINAL CORRECTED getDiseaseGenesInOrganism FUNCTION (Replace your current version) ---
+
+/**
+ * Finds human genes associated with a specific ciliopathy that are conserved
+ * and present in a given model organism, pulling the curated ortholog name 
+ * directly from the ciliahub_data.json annotation.
+ * * @param {string} disease - The name of the human ciliopathy (e.g., 'Joubert Syndrome').
+ * @param {string} organism - The target model organism (e.g., 'C. elegans').
+ */
 async function getDiseaseGenesInOrganism(disease, organism) {
+    // 1. Fetch all necessary data
     await fetchCiliaData();
     await fetchPhylogenyData();
 
-    let resultObject;
-    const diseaseQuery = (disease.toLowerCase().includes('ciliopathy')) ? "Ciliopathy" : disease;
+    // 2. Define the target ortholog key based on the organism input
+    const organismKeyMap = {
+        'worm': 'ortholog_c_elegans', 'c. elegans': 'ortholog_c_elegans',
+        'mouse': 'ortholog_mouse', 'xenopus': 'ortholog_xenopus',
+        'zebrafish': 'ortholog_zebrafish', 'drosophila': 'ortholog_drosophila', 
+        'fly': 'ortholog_drosophila', 'human': null 
+    };
+    const targetKey = organismKeyMap[organism.toLowerCase()] || null;
 
-    // STEP 2: **CRITICAL SWITCH** - Use the universal list for generic queries.
-    if (diseaseQuery === "Ciliopathy") {
-        resultObject = await getAllCiliopathyGenesRaw(); // Use the robust list
-    } else {
-        // Use the targeted helper for specific conditions (Joubert, BBS, etc.)
-        resultObject = await getCiliopathyGenes(diseaseQuery);
-        resultObject.disease = diseaseQuery;
-    }
+    // 3. Determine disease query for filtering (robustly selects ALL disease genes if 'Ciliopathy' is used)
+    const diseaseQuery = (disease.toLowerCase().includes('ciliopathy')) ? "Ciliopathy" : disease;
+    const queryTerm = (diseaseQuery === "Ciliopathy") ? "ciliopathy" : diseaseQuery;
+    const { genes: diseaseGenes } = await getCiliopathyGenes(queryTerm);
     
-    const diseaseGeneSet = new Set(resultObject.genes.map(g => g.gene.toUpperCase()));
+    const diseaseGeneSet = new Set(diseaseGenes.map(g => g.gene.toUpperCase()));
 
     if (diseaseGeneSet.size === 0) {
-        return formatListResult(
-            `Genes for ${disease} in ${organism}`, 
-            [], 
-            `No human genes found associated with ${disease}.`
-        );
+        return formatListResult(`Genes for ${disease} in ${organism}`, [], `No human genes found for ${disease}.`);
     }
 
-    // 3. Prepare organism lookup (Organism map logic is sound)
-    const organismMap = {
-        'worm': 'C.elegans', 'c. elegans': 'C.elegans',
-        'mouse': 'M.musculus', 'xenopus': 'X.tropicalis',
-        'zebrafish': 'D.rerio', 'drosophila': 'D.melanogaster', 'fly': 'D.melanogaster',
-        'chlamydomonas': 'C.reinhardtii',
+    // 4. Prepare organism filter (for phylogenetic conservation check)
+    const speciesMap = {
+        'worm': 'C.elegans', 'mouse': 'M.musculus', 'xenopus': 'X.tropicalis',
+        'zebrafish': 'D.rerio', 'drosophila': 'D.melanogaster', 
     };
-    const speciesQuery = organismMap[organism.toLowerCase()] || organism;
-    const speciesRegex = new RegExp(`^${normalizeTerm(speciesQuery).replace(/\./g, '\\.?').replace(/\s/g, '\\s*')}$`, 'i');
+    const speciesCode = speciesMap[organism.toLowerCase()] || organism;
+    const speciesRegex = new RegExp(`^${normalizeTerm(speciesCode).replace(/\./g, '\\.?').replace(/\s/g, '\\s*')}$`, 'i');
     
-    // 4. Filter disease genes by conservation in the target organism
+    // 5. Filter and Enrich Data
     const conservedDiseaseGenes = [];
 
     diseaseGeneSet.forEach(humanGene => {
-        const geneData = phylogenyDataCache[humanGene];
+        const hubData = ciliaHubDataCache.find(g => g.gene.toUpperCase() === humanGene);
+        const phyData = phylogenyDataCache[humanGene];
         
-        if (geneData && geneData.species) {
-            const isConserved = geneData.species.some(s => speciesRegex.test(normalizeTerm(s)));
+        // Check conservation using the phylogenetic map (REQUIRED for the query type)
+        const isPhyloConserved = phyData && phyData.species && 
+                                 phyData.species.some(s => speciesRegex.test(normalizeTerm(s)));
+        
+        if (isPhyloConserved) {
             
-            if (isConserved) {
-                const originalGene = ciliaHubDataCache.find(g => g.gene.toUpperCase() === humanGene);
+            // Collect the ortholog name using the dynamic key (e.g., ortholog_c_elegans)
+            const orthologName = (targetKey && hubData) ? (hubData[targetKey] || 'N/A') : 'N/A';
+            
+            conservedDiseaseGenes.push({
+                gene: humanGene,
+                description: `Diseases: ${hubData.ciliopathy.join(', ')}. Conserved in: ${speciesCode}.`,
                 
-                conservedDiseaseGenes.push({
-                    gene: humanGene,
-                    description: `Diseases: ${originalGene.ciliopathy.join(', ')}. Conserved in: ${speciesQuery}.`
-                });
-            }
+                // CRUCIAL: Add the ortholog name to the object under a universal key expected by the renderer
+                // The renderer will look for this field based on the targetKey provided below.
+                [targetKey]: orthologName 
+            });
         }
     });
 
-    const title = `${resultObject.disease} Genes Conserved in ${speciesQuery}`;
-    const description = `Found ${conservedDiseaseGenes.length} ${resultObject.disease} gene(s) conserved in ${speciesQuery}.`;
+    const title = `${diseaseQuery} Genes Conserved in ${speciesCode}`;
+    const description = `Found ${conservedDiseaseGenes.length} ${diseaseQuery} gene(s) conserved in ${speciesCode}.`;
 
-    // 5. Return formatted HTML string
-    return formatListResult(title, conservedDiseaseGenes, description);
+    const citationHtml = `<p style="font-size: 0.8em; color: #666; margin-top: 1rem; border-top: 1px solid #eee; padding-top: 0.5rem;">
+        <strong>Data Source:</strong> Phylogenetic conservation analysis (Li et al. 2014). Ortholog names curated from CiliaHub.
+        <a href="https://pubmed.ncbi.nlm.nih.gov/24995987/" target="_blank">[PMID: 24995987]</a>
+    </p>`;
+
+    // 6. Return formatted HTML string, flagging the renderer to show the correct column
+    return formatListResult(
+        title, 
+        conservedDiseaseGenes, 
+        description + citationHtml,
+        speciesCode, // Pass speciesCode for header name
+        targetKey    // Pass the actual key (e.g., 'ortholog_c_elegans') for data access
+    );
 }
-
 
 // C. Updated: Get Cilia Effects (with detailed screen data)
 async function getGeneCiliaEffects(gene) {
