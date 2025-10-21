@@ -908,22 +908,33 @@ async function displayUmapPlot() {
  * the large-scale phylogeny screen data (Li et al. 2014, phylogeny_summary.json).
  */
 async function getPhylogenyGenesForOrganism(organismName) {
-    await fetchCiliaData(); // For human ciliary gene list
-    await fetchPhylogenyData(); // For conservation matrix
-    
-    // Use the comprehensive helper that implements the filtering logic
+    await fetchCiliaData();
+    await fetchPhylogenyData();
+
+    // 1. Get the initial list from the phylogeny function
     const { genes, description, speciesCode } = await getCiliaryGenesForOrganism(organismName);
     
+    // 2. Enrich the gene list with the C. elegans ortholog name from the Hub data
+    const enrichedGenes = genes.map(geneEntry => {
+        const humanGeneUpper = geneEntry.gene.toUpperCase();
+        const hubData = ciliaHubDataCache.find(g => g.gene.toUpperCase() === humanGeneUpper);
+        
+        // Add the ortholog name to the object if it exists
+        return {
+            ...geneEntry,
+            ortholog_c_elegans: hubData ? (hubData.ortholog_c_elegans || 'N/A') : 'N/A'
+        };
+    });
+
     // Define the source citation
     const citationHtml = `<p style="font-size: 0.8em; color: #666; margin-top: 1rem; border-top: 1px solid #eee; padding-top: 0.5rem;">
-        <strong>Source:</strong> Phylogenetic conservation analysis (Li et al. 2014).
+        <strong>Data Source:</strong> Phylogenetic conservation analysis (Li et al. 2014). Ortholog names curated from CiliaHub.
         <a href="https://pubmed.ncbi.nlm.nih.gov/24995987/" target="_blank">[PMID: 24995987]</a>
     </p>`;
     
     return formatListResult(
         `Ciliary Genes Conserved in ${speciesCode} (Phylogeny Screen)`, 
-        genes, 
-        description, 
+        enrichedGenes, // Use the enriched list
         citationHtml
     );
 }
@@ -3418,47 +3429,52 @@ window.handleAIQuery = async function() {
     if (!query) return;
 
     // --- FIX 1: Purge any existing Plotly plots from the result area ---
-    // This frees up WebGL contexts and prevents the "Too many active contexts" warning.
     Plotly.purge(resultArea);
     // --- END OF FIX 1 ---
 
     resultArea.style.display = 'block';
+    // Display loading message immediately
     resultArea.innerHTML = `<p class="status-searching">CiliAI is thinking... 🧠</p>`;
     
     try {
+        // Await primary data fetches *before* running any query logic
         await Promise.all([
-        fetchCiliaData(),
-        fetchScreenData(),
-        fetchPhylogenyData(),
-        fetchTissueData(),
-        fetchCellxgeneData(),
-        fetchUmapData(),
-        getDomainData(),            // <-- ADD THIS
-        fetchNeversPhylogenyData(), // <-- ADD THIS
-        fetchLiPhylogenyData()      // <-- ADD THIS
-    ]);
-    console.log('ciliAI.js: All data loaded (including new domain and phylogeny sources).');
+            fetchCiliaData(),
+            fetchScreenData(),
+            fetchPhylogenyData(),
+            fetchTissueData(),
+            fetchCellxgeneData(),
+            fetchUmapData(),
+            getDomainData(),
+            fetchNeversPhylogenyData(),
+            fetchLiPhylogenyData()
+        ]);
+        console.log('ciliAI.js: All data loaded (including new domain and phylogeny sources).');
 
         let resultHtml = '';
         const qLower = query.toLowerCase();
         let match;
 
+        // 1. Check for Perfect Match in Registry
         const perfectMatch = questionRegistry.find(item => item.text.toLowerCase() === qLower);
         if (perfectMatch) {
             console.log(`Registry match found: "${perfectMatch.text}"`);
             resultHtml = await perfectMatch.handler();
-        } else if ((match = qLower.match(/(?:tell me about|what is|describe)\s+(.+)/i))) {
+        } 
+        // 2. Check for "Tell me about..." Intent (Comprehensive Detail)
+        else if ((match = qLower.match(/(?:tell me about|what is|describe)\s+(.+)/i))) {
             const term = match[1].trim();
             resultHtml = await getComprehensiveDetails(term);
-        } else {
+        } 
+        // 3. Check for Entity-Based Intent (Localization, Function, Disease Categories)
+        else {
             const intent = intentParser.parse(query);
             if (intent && typeof intent.handler === 'function') {
                 console.log(`Intent parser match found: ${intent.intent} for entity: ${intent.entity}`);
                 resultHtml = await intent.handler(intent.entity);
             }
-            // --- NEW: Smarter Fallback Logic ---
+            // 4. Smarter Fallback Logic (Gene/Plot Inference)
             else {
-                // Case-insensitive regex to find gene-like words
                 const potentialGenes = (query.match(/\b([A-Z0-9\-\.]{3,})\b/gi) || []);
                 const genes = potentialGenes.filter(g => ciliaHubDataCache.some(hubGene => hubGene.gene.toUpperCase() === g.toUpperCase()));
                 
@@ -3481,21 +3497,17 @@ window.handleAIQuery = async function() {
             }
         }
 
-        // --- FIX 2: Only update innerHTML if the handler returned HTML ---
-        // Plotting functions (like displayUmapPlot) return "" on purpose
-        // so they aren't erased by this line.
+        // --- Only update innerHTML if the handler returned HTML ---
         if (resultHtml !== "") {
             resultArea.innerHTML = resultHtml;
         }
-        // --- END OF FIX 2 ---
 
     } catch (e) {
-        resultArea.innerHTML = `<p class="status-not-found">An error occurred during your query: ${e.message}. Check the console for details.</p>`;
+        // Display generic error, but log details to console
+        resultArea.innerHTML = `<p class="status-not-found">An internal CiliAI error occurred during your query. Please check the console for details. (Error: ${e.message})</p>`;
         console.error("CiliAI Query Error:", e);
     }
 };
-
-
 
 // Helper for the comparison query (updated titles and threshold)
 async function displayEnrichedDomains() {
@@ -3903,44 +3915,106 @@ function formatGeneDetail(geneData, geneSymbol, detailTitle, detailContent) {
 }
 
 // --- Table Formatting ---
-function formatListResult(title, geneList, message = '', citationHtml = '') {
+function formatListResult(title, geneList, citationHtml = '') {
     if (!geneList || geneList.length === 0) {
         return `<div class="result-card"><h3>${title}</h3><p class="status-not-found">No matching genes found.</p></div>`;
     }
-    const messageHtml = message ? `<p>${message}</p>` : '';
+
     const displayedGenes = geneList.slice(0, 100);
-    const tableHtml = `
-    <table class="ciliopathy-table">
-      <thead>
+    
+    // --- Determine if C. elegans column is needed ---
+    // Check if the input geneList objects have the 'ortholog_c_elegans' property
+    const hasCelegansData = displayedGenes.some(g => g.ortholog_c_elegans && g.ortholog_c_elegans !== 'N/A');
+    
+    // --- Build Table Rows ---
+    const tableRows = displayedGenes.map(g => {
+        let cells = `<td><strong>${g.gene}</strong></td>`;
+        
+        // Add C. elegans ortholog column if data is available
+        if (hasCelegansData) {
+            cells += `<td>${g.ortholog_c_elegans || 'N/A'}</td>`;
+        }
+        
+        cells += `<td>${g.description.substring(0, 100)}${g.description.length > 100 ? '...' : ''}</td>`;
+        return `<tr>${cells}</tr>`;
+    }).join('');
+
+    // --- Build Table Header ---
+    let tableHeader = `
+    <thead>
         <tr>
-          <th class="sortable">Gene</th>
-          <th>Description (Snippet)</th>
+            <th class="sortable">Human Gene</th>`;
+    
+    if (hasCelegansData) {
+        tableHeader += `<th class="sortable">C. elegans Ortholog</th>`;
+    }
+    
+    tableHeader += `
+            <th>Description (Snippet)</th>
         </tr>
-      </thead>
-      <tbody>
-        ${displayedGenes.map(g => `<tr><td><strong>${g.gene}</strong></td><td>${g.description.substring(0, 100)}${g.description.length > 100 ? '...' : ''}</td></tr>`).join('')}
-      </tbody>
+    </thead>`;
+
+    // --- Final HTML Structure with Download Button ---
+    const tableHtml = `
+    <table class="ciliopathy-table" id="download-table-content">
+        ${tableHeader}
+        <tbody>${tableRows}</tbody>
     </table>
     ${geneList.length > 100 ? `<p><a href="https://theciliahub.github.io/" target="_blank">View full list (${geneList.length} genes) in CiliaHub</a></p>` : ''}`;
-
-    // Conditional Reference Logic (prioritizes citationHtml)
-    let finalReferenceHtml = citationHtml; // Use citationHtml if provided
-    if (!finalReferenceHtml) { // Fall back to phylogeny reference only if no citationHtml is provided
-        const phylogenyKeywords = ['ciliary-only', 'non-ciliary-only', 'all organisms', 'human-specific'];
-        if (phylogenyKeywords.some(kw => title.toLowerCase().includes(kw))) {
-            finalReferenceHtml = `<p style="font-size: 0.8em; color: #666; margin-top: 1rem; border-top: 1px solid #eee; padding-top: 0.5rem;">
-                Phylogenetic classification data extracted from: Li, Y. et al. (2014) <em>Cell</em>, 158(1), 213–225. <a href="https://pubmed.ncbi.nlm.nih.gov/24995987/" target="_blank" title="View on PubMed">PMID: 24995987</a>.
-            </p>`;
-        }
-    }
+    
+    const titleHtml = `<h3>${title} (${geneList.length} found)</h3>`;
 
     return `
     <div class="result-card">
-      <h3>${title} (${geneList.length} found)</h3>
-      ${messageHtml}
-      ${tableHtml}
-      ${finalReferenceHtml}
+        ${titleHtml}
+        ${tableHtml}
+        <button class="download-button" onclick="downloadTable('download-table-content', '${title.replace(/[^a-z0-9]/gi, '_')}')">Download CSV</button>
+        ${citationHtml}
     </div>`;
+}
+
+// ----------------------------------------------------------------------
+// NEW FUNCTIONALITY: CLIENT-SIDE CSV DOWNLOAD
+// ----------------------------------------------------------------------
+
+/**
+ * Downloads the content of a target HTML table as a CSV file.
+ * @param {string} tableId - The ID of the table element.
+ * @param {string} filename - The name for the output file.
+ */
+function downloadTable(tableId, filename) {
+    const table = document.getElementById(tableId);
+    if (!table) return;
+
+    let csv = [];
+    const rows = table.querySelectorAll('tr');
+
+    for (const row of rows) {
+        // Get text content of all non-empty cell elements in the row
+        const rowData = Array.from(row.querySelectorAll('th, td'))
+            .map(cell => {
+                let text = cell.innerText.replace(/"/g, '""'); // Escape double quotes
+                // For the "Reference" column (if included), extract text content without link
+                if (cell.querySelector('a')) {
+                    text = cell.textContent.trim().replace(/\s*Link$/, '');
+                }
+                return `"${text}"`;
+            });
+        csv.push(rowData.join(','));
+    }
+
+    const csvFile = csv.join('\n');
+    const blob = new Blob([csvFile], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement("a");
+    
+    if (link.download !== undefined) {
+        link.setAttribute("href", URL.createObjectURL(blob));
+        link.setAttribute("download", filename + ".csv");
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
 }
 
 async function getGeneCiliaEffects(gene) {
