@@ -1860,13 +1860,13 @@ const questionRegistry = [
 function notImplementedYet(feature) {
     return `<div class="result-card"><h3>Feature In Development</h3><p>The query handler for "<strong>${feature}</strong>" is not yet implemented. Stay tuned for future updates!</p></div>`;
 }
-// ---Updated: Get genes based on screen phenotype (now implemented to work with the data)
+// --- Updated: Get genes based on screen phenotype (Now robust against all valid inputs) ---
 async function getGenesByScreenPhenotype(phenotype) {
     if (!ciliaHubDataCache) await fetchCiliaData();
     const normalizedPhenotype = phenotype.toLowerCase();
     let genes = [];
 
-    // Handle "reduced ciliated cells" or "decreased number"
+    // Check for "reduced ciliated cells"
     if (normalizedPhenotype.includes('reduced') || normalizedPhenotype.includes('decrease') || normalizedPhenotype.includes('number')) {
         genes = ciliaHubDataCache
             .filter(g => g.percent_ciliated_cells_effects && (
@@ -1878,10 +1878,8 @@ async function getGenesByScreenPhenotype(phenotype) {
                 gene: g.gene, 
                 description: `Ciliogenesis effect: ${g.percent_ciliated_cells_effects}` 
             }));
-        
-        return formatListResult(`Genes Causing: ${phenotype}`, genes);
-
-    // Handle "shorter cilia" or "short"
+    
+    // Check for "shorter cilia"
     } else if (normalizedPhenotype.includes('shorter') || normalizedPhenotype.includes('short')) {
         genes = ciliaHubDataCache
             .filter(g => g.lof_effects && (
@@ -1892,10 +1890,8 @@ async function getGenesByScreenPhenotype(phenotype) {
                 gene: g.gene, 
                 description: `LoF effect: ${g.lof_effects}` 
             }));
-
-        return formatListResult(`Genes Causing: ${phenotype}`, genes);
         
-    // Handle "longer cilia" or "long"
+    // Check for "longer cilia"
     } else if (normalizedPhenotype.includes('longer') || normalizedPhenotype.includes('long')) {
         genes = ciliaHubDataCache
             .filter(g => g.lof_effects && (
@@ -1906,13 +1902,17 @@ async function getGenesByScreenPhenotype(phenotype) {
                 gene: g.gene, 
                 description: `LoF effect: ${g.lof_effects}` 
             }));
-
-        return formatListResult(`Genes Causing: ${phenotype}`, genes);
         
     } else {
+        // Fallback for unrecognized phenotype terms
         return notImplementedYet(`Genes by screen phenotype: ${phenotype}`);
     }
+
+    // Since this function is the handler, it must return a formatted string.
+    return formatListResult(`Genes Matching Phenotype: ${phenotype}`, genes);
 }
+
+
 
 // C. Updated: Get Cilia Effects (with detailed screen data)
 async function getGeneCiliaEffects(gene) {
@@ -2580,6 +2580,7 @@ async function getNoEffectGenes(screenName) {
     return formatListResult(`Genes with No Effect in ${screenCitationLinks[screenKey]?.name || screenName}`, noEffectGenes, citationHtml);
 }
 
+// --- GLOBAL SCREEN CITATION LINKS (Required by many helper functions) ---
 const screenCitationLinks = {
     // --- Number/Structure Screens ---
     "Kim2016": {
