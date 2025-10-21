@@ -2093,11 +2093,8 @@ function notImplementedYet(feature) {
 // --- Start of Appending Combined Disease + Organism Queries ---
 // This block should be appended to the END of your existing questionRegistry array.
 
-questionRegistry.push(
-    // ===================================================================================
-    // New Combined Disease + Organism Queries (Required Helper: getDiseaseGenesInOrganism)
-    // ===================================================================================
-
+// Define the queries in a self-contained array (ensuring proper const declaration)
+const combinedDiseaseOrganismQueries = [
     // --- Core/Direct Queries ---
     { 
         text: "Please bring the Joubert syndrome genes in C. elegans", 
@@ -2125,8 +2122,6 @@ questionRegistry.push(
     },
 
     // --- Expanded Synonyms and General Ciliopathy Queries ---
-    
-    // Joubert Synonyms
     { 
         text: "Which Joubert syndrome genes are conserved in C. elegans?", 
         handler: async () => getDiseaseGenesInOrganism("Joubert Syndrome", "C. elegans") 
@@ -2143,8 +2138,6 @@ questionRegistry.push(
         text: "List conserved Joubert genes in zebrafish", 
         handler: async () => getDiseaseGenesInOrganism("Joubert Syndrome", "Zebrafish") 
     },
-    
-    // General Ciliopathy Synonyms for all 4 model organisms
     { 
         text: "List ciliopathy genes conserved in Mouse", 
         handler: async () => getDiseaseGenesInOrganism("Ciliopathy", "Mouse") 
@@ -2169,12 +2162,13 @@ questionRegistry.push(
         text: "Show ciliary disease genes present in the worm", 
         handler: async () => getDiseaseGenesInOrganism("Ciliopathy", "C. elegans") 
     }
-);
-// --- End of Appending Combined Disease + Organism Queries ---
+];
 
-
-// Assuming the original 'questionRegistry' is globally available, append the new questions:
+// --- Merge the array contents into the global registry ---
+// This line should be placed immediately after the combinedDiseaseOrganismQueries array definition.
 questionRegistry.push(...combinedDiseaseOrganismQueries);
+
+
 
 // --- Updated: Get genes based on screen phenotype (Now robust against all valid inputs) ---
 async function getGenesByScreenPhenotype(phenotype) {
