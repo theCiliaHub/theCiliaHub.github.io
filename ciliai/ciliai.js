@@ -38,6 +38,192 @@ const CILI_AI_DB = {
     "BBS1": { "summary": { "lof_length": "Inhibits / Restricts", "percentage_ciliated": "Reduced cilia numbers", "source": "Expert DB" }, "evidence": [{ "id": "12118255", "source": "pubmed", "context": "Mutated in Bardet-Biedl syndrome (type 1) OMIM 209901." }] }
 };
 
+// --- Main Page Display Function (REPLACEMENT) ---
+window.displayCiliAIPage = async function displayCiliAIPage() {
+    const contentArea = document.querySelector('.content-area');
+    if (!contentArea) {
+        console.error('Content area not found');
+        return;
+    }
+    contentArea.className = 'content-area content-area-full';
+    const ciliaPanel = document.querySelector('.cilia-panel');
+    if (ciliaPanel) {
+        ciliaPanel.style.display = 'none';
+    }
+
+    try {
+        contentArea.innerHTML = `
+            <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+            <script src="https://cdn.jsdelivr.net/npm/cytoscape@3.23.0/dist/cytoscape.min.js"></script>
+            <div class="ciliai-container">
+                <div class="ciliai-header">
+                    <h1>CiliAI</h1>
+                    <p>Your AI-powered partner for discovering gene-cilia relationships.</p>
+                </div>
+                <div class="ciliai-main-content">
+                    <div class="ai-query-section">
+                        <h3>Ask a Question</h3>
+                        <div class="ai-input-group autocomplete-wrapper">
+                            <input type="text" id="aiQueryInput" class="ai-query-input" placeholder="What's on your mind? Try a gene name or a question...">
+                            <div id="aiQuerySuggestions" class="suggestions-container"></div>
+                            <button class="ai-query-btn" id="aiQueryBtn">Ask CiliAI</button>
+                        </div>
+                        <div class="example-queries">
+                            <p>
+                                <strong>Try asking:</strong> 
+                                <span data-question="Joubert syndrome">Joubert syndrome</span>, 
+                                <span data-question="c. elegans">c. elegans</span>, 
+                                <span data-question="Plot UMAP expression for FOXJ1">UMAP plot for FOXJ1</span>,
+                                <span data-question="Compare ARL13B and FOXJ1 expression in lung scRNA-seq">Compare ARL13B vs FOXJ1</span>,
+                                <span data-question="Which Joubert Syndrome genes are expressed in ciliated cells?">Joubert genes in ciliated cells</span>,
+                                <span data-question="Tell me about yourself">About CiliAI</span>
+                            </p>
+                        </div>
+                        <div id="ai-result-area" class="results-section" style="display: none; margin-top: 1.5rem; padding: 1rem;"></div>
+                    </div>
+                    
+                    <div class="input-section">
+                        <h3>Analyze Gene Phenotypes</h3>
+                        <div class="input-group">
+                            <label for="geneInput">Gene Symbols:</label>
+                            <div class="autocomplete-wrapper">
+                                <textarea id="geneInput" class="gene-input-textarea" placeholder="Start typing a gene symbol (e.g., IFT88)..."></textarea>
+                                <div id="geneSuggestions" class="suggestions-container"></div>
+                            </div>
+                        </div>
+                        <div class="input-group">
+                            <label>Analysis Mode:</label>
+                            <div class="mode-selector">
+                                <div class="mode-option">
+                                    <input type="radio" id="hybrid" name="mode" value="hybrid" checked aria-label="Hybrid mode">
+                                    <label for="hybrid" title="Combines database, screen data, and real-time AI literature mining.">
+                                        <span class="mode-icon">🔬</span>
+                                        <div><strong>Hybrid</strong><br><small>DB + Screens + Literature</small></div>
+                                    </label>
+                                </div>
+                                <div class="mode-option">
+                                    <input type="radio" id="expert" name="mode" value="expert" aria-label="Expert only mode">
+                                    <label for="expert" title="Queries only our internal database and screen data.">
+                                        <span class="mode-icon">🏛️</span>
+                                        <div><strong>Expert Only</strong><br><small>Curated DB + Screens</small></div>
+                                    </label>
+                                </div>
+                                <div class="mode-option">
+                                    <input type="radio" id="nlp" name="mode" value="nlp" aria-label="Literature only mode">
+                                    <label for="nlp" title="Performs a live AI-powered search across PubMed.">
+                                        <span class="mode-icon">📚</span>
+                                        <div><strong>Literature Only</strong><br><small>Live AI text mining</small></div>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                        <button class="analyze-btn" id="analyzeBtn">🔍 Analyze Genes</button>
+                    </div>
+                    <div id="resultsSection" class="results-section" style="display: none;">
+                        <h2>Analysis Results</h2>
+                        <button class="visualize-btn" id="visualizeBtn" style="display: none;">📊 Visualize Results</button>
+                        <div id="plot-display-area" style="margin-top: 1rem;"></div>
+                        <div id="resultsContainer"></div>
+                    </div>
+                </div>
+            </div>
+            <style>
+                .ciliai-container { font-family: 'Arial', sans-serif; max-width: 950px; margin: 2rem auto; padding: 2rem; background-color: #f9f9f9; border-radius: 12px; }
+                .ciliai-header { text-align: center; margin-bottom: 2rem; }
+                .ciliai-header h1 { font-size: 2.8rem; color: #2c5aa0; margin: 0; }
+                .ciliai-header p { font-size: 1.2rem; color: #555; margin-top: 0.5rem; }
+                .ai-query-section { background-color: #e8f4fd; border: 1px solid #bbdefb; padding: 1.5rem 2rem; border-radius: 8px; margin-bottom: 2rem; }
+                .ai-query-section h3 { margin-top: 0; color: #2c5aa0; }
+                .ai-input-group { position: relative; display: flex; gap: 10px; }
+                .ai-query-input { flex-grow: 1; padding: 0.8rem; border: 1px solid #ccc; border-radius: 4px; font-size: 1rem; }
+                .ai-query-btn { padding: 0.8rem 1.2rem; font-size: 1rem; background-color: #2c5aa0; color: white; border: none; border-radius: 4px; cursor: pointer; transition: background-color 0.2s; }
+                .ai-query-btn:hover { background-color: #1e4273; }
+                .example-queries { margin-top: 1rem; font-size: 0.9rem; color: #555; text-align: left; }
+                .example-queries span { background-color: #d1e7fd; padding: 4px 10px; border-radius: 12px; font-family: 'Arial', sans-serif; cursor: pointer; margin: 4px; display: inline-block; transition: background-color 0.2s; border: 1px solid #b1d7fc;}
+                .example-queries span:hover { background-color: #b1d7fc; }
+                .input-section { background-color: #fff; padding: 2rem; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+                .input-group { margin-bottom: 1.5rem; }
+                .input-group label { display: block; font-weight: bold; margin-bottom: 0.5rem; color: #333; }
+                .gene-input-textarea { width: 100%; box-sizing: border-box; padding: 0.8rem; border: 1px solid #ccc; border-radius: 4px; font-size: 1rem; min-height: 80px; resize: vertical; }
+                .mode-selector { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; }
+                .mode-option input[type="radio"] { display: none; }
+                .mode-option label { display: flex; align-items: center; gap: 10px; padding: 1rem; border: 2px solid #ddd; border-radius: 8px; cursor: pointer; transition: all 0.2s; }
+                .mode-option input[type="radio"]:checked + label { border-color: #2c5aa0; background-color: #e8f4fd; box-shadow: 0 0 5px rgba(44, 90, 160, 0.3); }
+                .mode-icon { font-size: 1.8rem; }
+                .analyze-btn { width: 100%; padding: 1rem; font-size: 1.1rem; font-weight: bold; background-color: #28a745; color: white; border: none; border-radius: 8px; cursor: pointer; transition: background-color 0.2s; }
+                .analyze-btn:hover:not([disabled]) { background-color: #218838; }
+                .results-section { margin-top: 2rem; padding: 2rem; background-color: #fff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+                .result-card { border: 1px solid #ddd; border-radius: 8px; padding: 1.5rem; margin-bottom: 1.5rem; }
+                .result-card h3 { margin-top: 0; color: #2c5aa0; }
+                .ciliopathy-table, .expression-table, .gene-detail-table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+                .ciliopathy-table th, .ciliopathy-table td, .expression-table th, .expression-table td, .gene-detail-table th, .gene-detail-table td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                .ciliopathy-table th, .expression-table th, .gene-detail-table th { background-color: #e8f4fd; color: #2c5aa0; }
+                .suggestions-container { position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid #ccc; z-index: 1000; max-height: 200px; overflow-y: auto; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+                .suggestion-item { padding: 10px; cursor: pointer; }
+                .suggestion-item:hover { background-color: #f0f0f0; }
+
+                /* --- ADDED CSS FOR DOWNLOAD BUTTON AND PLOT CARD --- */
+                .download-button {
+                    background-color: #28a745; /* Green */
+                    color: white;
+                    padding: 8px 14px;
+                    border: none;
+                    border-radius: 4px;
+                    cursor: pointer;
+                    font-size: 0.9em;
+                    font-weight: bold;
+                    margin-top: 15px;
+                    transition: background-color 0.3s ease;
+                }
+                .download-button:hover {
+                    background-color: #218838;
+                }
+                /* This re-defines .result-card to ensure it has the correct padding for plots */
+                .result-card {
+                    padding: 20px;
+                    background-color: #fff;
+                    border-radius: 8px;
+                    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+                    margin-top: 1.5rem;
+                    border: 1px solid #ddd; /* Kept original border */
+                    margin-bottom: 1.5rem; /* Kept original margin-bottom */
+                }
+            </style>
+        `;
+    } catch (error) {
+        console.error('Failed to inject CiliAI HTML:', error);
+        contentArea.innerHTML = '<p>Error: Failed to load CiliAI interface.</p>';
+        return;
+    }
+
+  await Promise.all([
+        fetchCiliaData(),         // Your original gene data
+        fetchScreenData(),       // Your original screen data
+        fetchPhylogenyData(),     // Your original phylogeny data
+        fetchTissueData(),       // Your original tissue data
+        fetchCellxgeneData(),     // Your original cellxgene data
+        fetchUmapData(),           // Your original umap data
+        getDomainData(),           // --- NEW ---
+        fetchNeversPhylogenyData(), // --- NEW ---
+        fetchLiPhylogenyData()     // --- NEW ---
+    ]);
+    console.log('ciliAI.js: All data loaded (including new domain and phylogeny sources).');
+    
+    setTimeout(setupCiliAIEventListeners, 0);
+};
+
+// --- Helper Functions ---
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+function debounce(fn, delay) { let timeout; return function(...args) { clearTimeout(timeout); timeout = setTimeout(() => fn(...args), delay); }; }
+
+function normalizeTerm(s) {
+    if (!s) return '';
+    // UPDATED: Now replaces periods, hyphens, underscores, and spaces with a single space.
+    return String(s).toLowerCase().replace(/[._\-\s]+/g, ' ').trim();
+}
+
+
+
 // =============================================================================
 // REPLACEMENT: The definitive "Brain" of CiliAI, merging all features correctly.
 // =============================================================================
@@ -2662,183 +2848,6 @@ async function getComprehensiveDetails(term) {
     const geneData = ciliaHubDataCache.find(g => g.gene.toUpperCase() === upperTerm);
     
     return formatComprehensiveGeneDetails(upperTerm, geneData); // Re-use the existing detailed formatter
-}
-
-// --- Main Page Display Function (REPLACEMENT) ---
-window.displayCiliAIPage = async function displayCiliAIPage() {
-    const contentArea = document.querySelector('.content-area');
-    if (!contentArea) {
-        console.error('Content area not found');
-        return;
-    }
-    contentArea.className = 'content-area content-area-full';
-    const ciliaPanel = document.querySelector('.cilia-panel');
-    if (ciliaPanel) {
-        ciliaPanel.style.display = 'none';
-    }
-
-    try {
-        contentArea.innerHTML = `
-            <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
-            <script src="https://cdn.jsdelivr.net/npm/cytoscape@3.23.0/dist/cytoscape.min.js"></script>
-            <div class="ciliai-container">
-                <div class="ciliai-header">
-                    <h1>CiliAI</h1>
-                    <p>Your AI-powered partner for discovering gene-cilia relationships.</p>
-                </div>
-                <div class="ciliai-main-content">
-                <div class="ai-query-section">
-                    <h3>Ask a Question</h3>
-                    <div class="ai-input-group autocomplete-wrapper">
-                        <input type="text" id="aiQueryInput" class="ai-query-input" placeholder="Enter gene (e.g., IFT88) or a question...">
-                        <div id="aiQuerySuggestions" class="suggestions-container"></div>
-                        <button class="ai-query-btn" id="aiQueryBtn">Ask CiliAI</button>
-                    </div>
-                    <div class="example-queries">
-                                                <p id="initial-prompt">
-                            **How can I help you?** Press the search box or <span data-question="What can you do?">features</span> to learn what I can do for you.
-                        </p>
-                    </div>
-                    <div id="ai-result-area" class="results-section" style="display: none; margin-top: 1.5rem; padding: 1rem;"></div>
-                </div>
-                    
-                    <div class="input-section">
-                        <h3>Analyze Gene Phenotypes</h3>
-                        <div class="input-group">
-                            <label for="geneInput">Gene Symbols:</label>
-                            <div class="autocomplete-wrapper">
-                                <textarea id="geneInput" class="gene-input-textarea" placeholder="Start typing a gene symbol (e.g., IFT88)..."></textarea>
-                                <div id="geneSuggestions" class="suggestions-container"></div>
-                            </div>
-                        </div>
-                        <div class="input-group">
-                            <label>Analysis Mode:</label>
-                            <div class="mode-selector">
-                                <div class="mode-option">
-                                    <input type="radio" id="hybrid" name="mode" value="hybrid" checked aria-label="Hybrid mode">
-                                    <label for="hybrid" title="Combines database, screen data, and real-time AI literature mining.">
-                                        <span class="mode-icon">🔬</span>
-                                        <div><strong>Hybrid</strong><br><small>DB + Screens + Literature</small></div>
-                                    </label>
-                                </div>
-                                <div class="mode-option">
-                                    <input type="radio" id="expert" name="mode" value="expert" aria-label="Expert only mode">
-                                    <label for="expert" title="Queries only our internal database and screen data.">
-                                        <span class="mode-icon">🏛️</span>
-                                        <div><strong>Expert Only</strong><br><small>Curated DB + Screens</small></div>
-                                    </label>
-                                </div>
-                                <div class="mode-option">
-                                    <input type="radio" id="nlp" name="mode" value="nlp" aria-label="Literature only mode">
-                                    <label for="nlp" title="Performs a live AI-powered search across PubMed.">
-                                        <span class="mode-icon">📚</span>
-                                        <div><strong>Literature Only</strong><br><small>Live AI text mining</small></div>
-                                    </label>
-                                </div>
-                            </div>
-                        </div>
-                        <button class="analyze-btn" id="analyzeBtn">🔍 Analyze Genes</button>
-                    </div>
-                    <div id="resultsSection" class="results-section" style="display: none;">
-                        <h2>Analysis Results</h2>
-                        <button class="visualize-btn" id="visualizeBtn" style="display: none;">📊 Visualize Results</button>
-                        <div id="plot-display-area" style="margin-top: 1rem;"></div>
-                        <div id="resultsContainer"></div>
-                    </div>
-                </div>
-            </div>
-            <style>
-                .ciliai-container { font-family: 'Arial', sans-serif; max-width: 950px; margin: 2rem auto; padding: 2rem; background-color: #f9f9f9; border-radius: 12px; }
-                .ciliai-header { text-align: center; margin-bottom: 2rem; }
-                .ciliai-header h1 { font-size: 2.8rem; color: #2c5aa0; margin: 0; }
-                .ciliai-header p { font-size: 1.2rem; color: #555; margin-top: 0.5rem; }
-                .ai-query-section { background-color: #e8f4fd; border: 1px solid #bbdefb; padding: 1.5rem 2rem; border-radius: 8px; margin-bottom: 2rem; }
-                .ai-query-section h3 { margin-top: 0; color: #2c5aa0; }
-                .ai-input-group { position: relative; display: flex; gap: 10px; }
-                .ai-query-input { flex-grow: 1; padding: 0.8rem; border: 1px solid #ccc; border-radius: 4px; font-size: 1rem; }
-                .ai-query-btn { padding: 0.8rem 1.2rem; font-size: 1rem; background-color: #2c5aa0; color: white; border: none; border-radius: 4px; cursor: pointer; transition: background-color 0.2s; }
-                .ai-query-btn:hover { background-color: #1e4273; }
-                .example-queries { margin-top: 1rem; font-size: 0.9rem; color: #555; text-align: left; }
-                .example-queries span { background-color: #d1e7fd; padding: 4px 10px; border-radius: 12px; font-family: 'Arial', sans-serif; cursor: pointer; margin: 4px; display: inline-block; transition: background-color 0.2s; border: 1px solid #b1d7fc;}
-                .example-queries span:hover { background-color: #b1d7fc; }
-                .input-section { background-color: #fff; padding: 2rem; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
-                .input-group { margin-bottom: 1.5rem; }
-                .input-group label { display: block; font-weight: bold; margin-bottom: 0.5rem; color: #333; }
-                .gene-input-textarea { width: 100%; box-sizing: border-box; padding: 0.8rem; border: 1px solid #ccc; border-radius: 4px; font-size: 1rem; min-height: 80px; resize: vertical; }
-                .mode-selector { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; }
-                .mode-option input[type="radio"] { display: none; }
-                .mode-option label { display: flex; align-items: center; gap: 10px; padding: 1rem; border: 2px solid #ddd; border-radius: 8px; cursor: pointer; transition: all 0.2s; }
-                .mode-option input[type="radio"]:checked + label { border-color: #2c5aa0; background-color: #e8f4fd; box-shadow: 0 0 5px rgba(44, 90, 160, 0.3); }
-                .mode-icon { font-size: 1.8rem; }
-                .analyze-btn { width: 100%; padding: 1rem; font-size: 1.1rem; font-weight: bold; background-color: #28a745; color: white; border: none; border-radius: 8px; cursor: pointer; transition: background-color 0.2s; }
-                .analyze-btn:hover:not([disabled]) { background-color: #218838; }
-                .results-section { margin-top: 2rem; padding: 2rem; background-color: #fff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
-                .result-card { border: 1px solid #ddd; border-radius: 8px; padding: 1.5rem; margin-bottom: 1.5rem; }
-                .result-card h3 { margin-top: 0; color: #2c5aa0; }
-                .ciliopathy-table, .expression-table, .gene-detail-table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
-                .ciliopathy-table th, .ciliopathy-table td, .expression-table th, .expression-table td, .gene-detail-table th, .gene-detail-table td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-                .ciliopathy-table th, .expression-table th, .gene-detail-table th { background-color: #e8f4fd; color: #2c5aa0; }
-                .suggestions-container { position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid #ccc; z-index: 1000; max-height: 200px; overflow-y: auto; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-                .suggestion-item { padding: 10px; cursor: pointer; }
-                .suggestion-item:hover { background-color: #f0f0f0; }
-
-                /* --- ADDED CSS FOR DOWNLOAD BUTTON AND PLOT CARD --- */
-                .download-button {
-                    background-color: #28a745; /* Green */
-                    color: white;
-                    padding: 8px 14px;
-                    border: none;
-                    border-radius: 4px;
-                    cursor: pointer;
-                    font-size: 0.9em;
-                    font-weight: bold;
-                    margin-top: 15px;
-                    transition: background-color 0.3s ease;
-                }
-                .download-button:hover {
-                    background-color: #218838;
-                }
-                /* This re-defines .result-card to ensure it has the correct padding for plots */
-                .result-card {
-                    padding: 20px;
-                    background-color: #fff;
-                    border-radius: 8px;
-                    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-                    margin-top: 1.5rem;
-                    border: 1px solid #ddd; /* Kept original border */
-                    margin-bottom: 1.5rem; /* Kept original margin-bottom */
-                }
-            </style>
-        `;
-    } catch (error) {
-        console.error('Failed to inject CiliAI HTML:', error);
-        contentArea.innerHTML = '<p>Error: Failed to load CiliAI interface.</p>';
-        return;
-    }
-
-  await Promise.all([
-        fetchCiliaData(),         // Your original gene data
-        fetchScreenData(),       // Your original screen data
-        fetchPhylogenyData(),     // Your original phylogeny data
-        fetchTissueData(),       // Your original tissue data
-        fetchCellxgeneData(),     // Your original cellxgene data
-        fetchUmapData(),           // Your original umap data
-        getDomainData(),           // --- NEW ---
-        fetchNeversPhylogenyData(), // --- NEW ---
-        fetchLiPhylogenyData()     // --- NEW ---
-    ]);
-    console.log('ciliAI.js: All data loaded (including new domain and phylogeny sources).');
-    
-    setTimeout(setupCiliAIEventListeners, 0);
-};
-// --- Helper Functions ---
-const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-function debounce(fn, delay) { let timeout; return function(...args) { clearTimeout(timeout); timeout = setTimeout(() => fn(...args), delay); }; }
-
-function normalizeTerm(s) {
-    if (!s) return '';
-    // UPDATED: Now replaces periods, hyphens, underscores, and spaces with a single space.
-    return String(s).toLowerCase().replace(/[._\-\s]+/g, ' ').trim();
 }
 
 
