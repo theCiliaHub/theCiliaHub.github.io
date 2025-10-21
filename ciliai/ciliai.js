@@ -303,14 +303,14 @@ function createIntentParser() {
                 "G.gallus", "M.gallopavo", "O.anatinus", "M.domestica", "S.scrofa", "M.musculus", "C.familiaris", "B.taurus", "H.sapiens",
                 "worm", "human", "mouse", "zebrafish", "fly", "yeast"
             ],
+
+            // In createIntentParser -> entityKeywords (type: 'ORGANISM')
             handler: async (term) => {
-                // ✅ FIX: Destructure the object returned by getCiliaryGenesForOrganism 
-                // and pass the components to formatListResult.
-                const { genes, description, speciesCode } = await getCiliaryGenesForOrganism(term);
-                return formatListResult(`Ciliary genes in ${speciesCode}`, genes, description);
+            const { genes, description, speciesCode } = await getCiliaryGenesForOrganism(term);
+            return formatListResult(`Ciliary genes in ${speciesCode}`, genes, description); 
             },
             autocompleteTemplate: (term) => `Display ciliary genes in ${term}`
-        },
+            },
             {
             type: 'DOMAIN',
             keywords: ['WD40', 'Leucine-rich repeat', 'IQ motif', 'calmodulin-binding', 'EF-hand', 'coiled-coil', 'CTS', 'ciliary targeting sequences', 'ciliary localization signals'],
@@ -1274,7 +1274,7 @@ const questionRegistry = [
     { text: "Display the ciliary genes that are conserved between humans and zebrafish", handler: async () => getConservedGenesBetween(["Human", "Zebrafish"]) },
     { text: "List all ciliary-only genes", handler: async () => getCiliaryOnlyGenes() },
     { text: "Which human ciliary genes have orthologs in Chlamydomonas?", handler: async () => getOrthologsInOrganism("Chlamydomonas") },
-    { text: "List ciliary genes in C. elegans", handler: async () => getCiliaryGenesForOrganism("C. elegans") },
+    { text: "List ciliary genes in C. elegans", handler: async () => { const result = await getCiliaryGenesForOrganism("C. elegans"); return formatListResult(`Ciliary genes in ${result.speciesCode}`, result.genes, result.description); } },
     { text: "Display ciliary genes in human", handler: async () => getCiliaryGenesForOrganism("human") },
     { text: "Show ciliary genes in mouse", handler: async () => getCiliaryGenesForOrganism("mouse") },
     { text: "List ciliary genes in zebrafish", handler: async () => getCiliaryGenesForOrganism("zebrafish") },
@@ -2329,7 +2329,6 @@ questionRegistry.push(
   { text: "List all ciliary-only genes", handler: () => getCiliaryOnlyGenes() },
   { text: "Display the ciliary genes that are conserved between humans and zebrafish", handler: () => getConservedGenesBetween(["Human", "Zebrafish"]) },
   { text: "Which human ciliary genes have orthologs in Chlamydomonas?", handler: () => getOrthologsInOrganism("Chlamydomonas") },
-  { text: "List ciliary genes in C. elegans", handler: () => getCiliaryGenesForOrganism("C. elegans") },
   { text: "Display conserved ciliary proteins between mouse and human", handler: () => getConservedGenes(["Mouse", "Human"]) },
   { text: "What is the phylogeny of IFT88?", handler: () => getGeneConservation("IFT88") },
   { text: "Evolutionary conservation of ARL13B", handler: () => getGeneConservation("ARL13B") },
