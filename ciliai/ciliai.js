@@ -1615,7 +1615,30 @@ const questionRegistry = [
     
     { text: "Is FOXJ1 expressed in ciliated cells?", handler: async () => getGeneExpressionInCellType("FOXJ1", "ciliated cell") },
     { text: "Do ciliated cells express ARL13B?", handler: async () => getGeneExpressionInCellType("ARL13B", "ciliated cell") },
+    
+    // ==================== CILIOPATHY CLASSIFICATION ====================
+    { text: "List all genes classified as Primary Ciliopathy", handler: async () => getGenesByCiliopathyClassification("Primary Ciliopathy") },
+    { text: "Show genes classified as Motile Ciliopathy", handler: async () => getGenesByCiliopathyClassification("Motile Ciliopathy") },
+    { text: "Which genes are classified as Secondary Diseases", handler: async () => getGenesByCiliopathyClassification("Secondary Disease") },
+    { text: "Find genes classified as Primary Ciliopathy", handler: async () => getGenesByCiliopathyClassification("Primary Ciliopathy") },
+    { text: "Genes associated with Secondary Ciliopathies", handler: async () => getGenesByCiliopathyClassification("Secondary Disease") },
+    
+    // ==================== CILIARY PHENOTYPE EFFECTS ====================
+    { text: "What are the ciliary effects of NPHP1?", handler: async () => getGeneCiliaEffects("NPHP1") },
+    { text: "Show ciliary effects for ARL13B", handler: async () => getGeneCiliaEffects("ARL13B") },
+    { text: "What happens to cilia when BBS1 is knocked down?", handler: async () => getGeneCiliaEffects("BBS1") },
+    { text: "Describe the effect of CEP290 LOF on cilia length", handler: async () => getGeneCiliaEffects("CEP290") },
+    { text: "Find genes that cause shorter cilia on loss of function", handler: async () => getGenesByScreenPhenotype("shorter cilia") },
+    { text: "Which genes reduce the percentage of ciliated cells?", handler: async () => getGenesByScreenPhenotype("Reduced cilia numbers") },
+    
+    // ==================== ORTHOLOGS ====================
+    { text: "Show orthologs of IFT88", handler: async () => getOrthologsForGene("IFT88") },
+    { text: "List orthologs for BBS1", handler: async () => getOrthologsForGene("BBS1") },
+    { text: "Does ARL13B have an ortholog in C. elegans?", handler: async () => getOrthologsForGene("ARL13B") },
+    { text: "Orthologs of DYNC2H1 in mouse and zebrafish", handler: async () => getOrthologsForGene("DYNC2H1") },
+    { text: "Find the zebrafish ortholog of NPHP1", handler: async () => getOrthologsForGene("NPHP1") },
 ];
+
 // --- ADDITION: New Helper Functions for Expanded Questions ---
 function notImplementedYet(feature) {
     return `<div class="result-card"><h3>Feature In Development</h3><p>The query handler for "<strong>${feature}</strong>" is not yet implemented. Stay tuned for future updates!</p></div>`;
@@ -3283,7 +3306,112 @@ function formatListResult(title, geneList, message = '') {
       ${referenceHtml}
     </div>`;
 }
+async function getGeneCiliaEffects(gene) {
+    if (!ciliaHubDataCache) await fetchCiliaData(); // Ensures data is loaded/integrated
+    const geneData = ciliaHubDataCache.find(g => g.gene.toUpperCase() === gene.toUpperCase());
 
+    if (!geneData) return `<div class="result-card"><h3>${gene}</h3><p class="status-not-found">Gene not found in the database.</p></div>`;
+
+    // --- 1. Summarized Effects (from ciliahub_data.json) ---
+    const lof = geneData.lof_effects || "Not Reported";
+    const oe = geneData.overexpression_effects || "Not Reported";
+    const percent = geneData.percent_ciliated_cells_effects || "Not Reported";
+
+    const summarizedEffectsHtml = `
+        <h4>Effects on Cilia (Curated Summary)</h4>
+        <table class="gene-detail-table">
+            <thead>
+                <tr>
+                    <th>Effect Type</th>
+                    <th>Result</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><th>Overexpression Effects</th><td>${oe}</td></tr>
+                <tr><th>Loss-of-Function (LoF) Effects</th><td>${lof}</td></tr>
+                <tr><th>Effects on % Ciliated Cells</th><td>${percent}</td></tr>
+            </tbody>
+        </table>`;
+
+    // --- 2. Detailed Screen Findings (from cilia_screens_data.json) ---
+    const screenFindings = geneData.screens_from_separate_file || [];
+    let detailedScreensHtml = ``;
+
+    if (screenFindings.length > 0) {
+        const tableRows = screenFindings.map(s => `
+            <tr>
+                <td>${s.dataset || 'N/A'}</td>
+                <td>${(s.mean_percent_ciliated !== undefined) ? s.mean_percent_ciliated.toFixed(2) : 'N/A'}</td>
+                <td>${(s.z_score !== undefined) ? s.z_score.toFixed(2) : 'N/A'}</td>
+                <td>${s.classification || s.result || 'N/A'}</td>
+                <td><a href="${s.paper_link}" target="_blank">${s.dataset || 'Link'}</a></td>
+            </tr>
+        `).join('');
+
+        detailedScreensHtml = `
+            <h4 style="margin-top: 20px;">Detailed Genome-Wide Screen Findings</h4>
+            <p>High-throughput screen results showing specific quantitative effects on ciliation.</p>
+            <table class="ciliopathy-table">
+                <thead>
+                    <tr>
+                        <th class="sortable">Dataset</th>
+                        <th>Mean % Ciliated</th>
+                        <th>Z-Score</th>
+                        <th>Classification</th>
+                        <th>Reference</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${tableRows}
+                </tbody>
+            </table>
+        `;
+    } else {
+        detailedScreensHtml = `<h4 style="margin-top: 20px;">Detailed Genome-Wide Screen Findings</h4><p class="status-not-found">No detailed screen data found for ${gene}.</p>`;
+    }
+    
+    // --- 3. Final Output ---
+    return `
+        <div class="result-card">
+            <h3>Ciliary Phenotype Analysis for ${gene}</h3>
+            ${summarizedEffectsHtml}
+            ${detailedScreensHtml}
+        </div>`;
+}
+
+async function getOrthologsForGene(gene) {
+    if (!ciliaHubDataCache) await fetchCiliaData();
+    const geneData = ciliaHubDataCache.find(g => g.gene.toUpperCase() === gene.toUpperCase());
+
+    if (!geneData) return `<div class="result-card"><h3>${gene}</h3><p class="status-not-found">Gene not found in the database.</p></div>`;
+
+    return `
+        <div class="result-card">
+            <h3>Orthologs of ${gene}</h3>
+            <table class="gene-detail-table">
+                <tr><th>Mouse (M. musculus)</th><td>${geneData.ortholog_mouse || 'N/A'}</td></tr>
+                <tr><th>Worm (C. elegans)</th><td>${geneData.ortholog_c_elegans || 'N/A'}</td></tr>
+                <tr><th>Xenopus (X. tropicalis)</th><td>${geneData.ortholog_xenopus || 'N/A'}</td></tr>
+                <tr><th>Zebrafish (D. rerio)</th><td>${geneData.ortholog_zebrafish || 'N/A'}</td></tr>
+                <tr><th>Fly (D. melanogaster)</th><td>${geneData.ortholog_drosophila || 'N/A'}</td></tr>
+            </table>
+        </div>`;
+}
+
+async function getGenesByCiliopathyClassification(classification) {
+    if (!ciliaHubDataCache) await fetchCiliaData();
+    const normalizedClassification = classification.toLowerCase().replace(/ciliopathy/g, 'disease');
+
+    const genes = ciliaHubDataCache
+        .filter(g => g.ciliopathy_classification && g.ciliopathy_classification.toLowerCase().includes(normalizedClassification))
+        .map(g => ({ 
+            gene: g.gene, 
+            description: g.ciliopathy_classification + (g.ciliopathy ? `: ${g.ciliopathy.join(', ')}` : '')
+        }))
+        .sort((a, b) => a.gene.localeCompare(b.gene));
+
+    return formatListResult(`Genes Classified as "${classification}"`, genes);
+}
 
 function formatSimpleResults(results, title) {
     if (results.length === 0) return `<div class="result-card"><h3>${title}</h3><p class="status-not-found">No matching genes found.</p></div>`;
