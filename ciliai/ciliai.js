@@ -2081,25 +2081,34 @@ async function getGenesByScreenPhenotype(phenotype) {
 }
 
 /**
- * Retrieves human ciliary genes that have an identified ortholog based on
- * the large-scale phylogeny screen data (Li et al. 2014, phylogeny_summary.json).
- * This function returns the final HTML string.
+ * Finds human genes associated with a specific ciliopathy that are conserved
+ * and present in a given model organism, based on phylogenetic data.
  */
 async function getDiseaseGenesInOrganism(disease, organism) {
-    // 1. Fetch all necessary data
     await fetchCiliaData();
     await fetchPhylogenyData();
 
-    // 2. Determine disease query for filtering
     const diseaseQuery = (disease.toLowerCase().includes('ciliopathy')) ? "Ciliopathy" : disease;
-    const { genes: diseaseGenes } = await getCiliopathyGenes(diseaseQuery);
+
+    // STEP 2: **CRUCIAL CHANGE HERE**
+    // If the query is "Ciliopathy" (general), retrieve ALL disease genes using the general handler.
+    // Otherwise, retrieve only genes matching the specific disease name.
+    const queryTerm = (diseaseQuery === "Ciliopathy") ? "ciliopathy" : diseaseQuery; 
+    const { genes: diseaseGenes } = await getCiliopathyGenes(queryTerm);
+    
+    // If querying "Ciliopathy," ensure we filter for genes that actually *have* a disease annotation.
+    // getCiliopathyGenes already performs this filtering effectively.
     const diseaseGeneSet = new Set(diseaseGenes.map(g => g.gene.toUpperCase()));
 
     if (diseaseGeneSet.size === 0) {
-        return formatListResult(`Genes for ${disease} in ${organism}`, [], `No human genes found for ${disease}.`);
+        return formatListResult(
+            `Genes for ${disease} in ${organism}`, 
+            [], 
+            `No human genes found associated with ${diseaseQuery}.`
+        );
     }
 
-    // 3. Prepare organism lookup
+    // 3. Prepare organism lookup (Organism map logic is sound)
     const organismMap = {
         'worm': 'C.elegans', 'c. elegans': 'C.elegans',
         'mouse': 'M.musculus', 'xenopus': 'X.tropicalis',
@@ -2109,7 +2118,7 @@ async function getDiseaseGenesInOrganism(disease, organism) {
     const speciesQuery = organismMap[organism.toLowerCase()] || organism;
     const speciesRegex = new RegExp(`^${normalizeTerm(speciesQuery).replace(/\./g, '\\.?').replace(/\s/g, '\\s*')}$`, 'i');
     
-    // 4. Filter disease genes by conservation in the target organism
+    // 4. Filter disease genes by conservation in the target organism (unchanged)
     const conservedDiseaseGenes = [];
 
     diseaseGeneSet.forEach(humanGene => {
@@ -2135,6 +2144,7 @@ async function getDiseaseGenesInOrganism(disease, organism) {
     // 5. Return formatted HTML string
     return formatListResult(title, conservedDiseaseGenes, description);
 }
+
 
 // C. Updated: Get Cilia Effects (with detailed screen data)
 async function getGeneCiliaEffects(gene) {
