@@ -1616,21 +1616,25 @@ const questionRegistry = [
     { text: "Is FOXJ1 expressed in ciliated cells?", handler: async () => getGeneExpressionInCellType("FOXJ1", "ciliated cell") },
     { text: "Do ciliated cells express ARL13B?", handler: async () => getGeneExpressionInCellType("ARL13B", "ciliated cell") },
     
-    // ==================== CILIOPATHY CLASSIFICATION ====================
+   // ==================== CILIOPATHY CLASSIFICATION ====================
     { text: "List all genes classified as Primary Ciliopathy", handler: async () => getGenesByCiliopathyClassification("Primary Ciliopathy") },
     { text: "Show genes classified as Motile Ciliopathy", handler: async () => getGenesByCiliopathyClassification("Motile Ciliopathy") },
     { text: "Which genes are classified as Secondary Diseases", handler: async () => getGenesByCiliopathyClassification("Secondary Disease") },
     { text: "Find genes classified as Primary Ciliopathy", handler: async () => getGenesByCiliopathyClassification("Primary Ciliopathy") },
     { text: "Genes associated with Secondary Ciliopathies", handler: async () => getGenesByCiliopathyClassification("Secondary Disease") },
     
-    // ==================== CILIARY PHENOTYPE EFFECTS ====================
+    // ==================== CILIARY PHENOTYPE EFFECTS (USING getGeneCiliaEffects) ====================
     { text: "What are the ciliary effects of NPHP1?", handler: async () => getGeneCiliaEffects("NPHP1") },
     { text: "Show ciliary effects for ARL13B", handler: async () => getGeneCiliaEffects("ARL13B") },
     { text: "What happens to cilia when BBS1 is knocked down?", handler: async () => getGeneCiliaEffects("BBS1") },
     { text: "Describe the effect of CEP290 LOF on cilia length", handler: async () => getGeneCiliaEffects("CEP290") },
-    { text: "Find genes that cause shorter cilia on loss of function", handler: async () => getGenesByScreenPhenotype("shorter cilia") },
-    { text: "Which genes reduce the percentage of ciliated cells?", handler: async () => getGenesByScreenPhenotype("Reduced cilia numbers") },
+    { text: "Show the comprehensive screen data for IFT88", handler: async () => getGeneCiliaEffects("IFT88") },
     
+    // ==================== PHENOTYPE QUERIES (USING getGenesByScreenPhenotype - Now Functional) ====================
+    { text: "Find genes that cause shorter cilia on loss of function", handler: async () => getGenesByScreenPhenotype("shorter cilia") },
+    { text: "Which genes reduce the percentage of ciliated cells?", handler: async () => getGenesByScreenPhenotype("reduced ciliated cells") },
+    { text: "List genes that result in longer cilia when silenced", handler: async () => getGenesByScreenPhenotype("longer cilia") },
+
     // ==================== ORTHOLOGS ====================
     { text: "Show orthologs of IFT88", handler: async () => getOrthologsForGene("IFT88") },
     { text: "List orthologs for BBS1", handler: async () => getOrthologsForGene("BBS1") },
@@ -1643,8 +1647,133 @@ const questionRegistry = [
 function notImplementedYet(feature) {
     return `<div class="result-card"><h3>Feature In Development</h3><p>The query handler for "<strong>${feature}</strong>" is not yet implemented. Stay tuned for future updates!</p></div>`;
 }
+/ B. Updated: Get genes based on screen phenotype (now implemented to work with the data)
+async function getGenesByScreenPhenotype(phenotype) {
+    if (!ciliaHubDataCache) await fetchCiliaData();
+    const normalizedPhenotype = phenotype.toLowerCase();
+    let genes = [];
 
-const getGenesByScreenPhenotype = async (phenotype) => notImplementedYet(`Genes by screen phenotype: ${phenotype}`);
+    // Handle "reduced ciliated cells" or "decreased number"
+    if (normalizedPhenotype.includes('reduced') || normalizedPhenotype.includes('decrease') || normalizedPhenotype.includes('number')) {
+        genes = ciliaHubDataCache
+            .filter(g => g.percent_ciliated_cells_effects && (
+                g.percent_ciliated_cells_effects.toLowerCase().includes('reduced') ||
+                g.percent_ciliated_cells_effects.toLowerCase().includes('fewer') ||
+                g.percent_ciliated_cells_effects.toLowerCase().includes('decreased')
+            ))
+            .map(g => ({ 
+                gene: g.gene, 
+                description: `Ciliogenesis effect: ${g.percent_ciliated_cells_effects}` 
+            }));
+        
+        return formatListResult(`Genes Causing: ${phenotype}`, genes);
+
+    // Handle "shorter cilia" or "short"
+    } else if (normalizedPhenotype.includes('shorter') || normalizedPhenotype.includes('short')) {
+        genes = ciliaHubDataCache
+            .filter(g => g.lof_effects && (
+                g.lof_effects.toLowerCase().includes('shorter') ||
+                g.lof_effects.toLowerCase().includes('short')
+            ))
+            .map(g => ({ 
+                gene: g.gene, 
+                description: `LoF effect: ${g.lof_effects}` 
+            }));
+
+        return formatListResult(`Genes Causing: ${phenotype}`, genes);
+        
+    // Handle "longer cilia" or "long"
+    } else if (normalizedPhenotype.includes('longer') || normalizedPhenotype.includes('long')) {
+        genes = ciliaHubDataCache
+            .filter(g => g.lof_effects && (
+                g.lof_effects.toLowerCase().includes('longer') ||
+                g.lof_effects.toLowerCase().includes('long')
+            ))
+            .map(g => ({ 
+                gene: g.gene, 
+                description: `LoF effect: ${g.lof_effects}` 
+            }));
+
+        return formatListResult(`Genes Causing: ${phenotype}`, genes);
+        
+    } else {
+        return notImplementedYet(`Genes by screen phenotype: ${phenotype}`);
+    }
+}
+
+// C. Updated: Get Cilia Effects (with detailed screen data)
+async function getGeneCiliaEffects(gene) {
+    if (!ciliaHubDataCache) await fetchCiliaData();
+    const geneData = ciliaHubDataCache.find(g => g.gene.toUpperCase() === gene.toUpperCase());
+
+    if (!geneData) return `<div class="result-card"><h3>${gene}</h3><p class="status-not-found">Gene not found in the database.</p></div>`;
+
+    // --- 1. Summarized Effects (from ciliahub_data.json) ---
+    const lof = geneData.lof_effects || "Not Reported";
+    const oe = geneData.overexpression_effects || "Not Reported";
+    const percent = geneData.percent_ciliated_cells_effects || "Not Reported";
+
+    const summarizedEffectsHtml = `
+        <h4>Effects on Cilia (Curated Summary)</h4>
+        <table class="gene-detail-table">
+            <thead>
+                <tr>
+                    <th>Effect Type</th>
+                    <th>Result</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><th>Overexpression Effects</th><td>${oe}</td></tr>
+                <tr><th>Loss-of-Function (LoF) Effects</th><td>${lof}</td></tr>
+                <tr><th>Effects on % Ciliated Cells</th><td>${percent}</td></tr>
+            </tbody>
+        </table>`;
+
+    // --- 2. Detailed Screen Findings (from cilia_screens_data.json) ---
+    const screenFindings = geneData.screens_from_separate_file || [];
+    let detailedScreensHtml = ``;
+
+    if (screenFindings.length > 0) {
+        const tableRows = screenFindings.map(s => `
+            <tr>
+                <td>${s.dataset || 'N/A'}</td>
+                <td>${(s.mean_percent_ciliated !== undefined) ? s.mean_percent_ciliated.toFixed(2) : 'N/A'}</td>
+                <td>${(s.z_score !== undefined) ? s.z_score.toFixed(2) : 'N/A'}</td>
+                <td>${s.classification || s.result || 'N/A'}</td>
+                <td><a href="${s.paper_link}" target="_blank">${s.dataset || 'Link'}</a></td>
+            </tr>
+        `).join('');
+
+        detailedScreensHtml = `
+            <h4 style="margin-top: 20px;">Detailed Genome-Wide Screen Findings</h4>
+            <p>High-throughput screen results showing specific quantitative effects on ciliation.</p>
+            <table class="ciliopathy-table">
+                <thead>
+                    <tr>
+                        <th class="sortable">Dataset</th>
+                        <th>Mean % Ciliated</th>
+                        <th>Z-Score</th>
+                        <th>Classification</th>
+                        <th>Reference</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${tableRows}
+                </tbody>
+            </table>
+        `;
+    } else {
+        detailedScreensHtml = `<h4 style="margin-top: 20px;">Detailed Genome-Wide Screen Findings</h4><p class="status-not-found">No detailed screen data found for ${gene}.</p>`;
+    }
+    
+    // --- 3. Final Output ---
+    return `
+        <div class="result-card">
+            <h3>Ciliary Phenotype Analysis for ${gene}</h3>
+            ${summarizedEffectsHtml}
+            ${detailedScreensHtml}
+        </div>`;
+}
 
 async function compareComplexes(complexA, complexB) {
     const componentsA = await getGenesByComplex(complexA);
@@ -2220,6 +2349,58 @@ async function getNoEffectGenes(screenName) {
     
     return formatListResult(`Genes with No Effect in ${screenName}`, noEffectGenes);
 }
+
+async function getGenesByScreenPhenotype(phenotype) {
+    if (!ciliaHubDataCache) await fetchCiliaData();
+    const normalizedPhenotype = phenotype.toLowerCase();
+    let genes = [];
+
+    // Handle "reduced ciliated cells" or "decreased number" (Query #1 Fix)
+    if (normalizedPhenotype.includes('reduced') || normalizedPhenotype.includes('decrease') || normalizedPhenotype.includes('number')) {
+        genes = ciliaHubDataCache
+            .filter(g => g.percent_ciliated_cells_effects && (
+                g.percent_ciliated_cells_effects.toLowerCase().includes('reduced') ||
+                g.percent_ciliated_cells_effects.toLowerCase().includes('fewer')
+            ))
+            .map(g => ({ 
+                gene: g.gene, 
+                description: `Ciliogenesis effect: ${g.percent_ciliated_cells_effects}` 
+            }));
+        
+        return formatListResult(`Genes Causing: ${phenotype}`, genes);
+
+    // Handle "shorter cilia" or "short" (Query #2 Fix)
+    } else if (normalizedPhenotype.includes('shorter') || normalizedPhenotype.includes('short')) {
+        genes = ciliaHubDataCache
+            .filter(g => g.lof_effects && (
+                g.lof_effects.toLowerCase().includes('shorter') ||
+                g.lof_effects.toLowerCase().includes('short')
+            ))
+            .map(g => ({ 
+                gene: g.gene, 
+                description: `LoF effect: ${g.lof_effects}` 
+            }));
+
+        return formatListResult(`Genes Causing: ${phenotype}`, genes);
+        
+    } else if (normalizedPhenotype.includes('longer') || normalizedPhenotype.includes('long')) {
+        genes = ciliaHubDataCache
+            .filter(g => g.lof_effects && (
+                g.lof_effects.toLowerCase().includes('longer') ||
+                g.lof_effects.toLowerCase().includes('long')
+            ))
+            .map(g => ({ 
+                gene: g.gene, 
+                description: `LoF effect: ${g.lof_effects}` 
+            }));
+
+        return formatListResult(`Genes Causing: ${phenotype}`, genes);
+        
+    } else {
+        return notImplementedYet(`Genes by screen phenotype: ${phenotype}`);
+    }
+}
+
 
 async function getGeneExpression(gene) {
     await fetchTissueData();
