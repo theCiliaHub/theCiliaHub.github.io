@@ -2126,94 +2126,83 @@ async function getAllCiliopathyGenesRaw() {
     };
 }
 
-// --- FINAL CORRECTED getDiseaseGenesInOrganism FUNCTION (Replace your current version) ---
-
 /**
  * Finds human genes associated with a specific ciliopathy that are conserved
  * and present in a given model organism, pulling the curated ortholog name 
  * directly from the ciliahub_data.json annotation.
- * * @param {string} disease - The name of the human ciliopathy (e.g., 'Joubert Syndrome').
- * @param {string} organism - The target model organism (e.g., 'C. elegans').
  */
-// --- FINAL CORRECTED getDiseaseGenesInOrganism FUNCTION ---
 async function getDiseaseGenesInOrganism(disease, organism) {
+    // 1. Ensure all data is ready
     await fetchCiliaData();
     await fetchPhylogenyData();
 
-    // 1. Define the target ortholog key based on the organism input
+    // 2. Define the target ortholog key (e.g., 'ortholog_c_elegans')
     const organismKeyMap = {
         'worm': 'ortholog_c_elegans', 'c. elegans': 'ortholog_c_elegans',
         'mouse': 'ortholog_mouse', 'xenopus': 'ortholog_xenopus',
         'zebrafish': 'ortholog_zebrafish', 'drosophila': 'ortholog_drosophila', 
-        'fly': 'ortholog_drosophila', 'human': null 
+        'fly': 'ortholog_drosophila', 
     };
     const targetKey = organismKeyMap[organism.toLowerCase()] || null;
+    const speciesCode = organism.replace(/(\w\.\w+)\s*/, '').trim() || organism;
 
-    // 2. Determine disease query (robustly selects ALL disease genes if 'Ciliopathy' is used)
+    if (!targetKey) {
+        return formatListResult(`Genes for ${disease} in ${organism}`, [], `Error: Ortholog data not tracked for organism ${organism}.`);
+    }
+
+    // 3. Get the raw human disease list (handling the generic "Ciliopathy" term)
     const diseaseQuery = (disease.toLowerCase().includes('ciliopathy')) ? "Ciliopathy" : disease;
     const queryTerm = (diseaseQuery === "Ciliopathy") ? "ciliopathy" : diseaseQuery;
     const { genes: diseaseGenes } = await getCiliopathyGenes(queryTerm);
-    const diseaseGeneSet = new Set(diseaseGenes.map(g => g.gene.toUpperCase()));
-
-    if (diseaseGeneSet.size === 0) {
-        return formatListResult(`Genes for ${disease} in ${organism}`, [], `No human genes found for ${disease}.`);
-    }
-
-    // 3. Prepare organism filter (for phylogenetic conservation check)
-    const speciesMap = {
-        'worm': 'C.elegans', 'mouse': 'M.musculus', 'xenopus': 'X.tropicalis',
-        'zebrafish': 'D.rerio', 'drosophila': 'D.melanogaster', 
-    };
-    const speciesCode = speciesMap[organism.toLowerCase()] || organism;
-    const speciesRegex = new RegExp(`^${normalizeTerm(speciesCode).replace(/\./g, '\\.?').replace(/\s/g, '\\s*')}$`, 'i');
     
-    // 4. Filter and Enrich Data
-    const conservedDiseaseGenes = [];
+    // 4. Perform the crucial combined filter (Disease + Conservation + Hub Data)
+    const conservedAndAnnotatedGenes = [];
 
-    diseaseGeneSet.forEach(humanGene => {
-        const hubData = ciliaHubDataCache.find(g => g.gene.toUpperCase() === humanGene);
-        const phyData = phylogenyDataCache[humanGene];
+    diseaseGenes.forEach(geneEntry => {
+        const humanGeneUpper = geneEntry.gene.toUpperCase();
+        const hubData = ciliaHubDataCache.find(g => g.gene.toUpperCase() === humanGeneUpper);
+        const phyData = phylogenyDataCache[humanGeneUpper];
         
-        // Check conservation using the phylogenetic map (REQUIRED for the query type)
-        const isPhyloConserved = phyData && phyData.species && 
-                                 phyData.species.some(s => speciesRegex.test(normalizeTerm(s)));
+        // Check A: Gene must be in the Hub's annotation and have the specific ortholog field
+        if (!hubData || !hubData[targetKey] || hubData[targetKey] === 'N/A' || hubData[targetKey] === 'Not Reported') {
+            return; // Skip if Hub annotation for the ortholog is missing or non-specific
+        }
         
-        if (isPhyloConserved && hubData) { // Ensure hubData exists before pushing
+        // Check B: Gene must be marked as conserved in the phylogenetic screening (presence in the target organism's clade)
+        const speciesRegex = new RegExp(`^${normalizeTerm(speciesCode).replace(/\./g, '\\.?').replace(/\s/g, '\\s*')}$`, 'i');
+        const isPhyloConserved = phyData?.species?.some(s => speciesRegex.test(normalizeTerm(s))) || false;
+        
+        if (isPhyloConserved) { 
+            // Only add if BOTH conditions are met.
             
-            // Collect the ortholog names (all of them)
-            const orthologs = {
-                ortholog_mouse: hubData.ortholog_mouse || 'N/A',
-                ortholog_c_elegans: hubData.ortholog_c_elegans || 'N/A',
-                ortholog_zebrafish: hubData.ortholog_zebrafish || 'N/A',
-                ortholog_drosophila: hubData.ortholog_drosophila || 'N/A',
-                ortholog_xenopus: hubData.ortholog_xenopus || 'N/A',
-            };
+            // Collect the ortholog name
+            const orthologName = hubData[targetKey];
             
-            conservedDiseaseGenes.push({
-                gene: humanGene,
-                description: `Diseases: ${hubData.ciliopathy.join(', ')}. Conserved in: ${speciesCode}.`,
+            conservedAndAnnotatedGenes.push({
+                gene: humanGeneUpper,
+                description: `Diseases: ${hubData.ciliopathy.join(', ')}.`,
                 
-                // CRUCIAL: Attach all orthologs to the output object
-                ...orthologs
+                // Attach the specific ortholog name using the dynamic key expected by the renderer
+                [targetKey]: orthologName 
             });
         }
     });
 
     const title = `${diseaseQuery} Genes Conserved in ${speciesCode}`;
-    const description = `Found ${conservedDiseaseGenes.length} ${diseaseQuery} gene(s) conserved in ${speciesCode}.`;
+    const description = `Found ${conservedAndAnnotatedGenes.length} ${diseaseQuery} gene(s) conserved in ${speciesCode}.`;
 
     const citationHtml = `<p style="font-size: 0.8em; color: #666; margin-top: 1rem; border-top: 1px solid #eee; padding-top: 0.5rem;">
-        <strong>Data Source:</strong> Phylogenetic conservation analysis (Li et al. 2014). Ortholog names curated from CiliaHub.
+        <strong>Data Source:</strong> Phylogenetic screening (Li et al. 2014) combined with CiliaHub Ortholog Annotation.
         <a href="https://pubmed.ncbi.nlm.nih.gov/24995987/" target="_blank">[PMID: 24995987]</a>
     </p>`;
 
-    // 5. Return formatted HTML string, flagging the renderer to show the correct column
+    // 5. Return formatted HTML string
     return formatListResult(
         title, 
-        conservedDiseaseGenes, 
-        citationHtml, // Pass citation as message (third argument)
-        speciesCode,  // Pass speciesCode for header name (fourth argument)
-        targetKey     // Pass the actual key (e.g., 'ortholog_c_elegans') for data access (fifth argument)
+        conservedAndAnnotatedGenes, 
+        citationHtml,
+        speciesCode,
+        targetKey
     );
 }
 
@@ -3953,23 +3942,30 @@ function formatGeneDetail(geneData, geneSymbol, detailTitle, detailContent) {
   `;
 }
 
-// --- UPDATED formatListResult (Now supports dynamic ortholog column) ---
-// Note: Changed function signature to accept FIVE arguments
+// --- FINAL UPDATED formatListResult (Accepts 5 arguments) ---
+
 function formatListResult(title, geneList, citationHtml = '', speciesCode = '', targetKey = null) {
     if (!geneList || geneList.length === 0) {
+        // ... (unchanged)
         return `<div class="result-card"><h3>${title}</h3><p class="status-not-found">No matching genes found.</p></div>`;
     }
 
     const displayedGenes = geneList.slice(0, 100);
-    const showOrthologColumn = targetKey && targetKey !== 'N/A';
-    // Clean up species code for header (e.g., C.elegans -> C. elegans)
+    const showOrthologColumn = targetKey && targetKey !== null;
+    
+    // Determine species name for the ortholog column header
     const orthologSpeciesName = speciesCode.replace(/(\w\.\w+)\s*/, '').replace('drosophila', 'Fly').replace('elegans', 'C. elegans').trim() || 'Ortholog';
 
+    // Determine the most accurate label for the Human Gene Column
+    let humanColumnLabel = "Human Gene";
+    if (title.includes("Genes Conserved")) {
+        humanColumnLabel = "Human Disease Gene"; // Best label for conserved disease lists
+    }
+    
     // --- Build Table Rows ---
     const tableRows = displayedGenes.map(g => {
         let cells = `<td><strong>${g.gene}</strong></td>`;
         
-        // Add the ortholog column if enabled
         if (showOrthologColumn) {
             // Access the ortholog name using the dynamic key (g[targetKey])
             const orthologName = g[targetKey] || 'N/A';
@@ -3984,7 +3980,7 @@ function formatListResult(title, geneList, citationHtml = '', speciesCode = '', 
     let tableHeader = `
     <thead>
         <tr>
-            <th class="sortable">Human Gene</th>`;
+            <th class="sortable">${humanColumnLabel}</th>`;
     
     if (showOrthologColumn) {
         tableHeader += `<th class="sortable">${orthologSpeciesName} Ortholog</th>`;
@@ -3995,7 +3991,7 @@ function formatListResult(title, geneList, citationHtml = '', speciesCode = '', 
         </tr>
     </thead>`;
 
-    // --- Final HTML Structure with Download Button ---
+    // --- Final HTML Structure ---
     const tableHtml = `
     <table class="ciliopathy-table" id="download-table-content">
         ${tableHeader}
@@ -4015,6 +4011,7 @@ function formatListResult(title, geneList, citationHtml = '', speciesCode = '', 
         ${citationHtml}
     </div>`;
 }
+
 
 // ----------------------------------------------------------------------
 // NEW FUNCTIONALITY: CLIENT-SIDE CSV DOWNLOAD
