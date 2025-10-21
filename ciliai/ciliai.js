@@ -69,30 +69,25 @@ function createIntentParser() {
         {
             type: 'FUNCTIONAL_CATEGORY',
             keywords: ['kinesin motors', 'dynein motors', 'Ciliary assembly/disassembly', 'Signaling', 'Motile cilium', 'Motor protein', 'Transport', 'Protein modification', 'Cytoskeletal', 'cilium assembly', 'basal body docking', 'retrograde IFT'],
-            handler: async (term) => formatListResult(`Genes in Functional Category: ${term}`, await getGenesByFunction(term)),
+            handler: async (term) => getGenesByFunction(term),
             autocompleteTemplate: (term) => `Show me ${term} genes`
         },
         {
             type: 'COMPLEX',
             keywords: ['BBSome', 'IFT-A', 'IFT-B', 'Transition Zone Complex', 'MKS Complex', 'NPHP Complex'],
-            handler: async (term) => formatListResult(`Components of ${term}`, await getGenesByComplex(term)),
+            handler: async (term) => getGenesByComplex(term),
             autocompleteTemplate: (term) => `Display components of ${term} complex`
         },
         {
             type: 'CILIOPATHY',
             keywords: [...new Set(allDiseases)],
-            handler: async (term) => {
-                const titleTerm = term.toUpperCase() === 'BBS' ? 'Bardet–Biedl Syndrome' :
-                                  term.toUpperCase() === 'MKS' ? 'Meckel–Gruber Syndrome' : term;
-                const { genes, description } = await getCiliopathyGenes(term);
-                return formatListResult(`Genes for ${titleTerm}`, genes, description);
-            },
+            handler: async (term) => getCiliopathyGenes(term),
             autocompleteTemplate: (term) => `Display genes for ${term}`
         },
         {
             type: 'LOCALIZATION',
             keywords: ['basal body', 'axoneme', 'transition zone', 'centrosome', 'cilium', 'lysosome', 'ciliary tip', 'transition fiber'],
-            handler: async (term) => formatListResult(`Genes localizing to ${term}`, await getGenesByLocalization(term)),
+            handler: async (term) => getGenesByLocalization(term),
             autocompleteTemplate: (term) => `Show me ${term} localizing genes`
         },
         {
@@ -116,16 +111,13 @@ function createIntentParser() {
                 "G.gallus", "M.gallopavo", "O.anatinus", "M.domestica", "S.scrofa", "M.musculus", "C.familiaris", "B.taurus", "H.sapiens",
                 "worm", "human", "mouse", "zebrafish", "fly", "yeast"
             ],
-            handler: async (term) => {
-                const { genes, description, speciesCode } = await getCiliaryGenesForOrganism(term);
-                return formatListResult(`Ciliary genes in ${speciesCode}`, genes, description);
-            },
+            handler: async (term) => getCiliaryGenesForOrganism(term),
             autocompleteTemplate: (term) => `Display ciliary genes in ${term}`
         },
         {
             type: 'DOMAIN',
             keywords: ['WD40', 'Leucine-rich repeat', 'IQ motif', 'calmodulin-binding', 'EF-hand', 'coiled-coil', 'CTS', 'ciliary targeting sequences', 'ciliary localization signals'],
-            handler: async (term) => formatListResult(`${term} domain-containing proteins`, await getGenesWithDomain(term)),
+            handler: async (term) => findGenesByNewDomainDB(term),
             autocompleteTemplate: (term) => `Show ${term} domain containing proteins`
         }
     ];
@@ -2679,26 +2671,36 @@ function updateIntentParser() {
 setTimeout(updateIntentParser, 1000);
 
 
-// =============================================================================
-// NEW: Helper function to get comprehensive details for "Tell me about..." queries
-// =============================================================================
+// Corrected: Uses direct lookup for gene fallback
 async function getComprehensiveDetails(term) {
+    if (!term) return `<div class="result-card"><p class="status-not-found">No term provided for details.</p></div>`;
     const upperTerm = term.toUpperCase();
-    
-    // Check if it's a known complex
-    const isComplex = intentParser.getAllComplexes().some(c => c.toUpperCase() === upperTerm);
+
+    // Ensure caches are loaded
+    if (!ciliaHubDataCache) await loadAndMergeGeneData();
+    if (!intentParser) { console.error("Intent parser not initialized!"); return "Error: Parser not ready."; } // Should be initialized globally
+
+    // Check if it's a known complex first
+    const knownComplexes = intentParser.getAllComplexes() || [];
+    const isComplex = knownComplexes.some(c => c.toUpperCase() === upperTerm);
     if (isComplex) {
-        const results = await getGenesByComplex(term);
-        return formatListResult(`Components of ${term}`, results);
+        console.log(`getComprehensiveDetails: Identified '${term}' as a complex.`);
+        // Call the function that returns HTML for complexes
+        return await getGenesByComplex(term);
     }
 
     // Otherwise, assume it's a gene
-    if (!ciliaHubDataCache) await fetchCiliaData();
-    const geneData = ciliaHubDataCache.find(g => g.gene.toUpperCase() === upperTerm);
-    
-    return formatComprehensiveGeneDetails(upperTerm, geneData); // Re-use the existing detailed formatter
-}
+     console.log(`getComprehensiveDetails: Assuming '${term}' is a gene.`);
+    if (!ciliaHubDataCache) {
+        return `<div class="result-card"><h3>${term}</h3><p class="status-not-found">Gene database not loaded.</p></div>`;
+    }
 
+    // FIXED: Use direct object lookup
+    const geneData = ciliaHubDataCache[upperTerm];
+
+    // Use the specific formatter for detailed gene views
+    return formatComprehensiveGeneDetails(term, geneData); // Pass original term for display if not found
+}
 // --- Main Page Display Function (Corrected Version) ---
 window.displayCiliAIPage = async function displayCiliAIPage() {
     const contentArea = document.querySelector('.content-area');
@@ -3571,59 +3573,74 @@ function formatListResult(title, genes, description = "") {
  * CORRECTED: Finds genes by localization.
  * Iterates using Object.values()
  */
+// Corrected: Returns HTML using formatListResult
 async function getGenesByLocalization(localization) {
     if (!ciliaHubDataCache) await loadAndMergeGeneData();
+    if (!ciliaHubDataCache || Object.keys(ciliaHubDataCache).length === 0) {
+         console.error(`getGenesByLocalization: Cache not ready for '${localization}'`);
+         return formatListResult(`Genes localizing to: ${localization}`, [], "Database not loaded."); // Return error HTML
+    }
+
     const searchTerm = localization.toLowerCase().trim();
-    
-    const results = Object.values(ciliaHubDataCache) // <-- THE FIX
-        .filter(geneData => 
-            geneData.localization && 
-            geneData.localization.toLowerCase().includes(searchTerm)
+    const results = Object.values(ciliaHubDataCache)
+        .filter(geneData =>
+            geneData && Array.isArray(geneData.localization) &&
+            geneData.localization.some(loc => loc && loc.toLowerCase().includes(searchTerm))
         )
         .map(geneData => ({
-            gene: geneData.gene,
-            description: geneData.localization
+            gene: geneData.gene || 'Unknown',
+            description: `Localization: ${geneData.localization.join(', ')}` // Show full localization
         }))
-        .sort((a,b) => a.gene.localeCompare(b.gene));
-    
-    // Use the new formatListResult helper
+        .sort((a,b) => (a.gene || '').localeCompare(b.gene || ''));
+
+    // FIXED: Calls formatListResult internally before returning
     return formatListResult(`Genes localizing to: ${localization}`, results);
 }
 
-/**
- * NEW/CONSOLIDATED: Finds genes by functional category, summary, complex, or disease.
- * This one function can now handle queries for "BBSome", "Trafficking", "motor", "signaling",
- * and also "Nephronophthisis" because it searches the relevant text fields.
- */
-// --- Internal Helper for searching cache ---
-// Returns ARRAY of gene data objects
+// Corrected: Fixes variable name error, improves robustness
 async function _getGenesByFunctionOrComplex(searchTerm) {
-    if (!ciliaHubDataCache) await loadAndMergeGeneData();
-    // FIXED: Handle case where cache loading failed
+    if (!ciliaHubDataCache) {
+        console.log("_getGenesByFunctionOrComplex: Cache not ready, attempting load...");
+        await loadAndMergeGeneData();
+    }
+    // Handle case where cache loading failed
     if (!ciliaHubDataCache || Object.keys(ciliaHubDataCache).length === 0) {
-        console.error("_getGenesByFunctionOrComplex called but ciliaHubDataCache is empty or not loaded.");
+        console.error("_getGenesByFunctionOrComplex: ciliaHubDataCache is empty or not loaded.");
         return []; // Return empty array to prevent downstream errors
     }
 
+    // Ensure searchTerm is a string before proceeding
+    if (typeof searchTerm !== 'string') {
+        console.error("_getGenesByFunctionOrComplex received non-string searchTerm:", searchTerm);
+        return [];
+    }
+
     const term = searchTerm.toLowerCase().trim();
-    // Use regex for potentially better word boundary matching
+    if (!term) return []; // Return empty if search term is empty after trimming
+
+    // Use regex for potentially better word boundary matching, especially for shorter terms
     const termRegex = new RegExp(`\\b${term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
 
-    const results = Object.values(ciliaHubDataCache) // FIXED: Iterate over values
+    const results = Object.values(ciliaHubDataCache)
         .filter(geneData => {
             if (!geneData) return false;
 
+            // Helper to check fields safely
             const checkField = (fieldValue) => {
                 if (!fieldValue) return false;
                 // Check string directly first (faster for exact matches) then regex
                 if (typeof fieldValue === 'string') return fieldValue.toLowerCase().includes(term) || termRegex.test(fieldValue);
-                if (Array.isArray(fieldValue)) return fieldValue.some(item => item && (item.toLowerCase().includes(term) || termRegex.test(item)));
+                // Check array elements
+                if (Array.isArray(fieldValue)) return fieldValue.some(item => item && (typeof item === 'string') && (item.toLowerCase().includes(term) || termRegex.test(item)));
                 return false;
             };
 
+            // More specific check for complexes by name/component
             const isComplexMatch = checkField(geneData.complex_names) ||
-                                   (/^[A-Z0-9-]+$/i.test(searchTerm) && Array.isArray(geneData.complex_components) && geneData.complex_components.some(c => c && c.toUpperCase() === searchTerm.toUpperCase()));
+                                   // Only check components if searchTerm looks like a gene/protein name
+                                   (/^[A-Z0-9][A-Z0-9-]+$/i.test(searchTerm) && Array.isArray(geneData.complex_components) && geneData.complex_components.some(c => c && c.toUpperCase() === searchTerm.toUpperCase()));
 
+            // FIXED: Use checkField consistently, removed undefined 'functionalCategory' variable
             return checkField(geneData.functional_category) ||
                    checkField(geneData.functional_summary) ||
                    checkField(geneData.description) ||
@@ -3632,10 +3649,11 @@ async function _getGenesByFunctionOrComplex(searchTerm) {
         })
         .map(geneData => ({ // Ensure map creates valid objects
             gene: geneData.gene || 'Unknown Gene',
-            description: geneData.functional_category?.join(', ') || geneData.complex_names?.join(', ') || geneData.ciliopathy?.join(', ') || geneData.functional_summary?.substring(0, 100) + '...' || geneData.description || 'Matching entry'
+            description: geneData.description || geneData.functional_summary?.substring(0,100)+'...' || geneData.functional_category?.join(', ') || geneData.complex_names?.join(', ') || geneData.ciliopathy?.join(', ') || 'Matching entry' // Provide better description fallback
         }))
         .sort((a,b) => (a.gene || '').localeCompare(b.gene || ''));
 
+    // console.log(`_getGenesByFunctionOrComplex found ${results.length} results for '${searchTerm}'`); // Debug log
     return results; // Returns the raw Array
 }
 
