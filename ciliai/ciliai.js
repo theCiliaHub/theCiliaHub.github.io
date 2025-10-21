@@ -901,9 +901,91 @@ async function displayUmapPlot() {
     Plotly.newPlot(plotDivId, plotData, layout, { responsive: true, displayModeBar: false });
     return "";
 }
-// =============================================================================
-// REPLACEMENT: The definitive and corrected Question Registry
-// =============================================================================
+
+
+/**
+ * Retrieves human ciliary genes that have an identified ortholog based on
+ * the large-scale phylogeny screen data (Li et al. 2014, phylogeny_summary.json).
+ */
+async function getPhylogenyGenesForOrganism(organismName) {
+    await fetchCiliaData(); // For human ciliary gene list
+    await fetchPhylogenyData(); // For conservation matrix
+    
+    // Use the comprehensive helper that implements the filtering logic
+    const { genes, description, speciesCode } = await getCiliaryGenesForOrganism(organismName);
+    
+    // Define the source citation
+    const citationHtml = `<p style="font-size: 0.8em; color: #666; margin-top: 1rem; border-top: 1px solid #eee; padding-top: 0.5rem;">
+        <strong>Source:</strong> Phylogenetic conservation analysis (Li et al. 2014).
+        <a href="https://pubmed.ncbi.nlm.nih.gov/24995987/" target="_blank">[PMID: 24995987]</a>
+    </p>`;
+    
+    return formatListResult(
+        `Ciliary Genes Conserved in ${speciesCode} (Phylogeny Screen)`, 
+        genes, 
+        description, 
+        citationHtml
+    );
+}
+
+// Function already defined but repeated here for context:
+async function getHubOrthologsForGene(gene) {
+    if (!ciliaHubDataCache) await fetchCiliaData();
+    const geneData = ciliaHubDataCache.find(g => g.gene.toUpperCase() === gene.toUpperCase());
+
+    if (!geneData) return `<div class="result-card"><h3>${gene}</h3><p class="status-not-found">Gene not found in the database.</p></div>`;
+
+    const citationHtml = `<p style="font-size: 0.8em; color: #666; margin-top: 1rem; border-top: 1px solid #eee; padding-top: 0.5rem;">
+        <strong>Source:</strong> Gene-specific annotation in the CiliaHub Database (ciliahub_data.json).
+    </p>`;
+
+    return `
+        <div class="result-card">
+            <h3>Curated Orthologs of ${gene} (CiliaHub Annotation)</h3>
+            <table class="gene-detail-table">
+                <tr><th>Mouse (M. musculus)</th><td>${geneData.ortholog_mouse || 'N/A'}</td></tr>
+                <tr><th>Worm (C. elegans)</th><td>${geneData.ortholog_c_elegans || 'N/A'}</td></tr>
+                <tr><th>Zebrafish (D. rerio)</th><td>${geneData.ortholog_zebrafish || 'N/A'}</td></tr>
+                <tr><th>Fly (D. melanogaster)</th><td>${geneData.ortholog_drosophila || 'N/A'}</td></tr>
+                <tr><th>Xenopus (X. tropicalis)</th><td>${geneData.ortholog_xenopus || 'N/A'}</td></tr>
+            </table>
+            ${citationHtml}
+        </div>`;
+}
+
+
+/**
+ * Generates a help card explaining the two different sources for organism data.
+ */
+async function tellAboutOrganismSources(organism) {
+    // Determine the common/scientific name pair for display purposes
+    const displayNames = {
+        'C. elegans': { common: 'C. elegans', query: 'C. elegans' },
+        'worm': { common: 'C. elegans', query: 'C. elegans' },
+        'mouse': { common: 'Mouse', query: 'Mouse' },
+        'xenopus': { common: 'Xenopus', query: 'Xenopus' },
+        'zebrafish': { common: 'Zebrafish', query: 'Zebrafish' },
+        'drosophila': { common: 'Drosophila', query: 'Drosophila' },
+        'fly': { common: 'Drosophila', query: 'Drosophila' },
+        'chlamydomonas': { common: 'Chlamydomonas', query: 'Chlamydomonas' }
+    }[organism.toLowerCase()] || { common: organism, query: organism };
+
+    const exampleGene = 'IFT88';
+    
+    return `
+        <div class="result-card">
+            <h3>${displayNames.common} Gene Data Sources</h3>
+            <p>For ${displayNames.common} ciliary genes, we track two distinct types of data:</p>
+            <ul>
+                <li><strong>1. Phylogenetic Screen Genes (The List):</strong> These are human genes identified as ciliary that possess a conserved ortholog found in large-scale evolutionary screens (e.g., Li et al. 2014). This provides a large-scale, presence/absence dataset.
+                    <br>Use the query: <strong>List Ciliary Genes in ${displayNames.query} (Phylogeny)</strong></li>
+                <li><strong>2. Curated Orthologs (The Name):</strong> These are manually verified gene names or IDs specific to ${displayNames.common} for a single human gene, annotated in the CiliaHub record.
+                    <br>Use the query: <strong>Show curated orthologs for ${exampleGene}</strong></li>
+            </ul>
+        </div>
+    `;
+}
+
 const questionRegistry = [
     // ==================== META / GENERAL ====================
     { text: "What can you do?", handler: async () => tellAboutCiliAI() },
@@ -914,6 +996,33 @@ const questionRegistry = [
     { text: "How can you help me?", handler: async () => tellAboutCiliAI() },
     { text: "What questions can I ask?", handler: async () => tellAboutCiliAI() },
     { text: "Give me an overview of your features", handler: async () => tellAboutCiliAI() },
+
+    // ==================== SOURCE QUERIES ====================
+    { text: "What is the source for Ciliary genes in C. elegans?", handler: async () => tellAboutOrganismSources("C. elegans") },
+    { text: "What is the source for Ciliary genes in mouse?", handler: async () => tellAboutOrganismSources("mouse") },
+    { text: "What is the source for Ciliary genes in zebrafish?", handler: async () => tellAboutOrganismSources("zebrafish") },
+    { text: "What is the source for Ciliary genes in drosophila?", handler: async () => tellAboutOrganismSources("drosophila") },
+
+    // ==================== PHYLOGENY QUERIES (List Genes based on Screen) ====================
+    { text: "List Ciliary Genes in C. elegans (Phylogeny)", handler: async () => getPhylogenyGenesForOrganism("C. elegans") },
+    { text: "List Ciliary Genes in Mouse (Phylogeny)", handler: async () => getPhylogenyGenesForOrganism("mouse") },
+    { text: "List Ciliary Genes in Xenopus (Phylogeny)", handler: async () => getPhylogenyGenesForOrganism("xenopus") },
+    { text: "List Ciliary Genes in Zebrafish (Phylogeny)", handler: async () => getPhylogenyGenesForOrganism("zebrafish") },
+    { text: "List Ciliary Genes in Drosophila (Phylogeny)", handler: async () => getPhylogenyGenesForOrganism("drosophila") },
+    { text: "List Ciliary Genes in Chlamydomonas (Phylogeny)", handler: async () => getPhylogenyGenesForOrganism("Chlamydomonas") },
+
+    // ==================== CURATED ORTHOLOG QUERIES (Gene Specific Annotation) ====================
+    { text: "Show curated orthologs for IFT88", handler: async () => getHubOrthologsForGene("IFT88") },
+    { text: "Show curated orthologs for BBS1", handler: async () => getHubOrthologsForGene("BBS1") },
+    { text: "What is the C. elegans ortholog for ARL13B?", handler: async () => getHubOrthologsForGene("ARL13B") },
+    { text: "Zebrafish ortholog name for NPHP1", handler: async () => getHubOrthologsForGene("NPHP1") },
+
+    // ==================== SIMPLE/LEGACY QUERIES (Now default to Phylogenetic List) ====================
+    { text: "List ciliary genes in C. elegans", handler: async () => getPhylogenyGenesForOrganism("C. elegans") },
+    { text: "List ciliary genes in mouse", handler: async () => getPhylogenyGenesForOrganism("mouse") },
+    { text: "List ciliary genes in zebrafish", handler: async () => getPhylogenyGenesForOrganism("zebrafish") },
+    { text: "List ciliary genes in drosophila", handler: async () => getPhylogenyGenesForOrganism("drosophila") },
+    { text: "List ciliary genes in xenopus", handler: async () => getPhylogenyGenesForOrganism("xenopus") },
 
     // ==================== GENE DETAILS & FUNCTION ====================
     // General function queries
@@ -1050,85 +1159,85 @@ const questionRegistry = [
     { text: "Show flagellar genes", handler: async () => formatListResult("Genes localizing to flagella", await getGenesByLocalization("flagella")) },
     { text: "List flagellar proteins", handler: async () => formatListResult("Genes localizing to flagella", await getGenesByLocalization("flagella")) },
 
-// ==================== PROTEIN DOMAINS (New DB) ====================
-    { text: "Show enriched domains in ciliary genes", handler: async () => displayEnrichedDomains() },
-    { text: "List the most enriched protein domains", handler: async () => displayEnrichedDomains() },
-    { text: "What domains are enriched in cilia?", handler: async () => displayEnrichedDomains() },
-    { text: "Show depleted domains in ciliary genes", handler: async () => displayDepletedDomains() },
-    { text: "List domains absent or rare in ciliary genes", handler: async () => displayDepletedDomains() },
-    { text: "What domains are depleted in cilia?", handler: async () => displayDepletedDomains() },
-    
-    // --- Specific gene domains (use new displayDomainsForGene handler) ---
-    { text: "Show protein domains of WDR35", handler: async () => displayDomainsForGene("WDR35") },
-    { text: "What domains does WDR35 have?", handler: async () => displayDomainsForGene("WDR35") },
-    { text: "List domains found in WDR35.", handler: async () => displayDomainsForGene("WDR35") },
-    { text: "WDR35 domain structure", handler: async () => displayDomainsForGene("WDR35") },
-    { text: "Describe WDR35 domains", handler: async () => displayDomainsForGene("WDR35") },
-    { text: "What domains does BBS1 have?", handler: async () => displayDomainsForGene("BBS1") },
-    { text: "Show IFT88 domains", handler: async () => displayDomainsForGene("IFT88") },
-    { text: "CEP290 domain structure", handler: async () => displayDomainsForGene("CEP290") },
-    { text: "What domains are in NPHP1?", handler: async () => displayDomainsForGene("NPHP1") },
-    
-    // --- Genes by domain type/description (use new findGenesByNewDomainDB handler) ---
-    { text: "Show WD40 domain containing proteins", handler: async () => findGenesByNewDomainDB("WD40") },
-    { text: "List WD40 repeat proteins", handler: async () => findGenesByNewDomainDB("WD40") },
-    { text: "Which genes have WD40 domains?", handler: async () => findGenesByNewDomainDB("WD40") },
-    { text: "WD40 repeat containing genes", handler: async () => findGenesByNewDomainDB("WD40") },
-    
-    { text: "Display Leucine-rich repeat domain proteins", handler: async () => findGenesByNewDomainDB("Leucine-rich repeat") },
-    { text: "LRR domain proteins", handler: async () => findGenesByNewDomainDB("Leucine-rich repeat") },
-    { text: "Show LRR containing genes", handler: async () => findGenesByNewDomainDB("Leucine-rich repeat") },
-    
-    { text: "Show IQ motif containing proteins", handler: async () => findGenesByNewDomainDB("IQ motif") },
-    { text: "List IQ motif proteins", handler: async () => findGenesByNewDomainDB("IQ motif") },
-    { text: "Which genes have IQ motifs?", handler: async () => findGenesByNewDomainDB("IQ motif") },
-    
-    { text: "Display calmodulin-binding proteins", handler: async () => findGenesByNewDomainDB("calmodulin-binding") },
-    { text: "Show calmodulin-binding domains", handler: async () => findGenesByNewDomainDB("calmodulin-binding") },
-    { text: "List calmodulin interacting proteins", handler: async () => findGenesByNewDomainDB("calmodulin-binding") },
-    { text: "Calcium-binding proteins in cilia", handler: async () => findGenesByNewDomainDB("calcium-binding") },
-    
-    { text: "Show EF-hand domain proteins", handler: async () => findGenesByNewDomainDB("EF-hand") },
-    { text: "Find genes with EF-hand motifs.", handler: async () => findGenesByNewDomainDB("EF-hand") },
-    { text: "List EF-hand proteins", handler: async () => findGenesByNewDomainDB("EF-hand") },
-    { text: "EF-hand containing genes", handler: async () => findGenesByNewDomainDB("EF-hand") },
-    
-    { text: "List all Kinase-related ciliary genes", handler: async () => findGenesByNewDomainDB("kinase") },
-    { text: "Show Kinase-containing proteins localized to cilia", handler: async () => findGenesByNewDomainDB("kinase") },
-    { text: "Display Kinase domain proteins involved in ciliogenesis", handler: async () => findGenesByNewDomainDB("kinase") },
-    { text: "Identify Kinase genes in cilia", handler: async () => findGenesByNewDomainDB("kinase") },
-    { text: "Which kinases are ciliary?", handler: async () => findGenesByNewDomainDB("kinase") },
-    { text: "Show me all ciliary kinases", handler: async () => findGenesByNewDomainDB("kinase") },
-    { text: "Display kinases regulating cilia length", handler: async () => findGenesByNewDomainDB("kinase") },
-    { text: "Which kinases control cilia length?", handler: async () => findGenesByNewDomainDB("kinase") },
-    { text: "Show kinases that could be therapeutic targets", handler: async () => findGenesByNewDomainDB("kinase") },
-    
-    { text: "List all Phosphatase-related ciliary genes", handler: async () => findGenesByNewDomainDB("phosphatase") },
-    { text: "Show Phosphatase-containing proteins localized to cilia", handler: async () => findGenesByNewDomainDB("phosphatase") },
-    { text: "Display Phosphatase domain proteins involved in ciliogenesis", handler: async () => findGenesByNewDomainDB("phosphatase") },
-    { text: "Identify Phosphatase genes in cilia", handler: async () => findGenesByNewDomainDB("phosphatase") },
-    { text: "Ciliary phosphatases", handler: async () => findGenesByNewDomainDB("phosphatase") },
-    
-    { text: "List all Actin-related ciliary genes", handler: async () => findGenesByNewDomainDB("actin") },
-    { text: "Show Actin-containing proteins localized to cilia", handler: async () => findGenesByNewDomainDB("actin") },
-    { text: "Display Actin domain proteins involved in ciliogenesis", handler: async () => findGenesByNewDomainDB("actin") },
-    { text: "Identify Actin genes in cilia", handler: async () => findGenesByNewDomainDB("actin") },
-    
-    { text: "List all Zinc finger-related ciliary genes", handler: async () => findGenesByNewDomainDB("zinc finger") },
-    { text: "Show Zinc finger-containing proteins localized to cilia", handler: async () => findGenesByNewDomainDB("zinc finger") },
-    { text: "Display Zinc finger domain proteins involved in ciliogenesis", handler: async () => findGenesByNewDomainDB("zinc finger") },
-    { text: "Identify Zinc finger genes in cilia", handler: async () => findGenesByNewDomainDB("zinc finger") },
-    
-    { text: "List all Atpase-related ciliary genes", handler: async () => findGenesByNewDomainDB("atpase") },
-    { text: "Show Atpase-containing proteins localized to cilia", handler: async () => findGenesByNewDomainDB("atpase") },
-    { text: "Display Atpase domain proteins involved in ciliogenesis", handler: async () => findGenesByNewDomainDB("atpase") },
-    { text: "Identify Atpase genes in cilia", handler: async () => findGenesByNewDomainDB("atpase") },
-    
-    { text: "Show coiled-coil domain proteins", handler: async () => findGenesByNewDomainDB("coiled-coil") },
-    { text: "List tetratricopeptide repeat proteins", handler: async () => findGenesByNewDomainDB("tetratricopeptide") },
-    { text: "Show GTPase domain proteins", handler: async () => findGenesByNewDomainDB("GTPase") },
-    { text: "List AAA domain proteins", handler: async () => findGenesByNewDomainDB("AAA") },
+    // ==================== PROTEIN DOMAINS ====================
+    { text: "Show enriched domains in ciliary genes", handler: async () => displayEnrichedDomains() },
+    { text: "List the most enriched protein domains", handler: async () => displayEnrichedDomains() },
+    { text: "What domains are enriched in cilia?", handler: async () => displayEnrichedDomains() },
+    { text: "Show depleted domains in ciliary genes", handler: async () => displayDepletedDomains() },
+    { text: "List domains absent or rare in ciliary genes", handler: async () => displayDepletedDomains() },
+    { text: "What domains are depleted in cilia?", handler: async () => displayDepletedDomains() },
     
+    // --- Specific gene domains (use new displayDomainsForGene handler) ---
+    { text: "Show protein domains of WDR35", handler: async () => displayDomainsForGene("WDR35") },
+    { text: "What domains does WDR35 have?", handler: async () => displayDomainsForGene("WDR35") },
+    { text: "List domains found in WDR35.", handler: async () => displayDomainsForGene("WDR35") },
+    { text: "WDR35 domain structure", handler: async () => displayDomainsForGene("WDR35") },
+    { text: "Describe WDR35 domains", handler: async () => displayDomainsForGene("WDR35") },
+    { text: "What domains does BBS1 have?", handler: async () => displayDomainsForGene("BBS1") },
+    { text: "Show IFT88 domains", handler: async () => displayDomainsForGene("IFT88") },
+    { text: "CEP290 domain structure", handler: async () => displayDomainsForGene("CEP290") },
+    { text: "What domains are in NPHP1?", handler: async () => displayDomainsForGene("NPHP1") },
+    
+    // --- Genes by domain type/description (use new findGenesByNewDomainDB handler) ---
+    { text: "Show WD40 domain containing proteins", handler: async () => findGenesByNewDomainDB("WD40") },
+    { text: "List WD40 repeat proteins", handler: async () => findGenesByNewDomainDB("WD40") },
+    { text: "Which genes have WD40 domains?", handler: async () => findGenesByNewDomainDB("WD40") },
+    { text: "WD40 repeat containing genes", handler: async () => findGenesByNewDomainDB("WD40") },
+    
+    { text: "Display Leucine-rich repeat domain proteins", handler: async () => findGenesByNewDomainDB("Leucine-rich repeat") },
+    { text: "LRR domain proteins", handler: async () => findGenesByNewDomainDB("Leucine-rich repeat") },
+    { text: "Show LRR containing genes", handler: async () => findGenesByNewDomainDB("Leucine-rich repeat") },
+    
+    { text: "Show IQ motif containing proteins", handler: async () => findGenesByNewDomainDB("IQ motif") },
+    { text: "List IQ motif proteins", handler: async () => findGenesByNewDomainDB("IQ motif") },
+    { text: "Which genes have IQ motifs?", handler: async () => findGenesByNewDomainDB("IQ motif") },
+    
+    { text: "Display calmodulin-binding proteins", handler: async () => findGenesByNewDomainDB("calmodulin-binding") },
+    { text: "Show calmodulin-binding domains", handler: async () => findGenesByNewDomainDB("calmodulin-binding") },
+    { text: "List calmodulin interacting proteins", handler: async () => findGenesByNewDomainDB("calmodulin-binding") },
+    { text: "Calcium-binding proteins in cilia", handler: async () => findGenesByNewDomainDB("calcium-binding") },
+    
+    { text: "Show EF-hand domain proteins", handler: async () => findGenesByNewDomainDB("EF-hand") },
+    { text: "Find genes with EF-hand motifs.", handler: async () => findGenesByNewDomainDB("EF-hand") },
+    { text: "List EF-hand proteins", handler: async () => findGenesByNewDomainDB("EF-hand") },
+    { text: "EF-hand containing genes", handler: async () => findGenesByNewDomainDB("EF-hand") },
+    
+    { text: "List all Kinase-related ciliary genes", handler: async () => findGenesByNewDomainDB("kinase") },
+    { text: "Show Kinase-containing proteins localized to cilia", handler: async () => findGenesByNewDomainDB("kinase") },
+    { text: "Display Kinase domain proteins involved in ciliogenesis", handler: async () => findGenesByNewDomainDB("kinase") },
+    { text: "Identify Kinase genes in cilia", handler: async () => findGenesByNewDomainDB("kinase") },
+    { text: "Which kinases are ciliary?", handler: async () => findGenesByNewDomainDB("kinase") },
+    { text: "Show me all ciliary kinases", handler: async () => findGenesByNewDomainDB("kinase") },
+    { text: "Display kinases regulating cilia length", handler: async () => findGenesByNewDomainDB("kinase") },
+    { text: "Which kinases control cilia length?", handler: async () => findGenesByNewDomainDB("kinase") },
+    { text: "Show kinases that could be therapeutic targets", handler: async () => findGenesByNewDomainDB("kinase") },
+    
+    { text: "List all Phosphatase-related ciliary genes", handler: async () => findGenesByNewDomainDB("phosphatase") },
+    { text: "Show Phosphatase-containing proteins localized to cilia", handler: async () => findGenesByNewDomainDB("phosphatase") },
+    { text: "Display Phosphatase domain proteins involved in ciliogenesis", handler: async () => findGenesByNewDomainDB("phosphatase") },
+    { text: "Identify Phosphatase genes in cilia", handler: async () => findGenesByNewDomainDB("phosphatase") },
+    { text: "Ciliary phosphatases", handler: async () => findGenesByNewDomainDB("phosphatase") },
+    
+    { text: "List all Actin-related ciliary genes", handler: async () => findGenesByNewDomainDB("actin") },
+    { text: "Show Actin-containing proteins localized to cilia", handler: async () => findGenesByNewDomainDB("actin") },
+    { text: "Display Actin domain proteins involved in ciliogenesis", handler: async () => findGenesByNewDomainDB("actin") },
+    { text: "Identify Actin genes in cilia", handler: async () => findGenesByNewDomainDB("actin") },
+    
+    { text: "List all Zinc finger-related ciliary genes", handler: async () => findGenesByNewDomainDB("zinc finger") },
+    { text: "Show Zinc finger-containing proteins localized to cilia", handler: async () => findGenesByNewDomainDB("zinc finger") },
+    { text: "Display Zinc finger domain proteins involved in ciliogenesis", handler: async () => findGenesByNewDomainDB("zinc finger") },
+    { text: "Identify Zinc finger genes in cilia", handler: async () => findGenesByNewDomainDB("zinc finger") },
+    
+    { text: "List all Atpase-related ciliary genes", handler: async () => findGenesByNewDomainDB("atpase") },
+    { text: "Show Atpase-containing proteins localized to cilia", handler: async () => findGenesByNewDomainDB("atpase") },
+    { text: "Display Atpase domain proteins involved in ciliogenesis", handler: async () => findGenesByNewDomainDB("atpase") },
+    { text: "Identify Atpase genes in cilia", handler: async () => findGenesByNewDomainDB("atpase") },
+    
+    { text: "Show coiled-coil domain proteins", handler: async () => findGenesByNewDomainDB("coiled-coil") },
+    { text: "List tetratricopeptide repeat proteins", handler: async () => findGenesByNewDomainDB("tetratricopeptide") },
+    { text: "Show GTPase domain proteins", handler: async () => findGenesByNewDomainDB("GTPase") },
+    { text: "List AAA domain proteins", handler: async () => findGenesByNewDomainDB("AAA") },
+
     // ==================== PROTEIN COMPLEXES ====================
     // BBSome
     { text: "Give me the list of BBSome components", handler: async () => formatListResult("Components of BBSome", await getGenesByComplex("BBSome")) },
@@ -1263,30 +1372,46 @@ const questionRegistry = [
     { text: "What ciliopathies involve IFT88?", handler: async () => getGeneDiseases("IFT88") },
     { text: "RPGRIP1L disease associations", handler: async () => getGeneDiseases("RPGRIP1L") },
 
+    // ==================== EVOLUTIONARY CONSERVATION & PHYLOGENY ====================
+    // Note: We use a helper function to correctly wrap the output {genes, desc, species} -> HTML string.
+    const wrapOrganismResult = async (organismName) => {
+        const result = await getCiliaryGenesForOrganism(organismName);
+        return formatListResult(`Ciliary genes in ${result.speciesCode}`, result.genes, result.description);
+    };
 
-  // ==================== EVOLUTIONARY CONSERVATION & PHYLOGENY ====================
-    { text: "Show evolutionary conservation of IFT88", handler: async () => getGeneConservation("IFT88") },
-    { text: "How conserved is ARL13B?", handler: async () => getGeneConservation("ARL13B") },
-    { text: "Show the evolutionary conservation of BBS1", handler: async () => getGeneConservation("BBS1") },
-    { text: "Is IFT88 conserved in C. elegans?", handler: async () => checkConservation("IFT88", "C. elegans") },
-    { text: "Is BBS1 present in zebrafish?", handler: async () => checkConservation("BBS1", "zebrafish") },
-    { text: "List conserved ciliary genes between C. elegans and humans", handler: async () => getConservedGenesBetween(["C. elegans", "H.sapiens"]) },
-    { text: "Display the ciliary genes that are conserved between humans and zebrafish", handler: async () => getConservedGenesBetween(["Human", "Zebrafish"]) },
-    { text: "List all ciliary-only genes", handler: async () => getCiliaryOnlyGenes() },
-    { text: "Which human ciliary genes have orthologs in Chlamydomonas?", handler: async () => getOrthologsInOrganism("Chlamydomonas") },
-    { text: "List ciliary genes in C. elegans", handler: async () => { const result = await getCiliaryGenesForOrganism("C. elegans"); return formatListResult(`Ciliary genes in ${result.speciesCode}`, result.genes, result.description); } },
-    { text: "Display ciliary genes in human", handler: async () => getCiliaryGenesForOrganism("human") },
-    { text: "Show ciliary genes in mouse", handler: async () => getCiliaryGenesForOrganism("mouse") },
-    { text: "List ciliary genes in zebrafish", handler: async () => getCiliaryGenesForOrganism("zebrafish") },
-    { text: "Display ciliary genes in fly", handler: async () => getCiliaryGenesForOrganism("fly") },
-    { text: "List ciliary genes in Chlamydomonas", handler: async () => getCiliaryGenesForOrganism("Chlamydomonas") },
-    
-    // ==================== NEW PHYLOGENY QUESTIONS ====================
-    { text: "Show conservation of IFT88 (Nevers 2017)", handler: async () => getNeversConservation("IFT88") },
-    { text: "What is the phylogeny of BBS1 (Nevers 2017)?", handler: async () => getNeversConservation("BBS1") },
-    { text: "Show conservation of IFT88 (Li 2014)", handler: async () => getLiConservation("IFT88") },
-    { text: "What is the phylogeny of ARL13B (Li 2014)?", handler: async () => getLiConservation("ARL13B") },
-    
+    { text: "Show evolutionary conservation of IFT88", handler: async () => getGeneConservation("IFT88") },
+    { text: "How conserved is ARL13B?", handler: async () => getGeneConservation("ARL13B") },
+    { text: "Show the evolutionary conservation of BBS1", handler: async () => getGeneConservation("BBS1") },
+    { text: "Is IFT88 conserved in C. elegans?", handler: async () => checkConservation("IFT88", "C. elegans") },
+    { text: "Is BBS1 present in zebrafish?", handler: async () => checkConservation("BBS1", "zebrafish") },
+    { text: "List conserved ciliary genes between C. elegans and humans", handler: async () => getConservedGenesBetween(["C. elegans", "H.sapiens"]) },
+    { text: "Display the ciliary genes that are conserved between humans and zebrafish", handler: async () => getConservedGenesBetween(["Human", "Zebrafish"]) },
+    { text: "List all ciliary-only genes", handler: async () => getCiliaryOnlyGenes() },
+
+    // --- All queries using the buggy getCiliaryGenesForOrganism now FIXED via wrapping ---
+    { text: "Which human ciliary genes have orthologs in Chlamydomonas?", handler: async () => getOrthologsInOrganism("Chlamydomonas") }, // Note: getOrthologsInOrganism should already use formatListResult internally.
+    { text: "List ciliary genes in C. elegans", handler: async () => wrapOrganismResult("C. elegans") },
+    { text: "Display ciliary genes in human", handler: async () => wrapOrganismResult("human") },
+    { text: "Show ciliary genes in mouse", handler: async () => wrapOrganismResult("mouse") },
+    { text: "List ciliary genes in zebrafish", handler: async () => wrapOrganismResult("zebrafish") },
+    { text: "Display ciliary genes in fly", handler: async () => wrapOrganismResult("fly") },
+
+    // ✅ FIX for Chlamydomonas: Uses the new reliable wrapping function.
+    { text: "List ciliary genes in Chlamydomonas", handler: async () => wrapOrganismResult("Chlamydomonas") }, 
+    // --- End of Fixes for getCiliaryGenesForOrganism calls ---
+
+    // ==================== NEW PHYLOGENY QUESTIONS ====================
+    { text: "Show conservation of IFT88 (Nevers 2017)", handler: async () => getNeversConservation("IFT88") },
+    { text: "What is the phylogeny of BBS1 (Nevers 2017)?", handler: async () => getNeversConservation("BBS1") },
+    { text: "Show conservation of IFT88 (Li 2014)", handler: async () => getLiConservation("IFT88") },
+    { text: "What is the phylogeny of ARL13B (Li 2014)?", handler: async () => getLiConservation("ARL13B") },
+
+    // ==================== COMPARATIVE GENOMICS ====================
+    { text: "Compare human and mouse ciliary genes", handler: async () => getConservedGenesBetween(["human", "mouse"]) },
+    { text: "Which ciliary genes are lost in non-ciliated organisms?", handler: async () => getCiliaryOnlyGenes() },
+    { text: "Show genes gained in vertebrates", handler: async () => notImplementedYet("Vertebrate-specific genes") },
+    { text: "Ciliary genes unique to mammals", handler: async () => notImplementedYet("Mammalian-specific genes") },
+    { text: "Which genes are conserved across all ciliated species?", handler: async () => notImplementedYet("Universally conserved ciliary genes") },
    
     // ==================== FUNCTIONAL GENOMICS SCREEN RESULTS ====================
     // Knockdown effects
@@ -1634,13 +1759,7 @@ const questionRegistry = [
     { text: "Find candidate ciliary genes", handler: async () => notImplementedYet("Prediction of ciliary genes") },
     { text: "Which genes might be ciliary based on expression?", handler: async () => notImplementedYet("Prediction of ciliary genes") },
     
-    // ==================== COMPARATIVE GENOMICS ====================
-    { text: "Compare human and mouse ciliary genes", handler: async () => getConservedGenesBetween(["human", "mouse"]) },
-    { text: "Which ciliary genes are lost in non-ciliated organisms?", handler: async () => getCiliaryOnlyGenes() },
-    { text: "Show genes gained in vertebrates", handler: async () => notImplementedYet("Vertebrate-specific genes") },
-    { text: "Ciliary genes unique to mammals", handler: async () => notImplementedYet("Mammalian-specific genes") },
-    { text: "Which genes are conserved across all ciliated species?", handler: async () => notImplementedYet("Universally conserved ciliary genes") },
-    
+
     // ==================== ADDITIONAL LOCALIZATION QUERIES ====================
     { text: "Show genes at ciliary base", handler: async () => formatListResult("Ciliary Base Genes", await getGenesByLocalization("ciliary base")) },
     { text: "Which genes localize to the periciliary membrane?", handler: async () => formatListResult("Periciliary Membrane Genes", await getGenesByLocalization("periciliary membrane")) },
@@ -3840,20 +3959,16 @@ function formatComplexResults(gene, title) {
     }
     return html + '</div>';
 }
-
-// --- Autocomplete Logic (REPLACEMENT) ---
 // =============================================================================
-// REPLACEMENT: Autocomplete now handles both prefixes and keywords
+// ENHANCED: Autocomplete with Trigger Word Detection + Contextual Suggestions
 // =============================================================================
 function setupAiQueryAutocomplete() {
     const aiQueryInput = document.getElementById('aiQueryInput');
     const suggestionsContainer = document.getElementById('aiQuerySuggestions');
     if (!aiQueryInput || !suggestionsContainer) return;
 
-    const initialPrompt = "How can I help you? Please press the features to learn what can I do for you.";
-    const metaQuestion = "What can you do?"; 
+    const metaQuestion = "What can you do?";
     
-    // Initial display when focused: Show the welcome message as a suggestion
     aiQueryInput.addEventListener('focus', () => {
         if (!aiQueryInput.value) {
             suggestionsContainer.innerHTML = `<div class="suggestion-item">${metaQuestion}</div>`;
@@ -3861,53 +3976,68 @@ function setupAiQueryAutocomplete() {
         }
     });
 
+    // Rich trigger word set for CiliaHub / CiliAI
     const triggerWords = [
-        // --- General commands & requests ---
         "list", "compare", "identify", "which", "what", "predict", "display",
         "describe", "show", "give", "provide", "tell me", "explain", "find",
         "summarize", "analyze", "define", "highlight", "report", "generate",
-        "create", "show me", "display", "outline", "make", "prepare",
-
-        // --- Scientific / Data-related ---
-        "evolutionary", "phylogenetic", "expression", "localization", "interaction",
-        "function", "role", "domain", "motif", "mutation", "variant", "disease",
-        "homolog", "ortholog", "paralog", "sequence", "alignment", "model",
-        "pathway", "network", "complex", "component", "isoform", "protein",
-        "gene", "transcript", "phenotype", "mechanism",
-
-        // --- Exploratory & conversational ---
-        "let me", "how", "where", "when", "is", "are", "can", "could", "would",
-        "does", "did", "should", "why", "who", "help", "learn", "discover",
-        "understand", "explore", "investigate", "test", "check", "search",
-
-        // --- Cilia-specific triggers (CiliAI context) ---
-        "cilia", "cilium", "ciliary", "basal body", "transition zone", "axoneme",
-        "IFT", "BBsome", "OSM", "ARL", "KIF", "IFT88", "ARL13B", "BBSome",
-        "PercevalHR", "ATP", "mitochondria", "IFT train", "flagella"
+        "create", "outline", "make", "prepare", "how", "where", "is", "are",
+        "can", "could", "would", "does", "did", "should", "why", "who", "help",
+        "learn", "discover", "understand", "explore", "investigate", "test",
+        "check", "search", "evolutionary", "phylogenetic", "expression",
+        "localization", "interaction", "function", "role", "domain", "motif",
+        "mutation", "variant", "disease", "homolog", "ortholog", "paralog",
+        "sequence", "alignment", "model", "pathway", "network", "complex",
+        "component", "isoform", "protein", "gene", "transcript", "phenotype",
+        "mechanism", "cilia", "cilium", "ciliary", "basal body",
+        "transition zone", "axoneme", "IFT", "BBSome", "OSM", "ARL", "KIF",
+        "IFT88", "ARL13B", "BBS", "PercevalHR", "ATP", "mitochondria", "flagella"
     ];
 
     aiQueryInput.addEventListener('input', debounce(async () => {
-        const inputText = aiQueryInput.value.toLowerCase();
+        const inputText = aiQueryInput.value.toLowerCase().trim();
         let suggestions = new Set();
 
         if (inputText.length < 3) {
-            if (inputText.length === 0) {
-                suggestions.add(metaQuestion);
-            } else {
-                suggestionsContainer.style.display = 'none';
-                return;
+            if (inputText.length === 0) suggestions.add(metaQuestion);
+            else suggestionsContainer.style.display = 'none';
+            renderSuggestions(suggestions);
+            return;
+        }
+
+        const words = inputText.split(/\s+/);
+        const detectedTriggers = triggerWords.filter(w => words.includes(w));
+
+        // --- Case 1: Trigger word detected ---
+        if (detectedTriggers.length > 0) {
+            detectedTriggers.forEach(trigger => {
+                // Example: filter questions starting with or containing the trigger
+                const related = questionRegistry
+                    .filter(q => q.text.toLowerCase().includes(trigger))
+                    .slice(0, 6);
+                related.forEach(q => suggestions.add(q.text));
+            });
+
+            // If no question matches trigger, provide generic helper prompts
+            if (suggestions.size === 0) {
+                detectedTriggers.forEach(trigger => {
+                    suggestions.add(`Show me ${trigger}-related data`);
+                    suggestions.add(`Describe ${trigger} in cilia`);
+                });
             }
         }
 
-        // --- Provider 1: Full questions (substring match for flexibility) ---
-        questionRegistry
-            .filter(item => item.text.toLowerCase().includes(inputText))
-            .slice(0, 6)
-            .forEach(item => suggestions.add(item.text));
+        // --- Case 2: Normal substring match (fallback) ---
+        if (suggestions.size === 0) {
+            questionRegistry
+                .filter(item => item.text.toLowerCase().includes(inputText))
+                .slice(0, 6)
+                .forEach(item => suggestions.add(item.text));
+        }
 
-        // --- Provider 2: Genes & Complexes (for broad queries like "about IFT88") ---
-        const lastWord = inputText.split(/\s+/).pop();
-        if (lastWord.length >= 2) {
+        // --- Case 3: Genes & complexes (broad support for scientific entities) ---
+        const lastWord = words[words.length - 1];
+        if (lastWord && lastWord.length >= 2) {
             const genes = intentParser.getAllGenes();
             if (genes.length > 0) {
                 genes
@@ -3920,7 +4050,12 @@ function setupAiQueryAutocomplete() {
                 .forEach(c => suggestions.add(`Components of ${c}`));
         }
 
-        // Display combined and deduplicated suggestions
+        renderSuggestions(suggestions);
+
+    }, 250));
+
+    // --- Render helper ---
+    function renderSuggestions(suggestions) {
         const finalSuggestions = Array.from(suggestions).slice(0, 6);
         if (finalSuggestions.length > 0) {
             suggestionsContainer.innerHTML = finalSuggestions
@@ -3930,9 +4065,9 @@ function setupAiQueryAutocomplete() {
         } else {
             suggestionsContainer.style.display = 'none';
         }
-    }, 250));
+    }
 
-    // Event listeners for suggestion clicks remain the same
+    // --- Click handling remains the same ---
     suggestionsContainer.addEventListener('click', (e) => {
         if (e.target.classList.contains('suggestion-item')) {
             aiQueryInput.value = e.target.textContent;
@@ -3948,7 +4083,6 @@ function setupAiQueryAutocomplete() {
         }
     });
 }
-
 
 
 // --- Gene Analysis Engine & UI (largely unchanged) ---
