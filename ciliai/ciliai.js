@@ -1630,9 +1630,11 @@ const questionRegistry = [
     { text: "Describe the effect of CEP290 LOF on cilia length", handler: async () => getGeneCiliaEffects("CEP290") },
     { text: "Show the comprehensive screen data for IFT88", handler: async () => getGeneCiliaEffects("IFT88") },
     
-    // ==================== PHENOTYPE QUERIES (USING getGenesByScreenPhenotype - Now Functional) ====================
+    // PHENOTYPE QUERIES (Functional Synonyms)
     { text: "Find genes that cause shorter cilia on loss of function", handler: async () => getGenesByScreenPhenotype("shorter cilia") },
+    { text: "Which genes result in shorter cilia when deleted?", handler: async () => getGenesByScreenPhenotype("shorter cilia") },
     { text: "Which genes reduce the percentage of ciliated cells?", handler: async () => getGenesByScreenPhenotype("reduced ciliated cells") },
+    { text: "Genes that reduce cilia number", handler: async () => getGenesByScreenPhenotype("reduced ciliated cells") },
     { text: "List genes that result in longer cilia when silenced", handler: async () => getGenesByScreenPhenotype("longer cilia") },
 
     // ==================== ORTHOLOGS ====================
@@ -2310,15 +2312,25 @@ async function getScreenResults(gene, screenName) {
         return `<div class="result-card"><h3>Screen Results for ${gene} in ${screenName}</h3><p class="status-not-found">No data found for this screen.</p></div>`;
     }
     
-    return `<div class="result-card"><h3>${screenName} Results for ${gene}</h3><p>${specificResult.result || "No specific result reported"}</p></div>`;
+    const citationHtml = getScreenCitationHtml(screenName);
+    
+    return `
+        <div class="result-card">
+            <h3>${screenCitationLinks[screenName]?.name || screenName} Results for ${gene}</h3>
+            <p><strong>Result:</strong> ${specificResult.result || "No specific result reported"}</p>
+            ${citationHtml}
+        </div>`;
 }
 
 async function getHedgehogRegulators(regulationType) {
     await fetchScreenData();
     const hedgehogGenes = [];
     
+    // The screen key is always Breslow2018 for Hedgehog.
+    const screenKey = "Breslow2018";
+    
     Object.entries(screenDataCache).forEach(([gene, screens]) => {
-        const hedgehogScreen = screens.find(s => s.source === "Breslow2018");
+        const hedgehogScreen = screens.find(s => s.source === screenKey);
         if (hedgehogScreen) {
             const result = hedgehogScreen.result?.toLowerCase() || "";
             if ((regulationType === "negative" || regulationType === "all") && result.includes("increased")) {
@@ -2333,22 +2345,72 @@ async function getHedgehogRegulators(regulationType) {
                   regulationType === "negative" ? "Negative Regulators of Hedgehog Signaling" : 
                   "Positive Regulators of Hedgehog Signaling";
     
-    return formatListResult(title, hedgehogGenes);
+    const citationHtml = getScreenCitationHtml(screenKey);
+    // Assuming formatListResult can include additional HTML at the end.
+    return formatListResult(title, hedgehogGenes, citationHtml);
 }
 
 async function getNoEffectGenes(screenName) {
     await fetchScreenData();
     const noEffectGenes = [];
     
+    // Ensure the screen name is a key in the citation object for lookup
+    const screenKey = screenName;
+    
     Object.entries(screenDataCache).forEach(([gene, screens]) => {
-        const targetScreen = screens.find(s => s.source === screenName);
+        const targetScreen = screens.find(s => s.source === screenKey);
         if (targetScreen && targetScreen.result === "No effect") {
-            noEffectGenes.push({ gene, description: `No effect in ${screenName}` });
+            noEffectGenes.push({ gene, description: `No effect in ${screenCitationLinks[screenKey]?.citation || screenKey}` });
         }
     });
     
-    return formatListResult(`Genes with No Effect in ${screenName}`, noEffectGenes);
+    const citationHtml = getScreenCitationHtml(screenKey);
+
+    return formatListResult(`Genes with No Effect in ${screenCitationLinks[screenKey]?.name || screenName}`, noEffectGenes, citationHtml);
 }
+
+const screenCitationLinks = {
+    // --- Number/Structure Screens ---
+    "Kim2016": {
+        name: 'Kim et al. (2016) IMCD3 RNAi',
+        link: 'https://www.sciencedirect.com/science/article/pii/S016748891630074X',
+        citation: 'Kim et al., FEBS Lett, 2016'
+    },
+    "Wheway2015": {
+        name: 'Wheway et al. (2015) RPE1 RNAi',
+        link: 'https://www.nature.com/articles/ncb3201#Abs1',
+        citation: 'Wheway et al., Nat Cell Biol, 2015'
+    },
+    "Roosing2015": {
+        name: 'Roosing et al. (2015) hTERT-RPE1',
+        link: 'https://elifesciences.org/articles/06602/figures#SD2-data',
+        citation: 'Roosing et al., eLife, 2015'
+    },
+    "Basu2023": {
+        name: 'Basu et al. (2023) MDCK CRISPR',
+        link: 'https://onlinelibrary.wiley.com/doi/10.1111/ahg.12529',
+        citation: 'Basu et al., Ann Hum Genet, 2023'
+    },
+    // --- Signaling Screen ---
+    "Breslow2018": {
+        name: 'Breslow et al. (2018) Hedgehog Signaling',
+        link: 'https://www.nature.com/articles/s41588-018-0054-7#Abs1',
+        citation: 'Breslow et al., Nat Genet, 2018'
+    }
+};
+
+// Helper to generate the citation HTML
+function getScreenCitationHtml(screenName) {
+    const citation = screenCitationLinks[screenName];
+    if (citation) {
+        return `<p style="font-size: 0.8em; color: #666; margin-top: 1rem; border-top: 1px solid #eee; padding-top: 0.5rem;">
+                    <strong>Source:</strong> ${citation.citation} - 
+                    <a href="${citation.link}" target="_blank">[View Publication]</a>
+                </p>`;
+    }
+    return '';
+}
+
 
 async function getGenesByScreenPhenotype(phenotype) {
     if (!ciliaHubDataCache) await fetchCiliaData();
@@ -2625,26 +2687,20 @@ window.displayCiliAIPage = async function displayCiliAIPage() {
                     <p>Your AI-powered partner for discovering gene-cilia relationships.</p>
                 </div>
                 <div class="ciliai-main-content">
-                    <div class="ai-query-section">
-                        <h3>Ask a Question</h3>
-                        <div class="ai-input-group autocomplete-wrapper">
-                            <input type="text" id="aiQueryInput" class="ai-query-input" placeholder="What's on your mind? Try a gene name or a question...">
-                            <div id="aiQuerySuggestions" class="suggestions-container"></div>
-                            <button class="ai-query-btn" id="aiQueryBtn">Ask CiliAI</button>
-                        </div>
-                        <div class="example-queries">
-                            <p>
-                                <strong>Try asking:</strong> 
-                                <span data-question="Joubert syndrome">Joubert syndrome</span>, 
-                                <span data-question="c. elegans">c. elegans</span>, 
-                                <span data-question="Plot UMAP expression for FOXJ1">UMAP plot for FOXJ1</span>,
-                                <span data-question="Compare ARL13B and FOXJ1 expression in lung scRNA-seq">Compare ARL13B vs FOXJ1</span>,
-                                <span data-question="Which Joubert Syndrome genes are expressed in ciliated cells?">Joubert genes in ciliated cells</span>,
-                                <span data-question="Tell me about yourself">About CiliAI</span>
-                            </p>
-                        </div>
-                        <div id="ai-result-area" class="results-section" style="display: none; margin-top: 1.5rem; padding: 1rem;"></div>
-                    </div>
+                <div class="ai-query-section">
+                    <h3>Ask a Question</h3>
+                    <div class="ai-input-group autocomplete-wrapper">
+                        <input type="text" id="aiQueryInput" class="ai-query-input" placeholder="Enter gene (e.g., IFT88) or a question...">
+                        <div id="aiQuerySuggestions" class="suggestions-container"></div>
+                        <button class="ai-query-btn" id="aiQueryBtn">Ask CiliAI</button>
+                    </div>
+                    <div class="example-queries">
+                                                <p id="initial-prompt">
+                            **How can I help you?** Press the search box or <span data-question="What can you do?">features</span> to learn what I can do for you.
+                        </p>
+                    </div>
+                    <div id="ai-result-area" class="results-section" style="display: none; margin-top: 1.5rem; padding: 1rem;"></div>
+                </div>
                     
                     <div class="input-section">
                         <h3>Analyze Gene Phenotypes</h3>
@@ -3359,25 +3415,87 @@ function formatComprehensiveGeneDetails(geneSymbol, geneData) {
     if (!geneData) {
         return `<div class="result-card"><h3>${geneSymbol}</h3><p class="status-not-found">Gene not found in the database.</p></div>`;
     }
-    const { ensembl_id, functional_summary, description, localization, complex_names, complex_components, domain_descriptions, synonym, ciliopathy } = geneData;
+    const { 
+        ensembl_id, functional_summary, description, localization, 
+        complex_names, complex_components, domain_descriptions, synonym, 
+        ciliopathy, 
+        // --- NEW FIELDS INTEGRATED ---
+        ciliopathy_classification, 
+        ortholog_mouse, ortholog_c_elegans, ortholog_zebrafish, ortholog_drosophila, 
+        overexpression_effects, lof_effects, percent_ciliated_cells_effects,
+        screens_from_separate_file 
+        // --- END NEW FIELDS ---
+    } = geneData;
+
+    // Helper to render the screen data table (reused logic from getGeneCiliaEffects)
+    // NOTE: This helper (renderDetailedScreenTable) must be defined elsewhere in your code.
+    const renderDetailedScreenTable = (screenFindings) => {
+        if (!screenFindings || screenFindings.length === 0) {
+            return `<p class="status-not-found">No detailed quantitative screen data available.</p>`;
+        }
+        const tableRows = screenFindings.map(s => `
+            <tr>
+                <td>${s.dataset || 'N/A'}</td>
+                <td>${(s.mean_percent_ciliated !== undefined) ? s.mean_percent_ciliated.toFixed(2) : 'N/A'}</td>
+                <td>${(s.z_score !== undefined) ? s.z_score.toFixed(2) : 'N/A'}</td>
+                <td>${s.classification || s.result || 'N/A'}</td>
+                <td><a href="${s.paper_link}" target="_blank">Link</a></td>
+            </tr>
+        `).join('');
+
+        return `
+            <table class="ciliopathy-table">
+                <thead>
+                    <tr>
+                        <th class="sortable">Dataset</th>
+                        <th>Mean % Ciliated</th>
+                        <th>Z-Score</th>
+                        <th>Classification</th>
+                        <th>Reference</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${tableRows}
+                </tbody>
+            </table>
+        `;
+    };
+
 
     return `
         <div class="result-card">
-            <h3>${geneSymbol} Details</h3>
+            <h3>${geneSymbol} Comprehensive Details</h3>
             <table class="gene-detail-table">
                 <tr><th>Ensembl ID</th><td>${ensembl_id || 'N/A'}</td></tr>
+                <tr><th>Ciliopathy Classification</th><td><strong>${ciliopathy_classification || 'N/A'}</strong></td></tr>
+                <tr><th>Ciliopathy/Disease</th><td>${ciliopathy.join(', ') || 'N/A'}</td></tr>
                 <tr><th>Functional Summary</th><td>${functional_summary || description || 'N/A'}</td></tr>
                 <tr><th>Localization</th><td>${localization.join(', ') || 'N/A'}</td></tr>
-                <tr><th>Complex Name</th><td>${complex_names.join(', ') || 'N/A'}</td></tr>
-                <tr><th>Complex Components</th><td>${complex_components.join(', ') || 'N/A'}</td></tr>
+                <tr><th>Primary Synonym</th><td>${synonym || 'N/A'}</td></tr>
+                <tr><th>Complex Name(s)</th><td>${complex_names.join(', ') || 'N/A'}</td></tr>
                 <tr><th>Domain Descriptions</th><td>${domain_descriptions.join(', ') || 'N/A'}</td></tr>
-                <tr><th>Synonym</th><td>${synonym || 'N/A'}</td></tr>
-                <tr><th>Ciliopathy</th><td>${ciliopathy.join(', ') || 'N/A'}</td></tr>
             </table>
-            <h4>Screen Results</h4>
-            ${screenDataCache && screenDataCache[geneSymbol] ? renderScreenDataTable(geneSymbol, screenDataCache[geneSymbol]) : '<p>No screen data available.</p>'}
+
+            <h4>Orthologs & Conservation</h4>
+            <table class="gene-detail-table">
+                <tr><th>Mouse</th><td>${ortholog_mouse || 'N/A'}</td></tr>
+                <tr><th>C. elegans</th><td>${ortholog_c_elegans || 'N/A'}</td></tr>
+                <tr><th>Zebrafish</th><td>${ortholog_zebrafish || 'N/A'}</td></tr>
+                <tr><th>Drosophila</th><td>${ortholog_drosophila || 'N/A'}</td></tr>
+            </table>
+
+            <h4>Ciliary Phenotypic Effects (Curated Summary)</h4>
+            <table class="gene-detail-table">
+                <tr><th>LOF Effects</th><td>${lof_effects || 'Not Reported'}</td></tr>
+                <tr><th>Overexpression Effects</th><td>${overexpression_effects || 'Not Reported'}</td></tr>
+                <tr><th>% Ciliated Cells Effect</th><td>${percent_ciliated_cells_effects || 'Not Reported'}</td></tr>
+            </table>
+            
+            <h4>Genome-Wide Screen Results</h4>
+            ${renderDetailedScreenTable(screens_from_separate_file)}
+            
             <p class="ai-suggestion">
-                <a href="#" class="ai-action" data-action="expression-visualize" data-gene="${geneSymbol}">📊 View expression heatmap</a>
+                <a href="#" class="ai-action" data-action="expression-visualize" data-gene="${geneSymbol}">📊 View tissue expression heatmap</a>
             </p>
         </div>
     `;
@@ -3450,7 +3568,7 @@ function formatGeneDetail(geneData, geneSymbol, detailTitle, detailContent) {
 }
 
 // --- Table Formatting ---
-function formatListResult(title, geneList, message = '') {
+function formatListResult(title, geneList, message = '', citationHtml = '') {
     if (!geneList || geneList.length === 0) {
         return `<div class="result-card"><h3>${title}</h3><p class="status-not-found">No matching genes found.</p></div>`;
     }
@@ -3470,13 +3588,15 @@ function formatListResult(title, geneList, message = '') {
     </table>
     ${geneList.length > 100 ? `<p><a href="https://theciliahub.github.io/" target="_blank">View full list (${geneList.length} genes) in CiliaHub</a></p>` : ''}`;
 
-    // NEW FEATURE: Add reference for phylogeny data
-    let referenceHtml = '';
-    const phylogenyKeywords = ['ciliary-only', 'non-ciliary-only', 'all organisms', 'human-specific'];
-    if (phylogenyKeywords.some(kw => title.toLowerCase().includes(kw))) {
-        referenceHtml = `<p style="font-size: 0.8em; color: #666; margin-top: 1rem; border-top: 1px solid #eee; padding-top: 0.5rem;">
-            Phylogenetic classification data extracted from: Li, Y. et al. (2014) <em>Cell</em>, 158(1), 213–225. <a href="https://pubmed.ncbi.nlm.nih.gov/24995987/" target="_blank" title="View on PubMed">PMID: 24995987</a>.
-        </p>`;
+    // Conditional Reference Logic (prioritizes citationHtml)
+    let finalReferenceHtml = citationHtml; // Use citationHtml if provided
+    if (!finalReferenceHtml) { // Fall back to phylogeny reference only if no citationHtml is provided
+        const phylogenyKeywords = ['ciliary-only', 'non-ciliary-only', 'all organisms', 'human-specific'];
+        if (phylogenyKeywords.some(kw => title.toLowerCase().includes(kw))) {
+            finalReferenceHtml = `<p style="font-size: 0.8em; color: #666; margin-top: 1rem; border-top: 1px solid #eee; padding-top: 0.5rem;">
+                Phylogenetic classification data extracted from: Li, Y. et al. (2014) <em>Cell</em>, 158(1), 213–225. <a href="https://pubmed.ncbi.nlm.nih.gov/24995987/" target="_blank" title="View on PubMed">PMID: 24995987</a>.
+            </p>`;
+        }
     }
 
     return `
@@ -3484,9 +3604,10 @@ function formatListResult(title, geneList, message = '') {
       <h3>${title} (${geneList.length} found)</h3>
       ${messageHtml}
       ${tableHtml}
-      ${referenceHtml}
+      ${finalReferenceHtml}
     </div>`;
 }
+
 async function getGeneCiliaEffects(gene) {
     if (!ciliaHubDataCache) await fetchCiliaData(); // Ensures data is loaded/integrated
     const geneData = ciliaHubDataCache.find(g => g.gene.toUpperCase() === gene.toUpperCase());
@@ -3640,11 +3761,40 @@ function setupAiQueryAutocomplete() {
     const suggestionsContainer = document.getElementById('aiQuerySuggestions');
     if (!aiQueryInput || !suggestionsContainer) return;
 
-    // CORRECTED: Moved triggerWords to the top-level scope of the function
+    const initialPrompt = "How can I help you? Please press the features to learn what can I do for you.";
+    const metaQuestion = "What can you do?"; 
+    
+    // Initial display when focused: Show the welcome message as a suggestion
+    aiQueryInput.addEventListener('focus', () => {
+        if (!aiQueryInput.value) {
+            suggestionsContainer.innerHTML = `<div class="suggestion-item">${metaQuestion}</div>`;
+            suggestionsContainer.style.display = 'block';
+        }
+    });
+
     const triggerWords = [
-        "list", "compare", "identify", "which", "what", "predict",
-        "display", "describe", "show", "give", "provide", "tell me",
-        "evolutionary", "let me"
+        // --- General commands & requests ---
+        "list", "compare", "identify", "which", "what", "predict", "display",
+        "describe", "show", "give", "provide", "tell me", "explain", "find",
+        "summarize", "analyze", "define", "highlight", "report", "generate",
+        "create", "show me", "display", "outline", "make", "prepare",
+
+        // --- Scientific / Data-related ---
+        "evolutionary", "phylogenetic", "expression", "localization", "interaction",
+        "function", "role", "domain", "motif", "mutation", "variant", "disease",
+        "homolog", "ortholog", "paralog", "sequence", "alignment", "model",
+        "pathway", "network", "complex", "component", "isoform", "protein",
+        "gene", "transcript", "phenotype", "mechanism",
+
+        // --- Exploratory & conversational ---
+        "let me", "how", "where", "when", "is", "are", "can", "could", "would",
+        "does", "did", "should", "why", "who", "help", "learn", "discover",
+        "understand", "explore", "investigate", "test", "check", "search",
+
+        // --- Cilia-specific triggers (CiliAI context) ---
+        "cilia", "cilium", "ciliary", "basal body", "transition zone", "axoneme",
+        "IFT", "BBsome", "OSM", "ARL", "KIF", "IFT88", "ARL13B", "BBSome",
+        "PercevalHR", "ATP", "mitochondria", "IFT train", "flagella"
     ];
 
     aiQueryInput.addEventListener('input', debounce(async () => {
@@ -3652,47 +3802,48 @@ function setupAiQueryAutocomplete() {
         let suggestions = new Set();
 
         if (inputText.length < 3) {
-            suggestionsContainer.style.display = 'none';
-            return;
-        }
-
-        // --- Provider 1: Full questions from the registry ---
-        questionRegistry
-            .filter(item =>
-                item.text.toLowerCase().includes(inputText) ||
-                triggerWords.some(word => inputText.startsWith(word))
-            )
-            .forEach(item => suggestions.add(item.text));
-
-        // --- Provider 2: "Tell me about..." for genes and complexes ---
-        if (inputText.startsWith('tell me') || inputText.startsWith('what is') || inputText.startsWith('describe')) {
-            const term = inputText.split(/\s+/).pop();
-            if (term.length >= 2) {
-                const genes = intentParser.getAllGenes();
-                if (genes.length > 0) {
-                    genes.filter(gene => gene.toLowerCase().startsWith(term)).slice(0, 2).forEach(gene => suggestions.add(`Tell me about ${gene}`));
-                }
-                intentParser.getAllComplexes().filter(c => c.toLowerCase().startsWith(term)).forEach(c => suggestions.add(`Tell me about ${c}`));
+            if (inputText.length === 0) {
+                suggestions.add(metaQuestion);
+            } else {
+                suggestionsContainer.style.display = 'none';
+                return;
             }
         }
-        // --- Provider 3: Direct keyword suggestions from the intent parser ---
-        else {
-            intentParser.getKnownKeywords()
-                .filter(item => item.keyword.toLowerCase().startsWith(inputText))
-                .forEach(item => suggestions.add(item.suggestion));
+
+        // --- Provider 1: Full questions (substring match for flexibility) ---
+        questionRegistry
+            .filter(item => item.text.toLowerCase().includes(inputText))
+            .slice(0, 6)
+            .forEach(item => suggestions.add(item.text));
+
+        // --- Provider 2: Genes & Complexes (for broad queries like "about IFT88") ---
+        const lastWord = inputText.split(/\s+/).pop();
+        if (lastWord.length >= 2) {
+            const genes = intentParser.getAllGenes();
+            if (genes.length > 0) {
+                genes
+                    .filter(gene => gene.toLowerCase().startsWith(lastWord))
+                    .slice(0, 2)
+                    .forEach(gene => suggestions.add(`Tell me about ${gene}`));
+            }
+            intentParser.getAllComplexes()
+                .filter(c => c.toLowerCase().startsWith(lastWord))
+                .forEach(c => suggestions.add(`Components of ${c}`));
         }
 
         // Display combined and deduplicated suggestions
         const finalSuggestions = Array.from(suggestions).slice(0, 6);
         if (finalSuggestions.length > 0) {
-            suggestionsContainer.innerHTML = finalSuggestions.map(s => `<div class="suggestion-item">${s}</div>`).join('');
+            suggestionsContainer.innerHTML = finalSuggestions
+                .map(s => `<div class="suggestion-item">${s}</div>`)
+                .join('');
             suggestionsContainer.style.display = 'block';
         } else {
             suggestionsContainer.style.display = 'none';
         }
     }, 250));
 
-    // Event listeners remain the same
+    // Event listeners for suggestion clicks remain the same
     suggestionsContainer.addEventListener('click', (e) => {
         if (e.target.classList.contains('suggestion-item')) {
             aiQueryInput.value = e.target.textContent;
@@ -3701,13 +3852,13 @@ function setupAiQueryAutocomplete() {
             handleAIQuery();
         }
     });
+
     document.addEventListener('click', (e) => {
         if (!aiQueryInput.contains(e.target) && !suggestionsContainer.contains(e.target)) {
             suggestionsContainer.style.display = 'none';
         }
     });
 }
-
 
 
 
