@@ -2081,30 +2081,51 @@ async function getGenesByScreenPhenotype(phenotype) {
 }
 
 /**
- * Finds human genes associated with a specific ciliopathy that are conserved
- * and present in a given model organism, based on phylogenetic data.
+ * Retrieves ALL genes marked with any ciliopathy, regardless of specific name.
+ * This is the robust way to handle the generic "Ciliopathy" query.
  */
+async function getAllCiliopathyGenesRaw() {
+    await fetchCiliaData();
+    
+    // Filter for genes where the 'ciliopathy' array is present and non-empty.
+    const allDiseaseGenes = ciliaHubDataCache
+        .filter(g => Array.isArray(g.ciliopathy) && g.ciliopathy.length > 0)
+        .map(g => ({ 
+            gene: g.gene, 
+            description: g.ciliopathy.join(', ')
+        }));
+
+    return { 
+        genes: allDiseaseGenes, 
+        description: `Found ${allDiseaseGenes.length} genes associated with ANY Ciliopathy.`,
+        disease: "Ciliopathy"
+    };
+}
+
+// --- UPDATED getDiseaseGenesInOrganism (Final Version) ---
 async function getDiseaseGenesInOrganism(disease, organism) {
     await fetchCiliaData();
     await fetchPhylogenyData();
 
+    let resultObject;
     const diseaseQuery = (disease.toLowerCase().includes('ciliopathy')) ? "Ciliopathy" : disease;
 
-    // STEP 2: **CRUCIAL CHANGE HERE**
-    // If the query is "Ciliopathy" (general), retrieve ALL disease genes using the general handler.
-    // Otherwise, retrieve only genes matching the specific disease name.
-    const queryTerm = (diseaseQuery === "Ciliopathy") ? "ciliopathy" : diseaseQuery; 
-    const { genes: diseaseGenes } = await getCiliopathyGenes(queryTerm);
+    // STEP 2: **CRITICAL SWITCH** - Use the universal list for generic queries.
+    if (diseaseQuery === "Ciliopathy") {
+        resultObject = await getAllCiliopathyGenesRaw(); // Use the robust list
+    } else {
+        // Use the targeted helper for specific conditions (Joubert, BBS, etc.)
+        resultObject = await getCiliopathyGenes(diseaseQuery);
+        resultObject.disease = diseaseQuery;
+    }
     
-    // If querying "Ciliopathy," ensure we filter for genes that actually *have* a disease annotation.
-    // getCiliopathyGenes already performs this filtering effectively.
-    const diseaseGeneSet = new Set(diseaseGenes.map(g => g.gene.toUpperCase()));
+    const diseaseGeneSet = new Set(resultObject.genes.map(g => g.gene.toUpperCase()));
 
     if (diseaseGeneSet.size === 0) {
         return formatListResult(
             `Genes for ${disease} in ${organism}`, 
             [], 
-            `No human genes found associated with ${diseaseQuery}.`
+            `No human genes found associated with ${disease}.`
         );
     }
 
@@ -2118,7 +2139,7 @@ async function getDiseaseGenesInOrganism(disease, organism) {
     const speciesQuery = organismMap[organism.toLowerCase()] || organism;
     const speciesRegex = new RegExp(`^${normalizeTerm(speciesQuery).replace(/\./g, '\\.?').replace(/\s/g, '\\s*')}$`, 'i');
     
-    // 4. Filter disease genes by conservation in the target organism (unchanged)
+    // 4. Filter disease genes by conservation in the target organism
     const conservedDiseaseGenes = [];
 
     diseaseGeneSet.forEach(humanGene => {
@@ -2132,14 +2153,14 @@ async function getDiseaseGenesInOrganism(disease, organism) {
                 
                 conservedDiseaseGenes.push({
                     gene: humanGene,
-                    description: `Disease: ${originalGene.ciliopathy.join(', ')}. Conserved in: ${speciesQuery}.`
+                    description: `Diseases: ${originalGene.ciliopathy.join(', ')}. Conserved in: ${speciesQuery}.`
                 });
             }
         }
     });
 
-    const title = `${diseaseQuery} Genes Conserved in ${speciesQuery}`;
-    const description = `Found ${conservedDiseaseGenes.length} ${diseaseQuery} gene(s) conserved in ${speciesQuery}.`;
+    const title = `${resultObject.disease} Genes Conserved in ${speciesQuery}`;
+    const description = `Found ${conservedDiseaseGenes.length} ${resultObject.disease} gene(s) conserved in ${speciesQuery}.`;
 
     // 5. Return formatted HTML string
     return formatListResult(title, conservedDiseaseGenes, description);
