@@ -595,37 +595,35 @@ async function fetchCellxgeneData() {
 
 
 // --- Helper Functions ---
-
 /**
  * Finds human genes associated with a specific ciliopathy that are conserved
  * and present in a given model organism, based on phylogenetic data.
- * @param {string} disease - The name of the human ciliopathy (e.g., 'Joubert Syndrome').
- * @param {string} organism - The target model organism (e.g., 'C. elegans').
+ * This function returns the final HTML string.
  */
 async function getDiseaseGenesInOrganism(disease, organism) {
-    // 1. Fetch all necessary data
+    // 1. Fetch all necessary data (already logged as successful in console output)
     await fetchCiliaData();
     await fetchPhylogenyData();
 
-    // 2. Get the list of genes associated with the disease
-    const { genes: diseaseGenes } = await getCiliopathyGenes(disease);
+    // 2. Get the list of genes associated with the disease (Use "Ciliopathy" for broad search)
+    const diseaseQuery = (disease.toLowerCase().includes('ciliopathy')) ? "Ciliopathy" : disease;
+    const { genes: diseaseGenes } = await getCiliopathyGenes(diseaseQuery);
     const diseaseGeneSet = new Set(diseaseGenes.map(g => g.gene.toUpperCase()));
 
     if (diseaseGeneSet.size === 0) {
         return formatListResult(`Genes for ${disease} in ${organism}`, [], `No human genes found for ${disease}.`);
     }
 
-    // 3. Normalize the organism name for phylogenetic lookup
+    // 3. Prepare organism lookup (must match getCiliaryGenesForOrganism internal logic)
     const organismMap = {
         'worm': 'C.elegans', 'c. elegans': 'C.elegans',
         'mouse': 'M.musculus', 'xenopus': 'X.tropicalis',
         'zebrafish': 'D.rerio', 'drosophila': 'D.melanogaster', 'fly': 'D.melanogaster',
         'chlamydomonas': 'C.reinhardtii',
-        // Add direct mappings for species codes if needed
     };
     const speciesQuery = organismMap[organism.toLowerCase()] || organism;
     const speciesRegex = new RegExp(`^${normalizeTerm(speciesQuery).replace(/\./g, '\\.?').replace(/\s/g, '\\s*')}$`, 'i');
-
+    
     // 4. Filter disease genes by conservation in the target organism
     const conservedDiseaseGenes = [];
 
@@ -641,21 +639,20 @@ async function getDiseaseGenesInOrganism(disease, organism) {
                 
                 conservedDiseaseGenes.push({
                     gene: humanGene,
-                    description: `Disease: ${disease}. Conserved in: ${speciesQuery}.`
+                    description: `Disease: ${originalGene.ciliopathy.join(', ')}. Conserved in: ${speciesQuery}.`
                 });
             }
         }
     });
 
-    const title = `${disease} Genes Conserved in ${speciesQuery}`;
-    const description = `Found ${conservedDiseaseGenes.length} ${disease} gene(s) with orthologs in ${speciesQuery}.`;
+    const title = `${diseaseQuery} Genes Conserved in ${speciesQuery}`;
+    const description = `Found ${conservedDiseaseGenes.length} ${diseaseQuery} gene(s) conserved in ${speciesQuery}.`;
 
+    // 5. Return formatted HTML
     return formatListResult(title, conservedDiseaseGenes, description);
 }
-/**
- * Fetches the new domain database (enriched, depleted, gene map).
- * URL: https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/cili_ai_domain_database.json
- */
+
+
 /**
  * Fetches the new domain database (enriched, depleted, gene map).
  * URL: https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/cili_ai_domain_database.json
@@ -2093,9 +2090,14 @@ function notImplementedYet(feature) {
 // --- Start of Appending Combined Disease + Organism Queries ---
 // This block should be appended to the END of your existing questionRegistry array.
 
-// Define the queries in a self-contained array (ensuring proper const declaration)
-const combinedDiseaseOrganismQueries = [
-    // --- Core/Direct Queries ---
+// This entire block replaces the previous attempt at defining and pushing
+// the combinedDiseaseOrganismQueries array.
+
+// Assuming the main global registry array is named 'questionRegistry' and is already defined.
+const combinedDiseaseOrganismQueries = [ 
+    // =========================================================================
+    // CORE/DIRECT QUERIES (Combined Disease and Organism)
+    // =========================================================================
     { 
         text: "Please bring the Joubert syndrome genes in C. elegans", 
         handler: async () => getDiseaseGenesInOrganism("Joubert Syndrome", "C. elegans") 
@@ -2121,7 +2123,9 @@ const combinedDiseaseOrganismQueries = [
         handler: async () => getDiseaseGenesInOrganism("Nephronophthisis", "C. elegans") 
     },
 
-    // --- Expanded Synonyms and General Ciliopathy Queries ---
+    // =========================================================================
+    // EXPANDED SYNONYMS AND GENERAL CILIOPATHY QUERIES
+    // =========================================================================
     { 
         text: "Which Joubert syndrome genes are conserved in C. elegans?", 
         handler: async () => getDiseaseGenesInOrganism("Joubert Syndrome", "C. elegans") 
@@ -2138,6 +2142,8 @@ const combinedDiseaseOrganismQueries = [
         text: "List conserved Joubert genes in zebrafish", 
         handler: async () => getDiseaseGenesInOrganism("Joubert Syndrome", "Zebrafish") 
     },
+    
+    // General Ciliopathy Queries
     { 
         text: "List ciliopathy genes conserved in Mouse", 
         handler: async () => getDiseaseGenesInOrganism("Ciliopathy", "Mouse") 
@@ -2167,6 +2173,8 @@ const combinedDiseaseOrganismQueries = [
 // --- Merge the array contents into the global registry ---
 // This line should be placed immediately after the combinedDiseaseOrganismQueries array definition.
 questionRegistry.push(...combinedDiseaseOrganismQueries);
+
+
 
 
 
