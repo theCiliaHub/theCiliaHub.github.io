@@ -69,25 +69,30 @@ function createIntentParser() {
         {
             type: 'FUNCTIONAL_CATEGORY',
             keywords: ['kinesin motors', 'dynein motors', 'Ciliary assembly/disassembly', 'Signaling', 'Motile cilium', 'Motor protein', 'Transport', 'Protein modification', 'Cytoskeletal', 'cilium assembly', 'basal body docking', 'retrograde IFT'],
-            handler: async (term) => getGenesByFunction(term),
+            handler: async (term) => formatListResult(`Genes in Functional Category: ${term}`, await getGenesByFunction(term)),
             autocompleteTemplate: (term) => `Show me ${term} genes`
         },
         {
             type: 'COMPLEX',
             keywords: ['BBSome', 'IFT-A', 'IFT-B', 'Transition Zone Complex', 'MKS Complex', 'NPHP Complex'],
-            handler: async (term) => getGenesByComplex(term),
+            handler: async (term) => formatListResult(`Components of ${term}`, await getGenesByComplex(term)),
             autocompleteTemplate: (term) => `Display components of ${term} complex`
         },
         {
             type: 'CILIOPATHY',
             keywords: [...new Set(allDiseases)],
-            handler: async (term) => getCiliopathyGenes(term),
+            handler: async (term) => {
+                const titleTerm = term.toUpperCase() === 'BBS' ? 'Bardet–Biedl Syndrome' :
+                                  term.toUpperCase() === 'MKS' ? 'Meckel–Gruber Syndrome' : term;
+                const { genes, description } = await getCiliopathyGenes(term);
+                return formatListResult(`Genes for ${titleTerm}`, genes, description);
+            },
             autocompleteTemplate: (term) => `Display genes for ${term}`
         },
         {
             type: 'LOCALIZATION',
             keywords: ['basal body', 'axoneme', 'transition zone', 'centrosome', 'cilium', 'lysosome', 'ciliary tip', 'transition fiber'],
-            handler: async (term) => getGenesByLocalization(term),
+            handler: async (term) => formatListResult(`Genes localizing to ${term}`, await getGenesByLocalization(term)),
             autocompleteTemplate: (term) => `Show me ${term} localizing genes`
         },
         {
@@ -111,13 +116,16 @@ function createIntentParser() {
                 "G.gallus", "M.gallopavo", "O.anatinus", "M.domestica", "S.scrofa", "M.musculus", "C.familiaris", "B.taurus", "H.sapiens",
                 "worm", "human", "mouse", "zebrafish", "fly", "yeast"
             ],
-            handler: async (term) => getCiliaryGenesForOrganism(term),
+            handler: async (term) => {
+                const { genes, description, speciesCode } = await getCiliaryGenesForOrganism(term);
+                return formatListResult(`Ciliary genes in ${speciesCode}`, genes, description);
+            },
             autocompleteTemplate: (term) => `Display ciliary genes in ${term}`
         },
         {
             type: 'DOMAIN',
             keywords: ['WD40', 'Leucine-rich repeat', 'IQ motif', 'calmodulin-binding', 'EF-hand', 'coiled-coil', 'CTS', 'ciliary targeting sequences', 'ciliary localization signals'],
-            handler: async (term) => findGenesByNewDomainDB(term),
+            handler: async (term) => formatListResult(`${term} domain-containing proteins`, await getGenesWithDomain(term)),
             autocompleteTemplate: (term) => `Show ${term} domain containing proteins`
         }
     ];
@@ -203,103 +211,56 @@ async function fetchScreenData() {
 }
 
 /**
- * MASTER data loader for all gene-centric data.
- * Fetches the main CiliaHub database AND the supplementary screen data,
- * then merges them into the object-based ciliaHubDataCache.
+ * NEW: Master data loader to fetch and merge all gene-centric data.
+ * This should be called before any query is run.
  */
 async function loadAndMergeGeneData() {
-    // Prevent re-fetching if already loaded and seems valid
-    if (ciliaHubDataCache && Object.keys(ciliaHubDataCache).length > 0) {
-        console.log("Using cached CiliaHub data.");
-        return ciliaHubDataCache;
-    }
-    console.log("Starting loadAndMergeGeneData...");
+    // Fetch both datasets in parallel
+    const [mainData, screenData] = await Promise.all([
+        fetchCiliaData(),
+        fetchScreenData()
+    ]);
 
-    const mainDataUrl = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/ciliahub_data.json';
-    const screenDataUrl = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/cilia_screens_data.json';
-
-    let mainDataArray = [];
-    let screenData = {};
-
-    try {
-        console.log("Fetching main gene data and screen data in parallel...");
-        const [mainResponse, screenResponse] = await Promise.all([
-            fetch(mainDataUrl),
-            fetch(screenDataUrl)
-        ]);
-
-        if (!mainResponse.ok) throw new Error(`Failed to fetch main data: ${mainResponse.statusText}`);
-        mainDataArray = await mainResponse.json();
-
-        if (screenResponse.ok) {
-            screenData = await screenResponse.json();
-        } else {
-             console.error(`Failed to fetch screen data: ${screenResponse.statusText}. Proceeding without merging supplementary screens.`);
-             screenData = {}; // Ensure it's an empty object
-        }
-        console.log(`Raw main data: ${mainDataArray.length} entries. Raw screen data: ${Object.keys(screenData).length} gene entries.`);
-
-    } catch (error) {
-        console.error('Critical error fetching core gene/screen data:', error);
-        ciliaHubDataCache = {}; // Set to empty on critical failure
-        throw error;
+    if (!mainData || !screenData) {
+        console.error("Failed to load one or more essential datasets. Merging skipped.");
+        return mainData; // Return whatever data we have
     }
 
-    const indexedMainData = {};
-    for (const geneEntry of mainDataArray) {
-        if (geneEntry && geneEntry.gene) {
-            const geneUpper = geneEntry.gene.toUpperCase();
-            // FIXED: Ensure screens is initialized as an array IF IT DOESN'T EXIST or is null
-            if (!geneEntry.screens || !Array.isArray(geneEntry.screens)) {
-                 geneEntry.screens = [];
-            }
-            indexedMainData[geneUpper] = geneEntry;
-        }
-    }
-    console.log(`Indexed main data: ${Object.keys(indexedMainData).length} unique genes.`);
-
+    // --- Merge Logic ---
+    // Merge supplementary screenData into the mainData (ciliaHubDataCache)
     let mergedCount = 0;
     for (const geneUpper in screenData) {
-        const extraScreens = screenData[geneUpper];
-        if (!Array.isArray(extraScreens)) {
-            console.warn(`Malformed screen data for ${geneUpper}, expected array. Skipping merge.`);
-            continue;
-        }
-
-        if (indexedMainData[geneUpper]) {
-            // FIXED: Ensure .screens is definitely an array before proceeding
-            if (!indexedMainData[geneUpper].screens || !Array.isArray(indexedMainData[geneUpper].screens)) {
-                indexedMainData[geneUpper].screens = [];
-            }
-            const mainScreens = indexedMainData[geneUpper].screens; // Now guaranteed to be an array
-
-            // FIXED: Ensure .map works correctly
-            const mainDatasetNames = new Set(mainScreens.map(s => s?.dataset).filter(Boolean));
-
+        if (mainData[geneUpper]) {
+            // Gene exists in both. Merge the 'screens' arrays.
+            const mainScreens = mainData[geneUpper].screens;
+            const extraScreens = screenData[geneUpper]; // This is already an array
+            
+            // Add only screens that are not already present (e.g., based on 'dataset')
+            const mainDatasetNames = new Set(mainScreens.map(s => s.dataset));
             for (const extraScreen of extraScreens) {
-                if (extraScreen && extraScreen.dataset && !mainDatasetNames.has(extraScreen.dataset)) {
-                     mainScreens.push(extraScreen);
-                     mergedCount++;
+                if (!mainDatasetNames.has(extraScreen.dataset)) {
+                    mainScreens.push(extraScreen);
+                    mergedCount++;
                 }
             }
         } else {
-            // Gene only in supplementary screen data. Create a minimal entry.
-            // console.warn(`Gene ${geneUpper} found only in screen data, creating minimal entry.`); // Reduced log noise
-             indexedMainData[geneUpper] = { /* ... (keep minimal entry structure) ... */ };
+            // Gene only in supplementary data; create a new entry
+            // (This is less likely if ciliahub_data.json is comprehensive)
+            mainData[geneUpper] = {
+                gene: geneUpper, 
+                screens: screenData[geneUpper],
+                // ...other fields will be default/missing
+            };
         }
     }
-
+    
     if (mergedCount > 0) {
         console.log(`Merged ${mergedCount} supplementary screen results into main data.`);
     }
-
-    ciliaHubDataCache = indexedMainData;
-    console.log(`✅ Final CiliaHub data cache contains ${Object.keys(ciliaHubDataCache).length} genes.`);
+    
+    ciliaHubDataCache = mainData; // Store the final merged data
     return ciliaHubDataCache;
 }
-
-
-
 async function fetchPhylogenyData() {
     if (phylogenyDataCache) return phylogenyDataCache;
     try {
@@ -864,32 +825,6 @@ async function displayUmapPlot() {
     Plotly.newPlot(plotDivId, plotData, layout, { responsive: true, displayModeBar: false });
     return "";
 }
-
-/**
- * EXTERNAL (for questionRegistry/intentParser): Returns formatted HTML.
- * Calls the internal helper `_getGenesByFunctionOrComplex`.
- */
-async function getGenesByFunctionOrComplex(searchTerm) {
-    // Calls the internal function that returns an array
-    return await getGenesByFunctionOrComplex(functionalCategory);
-    // Determine title
-    let title = `Genes related to: ${searchTerm}`;
-    try {
-        if (intentParser) { // Check if parser is available
-            const knownComplexes = intentParser.getAllComplexes();
-            const knownDiseases = intentParser.getAllDiseases();
-            if (knownComplexes && knownComplexes.some(c => c.toLowerCase() === searchTerm.toLowerCase())) {
-                title = `Components related to ${searchTerm}`;
-            } else if (knownDiseases && knownDiseases.some(d => d.toLowerCase() === searchTerm.toLowerCase())) {
-                 title = `Genes associated with ${searchTerm}`;
-            }
-        }
-    } catch (e) {
-        console.error("Error checking intent parser types:", e); // Log error if parser access fails
-    }
-    return formatListResult(title, results);
-}
-
 // =============================================================================
 // REPLACEMENT: The definitive and corrected Question Registry
 // =============================================================================
@@ -2001,54 +1936,34 @@ function downloadPlot(divId, filename) {
  * @param {string} cellType The cell type to check expression in.
  * @param {number} [threshold=0.01] The minimum expression level to be considered "highly expressed".
  */
-// Corrected: Uses the internal helper _getGenesByFunctionOrComplex
-async function findDiseaseGenesByCellExpression(diseaseName, cellType) {
-    if (!cellxgeneDataCache) await fetchCellxgeneData();
-    // FIXED: Handle cellxgene load failure
-    if (!cellxgeneDataCache || Object.keys(cellxgeneDataCache).length === 0) {
-         return `<div class="result-card"><p class="status-not-found">Single-cell expression data not loaded. Cannot perform query.</p></div>`;
+async function findDiseaseGenesByCellExpression(disease, cellType, threshold = 0.01) {
+    await fetchCiliaData();
+    await fetchCellxgeneData();
+
+    if (!cellxgeneDataCache) return [];
+
+    // 1. Get all genes for the specified disease
+    const { genes: diseaseGenes } = await getCiliopathyGenes(disease);
+    const diseaseGeneSet = new Set(diseaseGenes.map(g => g.gene.toUpperCase()));
+
+    // 2. Filter them by expression in the target cell type
+    const expressedGenes = [];
+    for (const gene of diseaseGeneSet) {
+        const geneExpressionData = cellxgeneDataCache[gene];
+        if (geneExpressionData && geneExpressionData[cellType] && geneExpressionData[cellType] > threshold) {
+            expressedGenes.push({
+                gene: gene,
+                description: `Expression in ${cellType}: ${geneExpressionData[cellType].toFixed(4)}`,
+                expression: geneExpressionData[cellType]
+            });
+        }
     }
 
-    const term = cellType.toLowerCase();
-
-    // 1. Get the raw ARRAY of disease genes using the CORRECTED internal helper
-    const diseaseGenes = await _getGenesByFunctionOrComplex(diseaseName); // Ensure this returns an array
-
-    // FIXED: Check if diseaseGenes is actually an array
-    if (!Array.isArray(diseaseGenes)) {
-         console.error("Failed to get disease gene list for expression check. Received:", diseaseGenes);
-         return `<div class="result-card"><p class="status-not-found">Error retrieving gene list for "${diseaseName}". Cannot check expression.</p></div>`;
-    }
-
-    if (diseaseGenes.length === 0) {
-        return `<div class="result-card"><p class="status-not-found">No genes were found for "${diseaseName}" in the database, so expression cannot be checked.</p></div>`;
-    }
-
-    // 2. Filter against cell expression data
-    const results = diseaseGenes
-        .map(g => {
-            // Ensure g and g.gene exist before proceeding
-            if (!g || !g.gene) return null;
-            const geneUpper = g.gene.toUpperCase();
-            const cellData = cellxgeneDataCache[geneUpper]; // Direct lookup in cellxgene object
-            const cellTypeMatch = cellData ? (Object.keys(cellData).find(key => key.toLowerCase() === term) || Object.keys(cellData).find(key => key.toLowerCase().includes(term))) : undefined;
-            const expression = cellTypeMatch ? (cellData[cellTypeMatch] || 0) : 0;
-            return {
-                gene: g.gene,
-                description: `Expression in ${cellTypeMatch || cellType}: ${expression.toFixed(4)}`,
-                expression: expression,
-                cellMatch: cellTypeMatch
-            };
-        })
-        .filter(g => g !== null && g.expression > 0.01) // Filter out nulls and non-expressed
-        .sort((a, b) => b.expression - a.expression);
-
-    // Prepare data for formatListResult
-    const formattedResults = results.map(r => ({ gene: r.gene, description: r.description }));
-    const foundCellType = results[0]?.cellMatch || cellType; // Use the matched cell type name in title if found
-
-    return formatListResult(`${diseaseName} Genes Expressed in ${foundCellType}`, formattedResults) + SC_RNA_SEQ_REFERENCE_HTML;
+    // 3. Sort by expression level
+    expressedGenes.sort((a, b) => b.expression - a.expression);
+    return expressedGenes;
 }
+
 async function compareGenes(geneA, geneB) {
     if (!ciliaHubDataCache) await fetchCiliaData();
     const dataA = ciliaHubDataCache.find(g => g.gene.toUpperCase() === geneA.toUpperCase());
@@ -2311,17 +2226,10 @@ async function generateDomainBasedQuestions() {
     return questionTemplates;
 }
 
+
 // --- ADDITION: Dynamic Domain-Based Questions ---
 async function extendQuestionRegistryWithDomains() {
-    // Ensure data is loaded first - essential for this function to work
-    if (!ciliaHubDataCache) {
-        console.warn("extendQuestionRegistryWithDomains called before ciliaHubDataCache was loaded. Attempting load...");
-        await loadAndMergeGeneData();
-        if (!ciliaHubDataCache) {
-             console.error("Failed to load ciliaHubDataCache for extendQuestionRegistryWithDomains. Skipping domain question extension.");
-             return; // Stop if data still not available
-        }
-    }
+    if (!ciliaHubDataCache) await fetchCiliaData();
 
     const domainKeywords = [
         { keyword: "kinase", label: "Ciliary Kinase" },
@@ -2333,54 +2241,40 @@ async function extendQuestionRegistryWithDomains() {
     ];
 
     const newQuestions = [];
-    const allGeneEntries = Object.values(ciliaHubDataCache); // FIXED: Get array from object cache
 
     for (const { keyword, label } of domainKeywords) {
-        // FIXED: Filter the array of entries
-        const genes = allGeneEntries.filter(g =>
-            g && Array.isArray(g.domain_descriptions) &&
-            g.domain_descriptions.some(d => d && d.toLowerCase().includes(keyword))
+        const genes = ciliaHubDataCache.filter(g =>
+            g.domain_descriptions?.some(d => d.toLowerCase().includes(keyword))
         );
 
         if (genes.length > 0) {
             const capitalized = keyword.charAt(0).toUpperCase() + keyword.slice(1);
-            // Use the NEW domain DB handler for consistency
-            const handler = async () => findGenesByNewDomainDB(keyword);
 
             newQuestions.push(
-                { text: `List all ${capitalized}-related ciliary genes`, handler: handler },
-                { text: `Show ${capitalized}-containing proteins localized to cilia`, handler: handler },
-                { text: `Display ${capitalized} domain proteins involved in ciliogenesis`, handler: handler },
-                { text: `Identify ${capitalized} genes in cilia`, handler: handler }
+                {
+                    text: `List all ${capitalized}-related ciliary genes`,
+                    handler: async () => formatListResult(`${label}s`, await getGenesByDomainDescription(keyword))
+                },
+                {
+                    text: `Show ${capitalized}-containing proteins localized to cilia`,
+                    handler: async () => formatListResult(`${label}s`, await getGenesByDomainDescription(keyword))
+                },
+                {
+                    text: `Display ${capitalized} domain proteins involved in ciliogenesis`,
+                    handler: async () => formatListResult(`${label}s`, await getGenesByDomainDescription(keyword))
+                },
+                {
+                    text: `Identify ${capitalized} genes in cilia`,
+                    handler: async () => formatListResult(`${label}s`, await getGenesByDomainDescription(keyword))
+                }
             );
         }
     }
 
-    // Merge with main registry IF it exists
-    if (typeof questionRegistry !== 'undefined' && Array.isArray(questionRegistry)) {
-        questionRegistry.push(...newQuestions);
-        console.log(`✅ Added ${newQuestions.length} domain-based questions to registry.`);
-    } else {
-        console.error("questionRegistry not found or not an array when trying to extend with domains.");
-    }
+    // Merge with main registry
+    questionRegistry.push(...newQuestions);
+    console.log(`✅ Added ${newQuestions.length} domain-based questions to registry.`);
 }
-
-// IMPORTANT: Ensure this function is called *after* the initial data loading completes successfully.
-// For example, call it at the end of the successful `try` block in `displayCiliAIPage`
-// or within `setupCiliAIEventListeners` after confirming data load.
-// Example call placement within displayCiliAIPage's try block:
-/*
-    try {
-        await Promise.allSettled([...]); // Load data
-        if (results[0].status === 'rejected' || !ciliaHubDataCache) { throw ... }
-        console.log("All essential data loaded...");
-
-        // NOW call the extension function
-        await extendQuestionRegistryWithDomains(); // Await it if it needs data
-
-        setTimeout(setupCiliAIEventListeners, 50);
-    } catch (error) { ... }
-*/
 
 // Call this after your data has been fetched
 extendQuestionRegistryWithDomains();
@@ -2671,92 +2565,83 @@ function updateIntentParser() {
 setTimeout(updateIntentParser, 1000);
 
 
-// Corrected: Uses direct lookup for gene fallback
+// =============================================================================
+// NEW: Helper function to get comprehensive details for "Tell me about..." queries
+// =============================================================================
 async function getComprehensiveDetails(term) {
-    if (!term) return `<div class="result-card"><p class="status-not-found">No term provided for details.</p></div>`;
     const upperTerm = term.toUpperCase();
-
-    // Ensure caches are loaded
-    if (!ciliaHubDataCache) await loadAndMergeGeneData();
-    if (!intentParser) { console.error("Intent parser not initialized!"); return "Error: Parser not ready."; } // Should be initialized globally
-
-    // Check if it's a known complex first
-    const knownComplexes = intentParser.getAllComplexes() || [];
-    const isComplex = knownComplexes.some(c => c.toUpperCase() === upperTerm);
+    
+    // Check if it's a known complex
+    const isComplex = intentParser.getAllComplexes().some(c => c.toUpperCase() === upperTerm);
     if (isComplex) {
-        console.log(`getComprehensiveDetails: Identified '${term}' as a complex.`);
-        // Call the function that returns HTML for complexes
-        return await getGenesByComplex(term);
+        const results = await getGenesByComplex(term);
+        return formatListResult(`Components of ${term}`, results);
     }
 
     // Otherwise, assume it's a gene
-     console.log(`getComprehensiveDetails: Assuming '${term}' is a gene.`);
-    if (!ciliaHubDataCache) {
-        return `<div class="result-card"><h3>${term}</h3><p class="status-not-found">Gene database not loaded.</p></div>`;
-    }
-
-    // FIXED: Use direct object lookup
-    const geneData = ciliaHubDataCache[upperTerm];
-
-    // Use the specific formatter for detailed gene views
-    return formatComprehensiveGeneDetails(term, geneData); // Pass original term for display if not found
+    if (!ciliaHubDataCache) await fetchCiliaData();
+    const geneData = ciliaHubDataCache.find(g => g.gene.toUpperCase() === upperTerm);
+    
+    return formatComprehensiveGeneDetails(upperTerm, geneData); // Re-use the existing detailed formatter
 }
-// --- Main Page Display Function (Corrected Version) ---
+
+// --- Main Page Display Function (REPLACEMENT) ---
 window.displayCiliAIPage = async function displayCiliAIPage() {
     const contentArea = document.querySelector('.content-area');
-    if (!contentArea) { console.error('Content area not found.'); return; }
-
-    // Adjust layout: make content area full width, hide other panels if needed
+    if (!contentArea) {
+        console.error('Content area not found');
+        return;
+    }
     contentArea.className = 'content-area content-area-full';
     const ciliaPanel = document.querySelector('.cilia-panel');
-    if (ciliaPanel) ciliaPanel.style.display = 'none';
+    if (ciliaPanel) {
+        ciliaPanel.style.display = 'none';
+    }
 
-    // --- Inject HTML Structure and CSS ---
     try {
         contentArea.innerHTML = `
             <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+            <script src="https://cdn.jsdelivr.net/npm/cytoscape@3.23.0/dist/cytoscape.min.js"></script>
             <div class="ciliai-container">
                 <div class="ciliai-header">
-                    <h1>CiliAI 🤖</h1>
-                    <p>Your AI partner for discovering gene-cilia relationships.</p>
+                    <h1>CiliAI</h1>
+                    <p>Your AI-powered partner for discovering gene-cilia relationships.</p>
                 </div>
                 <div class="ciliai-main-content">
                     <div class="ai-query-section">
-                        <h3>Ask CiliAI</h3>
+                        <h3>Ask a Question</h3>
                         <div class="ai-input-group autocomplete-wrapper">
-                            <input type="text" id="aiQueryInput" class="ai-query-input" placeholder="Ask about genes, functions, diseases, expression...">
+                            <input type="text" id="aiQueryInput" class="ai-query-input" placeholder="What's on your mind? Try a gene name or a question...">
                             <div id="aiQuerySuggestions" class="suggestions-container"></div>
-                            <button class="ai-query-btn" id="aiQueryBtn">Ask</button>
+                            <button class="ai-query-btn" id="aiQueryBtn">Ask CiliAI</button>
                         </div>
                         <div class="example-queries">
                             <p>
-                                <strong>Try:</strong>
-                                <span data-question="Tell me about IFT88">IFT88 info</span>,
-                                <span data-question="Joubert Syndrome genes">Joubert Syndrome</span>,
-                                <span data-question="Show transition zone genes">Transition Zone</span>,
-                                <span data-question="Plot UMAP expression for FOXJ1">UMAP FOXJ1</span>,
-                                <span data-question="Compare ARL13B and FOXJ1 single-cell">Compare ARL13B/FOXJ1 scRNA</span>,
-                                <span data-question="Is BBS1 conserved in zebrafish?">BBS1 zebrafish?</span>,
-                                <span data-question="What happens if CEP290 is knocked down?">CEP290 knockdown?</span>
+                                <strong>Try asking:</strong> 
+                                <span data-question="Joubert syndrome">Joubert syndrome</span>, 
+                                <span data-question="c. elegans">c. elegans</span>, 
+                                <span data-question="Plot UMAP expression for FOXJ1">UMAP plot for FOXJ1</span>,
+                                <span data-question="Compare ARL13B and FOXJ1 expression in lung scRNA-seq">Compare ARL13B vs FOXJ1</span>,
+                                <span data-question="Which Joubert Syndrome genes are expressed in ciliated cells?">Joubert genes in ciliated cells</span>,
+                                <span data-question="Tell me about yourself">About CiliAI</span>
                             </p>
                         </div>
-                        <div id="ai-result-area" class="results-section" style="display: none; margin-top: 1.5rem; padding-top: 1rem; border-top: 1px dashed #ccc;">
-                           </div>
+                        <div id="ai-result-area" class="results-section" style="display: none; margin-top: 1.5rem; padding: 1rem;"></div>
                     </div>
-
-                    <div class="input-section" style="margin-top: 2rem;">
-                        <h3>Analyze Specific Genes</h3>
+                    
+                    <div class="input-section">
+                        <h3>Analyze Gene Phenotypes</h3>
                         <div class="input-group">
-                            <label for="geneInput">Gene Symbols (comma/space separated):</label>
+                            <label for="geneInput">Gene Symbols:</label>
                             <div class="autocomplete-wrapper">
-                                <textarea id="geneInput" class="gene-input-textarea" placeholder="e.g., IFT88, BBS1, ARL13B..."></textarea>
+                                <textarea id="geneInput" class="gene-input-textarea" placeholder="Start typing a gene symbol (e.g., IFT88)..."></textarea>
                                 <div id="geneSuggestions" class="suggestions-container"></div>
                             </div>
                         </div>
                         <div class="input-group">
                             <label>Analysis Mode:</label>
                             <div class="mode-selector">
-                                 <div class="mode-option">
+                                <div class="mode-option">
                                     <input type="radio" id="hybrid" name="mode" value="hybrid" checked aria-label="Hybrid mode">
                                     <label for="hybrid" title="Combines database, screen data, and real-time AI literature mining.">
                                         <span class="mode-icon">🔬</span>
@@ -2781,159 +2666,98 @@ window.displayCiliAIPage = async function displayCiliAIPage() {
                         </div>
                         <button class="analyze-btn" id="analyzeBtn">🔍 Analyze Genes</button>
                     </div>
-
-                     <div id="resultsSection" class="results-section" style="display: none; margin-top: 2rem;">
+                    <div id="resultsSection" class="results-section" style="display: none;">
                         <h2>Analysis Results</h2>
-                         <div id="plot-display-area" style="margin-top: 1rem;"></div> <div id="resultsContainer"></div> </div>
-                </div> </div> <style>
-                /* --- CSS --- */
-                /* Base Styles */
-                .ciliai-container { font-family: 'Arial', sans-serif; max-width: 950px; margin: 1rem auto; padding: 1rem; background-color: #f9f9f9; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-                .ciliai-header { text-align: center; margin-bottom: 1.5rem; border-bottom: 1px solid #eee; padding-bottom: 1rem; }
-                .ciliai-header h1 { font-size: 2.2rem; color: #2c5aa0; margin: 0; }
-                .ciliai-header p { font-size: 1.1rem; color: #555; margin-top: 0.3rem; }
-                .ciliai-main-content { padding: 0 0.5rem; }
-
-                /* AI Query Section */
-                .ai-query-section { background-color: #e8f4fd; border: 1px solid #bbdefb; padding: 1rem 1.5rem; border-radius: 8px; margin-bottom: 2rem; }
-                .ai-query-section h3 { margin-top: 0; color: #1e4273; font-size: 1.3rem; }
-                .ai-input-group { position: relative; display: flex; gap: 10px; margin-bottom: 0.5rem; }
-                .ai-query-input { flex-grow: 1; padding: 0.7rem; border: 1px solid #ccc; border-radius: 4px; font-size: 1rem; }
-                .ai-query-btn { padding: 0.7rem 1rem; font-size: 1rem; background-color: #2c5aa0; color: white; border: none; border-radius: 4px; cursor: pointer; transition: background-color 0.2s; white-space: nowrap; }
+                        <button class="visualize-btn" id="visualizeBtn" style="display: none;">📊 Visualize Results</button>
+                        <div id="plot-display-area" style="margin-top: 1rem;"></div>
+                        <div id="resultsContainer"></div>
+                    </div>
+                </div>
+            </div>
+            <style>
+                .ciliai-container { font-family: 'Arial', sans-serif; max-width: 950px; margin: 2rem auto; padding: 2rem; background-color: #f9f9f9; border-radius: 12px; }
+                .ciliai-header { text-align: center; margin-bottom: 2rem; }
+                .ciliai-header h1 { font-size: 2.8rem; color: #2c5aa0; margin: 0; }
+                .ciliai-header p { font-size: 1.2rem; color: #555; margin-top: 0.5rem; }
+                .ai-query-section { background-color: #e8f4fd; border: 1px solid #bbdefb; padding: 1.5rem 2rem; border-radius: 8px; margin-bottom: 2rem; }
+                .ai-query-section h3 { margin-top: 0; color: #2c5aa0; }
+                .ai-input-group { position: relative; display: flex; gap: 10px; }
+                .ai-query-input { flex-grow: 1; padding: 0.8rem; border: 1px solid #ccc; border-radius: 4px; font-size: 1rem; }
+                .ai-query-btn { padding: 0.8rem 1.2rem; font-size: 1rem; background-color: #2c5aa0; color: white; border: none; border-radius: 4px; cursor: pointer; transition: background-color 0.2s; }
                 .ai-query-btn:hover { background-color: #1e4273; }
-                .example-queries { margin-top: 0.8rem; font-size: 0.85rem; color: #555; text-align: left; }
-                .example-queries strong { margin-right: 5px; }
-                .example-queries span { background-color: #d1e7fd; padding: 3px 8px; border-radius: 12px; cursor: pointer; margin: 2px 4px; display: inline-block; transition: background-color 0.2s; border: 1px solid #b1d7fc; white-space: nowrap;}
+                .example-queries { margin-top: 1rem; font-size: 0.9rem; color: #555; text-align: left; }
+                .example-queries span { background-color: #d1e7fd; padding: 4px 10px; border-radius: 12px; font-family: 'Arial', sans-serif; cursor: pointer; margin: 4px; display: inline-block; transition: background-color 0.2s; border: 1px solid #b1d7fc;}
                 .example-queries span:hover { background-color: #b1d7fc; }
-
-                /* Gene Analysis Section */
-                .input-section { background-color: #fff; padding: 1.5rem; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); border: 1px solid #e0e0e0; }
-                .input-section h3 { margin-top: 0; color: #333; font-size: 1.3rem; }
-                .input-group { margin-bottom: 1rem; }
-                .input-group label { display: block; font-weight: bold; margin-bottom: 0.4rem; color: #333; font-size: 0.95rem;}
-                .gene-input-textarea { width: 100%; box-sizing: border-box; padding: 0.7rem; border: 1px solid #ccc; border-radius: 4px; font-size: 1rem; min-height: 60px; resize: vertical; }
-                .mode-selector { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 0.8rem; }
-                .mode-option input[type="radio"] { position: absolute; opacity: 0; pointer-events: none; }
-                .mode-option label { display: flex; align-items: center; gap: 8px; padding: 0.8rem; border: 2px solid #ddd; border-radius: 6px; cursor: pointer; transition: all 0.2s; background-color: #fff; }
-                .mode-option input[type="radio"]:checked + label { border-color: #2c5aa0; background-color: #e8f4fd; box-shadow: 0 0 4px rgba(44, 90, 160, 0.2); }
-                .mode-option input[type="radio"]:focus + label { outline: 2px solid #80bdff; }
-                .mode-icon { font-size: 1.5rem; }
-                .mode-option label div { font-size: 0.9rem; line-height: 1.2;}
-                .mode-option label small { font-size: 0.75rem; color: #555; }
-                .analyze-btn { width: 100%; padding: 0.8rem; font-size: 1.05rem; font-weight: bold; background-color: #28a745; color: white; border: none; border-radius: 6px; cursor: pointer; transition: background-color 0.2s; margin-top: 1rem; }
-                 .analyze-btn:hover:not([disabled]) { background-color: #218838; }
-                 .analyze-btn:disabled { background-color: #aaa; cursor: not-allowed; }
-
-                /* Results Display */
-                .results-section { margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid #eee; }
-                #ai-result-area { border-top-color: #ccc; border-top-style: dashed;} /* Style AI results differently */
-                .result-card { border: 1px solid #ddd; border-radius: 6px; padding: 1rem 1.2rem; margin-bottom: 1rem; background-color: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
-                .result-card h3 { margin-top: 0; margin-bottom: 0.8rem; color: #2c5aa0; font-size: 1.25rem; }
-                .result-card h4 { margin-top: 1rem; margin-bottom: 0.5rem; color: #444; font-size: 1.05rem; border-bottom: 1px solid #eee; padding-bottom: 0.3rem;}
-                .status-searching { color: #ff9800; font-style: italic; }
-                .status-found { color: #4CAF50; font-weight: bold; }
-                .status-not-found { color: #f44336; font-style: italic; }
-                .gene-list { list-style: none; padding-left: 0; margin-top: 0.5rem; }
-                .gene-list li { margin-bottom: 0.4rem; font-size: 0.95rem; }
-                .gene-description { color: #666; font-size: 0.85em; margin-left: 5px;}
-
-                /* Autocomplete */
-                .autocomplete-wrapper { position: relative; }
-                .suggestions-container { position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid #ccc; z-index: 1000; max-height: 200px; overflow-y: auto; box-shadow: 0 4px 6px rgba(0,0,0,0.1); display: none; }
-                .suggestion-item { padding: 8px 12px; cursor: pointer; font-size: 0.95rem; border-bottom: 1px solid #eee; }
-                .suggestion-item:last-child { border-bottom: none; }
+                .input-section { background-color: #fff; padding: 2rem; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+                .input-group { margin-bottom: 1.5rem; }
+                .input-group label { display: block; font-weight: bold; margin-bottom: 0.5rem; color: #333; }
+                .gene-input-textarea { width: 100%; box-sizing: border-box; padding: 0.8rem; border: 1px solid #ccc; border-radius: 4px; font-size: 1rem; min-height: 80px; resize: vertical; }
+                .mode-selector { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; }
+                .mode-option input[type="radio"] { display: none; }
+                .mode-option label { display: flex; align-items: center; gap: 10px; padding: 1rem; border: 2px solid #ddd; border-radius: 8px; cursor: pointer; transition: all 0.2s; }
+                .mode-option input[type="radio"]:checked + label { border-color: #2c5aa0; background-color: #e8f4fd; box-shadow: 0 0 5px rgba(44, 90, 160, 0.3); }
+                .mode-icon { font-size: 1.8rem; }
+                .analyze-btn { width: 100%; padding: 1rem; font-size: 1.1rem; font-weight: bold; background-color: #28a745; color: white; border: none; border-radius: 8px; cursor: pointer; transition: background-color 0.2s; }
+                .analyze-btn:hover:not([disabled]) { background-color: #218838; }
+                .results-section { margin-top: 2rem; padding: 2rem; background-color: #fff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+                .result-card { border: 1px solid #ddd; border-radius: 8px; padding: 1.5rem; margin-bottom: 1.5rem; }
+                .result-card h3 { margin-top: 0; color: #2c5aa0; }
+                .ciliopathy-table, .expression-table, .gene-detail-table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+                .ciliopathy-table th, .ciliopathy-table td, .expression-table th, .expression-table td, .gene-detail-table th, .gene-detail-table td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                .ciliopathy-table th, .expression-table th, .gene-detail-table th { background-color: #e8f4fd; color: #2c5aa0; }
+                .suggestions-container { position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid #ccc; z-index: 1000; max-height: 200px; overflow-y: auto; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+                .suggestion-item { padding: 10px; cursor: pointer; }
                 .suggestion-item:hover { background-color: #f0f0f0; }
 
-                /* Tables */
-                .data-table, .expression-table, .gene-detail-table { width: 100%; border-collapse: collapse; margin-top: 0.8rem; font-size: 0.9rem;}
-                .data-table th, .data-table td,
-                .expression-table th, .expression-table td,
-                .gene-detail-table th, .gene-detail-table td { border: 1px solid #ddd; padding: 6px 8px; text-align: left; vertical-align: top;}
-                .data-table th, .expression-table th, .gene-detail-table th { background-color: #f2f2f2; font-weight: bold;}
-                .expression-table th { background-color: #e8f4fd; color: #1e4273; } /* Specific style for expression */
-                .gene-detail-table th { background-color: #f8f9fa; width: 180px; } /* Fixed width for labels */
-
-                /* Action Links & Download */
-                .ai-suggestion { font-size: 0.9em; margin-top: 1rem; border-top: 1px solid #eee; padding-top: 0.5rem; }
-                .ai-suggestion strong {display: block; margin-bottom: 5px;}
-                .ai-suggestion a { color: #0066cc; text-decoration: none; margin-right: 10px; white-space: nowrap; line-height: 1.6;}
-                .ai-suggestion a:hover { text-decoration: underline; }
-                .download-button { background-color: #28a745; color: white; padding: 6px 12px; border: none; border-radius: 4px; cursor: pointer; font-size: 0.85em; font-weight: bold; margin-top: 10px; transition: background-color 0.3s ease; float: right; }
-                .download-button:hover { background-color: #218838; }
-
-                /* Sortable Table */
-                .sortable-table th.sortable { cursor: pointer; position: relative; padding-right: 20px; }
-                .sortable-table th.sortable::after { content: ' \\2195'; position: absolute; right: 5px; top: 50%; transform: translateY(-50%); opacity: 0.4; }
-                .sortable-table th.sortable[data-sort="asc"]::after { content: ' \\2191'; opacity: 1; }
-                .sortable-table th.sortable[data-sort="desc"]::after { content: ' \\2193'; opacity: 1; }
-
+                /* --- ADDED CSS FOR DOWNLOAD BUTTON AND PLOT CARD --- */
+                .download-button {
+                    background-color: #28a745; /* Green */
+                    color: white;
+                    padding: 8px 14px;
+                    border: none;
+                    border-radius: 4px;
+                    cursor: pointer;
+                    font-size: 0.9em;
+                    font-weight: bold;
+                    margin-top: 15px;
+                    transition: background-color 0.3s ease;
+                }
+                .download-button:hover {
+                    background-color: #218838;
+                }
+                /* This re-defines .result-card to ensure it has the correct padding for plots */
+                .result-card {
+                    padding: 20px;
+                    background-color: #fff;
+                    border-radius: 8px;
+                    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+                    margin-top: 1.5rem;
+                    border: 1px solid #ddd; /* Kept original border */
+                    margin-bottom: 1.5rem; /* Kept original margin-bottom */
+                }
             </style>
         `;
     } catch (error) {
         console.error('Failed to inject CiliAI HTML:', error);
-        if (contentArea) contentArea.innerHTML = '<p>Error: Failed to load CiliAI interface.</p>';
-        return; // Stop if HTML injection fails
-    }
-
-    // --- Load Data ---
-    let dataLoadSuccess = false; // Flag to track critical load status
-    try {
-        console.log("ciliAI.js: Loading all data sources in parallel...");
-        const results = await Promise.allSettled([
-            loadAndMergeGeneData(),     // CRITICAL
-            fetchPhylogenyData(),
-            fetchTissueData(),
-            fetchCellxgeneData(),
-            fetchUmapData(),
-            getDomainData(),
-            fetchNeversPhylogenyData(),
-            fetchLiPhylogenyData()
-        ]);
-
-       const coreDataResult = results[0];
-        if (coreDataResult.status === 'rejected' || !ciliaHubDataCache || Object.keys(ciliaHubDataCache).length === 0) {
-             const loadError = coreDataResult.status === 'rejected' ? coreDataResult.reason : "Cache object is empty after load.";
-             console.error("Critical data load failure:", loadError);
-            throw new Error(`Failed to load core CiliaHub gene data.`);
-        }
-        console.log("ciliAI.js: All essential data loaded. Status of all fetches:", results.map(r => r.status));
-        dataLoadSuccess = true; // Mark critical data as loaded
-
-        // FIXED: Call extendQuestionRegistryWithDomains AFTER successful data load
-        // No need to await if it synchronous after data is present
-        extendQuestionRegistryWithDomains();
-
-    } catch (error) {
-        console.error("ciliAI.js: A critical error occurred during data loading:", error);
-        const errorArea = document.getElementById('ai-result-area'); // Target AI area for load errors
-        if (errorArea) {
-             errorArea.style.display = 'block';
-             errorArea.innerHTML = `<div class="result-card"><h3>Fatal Initialization Error</h3><p>Could not load critical datasets (e.g., CiliaHub gene data). CiliAI cannot function properly.<br><small>Error: ${error.message}</small></p></div>`;
-        }
-        // Do not proceed to setup listeners if critical data failed
+        contentArea.innerHTML = '<p>Error: Failed to load CiliAI interface.</p>';
         return;
     }
 
-    // --- Setup UI Listeners only if data loaded successfully ---
-    if (dataLoadSuccess) {
-        setTimeout(() => {
-            try {
-                // Check for essential elements before setup
-                 if (document.getElementById('aiQueryInput') && document.getElementById('geneInput')) {
-                    setupCiliAIEventListeners(); // This function now contains the checks
-                    console.log("CiliAI UI Initialized and Event Listeners Attached.");
-                 } else {
-                     throw new Error("UI elements (aiQueryInput or geneInput) not found after HTML injection.");
-                 }
-            } catch(err) {
-                console.error("Error setting up CiliAI event listeners:", err);
-                 const errorArea = document.getElementById('ai-result-area');
-                 if (errorArea) { /* ... show UI setup error ... */ }
-            }
-        }, 100); // Slightly increased delay
-    }
+  await Promise.all([
+        fetchCiliaData(),         // Your original gene data
+        fetchScreenData(),       // Your original screen data
+        fetchPhylogenyData(),     // Your original phylogeny data
+        fetchTissueData(),       // Your original tissue data
+        fetchCellxgeneData(),     // Your original cellxgene data
+        fetchUmapData(),           // Your original umap data
+        getDomainData(),           // --- NEW ---
+        fetchNeversPhylogenyData(), // --- NEW ---
+        fetchLiPhylogenyData()     // --- NEW ---
+    ]);
+    console.log('ciliAI.js: All data loaded (including new domain and phylogeny sources).');
+    
+    setTimeout(setupCiliAIEventListeners, 0);
 };
-
 // --- Helper Functions ---
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 function debounce(fn, delay) { let timeout; return function(...args) { clearTimeout(timeout); timeout = setTimeout(() => fn(...args), delay); }; }
@@ -2966,7 +2790,7 @@ async function getGenesWithDomain(domainName) {
 }
 
 async function getGenesByComplex(complexName) {
-   return await getGenesByFunctionOrComplex(complexName);
+    await fetchCiliaData();
     const complexRegex = new RegExp(complexName, 'i');
     
     const complexGenes = ciliaHubDataCache.filter(gene => 
@@ -3056,49 +2880,92 @@ async function getPhylogenyGenes({ type }) {
 }
 
 // Rule 1 & 3: Finds ciliary genes present in a specific organism
-// Corrected: Uses Object.values on phylogenyDataCache, returns HTML
-async function getCiliaryGenesForOrganism(organism) {
-    // Ensure phylogeny data is loaded
-    if (!phylogenyDataCache) {
-        console.log("getCiliaryGenesForOrganism: Phylogeny data not cached, fetching...");
-        await fetchPhylogenyData();
-    }
-    // FIXED: Handle case where phylogenyDataCache is still null or empty after fetch attempt
-    if (!phylogenyDataCache || Object.keys(phylogenyDataCache).length === 0) {
-        console.error("getCiliaryGenesForOrganism: Phylogeny data is missing or empty.");
-        return formatListResult(`Ciliary Genes in ${organism}`, [], "Failed to load phylogeny data."); // Return formatted error
-    }
 
-    const term = organism.toLowerCase();
-    let speciesName;
-    const nameMap = { /* ... (keep your name map) ... */ };
-    speciesName = nameMap[term];
+async function getCiliaryGenesForOrganism(organismName) {
+    await fetchCiliaData();
+    await fetchPhylogenyData();
+    
+    // Step 1: Get a set of all ciliary gene names for fast lookup (Existing Feature)
+    const ciliaryGeneSet = new Set(ciliaHubDataCache.map(g => g.gene.toUpperCase()));
+    console.log(`Ciliary genes in cache: ${ciliaHubDataCache.length}, Sample: ${ciliaHubDataCache.slice(0, 5).map(g => g.gene).join(', ')}`);
 
-    if (!speciesName) {
-         // Fallback search
-         speciesName = Object.values(phylogenyDataCache).reduce((found, data) => {
-             if (found || !Array.isArray(data.species)) return found;
-             return data.species.find(s => s && s.toLowerCase() === term);
-         }, null) || term;
-         console.log(`getCiliaryGenesForOrganism: No map hit for "${organism}", using "${speciesName}"`);
-    }
+    // Step 2: Map user-friendly names to species codes (NEW FEATURE: Greatly expanded map)
+    const organismMap = {
+        'human': 'H.sapiens', 'homo sapiens': 'H.sapiens',
+        'mouse': 'M.musculus', 'mus musculus': 'M.musculus',
+        'worm': 'C.elegans', 'c. elegans': 'C.elegans', 'caenorhabditis elegans': 'C.elegans',
+        'fly': 'D.melanogaster', 'drosophila': 'D.melanogaster', 'drosophila melanogaster': 'D.melanogaster',
+        'zebrafish': 'D.rerio', 'danio rerio': 'D.rerio',
+        'yeast': 'S.cerevisiae', 'saccharomyces cerevisiae': 'S.cerevisiae',
+        'arabidopsis': 'A.thaliana', 'a. thaliana': 'A.thaliana',
+        'chicken': 'G.gallus', 'gallus gallus': 'G.gallus',
+        'chlamydomonas': 'C.reinhardtii', 'c. reinhardtii': 'C.reinhardtii',
+        'tetrahymena': 'T.thermophila', 't. thermophila': 'T.thermophila',
+        'plasmodium falciparum': 'P.falciparum'
+        // This map handles common names. The logic below will fall back to use the direct input 
+        // (e.g., "X.tropicalis") if a common name is not found here.
+    };
+    
+    // Step 3: Gene synonym mapping for C. elegans (Existing Feature)
+    const geneSynonymMap = {
+        'OSM-5': 'IFT88',
+        'BBS-1': 'BBS1',
+        'CHE-11': 'IFT140',
+        'DHC-1': 'DYNC2H1',
+        'BBS-5': 'BBS5',
+        'XBOX-1': 'BBS4',
+        'DYF-1': 'IFT70'
+    };
 
-    // FIXED: Use Object.values() on **phylogenyDataCache**
-    const genes = Object.values(phylogenyDataCache)
-        .filter(data => data && Array.isArray(data.species) && data.species.includes(speciesName))
-        .map(data => ({
-            gene: data.sym || 'Unknown Symbol', // Use original symbol
-            description: `Category: ${data.category ? data.category.replace(/_/g,' ') : 'N/A'}`
-        }));
+    const normalizedOrganism = normalizeTerm(organismName);
+    // Use the expanded map first, then fall back to the user's input directly
+    const speciesCode = organismMap[normalizedOrganism] || organismName;
+    console.log(`Mapped organism "${organismName}" to species code "${speciesCode}"`);
+    
+    // Step 4: Normalize species codes for comparison (Existing Feature)
+    const speciesRegex = new RegExp(`^${normalizeTerm(speciesCode).replace(/\./g, '\\.?').replace(/\s/g, '\\s*')}$`, 'i');
+    console.log(`Species regex: ${speciesRegex}`);
 
+    // Step 5: Filter phylogeny data for genes present in the organism (Existing Feature)
+    const genes = Object.entries(phylogenyDataCache)
+        .filter(([gene, data]) => {
+            const geneName = (data.sym || gene).toUpperCase();
+            const standardGeneName = geneSynonymMap[geneName] || geneName;
+            const isCiliary = ciliaryGeneSet.has(standardGeneName);
+            const hasSpecies = Array.isArray(data.species) && data.species.some(s => speciesRegex.test(normalizeTerm(s)));
+            // The detailed console.log is preserved from your original code
+            // console.log(`Checking gene ${geneName} (standard: ${standardGeneName}): isCiliary=${isCiliary}, hasSpecies=${hasSpecies}`);
+            return isCiliary && hasSpecies;
+        })
+        .map(([gene, data]) => ({ gene: data.sym || gene, description: `Ciliary gene found in ${speciesCode}` }));
+    
+    console.log(`Found ${genes.length} ciliary genes for ${speciesCode}`);
+
+    // Step 6: Fallback if no genes are found (Existing Feature)
     if (genes.length === 0) {
-         return `<div class="result-card"><h3>Genes Found in ${speciesName}</h3><p class="status-not-found">No specific genes listed for ${speciesName} in the phylogeny summary data (might be grouped or absent).</p></div>`;
+        const knownCiliaryGenes = [
+            'IFT88', 'BBS1', 'ARL13B', 'BBS10', 'NPHP1', 'AHI1', 'CEP290', 'MKS1', 'TTC8',
+            'OSM-5', 'CHE-11', 'DHC-1', 'BBS-1', 'BBS-5', 'XBOX-1', 'DYF-1'
+        ];
+        const fallbackGenes = knownCiliaryGenes
+            .filter(gene => ciliaryGeneSet.has((geneSynonymMap[gene.toUpperCase()] || gene).toUpperCase()))
+            .map(gene => ({ gene, description: `Known ciliary gene (fallback) for ${speciesCode}` }));
+        
+        console.log(`Using fallback: ${fallbackGenes.length} genes (${fallbackGenes.map(g => g.gene).join(', ')})`);
+        
+        return {
+            genes: fallbackGenes,
+            description: `No specific ciliary genes found for ${speciesCode} in phylogeny data. Showing ${fallbackGenes.length} known ciliary genes.`,
+            speciesCode: speciesCode // NEW FEATURE: Returning the resolved species code
+        };
     }
-
-    genes.sort((a,b) => (a.gene || '').localeCompare(b.gene || ''));
-    return formatListResult(`Genes Found in ${speciesName} (Phylogeny Summary)`, genes);
+    
+    return {
+        genes,
+        description: `Found ${genes.length} ciliary genes present in ${speciesCode}.`,
+        speciesCode: speciesCode // NEW FEATURE: Returning the resolved species code
+    };
 }
-
 
 // --- Main AI Query Handler (REPLACEMENT) ---
 window.handleAIQuery = async function() {
@@ -3563,88 +3430,49 @@ function formatListResult(title, genes, description = "") {
  * CORRECTED: Finds genes by localization.
  * Iterates using Object.values()
  */
-// Corrected: Returns HTML using formatListResult
 async function getGenesByLocalization(localization) {
     if (!ciliaHubDataCache) await loadAndMergeGeneData();
-    if (!ciliaHubDataCache || Object.keys(ciliaHubDataCache).length === 0) {
-         console.error(`getGenesByLocalization: Cache not ready for '${localization}'`);
-         return formatListResult(`Genes localizing to: ${localization}`, [], "Database not loaded."); // Return error HTML
-    }
-
     const searchTerm = localization.toLowerCase().trim();
-    const results = Object.values(ciliaHubDataCache)
-        .filter(geneData =>
-            geneData && Array.isArray(geneData.localization) &&
-            geneData.localization.some(loc => loc && loc.toLowerCase().includes(searchTerm))
+    
+    const results = Object.values(ciliaHubDataCache) // <-- THE FIX
+        .filter(geneData => 
+            geneData.localization && 
+            geneData.localization.toLowerCase().includes(searchTerm)
         )
         .map(geneData => ({
-            gene: geneData.gene || 'Unknown',
-            description: `Localization: ${geneData.localization.join(', ')}` // Show full localization
+            gene: geneData.gene,
+            description: geneData.localization
         }))
-        .sort((a,b) => (a.gene || '').localeCompare(b.gene || ''));
-
-    // FIXED: Calls formatListResult internally before returning
+        .sort((a,b) => a.gene.localeCompare(b.gene));
+    
+    // Use the new formatListResult helper
     return formatListResult(`Genes localizing to: ${localization}`, results);
 }
 
-// Corrected: Fixes variable name error, improves robustness
-async function _getGenesByFunctionOrComplex(searchTerm) {
-    if (!ciliaHubDataCache) {
-        console.log("_getGenesByFunctionOrComplex: Cache not ready, attempting load...");
-        await loadAndMergeGeneData();
-    }
-    // Handle case where cache loading failed
-    if (!ciliaHubDataCache || Object.keys(ciliaHubDataCache).length === 0) {
-        console.error("_getGenesByFunctionOrComplex: ciliaHubDataCache is empty or not loaded.");
-        return []; // Return empty array to prevent downstream errors
-    }
-
-    // Ensure searchTerm is a string before proceeding
-    if (typeof searchTerm !== 'string') {
-        console.error("_getGenesByFunctionOrComplex received non-string searchTerm:", searchTerm);
-        return [];
-    }
-
+/**
+ * NEW/CONSOLIDATED: Finds genes by functional category, summary, complex, or disease.
+ * This one function can now handle queries for "BBSome", "Trafficking", "motor", "signaling",
+ * and also "Nephronophthisis" because it searches the relevant text fields.
+ */
+async function getGenesByFunctionOrComplex(searchTerm) {
+    if (!ciliaHubDataCache) await loadAndMergeGeneData();
     const term = searchTerm.toLowerCase().trim();
-    if (!term) return []; // Return empty if search term is empty after trimming
 
-    // Use regex for potentially better word boundary matching, especially for shorter terms
-    const termRegex = new RegExp(`\\b${term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
-
-    const results = Object.values(ciliaHubDataCache)
+    const results = Object.values(ciliaHubDataCache) // <-- THE FIX
         .filter(geneData => {
-            if (!geneData) return false;
-
-            // Helper to check fields safely
-            const checkField = (fieldValue) => {
-                if (!fieldValue) return false;
-                // Check string directly first (faster for exact matches) then regex
-                if (typeof fieldValue === 'string') return fieldValue.toLowerCase().includes(term) || termRegex.test(fieldValue);
-                // Check array elements
-                if (Array.isArray(fieldValue)) return fieldValue.some(item => item && (typeof item === 'string') && (item.toLowerCase().includes(term) || termRegex.test(item)));
-                return false;
-            };
-
-            // More specific check for complexes by name/component
-            const isComplexMatch = checkField(geneData.complex_names) ||
-                                   // Only check components if searchTerm looks like a gene/protein name
-                                   (/^[A-Z0-9][A-Z0-9-]+$/i.test(searchTerm) && Array.isArray(geneData.complex_components) && geneData.complex_components.some(c => c && c.toUpperCase() === searchTerm.toUpperCase()));
-
-            // FIXED: Use checkField consistently, removed undefined 'functionalCategory' variable
-            return checkField(geneData.functional_category) ||
-                   checkField(geneData.functional_summary) ||
-                   checkField(geneData.description) ||
-                   checkField(geneData.ciliopathy) ||
-                   isComplexMatch;
+            const inCategory = geneData.functional_category && 
+                             geneData.functional_category.toLowerCase().includes(term);
+            const inSummary = geneData.functional_summary &&
+                            geneData.functional_summary.toLowerCase().includes(term);
+            return inCategory || inSummary;
         })
-        .map(geneData => ({ // Ensure map creates valid objects
-            gene: geneData.gene || 'Unknown Gene',
-            description: geneData.description || geneData.functional_summary?.substring(0,100)+'...' || geneData.functional_category?.join(', ') || geneData.complex_names?.join(', ') || geneData.ciliopathy?.join(', ') || 'Matching entry' // Provide better description fallback
+        .map(geneData => ({
+            gene: geneData.gene,
+            description: geneData.functional_category || (geneData.functional_summary ? geneData.functional_summary.substring(0, 100) + '...' : 'N/A')
         }))
-        .sort((a,b) => (a.gene || '').localeCompare(b.gene || ''));
-
-    // console.log(`_getGenesByFunctionOrComplex found ${results.length} results for '${searchTerm}'`); // Debug log
-    return results; // Returns the raw Array
+        .sort((a,b) => a.gene.localeCompare(b.gene));
+    
+    return formatListResult(`Genes related to: ${searchTerm}`, results);
 }
 
 /**
@@ -3653,7 +3481,7 @@ async function _getGenesByFunctionOrComplex(searchTerm) {
  */
 async function getCiliopathyGenes(diseaseName) {
     // This function now just routes to the more powerful search
-    return await getGenesByFunctionOrComplex(diseaseName);
+    const htmlResult = await getGenesByFunctionOrComplex(diseaseName);
     
     // The old registry expected a { genes, description } object, 
     // but the new handler just returns HTML. We must refactor the registry.
@@ -3857,75 +3685,72 @@ function setupAutocomplete() {
     });
 }
 
-// Corrected: Verifies essential elements exist
 function setupCiliAIEventListeners() {
-    console.log("Attempting to attach CiliAI event listeners...");
-    const analyzeBtn = document.getElementById('analyzeBtn');
-    const aiQueryBtn = document.getElementById('aiQueryBtn');
-    // const visualizeBtn = document.getElementById('visualizeBtn'); // Removed check if button removed
-    const geneInput = document.getElementById('geneInput');
-    const aiQueryInput = document.getElementById('aiQueryInput');
-    const resultsSection = document.getElementById('resultsSection');
-    const aiResultArea = document.getElementById('ai-result-area');
+  const analyzeBtn = document.getElementById('analyzeBtn');
+  const aiQueryBtn = document.getElementById('aiQueryBtn');
+  const visualizeBtn = document.getElementById('visualizeBtn');
+  const geneInput = document.getElementById('geneInput');
+  const aiQueryInput = document.getElementById('aiQueryInput');
 
-    // Check for essential interactive elements
-    if (!analyzeBtn || !aiQueryBtn || !geneInput || !aiQueryInput || !resultsSection || !aiResultArea) {
-        console.error('One or more essential CiliAI UI elements were not found. Listeners partially or not attached.', {
-            analyzeBtn: !!analyzeBtn, aiQueryBtn: !!aiQueryBtn, geneInput: !!geneInput, aiQueryInput: !!aiQueryInput, resultsSection: !!resultsSection, aiResultArea: !!aiResultArea
-        });
-        // Optionally display a less critical warning in the UI if only minor elements are missing
-        if (!aiQueryInput && aiResultArea) aiResultArea.innerHTML += "<p><small>Warning: AI query input not found.</small></p>";
-        // Do not throw an error here, allow partial functionality if possible
-        // throw new Error("Essential UI elements not found."); // Original line - maybe too strict
-    } else {
-         console.log("All essential CiliAI elements found.");
+  if (!analyzeBtn || !aiQueryBtn || !visualizeBtn || !geneInput || !aiQueryInput) {
+    console.warn('One or more CiliAI elements were not found.');
+    return;
+  }
+
+  analyzeBtn.addEventListener('click', analyzeGenesFromInput);
+  aiQueryBtn.addEventListener('click', handleAIQuery);
+
+  visualizeBtn.addEventListener('click', async () => {
+    const genes = geneInput.value.split(/[\s,]+/).map(g => g.trim().toUpperCase()).filter(Boolean);
+    if (genes.length > 0) {
+      const mode = document.querySelector('input[name="mode"]:checked').value;
+      if (mode === 'expert' || mode === 'hybrid') {
+        document.getElementById('plot-display-area').innerHTML = `<p class="status-searching">Building screen results heatmap...</p>`;
+        const screenData = await fetchScreenData();
+        renderScreenSummaryHeatmap(genes, screenData);
+      } else {
+        document.getElementById('plot-display-area').innerHTML = `<p class="status-searching">Building phylogeny heatmap...</p>`;
+        await renderPhylogenyHeatmap(genes);
+      }
     }
+  });
 
-    // Attach listeners only if elements exist
-    if (analyzeBtn) analyzeBtn.addEventListener('click', analyzeGenesFromInput);
-    if (aiQueryBtn) aiQueryBtn.addEventListener('click', handleAIQuery);
-
-    // Enter key listeners
-    if (geneInput) {
-        geneInput.addEventListener('keydown', (e) => {
-            // Primarily rely on button for textarea
-            // if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); analyzeGenesFromInput(); }
-             if (e.key === 'Enter') {
-                 // Hide suggestions on Enter maybe?
-                 const suggestionsContainer = document.getElementById('geneSuggestions');
-                 if (suggestionsContainer) suggestionsContainer.style.display = 'none';
-             }
-        });
+  geneInput.addEventListener('keydown', debounce((e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      analyzeGenesFromInput();
     }
-    if (aiQueryInput) {
-        aiQueryInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                 const suggestionsContainer = document.getElementById('aiQuerySuggestions');
-                 if (suggestionsContainer) suggestionsContainer.style.display = 'none'; // Hide suggestions
-                handleAIQuery();
-            }
-        });
+  }, 300));
+
+  aiQueryInput.addEventListener('keydown', debounce((e) => {
+    if (e.key === 'Enter') {
+      handleAIQuery();
     }
+  }, 300));
 
-    // --- Event Delegation (keep corrected version) ---
-    // Delegation for AI result area actions
-    if (aiResultArea) { // Check if area exists
-        aiResultArea.addEventListener('click', async (e) => { /* ... Keep action link logic ... */ });
-    } else {
-        console.warn("ai-result-area not found for action link delegation.");
+  setupAutocomplete();
+  setupAiQueryAutocomplete();
+
+  // Add sorting for tables
+  document.addEventListener('click', (e) => {
+    if (e.target.classList.contains('sortable')) {
+      const table = e.target.closest('table');
+      const tbody = table.querySelector('tbody');
+      const rows = Array.from(tbody.querySelectorAll('tr'));
+      const index = Array.from(e.target.parentNode.children).indexOf(e.target);
+      const isAscending = e.target.dataset.sort !== 'desc';
+      rows.sort((a, b) => {
+        const aText = a.children[index].textContent.trim();
+        const bText = b.children[index].textContent.trim();
+        return isAscending ? aText.localeCompare(bText) : bText.localeCompare(aText);
+      });
+      tbody.innerHTML = '';
+      rows.forEach(row => tbody.appendChild(row));
+      e.target.dataset.sort = isAscending ? 'desc' : 'asc';
     }
-
-    // Delegation for table sorting
-    document.body.addEventListener('click', (e) => { /* ... Keep sortable logic ... */ });
-
-    // --- Setup Autocomplete ---
-    // These functions have internal checks for element existence
-    setupAutocomplete(); // For geneInput textarea
-    setupAiQueryAutocomplete(); // For aiQueryInput
-
-    console.log("CiliAI Event listeners setup complete (or attempted).");
+  });
 }
+
 // --- ADDITION: New handler to query gene expression in specific cell types ---
 async function getGeneExpressionInCellType(gene, cellType) {
     if (!cellxgeneDataCache) await fetchCellxgeneData();
