@@ -11,6 +11,7 @@ let umapDataCache = null;
 let CILI_AI_DOMAIN_DB = null;     // For the new domain database
 let neversPhylogenyCache = null;  // For Nevers et al. 2017 data
 let liPhylogenyCache = null;      // For Li et al. 2014 data
+let allGeneSymbols = null; // Add this global variable alongside others
 
 // --- NEW: Reusable scRNA-seq Data Reference ---
 const SC_RNA_SEQ_REFERENCE_HTML = `
@@ -70,13 +71,13 @@ window.displayCiliAIPage = async function displayCiliAIPage() {
                         </div>
                         <div class="example-queries">
                             <p>
-                                <strong>Try asking:</strong> 
-                                <span data-question="Joubert syndrome">Joubert syndrome</span>, 
-                                <span data-question="c. elegans">c. elegans</span>, 
-                                <span data-question="Plot UMAP expression for FOXJ1">UMAP plot for FOXJ1</span>,
-                                <span data-question="Compare ARL13B and FOXJ1 expression in lung scRNA-seq">Compare ARL13B vs FOXJ1</span>,
-                                <span data-question="Which Joubert Syndrome genes are expressed in ciliated cells?">Joubert genes in ciliated cells</span>,
-                                <span data-question="Tell me about yourself">About CiliAI</span>
+                               <strong>Try asking:</strong> 
+        <span data-question="What can you do?">About CiliAI</span>, 
+        <span data-question="Show genes for Joubert syndrome">Joubert syndrome</span>, 
+        <span data-question="List ciliary genes in C. elegans">c. elegans</span>, 
+        <span data-question="Plot UMAP expression for FOXJ1">UMAP plot for FOXJ1</span>,
+        <span data-question="Compare ARL13B and FOXJ1 expression in lung scRNA-seq">Compare ARL13B vs FOXJ1</span>,
+        <span data-question="Which Joubert Syndrome genes are expressed in ciliated cells?">Joubert genes in ciliated cells</span>
                             </p>
                         </div>
                         <div id="ai-result-area" class="results-section" style="display: none; margin-top: 1.5rem; padding: 1rem;"></div>
@@ -421,6 +422,7 @@ async function fetchCiliaData() {
 }
 
 
+// --- UPDATED fetchScreenData function (to be replaced in your code) ---
 async function fetchScreenData() {
     if (screenDataCache) return screenDataCache;
     try {
@@ -428,11 +430,21 @@ async function fetchScreenData() {
         if (!response.ok) throw new Error(`Failed to fetch screen data: ${response.statusText}`);
         const data = await response.json();
         screenDataCache = data;
+        
+        // --- NEW: Populate allGeneSymbols cache with screen genes ---
+        const screenGenes = Object.keys(data);
+        if (!allGeneSymbols) {
+            allGeneSymbols = new Set(screenGenes);
+        } else {
+            screenGenes.forEach(gene => allGeneSymbols.add(gene));
+        }
+        // This process needs to be finalized in fetchCiliaData too for complete coverage.
+
         console.log('Screen data loaded successfully:', Object.keys(data).length, 'genes');
         return screenDataCache;
     } catch (error) {
         console.error('Error fetching screen data:', error);
-        screenDataCache = {}; 
+        screenDataCache = {};
         return screenDataCache;
     }
 }
@@ -642,20 +654,33 @@ async function fetchLiPhylogenyData() {
 }
 
 /**
- * New function to describe CiliAI's capabilities.
+ * New function to describe CiliAI's capabilities, listing all available data types.
  */
 async function tellAboutCiliAI() {
     const html = `
     <div class="result-card">
         <h3>About CiliAI 🤖</h3>
-        <p>I am CiliAI, an AI-powered assistant designed to help you explore and analyze ciliary gene data. I can integrate information from five different datasets to answer complex questions. Here's what I can do:</p>
+        <p>I am CiliAI, an AI-powered assistant designed to help you explore and analyze ciliary gene data. I integrate information from 8 different genomic and functional datasets (CiliaHub, screen data, phylogeny, domain databases, and scRNA-seq) to answer your questions.</p>
+        
+        <h4>CiliAI Capabilities:</h4>
         <ul>
-            <li><strong>Query by Category:</strong> Find genes based on disease ("Joubert syndrome"), protein complex ("BBSome"), cellular localization ("transition zone"), or organism ("C. elegans").</li>
-            <li><strong>Get Gene Details:</strong> Ask for comprehensive information about a specific gene by typing its name (e.g., "ARL13B").</li>
-            <li><strong>Visualize Expression Data:</strong> Generate plots for gene expression, including tissue-specific heatmaps, single-cell bar charts, and UMAPs colored by expression.</li>
-            <li><strong>Compare Genes & Complexes:</strong> Directly compare functions or expression levels (e.g., "Compare IFT-A and IFT-B" or "Compare ARL13B and FOXJ1").</li>
-            <li><strong>Explore Evolutionary Data:</strong> Find information on gene conservation across species (e.g., "Show evolutionary conservation of IFT88").</li>
-            <li><strong>Integrate Multiple Datasets:</strong> Answer complex questions that combine data, such as "Which Joubert Syndrome genes are expressed in ciliated cells?".</li>
+            <li><strong>Comprehensive Gene Lookup:</strong> Get full details on any gene (e.g., <strong>Tell me about IFT88</strong>).</li>
+            <li><strong>Disease Genetics:</strong> Find genes for specific conditions (e.g., <strong>List genes for Bardet-Biedl Syndrome</strong>).</li>
+            <li><strong>Localization & Protein Complex:</strong> Identify components in cellular structures (e.g., <strong>Show proteins in the transition zone</strong> or <strong>components of IFT-A complex</strong>).</li>
+            <li><strong>Phenotype Screening:</strong> Query experimental results (e.g., <strong>Which genes cause shorter cilia?</strong> or <strong>Show ciliary effects for BBS1</strong>).</li>
+            <li><strong>Expression & Visualization:</strong> Explore tissue and single-cell data (e.g., <strong>Plot FOXJ1 UMAP expression</strong> or <strong>Which ciliary genes are expressed in kidney?</strong>).</li>
+            <li><strong>Phylogeny & Orthologs:</strong> Check conservation and orthologs across species (e.g., <strong>Does ARL13B have an ortholog in C. elegans?</strong>).</li>
+            <li><strong>Domain Analysis:</strong> Search by protein features (e.g., <strong>Show WD40 domain containing proteins</strong>).</li>
+        </ul>
+        
+        <h4>Try Asking:</h4>
+        <ul style="column-count: 2; margin-top: 10px;">
+            <li>Tell me about **DYNC2H1**</li>
+            <li>List genes classified as **Primary Ciliopathy**</li>
+            <li>Where is **CEP290** located?</li>
+            <li>Show **orthologs of IFT88**</li>
+            <li>**Compare IFT-A and IFT-B** complex composition</li>
+            <li>**UMAP plot for FOXJ1**</li>
         </ul>
     </div>`;
     return html;
@@ -2836,20 +2861,27 @@ setTimeout(updateIntentParser, 1000);
 async function getComprehensiveDetails(term) {
     const upperTerm = term.toUpperCase();
     
-    // Check if it's a known complex
+    // Check if it's a known complex (e.g., BBSome, IFT-A)
     const isComplex = intentParser.getAllComplexes().some(c => c.toUpperCase() === upperTerm);
     if (isComplex) {
+        // If it's a complex, retrieve the components list.
         const results = await getGenesByComplex(term);
         return formatListResult(`Components of ${term}`, results);
     }
 
-    // Otherwise, assume it's a gene
-    if (!ciliaHubDataCache) await fetchCiliaData();
+    // Assume the term is a Gene Symbol and fetch data.
+    if (!ciliaHubDataCache) {
+        // Ensure all data caches are populated before searching for the gene.
+        await fetchCiliaData();
+    }
+    
+    // Find the gene's integrated data entry.
     const geneData = ciliaHubDataCache.find(g => g.gene.toUpperCase() === upperTerm);
     
-    return formatComprehensiveGeneDetails(upperTerm, geneData); // Re-use the existing detailed formatter
+    // Use the existing detailed formatter to present the integrated data (including 
+    // orthologs, classification, and screen data).
+    return formatComprehensiveGeneDetails(upperTerm, geneData);
 }
-
 
 // --- Query Helper Functions ---
 
