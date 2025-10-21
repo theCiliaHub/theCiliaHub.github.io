@@ -304,12 +304,14 @@ function createIntentParser() {
                 "worm", "human", "mouse", "zebrafish", "fly", "yeast"
             ],
             handler: async (term) => {
+                // ✅ FIX: Destructure the object returned by getCiliaryGenesForOrganism 
+                // and pass the components to formatListResult.
                 const { genes, description, speciesCode } = await getCiliaryGenesForOrganism(term);
                 return formatListResult(`Ciliary genes in ${speciesCode}`, genes, description);
             },
             autocompleteTemplate: (term) => `Display ciliary genes in ${term}`
         },
-        {
+            {
             type: 'DOMAIN',
             keywords: ['WD40', 'Leucine-rich repeat', 'IQ motif', 'calmodulin-binding', 'EF-hand', 'coiled-coil', 'CTS', 'ciliary targeting sequences', 'ciliary localization signals'],
             handler: async (term) => formatListResult(`${term} domain-containing proteins`, await getGenesWithDomain(term)),
@@ -1833,6 +1835,13 @@ const questionRegistry = [
     { text: "Which genes are classified as Secondary Diseases", handler: async () => getGenesByCiliopathyClassification("Secondary Disease") },
     { text: "Find genes classified as Primary Ciliopathy", handler: async () => getGenesByCiliopathyClassification("Primary Ciliopathy") },
     { text: "Genes associated with Secondary Ciliopathies", handler: async () => getGenesByCiliopathyClassification("Secondary Disease") },
+      // ==================== CILIOPATHY & CLASSIFICATION (New Synonyms) ====================
+    { text: "List genes related to Primary Ciliopathy", handler: async () => getGenesByCiliopathyClassification("Primary Ciliopathy") },
+    { text: "Which genes are classified as Motile Ciliopathies?", handler: async () => getGenesByCiliopathyClassification("Motile Ciliopathy") },
+    { text: "Show secondary ciliopathy genes", handler: async () => getGenesByCiliopathyClassification("Secondary Disease") },
+    { text: "Genes linked to Primary Ciliary Dyskinesia (PCD)", handler: async () => { const { genes, description } = await getCiliopathyGenes("Primary Ciliary Dyskinesia"); return formatListResult("Genes for Primary Ciliary Dyskinesia", genes, description); } },
+    { text: "Genes causing Bardet-Biedl Syndrome (BBS)", handler: async () => { const { genes, description } = await getCiliopathyGenes("Bardet-Biedl Syndrome"); return formatListResult("Genes for Bardet-Biedl Syndrome", genes, description); }},
+    
     
     // ==================== CILIARY PHENOTYPE EFFECTS (USING getGeneCiliaEffects) ====================
     { text: "What are the ciliary effects of NPHP1?", handler: async () => getGeneCiliaEffects("NPHP1") },
@@ -1847,6 +1856,15 @@ const questionRegistry = [
     { text: "Which genes reduce the percentage of ciliated cells?", handler: async () => getGenesByScreenPhenotype("reduced ciliated cells") },
     { text: "Genes that reduce cilia number", handler: async () => getGenesByScreenPhenotype("reduced ciliated cells") },
     { text: "List genes that result in longer cilia when silenced", handler: async () => getGenesByScreenPhenotype("longer cilia") },
+      // ==================== PHENOTYPE / SCREEN RESULTS (New Synonyms) ====================
+    { text: "What are the curated ciliary effects for NPHP1?", handler: async () => getGeneCiliaEffects("NPHP1") },
+    { text: "Show screen and phenotypic effects for ARL13B", handler: async () => getGeneCiliaEffects("ARL13B") },
+    { text: "List proteins that restrict cilia length", handler: async () => getGenesByScreenPhenotype("shorter cilia") },
+    { text: "Which genes cause long cilia on knockout?", handler: async () => getGenesByScreenPhenotype("longer cilia") },
+    { text: "Genes that promote cilia elongation", handler: async () => getGenesByScreenPhenotype("longer cilia") },
+    { text: "Which knockdowns reduce ciliation rate?", handler: async () => getGenesByScreenPhenotype("reduced ciliated cells") },
+    { text: "Show Breslow Hedgehog screen positive hits", handler: async () => getHedgehogRegulators("positive") },
+    { text: "Which genes act as Hh pathway inhibitors?", handler: async () => getHedgehogRegulators("negative") },
 
     // ==================== ORTHOLOGS ====================
     { text: "Show orthologs of IFT88", handler: async () => getOrthologsForGene("IFT88") },
@@ -1854,6 +1872,36 @@ const questionRegistry = [
     { text: "Does ARL13B have an ortholog in C. elegans?", handler: async () => getOrthologsForGene("ARL13B") },
     { text: "Orthologs of DYNC2H1 in mouse and zebrafish", handler: async () => getOrthologsForGene("DYNC2H1") },
     { text: "Find the zebrafish ortholog of NPHP1", handler: async () => getOrthologsForGene("NPHP1") },
+    
+    // ==================== ORTHOLOGS (New Synonyms) ====================
+    { text: "Find the orthologs for BBS1", handler: async () => getOrthologsForGene("BBS1") },
+    { text: "What is the mouse homolog of IFT88?", handler: async () => getOrthologsForGene("IFT88") },
+    { text: "Evolutionary partners of ARL13B", handler: async () => getOrthologsForGene("ARL13B") },
+    { text: "Which model organisms have NPHP1 orthologs?", handler: async () => getOrthologsForGene("NPHP1") },
+    
+    // ==================== GENERAL / COMPREHENSIVE ====================
+    { text: "Tell me all information about IFT88", handler: async () => getComprehensiveDetails("IFT88") },
+    { text: "Detailed information for BBS1", handler: async () => getComprehensiveDetails("BBS1") },
+    { text: "Summarize ARL13B data", handler: async () => getComprehensiveDetails("ARL13B") },
+    { text: "Search for the function of KIF17", handler: async () => getGeneFunction("KIF17") },
+    { text: "What is the function of CC2D1A?", handler: async () => getGeneFunction("CC2D1A") },
+    { text: "ARL13B signaling role", handler: async () => getGeneRole("ARL13B", "ciliary signaling") },
+
+    // ==================== CILIARY STATUS / LOCALIZATION ====================
+    { text: "Is FOXJ1 a known ciliary protein?", handler: async () => checkCiliaryStatus("FOXJ1") },
+    { text: "Where exactly is EFCAB7 localized?", handler: async () => getGeneLocalization("EFCAB7") },
+    { text: "List genes at the ciliary base", handler: async () => formatListResult("Genes localizing to basal body", await getGenesByLocalization("basal body")) },
+    { text: "Which proteins are in the axoneme?", handler: async () => formatListResult("Genes localizing to axoneme", await getGenesByLocalization("axoneme")) },
+    { text: "Ciliary tip proteins list", handler: async () => formatListResult("Genes localizing to ciliary tip", await getGenesByLocalization("ciliary tip")) },
+
+
+    // ==================== EXPRESSION / VISUALIZATION (Synonyms) ====================
+    { text: "Tissue distribution of BBS1", handler: async () => getGeneExpression("BBS1") },
+    { text: "Show expression map for ARL13B", handler: async () => getGeneExpressionPattern("ARL13B") },
+    { text: "Which ciliary genes are active in the retina?", handler: async () => getTissueSpecificGenes("retina") },
+    { text: "Visualize ARL13B single-cell expression", handler: async () => displayCellxgeneBarChart(["ARL13B"])},
+    { text: "Plot FOXJ1 UMAP expression", handler: async () => displayUmapGeneExpression("FOXJ1") },
+    { text: "Show cell types on UMAP", handler: async () => displayUmapPlot() },
 ];
 
 // --- ADDITION: New Helper Functions for Expanded Questions ---
