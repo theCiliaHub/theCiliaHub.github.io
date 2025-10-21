@@ -903,41 +903,51 @@ async function displayUmapPlot() {
 }
 
 
-// --- UPDATED getPhylogenyGenesForOrganism (to enrich data with C. elegans orthologs) ---
+// --- UPDATED getPhylogenyGenesForOrganism (Enriches with ALL Orthologs) ---
 async function getPhylogenyGenesForOrganism(organismName) {
-    await fetchCiliaData(); // Ensures ciliaHubDataCache is ready
+    await fetchCiliaData(); 
     await fetchPhylogenyData();
 
     // 1. Get the initial list from the phylogeny function
     const { genes, description, speciesCode } = await getCiliaryGenesForOrganism(organismName);
     
-    // 2. Enrich the gene list with the C. elegans ortholog name from the Hub data
+    // 2. Enrich the gene list with all five model organism orthologs from the Hub data
     const enrichedGenes = genes.map(geneEntry => {
         const humanGeneUpper = geneEntry.gene.toUpperCase();
         const hubData = ciliaHubDataCache.find(g => g.gene.toUpperCase() === humanGeneUpper);
         
-        // Add the ortholog name to the object under a specific key
+        // Add ALL orthologs from the hub annotation for flexible display
         return {
             ...geneEntry,
-            // Use the curated ortholog name from the main Hub data
-            ortholog_c_elegans: hubData ? (hubData.ortholog_c_elegans || 'N/A') : 'N/A'
+            ortholog_mouse: hubData?.ortholog_mouse || 'N/A',
+            ortholog_c_elegans: hubData?.ortholog_c_elegans || 'N/A',
+            ortholog_zebrafish: hubData?.ortholog_zebrafish || 'N/A',
+            ortholog_drosophila: hubData?.ortholog_drosophila || 'N/A',
+            ortholog_xenopus: hubData?.ortholog_xenopus || 'N/A',
         };
     });
 
+    // Determine which key corresponds to the target organism for column display
+    const organismKeyMap = {
+        'mouse': 'ortholog_mouse', 'xenopus': 'ortholog_xenopus',
+        'zebrafish': 'ortholog_zebrafish', 'drosophila': 'ortholog_drosophila',
+        'worm': 'ortholog_c_elegans', 'c. elegans': 'ortholog_c_elegans',
+        'fly': 'ortholog_drosophila', 'human': 'N/A'
+    };
+    const targetKey = organismKeyMap[organismName.toLowerCase()] || 'N/A';
+    
     // Define the source citation
     const citationHtml = `<p style="font-size: 0.8em; color: #666; margin-top: 1rem; border-top: 1px solid #eee; padding-top: 0.5rem;">
         <strong>Data Source:</strong> Phylogenetic conservation analysis (Li et al. 2014). Ortholog names curated from CiliaHub.
         <a href="https://pubmed.ncbi.nlm.nih.gov/24995987/" target="_blank">[PMID: 24995987]</a>
     </p>`;
     
-    // Check if the current organism is C. elegans to trigger special column display
-    const isCelegans = speciesCode.toLowerCase().includes('c.elegans') || speciesCode.toLowerCase().includes('worm');
-    
     return formatListResult(
         `Ciliary Genes Conserved in ${speciesCode} (Phylogeny Screen)`, 
-        enrichedGenes, // Pass the enriched list
+        enrichedGenes, 
         citationHtml,
-        isCelegans // Pass a flag to signal the formatter to show the C. elegans column
+        speciesCode, // Pass the speciesCode to determine the column header
+        targetKey    // Pass the key to extract the correct ortholog name
     );
 }
 
@@ -3917,23 +3927,25 @@ function formatGeneDetail(geneData, geneSymbol, detailTitle, detailContent) {
   `;
 }
 
-// --- Table Formatting ---
-// Note: Changed function signature to accept a fourth argument for the C. elegans flag
-function formatListResult(title, geneList, citationHtml = '', showCelegansColumn = false) {
+// --- UPDATED formatListResult (Now supports dynamic ortholog column) ---
+function formatListResult(title, geneList, citationHtml = '', speciesCode = '', targetKey = 'N/A') {
     if (!geneList || geneList.length === 0) {
         return `<div class="result-card"><h3>${title}</h3><p class="status-not-found">No matching genes found.</p></div>`;
     }
 
     const displayedGenes = geneList.slice(0, 100);
-    
+    const showOrthologColumn = targetKey !== 'N/A';
+    const orthologSpeciesName = speciesCode.replace(/(\w\.\w+)\s*/, ''); // Clean up species code for header
+
     // --- Build Table Rows ---
     const tableRows = displayedGenes.map(g => {
         let cells = `<td><strong>${g.gene}</strong></td>`;
         
-        // Add C. elegans ortholog column if the flag is true
-        if (showCelegansColumn) {
-            // Assumes 'g' contains the enriched field 'ortholog_c_elegans'
-            cells += `<td>${g.ortholog_c_elegans || 'N/A'}</td>`;
+        // Add the ortholog column if enabled
+        if (showOrthologColumn) {
+            // Use bracket notation to access the ortholog dynamically (g[targetKey])
+            const orthologName = g[targetKey] || 'N/A';
+            cells += `<td>${orthologName}</td>`;
         }
         
         cells += `<td>${g.description.substring(0, 100)}${g.description.length > 100 ? '...' : ''}</td>`;
@@ -3946,8 +3958,8 @@ function formatListResult(title, geneList, citationHtml = '', showCelegansColumn
         <tr>
             <th class="sortable">Human Gene</th>`;
     
-    if (showCelegansColumn) {
-        tableHeader += `<th class="sortable">C. elegans Ortholog</th>`;
+    if (showOrthologColumn) {
+        tableHeader += `<th class="sortable">${orthologSpeciesName} Ortholog</th>`;
     }
     
     tableHeader += `
