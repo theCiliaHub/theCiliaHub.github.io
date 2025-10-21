@@ -213,7 +213,9 @@ window.displayCiliAIPage = async function displayCiliAIPage() {
     setTimeout(setupCiliAIEventListeners, 0);
 };
 
-// --- Helper Functions ---
+
+
+
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 function debounce(fn, delay) { let timeout; return function(...args) { clearTimeout(timeout); timeout = setTimeout(() => fn(...args), delay); }; }
 
@@ -591,6 +593,65 @@ async function fetchCellxgeneData() {
     }
 }
 
+
+// --- Helper Functions ---
+
+/**
+ * Finds human genes associated with a specific ciliopathy that are conserved
+ * and present in a given model organism, based on phylogenetic data.
+ * @param {string} disease - The name of the human ciliopathy (e.g., 'Joubert Syndrome').
+ * @param {string} organism - The target model organism (e.g., 'C. elegans').
+ */
+async function getDiseaseGenesInOrganism(disease, organism) {
+    // 1. Fetch all necessary data
+    await fetchCiliaData();
+    await fetchPhylogenyData();
+
+    // 2. Get the list of genes associated with the disease
+    const { genes: diseaseGenes } = await getCiliopathyGenes(disease);
+    const diseaseGeneSet = new Set(diseaseGenes.map(g => g.gene.toUpperCase()));
+
+    if (diseaseGeneSet.size === 0) {
+        return formatListResult(`Genes for ${disease} in ${organism}`, [], `No human genes found for ${disease}.`);
+    }
+
+    // 3. Normalize the organism name for phylogenetic lookup
+    const organismMap = {
+        'worm': 'C.elegans', 'c. elegans': 'C.elegans',
+        'mouse': 'M.musculus', 'xenopus': 'X.tropicalis',
+        'zebrafish': 'D.rerio', 'drosophila': 'D.melanogaster', 'fly': 'D.melanogaster',
+        'chlamydomonas': 'C.reinhardtii',
+        // Add direct mappings for species codes if needed
+    };
+    const speciesQuery = organismMap[organism.toLowerCase()] || organism;
+    const speciesRegex = new RegExp(`^${normalizeTerm(speciesQuery).replace(/\./g, '\\.?').replace(/\s/g, '\\s*')}$`, 'i');
+
+    // 4. Filter disease genes by conservation in the target organism
+    const conservedDiseaseGenes = [];
+
+    diseaseGeneSet.forEach(humanGene => {
+        const geneData = phylogenyDataCache[humanGene];
+        
+        if (geneData && geneData.species) {
+            const isConserved = geneData.species.some(s => speciesRegex.test(normalizeTerm(s)));
+            
+            if (isConserved) {
+                // Find the original description from the ciliaHubDataCache
+                const originalGene = ciliaHubDataCache.find(g => g.gene.toUpperCase() === humanGene);
+                
+                conservedDiseaseGenes.push({
+                    gene: humanGene,
+                    description: `Disease: ${disease}. Conserved in: ${speciesQuery}.`
+                });
+            }
+        }
+    });
+
+    const title = `${disease} Genes Conserved in ${speciesQuery}`;
+    const description = `Found ${conservedDiseaseGenes.length} ${disease} gene(s) with orthologs in ${speciesQuery}.`;
+
+    return formatListResult(title, conservedDiseaseGenes, description);
+}
 /**
  * Fetches the new domain database (enriched, depleted, gene map).
  * URL: https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/cili_ai_domain_database.json
@@ -2028,6 +2089,93 @@ const wrapOrganismResult = async (organismName) => {
 function notImplementedYet(feature) {
     return `<div class="result-card"><h3>Feature In Development</h3><p>The query handler for "<strong>${feature}</strong>" is not yet implemented. Stay tuned for future updates!</p></div>`;
 }
+
+// --- Start of Appending Combined Disease + Organism Queries ---
+// This block should be appended to the END of your existing questionRegistry array.
+
+questionRegistry.push(
+    // ===================================================================================
+    // New Combined Disease + Organism Queries (Required Helper: getDiseaseGenesInOrganism)
+    // ===================================================================================
+
+    // --- Core/Direct Queries ---
+    { 
+        text: "Please bring the Joubert syndrome genes in C. elegans", 
+        handler: async () => getDiseaseGenesInOrganism("Joubert Syndrome", "C. elegans") 
+    },
+    { 
+        text: "List Joubert syndrome genes found in Mouse", 
+        handler: async () => getDiseaseGenesInOrganism("Joubert Syndrome", "Mouse") 
+    },
+    { 
+        text: "Display genes for Meckel–Gruber Syndrome in Zebrafish", 
+        handler: async () => getDiseaseGenesInOrganism("Meckel–Gruber Syndrome", "Zebrafish") 
+    },
+    { 
+        text: "Find BBS genes conserved in Drosophila", 
+        handler: async () => getDiseaseGenesInOrganism("Bardet–Biedl Syndrome", "Drosophila") 
+    },
+    { 
+        text: "Which Polycystic Kidney Disease genes have orthologs in Xenopus", 
+        handler: async () => getDiseaseGenesInOrganism("Polycystic Kidney Disease", "Xenopus") 
+    },
+    { 
+        text: "Conserved NPHP genes in the worm", 
+        handler: async () => getDiseaseGenesInOrganism("Nephronophthisis", "C. elegans") 
+    },
+
+    // --- Expanded Synonyms and General Ciliopathy Queries ---
+    
+    // Joubert Synonyms
+    { 
+        text: "Which Joubert syndrome genes are conserved in C. elegans?", 
+        handler: async () => getDiseaseGenesInOrganism("Joubert Syndrome", "C. elegans") 
+    },
+    { 
+        text: "Show Joubert genes in C. elegans", 
+        handler: async () => getDiseaseGenesInOrganism("Joubert Syndrome", "C. elegans") 
+    },
+    { 
+        text: "Find Joubert genes conserved in mouse", 
+        handler: async () => getDiseaseGenesInOrganism("Joubert Syndrome", "Mouse") 
+    },
+    { 
+        text: "List conserved Joubert genes in zebrafish", 
+        handler: async () => getDiseaseGenesInOrganism("Joubert Syndrome", "Zebrafish") 
+    },
+    
+    // General Ciliopathy Synonyms for all 4 model organisms
+    { 
+        text: "List ciliopathy genes conserved in Mouse", 
+        handler: async () => getDiseaseGenesInOrganism("Ciliopathy", "Mouse") 
+    },
+    { 
+        text: "Display all ciliopathy genes that have a zebrafish ortholog", 
+        handler: async () => getDiseaseGenesInOrganism("Ciliopathy", "Zebrafish") 
+    },
+    { 
+        text: "Which ciliopathy genes are found in the fly genome?", 
+        handler: async () => getDiseaseGenesInOrganism("Ciliopathy", "Drosophila") 
+    },
+    { 
+        text: "Find ciliopathy genes conserved in Xenopus", 
+        handler: async () => getDiseaseGenesInOrganism("Ciliopathy", "Xenopus") 
+    },
+    { 
+        text: "List mouse orthologs for ciliopathy genes", 
+        handler: async () => getDiseaseGenesInOrganism("Ciliopathy", "Mouse") 
+    },
+    { 
+        text: "Show ciliary disease genes present in the worm", 
+        handler: async () => getDiseaseGenesInOrganism("Ciliopathy", "C. elegans") 
+    }
+);
+// --- End of Appending Combined Disease + Organism Queries ---
+
+
+// Assuming the original 'questionRegistry' is globally available, append the new questions:
+questionRegistry.push(...combinedDiseaseOrganismQueries);
+
 // --- Updated: Get genes based on screen phenotype (Now robust against all valid inputs) ---
 async function getGenesByScreenPhenotype(phenotype) {
     if (!ciliaHubDataCache) await fetchCiliaData();
@@ -2376,126 +2524,6 @@ const getGenesByDomainDescription = async (desc) => {
 const getGenesByMultipleComplexes = async (complexes) => notImplementedYet(`Genes by multiple complexes: ${complexes.join(', ')}`);
 const getConservedGenes = async (organisms) => notImplementedYet(`Conserved genes between: ${organisms.join(' & ')}`);
 const getProteinInteractions = async (gene) => notImplementedYet(`Protein interactions for: ${gene}`);
-
-// Add this after the questionRegistry array definition
-
-// =============================================================================
-// COMPREHENSIVE QUESTION EXPANSION FOR CiliAI ASK
-// =============================================================================
-
-// Add these new questions to your existing questionRegistry array
-questionRegistry.push(
-  // --- Core Functional Questions ---
-  { text: "What is the function of BBS1?", handler: () => getGeneFunction("BBS1") },
-  { text: "Describe the role of ARL13B in ciliary signaling", handler: () => getGeneRole("ARL13B", "ciliary signaling") },
-  { text: "Explain what CEP290 does", handler: () => getGeneFunction("CEP290") },
-  
-  // --- Localization Questions ---
-  { text: "Where is IFT88 localized in the cell?", handler: () => getGeneLocalization("IFT88") },
-  { text: "Show all genes found at the transition zone", handler: () => getGenesByLocalization("transition zone") },
-  { text: "Find genes localized to basal body", handler: () => getGenesByLocalization("basal body") },
-  { text: "Show proteins in transition zone", handler: () => getGenesByLocalization("transition zone") },
-  { text: "Display genes at ciliary tip", handler: () => getGenesByLocalization("ciliary tip") },
-  { text: "Which genes localize to axoneme?", handler: () => getGenesByLocalization("axoneme") },
-  { text: "Show transition fiber proteins", handler: () => getGenesByLocalization("transition fiber") },
-  
-  // --- Disease Association Questions ---
-  { text: "List all diseases linked to NPHP1", handler: () => getGeneDiseases("NPHP1") },
-  { text: "What ciliopathies are associated with mutations in MKS1?", handler: () => getGeneDiseases("MKS1") },
-  { text: "Show genes for Joubert Syndrome", handler: () => getCiliopathyGenes("Joubert Syndrome") },
-  { text: "Show genes for Bardet-Biedl Syndrome", handler: () => getCiliopathyGenes("Bardet-Biedl Syndrome") },
-  { text: "Display genes associated with Meckel-Gruber Syndrome", handler: () => getCiliopathyGenes("Meckel-Gruber Syndrome") },
-  { text: "List genes for Primary Ciliary Dyskinesia", handler: () => getCiliopathyGenes("Primary Ciliary Dyskinesia") },
-  { text: "Find genes linked to Leber congenital amaurosis", handler: () => getCiliopathyGenes("Leber congenital amaurosis") },
-  { text: "Which genes cause cystic kidney disease?", handler: () => getGenesByScreenPhenotype("cystic kidney disease") },
-  { text: "Show genes for cranioectodermal dysplasia", handler: () => getCiliopathyGenes("Cranioectodermal Dysplasia") },
-  { text: "Tell me genes causing short-rib thoracic dysplasia", handler: () => getCiliopathyGenes("Short-rib thoracic dysplasia") },
-  { text: "Display genes related to hydrocephalus", handler: () => getCiliopathyGenes("Hydrocephalus") },
-  
-  // --- Protein Structure & Complexes ---
-  { text: "Show protein domains of WDR35", handler: () => getGeneDomains("WDR35") },
-  { text: "List all components of the BBSome complex", handler: () => getGenesByComplex("BBSome") },
-  { text: "Display components of IFT-A complex", handler: () => getGenesByComplex("IFT-A") },
-  { text: "Display components of IFT-B complex", handler: () => getGenesByComplex("IFT-B") },
-  { text: "Show components of Transition Zone Complex", handler: () => getGenesByComplex("Transition Zone Complex") },
-  { text: "Display components of MKS Complex", handler: () => getGenesByComplex("MKS Complex") },
-  { text: "Show components of NPHP Complex", handler: () => getGenesByComplex("NPHP Complex") },
-  
-  // --- Ciliary Status ---
-  { text: "Is DYNC2H1 a ciliary gene?", handler: () => checkCiliaryStatus("DYNC2H1") },
-  { text: "Show me all ciliary genes", handler: () => getAllCiliaryGenes() },
-  
-  // --- Functional Genomics Screen Results ---
-  { text: "What happens to cilia when KIF3A is knocked down?", handler: () => getKnockdownEffect("KIF3A") },
-  { text: "Which genes cause longer cilia when silenced?", handler: () => getGenesByScreenPhenotype("long cilia") },
-  { text: "Show me the results for IFT88 in the Kim2016 screen", handler: () => getScreenResults("IFT88", "Kim2016") },
-  { text: "Find all genes that act as negative regulators of Hedgehog signaling", handler: () => getHedgehogRegulators("negative") },
-  { text: "Display genes that had 'No effect' in the Wheway2015 screen", handler: () => getNoEffectGenes("Wheway2015") },
-  { text: "Find genes causing short cilia", handler: () => getGenesByScreenPhenotype("short cilia") },
-  
-  // --- Gene Expression Data ---
-  { text: "Where is ARL13B expressed?", handler: () => getGeneExpression("ARL13B") },
-  { text: "Show the expression pattern of BBS1 across all tissues", handler: () => getGeneExpressionPattern("BBS1") },
-  { text: "Which ciliary genes are most highly expressed in the kidney?", handler: () => getTissueSpecificGenes("kidney") },
-  { text: "Compare the expression of IFT88 and OFD1 in the brain versus the retina", handler: () => compareGeneExpression(["IFT88", "OFD1"], ["brain", "retina"]) },
-  { text: "Show expression of ARL13B", handler: () => getGeneExpression("ARL13B") },
-  { text: "Where is BBS1 expressed?", handler: () => getGeneExpression("BBS1") },
-  { text: "In which tissues is IFT88 expressed?", handler: () => getGeneExpression("IFT88") },
-  { text: "Which organ systems express CEP290?", handler: () => getGeneExpression("CEP290") },
-  
-  // --- Evolutionary Conservation Data ---
-  { text: "Show the evolutionary conservation of BBS1", handler: () => getGeneConservation("BBS1") },
-  { text: "Is IFT88 conserved in C. elegans?", handler: () => checkConservation("IFT88", "C. elegans") },
-  { text: "List all ciliary-only genes", handler: () => getCiliaryOnlyGenes() },
-  { text: "Display the ciliary genes that are conserved between humans and zebrafish", handler: () => getConservedGenesBetween(["Human", "Zebrafish"]) },
-  { text: "Which human ciliary genes have orthologs in Chlamydomonas?", handler: () => getOrthologsInOrganism("Chlamydomonas") },
-  { text: "Display conserved ciliary proteins between mouse and human", handler: () => getConservedGenes(["Mouse", "Human"]) },
-  { text: "What is the phylogeny of IFT88?", handler: () => getGeneConservation("IFT88") },
-  { text: "Evolutionary conservation of ARL13B", handler: () => getGeneConservation("ARL13B") },
-  
-  // --- Mechanism & Functional Categories ---
-  { text: "Show me motor genes", handler: () => getGenesByFunction("motor") },
-  { text: "Display kinesin motors", handler: () => getGenesByFunction("kinesin motors") },
-  { text: "Show me dynein motors", handler: () => getGenesByFunction("dynein motors") },
-  { text: "Display kinases regulating cilia length", handler: () => getGenesByDomainDescription("kinase") },
-  { text: "List intraflagellar transport (IFT) components", handler: () => getGenesByComplex("IFT") },
-  { text: "Find IFT-A and IFT-B complex genes", handler: () => getGenesByMultipleComplexes(["IFT-A", "IFT-B"]) },
-  { text: "Which genes are involved in cilium assembly?", handler: () => getGenesByFunction("cilium assembly") },
-  { text: "Show me Ciliary assembly/disassembly genes", handler: () => getGenesByFunction("Ciliary assembly/disassembly") },
-  { text: "Display Signaling genes", handler: () => getGenesByFunction("Signaling") },
-  { text: "Show me Motile cilium genes", handler: () => getGenesByFunction("Motile cilium") },
-  { text: "Display Motor protein genes", handler: () => getGenesByFunction("Motor protein") },
-  { text: "Show Transport genes", handler: () => getGenesByFunction("Transport") },
-  { text: "Display Protein modification genes", handler: () => getGenesByFunction("Protein modification") },
-  { text: "Show Cytoskeletal genes", handler: () => getGenesByFunction("Cytoskeletal") },
-  
-  // --- Protein Domain Questions ---
-  { text: "Show WD40 domain containing proteins", handler: () => getGenesWithDomain("WD40") },
-  { text: "Display Leucine-rich repeat domain proteins", handler: () => getGenesWithDomain("Leucine-rich repeat") },
-  { text: "Show IQ motif containing proteins", handler: () => getGenesWithDomain("IQ motif") },
-  { text: "Display calmodulin-binding proteins", handler: () => getGenesWithDomain("calmodulin-binding") },
-  { text: "Show EF-hand domain proteins", handler: () => getGenesWithDomain("EF-hand") },
-  
-  // --- Organism-Specific Questions ---
-  { text: "Display ciliary genes in human", handler: () => getCiliaryGenesForOrganism("human") },
-  { text: "Show ciliary genes in mouse", handler: () => getCiliaryGenesForOrganism("mouse") },
-  { text: "List ciliary genes in zebrafish", handler: () => getCiliaryGenesForOrganism("zebrafish") },
-  { text: "Display ciliary genes in fly", handler: () => getCiliaryGenesForOrganism("fly") },
-  { text: "Show ciliary genes in yeast", handler: () => getCiliaryGenesForOrganism("yeast") },
-  { text: "List ciliary genes in Chlamydomonas", handler: () => getCiliaryGenesForOrganism("Chlamydomonas") },
-  
-  // --- Comprehensive Gene Information ---
-  { text: "Show all known info about IFT88", handler: () => getComprehensiveDetails("IFT88") },
-  { text: "Tell me about BBS1", handler: () => getComprehensiveDetails("BBS1") },
-  { text: "Tell me about ARL13B", handler: () => getComprehensiveDetails("ARL13B") },
-  { text: "Show interactors of IFT88", handler: () => getProteinInteractions("IFT88") },
-  { text: "What are the interacting partners of BBS1?", handler: () => getProteinInteractions("BBS1") }
-);
-
-// =============================================================================
-// REPLACEMENT: Corrected Query Handler Functions
-// These functions now format their own HTML to prevent incorrect error messages.
-// =============================================================================
 
 async function getGeneFunction(gene) {
     if (!ciliaHubDataCache) await fetchCiliaData();
