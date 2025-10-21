@@ -2135,12 +2135,12 @@ async function getAllCiliopathyGenesRaw() {
  * * @param {string} disease - The name of the human ciliopathy (e.g., 'Joubert Syndrome').
  * @param {string} organism - The target model organism (e.g., 'C. elegans').
  */
+// --- FINAL CORRECTED getDiseaseGenesInOrganism FUNCTION ---
 async function getDiseaseGenesInOrganism(disease, organism) {
-    // 1. Fetch all necessary data
     await fetchCiliaData();
     await fetchPhylogenyData();
 
-    // 2. Define the target ortholog key based on the organism input
+    // 1. Define the target ortholog key based on the organism input
     const organismKeyMap = {
         'worm': 'ortholog_c_elegans', 'c. elegans': 'ortholog_c_elegans',
         'mouse': 'ortholog_mouse', 'xenopus': 'ortholog_xenopus',
@@ -2149,18 +2149,17 @@ async function getDiseaseGenesInOrganism(disease, organism) {
     };
     const targetKey = organismKeyMap[organism.toLowerCase()] || null;
 
-    // 3. Determine disease query for filtering (robustly selects ALL disease genes if 'Ciliopathy' is used)
+    // 2. Determine disease query (robustly selects ALL disease genes if 'Ciliopathy' is used)
     const diseaseQuery = (disease.toLowerCase().includes('ciliopathy')) ? "Ciliopathy" : disease;
     const queryTerm = (diseaseQuery === "Ciliopathy") ? "ciliopathy" : diseaseQuery;
     const { genes: diseaseGenes } = await getCiliopathyGenes(queryTerm);
-    
     const diseaseGeneSet = new Set(diseaseGenes.map(g => g.gene.toUpperCase()));
 
     if (diseaseGeneSet.size === 0) {
         return formatListResult(`Genes for ${disease} in ${organism}`, [], `No human genes found for ${disease}.`);
     }
 
-    // 4. Prepare organism filter (for phylogenetic conservation check)
+    // 3. Prepare organism filter (for phylogenetic conservation check)
     const speciesMap = {
         'worm': 'C.elegans', 'mouse': 'M.musculus', 'xenopus': 'X.tropicalis',
         'zebrafish': 'D.rerio', 'drosophila': 'D.melanogaster', 
@@ -2168,7 +2167,7 @@ async function getDiseaseGenesInOrganism(disease, organism) {
     const speciesCode = speciesMap[organism.toLowerCase()] || organism;
     const speciesRegex = new RegExp(`^${normalizeTerm(speciesCode).replace(/\./g, '\\.?').replace(/\s/g, '\\s*')}$`, 'i');
     
-    // 5. Filter and Enrich Data
+    // 4. Filter and Enrich Data
     const conservedDiseaseGenes = [];
 
     diseaseGeneSet.forEach(humanGene => {
@@ -2179,18 +2178,23 @@ async function getDiseaseGenesInOrganism(disease, organism) {
         const isPhyloConserved = phyData && phyData.species && 
                                  phyData.species.some(s => speciesRegex.test(normalizeTerm(s)));
         
-        if (isPhyloConserved) {
+        if (isPhyloConserved && hubData) { // Ensure hubData exists before pushing
             
-            // Collect the ortholog name using the dynamic key (e.g., ortholog_c_elegans)
-            const orthologName = (targetKey && hubData) ? (hubData[targetKey] || 'N/A') : 'N/A';
+            // Collect the ortholog names (all of them)
+            const orthologs = {
+                ortholog_mouse: hubData.ortholog_mouse || 'N/A',
+                ortholog_c_elegans: hubData.ortholog_c_elegans || 'N/A',
+                ortholog_zebrafish: hubData.ortholog_zebrafish || 'N/A',
+                ortholog_drosophila: hubData.ortholog_drosophila || 'N/A',
+                ortholog_xenopus: hubData.ortholog_xenopus || 'N/A',
+            };
             
             conservedDiseaseGenes.push({
                 gene: humanGene,
                 description: `Diseases: ${hubData.ciliopathy.join(', ')}. Conserved in: ${speciesCode}.`,
                 
-                // CRUCIAL: Add the ortholog name to the object under a universal key expected by the renderer
-                // The renderer will look for this field based on the targetKey provided below.
-                [targetKey]: orthologName 
+                // CRUCIAL: Attach all orthologs to the output object
+                ...orthologs
             });
         }
     });
@@ -2203,13 +2207,13 @@ async function getDiseaseGenesInOrganism(disease, organism) {
         <a href="https://pubmed.ncbi.nlm.nih.gov/24995987/" target="_blank">[PMID: 24995987]</a>
     </p>`;
 
-    // 6. Return formatted HTML string, flagging the renderer to show the correct column
+    // 5. Return formatted HTML string, flagging the renderer to show the correct column
     return formatListResult(
         title, 
         conservedDiseaseGenes, 
-        description + citationHtml,
-        speciesCode, // Pass speciesCode for header name
-        targetKey    // Pass the actual key (e.g., 'ortholog_c_elegans') for data access
+        citationHtml, // Pass citation as message (third argument)
+        speciesCode,  // Pass speciesCode for header name (fourth argument)
+        targetKey     // Pass the actual key (e.g., 'ortholog_c_elegans') for data access (fifth argument)
     );
 }
 
@@ -3950,14 +3954,16 @@ function formatGeneDetail(geneData, geneSymbol, detailTitle, detailContent) {
 }
 
 // --- UPDATED formatListResult (Now supports dynamic ortholog column) ---
-function formatListResult(title, geneList, citationHtml = '', speciesCode = '', targetKey = 'N/A') {
+// Note: Changed function signature to accept FIVE arguments
+function formatListResult(title, geneList, citationHtml = '', speciesCode = '', targetKey = null) {
     if (!geneList || geneList.length === 0) {
         return `<div class="result-card"><h3>${title}</h3><p class="status-not-found">No matching genes found.</p></div>`;
     }
 
     const displayedGenes = geneList.slice(0, 100);
-    const showOrthologColumn = targetKey !== 'N/A';
-    const orthologSpeciesName = speciesCode.replace(/(\w\.\w+)\s*/, ''); // Clean up species code for header
+    const showOrthologColumn = targetKey && targetKey !== 'N/A';
+    // Clean up species code for header (e.g., C.elegans -> C. elegans)
+    const orthologSpeciesName = speciesCode.replace(/(\w\.\w+)\s*/, '').replace('drosophila', 'Fly').replace('elegans', 'C. elegans').trim() || 'Ortholog';
 
     // --- Build Table Rows ---
     const tableRows = displayedGenes.map(g => {
@@ -3965,7 +3971,7 @@ function formatListResult(title, geneList, citationHtml = '', speciesCode = '', 
         
         // Add the ortholog column if enabled
         if (showOrthologColumn) {
-            // Use bracket notation to access the ortholog dynamically (g[targetKey])
+            // Access the ortholog name using the dynamic key (g[targetKey])
             const orthologName = g[targetKey] || 'N/A';
             cells += `<td>${orthologName}</td>`;
         }
@@ -3985,7 +3991,7 @@ function formatListResult(title, geneList, citationHtml = '', speciesCode = '', 
     }
     
     tableHeader += `
-            <th>Description (Snippet)</th>
+            <th>Disease/Conservation Info</th>
         </tr>
     </thead>`;
 
@@ -4009,7 +4015,6 @@ function formatListResult(title, geneList, citationHtml = '', speciesCode = '', 
         ${citationHtml}
     </div>`;
 }
-
 
 // ----------------------------------------------------------------------
 // NEW FUNCTIONALITY: CLIENT-SIDE CSV DOWNLOAD
