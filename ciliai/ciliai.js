@@ -1647,7 +1647,7 @@ const questionRegistry = [
 function notImplementedYet(feature) {
     return `<div class="result-card"><h3>Feature In Development</h3><p>The query handler for "<strong>${feature}</strong>" is not yet implemented. Stay tuned for future updates!</p></div>`;
 }
-/ B. Updated: Get genes based on screen phenotype (now implemented to work with the data)
+// ---Updated: Get genes based on screen phenotype (now implemented to work with the data)
 async function getGenesByScreenPhenotype(phenotype) {
     if (!ciliaHubDataCache) await fetchCiliaData();
     const normalizedPhenotype = phenotype.toLowerCase();
