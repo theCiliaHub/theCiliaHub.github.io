@@ -1372,12 +1372,6 @@ const questionRegistry = [
     { text: "What ciliopathies involve IFT88?", handler: async () => getGeneDiseases("IFT88") },
     { text: "RPGRIP1L disease associations", handler: async () => getGeneDiseases("RPGRIP1L") },
 
-    // ==================== EVOLUTIONARY CONSERVATION & PHYLOGENY ====================
-    // Note: We use a helper function to correctly wrap the output {genes, desc, species} -> HTML string.
-    const wrapOrganismResult = async (organismName) => {
-        const result = await getCiliaryGenesForOrganism(organismName);
-        return formatListResult(`Ciliary genes in ${result.speciesCode}`, result.genes, result.description);
-    };
 
     { text: "Show evolutionary conservation of IFT88", handler: async () => getGeneConservation("IFT88") },
     { text: "How conserved is ARL13B?", handler: async () => getGeneConservation("ARL13B") },
@@ -2022,6 +2016,13 @@ const questionRegistry = [
     { text: "Plot FOXJ1 UMAP expression", handler: async () => displayUmapGeneExpression("FOXJ1") },
     { text: "Show cell types on UMAP", handler: async () => displayUmapPlot() },
 ];
+
+  // ==================== EVOLUTIONARY CONSERVATION & PHYLOGENY ====================
+    // Note: We use a helper function to correctly wrap the output {genes, desc, species} -> HTML string.
+const wrapOrganismResult = async (organismName) => {
+    const result = await getCiliaryGenesForOrganism(organismName);
+    return formatListResult(`Ciliary genes in ${result.speciesCode}`, result.genes, result.description);
+};
 
 // --- ADDITION: New Helper Functions for Expanded Questions ---
 function notImplementedYet(feature) {
