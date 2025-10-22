@@ -3525,77 +3525,83 @@ async function getGenesWithDomain(domainName) {
     return results;
 }
 
-// --- UPDATED getGenesByComplex FUNCTION (Final Robust Version) ---
+// --- AUTO-DETECTING getGenesByComplex (Dynamic Version) ---
 
 async function getGenesByComplex(complexName) {
-    if (!ciliaHubDataCache) await fetchCiliaData(); 
-    await fetchCorumComplexes(); 
-    
-    const complexUpper = complexName.toUpperCase();
-    let foundComponentSymbols = [];
-    let sourceText = 'CiliaHub Annotation';
+    if (!ciliaHubDataCache) await fetchCiliaData();
+    await fetchCorumComplexes();
 
-    // 1. Define the component symbols list based on hardcoded core data
-    const CORE_COMPONENTS_MAP = {
-        'BBSOME': ['BBS1', 'BBS2', 'BBS4', 'BBS5', 'BBS7', 'BBS9', 'BBS10', 'BBS12', 'TTC8', 'ARL6', 'BBIP1'],
-        'IFT-A': ['IFT121', 'IFT122', 'IFT139', 'IFT140', 'IFT144'],
-        'IFT-B': ['IFT20', 'IFT22', 'IFT25', 'IFT27', 'IFT46', 'IFT52', 'IFT57', 'IFT70', 'IFT74', 'IFT80', 'IFT81', 'IFT88'],
-        // Add other core complexes you manually track if needed (MKS, NPHP)
-    };
-    
-    // Check if the query matches a CORE CILIOPATHY COMPLEX (BBSome, IFT, etc.)
-    for (const [key, list] of Object.entries(CORE_COMPONENTS_MAP)) {
-        if (complexUpper.includes(key) || complexUpper.includes(key.replace(/OME| COMPLEX/g, ''))) {
-            // Assign the symbol list and break
-            foundComponentSymbols = list;
-            sourceText = 'Internal Core Ciliopathy List';
-            break;
-        }
-    }
-    
+    const query = complexName.trim().toUpperCase();
+    let sourceText = 'Auto-detected complex (CiliaHub + CORUM integrated)';
     let finalDisplayGenes = [];
 
-    // 2. If a core list was found, enrich it with Hub data
-    if (foundComponentSymbols.length > 0) {
-        finalDisplayGenes = foundComponentSymbols.map(geneSymbol => {
-            const hubData = ciliaHubDataCache.find(g => g.gene.toUpperCase() === geneSymbol.toUpperCase());
-            
-            // This guarantees the object structure required by formatListResult
-            return {
-                gene: geneSymbol,
-                description: `Ciliopathy: ${hubData?.ciliopathy?.join(', ') || 'N/A'}. Role: ${hubData?.functional_summary?.substring(0, 80) || 'N/A'}.`
-            };
-        });
-    }
-    
-    // 3. Fallback to CORUM for general human complexes (if no core complex was matched)
-    if (finalDisplayGenes.length === 0 && corumComplexCache && corumComplexCache.length > 0) {
-        // We skip redundant CORUM search if the CiliaHub list was already populated
-        
-        const corumEntry = corumComplexCache.find(c => c.complex_name.toUpperCase().includes(complexUpper));
+    // --- STEP 1: Search CiliaHub for complex-like entries (if present) ---
+    // Some CiliaHub datasets may have "complex" or "module" information in metadata
+    const ciliacomplexMatches = ciliaHubDataCache.filter(g => 
+        g.complex && g.complex.toUpperCase().includes(query)
+    );
 
-        if (corumEntry) {
-            sourceText = `CORUM Complex ID ${corumEntry.complex_id} (Corum/CiliaHub Filter)`;
-            
+    if (ciliacomplexMatches.length > 0) {
+        finalDisplayGenes = ciliacomplexMatches.map(g => ({
+            gene: g.gene,
+            description: `Ciliopathy: ${g.ciliopathy?.join(', ') || 'None'}. Role: ${g.functional_summary?.slice(0, 100) || 'N/A'}.`
+        }));
+        sourceText = 'CiliaHub complex association';
+    }
+
+    // --- STEP 2: Fuzzy search in CORUM complexes ---
+    if (finalDisplayGenes.length === 0 && corumComplexCache?.length > 0) {
+        // Create a normalized version of names to handle flexible matching
+        const normalize = str => str.replace(/[^A-Z0-9]/gi, '').toUpperCase();
+
+        const corumEntry = corumComplexCache.find(c => {
+            const cname = normalize(c.complex_name);
+            const qname = normalize(query);
+            return cname.includes(qname) || qname.includes(cname);
+        });
+
+        if (corumEntry && Array.isArray(corumEntry.subunits)) {
+            sourceText = `CORUM Complex ID ${corumEntry.complex_id} (${corumEntry.complex_name})`;
             corumEntry.subunits.forEach(subunit => {
-                const hubData = ciliaHubDataCache.find(g => g.gene.toUpperCase() === subunit.gene_name.toUpperCase());
-                
-                if (hubData) {
-                    finalDisplayGenes.push({
-                        gene: subunit.gene_name,
-                        description: `Ciliopathy: ${hubData.ciliopathy?.join(', ') || 'None'}. Role: ${hubData.functional_summary?.substring(0, 80) || 'N/A'}.`,
-                    });
-                }
+                const hubData = ciliaHubDataCache?.find(g => g.gene.toUpperCase() === subunit.gene_name.toUpperCase());
+                const desc = hubData?.functional_summary 
+                    ? hubData.functional_summary.slice(0, 100) + '...' 
+                    : 'No functional summary available.';
+                finalDisplayGenes.push({
+                    gene: subunit.gene_name,
+                    description: `Ciliopathy: ${hubData?.ciliopathy?.join(', ') || 'None'}. Role: ${desc}`,
+                });
             });
         }
     }
 
-    // 4. Final Output Formatting
-    const finalDescription = (finalDisplayGenes.length > 0) ? `Source: ${sourceText}.` : `No Ciliary components found for ${complexName}.`;
+    // --- STEP 3: Fallback - approximate name matching from CiliaHub gene annotations ---
+    if (finalDisplayGenes.length === 0) {
+        const hubCandidates = ciliaHubDataCache.filter(g => 
+            g.functional_summary?.toUpperCase().includes(query)
+        );
 
-    // CRITICAL: The function returns the formatted HTML string.
+        if (hubCandidates.length > 0) {
+            sourceText = 'CiliaHub functional annotation match';
+            finalDisplayGenes = hubCandidates.slice(0, 15).map(g => ({
+                gene: g.gene,
+                description: g.functional_summary?.slice(0, 100) || 'No description.',
+            }));
+        }
+    }
+
+    // --- STEP 4: Clean and prepare final output ---
+    finalDisplayGenes = finalDisplayGenes.filter(
+        (v, i, a) => a.findIndex(t => t.gene === v.gene) === i
+    );
+
+    const finalDescription = finalDisplayGenes.length > 0
+        ? `Source: ${sourceText}.`
+        : `No complex components found for "${complexName}".`;
+
     return formatListResult(`Components of ${complexName}`, finalDisplayGenes, finalDescription);
 }
+
 
 
 async function getGenesByFunction(functionalCategory) {
