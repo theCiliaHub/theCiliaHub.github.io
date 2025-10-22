@@ -12,6 +12,8 @@ let CILI_AI_DOMAIN_DB = null;     // For the new domain database
 let neversPhylogenyCache = null;  // For Nevers et al. 2017 data
 let liPhylogenyCache = null;      // For Li et al. 2014 data
 let allGeneSymbols = null; // Add this global variable alongside others
+// --- Global Data Cache (ADD THIS LINE) ---
+let corumComplexCache = null;
 
 // --- NEW: Reusable scRNA-seq Data Reference ---
 const SC_RNA_SEQ_REFERENCE_HTML = `
@@ -206,7 +208,8 @@ window.displayCiliAIPage = async function displayCiliAIPage() {
         fetchUmapData(),           // Your original umap data
         getDomainData(),           // --- NEW ---
         fetchNeversPhylogenyData(), // --- NEW ---
-        fetchLiPhylogenyData()     // --- NEW ---
+        fetchLiPhylogenyData(),     // --- NEW ---
+        fetchCorumComplexes()
     ]);
     console.log('ciliAI.js: All data loaded (including new domain and phylogeny sources).');
     
@@ -2499,6 +2502,25 @@ async function compareComplexes(complexA, complexB) {
     </div>`;
 }
 
+// --- NEW FUNCTION: fetchCorumComplexes ---
+async function fetchCorumComplexes() {
+    if (corumComplexCache) return corumComplexCache;
+    try {
+        const dataUrl = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/corum_humanComplexes.json';
+        const response = await fetch(dataUrl);
+        if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+        
+        corumComplexCache = await response.json(); 
+        console.log(`✅ CORUM Complex data loaded with ${corumComplexCache.length} entries.`);
+        return corumComplexCache;
+    } catch (error) {
+        console.error('Failed to fetch CORUM complex data:', error);
+        corumComplexCache = [];
+        return corumComplexCache;
+    }
+}
+
+
 /**
  * Displays a grouped bar chart of multiple genes' expression across cell types.
  * Uses "Nature-like" colors, solid axis lines, and no grid.
@@ -3419,30 +3441,60 @@ async function getGenesWithDomain(domainName) {
     return results;
 }
 
+// --- UPDATED getGenesByComplex FUNCTION ---
 async function getGenesByComplex(complexName) {
-    await fetchCiliaData();
+    if (!ciliaHubDataCache) await fetchCiliaData();
+    await fetchCorumComplexes(); // Ensure CORUM data is loaded
+    
+    const complexUpper = complexName.toUpperCase();
     const complexRegex = new RegExp(complexName, 'i');
-    
-    const complexGenes = ciliaHubDataCache.filter(gene => 
-        gene.complex_names && gene.complex_names.some(cn => cn.match(complexRegex))
-    );
-    
-    if (complexGenes.length > 0) {
-        return complexGenes.map(gene => ({
-            gene: gene.gene,
-            description: `Complex: ${gene.complex_names?.join(', ') || 'Unknown'}`
-        }));
+
+    let foundGenes = [];
+    let sourceText = 'CiliaHub Annotation';
+    let isCiliaHubCore = false;
+
+    // 1. Prioritize CiliaHub annotations for core complexes (BBSome, IFT, MKS)
+    // This is necessary because Hub annotations often contain more relevant ciliary functional summaries.
+    if (['BBSOME', 'IFT-A', 'IFT-B', 'MKS COMPLEX', 'NPHP COMPLEX'].some(name => complexUpper.includes(name))) {
+        foundGenes = ciliaHubDataCache
+            .filter(gene => Array.isArray(gene.complex_names) && gene.complex_names.some(cn => cn.toUpperCase().includes(complexUpper)))
+            .map(gene => ({ 
+                gene: gene.gene,
+                description: `Ciliopathy: ${gene.ciliopathy?.join(', ') || 'N/A'}. Localization: ${gene.localization?.join(', ') || 'N/A'}.`
+            }));
+        isCiliaHubCore = true;
+    } 
+
+    if (foundGenes.length === 0) {
+        // 2. Fallback to CORUM data if not a core CiliaHub complex, or if the core query failed
+        if (corumComplexCache && corumComplexCache.length > 0) {
+            const corumEntry = corumComplexCache.find(c => c.complex_name.toUpperCase().includes(complexUpper));
+
+            if (corumEntry) {
+                sourceText = `CORUM Complex ID ${corumEntry.complex_id}`;
+                
+                corumEntry.subunits.forEach(subunit => {
+                    const hubData = ciliaHubDataCache.find(g => g.gene.toUpperCase() === subunit.gene_name.toUpperCase());
+                    
+                    if (hubData) {
+                         // Only show CORUM components that are recognized as ciliary genes in your hub
+                        foundGenes.push({
+                            gene: subunit.gene_name,
+                            description: `Ciliopathy: ${hubData.ciliopathy?.join(', ') || 'None'}. Role: ${hubData.functional_summary?.substring(0, 80) || 'N/A'}.`,
+                        });
+                    }
+                });
+            }
+        }
     }
-    
-    const relatedGenes = ciliaHubDataCache.filter(gene => 
-        gene.functional_summary && gene.functional_summary.toLowerCase().includes(complexName.toLowerCase())
-    ).map(gene => ({
-        gene: gene.gene,
-        description: gene.functional_summary?.substring(0, 100) + '...' || 'No description'
-    }));
-    
-    return relatedGenes;
+
+    // 3. Final Output Formatting
+    const count = foundGenes.length;
+    const finalDescription = (count > 0) ? `Source: ${sourceText}.` : `No Ciliary components found for ${complexName}.`;
+
+    return formatListResult(`Components of ${complexName}`, foundGenes, finalDescription);
 }
+
 
 async function getGenesByFunction(functionalCategory) {
     await fetchCiliaData();
@@ -3623,7 +3675,8 @@ window.handleAIQuery = async function() {
             fetchUmapData(),
             getDomainData(),
             fetchNeversPhylogenyData(),
-            fetchLiPhylogenyData()
+            fetchLiPhylogenyData(),
+            fetchCorumComplexes()
         ]);
         console.log('ciliAI.js: All data loaded (including new domain and phylogeny sources).');
 
