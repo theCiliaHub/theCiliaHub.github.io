@@ -1903,20 +1903,6 @@ const questionRegistry = [
     { text: "Is FOXJ1 expressed in ciliated cells?", handler: async () => getGeneExpressionInCellType("FOXJ1", "ciliated cell") },
     { text: "Do ciliated cells express ARL13B?", handler: async () => getGeneExpressionInCellType("ARL13B", "ciliated cell") },
     
-   // ==================== CILIOPATHY CLASSIFICATION ====================
-    { text: "List all genes classified as Primary Ciliopathy", handler: async () => getGenesByCiliopathyClassification("Primary Ciliopathy") },
-    { text: "Show genes classified as Motile Ciliopathy", handler: async () => getGenesByCiliopathyClassification("Motile Ciliopathy") },
-    { text: "Which genes are classified as Secondary Diseases", handler: async () => getGenesByCiliopathyClassification("Secondary Disease") },
-    { text: "Find genes classified as Primary Ciliopathy", handler: async () => getGenesByCiliopathyClassification("Primary Ciliopathy") },
-    { text: "Genes associated with Secondary Ciliopathies", handler: async () => getGenesByCiliopathyClassification("Secondary Disease") },
-      // ==================== CILIOPATHY & CLASSIFICATION (New Synonyms) ====================
-    { text: "List genes related to Primary Ciliopathy", handler: async () => getGenesByCiliopathyClassification("Primary Ciliopathy") },
-    { text: "Which genes are classified as Motile Ciliopathies?", handler: async () => getGenesByCiliopathyClassification("Motile Ciliopathy") },
-    { text: "Show secondary ciliopathy genes", handler: async () => getGenesByCiliopathyClassification("Secondary Disease") },
-    { text: "Genes linked to Primary Ciliary Dyskinesia (PCD)", handler: async () => { const { genes, description } = await getCiliopathyGenes("Primary Ciliary Dyskinesia"); return formatListResult("Genes for Primary Ciliary Dyskinesia", genes, description); } },
-    { text: "Genes causing Bardet-Biedl Syndrome (BBS)", handler: async () => { const { genes, description } = await getCiliopathyGenes("Bardet-Biedl Syndrome"); return formatListResult("Genes for Bardet-Biedl Syndrome", genes, description); }},
-    
-    
     // ==================== CILIARY PHENOTYPE EFFECTS (USING getGeneCiliaEffects) ====================
     { text: "What are the ciliary effects of NPHP1?", handler: async () => getGeneCiliaEffects("NPHP1") },
     { text: "Show ciliary effects for ARL13B", handler: async () => getGeneCiliaEffects("ARL13B") },
@@ -2007,10 +1993,11 @@ const ALL_DISEASES = [
 
 // Define disease aliases for flexibility
 const DISEASE_ALIASES = {
+    "Bardet–Biedl Syndrome": ["BBS", "BBSome", "Bardet-Biedl"], // Includes the alias 'BBS'
+    "Nephronophthisis": ["NPHP"],
+    "Meckel–Gruber Syndrome": ["MKS"],
+    "Primary Ciliary Dyskinesia": ["PCD"],
     "Joubert Syndrome": ["Joubert", "JS", "Joubert's"],
-    "Bardet-Biedl Syndrome": ["BBS", "Bardet-Biedl"],
-      "Meckel–Gruber Syndrome": ["MKS"],
-    "Primary Ciliary Dyskinesia": ["PCD"]
 };
 
 // Define model organisms for combined disease-organism questions
@@ -2170,18 +2157,87 @@ console.log("Joubert Syndrome Organism Questions:", joubertOrganismQuestions.map
 function runAutomatedRegistryGeneration() {
     let generatedQuestions = [];
 
-    // 1. Generate Simple Disease List Queries (Human Genes)
+    // --- 1. Generate Simple Disease List Queries (Human Genes) ---
     ALL_DISEASES.forEach(disease => {
         generatedQuestions.push(...generateDiseaseListQuestions(disease));
     });
 
-    // 2. Generate Combined Disease + Organism Queries
+    // --- 2. Generate Combined Disease + Organism Queries ---
     ALL_DISEASES.forEach(disease => {
         generatedQuestions.push(...generateCombinedDiseaseOrganismQuestions(disease));
     });
     
+    // --- 3. Generate Simple Ortholog/Phylogeny Queries (Ensures general organism queries are covered) ---
+    const ORGANISM_QUERIES = [
+        "List Ciliary Genes in [NAME] (Phylogeny)",
+        "List ciliary genes in [NAME]",
+        "Display ciliary genes in [NAME]",
+        "Show ciliary genes in [NAME]",
+    ];
+    MODEL_ORGANISMS.forEach(organism => {
+        ORGANISM_QUERIES.forEach(pattern => {
+            generatedQuestions.push({
+                text: pattern.replace(/\[NAME\]/g, organism),
+                handler: async () => getPhylogenyGenesForOrganism(organism) 
+            });
+        });
+    });
+
+    // --- 4. Generate Simple Curated Ortholog Lookups (e.g., Show curated orthologs for IFT88) ---
+    // (These are already manually defined in your existing array, but are good for consistency)
+    
     return generatedQuestions;
 }
+// --- Automated General Question Synonym Generator ---
+// Note: This logic should be run AFTER the main questionRegistry has been defined/populated.
+
+function autoGenerateSynonyms(registry) {
+    const standardSynonyms = [
+        ["Show", "Display"], ["Show", "Present"], ["Show", "Give me"],
+        ["List", "Enumerate"], ["List", "Provide"],
+        ["What is", "Explain"], ["What is", "Describe"],
+        ["What is the function of", "What does [GENE] do?"],
+        ["Where is [GENE] localized in the cell?", "Where is [GENE] found in the cell?"],
+    ];
+
+    const newQuestions = [];
+    const processedTexts = new Set(registry.map(q => q.text.toLowerCase()));
+
+    registry.forEach(item => {
+        const text = item.text;
+        const handler = item.handler;
+        
+        // 1. Generate standard trigger synonyms
+        standardSynonyms.forEach(([verb1, verb2]) => {
+            if (text.startsWith(verb1)) {
+                const newText = text.replace(verb1, verb2);
+                if (!processedTexts.has(newText.toLowerCase())) {
+                    newQuestions.push({ text: newText, handler: handler });
+                    processedTexts.add(newText.toLowerCase());
+                }
+            }
+        });
+
+        // 2. Gene-specific function synonyms (e.g., KIF17 -> KIF17's role)
+        const geneMatch = text.match(/about ([A-Z0-9]+)/i) || text.match(/of ([A-Z0-9]+)/i);
+        if (geneMatch && geneMatch[1]) {
+            const gene = geneMatch[1].toUpperCase();
+            const roleQuery = `Explain ${gene}'s role`;
+            if (!processedTexts.has(roleQuery.toLowerCase())) {
+                newQuestions.push({ text: roleQuery, handler: handler });
+                processedTexts.add(roleQuery.toLowerCase());
+            }
+        }
+    });
+
+    // Add generated questions to the registry
+    registry.push(...newQuestions);
+    console.log(`Auto-generated and added ${newQuestions.length} standard synonyms.`);
+}
+
+// ⚠️ You would call this after your main registry is defined:
+// autoGenerateSynonyms(questionRegistry);
+
 
 // ⚠️ Final Execution Step: This line should run after the initial 
 // fixed registry (Section 2) has been defined.
