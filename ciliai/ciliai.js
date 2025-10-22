@@ -2266,11 +2266,14 @@ async function getAllCiliopathyGenesRaw() {
     };
 }
 
-// --- FINAL CORRECTED getDiseaseGenesInOrganism FUNCTION (The "Triple Filter + Display" Fix) ---
+/**
+ * FINALLY CORRECTED: Filters human disease genes by phylogenetic conservation 
+ * and then displays the curated ortholog name and disease name, using both caches.
+ */
 async function getDiseaseGenesInOrganism(disease, organism) {
-    // 1. Ensure all data is ready
-    await fetchCiliaData();
-    await fetchPhylogenyData();
+    // 1. Ensure all caches are ready
+    await fetchCiliaData(); // Contains all disease and ortholog annotations
+    // We rely on handleAIQuery to ensure fetchPhylogenyData() has run already.
 
     // 2. Define the target ortholog key (e.g., 'ortholog_c_elegans')
     const organismKeyMap = {
@@ -2286,38 +2289,42 @@ async function getDiseaseGenesInOrganism(disease, organism) {
         return formatListResult(`Genes for ${disease} in ${organism}`, [], `Error: Ortholog data not tracked for organism ${organism}.`);
     }
 
-    // 3. Get the raw human disease list (this fetches ALL disease genes if 'Ciliopathy' is used)
+    // 3. Get the human gene list filtered by disease
     const diseaseQuery = (disease.toLowerCase().includes('ciliopathy')) ? "Ciliopathy" : disease;
     const queryTerm = (diseaseQuery === "Ciliopathy") ? "ciliopathy" : diseaseQuery;
-    const { genes: diseaseGenes } = await getCiliopathyGenes(queryTerm);
+    const { genes: humanDiseaseGenesRaw } = await getCiliopathyGenes(queryTerm); // List of human genes filtered by disease
+
+    if (humanDiseaseGenesRaw.length === 0) {
+        return formatListResult(`Genes for ${disease} in ${organism}`, [], `No human genes found for ${disease}.`);
+    }
     
     // 4. Perform the crucial filtering and enrichment
     const finalDisplayGenes = [];
 
-    diseaseGenes.forEach(geneEntry => {
+    humanDiseaseGenesRaw.forEach(geneEntry => {
         const humanGeneUpper = geneEntry.gene.toUpperCase();
         const hubData = ciliaHubDataCache.find(g => g.gene.toUpperCase() === humanGeneUpper);
-        const phyData = phylogenyDataCache[humanGeneUpper];
+        const phyData = phylogenyDataCache[humanGeneUpper]; // Conservation status
         
-        if (!hubData) return; // Skip if no core Hub data exists.
-        
-        // Check 1: Gene must be marked as conserved in the phylogenetic screening (essential for "conserved in organism" query)
+        if (!hubData) return; // Must have core Hub data
+
+        // Filter A: Gene must be marked as conserved in the phylogenetic screening (presence in the organism's phylogeny)
         const speciesRegex = new RegExp(`^${normalizeTerm(speciesCode).replace(/\./g, '\\.?').replace(/\s/g, '\\s*')}$`, 'i');
         const isPhyloConserved = phyData?.species?.some(s => speciesRegex.test(normalizeTerm(s))) || false;
         
-        if (isPhyloConserved) { 
-            // Check 2: Retrieve the Curated Ortholog Name (can be 'N/A')
-            const orthologName = hubData[targetKey] || 'N/A';
-            const diseaseNames = hubData.ciliopathy.join(', ');
+        // Filter B: Gene must have a curated ortholog name (for display)
+        const orthologName = hubData[targetKey] || 'N/A';
+        
+        // If BOTH criteria are met AND the ortholog is not explicitly 'N/A' (optional strictness check)
+        if (isPhyloConserved && orthologName !== 'N/A' && orthologName !== 'Not Reported' && orthologName !== null) { 
             
             finalDisplayGenes.push({
                 gene: humanGeneUpper,
+                // Pull disease name from the HUB DATA (hubData.ciliopathy)
+                disease_names: hubData.ciliopathy.join(', '), 
                 
-                // Attach the ortholog name using the dynamic key expected by the renderer
-                [targetKey]: orthologName,
-                
-                // Use a dedicated description field for cleaner column display
-                description: diseaseNames 
+                // Attach the specific ortholog name using the dynamic key
+                [targetKey]: orthologName, 
             });
         }
     });
@@ -2326,21 +2333,23 @@ async function getDiseaseGenesInOrganism(disease, organism) {
     const description = `Found ${finalDisplayGenes.length} ${diseaseQuery} gene(s) conserved in ${speciesCode}.`;
 
     const citationHtml = `<p style="font-size: 0.8em; color: #666; margin-top: 1rem; border-top: 1px solid #eee; padding-top: 0.5rem;">
-        <strong>Data Source:</strong> Phylogenetic screening (Li et al. 2014) combined with CiliaHub Ortholog Annotation.
+        <strong>Data Source:</strong> Phylogenetic screening (Li et al. 2014) filtered against CiliaHub annotations.
         <a href="https://pubmed.ncbi.nlm.nih.gov/24995987/" target="_blank">[PMID: 24995987]</a>
     </p>`;
 
-    // 5. Return formatted HTML string
+    // 5. Return formatted HTML string, mapping fields for the 3-column table
     return formatListResult(
         title, 
-        finalDisplayGenes, 
+        finalDisplayGenes.map(g => ({
+            gene: g.gene,
+            disease_names: g.disease_names,
+            ortholog_gene: g[targetKey]
+        })), 
         citationHtml,
         speciesCode,
         targetKey
     );
 }
-
-
 // C. Updated: Get Cilia Effects (with detailed screen data)
 async function getGeneCiliaEffects(gene) {
     if (!ciliaHubDataCache) await fetchCiliaData();
