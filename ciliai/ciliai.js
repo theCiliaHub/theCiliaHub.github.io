@@ -1318,70 +1318,7 @@ const questionRegistry = [
     { text: "List nexin-dynein regulatory complex components", handler: async () => formatListResult("N-DRC Components", await getGenesByComplex("N-DRC")) },
     { text: "Show exocyst complex members", handler: async () => formatListResult("Exocyst Complex", await getGenesByComplex("exocyst")) },
 
-    // ==================== CILIOPATHIES & DISEASES ====================
-    // Bardet-Biedl Syndrome
-    { text: "List genes associated with Bardet–Biedl syndrome", handler: async () => { const { genes, description } = await getCiliopathyGenes("Bardet–Biedl syndrome"); return formatListResult("Genes for Bardet–Biedl syndrome", genes, description); }},
-    { text: "Show genes for Bardet-Biedl Syndrome", handler: async () => { const { genes, description } = await getCiliopathyGenes("Bardet-Biedl Syndrome"); return formatListResult("Genes for Bardet-Biedl Syndrome", genes, description); } },
-    { text: "What causes Bardet-Biedl Syndrome?", handler: async () => { const { genes, description } = await getCiliopathyGenes("Bardet-Biedl Syndrome"); return formatListResult("Genes for Bardet-Biedl Syndrome", genes, description); }},
-    { text: "BBS genes", handler: async () => { const { genes, description } = await getCiliopathyGenes("Bardet-Biedl Syndrome"); return formatListResult("Genes for Bardet-Biedl Syndrome", genes, description); }},
-    { text: "Which genes cause BBS?", handler: async () => { const { genes, description } = await getCiliopathyGenes("Bardet-Biedl Syndrome"); return formatListResult("Genes for Bardet-Biedl Syndrome", genes, description); }},
-    
-    // Joubert Syndrome
-    { text: "Show genes for Joubert syndrome", handler: async () => { const { genes, description } = await getCiliopathyGenes("Joubert Syndrome"); return formatListResult("Genes for Joubert Syndrome", genes, description); }},
-    { text: "What genes are involved in Joubert syndrome?", handler: async () => { const { genes, description } = await getCiliopathyGenes("Joubert Syndrome"); return formatListResult("Genes for Joubert Syndrome", genes, description); }},
-    { text: "Show genes for Joubert Syndrome", handler: async () => { const { genes, description } = await getCiliopathyGenes("Joubert Syndrome"); return formatListResult("Genes for Joubert Syndrome", genes, description); } },
-    { text: "Which genes cause Joubert Syndrome?", handler: async () => { const { genes, description } = await getCiliopathyGenes("Joubert Syndrome"); return formatListResult("Genes for Joubert Syndrome", genes, description); } },
-    { text: "Joubert syndrome genetics", handler: async () => { const { genes, description } = await getCiliopathyGenes("Joubert Syndrome"); return formatListResult("Genes for Joubert Syndrome", genes, description); }},
-    { text: "List Joubert genes", handler: async () => { const { genes, description } = await getCiliopathyGenes("Joubert Syndrome"); return formatListResult("Genes for Joubert Syndrome", genes, description); }},
-    
-    // Meckel-Gruber Syndrome
-    { text: "What genes are involved in Meckel-Gruber Syndrome?", handler: async () => { const { genes, description } = await getCiliopathyGenes("Meckel-Gruber Syndrome"); return formatListResult("Genes for Meckel-Gruber Syndrome", genes, description); }},
-    { text: "Display genes associated with Meckel-Gruber Syndrome", handler: async () => { const { genes, description } = await getCiliopathyGenes("Meckel-Gruber Syndrome"); return formatListResult("Genes for Meckel-Gruber Syndrome", genes, description); } },
-    { text: "MKS genes", handler: async () => { const { genes, description } = await getCiliopathyGenes("Meckel-Gruber Syndrome"); return formatListResult("Genes for Meckel-Gruber Syndrome", genes, description); }},
-    { text: "Meckel syndrome genetics", handler: async () => { const { genes, description } = await getCiliopathyGenes("Meckel-Gruber Syndrome"); return formatListResult("Genes for Meckel-Gruber Syndrome", genes, description); }},
-    
-    // Primary Ciliary Dyskinesia
-    { text: "List genes for Primary Ciliary Dyskinesia", handler: async () => { const { genes, description } = await getCiliopathyGenes("Primary Ciliary Dyskinesia"); return formatListResult("Genes for Primary Ciliary Dyskinesia", genes, description); } },
-    { text: "PCD genes", handler: async () => { const { genes, description } = await getCiliopathyGenes("Primary Ciliary Dyskinesia"); return formatListResult("Genes for Primary Ciliary Dyskinesia", genes, description); }},
-    { text: "What causes Primary Ciliary Dyskinesia?", handler: async () => { const { genes, description } = await getCiliopathyGenes("Primary Ciliary Dyskinesia"); return formatListResult("Genes for Primary Ciliary Dyskinesia", genes, description); }},
-    { text: "Show PCD associated genes", handler: async () => { const { genes, description } = await getCiliopathyGenes("Primary Ciliary Dyskinesia"); return formatListResult("Genes for Primary Ciliary Dyskinesia", genes, description); }},
-    { text: "Primary ciliary dyskinesia genetics", handler: async () => { const { genes, description } = await getCiliopathyGenes("Primary Ciliary Dyskinesia"); return formatListResult("Genes for Primary Ciliary Dyskinesia", genes, description); }},
-    
-    // Leber Congenital Amaurosis
-    { text: "Find genes linked to Leber congenital amaurosis", handler: async () => { const { genes, description } = await getCiliopathyGenes("Leber congenital amaurosis"); return formatListResult("Genes for Leber congenital amaurosis", genes, description); } },
-    { text: "LCA genes", handler: async () => { const { genes, description } = await getCiliopathyGenes("Leber congenital amaurosis"); return formatListResult("Genes for Leber congenital amaurosis", genes, description); }},
-    { text: "Leber congenital amaurosis genetics", handler: async () => { const { genes, description } = await getCiliopathyGenes("Leber congenital amaurosis"); return formatListResult("Genes for Leber congenital amaurosis", genes, description); }},
-    
-    // Other ciliopathies
-    { text: "Show genes for cranioectodermal dysplasia", handler: async () => { const { genes, description } = await getCiliopathyGenes("Cranioectodermal Dysplasia"); return formatListResult("Genes for Cranioectodermal Dysplasia", genes, description); } },
-    { text: "Sensenbrenner syndrome genes", handler: async () => { const { genes, description } = await getCiliopathyGenes("Cranioectodermal Dysplasia"); return formatListResult("Genes for Cranioectodermal Dysplasia", genes, description); }},
-    
-    { text: "Tell me genes causing short-rib thoracic dysplasia", handler: async () => { const { genes, description } = await getCiliopathyGenes("Short-rib thoracic dysplasia"); return formatListResult("Genes for Short-rib thoracic dysplasia", genes, description); } },
-    { text: "SRTD genes", handler: async () => { const { genes, description } = await getCiliopathyGenes("Short-rib thoracic dysplasia"); return formatListResult("Genes for Short-rib thoracic dysplasia", genes, description); }},
-    
-    { text: "Display genes related to hydrocephalus", handler: async () => { const { genes, description } = await getCiliopathyGenes("Hydrocephalus"); return formatListResult("Genes for Hydrocephalus", genes, description); } },
-    { text: "Hydrocephalus genetics", handler: async () => { const { genes, description } = await getCiliopathyGenes("Hydrocephalus"); return formatListResult("Genes for Hydrocephalus", genes, description); }},
-    
-    { text: "Which genes cause cystic kidney disease?", handler: async () => getGenesByScreenPhenotype("cystic kidney disease") },
-    { text: "Polycystic kidney disease genes", handler: async () => { const { genes, description } = await getCiliopathyGenes("Polycystic kidney disease"); return formatListResult("Genes for Polycystic kidney disease", genes, description); }},
-    { text: "PKD genetics", handler: async () => { const { genes, description } = await getCiliopathyGenes("Polycystic kidney disease"); return formatListResult("Genes for Polycystic kidney disease", genes, description); }},
-    
-    { text: "Nephronophthisis genes", handler: async () => { const { genes, description } = await getCiliopathyGenes("Nephronophthisis"); return formatListResult("Genes for Nephronophthisis", genes, description); }},
-    { text: "NPHP disease genes", handler: async () => { const { genes, description } = await getCiliopathyGenes("Nephronophthisis"); return formatListResult("Genes for Nephronophthisis", genes, description); }},
-    
-    { text: "Senior-Loken syndrome genes", handler: async () => { const { genes, description } = await getCiliopathyGenes("Senior-Loken syndrome"); return formatListResult("Genes for Senior-Loken syndrome", genes, description); }},
-    { text: "Retinitis pigmentosa ciliopathy genes", handler: async () => { const { genes, description } = await getCiliopathyGenes("Retinitis pigmentosa"); return formatListResult("Genes for Retinitis pigmentosa", genes, description); }},
-    { text: "Alstrom syndrome genes", handler: async () => { const { genes, description } = await getCiliopathyGenes("Alstrom syndrome"); return formatListResult("Genes for Alstrom syndrome", genes, description); }},
-    { text: "Oral-facial-digital syndrome genes", handler: async () => { const { genes, description } = await getCiliopathyGenes("Oral-facial-digital syndrome"); return formatListResult("Genes for Oral-facial-digital syndrome", genes, description); }},
-    { text: "OFD syndrome genetics", handler: async () => { const { genes, description } = await getCiliopathyGenes("Oral-facial-digital syndrome"); return formatListResult("Genes for Oral-facial-digital syndrome", genes, description); }},
-    
-    // All ciliopathies
-    { text: "Find all genes associated with ciliopathies", handler: async () => { const { genes, description } = await getCiliopathyGenes("ciliopathy"); return formatListResult("All Ciliopathy-Associated Genes", genes, description); }},
-    { text: "List all ciliopathy genes.", handler: async () => { const { genes, description } = await getCiliopathyGenes("ciliopathy"); return formatListResult("All Ciliopathy-Associated Genes", genes, description); } },
-    { text: "Show genes involved in any ciliopathy.", handler: async () => { const { genes, description } = await getCiliopathyGenes("ciliopathy"); return formatListResult("All Ciliopathy-Associated Genes", genes, description); } },
-    { text: "All ciliopathy-related genes", handler: async () => { const { genes, description } = await getCiliopathyGenes("ciliopathy"); return formatListResult("All Ciliopathy-Associated Genes", genes, description); }},
-    { text: "Complete list of ciliopathy genes", handler: async () => { const { genes, description } = await getCiliopathyGenes("ciliopathy"); return formatListResult("All Ciliopathy-Associated Genes", genes, description); }},
-    
+   
     // Disease associations for specific genes
     { text: "List all diseases linked to NPHP1", handler: async () => getGeneDiseases("NPHP1") },
     { text: "Which diseases involve NPHP1?", handler: async () => getGeneDiseases("NPHP1") },
@@ -2048,6 +1985,220 @@ const wrapOrganismResult = async (organismName) => {
     return formatListResult(`Ciliary genes in ${result.speciesCode}`, result.genes, result.description);
 };
 
+
+// --- Master Data Lists (Extracted from your input) ---
+const ALL_DISEASES = [
+    "Acrocallosal Syndrome", "Alström Syndrome", "Autosomal Dominant Polycystic Kidney Disease",
+    "Autosomal Recessive Polycystic Kidney Disease", "Bardet–Biedl Syndrome", "COACH Syndrome",
+    "Cranioectodermal Dysplasia", "Ellis-van Creveld Syndrome", "Hydrolethalus Syndrome", "Infantile Polycystic Kidney Disease",
+    "Joubert Syndrome", "Leber Congenital Amaurosis", "Meckel–Gruber Syndrome", "Nephronophthisis", "Orofaciodigital Syndrome",
+    "Senior-Løken Syndrome", "Short-rib Thoracic Dysplasia", "Skeletal Ciliopathy", "Retinal Ciliopathy", "Syndromic Ciliopathy",
+    "Al-Gazali-Bakalinova Syndrome", "Bazex-Dupré-Christol Syndrome", "Bilateral Polycystic Kidney Disease", "Biliary, Renal, Neurologic, and Skeletal Syndrome",
+    "Caroli Disease", "Carpenter Syndrome", "Complex Lethal Osteochondrodysplasia", "Greig Cephalopolysyndactyly Syndrome", "Kallmann Syndrome", "Lowe Oculocerebrorenal Syndrome",
+    "McKusick-Kaufman Syndrome", "Morbid Obesity and Spermatogenic Failure", "Polycystic Kidney Disease", "RHYNS Syndrome", "Renal-hepatic-pancreatic Dysplasia", "Retinal Dystrophy", "STAR Syndrome",
+    "Smith-Lemli-Opitz Syndrome", "Spondylometaphyseal Dysplasia", "Stromme Syndrome", "Weyers Acrofacial Dysostosis", "Primary Ciliary Dyskinesia",
+    "Birt-Hogg-Dubé Syndrome", "Juvenile Myoclonic Epilepsy", "Ataxia-telangiectasia-like Disorder", "Cone-Rod Dystrophy",
+    "Cornelia de Lange Syndrome", "Holoprosencephaly", "Medulloblastoma", "Retinitis Pigmentosa", "Spinocerebellar Ataxia",
+    "Pallister-Hall Syndrome", "Simpson-Golabi-Behmel Syndrome", "Townes-Brocks Syndrome", "Usher Syndrome", "Visceral Heterotaxy",
+    "Biliary Ciliopathy", "Chronic Obstructive Pulmonary Disease", "Ciliopathy", "Ciliopathy - Retinal dystrophy", "Golgipathies or Ciliopathy",
+    "Hepatic Ciliopathy", "Male Infertility and Ciliopathy", "Male infertility", "Microcephaly and Chorioretinopathy Type 3", "Mucociliary Clearance Disorder",
+    "Notch-mediated Ciliopathy", "Primary Endocardial Fibroelastosis", "Retinal Degeneration"
+].filter((v, i, a) => v && a.indexOf(v) === i); // Filter out duplicates/empty strings
+
+const MODEL_ORGANISMS = [
+    "C. elegans", "Mouse", "Drosophila", "Zebrafish", "Xenopus" // Focus on these 5 model organisms
+];
+
+const DISEASE_ALIASES = {
+    "Bardet–Biedl Syndrome": ["BBS"],
+    "Nephronophthisis": ["NPHP"],
+    "Meckel–Gruber Syndrome": ["MKS"],
+    "Primary Ciliary Dyskinesia": ["PCD"]
+};
+
+
+// Define disease aliases for flexibility
+const DISEASE_ALIASES = {
+    "Joubert Syndrome": ["Joubert", "JS", "Joubert's"],
+    "Bardet-Biedl Syndrome": ["BBS", "Bardet-Biedl"],
+    // Add other diseases and their aliases as needed
+};
+
+// Define model organisms for combined disease-organism questions
+const MODEL_ORGANISMS = [
+    "C. elegans", "Mouse", "Zebrafish", "Drosophila", "Xenopus", "Worm", "Fly"
+];
+
+// Function 1: Generates questions for simple human disease gene lists
+function generateDiseaseListQuestions(diseaseName) {
+    const questions = [];
+    const shortName = diseaseName.replace(/ Syndrome| Disease| Dyskinesia/g, '').trim();
+
+    // Comprehensive list of question patterns based on Joubert Syndrome examples and new variations
+    const basePatterns = [
+        "Show genes for [NAME]",
+        "What genes are involved in [NAME]?",
+        "Which genes cause [NAME]?",
+        "[SHORT_NAME] syndrome genetics",
+        "List [SHORT_NAME] genes",
+        "List genes associated with [NAME]",
+        "Display genes associated with [NAME]",
+        "Show genes associated with [NAME]",
+        "Provide the genes linked to [NAME]",
+        "Identify genes related to [NAME]",
+        "Show me the genes causing [NAME]",
+        "What are the genes involved in [NAME]?",
+        "Which genes are associated with [NAME]?",
+        "What genes contribute to [NAME]?",
+        "List all genes for [NAME]",
+        "Enumerate the genes linked to [NAME]",
+        "Give a list of [NAME] genes",
+        "Present the genes associated with [NAME]",
+        "Display the genetic basis of [NAME]",
+        "Show the genetic profile of [NAME]",
+        "Tell me about the genetics of [NAME]",
+        "What is the genetic basis of [NAME]?",
+        "Explain the genes behind [NAME]",
+        "Which genes are responsible for [NAME]?",
+        "What genes trigger [NAME]?",
+        "Which genes lead to [NAME]?",
+        "Show genes related to [NAME]",
+        "List genetic factors for [NAME]",
+        "Provide the genetic markers for [NAME]",
+        "What do we know about [NAME] genes?",
+        "Explore the genes involved in [NAME]",
+        "Investigate the genetics of [NAME]",
+        // New patterns for natural language variations
+        "What are the genetic causes of [NAME]?",
+        "Can you list the genes behind [NAME]?",
+        "Tell me the genes linked to [NAME]",
+        "What genetic factors are involved in [NAME]?",
+        "Provide a list of genes causing [NAME]",
+        "Show me which genes are tied to [NAME]",
+        "What genes play a role in [NAME]?",
+        "List the genetic contributors to [NAME]"
+    ];
+
+    // Add alias-based patterns
+    const aliases = DISEASE_ALIASES[diseaseName] || [];
+    aliases.forEach(alias => {
+        basePatterns.push(`List genes for ${alias}`);
+        basePatterns.push(`${alias} genes`);
+        basePatterns.push(`Show ${alias} syndrome genes`);
+        basePatterns.push(`What are the ${alias} genes?`);
+        basePatterns.push(`Provide genes for ${alias}`);
+    });
+
+    // Generate questions from patterns
+    basePatterns.forEach(pattern => {
+        const text = pattern
+            .replace(/\[NAME\]/g, diseaseName)
+            .replace(/\[SHORT_NAME\]/g, shortName);
+        
+        questions.push({
+            text: text,
+            handler: async () => {
+                const { genes, description } = await getCiliopathyGenes(diseaseName);
+                return formatListResult(`Genes for ${diseaseName}`, genes, description);
+            }
+        });
+    });
+
+    return questions;
+}
+
+// Function 2: Generates questions combining disease and model organism
+function generateCombinedDiseaseOrganismQuestions(diseaseName) {
+    const questions = [];
+    const shortName = diseaseName.replace(/ Syndrome| Disease| Dyskinesia/g, '').trim();
+
+    // Map organisms to their ortholog keys
+    const targetKeyMap = {
+        "C. elegans": 'ortholog_c_elegans',
+        "Worm": 'ortholog_c_elegans',
+        "Mouse": 'ortholog_mouse',
+        "Zebrafish": 'ortholog_zebrafish',
+        "Drosophila": 'ortholog_drosophila',
+        "Fly": 'ortholog_drosophila',
+        "Xenopus": 'ortholog_xenopus'
+    };
+
+    MODEL_ORGANISMS.forEach(organism => {
+        const shortOrg = organism.split('.')[0].trim();
+        const targetKey = targetKeyMap[organism] || targetKeyMap[shortOrg];
+        
+        if (targetKey) {
+            // Expanded patterns for disease-organism questions
+            const organismPatterns = [
+                `List ${diseaseName} genes conserved in ${organism}`,
+                `Show ${diseaseName} genes in ${shortOrg}`,
+                `Please bring the ${diseaseName} genes in ${organism}`,
+                // New patterns for natural variations
+                `What ${diseaseName} genes are found in ${organism}?`,
+                `Which ${diseaseName} genes are conserved in ${shortOrg}?`,
+                `List genes for ${diseaseName} in ${organism}`,
+                `Show me ${diseaseName} genes present in ${organism}`,
+                `Provide ${diseaseName} genes for ${shortOrg}`,
+                `What are the ${diseaseName} genes in ${organism}?`,
+                `Identify ${diseaseName} genes conserved in ${organism}`,
+                `List ${shortName} genes in ${organism}`,
+                `Show orthologs for ${diseaseName} in ${organism}`,
+                `What are the ${shortName} genes found in ${shortOrg}?`,
+                `Provide the genetic homologs for ${diseaseName} in ${organism}`
+            ];
+
+            // Add alias-based organism patterns
+            const aliases = DISEASE_ALIASES[diseaseName] || [];
+            aliases.forEach(alias => {
+                organismPatterns.push(`List ${alias} genes in ${organism}`);
+                organismPatterns.push(`Show ${alias} genes conserved in ${shortOrg}`);
+                organismPatterns.push(`What ${alias} genes are in ${organism}?`);
+            });
+
+            // Generate questions from organism patterns
+            organismPatterns.forEach(pattern => {
+                questions.push({
+                    text: pattern,
+                    handler: async () => getDiseaseGenesInOrganism(diseaseName, organism)
+                });
+            });
+        }
+    });
+
+    return questions;
+}
+
+// Example usage:
+const joubertQuestions = generateDiseaseListQuestions("Joubert Syndrome");
+const joubertOrganismQuestions = generateCombinedDiseaseOrganismQuestions("Joubert Syndrome");
+
+// Log generated questions for verification
+console.log("Joubert Syndrome Questions:", joubertQuestions.map(q => q.text));
+console.log("Joubert Syndrome Organism Questions:", joubertOrganismQuestions.map(q => q.text));
+
+// --- Execution Block (Place this logic near the end of your script) ---
+// This function needs to be executed once your generator logic is defined.
+function runAutomatedRegistryGeneration() {
+    let generatedQuestions = [];
+
+    // --- 1. Generate Simple Disease List Queries (Human Genes) ---
+    ALL_DISEASES.forEach(disease => {
+        generatedQuestions.push(...generateDiseaseListQuestions(disease));
+    });
+
+    // --- 2. Generate Combined Disease + Organism Queries ---
+    ALL_DISEASES.forEach(disease => {
+        generatedQuestions.push(...generateCombinedDiseaseOrganismQuestions(disease));
+    });
+    
+    return generatedQuestions;
+}
+
+// ⚠️ Final Execution Step: This line should run after the initial 
+// fixed registry (Section 2) has been defined.
+// questionRegistry.push(...runAutomatedRegistryGeneration());
+
+
 // --- ADDITION: New Helper Functions for Expanded Questions ---
 function notImplementedYet(feature) {
     return `<div class="result-card"><h3>Feature In Development</h3><p>The query handler for "<strong>${feature}</strong>" is not yet implemented. Stay tuned for future updates!</p></div>`;
@@ -2517,19 +2668,7 @@ questionRegistry.push(
   { text: "Display genes at ciliary tip", handler: () => getGenesByLocalization("ciliary tip") },
   { text: "Which genes localize to axoneme?", handler: () => getGenesByLocalization("axoneme") },
   { text: "Show transition fiber proteins", handler: () => getGenesByLocalization("transition fiber") },
-  
-  // --- Disease Association Questions ---
-  { text: "List all diseases linked to NPHP1", handler: () => getGeneDiseases("NPHP1") },
-  { text: "What ciliopathies are associated with mutations in MKS1?", handler: () => getGeneDiseases("MKS1") },
-  { text: "Show genes for Joubert Syndrome", handler: () => getCiliopathyGenes("Joubert Syndrome") },
-  { text: "Show genes for Bardet-Biedl Syndrome", handler: () => getCiliopathyGenes("Bardet-Biedl Syndrome") },
-  { text: "Display genes associated with Meckel-Gruber Syndrome", handler: () => getCiliopathyGenes("Meckel-Gruber Syndrome") },
-  { text: "List genes for Primary Ciliary Dyskinesia", handler: () => getCiliopathyGenes("Primary Ciliary Dyskinesia") },
-  { text: "Find genes linked to Leber congenital amaurosis", handler: () => getCiliopathyGenes("Leber congenital amaurosis") },
-  { text: "Which genes cause cystic kidney disease?", handler: () => getGenesByScreenPhenotype("cystic kidney disease") },
-  { text: "Show genes for cranioectodermal dysplasia", handler: () => getCiliopathyGenes("Cranioectodermal Dysplasia") },
-  { text: "Tell me genes causing short-rib thoracic dysplasia", handler: () => getCiliopathyGenes("Short-rib thoracic dysplasia") },
-  { text: "Display genes related to hydrocephalus", handler: () => getCiliopathyGenes("Hydrocephalus") },
+
   
   // --- Protein Structure & Complexes ---
   { text: "Show protein domains of WDR35", handler: () => getGeneDomains("WDR35") },
@@ -2610,46 +2749,6 @@ questionRegistry.push(
   { text: "Show interactors of IFT88", handler: () => getProteinInteractions("IFT88") },
   { text: "What are the interacting partners of BBS1?", handler: () => getProteinInteractions("BBS1") },
 
-    // =========================================================================
-    // CORE/DIRECT QUERIES (Combined Disease and Organism)
-    // =========================================================================
-    { text: "Please bring the Joubert syndrome genes in C. elegans", handler: async () => getDiseaseGenesInOrganism("Joubert Syndrome", "C. elegans") },
-    {text: "List Joubert syndrome genes found in Mouse", handler: async () => getDiseaseGenesInOrganism("Joubert Syndrome", "Mouse") },
-    {text: "Display genes for Meckel–Gruber Syndrome in Zebrafish", handler: async () => getDiseaseGenesInOrganism("Meckel–Gruber Syndrome", "Zebrafish")},
-    {text: "Find BBS genes conserved in Drosophila", handler: async () => getDiseaseGenesInOrganism("Bardet–Biedl Syndrome", "Drosophila") },
-    {text: "Which Polycystic Kidney Disease genes have orthologs in Xenopus", handler: async () => getDiseaseGenesInOrganism("Polycystic Kidney Disease", "Xenopus") },
-    {text: "Conserved NPHP genes in the worm", handler: async () => getDiseaseGenesInOrganism("Nephronophthisis", "C. elegans") },
-
-    // --- Expanded Synonyms and General Ciliopathy Queries ---
-    { text: "Which Joubert syndrome genes are conserved in C. elegans?", handler: async () => getDiseaseGenesInOrganism("Joubert Syndrome", "C. elegans") },
-    {text: "Show Joubert genes in C. elegans", handler: async () => getDiseaseGenesInOrganism("Joubert Syndrome", "C. elegans") },
-    {text: "Find Joubert genes conserved in mouse", handler: async () => getDiseaseGenesInOrganism("Joubert Syndrome", "Mouse") },
-    {text: "List conserved Joubert genes in zebrafish",handler: async () => getDiseaseGenesInOrganism("Joubert Syndrome", "Zebrafish") 
-    },
-    { 
-        text: "List ciliopathy genes conserved in Mouse", 
-        handler: async () => getDiseaseGenesInOrganism("Ciliopathy", "Mouse") 
-    },
-    { 
-        text: "Display all ciliopathy genes that have a zebrafish ortholog", 
-        handler: async () => getDiseaseGenesInOrganism("Ciliopathy", "Zebrafish") 
-    },
-    { 
-        text: "Which ciliopathy genes are found in the fly genome?", 
-        handler: async () => getDiseaseGenesInOrganism("Ciliopathy", "Drosophila") 
-    },
-    { 
-        text: "Find ciliopathy genes conserved in Xenopus", 
-        handler: async () => getDiseaseGenesInOrganism("Ciliopathy", "Xenopus") 
-    },
-    { 
-        text: "List mouse orthologs for ciliopathy genes", 
-        handler: async () => getDiseaseGenesInOrganism("Ciliopathy", "Mouse") 
-    },
-    { 
-        text: "Show ciliary disease genes present in the worm", 
-        handler: async () => getDiseaseGenesInOrganism("Ciliopathy", "C. elegans") 
-    }
 );
 
 // =============================================================================
