@@ -1265,62 +1265,8 @@ const questionRegistry = [
     { text: "Show GTPase domain proteins", handler: async () => findGenesByNewDomainDB("GTPase") },
     { text: "List AAA domain proteins", handler: async () => findGenesByNewDomainDB("AAA") },
 
-    // ==================== PROTEIN COMPLEXES ====================
-    // BBSome
-    { text: "Give me the list of BBSome components", handler: async () => formatListResult("Components of BBSome", await getGenesByComplex("BBSome")) },
-    { text: "List all components of the BBSome complex", handler: async () => formatListResult("Components of BBSome", await getGenesByComplex("BBSome")) },
-    { text: "What proteins are in the BBSome?", handler: async () => formatListResult("Components of BBSome", await getGenesByComplex("BBSome")) },
-    { text: "Members of the BBSome.", handler: async () => formatListResult("Components of BBSome", await getGenesByComplex("BBSome")) },
-    { text: "Show BBSome subunits", handler: async () => formatListResult("Components of BBSome", await getGenesByComplex("BBSome")) },
-    { text: "BBSome complex members", handler: async () => formatListResult("Components of BBSome", await getGenesByComplex("BBSome")) },
-    { text: "Which genes make up the BBSome?", handler: async () => formatListResult("Components of BBSome", await getGenesByComplex("BBSome")) },
     
-    // IFT complexes
-    { text: "Display components of IFT-A complex", handler: async () => formatListResult("Components of IFT-A", await getGenesByComplex("IFT-A")) },
-    { text: "IFT-A complex members", handler: async () => formatListResult("Components of IFT-A", await getGenesByComplex("IFT-A")) },
-    { text: "Show IFT-A subunits", handler: async () => formatListResult("Components of IFT-A", await getGenesByComplex("IFT-A")) },
-    { text: "What proteins are in IFT-A?", handler: async () => formatListResult("Components of IFT-A", await getGenesByComplex("IFT-A")) },
-    
-    { text: "Display components of IFT-B complex", handler: async () => formatListResult("Components of IFT-B", await getGenesByComplex("IFT-B")) },
-    { text: "IFT-B complex members", handler: async () => formatListResult("Components of IFT-B", await getGenesByComplex("IFT-B")) },
-    { text: "Show IFT-B subunits", handler: async () => formatListResult("Components of IFT-B", await getGenesByComplex("IFT-B")) },
-    { text: "List IFT-B proteins", handler: async () => formatListResult("Components of IFT-B", await getGenesByComplex("IFT-B")) },
-    
-    { text: "List intraflagellar transport (IFT) components", handler: async () => formatListResult("IFT Components", await getGenesByComplex("IFT")) },
-    { text: "Show all IFT proteins", handler: async () => formatListResult("IFT Components", await getGenesByComplex("IFT")) },
-    { text: "Which genes are part of IFT?", handler: async () => formatListResult("IFT Components", await getGenesByComplex("IFT")) },
-    
-    // Transition zone complexes
-    { text: "Show components of Transition Zone Complex", handler: async () => formatListResult("Components of Transition Zone Complex", await getGenesByComplex("Transition Zone Complex")) },
-    { text: "Transition zone complex members", handler: async () => formatListResult("Components of Transition Zone Complex", await getGenesByComplex("Transition Zone Complex")) },
-    { text: "List transition zone proteins", handler: async () => formatListResult("Components of Transition Zone Complex", await getGenesByComplex("Transition Zone Complex")) },
-    
-    { text: "Display components of MKS Complex", handler: async () => formatListResult("Components of MKS Complex", await getGenesByComplex("MKS Complex")) },
-    { text: "MKS complex members", handler: async () => formatListResult("Components of MKS Complex", await getGenesByComplex("MKS Complex")) },
-    { text: "Show MKS module proteins", handler: async () => formatListResult("Components of MKS Complex", await getGenesByComplex("MKS Complex")) },
-    
-    { text: "Show components of NPHP Complex", handler: async () => formatListResult("Components of NPHP Complex", await getGenesByComplex("NPHP Complex")) },
-    { text: "NPHP complex members", handler: async () => formatListResult("Components of NPHP Complex", await getGenesByComplex("NPHP Complex")) },
-    { text: "List NPHP module proteins", handler: async () => formatListResult("Components of NPHP Complex", await getGenesByComplex("NPHP Complex")) },
-    
-    // Comparisons
-    { text: "Compare IFT-A and IFT-B complex composition", handler: async () => compareComplexes("IFT-A", "IFT-B") },
-    { text: "Compare composition of IFT-A vs IFT-B.", handler: async () => compareComplexes("IFT-A", "IFT-B") },
-    { text: "What's the difference between IFT-A and IFT-B?", handler: async () => compareComplexes("IFT-A", "IFT-B") },
-    { text: "IFT-A versus IFT-B comparison", handler: async () => compareComplexes("IFT-A", "IFT-B") },
-    { text: "How do IFT-A and IFT-B differ?", handler: async () => compareComplexes("IFT-A", "IFT-B") },
-    
-    { text: "Find IFT-A and IFT-B complex genes", handler: async () => getGenesByMultipleComplexes(["IFT-A", "IFT-B"]) },
-    
-    // Additional complexes
-    { text: "Show dynein arm components", handler: async () => formatListResult("Dynein Arm Components", await getGenesByComplex("dynein")) },
-    { text: "List outer dynein arm proteins", handler: async () => formatListResult("ODA Components", await getGenesByComplex("outer dynein arm")) },
-    { text: "Show inner dynein arm proteins", handler: async () => formatListResult("IDA Components", await getGenesByComplex("inner dynein arm")) },
-    { text: "Display radial spoke proteins", handler: async () => formatListResult("Radial Spoke Components", await getGenesByComplex("radial spoke")) },
-    { text: "Show central pair complex proteins", handler: async () => formatListResult("Central Pair Components", await getGenesByComplex("central pair")) },
-    { text: "List nexin-dynein regulatory complex components", handler: async () => formatListResult("N-DRC Components", await getGenesByComplex("N-DRC")) },
-    { text: "Show exocyst complex members", handler: async () => formatListResult("Exocyst Complex", await getGenesByComplex("exocyst")) },
-
+   
    
     // Disease associations for specific genes
     { text: "List all diseases linked to NPHP1", handler: async () => getGeneDiseases("NPHP1") },
@@ -2157,10 +2103,11 @@ console.log("Joubert Syndrome Organism Questions:", joubertOrganismQuestions.map
 
 // --- Execution Block (Place this logic near the end of your script) ---
 // This function needs to be executed once your generator logic is defined.
+// --- Execution Block (Place this logic near the end of your script) ---
 function runAutomatedRegistryGeneration() {
     let generatedQuestions = [];
 
-    // --- 1. Generate Simple Disease List Queries (Human Genes) ---
+    // --- 1. Generate Simple Disease List Queries (Human Genes & Synonyms) ---
     ALL_DISEASES.forEach(disease => {
         generatedQuestions.push(...generateDiseaseListQuestions(disease));
     });
@@ -2170,12 +2117,35 @@ function runAutomatedRegistryGeneration() {
         generatedQuestions.push(...generateCombinedDiseaseOrganismQuestions(disease));
     });
     
-    // --- 3. Generate Simple Ortholog/Phylogeny Queries (Ensures general organism queries are covered) ---
+    // --- 3. Generate Simple Complex Queries (Core complexes + synonyms) ---
+    // Note: We use the complex name itself as the generator input
+    const CORE_COMPLEXES = ["BBSome", "IFT-A", "IFT-B", "MKS Complex", "NPHP Complex", "Transition Zone Complex", "IFT"];
+    
+    CORE_COMPLEXES.forEach(complexName => {
+        const patterns = [
+            `List components of ${complexName}`,
+            `Show subunits of ${complexName}`,
+            `What proteins are in the ${complexName}?`,
+            `Members of the ${complexName}`,
+        ];
+
+        // Add alias patterns (e.g., BBSome -> BBS)
+        if (complexName === "BBSome") patterns.push(`List BBS genes`);
+        if (complexName === "IFT") patterns.push(`List intraflagellar transport components`);
+
+        patterns.forEach(text => {
+            generatedQuestions.push({
+                text: text,
+                handler: async () => getGenesByComplex(complexName)
+            });
+        });
+    });
+    
+    // --- 4. Generate Simple Ortholog/Phylogeny Queries (Ensures general organism queries are covered) ---
     const ORGANISM_QUERIES = [
         "List Ciliary Genes in [NAME] (Phylogeny)",
         "List ciliary genes in [NAME]",
         "Display ciliary genes in [NAME]",
-        "Show ciliary genes in [NAME]",
     ];
     MODEL_ORGANISMS.forEach(organism => {
         ORGANISM_QUERIES.forEach(pattern => {
@@ -2185,12 +2155,19 @@ function runAutomatedRegistryGeneration() {
             });
         });
     });
-
-    // --- 4. Generate Simple Curated Ortholog Lookups (e.g., Show curated orthologs for IFT88) ---
-    // (These are already manually defined in your existing array, but are good for consistency)
     
     return generatedQuestions;
 }
+
+// 1. Generate all the complex questions and their synonyms
+const generatedComplexQuestions = generateAutomatedComplexQueries();
+
+
+
+// ⚠️ FINAL INTEGRATION STEP:
+// Run this once at the end of your script to load the complete question set.
+// questionRegistry.push(...runAutomatedRegistryGeneration());
+
 // --- Automated General Question Synonym Generator ---
 // Note: This logic should be run AFTER the main questionRegistry has been defined/populated.
 
@@ -2240,6 +2217,58 @@ function autoGenerateSynonyms(registry) {
 
 // ⚠️ You would call this after your main registry is defined:
 // autoGenerateSynonyms(questionRegistry);
+
+// --- Master Data Lists (defined globally in your file) ---
+const CORE_CILIOPATHY_COMPLEXES = [
+    "BBSome", "IFT-A", "IFT-B", "Transition Zone Complex", "MKS Complex", "NPHP Complex", "IFT"
+];
+
+const COMPLEX_SYNONYM_PATTERNS = {
+    // Patterns covering common commands (Show, List, What proteins are in)
+    "BBSome": ["List [NAME] genes", "Show [NAME] subunits", "What proteins are in the [NAME]?", "Members of the [NAME] complex"],
+    "IFT-A": ["List [NAME] components", "Show [NAME] subunits", "What proteins form the [NAME]?"],
+    "IFT-B": ["List [NAME] components", "Show [NAME] subunits", "What proteins form the [NAME]?"],
+    "Transition Zone Complex": ["List [NAME] components", "Show [NAME] proteins", "What proteins localize to the [NAME]?"],
+    "MKS Complex": ["List [NAME] components", "Show [NAME] module proteins", "MKS components"],
+    "NPHP Complex": ["List [NAME] components", "Show [NAME] module proteins", "NPHP components"],
+    "IFT": ["List [NAME] components", "Show all IFT proteins", "Which genes are part of [NAME]?"],
+};
+
+const COMPLEX_ALIAS_MAP = {
+    "BBSome": ["BBS"],
+    "Transition Zone Complex": ["TZ"],
+    "IFT": ["Intraflagellar Transport"]
+};
+
+// Function to automate all Complex-related questions (including synonyms)
+function generateAutomatedComplexQueries() {
+    const complexQuestions = [];
+
+    CORE_CILIOPATHY_COMPLEXES.forEach(complexName => {
+        const patterns = COMPLEX_SYNONYM_PATTERNS[complexName] || [];
+        const aliases = COMPLEX_ALIAS_MAP[complexName] || [];
+
+        // Combine the complex name and its aliases for substitution
+        const allNames = [complexName]; 
+        aliases.forEach(alias => allNames.push(alias));
+        
+        patterns.forEach(pattern => {
+            // Use the complex name (e.g., "BBSome") for the handler call
+            const handlerFn = async () => getGenesByComplex(complexName); 
+            
+            // Generate the question text using all available aliases/names
+            allNames.forEach(name => {
+                const text = pattern.replace(/\[NAME\]/g, name);
+                complexQuestions.push({
+                    text: text,
+                    handler: handlerFn
+                });
+            });
+        });
+    });
+
+    return complexQuestions;
+}
 
 
 // ⚠️ Final Execution Step: This line should run after the initial 
@@ -2731,7 +2760,11 @@ const getProteinInteractions = async (gene) => notImplementedYet(`Protein intera
 
 // Add these new questions to your existing questionRegistry array
 questionRegistry.push(
-  // --- Core Functional Questions ---
+    // 2. Add them to the global registry array
+    // ... [Original static questions that came before the nested push] ...
+    ...generatedComplexQuestions, // <-- The generated list is inserted here
+    // ... [Original static questions that came after the nested push] ...
+    // --- Core Functional Questions ---
   { text: "What is the function of BBS1?", handler: () => getGeneFunction("BBS1") },
   { text: "Describe the role of ARL13B in ciliary signaling", handler: () => getGeneRole("ARL13B", "ciliary signaling") },
   { text: "Explain what CEP290 does", handler: () => getGeneFunction("CEP290") },
@@ -2988,7 +3021,58 @@ async function extendQuestionRegistryWithDomains() {
 // Call this after your data has been fetched
 extendQuestionRegistryWithDomains();
 
+const staticQuestionsToKeep = [
+    // ==================== META / GENERAL ====================
+    { text: "What can you do?", handler: async () => tellAboutCiliAI() },
+    { text: "Tell me about yourself", handler: async () => tellAboutCiliAI() },
+    { text: "What information do you have?", handler: async () => tellAboutCiliAI() },
+    { text: "What datasets are you using?", handler: async () => tellAboutCiliAI() },
+    { text: "Explain CiliAI's capabilities.", handler: async () => tellAboutCiliAI() },
+    { text: "How can you help me?", handler: async () => tellAboutCiliAI() },
+    { text: "What questions can I ask?", handler: async () => tellAboutCiliAI() },
+    { text: "Give me an overview of your features", handler: async () => tellAboutCiliAI() },
+    
+    // ==================== GENE DETAILS / FUNCTION ====================
+    { text: "Describe the function of KIF17", handler: async () => getGeneFunction("KIF17") },
+    { text: "What is the function of KIF17?", handler: async () => getGeneFunction("KIF17") },
+    { text: "What does KIF17 do?", handler: async () => getGeneFunction("KIF17") },
+    { text: "Tell me the function of KIF17.", handler: async () => getGeneFunction("KIF17") },
+    { text: "What is the role of CC2D1A in cilia?", handler: async () => getGeneFunction("CC2D1A") },
+    { text: "What does ARL13B do in ciliary signaling?", handler: async () => getGeneRole("ARL13B", "ciliary signaling") },
+    
+    // ==================== GENE DETAILS / COMPREHENSIVE ====================
+    { text: "Show all known info about IFT88", handler: async () => getComprehensiveDetails("IFT88") },
+    { text: "Tell me about BBS1", handler: async () => getComprehensiveDetails("BBS1") },
+    { text: "Tell me about DYNC2H1", handler: async () => getComprehensiveDetails("DYNC2H1") },
+    
+    // ==================== GENE STATUS / PHENOTYPE ====================
+    { text: "Is DYNC2H1 a ciliary gene?", handler: async () => checkCiliaryStatus("DYNC2H1") },
+    { text: "Show me all ciliary genes", handler: async () => getAllCiliaryGenes() },
+    { text: "What happens to cilia when KIF3A is knocked down?", handler: async () => getKnockdownEffect("KIF3A") },
+    { text: "Which genes cause longer cilia when silenced?", handler: async () => getGenesByScreenPhenotype("long cilia") },
+    { text: "Find genes causing short cilia", handler: async () => getGenesByScreenPhenotype("short cilia") },
+    { text: "Which genes reduce the percentage of ciliated cells?", handler: async () => getGenesByScreenPhenotype("reduced ciliated cells") },
+    
+    // ==================== ORTHOLOGS & CONSERVATION ====================
+    { text: "Show evolutionary conservation of BBS1", handler: async () => getGeneConservation("BBS1") },
+    { text: "Is IFT88 conserved in C. elegans?", handler: async () => checkConservation("IFT88", "C. elegans") },
+    { text: "Display the ciliary genes that are conserved between humans and zebrafish", handler: async () => getConservedGenesBetween(["Human", "Zebrafish"]) },
+    { text: "Show curated orthologs for IFT88", handler: async () => getHubOrthologsForGene("IFT88") },
 
+    // ==================== UNIQUE COMPLEX QUERIES (Manual/Comparisons) ====================
+    { text: "Compare IFT-A and IFT-B complex composition", handler: async () => compareComplexes("IFT-A", "IFT-B") },
+    { text: "Find IFT-A and IFT-B complex genes", handler: async () => getGenesByMultipleComplexes(["IFT-A", "IFT-B"]) },
+    
+    // ==================== TISSUE & CELL EXPRESSION ====================
+    { text: "Where is ARL13B expressed?", handler: async () => getGeneExpression("ARL13B") },
+    { text: "Show the expression pattern of BBS1 across all tissues", handler: async () => getGeneExpressionPattern("BBS1") },
+    { text: "Which ciliary genes are most highly expressed in the kidney?", handler: async () => getTissueSpecificGenes("kidney") },
+    { text: "Which Joubert Syndrome genes are expressed in ciliated cells?", handler: async () => { const results = await findDiseaseGenesByCellExpression("Joubert Syndrome", "ciliated cell"); return formatListResult("Joubert Genes Expressed in Ciliated Cells", results); }},
+
+    // ==================== DOMAIN QUERIES ====================
+    { text: "Show enriched domains in ciliary genes", handler: async () => displayEnrichedDomains() },
+    { text: "Show WD40 domain containing proteins", handler: async () => findGenesByNewDomainDB("WD40") },
+];
 async function checkCiliaryStatus(gene) {
     if (!ciliaHubDataCache) await fetchCiliaData();
     const geneData = ciliaHubDataCache.find(g => g.gene.toUpperCase() === gene.toUpperCase());
