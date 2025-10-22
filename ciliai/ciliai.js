@@ -3441,19 +3441,21 @@ async function getGenesWithDomain(domainName) {
     return results;
 }
 
-// --- UPDATED getGenesByComplex FUNCTION (Targeted Fix for the Map Error) ---
+// --- UPDATED getGenesByComplex FUNCTION (Guaranteed Array Return) ---
+
 async function getGenesByComplex(complexName) {
-    // We rely on external fetches being handled by the promise chain outside this function.
+    // 1. Ensure CiliaHub data is loaded
     if (!ciliaHubDataCache) await fetchCiliaData(); 
     await fetchCorumComplexes(); 
     
     const complexUpper = complexName.toUpperCase();
 
-    // 🛑 Initialize as an empty array to GUARANTEE compatibility with .map()
+    // Initialize foundGenes as a guaranteed array.
     let foundGenes = [];
     let sourceText = 'CiliaHub Annotation';
 
     // 1. Prioritize CiliaHub annotations for core complexes (BBSome, IFT, MKS)
+    // This uses the explicit CiliaHub annotations.
     if (['BBSOME', 'IFT-A', 'IFT-B', 'MKS COMPLEX', 'NPHP COMPLEX'].some(name => complexUpper.includes(name))) {
         foundGenes = ciliaHubDataCache
             .filter(gene => Array.isArray(gene.complex_names) && gene.complex_names.some(cn => cn.toUpperCase().includes(complexUpper)))
@@ -3461,35 +3463,34 @@ async function getGenesByComplex(complexName) {
                 gene: gene.gene,
                 description: `Ciliopathy: ${gene.ciliopathy?.join(', ') || 'N/A'}. Localization: ${gene.localization?.join(', ') || 'N/A'}.`
             }));
-    } else {
-        // 2. Fallback to CORUM data
-        if (corumComplexCache && corumComplexCache.length > 0) {
-            const corumEntry = corumComplexCache.find(c => c.complex_name.toUpperCase().includes(complexUpper));
+        // If the array is empty, flow continues to CORUM search below.
+    }
+    
+    // 2. Fallback to CORUM data ONLY if the core CiliaHub search yielded no results.
+    if (foundGenes.length === 0 && corumComplexCache && corumComplexCache.length > 0) {
+        const corumEntry = corumComplexCache.find(c => c.complex_name.toUpperCase().includes(complexUpper));
 
-            if (corumEntry) {
-                sourceText = `CORUM Complex ID ${corumEntry.complex_id}`;
+        if (corumEntry) {
+            sourceText = `CORUM Complex ID ${corumEntry.complex_id}`;
+            
+            corumEntry.subunits.forEach(subunit => {
+                const hubData = ciliaHubDataCache.find(g => g.gene.toUpperCase() === subunit.gene_name.toUpperCase());
                 
-                // CRITICAL STEP: Build the array by merging subunit info with hub data
-                corumEntry.subunits.forEach(subunit => {
-                    const hubData = ciliaHubDataCache.find(g => g.gene.toUpperCase() === subunit.gene_name.toUpperCase());
-                    
-                    if (hubData) {
-                         // Only show CORUM components that are recognized as ciliary genes
-                        foundGenes.push({
-                            gene: subunit.gene_name,
-                            description: `Ciliopathy: ${hubData.ciliopathy?.join(', ') || 'None'}. Role: ${hubData.functional_summary?.substring(0, 80) || 'N/A'}.`,
-                        });
-                    }
-                });
-            }
+                if (hubData) {
+                     // Filter: only show CORUM subunits that are recognized as ciliary genes in your hub
+                    foundGenes.push({
+                        gene: subunit.gene_name,
+                        description: `Ciliopathy: ${hubData.ciliopathy?.join(', ') || 'None'}. Role: ${hubData.functional_summary?.substring(0, 80) || 'N/A'}.`,
+                    });
+                }
+            });
         }
     }
 
     // 3. Final Output Formatting
-    const count = foundGenes.length;
-    const finalDescription = (count > 0) ? `Source: ${sourceText}.` : `No Ciliary components found for ${complexName}.`;
+    const finalDescription = (foundGenes.length > 0) ? `Source: ${sourceText}.` : `No Ciliary components found for ${complexName}.`;
 
-    // Ensure we pass a guaranteed array to formatListResult
+    // CRITICAL: The return must be the final HTML structure using formatListResult.
     return formatListResult(`Components of ${complexName}`, foundGenes, finalDescription);
 }
 
