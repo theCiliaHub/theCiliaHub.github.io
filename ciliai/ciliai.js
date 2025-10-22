@@ -2170,12 +2170,12 @@ console.log("Joubert Syndrome Organism Questions:", joubertOrganismQuestions.map
 function runAutomatedRegistryGeneration() {
     let generatedQuestions = [];
 
-    // --- 1. Generate Simple Disease List Queries (Human Genes) ---
+    // 1. Generate Simple Disease List Queries (Human Genes)
     ALL_DISEASES.forEach(disease => {
         generatedQuestions.push(...generateDiseaseListQuestions(disease));
     });
 
-    // --- 2. Generate Combined Disease + Organism Queries ---
+    // 2. Generate Combined Disease + Organism Queries
     ALL_DISEASES.forEach(disease => {
         generatedQuestions.push(...generateCombinedDiseaseOrganismQuestions(disease));
     });
