@@ -2005,10 +2005,6 @@ const ALL_DISEASES = [
     "Notch-mediated Ciliopathy", "Primary Endocardial Fibroelastosis", "Retinal Degeneration"
 ].filter((v, i, a) => v && a.indexOf(v) === i); // Filter out duplicates/empty strings
 
-const MODEL_ORGANISMS = [
-    "C. elegans", "Mouse", "Drosophila", "Zebrafish", "Xenopus" // Focus on these 5 model organisms
-];
-
 // Define disease aliases for flexibility
 const DISEASE_ALIASES = {
     "Joubert Syndrome": ["Joubert", "JS", "Joubert's"],
