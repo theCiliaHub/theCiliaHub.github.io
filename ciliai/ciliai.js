@@ -3441,43 +3441,39 @@ async function getGenesWithDomain(domainName) {
     return results;
 }
 
-// --- UPDATED getGenesByComplex FUNCTION (Guaranteed Array Return) ---
+// --- UPDATED getGenesByComplex FUNCTION (Final CORUM Integration) ---
 
 async function getGenesByComplex(complexName) {
-    // 1. Ensure CiliaHub data is loaded
     if (!ciliaHubDataCache) await fetchCiliaData(); 
-    await fetchCorumComplexes(); 
+    await fetchCorumComplexes(); // Load CORUM data
     
     const complexUpper = complexName.toUpperCase();
-
-    // Initialize foundGenes as a guaranteed array.
     let foundGenes = [];
-    let sourceText = 'CiliaHub Annotation';
+    let sourceText = 'CiliaHub Annotation (Fallback)';
 
-    // 1. Prioritize CiliaHub annotations for core complexes (BBSome, IFT, MKS)
-    // This uses the explicit CiliaHub annotations.
-    if (['BBSOME', 'IFT-A', 'IFT-B', 'MKS COMPLEX', 'NPHP COMPLEX'].some(name => complexUpper.includes(name))) {
-        foundGenes = ciliaHubDataCache
-            .filter(gene => Array.isArray(gene.complex_names) && gene.complex_names.some(cn => cn.toUpperCase().includes(complexUpper)))
-            .map(gene => ({ 
-                gene: gene.gene,
-                description: `Ciliopathy: ${gene.ciliopathy?.join(', ') || 'N/A'}. Localization: ${gene.localization?.join(', ') || 'N/A'}.`
-            }));
-        // If the array is empty, flow continues to CORUM search below.
-    }
-    
-    // 2. Fallback to CORUM data ONLY if the core CiliaHub search yielded no results.
-    if (foundGenes.length === 0 && corumComplexCache && corumComplexCache.length > 0) {
-        const corumEntry = corumComplexCache.find(c => c.complex_name.toUpperCase().includes(complexUpper));
+    // 1. Search the CORUM Cache for Core Ciliopathy Complexes (BBSome, IFT, etc.)
+    if (corumComplexCache && corumComplexCache.length > 0) {
+        
+        // This regex ensures we match BBSome whether the query uses 'BBSome' or just 'BBS'
+        const complexSearchNames = [complexUpper];
+        if (complexUpper.includes('BBS')) complexSearchNames.push('BBSOME');
+
+        let corumEntry = null;
+        for (const name of complexSearchNames) {
+            corumEntry = corumComplexCache.find(c => c.complex_name.toUpperCase().includes(name));
+            if (corumEntry) break;
+        }
 
         if (corumEntry) {
             sourceText = `CORUM Complex ID ${corumEntry.complex_id}`;
             
+            // 2. Cross-Reference CORUM Subunits with CiliaHub Data
             corumEntry.subunits.forEach(subunit => {
-                const hubData = ciliaHubDataCache.find(g => g.gene.toUpperCase() === subunit.gene_name.toUpperCase());
+                const humanGeneUpper = subunit.gene_name.toUpperCase();
+                const hubData = ciliaHubDataCache.find(g => g.gene.toUpperCase() === humanGeneUpper);
                 
+                // Only push the subunit if it is found in the CiliaHub (i.e., it's a ciliary protein)
                 if (hubData) {
-                     // Filter: only show CORUM subunits that are recognized as ciliary genes in your hub
                     foundGenes.push({
                         gene: subunit.gene_name,
                         description: `Ciliopathy: ${hubData.ciliopathy?.join(', ') || 'None'}. Role: ${hubData.functional_summary?.substring(0, 80) || 'N/A'}.`,
@@ -3487,10 +3483,20 @@ async function getGenesByComplex(complexName) {
         }
     }
 
-    // 3. Final Output Formatting
-    const finalDescription = (foundGenes.length > 0) ? `Source: ${sourceText}.` : `No Ciliary components found for ${complexName}.`;
+    // 3. Fallback: If still no results, use the original fuzzy CiliaHub search (optional, but ensures maximal hit rate)
+    if (foundGenes.length === 0) {
+         foundGenes = ciliaHubDataCache
+            .filter(gene => Array.isArray(gene.complex_names) && gene.complex_names.some(cn => cn.toUpperCase().includes(complexUpper)))
+            .map(gene => ({ 
+                gene: gene.gene,
+                description: `Ciliopathy: ${gene.ciliopathy?.join(', ') || 'N/A'}. Localization: ${gene.localization?.join(', ') || 'N/A'}.`
+            }));
+            sourceText = 'CiliaHub Annotation (Fallback)';
+    }
+    // 4. Final Output Formatting
+    const finalDescription = (foundGenes.length > 0) ? `Source: ${sourceText}.` : `No Ciliary components found for ${complexName} in the CiliaHub or CORUM data.`;
 
-    // CRITICAL: The return must be the final HTML structure using formatListResult.
+    // The return must be the final HTML structure using formatListResult.
     return formatListResult(`Components of ${complexName}`, foundGenes, finalDescription);
 }
 
