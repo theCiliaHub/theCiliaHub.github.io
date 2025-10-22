@@ -2009,19 +2009,12 @@ const MODEL_ORGANISMS = [
     "C. elegans", "Mouse", "Drosophila", "Zebrafish", "Xenopus" // Focus on these 5 model organisms
 ];
 
-const DISEASE_ALIASES = {
-    "Bardet–Biedl Syndrome": ["BBS"],
-    "Nephronophthisis": ["NPHP"],
-    "Meckel–Gruber Syndrome": ["MKS"],
-    "Primary Ciliary Dyskinesia": ["PCD"]
-};
-
-
 // Define disease aliases for flexibility
 const DISEASE_ALIASES = {
     "Joubert Syndrome": ["Joubert", "JS", "Joubert's"],
     "Bardet-Biedl Syndrome": ["BBS", "Bardet-Biedl"],
-    // Add other diseases and their aliases as needed
+      "Meckel–Gruber Syndrome": ["MKS"],
+    "Primary Ciliary Dyskinesia": ["PCD"]
 };
 
 // Define model organisms for combined disease-organism questions
