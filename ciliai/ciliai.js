@@ -2126,14 +2126,11 @@ const joubertOrganismQuestions = generateCombinedDiseaseOrganismQuestions("Joube
 // Log generated questions for verification
 console.log("Joubert Syndrome Questions:", joubertQuestions.map(q => q.text));
 console.log("Joubert Syndrome Organism Questions:", joubertOrganismQuestions.map(q => q.text));
-
-// --- Execution Block (Place this logic near the end of your script) ---
-// This function needs to be executed once your generator logic is defined.
-// --- Execution Block (Place this logic near the end of your script) ---
+// Function that consolidates all question generation logic
 function runAutomatedRegistryGeneration() {
     let generatedQuestions = [];
 
-    // --- 1. Generate Simple Disease List Queries (Human Genes & Synonyms) ---
+    // --- 1. Generate Simple Disease List Queries ---
     ALL_DISEASES.forEach(disease => {
         generatedQuestions.push(...generateDiseaseListQuestions(disease));
     });
@@ -2143,36 +2140,17 @@ function runAutomatedRegistryGeneration() {
         generatedQuestions.push(...generateCombinedDiseaseOrganismQuestions(disease));
     });
     
-    // --- 3. Generate Simple Complex Queries (Core complexes + synonyms) ---
-    // Note: We use the complex name itself as the generator input
-    const CORE_COMPLEXES = ["BBSome", "IFT-A", "IFT-B", "MKS Complex", "NPHP Complex", "Transition Zone Complex", "IFT"];
+    // --- 3. Generate Complex Queries (This call is now correctly sequenced) ---
+    // NOTE: Assumes generateComplexQueryQuestions() is DEFINED BEFORE this point.
+    generatedQuestions.push(...generateComplexQueryQuestions());
     
-    CORE_COMPLEXES.forEach(complexName => {
-        const patterns = [
-            `List components of ${complexName}`,
-            `Show subunits of ${complexName}`,
-            `What proteins are in the ${complexName}?`,
-            `Members of the ${complexName}`,
-        ];
-
-        // Add alias patterns (e.g., BBSome -> BBS)
-        if (complexName === "BBSome") patterns.push(`List BBS genes`);
-        if (complexName === "IFT") patterns.push(`List intraflagellar transport components`);
-
-        patterns.forEach(text => {
-            generatedQuestions.push({
-                text: text,
-                handler: async () => getGenesByComplex(complexName)
-            });
-        });
-    });
-    
-    // --- 4. Generate Simple Ortholog/Phylogeny Queries (Ensures general organism queries are covered) ---
+    // --- 4. Generate Simple Ortholog/Phylogeny Queries ---
     const ORGANISM_QUERIES = [
         "List Ciliary Genes in [NAME] (Phylogeny)",
         "List ciliary genes in [NAME]",
         "Display ciliary genes in [NAME]",
     ];
+    
     MODEL_ORGANISMS.forEach(organism => {
         ORGANISM_QUERIES.forEach(pattern => {
             generatedQuestions.push({
@@ -2181,10 +2159,9 @@ function runAutomatedRegistryGeneration() {
             });
         });
     });
-    
+
     return generatedQuestions;
 }
-
 
 // Function 3: Generates questions for Ciliary Complex components
 function generateComplexQueryQuestions() {
@@ -4762,64 +4739,66 @@ function setupAutocomplete() {
     });
 }
 
+// This function needs to be placed BEFORE the setTimeout call near the top, 
+// and BEFORE the 'Global Exposure for Router' block at the end.
 function setupCiliAIEventListeners() {
-  const analyzeBtn = document.getElementById('analyzeBtn');
-  const aiQueryBtn = document.getElementById('aiQueryBtn');
-  const visualizeBtn = document.getElementById('visualizeBtn');
-  const geneInput = document.getElementById('geneInput');
-  const aiQueryInput = document.getElementById('aiQueryInput');
+    const analyzeBtn = document.getElementById('analyzeBtn');
+    const aiQueryBtn = document.getElementById('aiQueryBtn');
+    const visualizeBtn = document.getElementById('visualizeBtn');
+    const geneInput = document.getElementById('geneInput');
+    const aiQueryInput = document.getElementById('aiQueryInput');
 
-  if (!analyzeBtn || !aiQueryBtn || !visualizeBtn || !geneInput || !aiQueryInput) {
-    console.warn('One or more CiliAI elements were not found.');
-    return;
-  }
+    if (!analyzeBtn || !aiQueryBtn || !visualizeBtn || !geneInput || !aiQueryInput) {
+        console.warn('One or more CiliAI elements were not found.');
+        return;
+    }
 
-  // 1. FIX: Use window.analyzeGenesFromInput to ensure global scope reference is found on click.
-  analyzeBtn.addEventListener('click', window.analyzeGenesFromInput); 
-  
-  // 2. FIX: Use window.handleAIQuery to ensure global scope reference is found on click.
-  aiQueryBtn.addEventListener('click', window.handleAIQuery); 
+    // FIX: All handlers accessing globally defined functions now use the window prefix
+    analyzeBtn.addEventListener('click', window.analyzeGenesFromInput);
+    aiQueryBtn.addEventListener('click', window.handleAIQuery); // FIXES ReferenceError
 
-  visualizeBtn.addEventListener('click', async () => {
-    const genes = geneInput.value.split(/[\s,]+/).map(g => g.trim().toUpperCase()).filter(Boolean);
-    if (genes.length > 0) {
-      const mode = document.querySelector('input[name="mode"]:checked').value;
-      if (mode === 'expert' || mode === 'hybrid') {
-        document.getElementById('plot-display-area').innerHTML = `<p class="status-searching">Building screen results heatmap...</p>`;
-        const screenData = await window.fetchScreenData(); // Use window prefix if fetchScreenData is globally exposed
-        window.renderScreenSummaryHeatmap(genes, screenData); // Use window prefix
-      } else {
-        document.getElementById('plot-display-area').innerHTML = `<p class="status-searching">Building phylogeny heatmap...</p>`;
-        await window.renderPhylogenyHeatmap(genes); // Use window prefix
-      }
-    }
-  });
+    visualizeBtn.addEventListener('click', async () => {
+        const genes = geneInput.value.split(/[\s,]+/).map(g => g.trim().toUpperCase()).filter(Boolean);
+        if (genes.length > 0) {
+            const mode = document.querySelector('input[name="mode"]:checked').value;
+            const plotArea = document.getElementById('plot-display-area');
 
-  geneInput.addEventListener('keydown', debounce((e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      window.analyzeGenesFromInput(); // Use window prefix
-    }
-  }, 300));
+            if (mode === 'expert' || mode === 'hybrid') {
+                plotArea.innerHTML = `<p class="status-searching">Building screen results heatmap...</p>`;
+                const screenData = await window.fetchScreenData();
+                window.renderScreenSummaryHeatmap(genes, screenData);
+            } else {
+                plotArea.innerHTML = `<p class="status-searching">Building phylogeny heatmap...</p>`;
+                await window.renderPhylogenyHeatmap(genes);
+            }
+        }
+    });
 
-  aiQueryInput.addEventListener('keydown', debounce((e) => {
-    if (e.key === 'Enter') {
-      window.handleAIQuery(); // Use window prefix
-    }
-  }, 300));
+    geneInput.addEventListener('keydown', debounce((e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            window.analyzeGenesFromInput(); // FIX
+        }
+    }, 300));
 
-  // Assuming setupAutocomplete and setupAiQueryAutocomplete are defined locally 
-  // or globally without issue.
-  setupAutocomplete();
-  setupAiQueryAutocomplete();
+    aiQueryInput.addEventListener('keydown', debounce((e) => {
+        if (e.key === 'Enter') {
+            window.handleAIQuery(); // FIX
+        }
+    }, 300));
 
-  // Add sorting for tables (This section is fine)
-  document.addEventListener('click', (e) => {
-    if (e.target.classList.contains('sortable')) {
-      // ... sorting logic ...
-    }
-  });
+    setupAutocomplete();
+    setupAiQueryAutocomplete();
+
+    // Add sorting for tables (remains correct)
+    document.addEventListener('click', (e) => {
+        if (e.target.classList.contains('sortable')) {
+            // ... sorting logic ...
+        }
+    });
 }
+
+
 // --- ADDITION: New handler to query gene expression in specific cell types ---
 async function getGeneExpressionInCellType(gene, cellType) {
     if (!cellxgeneDataCache) await fetchCellxgeneData();
