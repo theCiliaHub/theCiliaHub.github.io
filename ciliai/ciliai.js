@@ -2219,9 +2219,14 @@ function autoGenerateSynonyms(registry) {
 // autoGenerateSynonyms(questionRegistry);
 
 // --- Master Data Lists (defined globally in your file) ---
-const CORE_CILIOPATHY_COMPLEXES = [
-    "BBSome", "IFT-A", "IFT-B", "Transition Zone Complex", "MKS Complex", "NPHP Complex", "IFT"
-];
+// ✅ Define before use
+const CORE_CILIOPATHY_COMPLEXES = {
+  'BBSome': ['BBS1', 'BBS2', 'BBS4', 'BBS5', 'BBS7', 'BBS9', 'BBS10', 'BBS12', 'TTC8', 'ARL6', 'BBIP1'],
+  'IFT-A': ['IFT121', 'IFT122', 'IFT139', 'IFT140', 'IFT144'],
+  'IFT-B': ['IFT20', 'IFT22', 'IFT25', 'IFT27', 'IFT46', 'IFT52', 'IFT57', 'IFT70', 'IFT74', 'IFT80', 'IFT81', 'IFT88'],
+  'MKS': ['MKS1', 'TMEM67', 'B9D1', 'B9D2', 'CC2D2A', 'TCTN1', 'TCTN2', 'TCTN3'],
+  'NPHP': ['NPHP1', 'NPHP3', 'NPHP4', 'NPHP5', 'NPHP6', 'NPHP8', 'NPHP9'],
+};
 
 const COMPLEX_SYNONYM_PATTERNS = {
     // Patterns covering common commands (Show, List, What proteins are in)
@@ -2242,6 +2247,7 @@ const COMPLEX_ALIAS_MAP = {
 
 // Function to automate all Complex-related questions (including synonyms)
 function generateAutomatedComplexQueries() {
+    for (const complex in CORE_CILIOPATHY_COMPLEXES) {
     const complexQuestions = [];
 
     CORE_CILIOPATHY_COMPLEXES.forEach(complexName => {
@@ -3602,6 +3608,49 @@ async function getGenesByComplex(complexName) {
     return formatListResult(`Components of ${complexName}`, finalDisplayGenes, finalDescription);
 }
 
+/**
+ * Detects if query refers to a known ciliary complex and displays its subunits automatically.
+ * Uses CORUM and CORE_CILIOPATHY_COMPLEXES data.
+ */
+async function detectAndDisplayComplex(query) {
+    const resultArea = document.getElementById('ai-result-area');
+    const qLower = query.toLowerCase();
+
+    if (typeof corumDataCache === 'undefined' || !corumDataCache.length) return false;
+
+    // Merge known curated core complexes for easier detection
+    const allComplexes = [
+        ...corumDataCache,
+        ...(typeof CORE_CILIOPATHY_COMPLEXES !== 'undefined' ? CORE_CILIOPATHY_COMPLEXES : [])
+    ];
+
+    // Look for partial or full name match
+    const match = allComplexes.find(c => 
+        qLower.includes(c.complex_name.toLowerCase()) || 
+        c.complex_aliases?.some(a => qLower.includes(a.toLowerCase()))
+    );
+
+    if (match) {
+        console.log(`🧩 Detected complex query: ${match.complex_name}`);
+        const subunits = match.subunits || match.genes || [];
+
+        if (subunits.length > 0) {
+            const formatted = `
+                <h3>${match.complex_name}</h3>
+                <p><b>Subunits (${subunits.length}):</b></p>
+                <ul style="columns:2; list-style-type:none; padding:0;">
+                    ${subunits.map(g => `<li>${g}</li>`).join('')}
+                </ul>
+            `;
+            resultArea.innerHTML = formatted;
+            return true;
+        } else {
+            resultArea.innerHTML = `<p>${match.complex_name} detected but no subunits available.</p>`;
+            return true;
+        }
+    }
+    return false;
+}
 
 
 async function getGenesByFunction(functionalCategory) {
@@ -3756,7 +3805,6 @@ async function getCiliaryGenesForOrganism(organismName) {
         speciesCode: speciesCode // NEW FEATURE: Returning the resolved species code
     };
 }
-
 // --- Main AI Query Handler (REPLACEMENT) ---
 window.handleAIQuery = async function() {
     const aiQueryInput = document.getElementById('aiQueryInput');
@@ -3769,11 +3817,10 @@ window.handleAIQuery = async function() {
     // --- END OF FIX 1 ---
 
     resultArea.style.display = 'block';
-    // Display loading message immediately
     resultArea.innerHTML = `<p class="status-searching">CiliAI is thinking... 🧠</p>`;
     
     try {
-        // Await primary data fetches *before* running any query logic
+        // Ensure all data sources are ready
         await Promise.all([
             fetchCiliaData(),
             fetchScreenData(),
@@ -3792,28 +3839,34 @@ window.handleAIQuery = async function() {
         const qLower = query.toLowerCase();
         let match;
 
-        // 1. Check for Perfect Match in Registry
+        // 1️⃣ Check for Perfect Match in Registry
         const perfectMatch = questionRegistry.find(item => item.text.toLowerCase() === qLower);
         if (perfectMatch) {
             console.log(`Registry match found: "${perfectMatch.text}"`);
             resultHtml = await perfectMatch.handler();
         } 
-        // 2. Check for "Tell me about..." Intent (Comprehensive Detail)
+        // 2️⃣ "Tell me about..." intent
         else if ((match = qLower.match(/(?:tell me about|what is|describe)\s+(.+)/i))) {
             const term = match[1].trim();
             resultHtml = await getComprehensiveDetails(term);
         } 
-        // 3. Check for Entity-Based Intent (Localization, Function, Disease Categories)
+        // 3️⃣ Auto-detect Complex Queries (e.g., BBSome, IFT-A, NPHP complex)
+        else if (await detectAndDisplayComplex(query)) {
+            return; // handled inside detectAndDisplayComplex()
+        }
+        // 4️⃣ Entity-based intent (function, localization, disease)
         else {
             const intent = intentParser.parse(query);
             if (intent && typeof intent.handler === 'function') {
                 console.log(`Intent parser match found: ${intent.intent} for entity: ${intent.entity}`);
                 resultHtml = await intent.handler(intent.entity);
             }
-            // 4. Smarter Fallback Logic (Gene/Plot Inference)
+            // 5️⃣ Smart gene fallback logic
             else {
                 const potentialGenes = (query.match(/\b([A-Z0-9\-\.]{3,})\b/gi) || []);
-                const genes = potentialGenes.filter(g => ciliaHubDataCache.some(hubGene => hubGene.gene.toUpperCase() === g.toUpperCase()));
+                const genes = potentialGenes.filter(g => 
+                    ciliaHubDataCache.some(hubGene => hubGene.gene.toUpperCase() === g.toUpperCase())
+                );
                 
                 if (genes.length === 2 && (qLower.includes('compare') || qLower.includes('vs'))) {
                     console.log(`Smart match: Comparing two genes: ${genes.join(' and ')}`);
@@ -3834,17 +3887,17 @@ window.handleAIQuery = async function() {
             }
         }
 
-        // --- Only update innerHTML if the handler returned HTML ---
+        // Update display if we got HTML
         if (resultHtml !== "") {
             resultArea.innerHTML = resultHtml;
         }
 
     } catch (e) {
-        // Display generic error, but log details to console
         resultArea.innerHTML = `<p class="status-not-found">An internal CiliAI error occurred during your query. Please check the console for details. (Error: ${e.message})</p>`;
         console.error("CiliAI Query Error:", e);
     }
 };
+
 
 // Helper for the comparison query (updated titles and threshold)
 async function displayEnrichedDomains() {
