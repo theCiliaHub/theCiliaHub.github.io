@@ -269,6 +269,7 @@ function createIntentParser() {
         },
         {
             type: 'COMPLEX',
+            // Ensure BBSome is included in this list, either statically or dynamically if possible
             keywords: ['BBSome', 'IFT-A', 'IFT-B', 'Transition Zone Complex', 'MKS Complex', 'NPHP Complex'],
             handler: async (term) => formatListResult(`Components of ${term}`, await getGenesByComplex(term)),
             autocompleteTemplate: (term) => `Display components of ${term} complex`
@@ -611,22 +612,35 @@ async function fetchCorumComplexes() {
         console.log('Fetching CORUM complexes...');
         const response = await fetch(dataUrl);
         if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
-        const data = await response.json();
+        
+        // Handle single object vs. array format for robustness
+        const rawData = await response.json();
+        const data = Array.isArray(rawData) ? rawData : [rawData]; 
 
         data.forEach(entry => {
-            if (!entry || !entry.complexName || !entry.subunits) return;
-            const complexNameLower = entry.complexName.toLowerCase();
-            corumDataCache.byNameLower[complexNameLower] = entry;
+            // CRITICAL FIX 1: Check for complex_name and subunits array
+            if (!entry || !entry.complex_name || !Array.isArray(entry.subunits)) return; 
+            
+            const complexNameLower = entry.complex_name.toLowerCase();
+            
+            // Store the whole entry for complex name lookup
+            corumDataCache.byNameLower[complexNameLower] = entry; 
             corumDataCache.list.push(entry);
 
             // Populate byGene lookup
-            entry.subunits.forEach(gene => {
-                const g = gene.toUpperCase();
+            entry.subunits.forEach(subunit => {
+                // CRITICAL FIX 2: Access gene symbol from the subunit object's 'gene_name' field
+                const geneSymbol = subunit.gene_name;
+                if (!geneSymbol) return; 
+
+                const g = geneSymbol.toUpperCase();
                 if (!corumDataCache.byGene[g]) corumDataCache.byGene[g] = [];
-                // Store a lighter reference to the complex
+                
+                // Store a lighter reference to the complex, listing all gene symbols
                 corumDataCache.byGene[g].push({
-                    complexName: entry.complexName,
-                    subunits: entry.subunits.map(s => s.toUpperCase())
+                    complexName: entry.complex_name,
+                    // Map the subunits array of objects back to an array of uppercase gene symbols
+                    subunits: entry.subunits.map(s => s.gene_name.toUpperCase()) 
                 });
             });
         });
@@ -636,6 +650,8 @@ async function fetchCorumComplexes() {
         return corumDataCache;
     } catch (err) {
         console.error('Failed to fetch CORUM data:', err);
+        // Set loaded to true to prevent endless retry loop
+        corumDataCache.loaded = true; 
         return corumDataCache;
     }
 }
@@ -3356,31 +3372,54 @@ async function getGenesWithDomain(domainName) {
     return results;
 }
 
+/**
+ * Retrieves components for a complex name, prioritizing CORUM data.
+ * NOTE: This assumes the corrected 'fetchCorumComplexes' is running.
+ */
 async function getGenesByComplex(complexName) {
-    await fetchCiliaData();
+    // Ensure all data is ready, including the newly added CORUM fetch
+    await Promise.all([fetchCorumComplexes(), fetchCiliaData()]);
+
+    const nameLower = complexName.toLowerCase();
+    
+    // --- 1. Check CORUM Cache (Priority Source for Complex Composition) ---
+    const corumEntry = corumDataCache.byNameLower[nameLower];
+    
+    if (corumEntry) {
+        // Return a standardized format for CORUM data
+        return corumEntry.subunits.map(subunit => ({
+            gene: subunit.gene_name,
+            description: `Complex: ${corumEntry.complex_name} (CORUM ID: ${corumEntry.complex_id})`,
+            source: 'CORUM'
+        }));
+    }
+
+    // --- 2. Fallback to CiliaHub Gene Annotations (Legacy/Secondary Source) ---
     const complexRegex = new RegExp(complexName, 'i');
     
     const complexGenes = ciliaHubDataCache.filter(gene => 
+        // Checks if the gene's own record mentions the complex name
         gene.complex_names && gene.complex_names.some(cn => cn.match(complexRegex))
-    );
-    
-    if (complexGenes.length > 0) {
-        return complexGenes.map(gene => ({
-            gene: gene.gene,
-            description: `Complex: ${gene.complex_names?.join(', ') || 'Unknown'}`
-        }));
-    }
-    
-    const relatedGenes = ciliaHubDataCache.filter(gene => 
-        gene.functional_summary && gene.functional_summary.toLowerCase().includes(complexName.toLowerCase())
     ).map(gene => ({
         gene: gene.gene,
-        description: gene.functional_summary?.substring(0, 100) + '...' || 'No description'
+        description: `Complex: ${gene.complex_names?.join(', ') || 'Unknown'}`,
+        source: 'CiliaHub'
     }));
     
+    // 3. Fallback to searching functional summary if no direct hit
+    if (complexGenes.length > 0) return complexGenes;
+
+    const relatedGenes = ciliaHubDataCache.filter(gene => 
+        gene.functional_summary && gene.functional_summary.toLowerCase().includes(nameLower)
+    ).map(gene => ({
+        gene: gene.gene,
+        description: gene.functional_summary?.substring(0, 100) + '...' || 'No description',
+        source: 'CiliaHub'
+    }));
+    
+    // Combine and return
     return relatedGenes;
 }
-
 async function getGenesByFunction(functionalCategory) {
     await fetchCiliaData();
     const categoryRegex = new RegExp(functionalCategory.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
