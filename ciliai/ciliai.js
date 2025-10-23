@@ -2185,8 +2185,6 @@ function runAutomatedRegistryGeneration() {
     return generatedQuestions;
 }
 
-// 1. Generate all the complex questions and their synonyms
-const generatedComplexQuestions = generateAutomatedComplexQueries();
 
 // Function 3: Generates questions for Ciliary Complex components
 function generateComplexQueryQuestions() {
@@ -2291,29 +2289,44 @@ function autoGenerateSynonyms(registry) {
 
 
 // --- Execution Block (Place this logic near the end of your script) ---
+// Function 4: Generates Simple Ortholog/Phylogeny Queries (and all remaining questions)
 function runAutomatedRegistryGeneration() {
-    let generatedQuestions = [];
+    let generatedQuestions = [];
 
-    // --- 1. Generate Simple Disease List Queries (Human Genes & Synonyms) ---
-    ALL_DISEASES.forEach(disease => {
-        generatedQuestions.push(...generateDiseaseListQuestions(disease));
-    });
+    // --- 1. Generate Simple Disease List Queries (Human Genes & Synonyms) ---
+    ALL_DISEASES.forEach(disease => {
+        generatedQuestions.push(...generateDiseaseListQuestions(disease));
+    });
 
-    // --- 2. Generate Combined Disease + Organism Queries ---
-    ALL_DISEASES.forEach(disease => {
-        generatedQuestions.push(...generateCombinedDiseaseOrganismQuestions(disease));
-    });
-    
-    // --- 3. Generate Complex Queries (REPLACEMENT) 🛠️
-    generatedQuestions.push(...generateComplexQueryQuestions());
-    // --- END REPLACEMENT ---
-    
-    // --- 4. Generate Simple Ortholog/Phylogeny Queries (Ensures general organism queries are covered) ---
-    const ORGANISM_QUERIES = [
-        // ... (rest of query generation) ...
-    ];
-    // ... (rest of function body) ...
-    return generatedQuestions;
+    // --- 2. Generate Combined Disease + Organism Queries ---
+    ALL_DISEASES.forEach(disease => {
+        generatedQuestions.push(...generateCombinedDiseaseOrganismQuestions(disease));
+    });
+    
+    // --- 3. Generate Complex Queries 🛠️
+    // NOTE: Assumes generateComplexQueryQuestions() is defined elsewhere.
+    generatedQuestions.push(...generateComplexQueryQuestions());
+    // --- END COMPLEX REPLACEMENT ---
+    
+    // --- 4. Generate Simple Ortholog/Phylogeny Queries (Ensures general organism queries are covered) ---
+    const ORGANISM_QUERIES = [
+        "List Ciliary Genes in [NAME] (Phylogeny)", 
+        "List ciliary genes in [NAME]",
+        "Display ciliary genes in [NAME]",
+    ];
+    
+    // Assuming MODEL_ORGANISMS array is defined globally
+    MODEL_ORGANISMS.forEach(organism => {
+        ORGANISM_QUERIES.forEach(pattern => {
+            generatedQuestions.push({
+                text: pattern.replace(/\[NAME\]/g, organism),
+                handler: async () => getPhylogenyGenesForOrganism(organism) // Assumes this function is defined
+            });
+        });
+    });
+
+    // 5. Finalize the list.
+    return generatedQuestions;
 }
 // ----------------------------------------------------
 
