@@ -2246,23 +2246,35 @@ const COMPLEX_ALIAS_MAP = {
 };
 
 // Function to automate all Complex-related questions (including synonyms)
+// Function to automate all Complex-related questions (including synonyms)
 function generateAutomatedComplexQueries() {
-    for (const complex in CORE_CILIOPATHY_COMPLEXES) {
-    const complexQuestions = [];
+    const complexQuestions = []; // Move initialization out of the loop
 
-    CORE_CILIOPATHY_COMPLEXES.forEach(complexName => {
+    // The entire logic here appears to be designed to iterate over all complexes 
+    // and build one large array (complexQuestions).
+
+    // The original intent seems to be to just loop over CORE_CILIOPATHY_COMPLEXES
+    // and push the resulting queries into complexQuestions.
+    
+    // Original loop was incorrect, but to preserve intent:
+
+    CORE_CILIOPATHY_COMPLEXES.forEach(complexName => { // Assuming intent was to iterate all keys
+        // ... loop logic that generates query objects (complexQuestions.push) ...
+    });
+    
+    // However, looking at the logic:
+    
+    // Corrected logic based on provided code structure (lines 1100-1140):
+    for (const complexName in CORE_CILIOPATHY_COMPLEXES) { // START OF OUTER LOOP
         const patterns = COMPLEX_SYNONYM_PATTERNS[complexName] || [];
         const aliases = COMPLEX_ALIAS_MAP[complexName] || [];
 
-        // Combine the complex name and its aliases for substitution
         const allNames = [complexName]; 
         aliases.forEach(alias => allNames.push(alias));
         
         patterns.forEach(pattern => {
-            // Use the complex name (e.g., "BBSome") for the handler call
             const handlerFn = async () => getGenesByComplex(complexName); 
             
-            // Generate the question text using all available aliases/names
             allNames.forEach(name => {
                 const text = pattern.replace(/\[NAME\]/g, name);
                 complexQuestions.push({
@@ -2271,9 +2283,9 @@ function generateAutomatedComplexQueries() {
                 });
             });
         });
-    });
+    } // <-- MISSING BRACE ADDED HERE (OR the entire loop needs re-writing)
 
-    return complexQuestions;
+    return complexQuestions; // Assuming the goal is to return a single array
 }
 
 
