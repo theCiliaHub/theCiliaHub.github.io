@@ -12,6 +12,14 @@ let CILI_AI_DOMAIN_DB = null;     // For the new domain database
 let neversPhylogenyCache = null;  // For Nevers et al. 2017 data
 let liPhylogenyCache = null;      // For Li et al. 2014 data
 let allGeneSymbols = null; // Add this global variable alongside others
+// --- GLOBAL CORUM CACHE ---
+let corumDataCache = {
+    list: [],
+    byGene: {},
+    byNameLower: {},
+    loaded: false
+};
+
 
 // --- NEW: Reusable scRNA-seq Data Reference ---
 const SC_RNA_SEQ_REFERENCE_HTML = `
@@ -206,7 +214,8 @@ window.displayCiliAIPage = async function displayCiliAIPage() {
         fetchUmapData(),           // Your original umap data
         getDomainData(),           // --- NEW ---
         fetchNeversPhylogenyData(), // --- NEW ---
-        fetchLiPhylogenyData()     // --- NEW ---
+        fetchLiPhylogenyData(),  // --- NEW ---
+        fetchCorumComplexes()     
     ]);
     console.log('ciliAI.js: All data loaded (including new domain and phylogeny sources).');
     
@@ -222,7 +231,6 @@ function normalizeTerm(s) {
     // UPDATED: Now replaces periods, hyphens, underscores, and spaces with a single space.
     return String(s).toLowerCase().replace(/[._\-\s]+/g, ' ').trim();
 }
-
 
 
 // =============================================================================
@@ -590,6 +598,83 @@ async function fetchCellxgeneData() {
         return null;
     }
 }
+
+/**
+ * Fetches and processes CORUM Human Complex data.
+ * @returns {Promise<Object>} The CORUM data cache object.
+ */
+async function fetchCorumComplexes() {
+    if (corumDataCache.loaded) return corumDataCache;
+    const dataUrl = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/corum_humanComplexes.json';
+
+    try {
+        console.log('Fetching CORUM complexes...');
+        const response = await fetch(dataUrl);
+        if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+        const data = await response.json();
+
+        data.forEach(entry => {
+            if (!entry || !entry.complexName || !entry.subunits) return;
+            const complexNameLower = entry.complexName.toLowerCase();
+            corumDataCache.byNameLower[complexNameLower] = entry;
+            corumDataCache.list.push(entry);
+
+            // Populate byGene lookup
+            entry.subunits.forEach(gene => {
+                const g = gene.toUpperCase();
+                if (!corumDataCache.byGene[g]) corumDataCache.byGene[g] = [];
+                // Store a lighter reference to the complex
+                corumDataCache.byGene[g].push({
+                    complexName: entry.complexName,
+                    subunits: entry.subunits.map(s => s.toUpperCase())
+                });
+            });
+        });
+
+        corumDataCache.loaded = true;
+        console.log(`✅ Loaded ${corumDataCache.list.length} CORUM complexes.`);
+        return corumDataCache;
+    } catch (err) {
+        console.error('Failed to fetch CORUM data:', err);
+        return corumDataCache;
+    }
+}
+
+/**
+ * Helper function to get complex details by gene symbol.
+ * @param {string} geneSymbol The gene to search for.
+ * @returns {Array<Object>} List of complexes containing the gene.
+ */
+function getComplexesByGene(geneSymbol) {
+    if (!corumDataCache.loaded) {
+        console.warn('CORUM data not loaded yet.');
+        return [];
+    }
+    const upper = geneSymbol.toUpperCase();
+    return corumDataCache.byGene[upper] || [];
+}
+
+/**
+ * Helper function to get complex subunits by complex name (partial match).
+ * This replaces the crashing regex logic for complex name lookups.
+ * @param {string} complexName The complex name (can be partial).
+ * @returns {Array<Object>} List of complexes matching the name.
+ */
+function getSubunitsByComplexName(complexName) {
+    if (!corumDataCache.loaded) {
+        console.warn('CORUM data not loaded yet.');
+        return [];
+    }
+    const qLower = complexName.toLowerCase();
+    
+    // Check main complex list for matches
+    const results = corumDataCache.list.filter(c => 
+        c.complexName.toLowerCase().includes(qLower)
+    );
+    
+    return results;
+}
+
 
 /**
  * Fetches the new domain database (enriched, depleted, gene map).
@@ -3475,7 +3560,9 @@ window.handleAIQuery = async function() {
             fetchUmapData(),
             getDomainData(),
             fetchNeversPhylogenyData(),
-            fetchLiPhylogenyData()
+            fetchLiPhylogenyData(),
+            fetchCorumComplexes()
+
         ]);
         console.log('ciliAI.js: All data loaded (including new domain and phylogeny sources).');
 
@@ -3536,6 +3623,84 @@ window.handleAIQuery = async function() {
         console.error("CiliAI Query Error:", e);
     }
 };
+
+// ----------------------------------------------------------------------
+// INTEGRATION PATCH: Override handleAIQuery to include CORUM logic
+// ----------------------------------------------------------------------
+
+/**
+ * Patches the main query handler to include Corum lookups.
+ * NOTE: This function must be placed AFTER window.handleAIQuery is defined.
+ */
+function patchAIQueryHandler() {
+    const originalHandler = window.handleAIQuery;
+
+    window.handleAIQuery = async function(event) {
+        // 1. Ensure CORUM data is loaded alongside other promises
+        await fetchCorumComplexes();
+        
+        const aiQueryInput = document.getElementById('aiQueryInput');
+        const resultArea = document.getElementById('ai-result-area');
+        const query = aiQueryInput.value.trim();
+        const qLower = query.toLowerCase();
+
+        // --- CUSTOM COMPLEX PARSING (Replaces the crash-prone regex) ---
+        
+        // Pattern 1: Subunits/components/members OF <complex name>
+        if (qLower.includes('subunits of') || qLower.includes('components of') || qLower.includes('members of')) {
+            const complexMatch = qLower.match(/(?:subunits|components|members)\s+of\s+(.+)/i);
+            const complexName = complexMatch ? complexMatch[1].trim() : null;
+
+            if (complexName) {
+                const results = getSubunitsByComplexName(complexName);
+                if (results.length > 0) {
+                    let html = `<div class="result-card"><h3>Complex Subunits Matching "${complexName}"</h3><ul>`;
+                    results.forEach(entry => {
+                        html += `<li><b>${entry.complexName}</b> (${entry.subunits.length} subunits): 
+                                 <small>${entry.subunits.map(s => s.toUpperCase()).join(', ')}</small></li>`;
+                    });
+                    html += '</ul></div>';
+                    resultArea.innerHTML = html;
+                    resultArea.style.display = 'block';
+                    return; // Handled
+                }
+            }
+        }
+        
+        // Pattern 2: Complexes FOR <gene>
+        if (qLower.includes('complexes for') || qLower.includes('complexes of') || qLower.includes('complexes containing')) {
+            const geneMatch = qLower.match(/(?:complexes|subunits)\s+(?:for|of|containing)\s+([A-Za-z0-9\-]+)/i);
+            const gene = geneMatch ? geneMatch[1].toUpperCase() : null;
+
+            if (gene) {
+                const complexes = getComplexesByGene(gene);
+                if (complexes.length > 0) {
+                    let html = `<div class="result-card"><h3>🧬 CORUM Complexes containing ${gene}</h3><ul>`;
+                    complexes.forEach(c => {
+                        html += `<li><b>${c.complexName}</b> (Total subunits: ${c.subunits.length})</li>`;
+                    });
+                    html += '</ul></div>';
+                    resultArea.innerHTML = html;
+                    resultArea.style.display = 'block';
+                    return; // Handled
+                }
+            }
+        }
+
+        // --- END CUSTOM COMPLEX PARSING ---
+
+        // 2. If not a CORUM query, fall back to the original handling
+        return originalHandler.apply(this, arguments);
+    };
+}
+
+// --- Execute CORUM Integration Patch ---
+patchAIQueryHandler(); 
+
+// --- Initial Data Load (Must call fetchCorumComplexes for complex queries to work) ---
+(async function initializeCorum() {
+    await fetchCorumComplexes();
+})();
 
 // Helper for the comparison query (updated titles and threshold)
 async function displayEnrichedDomains() {
@@ -4012,11 +4177,9 @@ function formatListResult(title, geneList, citationHtml = '', speciesCode = '', 
     </div>`;
 }
 
-
 // ----------------------------------------------------------------------
 // NEW FUNCTIONALITY: CLIENT-SIDE CSV DOWNLOAD
 // ----------------------------------------------------------------------
-
 /**
  * Downloads the content of a target HTML table as a CSV file.
  * @param {string} tableId - The ID of the table element.
@@ -4325,7 +4488,6 @@ function setupAiQueryAutocomplete() {
     });
 }
 
-
 // --- Gene Analysis Engine & UI (largely unchanged) ---
 
 function setupAutocomplete() {
@@ -4533,9 +4695,6 @@ async function handleCiliAISelection(genes) {
         `;
     }
 }
-
-
-
 
 function analyzeGenesFromInput() {
     const geneInput = document.getElementById('geneInput');
@@ -5066,6 +5225,9 @@ function renderScreenSummaryHeatmap(genes, screenData) {
 
 
 // --- Global Exposure for Router ---
+window.fetchCorumComplexes = fetchCorumComplexes;
+window.getComplexesByGene = getComplexesByGene;
+window.getSubunitsByComplexName = getSubunitsByComplexName;
 window.displayCiliAIPage = displayCiliAIPage;
 window.setupCiliAIEventListeners = setupCiliAIEventListeners;
 window.handleAIQuery = handleAIQuery;
