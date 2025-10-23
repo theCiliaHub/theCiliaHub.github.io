@@ -12,6 +12,7 @@ let CILI_AI_DOMAIN_DB = null;     // For the new domain database
 let neversPhylogenyCache = null;  // For Nevers et al. 2017 data
 let liPhylogenyCache = null;      // For Li et al. 2014 data
 let allGeneSymbols = null; // Add this global variable alongside others
+let corumDataCache = null;
 
 // --- NEW: Reusable scRNA-seq Data Reference ---
 const SC_RNA_SEQ_REFERENCE_HTML = `
@@ -196,18 +197,18 @@ window.displayCiliAIPage = async function displayCiliAIPage() {
         contentArea.innerHTML = '<p>Error: Failed to load CiliAI interface.</p>';
         return;
     }
-
-  await Promise.all([
-        fetchCiliaData(),         // Your original gene data
-        fetchScreenData(),       // Your original screen data
-        fetchPhylogenyData(),     // Your original phylogeny data
-        fetchTissueData(),       // Your original tissue data
-        fetchCellxgeneData(),     // Your original cellxgene data
-        fetchUmapData(),           // Your original umap data
-        getDomainData(),           // --- NEW ---
-        fetchNeversPhylogenyData(), // --- NEW ---
-        fetchLiPhylogenyData()     // --- NEW ---
-    ]);
+     await Promise.all([
+    fetchCiliaData(),
+    fetchScreenData(),
+    fetchPhylogenyData(),
+    fetchTissueData(),
+    fetchCellxgeneData(),
+    fetchUmapData(),
+    getDomainData(),
+    fetchNeversPhylogenyData(),
+    fetchLiPhylogenyData(),
+    fetchCorumData()
+  ]);
     console.log('ciliAI.js: All data loaded (including new domain and phylogeny sources).');
     
     setTimeout(setupCiliAIEventListeners, 0);
@@ -222,8 +223,6 @@ function normalizeTerm(s) {
     // UPDATED: Now replaces periods, hyphens, underscores, and spaces with a single space.
     return String(s).toLowerCase().replace(/[._\-\s]+/g, ' ').trim();
 }
-
-
 
 // =============================================================================
 // REPLACEMENT: The definitive "Brain" of CiliAI, merging all features correctly.
@@ -249,7 +248,7 @@ function createIntentParser() {
             "Biliary Ciliopathy", "Chronic Obstructive Pulmonary Disease", "Ciliopathy", "Ciliopathy - Retinal dystrophy", "Golgipathies or Ciliopathy", "Hepatic Ciliopathy", "Male Infertility and Ciliopathy", "Male infertility", "Microcephaly and Chorioretinopathy Type 3", "Mucociliary Clearance Disorder", "Notch-mediated Ciliopathy", "Primary Endocardial Fibroelastosis", "Retinal Degeneration"
         ]
     };
-    const aliases = ["BBS", "Joubert", "NPHP", "MKS"];
+    const aliases = ["BBS", "BBSome", "Joubert", "NPHP", "MKS"];
     const allDiseases = [...Object.values(classifiedDiseases).flat(), ...aliases];
 
     const entityKeywords = [
@@ -260,11 +259,21 @@ function createIntentParser() {
             autocompleteTemplate: (term) => `Show me ${term} genes`
         },
         {
-            type: 'COMPLEX',
-            keywords: ['BBSome', 'IFT-A', 'IFT-B', 'Transition Zone Complex', 'MKS Complex', 'NPHP Complex'],
-            handler: async (term) => formatListResult(`Components of ${term}`, await getGenesByComplex(term)),
-            autocompleteTemplate: (term) => `Display components of ${term} complex`
-        },
+  type: 'COMPLEX',
+  keywords: [
+    'BBSome', 'IFT-A', 'IFT-B', 'Transition Zone Complex', 'MKS Complex', 'NPHP Complex',
+    'IFT A', 'IFT B', 'MKS', 'NPHP', 'TZ complex', 'Transition Zone', 'Bardet-Biedl complex',
+    'Intraflagellar Transport A', 'Intraflagellar Transport B'
+  ],
+  handler: async (term) => {
+    const results = await getGenesByComplex(term);
+    const displayTitle = term.toUpperCase().includes('IFT') 
+      ? `Components of ${term} Complex`
+      : `Components of ${term}`;
+    return formatListResult(displayTitle, results);
+  },
+  autocompleteTemplate: (term) => `Display components of ${term} complex`
+},
         {
             type: 'CILIOPATHY',
             keywords: [...new Set(allDiseases)],
@@ -312,11 +321,11 @@ function createIntentParser() {
             autocompleteTemplate: (term) => `Display ciliary genes in ${term}`
             },
             {
-            type: 'DOMAIN',
-            keywords: ['WD40', 'Leucine-rich repeat', 'IQ motif', 'calmodulin-binding', 'EF-hand', 'coiled-coil', 'CTS', 'ciliary targeting sequences', 'ciliary localization signals'],
-            handler: async (term) => formatListResult(`${term} domain-containing proteins`, await getGenesWithDomain(term)),
-            autocompleteTemplate: (term) => `Show ${term} domain containing proteins`
-        }
+          type: 'DOMAIN',
+          keywords: ['WD40', 'Leucine-rich repeat', 'IQ motif', 'calmodulin-binding', 'EF-hand', 'coiled-coil', 'CTS', 'ciliary targeting sequences', 'ciliary localization signals'],
+          handler: async (term) => formatListResult(`${term} domain-containing proteins`, await getGenesWithDomain(term)),
+          autocompleteTemplate: (term) => `Show ${term} domain containing proteins`
+            }
     ];
 
     return {
@@ -654,7 +663,22 @@ async function fetchLiPhylogenyData() {
         return null;
     }
 }
-
+        
+async function fetchCorumData() {
+  if (corumDataCache) return corumDataCache;
+  try {
+    const response = await fetch('https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/corum_humanComplexes.json');
+    if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+    corumDataCache = await response.json();
+    console.log('CORUM data loaded successfully:', corumDataCache.length, 'complexes');
+    return corumDataCache;
+  } catch (error) {
+    console.error("Failed to fetch CORUM data:", error);
+    corumDataCache = [];
+    return corumDataCache;
+  }
+}
+        
 /**
  * New function to describe CiliAI's capabilities, listing all available data types.
  */
@@ -3192,29 +3216,19 @@ setTimeout(updateIntentParser, 1000);
 // NEW: Helper function to get comprehensive details for "Tell me about..." queries
 // =============================================================================
 async function getComprehensiveDetails(term) {
-    const upperTerm = term.toUpperCase();
-    
-    // Check if it's a known complex (e.g., BBSome, IFT-A)
-    const isComplex = intentParser.getAllComplexes().some(c => c.toUpperCase() === upperTerm);
-    if (isComplex) {
-        // If it's a complex, retrieve the components list.
-        const results = await getGenesByComplex(term);
-        return formatListResult(`Components of ${term}`, results);
-    }
-
-    // Assume the term is a Gene Symbol and fetch data.
-    if (!ciliaHubDataCache) {
-        // Ensure all data caches are populated before searching for the gene.
-        await fetchCiliaData();
-    }
-    
-    // Find the gene's integrated data entry.
-    const geneData = ciliaHubDataCache.find(g => g.gene.toUpperCase() === upperTerm);
-    
-    // Use the existing detailed formatter to present the integrated data (including 
-    // orthologs, classification, and screen data).
-    return formatComprehensiveGeneDetails(upperTerm, geneData);
+  const upperTerm = term.toUpperCase();
+  const isComplex = intentParser.getAllComplexes().some(c => c.toUpperCase() === upperTerm);
+  if (isComplex) {
+    const results = await getGenesByComplex(term);
+    return formatListResult(`Components of ${term}`, results);
+  }
+  if (!ciliaHubDataCache) {
+    await fetchCiliaData();
+  }
+  const geneData = ciliaHubDataCache.find(g => g.gene.toUpperCase() === upperTerm);
+  return formatComprehensiveGeneDetails(upperTerm, geneData);
 }
+
 
 // --- Query Helper Functions ---
 
@@ -3272,30 +3286,30 @@ async function getGenesWithDomain(domainName) {
 }
 
 async function getGenesByComplex(complexName) {
-    await fetchCiliaData();
-    const complexRegex = new RegExp(complexName, 'i');
-    
-    const complexGenes = ciliaHubDataCache.filter(gene => 
-        gene.complex_names && gene.complex_names.some(cn => cn.match(complexRegex))
-    );
-    
-    if (complexGenes.length > 0) {
-        return complexGenes.map(gene => ({
-            gene: gene.gene,
-            description: `Complex: ${gene.complex_names?.join(', ') || 'Unknown'}`
-        }));
+  await fetchCiliaData();
+  await fetchCorumData();
+  const complexRegex = new RegExp(complexName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+  const ciliaHubMatches = ciliaHubDataCache.filter(gene => gene.complex_names && gene.complex_names.some(cn => cn.match(complexRegex)) );
+  let results = [];
+  if (ciliaHubMatches.length > 0) {
+    results = ciliaHubMatches.map(gene => ({ gene: gene.gene, description: `Complex: ${gene.complex_names?.join(', ') || 'Unknown'} (CiliaHub)` }));
+  }
+  if (results.length === 0 && corumDataCache) {
+    const corumMatches = corumDataCache.filter(complex => (complex.complexName && complex.complexName.match(complexRegex)) || (complex.synonyms && complex.synonyms.match(complexRegex)) );
+    if (corumMatches.length > 0) {
+      const subunitsField = corumMatches[0]['subunits(Gene name)'] || '';
+      const subunits = subunitsField.split(';').map(s => s.trim()).filter(Boolean);
+      results = subunits.map(sub => ({ gene: sub, description: `From CORUM: ${corumMatches[0].complexName}` }));
     }
-    
-    const relatedGenes = ciliaHubDataCache.filter(gene => 
-        gene.functional_summary && gene.functional_summary.toLowerCase().includes(complexName.toLowerCase())
-    ).map(gene => ({
-        gene: gene.gene,
-        description: gene.functional_summary?.substring(0, 100) + '...' || 'No description'
-    }));
-    
-    return relatedGenes;
+  }
+  if (results.length === 0) {
+    const fallbackMatches = ciliaHubDataCache.filter(gene => gene.functional_summary && gene.functional_summary.toLowerCase().includes(complexName.toLowerCase()) );
+    results = fallbackMatches.map(gene => ({ gene: gene.gene, description: gene.functional_summary?.substring(0, 100) + '...' || 'No description' }));
+  }
+  return results.sort((a, b) => a.gene.localeCompare(b.gene));
 }
 
+        
 async function getGenesByFunction(functionalCategory) {
     await fetchCiliaData();
     const categoryRegex = new RegExp(functionalCategory.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
@@ -3787,95 +3801,71 @@ function formatComparisonResult(title, tissue, list1, list2) {
 
 // --- UI and Formatting Helper Functions ---
 function formatComprehensiveGeneDetails(geneSymbol, geneData) {
-    if (!geneData) {
-        return `<div class="result-card"><h3>${geneSymbol}</h3><p class="status-not-found">Gene not found in the database.</p></div>`;
-    }
-    const { 
-        ensembl_id, functional_summary, description, localization, 
-        complex_names, complex_components, domain_descriptions, synonym, 
-        ciliopathy, 
-        // --- NEW FIELDS INTEGRATED ---
-        ciliopathy_classification, 
-        ortholog_mouse, ortholog_c_elegans, ortholog_zebrafish, ortholog_drosophila, 
-        overexpression_effects, lof_effects, percent_ciliated_cells_effects,
-        screens_from_separate_file 
-        // --- END NEW FIELDS ---
-    } = geneData;
-
-    // Helper to render the screen data table (reused logic from getGeneCiliaEffects)
-    // NOTE: This helper (renderDetailedScreenTable) must be defined elsewhere in your code.
-    const renderDetailedScreenTable = (screenFindings) => {
-        if (!screenFindings || screenFindings.length === 0) {
-            return `<p class="status-not-found">No detailed quantitative screen data available.</p>`;
-        }
-        const tableRows = screenFindings.map(s => `
-            <tr>
-                <td>${s.dataset || 'N/A'}</td>
-                <td>${(s.mean_percent_ciliated !== undefined) ? s.mean_percent_ciliated.toFixed(2) : 'N/A'}</td>
-                <td>${(s.z_score !== undefined) ? s.z_score.toFixed(2) : 'N/A'}</td>
-                <td>${s.classification || s.result || 'N/A'}</td>
-                <td><a href="${s.paper_link}" target="_blank">Link</a></td>
-            </tr>
-        `).join('');
-
-        return `
-            <table class="ciliopathy-table">
-                <thead>
-                    <tr>
-                        <th class="sortable">Dataset</th>
-                        <th>Mean % Ciliated</th>
-                        <th>Z-Score</th>
-                        <th>Classification</th>
-                        <th>Reference</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${tableRows}
-                </tbody>
-            </table>
-        `;
-    };
-
-
+  if (!geneData) {
     return `
-        <div class="result-card">
-            <h3>${geneSymbol} Comprehensive Details</h3>
-            <table class="gene-detail-table">
-                <tr><th>Ensembl ID</th><td>${ensembl_id || 'N/A'}</td></tr>
-                <tr><th>Ciliopathy Classification</th><td><strong>${ciliopathy_classification || 'N/A'}</strong></td></tr>
-                <tr><th>Ciliopathy/Disease</th><td>${ciliopathy.join(', ') || 'N/A'}</td></tr>
-                <tr><th>Functional Summary</th><td>${functional_summary || description || 'N/A'}</td></tr>
-                <tr><th>Localization</th><td>${localization.join(', ') || 'N/A'}</td></tr>
-                <tr><th>Primary Synonym</th><td>${synonym || 'N/A'}</td></tr>
-                <tr><th>Complex Name(s)</th><td>${complex_names.join(', ') || 'N/A'}</td></tr>
-                <tr><th>Domain Descriptions</th><td>${domain_descriptions.join(', ') || 'N/A'}</td></tr>
-            </table>
 
-            <h4>Orthologs & Conservation</h4>
-            <table class="gene-detail-table">
-                <tr><th>Mouse</th><td>${ortholog_mouse || 'N/A'}</td></tr>
-                <tr><th>C. elegans</th><td>${ortholog_c_elegans || 'N/A'}</td></tr>
-                <tr><th>Zebrafish</th><td>${ortholog_zebrafish || 'N/A'}</td></tr>
-                <tr><th>Drosophila</th><td>${ortholog_drosophila || 'N/A'}</td></tr>
-            </table>
+### ${geneSymbol}
 
-            <h4>Ciliary Phenotypic Effects (Curated Summary)</h4>
-            <table class="gene-detail-table">
-                <tr><th>LOF Effects</th><td>${lof_effects || 'Not Reported'}</td></tr>
-                <tr><th>Overexpression Effects</th><td>${overexpression_effects || 'Not Reported'}</td></tr>
-                <tr><th>% Ciliated Cells Effect</th><td>${percent_ciliated_cells_effects || 'Not Reported'}</td></tr>
-            </table>
-            
-            <h4>Genome-Wide Screen Results</h4>
-            ${renderDetailedScreenTable(screens_from_separate_file)}
-            
-            <p class="ai-suggestion">
-                <a href="#" class="ai-action" data-action="expression-visualize" data-gene="${geneSymbol}">📊 View tissue expression heatmap</a>
-            </p>
-        </div>
-    `;
+Gene not found in the database.
+
+`;
+  }
+  const { ensembl_id, functional_summary, description, localization, complex_names, complex_components, domain_descriptions, synonym, ciliopathy, ciliopathy_classification, ortholog_mouse, ortholog_c_elegans, ortholog_zebrafish, ortholog_drosophila, ortholog_xenopus, overexpression_effects, lof_effects, percent_ciliated_cells_effects, screens_from_separate_file } = geneData;
+  const renderDetailedScreenTable = (screenFindings) => {
+    if (!screenFindings || screenFindings.length === 0) {
+      return `
+
+No detailed quantitative screen data available.
+
+`;
+    }
+    const tableRows = screenFindings.map(s => ` ${s.dataset || 'N/A'} ${(s.mean_percent_ciliated !== undefined) ? s.mean_percent_ciliated.toFixed(2) : 'N/A'} ${(s.z_score !== undefined) ? s.z_score.toFixed(2) : 'N/A'} ${s.classification || s.result || 'N/A'} Link `).join('');
+    return ` ${tableRows}
+
+Dataset
+Mean % Ciliated
+Z-Score
+Classification
+Reference
+
+ `;
+  };
+  return `
+
+### ${geneSymbol} Comprehensive Details
+
+| Ensembl ID | ${ensembl_id || 'N/A'} |
+| Ciliopathy Classification | ${ciliopathy_classification || 'N/A'} |
+| Ciliopathy/Disease | ${ciliopathy.join(', ') || 'N/A'} |
+| Functional Summary | ${functional_summary || description || 'N/A'} |
+| Localization | ${localization.join(', ') || 'N/A'} |
+| Primary Synonym | ${synonym || 'N/A'} |
+| Complex Name(s) | ${complex_names.join(', ') || 'N/A'} |
+| Domain Descriptions | ${domain_descriptions.join(', ') || 'N/A'} |
+
+#### Orthologs & Conservation
+
+| Mouse | ${ortholog_mouse || 'N/A'} |
+| C. elegans | ${ortholog_c_elegans || 'N/A'} |
+| Zebrafish | ${ortholog_zebrafish || 'N/A'} |
+| Drosophila | ${ortholog_drosophila || 'N/A'} |
+| Xenopus | ${ortholog_xenopus || 'N/A'} |
+
+#### Ciliary Phenotypic Effects (Curated Summary)
+
+| LOF Effects | ${lof_effects || 'Not Reported'} |
+| Overexpression Effects | ${overexpression_effects || 'Not Reported'} |
+| % Ciliated Cells Effect | ${percent_ciliated_cells_effects || 'Not Reported'} |
+
+#### Genome-Wide Screen Results
+
+ ${renderDetailedScreenTable(screens_from_separate_file)}
+
+ View tissue expression heatmap
+
+ `;
 }
-
+        
 function formatGeneDetail(geneData, geneSymbol, detailTitle, detailContent) {
     if (!geneData) {
         return `<div class="result-card"><h3>${geneSymbol}</h3><p class="status-not-found">Gene not found in the database.</p></div>`;
@@ -3945,77 +3935,54 @@ function formatGeneDetail(geneData, geneSymbol, detailTitle, detailContent) {
 // --- FINAL UPDATED formatListResult (Accepts 5 arguments) ---
 
 function formatListResult(title, geneList, citationHtml = '', speciesCode = '', targetKey = null) {
-    if (!geneList || geneList.length === 0) {
-        // ... (unchanged)
-        return `<div class="result-card"><h3>${title}</h3><p class="status-not-found">No matching genes found.</p></div>`;
-    }
-
-    const displayedGenes = geneList.slice(0, 100);
-    const showOrthologColumn = targetKey && targetKey !== null;
-    
-    // Determine species name for the ortholog column header
-    const orthologSpeciesName = speciesCode.replace(/(\w\.\w+)\s*/, '').replace('drosophila', 'Fly').replace('elegans', 'C. elegans').trim() || 'Ortholog';
-
-    // Determine the most accurate label for the Human Gene Column
-    let humanColumnLabel = "Human Gene";
-    if (title.includes("Genes Conserved")) {
-        humanColumnLabel = "Human Disease Gene"; // Best label for conserved disease lists
-    }
-    
-    // --- Build Table Rows ---
-    const tableRows = displayedGenes.map(g => {
-        let cells = `<td><strong>${g.gene}</strong></td>`;
-        
-        if (showOrthologColumn) {
-            // Access the ortholog name using the dynamic key (g[targetKey])
-            const orthologName = g[targetKey] || 'N/A';
-            cells += `<td>${orthologName}</td>`;
-        }
-        
-        cells += `<td>${g.description.substring(0, 100)}${g.description.length > 100 ? '...' : ''}</td>`;
-        return `<tr>${cells}</tr>`;
-    }).join('');
-
-    // --- Build Table Header ---
-    let tableHeader = `
-    <thead>
-        <tr>
-            <th class="sortable">${humanColumnLabel}</th>`;
-    
-    if (showOrthologColumn) {
-        tableHeader += `<th class="sortable">${orthologSpeciesName} Ortholog</th>`;
-    }
-    
-    tableHeader += `
-            <th>Disease/Conservation Info</th>
-        </tr>
-    </thead>`;
-
-    // --- Final HTML Structure ---
-    const tableHtml = `
-    <table class="ciliopathy-table" id="download-table-content">
-        ${tableHeader}
-        <tbody>${tableRows}</tbody>
-    </table>
-    ${geneList.length > 100 ? `<p><a href="https://theciliahub.github.io/" target="_blank">View full list (${geneList.length} genes) in CiliaHub</a></p>` : ''}`;
-    
-    const titleHtml = `<h3>${title} (${geneList.length} found)</h3>`;
-    const downloadButtonHtml = `<button class="download-button" onclick="downloadTable('download-table-content', '${title.replace(/[^a-z0-9]/gi, '_')}')">Download CSV</button>`;
-
-
+  if (!geneList || geneList.length === 0) {
     return `
-    <div class="result-card">
-        ${titleHtml}
-        ${tableHtml}
-        ${downloadButtonHtml}
-        ${citationHtml}
-    </div>`;
+
+### ${title}
+
+No matching genes found.
+
+`;
+  }
+  const displayedGenes = geneList.slice(0, 100);
+  const showOrthologColumn = targetKey && targetKey !== null;
+  const orthologSpeciesName = speciesCode.replace(/(\w\.\w+)\s*/, '').replace('drosophila', 'Fly').replace('elegans', 'C. elegans').trim() || 'Ortholog';
+  let humanColumnLabel = "Human Gene";
+  if (title.includes("Genes Conserved")) {
+    humanColumnLabel = "Human Disease Gene";
+  }
+  const tableRows = displayedGenes.map(g => {
+    let cells = ` ${g.gene}`;
+    if (showOrthologColumn) {
+      const orthologName = g[targetKey] || 'N/A';
+      cells += `${orthologName}`;
+    }
+    cells += `${g.description.substring(0, 100)}${g.description.length > 100 ? '...' : ''}`;
+    return `${cells}`;
+  }).join('');
+  let tableHeader = ` ${humanColumnLabel}`;
+  if (showOrthologColumn) {
+    tableHeader += `${orthologSpeciesName} Ortholog`;
+  }
+  tableHeader += ` Disease/Conservation Info `;
+  const tableHtml = ` ${tableHeader} ${tableRows} ${geneList.length > 100 ? `
+
+View full list (${geneList.length} genes) in CiliaHub
+
+` : ''}`;
+  const titleHtml = `
+
+### ${title} (${geneList.length} found)
+
+`;
+  const downloadButtonHtml = ``;
+  return `
+
+ ${titleHtml} ${tableHtml} ${downloadButtonHtml} ${citationHtml}
+
+`;
 }
-
-
-// ----------------------------------------------------------------------
-// NEW FUNCTIONALITY: CLIENT-SIDE CSV DOWNLOAD
-// ----------------------------------------------------------------------
+    
 
 /**
  * Downloads the content of a target HTML table as a CSV file.
