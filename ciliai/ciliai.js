@@ -456,21 +456,48 @@ async function fetchScreenData() {
         return screenDataCache;
     }
 }
-/**
- * Fetch CORUM complexes and cache in memory.
- * Each entry: { complex_id, complex_name, subunits: [ { gene_name, uniprot_id } ] }
- */
+// ======================================================
+// CORUM Integration for CiliaAI
+// ======================================================
+
+// --- 1. Safe global cache initialization ---
+window.corumDataCache = window.corumDataCache || {
+  list: [],
+  byGene: {},
+  byNameLower: {},
+  loaded: false
+};
+const corumDataCache = window.corumDataCache;
+
+// --- 2. Fetch and parse CORUM complexes ---
 async function fetchCorumComplexes() {
-    const url = "https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/corum_humanComplexes.json";
-    try {
-        const response = await fetch(url);
-        if (!response.ok) throw new Error(`Failed to fetch CORUM data: ${response.status}`);
-        corumDataCache = await response.json();
-        console.log(`CORUM data loaded (${corumDataCache.length} complexes).`);
-    } catch (err) {
-        console.error("Error loading CORUM data:", err);
-        corumDataCache = [];
-    }
+  if (corumDataCache.loaded) return corumDataCache.list;
+  try {
+    console.log('Fetching CORUM complexes...');
+    const response = await fetch('https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/data/corum_humanComplexes.json');
+    const data = await response.json();
+
+    // Normalize CORUM data
+    data.forEach(entry => {
+      if (!entry || !entry.complexName || !entry.subunits) return;
+      const complexNameLower = entry.complexName.toLowerCase();
+      corumDataCache.byNameLower[complexNameLower] = entry;
+
+      entry.subunits.forEach(gene => {
+        const g = gene.toUpperCase();
+        if (!corumDataCache.byGene[g]) corumDataCache.byGene[g] = [];
+        corumDataCache.byGene[g].push(entry);
+      });
+    });
+
+    corumDataCache.list = data;
+    corumDataCache.loaded = true;
+    console.log(`Loaded ${data.length} CORUM complexes.`);
+    return data;
+  } catch (err) {
+    console.error('Failed to fetch CORUM data:', err);
+    return [];
+  }
 }
 
 async function fetchPhylogenyData() {
@@ -3462,31 +3489,74 @@ async function getGenesWithDomain(domainName) {
     return results;
 }
 
-async function getGenesByComplex(complexName) {
-    await fetchCiliaData();
-    const complexRegex = new RegExp(complexName, 'i');
-    
-    const complexGenes = ciliaHubDataCache.filter(gene => 
-        gene.complex_names && gene.complex_names.some(cn => cn.match(complexRegex))
-    );
-    
-    if (complexGenes.length > 0) {
-        return complexGenes.map(gene => ({
-            gene: gene.gene,
-            description: `Complex: ${gene.complex_names?.join(', ') || 'Unknown'}`
-        }));
-    }
-    
-    const relatedGenes = ciliaHubDataCache.filter(gene => 
-        gene.functional_summary && gene.functional_summary.toLowerCase().includes(complexName.toLowerCase())
-    ).map(gene => ({
-        gene: gene.gene,
-        description: gene.functional_summary?.substring(0, 100) + '...' || 'No description'
-    }));
-    
-    return relatedGenes;
+// --- 3. Helper: get complexes containing a gene ---
+async function getGenesByComplex(gene) {
+  if (!gene) return [];
+  if (!corumDataCache.loaded) await fetchCorumComplexes();
+  const upper = gene.toUpperCase();
+  return corumDataCache.byGene[upper] || [];
 }
 
+// --- 4. IntentParser: Recognize CORUM queries ---
+window.intentParser = window.intentParser || {};
+intentParser.parse = function (query) {
+  const qLower = query.toLowerCase().trim();
+
+  // --- Match "show me complexes for IFT88" ---
+  let match = qLower.match(/(?:show|list|get).*(?:complex|complexes).*(?:for|of|containing)\s+([A-Za-z0-9\-]+)/i);
+  if (match) {
+    const gene = match[1].toUpperCase();
+    return {
+      intent: 'showComplexesForGene',
+      entity: gene,
+      handler: async function () {
+        const complexes = await getGenesByComplex(gene);
+        if (!complexes.length) {
+          return `<p>No CORUM complexes found for <b>${gene}</b>.</p>`;
+        }
+        let html = `<h3>🧬 CORUM Complexes containing ${gene}</h3><ul>`;
+        for (const c of complexes) {
+          html += `<li><b>${c.complexName}</b> — ${c.subunits.length} subunits<br>
+            <small>${c.subunits.join(', ')}</small></li>`;
+        }
+        html += '</ul>';
+        return html;
+      }
+    };
+  }
+
+  // --- Match "subunits of the BBSome" ---
+  match = qLower.match(/subunits\s+(?:of|in)\s+([A-Za-z0-9\-\s]+)/i);
+  if (match) {
+    const complexName = match[1].trim().toLowerCase();
+    return {
+      intent: 'showSubunitsOfComplex',
+      entity: complexName,
+      handler: async function () {
+        if (!corumDataCache.loaded) await fetchCorumComplexes();
+        const entry = corumDataCache.byNameLower[complexName];
+        if (!entry) {
+          return `<p>No CORUM entry found for complex <b>${complexName}</b>.</p>`;
+        }
+        return `<h3>🔗 Subunits of ${entry.complexName}</h3>
+          <ul>${entry.subunits.map(s => `<li>${s}</li>`).join('')}</ul>`;
+      }
+    };
+  }
+
+  // Fallback: nothing matched
+  return null;
+};
+
+// --- 5. Auto-load CORUM data on startup ---
+(async () => {
+  try {
+    await fetchCorumComplexes();
+    console.log('CORUM data ready for intentParser.');
+  } catch (err) {
+    console.warn('CORUM preload failed:', err);
+  }
+})();
 async function getGenesByFunction(functionalCategory) {
     await fetchCiliaData();
     const categoryRegex = new RegExp(functionalCategory.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
