@@ -3396,10 +3396,6 @@ async function getOrthologsInOrganism(organism) {
 
 
 // =============================================================================
-// UPDATE INTENT PARSER WITH ADDITIONAL KEYWORDS (CORRECTED)
-// =============================================================================
-
-// =============================================================================
 // UPDATE INTENT PARSER WITH ADDITIONAL KEYWORDS (CORRECTED & SYNTAX-SAFE)
 // =============================================================================
 
@@ -3410,7 +3406,7 @@ function updateIntentParser() {
         return; 
     }
     
-    // --- 1. Add new keywords ---
+    // --- 1. Update Keyword Lists (Retained as planned) ---
     const functionalCategory = window.intentParser.getKnownKeywords().find(e => e.type === 'FUNCTIONAL_CATEGORY');
     if (functionalCategory) {
         functionalCategory.keywords.push(
@@ -3428,53 +3424,62 @@ function updateIntentParser() {
     
     console.log('Intent parser updated with new question keywords.');
 
-    // --- 2. Correct and Override the Core Parsing Logic ---
-    // The previous implementation used the incorrect variable 'qLower' and contained a faulty regex.
-    const oldParse = window.intentParser.parse; // Safely hold onto the original implementation for fallback
+    // --- 2. Define Safe String Patterns ---
+    const matchAction = ['show', 'list', 'display', 'components', 'subunits', 'members'];
+    const matchComplexKeywords = ['complex', 'subunit', 'component', 'members', 'for', 'of'];
+
+    // --- 3. Override/Define the Core Parsing Logic with Safely ---
+    const oldParse = window.intentParser.parse; 
 
     window.intentParser.parse = function(query) {
-        const q = query.toLowerCase(); // Use 'q' as defined earlier
+        const q = query.toLowerCase(); 
+        const qWords = q.split(/\s+/).filter(Boolean);
 
-        // --- Execute previous complex parsing logic if needed ---
-        // This relies on the core 'createIntentParser' regex being correct.
-        let result = oldParse(query); 
-        if (result) return result; 
-
-        // --- New Complex-related queries (e.g. "show subunits of IFT-A") ---
-        if (q.match(/(complex|subunit|components|members)/)) {
-            // FIX: Replaced the internal regex, ensuring the hyphen is safely included.
-            const match = q.match(/(?:show|list|display)\s+(?:complexes|subunits|components)\s+(?:for|of)?\s*([a-z0-9\-\s]+)/i);
+        // --- A. Complex-related queries (Keyword-based check) ---
+        // Checks if the query contains both an action and a complex entity keyword, 
+        // OR begins with an action phrase.
+        const isComplexQuery = qWords.some(w => matchAction.includes(w)) && 
+                               qWords.some(w => matchComplexKeywords.includes(w));
+        
+        if (isComplexQuery) {
+            // New safer method to extract the entity name without the crashing regex
+            const complexNames = window.intentParser.getAllComplexes();
             
-            if (match) {
-                const term = match[1].trim();
-                return {
-                    intent: "complex_query",
-                    entity: term,
-                    handler: async function(entity) {
-                        const results = getGenesByComplex(entity);
-                        return formatComplexQueryResults(results, entity); 
-                    }
-                };
+            // Try to match the largest known complex name first
+            for (const knownComplex of complexNames.sort((a, b) => b.length - a.length)) {
+                if (q.includes(knownComplex.toLowerCase())) {
+                    const term = knownComplex;
+                    return {
+                        intent: "complex_query_safe",
+                        entity: term,
+                        handler: async function(entity) {
+                            // Assuming getGenesByComplex and formatComplexQueryResults exist globally
+                            const results = getGenesByComplex(entity);
+                            return formatComplexQueryResults(results, entity); 
+                        }
+                    };
+                }
             }
         }
 
-        // --- New Gene-based queries (e.g. "show me complexes for IFT88") ---
-        // FIX: Renamed 'matchGene' to 'match' for consistency with typical regex blocks, 
-        // and fixed the variable access error inside the handler block.
-        const match = q.match(/(?:complex(?:es)?\s+for|subunits?\s+of)\s+([a-z0-9\-]+)/i);
-        if (match) {
-            const gene = match[1].toUpperCase();
+        // --- B. Gene-based Complex queries (e.g. "show me complexes for IFT88") ---
+        // This regex still works if defined correctly elsewhere, but we'll use a safer one here too.
+        // The original code relies on this simpler regex pattern which is not the one causing the SyntaxError:
+        const matchGene = q.match(/(?:complex(?:es)?\s+for|subunits?\s+of)\s+([a-z0-9\-]+)/i);
+
+        if (matchGene) {
+            const gene = matchGene[1].toUpperCase();
             return {
                 intent: "complex_for_gene",
                 entity: gene,
                 handler: async function(entity) {
+                    // This uses existing functions which should be safe
                     const complexes = getCorumComplexesForGene(entity);
                     if (complexes.length === 0)
                         return `<div class="result-card"><h3>${entity}</h3><p>No CORUM complexes found for this gene.</p></div>`;
                     
                     let html = `<div class="result-card"><h3>Complexes containing ${entity}</h3><ul>`;
                     complexes.forEach(c => {
-                        // Assuming the c.subunits structure is correct for CORUM data
                         const members = c.subunits.map(s => s.gene_name).join(", ");
                         html += `<li><strong>${c.complexName}</strong>: ${members}</li>`;
                     });
@@ -3484,8 +3489,8 @@ function updateIntentParser() {
             };
         }
 
-        // Final fallback: no match found
-        return null; 
+        // Final fallback to the default entity parser logic (Ciliopathy, Organism, etc.)
+        return oldParse(query); 
     };
 }
 
