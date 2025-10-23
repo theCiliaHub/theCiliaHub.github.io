@@ -3396,13 +3396,22 @@ async function getOrthologsInOrganism(organism) {
 
 
 // =============================================================================
-// UPDATE INTENT PARSER WITH ADDITIONAL KEYWORDS
+// UPDATE INTENT PARSER WITH ADDITIONAL KEYWORDS (CORRECTED)
 // =============================================================================
 
-// Update the intent parser to include the new question types
+// =============================================================================
+// UPDATE INTENT PARSER WITH ADDITIONAL KEYWORDS (CORRECTED & SYNTAX-SAFE)
+// =============================================================================
+
 function updateIntentParser() {
-    // Add new keywords to existing entity types
-    const functionalCategory = intentParser.getKnownKeywords().find(e => e.type === 'FUNCTIONAL_CATEGORY');
+    // Check for correct initialization. Assuming intentional global access via window.
+    if (typeof window.intentParser === "undefined" || !window.intentParser.getKnownKeywords) {
+        console.error("CiliAI IntentParser is not yet initialized or lacks necessary methods.");
+        return; 
+    }
+    
+    // --- 1. Add new keywords ---
+    const functionalCategory = window.intentParser.getKnownKeywords().find(e => e.type === 'FUNCTIONAL_CATEGORY');
     if (functionalCategory) {
         functionalCategory.keywords.push(
             'cilium assembly', 'motility', 'trafficking', 'membrane composition',
@@ -3410,27 +3419,32 @@ function updateIntentParser() {
         );
     }
     
-    // Add new complex types
-    const complexType = intentParser.getKnownKeywords().find(e => e.type === 'COMPLEX');
+    const complexType = window.intentParser.getKnownKeywords().find(e => e.type === 'COMPLEX');
     if (complexType) {
         complexType.keywords.push(
             'IFT-A', 'IFT-B', 'MKS Complex', 'NPHP Complex', 'Transition Zone Complex'
         );
     }
     
-    console.log('Intent parser updated with new question keywords');
+    console.log('Intent parser updated with new question keywords.');
 
-if (typeof intentParser === "undefined") {
-    window.intentParser = {};
-}
+    // --- 2. Correct and Override the Core Parsing Logic ---
+    // The previous implementation used the incorrect variable 'qLower' and contained a faulty regex.
+    const oldParse = window.intentParser.parse; // Safely hold onto the original implementation for fallback
 
-if (!intentParser.parse) {
-    intentParser.parse = function(query) {
-        const q = query.toLowerCase();
+    window.intentParser.parse = function(query) {
+        const q = query.toLowerCase(); // Use 'q' as defined earlier
 
-        // --- Complex-related queries ---
+        // --- Execute previous complex parsing logic if needed ---
+        // This relies on the core 'createIntentParser' regex being correct.
+        let result = oldParse(query); 
+        if (result) return result; 
+
+        // --- New Complex-related queries (e.g. "show subunits of IFT-A") ---
         if (q.match(/(complex|subunit|components|members)/)) {
-            const match = qLower.match(/(?:show|list|display)\s+(?:complexes|subunits|components)\s+(?:for|of)?\s*([a-z0-9\- ]+)/i);
+            // FIX: Replaced the internal regex, ensuring the hyphen is safely included.
+            const match = q.match(/(?:show|list|display)\s+(?:complexes|subunits|components)\s+(?:for|of)?\s*([a-z0-9\-\s]+)/i);
+            
             if (match) {
                 const term = match[1].trim();
                 return {
@@ -3438,16 +3452,18 @@ if (!intentParser.parse) {
                     entity: term,
                     handler: async function(entity) {
                         const results = getGenesByComplex(entity);
-                        return formatComplexQueryResults(results, entity);
+                        return formatComplexQueryResults(results, entity); 
                     }
                 };
             }
         }
 
-        // --- Gene-based queries (e.g. "show me complexes for IFT88") ---
-        const matchGene = q.match(/(?:complex(?:es)?\s+for|subunits?\s+of)\s+([a-z0-9\-]+)/i);
-        if (matchGene) {
-            const gene = matchGene[1].toUpperCase();
+        // --- New Gene-based queries (e.g. "show me complexes for IFT88") ---
+        // FIX: Renamed 'matchGene' to 'match' for consistency with typical regex blocks, 
+        // and fixed the variable access error inside the handler block.
+        const match = q.match(/(?:complex(?:es)?\s+for|subunits?\s+of)\s+([a-z0-9\-]+)/i);
+        if (match) {
+            const gene = match[1].toUpperCase();
             return {
                 intent: "complex_for_gene",
                 entity: gene,
@@ -3458,8 +3474,9 @@ if (!intentParser.parse) {
                     
                     let html = `<div class="result-card"><h3>Complexes containing ${entity}</h3><ul>`;
                     complexes.forEach(c => {
+                        // Assuming the c.subunits structure is correct for CORUM data
                         const members = c.subunits.map(s => s.gene_name).join(", ");
-                        html += `<li><strong>${c.complex_name}</strong>: ${members}</li>`;
+                        html += `<li><strong>${c.complexName}</strong>: ${members}</li>`;
                     });
                     html += "</ul></div>";
                     return html;
@@ -3467,10 +3484,9 @@ if (!intentParser.parse) {
             };
         }
 
-        return null; // fallback if nothing matches
+        // Final fallback: no match found
+        return null; 
     };
-}
-    
 }
 
 // Call this after setting up the intent parser
