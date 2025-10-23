@@ -12,6 +12,11 @@ let CILI_AI_DOMAIN_DB = null;     // For the new domain database
 let neversPhylogenyCache = null;  // For Nevers et al. 2017 data
 let liPhylogenyCache = null;      // For Li et al. 2014 data
 let allGeneSymbols = null; // Add this global variable alongside others
+let corumDataCache = null; // <-- CORUM cache
+// ============================================================================
+// CORUM INTEGRATION MODULE
+// ============================================================================
+let corumDataCache = [];
 
 // --- NEW: Reusable scRNA-seq Data Reference ---
 const SC_RNA_SEQ_REFERENCE_HTML = `
@@ -198,15 +203,16 @@ window.displayCiliAIPage = async function displayCiliAIPage() {
     }
 
   await Promise.all([
-        fetchCiliaData(),         // Your original gene data
-        fetchScreenData(),       // Your original screen data
-        fetchPhylogenyData(),     // Your original phylogeny data
-        fetchTissueData(),       // Your original tissue data
-        fetchCellxgeneData(),     // Your original cellxgene data
-        fetchUmapData(),           // Your original umap data
+        fetchCiliaData(),         // Original gene data
+        fetchScreenData(),       // Original screen data
+        fetchPhylogenyData(),     // Original phylogeny data
+        fetchTissueData(),       // Original tissue data
+        fetchCellxgeneData(),     // Original cellxgene data
+        fetchUmapData(),           // Original umap data
         getDomainData(),           // --- NEW ---
         fetchNeversPhylogenyData(), // --- NEW ---
-        fetchLiPhylogenyData()     // --- NEW ---
+        fetchLiPhylogenyData(),// --- NEW ---
+        fetchCorumComplexes() // --- NEW ---
     ]);
     console.log('ciliAI.js: All data loaded (including new domain and phylogeny sources).');
     
@@ -448,6 +454,22 @@ async function fetchScreenData() {
         console.error('Error fetching screen data:', error);
         screenDataCache = {};
         return screenDataCache;
+    }
+}
+/**
+ * Fetch CORUM complexes and cache in memory.
+ * Each entry: { complex_id, complex_name, subunits: [ { gene_name, uniprot_id } ] }
+ */
+async function fetchCorumComplexes() {
+    const url = "https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/corum_humanComplexes.json";
+    try {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(`Failed to fetch CORUM data: ${response.status}`);
+        corumDataCache = await response.json();
+        console.log(`CORUM data loaded (${corumDataCache.length} complexes).`);
+    } catch (err) {
+        console.error("Error loading CORUM data:", err);
+        corumDataCache = [];
     }
 }
 
@@ -829,6 +851,116 @@ async function displayUmapGeneExpression(geneSymbol) {
     
     Plotly.newPlot(plotDivId, plotData, layout, { responsive: true, displayModeBar: false });
     return "";
+}
+
+
+/**
+ * Returns all CORUM complexes containing a given gene symbol.
+ * Example: getCorumComplexesForGene('IFT88')
+ */
+function getCorumComplexesForGene(geneSymbol) {
+    if (!geneSymbol || corumDataCache.length === 0) return [];
+    const geneUpper = geneSymbol.toUpperCase();
+    return corumDataCache.filter(c => 
+        c.subunits?.some(sub => sub.gene_name.toUpperCase() === geneUpper)
+    );
+}
+
+/**
+ * Returns subunit list for a given complex name (partial matches allowed)
+ * Example: getGenesByComplex('IFT-A complex')
+ */
+function getGenesByComplex(complexName) {
+    const nameLower = complexName.toLowerCase();
+    let results = [];
+
+    // --- 1. CiliaHub annotations (if available)
+    if (typeof ciliaHubDataCache !== "undefined" && Array.isArray(ciliaHubDataCache)) {
+        ciliaHubDataCache.forEach(g => {
+            if (g.complex_names && g.complex_names.some(n => n.toLowerCase().includes(nameLower))) {
+                results.push({
+                    source: "CiliaHub",
+                    complex_name: g.complex_names.find(n => n.toLowerCase().includes(nameLower)),
+                    gene: g.gene,
+                    description: g.description || null
+                });
+            }
+        });
+    }
+
+    // --- 2. CORUM complexes (broad search)
+    if (corumDataCache.length > 0) {
+        corumDataCache.forEach(c => {
+            if (c.complex_name.toLowerCase().includes(nameLower)) {
+                c.subunits.forEach(sub => {
+                    results.push({
+                        source: "CORUM",
+                        complex_name: c.complex_name,
+                        gene: sub.gene_name,
+                        uniprot_id: sub.uniprot_id
+                    });
+                });
+            }
+        });
+    }
+
+    // Remove duplicates
+    results = results.filter((v, i, a) =>
+        a.findIndex(t => t.gene === v.gene && t.complex_name === v.complex_name) === i
+    );
+    return results;
+}
+
+/**
+ * Format results for complex-related queries
+ */
+function formatComplexQueryResults(results, complexName) {
+    if (results.length === 0)
+        return `<div class="result-card"><h3>${complexName}</h3><p class="status-not-found">No complexes or subunits found.</p></div>`;
+
+    const ciliaHub = results.filter(r => r.source === "CiliaHub");
+    const corum = results.filter(r => r.source === "CORUM");
+
+    let html = `<div class="result-card"><h3>Complex Query: ${complexName}</h3>`;
+
+    if (ciliaHub.length > 0) {
+        html += `<h4>🧬 CiliaHub Matches (${ciliaHub.length})</h4><ul>`;
+        ciliaHub.forEach(r => html += `<li><strong>${r.gene}</strong> – ${r.complex_name}</li>`);
+        html += `</ul>`;
+    }
+
+    if (corum.length > 0) {
+        html += `<h4>🧫 CORUM Matches (${corum.length})</h4><ul>`;
+        corum.forEach(r => html += `<li><strong>${r.gene}</strong> – ${r.complex_name}</li>`);
+        html += `</ul>`;
+    }
+
+    html += "</div>";
+    return html;
+}
+
+
+
+// --- Helper: search CORUM by gene ---
+function findCorumComplexesForGene(geneSymbol) {
+if (!corumDataCache) return [];
+const g = geneSymbol.toUpperCase();
+return corumDataCache.byGene[g] || [];
+}
+
+
+// --- Helper: find CORUM complexes by (partial) name/alias ---
+function findCorumComplexesByName(queryName) {
+if (!corumDataCache) return [];
+const q = (queryName || '').toLowerCase().trim();
+const exact = corumDataCache.byNameLower[q];
+const results = new Set();
+if (exact) exact.forEach(c => results.add(c));
+// fuzzy: check substring matches on complex_name
+corumDataCache.list.forEach(c => {
+if ((c.complex_name || '').toLowerCase().includes(q)) results.add(c);
+});
+return Array.from(results);
 }
 
 /**
@@ -3182,10 +3314,69 @@ function updateIntentParser() {
     }
     
     console.log('Intent parser updated with new question keywords');
+
+if (typeof intentParser === "undefined") {
+    window.intentParser = {};
+}
+
+if (!intentParser.parse) {
+    intentParser.parse = function(query) {
+        const q = query.toLowerCase();
+
+        // --- Complex-related queries ---
+        if (q.match(/(complex|subunit|components|members)/)) {
+            const match = q.match(/(?:of|for|about)\s+([a-z0-9\- ]+)/i);
+            if (match) {
+                const term = match[1].trim();
+                return {
+                    intent: "complex_query",
+                    entity: term,
+                    handler: async function(entity) {
+                        const results = getGenesByComplex(entity);
+                        return formatComplexQueryResults(results, entity);
+                    }
+                };
+            }
+        }
+
+        // --- Gene-based queries (e.g. "show me complexes for IFT88") ---
+        const matchGene = q.match(/(?:complex(?:es)?\s+for|subunits?\s+of)\s+([a-z0-9\-]+)/i);
+        if (matchGene) {
+            const gene = matchGene[1].toUpperCase();
+            return {
+                intent: "complex_for_gene",
+                entity: gene,
+                handler: async function(entity) {
+                    const complexes = getCorumComplexesForGene(entity);
+                    if (complexes.length === 0)
+                        return `<div class="result-card"><h3>${entity}</h3><p>No CORUM complexes found for this gene.</p></div>`;
+                    
+                    let html = `<div class="result-card"><h3>Complexes containing ${entity}</h3><ul>`;
+                    complexes.forEach(c => {
+                        const members = c.subunits.map(s => s.gene_name).join(", ");
+                        html += `<li><strong>${c.complex_name}</strong>: ${members}</li>`;
+                    });
+                    html += "</ul></div>";
+                    return html;
+                }
+            };
+        }
+
+        return null; // fallback if nothing matches
+    };
+}
+    
 }
 
 // Call this after setting up the intent parser
 setTimeout(updateIntentParser, 1000);
+
+// ============================================================================
+// STARTUP INTEGRATION
+// ============================================================================
+(async function initializeCorum() {
+    await fetchCorumComplexes();
+})();
 
 
 // =============================================================================
@@ -3449,7 +3640,7 @@ async function getCiliaryGenesForOrganism(organismName) {
     };
 }
 
-// --- Main AI Query Handler (REPLACEMENT) ---
+// --- Main AI Query Handler (CORUM-INTEGRATED REPLACEMENT) ---
 window.handleAIQuery = async function() {
     const aiQueryInput = document.getElementById('aiQueryInput');
     const resultArea = document.getElementById('ai-result-area');
@@ -3457,15 +3648,16 @@ window.handleAIQuery = async function() {
     if (!query) return;
 
     // --- FIX 1: Purge any existing Plotly plots from the result area ---
-    Plotly.purge(resultArea);
+    if (typeof Plotly !== "undefined" && Plotly.purge) {
+        Plotly.purge(resultArea);
+    }
     // --- END OF FIX 1 ---
 
     resultArea.style.display = 'block';
-    // Display loading message immediately
     resultArea.innerHTML = `<p class="status-searching">CiliAI is thinking... 🧠</p>`;
-    
+
     try {
-        // Await primary data fetches *before* running any query logic
+        // --- Load all required datasets, now including CORUM ---
         await Promise.all([
             fetchCiliaData(),
             fetchScreenData(),
@@ -3475,41 +3667,85 @@ window.handleAIQuery = async function() {
             fetchUmapData(),
             getDomainData(),
             fetchNeversPhylogenyData(),
-            fetchLiPhylogenyData()
+            fetchLiPhylogenyData(),
+            fetchCorumComplexes() // <-- NEW
         ]);
-        console.log('ciliAI.js: All data loaded (including new domain and phylogeny sources).');
+
+        console.log('ciliAI.js: All data loaded (including CORUM, domain, and phylogeny sources).');
 
         let resultHtml = '';
         const qLower = query.toLowerCase();
         let match;
 
-        // 1. Check for Perfect Match in Registry
+        // 1️⃣ Perfect Registry Match
         const perfectMatch = questionRegistry.find(item => item.text.toLowerCase() === qLower);
         if (perfectMatch) {
             console.log(`Registry match found: "${perfectMatch.text}"`);
             resultHtml = await perfectMatch.handler();
         } 
-        // 2. Check for "Tell me about..." Intent (Comprehensive Detail)
-        else if ((match = qLower.match(/(?:tell me about|what is|describe)\s+(.+)/i))) {
+
+        // 2️⃣ "Tell me about..." / "Describe" Queries
+        else if ((match = qLower.match(/(?:tell me about|what is|describe)\\s+(.+)/i))) {
             const term = match[1].trim();
             resultHtml = await getComprehensiveDetails(term);
         } 
-        // 3. Check for Entity-Based Intent (Localization, Function, Disease Categories)
+
+        // 3️⃣ CORUM-Aware Complex Queries
+        else if (
+            (match = qLower.match(/(?:show|list|display)\\s+(?:complexes|subunits|components)\\s+(?:for|of)?\\s*([a-z0-9\\- ]+)/i))
+        ) {
+            const target = match[1].trim();
+            const geneLike = /^[a-z0-9\\-_]+$/i.test(target);
+
+            await fetchCorumComplexes(); // ensure cache
+
+            if (geneLike) {
+                const gene = target.toUpperCase();
+                const corumMatches = findCorumComplexesForGene(gene);
+                if (corumMatches.length > 0) {
+                    resultHtml = `<h3>Complexes containing ${gene}</h3><ul>` +
+                        corumMatches.map(c => 
+                            `<li><strong>${c.complex_name}</strong> — subunits: ${c.subunits.map(s => s.gene_name).join(', ')}</li>`
+                        ).join('') +
+                        `</ul>`;
+                } else {
+                    resultHtml = `<p>No CORUM complexes found containing ${gene}. Try a complex name instead (e.g., "IFT-A complex").</p>`;
+                }
+            } else {
+                const complexes = findCorumComplexesByName(target);
+                if (complexes.length > 0) {
+                    resultHtml = `<h3>Subunits/components for complex: ${target}</h3>` +
+                        complexes.map(c =>
+                            `<div><strong>${c.complex_name}</strong> — subunits: ${c.subunits.map(s => s.gene_name).join(', ')}</div>`
+                        ).join('');
+                } else {
+                    resultHtml = `<p>No CORUM complex found for “${target}”. Try a known name like “BBSome” or “Condensin I complex”.</p>`;
+                }
+            }
+        } 
+
+        // 4️⃣ Entity-Based Queries (Localization, Function, Disease)
         else {
             const intent = intentParser.parse(query);
             if (intent && typeof intent.handler === 'function') {
                 console.log(`Intent parser match found: ${intent.intent} for entity: ${intent.entity}`);
                 resultHtml = await intent.handler(intent.entity);
             }
-            // 4. Smarter Fallback Logic (Gene/Plot Inference)
+
+            // 5️⃣ Smart Fallback Logic (Gene/Plot Inference)
             else {
-                const potentialGenes = (query.match(/\b([A-Z0-9\-\.]{3,})\b/gi) || []);
-                const genes = potentialGenes.filter(g => ciliaHubDataCache.some(hubGene => hubGene.gene.toUpperCase() === g.toUpperCase()));
-                
+                const potentialGenes = (query.match(/\\b([A-Z0-9\\-\\.]{3,})\\b/gi) || []);
+                const genes = potentialGenes.filter(g =>
+                    ciliaHubDataCache.some(hubGene => hubGene.gene.toUpperCase() === g.toUpperCase())
+                );
+
                 if (genes.length === 2 && (qLower.includes('compare') || qLower.includes('vs'))) {
                     console.log(`Smart match: Comparing two genes: ${genes.join(' and ')}`);
                     resultHtml = await displayCellxgeneBarChart(genes);
-                } else if (genes.length === 1 && (qLower.includes('plot') || qLower.includes('show expression') || qLower.includes('visualize'))) {
+                } else if (
+                    genes.length === 1 &&
+                    (qLower.includes('plot') || qLower.includes('show expression') || qLower.includes('visualize'))
+                ) {
                     console.log(`Smart match: Plotting single gene: ${genes[0]}`);
                     if (qLower.includes('umap')) {
                         resultHtml = await displayUmapGeneExpression(genes[0]);
@@ -3525,13 +3761,12 @@ window.handleAIQuery = async function() {
             }
         }
 
-        // --- Only update innerHTML if the handler returned HTML ---
-        if (resultHtml !== "") {
+        // ✅ Only update result area if handler returned HTML
+        if (resultHtml && resultHtml.trim() !== "") {
             resultArea.innerHTML = resultHtml;
         }
 
     } catch (e) {
-        // Display generic error, but log details to console
         resultArea.innerHTML = `<p class="status-not-found">An internal CiliAI error occurred during your query. Please check the console for details. (Error: ${e.message})</p>`;
         console.error("CiliAI Query Error:", e);
     }
