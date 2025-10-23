@@ -1007,7 +1007,6 @@ async function getHubOrthologsForGene(gene) {
         </div>`;
 }
 
-
 /**
  * Generates a help card explaining the two different sources for organism data.
  */
@@ -2189,9 +2188,56 @@ function runAutomatedRegistryGeneration() {
 // 1. Generate all the complex questions and their synonyms
 const generatedComplexQuestions = generateAutomatedComplexQueries();
 
-// ⚠️ FINAL INTEGRATION STEP:
-// Run this once at the end of your script to load the complete question set.
-// questionRegistry.push(...runAutomatedRegistryGeneration());
+// Function 3: Generates questions for Ciliary Complex components
+function generateComplexQueryQuestions() {
+    const questions = [];
+    
+    // Define the core complexes and their aliases
+    const COMPLEX_INFO = {
+        'BBSome': { names: ['BBSome', 'BBS', 'Bardet-Biedl Complex'], subunits: CORE_CILIOPATHY_COMPLEXES.BBSome },
+        'IFT-A': { names: ['IFT-A Complex', 'IFT A'], subunits: CORE_CILIOPATHY_COMPLEXES['IFT-A'] },
+        'IFT-B': { names: ['IFT-B Complex', 'IFT B'], subunits: CORE_CILIOPATHY_COMPLEXES['IFT-B'] },
+        'MKS Complex': { names: ['MKS Complex', 'Meckel Complex'], subunits: CORE_CILIOPATHY_COMPLEXES.MKS },
+        'NPHP Complex': { names: ['NPHP Complex'], subunits: CORE_CILIOPATHY_COMPLEXES.NPHP },
+        'Transition Zone Complex': { names: ['Transition Zone Complex', 'TZ Complex'], subunits: [] },
+        'IFT': { names: ['IFT Components', 'Intraflagellar Transport'], subunits: [] },
+    };
+
+    // Patterns for finding components/subunits
+    const basePatterns = [
+        "Provide the list of [NAME] components",
+        "Display the list of [NAME] components",
+        "Show the list of [NAME] components",
+        "List components of [NAME]",
+        "Show subunits of [NAME]",
+        "What proteins form the [NAME]?",
+        "Members of the [NAME] complex",
+        "Display genes in [NAME]",
+        "Identify components in [NAME]",
+        "Subunit composition of [NAME]",
+    ];
+
+    Object.keys(COMPLEX_INFO).forEach(complexKey => {
+        const info = COMPLEX_INFO[complexKey];
+        
+        info.names.forEach(name => {
+            basePatterns.forEach(pattern => {
+                const text = pattern.replace(/\[NAME\]/g, name);
+                
+                questions.push({
+                    text: text,
+                    // The handler calls getGenesByComplex, which now correctly returns the raw array
+                    handler: async () => {
+                        const { genes, description } = await getGenesByComplex(complexKey);
+                        return formatListResult(`Components of ${complexKey}`, genes, description);
+                    }
+                });
+            });
+        });
+    });
+
+    return questions;
+}
 
 // --- Automated General Question Synonym Generator ---
 // Note: This logic should be run AFTER the main questionRegistry has been defined/populated.
@@ -2244,35 +2290,36 @@ function autoGenerateSynonyms(registry) {
 // autoGenerateSynonyms(questionRegistry);
 
 
-// ✅ CORRECTED ITERATION LOGIC
-// ✅ Correct Implementation of generateAutomatedComplexQueries
-function generateAutomatedComplexQueries() {
-    const complexQuestions = []; 
-    
-    // Iterate over the KEYS of the CORE_CILIOPATHY_COMPLEXES object
-    Object.keys(CORE_CILIOPATHY_COMPLEXES).forEach(complexName => { 
-        // Note: The structure below correctly accesses objects using complexName as the key.
-        const patterns = COMPLEX_SYNONYM_PATTERNS[complexName] || [];
-        const aliases = COMPLEX_ALIAS_MAP[complexName] || [];
+// --- Execution Block (Place this logic near the end of your script) ---
+function runAutomatedRegistryGeneration() {
+    let generatedQuestions = [];
 
-        const allNames = [complexName]; 
-        aliases.forEach(alias => allNames.push(alias));
-        
-        patterns.forEach(pattern => {
-            const handlerFn = async () => getGenesByComplex(complexName); 
-            
-            allNames.forEach(name => {
-                const text = pattern.replace(/\[NAME\]/g, name);
-                complexQuestions.push({
-                    text: text,
-                    handler: handlerFn
-                });
-            });
-        });
-    }); // ⬅️ The outer iterator is correct here
+    // --- 1. Generate Simple Disease List Queries (Human Genes & Synonyms) ---
+    ALL_DISEASES.forEach(disease => {
+        generatedQuestions.push(...generateDiseaseListQuestions(disease));
+    });
 
-    return complexQuestions; 
+    // --- 2. Generate Combined Disease + Organism Queries ---
+    ALL_DISEASES.forEach(disease => {
+        generatedQuestions.push(...generateCombinedDiseaseOrganismQuestions(disease));
+    });
+    
+    // --- 3. Generate Complex Queries (REPLACEMENT) 🛠️
+    generatedQuestions.push(...generateComplexQueryQuestions());
+    // --- END REPLACEMENT ---
+    
+    // --- 4. Generate Simple Ortholog/Phylogeny Queries (Ensures general organism queries are covered) ---
+    const ORGANISM_QUERIES = [
+        // ... (rest of query generation) ...
+    ];
+    // ... (rest of function body) ...
+    return generatedQuestions;
 }
+// ----------------------------------------------------
+
+// 5. Final Registry Integration: Use the results of the complete run
+questionRegistry.push(...runAutomatedRegistryGeneration());
+
 
 // ⚠️ Final Execution Step: This line should run after the initial 
 // fixed registry (Section 2) has been defined.
