@@ -3430,7 +3430,7 @@ if (!intentParser.parse) {
 
         // --- Complex-related queries ---
         if (q.match(/(complex|subunit|components|members)/)) {
-            const match = q.match(/(?:of|for|about)\s+([a-z0-9\- ]+)/i);
+            const match = qLower.match(/(?:show|list|display)\s+(?:complexes|subunits|components)\s+(?:for|of)?\s*([a-z0-9\- ]+)/i);
             if (match) {
                 const term = match[1].trim();
                 return {
