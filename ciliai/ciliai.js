@@ -15,6 +15,33 @@ let allGeneSymbols = null; // Add this global variable alongside others
 // --- Global Data Cache (ADD THIS LINE) ---
 let corumComplexCache = null;
 
+// --- Master Data Lists (defined globally in your file) ---
+// ✅ Define before use
+const CORE_CILIOPATHY_COMPLEXES = {
+  'BBSome': ['BBS1', 'BBS2', 'BBS4', 'BBS5', 'BBS7', 'BBS9', 'BBS10', 'BBS12', 'TTC8', 'ARL6', 'BBIP1'],
+  'IFT-A': ['IFT121', 'IFT122', 'IFT139', 'IFT140', 'IFT144'],
+  'IFT-B': ['IFT20', 'IFT22', 'IFT25', 'IFT27', 'IFT46', 'IFT52', 'IFT57', 'IFT70', 'IFT74', 'IFT80', 'IFT81', 'IFT88'],
+  'MKS': ['MKS1', 'TMEM67', 'B9D1', 'B9D2', 'CC2D2A', 'TCTN1', 'TCTN2', 'TCTN3'],
+  'NPHP': ['NPHP1', 'NPHP3', 'NPHP4', 'NPHP5', 'NPHP6', 'NPHP8', 'NPHP9'],
+};
+
+const COMPLEX_SYNONYM_PATTERNS = {
+    // Patterns covering common commands (Show, List, What proteins are in)
+    "BBSome": ["List [NAME] genes", "Show [NAME] subunits", "What proteins are in the [NAME]?", "Members of the [NAME] complex"],
+    "IFT-A": ["List [NAME] components", "Show [NAME] subunits", "What proteins form the [NAME]?"],
+    "IFT-B": ["List [NAME] components", "Show [NAME] subunits", "What proteins form the [NAME]?"],
+    "Transition Zone Complex": ["List [NAME] components", "Show [NAME] proteins", "What proteins localize to the [NAME]?"],
+    "MKS Complex": ["List [NAME] components", "Show [NAME] module proteins", "MKS components"],
+    "NPHP Complex": ["List [NAME] components", "Show [NAME] module proteins", "NPHP components"],
+    "IFT": ["List [NAME] components", "Show all IFT proteins", "Which genes are part of [NAME]?"],
+};
+
+const COMPLEX_ALIAS_MAP = {
+    "BBSome": ["BBS"],
+    "Transition Zone Complex": ["TZ"],
+    "IFT": ["Intraflagellar Transport"]
+};
+
 // --- NEW: Reusable scRNA-seq Data Reference ---
 const SC_RNA_SEQ_REFERENCE_HTML = `
 <p style="font-size: 0.8em; color: #666; margin-top: 1rem; border-top: 1px solid #eee; padding-top: 0.5rem;">
@@ -2162,8 +2189,6 @@ function runAutomatedRegistryGeneration() {
 // 1. Generate all the complex questions and their synonyms
 const generatedComplexQuestions = generateAutomatedComplexQueries();
 
-
-
 // ⚠️ FINAL INTEGRATION STEP:
 // Run this once at the end of your script to load the complete question set.
 // questionRegistry.push(...runAutomatedRegistryGeneration());
@@ -2218,32 +2243,6 @@ function autoGenerateSynonyms(registry) {
 // ⚠️ You would call this after your main registry is defined:
 // autoGenerateSynonyms(questionRegistry);
 
-// --- Master Data Lists (defined globally in your file) ---
-// ✅ Define before use
-const CORE_CILIOPATHY_COMPLEXES = {
-  'BBSome': ['BBS1', 'BBS2', 'BBS4', 'BBS5', 'BBS7', 'BBS9', 'BBS10', 'BBS12', 'TTC8', 'ARL6', 'BBIP1'],
-  'IFT-A': ['IFT121', 'IFT122', 'IFT139', 'IFT140', 'IFT144'],
-  'IFT-B': ['IFT20', 'IFT22', 'IFT25', 'IFT27', 'IFT46', 'IFT52', 'IFT57', 'IFT70', 'IFT74', 'IFT80', 'IFT81', 'IFT88'],
-  'MKS': ['MKS1', 'TMEM67', 'B9D1', 'B9D2', 'CC2D2A', 'TCTN1', 'TCTN2', 'TCTN3'],
-  'NPHP': ['NPHP1', 'NPHP3', 'NPHP4', 'NPHP5', 'NPHP6', 'NPHP8', 'NPHP9'],
-};
-
-const COMPLEX_SYNONYM_PATTERNS = {
-    // Patterns covering common commands (Show, List, What proteins are in)
-    "BBSome": ["List [NAME] genes", "Show [NAME] subunits", "What proteins are in the [NAME]?", "Members of the [NAME] complex"],
-    "IFT-A": ["List [NAME] components", "Show [NAME] subunits", "What proteins form the [NAME]?"],
-    "IFT-B": ["List [NAME] components", "Show [NAME] subunits", "What proteins form the [NAME]?"],
-    "Transition Zone Complex": ["List [NAME] components", "Show [NAME] proteins", "What proteins localize to the [NAME]?"],
-    "MKS Complex": ["List [NAME] components", "Show [NAME] module proteins", "MKS components"],
-    "NPHP Complex": ["List [NAME] components", "Show [NAME] module proteins", "NPHP components"],
-    "IFT": ["List [NAME] components", "Show all IFT proteins", "Which genes are part of [NAME]?"],
-};
-
-const COMPLEX_ALIAS_MAP = {
-    "BBSome": ["BBS"],
-    "Transition Zone Complex": ["TZ"],
-    "IFT": ["Intraflagellar Transport"]
-};
 
 // Function to automate all Complex-related questions (including synonyms)
 // Function to automate all Complex-related questions (including synonyms)
@@ -2287,7 +2286,6 @@ function generateAutomatedComplexQueries() {
 
     return complexQuestions; // Assuming the goal is to return a single array
 }
-
 
 // ⚠️ Final Execution Step: This line should run after the initial 
 // fixed registry (Section 2) has been defined.
