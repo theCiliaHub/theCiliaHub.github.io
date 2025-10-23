@@ -2123,6 +2123,7 @@ function generateCombinedDiseaseOrganismQuestions(diseaseName) {
 const joubertQuestions = generateDiseaseListQuestions("Joubert Syndrome");
 const joubertOrganismQuestions = generateCombinedDiseaseOrganismQuestions("Joubert Syndrome");
 
+
 // Log generated questions for verification
 console.log("Joubert Syndrome Questions:", joubertQuestions.map(q => q.text));
 console.log("Joubert Syndrome Organism Questions:", joubertOrganismQuestions.map(q => q.text));
@@ -2307,13 +2308,10 @@ function runAutomatedRegistryGeneration() {
 }
 // ----------------------------------------------------
 
-// 5. Final Registry Integration: Use the results of the complete run
-questionRegistry.push(...runAutomatedRegistryGeneration());
-
-
-// ⚠️ Final Execution Step: This line should run after the initial 
-// fixed registry (Section 2) has been defined.
-// questionRegistry.push(...runAutomatedRegistryGeneration());
+// 1. Generate the combined list of all automated questions
+const ALL_AUTOMATED_QUESTIONS = runAutomatedRegistryGeneration();
+// 2. Push the result to the main array (replace your old integration push)
+questionRegistry.push(...ALL_AUTOMATED_QUESTIONS);
 
 
 // --- ADDITION: New Helper Functions for Expanded Questions ---
