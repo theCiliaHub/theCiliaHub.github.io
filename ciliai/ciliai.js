@@ -4531,7 +4531,7 @@ function formatGeneDetail(geneData, geneSymbol, detailTitle, detailContent) {
 
 // --- FINAL UPDATED formatListResult (Accepts 5 arguments) ---
 
-/ Helper: formatListResult
+//  Helper: formatListResult
 function formatListResult(title, geneList, citationHtml = '', speciesCode = '', targetKey = null) {
     if (!geneList || geneList.length === 0) {
         return `<div class="result-card"><h3>${title}</h3><p class="status-not-found">No matching genes found.</p></div>`;
