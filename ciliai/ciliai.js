@@ -754,24 +754,23 @@ async function fetchLiPhylogenyData() {
 }
 
 
-// A mapping of user-friendly names to the specific CiliaHub data fields (ortholog_X)
+// A mapping of valid organisms to their corresponding CiliaHub field names
 const CURATED_ORTHOLOG_MAP = {
     'mouse': 'ortholog_mouse', 'm. musculus': 'ortholog_mouse',
     'c. elegans': 'ortholog_c_elegans', 'worm': 'ortholog_c_elegans',
     'zebrafish': 'ortholog_zebrafish', 'd. rerio': 'ortholog_zebrafish',
     'drosophila': 'ortholog_drosophila', 'fly': 'ortholog_drosophila',
     'xenopus': 'ortholog_xenopus', 'x. tropicalis': 'ortholog_xenopus',
-    // We explicitly exclude organisms handled by phylogeny data here, e.g., 'chlamydomonas'
 };
 
 /**
- * Retrieves ortholog information for a specific gene based on the organism.
- * Prioritizes curated CiliaHub orthologs; falls back to phylogenetic data for others.
+ * Handles all single-gene ortholog lookups.
+ * Prioritizes curated CiliaHub fields; falls back to phylogenetic data for non-core organisms.
+ * @param {string} geneSymbol The human gene symbol (e.g., IFT88).
+ * @param {string} organismName The organism name (e.g., mouse, Chlamydomonas).
  */
 async function getOrthologsInOrganism(geneSymbol, organismName) {
-    await fetchCiliaData(); // Ensure curated data is loaded
-    await fetchCorumComplexes(); // Ensure complexes are loaded
-    
+    await fetchCiliaData();
     const upperGene = geneSymbol.toUpperCase();
     const geneData = ciliaHubDataCache.find(g => g.gene.toUpperCase() === upperGene);
 
@@ -783,37 +782,52 @@ async function getOrthologsInOrganism(geneSymbol, organismName) {
     const curatedKey = CURATED_ORTHOLOG_MAP[normOrganism];
 
     let html = '';
-    const title = `Ortholog Status for ${geneSymbol} in ${organismName}`;
-
+    
     if (curatedKey) {
-        // --- Strategy 1: Use Curated CiliaHub Data ---
+        // --- Strategy 1: Use Curated CiliaHub Data (The requested fix) ---
         const orthologName = geneData[curatedKey] || 'N/A';
+        const organismDisplay = organismName.split('.').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join('. ');
         
-        // Return full Hub ortholog table and highlight the requested field
-        const fullTable = `
+        html = `
+            <h3>Curated Ortholog for ${geneSymbol} in ${organismDisplay}</h3>
+            <table class="gene-detail-table">
+                <tr><th>Human Gene</th><td><strong>${geneSymbol}</strong></td></tr>
+                <tr><th>${organismDisplay} Ortholog</th><td><strong>${orthologName}</strong></td></tr>
+            </table>
+            <h4>Full Curated Ortholog Set:</h4>
             <table class="gene-detail-table">
                 <tr><th>Mouse (M. musculus)</th><td>${geneData.ortholog_mouse || 'N/A'}</td></tr>
                 <tr><th>Worm (C. elegans)</th><td>${geneData.ortholog_c_elegans || 'N/A'}</td></tr>
                 <tr><th>Zebrafish (D. rerio)</th><td>${geneData.ortholog_zebrafish || 'N/A'}</td></tr>
                 <tr><th>Fly (D. melanogaster)</th><td>${geneData.ortholog_drosophila || 'N/A'}</td></tr>
                 <tr><th>Xenopus (X. tropicalis)</th><td>${geneData.ortholog_xenopus || 'N/A'}</td></tr>
-            </table>`;
-            
-        html = `
-            <h3>${title} (Curated CiliaHub)</h3>
-            <p>The curated ortholog name found is: <strong>${orthologName}</strong>.</p>
-            <h4>Full Curated Ortholog Set:</h4>
-            ${fullTable}
-            <p class="info-note">Source: CiliaHub Gene Annotations (ciliahub_data.json)</p>
+            </table>
+            <p class="info-note">Source: CiliaHub Curated Gene Annotations.</p>
         `;
 
     } else {
-        // --- Strategy 2: Use Phylogenetic Analysis Data (Li 2014 & Nevers 2017) ---
+        // --- Strategy 2: Use Phylogenetic Analysis Data (for non-curated organisms) ---
+        // This handles organisms like Chlamydomonas, Protists, etc., as requested.
         html = await getGeneConservationBothDatasets(geneSymbol, organismName);
     }
 
     return `<div class="result-card">${html}</div>`;
 }
+
+// NOTE: The original handler getHubOrthologsForGene is now redundant, but kept for legacy calls.
+// The new expanded registry questions must now call getOrthologsInOrganism(gene, organism).
+
+// --- Original getHubOrthologsForGene modified to use the new function ---
+async function getHubOrthologsForGene(gene) {
+    // If only the gene name is given, we assume the user wants the full table.
+    // We choose an arbitrary curated organism (Mouse) to force the curated lookup path.
+    return getOrthologsInOrganism(gene, 'mouse');
+    return getOrthologsInOrganism(gene, 'c. elegans');
+    return getOrthologsInOrganism(gene,  'zebrafish');
+    return getOrthologsInOrganism(gene,  'drosophila');
+    return getOrthologsInOrganism(gene,  'xenopus');
+}
+
 
 // -------------------------------------------------------------------------------------------------
 // NOTE: getGeneConservationBothDatasets and its helpers must be defined as below
@@ -1199,31 +1213,7 @@ async function getPhylogenyGenesForOrganism(organismName) {
     );
 }
 // --- Helper Functions ---
-// Helper to get orthologs for a gene
-async function getHubOrthologsForGene(geneSymbol) {
-    const data = await fetchCiliaData();
-    if (!data || data.length === 0) {
-        console.error('No cilia data available for', geneSymbol);
-        return "No cilia data available.";
-    }
-    
-    console.log('Searching for gene:', geneSymbol);
-    const geneData = data.find(g => g.gene.toUpperCase() === geneSymbol.toUpperCase());
-    if (!geneData) {
-        console.error(`Gene ${geneSymbol} not found in dataset. Available genes include:`, data.slice(0, 10).map(g => g.gene), '...');
-        return `Gene ${geneSymbol} not found in the database.`;
-    }
-    
-    console.log('Found gene data for', geneSymbol, ':', geneData);
-    const orthologs = [];
-    for (const [key, value] of Object.entries(geneData)) {
-        if (key.startsWith('ortholog_') && value !== "N/A" && value) {
-            const organism = key.replace('ortholog_', '').replace('_', ' ').replace(/\b\w/g, c => c.toUpperCase());
-            orthologs.push(`${organism}: ${value}`);
-        }
-    }
-    return orthologs.length > 0 ? orthologs.join('\n') : `No orthologs found for ${geneSymbol}.`;
-}
+
 
 // Helper to get genes with orthologs in a specific organism
 async function getGenesWithOrthologInOrganism(organism) {
@@ -1339,15 +1329,22 @@ const questionRegistry = [
 // Core organism checks (prioritizes curated CiliaHub data)
 { text: "Show orthologs of IFT88 in mouse", handler: async () => getOrthologsInOrganism("IFT88", "mouse") },
 { text: "What is the C. elegans ortholog for ARL13B?", handler: async () => getOrthologsInOrganism("ARL13B", "C. elegans") },
-{ text: "Drosophila ortholog of BBS1", handler: async () => getOrthologsInOrganism("BBS1", "Drosophila") },
+{ text: "Zebrafish ortholog name for NPHP1", handler: async () => getOrthologsInOrganism("NPHP1", "zebrafish") },
+{ text: "Drosophila ortholog of BBS1", handler: async () => getOrthologsInOrganism("BBS1", "drosophila") },
 
-// Phylogenetic checks (using synonyms for non-curated organisms or specific requests)
+// Phylogenetic Lookup: Directs to combined phylogenetic data (Strategy 2)
 { text: "Tell me about IFT88 in Chlamydomonas", handler: async () => getOrthologsInOrganism("IFT88", "Chlamydomonas") },
+{ text: "Is IFT88 conserved in Chlamydomonas?", handler: async () => getOrthologsInOrganism("IFT88", "Chlamydomonas") },
 { text: "Display CEP290 in algae", handler: async () => getOrthologsInOrganism("CEP290", "algae") },
-{ text: "Is BBS1 conserved in unicellular organisms?", handler: async () => getOrthologsInOrganism("BBS1", "unicellular organisms") },
 { text: "List NPHP1 orthologs in protists", handler: async () => getOrthologsInOrganism("NPHP1", "protists") },
 { text: "What about DYNC2H1 in Tetrahymena?", handler: async () => getOrthologsInOrganism("DYNC2H1", "Tetrahymena") },
+{ text: "Is BBS1 conserved in unicellular organisms?", handler: async () => getOrthologsInOrganism("BBS1", "unicellular organisms") },
+
     
+
+
+
+ 
 
     // ==================== PHYLOGENY QUERIES (List Genes based on Screen) ====================
     { text: "List Ciliary Genes in C. elegans (Phylogeny)", handler: async () => getPhylogenyGenesForOrganism("C. elegans") },
