@@ -1127,6 +1127,17 @@ const questionRegistry = [
     { text: "What is the source for Ciliary genes in mouse?", handler: async () => tellAboutOrganismSources("mouse") },
     { text: "What is the source for Ciliary genes in zebrafish?", handler: async () => tellAboutOrganismSources("zebrafish") },
     { text: "What is the source for Ciliary genes in drosophila?", handler: async () => tellAboutOrganismSources("drosophila") },
+    
+    // ==================== NEW CONSOLIDATED PHYLOGENY QUESTIONS ====================
+    { text: "Compare IFT88 phylogeny (Li and Nevers)", handler: async () => comparePhylogenyDatasets("IFT88") },
+    { text: "Compare BBS1 phylogeny (Li and Nevers)", handler: async () => comparePhylogenyDatasets("BBS1") },
+    { text: "Show the phylogenetic comparison for ARL13B", handler: async () => comparePhylogenyDatasets("ARL13B") },
+    { text: "NPHP1 phylogenetic analysis comparison", handler: async () => comparePhylogenyDatasets("NPHP1") },
+
+    // Update general questions to use the comparison function for maximum utility:
+    { text: "Show evolutionary conservation of IFT88", handler: async () => comparePhylogenyDatasets("IFT88") },
+    { text: "What is the phylogeny of BBS1?", handler: async () => comparePhylogenyDatasets("BBS1") },
+
 
     // ==================== PHYLOGENY QUERIES (List Genes based on Screen) ====================
     { text: "List Ciliary Genes in C. elegans (Phylogeny)", handler: async () => getPhylogenyGenesForOrganism("C. elegans") },
@@ -1519,11 +1530,7 @@ const questionRegistry = [
     { text: "List ciliary genes in Chlamydomonas", handler: async () => wrapOrganismResult("Chlamydomonas") }, 
     // --- End of Fixes for getCiliaryGenesForOrganism calls ---
 
-    // ==================== NEW PHYLOGENY QUESTIONS ====================
-    { text: "Show conservation of IFT88 (Nevers 2017)", handler: async () => getNeversConservation("IFT88") },
-    { text: "What is the phylogeny of BBS1 (Nevers 2017)?", handler: async () => getNeversConservation("BBS1") },
-    { text: "Show conservation of IFT88 (Li 2014)", handler: async () => getLiConservation("IFT88") },
-    { text: "What is the phylogeny of ARL13B (Li 2014)?", handler: async () => getLiConservation("ARL13B") },
+    
 
     // ==================== COMPARATIVE GENOMICS ====================
     { text: "Compare human and mouse ciliary genes", handler: async () => getConservedGenesBetween(["human", "mouse"]) },
@@ -2203,6 +2210,111 @@ async function getGenesByScreenPhenotype(phenotype) {
 
     // Since this function is the handler, it must return a formatted string.
     return formatListResult(`Genes Matching Phenotype: ${phenotype}`, genes);
+}
+
+// --- NEW HANDLER: Combined Phylogeny Comparison ---
+/**
+ * Fetches and combines conservation data for a single gene from both 
+ * Nevers et al. 2017 and Li et al. 2014 datasets into a single card.
+ * @param {string} geneSymbol - The gene symbol to search.
+ */
+async function comparePhylogenyDatasets(geneSymbol) {
+    const geneUpper = geneSymbol.toUpperCase();
+
+    // 1. Fetch both datasets in parallel
+    await Promise.all([fetchNeversPhylogenyData(), fetchLiPhylogenyData()]);
+
+    // --- Process Nevers 2017 Data ---
+    let neversData = { found: false, speciesCount: 'N/A', speciesList: 'N/A' };
+    const neversEntry = neversPhylogenyCache?.genes?.[geneUpper];
+    if (neversEntry) {
+        neversData.found = true;
+        neversData.speciesCount = neversEntry.s.length;
+        const organismsList = neversPhylogenyCache.organism_groups.all_organisms_list;
+        // Use full list of organisms but clip for the table
+        neversData.speciesList = neversEntry.s.map(index => organismsList[index]).slice(0, 5).join(', ') + (neversEntry.s.length > 5 ? '...' : '');
+    }
+
+    // --- Process Li 2014 Data ---
+    let liData = { found: false, speciesCount: 'N/A', classification: 'N/A', speciesList: 'N/A' };
+    let liEntry = null;
+    if (liPhylogenyCache?.genes) {
+        liEntry = Object.values(liPhylogenyCache.genes).find(g => g.g.toUpperCase() === geneUpper);
+    }
+    if (liEntry) {
+        liData.found = true;
+        liData.speciesCount = liEntry.s.length;
+        const classList = liPhylogenyCache.summary.class_list;
+        liData.classification = (classList[liEntry.c] || "Unknown").replace(/_/g, ' ');
+
+        const organismsList = liPhylogenyCache.summary.organisms_list;
+        // Use full list of organisms but clip for the table
+        liData.speciesList = liEntry.s.map(index => organismsList[index]).slice(0, 5).join(', ') + (liEntry.s.length > 5 ? '...' : '');
+    }
+
+    // --- Handle Case: Gene Not Found in Either ---
+    if (!neversData.found && !liData.found) {
+        return `<div class="result-card"><h3>${geneSymbol} Phylogeny Comparison</h3><p class="status-not-found">Gene **${geneSymbol}** was not found in either the Nevers et al. (2017) or Li et al. (2014) phylogenetic datasets.</p></div>`;
+    }
+    
+    // --- Generate Combined Table ---
+    return `
+        <div class="result-card">
+            <h3>Evolutionary Conservation of ${geneSymbol} (Comparative Analysis) 🧬</h3>
+            <p>Comparing conservation data between two major phylogenetic studies.</p>
+            
+            <table class="ciliopathy-table gene-detail-table">
+                <thead>
+                    <tr>
+                        <th style="width: 30%;">Dataset</th>
+                        <th style="width: 20%;">Species Count</th>
+                        <th>Key Finding / Classification</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr class="${neversData.found ? '' : 'status-not-found'}">
+                        <td><strong>Nevers et al. (2017)</strong></td>
+                        <td>${neversData.speciesCount}</td>
+                        <td>${neversData.found ? `Found in species like: ${neversData.speciesList}` : 'Not Found'}</td>
+                    </tr>
+                    <tr class="${liData.found ? '' : 'status-not-found'}">
+                        <td><strong>Li et al. (2014)</strong></td>
+                        <td>${liData.speciesCount}</td>
+                        <td>${liData.found ? `**Classification:** ${liData.classification}` : 'Not Found'}</td>
+                    </tr>
+                </tbody>
+            </table>
+            
+            <h4>Data Sources</h4>
+            <ul style="font-size: 0.85em;">
+                <li><strong>Nevers et al. 2017:</strong> Comparative genomics of 130 species. <a href="https://doi.org/10.1093/molbev/msx146" target="_blank">DOI: 10.1093/molbev/msx146</a></li>
+                <li><strong>Li et al. 2014:</strong> Comprehensive ciliary proteome across diverse eukaryotes. <a href="https://pubmed.ncbi.nlm.nih.gov/24995987/" target="_blank">PMID: 24995987</a></li>
+            </ul>
+        </div>
+    `;
+}
+
+// --- UPDATED getOrthologsForGene (uses curated orthologs from ciliahub_data.json) ---
+async function getOrthologsForGene(gene) {
+    if (!ciliaHubDataCache) await fetchCiliaData();
+    const geneData = ciliaHubDataCache.find(g => g.gene.toUpperCase() === gene.toUpperCase());
+
+    if (!geneData) return `<div class="result-card"><h3>${gene}</h3><p class="status-not-found">Gene not found in the database.</p></div>`;
+
+    return `
+        <div class="result-card">
+            <h3>Curated Orthologs of ${gene} (CiliaHub Annotation) 🧬</h3>
+            <table class="gene-detail-table">
+                <tr><th>Mouse (M. musculus)</th><td>${geneData.ortholog_mouse || 'N/A'}</td></tr>
+                <tr><th>Worm (C. elegans)</th><td>${geneData.ortholog_c_elegans || 'N/A'}</td></tr>
+                <tr><th>Xenopus (X. tropicalis)</th><td>${geneData.ortholog_xenopus || 'N/A'}</td></tr>
+                <tr><th>Zebrafish (D. rerio)</th><td>${geneData.ortholog_zebrafish || 'N/A'}</td></tr>
+                <tr><th>Fly (D. melanogaster)</th><td>${geneData.ortholog_drosophila || 'N/A'}</td></tr>
+            </table>
+            <p style="font-size: 0.8em; color: #666; margin-top: 1rem; border-top: 1px solid #eee; padding-top: 0.5rem;">
+                <strong>Source:</strong> Curated orthologs from CiliaHub (ciliahub_data.json).
+            </p>
+        </div>`;
 }
 
 /**
