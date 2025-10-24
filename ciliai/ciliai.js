@@ -753,7 +753,6 @@ async function fetchLiPhylogenyData() {
     }
 }
 
-
 // A mapping of valid organisms to their corresponding CiliaHub field names
 const CURATED_ORTHOLOG_MAP = {
     'mouse': 'ortholog_mouse', 'm. musculus': 'ortholog_mouse',
@@ -765,9 +764,7 @@ const CURATED_ORTHOLOG_MAP = {
 
 /**
  * Handles all single-gene ortholog lookups.
- * Prioritizes curated CiliaHub fields; falls back to phylogenetic data for non-core organisms.
- * @param {string} geneSymbol The human gene symbol (e.g., IFT88).
- * @param {string} organismName The organism name (e.g., mouse, Chlamydomonas).
+ * CORRECTED: It no longer calls the dangerous 'getCiliaryGenesForOrganism' function.
  */
 async function getOrthologsInOrganism(geneSymbol, organismName) {
     await fetchCiliaData();
@@ -784,16 +781,14 @@ async function getOrthologsInOrganism(geneSymbol, organismName) {
     let html = '';
     
     if (curatedKey) {
-        // --- Strategy 1: Use Curated CiliaHub Data (The requested fix) ---
+        // --- Strategy 1: Use Curated CiliaHub Data (SUCCESS PATH) ---
         const orthologName = geneData[curatedKey] || 'N/A';
         const organismDisplay = organismName.split('.').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join('. ');
         
+        // This is the correct, specific result you want for mouse.
         html = `
             <h3>Curated Ortholog for ${geneSymbol} in ${organismDisplay}</h3>
-            <table class="gene-detail-table">
-                <tr><th>Human Gene</th><td><strong>${geneSymbol}</strong></td></tr>
-                <tr><th>${organismDisplay} Ortholog</th><td><strong>${orthologName}</strong></td></tr>
-            </table>
+            <p>The curated ortholog name found is: <strong>${orthologName}</strong>.</p>
             <h4>Full Curated Ortholog Set:</h4>
             <table class="gene-detail-table">
                 <tr><th>Mouse (M. musculus)</th><td>${geneData.ortholog_mouse || 'N/A'}</td></tr>
@@ -807,22 +802,19 @@ async function getOrthologsInOrganism(geneSymbol, organismName) {
 
     } else {
         // --- Strategy 2: Use Phylogenetic Analysis Data (for non-curated organisms) ---
-        // This handles organisms like Chlamydomonas, Protists, etc., as requested.
+        // We ensure the fallback path is also robust.
         html = await getGeneConservationBothDatasets(geneSymbol, organismName);
     }
 
     return `<div class="result-card">${html}</div>`;
 }
 
-// NOTE: The original handler getHubOrthologsForGene is now redundant, but kept for legacy calls.
-// The new expanded registry questions must now call getOrthologsInOrganism(gene, organism).
-
-// --- Original getHubOrthologsForGene modified to use the new function ---
+// Ensure the helper is updated to pass the correct target to the combined phylogenetic handler
 async function getHubOrthologsForGene(gene) {
-    // Only this line executes and the function immediately exits.
-    return getOrthologsInOrganism(gene, 'mouse');
+    // This handler, used for "Show curated orthologs for IFT88", now correctly targets a curated organism
+    // (mouse) to force the display of the full curated ortholog table.
+    return getOrthologsInOrganism(gene, 'mouse');
 }
-
 
 // -------------------------------------------------------------------------------------------------
 // NOTE: getGeneConservationBothDatasets and its helpers must be defined as below
