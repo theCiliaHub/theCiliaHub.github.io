@@ -352,75 +352,78 @@ function createIntentParser() {
 
 const intentParser = createIntentParser();
 
-// --- Fetch Functions ---// 
+// --- Data Fetching and Caching (Updated with New Integration Logic) ---
+
 async function fetchCiliaData() {
-    if (ciliaHubDataCache && ciliaHubDataCache.length > 0) {
-        console.log('Returning cached CiliaHub data:', ciliaHubDataCache.length, 'genes, including:', ciliaHubDataCache.slice(0, 10).map(g => g.gene));
-        return ciliaHubDataCache;
-    }
+    if (ciliaHubDataCache) return ciliaHubDataCache;
     try {
-        console.log('Fetching CiliaHub data from source...');
+        // Fetch primary gene data
         const response = await fetch('https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/ciliahub_data.json');
         if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
         const data = await response.json();
 
-        if (!Array.isArray(data) || data.length === 0) {
-            throw new Error('Invalid or empty CiliaHub data');
-        }
+        // Fetch screen data for merging
+        const screenData = await fetchScreenData(); // Ensure screen data is loaded
 
-        const screenData = await fetchScreenData();
         const processToArray = (field) => {
             if (typeof field === 'string') return field.split(',').map(item => item.trim()).filter(Boolean);
             if (Array.isArray(field)) return field;
             return [];
         };
 
-        ciliaHubDataCache = data.map((gene, index) => {
-            if (!gene || !gene.gene || typeof gene.gene !== 'string') {
-                console.warn(`Invalid gene entry at index ${index}, skipping:`, gene);
-                return null;
-            }
-            const geneUpper = gene.gene.toUpperCase().trim();
+        ciliaHubDataCache = data.map(gene => {
+            const geneUpper = gene.gene.toUpperCase();
+
+            // 1. Map core gene fields to arrays where appropriate
             const processedGene = {
                 ...gene,
-                gene: gene.gene.trim(),
                 functional_category: processToArray(gene.functional_category),
                 domain_descriptions: processToArray(gene.domain_descriptions),
                 ciliopathy: processToArray(gene.ciliopathy),
                 localization: processToArray(gene.localization),
                 complex_names: processToArray(gene.complex_names),
-                complex_components: processToArray(gene.complex_components),
-                description: gene.description || "No description available"
+                complex_components: processToArray(gene.complex_components)
             };
 
+            // 2. Add Cilia Effects from ciliahub_data.json
+            // These fields are correctly sourced from the main ciliahub_data.json.
             const effectsFromHub = {
                 overexpression_effects: processedGene.overexpression_effects || "Not Reported",
                 lof_effects: processedGene.lof_effects || "Not Reported",
                 percent_ciliated_cells_effects: processedGene.percent_ciliated_cells_effects || "Not Reported",
             };
 
+            // 3. Merge in custom effects on cilia if the gene is found in screenData, 
+            // but explicitly ignoring the 'screens' field in the main data.
+            // Note: The logic requires that the new 'effects' data comes from 
+            // ciliahub_data.json (which we've done in point #2) 
+            // AND the screen data should be integrated with gene data for display.
+            // The request states "Please add effects on cilia together with cilia_screens_data.json."
+            // We interpret this as ensuring both the core effects (from the old 'screens' in the hub)
+            // and the detailed screens (from the separate JSON) are present for a gene.
             const screensFromSeparateFile = screenData[geneUpper] || [];
 
+            // 4. Ensure new requested fields are added (they should be present but are mapped for clarity)
             const newIntegratedFields = {
+                // These are the new requested fields, ensuring they exist:
                 ciliopathy_classification: processedGene.ciliopathy_classification || "Not Classified",
                 ortholog_mouse: processedGene.ortholog_mouse || "N/A",
                 ortholog_c_elegans: processedGene.ortholog_c_elegans || "N/A",
                 ortholog_xenopus: processedGene.ortholog_xenopus || "N/A",
                 ortholog_zebrafish: processedGene.ortholog_zebrafish || "N/A",
                 ortholog_drosophila: processedGene.ortholog_drosophila || "N/A",
-                ...effectsFromHub,
+                
+                // Add the explicit effects from the Hub for use in gene summary:
+                ...effectsFromHub, 
+
+                // Add the screens array from the separate file for the comprehensive details card:
                 screens_from_separate_file: screensFromSeparateFile
             };
 
             return { ...processedGene, ...newIntegratedFields };
-        }).filter(g => g !== null);
+        });
 
-        if (!ciliaHubDataCache.some(g => g.gene.toUpperCase() === 'ARL13B')) {
-            console.warn('ARL13B not found in processed data. Raw data contains ARL13B:', data.some(g => g.gene === 'ARL13B'));
-        }
-
-        allGeneSymbols = new Set([...ciliaHubDataCache.map(g => g.gene.toUpperCase()), ...Object.keys(screenData)]);
-        console.log('CiliaHub data loaded and formatted with', ciliaHubDataCache.length, 'genes, including:', ciliaHubDataCache.slice(0, 10).map(g => g.gene));
+        console.log('CiliaHub data loaded and formatted with new orthologs, classification, and screens integration successfully.');
         return ciliaHubDataCache;
     } catch (error) {
         console.error("Failed to fetch CiliaHub data:", error);
@@ -429,6 +432,8 @@ async function fetchCiliaData() {
     }
 }
 
+
+// --- UPDATED fetchScreenData function (to be replaced in your code) ---
 async function fetchScreenData() {
     if (screenDataCache) return screenDataCache;
     try {
@@ -436,12 +441,15 @@ async function fetchScreenData() {
         if (!response.ok) throw new Error(`Failed to fetch screen data: ${response.statusText}`);
         const data = await response.json();
         screenDataCache = data;
-
+        
+        // --- NEW: Populate allGeneSymbols cache with screen genes ---
+        const screenGenes = Object.keys(data);
         if (!allGeneSymbols) {
-            allGeneSymbols = new Set(Object.keys(data));
+            allGeneSymbols = new Set(screenGenes);
         } else {
-            Object.keys(data).forEach(gene => allGeneSymbols.add(gene));
+            screenGenes.forEach(gene => allGeneSymbols.add(gene));
         }
+        // This process needs to be finalized in fetchCiliaData too for complete coverage.
 
         console.log('Screen data loaded successfully:', Object.keys(data).length, 'genes');
         return screenDataCache;
@@ -648,11 +656,6 @@ async function fetchCorumComplexes() {
     }
 }
 
-
-
-
-
-
 /**
  * Helper function to get complex details by gene symbol.
  * @param {string} geneSymbol The gene to search for.
@@ -715,7 +718,7 @@ async function getDomainData() {
     }
 }
 
-/**Helper Functions
+/**
  * Fetches the Nevers et al. 2017 phylogeny matrix.
  * URL: https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/nevers_et_al_2017_matrix_optimized.json
  */
@@ -753,154 +756,6 @@ async function fetchLiPhylogenyData() {
     }
 }
 
-// A mapping of valid organisms to their corresponding CiliaHub field names
-const CURATED_ORTHOLOG_MAP = {
-    'mouse': 'ortholog_mouse', 'm. musculus': 'ortholog_mouse',
-    'c. elegans': 'ortholog_c_elegans', 'worm': 'ortholog_c_elegans',
-    'zebrafish': 'ortholog_zebrafish', 'd. rerio': 'ortholog_zebrafish',
-    'drosophila': 'ortholog_drosophila', 'fly': 'ortholog_drosophila',
-    'xenopus': 'ortholog_xenopus', 'x. tropicalis': 'ortholog_xenopus',
-};
-
-/**
- * Handles single-gene ortholog lookups using CURATED CiliaHub data (Strategy 1).
- * This function bypasses the problematic getCiliaryGenesForOrganism entirely.
- */
-async function getOrthologsInOrganism(geneSymbol, organismName) {
-    await fetchCiliaData();
-    const upperGene = geneSymbol.toUpperCase();
-    const geneData = ciliaHubDataCache.find(g => g.gene.toUpperCase() === upperGene);
-
-    if (!geneData) {
-        return `<div class="result-card"><h3>${geneSymbol}</h3><p class="status-not-found">Gene not found in the CiliaHub Database.</p></div>`;
-    }
-
-    const normOrganism = organismName.toLowerCase();
-    const curatedKey = CURATED_ORTHOLOG_MAP[normOrganism];
-
-    if (curatedKey) {
-        // --- Strategy 1: Use Curated CiliaHub Data (SUCCESS PATH) ---
-        const orthologName = geneData[curatedKey] || 'N/A';
-        const organismDisplay = organismName.split('.').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join('. ');
-        
-        // This constructs the exact, correct answer format immediately.
-        const html = `
-            <h3>Curated Ortholog for ${geneSymbol} in ${organismDisplay}</h3>
-            <p>The curated ortholog name found is: <strong>${orthologName}</strong>.</p>
-            <h4>Full Curated Ortholog Set:</h4>
-            <table class="gene-detail-table">
-                <tr><th>Mouse (M. musculus)</th><td>${geneData.ortholog_mouse || 'N/A'}</td></tr>
-                <tr><th>Worm (C. elegans)</th><td>${geneData.ortholog_c_elegans || 'N/A'}</td></tr>
-                <tr><th>Zebrafish (D. rerio)</th><td>${geneData.ortholog_zebrafish || 'N/A'}</td></tr>
-                <tr><th>Fly (D. melanogaster)</th><td>${geneData.ortholog_drosophila || 'N/A'}</td></tr>
-                <tr><th>Xenopus (X. tropicalis)</th><td>${geneData.ortholog_xenopus || 'N/A'}</td></tr>
-            </table>
-            <p class="info-note">Source: CiliaHub Curated Gene Annotations.</p>
-        `;
-        return `<div class="result-card">${html}</div>`;
-
-    } else {
-        // --- Strategy 2: Use Phylogenetic Analysis Data (for non-curated organisms) ---
-        // This handles organisms like Chlamydomonas, Protists, etc.
-        return getGeneConservationBothDatasets(geneSymbol, organismName);
-    }
-}
-
-// --- Updated handler for generic requests ---
-async function getHubOrthologsForGene(gene) {
-    // This handler, used for the generic "Show curated orthologs for IFT88" question, 
-    // now correctly targets a curated organism ('mouse') to force the display of the full curated ortholog table.
-    return getOrthologsInOrganism(gene, 'mouse');
-}
-
-// -------------------------------------------------------------------------------------------------
-// NOTE: getGeneConservationBothDatasets and its helpers must be defined as below
-// -------------------------------------------------------------------------------------------------
-
-const PHYLO_ORGANISM_MAP = {
-    'chlamydomonas': 'C.reinhardtii', 'algae': 'C.reinhardtii', 'protists': 'T.thermophila', 
-    'unicellular organisms': 'C.reinhardtii' // Mapping common synonyms to known codes
-};
-
-
-async function getNeversStatus(geneSymbol, targetOrganism) {
-    await fetchNeversPhylogenyData();
-    const upperGene = geneSymbol.toUpperCase();
-    const orgCode = PHYLO_ORGANISM_MAP[targetOrganism.toLowerCase()] || targetOrganism;
-
-    const data = neversPhylogenyCache?.genes?.[upperGene];
-    const isPresent = data?.s.some(s => s.toLowerCase().includes(orgCode.toLowerCase())) || false;
-
-    return {
-        source: 'Nevers et al. (2017) Phylogenetic Analysis',
-        link: 'https://doi.org/10.1093/molbev/msx146',
-        present: isPresent,
-        ortholog: 'Check Primary Literature' 
-    };
-}
-
-async function getLiStatus(geneSymbol, targetOrganism) {
-    await fetchLiPhylogenyData();
-    const upperGene = geneSymbol.toUpperCase();
-    const orgCode = PHYLO_ORGANISM_MAP[targetOrganism.toLowerCase()] || targetOrganism;
-    
-    // Li data structure requires finding by gene symbol 'g' and checking species index 's'
-    const entry = Object.values(liPhylogenyCache?.genes || {}).find(g => g.g.toUpperCase() === upperGene);
-    
-    // We need the index of the organism in Li's list to check the presence 's' array
-    const orgIndex = liPhylogenyCache?.summary?.organisms_list?.findIndex(o => o.toLowerCase().includes(orgCode.toLowerCase()));
-
-    const isPresent = entry && orgIndex !== -1 && entry.s.includes(orgIndex);
-
-    return {
-        source: 'Li et al. (2014) Phylogenetic Analysis',
-        link: 'https://pubmed.ncbi.nlm.nih.gov/24995987/',
-        present: isPresent,
-        ortholog: 'Check Primary Literature' 
-    };
-}
-
-
-async function getGeneConservationBothDatasets(geneSymbol, organismName) {
-    // We use a normalized name for internal lookups
-    const normalizedName = organismName.toLowerCase();
-    
-    // Fetch and wait for results from both phylogenetic sources
-    const [neversStatus, liStatus] = await Promise.all([
-        getNeversStatus(geneSymbol, normalizedName),
-        getLiStatus(geneSymbol, normalizedName)
-    ]);
-
-    const statusToIcon = (isPresent) => isPresent ? '✅ Yes' : '❌ No';
-    
-    const html = `
-        <h3>Phylogenetic Analysis: ${geneSymbol} in ${organismName}</h3>
-        <p>Comparison of conservation status based on broad **Phylogenetic analysis** studies:</p>
-        <table class="gene-detail-table">
-            <thead>
-                <tr>
-                    <th>Study (Phylogenetic Source)</th>
-                    <th>Conserved?</th>
-                    <th>Source Link</th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr>
-                    <td>${neversStatus.source}</td>
-                    <td><strong>${statusToIcon(neversStatus.present)}</strong></td>
-                    <td><a href="${neversStatus.link}" target="_blank">View Nevers (2017)</a></td>
-                </tr>
-                <tr>
-                    <td>${liStatus.source}</td>
-                    <td><strong>${statusToIcon(liStatus.present)}</strong></td>
-                    <td><a href="${liStatus.link}" target="_blank">View Li (2014)</a></td>
-                </tr>
-            </tbody>
-        </table>
-        <p class="info-note">Note: For curated ortholog names in core models (Mouse, C. elegans, etc.), please ask directly.</p>
-    `;
-    return html;
-}
 /**
  * New function to describe CiliAI's capabilities, listing all available data types.
  */
@@ -1196,68 +1051,31 @@ async function getPhylogenyGenesForOrganism(organismName) {
         targetKey    // Pass the key to extract the correct ortholog name
     );
 }
-// --- Helper Functions ---
 
 
-// Helper to get genes with orthologs in a specific organism
-async function getGenesWithOrthologInOrganism(organism) {
-    const data = await fetchCiliaData();
-    if (!data || data.length === 0) return "No cilia data available.";
-    
-    const orthologField = `ortholog_${organism.toLowerCase().replace(/\s+/g, '_')}`;
-    const genes = data
-        .filter(g => g[orthologField] && g[orthologField] !== "N/A" && g[orthologField] !== "")
-        .map(g => ({
-            gene: g.gene,
-            [orthologField]: g[orthologField],
-            description: g.description || "No description available"
-        }));
-    return genes.length > 0 ? genes : `No genes found with orthologs in ${organism}.`;
-}
+// Function already defined but repeated here for context:
+async function getHubOrthologsForGene(gene) {
+    if (!ciliaHubDataCache) await fetchCiliaData();
+    const geneData = ciliaHubDataCache.find(g => g.gene.toUpperCase() === gene.toUpperCase());
 
-// Helper to format effects summary as a table
-async function getGeneEffectsSummary(geneSymbol) {
-    const ciliaData = await fetchCiliaData();
-    const screenData = await fetchScreenData();
-    
-    const geneData = ciliaData.find(g => g.gene.toUpperCase() === geneSymbol.toUpperCase());
-    if (!geneData) return `Gene ${geneSymbol} not found.`;
-    
-    const geneScreenData = screenData[geneSymbol.toUpperCase()] || [];
-    
-    let table = `### Effects Summary for ${geneSymbol}\n\n`;
-    table += `| Effect Type | Result |\n|-------------|--------|\n`;
-    table += `| Overexpression | ${geneData.overexpression_effects || 'Not Reported'} |\n`;
-    table += `| Loss of Function | ${geneData.lof_effects || 'Not Reported'} |\n`;
-    table += `| Percent Ciliated Cells | ${geneData.percent_ciliated_cells_effects || 'Not Reported'} |\n`;
-    
-    table += `\n### Screen Results\n\n`;
-    table += `| Screen | Phenotype |\n|--------|-----------|\n`;
-    if (geneScreenData.length > 0) {
-        geneScreenData.forEach(screen => {
-            table += `| ${screen.screen || 'Unknown'} | ${screen.phenotype || 'Not Reported'} |\n`;
-        });
-    } else {
-        table += `| No screen data | Not Reported |\n`;
-    }
-    
-    return table;
-}
+    if (!geneData) return `<div class="result-card"><h3>${gene}</h3><p class="status-not-found">Gene not found in the database.</p></div>`;
 
-// Helper to get screen results for a gene
-async function getScreenResults(geneSymbol, screenType) {
-    const screenData = await fetchScreenData();
-    const geneScreens = screenData[geneSymbol.toUpperCase()];
-    if (!geneScreens || geneScreens.length === 0) return `No screen data found for ${geneSymbol}.`;
-    
-    let result = `### Screen Results for ${geneSymbol}\n\n`;
-    result += `| Screen | Phenotype |\n|--------|-----------|\n`;
-    geneScreens.forEach(screen => {
-        if (screenType === "all" || screen.screen.toLowerCase() === screenType.toLowerCase()) {
-            result += `| ${screen.screen || 'Unknown'} | ${screen.phenotype || 'Not Reported'} |\n`;
-        }
-    });
-    return result.includes('Phenotype') ? result : `No data found for ${screenType} screen.`;
+    const citationHtml = `<p style="font-size: 0.8em; color: #666; margin-top: 1rem; border-top: 1px solid #eee; padding-top: 0.5rem;">
+        <strong>Source:</strong> Gene-specific annotation in the CiliaHub Database (ciliahub_data.json).
+    </p>`;
+
+    return `
+        <div class="result-card">
+            <h3>Curated Orthologs of ${gene} (CiliaHub Annotation)</h3>
+            <table class="gene-detail-table">
+                <tr><th>Mouse (M. musculus)</th><td>${geneData.ortholog_mouse || 'N/A'}</td></tr>
+                <tr><th>Worm (C. elegans)</th><td>${geneData.ortholog_c_elegans || 'N/A'}</td></tr>
+                <tr><th>Zebrafish (D. rerio)</th><td>${geneData.ortholog_zebrafish || 'N/A'}</td></tr>
+                <tr><th>Fly (D. melanogaster)</th><td>${geneData.ortholog_drosophila || 'N/A'}</td></tr>
+                <tr><th>Xenopus (X. tropicalis)</th><td>${geneData.ortholog_xenopus || 'N/A'}</td></tr>
+            </table>
+            ${citationHtml}
+        </div>`;
 }
 
 
@@ -1309,25 +1127,6 @@ const questionRegistry = [
     { text: "What is the source for Ciliary genes in mouse?", handler: async () => tellAboutOrganismSources("mouse") },
     { text: "What is the source for Ciliary genes in zebrafish?", handler: async () => tellAboutOrganismSources("zebrafish") },
     { text: "What is the source for Ciliary genes in drosophila?", handler: async () => tellAboutOrganismSources("drosophila") },
-
-// Core organism checks (prioritizes curated CiliaHub data)
-{ text: "Show orthologs of IFT88 in mouse",   handler: async () => getOrthologsInOrganism("IFT88", "mouse") },
-{ text: "What is the C. elegans ortholog for ARL13B?", handler: async () => getOrthologsInOrganism("ARL13B", "C. elegans") },
-{ text: "Zebrafish ortholog name for NPHP1", handler: async () => getOrthologsInOrganism("NPHP1", "zebrafish") },
-    
-// Phylogenetic Lookup: Directs to combined phylogenetic data (Strategy 2)
-{ text: "Tell me about IFT88 in Chlamydomonas", handler: async () => getOrthologsInOrganism("IFT88", "Chlamydomonas") },
-{ text: "Is IFT88 conserved in Chlamydomonas?", handler: async () => getOrthologsInOrganism("IFT88", "Chlamydomonas") },
-{ text: "Display CEP290 in algae", handler: async () => getOrthologsInOrganism("CEP290", "algae") },
-{ text: "List NPHP1 orthologs in protists", handler: async () => getOrthologsInOrganism("NPHP1", "protists") },
-{ text: "What about DYNC2H1 in Tetrahymena?", handler: async () => getOrthologsInOrganism("DYNC2H1", "Tetrahymena") },
-{ text: "Is BBS1 conserved in unicellular organisms?", handler: async () => getOrthologsInOrganism("BBS1", "unicellular organisms") },
-
-    
-
-
-
- 
 
     // ==================== PHYLOGENY QUERIES (List Genes based on Screen) ====================
     { text: "List Ciliary Genes in C. elegans (Phylogeny)", handler: async () => getPhylogenyGenesForOrganism("C. elegans") },
@@ -1631,9 +1430,10 @@ const questionRegistry = [
     // Joubert Syndrome
     { text: "Show genes for Joubert syndrome", handler: async () => { const { genes, description } = await getCiliopathyGenes("Joubert Syndrome"); return formatListResult("Genes for Joubert Syndrome", genes, description); }},
     { text: "What genes are involved in Joubert syndrome?", handler: async () => { const { genes, description } = await getCiliopathyGenes("Joubert Syndrome"); return formatListResult("Genes for Joubert Syndrome", genes, description); }},
+    { text: "Show genes for Joubert Syndrome", handler: async () => { const { genes, description } = await getCiliopathyGenes("Joubert Syndrome"); return formatListResult("Genes for Joubert Syndrome", genes, description); } },
     { text: "Which genes cause Joubert Syndrome?", handler: async () => { const { genes, description } = await getCiliopathyGenes("Joubert Syndrome"); return formatListResult("Genes for Joubert Syndrome", genes, description); } },
     { text: "Joubert syndrome genetics", handler: async () => { const { genes, description } = await getCiliopathyGenes("Joubert Syndrome"); return formatListResult("Genes for Joubert Syndrome", genes, description); }},
-    { text: "List Joubert syndrome genes", handler: async () => { const { genes, description } = await getCiliopathyGenes("Joubert Syndrome"); return formatListResult("Genes for Joubert Syndrome", genes, description); }},
+    { text: "List Joubert genes", handler: async () => { const { genes, description } = await getCiliopathyGenes("Joubert Syndrome"); return formatListResult("Genes for Joubert Syndrome", genes, description); }},
     
     // Meckel-Gruber Syndrome
     { text: "What genes are involved in Meckel-Gruber Syndrome?", handler: async () => { const { genes, description } = await getCiliopathyGenes("Meckel-Gruber Syndrome"); return formatListResult("Genes for Meckel-Gruber Syndrome", genes, description); }},
@@ -2340,190 +2140,9 @@ const questionRegistry = [
     { text: "Visualize ARL13B single-cell expression", handler: async () => displayCellxgeneBarChart(["ARL13B"])},
     { text: "Plot FOXJ1 UMAP expression", handler: async () => displayUmapGeneExpression("FOXJ1") },
     { text: "Show cell types on UMAP", handler: async () => displayUmapPlot() },
-    // ==================== EXPANSIONS FOR fetchCiliaData (Core gene info, orthologs, effects, etc.) ====================
-    // Synonyms and simple expansions
-    { text: "What is the ortholog of IFT88 in mouse?", handler: async () => await getHubOrthologsForGene("IFT88") },
-    { text: "What is the ortholog of ARL13B in mouse?", handler: async () => await getHubOrthologsForGene("ARL13B") },
-    { text: "Find C. elegans ortholog for BBS1", handler: async () => getHubOrthologsForGene("BBS1") },
-    { text: "Show orthologs in zebrafish for ARL13B", handler: async () => getHubOrthologsForGene("ARL13B") },
-    { text: "Genes with mouse orthologs", handler: async () => formatListResult("Genes with Mouse Orthologs", await getGenesWithOrthologInOrganism("mouse")) }, // New helper
-    { text: "List genes with C. elegans orthologs", handler: async () => formatListResult("Genes with C. elegans Orthologs", await getGenesWithOrthologInOrganism("C. elegans")) },
-    { text: "Effects summary for IFT88", handler: async () => getGeneEffectsSummary("IFT88") }, // New helper
-    { text: "Summarize effects of BBS1", handler: async () => getGeneEffectsSummary("BBS1") },
-    { text: "What are the effects on cilia for NPHP1?", handler: async () => getGeneEffectsSummary("NPHP1") },
-    { text: "Primary ciliopathy genes list", handler: async () => getGenesByCiliopathyClassification("Primary Ciliopathy") },
-    { text: "Motile ciliopathy associated genes", handler: async () => getGenesByCiliopathyClassification("Motile Ciliopathy") },
-
-    // ==================== EXPANSIONS FOR fetchScreenData (Screen phenotypes) ====================
-    { text: "Genes causing abnormal cilia morphology", handler: async () => formatListResult("Genes with Abnormal Morphology", await getGenesByPhenotypeKeyword("abnormal")) }, // New helper
-    { text: "Find genes with no cilia phenotype", handler: async () => formatListResult("No Cilia Phenotype Genes", await getGenesByPhenotypeKeyword("no cilia")) },
-    { text: "Which genes lead to dyskinetic cilia?", handler: async () => formatListResult("Dyskinetic Cilia Genes", await getGenesByPhenotypeKeyword("dyskinetic")) },
-    { text: "Screen results summary for ARL13B", handler: async () => getScreenResults("ARL13B", "all") },
-    { text: "Phenotypes in screens for CEP290", handler: async () => getScreenResults("CEP290", "all") },
-    { text: "Genes with short cilia in any screen", handler: async () => getGenesByScreenPhenotype("short cilia") },
-    { text: "List genes increasing ciliated cells", handler: async () => getGenesByScreenPhenotype("increased cilia numbers") },
-    { text: "No effect genes across screens", handler: async () => getNoEffectGenes("all") },
-
-    // ==================== EXPANSIONS FOR fetchPhylogenyData (Phylogeny categories) ====================
-    { text: "Ciliated-only genes list", handler: async () => formatListResult("Ciliated-Only Genes", await getGenesByPhylogenyCategory("ciliated_only_genes")) }, // New helper
-    { text: "Genes present in all organisms", handler: async () => formatListResult("Genes in All Organisms", await getGenesByPhylogenyCategory("in_all_organisms")) },
-    { text: "Non-ciliary genes from phylogeny", handler: async () => formatListResult("Non-Ciliary Genes", await getGenesByPhylogenyCategory("nonciliary_only_genes")) },
-    { text: "Show phylogeny category for ciliary-only", handler: async () => getGenesByPhylogenyCategory("ciliated_only_genes") },
-    { text: "List genes in nonciliary category", handler: async () => getGenesByPhylogenyCategory("nonciliary_only_genes") },
-    { text: "Universal genes from phylogeny", handler: async () => getGenesByPhylogenyCategory("in_all_organisms") },
-
-    // ==================== EXPANSIONS FOR fetchTissueData (Tissue expression) ====================
-    { text: "Top 10 genes in kidney", handler: async () => formatListResult("Top Genes in Kidney", await getTopGenesInTissue("kidney")) }, // New helper
-    { text: "Highest expressed genes in brain", handler: async () => formatListResult("Top Genes in Brain", await getTopGenesInTissue("brain")) },
-    { text: "Top genes expressed in lung", handler: async () => formatListResult("Top Genes in Lung", await getTopGenesInTissue("lung")) },
-    { text: "Expression of IFT88 in tissues", handler: async () => getGeneExpression("IFT88") },
-    { text: "Tissue expression for BBS1", handler: async () => getGeneExpression("BBS1") },
-    { text: "Where is ARL13B most expressed?", handler: async () => getGeneExpressionPattern("ARL13B") },
-    { text: "Compare IFT88 and BBS1 in kidney and lung", handler: async () => compareGeneExpression(["IFT88", "BBS1"], ["kidney", "lung"]) },
-
-    // ==================== EXPANSIONS FOR fetchUmapData (UMAP coordinates) ====================
-    { text: "Summarize UMAP clusters", handler: async () => getUmapClustersSummary() }, // New helper
-    { text: "How many clusters in UMAP?", handler: async () => getUmapClustersSummary() },
-    { text: "Show UMAP cluster info", handler: async () => getUmapClustersSummary() },
-    { text: "Display UMAP for ARL13B", handler: async () => displayUmapGeneExpression("ARL13B") },
-    { text: "UMAP plot for FOXJ1 expression", handler: async () => displayUmapGeneExpression("FOXJ1") },
-    { text: "Show the full UMAP plot", handler: async () => displayUmapPlot() },
-
-    // ==================== EXPANSIONS FOR fetchCellxgeneData (Single-cell expression) ====================
-    { text: "Expression summary for ARL13B in cell types", handler: async () => getCellTypeExpressionSummary("ARL13B") }, // New helper
-    { text: "Cell type expression for FOXJ1", handler: async () => getCellTypeExpressionSummary("FOXJ1") },
-    { text: "Show IFT88 in different cell types", handler: async () => getCellTypeExpressionSummary("IFT88") },
-    { text: "Bar chart for ARL13B single-cell", handler: async () => displayCellxgeneBarChart(["ARL13B"]) },
-    { text: "Compare FOXJ1 and ARL13B in scRNA", handler: async () => displayCellxgeneBarChart(["FOXJ1", "ARL13B"]) },
-    { text: "Expression of BBS1 in ciliated cells", handler: async () => getGeneExpressionInCellType("BBS1", "ciliated cell") },
-
-    // ==================== EXPANSIONS FOR fetchCorumComplexes (Complexes) ====================
-    { text: "Complexes containing IFT88", handler: async () => formatListResult("Complexes with IFT88", await getComplexesContainingGene("IFT88")) }, // New helper
-    { text: "Which complexes include BBS1?", handler: async () => formatListResult("Complexes with BBS1", await getComplexesContainingGene("BBS1")) },
-    { text: "Find complexes for ARL13B", handler: async () => formatListResult("Complexes with ARL13B", await getComplexesContainingGene("ARL13B")) },
-    { text: "Show subunits of BBSome", handler: async () => formatListResult("BBSome Subunits", await getGenesByComplex("BBSome")) },
-    { text: "IFT-A complex components", handler: async () => formatListResult("IFT-A Components", await getGenesByComplex("IFT-A")) },
-    { text: "Compare IFT-A and IFT-B", handler: async () => compareComplexes("IFT-A", "IFT-B") },
-
-    // ==================== EXPANSIONS FOR getDomainData (Domains) ====================
-    { text: "Genes with WD40 domain", handler: async () => formatListResult("WD40 Domain Genes", await getGenesWithDomain("WD40")) }, // New helper
-    { text: "List genes having EF-hand domain", handler: async () => formatListResult("EF-hand Domain Genes", await getGenesWithDomain("EF-hand")) },
-    { text: "Show genes with kinase domain", handler: async () => formatListResult("Kinase Domain Genes", await getGenesWithDomain("kinase")) },
-    { text: "Enriched domains list", handler: async () => displayEnrichedDomains() },
-    { text: "Depleted domains in cilia", handler: async () => displayDepletedDomains() },
-    { text: "Domains in IFT88", handler: async () => displayDomainsForGene("IFT88") },
-
-    // ==================== EXPANSIONS FOR fetchNeversPhylogenyData (Nevers matrix) ====================
-    { text: "Is IFT88 present in C. elegans (Nevers)?", handler: async () => checkNeversPresence("IFT88", "C. elegans") }, // New helper
-    { text: "Check BBS1 in zebrafish (Nevers 2017)", handler: async () => checkNeversPresence("BBS1", "zebrafish") },
-    { text: "Show conservation for ARL13B", handler: async () => getNeversConservation("ARL13B") },
-    { text: "Show phylogeny for CEP290", handler: async () => getNeversConservation("CEP290") },
-    { text: "Is NPHP1 in Drosophila (Nevers)?", handler: async () => checkNeversPresence("NPHP1", "Drosophila") },
-
-    // ==================== EXPANSIONS FOR fetchLiPhylogenyData (Li matrix) ====================
-    { text: "Is BBS1 present in mouse (Li)?", handler: async () => checkLiPresence("BBS1", "mouse") }, // New helper
-    { text: "Check ARL13B in Chlamydomonas (Li 2014)", handler: async () => checkLiPresence("ARL13B", "Chlamydomonas") },
-    { text: "Display conservation for IFT88", handler: async () => getLiConservation("IFT88") },
-    { text: "Show phylogeny for NPHP1", handler: async () => getLiConservation("NPHP1") },
-    { text: "Is CEP290 in Xenopus (Li)?", handler: async () => checkLiPresence("CEP290", "Xenopus") },
-    // ==================== NEW INTERSECTION QUERIES ====================
-
-// --- Disease X Localization ---
-{ text: "Which Joubert Syndrome genes are localized to the transition zone?", handler: async () => getDiseaseGenesByLocalization("Joubert Syndrome", "transition zone") },
-{ text: "Find Joubert genes in the transition zone", handler: async () => getDiseaseGenesByLocalization("Joubert Syndrome", "transition zone") },
-{ text: "Show BBS genes in the basal body", handler: async () => getDiseaseGenesByLocalization("Bardet–Biedl Syndrome", "basal body") },
-{ text: "Which Bardet-Biedl proteins are found at the basal body?", handler: async () => getDiseaseGenesByLocalization("Bardet–Biedl Syndrome", "basal body") },
-{ text: "Find Nephronophthisis genes localizing to the axoneme", handler: async () => getDiseaseGenesByLocalization("Nephronophthisis", "axoneme") },
-{ text: "MKS genes in the transition fiber", handler: async () => getDiseaseGenesByLocalization("Meckel–Gruber Syndrome", "transition fiber") },
-
-// --- Complex X Phenotype ---
-{ 
-    text: "Which IFT-B components cause shorter cilia?", 
-    handler: async () => getComplexGenesByPhenotype("IFT-B", "shorter cilia") 
-},
-{ 
-    text: "Show BBSome subunits causing long cilia", 
-    handler: async () => getComplexGenesByPhenotype("BBSome", "long cilia") 
-},
-{ 
-    text: "Which IFT-A proteins reduce cilia number?", 
-    handler: async () => getComplexGenesByPhenotype("IFT-A", "reduced cilia numbers") 
-},
-
-// ==================== NEW FUNCTIONAL LOOKUPS (Simple Expansion) ====================
-
-// --- Complex Lookup (Synonyms) ---
-{ 
-    text: "List subunits of ACK1 signaling complex", 
-    handler: async () => formatListResult("Components of ACK1 signaling complex", await getComplexSubunitsByName("ACK1 signaling complex")) 
-},
-{ 
-    text: "Show me ACK1 signaling complex components", 
-    handler: async () => formatListResult("Components of ACK1 signaling complex", await getComplexSubunitsByName("ACK1 signaling complex")) 
-},
-{ 
-    text: "ACK1 signaling complex subunits", 
-    handler: async () => formatListResult("Components of ACK1 signaling complex", await getComplexSubunitsByName("ACK1 signaling complex")) 
-},
-{ 
-    text: "What genes are in the BBSome complex?", 
-    handler: async () => formatListResult("Components of BBSome", await getComplexSubunitsByName("BBSome")) 
-},
-
-// --- Tissue Expression Lookup (Synonyms) ---
-{ 
-    text: "Top ciliary genes highly expressed in the retina", 
-    handler: async () => formatListResult("Top Ciliary Genes in Retina", await getTopGenesInTissue("retina")) 
-},
-{ 
-    text: "Top 10 expressed ciliary genes in kidney", 
-    handler: async () => formatListResult("Top Ciliary Genes in Kidney", await getTopGenesInTissue("kidney")) 
-},
-
-// --- Single-Cell Lookup (Synonyms) ---
-{ 
-    text: "Expression summary for ARL13B in cell types", 
-    handler: async () => getCellTypeExpressionSummary("ARL13B") 
-},
-{ 
-    text: "What are the most active cell types for IFT88?", 
-    handler: async () => getCellTypeExpressionSummary("IFT88") 
-},
-
-// --- Complexes by Gene ---
-{ 
-    text: "Complexes containing IFT88", 
-    handler: async () => formatListResult("Complexes with IFT88", await getComplexesContainingGene("IFT88")) 
-},
-{ 
-    text: "Which complexes include BBS1?", 
-    handler: async () => formatListResult("Complexes with BBS1", await getComplexesContainingGene("BBS1")) 
-},
-
-// --- Domain Search ---
-{ 
-    text: "Show genes with kinase domain", 
-    handler: async () => formatListResult("Kinase Domain Genes", await getGenesWithDomain("kinase")) 
-},
-
-// --- Phylogenetic Category ---
-{ 
-    text: "Genes present in all organisms", 
-    handler: async () => formatListResult("Genes in All Organisms", await getGenesByPhylogenyCategory("in_all_organisms")) 
-},
-
-// --- Phylogenetic Presence Check ---
-{ 
-    text: "Is IFT88 conserved in Chlamydomonas (Li 2014)?", 
-    handler: async () => checkLiPresence("IFT88", "C. reinhardtii") 
-},
-{ 
-    text: "Check BBS1 in zebrafish (Nevers 2017)", 
-    handler: async () => checkNeversPresence("BBS1", "zebrafish")},
 ];
 
-
-// ==================== EVOLUTIONARY CONSERVATION & PHYLOGENY ====================
+  // ==================== EVOLUTIONARY CONSERVATION & PHYLOGENY ====================
     // Note: We use a helper function to correctly wrap the output {genes, desc, species} -> HTML string.
 const wrapOrganismResult = async (organismName) => {
     const result = await getCiliaryGenesForOrganism(organismName);
@@ -3639,155 +3258,7 @@ async function getOrthologsInOrganism(organism) {
     return formatListResult(`Human Ciliary Genes with Orthologs in ${organism}`, genes, description);
 }
 
-// =============================================================================
-// NEW MODULAR HELPER FUNCTIONS (for Complex & Intersection Queries)
-// =============================================================================
 
-/**
- * Finds Ciliopathy genes that localize to a specific subcellular compartment.
- * DATA: Ciliopathy (CiliaHub) X Localization (CiliaHub).
- */
-async function getDiseaseGenesByLocalization(disease, localization) {
-    await fetchCiliaData(); // Assumed working
-    const { genes: diseaseGenes } = await getCiliopathyGenes(disease);
-    const diseaseGeneNames = new Set(diseaseGenes.map(g => g.gene.toUpperCase()));
-    const normLocalization = normalizeTerm(localization);
-    
-    const intersectingGenes = ciliaHubDataCache
-        .filter(g => 
-            diseaseGeneNames.has(g.gene.toUpperCase()) &&
-            g.localization && 
-            g.localization.some(loc => normalizeTerm(loc).includes(normLocalization))
-        )
-        .map(g => ({
-            gene: g.gene,
-            description: `Diseases: ${g.ciliopathy.join(', ')} | Loc: ${g.localization.join(', ')}`,
-        }));
-
-    const title = `${disease} Genes Localized to the ${localization}`;
-    return formatListResult(title, intersectingGenes);
-}
-
-/**
- * Finds genes in a specific Complex that cause a specific Ciliary Phenotype.
- * DATA: Complex (CORUM) X Phenotype (CiliaHub Screens).
- */
-async function getComplexGenesByPhenotype(complexName, phenotype) {
-    // 1. Get complex components (relies on the fixed CORUM lookup logic)
-    const complexComponents = await getGenesByComplex(complexName);
-    const componentGeneNames = new Set(complexComponents.map(c => c.gene.toUpperCase()));
-
-    // 2. Filter components against CiliaHub screening data
-    await fetchCiliaData();
-    const normPhenotype = phenotype.toLowerCase();
-    
-    const intersectingGenes = ciliaHubDataCache
-        .filter(g => {
-            const isComponent = componentGeneNames.has(g.gene.toUpperCase());
-            if (!isComponent) return false;
-            
-            // Check for phenotype match (Simplified screening logic based on existing fields)
-            return (
-                (normPhenotype.includes('short') && g.lof_effects?.toLowerCase().includes('shorter')) ||
-                (normPhenotype.includes('long') && g.lof_effects?.toLowerCase().includes('longer')) ||
-                (normPhenotype.includes('reduced') && g.percent_ciliated_cells_effects?.toLowerCase().includes('reduced'))
-            );
-        })
-        .map(g => ({
-            gene: g.gene,
-            description: `Phenotype: ${g.lof_effects || 'N/A'} | Ciliation: ${g.percent_ciliated_cells_effects || 'N/A'}`,
-        }));
-    
-    const title = `${complexName} Components Causing ${phenotype}`;
-    return formatListResult(title, intersectingGenes);
-}
-
-/**
- * Retrieves the subunits for a specific complex (CORUM and CiliaHub).
- */
-async function getComplexSubunitsByName(complexName) {
-    // Rely on fetchCorumComplexes being properly defined and run
-    await fetchCorumComplexes(); 
-
-    const nameLower = complexName.toLowerCase();
-    
-    // 1. Check CORUM Cache for exact match
-    const corumEntry = corumDataCache.byNameLower[nameLower];
-    if (corumEntry) {
-        return corumEntry.subunits.map(subunit => ({
-            gene: subunit.gene_name,
-            description: `CORUM Complex Subunit (ID: ${corumEntry.complex_id})`,
-            source: 'CORUM'
-        }));
-    }
-
-    // 2. Fallback to CiliaHub annotation search
-    const results = await getGenesByComplex(complexName); 
-    if (results.length > 0) return results;
-
-    return [];
-}
-
-/** Placeholder helper to get genes by simple phenotype keyword. */
-async function getGenesByPhenotypeKeyword(keyword) {
-    const screenData = await fetchScreenData();
-    const genes = [];
-    Object.entries(screenData).forEach(([gene, screens]) => {
-        if (screens.some(s => (s.phenotype || s.result).toLowerCase().includes(keyword.toLowerCase()))) {
-            genes.push({gene: gene, description: "Phenotype match in screening data"});
-        }
-    });
-    return genes;
-}
-
-/** Helper to get top N expressed genes in tissue (simple expression). */
-async function getTopGenesInTissue(tissue, topN = 10) {
-    await fetchTissueData();
-    await fetchCiliaData();
-    const ciliaryGeneSet = new Set(ciliaHubDataCache.map(g => g.gene.toUpperCase()));
-    
-    const expressed = Object.entries(window.tissueDataCache)
-        .filter(([gene]) => ciliaryGeneSet.has(gene))
-        .map(([gene, tissues]) => ({ gene, expr: tissues[tissue] || 0 }))
-        .filter(e => e.expr > 0)
-        .sort((a, b) => b.expr - a.expr)
-        .slice(0, topN)
-        .map(e => ({gene: e.gene, description: `nTPM: ${e.expr.toFixed(2)}`}));
-        
-    return expressed;
-}
-
-/** Helper for UMAP cluster summary. */
-async function getUmapClustersSummary() {
-    const data = await fetchUmapData();
-    if (!data) return `<div class="result-card"><h3>UMAP Info</h3><p class="status-not-found">No UMAP data available.</p></div>`;
-    const cellTypes = [...new Set(data.map(p => p.cell_type))];
-    return `<div class="result-card"><h3>UMAP Cell Type Summary</h3><p>Data loaded for ${data.length} cells across ${cellTypes.length} types. Major types: ${cellTypes.slice(0, 5).join(', ')}${cellTypes.length > 5 ? '...' : ''}</p></div>`;
-}
-
-/** Helper to get complexes by gene (uses corumDataCache.byGene) */
-async function getComplexesContainingGene(geneSymbol) {
-    await fetchCorumComplexes();
-    const complexes = getComplexesByGene(geneSymbol); // Assumed to return array of complexes
-    return complexes.length > 0 ? complexes.map(c => c.complexName) : [];
-}
-
-// NOTE: checkNeversPresence and checkLiPresence functions are needed but assumed to be defined elsewhere in the full file.
-// For now, these are placeholder names.
-async function checkNeversPresence(geneSymbol, species) {
-    const data = await fetchNeversPhylogenyData();
-    const orgCode = species.replace(' ', '.');
-    // Simplified logic for presentation
-    const isPresent = data?.genes?.[geneSymbol.toUpperCase()]?.s?.includes(orgCode);
-    return `<div class="result-card"><h3>Conservation Check</h3><p>Gene ${geneSymbol} is ${isPresent ? 'PRESENT' : 'NOT PRESENT'} in ${species} (Nevers 2017).</p></div>`;
-}
-async function checkLiPresence(geneSymbol, species) {
-    const data = await fetchLiPhylogenyData();
-    const orgCode = species.replace(' ', '.');
-    // Simplified logic for presentation
-    const isPresent = Object.values(data?.genes || {}).some(g => g.g.toUpperCase() === geneSymbol.toUpperCase() && g.s.includes(orgCode));
-    return `<div class="result-card"><h3>Conservation Check</h3><p>Gene ${geneSymbol} is ${isPresent ? 'PRESENT' : 'NOT PRESENT'} in ${species} (Li 2014).</p></div>`;
-}
 // =============================================================================
 // UPDATE INTENT PARSER WITH ADDITIONAL KEYWORDS
 // =============================================================================
@@ -4675,30 +4146,32 @@ function formatGeneDetail(geneData, geneSymbol, detailTitle, detailContent) {
   `;
 }
 
-
-
 // --- FINAL UPDATED formatListResult (Accepts 5 arguments) ---
 
-//  Helper: formatListResult
 function formatListResult(title, geneList, citationHtml = '', speciesCode = '', targetKey = null) {
     if (!geneList || geneList.length === 0) {
+        // ... (unchanged)
         return `<div class="result-card"><h3>${title}</h3><p class="status-not-found">No matching genes found.</p></div>`;
     }
 
     const displayedGenes = geneList.slice(0, 100);
     const showOrthologColumn = targetKey && targetKey !== null;
     
+    // Determine species name for the ortholog column header
     const orthologSpeciesName = speciesCode.replace(/(\w\.\w+)\s*/, '').replace('drosophila', 'Fly').replace('elegans', 'C. elegans').trim() || 'Ortholog';
 
+    // Determine the most accurate label for the Human Gene Column
     let humanColumnLabel = "Human Gene";
     if (title.includes("Genes Conserved")) {
-        humanColumnLabel = "Human Disease Gene";
+        humanColumnLabel = "Human Disease Gene"; // Best label for conserved disease lists
     }
     
+    // --- Build Table Rows ---
     const tableRows = displayedGenes.map(g => {
         let cells = `<td><strong>${g.gene}</strong></td>`;
         
         if (showOrthologColumn) {
+            // Access the ortholog name using the dynamic key (g[targetKey])
             const orthologName = g[targetKey] || 'N/A';
             cells += `<td>${orthologName}</td>`;
         }
@@ -4707,6 +4180,7 @@ function formatListResult(title, geneList, citationHtml = '', speciesCode = '', 
         return `<tr>${cells}</tr>`;
     }).join('');
 
+    // --- Build Table Header ---
     let tableHeader = `
     <thead>
         <tr>
@@ -4721,6 +4195,7 @@ function formatListResult(title, geneList, citationHtml = '', speciesCode = '', 
         </tr>
     </thead>`;
 
+    // --- Final HTML Structure ---
     const tableHtml = `
     <table class="ciliopathy-table" id="download-table-content">
         ${tableHeader}
@@ -4730,6 +4205,7 @@ function formatListResult(title, geneList, citationHtml = '', speciesCode = '', 
     
     const titleHtml = `<h3>${title} (${geneList.length} found)</h3>`;
     const downloadButtonHtml = `<button class="download-button" onclick="downloadTable('download-table-content', '${title.replace(/[^a-z0-9]/gi, '_')}')">Download CSV</button>`;
+
 
     return `
     <div class="result-card">
@@ -4926,93 +4402,6 @@ function formatComplexResults(gene, title) {
     }
     return html + '</div>';
 }
-
-// New helper: Get genes by phenotype keyword (uses fetchScreenData)
-async function getGenesByPhenotypeKeyword(keyword) {
-    const screenData = await fetchScreenData();
-    const genes = [];
-    Object.entries(screenData).forEach(([gene, screens]) => {
-        if (screens.some(s => s.phenotype.toLowerCase().includes(keyword.toLowerCase()))) {
-            genes.push(gene);
-        }
-    });
-    return genes.length > 0 ? genes : "No genes found with phenotype containing '" + keyword + "'.";
-}
-
-// New helper: Get phylogeny category genes (uses fetchPhylogenyData)
-async function getGenesByPhylogenyCategory(category) {
-    const data = await fetchPhylogenyData();
-    const genes = Object.values(data)
-        .filter(d => d.category === category)
-        .map(d => d.sym);
-    return genes.length > 0 ? genes : "No genes in category '" + category + "'.";
-}
-
-// New helper: Get top expressed genes in tissue (uses fetchTissueData)
-async function getTopGenesInTissue(tissue, topN = 10) {
-    const data = await fetchTissueData();
-    const expressed = Object.entries(data)
-        .map(([gene, tissues]) => ({ gene, expr: tissues[tissue] || 0 }))
-        .filter(e => e.expr > 0)
-        .sort((a, b) => b.expr - a.expr)
-        .slice(0, topN)
-        .map(e => e.gene);
-    return expressed.length > 0 ? expressed : "No expression data for tissue '" + tissue + "'.";
-}
-
-// New helper: Get UMAP clusters summary (uses fetchUmapData)
-async function getUmapClustersSummary() {
-    const data = await fetchUmapData();
-    if (!data) return "No UMAP data available.";
-    const clusters = new Set(data.map(p => p.cluster));
-    return `UMAP has ${clusters.size} clusters: ${Array.from(clusters).join(", ")}`;
-}
-
-// New helper: Get cell type expression summary for gene (uses fetchCellxgeneData)
-async function getCellTypeExpressionSummary(geneSymbol) {
-    const data = await fetchCellxgeneData();
-    const geneData = data[geneSymbol.toUpperCase()];
-    if (!geneData) return "No single-cell data for " + geneSymbol + ".";
-    let summary = `Expression of ${geneSymbol} in cell types:\n`;
-    Object.entries(geneData).forEach(([cellType, expr]) => {
-        summary += `- ${cellType}: ${expr.toFixed(4)}\n`;
-    });
-    return summary;
-}
-
-// New helper: Get complex names containing gene (uses fetchCorumComplexes)
-async function getComplexesContainingGene(geneSymbol) {
-    await fetchCorumComplexes();
-    const complexes = getComplexesByGene(geneSymbol);
-    return complexes.length > 0 ? complexes.map(c => c.complexName) : "No complexes found containing " + geneSymbol + ".";
-}
-
-// New helper: Get genes with specific domain (uses getDomainData)
-async function getGenesWithDomain(domain) {
-    const db = await getDomainData();
-    if (!db || !db.gene_map) return "Domain data not available.";
-    const genes = Object.entries(db.gene_map)
-        .filter(([g, domains]) => domains.some(d => d.toLowerCase().includes(domain.toLowerCase())))
-        .map(([g]) => g);
-    return genes.length > 0 ? genes : "No genes with domain '" + domain + "'.";
-}
-
-// New helper: Check presence in Nevers matrix (uses fetchNeversPhylogenyData)
-async function checkNeversPresence(geneSymbol, species) {
-    const data = await fetchNeversPhylogenyData();
-    if (!data) return "Nevers data not available.";
-    const geneData = data[geneSymbol.toUpperCase()];
-    return geneData && geneData.species.includes(species) ? `${geneSymbol} present in ${species} (Nevers 2017)` : `${geneSymbol} not present in ${species} (Nevers 2017)`;
-}
-
-// New helper: Check presence in Li matrix (uses fetchLiPhylogenyData)
-async function checkLiPresence(geneSymbol, species) {
-    const data = await fetchLiPhylogenyData();
-    if (!data) return "Li data not available.";
-    const geneData = data[geneSymbol.toUpperCase()];
-    return geneData && geneData.species.includes(species) ? `${geneSymbol} present in ${species} (Li 2014)` : `${geneSymbol} not present in ${species} (Li 2014)`;
-}
-
 // =============================================================================
 // ENHANCED: Autocomplete with Trigger Word Detection + Contextual Suggestions
 // =============================================================================
