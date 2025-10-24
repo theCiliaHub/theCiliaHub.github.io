@@ -354,76 +354,75 @@ const intentParser = createIntentParser();
 
 // --- Data Fetching and Caching (Updated with New Integration Logic) ---
 
+/ --- Fetch Functions ---
 async function fetchCiliaData() {
-    if (ciliaHubDataCache) return ciliaHubDataCache;
+    if (ciliaHubDataCache && ciliaHubDataCache.length > 0) {
+        console.log('Returning cached CiliaHub data:', ciliaHubDataCache.length, 'genes, including:', ciliaHubDataCache.slice(0, 10).map(g => g.gene));
+        return ciliaHubDataCache;
+    }
     try {
-        // Fetch primary gene data
+        console.log('Fetching CiliaHub data from source...');
         const response = await fetch('https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/ciliahub_data.json');
         if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
         const data = await response.json();
 
-        // Fetch screen data for merging
-        const screenData = await fetchScreenData(); // Ensure screen data is loaded
+        if (!Array.isArray(data) || data.length === 0) {
+            throw new Error('Invalid or empty CiliaHub data');
+        }
 
+        const screenData = await fetchScreenData();
         const processToArray = (field) => {
             if (typeof field === 'string') return field.split(',').map(item => item.trim()).filter(Boolean);
             if (Array.isArray(field)) return field;
             return [];
         };
 
-        ciliaHubDataCache = data.map(gene => {
-            const geneUpper = gene.gene.toUpperCase();
-
-            // 1. Map core gene fields to arrays where appropriate
+        ciliaHubDataCache = data.map((gene, index) => {
+            if (!gene || !gene.gene || typeof gene.gene !== 'string') {
+                console.warn(`Invalid gene entry at index ${index}, skipping:`, gene);
+                return null;
+            }
+            const geneUpper = gene.gene.toUpperCase().trim();
             const processedGene = {
                 ...gene,
+                gene: gene.gene.trim(),
                 functional_category: processToArray(gene.functional_category),
                 domain_descriptions: processToArray(gene.domain_descriptions),
                 ciliopathy: processToArray(gene.ciliopathy),
                 localization: processToArray(gene.localization),
                 complex_names: processToArray(gene.complex_names),
-                complex_components: processToArray(gene.complex_components)
+                complex_components: processToArray(gene.complex_components),
+                description: gene.description || "No description available"
             };
 
-            // 2. Add Cilia Effects from ciliahub_data.json
-            // These fields are correctly sourced from the main ciliahub_data.json.
             const effectsFromHub = {
                 overexpression_effects: processedGene.overexpression_effects || "Not Reported",
                 lof_effects: processedGene.lof_effects || "Not Reported",
                 percent_ciliated_cells_effects: processedGene.percent_ciliated_cells_effects || "Not Reported",
             };
 
-            // 3. Merge in custom effects on cilia if the gene is found in screenData, 
-            // but explicitly ignoring the 'screens' field in the main data.
-            // Note: The logic requires that the new 'effects' data comes from 
-            // ciliahub_data.json (which we've done in point #2) 
-            // AND the screen data should be integrated with gene data for display.
-            // The request states "Please add effects on cilia together with cilia_screens_data.json."
-            // We interpret this as ensuring both the core effects (from the old 'screens' in the hub)
-            // and the detailed screens (from the separate JSON) are present for a gene.
             const screensFromSeparateFile = screenData[geneUpper] || [];
 
-            // 4. Ensure new requested fields are added (they should be present but are mapped for clarity)
             const newIntegratedFields = {
-                // These are the new requested fields, ensuring they exist:
                 ciliopathy_classification: processedGene.ciliopathy_classification || "Not Classified",
                 ortholog_mouse: processedGene.ortholog_mouse || "N/A",
                 ortholog_c_elegans: processedGene.ortholog_c_elegans || "N/A",
                 ortholog_xenopus: processedGene.ortholog_xenopus || "N/A",
                 ortholog_zebrafish: processedGene.ortholog_zebrafish || "N/A",
                 ortholog_drosophila: processedGene.ortholog_drosophila || "N/A",
-                
-                // Add the explicit effects from the Hub for use in gene summary:
-                ...effectsFromHub, 
-
-                // Add the screens array from the separate file for the comprehensive details card:
+                ...effectsFromHub,
                 screens_from_separate_file: screensFromSeparateFile
             };
 
             return { ...processedGene, ...newIntegratedFields };
-        });
+        }).filter(g => g !== null);
 
-        console.log('CiliaHub data loaded and formatted with new orthologs, classification, and screens integration successfully.');
+        if (!ciliaHubDataCache.some(g => g.gene.toUpperCase() === 'ARL13B')) {
+            console.warn('ARL13B not found in processed data. Raw data contains ARL13B:', data.some(g => g.gene === 'ARL13B'));
+        }
+
+        allGeneSymbols = new Set([...ciliaHubDataCache.map(g => g.gene.toUpperCase()), ...Object.keys(screenData)]);
+        console.log('CiliaHub data loaded and formatted with', ciliaHubDataCache.length, 'genes, including:', ciliaHubDataCache.slice(0, 10).map(g => g.gene));
         return ciliaHubDataCache;
     } catch (error) {
         console.error("Failed to fetch CiliaHub data:", error);
@@ -432,8 +431,6 @@ async function fetchCiliaData() {
     }
 }
 
-
-// --- UPDATED fetchScreenData function (to be replaced in your code) ---
 async function fetchScreenData() {
     if (screenDataCache) return screenDataCache;
     try {
@@ -441,15 +438,12 @@ async function fetchScreenData() {
         if (!response.ok) throw new Error(`Failed to fetch screen data: ${response.statusText}`);
         const data = await response.json();
         screenDataCache = data;
-        
-        // --- NEW: Populate allGeneSymbols cache with screen genes ---
-        const screenGenes = Object.keys(data);
+
         if (!allGeneSymbols) {
-            allGeneSymbols = new Set(screenGenes);
+            allGeneSymbols = new Set(Object.keys(data));
         } else {
-            screenGenes.forEach(gene => allGeneSymbols.add(gene));
+            Object.keys(data).forEach(gene => allGeneSymbols.add(gene));
         }
-        // This process needs to be finalized in fetchCiliaData too for complete coverage.
 
         console.log('Screen data loaded successfully:', Object.keys(data).length, 'genes');
         return screenDataCache;
@@ -1052,7 +1046,6 @@ async function getPhylogenyGenesForOrganism(organismName) {
     );
 }
 // --- Helper Functions ---
-
 // Helper to get orthologs for a gene
 async function getHubOrthologsForGene(geneSymbol) {
     const data = await fetchCiliaData();
@@ -1064,11 +1057,11 @@ async function getHubOrthologsForGene(geneSymbol) {
     console.log('Searching for gene:', geneSymbol);
     const geneData = data.find(g => g.gene.toUpperCase() === geneSymbol.toUpperCase());
     if (!geneData) {
-        console.error(`Gene ${geneSymbol} not found in dataset. Available genes:`, data.map(g => g.gene));
+        console.error(`Gene ${geneSymbol} not found in dataset. Available genes include:`, data.slice(0, 10).map(g => g.gene), '...');
         return `Gene ${geneSymbol} not found in the database.`;
     }
     
-    console.log('Found gene data:', geneData);
+    console.log('Found gene data for', geneSymbol, ':', geneData);
     const orthologs = [];
     for (const [key, value] of Object.entries(geneData)) {
         if (key.startsWith('ortholog_') && value !== "N/A" && value) {
@@ -1078,7 +1071,6 @@ async function getHubOrthologsForGene(geneSymbol) {
     }
     return orthologs.length > 0 ? orthologs.join('\n') : `No orthologs found for ${geneSymbol}.`;
 }
-
 
 // Helper to get genes with orthologs in a specific organism
 async function getGenesWithOrthologInOrganism(organism) {
@@ -1125,7 +1117,6 @@ async function getGeneEffectsSummary(geneSymbol) {
     return table;
 }
 
-
 // Helper to get screen results for a gene
 async function getScreenResults(geneSymbol, screenType) {
     const screenData = await fetchScreenData();
@@ -1141,6 +1132,7 @@ async function getScreenResults(geneSymbol, screenType) {
     });
     return result.includes('Phenotype') ? result : `No data found for ${screenType} screen.`;
 }
+
 
 /**
  * Generates a help card explaining the two different sources for organism data.
@@ -4298,30 +4290,26 @@ function formatGeneDetail(geneData, geneSymbol, detailTitle, detailContent) {
 
 // --- FINAL UPDATED formatListResult (Accepts 5 arguments) ---
 
+/ Helper: formatListResult
 function formatListResult(title, geneList, citationHtml = '', speciesCode = '', targetKey = null) {
     if (!geneList || geneList.length === 0) {
-        // ... (unchanged)
         return `<div class="result-card"><h3>${title}</h3><p class="status-not-found">No matching genes found.</p></div>`;
     }
 
     const displayedGenes = geneList.slice(0, 100);
     const showOrthologColumn = targetKey && targetKey !== null;
     
-    // Determine species name for the ortholog column header
     const orthologSpeciesName = speciesCode.replace(/(\w\.\w+)\s*/, '').replace('drosophila', 'Fly').replace('elegans', 'C. elegans').trim() || 'Ortholog';
 
-    // Determine the most accurate label for the Human Gene Column
     let humanColumnLabel = "Human Gene";
     if (title.includes("Genes Conserved")) {
-        humanColumnLabel = "Human Disease Gene"; // Best label for conserved disease lists
+        humanColumnLabel = "Human Disease Gene";
     }
     
-    // --- Build Table Rows ---
     const tableRows = displayedGenes.map(g => {
         let cells = `<td><strong>${g.gene}</strong></td>`;
         
         if (showOrthologColumn) {
-            // Access the ortholog name using the dynamic key (g[targetKey])
             const orthologName = g[targetKey] || 'N/A';
             cells += `<td>${orthologName}</td>`;
         }
@@ -4330,7 +4318,6 @@ function formatListResult(title, geneList, citationHtml = '', speciesCode = '', 
         return `<tr>${cells}</tr>`;
     }).join('');
 
-    // --- Build Table Header ---
     let tableHeader = `
     <thead>
         <tr>
@@ -4345,7 +4332,6 @@ function formatListResult(title, geneList, citationHtml = '', speciesCode = '', 
         </tr>
     </thead>`;
 
-    // --- Final HTML Structure ---
     const tableHtml = `
     <table class="ciliopathy-table" id="download-table-content">
         ${tableHeader}
@@ -4355,7 +4341,6 @@ function formatListResult(title, geneList, citationHtml = '', speciesCode = '', 
     
     const titleHtml = `<h3>${title} (${geneList.length} found)</h3>`;
     const downloadButtonHtml = `<button class="download-button" onclick="downloadTable('download-table-content', '${title.replace(/[^a-z0-9]/gi, '_')}')">Download CSV</button>`;
-
 
     return `
     <div class="result-card">
