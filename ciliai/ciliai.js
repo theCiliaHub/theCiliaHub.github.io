@@ -819,13 +819,8 @@ async function getOrthologsInOrganism(geneSymbol, organismName) {
 
 // --- Original getHubOrthologsForGene modified to use the new function ---
 async function getHubOrthologsForGene(gene) {
-    // If only the gene name is given, we assume the user wants the full table.
-    // We choose an arbitrary curated organism (Mouse) to force the curated lookup path.
-    return getOrthologsInOrganism(gene, 'mouse');
-    return getOrthologsInOrganism(gene, 'c. elegans');
-    return getOrthologsInOrganism(gene,  'zebrafish');
-    return getOrthologsInOrganism(gene,  'drosophila');
-    return getOrthologsInOrganism(gene,  'xenopus');
+    // Only this line executes and the function immediately exits.
+    return getOrthologsInOrganism(gene, 'mouse');
 }
 
 
@@ -1327,15 +1322,9 @@ const questionRegistry = [
     { text: "What is the source for Ciliary genes in drosophila?", handler: async () => tellAboutOrganismSources("drosophila") },
 
 // Core organism checks (prioritizes curated CiliaHub data)
-{ text: "What is the C. elegans ortholog for ARL13B?", handler: async () => getHubOrthologsForGene("ARL13B", "C. elegans") },
-{ text: "Zebrafish ortholog name for NPHP1", handler: async () => getHubOrthologsForGene("NPHP1", "zebrafish") },
-{ text: "Drosophila ortholog of BBS1", handler: async () => getHubOrthologsForGene("BBS1", "drosophila") },
-{ text: "Show orthologs of IFT88 in mouse", handler: async () => getHubOrthologsForGene("IFT88") }, 
-{ text: "What is the IFT88 ortholog in mouse?", handler: async () => getHubOrthologsForGene("IFT88") },
-{ text: "Show me the ortholog of IFT88 in mouse", handler: async () => getHubOrthologsForGene("IFT88") }, 
-{ text: "Display the IFT88 ortholog in mouse?", handler: async () => getHubOrthologsForGene("IFT88") },
-{ text: "Tell me about the IFT88 ortholog in mouse?", handler: async () => getHubOrthologsForGene("IFT88") },
-{ text: "List the IFT88 ortholog in mouse?", handler: async () => getHubOrthologsForGene("IFT88") },
+{ text: "Show orthologs of IFT88 in mouse",   handler: async () => getOrthologsInOrganism("IFT88", "mouse") },
+{ text: "What is the C. elegans ortholog for ARL13B?", handler: async () => getOrthologsInOrganism("ARL13B", "C. elegans") },
+{ text: "Zebrafish ortholog name for NPHP1", handler: async () => getOrthologsInOrganism("NPHP1", "zebrafish") },
     
 // Phylogenetic Lookup: Directs to combined phylogenetic data (Strategy 2)
 { text: "Tell me about IFT88 in Chlamydomonas", handler: async () => getOrthologsInOrganism("IFT88", "Chlamydomonas") },
