@@ -2371,10 +2371,11 @@ const questionRegistry = [
 },
 { 
     text: "Check BBS1 in zebrafish (Nevers 2017)", 
-    handler: async () => checkNeversPresence("BBS1", "zebrafish")
+    handler: async () => checkNeversPresence("BBS1", "zebrafish")},
 ];
 
-  // ==================== EVOLUTIONARY CONSERVATION & PHYLOGENY ====================
+
+// ==================== EVOLUTIONARY CONSERVATION & PHYLOGENY ====================
     // Note: We use a helper function to correctly wrap the output {genes, desc, species} -> HTML string.
 const wrapOrganismResult = async (organismName) => {
     const result = await getCiliaryGenesForOrganism(organismName);
