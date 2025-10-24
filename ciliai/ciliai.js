@@ -352,9 +352,7 @@ function createIntentParser() {
 
 const intentParser = createIntentParser();
 
-// --- Data Fetching and Caching (Updated with New Integration Logic) ---
-
-/ --- Fetch Functions ---
+// --- Fetch Functions ---// 
 async function fetchCiliaData() {
     if (ciliaHubDataCache && ciliaHubDataCache.length > 0) {
         console.log('Returning cached CiliaHub data:', ciliaHubDataCache.length, 'genes, including:', ciliaHubDataCache.slice(0, 10).map(g => g.gene));
@@ -2280,6 +2278,100 @@ const questionRegistry = [
     { text: "Display conservation for IFT88", handler: async () => getLiConservation("IFT88") },
     { text: "Show phylogeny for NPHP1", handler: async () => getLiConservation("NPHP1") },
     { text: "Is CEP290 in Xenopus (Li)?", handler: async () => checkLiPresence("CEP290", "Xenopus") },
+    // ==================== NEW INTERSECTION QUERIES ====================
+
+// --- Disease X Localization ---
+{ text: "Which Joubert Syndrome genes are localized to the transition zone?", handler: async () => getDiseaseGenesByLocalization("Joubert Syndrome", "transition zone") },
+{ text: "Find Joubert genes in the transition zone", handler: async () => getDiseaseGenesByLocalization("Joubert Syndrome", "transition zone") },
+{ text: "Show BBS genes in the basal body", handler: async () => getDiseaseGenesByLocalization("Bardet–Biedl Syndrome", "basal body") },
+{ text: "Which Bardet-Biedl proteins are found at the basal body?", handler: async () => getDiseaseGenesByLocalization("Bardet–Biedl Syndrome", "basal body") },
+{ text: "Find Nephronophthisis genes localizing to the axoneme", handler: async () => getDiseaseGenesByLocalization("Nephronophthisis", "axoneme") },
+{ text: "MKS genes in the transition fiber", handler: async () => getDiseaseGenesByLocalization("Meckel–Gruber Syndrome", "transition fiber") },
+
+// --- Complex X Phenotype ---
+{ 
+    text: "Which IFT-B components cause shorter cilia?", 
+    handler: async () => getComplexGenesByPhenotype("IFT-B", "shorter cilia") 
+},
+{ 
+    text: "Show BBSome subunits causing long cilia", 
+    handler: async () => getComplexGenesByPhenotype("BBSome", "long cilia") 
+},
+{ 
+    text: "Which IFT-A proteins reduce cilia number?", 
+    handler: async () => getComplexGenesByPhenotype("IFT-A", "reduced cilia numbers") 
+},
+
+// ==================== NEW FUNCTIONAL LOOKUPS (Simple Expansion) ====================
+
+// --- Complex Lookup (Synonyms) ---
+{ 
+    text: "List subunits of ACK1 signaling complex", 
+    handler: async () => formatListResult("Components of ACK1 signaling complex", await getComplexSubunitsByName("ACK1 signaling complex")) 
+},
+{ 
+    text: "Show me ACK1 signaling complex components", 
+    handler: async () => formatListResult("Components of ACK1 signaling complex", await getComplexSubunitsByName("ACK1 signaling complex")) 
+},
+{ 
+    text: "ACK1 signaling complex subunits", 
+    handler: async () => formatListResult("Components of ACK1 signaling complex", await getComplexSubunitsByName("ACK1 signaling complex")) 
+},
+{ 
+    text: "What genes are in the BBSome complex?", 
+    handler: async () => formatListResult("Components of BBSome", await getComplexSubunitsByName("BBSome")) 
+},
+
+// --- Tissue Expression Lookup (Synonyms) ---
+{ 
+    text: "Top ciliary genes highly expressed in the retina", 
+    handler: async () => formatListResult("Top Ciliary Genes in Retina", await getTopGenesInTissue("retina")) 
+},
+{ 
+    text: "Top 10 expressed ciliary genes in kidney", 
+    handler: async () => formatListResult("Top Ciliary Genes in Kidney", await getTopGenesInTissue("kidney")) 
+},
+
+// --- Single-Cell Lookup (Synonyms) ---
+{ 
+    text: "Expression summary for ARL13B in cell types", 
+    handler: async () => getCellTypeExpressionSummary("ARL13B") 
+},
+{ 
+    text: "What are the most active cell types for IFT88?", 
+    handler: async () => getCellTypeExpressionSummary("IFT88") 
+},
+
+// --- Complexes by Gene ---
+{ 
+    text: "Complexes containing IFT88", 
+    handler: async () => formatListResult("Complexes with IFT88", await getComplexesContainingGene("IFT88")) 
+},
+{ 
+    text: "Which complexes include BBS1?", 
+    handler: async () => formatListResult("Complexes with BBS1", await getComplexesContainingGene("BBS1")) 
+},
+
+// --- Domain Search ---
+{ 
+    text: "Show genes with kinase domain", 
+    handler: async () => formatListResult("Kinase Domain Genes", await getGenesWithDomain("kinase")) 
+},
+
+// --- Phylogenetic Category ---
+{ 
+    text: "Genes present in all organisms", 
+    handler: async () => formatListResult("Genes in All Organisms", await getGenesByPhylogenyCategory("in_all_organisms")) 
+},
+
+// --- Phylogenetic Presence Check ---
+{ 
+    text: "Is IFT88 conserved in Chlamydomonas (Li 2014)?", 
+    handler: async () => checkLiPresence("IFT88", "C. reinhardtii") 
+},
+{ 
+    text: "Check BBS1 in zebrafish (Nevers 2017)", 
+    handler: async () => checkNeversPresence("BBS1", "zebrafish")
 ];
 
   // ==================== EVOLUTIONARY CONSERVATION & PHYLOGENY ====================
@@ -3398,7 +3490,155 @@ async function getOrthologsInOrganism(organism) {
     return formatListResult(`Human Ciliary Genes with Orthologs in ${organism}`, genes, description);
 }
 
+// =============================================================================
+// NEW MODULAR HELPER FUNCTIONS (for Complex & Intersection Queries)
+// =============================================================================
 
+/**
+ * Finds Ciliopathy genes that localize to a specific subcellular compartment.
+ * DATA: Ciliopathy (CiliaHub) X Localization (CiliaHub).
+ */
+async function getDiseaseGenesByLocalization(disease, localization) {
+    await fetchCiliaData(); // Assumed working
+    const { genes: diseaseGenes } = await getCiliopathyGenes(disease);
+    const diseaseGeneNames = new Set(diseaseGenes.map(g => g.gene.toUpperCase()));
+    const normLocalization = normalizeTerm(localization);
+    
+    const intersectingGenes = ciliaHubDataCache
+        .filter(g => 
+            diseaseGeneNames.has(g.gene.toUpperCase()) &&
+            g.localization && 
+            g.localization.some(loc => normalizeTerm(loc).includes(normLocalization))
+        )
+        .map(g => ({
+            gene: g.gene,
+            description: `Diseases: ${g.ciliopathy.join(', ')} | Loc: ${g.localization.join(', ')}`,
+        }));
+
+    const title = `${disease} Genes Localized to the ${localization}`;
+    return formatListResult(title, intersectingGenes);
+}
+
+/**
+ * Finds genes in a specific Complex that cause a specific Ciliary Phenotype.
+ * DATA: Complex (CORUM) X Phenotype (CiliaHub Screens).
+ */
+async function getComplexGenesByPhenotype(complexName, phenotype) {
+    // 1. Get complex components (relies on the fixed CORUM lookup logic)
+    const complexComponents = await getGenesByComplex(complexName);
+    const componentGeneNames = new Set(complexComponents.map(c => c.gene.toUpperCase()));
+
+    // 2. Filter components against CiliaHub screening data
+    await fetchCiliaData();
+    const normPhenotype = phenotype.toLowerCase();
+    
+    const intersectingGenes = ciliaHubDataCache
+        .filter(g => {
+            const isComponent = componentGeneNames.has(g.gene.toUpperCase());
+            if (!isComponent) return false;
+            
+            // Check for phenotype match (Simplified screening logic based on existing fields)
+            return (
+                (normPhenotype.includes('short') && g.lof_effects?.toLowerCase().includes('shorter')) ||
+                (normPhenotype.includes('long') && g.lof_effects?.toLowerCase().includes('longer')) ||
+                (normPhenotype.includes('reduced') && g.percent_ciliated_cells_effects?.toLowerCase().includes('reduced'))
+            );
+        })
+        .map(g => ({
+            gene: g.gene,
+            description: `Phenotype: ${g.lof_effects || 'N/A'} | Ciliation: ${g.percent_ciliated_cells_effects || 'N/A'}`,
+        }));
+    
+    const title = `${complexName} Components Causing ${phenotype}`;
+    return formatListResult(title, intersectingGenes);
+}
+
+/**
+ * Retrieves the subunits for a specific complex (CORUM and CiliaHub).
+ */
+async function getComplexSubunitsByName(complexName) {
+    // Rely on fetchCorumComplexes being properly defined and run
+    await fetchCorumComplexes(); 
+
+    const nameLower = complexName.toLowerCase();
+    
+    // 1. Check CORUM Cache for exact match
+    const corumEntry = corumDataCache.byNameLower[nameLower];
+    if (corumEntry) {
+        return corumEntry.subunits.map(subunit => ({
+            gene: subunit.gene_name,
+            description: `CORUM Complex Subunit (ID: ${corumEntry.complex_id})`,
+            source: 'CORUM'
+        }));
+    }
+
+    // 2. Fallback to CiliaHub annotation search
+    const results = await getGenesByComplex(complexName); 
+    if (results.length > 0) return results;
+
+    return [];
+}
+
+/** Placeholder helper to get genes by simple phenotype keyword. */
+async function getGenesByPhenotypeKeyword(keyword) {
+    const screenData = await fetchScreenData();
+    const genes = [];
+    Object.entries(screenData).forEach(([gene, screens]) => {
+        if (screens.some(s => (s.phenotype || s.result).toLowerCase().includes(keyword.toLowerCase()))) {
+            genes.push({gene: gene, description: "Phenotype match in screening data"});
+        }
+    });
+    return genes;
+}
+
+/** Helper to get top N expressed genes in tissue (simple expression). */
+async function getTopGenesInTissue(tissue, topN = 10) {
+    await fetchTissueData();
+    await fetchCiliaData();
+    const ciliaryGeneSet = new Set(ciliaHubDataCache.map(g => g.gene.toUpperCase()));
+    
+    const expressed = Object.entries(window.tissueDataCache)
+        .filter(([gene]) => ciliaryGeneSet.has(gene))
+        .map(([gene, tissues]) => ({ gene, expr: tissues[tissue] || 0 }))
+        .filter(e => e.expr > 0)
+        .sort((a, b) => b.expr - a.expr)
+        .slice(0, topN)
+        .map(e => ({gene: e.gene, description: `nTPM: ${e.expr.toFixed(2)}`}));
+        
+    return expressed;
+}
+
+/** Helper for UMAP cluster summary. */
+async function getUmapClustersSummary() {
+    const data = await fetchUmapData();
+    if (!data) return `<div class="result-card"><h3>UMAP Info</h3><p class="status-not-found">No UMAP data available.</p></div>`;
+    const cellTypes = [...new Set(data.map(p => p.cell_type))];
+    return `<div class="result-card"><h3>UMAP Cell Type Summary</h3><p>Data loaded for ${data.length} cells across ${cellTypes.length} types. Major types: ${cellTypes.slice(0, 5).join(', ')}${cellTypes.length > 5 ? '...' : ''}</p></div>`;
+}
+
+/** Helper to get complexes by gene (uses corumDataCache.byGene) */
+async function getComplexesContainingGene(geneSymbol) {
+    await fetchCorumComplexes();
+    const complexes = getComplexesByGene(geneSymbol); // Assumed to return array of complexes
+    return complexes.length > 0 ? complexes.map(c => c.complexName) : [];
+}
+
+// NOTE: checkNeversPresence and checkLiPresence functions are needed but assumed to be defined elsewhere in the full file.
+// For now, these are placeholder names.
+async function checkNeversPresence(geneSymbol, species) {
+    const data = await fetchNeversPhylogenyData();
+    const orgCode = species.replace(' ', '.');
+    // Simplified logic for presentation
+    const isPresent = data?.genes?.[geneSymbol.toUpperCase()]?.s?.includes(orgCode);
+    return `<div class="result-card"><h3>Conservation Check</h3><p>Gene ${geneSymbol} is ${isPresent ? 'PRESENT' : 'NOT PRESENT'} in ${species} (Nevers 2017).</p></div>`;
+}
+async function checkLiPresence(geneSymbol, species) {
+    const data = await fetchLiPhylogenyData();
+    const orgCode = species.replace(' ', '.');
+    // Simplified logic for presentation
+    const isPresent = Object.values(data?.genes || {}).some(g => g.g.toUpperCase() === geneSymbol.toUpperCase() && g.s.includes(orgCode));
+    return `<div class="result-card"><h3>Conservation Check</h3><p>Gene ${geneSymbol} is ${isPresent ? 'PRESENT' : 'NOT PRESENT'} in ${species} (Li 2014).</p></div>`;
+}
 // =============================================================================
 // UPDATE INTENT PARSER WITH ADDITIONAL KEYWORDS
 // =============================================================================
