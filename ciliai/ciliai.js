@@ -1051,16 +1051,24 @@ async function getPhylogenyGenesForOrganism(organismName) {
         targetKey    // Pass the key to extract the correct ortholog name
     );
 }
-
+// --- Helper Functions ---
 
 // Helper to get orthologs for a gene
 async function getHubOrthologsForGene(geneSymbol) {
     const data = await fetchCiliaData();
-    if (!data || data.length === 0) return "No cilia data available.";
+    if (!data || data.length === 0) {
+        console.error('No cilia data available for', geneSymbol);
+        return "No cilia data available.";
+    }
     
+    console.log('Searching for gene:', geneSymbol);
     const geneData = data.find(g => g.gene.toUpperCase() === geneSymbol.toUpperCase());
-    if (!geneData) return `Gene ${geneSymbol} not found in the database.`;
+    if (!geneData) {
+        console.error(`Gene ${geneSymbol} not found in dataset. Available genes:`, data.map(g => g.gene));
+        return `Gene ${geneSymbol} not found in the database.`;
+    }
     
+    console.log('Found gene data:', geneData);
     const orthologs = [];
     for (const [key, value] of Object.entries(geneData)) {
         if (key.startsWith('ortholog_') && value !== "N/A" && value) {
@@ -1071,7 +1079,8 @@ async function getHubOrthologsForGene(geneSymbol) {
     return orthologs.length > 0 ? orthologs.join('\n') : `No orthologs found for ${geneSymbol}.`;
 }
 
-// Helper to get genes with orthologs in a specific organism (fixed substring error)
+
+// Helper to get genes with orthologs in a specific organism
 async function getGenesWithOrthologInOrganism(organism) {
     const data = await fetchCiliaData();
     if (!data || data.length === 0) return "No cilia data available.";
@@ -1079,11 +1088,15 @@ async function getGenesWithOrthologInOrganism(organism) {
     const orthologField = `ortholog_${organism.toLowerCase().replace(/\s+/g, '_')}`;
     const genes = data
         .filter(g => g[orthologField] && g[orthologField] !== "N/A" && g[orthologField] !== "")
-        .map(g => ({ gene: g.gene, ortholog: g[orthologField] }));
+        .map(g => ({
+            gene: g.gene,
+            [orthologField]: g[orthologField],
+            description: g.description || "No description available"
+        }));
     return genes.length > 0 ? genes : `No genes found with orthologs in ${organism}.`;
 }
 
-// Helper to format effects summary as a table (fixed undefined and improved table output)
+// Helper to format effects summary as a table
 async function getGeneEffectsSummary(geneSymbol) {
     const ciliaData = await fetchCiliaData();
     const screenData = await fetchScreenData();
@@ -1093,14 +1106,12 @@ async function getGeneEffectsSummary(geneSymbol) {
     
     const geneScreenData = screenData[geneSymbol.toUpperCase()] || [];
     
-    // Construct table
     let table = `### Effects Summary for ${geneSymbol}\n\n`;
     table += `| Effect Type | Result |\n|-------------|--------|\n`;
     table += `| Overexpression | ${geneData.overexpression_effects || 'Not Reported'} |\n`;
     table += `| Loss of Function | ${geneData.lof_effects || 'Not Reported'} |\n`;
     table += `| Percent Ciliated Cells | ${geneData.percent_ciliated_cells_effects || 'Not Reported'} |\n`;
     
-    // Add screen results
     table += `\n### Screen Results\n\n`;
     table += `| Screen | Phenotype |\n|--------|-----------|\n`;
     if (geneScreenData.length > 0) {
@@ -1114,7 +1125,8 @@ async function getGeneEffectsSummary(geneSymbol) {
     return table;
 }
 
-// Helper to get screen results for a gene (fixed undefined issue)
+
+// Helper to get screen results for a gene
 async function getScreenResults(geneSymbol, screenType) {
     const screenData = await fetchScreenData();
     const geneScreens = screenData[geneSymbol.toUpperCase()];
@@ -1129,8 +1141,6 @@ async function getScreenResults(geneSymbol, screenType) {
     });
     return result.includes('Phenotype') ? result : `No data found for ${screenType} screen.`;
 }
-
-
 
 /**
  * Generates a help card explaining the two different sources for organism data.
@@ -2195,6 +2205,7 @@ const questionRegistry = [
     // ==================== EXPANSIONS FOR fetchCiliaData (Core gene info, orthologs, effects, etc.) ====================
     // Synonyms and simple expansions
     { text: "What is the ortholog of IFT88 in mouse?", handler: async () => await getHubOrthologsForGene("IFT88") },
+    { text: "What is the ortholog of ARL13B in mouse?", handler: async () => await getHubOrthologsForGene("ARL13B") },
     { text: "Find C. elegans ortholog for BBS1", handler: async () => getHubOrthologsForGene("BBS1") },
     { text: "Show orthologs in zebrafish for ARL13B", handler: async () => getHubOrthologsForGene("ARL13B") },
     { text: "Genes with mouse orthologs", handler: async () => formatListResult("Genes with Mouse Orthologs", await getGenesWithOrthologInOrganism("mouse")) }, // New helper
@@ -4282,6 +4293,8 @@ function formatGeneDetail(geneData, geneSymbol, detailTitle, detailContent) {
     </div>
   `;
 }
+
+
 
 // --- FINAL UPDATED formatListResult (Accepts 5 arguments) ---
 
