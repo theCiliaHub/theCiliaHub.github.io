@@ -763,8 +763,8 @@ const CURATED_ORTHOLOG_MAP = {
 };
 
 /**
- * Handles all single-gene ortholog lookups.
- * CORRECTED: It no longer calls the dangerous 'getCiliaryGenesForOrganism' function.
+ * Handles single-gene ortholog lookups using CURATED CiliaHub data (Strategy 1).
+ * This function bypasses the problematic getCiliaryGenesForOrganism entirely.
  */
 async function getOrthologsInOrganism(geneSymbol, organismName) {
     await fetchCiliaData();
@@ -778,15 +778,13 @@ async function getOrthologsInOrganism(geneSymbol, organismName) {
     const normOrganism = organismName.toLowerCase();
     const curatedKey = CURATED_ORTHOLOG_MAP[normOrganism];
 
-    let html = '';
-    
     if (curatedKey) {
         // --- Strategy 1: Use Curated CiliaHub Data (SUCCESS PATH) ---
         const orthologName = geneData[curatedKey] || 'N/A';
         const organismDisplay = organismName.split('.').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join('. ');
         
-        // This is the correct, specific result you want for mouse.
-        html = `
+        // This constructs the exact, correct answer format immediately.
+        const html = `
             <h3>Curated Ortholog for ${geneSymbol} in ${organismDisplay}</h3>
             <p>The curated ortholog name found is: <strong>${orthologName}</strong>.</p>
             <h4>Full Curated Ortholog Set:</h4>
@@ -799,20 +797,19 @@ async function getOrthologsInOrganism(geneSymbol, organismName) {
             </table>
             <p class="info-note">Source: CiliaHub Curated Gene Annotations.</p>
         `;
+        return `<div class="result-card">${html}</div>`;
 
     } else {
         // --- Strategy 2: Use Phylogenetic Analysis Data (for non-curated organisms) ---
-        // We ensure the fallback path is also robust.
-        html = await getGeneConservationBothDatasets(geneSymbol, organismName);
+        // This handles organisms like Chlamydomonas, Protists, etc.
+        return getGeneConservationBothDatasets(geneSymbol, organismName);
     }
-
-    return `<div class="result-card">${html}</div>`;
 }
 
-// Ensure the helper is updated to pass the correct target to the combined phylogenetic handler
+// --- Updated handler for generic requests ---
 async function getHubOrthologsForGene(gene) {
-    // This handler, used for "Show curated orthologs for IFT88", now correctly targets a curated organism
-    // (mouse) to force the display of the full curated ortholog table.
+    // This handler, used for the generic "Show curated orthologs for IFT88" question, 
+    // now correctly targets a curated organism ('mouse') to force the display of the full curated ortholog table.
     return getOrthologsInOrganism(gene, 'mouse');
 }
 
