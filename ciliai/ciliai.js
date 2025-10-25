@@ -2212,30 +2212,10 @@ async function getGenesByScreenPhenotype(phenotype) {
     return formatListResult(`Genes Matching Phenotype: ${phenotype}`, genes);
 }
 
-
-
-
-// --- NEW: Hardcoded Nevers et al. (2017) Organism Lists ---
-// This bypasses the issue of missing 'ciliated_organisms' lists in the cache structure.
-const NEVERS_CILIATED_ORGANISMS = [
-    "H.sapiens", "M.musculus", "C.familiaris", "B.taurus", "G.gallus", 
-    "X.tropicalis", "D.rerio", "O.latipes", "T.nigroviridis", "C.intestinalis", 
-    "S.purpuratus", "H.magnipapillata", "N.vectensis", "C.elegans", "C.briggsae", 
-    "T.thermophila", "P.tetraurelia", "C.reinhardtii", "V.carteri", "T.brucei"
-];
-
-const NEVERS_NON_CILIATED_ORGANISMS = [
-    "S.cerevisiae", "S.pombe", "C.glabrata", "K.lactis", "Y.lipolytica", 
-    "D.melanogaster", "A.gambiae", "C.quinquefasciatus", "B.mori", "T.castaneum", 
-    "A.thaliana", "O.sativa", "Z.mays", "P.patens", "T.trahens", 
-    "D.discoideum", "U.maydis", "C.neoformans", "T.gondii", "P.falciparum" // Using T.gondii/P.falciparum as non-metazoan/different ciliation type/lost cilia
-];
-
-
-// --- CRITICAL FIX: UPDATED HELPER: getPhylogenyMatrix (Nevers et al. 2017 ONLY) ---
+/// --- CRITICAL FIX: UPDATED HELPER: getPhylogenyMatrix (Nevers et al. 2017 ONLY) ---
 /**
  * Processes only Nevers et al. 2017 data across 20 ciliated and 20 non-ciliated organisms.
- * FIX: Uses direct dictionary lookup instead of slow, error-prone array search.
+ * FIX: Implements robust mapping of hardcoded species names to their list indices (s[]).
  * @param {string[]} geneSymbols - Genes to include (up to 20).
  * @returns {{matrix: number[][], xLabels: string[], yLabels: string[], textMatrix: string[][]}}
  */
@@ -2273,39 +2253,45 @@ function getPhylogenyMatrix(geneSymbols) {
     // Create X-axis labels (CILIATED first, NON-CILIATED second)
     const xLabels = selectedCiliated.map(s => `${s} (CIL)`).concat(selectedNonCiliated.map(s => `${s} (NCIL)`));
     
+    // *** NEW MAPPING LAYER: Create a reliable index map ***
+    const speciesIndexMap = new Map();
+    allNeversSpecies.forEach((speciesName, index) => {
+        speciesIndexMap.set(speciesName, index);
+    });
+
     const matrix = [];
     const textMatrix = [];
     const yLabels = [];
-
-    // 3. Populate matrix
     const neversGenes = neversPhylogenyCache?.genes || {}; // Direct object for lookup
 
+    // 3. Populate matrix
     uniqueGenes.forEach(gene => {
-        // *** FIX APPLIED HERE: Direct dictionary lookup using gene as key ***
+        // Direct dictionary lookup
         const geneDataNevers = neversGenes[gene]; 
         
-        // Skip if gene not found in Nevers 2017
         if (!geneDataNevers) return; 
 
         const presentIndices = new Set(geneDataNevers.s || []);
         const row = [];
         const textRow = [];
 
+        // Function to process a group (Ciliated or Non-Ciliated)
+        const processGroup = (speciesGroup, zValue) => {
+            speciesGroup.forEach(species => {
+                // *** FIX APPLIED HERE: Use the reliable Map lookup ***
+                const globalIndex = speciesIndexMap.get(species);
+                const isPresent = (globalIndex !== undefined) && presentIndices.has(globalIndex);
+                
+                row.push(isPresent ? zValue : 0);
+                textRow.push(isPresent ? `${gene} in ${species}: Present` : `${gene} in ${species}: Absent`);
+            });
+        };
+
         // Ciliated Organisms (Z=2)
-        selectedCiliated.forEach(species => {
-            const globalIndex = allNeversSpecies.indexOf(species);
-            const isPresent = presentIndices.has(globalIndex);
-            row.push(isPresent ? 2 : 0);
-            textRow.push(isPresent ? `${gene} in ${species}: CILIATED - Present` : `${gene} in ${species}: CILIATED - Absent`);
-        });
+        processGroup(selectedCiliated, 2);
 
         // Non-Ciliated Organisms (Z=1)
-        selectedNonCiliated.forEach(species => {
-            const globalIndex = allNeversSpecies.indexOf(species);
-            const isPresent = presentIndices.has(globalIndex);
-            row.push(isPresent ? 1 : 0);
-            textRow.push(isPresent ? `${gene} in ${species}: NON-CILIATED - Present` : `${gene} in ${species}: NON-CILIATED - Absent`);
-        });
+        processGroup(selectedNonCiliated, 1);
 
         if (row.length === 40) { // Ensure we have a full row of 40 columns
             matrix.push(row);
@@ -2315,7 +2301,7 @@ function getPhylogenyMatrix(geneSymbols) {
     });
 
     if (matrix.length === 0) {
-        console.warn("CRITICAL: No Nevers et al. (2017) conservation data found for selected genes. Check gene names/data structure.");
+        console.warn("CRITICAL: No Nevers et al. (2017) conservation data found for selected genes after lookup.");
     }
 
     return { matrix: matrix, xLabels: xLabels, yLabels: yLabels, textMatrix: textMatrix };
