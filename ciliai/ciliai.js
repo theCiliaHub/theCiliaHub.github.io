@@ -2219,8 +2219,8 @@ async function getGenesByScreenPhenotype(phenotype) {
  * @param {string[]} geneSymbols - Genes to include (up to 20).
  * @returns {{matrix: number[][], xLabels: string[], yLabels: string[], textMatrix: string[][]}}
  */
-// --- FIXED HELPER: Generates unified phylogeny matrix for plotting ---
-// Focused on Li et al. (2014) only — selects 20 Ciliated + 20 Non-Ciliated organisms.
+// --- Nevers et al. (2017) Phylogeny Matrix Builder ---
+// Displays 20 ciliated and 20 non-ciliated organisms.
 function getPhylogenyMatrix(geneSymbols) {
     const defaultGenes = [
         "IFT88", "BBS1", "ARL13B", "NPHP1", "CEP290", "DYNLT1", "TTC8", "KIF3A",
@@ -2232,42 +2232,28 @@ function getPhylogenyMatrix(geneSymbols) {
         .slice(0, 20)
         .map(g => g.toUpperCase());
 
-    // --- Load Li et al. (2014) data ---
-    const liGenes = liPhylogenyCache?.genes || {};
-    const liOrganisms = liPhylogenyCache?.summary?.organisms_list || [];
+    // --- Load Nevers et al. (2017) data ---
+    const neversGenes = neversPhylogenyCache?.genes || {};
+    const organisms = neversPhylogenyCache?.organism_groups?.all_organisms_list || [];
 
-    if (!liOrganisms.length || !Object.keys(liGenes).length) {
-        console.warn("Li et al. (2014) data not loaded properly.");
+    if (!organisms.length || !Object.keys(neversGenes).length) {
+        console.warn("Nevers et al. (2017) data not loaded properly.");
         return { matrix: [], xLabels: [], yLabels: [], textMatrix: [] };
     }
 
-    // --- Predefined 20 ciliated and 20 non-ciliated organisms (excluding prokaryotes) ---
-    const ciliatedOrganisms = [
-        "C.reinhardtii", "V.carteri", "T.thermophila", "P.tetraurelia",
-        "C.elegans", "C.briggsae", "D.melanogaster", "D.pseudoobscura",
-        "A.gambiae", "A.aegypti", "S.purpuratus", "N.vectensis",
-        "C.intestinalis", "D.rerio", "O.latipes", "X.tropicalis",
-        "G.gallus", "M.musculus", "B.taurus", "H.sapiens"
-    ];
-
-    const nonCiliatedOrganisms = [
-        "S.cerevisiae", "S.pombe", "A.thaliana", "O.sativa",
-        "Z.mays", "B.distachyon", "V.vinifera", "R.communis",
-        "N.crassa", "A.nidulans", "P.patens", "M.truncatula",
-        "S.bicolor", "A.lyrata", "U.maydis", "C.neoformans",
-        "A.fumigatus", "T.melanosporum", "Y.lipolytica", "C.glabrata"
-    ];
-
-    const selectedLiSpecies = ciliatedOrganisms.concat(nonCiliatedOrganisms);
+    // --- Define 20 ciliated and 20 non-ciliated organisms from the metadata ---
+    const ciliatedOrganisms = neversPhylogenyCache.organism_groups.ciliated_organisms.slice(0, 20);
+    const nonCiliatedOrganisms = neversPhylogenyCache.organism_groups.non_ciliated_organisms.slice(0, 20);
+    const selectedSpecies = ciliatedOrganisms.concat(nonCiliatedOrganisms);
 
     // --- Construct presence/absence matrix ---
     const matrix = [];
     const textMatrix = [];
     const yLabels = [];
-    const xLabels = selectedLiSpecies.map(s => `${s}`);
+    const xLabels = selectedSpecies;
 
     genes.forEach(gene => {
-        const geneEntry = Object.values(liGenes).find(g => g.g.toUpperCase() === gene);
+        const geneEntry = Object.values(neversGenes).find(g => g.g.toUpperCase() === gene);
         if (!geneEntry) return;
 
         const presentIndices = new Set(geneEntry.s || []);
@@ -2275,8 +2261,8 @@ function getPhylogenyMatrix(geneSymbols) {
         const textRow = [];
         let included = false;
 
-        selectedLiSpecies.forEach(species => {
-            const globalIndex = liOrganisms.indexOf(species);
+        selectedSpecies.forEach(species => {
+            const globalIndex = organisms.indexOf(species);
             const isPresent = presentIndices.has(globalIndex);
             row.push(isPresent ? 1 : 0);
             textRow.push(isPresent ? `${species}: Present` : `${species}: Absent`);
@@ -2291,11 +2277,12 @@ function getPhylogenyMatrix(geneSymbols) {
     });
 
     if (matrix.length === 0) {
-        console.warn("No Li et al. (2014) conservation data found for selected core genes.");
+        console.warn("No Nevers et al. (2017) conservation data found for selected genes.");
     }
 
     return { matrix, xLabels, yLabels, textMatrix };
 }
+
 
 // --- PLOT HELPER: Visualize the unified Li (2014) phylogeny matrix ---
 function plotPhylogenyMatrix() {
@@ -2358,88 +2345,62 @@ function plotPhylogenyMatrix() {
 }
 
 
-// --- NEW MAIN DISPLAY FUNCTION: Creates Heatmap and Combined Table ---
 /**
- * Renders the comparative phylogeny visualization (Heatmap + Detailed Table).
- * @param {string[]} genes - Genes selected by the user.
+ * Displays phylogeny comparison table using only Nevers et al. (2017) Mol Biol Evol dataset.
+ * All heatmap generation code has been removed.
+ * @param {string[]} genes - Array of gene symbols selected by the user.
  */
 async function displayPhylogenyComparison(genes) {
-    const [neversLoaded, liLoaded] = await Promise.all([fetchNeversPhylogenyData(), fetchLiPhylogenyData()]);
+    const neversLoaded = await fetchNeversPhylogenyData();
     const resultArea = document.getElementById('ai-result-area');
-    
-    if (!neversLoaded || !liLoaded) {
-        return `<div class="result-card"><h3>Phylogeny Comparison</h3><p class="status-not-found">One or more phylogeny datasets failed to load. Please try again later.</p></div>`;
+
+    if (!neversLoaded) {
+        resultArea.innerHTML = `
+            <div class="result-card">
+                <h3>Phylogeny Comparison</h3>
+                <p class="status-not-found">Nevers et al. (2017) dataset failed to load. Please try again later.</p>
+            </div>`;
+        return;
     }
 
     const { matrix, xLabels, yLabels, textMatrix } = getPhylogenyMatrix(genes);
-    const geneSymbol = genes[0]; // Focus on the first gene for the summary table
+    const geneSymbol = genes[0] || "Unknown";
 
-    if (matrix.length === 0) {
-         return `<div class="result-card"><h3>Phylogeny Comparison</h3><p class="status-not-found">No data found for the genes: **${genes.join(', ')}** in the selected organisms.</p></div>`;
+    if (!matrix.length) {
+        resultArea.innerHTML = `
+            <div class="result-card">
+                <h3>Phylogeny Comparison</h3>
+                <p class="status-not-found">No phylogenetic data found for <b>${genes.join(", ")}</b> in Nevers et al. (2017) dataset.</p>
+            </div>`;
+        return;
     }
 
-    const plotDivId = 'phylogeny-heatmap-plot';
     const tableDivId = 'phylogeny-comparison-table';
-    
-    // --- 1. Render HTML structure ---
+
+    // --- Render summary card without heatmap ---
     resultArea.innerHTML = `
         <div class="result-card">
             <h3>Phylogeny Comparison: ${genes.length > 1 ? `${genes.length} Genes` : geneSymbol} 🌍</h3>
-            <p>Comparative analysis across two major ciliary phylogenetic studies.</p>
-
-            <h4 style="margin-top: 1.5rem;">Heatmap: Species Presence (First 15 Organisms)</h4>
-            <div id="${plotDivId}" style="height: 600px; width: 100%;"></div>
-            <button class="download-button" onclick="downloadPlot('${plotDivId}', 'Phylogeny_Heatmap_Li_Nevers')">Download Heatmap (PNG)</button>
-            <hr style="margin-top: 1.5rem;">
-
+            <p>Data source: <a href="https://doi.org/10.1093/molbev/msx146" target="_blank">
+                Nevers et al. (2017), <i>Molecular Biology and Evolution</i></a></p>
+            
             <h4 style="margin-top: 1.5rem;">Detailed Summary for ${geneSymbol}</h4>
             <div id="${tableDivId}"></div>
-            <button class="download-button" onclick="downloadTable('${tableDivId}', 'Phylogeny_Comparison_${geneSymbol}')">Download Table (CSV)</button>
+            <button class="download-button" onclick="downloadTable('${tableDivId}', 'Nevers2017_Phylogeny_${geneSymbol}')">Download Table (CSV)</button>
 
-            <h4 style="margin-top: 1.5rem;">Data Source Keys</h4>
-            <p style="font-size: 0.9em;">(L14) = Li et al. 2014 | (N17) = Nevers et al. 2017</p>
+            <h4 style="margin-top: 1.5rem;">Reference</h4>
+            <p style="font-size: 0.9em; line-height: 1.4;">
+                Nevers, Y., Prasad, M. K., Poidevin, L., Chennen, K., Allot, A., Kress, A., Ripp, R., Thompson, J. D., Dollfus, H., Poch, O., & Lecompte, O. (2017). 
+                <b>Insights into Ciliary Genes and Evolution from Multi-Level Phylogenetic Profiling.</b> 
+                <i>Molecular Biology and Evolution</i>, 34(8), 2016–2034. 
+                <a href="https://doi.org/10.1093/molbev/msx146" target="_blank">DOI: 10.1093/molbev/msx146</a>
+            </p>
         </div>`;
 
-    // --- 2. Plotly Heatmap Generation ---
-    const trace = {
-        z: matrix,
-        x: xLabels,
-        y: yLabels,
-        type: 'heatmap',
-        colorscale: [
-            [0, '#f8f9fa'], 
-            [0.5, '#495057'], // Grey for Li 2014 hits
-            [1.0, '#2c5aa0']  // Blue for Nevers 2017 hits
-        ],
-        hoverinfo: 'text',
-        text: textMatrix,
-        showscale: false,
-        xgap: 1, ygap: 1
-    };
-
-    const layout = {
-        title: `Gene Conservation Across Li (L14) and Nevers (N17) Datasets`,
-        xaxis: { 
-            title: 'Organisms (N17 | L14)', 
-            tickangle: 45, 
-            automargin: true 
-        },
-        yaxis: { 
-            title: 'Genes', 
-            automargin: true,
-            tickfont: { size: 10 } 
-        },
-        height: 600,
-        margin: { t: 50, b: 200, l: 100, r: 50 }
-    };
-
-    Plotly.newPlot(plotDivId, [trace], layout, { responsive: true, displayModeBar: false });
-
-    // --- 3. Detailed Table for the focused gene (IFT88) ---
-    renderDetailedPhylogenyTable(geneSymbol, tableDivId, neversLoaded, liLoaded);
-    
-    return ""; // Return empty string as results are rendered directly
+    // --- Render the detailed gene phylogeny table ---
+    renderDetailedPhylogenyTable(geneSymbol, tableDivId, neversLoaded, null);
 }
+
 
 /**
  * Helper to render the detailed text table for a single gene (called by displayPhylogenyComparison).
