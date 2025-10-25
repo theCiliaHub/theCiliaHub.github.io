@@ -2212,10 +2212,10 @@ async function getGenesByScreenPhenotype(phenotype) {
     return formatListResult(`Genes Matching Phenotype: ${phenotype}`, genes);
 }
 
-// --- UPDATED HELPER: getPhylogenyMatrix (Nevers et al. 2017 ONLY) ---
+// --- UPDATED HELPER: getPhylogenyMatrix (Scoping Fix and Aesthetic Updates) ---
 /**
- * Processes only Nevers et al. 2017 data across a custom 20-organism list, ordered by development.
- * It also extracts and maps simplified organism names.
+ * Processes only Nevers et al. 2017 data across 20 ciliated and 20 non-ciliated organisms.
+ * FIX: Uses reliable organism mapping and applies aesthetic requirements.
  * @param {string[]} geneSymbols - Genes to include (up to 20).
  * @returns {{matrix: number[][], xLabels: string[], yLabels: string[], textMatrix: string[], speciesColors: string[]}}
  */
@@ -2229,31 +2229,32 @@ function getPhylogenyMatrix(geneSymbols) {
     const inputGenesUpper = geneSymbols.map(g => g.toUpperCase());
     const uniqueGenes = [...new Set(inputGenesUpper.concat(defaultGenes.map(g => g.toUpperCase())))].slice(0, 20);
 
-    // 2. Define custom 20-organism list (Point 1: Developed to less developed)
-    const CUSTOM_ORGANISM_ORDER = [
-        // CILIATED (Developed to less)
+    // --- FIX 2: Define/re-define organism lists internally to solve the ReferenceError ---
+    const CIL_ORG_FULL = [
         "Homo sapiens", "Rattus norvegicus", "Cricetulus griseus", "Mus musculus", 
         "Gallus gallus", "Xenopus tropicalis", "Danio rerio", "Caenorhabditis elegans", 
         "Chlamydomonas reinhardtii", "Tetrahymena thermophila", "Trypanosoma cruzi", "Leishmania mexicana",
-        
-        // ADDED 7 MORE CILIATED (to fill the 20)
         "Trichomonas vaginalis", "Giardia intestinalis", "Naegleria gruberi", "Trypanosoma brucei brucei",
-        "Volvox carteri", "Micromonas sp.", "Strongylocentrotus purpuratus",
-
-        // NON-CILIATED (Starting here to ensure 40 total columns, but only need 20 CIL + 20 NCIL for plotting)
+        "Volvox carteri", "Micromonas sp.", "Strongylocentrotus purpuratus", "Ciona intestinalis" // Added one more for 20 total
+    ];
+    const NCIL_ORG_FULL = [
         "Drosophila melanogaster", "Saccharomyces cerevisiae", "Schizosaccharomyces pombe", "Ustilago maydis",
         "Arabidopsis thaliana", "Oryza sativa", "Zea mays", "Batrachochytrium dendrobatidis",
         "Puccinia graminis f. sp. tritici", "Cryptococcus neoformans var. neoformans serotype D", 
         "Schistosoma mansoni", "Acyrthosiphon pisum", "Tribolium castaneum", "Anopheles gambiae",
-        "Aureococcus anophagefferens", "Phytophthora infestans (strain T30-4)", "Cyanidioschyzon merolae",
-        "Blastocystis hominis", "Cryptosporidium parvum (strain Iowa II)", "Entamoeba histolytica"
-    ];
+        "Aureococcus anophagefferens", "Phytophthora infestans", "Cyanidioschyzon merolae",
+        "Blastocystis hominis", "Cryptosporidium parvum", "Entamoeba histolytica"
+    ].slice(0, 20); // Slice to 20 just in case
 
-    // Helper to extract clean name from Nevers data's long string
-    const cleanName = (species) => species.replace(/\s*\(.*\)\s*/g, '').replace('subsp. patens', '').trim();
-
-    // Map species in the cache to their cleaned names (for easier lookup against our list)
     const allNeversSpecies = neversPhylogenyCache?.organism_groups?.all_organisms_list || [];
+    
+    // Select the first 20 species from the hardcoded lists
+    const selectedCIL = CIL_ORG_FULL.slice(0, 20);
+    const selectedNCIL = NCIL_ORG_FULL.slice(0, 20);
+    const selectedSpecies = selectedCIL.concat(selectedNCIL);
+
+    // Helper to extract clean name (Point 1: remove strain names)
+    const cleanName = (species) => species.replace(/\s*\(.*\)\s*/g, '').replace('subsp. patens', '').trim();
     
     // Create a robust lookup map from (CleanName) -> (Global Index)
     const speciesIndexMap = new Map();
@@ -2261,33 +2262,7 @@ function getPhylogenyMatrix(geneSymbols) {
         speciesIndexMap.set(cleanName(speciesName), index);
     });
 
-    // 3. Select final 40 organisms and map them to their categories/colors
-    const ciliatedSpeciesMap = selectedCiliated.reduce((acc, name) => {
-        if (acc.length < 20) acc.push(name);
-        return acc;
-    }, []);
-    const nonCiliatedSpeciesMap = selectedNonCiliated.reduce((acc, name) => {
-        if (acc.length < 20) acc.push(name);
-        return acc;
-    }, []);
-    
-    // Use the hardcoded CILIATED group for the 20 CIL columns
-    const selectedCIL = CUSTOM_ORGANISM_ORDER.filter(name => NEVERS_CILIATED_ORGANISMS.map(cleanName).includes(cleanName(name))).slice(0, 20);
-    // Use the hardcoded NON-CILIATED group for the 20 NCIL columns
-    const selectedNCIL = CUSTOM_ORGANISM_ORDER.filter(name => NEVERS_NON_CILIATED_ORGANISMS.map(cleanName).includes(cleanName(name))).slice(0, 20);
-
-    // If needed, fill missing non-ciliated spots from the end of the custom list
-    while (selectedNCIL.length < 20 && CUSTOM_ORGANISM_ORDER.length > 0) {
-        let filler = CUSTOM_ORGANISM_ORDER.pop();
-        if (NEVERS_NON_CILIATED_ORGANISMS.map(cleanName).includes(cleanName(filler))) {
-             selectedNCIL.push(filler);
-        }
-    }
-
-
-    const selectedSpecies = selectedCIL.concat(selectedNCIL);
-
-    // 4. Final Data structure preparation
+    // 3. Final Data structure preparation
     const neversGenes = neversPhylogenyCache?.genes || {};
     const matrix = [];
     const textMatrix = [];
@@ -2295,15 +2270,15 @@ function getPhylogenyMatrix(geneSymbols) {
     const speciesColors = [];
     
     // Set X-axis labels to clean names and define column colors
-    const xLabels = selectedSpecies.map(species => {
+    const xLabels = selectedSpecies.map((species, index) => {
         const simpleName = cleanName(species);
-        // Determine color based on whether the name is in the CIL set
-        const isCiliated = selectedCIL.map(cleanName).includes(simpleName);
-        speciesColors.push(isCiliated ? '#698ECF' : '#FFE5B5');
+        // Determine color based on position in the list
+        const isCiliated = index < selectedCIL.length;
+        speciesColors.push(isCiliated ? '#698ECF' : '#FFE5B5'); // Point 2/3 color
         return simpleName; // Clean name for X-axis label (Point 4)
     });
 
-    // 5. Populate matrix
+    // 4. Populate matrix
     uniqueGenes.forEach(gene => {
         const geneDataNevers = neversGenes[gene]; 
         if (!geneDataNevers) return; 
@@ -2312,21 +2287,27 @@ function getPhylogenyMatrix(geneSymbols) {
         const row = [];
         const textRow = [];
 
-        selectedSpecies.forEach(species => {
-            const cleanSpName = cleanName(species);
-            const globalIndex = speciesIndexMap.get(cleanSpName);
-            
-            const isPresent = (globalIndex !== undefined) && presentIndices.has(globalIndex);
-            
-            // Z=2 (CIL) or Z=1 (NCIL) for color scale consistency
-            const isCiliatedColumn = selectedCIL.includes(species);
-            const zValue = isCiliatedColumn ? 2 : 1; 
+        // Function to process a group (Ciliated or Non-Ciliated)
+        const processGroup = (speciesGroup, zValue) => {
+            speciesGroup.forEach(species => {
+                const cleanSpName = cleanName(species);
+                const globalIndex = speciesIndexMap.get(cleanSpName);
+                
+                // Lookup must succeed (globalIndex !== undefined) and index must be present
+                const isPresent = (globalIndex !== undefined) && presentIndices.has(globalIndex);
+                
+                row.push(isPresent ? zValue : 0);
+                textRow.push(isPresent ? `${gene} in ${cleanSpName}: Present` : `${gene} in ${cleanSpName}: Absent`);
+            });
+        };
 
-            row.push(isPresent ? zValue : 0);
-            textRow.push(isPresent ? `${gene} in ${cleanSpName}: Present` : `${gene} in ${cleanSpName}: Absent`);
-        });
+        // Ciliated Organisms (Z=2)
+        processGroup(selectedCIL, 2);
 
-        if (row.length === 40) {
+        // Non-Ciliated Organisms (Z=1)
+        processGroup(selectedNCIL, 1);
+
+        if (row.length === 40) { // Ensure we have a full row of 40 columns
             matrix.push(row);
             textMatrix.push(textRow);
             yLabels.push(gene);
@@ -2336,6 +2317,7 @@ function getPhylogenyMatrix(geneSymbols) {
     return { matrix: matrix, xLabels: xLabels, yLabels: yLabels, textMatrix: textMatrix, speciesColors: speciesColors };
 }
 
+
 // --- UPDATED MAIN DISPLAY FUNCTION: Heatmap (Nevers 2017 Only, Styled) ---
 /**
  * Renders the comparative phylogeny visualization (Heatmap + Detailed Table).
@@ -2343,6 +2325,7 @@ function getPhylogenyMatrix(geneSymbols) {
  * @param {string[]} genes - Genes selected by the user.
  */
 async function displayPhylogenyComparison(genes) {
+    // CRITICAL: Ensure both datasets are loaded for the table, as requested.
     const [neversLoaded, liLoaded] = await Promise.all([fetchNeversPhylogenyData(), fetchLiPhylogenyData()]);
     const resultArea = document.getElementById('ai-result-area');
     
@@ -2358,11 +2341,11 @@ async function displayPhylogenyComparison(genes) {
     const plotDivId = 'phylogeny-heatmap-plot';
     const tableDivId = 'phylogeny-comparison-table-content';
 
-    // --- 1. Render HTML structure ---
+    // --- 1. Render HTML structure (Unchanged from previous aesthetic update) ---
     resultArea.innerHTML = `
         <div class="result-card">
             <h3>Phylogeny Comparison: ${genes.length > 1 ? `${genes.length} Genes` : geneSymbol} 🌍</h3>
-            <p>**Heatmap Source:** Nevers et al. (2017) conservation profile across 40 selected organisms, ordered by evolutionary complexity.</p>
+            <p>**Heatmap Source:** Nevers et al. (2017) conservation profile across a specialized panel of **20 Ciliated** and **20 Non-Ciliated** organisms, ordered by evolutionary complexity. **The detailed table below remains unchanged, showing both Li and Nevers data.**</p>
 
             <h4 style="margin-top: 1.5rem;">Heatmap: Ciliated vs Non-Ciliated Organisms (40 Species)</h4>
             <div id="${plotDivId}" style="height: ${Math.min(yLabels.length * 40 + 200, 900)}px; width: 100%;"></div>
@@ -2389,20 +2372,19 @@ async function displayPhylogenyComparison(genes) {
             <h4 style="margin-top: 1.5rem;">Data Source Keys & Legend</h4>
             <ul style="font-size: 0.85em;">
                 <li><strong style="color: #698ECF;">CILIATED HIT</strong>: Present in ciliated species (Heatmap Z-score 2).</li>
-                <li><strong style="color: #FFE5B5;">NON-CILIATED HIT</strong>: Present in non-ciliated species (Heatmap Z-score 1).</li>
+                <li><strong style="color: #FFE5B5;">NON-CILIATED HIT</strong>: Present in species known to have lost these organelles (Heatmap Z-score 1).</li>
                 <li>**Li et al. 2014:** *Cell*. <a href="https://pubmed.ncbi.nlm.nih.gov/24995987/" target="_blank">PMID: 24995987</a></li>
                 <li>**Nevers et al. 2017:** *Mol. Biol. Evol.* <a href="https://doi.org/10.1093/molbev/msx146" target="_blank">DOI: 10.1093/molbev/msx146</a></li>
             </ul>
         </div>`;
 
-    // --- 2. Plotly Heatmap Generation ---
+    // --- 2. Plotly Heatmap Generation (Aesthetics and Labels) ---
     if (!isPrimaryQueryGeneMissing && matrix.length > 0) {
         const trace = {
             z: matrix,
             x: xLabels,
             y: yLabels,
             type: 'heatmap',
-            // Point 2: Use Hex colors (Hex code must be converted to a 0-1 range for Z-values)
             colorscale: [
                 [0/2, '#FFFFFF'],      // Z=0 (Absent) -> White
                 [0.0001/2, '#FFE5B5'], // Z=1 (NCIL Hit) start -> Light Orange
@@ -2415,35 +2397,39 @@ async function displayPhylogenyComparison(genes) {
             text: textMatrix,
             xgap: 0, 
             ygap: 0,
-            // Point 3: Add line color/width
             line: {
-                color: '#000000', // Black lines for the grid
+                color: '#000000', // Point 2: Black lines for the grid
                 width: 0.5 
             }
         };
 
         const layout = {
-            title: `Nevers et al. (2017) Conservation: 20 Ciliated vs 20 Non-Ciliated Organisms`,
             plot_bgcolor: '#FFFFFF', // Point 2: White background
             paper_bgcolor: '#FFFFFF',
 
             xaxis: { 
-                title: { text: '<b>Organisms</b>', font: { size: 12, color: '#000000' } }, // Point 4: Bold and Black title, no CIL/NCIL
+                title: { text: '<b>Organisms</b>', font: { size: 12, color: '#000000' } }, // Point 4: Bold and Black title
                 tickangle: 45, 
                 automargin: true,
                 tickfont: { size: 10, color: '#000000' }, // Point 4: Same font size for labels
                 showgrid: true,
-                gridcolor: '#000000', // Point 2: Black grid lines
+                gridcolor: '#000000', 
                 zeroline: false,
                 linecolor: '#000000',
-                linewidth: 2
+                linewidth: 2,
+                // Point 3: Use Plotly's tick color feature for visual classification
+                tickfont: {
+                    color: '#000000',
+                    size: 10
+                },
+                tickcolor: '#000000',
             },
             yaxis: { 
                 title: { text: '<b>Genes</b>', font: { size: 12, color: '#000000' } }, // Point 4: Bold and Black title
                 automargin: true,
                 tickfont: { size: 10, color: '#000000' }, // Point 4: Same font size for labels
                 showgrid: true,
-                gridcolor: '#000000', // Point 2: Black grid lines
+                gridcolor: '#000000', 
                 zeroline: false,
                 linecolor: '#000000',
                 linewidth: 2
@@ -2451,17 +2437,16 @@ async function displayPhylogenyComparison(genes) {
             height: Math.min(yLabels.length * 40 + 200, 900),
             margin: { t: 50, b: 200, l: 100, r: 50 },
             
-            // Point 3: Add line colors for classification (using shapes/annotations in Plotly is complex, 
-            // so we'll use a visual cue on the X-axis line)
+            // Point 3: Add line colors for classification (using shapes)
             shapes: [
-                // Ciliated Line (Under the first 20 ticks)
+                // Ciliated Line (Under the first 20 columns)
                 {
                     type: 'line',
                     xref: 'paper', x0: 0, x1: 0.5, // 0 to 50% of the plot area (20/40 columns)
                     yref: 'paper', y0: 0.999, y1: 0.999, 
                     line: { color: '#698ECF', width: 4 }
                 },
-                // Non-Ciliated Line (Under the last 20 ticks)
+                // Non-Ciliated Line (Under the last 20 columns)
                 {
                     type: 'line',
                     xref: 'paper', x0: 0.5, x1: 1, // 50% to 100% of the plot area
