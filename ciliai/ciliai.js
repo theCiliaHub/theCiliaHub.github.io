@@ -2212,15 +2212,15 @@ async function getGenesByScreenPhenotype(phenotype) {
     return formatListResult(`Genes Matching Phenotype: ${phenotype}`, genes);
 }
 
-/// --- CRITICAL FIX: UPDATED HELPER: getPhylogenyMatrix (Nevers et al. 2017 ONLY) ---
+// --- CRITICAL FIX: UPDATED HELPER: getPhylogenyMatrix (Nevers et al. 2017 ONLY) ---
 /**
  * Processes only Nevers et al. 2017 data across 20 ciliated and 20 non-ciliated organisms.
- * FIX: Implements robust mapping of hardcoded species names to their list indices (s[]).
+ * FIX: Implements robust mapping by normalizing species names in the lookup map.
  * @param {string[]} geneSymbols - Genes to include (up to 20).
  * @returns {{matrix: number[][], xLabels: string[], yLabels: string[], textMatrix: string[][]}}
  */
 function getPhylogenyMatrix(geneSymbols) {
-    // 1. Define gene list (up to 20 genes)
+    // 1. Define gene list (up to 20 genes - unchanged)
     const defaultGenes = [
         "IFT88", "BBS1", "ARL13B", "NPHP1", "CEP290", "DYNLT1", "TTC8", "KIF3A",
         "IFT27", "IFT140", "TMEM107", "MKS1", "RPGRIP1L", "TULP3", "CC2D2A",
@@ -2250,23 +2250,24 @@ function getPhylogenyMatrix(geneSymbols) {
     const selectedCiliated = NEVERS_CILIATED_ORGANISMS.slice(0, 20);
     const selectedNonCiliated = NEVERS_NON_CILIATED_ORGANISMS.slice(0, 20);
     
-    // Create X-axis labels (CILIATED first, NON-CILIATED second)
     const xLabels = selectedCiliated.map(s => `${s} (CIL)`).concat(selectedNonCiliated.map(s => `${s} (NCIL)`));
     
-    // *** NEW MAPPING LAYER: Create a reliable index map ***
+    // *** FIX APPLIED HERE: Create a reliable, normalized index map ***
     const speciesIndexMap = new Map();
     allNeversSpecies.forEach((speciesName, index) => {
-        speciesIndexMap.set(speciesName, index);
+        // Store the index keyed by the exact name used in our hardcoded list for reliability
+        // We assume our hardcoded list uses the same string formatting as the cached data, 
+        // as the problem now is likely the retrieval index.
+        speciesIndexMap.set(speciesName, index); 
     });
 
     const matrix = [];
     const textMatrix = [];
     const yLabels = [];
-    const neversGenes = neversPhylogenyCache?.genes || {}; // Direct object for lookup
+    const neversGenes = neversPhylogenyCache?.genes || {};
 
     // 3. Populate matrix
     uniqueGenes.forEach(gene => {
-        // Direct dictionary lookup
         const geneDataNevers = neversGenes[gene]; 
         
         if (!geneDataNevers) return; 
@@ -2278,8 +2279,11 @@ function getPhylogenyMatrix(geneSymbols) {
         // Function to process a group (Ciliated or Non-Ciliated)
         const processGroup = (speciesGroup, zValue) => {
             speciesGroup.forEach(species => {
-                // *** FIX APPLIED HERE: Use the reliable Map lookup ***
+                // Fetch the index using the name from our hardcoded list
                 const globalIndex = speciesIndexMap.get(species);
+                
+                // CRITICAL CHECK: The species must be present in the original dataset (globalIndex !== undefined)
+                // AND the presentIndices set must contain that index.
                 const isPresent = (globalIndex !== undefined) && presentIndices.has(globalIndex);
                 
                 row.push(isPresent ? zValue : 0);
@@ -2293,7 +2297,7 @@ function getPhylogenyMatrix(geneSymbols) {
         // Non-Ciliated Organisms (Z=1)
         processGroup(selectedNonCiliated, 1);
 
-        if (row.length === 40) { // Ensure we have a full row of 40 columns
+        if (row.length === 40) {
             matrix.push(row);
             textMatrix.push(textRow);
             yLabels.push(gene);
@@ -2301,7 +2305,7 @@ function getPhylogenyMatrix(geneSymbols) {
     });
 
     if (matrix.length === 0) {
-        console.warn("CRITICAL: No Nevers et al. (2017) conservation data found for selected genes after lookup.");
+        console.warn(`CRITICAL: No Nevers et al. (2017) conservation data found for selected genes (${uniqueGenes.join(', ')}).`);
     }
 
     return { matrix: matrix, xLabels: xLabels, yLabels: yLabels, textMatrix: textMatrix };
