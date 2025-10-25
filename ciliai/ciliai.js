@@ -2212,12 +2212,6 @@ async function getGenesByScreenPhenotype(phenotype) {
     return formatListResult(`Genes Matching Phenotype: ${phenotype}`, genes);
 }
 
-// --- NEW HANDLER: Combined Phylogeny Comparison ---
-/**
- * Fetches and combines conservation data for a single gene from both 
- * Nevers et al. 2017 and Li et al. 2014 datasets into a single card.
- * @param {string} geneSymbol - The gene symbol to search.
- */
 
 // --- NEW HELPER: Generates the unified phylogeny matrix for plotting ---
 /**
@@ -2225,45 +2219,85 @@ async function getGenesByScreenPhenotype(phenotype) {
  * @param {string[]} geneSymbols - Genes to include (up to 20).
  * @returns {{matrix: number[][], xLabels: string[], yLabels: string[], textMatrix: string[][]}}
  */
+// --- FIXED HELPER: Generates unified phylogeny matrix for plotting ---
+// Focused on Li et al. (2014) only — selects 20 Ciliated + 20 Non-Ciliated organisms.
 function getPhylogenyMatrix(geneSymbols) {
-    const defaultGenes = ["IFT88", "BBS1", "ARL13B", "NPHP1", "CEP290", "DYNLT1", "TTC8", "KIF3A", "IFT27", "IFT140", "OFD1", "MKS1", "RPGRIP1L", "TULP3", "CC2D2A", "NEK8", "CENPF", "KIAA0556", "HYLS1", "CCDC39"];
-    const genes = [...new Set(geneSymbols.concat(defaultGenes))].slice(0, 20).map(g => g.toUpperCase());
+    const defaultGenes = [
+        "IFT88", "BBS1", "ARL13B", "NPHP1", "CEP290", "DYNLT1", "TTC8", "KIF3A",
+        "IFT27", "IFT140", "TMEM107", "MKS1", "RPGRIP1L", "TULP3", "CC2D2A",
+        "NEK8", "CENPF", "KIAA0556", "HYLS1", "CCDC39"
+    ];
 
-    const neversSpecies = neversPhylogenyCache?.organism_groups?.all_organisms_list || [];
-    const liSpecies = liPhylogenyCache?.summary?.organisms_list || [];
-    
-    // Select the first 15 organisms from Nevers and the first 15 from Li for the heatmap
-    const selectedNeversSpecies = neversSpecies.slice(0, 15);
-    const selectedLiSpecies = liSpecies.slice(0, 15);
-    
-    // Create combined organism list for X-axis labels
-    const xLabels = selectedNeversSpecies.map(s => `${s} (N17)`).concat(selectedLiSpecies.map(s => `${s} (L14)`));
-    
+    const genes = [...new Set(geneSymbols.concat(defaultGenes))]
+        .slice(0, 20)
+        .map(g => g.toUpperCase());
+
+    // --- Load Li et al. (2014) data ---
+    const liGenes = liPhylogenyCache?.genes || {};
+    const liOrganisms = liPhylogenyCache?.summary?.organisms_list || [];
+    const liClassList = liPhylogenyCache?.summary?.class_list || [];
+    const liClasses = liPhylogenyCache?.summary?.classification_summary || {};
+
+    if (!liOrganisms.length || !Object.keys(liGenes).length) {
+        console.warn("Li et al. (2014) data not loaded properly.");
+        return { matrix: [], xLabels: [], yLabels: [], textMatrix: [] };
+    }
+
+    // --- Classify organisms based on their inferred evolutionary class ---
+    // We don't have per-organism class labels, so we use gene class index info to derive
+    const ciliatedKeywords = ["ciliary", "cilia"];
+    const nonCiliatedKeywords = ["vertebrate", "mammalian", "other", "no_data"];
+
+    // Create inferred classification map (by keyword match)
+    const classifyOrganism = (orgName) => {
+        const lower = orgName.toLowerCase();
+        return (lower.includes("chlamy") || lower.includes("reinhardtii") || lower.includes("tetra") || lower.includes("paramecium") || lower.includes("ciliate"))
+            ? "Ciliated"
+            : "Non-Ciliated";
+    };
+
+    const ciliatedOrganisms = [];
+    const nonCiliatedOrganisms = [];
+
+    liOrganisms.forEach(org => {
+        const category = classifyOrganism(org);
+        if (category === "Ciliated" && ciliatedOrganisms.length < 20) {
+            ciliatedOrganisms.push(org);
+        } else if (category === "Non-Ciliated" && nonCiliatedOrganisms.length < 20) {
+            nonCiliatedOrganisms.push(org);
+        }
+    });
+
+    // Fallback: if fewer than 20 in either group, pad from remaining species
+    while (ciliatedOrganisms.length < 20 && liOrganisms.length > ciliatedOrganisms.length)
+        ciliatedOrganisms.push(liOrganisms[ciliatedOrganisms.length]);
+    while (nonCiliatedOrganisms.length < 20 && liOrganisms.length > nonCiliatedOrganisms.length)
+        nonCiliatedOrganisms.push(liOrganisms[liOrganisms.length - 1 - nonCiliatedOrganisms.length]);
+
+    const selectedLiSpecies = ciliatedOrganisms.concat(nonCiliatedOrganisms);
+
+    // --- Construct matrix ---
     const matrix = [];
     const textMatrix = [];
     const yLabels = [];
+    const xLabels = selectedLiSpecies.map(s => `${s} (L14)`);
 
     genes.forEach(gene => {
-        const geneDataNevers = neversPhylogenyCache?.genes?.[gene];
-        const geneDataLi = liPhylogenyCache?.genes ? Object.values(liPhylogenyCache.genes).find(g => g.g.toUpperCase() === gene) : null;
+        const geneEntry = Object.values(liGenes).find(g => g.g.toUpperCase() === gene);
+        if (!geneEntry) return;
 
+        const presentIndices = new Set(geneEntry.s || []);
         const row = [];
         const textRow = [];
         let included = false;
 
-        // Add Nevers Data (15 columns)
-        selectedNeversSpecies.forEach((species, index) => {
-            const isPresent = geneDataNevers?.s.includes(index) || false;
+        selectedLiSpecies.forEach(species => {
+            const globalIndex = liOrganisms.indexOf(species);
+            const isPresent = presentIndices.has(globalIndex);
             row.push(isPresent ? 1 : 0);
-            textRow.push(isPresent ? `${species} (N17): Present` : `${species} (N17): Absent`);
-            if (isPresent) included = true;
-        });
-
-        // Add Li Data (15 columns)
-        selectedLiSpecies.forEach((species, index) => {
-            const isPresent = geneDataLi?.s.includes(index) || false;
-            row.push(isPresent ? 2 : 0); // Use a different color scale level for Li data
-            textRow.push(isPresent ? `${species} (L14): Present` : `${species} (L14): Absent`);
+            textRow.push(isPresent
+                ? `${species} (L14): Present`
+                : `${species} (L14): Absent`);
             if (isPresent) included = true;
         });
 
@@ -2274,8 +2308,13 @@ function getPhylogenyMatrix(geneSymbols) {
         }
     });
 
-    return { matrix: matrix, xLabels: xLabels, yLabels: yLabels, textMatrix: textMatrix };
+    if (matrix.length === 0) {
+        console.warn("No Li et al. (2014) conservation data found for selected core genes.");
+    }
+
+    return { matrix, xLabels, yLabels, textMatrix };
 }
+
 
 // --- NEW MAIN DISPLAY FUNCTION: Creates Heatmap and Combined Table ---
 /**
