@@ -2212,12 +2212,6 @@ async function getGenesByScreenPhenotype(phenotype) {
     return formatListResult(`Genes Matching Phenotype: ${phenotype}`, genes);
 }
 
-// --- NEW HANDLER: Combined Phylogeny Comparison ---
-/**
- * Fetches and combines conservation data for a single gene from both 
- * Nevers et al. 2017 and Li et al. 2014 datasets into a single card.
- * @param {string} geneSymbol - The gene symbol to search.
- */
 
 // --- NEW HELPER: Generates the unified phylogeny matrix (Li et al. 2014 ONLY) ---
 /**
@@ -2227,7 +2221,7 @@ async function getGenesByScreenPhenotype(phenotype) {
  */
 function getPhylogenyMatrix(geneSymbols) {
     // 1. Define gene list (up to 20 genes)
-    const defaultGenes = ["IFT88", "BBS1", "ARL13B", "NPHP1", "CEP290", "DYNLT1", "TTC8", "KIF3A", "IFT27", "IFT140", "OFD1", "MKS1", "RPGRIP1L", "TULP3", "CC2D2A", "NEK8", "CENPF", "KIAA0556", "HYLS1", "CCDC39"];
+    const defaultGenes = ["IFT88", "BBS1", "ARL13B", "NPHP1", "CEP290", "DYNLT1", "TTC8", "KIF3A", "IFT27", "IFT140", "TMEM107", "MKS1", "RPGRIP1L", "TULP3", "CC2D2A", "NEK8", "CENPF", "KIAA0556", "HYLS1", "CCDC39"];
     const inputGenesUpper = geneSymbols.map(g => g.toUpperCase());
     const uniqueGenes = [...new Set(inputGenesUpper.concat(defaultGenes.map(g => g.toUpperCase())))].slice(0, 20);
 
@@ -2263,7 +2257,7 @@ function getPhylogenyMatrix(geneSymbols) {
     const selectedCiliated = ciliatedOrganisms.slice(0, 10);
     const selectedNonCiliated = nonCiliatedOrganisms.slice(0, 10);
     
-    const xLabels = selectedCiliated.map(s => `${s.name} (CIL)`).concat(selectedNonCiliated.map(s => `${s.name} (NCIL)`));
+    const xLabels = selectedCiliated.map(s => `${s.name} (Ciliary Organisms)`).concat(selectedNonCiliated.map(s => `${s.name} (Non-Ciliary Organisms)`));
     
     const matrix = [];
     const textMatrix = [];
@@ -2303,6 +2297,7 @@ function getPhylogenyMatrix(geneSymbols) {
 
     return { matrix: matrix, xLabels: xLabels, yLabels: yLabels, textMatrix: textMatrix };
 }
+
 
 // --- UPDATED MAIN DISPLAY FUNCTION: Creates Heatmap and Combined Table (Li 2014 Only) ---
 /**
