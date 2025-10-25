@@ -2232,9 +2232,10 @@ const NEVERS_NON_CILIATED_ORGANISMS = [
 ];
 
 
-// --- UPDATED HELPER: getPhylogenyMatrix (Nevers et al. 2017 ONLY) ---
+// --- CRITICAL FIX: UPDATED HELPER: getPhylogenyMatrix (Nevers et al. 2017 ONLY) ---
 /**
  * Processes only Nevers et al. 2017 data across 20 ciliated and 20 non-ciliated organisms.
+ * FIX: Uses direct dictionary lookup instead of slow, error-prone array search.
  * @param {string[]} geneSymbols - Genes to include (up to 20).
  * @returns {{matrix: number[][], xLabels: string[], yLabels: string[], textMatrix: string[][]}}
  */
@@ -2248,9 +2249,24 @@ function getPhylogenyMatrix(geneSymbols) {
     const inputGenesUpper = geneSymbols.map(g => g.toUpperCase());
     const uniqueGenes = [...new Set(inputGenesUpper.concat(defaultGenes.map(g => g.toUpperCase())))].slice(0, 20);
 
-    // 2. Define organisms
+    // 2. Define organisms (Hardcoded lists for stable X-axis)
     const allNeversSpecies = neversPhylogenyCache?.organism_groups?.all_organisms_list || [];
     
+    // Using the hardcoded lists from the previous response for stability
+    const NEVERS_CILIATED_ORGANISMS = [
+        "H.sapiens", "M.musculus", "C.familiaris", "B.taurus", "G.gallus", 
+        "X.tropicalis", "D.rerio", "O.latipes", "T.nigroviridis", "C.intestinalis", 
+        "S.purpuratus", "H.magnipapillata", "N.vectensis", "C.elegans", "C.briggsae", 
+        "T.thermophila", "P.tetraurelia", "C.reinhardtii", "V.carteri", "T.brucei"
+    ];
+
+    const NEVERS_NON_CILIATED_ORGANISMS = [
+        "S.cerevisiae", "S.pombe", "C.glabrata", "K.lactis", "Y.lipolytica", 
+        "D.melanogaster", "A.gambiae", "C.quinquefasciatus", "B.mori", "T.castaneum", 
+        "A.thaliana", "O.sativa", "Z.mays", "P.patens", "T.trahens", 
+        "D.discoideum", "U.maydis", "C.neoformans", "T.gondii", "P.falciparum"
+    ];
+
     const selectedCiliated = NEVERS_CILIATED_ORGANISMS.slice(0, 20);
     const selectedNonCiliated = NEVERS_NON_CILIATED_ORGANISMS.slice(0, 20);
     
@@ -2262,8 +2278,11 @@ function getPhylogenyMatrix(geneSymbols) {
     const yLabels = [];
 
     // 3. Populate matrix
+    const neversGenes = neversPhylogenyCache?.genes || {}; // Direct object for lookup
+
     uniqueGenes.forEach(gene => {
-        const geneDataNevers = neversPhylogenyCache?.genes?.[gene];
+        // *** FIX APPLIED HERE: Direct dictionary lookup using gene as key ***
+        const geneDataNevers = neversGenes[gene]; 
         
         // Skip if gene not found in Nevers 2017
         if (!geneDataNevers) return; 
@@ -2295,9 +2314,12 @@ function getPhylogenyMatrix(geneSymbols) {
         }
     });
 
+    if (matrix.length === 0) {
+        console.warn("CRITICAL: No Nevers et al. (2017) conservation data found for selected genes. Check gene names/data structure.");
+    }
+
     return { matrix: matrix, xLabels: xLabels, yLabels: yLabels, textMatrix: textMatrix };
 }
-
 
 // --- UPDATED MAIN DISPLAY FUNCTION: Heatmap (Nevers 2017 Only, 40 Organisms) ---
 /**
