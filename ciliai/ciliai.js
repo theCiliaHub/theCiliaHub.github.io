@@ -2225,7 +2225,7 @@ function getPhylogenyMatrix(geneSymbols) {
     const defaultGenes = [
         "IFT88", "BBS1", "ARL13B", "NPHP1", "CEP290", "DYNLT1", "TTC8", "KIF3A",
         "IFT27", "IFT140", "TMEM107", "MKS1", "RPGRIP1L", "TULP3", "CC2D2A",
-        "NEK8", "CENPF", "KIAA0556", "HYLS1", "CCDC39"
+        "NEK8", "CENPF", "KIAA0556", "HYLS1", "WDR54"
     ];
 
     const genes = [...new Set(geneSymbols.concat(defaultGenes))]
@@ -2235,52 +2235,36 @@ function getPhylogenyMatrix(geneSymbols) {
     // --- Load Li et al. (2014) data ---
     const liGenes = liPhylogenyCache?.genes || {};
     const liOrganisms = liPhylogenyCache?.summary?.organisms_list || [];
-    const liClassList = liPhylogenyCache?.summary?.class_list || [];
-    const liClasses = liPhylogenyCache?.summary?.classification_summary || {};
 
     if (!liOrganisms.length || !Object.keys(liGenes).length) {
         console.warn("Li et al. (2014) data not loaded properly.");
         return { matrix: [], xLabels: [], yLabels: [], textMatrix: [] };
     }
 
-    // --- Classify organisms based on their inferred evolutionary class ---
-    // We don't have per-organism class labels, so we use gene class index info to derive
-    const ciliatedKeywords = ["ciliary", "cilia"];
-    const nonCiliatedKeywords = ["vertebrate", "mammalian", "other", "no_data"];
+    // --- Predefined 20 ciliated and 20 non-ciliated organisms (excluding prokaryotes) ---
+    const ciliatedOrganisms = [
+        "C.reinhardtii", "V.carteri", "T.thermophila", "P.tetraurelia",
+        "C.elegans", "C.briggsae", "D.melanogaster", "D.pseudoobscura",
+        "A.gambiae", "A.aegypti", "S.purpuratus", "N.vectensis",
+        "C.intestinalis", "D.rerio", "O.latipes", "X.tropicalis",
+        "G.gallus", "M.musculus", "B.taurus", "H.sapiens"
+    ];
 
-    // Create inferred classification map (by keyword match)
-    const classifyOrganism = (orgName) => {
-        const lower = orgName.toLowerCase();
-        return (lower.includes("chlamy") || lower.includes("reinhardtii") || lower.includes("tetra") || lower.includes("paramecium") || lower.includes("ciliate"))
-            ? "Ciliated"
-            : "Non-Ciliated";
-    };
-
-    const ciliatedOrganisms = [];
-    const nonCiliatedOrganisms = [];
-
-    liOrganisms.forEach(org => {
-        const category = classifyOrganism(org);
-        if (category === "Ciliated" && ciliatedOrganisms.length < 20) {
-            ciliatedOrganisms.push(org);
-        } else if (category === "Non-Ciliated" && nonCiliatedOrganisms.length < 20) {
-            nonCiliatedOrganisms.push(org);
-        }
-    });
-
-    // Fallback: if fewer than 20 in either group, pad from remaining species
-    while (ciliatedOrganisms.length < 20 && liOrganisms.length > ciliatedOrganisms.length)
-        ciliatedOrganisms.push(liOrganisms[ciliatedOrganisms.length]);
-    while (nonCiliatedOrganisms.length < 20 && liOrganisms.length > nonCiliatedOrganisms.length)
-        nonCiliatedOrganisms.push(liOrganisms[liOrganisms.length - 1 - nonCiliatedOrganisms.length]);
+    const nonCiliatedOrganisms = [
+        "S.cerevisiae", "S.pombe", "A.thaliana", "O.sativa",
+        "Z.mays", "B.distachyon", "V.vinifera", "R.communis",
+        "N.crassa", "A.nidulans", "P.patens", "M.truncatula",
+        "S.bicolor", "A.lyrata", "U.maydis", "C.neoformans",
+        "A.fumigatus", "T.melanosporum", "Y.lipolytica", "C.glabrata"
+    ];
 
     const selectedLiSpecies = ciliatedOrganisms.concat(nonCiliatedOrganisms);
 
-    // --- Construct matrix ---
+    // --- Construct presence/absence matrix ---
     const matrix = [];
     const textMatrix = [];
     const yLabels = [];
-    const xLabels = selectedLiSpecies.map(s => `${s} (L14)`);
+    const xLabels = selectedLiSpecies.map(s => `${s}`);
 
     genes.forEach(gene => {
         const geneEntry = Object.values(liGenes).find(g => g.g.toUpperCase() === gene);
@@ -2295,9 +2279,7 @@ function getPhylogenyMatrix(geneSymbols) {
             const globalIndex = liOrganisms.indexOf(species);
             const isPresent = presentIndices.has(globalIndex);
             row.push(isPresent ? 1 : 0);
-            textRow.push(isPresent
-                ? `${species} (L14): Present`
-                : `${species} (L14): Absent`);
+            textRow.push(isPresent ? `${species}: Present` : `${species}: Absent`);
             if (isPresent) included = true;
         });
 
@@ -2313,6 +2295,66 @@ function getPhylogenyMatrix(geneSymbols) {
     }
 
     return { matrix, xLabels, yLabels, textMatrix };
+}
+
+// --- PLOT HELPER: Visualize the unified Li (2014) phylogeny matrix ---
+function plotPhylogenyMatrix() {
+    const { matrix, xLabels, yLabels, textMatrix } = getPhylogenyMatrix([]);
+
+    if (!matrix.length) {
+        console.error("No data available for phylogeny heatmap.");
+        return;
+    }
+
+    const colorscale = [[0, "white"], [1, "darkblue"]];
+
+    const trace = {
+        z: matrix,
+        x: xLabels.map(x => `<b>${x}</b>`),
+        y: yLabels.map(y => `<b>${y}</b>`),
+        type: "heatmap",
+        colorscale,
+        text: textMatrix,
+        hoverinfo: "text"
+    };
+
+    const layout = {
+        title: {
+            text: "<b>Phylogenetic Distributions of Gene across ciliated and non-ciliated organisms</b><br>" +
+                "<sup>Data integrated from " +
+                "<a href='https://doi.org/10.1016/j.cell.2014.06.021' target='_blank'>Li et al., 2014</a> and " +
+                "<a href='https://doi.org/10.1016/j.cub.2017.07.011' target='_blank'>Nevers et al., 2017</a></sup>",
+            x: 0.5
+        },
+        xaxis: { title: "<b>Organism Names</b>", tickangle: 45 },
+        yaxis: { title: "<b>Genes</b>" },
+        plot_bgcolor: "white",
+        margin: { l: 100, r: 40, t: 140, b: 120 },
+        shapes: []
+    };
+
+    // Add background highlighting for organism categories
+    xLabels.forEach((label, i) => {
+        const isCiliated = [
+            "C.reinhardtii", "V.carteri", "T.thermophila", "P.tetraurelia",
+            "C.elegans", "C.briggsae", "D.melanogaster", "D.pseudoobscura",
+            "A.gambiae", "A.aegypti", "S.purpuratus", "N.vectensis",
+            "C.intestinalis", "D.rerio", "O.latipes", "X.tropicalis",
+            "G.gallus", "M.musculus", "B.taurus", "H.sapiens"
+        ].includes(label.replace(/<b>|<\/b>/g, ""));
+
+        layout.shapes.push({
+            type: "rect",
+            x0: i - 0.5, x1: i + 0.5,
+            y0: -0.5, y1: yLabels.length - 0.5,
+            fillcolor: isCiliated ? "#a8d8ff" : "#ffd8a8",
+            opacity: 0.3,
+            line: { width: 0 },
+            layer: "below"
+        });
+    });
+
+    Plotly.newPlot("phylogeny-heatmap", [trace], layout);
 }
 
 
