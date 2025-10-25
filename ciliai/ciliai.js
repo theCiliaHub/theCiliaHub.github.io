@@ -2212,10 +2212,11 @@ async function getGenesByScreenPhenotype(phenotype) {
     return formatListResult(`Genes Matching Phenotype: ${phenotype}`, genes);
 }
 
-// --- CRITICAL FIX: UPDATED HELPER: getPhylogenyMatrix (Nevers et al. 2017 ONLY) ---
+// --- FINAL CRITICAL FIX: UPDATED HELPER: getPhylogenyMatrix (Nevers et al. 2017 ONLY) ---
 /**
  * Processes only Nevers et al. 2017 data across 20 ciliated and 20 non-ciliated organisms.
- * FIX: Implements robust mapping by normalizing species names in the lookup map.
+ * FIX: Relies entirely on the exact species lists provided in the cached JSON structure
+ * to ensure the correct organism indices (s[]) are always found.
  * @param {string[]} geneSymbols - Genes to include (up to 20).
  * @returns {{matrix: number[][], xLabels: string[], yLabels: string[], textMatrix: string[][]}}
  */
@@ -2229,38 +2230,23 @@ function getPhylogenyMatrix(geneSymbols) {
     const inputGenesUpper = geneSymbols.map(g => g.toUpperCase());
     const uniqueGenes = [...new Set(inputGenesUpper.concat(defaultGenes.map(g => g.toUpperCase())))].slice(0, 20);
 
-    // 2. Define organisms (Hardcoded lists for stable X-axis)
-    const allNeversSpecies = neversPhylogenyCache?.organism_groups?.all_organisms_list || [];
+    // 2. Define organisms using the arrays directly from the cache
+    const groups = neversPhylogenyCache?.organism_groups;
+    const allNeversSpecies = groups?.all_organisms_list || [];
     
-    // Using the hardcoded lists from the previous response for stability
-    const NEVERS_CILIATED_ORGANISMS = [
-        "H.sapiens", "M.musculus", "C.familiaris", "B.taurus", "G.gallus", 
-        "X.tropicalis", "D.rerio", "O.latipes", "T.nigroviridis", "C.intestinalis", 
-        "S.purpuratus", "H.magnipapillata", "N.vectensis", "C.elegans", "C.briggsae", 
-        "T.thermophila", "P.tetraurelia", "C.reinhardtii", "V.carteri", "T.brucei"
-    ];
-
-    const NEVERS_NON_CILIATED_ORGANISMS = [
-        "S.cerevisiae", "S.pombe", "C.glabrata", "K.lactis", "Y.lipolytica", 
-        "D.melanogaster", "A.gambiae", "C.quinquefasciatus", "B.mori", "T.castaneum", 
-        "A.thaliana", "O.sativa", "Z.mays", "P.patens", "T.trahens", 
-        "D.discoideum", "U.maydis", "C.neoformans", "T.gondii", "P.falciparum"
-    ];
-
-    const selectedCiliated = NEVERS_CILIATED_ORGANISMS.slice(0, 20);
-    const selectedNonCiliated = NEVERS_NON_CILIATED_ORGANISMS.slice(0, 20);
+    // CRITICAL FIX: Take the first 20 species directly from the cache's own lists.
+    const selectedCiliated = groups?.ciliated_organisms.slice(0, 20) || [];
+    const selectedNonCiliated = groups?.non_ciliated_organisms.slice(0, 20) || [];
     
+    // Create X-axis labels
     const xLabels = selectedCiliated.map(s => `${s} (CIL)`).concat(selectedNonCiliated.map(s => `${s} (NCIL)`));
     
-    // *** FIX APPLIED HERE: Create a reliable, normalized index map ***
+    // Create a robust lookup map using the exact names from the ALL list
     const speciesIndexMap = new Map();
     allNeversSpecies.forEach((speciesName, index) => {
-        // Store the index keyed by the exact name used in our hardcoded list for reliability
-        // We assume our hardcoded list uses the same string formatting as the cached data, 
-        // as the problem now is likely the retrieval index.
         speciesIndexMap.set(speciesName, index); 
     });
-
+    
     const matrix = [];
     const textMatrix = [];
     const yLabels = [];
@@ -2279,11 +2265,10 @@ function getPhylogenyMatrix(geneSymbols) {
         // Function to process a group (Ciliated or Non-Ciliated)
         const processGroup = (speciesGroup, zValue) => {
             speciesGroup.forEach(species => {
-                // Fetch the index using the name from our hardcoded list
-                const globalIndex = speciesIndexMap.get(species);
+                // Look up index using the species name directly from the cache's lists
+                const globalIndex = speciesIndexMap.get(species); 
                 
-                // CRITICAL CHECK: The species must be present in the original dataset (globalIndex !== undefined)
-                // AND the presentIndices set must contain that index.
+                // CRITICAL CHECK: Look up must succeed (globalIndex !== undefined) 
                 const isPresent = (globalIndex !== undefined) && presentIndices.has(globalIndex);
                 
                 row.push(isPresent ? zValue : 0);
@@ -2297,7 +2282,7 @@ function getPhylogenyMatrix(geneSymbols) {
         // Non-Ciliated Organisms (Z=1)
         processGroup(selectedNonCiliated, 1);
 
-        if (row.length === 40) {
+        if (row.length === 40) { // Ensure we have a full row of 40 columns
             matrix.push(row);
             textMatrix.push(textRow);
             yLabels.push(gene);
@@ -2305,7 +2290,7 @@ function getPhylogenyMatrix(geneSymbols) {
     });
 
     if (matrix.length === 0) {
-        console.warn(`CRITICAL: No Nevers et al. (2017) conservation data found for selected genes (${uniqueGenes.join(', ')}).`);
+        console.warn(`CRITICAL: No Nevers et al. (2017) conservation data found for selected genes after lookup.`);
     }
 
     return { matrix: matrix, xLabels: xLabels, yLabels: yLabels, textMatrix: textMatrix };
