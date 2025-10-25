@@ -2212,101 +2212,62 @@ async function getGenesByScreenPhenotype(phenotype) {
     return formatListResult(`Genes Matching Phenotype: ${phenotype}`, genes);
 }
 
-// --- UPDATED HELPER: Generates the unified phylogeny matrix (Li et al. 2014 ONLY) ---
+// --- NEW HANDLER: Combined Phylogeny Comparison ---
 /**
- * Processes only Li et al. 2014 data, selecting 20 ciliated and 20 non-ciliated organisms
- * for the heatmap matrix. Nevers data is explicitly excluded from the matrix.
+ * Fetches and combines conservation data for a single gene from both 
+ * Nevers et al. 2017 and Li et al. 2014 datasets into a single card.
+ * @param {string} geneSymbol - The gene symbol to search.
+ */
+
+// --- NEW HELPER: Generates the unified phylogeny matrix for plotting ---
+/**
+ * Processes both Li and Nevers data into a single matrix for plotting.
  * @param {string[]} geneSymbols - Genes to include (up to 20).
  * @returns {{matrix: number[][], xLabels: string[], yLabels: string[], textMatrix: string[][]}}
  */
 function getPhylogenyMatrix(geneSymbols) {
-    // 1. Define gene list (up to 20 genes)
     const defaultGenes = ["IFT88", "BBS1", "ARL13B", "NPHP1", "CEP290", "DYNLT1", "TTC8", "KIF3A", "IFT27", "IFT140", "OFD1", "MKS1", "RPGRIP1L", "TULP3", "CC2D2A", "NEK8", "CENPF", "KIAA0556", "HYLS1", "CCDC39"];
-    const inputGenesUpper = geneSymbols.map(g => g.toUpperCase());
-    const uniqueGenes = [...new Set(inputGenesUpper.concat(defaultGenes.map(g => g.toUpperCase())))].slice(0, 20);
+    const genes = [...new Set(geneSymbols.concat(defaultGenes))].slice(0, 20).map(g => g.toUpperCase());
 
-    // 2. Separate Li et al. 2014 organisms by ciliary status
-    const allLiSpecies = liPhylogenyCache?.summary?.organisms_list || [];
-    const allLiClasses = liPhylogenyCache?.summary?.organism_class_list || [];
+    const neversSpecies = neversPhylogenyCache?.organism_groups?.all_organisms_list || [];
+    const liSpecies = liPhylogenyCache?.summary?.organisms_list || [];
     
-    let ciliatedOrganisms = [];
-    let nonCiliatedOrganisms = [];
-
-    // Filter and categorize all species from the Li 2014 list
-    for (let i = 0; i < allLiSpecies.length; i++) {
-        const speciesCode = allLiSpecies[i];
-        const speciesClass = allLiClasses[i] || '';
-
-        // Heuristic check to divide into CILIATED (CIL) vs. NON-CILIATED (NCIL)
-        // Ciliated: Species known to have cilia/flagella
-        if (speciesClass.includes('Ciliated') || speciesClass.includes('Flagellated') || 
-            speciesCode.includes('sapiens') || speciesCode.includes('musculus') || 
-            speciesCode.includes('rerio') || speciesCode.includes('elegans') ||
-            speciesCode.includes('reinhardtii') || speciesCode.includes('thermophila') ||
-            speciesCode.includes('tropicalis') || speciesCode.includes('lamblia') ||
-            speciesCode.includes('hominis') || speciesCode.includes('parvum') ||
-            speciesCode.includes('braziliensis') || speciesCode.includes('infantum') ||
-            speciesCode.includes('major') || speciesCode.includes('trucei') || speciesCode.includes('cruzi')
-        ) {
-            ciliatedOrganisms.push({ name: speciesCode, index: i });
-        } 
-        // Non-Ciliated: Species known to have lost cilia/flagella (Fungi, specific Protists/Animals/Plants)
-        else if (speciesCode.includes('cerevisiae') || speciesCode.includes('melanogaster') ||
-                   speciesCode.includes('thaliana') || speciesCode.includes('patens') || 
-                   speciesCode.includes('purpuratus') || speciesCode.includes('discoideum') || 
-                   speciesCode.includes('immitis') || speciesCode.includes('posadasii') || 
-                   speciesCode.includes('sclerotiorum') || speciesCode.includes('oryzae') ||
-                   speciesCode.includes('bayanus') || speciesCode.includes('glabrata') ||
-                   speciesCode.includes('briggsae') || speciesCode.includes('drosophila') ||
-                   speciesCode.includes('histolytica') || speciesCode.includes('dispar')
-        ) {
-            nonCiliatedOrganisms.push({ name: speciesCode, index: i });
-        }
-    }
+    // Select the first 15 organisms from Nevers and the first 15 from Li for the heatmap
+    const selectedNeversSpecies = neversSpecies.slice(0, 15);
+    const selectedLiSpecies = liSpecies.slice(0, 15);
     
-    // Select 20 from each category
-    const selectedCiliated = ciliatedOrganisms.slice(0, 20);
-    const selectedNonCiliated = nonCiliatedOrganisms.slice(0, 20);
-    
-    // Create X-axis labels (CILIATED first, NON-CILIATED second)
-    const xLabels = selectedCiliated.map(s => `${s.name} (CIL)`).concat(selectedNonCiliated.map(s => `${s.name} (NCIL)`));
+    // Create combined organism list for X-axis labels
+    const xLabels = selectedNeversSpecies.map(s => `${s} (N17)`).concat(selectedLiSpecies.map(s => `${s} (L14)`));
     
     const matrix = [];
     const textMatrix = [];
     const yLabels = [];
 
-    // 3. Populate matrix
-    uniqueGenes.forEach(gene => {
+    genes.forEach(gene => {
+        const geneDataNevers = neversPhylogenyCache?.genes?.[gene];
         const geneDataLi = liPhylogenyCache?.genes ? Object.values(liPhylogenyCache.genes).find(g => g.g.toUpperCase() === gene) : null;
-        
-        // CRITICAL FIX: Only check if geneDataLi exists. Do not skip if the gene is present in the database.
-        if (!geneDataLi) {
-            // If it's a primary query gene and we can't find Li data, we should still proceed for the table
-            if (inputGenesUpper.includes(gene)) {
-                // However, we must skip for the matrix if the data doesn't exist
-                return;
-            }
-            return;
-        }
 
         const row = [];
         const textRow = [];
+        let included = false;
 
-        // Ciliated Organisms (Z=2)
-        selectedCiliated.forEach(org => {
-            const isPresent = geneDataLi.s.includes(org.index) || false;
-            row.push(isPresent ? 2 : 0);
-            textRow.push(isPresent ? `${gene} in ${org.name}: CILIATED - Present` : `${gene} in ${org.name}: CILIATED - Absent`);
-        });
-
-        // Non-Ciliated Organisms (Z=1)
-        selectedNonCiliated.forEach(org => {
-            const isPresent = geneDataLi.s.includes(org.index) || false;
+        // Add Nevers Data (15 columns)
+        selectedNeversSpecies.forEach((species, index) => {
+            const isPresent = geneDataNevers?.s.includes(index) || false;
             row.push(isPresent ? 1 : 0);
-            textRow.push(isPresent ? `${gene} in ${org.name}: NON-CILIATED - Present` : `${gene} in ${org.name}: NON-CILIATED - Absent`);
+            textRow.push(isPresent ? `${species} (N17): Present` : `${species} (N17): Absent`);
+            if (isPresent) included = true;
         });
 
-        if (row.length === 40) { // Ensure we have a full row of 40 columns
+        // Add Li Data (15 columns)
+        selectedLiSpecies.forEach((species, index) => {
+            const isPresent = geneDataLi?.s.includes(index) || false;
+            row.push(isPresent ? 2 : 0); // Use a different color scale level for Li data
+            textRow.push(isPresent ? `${species} (L14): Present` : `${species} (L14): Absent`);
+            if (isPresent) included = true;
+        });
+
+        if (included || geneSymbols.includes(gene)) {
             matrix.push(row);
             textMatrix.push(textRow);
             yLabels.push(gene);
@@ -2315,141 +2276,6 @@ function getPhylogenyMatrix(geneSymbols) {
 
     return { matrix: matrix, xLabels: xLabels, yLabels: yLabels, textMatrix: textMatrix };
 }
-
-
-### 2. Updated Main Display Function: `displayPhylogenyComparison()`
-
-This function remains visually consistent with your last request. The fix primarily resides in how we handle the `matrix.length === 0` check.
-
-```javascript
-// --- UPDATED MAIN DISPLAY FUNCTION: Heatmap (Li 2014 Only, 40 Organisms) ---
-/**
- * Renders the comparative phylogeny visualization (Heatmap + Detailed Table).
- * The table content remains the same, showing both Li and Nevers data.
- * @param {string[]} genes - Genes selected by the user.
- */
-async function displayPhylogenyComparison(genes) {
-    // CRITICAL: Ensure all data is loaded. The table relies on Nevers data.
-    const [neversLoaded, liLoaded] = await Promise.all([fetchNeversPhylogenyData(), fetchLiPhylogenyData()]);
-    const resultArea = document.getElementById('ai-result-area');
-    
-    if (!liLoaded) {
-        return `<div class="result-card"><h3>Phylogeny Comparison</h3><p class="status-not-found">Li et al. (2014) phylogeny dataset failed to load.</p></div>`;
-    }
-
-    const { matrix, xLabels, yLabels, textMatrix } = getPhylogenyMatrix(genes);
-    const geneSymbol = genes[0]; 
-    const isPrimaryQueryGeneMissing = !yLabels.includes(geneSymbol.toUpperCase());
-
-    // CRITICAL FIX: Check if the primary gene requested is missing from the *heatmap* matrix,
-    // but proceed if the tables loaded successfully (liLoaded is true) and we can render the table.
-    if (isPrimaryQueryGeneMissing && liLoaded && neversLoaded) {
-         // Proceed to render the table (which is what the user ultimately requested)
-         // but log a warning about the heatmap data
-         console.warn(`Primary gene ${geneSymbol} not found in Li 2014 data for heatmap, but will attempt to render table.`);
-    } else if (matrix.length === 0) {
-        // If the entire matrix is empty (no default or target gene found), return error.
-        return `<div class="result-card"><h3>Phylogeny Comparison</h3><p class="status-not-found">No Li et al. (2014) conservation data was found for the core genes required for this heatmap. Please check if the genes are present in the dataset.</p></div>`;
-    }
-
-    const plotDivId = 'phylogeny-heatmap-plot';
-    const tableDivId = 'phylogeny-comparison-table-content';
-    
-    // --- 1. Render HTML structure ---
-    resultArea.innerHTML = `
-        <div class="result-card">
-            <h3>Phylogeny Comparison: ${genes.length > 1 ? `${genes.length} Genes` : geneSymbol} 🔬</h3>
-            <p>**Heatmap Source:** Li et al. (2014) conservation profile across a specialized panel of **20 Ciliated** (CIL) and **20 Non-Ciliated** (NCIL) organisms. **The detailed table below remains unchanged, showing both Li and Nevers data.**</p>
-
-            <h4 style="margin-top: 1.5rem;">Heatmap: Ciliated (CIL) vs Non-Ciliated (NCIL) Organisms (40 Species)</h4>
-            <div id="${plotDivId}" style="height: ${Math.min(yLabels.length * 40 + 200, 900)}px; width: 100%;"></div>
-            <button class="download-button" onclick="downloadPlot('${plotDivId}', 'Phylogeny_Heatmap_Li2014_CIL_vs_NCIL')">Download Heatmap (PNG)</button>
-            <hr style="margin-top: 1.5rem;">
-
-            <h4 style="margin-top: 1.5rem;">Detailed Conservation for ${geneSymbol} (Li 2014 & Nevers 2017)</h4>
-            <div id="table-container">
-                <table class="ciliopathy-table gene-detail-table" id="${tableDivId}">
-                    <thead>
-                        <tr>
-                            <th style="width: 20%;">Dataset</th>
-                            <th style="width: 10%;">Species Count</th>
-                            <th style="width: 15%;">Key Classification</th>
-                            <th>Full Organisms List</th>
-                        </tr>
-                    </thead>
-                    <tbody id="phylogeny-table-body">
-                        </tbody>
-                </table>
-            </div>
-            <button class="download-button" onclick="downloadTable('${tableDivId}', 'Phylogeny_Comparison_${geneSymbol}')">Download Table (CSV)</button>
-
-            <h4 style="margin-top: 1.5rem;">Data Source Keys & Legend</h4>
-            <ul style="font-size: 0.85em;">
-                <li><strong style="color: #2c5aa0;">CILIATED (CIL) HIT</strong>: Present in a ciliated/flagellated species (Heatmap Z-score 2).</li>
-                <li><strong style="color: #fa872b;">NON-CILIATED (NCIL) HIT</strong>: Present in a species known to have lost these organelles (Heatmap Z-score 1).</li>
-                <li>**Li et al. 2014:** *Cell*. <a href="[https://pubmed.ncbi.nlm.nih.gov/24995987/](https://pubmed.ncbi.nlm.nih.gov/24995987/)" target="_blank">PMID: 24995987</a></li>
-                <li>**Nevers et al. 2017:** *Mol. Biol. Evol.* <a href="[https://doi.org/10.1093/molbev/msx146](https://doi.org/10.1093/molbev/msx146)" target="_blank">DOI: 10.1093/molbev/msx146</a></li>
-            </ul>
-        </div>`;
-
-    // --- 2. Plotly Heatmap Generation ---
-    if (!isPrimaryQueryGeneMissing && matrix.length > 0) {
-        const trace = {
-            z: matrix,
-            x: xLabels,
-            y: yLabels,
-            type: 'heatmap',
-            colorscale: [
-                [0/2, '#f8f9fa'], // Z=0 (Absent) -> Light Gray
-                [0.0001/2, '#fa872b'], [1/2, '#fa872b'], // Z=1 (Non-Ciliated Hit) -> Orange
-                [1.0001/2, '#2c5aa0'], [2/2, '#2c5aa0'] // Z=2 (Ciliated Hit) -> Blue
-            ],
-            showscale: false,
-            hoverinfo: 'text',
-            text: textMatrix,
-            xgap: 1, ygap: 1
-        };
-
-        const layout = {
-            title: `Li et al. (2014) Conservation: 20 Ciliated vs 20 Non-Ciliated Organisms`,
-            xaxis: { 
-                title: 'Organisms (CILIATED | NON-CILIATED)', 
-                tickangle: 45, 
-                automargin: true,
-                tickfont: { size: 7.5 }
-            },
-            yaxis: { 
-                title: 'Genes', 
-                automargin: true,
-                tickfont: { size: 10 } 
-            },
-            height: Math.min(yLabels.length * 40 + 200, 900),
-            margin: { t: 50, b: 180, l: 100, r: 50 }
-        };
-
-        Plotly.newPlot(plotDivId, [trace], layout, { responsive: true, displayModeBar: true });
-    } else {
-        // If primary gene is missing or matrix is empty, replace the heatmap div content
-        document.getElementById('phylogeny-heatmap-plot').innerHTML = `<p class="status-not-found">Heatmap not available: The gene **${geneSymbol}** was not found in the Li et al. 2014 dataset used for this visualization.</p>`;
-        // Hide download button for non-existent plot
-        const downloadButton = resultArea.querySelector(`button[onclick*='${plotDivId}']`);
-        if (downloadButton) downloadButton.style.display = 'none';
-    }
-
-    // --- 3. Detailed Table Generation (UNCHANGED and always executed) ---
-    renderDetailedPhylogenyTable(geneSymbol, 'phylogeny-table-body'); 
-    
-    return "";
-}
-
-// NOTE: The implementation of comparePhylogenyDatasets and renderDetailedPhylogenyTable 
-// remains as defined in your working version to ensure the table content 
-// (including Nevers data) is unchanged.
-
-// NOTE: The implementation of comparePhylogenyDatasets and renderDetailedPhylogenyTable 
-// remains as defined in your working version to ensure the table content 
-// (including Nevers data) is unchanged.
-
 
 // --- NEW MAIN DISPLAY FUNCTION: Creates Heatmap and Combined Table ---
 /**
