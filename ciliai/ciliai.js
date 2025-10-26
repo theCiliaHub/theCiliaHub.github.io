@@ -1129,15 +1129,37 @@ const questionRegistry = [
     { text: "What is the source for Ciliary genes in drosophila?", handler: async () => tellAboutOrganismSources("drosophila") },
     
     // ==================== NEW CONSOLIDATED PHYLOGENY QUESTIONS ====================
-    { text: "Compare IFT88 phylogeny (Li and Nevers)", handler: async () => comparePhylogenyDatasets("IFT88") },
-    { text: "Compare BBS1 phylogeny (Li and Nevers)", handler: async () => comparePhylogenyDatasets("BBS1") },
+    { text: "Compare IFT88 phylogeny", handler: async () => comparePhylogenyDatasets("IFT88") },
+    { text: "Compare BBS1 phylogeny", handler: async () => comparePhylogenyDatasets("BBS1") },
     { text: "Show the phylogenetic comparison for ARL13B", handler: async () => comparePhylogenyDatasets("ARL13B") },
     { text: "NPHP1 phylogenetic analysis comparison", handler: async () => comparePhylogenyDatasets("NPHP1") },
 
     // Update general questions to use the comparison function for maximum utility:
     { text: "Show evolutionary conservation of IFT88", handler: async () => comparePhylogenyDatasets("IFT88") },
     { text: "What is the phylogeny of BBS1?", handler: async () => comparePhylogenyDatasets("BBS1") },
+// --- List Queries (Router Intent: CILIARY_LIST/NONCILIARY_LIST) ---
+    { text: "Provide the list of ciliary genes in mouse", handler: async (q) => handlePhylogenyAndOrthologQuery(q) },
+    { text: "Show ciliary genes in C. elegans", handler: async (q) => handlePhylogenyAndOrthologQuery(q) },
+    { text: "List the ciliary genes found in zebrafish", handler: async (q) => handlePhylogenyAndOrthologQuery(q) },
+    { text: "Do you know the ciliary genes for the worm?", handler: async (q) => handlePhylogenyAndOrthologQuery(q) },
+    { text: "Do you have the list of ciliary genes in drosophila?", handler: async (q) => handlePhylogenyAndOrthologQuery(q) },
+    { text: "Show non-ciliary genes in mouse", handler: async (q) => handlePhylogenyAndOrthologQuery(q) },
+    { text: "List non-ciliary genes in C. elegans", handler: async (q) => handlePhylogenyAndOrthologQuery(q) },
+    
+    // --- Ortholog Queries (Router Intent: ORTHOLOG_LOOKUP) ---
+    { text: "What are the orthologs of ARL13B?", handler: async (q) => handlePhylogenyAndOrthologQuery(q) },
+    { text: "Show me the homologs of IFT88", handler: async (q) => handlePhylogenyAndOrthologQuery(q) },
+    { text: "List all orthologs for WDR31", handler: async (q) => handlePhylogenyAndOrthologQuery(q) },
+    { text: "What is the C. elegans homolog of BBS1?", handler: async (q) => handlePhylogenyAndOrthologQuery(q) },
+    { text: "Show me the orthologs in mouse", handler: async (q) => handlePhylogenyAndOrthologQuery(q) },
+    { text: "List conserved genes in C. elegans", handler: async (q) => handlePhylogenyAndOrthologQuery(q) },
 
+    // --- Visual Comparison Queries (Router Fallback to getPhylogenyComparisonGene) ---
+    { text: "Show the phylogenetic comparison for ARL13B", handler: async (query) => handlePhylogenyAndOrthologQuery(query) },
+    { text: "Show the phylogenetic comparison for WDR31", handler: async (query) => handlePhylogenyAndOrthologQuery(query) },
+    { text: "What is the phylogeny of BBS1?", handler: async (query) => handlePhylogenyAndOrthologQuery(query) },
+    { text: "Show evolutionary conservation of IFT88", handler: async (query) => handlePhylogenyAndOrthologQuery(query) },
+    { text: "Phylogenetic analysis of CEP290", handler: async (query) => handlePhylogenyAndOrthologQuery(query) },
     // ==================== PHYLOGENY QUERIES (List Genes based on Screen) ====================
     { text: "List Ciliary Genes in C. elegans (Phylogeny)", handler: async () => getPhylogenyGenesForOrganism("C. elegans") },
     { text: "List Ciliary Genes in Mouse (Phylogeny)", handler: async () => getPhylogenyGenesForOrganism("mouse") },
@@ -2352,28 +2374,6 @@ function getPhylogenyMatrix(geneSymbols) {
     return { matrix: matrix, xLabels: xLabels, yLabels: yLabels, textMatrix: textMatrix, speciesColors: speciesColors };
 }
 
-// --- NEW HELPER: Generalized handler for Phylogeny Comparison (Automated) ---
-/**
- * Parses a query string to extract a single gene and triggers the visual comparison.
- * NOTE: This function must be globally accessible or defined in the correct scope.
- * @param {string} query The user's input query.
- * @returns {Promise<string>} HTML result from displayPhylogenyComparison.
- */
-async function getPhylogenyComparisonGene(query) {
-    // Look for a gene-like word (3+ uppercase letters or common ciliary gene pattern)
-    // This is the core logic that extracts 'WDR31' from the sentence.
-    const geneMatch = query.match(/\b([A-Z0-9]{3,}|ift\d+|bbs\d+|arl\d+b|nphp\d+)\b/i);
-    const geneSymbol = geneMatch ? geneMatch[1].toUpperCase() : null;
-
-    if (!geneSymbol) {
-        return `<div class="result-card"><h3>Phylogeny Query Failed</h3><p class="status-not-found">Could not identify a clear gene symbol in your query. Please try searching for a single gene (e.g., 'IFT88').</p></div>`;
-    }
-
-    // Pass the identified gene (and only that gene) to the visualization function
-    // This calls the display function which handles the matrix and plot.
-    return displayPhylogenyComparison([geneSymbol]);
-}
-
 // --- UPDATED MAIN DISPLAY FUNCTION: Heatmap (Nevers 2017 Only, Styled) ---
 /**
  * Renders the comparative phylogeny visualization (Heatmap + Detailed Table).
@@ -2612,27 +2612,30 @@ async function comparePhylogenyDatasets(geneSymbol) {
 }
 
 /**
-
+// --- NEW HELPER: Get Non-Ciliary Genes for Organism ---
+/**
  * Retrieves human genes classified as Non-Ciliary that have an ortholog in the target organism.
-
  * @param {string} organismName - The target organism (e.g., 'mouse').
-
  * @returns {Array<Object>} - List of genes.
-
  */
-
+// --- NEW HELPER: Get Non-Ciliary Genes for Organism ---
+/**
+ * Retrieves human genes classified as Non-Ciliary that have an ortholog in the target organism.
+ * @param {string} organismName - The target organism (e.g., 'mouse').
+ * @returns {Array<Object>} - List of genes.
+ */
 async function getNonCiliaryGenesForOrganism(organismName) {
     await fetchPhylogenyData();
     const normalizedOrganism = normalizeTerm(organismName);
+    
     // Simplified mapping for species codes used in phylogenyDataCache
     const speciesMap = {
         'human': 'H.sapiens', 'mouse': 'M.musculus', 'worm': 'C.elegans', 'c. elegans': 'C.elegans',
-
         'fly': 'D.melanogaster', 'zebrafish': 'D.rerio', 'xenopus': 'X.tropicalis' 
-
     };
     const speciesCode = speciesMap[normalizedOrganism] || organismName;
     const speciesRegex = new RegExp(speciesCode.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+
     const genes = Object.entries(phylogenyDataCache)
         .filter(([gene, data]) => {
             // Filter by the 'nonciliary_only_genes' category in the main phylogeny summary.
@@ -2641,8 +2644,31 @@ async function getNonCiliaryGenesForOrganism(organismName) {
             return isNonCiliaryCategory && hasSpecies;
         })
         .map(([gene, data]) => ({ gene: data.sym || gene, description: `Non-Ciliary (Li 2014) gene present in ${speciesCode}` }));
+    
     return genes;
+}
 
+
+// --- NEW HELPER: VISUAL COMPARISON LAUNCHER (To resolve ReferenceError) ---
+/**
+ * Parses a query string to extract a single gene and triggers the visual comparison.
+ * NOTE: This function must be defined for the router to call the visualization path.
+ * @param {string} query The user's input query.
+ * @returns {Promise<string>} HTML result from displayPhylogenyComparison.
+ */
+async function getPhylogenyComparisonGene(query) {
+    // Safe query check to prevent crash if 'query' is undefined/null
+    const queryStr = typeof query === 'string' ? query : '';
+    // Look for a gene-like word
+    const geneMatch = queryStr.match(/\b([A-Z0-9]{3,}|ift\d+|bbs\d+|arl\d+b|nphp\d+)\b/i);
+    const geneSymbol = geneMatch ? geneMatch[1].toUpperCase() : null;
+
+    if (!geneSymbol) {
+        return `<div class="result-card"><h3>Phylogeny Query Failed</h3><p class="status-not-found">Could not identify a clear gene symbol in your query. Please try searching for a single gene (e.g., 'IFT88').</p></div>`;
+    }
+
+    // Assuming displayPhylogenyComparison is defined and accessible
+    return displayPhylogenyComparison([geneSymbol]);
 }
 
 
@@ -2686,7 +2712,14 @@ async function getPhylogenyOrthologStatus(gene) {
     return displayPhylogenyComparison([gene]);
 }
 
-// --- CORE ROUTER (Updates how ORTHOLOG_LOOKUP is handled) ---
+// --- NEW CENTRALIZED PHYLOGENY AND ORTHOLOG HANDLER (The Router) ---
+
+/**
+ * Parses user questions related to phylogenetic lists and orthologs, and routes them 
+ * to the appropriate list-generating or detail-fetching function.
+ * @param {string} query - The user's input query.
+ * @returns {Promise<string>} - HTML result showing the list or details.
+ */
 async function handlePhylogenyAndOrthologQuery(query) {
     // Ensure core data is loaded for lookups
     await Promise.all([fetchCiliaData(), fetchPhylogenyData()]);
@@ -2724,11 +2757,11 @@ async function handlePhylogenyAndOrthologQuery(query) {
     // --- 3. Routing Logic ---
 
     if (intent === 'ORTHOLOG_LOOKUP' && entity) {
-        // Primary route for ORTHOLOG/HOMOLOG lookup: Always return curated CiliaHub ortholog table.
+        // Route 1: Gene-specific Ortholog lookup (curated CiliaHub table)
         return getOrthologsForGene(entity);
         
     } else if (intent === 'NONCILIARY_LIST' && entity) {
-        // Route 2: Non-Ciliary gene list
+        // Route 2: Non-Ciliary gene list for a specific organism (phylogenetic screen)
         const genes = await getNonCiliaryGenesForOrganism(entity);
         return formatListResult(`Non-Ciliary Genes in ${entity}`, genes);
 
@@ -2746,9 +2779,10 @@ async function handlePhylogenyAndOrthologQuery(query) {
         if (geneMatch && !organismMatch) {
             // If the user mentions phylogeny, give the plot
             if (qLower.includes('phylogeny') || qLower.includes('conservation') || qLower.includes('tree')) {
-                 return getPhylogenyOrthologStatus(geneMatch[1]);
+                 // Use the explicit visual handler
+                 return getPhylogenyComparisonGene(geneMatch[1]);
             }
-            // Otherwise, return full comprehensive details (assuming this is defined elsewhere)
+            // Otherwise, default to full comprehensive details (assuming this is defined elsewhere)
             return getComprehensiveDetails(geneMatch[1]);
         }
         return `<div class="result-card"><h3>Query Not Understood</h3><p>I couldn't identify the type of gene list or the organism you're looking for. Please specify a gene (e.g., **IFT88 orthologs**) or an organism (e.g., **list ciliary genes in mouse**).</p></div>`;
