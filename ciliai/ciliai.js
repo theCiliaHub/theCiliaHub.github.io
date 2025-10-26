@@ -1003,7 +1003,32 @@ async function displayUmapPlot() {
     return "";
 }
 
+// --- Data Access: All Extracted Genes (For reference, no change needed) ---
+function getAllPhylogenyGenes() {
+    // This line returns an array containing all ~19,000+ gene symbols 
+    // (the keys from your two optimized JSON files).
+    return Object.keys(phylogenyDataCache); 
+}
 
+// --- NEW HELPER: Extract Multiple Genes Dynamically ---
+/**
+ * Scans a query string to extract one or more gene symbols.
+ * @param {string} query - The user's input query.
+ * @returns {Array<string>} - A unique list of uppercase gene symbols found.
+ */
+function extractMultipleGenes(query) {
+    // Looks for capital letters/numbers (3+ characters) or common ciliary gene patterns.
+    // The 'g' flag ensures all matches are found.
+    const genePattern = /\b([A-Z0-9]{3,}|ift\d+|bbs\d+|arl\d+b|nphp\d+)\b/gi;
+    const matches = query.match(genePattern);
+
+    if (!matches) {
+        return [];
+    }
+
+    // Return unique uppercase gene symbols
+    return [...new Set(matches.map(g => g.toUpperCase()))];
+}
 // --- UPDATED getPhylogenyGenesForOrganism (Enriches with ALL Orthologs) ---
 async function getPhylogenyGenesForOrganism(organismName) {
     await fetchCiliaData(); 
@@ -2649,28 +2674,6 @@ async function getNonCiliaryGenesForOrganism(organismName) {
 }
 
 
-// --- NEW HELPER: VISUAL COMPARISON LAUNCHER (To resolve ReferenceError) ---
-/**
- * Parses a query string to extract a single gene and triggers the visual comparison.
- * NOTE: This function must be defined for the router to call the visualization path.
- * @param {string} query The user's input query.
- * @returns {Promise<string>} HTML result from displayPhylogenyComparison.
- */
-async function getPhylogenyComparisonGene(query) {
-    // Safe query check to prevent crash if 'query' is undefined/null
-    const queryStr = typeof query === 'string' ? query : '';
-    // Look for a gene-like word
-    const geneMatch = queryStr.match(/\b([A-Z0-9]{3,}|ift\d+|bbs\d+|arl\d+b|nphp\d+)\b/i);
-    const geneSymbol = geneMatch ? geneMatch[1].toUpperCase() : null;
-
-    if (!geneSymbol) {
-        return `<div class="result-card"><h3>Phylogeny Query Failed</h3><p class="status-not-found">Could not identify a clear gene symbol in your query. Please try searching for a single gene (e.g., 'IFT88').</p></div>`;
-    }
-
-    // Assuming displayPhylogenyComparison is defined and accessible
-    return displayPhylogenyComparison([geneSymbol]);
-}
-
 
 
 // --- CORE FUNCTION: CURATED ORTHOLOG LOOKUP (From ciliahub_data.json) ---
@@ -2712,23 +2715,44 @@ async function getPhylogenyOrthologStatus(gene) {
     return displayPhylogenyComparison([gene]);
 }
 
-// --- NEW CENTRALIZED PHYLOGENY AND ORTHOLOG HANDLER (The Router) ---
+// --- UPDATED CENTRALIZED PHYLOGENY AND ORTHOLOG HANDLER (The Router) ---
 
 /**
- * Parses user questions related to phylogenetic lists and orthologs, and routes them 
- * to the appropriate list-generating or detail-fetching function.
+ * Parses all gene list, ortholog, and phylogenetic comparison queries.
+ * Handles single-gene, multi-gene, and specific conservation group queries.
  * @param {string} query - The user's input query.
- * @returns {Promise<string>} - HTML result showing the list or details.
+ * @returns {Promise<string>} - HTML result showing the list, details, or visualization.
  */
 async function handlePhylogenyAndOrthologQuery(query) {
-    // Ensure core data is loaded for lookups
+    // CRITICAL FIX: Ensure query is a string to prevent TypeError
+    const safeQuery = typeof query === 'string' ? query : ''; 
     await Promise.all([fetchCiliaData(), fetchPhylogenyData()]);
-    const qLower = query.toLowerCase();
+    const qLower = safeQuery.toLowerCase();
+    
+    // DYNAMIC GENE EXTRACTION: Check for multiple genes first
+    const genes = extractMultipleGenes(safeQuery); 
     
     let intent = null;
     let entity = null; // Gene or Organism
+    const organismPattern = /(c\.?\s*elegans|worm|mouse|zebrafish|xenopus|fly|drosophila|human|chlamydomonas|yeast|h\.?\s*sapiens|m\.?\s*musculus)/;
+    const organismMatch = qLower.match(organismPattern);
 
-    // --- 1. Intent Determination ---
+    if (genes.length > 1) {
+        // --- ROUTE 1: MULTI-GENE CONSERVATION COMPARISON ---
+        // Handles: "Show me conservations of BBS1, BBS5, ARL13B"
+        // This is the primary route for dynamic, arbitrary gene inputs.
+        return getPhylogenyComparisonGene(genes); // Passes array of genes for visualization
+    }
+    
+    // Check for specific evolutionary group conservation
+    if (qLower.includes('unicellular') || qLower.includes('algae') || qLower.includes('chlamydomonas') || qLower.includes('yeast')) {
+        // --- ROUTE 2: UNICELLULAR/EVOLUTIONARY GROUP QUERY ---
+        // Handles: "Tell me if ARL13B and BBS1 have orthologs in unicellular organisms"
+        // Use the comparison view which visually displays this conservation.
+        return getPhylogenyComparisonGene(genes); 
+    }
+
+    // --- Intent Determination (Original Logic for Lists/Single Orthologs) ---
     const isOrthologRequest = qLower.includes('ortholog') || qLower.includes('homolog') || qLower.includes('conserved in');
 
     if (isOrthologRequest) {
@@ -2741,52 +2765,47 @@ async function handlePhylogenyAndOrthologQuery(query) {
         intent = 'CILIARY_LIST';
     }
 
-    // --- 2. Entity Extraction ---
-    const organismPattern = /(c\.?\s*elegans|worm|mouse|zebrafish|xenopus|fly|drosophila|human|chlamydomonas|yeast|h\.?\s*sapiens|m\.?\s*musculus)/;
-    const genePattern = /\b([A-Z0-9]{3,}|ift\d+|bbs\d+|arl\d+b|nphp\d+)\b/i;
-
-    const organismMatch = qLower.match(organismPattern);
-    const geneMatch = query.match(genePattern);
-
-    if (intent === 'ORTHOLOG_LOOKUP' && geneMatch) {
-        entity = geneMatch[1].toUpperCase();
-    } else if (organismMatch) {
+    if (organismMatch) {
         entity = organismMatch[1].trim();
     }
-    
-    // --- 3. Routing Logic ---
 
-    if (intent === 'ORTHOLOG_LOOKUP' && entity) {
-        // Route 1: Gene-specific Ortholog lookup (curated CiliaHub table)
-        return getOrthologsForGene(entity);
+    // --- Routing Logic (Single Gene/List Requests) ---
+
+    if (intent === 'ORTHOLOG_LOOKUP' && genes.length === 1) {
+        // Route 3: Single Gene-specific Ortholog lookup (curated CiliaHub table)
+        return getOrthologsForGene(genes[0]);
         
     } else if (intent === 'NONCILIARY_LIST' && entity) {
-        // Route 2: Non-Ciliary gene list for a specific organism (phylogenetic screen)
-        const genes = await getNonCiliaryGenesForOrganism(entity);
-        return formatListResult(`Non-Ciliary Genes in ${entity}`, genes);
+        // Route 4: Non-Ciliary gene list for a specific organism 
+        const nonCiliaryGenes = await getNonCiliaryGenesForOrganism(entity);
+        return formatListResult(`Non-Ciliary Genes in ${entity}`, nonCiliaryGenes);
 
     } else if (intent === 'CILIARY_LIST' && entity) {
-        // Route 3: Ciliary gene list for a specific organism (phylogenetic screen)
-        const { genes, description, speciesCode } = await getCiliaryGenesForOrganism(entity);
-        return formatListResult(`Ciliary Genes in ${speciesCode} (Phylogeny Screen)`, genes, description, speciesCode, 'N/A');
+        // Route 5: Ciliary gene list for a specific organism
+        const { genes: ciliaryGenes, description, speciesCode } = await getCiliaryGenesForOrganism(entity);
+        return formatListResult(`Ciliary Genes in ${speciesCode} (Phylogeny Screen)`, ciliaryGenes, description, speciesCode, 'N/A');
 
     } else if (intent === 'CILIARY_LIST' && !entity) {
-        // Route 4: Global Ciliary gene list
+        // Route 6: Global Ciliary gene list
         return getAllCiliaryGenes();
 
     } else {
-        // Fallback: If intent is weak, try single gene lookup for comparison plot or details
-        if (geneMatch && !organismMatch) {
-            // If the user mentions phylogeny, give the plot
-            if (qLower.includes('phylogeny') || qLower.includes('conservation') || qLower.includes('tree')) {
-                 // Use the explicit visual handler
-                 return getPhylogenyComparisonGene(geneMatch[1]);
-            }
-            // Otherwise, default to full comprehensive details (assuming this is defined elsewhere)
-            return getComprehensiveDetails(geneMatch[1]);
-        }
-        return `<div class="result-card"><h3>Query Not Understood</h3><p>I couldn't identify the type of gene list or the organism you're looking for. Please specify a gene (e.g., **IFT88 orthologs**) or an organism (e.g., **list ciliary genes in mouse**).</p></div>`;
+        // --- FALLBACK: SINGLE GENE PHYLOGENY/COMPREHENSIVE DETAILS ---
+        if (genes.length === 1 && !organismMatch) {
+            // Default to the visual plot for general conservation questions
+            return getPhylogenyComparisonGene(genes);
+        } 
+        return `<div class="result-card"><h3>Query Not Understood</h3><p>I couldn't identify the type of gene list, the organism, or the genes you're looking for. Please specify a gene, a list, or an organism.</p></div>`;
     }
+}
+
+// --- NOTE: The getPhylogenyComparisonGene function must be updated to accept an array of genes: ---
+async function getPhylogenyComparisonGene(genes) {
+    // If a single gene (string) was passed directly, wrap it in an array for compatibility
+    const geneArray = Array.isArray(genes) ? genes : [genes];
+    
+    // This now passes the array of 1 or more genes to the visualization function
+    return displayPhylogenyComparison(geneArray); 
 }
 
 /**
