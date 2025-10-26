@@ -2352,6 +2352,27 @@ function getPhylogenyMatrix(geneSymbols) {
     return { matrix: matrix, xLabels: xLabels, yLabels: yLabels, textMatrix: textMatrix, speciesColors: speciesColors };
 }
 
+// --- NEW HELPER: Generalized handler for Phylogeny Comparison (Automated) ---
+/**
+ * Parses a query string to extract a single gene and triggers the visual comparison.
+ * NOTE: This function must be globally accessible or defined in the correct scope.
+ * @param {string} query The user's input query.
+ * @returns {Promise<string>} HTML result from displayPhylogenyComparison.
+ */
+async function getPhylogenyComparisonGene(query) {
+    // Look for a gene-like word (3+ uppercase letters or common ciliary gene pattern)
+    // This is the core logic that extracts 'WDR31' from the sentence.
+    const geneMatch = query.match(/\b([A-Z0-9]{3,}|ift\d+|bbs\d+|arl\d+b|nphp\d+)\b/i);
+    const geneSymbol = geneMatch ? geneMatch[1].toUpperCase() : null;
+
+    if (!geneSymbol) {
+        return `<div class="result-card"><h3>Phylogeny Query Failed</h3><p class="status-not-found">Could not identify a clear gene symbol in your query. Please try searching for a single gene (e.g., 'IFT88').</p></div>`;
+    }
+
+    // Pass the identified gene (and only that gene) to the visualization function
+    // This calls the display function which handles the matrix and plot.
+    return displayPhylogenyComparison([geneSymbol]);
+}
 
 // --- UPDATED MAIN DISPLAY FUNCTION: Heatmap (Nevers 2017 Only, Styled) ---
 /**
