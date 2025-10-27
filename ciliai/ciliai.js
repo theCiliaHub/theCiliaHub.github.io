@@ -2562,50 +2562,54 @@ async function displayPhylogenyComparison(genes) {
     return "";
 }
 
-// --- NEW/UPDATED: Data Merging Functions ---
-async function mergePhylogenyCaches() {
-    // If phylogenyDataCache exists, it means the merging was already successful.
-    if (phylogenyDataCache) return phylogenyDataCache;
+// --- NEW AUTHORITY: Replaces the old fetchPhylogenyData ---
+// All legacy and new code paths needing phylogeny data should call this.
+async function fetchPhylogenyData() {
+    return mergePhylogenyCaches();
+}
 
-    // Await global loads (assumed to populate global caches)
+// --- NEW/UPDATED: Data Merging Logic (Safeguarded) ---
+async function mergePhylogenyCaches() {
+    if (phylogenyDataCache && Object.keys(phylogenyDataCache).length > 0) {
+        console.log("Phylogeny cache already merged.");
+        return phylogenyDataCache;
+    }
+
+    // Await fetches directly
     await Promise.all([fetchLiPhylogenyData(), fetchNeversPhylogenyData()]); 
 
     const merged = {};
 
-    // Get LI data (safe access)
+    // 1. Process LI Data (Accessing global caches safely)
     const liGenes = liPhylogenyCache?.genes || {};
-    
-    // Get NEVERS data (safe access)
-    const neversGenes = neversPhylogenyCache?.genes || {};
-
-    // Merge LI data first (accessing properties safely)
     for (const entrez in liGenes) {
         const data = liGenes[entrez];
-        const gene = (data.g || '').toUpperCase();
-        if (gene) {
-            merged[gene] = { li: data, nevers: null };
+        const geneSymbol = (data.g || '').toUpperCase();
+        if (geneSymbol) {
+            merged[geneSymbol] = { li: data, nevers: null, liSummary: liPhylogenyCache?.summary };
         }
     }
 
-    // Merge NEVERS data
+    // 2. Process NEVERS Data (Accessing global caches safely)
+    const neversGenes = neversPhylogenyCache?.genes || {};
     for (const gene in neversGenes) {
+        const geneSymbol = gene.toUpperCase();
         const data = neversGenes[gene];
-        const geneUpper = gene.toUpperCase();
-        if (geneUpper) {
-            if (!merged[geneUpper]) {
-                merged[geneUpper] = { li: null, nevers: data };
-            } else {
-                merged[geneUpper].nevers = data;
-            }
+        
+        if (!merged[geneSymbol]) {
+            merged[geneSymbol] = { li: null, nevers: data, neversGroups: neversPhylogenyCache?.organism_groups };
+        } else {
+            merged[geneSymbol].nevers = data;
+            merged[geneSymbol].neversGroups = neversPhylogenyCache?.organism_groups;
         }
     }
     
-    // Update global phylogenyDataCache for use in the router's validation block
+    // Update global cache (This final action is what the router checks)
     phylogenyDataCache = merged; 
+    console.log(`✅ Merged phylogeny cache created with ${Object.keys(phylogenyDataCache).length} genes (using HUGO symbols as keys).`);
 
     return phylogenyDataCache;
 }
-
 
 // NOTE: The implementation of comparePhylogenyDatasets and renderDetailedPhylogenyTable 
 // remains as defined in your working version to ensure the table content 
@@ -2827,10 +2831,9 @@ function extractMultipleGenes(query) {
 
 
 // --- UPDATED CENTRALIZED PHYLOGENY AND ORTHOLOG HANDLER (The Router) ---
-
 async function handlePhylogenyAndOrthologQuery(query) {
     const safeQuery = typeof query === 'string' ? query : ''; 
-    // CRITICAL: Ensure MERGED data structure is ready.
+    // CRITICAL: Ensure MERGED data structure is ready. This is now robust.
     await Promise.all([fetchCiliaData(), mergePhylogenyCaches()]); 
     
     const qLower = safeQuery.toLowerCase();
@@ -2840,10 +2843,11 @@ async function handlePhylogenyAndOrthologQuery(query) {
     
     // VALIDATION FIX: Check gene existence directly against the reliable merged phylogenyDataCache object
     const validPhyloGenes = allExtractedGenes.filter(gene => 
+        // This check is now guaranteed to work because mergePhylogenyCaches completed successfully.
         phylogenyDataCache.hasOwnProperty(gene)
     );
-    const genes = validPhyloGenes; 
-
+    const genes = validPhyloGenes;
+    
     let intent = null;
     let entity = null; 
     const organismPattern = /(c\.?\s*elegans|worm|mouse|zebrafish|xenopus|fly|drosophila|human|chlamydomonas|yeast|h\.?\s*sapiens|m\.?\s*musculus)/;
