@@ -1,26 +1,3 @@
-// --- Global Data Cache ---
-let ciliaHubDataCache = null;
-let screenDataCache = null;
-let phylogenyDataCache = null;
-// Note: tissueDataCache is attached to the window object in its function
-// --- ADDITION: New function to fetch and parse Cellxgene data ---
-let cellxgeneDataCache = null;
-// --- ADDITION: UMAP Plotting Functions ---
-let umapDataCache = null;
-// --- ADD THESE NEW LINES ---
-let CILI_AI_DOMAIN_DB = null;     // For the new domain database
-let neversPhylogenyCache = null;  // For Nevers et al. 2017 data
-let liPhylogenyCache = null;      // For Li et al. 2014 data
-let allGeneSymbols = null; // Add this global variable alongside others
-// --- GLOBAL CORUM CACHE ---
-let corumDataCache = {
-    list: [],
-    byGene: {},
-    byNameLower: {},
-    loaded: false
-};
-
-
 // --- NEW: Reusable scRNA-seq Data Reference ---
 const SC_RNA_SEQ_REFERENCE_HTML = `
 <p style="font-size: 0.8em; color: #666; margin-top: 1rem; border-top: 1px solid #eee; padding-top: 0.5rem;">
@@ -6030,3 +6007,29 @@ window.renderScreenSummaryHeatmap = renderScreenSummaryHeatmap;
 // Expose globally so other scripts can call them
 window.displayCiliAIExpressionHeatmap = displayCiliAIExpressionHeatmap;
 window.handleCiliAISelection = handleCiliAISelection;
+// --- Global Data Cache (safe initialization) ---
+globalThis.ciliaHubDataCache   = globalThis.ciliaHubDataCache   ?? null;
+globalThis.screenDataCache     = globalThis.screenDataCache     ?? null;
+globalThis.phylogenyDataCache  = globalThis.phylogenyDataCache  ?? null;
+
+// Note: tissueDataCache is attached to the window object in its function
+
+// --- ADDITION: New function to fetch and parse Cellxgene data ---
+globalThis.cellxgeneDataCache  = globalThis.cellxgeneDataCache  ?? null;
+
+// --- ADDITION: UMAP Plotting Functions ---
+globalThis.umapDataCache       = globalThis.umapDataCache       ?? null;
+
+// --- ADD THESE NEW LINES ---
+globalThis.CILI_AI_DOMAIN_DB   = globalThis.CILI_AI_DOMAIN_DB   ?? null;     // For the new domain database
+globalThis.neversPhylogenyCache = globalThis.neversPhylogenyCache ?? null;   // For Nevers et al. 2017 data
+globalThis.liPhylogenyCache    = globalThis.liPhylogenyCache    ?? null;     // For Li et al. 2014 data
+globalThis.allGeneSymbols      = globalThis.allGeneSymbols      ?? null;     // All known gene symbols
+
+// --- GLOBAL CORUM CACHE ---
+globalThis.corumDataCache = globalThis.corumDataCache ?? {
+    list: [],
+    byGene: {},
+    byNameLower: {},
+    loaded: false
+};
