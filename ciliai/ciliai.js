@@ -2781,96 +2781,122 @@ function classifyGeneCiliaryOrigin(geneUpper) {
   return 'Unknown';
 }
 
-// --- UPDATED: Dynamic Routing Function (The Brain) ---
-async function handlePhylogenyAndOrthologQuery(query) {
-  const safeQuery = typeof query === 'string' ? query : '';
-  await mergePhylogenyCaches();  // Ensure merged cache is ready
-  const qLower = safeQuery.toLowerCase();
-  
-  const genes = extractMultipleGenes(safeQuery);
-  if (genes.length === 0) {
-    return `<div class="result-card"><h3>Invalid Query</h3><p>No valid gene symbols found in query.</p></div>`;
-  }
 
-  // Detect organism/group from query
-  let organism = null;
-  const organismMatch = qLower.match(/(unicellular|prokaryote|[a-z]\.\s*[a-z]+|human|mouse|worm|fly|zebrafish|xenopus|chlamydomonas|yeast)/i);
-  if (organismMatch) organism = organismMatch[0].toLowerCase();
+// --- NEW: Merge Li and Nevers into Single Cache ---
+// This function ensures a single object containing all genes from both files is created
+// and stored in the global cache.
+async function mergePhylogenyCaches() {
+    if (phylogenyDataCache) return phylogenyDataCache;
 
-  const isOrthologRequest = qLower.includes('ortholog') || qLower.includes('homolog') || qLower.includes('conserved in') || qLower.includes('present in');
-  const isNonCiliaryList = qLower.includes('non-ciliary') || qLower.includes('nonciliary');
-  const isCiliaryList = qLower.includes('ciliary genes') || qLower.includes('cilia genes') || qLower.includes('list of genes');
+    const [liData, neversData] = await Promise.all([
+        fetch('https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/li_et_al_2014_matrix_optimized.json').then(res => res.json()),
+        fetch('https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/nevers_et_al_2017_matrix_optimized.json').then(res => res.json())
+    ]);
 
-  // --- Route 1: Ortholog Lookup (with organism/group context) ---
-  if (isOrthologRequest && organism) {
-    const mergedCache = phylogenyDataCache;
-    let textResults = '<ul>';
-    genes.forEach(geneUpper => {
-      const geneData = mergedCache[geneUpper];
-      if (!geneData) {
-        textResults += `<li><strong>${geneUpper}</strong>: No data in either dataset.</li>`;
-        return;
-      }
-
-      // Handle special "unicellular" group
-      const isUnicellular = organism === 'unicellular';
-      const targetSpecies = isUnicellular ? UNICELLULAR_SPECIES : [organism];
-
-      // Check presence in Li
-      let liPresent = [];
-      if (geneData.li && Array.isArray(geneData.li.s)) {
-        const liOrganisms = liPhylogenyCache.summary.organisms_list;
-        liPresent = geneData.li.s.map(idx => liOrganisms[idx]).filter(s => targetSpecies.some(t => normalizeTerm(s).includes(normalizeTerm(t))));
-      }
-
-      // Check presence in Nevers
-      let neversPresent = [];
-      if (geneData.nevers && Array.isArray(geneData.nevers.s)) {
-        const neversOrganisms = neversPhylogenyCache.organism_groups.all_organisms_list;
-        neversPresent = geneData.nevers.s.map(idx => neversOrganisms[idx]).filter(s => targetSpecies.some(t => normalizeTerm(s).includes(normalizeTerm(t))));
-      }
-
-      const hasOrtholog = liPresent.length > 0 || neversPresent.length > 0;
-      const status = hasOrtholog ? 'Yes' : 'No';
-      const details = hasOrtholog 
-        ? `(Li: ${liPresent.join(', ') || 'None'}; Nevers: ${neversPresent.join(', ') || 'None'})`
-        : '';
-
-      textResults += `<li><strong>${geneUpper}</strong>: ${status} has orthologs in ${organism} organisms. ${details}</li>`;
-    });
-    textResults += '</ul>';
-
-    const textHtml = `<div class="result-card"><h3>Ortholog Presence Analysis</h3>${textResults}</div>`;
-
-    // Combine with heatmap for visual confirmation
-    const heatmapHtml = await displayPhylogenyComparison(genes);
-    return textHtml + heatmapHtml;
-  }
-
-  // --- Route 2: Non-Ciliary List for Organism ---
-  if (isNonCiliaryList && organism) {
-    const nonCiliaryGenes = await getNonCiliaryGenesForOrganism(organism);
-    return formatListResult(`Non-Ciliary Genes in ${organism}`, nonCiliaryGenes);
-  }
-
-  // --- Route 3: Ciliary List for Organism ---
-  if (isCiliaryList && organism) {
-    const { genes: ciliaryGenes, description, speciesCode } = await getCiliaryGenesForOrganism(organism);
-    return formatListResult(`Ciliary Genes in ${speciesCode}`, ciliaryGenes, description);
-  }
-
-  // --- Fallback: General Phylogeny Visualization (for any gene(s)) ---
-  return await displayPhylogenyComparison(genes);
-}
-
-// --- NOTE: The getPhylogenyComparisonGene function must be updated to accept an array of genes: ---
-async function getPhylogenyComparisonGene(genes) {
-    // If a single gene (string) was passed directly, wrap it in an array for compatibility
-    const geneArray = Array.isArray(genes) ? genes : [genes];
+    // Store the raw data into the global cache
+    phylogenyDataCache = { li: liData, nevers: neversData };
+    console.log('Phylogeny data fetched and merged into primary cache structure.');
     
-    // This now passes the array of 1 or more genes to the visualization function
-    return displayPhylogenyComparison(geneArray); 
+    return phylogenyDataCache;
 }
+
+// --- NEW HELPER: Extract Multiple Genes Dynamically ---
+// This remains the same as previously defined, crucial for extracting genes from query.
+function extractMultipleGenes(query) {
+    const genePattern = /\b([A-Z0-9]{3,}|ift\d+|bbs\d+|arl\d+b|nphp\d+)\b/gi;
+    const matches = query.match(genePattern);
+    return matches ? [...new Set(matches.map(g => g.toUpperCase()))] : [];
+}
+
+// --- UPDATED CENTRALIZED PHYLOGENY AND ORTHOLOG HANDLER (The Router) ---
+
+async function handlePhylogenyAndOrthologQuery(query) {
+    const safeQuery = typeof query === 'string' ? query : ''; 
+    // CRITICAL CHANGE: Ensure MERGED data structure is ready
+    await Promise.all([fetchCiliaData(), mergePhylogenyCaches()]); 
+    const qLower = safeQuery.toLowerCase();
+    
+    // 1. DYNAMIC GENE EXTRACTION & VALIDATION
+    const allExtractedGenes = extractMultipleGenes(safeQuery);
+    
+    // Validate genes against the combined data (keys from Li's and Nevers' gene objects)
+    const liGenes = Object.values(phylogenyDataCache.li.genes || {}).map(entry => entry.g.toUpperCase());
+    const neversGenes = Object.keys(phylogenyDataCache.nevers.genes || {}).map(gene => gene.toUpperCase());
+    const allPhyloGenesSet = new Set([...liGenes, ...neversGenes]);
+
+    // Filter extracted genes to ensure they exist in *either* phylogenetic dataset
+    const validPhyloGenes = allExtractedGenes.filter(gene => allPhyloGenesSet.has(gene));
+    const genes = validPhyloGenes; 
+
+    // --- CRITICAL FIX POINT ---
+    if (genes.length === 0) {
+        // If the query was to show conservation but no valid gene was found in the datasets
+        if (qLower.includes('phylogeny') || qLower.includes('conservation')) {
+             return `<div class="result-card"><h3>Query Failed: Gene Not Found</h3><p>The gene symbol(s) found in your query (**${allExtractedGenes.join(', ') || 'None'}**) could not be matched to either the Li et al. (2014) or Nevers et al. (2017) phylogenetic datasets.</p></div>`;
+        }
+        // Fall back to a general failure if it wasn't a specific conservation query
+        return `<div class="result-card"><h3>Invalid Query</h3><p>No valid gene symbols found for analysis in the phylogenetic databases.</p></div>`;
+    }
+    // --- END CRITICAL FIX POINT ---
+
+
+    let intent = null;
+    let entity = null; 
+    const organismPattern = /(c\.?\s*elegans|worm|mouse|zebrafish|xenopus|fly|drosophila|human|chlamydomonas|yeast|h\.?\s*sapiens|m\.?\s*musculus)/;
+    const organismMatch = qLower.match(organismPattern);
+
+    // 2. Multi-Gene/Visual Intent Pre-Routing
+    if (genes.length > 1 || qLower.includes('phylogeny') || qLower.includes('conservation') || qLower.includes('tree') || qLower.includes('unicellular')) {
+        return getPhylogenyComparisonGene(genes);
+    }
+    
+    // Use the single gene found for further lookup logic below
+    if (genes.length === 1) {
+        entity = genes[0];
+    }
+
+
+    // 3. Simple Intent Determination (for Lists/Single Orthologs)
+    const isOrthologRequest = qLower.includes('ortholog') || qLower.includes('homolog') || qLower.includes('conserved in');
+
+    if (isOrthologRequest) {
+        intent = 'ORTHOLOG_LOOKUP';
+    } else if (qLower.includes('non-ciliary genes') || qLower.includes('nonciliary genes')) {
+        intent = 'NONCILIARY_LIST';
+    } else if (qLower.includes('ciliary genes') || qLower.includes('cilia genes') || qLower.includes('list of genes') || qLower.includes('provide') || qLower.includes('show')) {
+        intent = 'CILIARY_LIST';
+    }
+
+    if (organismMatch) {
+        entity = organismMatch[1].trim();
+    }
+    
+    // 4. FINAL ROUTING EXECUTION
+    if (intent === 'ORTHOLOG_LOOKUP' && genes.length === 1) {
+        // Route 3: Curated Ortholog (CiliaHub table)
+        return getOrthologsForGene(genes[0]);
+        
+    } else if (intent === 'NONCILIARY_LIST' && entity) {
+        // Route 4: Non-Ciliary gene list
+        const nonCiliaryGenes = await getNonCiliaryGenesForOrganism(entity);
+        return formatListResult(`Non-Ciliary Genes in ${entity}`, nonCiliaryGenes);
+
+    } else if (intent === 'CILIARY_LIST' && entity) {
+        // Route 5: Ciliary gene list for a specific organism
+        const { genes: ciliaryGenes, description, speciesCode } = await getCiliaryGenesForOrganism(entity);
+        return formatListResult(`Ciliary Genes in ${speciesCode} (Phylogeny Screen)`, ciliaryGenes, description, speciesCode, 'N/A');
+
+    } else if (intent === 'CILIARY_LIST' && !entity) {
+        // Route 6: Global Ciliary gene list
+        return getAllCiliaryGenes();
+
+    } else {
+        // Fallback catch-all for queries that hit the router but didn't fit above rules
+        return `<div class="result-card"><h3>Query Not Understood</h3><p>I couldn't identify a valid gene or list intent based on the Li/Nevers datasets. Please specify a gene, a list type, or an organism.</p></div>`;
+    }
+}
+
+
 
 /**
  * Retrieves ALL genes marked with any ciliopathy, regardless of specific name.
