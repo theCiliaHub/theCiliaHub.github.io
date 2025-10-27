@@ -2309,7 +2309,10 @@ function getPhylogenyMatrix(geneSymbols) {
         "NEK8", "CENPF", "KIAA0556", "HYLS1", "WDR54"
     ];
     const inputGenesUpper = geneSymbols.map(g => g.toUpperCase());
-    const uniqueGenes = [...new Set(inputGenesUpper.concat(defaultGenes.map(g => g.toUpperCase())))].slice(0, 20);
+   // Replace with (for clarity):
+const uniqueGenes = Array.from(
+    new Set([...inputGenesUpper, ...defaultGenes.map(g => g.toUpperCase())])
+).slice(0, 20);
 
     // --- FIX 2: Define/re-define organism lists internally to solve the ReferenceError ---
     const CIL_ORG_FULL = [
@@ -2613,7 +2616,7 @@ function renderDetailedPhylogenyTable(geneSymbol, targetDivId, neversLoaded, liL
     }
 
     const html = `
-        <table class="ciliopathy-table gene-detail-table" id="${targetDivId}">
+        <table class="ciliopathy-table gene-detail-table">
             <thead>
                 <tr>
                     <th style="width: 25%;">Dataset</th>
@@ -2626,8 +2629,20 @@ function renderDetailedPhylogenyTable(geneSymbol, targetDivId, neversLoaded, liL
                 ${liRow}
             </tbody>
         </table>
-        `;
-    document.getElementById(targetDivId).innerHTML = html;
+    `;
+
+    const targetEl = document.getElementById(targetDivId);
+    if (!targetEl) {
+        console.warn(`renderDetailedPhylogenyTable: Element with id '${targetDivId}' not found.`);
+        return;
+    }
+    // If the target is a <div> or similar container, update innerHTML;
+    // if it's a <table>/<tbody>, replace it completely.
+    if (targetEl.tagName.toLowerCase() === 'div') {
+        targetEl.innerHTML = html;
+    } else {
+        targetEl.outerHTML = html;
+    }
 }
 
 // --- UPDATED HANDLER (Call the new display function) ---
@@ -2653,18 +2668,18 @@ async function getNonCiliaryGenesForOrganism(organismName) {
     await fetchPhylogenyData();
     const normalizedOrganism = normalizeTerm(organismName);
     
-    // Simplified mapping for species codes used in phylogenyDataCache
     const speciesMap = {
         'human': 'H.sapiens', 'mouse': 'M.musculus', 'worm': 'C.elegans', 'c. elegans': 'C.elegans',
-        'fly': 'D.melanogaster', 'zebrafish': 'D.rerio', 'xenopus': 'X.tropicalis' 
+        'fly': 'D.melanogaster', 'zebrafish': 'D.rerio', 'xenopus': 'X.tropicalis'
     };
     const speciesCode = speciesMap[normalizedOrganism] || organismName;
     const speciesRegex = new RegExp(speciesCode.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
 
-    const genes = Object.entries(phylogenyDataCache)
+    const genes = Object.entries(liPhylogenyCache?.genes || {})
         .filter(([gene, data]) => {
-            // Filter by the 'nonciliary_only_genes' category in the main phylogeny summary.
-            const isNonCiliaryCategory = data.category === 'nonciliary_only_genes' || data.category.toLowerCase().includes('non-ciliary');
+            const isNonCiliaryCategory = data.category && (
+                data.category === 'nonciliary_only_genes' || data.category.toLowerCase().includes('non-ciliary')
+            );
             const hasSpecies = Array.isArray(data.species) && data.species.some(s => speciesRegex.test(normalizeTerm(s)));
             return isNonCiliaryCategory && hasSpecies;
         })
@@ -2672,6 +2687,7 @@ async function getNonCiliaryGenesForOrganism(organismName) {
     
     return genes;
 }
+
 
 
 
@@ -2715,93 +2731,220 @@ async function getPhylogenyOrthologStatus(gene) {
     return displayPhylogenyComparison([gene]);
 }
 
-// --- UPDATED CENTRALIZED PHYLOGENY AND ORTHOLOG HANDLER (The Router) ---
 
-/**
- * Parses all gene list, ortholog, and phylogenetic comparison queries.
- * Handles single-gene, multi-gene, and specific conservation group queries.
- * @param {string} query - The user's input query.
- * @returns {Promise<string>} - HTML result showing the list, details, or visualization.
- */
-/**
- * Parses all gene list, ortholog, and phylogenetic comparison queries.
- * Handles single-gene, multi-gene, and specific conservation group queries.
- * @param {string} query - The user's input query.
- * @returns {Promise<string>} - HTML result showing the list, details, or visualization.
- */
-async function handlePhylogenyAndOrthologQuery(query) {
-    // CRITICAL FIX: Ensure query is a string to prevent TypeError
-    const safeQuery = typeof query === 'string' ? query : ''; 
-    await Promise.all([fetchCiliaData(), fetchPhylogenyData()]);
-    const qLower = safeQuery.toLowerCase();
-    
-    // 1. DYNAMIC GENE EXTRACTION: Find all genes mentioned
-    const genes = extractMultipleGenes(safeQuery); 
-    
-    let intent = null;
-    let entity = null; 
-    const organismPattern = /(c\.?\s*elegans|worm|mouse|zebrafish|xenopus|fly|drosophila|human|chlamydomonas|yeast|h\.?\s*sapiens|m\.?\s*musculus)/;
-    const organismMatch = qLower.match(organismPattern);
+/*****************************************************************************************
+ * CiliAI ASK - Dynamic Phylogeny and Orthology Engine
+ * ----------------------------------------------------
+ * Supports natural-language queries about ciliary evolution and orthology.
+ * 
+ * Example questions:
+ *   "Show me if ARL13B is conserved in unicellular organisms"
+ *   "List the ciliary genes conserved in unicellular organisms"
+ *   "Compare WDR31 and TP53 phylogeny"
+ *****************************************************************************************/
 
-    if (genes.length > 1) {
-        // --- ROUTE 1: MULTI-GENE CONSERVATION COMPARISON ---
-        return getPhylogenyComparisonGene(genes);
-    }
-    
-    // Check for specific evolutionary group conservation
-    if (qLower.includes('unicellular') || qLower.includes('algae') || qLower.includes('chlamydomonas') || qLower.includes('yeast')) {
-        // --- ROUTE 2: UNICELLULAR/EVOLUTIONARY GROUP QUERY (Visual) ---
-        return getPhylogenyComparisonGene(genes); 
-    }
+// ----------------------------- DATASET CACHE --------------------------------------------
 
-    // --- Intent Determination (Original Logic for Lists/Single Orthologs) ---
-    const isOrthologRequest = qLower.includes('ortholog') || qLower.includes('homolog') || qLower.includes('conserved in');
+const phylogenyDataCache = {
+  Li2014: null,
+  Nevers2017: null
+};
 
-    if (isOrthologRequest) {
-        intent = 'ORTHOLOG_LOOKUP';
-    } else if (qLower.includes('non-ciliary genes') || qLower.includes('nonciliary genes')) {
-        intent = 'NONCILIARY_LIST';
-    } else if (qLower.includes('ciliary genes') || qLower.includes('cilia genes') || qLower.includes('list of genes')) {
-        intent = 'CILIARY_LIST';
-    } else if (qLower.includes('provide') || qLower.includes('show') || qLower.includes('display') || qLower.includes('list') || qLower.includes('tell me')) {
-        intent = 'CILIARY_LIST';
-    }
+// ----------------------------- LOADING FUNCTIONS -----------------------------------------
 
-    if (organismMatch) {
-        entity = organismMatch[1].trim();
-    }
-
-    // --- Routing Logic (Single Gene/List Requests) ---
-
-    if (intent === 'ORTHOLOG_LOOKUP' && genes.length === 1) {
-        // Route 3: Single Gene-specific Ortholog lookup (curated CiliaHub table)
-        return getOrthologsForGene(genes[0]);
-        
-    } else if (intent === 'NONCILIARY_LIST' && entity) {
-        // Route 4: Non-Ciliary gene list for a specific organism 
-        const nonCiliaryGenes = await getNonCiliaryGenesForOrganism(entity);
-        return formatListResult(`Non-Ciliary Genes in ${entity}`, nonCiliaryGenes);
-
-    } else if (intent === 'CILIARY_LIST' && entity) {
-        // Route 5: Ciliary gene list for a specific organism
-        const { genes: ciliaryGenes, description, speciesCode } = await getCiliaryGenesForOrganism(entity);
-        return formatListResult(`Ciliary Genes in ${speciesCode} (Phylogeny Screen)`, ciliaryGenes, description, speciesCode, 'N/A');
-
-    } else if (intent === 'CILIARY_LIST' && !entity) {
-        // Route 6: Global Ciliary gene list
-        return getAllCiliaryGenes();
-
-    } else {
-        // --- ROUTE 7: FALLBACK TO SINGLE GENE VISUALIZATION (Fix for WDR31) ---
-        if (genes.length === 1 && !organismMatch) {
-            // If the query is just a single gene or a phrase like "Show conservation of WDR31", 
-            // the intent is clearly to see the visual comparison plot.
-            return getPhylogenyComparisonGene(genes); // Return visual plot
-        }
-        
-        return `<div class="result-card"><h3>Query Not Understood</h3><p>I couldn't identify the type of gene list, the organism, or the genes you're looking for. Please specify a gene, a list, or an organism.</p></div>`;
-    }
+async function loadLiPhylogenyData() {
+  if (phylogenyDataCache.Li2014) return phylogenyDataCache.Li2014;
+  const res = await fetch("li_et_al_2014_phylogeny.json");
+  phylogenyDataCache.Li2014 = await res.json();
+  return phylogenyDataCache.Li2014;
 }
+
+async function loadNeversPhylogenyData() {
+  if (phylogenyDataCache.Nevers2017) return phylogenyDataCache.Nevers2017;
+  const res = await fetch("nevers_et_al_2017_phylogeny.json");
+  phylogenyDataCache.Nevers2017 = await res.json();
+  return phylogenyDataCache.Nevers2017;
+}
+
+// ----------------------------- UTILITIES -------------------------------------------------
+
+function normalizeGeneSymbol(input) {
+  if (!input) return "";
+  return input.trim().toUpperCase().replace(/[^A-Z0-9_-]/g, "");
+}
+
+function inferCiliaryOrigin(liData, neversData) {
+  if (!liData && !neversData) return "Unclassified";
+
+  const s = neversData?.s || [];
+  const ciliatedCount = s.filter(i => i < 20).length;
+  const nonCiliatedCount = s.filter(i => i >= 20).length;
+
+  if (ciliatedCount > 10 && nonCiliatedCount === 0) return "Ciliary core";
+  if (ciliatedCount > 5 && nonCiliatedCount > 0) return "Ciliary-related";
+  if (ciliatedCount === 0 && nonCiliatedCount > 5) return "Non-ciliary conserved";
+  return "Unclassified";
+}
+
+function summarizeLiData(liData) {
+  if (!liData) return "No Li2014 record.";
+  return `${liData.ciliome_category || "Unclassified"} (${liData.organisms?.length || 0} species)`;
+}
+
+function summarizeNeversData(neversData) {
+  if (!neversData) return "No Nevers2017 record.";
+  const s = neversData.s || [];
+  const ciliatedCount = s.filter(i => i < 20).length;
+  const nonCiliatedCount = s.filter(i => i >= 20).length;
+  return `Found in ${ciliatedCount}/20 ciliated and ${nonCiliatedCount}/20 non-ciliated species.`;
+}
+
+// ----------------------------- QUERY PARSER ----------------------------------------------
+
+function parsePhylogenyQuery(query) {
+  const q = query.toLowerCase().trim();
+
+  // 1. Single gene conservation query
+  const singleGeneMatch = q.match(/(?:is|show|check|see|display).*(\b[A-Z0-9_-]{3,}\b)/i);
+  if (singleGeneMatch) {
+    const gene = normalizeGeneSymbol(singleGeneMatch[1]);
+    const focus = q.includes("unicellular") ? "unicellular" : "all";
+    return { type: "singleGene", gene, focus };
+  }
+
+  // 2. List-type queries
+  if (q.includes("list") || q.includes("show all") || q.includes("which")) {
+    if (q.includes("unicellular")) return { type: "listUnicellular" };
+    if (q.includes("multicellular")) return { type: "listMulticellular" };
+    return { type: "listAll" };
+  }
+
+  // 3. Comparison query
+  const comparisonMatch = q.match(/compare\s+([A-Z0-9_-]+)\s+(?:and|vs)\s+([A-Z0-9_-]+)/i);
+  if (comparisonMatch) {
+    return {
+      type: "compareGenes",
+      genes: [normalizeGeneSymbol(comparisonMatch[1]), normalizeGeneSymbol(comparisonMatch[2])]
+    };
+  }
+
+  return { type: "unknown" };
+}
+
+// ----------------------------- CORE HANDLER ----------------------------------------------
+
+async function handlePhylogenyAndOrthologQuery(userInput) {
+  await Promise.all([loadLiPhylogenyData(), loadNeversPhylogenyData()]);
+  const { Li2014, Nevers2017 } = phylogenyDataCache;
+  const parsed = parsePhylogenyQuery(userInput);
+
+  // --- Handle single gene ---
+  if (parsed.type === "singleGene") {
+    const gene = parsed.gene;
+    const liData = Li2014.genes?.[gene];
+    const neversData = Nevers2017.genes?.[gene];
+
+    if (!liData && !neversData)
+      return `<div>Gene <b>${gene}</b> not found in either dataset.</div>`;
+
+    const inferred = inferCiliaryOrigin(liData, neversData);
+    const s = neversData?.s || [];
+    const unicellularCount = s.filter(i => i < 5).length; // arbitrary: first 5 species = unicellular
+
+    if (parsed.focus === "unicellular") {
+      return `<div><b>${gene}</b> is ${
+        unicellularCount > 0 ? "" : "not "
+      }conserved in unicellular organisms.</div>`;
+    }
+
+    return `
+      <div>
+        <h3>Phylogenetic Comparison for ${gene}</h3>
+        <ul>
+          <li><b>Li et al. 2014:</b> ${summarizeLiData(liData)}</li>
+          <li><b>Nevers et al. 2017:</b> ${summarizeNeversData(neversData)}</li>
+          <li><b>Inferred Ciliary Origin:</b> ${inferred}</li>
+        </ul>
+      </div>`;
+  }
+
+  // --- Handle list queries ---
+  if (parsed.type === "listUnicellular") {
+    const result = [];
+    for (const [gene, data] of Object.entries(Nevers2017.genes)) {
+      const s = data.s || [];
+      const unicellularCount = s.filter(i => i < 5).length;
+      if (unicellularCount > 0) {
+        const liData = Li2014.genes?.[gene];
+        if (liData?.ciliome_category) result.push(gene);
+      }
+    }
+    return `<div><b>Ciliary genes conserved in unicellular organisms (${result.length}):</b><br>${result.join(", ")}</div>`;
+  }
+
+  if (parsed.type === "listMulticellular") {
+    const result = [];
+    for (const [gene, data] of Object.entries(Nevers2017.genes)) {
+      const s = data.s || [];
+      const multiCount = s.filter(i => i >= 5 && i < 20).length;
+      if (multiCount > 10) {
+        const liData = Li2014.genes?.[gene];
+        if (liData?.ciliome_category) result.push(gene);
+      }
+    }
+    return `<div><b>Ciliary genes conserved in multicellular organisms (${result.length}):</b><br>${result.join(", ")}</div>`;
+  }
+
+  if (parsed.type === "listAll") {
+    const allGenes = Object.keys(Li2014.genes);
+    return `<div><b>All genes in Li et al. 2014 dataset (${allGenes.length}):</b><br>${allGenes.slice(0, 50).join(", ")} ...</div>`;
+  }
+
+  // --- Handle comparison queries ---
+  if (parsed.type === "compareGenes") {
+    const [g1, g2] = parsed.genes;
+    const li1 = Li2014.genes?.[g1], li2 = Li2014.genes?.[g2];
+    const n1 = Nevers2017.genes?.[g1], n2 = Nevers2017.genes?.[g2];
+
+    if (!n1 && !n2)
+      return `<div>Neither ${g1} nor ${g2} found in datasets.</div>`;
+
+    const inf1 = inferCiliaryOrigin(li1, n1);
+    const inf2 = inferCiliaryOrigin(li2, n2);
+
+    return `
+      <div>
+        <h3>Comparison: ${g1} vs ${g2}</h3>
+        <table border="1" cellpadding="4">
+          <tr><th>Gene</th><th>Li 2014</th><th>Nevers 2017</th><th>Inferred Origin</th></tr>
+          <tr><td>${g1}</td><td>${summarizeLiData(li1)}</td><td>${summarizeNeversData(n1)}</td><td>${inf1}</td></tr>
+          <tr><td>${g2}</td><td>${summarizeLiData(li2)}</td><td>${summarizeNeversData(n2)}</td><td>${inf2}</td></tr>
+        </table>
+      </div>`;
+  }
+
+  // --- Unknown queries ---
+  return `<div class="text-red-500">Sorry, I didn’t understand that. Try: 
+    <ul>
+      <li>“Show me if ARL13B is conserved in unicellular organisms.”</li>
+      <li>“List the ciliary genes conserved in unicellular organisms.”</li>
+      <li>“Compare TP53 and WDR31.”</li>
+    </ul>
+  </div>`;
+}
+
+// ----------------------------- OPTIONAL: EXPORTS -----------------------------------------
+if (typeof module !== "undefined") {
+  module.exports = {
+    handlePhylogenyAndOrthologQuery,
+    loadLiPhylogenyData,
+    loadNeversPhylogenyData,
+    parsePhylogenyQuery,
+    inferCiliaryOrigin
+  };
+}
+
+
 
 // --- NOTE: The getPhylogenyComparisonGene function must be updated to accept an array of genes: ---
 async function getPhylogenyComparisonGene(genes) {
