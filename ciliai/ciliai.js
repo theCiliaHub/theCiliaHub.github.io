@@ -2623,13 +2623,6 @@ async function comparePhylogenyDatasets(geneSymbol) {
     return displayPhylogenyComparison([geneSymbol]);
 }
 
-/**
-// --- NEW HELPER: Get Non-Ciliary Genes for Organism ---
-/**
- * Retrieves human genes classified as Non-Ciliary that have an ortholog in the target organism.
- * @param {string} organismName - The target organism (e.g., 'mouse').
- * @returns {Array<Object>} - List of genes.
- */
 // --- NEW HELPER: Get Non-Ciliary Genes for Organism ---
 /**
  * Retrieves human genes classified as Non-Ciliary that have an ortholog in the target organism.
@@ -2659,8 +2652,6 @@ async function getNonCiliaryGenesForOrganism(organismName) {
     
     return genes;
 }
-
-
 
 
 // --- CORE FUNCTION: CURATED ORTHOLOG LOOKUP (From ciliahub_data.json) ---
@@ -2730,7 +2721,6 @@ function classifyGeneCiliaryOrigin(geneUpper) {
   return 'Unknown';
 }
 
-
 // --- NEW: Merge Li and Nevers into Single Cache ---
 // This function ensures a single object containing all genes from both files is created
 // and stored in the global cache.
@@ -2748,6 +2738,7 @@ async function mergePhylogenyCaches() {
     
     return phylogenyDataCache;
 }
+
 // --- NEW HELPER: Extract Multiple Genes Dynamically ---
 // This remains the same as previously defined, crucial for extracting genes from query.
 function extractMultipleGenes(query) {
@@ -2757,8 +2748,8 @@ function extractMultipleGenes(query) {
 }
 
 
-// --- UPDATED CENTRALIZED PHYLOGENY AND ORTHOLOG HANDLER (The Router) ---
-async function (query) {
+// --- REVISED CENTRALIZED PHYLOGENY AND ORTHOLOG HANDLER (The Router) ---
+async function displayPhylogenyComparison(query) { // Renaming to the consolidated function
     const safeQuery = typeof query === 'string' ? query : ''; 
     // CRITICAL: Ensure MERGED data structure is ready. This is now robust.
     await Promise.all([fetchCiliaData(), mergePhylogenyCaches()]); 
@@ -2770,8 +2761,8 @@ async function (query) {
     
     // VALIDATION FIX: Check gene existence directly against the reliable merged phylogenyDataCache object
     const validPhyloGenes = allExtractedGenes.filter(gene => 
-        // This check is now guaranteed to work because mergePhylogenyCaches completed successfully.
-        phylogenyDataCache.hasOwnProperty(gene)
+        // Note: phylogenyDataCache must be a globally accessible object containing all gene keys
+        phylogenyDataCache.hasOwnProperty(gene) 
     );
     const genes = validPhyloGenes;
     
@@ -2780,15 +2771,22 @@ async function (query) {
     const organismPattern = /(c\.?\s*elegans|worm|mouse|zebrafish|xenopus|fly|drosophila|human|chlamydomonas|yeast|h\.?\s*sapiens|m\.?\s*musculus)/;
     const organismMatch = qLower.match(organismPattern);
 
-    // 2. Multi-Gene/Visual Intent Pre-Routing
-    if (genes.length >= 1) { 
-        // Visual comparison intent check (including multi-gene and single-gene visual queries)
-        if (genes.length > 1 || qLower.includes('phylogeny') || qLower.includes('conservation') || qLower.includes('tree') || qLower.includes('unicellular')) {
-            return getPhylogenyComparisonGene(genes);
-        }
-        // Use the single gene found for further lookup logic below
-        if (genes.length === 1) entity = genes[0];
+    // 2. CONSOLIDATED VISUAL INTENT ROUTING (FIXED)
+    // ACTION: If any valid gene is found AND a visualization keyword exists, or if it's the final single gene fallback, route to visualization immediately.
+    const isVisualizationRequest = genes.length > 1 || 
+                                   qLower.includes('phylogeny') || 
+                                   qLower.includes('comparison') || // Added to ensure "Show phylogenetic comparison" works
+                                   qLower.includes('conservation') || 
+                                   qLower.includes('tree') || 
+                                   qLower.includes('unicellular');
+
+    if (genes.length >= 1 && isVisualizationRequest) { 
+        // Route 1: Explicit Visualization Request (works for ARL13B and should now work for WDR31)
+        return getPhylogenyComparisonGene(genes);
     }
+    
+    // Use the single gene found for further lookup logic below
+    if (genes.length === 1) entity = genes[0];
     
     // 3. Simple Intent Determination (Original Logic)
     const isOrthologRequest = qLower.includes('ortholog') || qLower.includes('homolog') || qLower.includes('conserved in');
@@ -2826,8 +2824,11 @@ async function (query) {
         return getAllCiliaryGenes();
 
     } else if (genes.length === 1) {
-        // Route 7: Final fallback for a single gene (e.g., "WDR31") defaults to the visual comparison
-        return getPhylogenyComparisonGene(genes); 
+        // Route 7 (FIXED): Final fallback for a single gene (e.g., "WDR31") now defaults to the visual comparison
+        // ACTION: This route is now redundant because it should have been caught by the visual intent check above,
+        // but if it still reaches here, it means it wasn't an explicit list/ortholog request either.
+        // It must be a direct visualization request like 'WDR31' alone.
+        return getPhylogenyComparisonGene(genes); // Final fallback to visualization
     }
     
     // Final error message if no recognizable gene or intent exists
