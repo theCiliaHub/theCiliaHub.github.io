@@ -1156,12 +1156,6 @@ const questionRegistry = [
     { text: "What is the source for Ciliary genes in zebrafish?", handler: async () => tellAboutOrganismSources("zebrafish") },
     { text: "What is the source for Ciliary genes in drosophila?", handler: async () => tellAboutOrganismSources("drosophila") },
     
-    // ==================== NEW CONSOLIDATED PHYLOGENY QUESTIONS ====================
-    { text: "Compare IFT88 phylogeny", handler: async () => comparePhylogenyDatasets("IFT88") },
-    { text: "Compare BBS1 phylogeny", handler: async () => comparePhylogenyDatasets("BBS1") },
-    { text: "Show the phylogenetic comparison for ARL13B", handler: async () => comparePhylogenyDatasets("ARL13B") },
-    { text: "NPHP1 phylogenetic analysis comparison", handler: async () => comparePhylogenyDatasets("NPHP1") },
-
     // Update general questions to use the comparison function for maximum utility:
     { text: "Show evolutionary conservation of IFT88", handler: async () => comparePhylogenyDatasets("IFT88") },
     { text: "What is the phylogeny of BBS1?", handler: async () => comparePhylogenyDatasets("BBS1") },
@@ -1183,11 +1177,12 @@ const questionRegistry = [
     { text: "List conserved genes in C. elegans", handler: async (q) => handlePhylogenyAndOrthologQuery(q) },
 
     // --- Visual Comparison Queries (Router Fallback to getPhylogenyComparisonGene) ---
-    { text: "Show the phylogenetic comparison for ARL13B", handler: async (query) => handlePhylogenyAndOrthologQuery(query) },
-    { text: "Show the phylogenetic comparison for WDR31", handler: async (query) => handlePhylogenyAndOrthologQuery(query) },
-    { text: "What is the phylogeny of BBS1?", handler: async (query) => handlePhylogenyAndOrthologQuery(query) },
-    { text: "Show evolutionary conservation of IFT88", handler: async (query) => handlePhylogenyAndOrthologQuery(query) },
-    { text: "Phylogenetic analysis of CEP290", handler: async (query) => handlePhylogenyAndOrthologQuery(query) },
+    { text: "Show the phylogenetic comparison for ARL13B", handler: async (query) => getPhylogenyComparisonGene(query) },
+    { text: "Show the phylogenetic comparison for WDR31", handler: async (query) => getPhylogenyComparisonGene(query) },
+    { text: "What is the phylogeny of BBS1?", handler: async (query) => getPhylogenyComparisonGene(query) },
+    { text: "Show evolutionary conservation of IFT88", handler: async (query) => getPhylogenyComparisonGene(query) },
+    { text: "Phylogenetic analysis of CEP290", handler: async (query) => getPhylogenyComparisonGene(query) },
+  
     // ==================== PHYLOGENY QUERIES (List Genes based on Screen) ====================
     { text: "List Ciliary Genes in C. elegans (Phylogeny)", handler: async () => getPhylogenyGenesForOrganism("C. elegans") },
     { text: "List Ciliary Genes in Mouse (Phylogeny)", handler: async () => getPhylogenyGenesForOrganism("mouse") },
@@ -1231,12 +1226,6 @@ const questionRegistry = [
     { text: "List conserved genes in C. elegans", handler: async (q) => handlePhylogenyAndOrthologQuery(q) },
     { text: "Which genes are conserved in Xenopus?", handler: async (q) => handlePhylogenyAndOrthologQuery(q) },
 
-    // Fallback/Visual Comparison (Using the specialized handler for plots)
-    { text: "Show the phylogenetic comparison for ARL13B", handler: async (query) => getPhylogenyComparisonGene(query) },
-    { text: "Show the phylogenetic comparison for WDR31", handler: async (query) => getPhylogenyComparisonGene(query) },
-    { text: "What is the phylogeny of BBS1?", handler: async (query) => getPhylogenyComparisonGene(query) },
-    { text: "Show evolutionary conservation of IFT88", handler: async (query) => getPhylogenyComparisonGene(query) },
-    { text: "Phylogenetic analysis of CEP290", handler: async (query) => getPhylogenyComparisonGene(query) },
     
     // ==================== SIMPLE/LEGACY QUERIES (Now default to Phylogenetic List) ====================
     { text: "List ciliary genes in C. elegans", handler: async () => getPhylogenyGenesForOrganism("C. elegans") },
