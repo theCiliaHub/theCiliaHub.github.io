@@ -1156,83 +1156,68 @@ const questionRegistry = [
     { text: "What is the source for Ciliary genes in zebrafish?", handler: async () => tellAboutOrganismSources("zebrafish") },
     { text: "What is the source for Ciliary genes in drosophila?", handler: async () => tellAboutOrganismSources("drosophila") },
     
-    // Update general questions to use the comparison function for maximum utility:
-    { text: "Show evolutionary conservation of IFT88", handler: async () => comparePhylogenyDatasets("IFT88") },
-    { text: "What is the phylogeny of BBS1?", handler: async () => comparePhylogenyDatasets("BBS1") },
+   // ==================== NEW CONSOLIDATED PHYLOGENY QUESTIONS (FIXED) ====================
+// ACTION: Replaced undefined 'comparePhylogenyDatasets' with 'displayPhylogenyComparison'
+{ text: "Compare IFT88 phylogeny", handler: async () => displayPhylogenyComparison(["IFT88"]) },
+{ text: "Compare BBS1 phylogeny", handler: async () => displayPhylogenyComparison(["BBS1"]) },
+{ text: "Show the phylogenetic comparison for ARL13B", handler: async () => displayPhylogenyComparison(["ARL13B"]) },
+{ text: "NPHP1 phylogenetic analysis comparison", handler: async () => displayPhylogenyComparison(["NPHP1"]) },
+
+// Update general questions to use the comparison function for visualization:
+{ text: "Show evolutionary conservation of IFT88", handler: async () => displayPhylogenyComparison(["IFT88"]) },
+{ text: "What is the phylogeny of BBS1?", handler: async () => displayPhylogenyComparison(["BBS1"]) },
+
+// --------------------------------------------------------------------------------------
 // --- List Queries (Router Intent: CILIARY_LIST/NONCILIARY_LIST) ---
-    { text: "Provide the list of ciliary genes in mouse", handler: async (q) => handlePhylogenyAndOrthologQuery(q) },
-    { text: "Show ciliary genes in C. elegans", handler: async (q) => handlePhylogenyAndOrthologQuery(q) },
-    { text: "List the ciliary genes found in zebrafish", handler: async (q) => handlePhylogenyAndOrthologQuery(q) },
-    { text: "Do you know the ciliary genes for the worm?", handler: async (q) => handlePhylogenyAndOrthologQuery(q) },
-    { text: "Do you have the list of ciliary genes in drosophila?", handler: async (q) => handlePhylogenyAndOrthologQuery(q) },
-    { text: "Show non-ciliary genes in mouse", handler: async (q) => handlePhylogenyAndOrthologQuery(q) },
-    { text: "List non-ciliary genes in C. elegans", handler: async (q) => handlePhylogenyAndOrthologQuery(q) },
-    
-    // --- Ortholog Queries (Router Intent: ORTHOLOG_LOOKUP) ---
-    { text: "What are the orthologs of ARL13B?", handler: async (q) => handlePhylogenyAndOrthologQuery(q) },
-    { text: "Show me the homologs of IFT88", handler: async (q) => handlePhylogenyAndOrthologQuery(q) },
-    { text: "List all orthologs for WDR31", handler: async (q) => handlePhylogenyAndOrthologQuery(q) },
-    { text: "What is the C. elegans homolog of BBS1?", handler: async (q) => handlePhylogenyAndOrthologQuery(q) },
-    { text: "Show me the orthologs in mouse", handler: async (q) => handlePhylogenyAndOrthologQuery(q) },
-    { text: "List conserved genes in C. elegans", handler: async (q) => handlePhylogenyAndOrthologQuery(q) },
+// ACTION: Keep these using the handler designed for listing (handlePhylogenyAndOrthologQuery)
+{ text: "Provide the list of ciliary genes in mouse", handler: async (q) => handlePhylogenyAndOrthologQuery(q) },
+{ text: "Show ciliary genes in C. elegans", handler: async (q) => handlePhylogenyAndOrthologQuery(q) },
+{ text: "List the ciliary genes found in zebrafish", handler: async (q) => handlePhylogenyAndOrthologQuery(q) },
+{ text: "Do you know the ciliary genes for the worm?", handler: async (q) => handlePhylogenyAndOrthologQuery(q) },
+{ text: "Do you have the list of ciliary genes in drosophila?", handler: async (q) => handlePhylogenyAndOrthologQuery(q) },
+{ text: "Show non-ciliary genes in mouse", handler: async (q) => handlePhylogenyAndOrthologQuery(q) },
+{ text: "List non-ciliary genes in C. elegans", handler: async (q) => handlePhylogenyAndOrthologQuery(q) },
 
-    // --- Visual Comparison Queries (Router Fallback to getPhylogenyComparisonGene) ---
-    { text: "Show the phylogenetic comparison for ARL13B", handler: async (query) => getPhylogenyComparisonGene(query) },
-    { text: "Show the phylogenetic comparison for WDR31", handler: async (query) => getPhylogenyComparisonGene(query) },
-    { text: "What is the phylogeny of BBS1?", handler: async (query) => getPhylogenyComparisonGene(query) },
-    { text: "Show evolutionary conservation of IFT88", handler: async (query) => getPhylogenyComparisonGene(query) },
-    { text: "Phylogenetic analysis of CEP290", handler: async (query) => getPhylogenyComparisonGene(query) },
-  
-    // ==================== PHYLOGENY QUERIES (List Genes based on Screen) ====================
-    { text: "List Ciliary Genes in C. elegans (Phylogeny)", handler: async () => getPhylogenyGenesForOrganism("C. elegans") },
-    { text: "List Ciliary Genes in Mouse (Phylogeny)", handler: async () => getPhylogenyGenesForOrganism("mouse") },
-    { text: "List Ciliary Genes in Xenopus (Phylogeny)", handler: async () => getPhylogenyGenesForOrganism("xenopus") },
-    { text: "List Ciliary Genes in Zebrafish (Phylogeny)", handler: async () => getPhylogenyGenesForOrganism("zebrafish") },
-    { text: "List Ciliary Genes in Drosophila (Phylogeny)", handler: async () => getPhylogenyGenesForOrganism("drosophila") },
-    { text: "List Ciliary Genes in Chlamydomonas (Phylogeny)", handler: async () => getPhylogenyGenesForOrganism("Chlamydomonas") },
-    // ==================== CURATED ORTHOLOG QUERIES (Gene Specific Annotation) ====================
-    { text: "Show curated orthologs for IFT88", handler: async () => getHubOrthologsForGene("IFT88") },
-    { text: "Show curated orthologs for BBS1", handler: async () => getHubOrthologsForGene("BBS1") },
-    { text: "What is the C. elegans ortholog for ARL13B?", handler: async () => getHubOrthologsForGene("ARL13B") },
-    { text: "Zebrafish ortholog name for NPHP1", handler: async () => getHubOrthologsForGene("NPHP1") },
+// --------------------------------------------------------------------------------------
+// --- Ortholog Queries (Router Intent: ORTHOLOG_LOOKUP) ---
+// ACTION: Keep these using the handler designed for ortholog lookups.
+{ text: "What are the orthologs of ARL13B?", handler: async (q) => handlePhylogenyAndOrthologQuery(q) },
+{ text: "Show me the homologs of IFT88", handler: async (q) => handlePhylogenyAndOrthologQuery(q) },
+{ text: "List all orthologs for WDR31", handler: async (q) => handlePhylogenyAndOrthologQuery(q) },
+{ text: "What is the C. elegans homolog of BBS1?", handler: async (q) => handlePhylogenyAndOrthologQuery(q) },
+{ text: "Show me the orthologs in mouse", handler: async (q) => handlePhylogenyAndOrthologQuery(q) },
+{ text: "List conserved genes in C. elegans", handler: async (q) => handlePhylogenyAndOrthologQuery(q) },
 
-// 1 & 2 & 3: Ciliary List (All formats)
-    { text: "Provide the list of ciliary genes in mouse", handler: async (q) => handlePhylogenyAndOrthologQuery(q) },
-    { text: "Show ciliary genes in C. elegans", handler: async (q) => handlePhylogenyAndOrthologQuery(q) },
-    { text: "List the ciliary genes found in zebrafish", handler: async (q) => handlePhylogenyAndOrthologQuery(q) },
-    { text: "Do you know the ciliary genes for the worm?", handler: async (q) => handlePhylogenyAndOrthologQuery(q) },
-    { text: "Do you have the list of ciliary genes in drosophila?", handler: async (q) => handlePhylogenyAndOrthologQuery(q) },
-    { text: "Tell me about the ciliary genes in human", handler: async (q) => handlePhylogenyAndOrthologQuery(q) },
-    { text: "Let me know the list of ciliary genes in Xenopus", handler: async (q) => handlePhylogenyAndOrthologQuery(q) },
-    
-    // 1 & 2 & 3: Non-Ciliary List (All formats)
-    { text: "Show non-ciliary genes in mouse", handler: async (q) => handlePhylogenyAndOrthologQuery(q) },
-    { text: "List non-ciliary genes in C. elegans", handler: async (q) => handlePhylogenyAndOrthologQuery(q) },
-    { text: "Provide the nonciliary genes found in zebrafish", handler: async (q) => handlePhylogenyAndOrthologQuery(q) },
-    { text: "Do you have the list of non-ciliary genes in fly?", handler: async (q) => handlePhylogenyAndOrthologQuery(q) },
-    
-    // 4: Ortholog Lookup (Gene-centric)
-    { text: "What are the orthologs of ARL13B?", handler: async (q) => handlePhylogenyAndOrthologQuery(q) },
-    { text: "Show me the homologs of IFT88", handler: async (q) => handlePhylogenyAndOrthologQuery(q) },
-    { text: "List all orthologs for WDR31", handler: async (q) => handlePhylogenyAndOrthologQuery(q) },
-    { text: "What is the C. elegans homolog of BBS1?", handler: async (q) => handlePhylogenyAndOrthologQuery(q) },
-    { text: "Give me the mouse ortholog for CEP290", handler: async (q) => handlePhylogenyAndOrthologQuery(q) },
-    { text: "Is NPHP1 conserved in mouse?", handler: async (q) => handlePhylogenyAndOrthologQuery(q) },
-    { text: "Find the drosophila ortholog for MKS1", handler: async (q) => handlePhylogenyAndOrthologQuery(q) },
-    { text: "Orthologs of TMEM107 in zebrafish", handler: async (q) => handlePhylogenyAndOrthologQuery(q) },
-    
-    // 4: Ortholog Lookup (Organism-centric)
-    { text: "Show me the orthologs in mouse", handler: async (q) => handlePhylogenyAndOrthologQuery(q) },
-    { text: "List conserved genes in C. elegans", handler: async (q) => handlePhylogenyAndOrthologQuery(q) },
-    { text: "Which genes are conserved in Xenopus?", handler: async (q) => handlePhylogenyAndOrthologQuery(q) },
+{ text: "Show the phylogenetic comparison for ARL13B", handler: async (query) => handlePhylogenyAndOrthologQuery(query) },
+{ text: "Show the phylogenetic comparison for WDR31", handler: async (query) => handlePhylogenyAndOrthologQuery(query) },
+{ text: "What is the phylogeny of BBS1?", handler: async (query) => handlePhylogenyAndOrthologQuery(query) },
+{ text: "Show evolutionary conservation of IFT88", handler: async (query) => handlePhylogenyAndOrthologQuery(query) },
+{ text: "Phylogenetic analysis of CEP290", handler: async (query) => handlePhylogenyAndOrthologQuery(query) },
 
-    
-    // ==================== SIMPLE/LEGACY QUERIES (Now default to Phylogenetic List) ====================
-    { text: "List ciliary genes in C. elegans", handler: async () => getPhylogenyGenesForOrganism("C. elegans") },
-    { text: "List ciliary genes in mouse", handler: async () => getPhylogenyGenesForOrganism("mouse") },
-    { text: "List ciliary genes in zebrafish", handler: async () => getPhylogenyGenesForOrganism("zebrafish") },
-    { text: "List ciliary genes in drosophila", handler: async () => getPhylogenyGenesForOrganism("drosophila") },
-    { text: "List ciliary genes in xenopus", handler: async () => getPhylogenyGenesForOrganism("xenopus") },
+// --------------------------------------------------------------------------------------
+// ==================== PHYLOGENY QUERIES (List Genes based on Screen) ====================
+// ACTION: These look correct, assuming getPhylogenyGenesForOrganism is defined.
+{ text: "List Ciliary Genes in C. elegans (Phylogeny)", handler: async () => getPhylogenyGenesForOrganism("C. elegans") },
+{ text: "List Ciliary Genes in Mouse (Phylogeny)", handler: async () => getPhylogenyGenesForOrganism("mouse") },
+{ text: "List Ciliary Genes in Xenopus (Phylogeny)", handler: async () => getPhylogenyGenesForOrganism("xenopus") },
+{ text: "List Ciliary Genes in Zebrafish (Phylogeny)", handler: async () => getPhylogenyGenesForOrganism("zebrafish") },
+{ text: "List Ciliary Genes in Drosophila (Phylogeny)", handler: async () => getPhylogenyGenesForOrganism("drosophila") },
+{ text: "List Ciliary Genes in Chlamydomonas (Phylogeny)", handler: async () => getPhylogenyGenesForOrganism("Chlamydomonas") },
+
+// --------------------------------------------------------------------------------------
+// ==================== CURATED ORTHOLOG QUERIES (Gene Specific Annotation) ====================
+// ACTION: These look correct, explicitly calling the gene-specific ortholog function.
+{ text: "Show curated orthologs for IFT88", handler: async () => getHubOrthologsForGene("IFT88") },
+{ text: "Show curated orthologs for BBS1", handler: async () => getHubOrthologsForGene("BBS1") },
+{ text: "What is the C. elegans ortholog for ARL13B?", handler: async () => getHubOrthologsForGene("ARL13B") },
+{ text: "Zebrafish ortholog name for NPHP1", handler: async () => getHubOrthologsForGene("NPHP1") },
+
+// ==================== SIMPLE/LEGACY QUERIES (Now default to Phylogenetic List) ====================
+{ text: "List ciliary genes in C. elegans", handler: async () => getPhylogenyGenesForOrganism("C. elegans") },
+{ text: "List ciliary genes in mouse", handler: async () => getPhylogenyGenesForOrganism("mouse") },
+{ text: "List ciliary genes in zebrafish", handler: async () => getPhylogenyGenesForOrganism("zebrafish") },
+{ text: "List ciliary genes in drosophila", handler: async () => getPhylogenyGenesForOrganism("drosophila") },
+{ text: "List ciliary genes in xenopus", handler: async () => getPhylogenyGenesForOrganism("xenopus") }
 
     // ==================== GENE DETAILS & FUNCTION ====================
     // General function queries
