@@ -2723,32 +2723,34 @@ async function getPhylogenyOrthologStatus(gene) {
  * @param {string} query - The user's input query.
  * @returns {Promise<string>} - HTML result showing the list, details, or visualization.
  */
+/**
+ * Parses all gene list, ortholog, and phylogenetic comparison queries.
+ * Handles single-gene, multi-gene, and specific conservation group queries.
+ * @param {string} query - The user's input query.
+ * @returns {Promise<string>} - HTML result showing the list, details, or visualization.
+ */
 async function handlePhylogenyAndOrthologQuery(query) {
     // CRITICAL FIX: Ensure query is a string to prevent TypeError
     const safeQuery = typeof query === 'string' ? query : ''; 
     await Promise.all([fetchCiliaData(), fetchPhylogenyData()]);
     const qLower = safeQuery.toLowerCase();
     
-    // DYNAMIC GENE EXTRACTION: Check for multiple genes first
+    // 1. DYNAMIC GENE EXTRACTION: Find all genes mentioned
     const genes = extractMultipleGenes(safeQuery); 
     
     let intent = null;
-    let entity = null; // Gene or Organism
+    let entity = null; 
     const organismPattern = /(c\.?\s*elegans|worm|mouse|zebrafish|xenopus|fly|drosophila|human|chlamydomonas|yeast|h\.?\s*sapiens|m\.?\s*musculus)/;
     const organismMatch = qLower.match(organismPattern);
 
     if (genes.length > 1) {
         // --- ROUTE 1: MULTI-GENE CONSERVATION COMPARISON ---
-        // Handles: "Show me conservations of BBS1, BBS5, ARL13B"
-        // This is the primary route for dynamic, arbitrary gene inputs.
-        return getPhylogenyComparisonGene(genes); // Passes array of genes for visualization
+        return getPhylogenyComparisonGene(genes);
     }
     
     // Check for specific evolutionary group conservation
     if (qLower.includes('unicellular') || qLower.includes('algae') || qLower.includes('chlamydomonas') || qLower.includes('yeast')) {
-        // --- ROUTE 2: UNICELLULAR/EVOLUTIONARY GROUP QUERY ---
-        // Handles: "Tell me if ARL13B and BBS1 have orthologs in unicellular organisms"
-        // Use the comparison view which visually displays this conservation.
+        // --- ROUTE 2: UNICELLULAR/EVOLUTIONARY GROUP QUERY (Visual) ---
         return getPhylogenyComparisonGene(genes); 
     }
 
@@ -2790,11 +2792,13 @@ async function handlePhylogenyAndOrthologQuery(query) {
         return getAllCiliaryGenes();
 
     } else {
-        // --- FALLBACK: SINGLE GENE PHYLOGENY/COMPREHENSIVE DETAILS ---
+        // --- ROUTE 7: FALLBACK TO SINGLE GENE VISUALIZATION (Fix for WDR31) ---
         if (genes.length === 1 && !organismMatch) {
-            // Default to the visual plot for general conservation questions
-            return getPhylogenyComparisonGene(genes);
-        } 
+            // If the query is just a single gene or a phrase like "Show conservation of WDR31", 
+            // the intent is clearly to see the visual comparison plot.
+            return getPhylogenyComparisonGene(genes); // Return visual plot
+        }
+        
         return `<div class="result-card"><h3>Query Not Understood</h3><p>I couldn't identify the type of gene list, the organism, or the genes you're looking for. Please specify a gene, a list, or an organism.</p></div>`;
     }
 }
