@@ -6007,29 +6007,34 @@ window.renderScreenSummaryHeatmap = renderScreenSummaryHeatmap;
 // Expose globally so other scripts can call them
 window.displayCiliAIExpressionHeatmap = displayCiliAIExpressionHeatmap;
 window.handleCiliAISelection = handleCiliAISelection;
+
 // --- Global Data Cache (safe initialization) ---
-globalThis.ciliaHubDataCache   = globalThis.ciliaHubDataCache   ?? null;
-globalThis.screenDataCache     = globalThis.screenDataCache     ?? null;
-globalThis.phylogenyDataCache  = globalThis.phylogenyDataCache  ?? null;
+(() => {
+    const g = globalThis;
 
-// Note: tissueDataCache is attached to the window object in its function
+    g.ciliaHubDataCache    = g.ciliaHubDataCache    ?? null;
+    g.screenDataCache      = g.screenDataCache      ?? null;
+    g.phylogenyDataCache   = g.phylogenyDataCache   ?? null;
 
-// --- ADDITION: New function to fetch and parse Cellxgene data ---
-globalThis.cellxgeneDataCache  = globalThis.cellxgeneDataCache  ?? null;
+    // Note: tissueDataCache is attached to the window object in its function
 
-// --- ADDITION: UMAP Plotting Functions ---
-globalThis.umapDataCache       = globalThis.umapDataCache       ?? null;
+    // --- ADDITION: New function to fetch and parse Cellxgene data ---
+    g.cellxgeneDataCache   = g.cellxgeneDataCache   ?? null;
 
-// --- ADD THESE NEW LINES ---
-globalThis.CILI_AI_DOMAIN_DB   = globalThis.CILI_AI_DOMAIN_DB   ?? null;     // For the new domain database
-globalThis.neversPhylogenyCache = globalThis.neversPhylogenyCache ?? null;   // For Nevers et al. 2017 data
-globalThis.liPhylogenyCache    = globalThis.liPhylogenyCache    ?? null;     // For Li et al. 2014 data
-globalThis.allGeneSymbols      = globalThis.allGeneSymbols      ?? null;     // All known gene symbols
+    // --- ADDITION: UMAP Plotting Functions ---
+    g.umapDataCache        = g.umapDataCache        ?? null;
 
-// --- GLOBAL CORUM CACHE ---
-globalThis.corumDataCache = globalThis.corumDataCache ?? {
-    list: [],
-    byGene: {},
-    byNameLower: {},
-    loaded: false
-};
+    // --- ADD THESE NEW LINES ---
+    g.CILI_AI_DOMAIN_DB    = g.CILI_AI_DOMAIN_DB    ?? null;     // New domain database
+    g.neversPhylogenyCache = g.neversPhylogenyCache ?? null;     // Nevers et al. 2017 phylogeny
+    g.liPhylogenyCache     = g.liPhylogenyCache     ?? null;     // Li et al. 2014 phylogeny
+    g.allGeneSymbols       = g.allGeneSymbols       ?? null;     // All known gene symbols
+
+    // --- GLOBAL CORUM CACHE ---
+    g.corumDataCache = g.corumDataCache ?? {
+        list: [],
+        byGene: {},
+        byNameLower: {},
+        loaded: false
+    };
+})();
