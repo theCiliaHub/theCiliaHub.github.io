@@ -2305,109 +2305,137 @@ const UNICELLULAR_SPECIES = [
   "C.reinhardtii", "V.carteri"
 ];
 
-// --- UPDATED HELPER: getPhylogenyMatrix (Scoping Fix and Aesthetic Updates) ---
 /**
- * Processes only Nevers et al. 2017 data across 20 ciliated and 20 non-ciliated organisms.
- * FIX: Uses reliable organism mapping and applies aesthetic requirements.
- * @param {string[]} geneSymbols - Genes to include (up to 20).
+ * CRITICAL FIX: Retrieves phylogeny data for a single gene from both Li (2014) and Nevers (2017) datasets.
+ * Handles the different keying schemes: Li is keyed by Entrez ID, but searched by internal Gene Symbol ('g').
+ * Nevers is keyed by Gene Symbol.
+ * @param {string} geneSymbol - The gene symbol (e.g., 'WDR31').
+ * @returns {{liData: Object, neversData: Object, neversOrganisms: string[]}}
+ */
+function getGenePhylogenyData(geneSymbol) {
+    const geneUpper = geneSymbol.toUpperCase();
+    
+    // 1. NEVERS (2017) Data - Keyed directly by Gene Symbol
+    const neversGenes = neversPhylogenyCache?.genes || {};
+    const neversData = neversGenes[geneUpper] || null;
+    const neversOrganisms = neversPhylogenyCache?.organism_groups?.all_organisms_list || [];
+    
+    // 2. LI (2014) Data - Keyed by Entrez ID, must search by internal Gene Symbol ('g')
+    let liData = null;
+    if (liPhylogenyCache?.genes) {
+        // Find the gene entry where the internal 'g' field matches the requested gene symbol
+        const liEntry = Object.values(liPhylogenyCache.genes).find(g => g.g.toUpperCase() === geneUpper);
+        if (liEntry) {
+            liData = liEntry;
+        }
+    }
+
+    return { liData, neversData, neversOrganisms };
+}
+
+/**
+ * FIX APPLIED: Generates the Plotly matrix for the heatmap (Nevers 2017).
+ * Uses a default list of 19-20 ciliary genes plus user-specified genes against 40 species columns.
+ * @param {string[]} geneSymbols - Genes selected by the user (or empty array).
  * @returns {{matrix: number[][], xLabels: string[], yLabels: string[], textMatrix: string[], speciesColors: string[]}}
  */
 function getPhylogenyMatrix(geneSymbols) {
-    // 1. Define gene list (up to 20 genes - unchanged)
+    // 1. Define final gene list (max 20)
+    // Adjusted to 19 genes as requested, plus user input, truncated to 20 total.
     const defaultGenes = [
         "IFT88", "BBS1", "ARL13B", "NPHP1", "CEP290", "DYNLT1", "TTC8", "KIF3A",
         "IFT27", "IFT140", "TMEM107", "MKS1", "RPGRIP1L", "TULP3", "CC2D2A",
-        "NEK8", "CENPF", "KIAA0556", "HYLS1", "WDR54"
+        "NEK8", "CENPF", "KIAA0556", "HYLS1" // 19 core genes
     ];
-    const inputGenesUpper = geneSymbols.map(g => g.toUpperCase());
-    const uniqueGenes = [...new Set(inputGenesUpper.concat(defaultGenes.map(g => g.toUpperCase())))].slice(0, 20);
-
-    // --- FIX 2: Define/re-define organism lists internally to solve the ReferenceError ---
-    const CIL_ORG_FULL = [
-        "Homo sapiens", "Rattus norvegicus", "Cricetulus griseus", "Mus musculus", 
-        "Gallus gallus", "Xenopus tropicalis", "Danio rerio", "Caenorhabditis elegans", 
-        "Chlamydomonas reinhardtii", "Tetrahymena thermophila", "Trypanosoma cruzi", "Leishmania mexicana",
-        "Trichomonas vaginalis", "Giardia intestinalis", "Naegleria gruberi", "Trypanosoma brucei brucei",
-        "Volvox carteri", "Micromonas sp.", "Strongylocentrotus purpuratus", "Ciona intestinalis" // Added one more for 20 total
-    ];
-    const NCIL_ORG_FULL = [
-        "Drosophila melanogaster", "Saccharomyces cerevisiae", "Schizosaccharomyces pombe", "Ustilago maydis",
-        "Arabidopsis thaliana", "Oryza sativa", "Zea mays", "Batrachochytrium dendrobatidis",
-        "Puccinia graminis f. sp. tritici", "Cryptococcus neoformans var. neoformans serotype D", 
-        "Schistosoma mansoni", "Acyrthosiphon pisum", "Tribolium castaneum", "Anopheles gambiae",
-        "Aureococcus anophagefferens", "Phytophthora infestans", "Cyanidioschyzon merolae",
-        "Blastocystis hominis", "Cryptosporidium parvum", "Entamoeba histolytica"
-    ].slice(0, 20); // Slice to 20 just in case
-
-    const allNeversSpecies = neversPhylogenyCache?.organism_groups?.all_organisms_list || [];
     
-    // Select the first 20 species from the hardcoded lists
-    const selectedCIL = CIL_ORG_FULL.slice(0, 20);
-    const selectedNCIL = NCIL_ORG_FULL.slice(0, 20);
-    const selectedSpecies = selectedCIL.concat(selectedNCIL);
+    // Prioritize user genes, then fill with defaults, limit to 20 unique genes
+    const inputGenesUpper = geneSymbols.map(g => g.toUpperCase());
+    let uniqueGenes = [...new Set(inputGenesUpper.concat(defaultGenes.map(g => g.toUpperCase())))];
+    uniqueGenes = uniqueGenes.filter((g, index, self) => self.indexOf(g) === index).slice(0, 20);
 
-    // Helper to extract clean name (Point 1: remove strain names)
+    // --- 2. Define/re-define organism lists internally ---
+    // These hardcoded lists represent the first 20 Ciliated and Non-Ciliated species
+    // from the Nevers et al. 2017 raw data file's 'ciliated_organisms' and 'non_ciliated_organisms' keys.
+    const CIL_ORG_20 = [
+        "Trichomonas vaginalis", "Giardia intestinalis (strain ATCC 50803 / WB clone C6)", 
+        "Giardia intestinalis (strain P15)", "Naegleria gruberi", "Trypanosoma brucei brucei (strain 927/4 GUTat10.1)",
+        "Trypanosoma cruzi", "Leishmania mexicana (strain MHOM/GT/2001/U1103)", "Leishmania major",
+        "Volvox carteri", "Chlamydomonas reinhardtii", "Micromonas sp. (strain RCC299 / NOUM17)", 
+        "Physcomitrella patens subsp. patens", "Selaginella moellendorffii", "Pythium ultimum",
+        "Phytophthora infestans (strain T30-4)", "Thalassiosira pseudonana", "Ectocarpus siliculosus",
+        "Paramecium tetraurelia", "Ichthyophthirius multifiliis (strain G5)", "Tetrahymena thermophila (strain SB210)"
+    ];
+    const NCIL_ORG_20 = [
+        "Cyanidioschyzon merolae", "Brachypodium distachyon", "Sorghum bicolor", "Vitis vinifera",
+        "Arabidopsis thaliana", "Blastocystis hominis", "Phaeodactylum tricornutum (strain CCAP 1055/1)", 
+        "Cryptosporidium parvum (strain Iowa II)", "Babesia bovis", "Theileria parva", 
+        "Theileria annulata", "Entamoeba dispar (strain ATCC PRA-260 / SAW760)", 
+        "Entamoeba histolytica", "Dictyostelium discoideum", "Dictyostelium purpureum",
+        "Nosema ceranae (strain BRL01)", "Enterocytozoon bieneusi (strain H348)", 
+        "Encephalitozoon cuniculi (strain GB-M1)", "Puccinia graminis f. sp. tritici (strain CRL 75-36-700-3 / race SCCL)", 
+        "Ustilago maydis (strain 521 / FGSC 9021)"
+    ];
+    
+    // Consolidate species and define clean name helper
+    const selectedSpecies = CIL_ORG_20.concat(NCIL_ORG_20); // Total 40 species
+    
+    // Helper to extract clean name (remove strain names/subspecies)
     const cleanName = (species) => species.replace(/\s*\(.*\)\s*/g, '').replace('subsp. patens', '').trim();
     
-    // Create a robust lookup map from (CleanName) -> (Global Index)
+    // Create a robust lookup map from (CleanName) -> (Global Index from full Nevers list)
+    const allNeversSpecies = neversPhylogenyCache?.organism_groups?.all_organisms_list || [];
     const speciesIndexMap = new Map();
     allNeversSpecies.forEach((speciesName, index) => {
         speciesIndexMap.set(cleanName(speciesName), index);
     });
 
-    // 3. Final Data structure preparation
+    // 3. Final Data structure initialization
     const neversGenes = neversPhylogenyCache?.genes || {};
     const matrix = [];
     const textMatrix = [];
     const yLabels = [];
-    const speciesColors = [];
     
-    // Set X-axis labels to clean names and define column colors
-    const xLabels = selectedSpecies.map((species, index) => {
-        const simpleName = cleanName(species);
-        // Determine color based on position in the list
-        const isCiliated = index < selectedCIL.length;
-        speciesColors.push(isCiliated ? '#698ECF' : '#FFE5B5'); // Point 2/3 color
-        return simpleName; // Clean name for X-axis label (Point 4)
-    });
+    // Set X-axis labels to clean names and define column colors (for reference)
+    const xLabels = selectedSpecies.map((species) => cleanName(species));
+    const speciesColors = Array(CIL_ORG_20.length).fill('#698ECF').concat(Array(NCIL_ORG_20.length).fill('#FFE5B5'));
 
     // 4. Populate matrix
     uniqueGenes.forEach(gene => {
-        const geneDataNevers = neversGenes[gene]; 
-        if (!geneDataNevers) return; 
+        const geneDataNevers = neversGenes[gene];
+        if (!geneDataNevers) return; // Skip if gene not in the Nevers dataset
 
         const presentIndices = new Set(geneDataNevers.s || []);
         const row = [];
         const textRow = [];
 
-        // Function to process a group (Ciliated or Non-Ciliated)
+        // Function to process a group and set Z-score (2 for CIL, 1 for NCIL)
         const processGroup = (speciesGroup, zValue) => {
             speciesGroup.forEach(species => {
                 const cleanSpName = cleanName(species);
                 const globalIndex = speciesIndexMap.get(cleanSpName);
                 
-                // Lookup must succeed (globalIndex !== undefined) and index must be present
+                // Lookup must find the global index AND the gene must be present in that index
                 const isPresent = (globalIndex !== undefined) && presentIndices.has(globalIndex);
                 
                 row.push(isPresent ? zValue : 0);
-                textRow.push(isPresent ? `${gene} in ${cleanSpName}: Present` : `${gene} in ${cleanSpName}: Absent`);
+                textRow.push(isPresent ? `${gene} in ${cleanSpName}: Present (${zValue === 2 ? 'CIL' : 'NCIL'})` : `${gene} in ${cleanSpName}: Absent`);
             });
         };
 
         // Ciliated Organisms (Z=2)
-        processGroup(selectedCIL, 2);
+        processGroup(CIL_ORG_20, 2);
 
         // Non-Ciliated Organisms (Z=1)
-        processGroup(selectedNCIL, 1);
+        processGroup(NCIL_ORG_20, 1);
 
-        if (row.length === 40) { // Ensure we have a full row of 40 columns
+        if (row.length === 40) { // Should always be 20 CIL + 20 NCIL = 40 columns
             matrix.push(row);
             textMatrix.push(textRow);
             yLabels.push(gene);
         }
     });
 
-    return { matrix: matrix, xLabels: xLabels, yLabels: yLabels, textMatrix: textMatrix, speciesColors: speciesColors };
+    return { matrix, xLabels, yLabels, textMatrix, speciesColors };
 }
 
 // --- UPDATED MAIN DISPLAY FUNCTION: Heatmap (Nevers 2017 Only, Styled) ---
@@ -2690,47 +2718,77 @@ function renderDetailedPhylogenyTable(geneSymbol, targetDivId, neversLoaded, liL
     document.getElementById(targetDivId).innerHTML = html;
 }
 
-// --- UPDATED HANDLER (Call the new display function) ---
-async function comparePhylogenyDatasets(geneSymbol) {
-    // This calls the new function that generates both the table and the heatmap
-    return displayPhylogenyComparison([geneSymbol]);
-}
-
 /**
-// --- NEW HELPER: Get Non-Ciliary Genes for Organism ---
-/**
- * Retrieves human genes classified as Non-Ciliary that have an ortholog in the target organism.
- * @param {string} organismName - The target organism (e.g., 'mouse').
- * @returns {Array<Object>} - List of genes.
+ * FIX APPLIED: Renders the detailed conservation table using data from both Li and Nevers (now correctly retrieved).
+ * @param {string} geneSymbol - The gene symbol.
+ * @param {string} tbodyId - The ID of the <tbody> element to populate.
+ * @param {boolean} neversLoaded - Status of Nevers data loading.
+ * @param {boolean} liLoaded - Status of Li data loading.
  */
-// --- NEW HELPER: Get Non-Ciliary Genes for Organism ---
-/**
- * Retrieves human genes classified as Non-Ciliary that have an ortholog in the target organism.
- * @param {string} organismName - The target organism (e.g., 'mouse').
- * @returns {Array<Object>} - List of genes.
- */
-async function getNonCiliaryGenesForOrganism(organismName) {
-    await fetchPhylogenyData();
-    const normalizedOrganism = normalizeTerm(organismName);
-    
-    // Simplified mapping for species codes used in phylogenyDataCache
-    const speciesMap = {
-        'human': 'H.sapiens', 'mouse': 'M.musculus', 'worm': 'C.elegans', 'c. elegans': 'C.elegans',
-        'fly': 'D.melanogaster', 'zebrafish': 'D.rerio', 'xenopus': 'X.tropicalis' 
-    };
-    const speciesCode = speciesMap[normalizedOrganism] || organismName;
-    const speciesRegex = new RegExp(speciesCode.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+function renderDetailedPhylogenyTable(geneSymbol, tbodyId, neversLoaded, liLoaded) {
+    const tbody = document.getElementById(tbodyId);
+    if (!tbody) return;
+    tbody.innerHTML = ''; 
 
-    const genes = Object.entries(phylogenyDataCache)
-        .filter(([gene, data]) => {
-            // Filter by the 'nonciliary_only_genes' category in the main phylogeny summary.
-            const isNonCiliaryCategory = data.category === 'nonciliary_only_genes' || data.category.toLowerCase().includes('non-ciliary');
-            const hasSpecies = Array.isArray(data.species) && data.species.some(s => speciesRegex.test(normalizeTerm(s)));
-            return isNonCiliaryCategory && hasSpecies;
-        })
-        .map(([gene, data]) => ({ gene: data.sym || gene, description: `Non-Ciliary (Li 2014) gene present in ${speciesCode}` }));
-    
-    return genes;
+    const { liData, neversData, neversOrganisms } = getGenePhylogenyData(geneSymbol);
+    const liOrganismsList = liPhylogenyCache?.summary?.organisms_list || [];
+    const liClassList = liPhylogenyCache?.summary?.class_list || [];
+
+    // --- LI et al. 2014 Row ---
+    let liRowHtml = '<tr>';
+    if (!liLoaded) {
+        liRowHtml += `<td colspan="4" class="status-not-found">Li et al. (2014) data failed to load.</td>`;
+    } else if (liData) {
+        const liSpecies = liData.s.map(index => liOrganismsList[index]).join(', ');
+        const liCategory = (liClassList[liData.c] || "Unclassified").replace(/_/g, ' ');
+        liRowHtml += `
+            <td>Li et al. (2014)</td>
+            <td><strong>${liData.s.length}</strong> / ${liOrganismsList.length}</td>
+            <td>${liCategory}</td>
+            <td class="organism-list">${liSpecies || 'N/A'}</td>
+        `;
+    } else {
+        liRowHtml += `<td colspan="4" class="status-not-found">The gene **${geneSymbol}** was not found in Li et al. (2014) dataset.</td>`;
+    }
+    liRowHtml += '</tr>';
+    tbody.innerHTML += liRowHtml;
+
+
+    // --- NEVERS et al. 2017 Row ---
+    let neversRowHtml = '<tr>';
+    if (!neversLoaded) {
+        neversRowHtml += `<td colspan="4" class="status-not-found">Nevers et al. (2017) data failed to load.</td>`;
+    } else if (neversData) {
+        const neversSpecies = neversData.s.map(index => neversOrganisms[index]).join(', ');
+        
+        // Count CILIATED vs NON-CILIATED hits (using indices from the organism_groups key)
+        const ciliatedIndices = new Set(neversPhylogenyCache?.organism_groups?.ciliated_organisms.map(name => neversOrganisms.indexOf(name)).filter(i => i >= 0) || []);
+        const nonCiliatedIndices = new Set(neversPhylogenyCache?.organism_groups?.non_ciliated_organisms.map(name => neversOrganisms.indexOf(name)).filter(i => i >= 0) || []);
+        
+        let cilCount = 0;
+        let nonCilCount = 0;
+        
+        for (const index of neversData.s) {
+            if (ciliatedIndices.has(index)) {
+                cilCount++;
+            } else if (nonCiliatedIndices.has(index)) {
+                nonCilCount++;
+            }
+        }
+        
+        const neversClassification = `CIL: ${cilCount} | Non-CIL: ${nonCilCount}`;
+        
+        neversRowHtml += `
+            <td>Nevers et al. (2017)</td>
+            <td><strong>${neversData.s.length}</strong> / ${neversOrganisms.length}</td>
+            <td>${neversClassification}</td>
+            <td class="organism-list">${neversSpecies || 'N/A'}</td>
+        `;
+    } else {
+        neversRowHtml += `<td colspan="4" class="status-not-found">The gene **${geneSymbol}** was not found in Nevers et al. (2017) dataset.</td>`;
+    }
+    neversRowHtml += '</tr>';
+    tbody.innerHTML += neversRowHtml;
 }
 
 
