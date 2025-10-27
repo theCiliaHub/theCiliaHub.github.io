@@ -1217,7 +1217,7 @@ const questionRegistry = [
 { text: "List ciliary genes in mouse", handler: async () => getPhylogenyGenesForOrganism("mouse") },
 { text: "List ciliary genes in zebrafish", handler: async () => getPhylogenyGenesForOrganism("zebrafish") },
 { text: "List ciliary genes in drosophila", handler: async () => getPhylogenyGenesForOrganism("drosophila") },
-{ text: "List ciliary genes in xenopus", handler: async () => getPhylogenyGenesForOrganism("xenopus") }
+{ text: "List ciliary genes in xenopus", handler: async () => getPhylogenyGenesForOrganism("xenopus") },
 
     // ==================== GENE DETAILS & FUNCTION ====================
     // General function queries
