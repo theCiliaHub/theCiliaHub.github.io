@@ -2562,31 +2562,58 @@ async function displayPhylogenyComparison(genes) {
     return "";
 }
 
+// --- NEW/UPDATED: Data Merging Functions ---
+// Note: You must ensure fetchLiPhylogenyData and fetchNeversPhylogenyData correctly populate
+// liPhylogenyCache and neversPhylogenyCache globally.
+// Assuming your global caches: let liPhylogenyCache = null; let neversPhylogenyCache = null;
+
 async function mergePhylogenyCaches() {
-  if (phylogenyDataCache) return phylogenyDataCache;
+    if (phylogenyDataCache) return phylogenyDataCache;
 
-  await Promise.all([fetchLiPhylogenyData(), fetchNeversPhylogenyData()]);
+    // Await global loads (assumed to populate global caches)
+    await Promise.all([fetchLiPhylogenyData(), fetchNeversPhylogenyData()]); 
 
-  phylogenyDataCache = {};
+    const merged = {};
 
-  // Merge Li data
-  for (const entrez in liPhylogenyCache.genes) {
-    const data = liPhylogenyCache.genes[entrez];
-    const gene = data.g.toUpperCase();
-    if (!phylogenyDataCache[gene]) phylogenyDataCache[gene] = { li: data, nevers: null };
-    else phylogenyDataCache[gene].li = data;
-  }
+    // Get LI data (safe access)
+    const liGenes = liPhylogenyCache?.genes || {};
+    const liSummary = liPhylogenyCache?.summary || { organisms_list: [] };
+    
+    // Get NEVERS data (safe access)
+    const neversGenes = neversPhylogenyCache?.genes || {};
+    const neversGroups = neversPhylogenyCache?.organism_groups || { all_organisms_list: [] };
 
-  // Merge Nevers data
-  for (const gene in neversPhylogenyCache.genes) {
-    const data = neversPhylogenyCache.genes[gene];
-    const geneUpper = gene.toUpperCase();
-    if (!phylogenyDataCache[geneUpper]) phylogenyDataCache[geneUpper] = { li: null, nevers: data };
-    else phylogenyDataCache[geneUpper].nevers = data;
-  }
+    // Merge LI data first
+    for (const entrez in liGenes) {
+        const data = liGenes[entrez];
+        const gene = (data.g || '').toUpperCase();
+        if (gene) {
+            merged[gene] = { li: data, nevers: null };
+        }
+    }
 
-  console.log(`✅ Merged phylogeny cache created with ${Object.keys(phylogenyDataCache).length} genes.`);
-  return phylogenyDataCache;
+    // Merge NEVERS data
+    for (const gene in neversGenes) {
+        const data = neversGenes[gene];
+        const geneUpper = gene.toUpperCase();
+        if (geneUpper) {
+            if (!merged[geneUpper]) {
+                merged[geneUpper] = { li: null, nevers: data };
+            } else {
+                merged[geneUpper].nevers = data;
+            }
+        }
+    }
+
+    // The old simple phylogenyDataCache must be updated too (optional, but good practice)
+    const unifiedSummary = {};
+    // ... logic to create the unifiedSummary for the old fetchPhylogenyData return type ...
+    // Since this is complex, we will stick to the new merged structure for validation.
+    
+    // Update global phylogenyDataCache for use in the router's validation block
+    phylogenyDataCache = merged; 
+
+    return phylogenyDataCache;
 }
 
 // NOTE: The implementation of comparePhylogenyDatasets and renderDetailedPhylogenyTable 
@@ -2812,24 +2839,25 @@ function extractMultipleGenes(query) {
 
 async function handlePhylogenyAndOrthologQuery(query) {
     const safeQuery = typeof query === 'string' ? query : ''; 
-    // CRITICAL CHANGE: Ensure MERGED data structure is ready
+    
+    // CRITICAL: Ensure the complex merge operation runs correctly
     await Promise.all([fetchCiliaData(), mergePhylogenyCaches()]); 
+    
     const qLower = safeQuery.toLowerCase();
     
     // 1. DYNAMIC GENE EXTRACTION & VALIDATION
     const allExtractedGenes = extractMultipleGenes(safeQuery);
     
-    // Validate genes against the combined data (keys from Li's and Nevers' gene objects)
-    const liGenes = Object.values(phylogenyDataCache.li.genes || {}).map(entry => entry.g.toUpperCase());
-    const neversGenes = Object.keys(phylogenyDataCache.nevers.genes || {}).map(gene => gene.toUpperCase());
-    const allPhyloGenesSet = new Set([...liGenes, ...neversGenes]);
-
-    // Filter extracted genes to ensure they exist in *either* phylogenetic dataset
-    const validPhyloGenes = allExtractedGenes.filter(gene => allPhyloGenesSet.has(gene));
-    const genes = validPhyloGenes; 
+    // VALIDATION FIX: Check gene existence directly against the new merged cache object
+    const validPhyloGenes = allExtractedGenes.filter(gene => 
+        // Checks if the key exists in the merged phylogenyDataCache
+        phylogenyDataCache && phylogenyDataCache.hasOwnProperty(gene)
+    );
+    const genes = validPhyloGenes;
 
     // --- CRITICAL FIX POINT ---
-    if (genes.length === 0) {
+    if (genes.length > 1) {
+         return getPhylogenyComparisonGene(genes);
         // If the query was to show conservation but no valid gene was found in the datasets
         if (qLower.includes('phylogeny') || qLower.includes('conservation')) {
              return `<div class="result-card"><h3>Query Failed: Gene Not Found</h3><p>The gene symbol(s) found in your query (**${allExtractedGenes.join(', ') || 'None'}**) could not be matched to either the Li et al. (2014) or Nevers et al. (2017) phylogenetic datasets.</p></div>`;
@@ -2846,7 +2874,7 @@ async function handlePhylogenyAndOrthologQuery(query) {
     const organismMatch = qLower.match(organismPattern);
 
     // 2. Multi-Gene/Visual Intent Pre-Routing
-    if (genes.length > 1 || qLower.includes('phylogeny') || qLower.includes('conservation') || qLower.includes('tree') || qLower.includes('unicellular')) {
+    if (qLower.includes('phylogeny') || qLower.includes('conservation') || qLower.includes('tree') || qLower.includes('unicellular')) {
         return getPhylogenyComparisonGene(genes);
     }
     
@@ -2854,8 +2882,6 @@ async function handlePhylogenyAndOrthologQuery(query) {
     if (genes.length === 1) {
         entity = genes[0];
     }
-
-
     // 3. Simple Intent Determination (for Lists/Single Orthologs)
     const isOrthologRequest = qLower.includes('ortholog') || qLower.includes('homolog') || qLower.includes('conserved in');
 
