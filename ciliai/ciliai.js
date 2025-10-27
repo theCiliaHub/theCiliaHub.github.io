@@ -2562,12 +2562,9 @@ async function displayPhylogenyComparison(genes) {
     return "";
 }
 
-/// --- NEW/UPDATED: Data Merging Functions ---
-// Note: You must ensure fetchLiPhylogenyData and fetchNeversPhylogenyData correctly populate
-// liPhylogenyCache and neversPhylogenyCache globally.
-// Assuming your global caches: let liPhylogenyCache = null; let neversPhylogenyCache = null;
-
+// --- NEW/UPDATED: Data Merging Functions ---
 async function mergePhylogenyCaches() {
+    // If phylogenyDataCache exists, it means the merging was already successful.
     if (phylogenyDataCache) return phylogenyDataCache;
 
     // Await global loads (assumed to populate global caches)
@@ -2833,7 +2830,7 @@ function extractMultipleGenes(query) {
 
 async function handlePhylogenyAndOrthologQuery(query) {
     const safeQuery = typeof query === 'string' ? query : ''; 
-    // CRITICAL: Ensure MERGED data structure is ready. This loads Li and Nevers data.
+    // CRITICAL: Ensure MERGED data structure is ready.
     await Promise.all([fetchCiliaData(), mergePhylogenyCaches()]); 
     
     const qLower = safeQuery.toLowerCase();
@@ -2841,8 +2838,7 @@ async function handlePhylogenyAndOrthologQuery(query) {
     // 1. DYNAMIC GENE EXTRACTION & VALIDATION
     const allExtractedGenes = extractMultipleGenes(safeQuery);
     
-    // VALIDATION FIX: Check gene existence directly against the new merged phylogenyDataCache object
-    // This is the correct way to validate against the 19k+ genes after the merge.
+    // VALIDATION FIX: Check gene existence directly against the reliable merged phylogenyDataCache object
     const validPhyloGenes = allExtractedGenes.filter(gene => 
         phylogenyDataCache.hasOwnProperty(gene)
     );
@@ -2854,8 +2850,8 @@ async function handlePhylogenyAndOrthologQuery(query) {
     const organismMatch = qLower.match(organismPattern);
 
     // 2. Multi-Gene/Visual Intent Pre-Routing
-    if (genes.length >= 1) { // Check if we have *any* valid gene for routing
-        // Visual comparison intent check (including multi-gene queries)
+    if (genes.length >= 1) { 
+        // Visual comparison intent check (including multi-gene and single-gene visual queries)
         if (genes.length > 1 || qLower.includes('phylogeny') || qLower.includes('conservation') || qLower.includes('tree') || qLower.includes('unicellular')) {
             return getPhylogenyComparisonGene(genes);
         }
@@ -2906,7 +2902,6 @@ async function handlePhylogenyAndOrthologQuery(query) {
     // Final error message if no recognizable gene or intent exists
     return `<div class="result-card"><h3>Query Not Understood</h3><p>I couldn't identify a valid gene or list intent based on the Li/Nevers datasets. Please specify a gene, a list type, or an organism.</p></div>`;
 }
-
 
 
 /**
