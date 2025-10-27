@@ -2562,7 +2562,7 @@ async function displayPhylogenyComparison(genes) {
     return "";
 }
 
-// --- NEW/UPDATED: Data Merging Functions ---
+/// --- NEW/UPDATED: Data Merging Functions ---
 // Note: You must ensure fetchLiPhylogenyData and fetchNeversPhylogenyData correctly populate
 // liPhylogenyCache and neversPhylogenyCache globally.
 // Assuming your global caches: let liPhylogenyCache = null; let neversPhylogenyCache = null;
@@ -2577,13 +2577,11 @@ async function mergePhylogenyCaches() {
 
     // Get LI data (safe access)
     const liGenes = liPhylogenyCache?.genes || {};
-    const liSummary = liPhylogenyCache?.summary || { organisms_list: [] };
     
     // Get NEVERS data (safe access)
     const neversGenes = neversPhylogenyCache?.genes || {};
-    const neversGroups = neversPhylogenyCache?.organism_groups || { all_organisms_list: [] };
 
-    // Merge LI data first
+    // Merge LI data first (accessing properties safely)
     for (const entrez in liGenes) {
         const data = liGenes[entrez];
         const gene = (data.g || '').toUpperCase();
@@ -2604,17 +2602,13 @@ async function mergePhylogenyCaches() {
             }
         }
     }
-
-    // The old simple phylogenyDataCache must be updated too (optional, but good practice)
-    const unifiedSummary = {};
-    // ... logic to create the unifiedSummary for the old fetchPhylogenyData return type ...
-    // Since this is complex, we will stick to the new merged structure for validation.
     
     // Update global phylogenyDataCache for use in the router's validation block
     phylogenyDataCache = merged; 
 
     return phylogenyDataCache;
 }
+
 
 // NOTE: The implementation of comparePhylogenyDatasets and renderDetailedPhylogenyTable 
 // remains as defined in your working version to ensure the table content 
@@ -2826,7 +2820,6 @@ async function mergePhylogenyCaches() {
     
     return phylogenyDataCache;
 }
-
 // --- NEW HELPER: Extract Multiple Genes Dynamically ---
 // This remains the same as previously defined, crucial for extracting genes from query.
 function extractMultipleGenes(query) {
@@ -2835,12 +2828,12 @@ function extractMultipleGenes(query) {
     return matches ? [...new Set(matches.map(g => g.toUpperCase()))] : [];
 }
 
+
 // --- UPDATED CENTRALIZED PHYLOGENY AND ORTHOLOG HANDLER (The Router) ---
 
 async function handlePhylogenyAndOrthologQuery(query) {
     const safeQuery = typeof query === 'string' ? query : ''; 
-    
-    // CRITICAL: Ensure the complex merge operation runs correctly
+    // CRITICAL: Ensure MERGED data structure is ready. This loads Li and Nevers data.
     await Promise.all([fetchCiliaData(), mergePhylogenyCaches()]); 
     
     const qLower = safeQuery.toLowerCase();
@@ -2848,25 +2841,12 @@ async function handlePhylogenyAndOrthologQuery(query) {
     // 1. DYNAMIC GENE EXTRACTION & VALIDATION
     const allExtractedGenes = extractMultipleGenes(safeQuery);
     
-    // VALIDATION FIX: Check gene existence directly against the new merged cache object
+    // VALIDATION FIX: Check gene existence directly against the new merged phylogenyDataCache object
+    // This is the correct way to validate against the 19k+ genes after the merge.
     const validPhyloGenes = allExtractedGenes.filter(gene => 
-        // Checks if the key exists in the merged phylogenyDataCache
-        phylogenyDataCache && phylogenyDataCache.hasOwnProperty(gene)
+        phylogenyDataCache.hasOwnProperty(gene)
     );
-    const genes = validPhyloGenes;
-
-    // --- CRITICAL FIX POINT ---
-    if (genes.length > 1) {
-         return getPhylogenyComparisonGene(genes);
-        // If the query was to show conservation but no valid gene was found in the datasets
-        if (qLower.includes('phylogeny') || qLower.includes('conservation')) {
-             return `<div class="result-card"><h3>Query Failed: Gene Not Found</h3><p>The gene symbol(s) found in your query (**${allExtractedGenes.join(', ') || 'None'}**) could not be matched to either the Li et al. (2014) or Nevers et al. (2017) phylogenetic datasets.</p></div>`;
-        }
-        // Fall back to a general failure if it wasn't a specific conservation query
-        return `<div class="result-card"><h3>Invalid Query</h3><p>No valid gene symbols found for analysis in the phylogenetic databases.</p></div>`;
-    }
-    // --- END CRITICAL FIX POINT ---
-
+    const genes = validPhyloGenes; 
 
     let intent = null;
     let entity = null; 
@@ -2874,15 +2854,16 @@ async function handlePhylogenyAndOrthologQuery(query) {
     const organismMatch = qLower.match(organismPattern);
 
     // 2. Multi-Gene/Visual Intent Pre-Routing
-    if (qLower.includes('phylogeny') || qLower.includes('conservation') || qLower.includes('tree') || qLower.includes('unicellular')) {
-        return getPhylogenyComparisonGene(genes);
+    if (genes.length >= 1) { // Check if we have *any* valid gene for routing
+        // Visual comparison intent check (including multi-gene queries)
+        if (genes.length > 1 || qLower.includes('phylogeny') || qLower.includes('conservation') || qLower.includes('tree') || qLower.includes('unicellular')) {
+            return getPhylogenyComparisonGene(genes);
+        }
+        // Use the single gene found for further lookup logic below
+        if (genes.length === 1) entity = genes[0];
     }
     
-    // Use the single gene found for further lookup logic below
-    if (genes.length === 1) {
-        entity = genes[0];
-    }
-    // 3. Simple Intent Determination (for Lists/Single Orthologs)
+    // 3. Simple Intent Determination (Original Logic)
     const isOrthologRequest = qLower.includes('ortholog') || qLower.includes('homolog') || qLower.includes('conserved in');
 
     if (isOrthologRequest) {
@@ -2898,6 +2879,7 @@ async function handlePhylogenyAndOrthologQuery(query) {
     }
     
     // 4. FINAL ROUTING EXECUTION
+
     if (intent === 'ORTHOLOG_LOOKUP' && genes.length === 1) {
         // Route 3: Curated Ortholog (CiliaHub table)
         return getOrthologsForGene(genes[0]);
@@ -2916,10 +2898,13 @@ async function handlePhylogenyAndOrthologQuery(query) {
         // Route 6: Global Ciliary gene list
         return getAllCiliaryGenes();
 
-    } else {
-        // Fallback catch-all for queries that hit the router but didn't fit above rules
-        return `<div class="result-card"><h3>Query Not Understood</h3><p>I couldn't identify a valid gene or list intent based on the Li/Nevers datasets. Please specify a gene, a list type, or an organism.</p></div>`;
+    } else if (genes.length === 1) {
+        // Route 7: Final fallback for a single gene (e.g., "WDR31") defaults to the visual comparison
+        return getPhylogenyComparisonGene(genes); 
     }
+    
+    // Final error message if no recognizable gene or intent exists
+    return `<div class="result-card"><h3>Query Not Understood</h3><p>I couldn't identify a valid gene or list intent based on the Li/Nevers datasets. Please specify a gene, a list type, or an organism.</p></div>`;
 }
 
 
