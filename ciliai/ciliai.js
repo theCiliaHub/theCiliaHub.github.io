@@ -2866,7 +2866,6 @@ function generateGeneralCiliaryBiologyQuestions() {
         `Ciliary compartment for **NPHP1**`,
         `Where is NPHP1 localized in the cilium?`
     );
-
     htmlContent += '</ul></div>';
     return htmlContent;
 }
