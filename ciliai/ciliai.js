@@ -1169,8 +1169,14 @@ const questionRegistry = [
 { text: "Show the phylogenetic comparison for WDR31", handler: async () => displayPhylogenyComparison(["WDR31"]) },
 { text: "WDR31 evolutionary heatmap", handler: async () => displayPhylogenyComparison(["WDR31"]) },
 { text: "Phylogenetic analysis of CEP290", handler: async () => displayPhylogenyComparison(["CEP290"]) },
-{ // This pattern catches the phrasing and uses the dedicated plotter // It captures whatever follows 'conservation of' or 'phylogeny for'. 
-    text: "Show evolutionary conservation of gene X", handler: async (q) => plotPhylogenyFromQuery(q) },
+{ // Catches the most common conservation phrase for any gene (e.g., WDR54)
+text: "Show evolutionary conservation of gene X", handler: async (q) => plotPhylogenyFromQuery(q) },
+{ // Catches the "What is the phylogeny/comparison of" phrase 
+    text: "What is the phylogeny of gene X?", handler: async (q) => plotPhylogenyFromQuery(q) },
+{ // Catches comparison formats
+    text: "Compare gene X phylogeny", handler: async (q) => plotPhylogenyFromQuery(q) },
+{ // Catches the original 'Show the phylogenetic comparison' phrasing
+    text: "Show the phylogenetic comparison for gene X", handler: async (q) => plotPhylogenyFromQuery(q) },
 
 // --------------------------------------------------------------------------------------
 // --- List Queries (CILIARY/NON-CILIARY LISTS) ---
@@ -2406,30 +2412,24 @@ async function mergePhylogenyData() {
     phylogenyDataCache = merged;
     return merged;
 }
+
 /**
- * Extracts gene symbols from the raw query string and executes the plotting logic.
- * This ensures ANY gene input is handled, fulfilling the "gene X" requirement.
- * @param {string} query - The full user query string.
- * @returns {Promise<string>} HTML result from displayPhylogenyComparison.
+ * Universal handler that extracts gene name(s) from the query and plots them.
+ * This is the function that makes "Show the phylogenetic comparison for WDR54" work.
  */
 async function plotPhylogenyFromQuery(query) {
-    // Regex explanation: Captures one or more groups of gene symbols (A-Z, 0-9, -, .)
-    // that follow 'for ' or 'of ' in the query.
+    // This regex grabs any gene list (e.g., "WDR54" or "IFT88, BBS1") after 'for' or 'of'.
     const geneMatch = query.match(/(?:for|of)\s+([A-Z0-9\-\.]+(?:,\s*[A-Z0-9\-\.]+)*)/i);
-    
     if (!geneMatch) {
-        return `<div class="result-card"><h3>Error</h3><p class="status-not-found">Could not identify a gene symbol in your query. Please use the format: 'Show the phylogenetic comparison for GENEX'.</p></div>`;
+        return `<div class="result-card"><h3>Error</h3><p class="status-not-found">Could not identify a gene symbol in your query for plotting.</p></div>`;
     }
-    
-    // Split and clean the captured gene(s)
     const geneSymbols = geneMatch[1].split(',')
                                     .map(g => g.trim().toUpperCase())
                                     .filter(Boolean);
-
     if (geneSymbols.length === 0) {
         return `<div class="result-card"><h3>Error</h3><p class="status-not-found">No valid gene symbols found for plotting.</p></div>`;
     }
-    // Call the core visualization function, which handles checking if the gene is in the Nevers dataset.
+    // Call the core visualization function.
     return displayPhylogenyComparison(geneSymbols);
 }
 
