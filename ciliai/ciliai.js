@@ -1156,50 +1156,48 @@ const questionRegistry = [
     { text: "What is the source for Ciliary genes in zebrafish?", handler: async () => tellAboutOrganismSources("zebrafish") },
     { text: "What is the source for Ciliary genes in drosophila?", handler: async () => tellAboutOrganismSources("drosophila") },
 
-
-// ==================== PHYLOGENY QUERIES (FIXED) ====================
-    // ACTION: FIXING calls to the undefined 'comparePhylogenyDatasets' and replacing 
-    // with the dedicated display function.
-    { text: "Show evolutionary conservation of IFT88", handler: async () => displayPhylogenyComparison(["IFT88"]) },
-    { text: "What is the phylogeny of BBS1?", handler: async () => displayPhylogenyComparison(["BBS1"]) },
-    { text: "Compare IFT88 phylogeny", handler: async () => displayPhylogenyComparison(["IFT88"]) }, // Added from previous step
-    { text: "Compare BBS1 phylogeny", handler: async () => displayPhylogenyComparison(["BBS1"]) },     // Added from previous step
-    { text: "Show the phylogenetic comparison for ARL13B", handler: async () => displayPhylogenyComparison(["ARL13B"]) }, // Added from previous step
-    { text: "NPHP1 phylogenetic analysis comparison", handler: async () => displayPhylogenyComparison(["NPHP1"]) }, // Added from previous step
-
-    // --- List Queries (Router Intent: CILIARY_LIST/NONCILIARY_LIST) ---
-    // ACTION: These queries should continue to use the complex router (handlePhylogenyAndOrthologQuery) 
-    // for now, as that's where the LISTING logic resides.
-    { text: "Provide the list of ciliary genes in mouse", handler: async (q) => handlePhylogenyAndOrthologQuery(q) },
-    { text: "Show ciliary genes in C. elegans", handler: async (q) => handlePhylogenyAndOrthologQuery(q) },
-    { text: "Show non-ciliary genes in mouse", handler: async (q) => handlePhylogenyAndOrthologQuery(q) },
-    { text: "List non-ciliary genes in C. elegans", handler: async (q) => handlePhylogenyAndOrthologQuery(q) },
-    { text: "Provide the nonciliary genes found in zebrafish", handler: async (q) => handlePhylogenyAndOrthologQuery(q) },
-    { text: "Do you have the list of non-ciliary genes in fly?", handler: async (q) => handlePhylogenyAndOrthologQuery(q) },
-
+// ==================== PHYLOGENY QUERIES (FIXED VISUALIZATION) ====================
+// NOTE: These are already correct and call the direct visualization function.
+{ text: "Show evolutionary conservation of IFT88", handler: async () => displayPhylogenyComparison(["IFT88"]) },
+{ text: "What is the phylogeny of BBS1?", handler: async () => displayPhylogenyComparison(["BBS1"]) },
+{ text: "Compare IFT88 phylogeny", handler: async () => displayPhylogenyComparison(["IFT88"]) },
+{ text: "Compare BBS1 phylogeny", handler: async () => displayPhylogenyComparison(["BBS1"]) },
+{ text: "Show the phylogenetic comparison for ARL13B", handler: async () => displayPhylogenyComparison(["ARL13B"]) },
+{ text: "NPHP1 phylogenetic analysis comparison", handler: async () => displayPhylogenyComparison(["NPHP1"]) },
     
-    // ... (rest of List Queries remain unchanged) ...
+  // --------------------------------------------------------------------------------------
+// --- List Queries (FIXED ROUTING) ---
+// ACTION: Route these complex listing questions to the specialized query handler.
+{ text: "Provide the list of ciliary genes in mouse", handler: async (q) => routePhylogenyAndListQueries(q) },
+{ text: "Show ciliary genes in C. elegans", handler: async (q) => routePhylogenyAndListQueries(q) },
+{ text: "Show non-ciliary genes in mouse", handler: async (q) => routePhylogenyAndListQueries(q) },
+{ text: "List non-ciliary genes in C. elegans", handler: async (q) => routePhylogenyAndListQueries(q) },
+{ text: "Provide the nonciliary genes found in zebrafish", handler: async (q) => routePhylogenyAndListQueries(q) },
+{ text: "Do you have the list of non-ciliary genes in fly?", handler: async (q) => routePhylogenyAndListQueries(q) },
 
-    // --- Ortholog Queries (Router Intent: ORTHOLOG_LOOKUP) ---
-    // ACTION: These queries should continue to use the complex router.
-    { text: "What are the orthologs of ARL13B?", handler: async (q) => handlePhylogenyAndOrthologQuery(q) },
-    { text: "Show me the homologs of IFT88", handler: async (q) => handlePhylogenyAndOrthologQuery(q) },
-    { text: "List all orthologs for WDR31", handler: async (q) => handlePhylogenyAndOrthologQuery(q) },
-    { text: "What is the C. elegans homolog of BBS1?", handler: async (q) => handlePhylogenyAndOrthologQuery(q) },
-    { text: "Give me the mouse ortholog for CEP290", handler: async (q) => handlePhylogenyAndOrthologQuery(q) },
-    { text: "Is NPHP1 conserved in mouse?", handler: async (q) => handlePhylogenyAndOrthologQuery(q) },
-    { text: "Find the drosophila ortholog for MKS1", handler: async (q) => handlePhylogenyAndOrthologQuery(q) },
-    { text: "Orthologs of TMEM107 in zebrafish", handler: async (q) => handlePhylogenyAndOrthologQuery(q) },
+// --------------------------------------------------------------------------------------
+// --- Ortholog Queries (FIXED ROUTING) ---
+// ACTION: Orthologs are best served by the curated Hub data lookup (getOrthologsForGene).
+// We should either route them directly there, or use the specialized router which will call it.
+// We will route them directly to the intended final function to bypass unnecessary intent parsing checks.
+{ text: "What are the orthologs of ARL13B?", handler: async () => getOrthologsForGene("ARL13B") },
+{ text: "Show me the homologs of IFT88", handler: async () => getOrthologsForGene("IFT88") },
+{ text: "List all orthologs for WDR31", handler: async () => getOrthologsForGene("WDR31") },
+{ text: "What is the C. elegans homolog of BBS1?", handler: async () => getOrthologsForGene("BBS1") },
+{ text: "Give me the mouse ortholog for CEP290", handler: async () => getOrthologsForGene("CEP290") },
+{ text: "Is NPHP1 conserved in mouse?", handler: async () => checkConservation("NPHP1", "mouse") }, // Direct check
+{ text: "Find the drosophila ortholog for MKS1", handler: async () => getOrthologsForGene("MKS1") },
+{ text: "Orthologs of TMEM107 in zebrafish", handler: async () => getOrthologsForGene("TMEM107") },
    
-
-    // --- Visual Comparison Queries (Router Fallback to getPhylogenyComparisonGene) ---
-    // ACTION: FIXING all visualization queries in this block to use the correct function directly.
-    { text: "Show the phylogenetic comparison for ARL13B", handler: async () => displayPhylogenyComparison(["ARL13B"]) }, // Use array for clarity
-    { text: "Show the phylogenetic comparison for WDR31", handler: async () => displayPhylogenyComparison(["WDR31"]) },   // Use array for clarity
-    { text: "What is the phylogeny of BBS1?", handler: async () => displayPhylogenyComparison(["BBS1"]) },
-    { text: "Show evolutionary conservation of IFT88", handler: async () => displayPhylogenyComparison(["IFT88"]) },
-    { text: "Phylogenetic analysis of CEP290", handler: async () => displayPhylogenyComparison(["CEP290"]) },
-
+// --------------------------------------------------------------------------------------
+// --- Visual Comparison Queries (Router Fallback to getPhylogenyComparisonGene) ---
+// NOTE: These are already correctly set for direct plotting.
+{ text: "Show the phylogenetic comparison for ARL13B", handler: async () => displayPhylogenyComparison(["ARL13B"]) },
+{ text: "Show the phylogenetic comparison for WDR31", handler: async () => displayPhylogenyComparison(["WDR31"]) },
+{ text: "What is the phylogeny of BBS1?", handler: async () => displayPhylogenyComparison(["BBS1"]) },
+{ text: "Show evolutionary conservation of IFT88", handler: async () => displayPhylogenyComparison(["IFT88"]) },
+{ text: "Phylogenetic analysis of CEP290", handler: async () => displayPhylogenyComparison(["CEP290"]) },
+    
     // ==================== GENE DETAILS & FUNCTION ====================
     // General function queries
     { text: "Describe the function of KIF17", handler: async () => getGeneFunction("KIF17") },
