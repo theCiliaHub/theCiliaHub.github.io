@@ -2414,22 +2414,24 @@ async function mergePhylogenyData() {
 }
 
 /**
- * Universal handler that extracts gene name(s) from the query and plots them.
- * This is the function that makes "Show the phylogenetic comparison for WDR54" work.
+ * Universal handler to extract ANY gene name(s) from a visualization query 
+ * and forward them to the core plotting function (displayPhylogenyComparison).
  */
 async function plotPhylogenyFromQuery(query) {
-    // This regex grabs any gene list (e.g., "WDR54" or "IFT88, BBS1") after 'for' or 'of'.
+    // Regex: Captures gene symbol(s) following 'of' or 'for'
     const geneMatch = query.match(/(?:for|of)\s+([A-Z0-9\-\.]+(?:,\s*[A-Z0-9\-\.]+)*)/i);
+    
     if (!geneMatch) {
         return `<div class="result-card"><h3>Error</h3><p class="status-not-found">Could not identify a gene symbol in your query for plotting.</p></div>`;
     }
+    // Extract, clean, and uppercase the gene(s) found
     const geneSymbols = geneMatch[1].split(',')
                                     .map(g => g.trim().toUpperCase())
                                     .filter(Boolean);
     if (geneSymbols.length === 0) {
         return `<div class="result-card"><h3>Error</h3><p class="status-not-found">No valid gene symbols found for plotting.</p></div>`;
     }
-    // Call the core visualization function.
+    // This is the core plotting function that handles the heatmap generation
     return displayPhylogenyComparison(geneSymbols);
 }
 
