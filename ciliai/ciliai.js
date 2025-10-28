@@ -2260,88 +2260,82 @@ const UNICELLULAR_SPECIES = [
   "C.reinhardtii", "V.carteri"
 ];
 
-// --- UPDATED HELPER: getPhylogenyMatrix (Scoping Fix and Aesthetic Updates) ---
+// --- UPDATED HELPER: getPhylogenyMatrix ---
 /**
- * Processes only Nevers et al. 2017 data across 20 ciliated and 20 non-ciliated organisms.
- * FIX: Uses reliable organism mapping and applies aesthetic requirements.
- * @param {string[]} geneSymbols - Genes to include (up to 20).
- * @returns {{matrix: number[][], xLabels: string[], yLabels: string[], textMatrix: string[], speciesColors: string[]}}
+ * Processes Nevers et al. 2017 data across 20 ciliated and 20 non-ciliated organisms.
+ * @param {string[]} geneSymbols - Genes selected by the user (can be 1 or many).
+ * @returns {Object} The matrix data.
  */
 function getPhylogenyMatrix(geneSymbols) {
-    // 1. Define gene list (up to 20 genes - unchanged)
+    // 1. Define gene list (UPPERCASED AND DEDUPLICATED)
     const defaultGenes = [
         "IFT88", "BBS1", "ARL13B", "NPHP1", "CEP290", "DYNLT1", "TTC8", "KIF3A",
         "IFT27", "IFT140", "TMEM107", "MKS1", "RPGRIP1L", "TULP3", "CC2D2A",
-        "NEK8", "CENPF", "KIAA0556", "HYLS1", "WDR54"
+        "NEK8", "CENPF", "KIAA0556", "HYLS1", "WDR54" // 20 total
     ];
+    
     const inputGenesUpper = geneSymbols.map(g => g.toUpperCase());
-    const uniqueGenes = [...new Set(inputGenesUpper.concat(defaultGenes.map(g => g.toUpperCase())))].slice(0, 20);
+    
+    // START FIX: Prioritize input genes, then filter defaults to fill remaining slots (max 20)
+    let uniqueGenes = [...new Set(inputGenesUpper)];
+    const inputGeneSet = new Set(uniqueGenes);
 
-    // --- FIX 2: Define/re-define organism lists internally to solve the ReferenceError ---
+    for (const dGene of defaultGenes) {
+        if (uniqueGenes.length >= 20) break;
+        if (!inputGeneSet.has(dGene.toUpperCase())) {
+            uniqueGenes.push(dGene.toUpperCase());
+        }
+    }
+    // END FIX
+
+    // ... (rest of the function, including organisms definition and matrix generation) ...
+    
     const CIL_ORG_FULL = [
-        "Homo sapiens", "Rattus norvegicus", "Cricetulus griseus", "Mus musculus", 
-        "Gallus gallus", "Xenopus tropicalis", "Danio rerio", "Caenorhabditis elegans", 
-        "Chlamydomonas reinhardtii", "Tetrahymena thermophila", "Trypanosoma cruzi", "Leishmania mexicana",
-        "Trichomonas vaginalis", "Giardia intestinalis", "Naegleria gruberi", "Trypanosoma brucei brucei",
-        "Volvox carteri", "Micromonas sp.", "Strongylocentrotus purpuratus", "Ciona intestinalis" // Added one more for 20 total
+        "Homo sapiens", "Rattus norvegicus", "Cricetulus griseus", "Mus musculus", "Gallus gallus", "Xenopus tropicalis", "Danio rerio", "Caenorhabditis elegans", "Chlamydomonas reinhardtii", "Tetrahymena thermophila", "Trypanosoma cruzi", "Leishmania mexicana", "Trichomonas vaginalis", "Giardia intestinalis", "Naegleria gruberi", "Trypanosoma brucei brucei", "Volvox carteri", "Micromonas sp.", "Strongylocentrotus purpuratus", "Ciona intestinalis"
     ];
     const NCIL_ORG_FULL = [
-        "Drosophila melanogaster", "Saccharomyces cerevisiae", "Schizosaccharomyces pombe", "Ustilago maydis",
-        "Arabidopsis thaliana", "Oryza sativa", "Zea mays", "Batrachochytrium dendrobatidis",
-        "Puccinia graminis f. sp. tritici", "Cryptococcus neoformans var. neoformans serotype D", 
-        "Schistosoma mansoni", "Acyrthosiphon pisum", "Tribolium castaneum", "Anopheles gambiae",
-        "Aureococcus anophagefferens", "Phytophthora infestans", "Cyanidioschyzon merolae",
-        "Blastocystis hominis", "Cryptosporidium parvum", "Entamoeba histolytica"
-    ].slice(0, 20); // Slice to 20 just in case
+        "Drosophila melanogaster", "Saccharomyces cerevisiae", "Schizosaccharomyces pombe", "Ustilago maydis", "Arabidopsis thaliana", "Oryza sativa", "Zea mays", "Batrachochytrium dendrobatidis", "Puccinia graminis f. sp. tritici", "Cryptococcus neoformans var. neoformans serotype D", "Schistosoma mansoni", "Acyrthosiphon pisum", "Tribolium castaneum", "Anopheles gambiae", "Aureococcus anophagefferens", "Phytophthora infestans", "Cyanidioschyzon merolae", "Blastocystis hominis", "Cryptosporidium parvum", "Entamoeba histolytica"
+    ];
 
     const allNeversSpecies = neversPhylogenyCache?.organism_groups?.all_organisms_list || [];
-    
-    // Select the first 20 species from the hardcoded lists
     const selectedCIL = CIL_ORG_FULL.slice(0, 20);
     const selectedNCIL = NCIL_ORG_FULL.slice(0, 20);
     const selectedSpecies = selectedCIL.concat(selectedNCIL);
 
-    // Helper to extract clean name (Point 1: remove strain names)
     const cleanName = (species) => species.replace(/\s*\(.*\)\s*/g, '').replace('subsp. patens', '').trim();
     
-    // Create a robust lookup map from (CleanName) -> (Global Index)
     const speciesIndexMap = new Map();
     allNeversSpecies.forEach((speciesName, index) => {
         speciesIndexMap.set(cleanName(speciesName), index);
     });
 
-    // 3. Final Data structure preparation
     const neversGenes = neversPhylogenyCache?.genes || {};
     const matrix = [];
     const textMatrix = [];
     const yLabels = [];
     const speciesColors = [];
     
-    // Set X-axis labels to clean names and define column colors
     const xLabels = selectedSpecies.map((species, index) => {
         const simpleName = cleanName(species);
-        // Determine color based on position in the list
         const isCiliated = index < selectedCIL.length;
-        speciesColors.push(isCiliated ? '#698ECF' : '#FFE5B5'); // Point 2/3 color
-        return simpleName; // Clean name for X-axis label (Point 4)
+        speciesColors.push(isCiliated ? '#698ECF' : '#FFE5B5');
+        return simpleName;
     });
 
     // 4. Populate matrix
-    uniqueGenes.forEach(gene => {
-        const geneDataNevers = neversGenes[gene]; 
-        if (!geneDataNevers) return; 
+    uniqueGenes.forEach(gene => { // Use the prioritized 'uniqueGenes' list
+        const geneDataNevers = neversGenes[gene];
+        if (!geneDataNevers) return;
 
         const presentIndices = new Set(geneDataNevers.s || []);
         const row = [];
         const textRow = [];
 
-        // Function to process a group (Ciliated or Non-Ciliated)
         const processGroup = (speciesGroup, zValue) => {
             speciesGroup.forEach(species => {
                 const cleanSpName = cleanName(species);
                 const globalIndex = speciesIndexMap.get(cleanSpName);
                 
-                // Lookup must succeed (globalIndex !== undefined) and index must be present
                 const isPresent = (globalIndex !== undefined) && presentIndices.has(globalIndex);
                 
                 row.push(isPresent ? zValue : 0);
@@ -2349,13 +2343,10 @@ function getPhylogenyMatrix(geneSymbols) {
             });
         };
 
-        // Ciliated Organisms (Z=2)
         processGroup(selectedCIL, 2);
-
-        // Non-Ciliated Organisms (Z=1)
         processGroup(selectedNCIL, 1);
 
-        if (row.length === 40) { // Ensure we have a full row of 40 columns
+        if (row.length === 40) {
             matrix.push(row);
             textMatrix.push(textRow);
             yLabels.push(gene);
@@ -2363,6 +2354,182 @@ function getPhylogenyMatrix(geneSymbols) {
     });
 
     return { matrix: matrix, xLabels: xLabels, yLabels: yLabels, textMatrix: textMatrix, speciesColors: speciesColors };
+}
+
+/**
+ * Generates a comprehensive HTML block of clickable questions covering 
+ * all major functional areas, genes, and conservation data points.
+ * @returns {string} HTML string containing formatted, clickable questions.
+ */
+function generatePhylogenyAndOrthologQuestions() {
+    // Core Gene List derived from your defaultGenes
+    const CORE_GENES = ["IFT88", "ARL13B", "BBS1", "CEP290", "NPHP1", "WDR31", "DYNC2H1", "MKS1"];
+    
+    // Core Model Organisms
+    const MODEL_ORGANISMS = ["C. elegans", "Mouse", "Zebrafish", "Drosophila", "Xenopus"];
+
+    // Unicellular species for specialized query (using the UNICELLULAR_SAMPLES)
+    const UNICELLULAR_SAMPLES = ["Chlamydomonas reinhardtii", "Tetrahymena thermophila", "Giardia intestinalis"];
+
+    let htmlContent = '<div class="result-card" style="margin-top: 1rem; background-color: #e8f4fd; border: 1px solid #bbdefb;">';
+    htmlContent += '<h3>Explore Conservation & Orthologs</h3><ul style="column-count: 2; list-style: none; padding-left: 0;">';
+    
+    // Helper to format the clickable span element
+    const formatSpan = (text, question) => `<li class="ai-question-item"><span data-question="${question}">${text}</span></li>`;
+
+    // --- 0. Dynamic Placeholder for Any Gene ---
+    htmlContent += '<li style="grid-column: 1 / -1;"><h4 style="margin-top: 0;">Try *Any* Gene (Out of 19,000+) 💡</h4></li>';
+    htmlContent += formatSpan(
+        `Conservation status for **[Any Gene]** (e.g., SMAD2)`,
+        `Show the phylogenetic comparison for SMAD2`
+    );
+    htmlContent += formatSpan(
+        `Evolutionary origin of **[Any Gene]** (e.g., WDR31)`,
+        `Show evolutionary conservation of WDR31`
+    );
+    
+    // --- 1. Visualization Queries (Heatmap) ---
+    htmlContent += '<li style="grid-column: 1 / -1;"><h4 style="margin-top: 0;">Heatmap Visualization 🌍</h4></li>';
+    
+    CORE_GENES.slice(0, 4).forEach(gene => {
+        htmlContent += formatSpan(
+            `Show heatmap for **${gene}**`,
+            `Show the phylogenetic comparison for ${gene}`
+        );
+    });
+
+    htmlContent += formatSpan(
+        `Compare **IFT88** and **BBS1** phylogeny`,
+        `Show the phylogenetic comparison for IFT88, BBS1`
+    );
+
+    // --- 2. Curated Ortholog Lookups (Gene-centric) ---
+    htmlContent += '<li style="grid-column: 1 / -1;"><h4>Curated Ortholog Names 🧬</h4></li>';
+    
+    CORE_GENES.slice(0, 3).forEach(gene => {
+        htmlContent += formatSpan(
+            `Curated orthologs for **${gene}**`,
+            `Show curated orthologs for ${gene}`
+        );
+    });
+    htmlContent += formatSpan(
+        `**C. elegans** homolog of **NPHP1**`,
+        `What is the C. elegans homolog of NPHP1?`
+    );
+
+    // --- 3. Conservation Status Checks (Gene vs. Organism) ---
+    htmlContent += '<li style="grid-column: 1 / -1;"><h4>Specific Conservation Checks ✅</h4></li>';
+    
+    htmlContent += formatSpan(
+        `Is **ARL13B** conserved in **C. elegans**?`,
+        `Is ARL13B conserved in C. elegans?`
+    );
+    htmlContent += formatSpan(
+        `Is **WDR31** present in **Zebrafish**?`,
+        `Is WDR31 conserved in Zebrafish?`
+    );
+    htmlContent += formatSpan(
+        `How conserved is **IFT88** (status)?`,
+        `Show evolutionary conservation of IFT88`
+    );
+    
+    // --- 4. Organism-Specific List Queries (Phylogeny Screen) ---
+    htmlContent += '<li style="grid-column: 1 / -1;"><h4>Phylogeny Gene Lists (By Species)</h4></li>';
+    
+    MODEL_ORGANISMS.slice(0, 3).forEach(organism => {
+        htmlContent += formatSpan(
+            `List ciliary genes in **${organism}** (Phylogeny)`,
+            `List Ciliary Genes in ${organism} (Phylogeny)`
+        );
+    });
+
+    // --- 5. Conserved Disease Gene Lists ---
+    htmlContent += '<li style="grid-column: 1 / -1;"><h4>Conserved Disease Genes (Ciliopathies)</h4></li>';
+    
+    htmlContent += formatSpan(
+        `**Joubert** genes conserved in **C. elegans**`,
+        `List Joubert syndrome genes found in C. elegans`
+    );
+    htmlContent += formatSpan(
+        `**BBS** genes conserved in **Mouse**`,
+        `Find BBS genes conserved in Mouse`
+    );
+
+    // --- 6. Unicellular Species Conservation ---
+    htmlContent += '<li style="grid-column: 1 / -1;"><h4>Unicellular/Basal Species Check 🦠</h4></li>';
+
+    UNICELLULAR_SAMPLES.forEach(organism => {
+        const simpleName = organism.split(' ')[0];
+        htmlContent += formatSpan(
+            `Ciliary genes in **${simpleName}**`,
+            `List ciliary genes in ${organism}`
+        );
+    });
+
+    // --- 7. NEW: Single Gene Conservation in Unicellular Organisms ---
+    htmlContent += '<li style="grid-column: 1 / -1;"><h4>Gene Conservation in Unicellular Species 🔬</h4></li>';
+    
+    // Check specific genes in specific unicellular organisms
+    htmlContent += formatSpan(
+        `Is **IFT88** conserved in **Chlamydomonas**?`,
+        `Is IFT88 conserved in Chlamydomonas reinhardtii?`
+    );
+    htmlContent += formatSpan(
+        `Is **BBS1** found in **Tetrahymena**?`,
+        `Is BBS1 conserved in Tetrahymena thermophila?`
+    );
+    htmlContent += formatSpan(
+        `Is **CEP290** present in **Giardia**?`,
+        `Is CEP290 conserved in Giardia intestinalis?`
+    );
+    htmlContent += formatSpan(
+        `**DYNC2H1** conservation in unicellular organisms`,
+        `Is DYNC2H1 conserved in unicellular organisms?`
+    );
+
+    // --- 8. NEW: Broadly Conserved Genes in Unicellular Organisms ---
+    htmlContent += '<li style="grid-column: 1 / -1;"><h4>Ancient Conservation Patterns 🌿</h4></li>';
+    
+    htmlContent += formatSpan(
+        `Which human ciliary genes are in **Chlamydomonas**?`,
+        `List human ciliary genes conserved in Chlamydomonas reinhardtii`
+    );
+    htmlContent += formatSpan(
+        `Ancient ciliary genes (unicellular conserved)`,
+        `List human ciliary genes conserved in all unicellular organisms`
+    );
+    htmlContent += formatSpan(
+        `Ciliary-specific genes in **Tetrahymena**`,
+        `List ciliary-specific genes found in Tetrahymena thermophila`
+    );
+    htmlContent += formatSpan(
+        `Which IFT genes exist in unicellular species?`,
+        `List IFT genes conserved in unicellular organisms`
+    );
+
+    // --- 9. NEW: Cross-Domain Conservation Comparisons ---
+    htmlContent += '<li style="grid-column: 1 / -1;"><h4>Evolutionary Breadth Analysis 🌳</h4></li>';
+    
+    htmlContent += formatSpan(
+        `Genes conserved from unicellular to human`,
+        `List genes conserved from unicellular organisms to humans`
+    );
+    htmlContent += formatSpan(
+        `**IFT88** conservation: unicellular vs metazoan`,
+        `Compare IFT88 conservation in unicellular organisms vs metazoans`
+    );
+    htmlContent += formatSpan(
+        `Lost in **Giardia** but conserved elsewhere`,
+        `List ciliary genes absent in Giardia intestinalis but present in other organisms`
+    );
+    htmlContent += formatSpan(
+        `Genes unique to ciliated unicellular organisms`,
+        `List genes found only in ciliated unicellular organisms`
+    );
+
+    htmlContent += '</ul></div>';
+    
+    return htmlContent;
 }
 
 // --- UPDATED MAIN DISPLAY FUNCTION: Heatmap (Nevers 2017 Only, Styled) ---
