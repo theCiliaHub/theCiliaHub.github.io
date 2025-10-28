@@ -2691,8 +2691,6 @@ async function getNonCiliaryGenesForOrganism(organismName) {
 }
 
 
-
-
 // --- CORE FUNCTION: CURATED ORTHOLOG LOOKUP (From ciliahub_data.json) ---
 // This function fulfills the requirement for zebrafish, mice, xenopus, drosophila, and C. elegans.
 async function getOrthologsForGene(gene) {
@@ -2864,6 +2862,112 @@ async function handlePhylogenyAndOrthologQuery(query) {
     return `<div class="result-card"><h3>Query Not Understood</h3><p>I couldn't identify a valid gene or list intent based on the Li/Nevers datasets. Please specify a gene, a list type, or an organism.</p></div>`;
 }
 
+/**
+ * Generates a comprehensive HTML block of clickable questions covering 
+ * all major functional areas, genes, and conservation data points.
+ * * @returns {string} HTML string containing formatted, clickable questions.
+ */
+function generatePhylogenyAndOrthologQuestions() {
+    // Core Gene List derived from your defaultGenes
+    const CORE_GENES = ["IFT88", "ARL13B", "BBS1", "CEP290", "NPHP1", "WDR31", "DYNC2H1", "MKS1"];
+    
+    // Core Model Organisms
+    const MODEL_ORGANISMS = ["C. elegans", "Mouse", "Zebrafish", "Drosophila", "Xenopus"];
+
+    // Unicellular species for specialized query (using the UNICELLULAR_SPECIES global)
+    const UNICELLULAR_SAMPLES = ["Chlamydomonas reinhardtii", "Tetrahymena thermophila", "Giardia intestinalis"];
+
+    let htmlContent = '<div class="result-card" style="margin-top: 1rem; background-color: #e8f4fd; border: 1px solid #bbdefb;">';
+    htmlContent += '<h3>Explore Conservation & Orthologs</h3><ul style="column-count: 2; list-style: none; padding-left: 0;">';
+    
+    // Helper to format the clickable span element
+    const formatSpan = (text, question) => `<li class="ai-question-item"><span data-question="${question}">${text}</span></li>`;
+
+    // --- 1. Visualization Queries (Heatmap) ---
+    htmlContent += '<li style="grid-column: 1 / -1;"><h4 style="margin-top: 0;">Heatmap Visualization 🌍</h4></li>';
+    
+    CORE_GENES.slice(0, 4).forEach(gene => {
+        htmlContent += formatSpan(
+            `Show heatmap for **${gene}**`,
+            `Show the phylogenetic comparison for ${gene}`
+        );
+    });
+
+    htmlContent += formatSpan(
+        `Compare **IFT88** and **BBS1** phylogeny`,
+        `Show the phylogenetic comparison for IFT88, BBS1`
+    );
+
+    // --- 2. Curated Ortholog Lookups (Gene-centric) ---
+    htmlContent += '<li style="grid-column: 1 / -1;"><h4>Curated Ortholog Names 🧬</h4></li>';
+    
+    CORE_GENES.slice(0, 3).forEach(gene => {
+        htmlContent += formatSpan(
+            `Curated orthologs for **${gene}**`,
+            `Show curated orthologs for ${gene}`
+        );
+    });
+    htmlContent += formatSpan(
+        `**C. elegans** homolog of **NPHP1**`,
+        `What is the C. elegans homolog of NPHP1?`
+    );
+
+    // --- 3. Conservation Status Checks (Gene vs. Organism) ---
+    htmlContent += '<li style="grid-column: 1 / -1;"><h4>Specific Conservation Checks ✅</h4></li>';
+    
+    htmlContent += formatSpan(
+        `Is **ARL13B** conserved in **C. elegans**?`,
+        `Is ARL13B conserved in C. elegans?`
+    );
+    htmlContent += formatSpan(
+        `Is **WDR31** present in **Zebrafish**?`,
+        `Is WDR31 conserved in Zebrafish?`
+    );
+    htmlContent += formatSpan(
+        `How conserved is **IFT88** (status)?`,
+        `Show evolutionary conservation of IFT88`
+    );
+    
+    // --- 4. Organism-Specific List Queries (Phylogeny Screen) ---
+    htmlContent += '<li style="grid-column: 1 / -1;"><h4>Phylogeny Gene Lists (By Species)</h4></li>';
+    
+    MODEL_ORGANISMS.slice(0, 3).forEach(organism => {
+        htmlContent += formatSpan(
+            `List ciliary genes in **${organism}** (Phylogeny)`,
+            `List Ciliary Genes in ${organism} (Phylogeny)`
+        );
+    });
+
+    // --- 5. Conserved Disease Gene Lists ---
+    htmlContent += '<li style="grid-column: 1 / -1;"><h4>Conserved Disease Genes (Ciliopathies)</h4></li>';
+    
+    htmlContent += formatSpan(
+        `**Joubert** genes conserved in **C. elegans**`,
+        `List Joubert syndrome genes found in C. elegans`
+    );
+    htmlContent += formatSpan(
+        `**BBS** genes conserved in **Mouse**`,
+        `Find BBS genes conserved in Mouse`
+    );
+
+    // --- 6. Unicellular Species Conservation ---
+    htmlContent += '<li style="grid-column: 1 / -1;"><h4>Unicellular/Basal Species Check 🦠</h4></li>';
+
+    UNICELLULAR_SAMPLES.forEach(organism => {
+        const simpleName = organism.split(' ')[0];
+        htmlContent += formatSpan(
+            `Ciliary genes in **${simpleName}**`,
+            `List ciliary genes in ${organism}`
+        );
+    });
+
+    htmlContent += '</ul></div>';
+    
+    return htmlContent;
+}
+
+// NOTE: This generated HTML string is ready to be injected into your UI's suggestion area.
+// Example: document.getElementById('phylogeny-suggestions').innerHTML = generatePhylogenyAndOrthologQuestions();
 
 /**
  * Retrieves ALL genes marked with any ciliopathy, regardless of specific name.
