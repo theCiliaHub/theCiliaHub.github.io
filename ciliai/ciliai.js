@@ -2368,8 +2368,11 @@ function generatePhylogenyAndOrthologQuestions() {
     // Core Model Organisms
     const MODEL_ORGANISMS = ["C. elegans", "Mouse", "Zebrafish", "Drosophila", "Xenopus"];
 
-    // Unicellular species for specialized query (using the UNICELLULAR_SAMPLES)
+    // Unicellular species for specialized query
     const UNICELLULAR_SAMPLES = ["Chlamydomonas reinhardtii", "Tetrahymena thermophila", "Giardia intestinalis"];
+
+    // Additional gene examples for variety
+    const DIVERSE_GENES = ["DNAH5", "RPGR", "INPP5E", "TMEM67", "TCTN1", "KIF3A", "OFD1", "CC2D2A"];
 
     let htmlContent = '<div class="result-card" style="margin-top: 1rem; background-color: #e8f4fd; border: 1px solid #bbdefb;">';
     htmlContent += '<h3>Explore Conservation & Orthologs</h3><ul style="column-count: 2; list-style: none; padding-left: 0;">';
@@ -2377,154 +2380,233 @@ function generatePhylogenyAndOrthologQuestions() {
     // Helper to format the clickable span element
     const formatSpan = (text, question) => `<li class="ai-question-item"><span data-question="${question}">${text}</span></li>`;
 
-    // --- 0. Dynamic Placeholder for Any Gene ---
-    htmlContent += '<li style="grid-column: 1 / -1;"><h4 style="margin-top: 0;">Try *Any* Gene (Out of 19,000+) 💡</h4></li>';
-    htmlContent += formatSpan(
-        `Conservation status for **[Any Gene]** (e.g., SMAD2)`,
-        `Show the phylogenetic comparison for SMAD2`
-    );
-    htmlContent += formatSpan(
-        `Evolutionary origin of **[Any Gene]** (e.g., WDR31)`,
-        `Show evolutionary conservation of WDR31`
-    );
+    // === 0. ANY GENE SECTION - PRIMARY ACCESS POINT ===
+    htmlContent += '<li style="grid-column: 1 / -1;"><h4 style="margin-top: 0; color: #d35400;">🔍 Try *Any* Gene (Out of 19,000+)</h4></li>';
     
-    // --- 1. Visualization Queries (Heatmap) ---
-    htmlContent += '<li style="grid-column: 1 / -1;"><h4 style="margin-top: 0;">Heatmap Visualization 🌍</h4></li>';
+    // Dynamic gene placeholder examples
+    const EXAMPLE_GENES = ["SMAD2", "WDR31", "DNAH5", "RPGR", "KIF3A", "INPP5E", "TMEM67", "CC2D2A"];
     
-    CORE_GENES.slice(0, 4).forEach(gene => {
+    EXAMPLE_GENES.forEach(gene => {
         htmlContent += formatSpan(
-            `Show heatmap for **${gene}**`,
+            `Conservation status for **${gene}**`,
             `Show the phylogenetic comparison for ${gene}`
         );
     });
-
-    htmlContent += formatSpan(
-        `Compare **IFT88** and **BBS1** phylogeny`,
-        `Show the phylogenetic comparison for IFT88, BBS1`
-    );
-
-    // --- 2. Curated Ortholog Lookups (Gene-centric) ---
-    htmlContent += '<li style="grid-column: 1 / -1;"><h4>Curated Ortholog Names 🧬</h4></li>';
-    
-    CORE_GENES.slice(0, 3).forEach(gene => {
-        htmlContent += formatSpan(
-            `Curated orthologs for **${gene}**`,
-            `Show curated orthologs for ${gene}`
-        );
-    });
-    htmlContent += formatSpan(
-        `**C. elegans** homolog of **NPHP1**`,
-        `What is the C. elegans homolog of NPHP1?`
-    );
-
-    // --- 3. Conservation Status Checks (Gene vs. Organism) ---
-    htmlContent += '<li style="grid-column: 1 / -1;"><h4>Specific Conservation Checks ✅</h4></li>';
     
     htmlContent += formatSpan(
-        `Is **ARL13B** conserved in **C. elegans**?`,
-        `Is ARL13B conserved in C. elegans?`
-    );
-    htmlContent += formatSpan(
-        `Is **WDR31** present in **Zebrafish**?`,
-        `Is WDR31 conserved in Zebrafish?`
-    );
-    htmlContent += formatSpan(
-        `How conserved is **IFT88** (status)?`,
+        `Evolutionary origin of **[Your Gene]**`,
         `Show evolutionary conservation of IFT88`
     );
+    htmlContent += formatSpan(
+        `Orthologs for **[Any Gene Name]**`,
+        `Show curated orthologs for ARL13B`
+    );
+
+    // === 1. GENE FAMILY & COMPLEX ANALYSIS ===
+    htmlContent += '<li style="grid-column: 1 / -1;"><h4>Gene Family & Complex Analysis 🧬</h4></li>';
     
-    // --- 4. Organism-Specific List Queries (Phylogeny Screen) ---
-    htmlContent += '<li style="grid-column: 1 / -1;"><h4>Phylogeny Gene Lists (By Species)</h4></li>';
+    htmlContent += formatSpan(
+        `Compare all **IFT-A complex** genes`,
+        `Compare phylogenetic profiles of IFT140, IFT122, IFT43`
+    );
+    htmlContent += formatSpan(
+        `**BBSome** components conservation`,
+        `Compare conservation of BBS1, BBS2, BBS4, BBS5, BBS7, BBS9`
+    );
+    htmlContent += formatSpan(
+        **Transition zone** genes evolution`,
+        `Compare TMEM67, CEP290, RPGRIP1L, MKS1 conservation`
+    );
+    htmlContent += formatSpan(
+        **Dynein motor** genes across species`,
+        `Show conservation of DNAH5, DNAH11, DNAI1, DNAI2`
+    );
+    htmlContent += formatSpan(
+        **Kinesin family** ciliary members`,
+        `Compare KIF3A, KIF3B, KIF17, KIF7 phylogenetic patterns`
+    );
+
+    // === 2. EVOLUTIONARY TIMING & ORIGIN QUESTIONS ===
+    htmlContent += '<li style="grid-column: 1 / -1;"><h4>Evolutionary Timing & Origin ⏳</h4></li>';
     
-    MODEL_ORGANISMS.slice(0, 3).forEach(organism => {
+    htmlContent += formatSpan(
+        `Genes originating in **early eukaryotes**`,
+        `List ciliary genes found in Giardia and all higher organisms`
+    );
+    htmlContent += formatSpan(
+        **Metazoan-specific** ciliary innovations`,
+        `List ciliary genes first appearing in metazoans`
+    );
+    htmlContent += formatSpan(
+        **Vertebrate-specific** ciliary genes`,
+        `List ciliary genes found only in vertebrates`
+    );
+    htmlContent += formatSpan(
+        `When did **NPHP1** evolve?`,
+        `Show evolutionary origin and conservation of NPHP1`
+    );
+    htmlContent += formatSpan(
+        **Mammalian-specific** ciliary adaptations`,
+        `List ciliary genes unique to mammals`
+    );
+
+    // === 3. CONSERVATION PATTERN ANALYSIS ===
+    htmlContent += '<li style="grid-column: 1 / -1;"><h4>Conservation Pattern Analysis 📊</h4></li>';
+    
+    htmlContent += formatSpan(
+        **Ubiquitous** ciliary genes (all species)`,
+        `List ciliary genes conserved across all organisms`
+    );
+    htmlContent += formatSpan(
+        **Patchy distribution** ciliary genes`,
+        `Find ciliary genes with irregular conservation patterns`
+    );
+    htmlContent += formatSpan(
+        **Recently evolved** ciliary genes`,
+        `List ciliary genes with limited phylogenetic distribution`
+    );
+    htmlContent += formatSpan(
+        `Genes **lost in fungi** but kept elsewhere`,
+        `List ciliary genes absent in fungi but present in other lineages`
+    );
+    htmlContent += formatSpan(
+        **Plant lineage** ciliary gene losses`,
+        `Compare ciliary gene conservation between plants and animals`
+    );
+
+    // === 4. DISEASE & PHENOTYPE CORRELATION ===
+    htmlContent += '<li style="grid-column: 1 / -1;"><h4>Disease & Phenotype Correlation 🏥</h4></li>';
+    
+    htmlContent += formatSpan(
+        **Joubert syndrome** gene conservation`,
+        `Compare conservation of Joubert syndrome associated genes`
+    );
+    htmlContent += formatSpan(
+        **Bardet-Biedl** genes in model organisms`,
+        `Show BBS gene conservation across model organisms`
+    );
+    htmlContent += formatSpan(
+        **Polycystic kidney disease** gene evolution`,
+        `Compare PKHD1, PKD1, PKD2 conservation patterns`
+    );
+    htmlContent += formatSpan(
+        **Retinal degeneration** ciliary genes`,
+        `List ciliary genes associated with retinal diseases across species`
+    );
+    htmlContent += formatSpan(
+        **Situs inversus** genes conservation`,
+        `Compare conservation of genes causing situs inversus`
+    );
+
+    // === 5. FUNCTIONAL CATEGORY EXPLORATION ===
+    htmlContent += '<li style="grid-column: 1 / -1;"><h4>Functional Category Exploration ⚙️</h4></li>';
+    
+    htmlContent += formatSpan(
+        **IFT complex** genes across eukaryotes`,
+        `List intraflagellar transport genes in unicellular organisms`
+    );
+    htmlContent += formatSpan(
+        **Ciliary membrane** protein evolution`,
+        `Compare conservation of ciliary membrane associated proteins`
+    );
+    htmlContent += formatSpan(
+        **Basal body** components phylogeny`,
+        `Show conservation of basal body and centriolar proteins`
+    );
+    htmlContent += formatSpan(
+        **Ciliary signaling** pathway conservation`,
+        `Compare Hedgehog signaling components across species`
+    );
+    htmlContent += formatSpan(
+        **Motile vs primary** cilia genes`,
+        `Compare genes specific to motile vs primary cilia`
+    );
+
+    // === 6. ORGANISM-SPECIFIC DEEP DIVES ===
+    htmlContent += '<li style="grid-column: 1 / -1;"><h4>Organism-Specific Deep Dives 🔍</h4></li>';
+    
+    MODEL_ORGANISMS.forEach(organism => {
         htmlContent += formatSpan(
-            `List ciliary genes in **${organism}** (Phylogeny)`,
-            `List Ciliary Genes in ${organism} (Phylogeny)`
+            `Complete ciliome of **${organism}**`,
+            `List all ciliary genes in ${organism}`
         );
     });
-
-    // --- 5. Conserved Disease Gene Lists ---
-    htmlContent += '<li style="grid-column: 1 / -1;"><h4>Conserved Disease Genes (Ciliopathies)</h4></li>';
     
     htmlContent += formatSpan(
-        `**Joubert** genes conserved in **C. elegans**`,
-        `List Joubert syndrome genes found in C. elegans`
+        **Human-specific** ciliary adaptations`,
+        `List ciliary genes unique to humans`
     );
     htmlContent += formatSpan(
-        `**BBS** genes conserved in **Mouse**`,
-        `Find BBS genes conserved in Mouse`
+        **C. elegans** sensory cilium genes`,
+        `List sensory cilium specific genes in C. elegans`
+    );
+    htmlContent += formatSpan(
+        **Zebrafish** Kupffer's vesicle genes`,
+        `List ciliary genes involved in zebrafish left-right asymmetry`
     );
 
-    // --- 6. Unicellular Species Conservation ---
-    htmlContent += '<li style="grid-column: 1 / -1;"><h4>Unicellular/Basal Species Check 🦠</h4></li>';
+    // === 7. COMPARATIVE ANALYSIS QUESTIONS ===
+    htmlContent += '<li style="grid-column: 1 / -1;"><h4>Comparative Analysis 🔄</h4></li>';
+    
+    htmlContent += formatSpan(
+        `Compare **IFT-B vs IFT-A** evolution`,
+        `Compare phylogenetic patterns of IFT-B complex vs IFT-A complex genes`
+    );
+    htmlContent += formatSpan(
+        **BBSome vs MKS complex** conservation`,
+        `Compare BBSome and Meckel syndrome complex gene evolution`
+    );
+    htmlContent += formatSpan(
+        **Anterograde vs retrograde** IFT motors`,
+        `Compare kinesin and dynein motor conservation in cilia`
+    );
+    htmlContent += formatSpan(
+        **Ciliary rootlet** components evolution`,
+        `Show conservation of rootletin and other rootlet proteins`
+    );
 
+    // === 8. UNICELLULAR SPECIES FOCUS ===
+    htmlContent += '<li style="grid-column: 1 / -1;"><h4>Unicellular Species Focus 🦠</h4></li>';
+    
     UNICELLULAR_SAMPLES.forEach(organism => {
         const simpleName = organism.split(' ')[0];
         htmlContent += formatSpan(
-            `Ciliary genes in **${simpleName}**`,
-            `List ciliary genes in ${organism}`
+            `Ancient ciliary machinery in **${simpleName}**`,
+            `List core ciliary genes conserved in ${organism}`
         );
     });
 
-    // --- 7. NEW: Single Gene Conservation in Unicellular Organisms ---
-    htmlContent += '<li style="grid-column: 1 / -1;"><h4>Gene Conservation in Unicellular Species 🔬</h4></li>';
-    
-    // Check specific genes in specific unicellular organisms
     htmlContent += formatSpan(
-        `Is **IFT88** conserved in **Chlamydomonas**?`,
-        `Is IFT88 conserved in Chlamydomonas reinhardtii?`
+        **Chlamydomonas** as ciliary model relevance`,
+        `Compare human ciliary genes with Chlamydomonas orthologs`
     );
     htmlContent += formatSpan(
-        `Is **BBS1** found in **Tetrahymena**?`,
-        `Is BBS1 conserved in Tetrahymena thermophila?`
+        **Giardia** minimal ciliary apparatus`,
+        `List ciliary genes retained in Giardia intestinalis`
     );
     htmlContent += formatSpan(
-        `Is **CEP290** present in **Giardia**?`,
-        `Is CEP290 conserved in Giardia intestinalis?`
-    );
-    htmlContent += formatSpan(
-        `**DYNC2H1** conservation in unicellular organisms`,
-        `Is DYNC2H1 conserved in unicellular organisms?`
+        **Tetrahymena** motile cilia genes`,
+        `List motile cilia specific genes in Tetrahymena`
     );
 
-    // --- 8. NEW: Broadly Conserved Genes in Unicellular Organisms ---
-    htmlContent += '<li style="grid-column: 1 / -1;"><h4>Ancient Conservation Patterns 🌿</h4></li>';
+    // === 9. TECHNICAL & DATASET EXPLORATION ===
+    htmlContent += '<li style="grid-column: 1 / -1;"><h4>Dataset & Technical Queries 🔧</h4></li>';
     
     htmlContent += formatSpan(
-        `Which human ciliary genes are in **Chlamydomonas**?`,
-        `List human ciliary genes conserved in Chlamydomonas reinhardtii`
+        **Most conserved** ciliary gene`,
+        `Find the ciliary gene with broadest phylogenetic distribution`
     );
     htmlContent += formatSpan(
-        `Ancient ciliary genes (unicellular conserved)`,
-        `List human ciliary genes conserved in all unicellular organisms`
+        **Least conserved** ciliary gene`,
+        `Find ciliary genes with most restricted distribution`
     );
     htmlContent += formatSpan(
-        `Ciliary-specific genes in **Tetrahymena**`,
-        `List ciliary-specific genes found in Tetrahymena thermophila`
+        **Gene families** with multiple ciliary members`,
+        `List gene families with multiple ciliary protein members`
     );
     htmlContent += formatSpan(
-        `Which IFT genes exist in unicellular species?`,
-        `List IFT genes conserved in unicellular organisms`
-    );
-
-    // --- 9. NEW: Cross-Domain Conservation Comparisons ---
-    htmlContent += '<li style="grid-column: 1 / -1;"><h4>Evolutionary Breadth Analysis 🌳</h4></li>';
-    
-    htmlContent += formatSpan(
-        `Genes conserved from unicellular to human`,
-        `List genes conserved from unicellular organisms to humans`
-    );
-    htmlContent += formatSpan(
-        `**IFT88** conservation: unicellular vs metazoan`,
-        `Compare IFT88 conservation in unicellular organisms vs metazoans`
-    );
-    htmlContent += formatSpan(
-        `Lost in **Giardia** but conserved elsewhere`,
-        `List ciliary genes absent in Giardia intestinalis but present in other organisms`
-    );
-    htmlContent += formatSpan(
-        `Genes unique to ciliated unicellular organisms`,
-        `List genes found only in ciliated unicellular organisms`
+        **Recently duplicated** ciliary genes`,
+        `Find ciliary genes with recent lineage-specific duplications`
     );
 
     htmlContent += '</ul></div>';
@@ -2733,9 +2815,200 @@ async function mergePhylogenyCaches() {
     return phylogenyDataCache;
 }
 
-// NOTE: The implementation of comparePhylogenyDatasets and renderDetailedPhylogenyTable 
-// remains as defined in your working version to ensure the table content 
-// (including Li data) is correctly preserved and unchanged.
+/**
+ * Generates questions for general ciliary biology exploration with "any gene" support
+ */
+function generateGeneralCiliaryBiologyQuestions() {
+    let htmlContent = '<div class="result-card" style="margin-top: 1rem; background-color: #f0f8f0; border: 1px solid #c8e6c9;">';
+    htmlContent += '<h3>General Ciliary Biology</h3><ul style="column-count: 2; list-style: none; padding-left: 0;">';
+    
+    const formatSpan = (text, question) => `<li class="ai-question-item"><span data-question="${question}">${text}</span></li>`;
+
+    // ANY GENE SECTION
+    htmlContent += '<li style="grid-column: 1 / -1;"><h4 style="margin-top: 0; color: #d35400;">🔍 Try *Any* Gene (Out of 19,000+)</h4></li>';
+    htmlContent += formatSpan(
+        `Basic information about **[Any Gene]**`,
+        `Tell me about IFT88 function in cilia`
+    );
+    htmlContent += formatSpan(
+        `Ciliary role of **[Your Gene]**`,
+        `What is the ciliary function of ARL13B?`
+    );
+    htmlContent += formatSpan(
+        `Disease associations for **[Gene Name]**`,
+        `What ciliopathies are associated with CEP290?`
+    );
+
+    // Basic function questions
+    htmlContent += '<li style="grid-column: 1 / -1;"><h4>Gene Function & Mechanism</h4></li>';
+    htmlContent += formatSpan(
+        `How does **IFT88** work in intraflagellar transport?`,
+        `Explain the role of IFT88 in intraflagellar transport`
+    );
+    htmlContent += formatSpan(
+        `What is the function of **BBS1** in the BBSome?`,
+        `Describe BBS1 function in the BBSome complex`
+    );
+    htmlContent += formatSpan(
+        `Mechanism of **DYNC2H1** in retrograde transport`,
+        `Explain DYNC2H1 role in ciliary retrograde transport`
+    );
+
+    // Localization questions
+    htmlContent += '<li style="grid-column: 1 / -1;"><h4>Subcellular Localization</h4></li>';
+    htmlContent += formatSpan(
+        `Where is **ARL13B** localized in the cilium?`,
+        `Describe ARL13B localization within the cilium`
+    );
+    htmlContent += formatSpan(
+        `Ciliary compartment for **NPHP1**`,
+        `Where is NPHP1 localized in the cilium?`
+    );
+
+    htmlContent += '</ul></div>';
+    return htmlContent;
+}
+
+/**
+ * Generates questions for ciliopathies and diseases with "any gene" support
+ */
+function generateCiliopathyQuestions() {
+    let htmlContent = '<div class="result-card" style="margin-top: 1rem; background-color: #fff3e0; border: 1px solid #ffcc80;">';
+    htmlContent += '<h3>Ciliopathies & Diseases</h3><ul style="column-count: 2; list-style: none; padding-left: 0;">';
+    
+    const formatSpan = (text, question) => `<li class="ai-question-item"><span data-question="${question}">${text}</span></li>`;
+
+    // ANY GENE SECTION
+    htmlContent += '<li style="grid-column: 1 / -1;"><h4 style="margin-top: 0; color: #d35400;">🔍 Try *Any* Gene (Out of 19,000+)</h4></li>';
+    htmlContent += formatSpan(
+        `Disease associations for **[Any Gene]**`,
+        `What diseases are associated with CEP290 mutations?`
+    );
+    htmlContent += formatSpan(
+        `**[Gene Name]** mutation phenotypes`,
+        `What phenotypes result from NPHP1 mutations?`
+    );
+    htmlContent += formatSpan(
+        `Clinical significance of **[Your Gene]**`,
+        `What is the clinical significance of BBS1?`
+    );
+
+    // Disease-specific questions
+    htmlContent += '<li style="grid-column: 1 / -1;"><h4>Specific Ciliopathies</h4></li>';
+    htmlContent += formatSpan(
+        `Genes involved in **Bardet-Biedl syndrome**`,
+        `List genes associated with Bardet-Biedl syndrome`
+    );
+    htmlContent += formatSpan(
+        **Joubert syndrome** genetic causes`,
+        `What genes cause Joubert syndrome?`
+    );
+    htmlContent += formatSpan(
+        **Meckel syndrome** gene list`,
+        `List genes associated with Meckel syndrome`
+    );
+
+    // Mechanism questions
+    htmlContent += '<li style="grid-column: 1 / -1;"><h4>Disease Mechanisms</h4></li>';
+    htmlContent += formatSpan(
+        `How do **BBS1** mutations cause disease?`,
+        `Explain how BBS1 mutations lead to ciliopathies`
+    );
+    htmlContent += formatSpan(
+        **CEP290** and retinal degeneration`,
+        `How does CEP290 mutation cause retinal degeneration?`
+    );
+
+    htmlContent += '</ul></div>';
+    return htmlContent;
+}
+
+/**
+ * Generates questions for experimental techniques with "any gene" support
+ */
+function generateExperimentalQuestions() {
+    let htmlContent = '<div class="result-card" style="margin-top: 1rem; background-color: #f3e5f5; border: 1px solid #e1bee7;">';
+    htmlContent += '<h3>Experimental & Technical</h3><ul style="column-count: 2; list-style: none; padding-left: 0;">';
+    
+    const formatSpan = (text, question) => `<li class="ai-question-item"><span data-question="${question}">${text}</span></li>`;
+
+    // ANY GENE SECTION
+    htmlContent += '<li style="grid-column: 1 / -1;"><h4 style="margin-top: 0; color: #d35400;">🔍 Try *Any* Gene (Out of 19,000+)</h4></li>';
+    htmlContent += formatSpan(
+        `Antibodies for studying **[Any Gene]**`,
+        `What antibodies are available for IFT88?`
+    );
+    htmlContent += formatSpan(
+        `Knockout models for **[Gene Name]**`,
+        `What knockout models exist for ARL13B?`
+    );
+    htmlContent += formatSpan(
+        `CRISPR targets for **[Your Gene]**`,
+        `Suggest CRISPR targets for CEP290`
+    );
+
+    // Technical questions
+    htmlContent += '<li style="grid-column: 1 / -1;"><h4>Research Methods</h4></li>';
+    htmlContent += formatSpan(
+        `How to study **IFT88** localization?`,
+        `What methods are used to study IFT88 localization?`
+    );
+    htmlContent += formatSpan(
+        `Best model for **BBS1** research`,
+        `What are the best model organisms for studying BBS1?`
+    );
+    htmlContent += formatSpan(
+        `Imaging techniques for ciliary proteins`,
+        `What imaging techniques are best for ciliary proteins?`
+    );
+
+    htmlContent += '</ul></div>';
+    return htmlContent;
+}
+
+/**
+ * Generates questions for pathways and systems biology with "any gene" support
+ */
+function generatePathwayQuestions() {
+    let htmlContent = '<div class="result-card" style="margin-top: 1rem; background-color: #e8f5e8; border: 1px solid #c8e6c9;">';
+    htmlContent += '<h3>Pathways & Systems</h3><ul style="column-count: 2; list-style: none; padding-left: 0;">';
+    
+    const formatSpan = (text, question) => `<li class="ai-question-item"><span data-question="${question}">${text}</span></li>`;
+
+    // ANY GENE SECTION
+    htmlContent += '<li style="grid-column: 1 / -1;"><h4 style="margin-top: 0; color: #d35400;">🔍 Try *Any* Gene (Out of 19,000+)</h4></li>';
+    htmlContent += formatSpan(
+        `Pathways involving **[Any Gene]**`,
+        `What pathways involve IFT88?`
+    );
+    htmlContent += formatSpan(
+        **Interactions for [Gene Name]**`,
+        `What proteins interact with ARL13B?`
+    );
+    htmlContent += formatSpan(
+        `Complex membership of **[Your Gene]**`,
+        `What complexes does BBS1 belong to?`
+    );
+
+    // Pathway questions
+    htmlContent += '<li style="grid-column: 1 / -1;"><h4>Ciliary Pathways</h4></li>';
+    htmlContent += formatSpan(
+        **Hedgehog signaling** and cilia`,
+        `How do cilia regulate Hedgehog signaling?`
+    );
+    htmlContent += formatSpan(
+        **Wnt signaling** ciliary components`,
+        `What ciliary proteins are involved in Wnt signaling?`
+    );
+    htmlContent += formatSpan(
+        **PDGFRα** signaling in cilia`,
+        `Describe PDGFRα signaling in primary cilia`
+    );
+
+    htmlContent += '</ul></div>';
+    return htmlContent;
+}
+
 
 /**
  * Helper to render the detailed text table for a single gene (called by displayPhylogenyComparison).
@@ -3034,103 +3307,79 @@ async function handlePhylogenyAndOrthologQuery(query) {
  * all major functional areas, genes, and conservation data points.
  * * @returns {string} HTML string containing formatted, clickable questions.
  */
-function generatePhylogenyAndOrthologQuestions() {
-    // Core Gene List derived from your defaultGenes
+ffunction generatePhylogenyAndOrthologQuestions() {
     const CORE_GENES = ["IFT88", "ARL13B", "BBS1", "CEP290", "NPHP1", "WDR31", "DYNC2H1", "MKS1"];
-    
-    // Core Model Organisms
     const MODEL_ORGANISMS = ["C. elegans", "Mouse", "Zebrafish", "Drosophila", "Xenopus"];
-
-    // Unicellular species for specialized query (using the UNICELLULAR_SPECIES global)
     const UNICELLULAR_SAMPLES = ["Chlamydomonas reinhardtii", "Tetrahymena thermophila", "Giardia intestinalis"];
 
     let htmlContent = '<div class="result-card" style="margin-top: 1rem; background-color: #e8f4fd; border: 1px solid #bbdefb;">';
     htmlContent += '<h3>Explore Conservation & Orthologs</h3><ul style="column-count: 2; list-style: none; padding-left: 0;">';
     
-    // Helper to format the clickable span element
     const formatSpan = (text, question) => `<li class="ai-question-item"><span data-question="${question}">${text}</span></li>`;
 
-    // --- 1. Visualization Queries (Heatmap) ---
-    htmlContent += '<li style="grid-column: 1 / -1;"><h4 style="margin-top: 0;">Heatmap Visualization 🌍</h4></li>';
+    // === PRIMARY ANY GENE ACCESS ===
+    htmlContent += '<li style="grid-column: 1 / -1;"><h4 style="margin-top: 0; color: #d35400;">🔍 Try *Any* Gene (Out of 19,000+)</h4></li>';
     
-    CORE_GENES.slice(0, 4).forEach(gene => {
+    // Dynamic examples showing the range
+    const EXAMPLE_GENES = ["SMAD2", "WDR31", "DNAH5", "RPGR", "KIF3A", "INPP5E", "TMEM67", "CC2D2A"];
+    
+    EXAMPLE_GENES.forEach(gene => {
         htmlContent += formatSpan(
-            `Show heatmap for **${gene}**`,
+            `Conservation status for **${gene}**`,
             `Show the phylogenetic comparison for ${gene}`
         );
     });
-
-    htmlContent += formatSpan(
-        `Compare **IFT88** and **BBS1** phylogeny`,
-        `Show the phylogenetic comparison for IFT88, BBS1`
-    );
-
-    // --- 2. Curated Ortholog Lookups (Gene-centric) ---
-    htmlContent += '<li style="grid-column: 1 / -1;"><h4>Curated Ortholog Names 🧬</h4></li>';
-    
-    CORE_GENES.slice(0, 3).forEach(gene => {
-        htmlContent += formatSpan(
-            `Curated orthologs for **${gene}**`,
-            `Show curated orthologs for ${gene}`
-        );
-    });
-    htmlContent += formatSpan(
-        `**C. elegans** homolog of **NPHP1**`,
-        `What is the C. elegans homolog of NPHP1?`
-    );
-
-    // --- 3. Conservation Status Checks (Gene vs. Organism) ---
-    htmlContent += '<li style="grid-column: 1 / -1;"><h4>Specific Conservation Checks ✅</h4></li>';
     
     htmlContent += formatSpan(
-        `Is **ARL13B** conserved in **C. elegans**?`,
-        `Is ARL13B conserved in C. elegans?`
-    );
-    htmlContent += formatSpan(
-        `Is **WDR31** present in **Zebrafish**?`,
-        `Is WDR31 conserved in Zebrafish?`
-    );
-    htmlContent += formatSpan(
-        `How conserved is **IFT88** (status)?`,
+        `Evolutionary origin of **[Your Gene]**`,
         `Show evolutionary conservation of IFT88`
     );
-    
-    // --- 4. Organism-Specific List Queries (Phylogeny Screen) ---
-    htmlContent += '<li style="grid-column: 1 / -1;"><h4>Phylogeny Gene Lists (By Species)</h4></li>';
-    
-    MODEL_ORGANISMS.slice(0, 3).forEach(organism => {
-        htmlContent += formatSpan(
-            `List ciliary genes in **${organism}** (Phylogeny)`,
-            `List Ciliary Genes in ${organism} (Phylogeny)`
-        );
-    });
-
-    // --- 5. Conserved Disease Gene Lists ---
-    htmlContent += '<li style="grid-column: 1 / -1;"><h4>Conserved Disease Genes (Ciliopathies)</h4></li>';
-    
     htmlContent += formatSpan(
-        `**Joubert** genes conserved in **C. elegans**`,
-        `List Joubert syndrome genes found in C. elegans`
+        `Orthologs for **[Any Gene Name]**`,
+        `Show curated orthologs for ARL13B`
     );
     htmlContent += formatSpan(
-        `**BBS** genes conserved in **Mouse**`,
-        `Find BBS genes conserved in Mouse`
+        `Gene family evolution for **[Gene]**`,
+        `Show evolutionary conservation of DYNC2H1`
     );
 
-    // --- 6. Unicellular Species Conservation ---
-    htmlContent += '<li style="grid-column: 1 / -1;"><h4>Unicellular/Basal Species Check 🦠</h4></li>';
+    // Rest of the existing phylogeny questions...
+    htmlContent += '<li style="grid-column: 1 / -1;"><h4>Gene Family & Complex Analysis 🧬</h4></li>';
+    htmlContent += formatSpan(
+        `Compare all **IFT-A complex** genes`,
+        `Compare phylogenetic profiles of IFT140, IFT122, IFT43`
+    );
+    htmlContent += formatSpan(
+        `**BBSome** components conservation`,
+        `Compare conservation of BBS1, BBS2, BBS4, BBS5, BBS7, BBS9`
+    );
 
-    UNICELLULAR_SAMPLES.forEach(organism => {
-        const simpleName = organism.split(' ')[0];
-        htmlContent += formatSpan(
-            `Ciliary genes in **${simpleName}**`,
-            `List ciliary genes in ${organism}`
-        );
-    });
+    // Continue with other sections...
+    htmlContent += '<li style="grid-column: 1 / -1;"><h4>Evolutionary Timing & Origin ⏳</h4></li>';
+    htmlContent += formatSpan(
+        `Genes originating in **early eukaryotes**`,
+        `List ciliary genes found in Giardia and all higher organisms`
+    );
+    htmlContent += formatSpan(
+        `When did **[Gene]** evolve?`,
+        `Show evolutionary origin and conservation of NPHP1`
+    );
 
     htmlContent += '</ul></div>';
-    
     return htmlContent;
+}
+
+/**
+ * Main function to generate all question blocks
+ */
+function generateAllQuestionBlocks() {
+    return `
+        ${generateGeneralCiliaryBiologyQuestions()}
+        ${generateCiliopathyQuestions()}
+        ${generatePhylogenyAndOrthologQuestions()}
+        ${generatePathwayQuestions()}
+        ${generateExperimentalQuestions()}
+    `;
 }
 
 // NOTE: This generated HTML string is ready to be injected into your UI's suggestion area.
