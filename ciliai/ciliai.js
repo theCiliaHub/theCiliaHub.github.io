@@ -1155,49 +1155,55 @@ const questionRegistry = [
     { text: "What is the source for Ciliary genes in mouse?", handler: async () => tellAboutOrganismSources("mouse") },
     { text: "What is the source for Ciliary genes in zebrafish?", handler: async () => tellAboutOrganismSources("zebrafish") },
     { text: "What is the source for Ciliary genes in drosophila?", handler: async () => tellAboutOrganismSources("drosophila") },
-
-// ==================== PHYLOGENY QUERIES (FIXED VISUALIZATION) ====================
-// NOTE: These are already correct and call the direct visualization function.
+// ==================== PHYLOGENY QUERIES (VISUALIZATION) ====================
 { text: "Show evolutionary conservation of IFT88", handler: async () => displayPhylogenyComparison(["IFT88"]) },
+{ text: "IFT88 conservation analysis", handler: async () => displayPhylogenyComparison(["IFT88"]) },
 { text: "What is the phylogeny of BBS1?", handler: async () => displayPhylogenyComparison(["BBS1"]) },
+{ text: "BBS1 conservation heatmap", handler: async () => displayPhylogenyComparison(["BBS1"]) },
 { text: "Compare IFT88 phylogeny", handler: async () => displayPhylogenyComparison(["IFT88"]) },
 { text: "Compare BBS1 phylogeny", handler: async () => displayPhylogenyComparison(["BBS1"]) },
 { text: "Show the phylogenetic comparison for ARL13B", handler: async () => displayPhylogenyComparison(["ARL13B"]) },
+{ text: "Show heatmap for ARL13B", handler: async () => displayPhylogenyComparison(["ARL13B"]) },
 { text: "NPHP1 phylogenetic analysis comparison", handler: async () => displayPhylogenyComparison(["NPHP1"]) },
-    
-  // --------------------------------------------------------------------------------------
-// --- List Queries (FIXED ROUTING) ---
-// ACTION: Route these complex listing questions to the specialized query handler.
+{ text: "Show NPHP1 phylogeny plot", handler: async () => displayPhylogenyComparison(["NPHP1"]) },
+{ text: "Show the phylogenetic comparison for WDR31", handler: async () => displayPhylogenyComparison(["WDR31"]) },
+{ text: "WDR31 evolutionary heatmap", handler: async () => displayPhylogenyComparison(["WDR31"]) },
+{ text: "Phylogenetic analysis of CEP290", handler: async () => displayPhylogenyComparison(["CEP290"]) },
+{ // This pattern catches the phrasing and uses the dedicated plotter // It captures whatever follows 'conservation of' or 'phylogeny for'. 
+    text: "Show evolutionary conservation of gene X", handler: async (q) => plotPhylogenyFromQuery(q) },
+
+// --------------------------------------------------------------------------------------
+// --- List Queries (CILIARY/NON-CILIARY LISTS) ---
 { text: "Provide the list of ciliary genes in mouse", handler: async (q) => routePhylogenyAndListQueries(q) },
+{ text: "List all ciliary genes found in mice", handler: async (q) => routePhylogenyAndListQueries(q) },
 { text: "Show ciliary genes in C. elegans", handler: async (q) => routePhylogenyAndListQueries(q) },
+{ text: "C. elegans ciliary gene list", handler: async (q) => routePhylogenyAndListQueries(q) },
 { text: "Show non-ciliary genes in mouse", handler: async (q) => routePhylogenyAndListQueries(q) },
+{ text: "List non-ciliary genes in mice", handler: async (q) => routePhylogenyAndListQueries(q) },
 { text: "List non-ciliary genes in C. elegans", handler: async (q) => routePhylogenyAndListQueries(q) },
 { text: "Provide the nonciliary genes found in zebrafish", handler: async (q) => routePhylogenyAndListQueries(q) },
 { text: "Do you have the list of non-ciliary genes in fly?", handler: async (q) => routePhylogenyAndListQueries(q) },
+{ text: "Show non-ciliary genes in Drosophila", handler: async (q) => routePhylogenyAndListQueries(q) },
 
 // --------------------------------------------------------------------------------------
-// --- Ortholog Queries (FIXED ROUTING) ---
-// ACTION: Orthologs are best served by the curated Hub data lookup (getOrthologsForGene).
-// We should either route them directly there, or use the specialized router which will call it.
-// We will route them directly to the intended final function to bypass unnecessary intent parsing checks.
+// --- Ortholog & Conservation Check Queries ---
 { text: "What are the orthologs of ARL13B?", handler: async () => getOrthologsForGene("ARL13B") },
+{ text: "Show curated orthologs for ARL13B", handler: async () => getOrthologsForGene("ARL13B") },
 { text: "Show me the homologs of IFT88", handler: async () => getOrthologsForGene("IFT88") },
+{ text: "Ortholog names for IFT88", handler: async () => getOrthologsForGene("IFT88") },
 { text: "List all orthologs for WDR31", handler: async () => getOrthologsForGene("WDR31") },
+{ text: "Show WDR31 ortholog names", handler: async () => getOrthologsForGene("WDR31") },
 { text: "What is the C. elegans homolog of BBS1?", handler: async () => getOrthologsForGene("BBS1") },
+{ text: "Worm ortholog for BBS1", handler: async () => getOrthologsForGene("BBS1") },
 { text: "Give me the mouse ortholog for CEP290", handler: async () => getOrthologsForGene("CEP290") },
-{ text: "Is NPHP1 conserved in mouse?", handler: async () => checkConservation("NPHP1", "mouse") }, // Direct check
+{ text: "Mouse homolog for CEP290", handler: async () => getOrthologsForGene("CEP290") },
+{ text: "Is NPHP1 conserved in mouse?", handler: async () => checkConservation("NPHP1", "mouse") },
+{ text: "Is NPHP1 present in mouse?", handler: async () => checkConservation("NPHP1", "mouse") },
+{ text: "Does mouse have a homolog of NPHP1?", handler: async () => checkConservation("NPHP1", "mouse") },
 { text: "Find the drosophila ortholog for MKS1", handler: async () => getOrthologsForGene("MKS1") },
+{ text: "Fly ortholog of MKS1", handler: async () => getOrthologsForGene("MKS1") },
 { text: "Orthologs of TMEM107 in zebrafish", handler: async () => getOrthologsForGene("TMEM107") },
-   
-// --------------------------------------------------------------------------------------
-// --- Visual Comparison Queries (Router Fallback to getPhylogenyComparisonGene) ---
-// NOTE: These are already correctly set for direct plotting.
-{ text: "Show the phylogenetic comparison for ARL13B", handler: async () => displayPhylogenyComparison(["ARL13B"]) },
-{ text: "Show the phylogenetic comparison for WDR31", handler: async () => displayPhylogenyComparison(["WDR31"]) },
-{ text: "What is the phylogeny of BBS1?", handler: async () => displayPhylogenyComparison(["BBS1"]) },
-{ text: "Show evolutionary conservation of IFT88", handler: async () => displayPhylogenyComparison(["IFT88"]) },
-{ text: "Phylogenetic analysis of CEP290", handler: async () => displayPhylogenyComparison(["CEP290"]) },
-    
+{ text: "Zebrafish homolog of TMEM107", handler: async () => getOrthologsForGene("TMEM107") },    
     // ==================== GENE DETAILS & FUNCTION ====================
     // General function queries
     { text: "Describe the function of KIF17", handler: async () => getGeneFunction("KIF17") },
@@ -2399,6 +2405,32 @@ async function mergePhylogenyData() {
     
     phylogenyDataCache = merged;
     return merged;
+}
+/**
+ * Extracts gene symbols from the raw query string and executes the plotting logic.
+ * This ensures ANY gene input is handled, fulfilling the "gene X" requirement.
+ * @param {string} query - The full user query string.
+ * @returns {Promise<string>} HTML result from displayPhylogenyComparison.
+ */
+async function plotPhylogenyFromQuery(query) {
+    // Regex explanation: Captures one or more groups of gene symbols (A-Z, 0-9, -, .)
+    // that follow 'for ' or 'of ' in the query.
+    const geneMatch = query.match(/(?:for|of)\s+([A-Z0-9\-\.]+(?:,\s*[A-Z0-9\-\.]+)*)/i);
+    
+    if (!geneMatch) {
+        return `<div class="result-card"><h3>Error</h3><p class="status-not-found">Could not identify a gene symbol in your query. Please use the format: 'Show the phylogenetic comparison for GENEX'.</p></div>`;
+    }
+    
+    // Split and clean the captured gene(s)
+    const geneSymbols = geneMatch[1].split(',')
+                                    .map(g => g.trim().toUpperCase())
+                                    .filter(Boolean);
+
+    if (geneSymbols.length === 0) {
+        return `<div class="result-card"><h3>Error</h3><p class="status-not-found">No valid gene symbols found for plotting.</p></div>`;
+    }
+    // Call the core visualization function, which handles checking if the gene is in the Nevers dataset.
+    return displayPhylogenyComparison(geneSymbols);
 }
 
 // === NEW CORE FUNCTION 2: GENERIC PHYLOGENETIC LIST RETRIEVAL ===
