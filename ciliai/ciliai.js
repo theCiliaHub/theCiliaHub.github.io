@@ -2413,16 +2413,18 @@ function generatePhylogenyAndOrthologQuestions() {
         `**BBSome** components conservation`,
         `Compare conservation of BBS1, BBS2, BBS4, BBS5, BBS7, BBS9`
     );
+    
+    // FIX: Added template literal delimiters (`...`)
     htmlContent += formatSpan(
-        **Transition zone** genes evolution`,
+        `***Transition zone** genes evolution`,
         `Compare TMEM67, CEP290, RPGRIP1L, MKS1 conservation`
     );
     htmlContent += formatSpan(
-        **Dynein motor** genes across species`,
+        `**Dynein motor** genes across species`,
         `Show conservation of DNAH5, DNAH11, DNAI1, DNAI2`
     );
     htmlContent += formatSpan(
-        **Kinesin family** ciliary members`,
+        `**Kinesin family** ciliary members`,
         `Compare KIF3A, KIF3B, KIF17, KIF7 phylogenetic patterns`
     );
 
@@ -2434,11 +2436,11 @@ function generatePhylogenyAndOrthologQuestions() {
         `List ciliary genes found in Giardia and all higher organisms`
     );
     htmlContent += formatSpan(
-        **Metazoan-specific** ciliary innovations`,
+        `**Metazoan-specific** ciliary innovations`,
         `List ciliary genes first appearing in metazoans`
     );
     htmlContent += formatSpan(
-        **Vertebrate-specific** ciliary genes`,
+        `**Vertebrate-specific** ciliary genes`,
         `List ciliary genes found only in vertebrates`
     );
     htmlContent += formatSpan(
@@ -2446,7 +2448,7 @@ function generatePhylogenyAndOrthologQuestions() {
         `Show evolutionary origin and conservation of NPHP1`
     );
     htmlContent += formatSpan(
-        **Mammalian-specific** ciliary adaptations`,
+        `**Mammalian-specific** ciliary adaptations`,
         `List ciliary genes unique to mammals`
     );
 
@@ -2454,15 +2456,15 @@ function generatePhylogenyAndOrthologQuestions() {
     htmlContent += '<li style="grid-column: 1 / -1;"><h4>Conservation Pattern Analysis 📊</h4></li>';
     
     htmlContent += formatSpan(
-        **Ubiquitous** ciliary genes (all species)`,
+        `**Ubiquitous** ciliary genes (all species)`,
         `List ciliary genes conserved across all organisms`
     );
     htmlContent += formatSpan(
-        **Patchy distribution** ciliary genes`,
+        `**Patchy distribution** ciliary genes`,
         `Find ciliary genes with irregular conservation patterns`
     );
     htmlContent += formatSpan(
-        **Recently evolved** ciliary genes`,
+        `**Recently evolved** ciliary genes`,
         `List ciliary genes with limited phylogenetic distribution`
     );
     htmlContent += formatSpan(
@@ -2470,7 +2472,7 @@ function generatePhylogenyAndOrthologQuestions() {
         `List ciliary genes absent in fungi but present in other lineages`
     );
     htmlContent += formatSpan(
-        **Plant lineage** ciliary gene losses`,
+        `**Plant lineage** ciliary gene losses`,
         `Compare ciliary gene conservation between plants and animals`
     );
 
@@ -2478,23 +2480,23 @@ function generatePhylogenyAndOrthologQuestions() {
     htmlContent += '<li style="grid-column: 1 / -1;"><h4>Disease & Phenotype Correlation 🏥</h4></li>';
     
     htmlContent += formatSpan(
-        **Joubert syndrome** gene conservation`,
+        `**Joubert syndrome** gene conservation`,
         `Compare conservation of Joubert syndrome associated genes`
     );
     htmlContent += formatSpan(
-        **Bardet-Biedl** genes in model organisms`,
+        `**Bardet-Biedl** genes in model organisms`,
         `Show BBS gene conservation across model organisms`
     );
     htmlContent += formatSpan(
-        **Polycystic kidney disease** gene evolution`,
+        `**Polycystic kidney disease** gene evolution`,
         `Compare PKHD1, PKD1, PKD2 conservation patterns`
     );
     htmlContent += formatSpan(
-        **Retinal degeneration** ciliary genes`,
+        `**Retinal degeneration** ciliary genes`,
         `List ciliary genes associated with retinal diseases across species`
     );
     htmlContent += formatSpan(
-        **Situs inversus** genes conservation`,
+        `**Situs inversus** genes conservation`,
         `Compare conservation of genes causing situs inversus`
     );
 
@@ -2502,23 +2504,23 @@ function generatePhylogenyAndOrthologQuestions() {
     htmlContent += '<li style="grid-column: 1 / -1;"><h4>Functional Category Exploration ⚙️</h4></li>';
     
     htmlContent += formatSpan(
-        **IFT complex** genes across eukaryotes`,
+        `**IFT complex** genes across eukaryotes`,
         `List intraflagellar transport genes in unicellular organisms`
     );
     htmlContent += formatSpan(
-        **Ciliary membrane** protein evolution`,
+        `**Ciliary membrane** protein evolution`,
         `Compare conservation of ciliary membrane associated proteins`
     );
     htmlContent += formatSpan(
-        **Basal body** components phylogeny`,
+        `**Basal body** components phylogeny`,
         `Show conservation of basal body and centriolar proteins`
     );
     htmlContent += formatSpan(
-        **Ciliary signaling** pathway conservation`,
+        `**Ciliary signaling** pathway conservation`,
         `Compare Hedgehog signaling components across species`
     );
     htmlContent += formatSpan(
-        **Motile vs primary** cilia genes`,
+        `**Motile vs primary** cilia genes`,
         `Compare genes specific to motile vs primary cilia`
     );
 
@@ -2533,15 +2535,15 @@ function generatePhylogenyAndOrthologQuestions() {
     });
     
     htmlContent += formatSpan(
-        **Human-specific** ciliary adaptations`,
+        `**Human-specific** ciliary adaptations`,
         `List ciliary genes unique to humans`
     );
     htmlContent += formatSpan(
-        **C. elegans** sensory cilium genes`,
+        `**C. elegans** sensory cilium genes`,
         `List sensory cilium specific genes in C. elegans`
     );
     htmlContent += formatSpan(
-        **Zebrafish** Kupffer's vesicle genes`,
+        `**Zebrafish** Kupffer's vesicle genes`,
         `List ciliary genes involved in zebrafish left-right asymmetry`
     );
 
@@ -2553,15 +2555,15 @@ function generatePhylogenyAndOrthologQuestions() {
         `Compare phylogenetic patterns of IFT-B complex vs IFT-A complex genes`
     );
     htmlContent += formatSpan(
-        **BBSome vs MKS complex** conservation`,
+        `**BBSome vs MKS complex** conservation`,
         `Compare BBSome and Meckel syndrome complex gene evolution`
     );
     htmlContent += formatSpan(
-        **Anterograde vs retrograde** IFT motors`,
+        `**Anterograde vs retrograde** IFT motors`,
         `Compare kinesin and dynein motor conservation in cilia`
     );
     htmlContent += formatSpan(
-        **Ciliary rootlet** components evolution`,
+        `**Ciliary rootlet** components evolution`,
         `Show conservation of rootletin and other rootlet proteins`
     );
 
@@ -2577,15 +2579,15 @@ function generatePhylogenyAndOrthologQuestions() {
     });
 
     htmlContent += formatSpan(
-        **Chlamydomonas** as ciliary model relevance`,
+        `**Chlamydomonas** as ciliary model relevance`,
         `Compare human ciliary genes with Chlamydomonas orthologs`
     );
     htmlContent += formatSpan(
-        **Giardia** minimal ciliary apparatus`,
+        `**Giardia** minimal ciliary apparatus`,
         `List ciliary genes retained in Giardia intestinalis`
     );
     htmlContent += formatSpan(
-        **Tetrahymena** motile cilia genes`,
+        `**Tetrahymena** motile cilia genes`,
         `List motile cilia specific genes in Tetrahymena`
     );
 
@@ -2593,19 +2595,19 @@ function generatePhylogenyAndOrthologQuestions() {
     htmlContent += '<li style="grid-column: 1 / -1;"><h4>Dataset & Technical Queries 🔧</h4></li>';
     
     htmlContent += formatSpan(
-        **Most conserved** ciliary gene`,
+        `**Most conserved** ciliary gene`,
         `Find the ciliary gene with broadest phylogenetic distribution`
     );
     htmlContent += formatSpan(
-        **Least conserved** ciliary gene`,
-        `Find ciliary genes with most restricted distribution`
+        `**Least conserved** ciliary gene`,
+        `Find ciliary genes with most restricted phylogenetic distribution`
     );
     htmlContent += formatSpan(
-        **Gene families** with multiple ciliary members`,
+        `**Gene families** with multiple ciliary members`,
         `List gene families with multiple ciliary protein members`
     );
     htmlContent += formatSpan(
-        **Recently duplicated** ciliary genes`,
+        `**Recently duplicated** ciliary genes`,
         `Find ciliary genes with recent lineage-specific duplications`
     );
 
