@@ -2356,6 +2356,171 @@ function getPhylogenyMatrix(geneSymbols) {
     return { matrix: matrix, xLabels: xLabels, yLabels: yLabels, textMatrix: textMatrix, speciesColors: speciesColors };
 }
 
+// --- GLOBAL CACHES (Must be initialized outside these functions) ---
+// let liPhylogenyCache = null;
+// let neversPhylogenyCache = null;
+// let phylogenyDataCache = null; // Merged data structure
+
+// Assuming the basic fetch functions (fetchLiPhylogenyData, fetchNeversPhylogenyData) exist and populate the caches.
+
+// === NEW CORE FUNCTION 1: MERGE DATA FOR ACCESS ===
+// NOTE: This logic replaces your existing mergePhylogenyCaches.
+async function mergePhylogenyData() {
+    if (phylogenyDataCache && Object.keys(phylogenyDataCache).length > 0) return phylogenyDataCache;
+
+    const [liData, neversData] = await Promise.all([
+        fetchLiPhylogenyData(),
+        fetchNeversPhylogenyData()
+    ]);
+
+    const merged = {};
+    const liGenes = liData?.genes || {};
+    const neversGenes = neversData?.genes || {};
+
+    // 1. Unify Li data (keyed by Entrez ID, searched by internal symbol 'g')
+    for (const entrezId in liGenes) {
+        const data = liGenes[entrezId];
+        const geneSymbol = (data.g || '').toUpperCase();
+        if (geneSymbol) {
+            merged[geneSymbol] = { li: data, nevers: null, liSummary: liData?.summary };
+        }
+    }
+
+    // 2. Add Nevers data (keyed by Gene Symbol)
+    for (const geneSymbol in neversGenes) {
+        const upperSymbol = geneSymbol.toUpperCase();
+        const data = neversGenes[geneSymbol];
+        
+        if (!merged[upperSymbol]) {
+            merged[upperSymbol] = { li: null, nevers: data, neversGroups: neversData?.organism_groups };
+        } else {
+            merged[upperSymbol].nevers = data;
+            merged[upperSymbol].neversGroups = neversData?.organism_groups;
+        }
+    }
+    
+    phylogenyDataCache = merged;
+    return merged;
+}
+
+// === NEW CORE FUNCTION 2: GENERIC PHYLOGENETIC LIST RETRIEVAL ===
+/**
+ * Core function to retrieve genes based on conservation and classification.
+ * This function addresses lists like "Motile cilia specific genes in Tetrahymena"
+ * and "List ciliary genes unique to mammals".
+ * * @param {string} targetSpeciesCode - Species code (e.g., 'T.thermophila', 'C.elegans', 'Mammalian_specific').
+ * @param {string} filterTag - Optional functional filter (e.g., 'Motile cilium', 'Sensory').
+ * @param {string} source - 'Li' for Li classifications, 'Nevers' for Nevers organism lists.
+ * @returns {Array<Object>} List of matching genes.
+ */
+async function getPhylogenyGenesByFilter(targetSpeciesCode, filterTag = null, source = 'Li') {
+    await mergePhylogenyData();
+    const results = [];
+    const targetSpeciesLower = targetSpeciesCode.toLowerCase();
+
+    for (const humanGene in phylogenyDataCache) {
+        const data = phylogenyDataCache[humanGene];
+        const geneSymbol = humanGene;
+
+        // 1. Check Li Classification (for Mammalian-specific, Ciliary-specific, etc.)
+        if (source === 'Li' && data.li) {
+            const liClassList = data.liSummary?.class_list || [];
+            const liClassification = (liClassList[data.li.c] || 'Unknown').toLowerCase();
+
+            // Check if the Li classification matches the target species code (e.g., targetSpeciesCode = 'mammalian_specific')
+            if (liClassification.includes(targetSpeciesLower)) {
+                
+                // If a functional tag is also required (not typically needed with Li classification), check CiliaHub data (assumed global)
+                let passesFunctionalFilter = true;
+                if (filterTag && window.ciliaHubDataCache) {
+                    const hubData = window.ciliaHubDataCache.find(g => g.gene.toUpperCase() === geneSymbol);
+                    passesFunctionalFilter = hubData?.functional_category?.some(cat => normalizeTerm(cat).includes(normalizeTerm(filterTag))) || false;
+                }
+                
+                if (passesFunctionalFilter) {
+                    results.push({
+                        gene: geneSymbol,
+                        description: `Classified as ${liClassification.replace(/_/g, ' ')} (Li 2014)`,
+                        source: 'Li'
+                    });
+                }
+            }
+        }
+        
+        // 2. Check Nevers/Direct Species Presence (for Tetrahymena, Giardia, etc.)
+        if (source === 'Nevers' && data.nevers) {
+            const speciesList = data.nevers.s; // Indices of species where gene is present
+            const allNeversOrganisms = data.neversGroups?.all_organisms_list || [];
+            
+            const speciesRegex = new RegExp(targetSpeciesLower.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+            
+            // Check if the gene is conserved in the target organism
+            const isConserved = speciesList.some(index => speciesRegex.test(normalizeTerm(allNeversOrganisms[index])));
+            
+            if (isConserved) {
+                // If a functional filter is present, apply it (e.g., 'Motile cilium')
+                let passesFunctionalFilter = true;
+                if (filterTag && window.ciliaHubDataCache) {
+                    const hubData = window.ciliaHubDataCache.find(g => g.gene.toUpperCase() === geneSymbol);
+                    passesFunctionalFilter = hubData?.functional_category?.some(cat => normalizeTerm(cat).includes(normalizeTerm(filterTag))) || false;
+                }
+                
+                if (passesFunctionalFilter) {
+                    results.push({
+                        gene: geneSymbol,
+                        description: `Present in ${targetSpeciesCode} (Nevers 2017)`,
+                        source: 'Nevers'
+                    });
+                }
+            }
+        }
+    }
+    
+    return results;
+}
+
+// === NEW CORE FUNCTION 3: DEDICATED ROUTER (Replaces complexity in handlePhylogenyAndOrthologQuery) ===
+/**
+ * Dedicated router for complex phylogenetic list and check queries.
+ * @param {string} query - The raw user query.
+ * @returns {Promise<string>} Formatted HTML result.
+ */
+async function routePhylogeneticQuery(query) {
+    const qLower = query.toLowerCase();
+    
+    // --- 1. Motile/Sensory/Complex Genes in Specific Organism (List Queries) ---
+    const functionalTags = { 'motile cilia': 'motile cilium', 'sensory cilium': 'sensory', 'ift genes': 'ift' };
+    let functionalMatch = Object.keys(functionalTags).find(tag => qLower.includes(tag));
+    
+    if (functionalMatch) {
+        const organismMatch = qLower.match(/(?:in|retained in|exist in)\s+(.+)/i);
+        const organism = organismMatch ? organismMatch[1].trim() : null;
+
+        if (organism) {
+            const genes = await getPhylogenyGenesByFilter(organism, functionalTags[functionalMatch], 'Nevers');
+            return formatListResult(`${functionalMatch.replace(/genes/i, 'genes')} Conserved in ${organism}`, genes);
+        }
+    }
+
+    // --- 2. Classification List Queries (Li 2014) ---
+    if (qLower.includes('unique to mammals') || qLower.includes('mammalian specific')) {
+        return getGenesByPhyloClassification('Mammalian_specific');
+    }
+    if (qLower.includes('ciliary genes unique to')) {
+        return getGenesByPhyloClassification('Ciliary_specific');
+    }
+
+    // --- 3. Simple Ciliary/Localization List (Fallback) ---
+    // This is the broadest list requested (Genes localizing to cilium -> essentially all ciliary genes)
+    if (qLower.includes('genes localizing to cilium') || qLower.includes('genes in cilium')) {
+        const allGenes = await getGenesByLocalization('cilium');
+        return formatListResult("Genes Localizing to Cilium", allGenes);
+    }
+    
+    // Fallback to error or default functionality
+    return `<div class="result-card"><h3>Query Not Understood</h3><p>I couldn't interpret that specific phylogenetic request. Try a direct visualization or check your spelling: ${query}</p></div>`;
+}
+
 /**
  * Generates a comprehensive HTML block of clickable questions covering 
  * all major functional areas, genes, and conservation data points.
@@ -2615,6 +2780,125 @@ function generatePhylogenyAndOrthologQuestions() {
     
     return htmlContent;
 }
+
+// Function 1: Handles specific functional group lists in a given organism (e.g., Motile cilia in Tetrahymena)
+async function getFunctionalGenesInOrganism(functionalTag, organismName) {
+    // Note: UNICELLULAR_SPECIES list is assumed to be globally available from your file.
+    
+    await fetchCiliaData(); 
+    await mergePhylogenyCaches();
+
+    // 1. Map organism name to species code (must be robust for Giardia/Tetrahymena/C. elegans)
+    const organismMap = {
+        'worm': 'C.elegans', 'c. elegans': 'C.elegans', 'mouse': 'M.musculus', 
+        'zebrafish': 'D.rerio', 'drosophila': 'D.melanogaster', 
+        'tetrahymena': 'T.thermophila', 'giardia': 'G.lamblia', 
+        'giardia intestinalis': 'G.lamblia', 'chlamydomonas': 'C.reinhardtii'
+    };
+    const speciesCode = organismMap[normalizeTerm(organismName)] || organismName;
+    const speciesRegex = new RegExp(speciesCode.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+
+    // 2. Filter 1: CiliaHub Functional Tag match
+    const functionalGenes = window.ciliaHubDataCache.filter(g => 
+        Array.isArray(g.functional_category) && 
+        g.functional_category.some(cat => normalizeTerm(cat).includes(normalizeTerm(functionalTag)))
+    );
+
+    const functionalGeneSet = new Set(functionalGenes.map(g => g.gene.toUpperCase()));
+    
+    // 3. Filter 2: Phylogenetic Conservation match
+    const conservedGenes = Object.entries(phylogenyDataCache)
+        .filter(([gene, data]) => {
+            const humanGeneUpper = (data.li?.g || gene).toUpperCase(); // Use Li gene name for robustness
+            const isTargetFunction = functionalGeneSet.has(humanGeneUpper);
+            const hasSpecies = Array.isArray(data.li?.species) && data.li.species.some(s => speciesRegex.test(normalizeTerm(s)));
+            
+            return isTargetFunction && hasSpecies;
+        })
+        .map(([gene, data]) => ({ 
+            gene: data.li?.g || gene, 
+            description: `Func: ${functionalTag}. Conserved in ${speciesCode}` 
+        }));
+
+    const title = `${functionalTag} Genes Conserved in ${speciesCode}`;
+    return formatListResult(title, conservedGenes);
+}
+
+// Function 2: Handles Li 2014 classification lists (e.g., unique to mammals)
+async function getGenesByPhyloClassification(classificationTag) {
+    await mergePhylogenyCaches();
+    const tagLower = normalizeTerm(classificationTag).replace(/\s/g, '_');
+
+    const genes = Object.entries(phylogenyDataCache)
+        .filter(([gene, data]) => {
+            if (!data.li) return false;
+            
+            const liClassList = data.liSummary?.class_list || [];
+            const classification = (liClassList[data.li.c] || 'Unknown').toLowerCase();
+            
+            return classification.includes(tagLower);
+        })
+        .map(([gene, data]) => ({
+            gene: data.li?.g || gene,
+            description: `Classification: ${classificationTag}`
+        }));
+        
+    return formatListResult(`${classificationTag} Genes (Li 2014)`, genes);
+}
+
+// Function 3: Final Consolidation Router
+// This function needs to be used in your question registry for all complex phylogenetic queries.
+async function routePhylogenyAndListQueries(query) {
+    const qLower = query.toLowerCase();
+    
+    // --- Parse Entities ---
+    const organismPattern = /(c\.?\s*elegans|worm|mouse|zebrafish|xenopus|fly|drosophila|human|chlamydomonas|tetrahymena|giardia|mammals|vertebrates)/;
+    const organismMatch = qLower.match(organismPattern);
+    const organism = organismMatch ? organismMatch[1].trim() : null;
+    const genes = extractMultipleGenes(query);
+    
+    // --- 1. SPECIALIZED FUNCTIONAL/ORGANISM LISTS ---
+    
+    // A. Motile/IFT/BBS Genes in Specific Organism (e.g., "List motile cilia specific genes in Tetrahymena")
+    if (organism && (qLower.includes('ift genes') || qLower.includes('bbs genes') || qLower.includes('motile cilia') || qLower.includes('sensory cilium'))) {
+        let functionalTag = 'IFT';
+        if (qLower.includes('motile cilia') || qLower.includes('motile cilium')) functionalTag = 'Motile cilium';
+        if (qLower.includes('sensory cilium')) functionalTag = 'Sensory';
+        if (qLower.includes('bbs genes')) functionalTag = 'BBSome';
+        
+        return getFunctionalGenesInOrganism(functionalTag, organism);
+    }
+
+    // B. Li Classification Lists (e.g., "unique to mammals")
+    if (qLower.includes('unique to mammals') || qLower.includes('mammalian specific')) {
+        return getGenesByPhyloClassification('Mammalian_specific');
+    }
+    if (qLower.includes('unique to vertebrates') || qLower.includes('vertebrate specific')) {
+        return getGenesByPhyloClassification('Vertebrate_specific');
+    }
+    
+    // C. Broad Localization (e.g., "Genes localizing to cilium")
+    if (qLower.includes('genes localizing to cilium') || qLower.includes('genes in cilium')) {
+        const allCiliaryGenes = await getGenesByLocalization('cilium');
+        return formatListResult("Genes Localizing to Cilium", allCiliaryGenes);
+    }
+    
+    // D. Simple Conservation Check (e.g., "Is CEP290 conserved in Giardia intestinalis?")
+    if (genes.length === 1 && organism && (qLower.includes('is') || qLower.includes('conserved') || qLower.includes('present'))) {
+        // Assuming checkConservation(gene, organism) exists
+        return checkConservation(genes[0], organism);
+    }
+
+    // --- 2. FALLBACK/VISUALIZATION ---
+    // If a gene is found and no specific list/ortholog intent was detected, assume visualization.
+    if (genes.length >= 1 && (qLower.includes('phylogeny') || qLower.includes('comparison'))) {
+        return displayPhylogenyComparison(genes);
+    }
+    
+    // Final generic error
+    return `<div class="result-card"><h3>Query Not Understood</h3><p>I couldn't identify a list, conservation check, or visualization for your request. Please try a core gene or a specific classification term.</p></div>`;
+}
+
 
 // --- UPDATED MAIN DISPLAY FUNCTION: Heatmap (Nevers 2017 Only, Styled) ---
 /**
