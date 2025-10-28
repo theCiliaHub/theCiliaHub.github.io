@@ -2901,12 +2901,13 @@ function generateCiliopathyQuestions() {
         `Genes involved in **Bardet-Biedl syndrome**`,
         `List genes associated with Bardet-Biedl syndrome`
     );
+    // FIX APPLIED: Use backticks (`) for the descriptive text
     htmlContent += formatSpan(
-        **Joubert syndrome** genetic causes`,
+        `**Joubert syndrome** genetic causes`,
         `What genes cause Joubert syndrome?`
     );
     htmlContent += formatSpan(
-        **Meckel syndrome** gene list`,
+        `**Meckel syndrome** gene list`,
         `List genes associated with Meckel syndrome`
     );
 
@@ -2916,8 +2917,9 @@ function generateCiliopathyQuestions() {
         `How do **BBS1** mutations cause disease?`,
         `Explain how BBS1 mutations lead to ciliopathies`
     );
+    // FIX APPLIED: Use backticks (`) for the descriptive text
     htmlContent += formatSpan(
-        **CEP290** and retinal degeneration`,
+        `**CEP290** and retinal degeneration`,
         `How does CEP290 mutation cause retinal degeneration?`
     );
 
