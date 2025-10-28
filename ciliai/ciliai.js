@@ -2882,6 +2882,8 @@ function generateCiliopathyQuestions() {
 
     // ANY GENE SECTION
     htmlContent += '<li style="grid-column: 1 / -1;"><h4 style="margin-top: 0; color: #d35400;">🔍 Try *Any* Gene (Out of 19,000+)</h4></li>';
+    
+    // FIX APPLIED: Added backticks to the descriptive text strings
     htmlContent += formatSpan(
         `Disease associations for **[Any Gene]**`,
         `What diseases are associated with CEP290 mutations?`
@@ -2901,7 +2903,6 @@ function generateCiliopathyQuestions() {
         `Genes involved in **Bardet-Biedl syndrome**`,
         `List genes associated with Bardet-Biedl syndrome`
     );
-    // FIX APPLIED: Use backticks (`) for the descriptive text
     htmlContent += formatSpan(
         `**Joubert syndrome** genetic causes`,
         `What genes cause Joubert syndrome?`
@@ -2917,7 +2918,6 @@ function generateCiliopathyQuestions() {
         `How do **BBS1** mutations cause disease?`,
         `Explain how BBS1 mutations lead to ciliopathies`
     );
-    // FIX APPLIED: Use backticks (`) for the descriptive text
     htmlContent += formatSpan(
         `**CEP290** and retinal degeneration`,
         `How does CEP290 mutation cause retinal degeneration?`
@@ -2938,6 +2938,7 @@ function generateExperimentalQuestions() {
 
     // ANY GENE SECTION
     htmlContent += '<li style="grid-column: 1 / -1;"><h4 style="margin-top: 0; color: #d35400;">🔍 Try *Any* Gene (Out of 19,000+)</h4></li>';
+    // FIX APPLIED: Added backticks to the descriptive text strings
     htmlContent += formatSpan(
         `Antibodies for studying **[Any Gene]**`,
         `What antibodies are available for IFT88?`
@@ -2981,12 +2982,13 @@ function generatePathwayQuestions() {
 
     // ANY GENE SECTION
     htmlContent += '<li style="grid-column: 1 / -1;"><h4 style="margin-top: 0; color: #d35400;">🔍 Try *Any* Gene (Out of 19,000+)</h4></li>';
+    // FIX APPLIED: Added backticks to the descriptive text strings
     htmlContent += formatSpan(
         `Pathways involving **[Any Gene]**`,
         `What pathways involve IFT88?`
     );
     htmlContent += formatSpan(
-        **Interactions for [Gene Name]**`,
+        `Interactions for **[Gene Name]**`,
         `What proteins interact with ARL13B?`
     );
     htmlContent += formatSpan(
@@ -2997,22 +2999,21 @@ function generatePathwayQuestions() {
     // Pathway questions
     htmlContent += '<li style="grid-column: 1 / -1;"><h4>Ciliary Pathways</h4></li>';
     htmlContent += formatSpan(
-        **Hedgehog signaling** and cilia`,
+        `**Hedgehog signaling** and cilia`,
         `How do cilia regulate Hedgehog signaling?`
     );
     htmlContent += formatSpan(
-        **Wnt signaling** ciliary components`,
+        `**Wnt signaling** ciliary components`,
         `What ciliary proteins are involved in Wnt signaling?`
     );
     htmlContent += formatSpan(
-        **PDGFRα** signaling in cilia`,
+        `**PDGFRα** signaling in cilia`,
         `Describe PDGFRα signaling in primary cilia`
     );
 
     htmlContent += '</ul></div>';
     return htmlContent;
 }
-
 
 /**
  * Helper to render the detailed text table for a single gene (called by displayPhylogenyComparison).
