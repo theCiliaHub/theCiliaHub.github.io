@@ -1080,6 +1080,178 @@ async function getPhylogenyGenesForOrganism(organismName) {
     );
 }
 
+function renderLiPhylogenyHeatmap(genes) {
+    if (!liPhylogenyCache) {
+        return `<div class="result-card"><h3>Heatmap Error</h3><p>Li et al. 2014 data not loaded. Please try again.</p></div>`;
+    }
+    
+    // --- 1. Map Target Organisms to Li Indices ---
+    const liOrgList = liPhylogenyCache.summary.organisms_list;
+    const liOrgMap = new Map();
+    liOrgList.forEach((name, index) => {
+        // Standardize names in the Li map for fuzzy lookup
+        liOrgMap.set(name.toLowerCase(), index); 
+    });
+
+    const targetOrganisms = CIL_ORG_FULL.concat(NCIL_ORG_FULL);
+    const targetLiIndices = targetOrganisms.map(orgName => {
+        // Get the index in the 140 list for the 40 target species
+        let nameToLookup = orgName.toLowerCase().replace(/c\.?\s*elegans/, 'c.elegans');
+        return liOrgMap.get(nameToLookup);
+    });
+
+    const geneLabels = genes.map(g => g.toUpperCase());
+    const matrix = [];
+    const textMatrix = [];
+    
+    // --- 2. Build the Matrix (Z-scores: 2=CIL Hit, 1=NCIL Hit, 0=Absent) ---
+    geneLabels.forEach(gene => {
+        // Find the gene's entry, searching by the 'g' (gene symbol) field
+        const geneData = Object.values(liPhylogenyCache.genes).find(g => g.g.toUpperCase() === gene);
+        const presenceIndices = new Set(geneData ? geneData.s : []);
+        const row = [];
+        const textRow = [];
+
+        targetOrganisms.forEach((orgName, index) => {
+            const liIndex = targetLiIndices[index];
+            const isCiliated = index < CIL_ORG_FULL.length; 
+            const isPresent = liIndex !== undefined && presenceIndices.has(liIndex);
+
+            let zValue = 0;
+            let status = "Absent";
+
+            if (isPresent) {
+                zValue = isCiliated ? 2 : 1;
+                status = "Present";
+            }
+            
+            row.push(zValue);
+            textRow.push(`Gene: ${gene}<br>Organism: ${orgName}<br>Status: ${status}`);
+        });
+
+        if (row.length > 0) {
+            matrix.push(row);
+            textMatrix.push(textRow);
+        }
+    });
+
+    // --- 3. Plotting using Plotly ---
+    const plotDivId = 'li-phylogeny-heatmap-plot';
+
+    const trace = {
+        z: matrix,
+        x: targetOrganisms.map(name => name.split(' ')[0].replace('reinhardtii', 'C.reinhardtii')), // Short names for ticks
+        y: geneLabels,
+        type: 'heatmap',
+        colorscale: [
+            [0/2, '#FFFFFF'],      // Z=0 (Absent) -> White
+            [0.0001/2, '#FFE5B5'], // Z=1 (NCIL Hit) start -> Light Orange (NCIL)
+            [1/2, '#FFE5B5'],      // Z=1 (NCIL Hit) end
+            [1.0001/2, '#698ECF'], // Z=2 (CIL Hit) start -> Blue (CIL)
+            [2/2, '#698ECF']       // Z=2 (CIL Hit) end
+        ],
+        showscale: false,
+        hoverinfo: 'text',
+        text: textMatrix,
+        xgap: 0.5,
+        ygap: 0.5,
+        line: { color: '#000000', width: 0.5 } // Black grid lines
+    };
+
+    const layout = {
+        title: `Phylogenetic Conservation (Li et al. 2014) - ${genes.length > 1 ? `${genes.length} Genes` : genes[0]}`,
+        xaxis: { 
+            title: 'Organisms (Ciliated | Non-Ciliated)', 
+            tickangle: 45, 
+            automargin: true 
+        },
+        yaxis: { 
+            title: 'Genes', 
+            automargin: true 
+        },
+        shapes: [
+            // Line separating Ciliated (20) and Non-Ciliated (20) organisms columns
+            {
+                type: 'line',
+                xref: 'x', x0: 19.5, x1: 19.5,
+                yref: 'paper', y0: 0, y1: 1,
+                line: { color: 'black', width: 2 }
+            }
+        ],
+        margin: { t: 50, b: 200, l: 100, r: 50 },
+        height: Math.max(500, genes.length * 40 + 150)
+    };
+    
+    const plotContainer = 'li-phylogeny-heatmap-container';
+    const htmlOutput = `
+        <div class="result-card">
+            <h3>Phylogenetic Heatmap for ${geneLabels.join(', ')} 🌍</h3>
+            <p>Data from **Li et al. (2014) Cell**, mapped to a fixed panel of **20 Ciliated (Blue)** and **20 Non-Ciliated (Orange)** organisms.</p>
+            <div id="${plotContainer}" style="height: ${layout.height}px; width: 100%;"></div>
+            <button class="download-button" onclick="downloadPlot('${plotContainer}', 'Phylogeny_Li2014')">Download Heatmap (PNG)</button>
+            <p style="font-size: 0.8em; color: #666; margin-top: 1rem; border-top: 1px solid #eee; padding-top: 0.5rem;">
+                **Source:** Li, Y. et al. (2014) <em>Cell</em>. <a href="https://pubmed.ncbi.nlm.nih.gov/24995987/" target="_blank">PMID: 24995987</a>
+            </p>
+        </div>
+        <script>
+            // Execute Plotly code after rendering the HTML
+            (function() {
+                const data = ${JSON.stringify([trace])};
+                const layout = ${JSON.stringify(layout)};
+                Plotly.newPlot('${plotContainer}', data, layout, { responsive: true, displayModeBar: false });
+            })();
+        </script>
+    `;
+
+    return htmlOutput;
+}
+
+#### 3. Router Function (Detects Phylogeny Queries)
+
+This function handles all 7 query types by extracting the gene(s) and calling the heatmap function.
+
+```javascript
+async function handlePhylogenyVisualizationQuery(query) {
+    // Extracts gene symbols from query (e.g., "for WDR31, IFT88")
+    const geneMatch = query.match(/(?:for|of)\s+([A-Z0-9\-\.]+(?:,\s*[A-Z0-9\-\.]+)*)/i);
+    const inputGenes = geneMatch ? geneMatch[1].split(',').map(g => g.trim().toUpperCase()).filter(Boolean) : [];
+    
+    await fetchLiPhylogenyData();
+    if (!liPhylogenyCache) {
+        return `<div class="result-card"><h3>Error</h3><p>Could not load phylogenetic data to run this analysis.</p></div>`;
+    }
+
+    // Identify available genes in the Li database (based on HUGO symbol 'g')
+    const liGenes = new Set(Object.values(liPhylogenyCache.genes).map(g => g.g.toUpperCase()).filter(Boolean));
+    const validGenes = inputGenes.filter(g => liGenes.has(g));
+
+    if (validGenes.length === 0) {
+        // Fallback to a set of default genes if the user's gene is missing or if no gene was specified
+        const defaultGenes = ["IFT88", "ARL13B", "BBS1", "CEP290", "NPHP1", "WDR31", "HYLS1"];
+        const validDefaults = defaultGenes.filter(g => liGenes.has(g));
+        
+        if (validDefaults.length === 0) {
+            return `<div class="result-card"><h3>Analysis Error</h3><p>The requested gene(s) were not found in the Li et al. 2014 phylogenetic dataset, and no default genes could be loaded.</p></div>`;
+        }
+        
+        return renderLiPhylogenyHeatmap(validDefaults.slice(0, 5));
+    }
+    
+    // Combine user's genes with defaults up to 20 spots
+    let finalGenes = [...new Set(validGenes)];
+    if (finalGenes.length < 20) {
+        const defaultGenes = ["IFT88", "ARL13B", "BBS1", "CEP290", "NPHP1", "WDR31", "HYLS1", "DYNC2H1"];
+        for (const dGene of defaultGenes) {
+            if (finalGenes.length >= 20) break;
+            if (liGenes.has(dGene) && !finalGenes.includes(dGene)) {
+                finalGenes.push(dGene);
+            }
+        }
+    }
+    
+    return renderLiPhylogenyHeatmap(finalGenes);
+}
+
 
 // Function already defined but repeated here for context:
 async function getHubOrthologsForGene(gene) {
@@ -1107,8 +1279,6 @@ async function getHubOrthologsForGene(gene) {
 }
 
 
-
-
 const questionRegistry = [
     // ==================== META / GENERAL ====================
     { text: "What can you do?", handler: async () => tellAboutCiliAI() },
@@ -1120,6 +1290,27 @@ const questionRegistry = [
     { text: "What questions can I ask?", handler: async () => tellAboutCiliAI() },
     { text: "Give me an overview of your features", handler: async () => tellAboutCiliAI() },
 
+// ==================== PHYLOGENY QUERIES (VISUALIZATION) - UPDATED ====================
+// These queries now route to the unified analysis function.
+{ text: "Show evolutionary conservation of IFT88", handler: async () => getPhylogenyAnalysis(["IFT88"]) },
+{ text: "IFT88 conservation analysis", handler: async () => getPhylogenyAnalysis(["IFT88"]) },
+{ text: "What is the phylogeny of BBS1?", handler: async () => getPhylogenyAnalysis(["BBS1"]) },
+{ text: "BBS1 conservation heatmap", handler: async () => getPhylogenyAnalysis(["BBS1"]) },
+// ... (continue for all other specific gene entries: ARL13B, NPHP1, WDR31, CEP290) ...
+// The general catch-all queries must also be updated to call this new function:
+{ // Catches the most common conservation phrase for any gene (e.g., WDR54)
+    text: "Show evolutionary conservation of gene X", handler: async (q) => getPhylogenyAnalysis(extractMultipleGenes(q)) 
+},
+{ // Catches the "What is the phylogeny/comparison of" phrase 
+    text: "What is the phylogeny of gene X?", handler: async (q) => getPhylogenyAnalysis(extractMultipleGenes(q)) 
+},
+{ // Catches comparison formats
+    text: "Compare gene X phylogeny", handler: async (q) => getPhylogenyAnalysis(extractMultipleGenes(q)) 
+},
+{ // Catches the original 'Show the phylogenetic comparison' phrasing
+    text: "Show the phylogenetic comparison for gene X", handler: async (q) => getPhylogenyAnalysis(extractMultipleGenes(q)) 
+},
+    
     // ==================== SOURCE QUERIES ====================
     { text: "What is the source for Ciliary genes in C. elegans?", handler: async () => tellAboutOrganismSources("C. elegans") },
     { text: "What is the source for Ciliary genes in mouse?", handler: async () => tellAboutOrganismSources("mouse") },
@@ -4106,7 +4297,7 @@ async function getCiliaryGenesForOrganism(organismName) {
     };
 }
 
-// --- Main AI Query Handler (REPLACEMENT) ---
+// --- Main AI Query Handler ---
 window.handleAIQuery = async function() {
     const aiQueryInput = document.getElementById('aiQueryInput');
     const resultArea = document.getElementById('ai-result-area');
@@ -4114,90 +4305,90 @@ window.handleAIQuery = async function() {
     if (!query) return;
 
     // --- FIX 1: Purge any existing Plotly plots from the result area ---
-    Plotly.purge(resultArea);
-    // --- END OF FIX 1 ---
+    try { if (window.Plotly) window.Plotly.purge(resultArea); } catch (e) {}
 
     resultArea.style.display = 'block';
-    // Display loading message immediately
     resultArea.innerHTML = `<p class="status-searching">CiliAI is thinking... 🧠</p>`;
     
     try {
-        // Await primary data fetches *before* running any query logic
+        // Await core CiliaHub data fetches ONLY. Phylogeny fetches run in the router.
         await Promise.all([
             fetchCiliaData(),
             fetchScreenData(),
-            fetchPhylogenyData(),
             fetchTissueData(),
             fetchCellxgeneData(),
             fetchUmapData(),
             getDomainData(),
-            fetchNeversPhylogenyData(),
-            fetchLiPhylogenyData(),
             fetchCorumComplexes()
+            // Removed redundant phylogeny fetches from here
         ]);
-        console.log('ciliAI.js: All data loaded (including new domain and phylogeny sources).');
+        console.log('ciliAI.js: All core data loaded for processing.');
 
         let resultHtml = '';
         const qLower = query.toLowerCase();
         let match;
 
-        // 1. Check for Perfect Match in Registry
-        const perfectMatch = questionRegistry.find(item => item.text.toLowerCase() === qLower);
-        if (perfectMatch) {
-            console.log(`Registry match found: "${perfectMatch.text}"`);
-            resultHtml = await perfectMatch.handler();
-        } 
-        // 2. Check for "Tell me about..." Intent (Comprehensive Detail)
-        else if ((match = qLower.match(/(?:tell me about|what is|describe)\s+(.+)/i))) {
-            const term = match[1].trim();
-            resultHtml = await getComprehensiveDetails(term);
-        } 
-        // 3. Check for Entity-Based Intent (Localization, Function, Disease Categories)
+        // =================================================================
+        // **NEW ROUTING PRIORITY:** Handle Phylogeny/Heatmap Queries (Q1-Q7)
+        // =================================================================
+        if (qLower.includes('phylogeny') || qLower.includes('conservation') || 
+            qLower.includes('heatmap') || qLower.includes('comparison') || 
+            qLower.includes('tree')) {
+            
+            console.log('Routing to Phylogenetic Visualization Query...');
+            resultHtml = await handlePhylogenyVisualizationQuery(query);
+        }
+        // =================================================================
+        // **FALLBACK TO ORIGINAL LOGIC**
+        // =================================================================
+        
         else {
-            const intent = intentParser.parse(query);
-            if (intent && typeof intent.handler === 'function') {
-                console.log(`Intent parser match found: ${intent.intent} for entity: ${intent.entity}`);
-                resultHtml = await intent.handler(intent.entity);
-            }
-            // 4. Smarter Fallback Logic (Gene/Plot Inference)
+            const perfectMatch = questionRegistry.find(item => item.text.toLowerCase() === qLower);
+            if (perfectMatch) {
+                console.log(`Registry match found: "${perfectMatch.text}"`);
+                resultHtml = await perfectMatch.handler();
+            } 
+            else if ((match = qLower.match(/(?:tell me about|what is|describe)\s+(.+)/i))) {
+                const term = match[1].trim();
+                resultHtml = await getComprehensiveDetails(term);
+            } 
             else {
-                const potentialGenes = (query.match(/\b([A-Z0-9\-\.]{3,})\b/gi) || []);
-                const genes = potentialGenes.filter(g => ciliaHubDataCache.some(hubGene => hubGene.gene.toUpperCase() === g.toUpperCase()));
-                
-                if (genes.length === 2 && (qLower.includes('compare') || qLower.includes('vs'))) {
-                    console.log(`Smart match: Comparing two genes: ${genes.join(' and ')}`);
-                    resultHtml = await displayCellxgeneBarChart(genes);
-                } else if (genes.length === 1 && (qLower.includes('plot') || qLower.includes('show expression') || qLower.includes('visualize'))) {
-                    console.log(`Smart match: Plotting single gene: ${genes[0]}`);
-                    if (qLower.includes('umap')) {
-                        resultHtml = await displayUmapGeneExpression(genes[0]);
-                    } else {
+                const intent = intentParser.parse(query);
+                if (intent && typeof intent.handler === 'function') {
+                    console.log(`Intent parser match found: ${intent.intent} for entity: ${intent.entity}`);
+                    resultHtml = await intent.handler(intent.entity);
+                }
+                else {
+                    const potentialGenes = (query.match(/\b([A-Z0-9\-\.]{3,})\b/gi) || []);
+                    const genes = potentialGenes.filter(g => ciliaHubDataCache.some(hubGene => hubGene.gene.toUpperCase() === g.toUpperCase()));
+                    
+                    if (genes.length === 2 && (qLower.includes('compare') || qLower.includes('vs'))) {
                         resultHtml = await displayCellxgeneBarChart(genes);
+                    } else if (genes.length === 1 && (qLower.includes('plot') || qLower.includes('show expression') || qLower.includes('visualize'))) {
+                        if (qLower.includes('umap')) {
+                            resultHtml = await displayUmapGeneExpression(genes[0]);
+                        } else {
+                            resultHtml = await displayCellxgeneBarChart(genes);
+                        }
+                    } else if (genes.length === 1 && qLower.length < (genes[0].length + 5)) {
+                        resultHtml = await getComprehensiveDetails(query);
+                    } else {
+                        resultHtml = `<p>Sorry, I didn’t understand that. Please try one of the suggested questions or a known keyword.</p>`;
                     }
-                } else if (genes.length === 1 && qLower.length < (genes[0].length + 5)) {
-                    console.log(`Standalone gene match found: "${query}"`);
-                    resultHtml = await getComprehensiveDetails(query);
-                } else {
-                    resultHtml = `<p>Sorry, I didn’t understand that. Please try one of the suggested questions or a known keyword.</p>`;
                 }
             }
         }
 
-        // --- Only update innerHTML if the handler returned HTML ---
         if (resultHtml !== "") {
             resultArea.innerHTML = resultHtml;
         }
 
     } catch (e) {
-        // Display generic error, but log details to console
         resultArea.innerHTML = `<p class="status-not-found">An internal CiliAI error occurred during your query. Please check the console for details. (Error: ${e.message})</p>`;
         console.error("CiliAI Query Error:", e);
     }
 };
 
-// ----------------------------------------------------------------------
-// INTEGRATION PATCH: Override handleAIQuery to include CORUM logic
-// ----------------------------------------------------------------------
 
 /**
  * Patches the main query handler to include Corum lookups.
@@ -4460,6 +4651,53 @@ async function getLiConservation(geneSymbol) {
     // Use the helper to format the data
     return formatLiGeneData(geneSymbol, geneEntry, liPhylogenyCache.summary);
 }
+
+/**
+ * Automated handler for all phylogenetic questions (Q1-Q7).
+ * It fetches the pre-loaded Li/Nevers data for quick summary and triggers
+ * the visualization router to handle the heatmap rendering.
+ * * @param {string[]} genes - Array of gene symbols requested (e.g., ["IFT88"]).
+ * @returns {Promise<string>} HTML string containing the summary and the visualization call.
+ */
+async function getPhylogenyAnalysis(genes) {
+    // 1. Ensure data is loaded (these functions simply return the cached data if already fetched)
+    await Promise.all([fetchLiPhylogenyData(), fetchNeversPhylogenyData()]);
+
+    const geneSymbol = genes[0].toUpperCase();
+    
+    // --- Li Data Lookup ---
+    const liEntry = Object.values(liPhylogenyCache?.genes || {}).find(g => g.g.toUpperCase() === geneSymbol);
+    const liSummary = liEntry 
+        ? liPhylogenyCache.summary.class_list[liEntry.c] || 'Classification Unavailable'
+        : 'Not found in Li et al. (2014)';
+
+    // --- Nevers Data Lookup (uses simple presence check) ---
+    const neversEntry = neversPhylogenyCache?.genes?.[geneSymbol];
+    const neversSpeciesCount = neversEntry?.s?.length || 0;
+    const neversStatus = neversEntry 
+        ? `Found in ${neversSpeciesCount} species (Nevers et al. 2017)`
+        : 'Not found in Nevers et al. (2017)';
+
+    const generalSummary = `
+        <div class="result-card">
+            <h3>Evolutionary Summary: ${geneSymbol}</h3>
+            <table class="gene-detail-table">
+                <tr><th>Li et al. (2014) Classification</th><td><strong>${liSummary.replace(/_/g, ' ')}</strong></td></tr>
+                <tr><th>Nevers et al. (2017) Status</th><td>${neversStatus}</td></tr>
+                <tr><th>Analysis</th><td>Visualization is based on the Li et al. (2014) data.</td></tr>
+            </table>
+        </div>
+    `;
+
+    // 2. Route to Visualization
+    // This calls the router you defined previously, which handles the rendering 
+    // of the Li et al. heatmap using a selection of organisms.
+    const visualizationHtml = await handlePhylogenyVisualizationQuery(`Show heatmap for ${geneSymbol}`);
+
+    // 3. Combine the textual summary and the visual output
+    return generalSummary + visualizationHtml;
+}
+
 
 /**
  * [NEW HELPER] Formats the output for the Li et al. 2014 data
