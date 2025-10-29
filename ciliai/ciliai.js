@@ -4520,21 +4520,33 @@ function renderNeversPhylogenyHeatmap(genes) {
     const CIL_COUNT = CIL_ORG_FULL.length;
     const NCIL_COUNT = NCIL_ORG_FULL.length;
 
-    // --- 1. Map Target Organisms to Nevers Indices (CRITICAL FIX) ---
+    // --- 1. Map Target Organisms to Nevers Indices (CRITICAL FIX: Prioritize Exact Match) ---
     const neversOrgList = neversPhylogenyCache.organism_groups?.all_organisms_list || [];
-    const neversOrgMap = new Map(); // <-- DEFINED LOCALLY
+    const neversOrgMap = new Map(); // Defined locally
     
-    // Loop 1: Map all Nevers list entries to their index using simplified keys.
+    // Loop 1: Map all Nevers list entries using multiple naming keys.
     neversOrgList.forEach((name, index) => {
-        // Map using simplified keys (removing periods, brackets, spaces, and converting to lower case)
-        neversOrgMap.set(name.toLowerCase().replace(/[\s\.\(\)]/g, ''), index);
+        const lowerName = name.toLowerCase();
+        
+        // Key 1 (Highest Priority): Map the EXACT name string present in the source data.
+        neversOrgMap.set(name, index);
+        
+        // Key 2: Map the fully simplified key (removes all non-alphanumeric characters for robust fallback).
+        neversOrgMap.set(lowerName.replace(/[\s\.\(\)]/g, ''), index);
     });
-
     const targetOrganisms = CIL_ORG_FULL.concat(NCIL_ORG_FULL);
     
     const targetNeversIndices = targetOrganisms.map(orgName => {
-        const simplifiedKey = orgName.toLowerCase().replace(/[\s\.]/g, '');
-        // Lookup in the locally defined map:
+        const lowerOrg = orgName.toLowerCase();
+        const simplifiedKey = lowerOrg.replace(/[\s\.]/g, '');
+        
+        // A. Try the official, exact name from the input list (CRITICAL FIX)
+        // This is necessary because Nevers keys often include parenthetical strain info.
+        if (neversOrgMap.has(orgName)) {
+            return neversOrgMap.get(orgName);
+        }
+        
+        // B. Fallback: Use the fully simplified key (for protists/fungi with simple names)
         return neversOrgMap.get(simplifiedKey);
     });
 
@@ -4544,7 +4556,8 @@ function renderNeversPhylogenyHeatmap(genes) {
     
     // --- 2. Build the Matrix (Presence/Absence in Nevers data) ---
     geneLabels.forEach(gene => {
-        const geneData = neversPhylogenyCache.genes?.[gene];
+        // NOTE: Nevers data is keyed directly by HUGO symbol, unlike Li data.
+        const geneData = neversPhylogenyCache.genes?.[gene]; 
         const presenceIndices = new Set(geneData ? geneData.s : []);
         const row = [];
         const textRow = [];
@@ -4574,7 +4587,7 @@ function renderNeversPhylogenyHeatmap(genes) {
 
     const plotContainer = 'nevers-phylogeny-heatmap-container';
 
-    // --- Plotly Data & Layout (DIFFERENT COLORSCALE: Teal/Pink) ---
+    // --- 3. Plotly Data & Layout (DIFFERENT COLORSCALE: Teal/Pink) ---
     const NEVERS_COLORS = [
         [0/2, '#F0F0F0'],      // Z=0 (Absent) -> Light Gray
         [0.0001/2, '#F0A0A0'], // Z=1 (NCIL Hit) start -> Light Red/Pink
@@ -4618,7 +4631,7 @@ function renderNeversPhylogenyHeatmap(genes) {
         height: Math.max(500, genes.length * 40 + 150)
     };
     
-    // --- HTML Output (Includes link to switch back to Li) ---
+    // --- 4. HTML Output (Includes link to switch back to Li) ---
     const htmlOutput = `
         <div class="result-card">
             <h3>Phylogenetic Heatmap for ${geneLabels.join(', ')} 🌍</h3>
@@ -4637,7 +4650,6 @@ function renderNeversPhylogenyHeatmap(genes) {
 
     return { html: htmlOutput, plotData: [trace], plotLayout: layout, plotId: plotContainer };
 }
-
 /**
  * MODIFIED: Adds a link to switch to the Nevers heatmap.
  */
