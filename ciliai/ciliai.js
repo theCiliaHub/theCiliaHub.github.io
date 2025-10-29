@@ -4647,6 +4647,38 @@ async function getLiConservation(geneSymbol) {
     return formatLiGeneData(geneSymbol, geneEntry, liPhylogenyCache.summary);
 }
 
+const CIL_ORG_FULL = [
+    "Homo sapiens", "Rattus norvegicus", "Cricetulus griseus", "Mus musculus", "Gallus gallus", 
+    "Xenopus tropicalis", "Danio rerio", "Caenorhabditis elegans", "Chlamydomonas reinhardtii", 
+    "Tetrahymena thermophila", "Trypanosoma cruzi", "Leishmania mexicana", "Trichomonas vaginalis", 
+    "Giardia intestinalis", "Naegleria gruberi", "Trypanosoma brucei brucei", "Volvox carteri", 
+    "Micromonas sp.", "Strongylocentrotus purpuratus", "Ciona intestinalis"
+];
+
+// NOTE: Drosophila melanogaster has been removed from this list 
+// to ensure only strictly non-ciliated organisms remain.
+const NCIL_ORG_FULL = [
+    "Saccharomyces cerevisiae", 
+    "Schizosaccharomyces pombe", 
+    "Ustilago maydis", 
+    "Arabidopsis thaliana", 
+    "Oryza sativa", 
+    "Zea mays", 
+    "Batrachochytrium dendrobatidis", 
+    "Puccinia graminis f. sp. tritici", 
+    "Cryptococcus neoformans var. neoformans serotype D", 
+    "Schistosoma mansoni", 
+    "Acyrthosiphon pisum", 
+    "Tribolium castaneum", 
+    "Anopheles gambiae", 
+    "Aureococcus anophagefferens", 
+    "Phytophthora infestans", 
+    "Cyanidioschyzon merolae", 
+    "Blastocystis hominis", 
+    "Cryptosporidium parvum", 
+    "Entamoeba histolytica"
+];
+
 /**
  * Automated handler for all phylogenetic questions (Q1-Q7).
  * It fetches the pre-loaded Li/Nevers data for quick summary and triggers
@@ -4655,27 +4687,33 @@ async function getLiConservation(geneSymbol) {
  * @returns {Promise<string>} HTML string containing the summary and the visualization call.
  */
 async function getPhylogenyAnalysis(genes) {
+    // 1. **BEST PRACTICE FIX:** Check for empty input immediately.
+    if (!Array.isArray(genes) || genes.length === 0) {
+        return `<div class="result-card"><h3>Analysis Error</h3><p>No valid gene symbol was provided for phylogenetic analysis.</p></div>`;
+    }
+    
     // 1. Ensure data is loaded (these functions simply return the cached data if already fetched)
     await Promise.all([fetchLiPhylogenyData(), fetchNeversPhylogenyData()]);
 
     const geneSymbol = genes[0].toUpperCase();
     
     // --- Li Data Lookup ---
-    const liEntry = Object.values(liPhylogenyCache?.genes || {}).find(g => g.g.toUpperCase() === geneSymbol);
-    const liSummary = liEntry 
-        ? liPhylogenyCache.summary.class_list[liEntry.c] || 'Classification Unavailable'
+    // Safely attempt to find the gene by its HUGO symbol within the Li cache's 'genes' object
+    const liEntry = Object.values(liPhylogenyCache?.genes || {}).find(g => g.g && g.g.toUpperCase() === geneSymbol);
+    const liSummary = liEntry 
+        ? (liPhylogenyCache.summary.class_list[liEntry.c] || 'Classification Unavailable')
         : 'Not found in Li et al. (2014)';
 
-    // --- Nevers Data Lookup (uses simple presence check) ---
+    // --- Nevers Data Lookup (Assumes Nevers is keyed by the HUGO Symbol for simplicity) ---
     const neversEntry = neversPhylogenyCache?.genes?.[geneSymbol];
     const neversSpeciesCount = neversEntry?.s?.length || 0;
-    const neversStatus = neversEntry 
+    const neversStatus = neversEntry 
         ? `Found in ${neversSpeciesCount} species (Nevers et al. 2017)`
         : 'Not found in Nevers et al. (2017)';
 
     const generalSummary = `
         <div class="result-card">
-            <h3>Evolutionary Summary: ${geneSymbol}</h3>
+            <h3>Evolutionary Summary: ${geneSymbol} 🧬</h3>
             <table class="gene-detail-table">
                 <tr><th>Li et al. (2014) Classification</th><td><strong>${liSummary.replace(/_/g, ' ')}</strong></td></tr>
                 <tr><th>Nevers et al. (2017) Status</th><td>${neversStatus}</td></tr>
@@ -4684,16 +4722,13 @@ async function getPhylogenyAnalysis(genes) {
         </div>
     `;
 
-    // 2. Route to Visualization
-    // This calls the router you defined previously, which handles the rendering 
-    // of the Li et al. heatmap using a selection of organisms.
-    const visualizationHtml = await handlePhylogenyVisualizationQuery(`Show heatmap for ${geneSymbol}`);
+    // 2. Route to Visualization (Handles the rendering of the heatmap)
+    // NOTE: We pass the actual gene symbol(s) to the router.
+    const visualizationHtml = await handlePhylogenyVisualizationQuery(`Show heatmap for ${genes.join(',')}`);
 
     // 3. Combine the textual summary and the visual output
     return generalSummary + visualizationHtml;
 }
-
-
 /**
  * [NEW HELPER] Formats the output for the Li et al. 2014 data
  */
