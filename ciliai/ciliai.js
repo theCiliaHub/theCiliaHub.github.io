@@ -5134,11 +5134,9 @@ function formatGeneDetail(geneData, geneSymbol, detailTitle, detailContent) {
     `;
 }
 
-// -------------------------------
 // Click handler for all interactions (Gene selection, Quick queries, and Plot switching)
 document.addEventListener('click', (e) => {
-    / 1. Handle clicks on gene cards/names from analysis results (STANDARD)
-    if (e.target.matches('.gene-card, .gene-name')) {
+    if (e.target.matches('.gene-card, .gene-name')) {
         const geneName = e.target.dataset.geneName || e.target.textContent.trim();
         if (geneName) handleCiliAISelection([geneName]);
     }
