@@ -1079,7 +1079,6 @@ async function getPhylogenyGenesForOrganism(organismName) {
         targetKey    // Pass the key to extract the correct ortholog name
     );
 }
-
 function renderLiPhylogenyHeatmap(genes) {
     if (!liPhylogenyCache) {
         return {
@@ -1089,33 +1088,59 @@ function renderLiPhylogenyHeatmap(genes) {
             plotId: null
         };
     }
-    
     const CIL_COUNT = CIL_ORG_FULL.length;
     const NCIL_COUNT = NCIL_ORG_FULL.length;
 
-    // --- MAPPING (Robust lookup logic remains the same) ---
+    // --- 1. Map Target Organisms to Li Indices (FINAL, ROBUST MAPPING) ---
     const liOrgList = liPhylogenyCache.summary.organisms_list;
     const liOrgMap = new Map();
+
+    // Loop 1: Pre-process the source Li organism list (140 names) for robust keys.
     liOrgList.forEach((name, index) => {
-        const simpleKey = name.toLowerCase().replace(/\s*\(.*\)\s*/g, '').replace(/\./g, '').split(' ')[0];
-        liOrgMap.set(simpleKey, index);
-        if (name.toLowerCase().includes('elegans')) { liOrgMap.set('celegans', index); }
+        const lowerName = name.toLowerCase();
+        
+        // Key 1: Exact abbreviated name (e.g., 'h.sapiens')
+        liOrgMap.set(lowerName, index); 
+        
+        // Key 2: Abbreviation without dots/spaces (e.g., 'hsapiens')
+        liOrgMap.set(lowerName.replace(/\.|\s/g, ''), index); 
+        
+        // Key 3: Specific common organism overrides (C. elegans)
+        if (lowerName.includes('elegans')) { liOrgMap.set('celegans', index); }
+        
+        // Key 4: First word only (e.g., 'homo', 'danio')
+        liOrgMap.set(lowerName.split(/[\s\.]/g)[0], index);
     });
 
     const targetOrganisms = CIL_ORG_FULL.concat(NCIL_ORG_FULL);
+    
     const targetLiIndices = targetOrganisms.map(orgName => {
-        const normalizedName = orgName.toLowerCase().replace(/\s*\(.*\)\s*/g, '').replace(/\./g, '').split(' ')[0];
-        const keyToLookup = (normalizedName.includes('caenorhabditis') || normalizedName.includes('elegans')) 
-                            ? 'celegans' 
-                            : normalizedName;
-        return liOrgMap.get(keyToLookup);
+        const lowerOrg = orgName.toLowerCase();
+        
+        // 2. Lookup logic: Try keys from most to least specific
+        
+        // A. Try specific overrides (e.g., C. elegans)
+        if (lowerOrg.includes('elegans')) return liOrgMap.get('celegans');
+        
+        // B. Try matching the exact string from the constant list (e.g., "Homo sapiens")
+        if (liOrgMap.has(lowerOrg)) return liOrgMap.get(lowerOrg);
+        
+        // C. Try matching the typical Li abbreviation (e.g., "M. musculus" -> "m.musculus")
+        const scientificAbbreviation = lowerOrg.split(' ').map((w, i) => i === 0 ? w[0] + '.' : w).join('').replace(/\s/g, '');
+        if (liOrgMap.has(scientificAbbreviation)) return liOrgMap.get(scientificAbbreviation);
+
+        // D. Try matching the name without any spaces/dots (e.g., 'homosapiens')
+        if (liOrgMap.has(lowerOrg.replace(/[\s\.]/g, ''))) return liOrgMap.get(lowerOrg.replace(/[\s\.]/g, ''));
+        
+        // E. Try matching the name by its first word (safest fallback for full names)
+        return liOrgMap.get(lowerOrg.split(/[\s\.]/g)[0]);
     });
 
     const geneLabels = genes.map(g => g.toUpperCase());
     const matrix = [];
     const textMatrix = [];
     
-    // --- 2. Build the Matrix ---
+    // --- 2. Build the Matrix (Presence/Absence) ---
     geneLabels.forEach(gene => {
         const geneData = Object.values(liPhylogenyCache.genes).find(g => g.g && g.g.toUpperCase() === gene);
         const presenceIndices = new Set(geneData ? geneData.s : []);
@@ -1125,6 +1150,8 @@ function renderLiPhylogenyHeatmap(genes) {
         targetOrganisms.forEach((orgName, index) => {
             const liIndex = targetLiIndices[index];
             const isCiliated = index < CIL_COUNT;
+            
+            // CRITICAL CHECK: The bug is resolved here by ensuring liIndex is correct.
             const isPresent = liIndex !== undefined && presenceIndices.has(liIndex);
 
             let zValue = 0;
@@ -1145,21 +1172,21 @@ function renderLiPhylogenyHeatmap(genes) {
         }
     });
 
-    // --- 3. Plotly Data & Layout Definition ---
+    // --- 3. Plotly Data & Layout Definition (Uses full names for clarity) ---
     const plotContainer = 'li-phylogeny-heatmap-container';
 
     const trace = {
         z: matrix,
-        // *** CORRECTION: Use the full name for the X-axis labels ***
+        // Use full organism names for X-axis ticks
         x: targetOrganisms.map(name => name.replace('Caenorhabditis elegans', 'C. elegans')), 
         y: geneLabels,
         type: 'heatmap',
         colorscale: [
-            [0/2, '#FFFFFF'],      
-            [0.0001/2, '#FFE5B5'], 
-            [1/2, '#FFE5B5'],      
-            [1.0001/2, '#698ECF'], 
-            [2/2, '#698ECF']       
+            [0/2, '#FFFFFF'],      // Z=0 (Absent) -> White
+            [0.0001/2, '#FFE5B5'], // Z=1 (NCIL Hit) start -> Light Orange (NCIL)
+            [1/2, '#FFE5B5'],      // Z=1 (NCIL Hit) end
+            [1.0001/2, '#698ECF'], // Z=2 (CIL Hit) start -> Blue (CIL)
+            [2/2, '#698ECF']       // Z=2 (CIL Hit) end
         ],
         showscale: false,
         hoverinfo: 'text',
@@ -1201,6 +1228,7 @@ function renderLiPhylogenyHeatmap(genes) {
             <button class="download-button" onclick="downloadPlot('${plotContainer}', 'Phylogeny_Li2014')">Download Heatmap (PNG)</button>
             <p style="font-size: 0.8em; color: #666; margin-top: 1rem; border-top: 1px solid #eee; padding-top: 0.5rem;">
                 <strong>Source:</strong> Li Y, Calvo SE, Gutman R, Liu JS, Mootha VK. Expansion of biological pathways based on evolutionary inference. (2014) <em>Cell</em>. 
+                <a href="https://pubmed.ncbi.nlm.nih.gov/24995987/" target="_blank">[PMID: 24995987]</a>
             </p>
         </div>
     `;
@@ -1212,7 +1240,6 @@ function renderLiPhylogenyHeatmap(genes) {
         plotId: plotContainer
     };
 }
-
 /**
  * Safely handles the execution of the Plotly command.
  */
