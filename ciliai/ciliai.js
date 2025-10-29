@@ -1258,6 +1258,9 @@ function renderLiPhylogenyHeatmap(genes) {
 // - window.initPhylogenyPlot()
 // - window.extractMultipleGenes()
 
+
+
+
 async function handlePhylogenyVisualizationQuery(query) {
     const resultArea = document.getElementById('ai-result-area');
     
@@ -1325,6 +1328,24 @@ async function handlePhylogenyVisualizationQuery(query) {
     return "";
 }
 
+/**
+ * Safely handles the execution of the Plotly command.
+ * This function must be defined in the global scope (window.initPhylogenyPlot).
+ */
+window.initPhylogenyPlot = function(containerId, traceData, layoutData) {
+    // We use setTimeout(0) to ensure the browser finishes injecting the HTML <div> before plotting.
+    setTimeout(() => {
+        const plotElement = document.getElementById(containerId);
+        // CRITICAL CHECK: Ensure Plotly library is loaded and the container exists
+        if (plotElement && window.Plotly) {
+            console.log("Successfully initiating Plotly visualization.");
+            Plotly.newPlot(containerId, traceData, layoutData, { responsive: true, displayModeBar: false });
+        } else {
+            // This error should only occur if the Plotly script itself failed to load.
+            console.error("Plotly execution aborted: Container or Plotly library not ready.");
+        }
+    }, 0); 
+};
 
 // Function already defined but repeated here for context:
 async function getHubOrthologsForGene(gene) {
