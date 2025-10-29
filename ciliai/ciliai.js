@@ -4529,28 +4529,20 @@ const NEVERS_CIL_PANEL = [
     "Monosiga brevicollis" // Index 60
 ];
 
-// 20 Non-Ciliated Organisms (Includes fungi, plants, and non-ciliated protists)
+// 12 Non-Ciliated Organisms (Includes fungi, plants, and non-ciliated protists)
 const NEVERS_NCIL_PANEL = [
-    "Saccharomyces cerevisiae (strain ATCC 204508 / S288c)", // Index 70
-    "Schizosaccharomyces pombe (strain 972 / ATCC 24843)", // Index 54
-    "Cryptococcus neoformans var. neoformans serotype D (strain JEC21 / ATCC MYA-565)", // Index 51
-    "Ustilago maydis (strain 521 / FGSC 9021)", // Index 50
-    "Candida albicans (strain WO-1)", // Index 69
-    "Arabidopsis thaliana", // Index 20
-    "Brachypodium distachyon", // Index 17
-    "Sorghum bicolor", // Index 18
-    "Vitis vinifera", // Index 19
-    "Cyanidioschyzon merolae", // Index 8
-    "Phaeodactylum tricornutum (strain CCAP 1055/1)", // Index 25
-    "Cryptosporidium parvum (strain Iowa II)", // Index 31
-    "Entamoeba histolytica", // Index 40
-    "Drosophila melanogaster", // Index 92 (A known partial ciliate, retained in NCIL list for phylogenetic comparison tradition)
-    "Acyrthosiphon pisum", // Index 88
-    "Tribolium castaneum", // Index 90
-    "Anopheles gambiae", // Index 93
-    "Schistosoma mansoni", // Index 82
-    "Trichinella spiralis", // Index 84
-    "Encephalitozoon cuniculi (strain GB-M1)" // Index 46
+    "Saccharomyces cerevisiae (strain ATCC 204508 / S288c)",
+    "Schizosaccharomyces pombe (strain 972 / ATCC 24843)",
+    "Cryptococcus neoformans var. neoformans serotype D (strain JEC21 / ATCC MYA-565)",
+    "Ustilago maydis (strain 521 / FGSC 9021)",
+    "Candida albicans (strain WO-1)",
+    "Arabidopsis thaliana",
+    "Brachypodium distachyon",
+    "Sorghum bicolor",
+    "Vitis vinifera",
+    "Cryptosporidium parvum (strain Iowa II)",
+    "Entamoeba histolytica",
+    "Encephalitozoon cuniculi (strain GB-M1)"
 ];
 
 // --------------------------------------------------------------------------------------
