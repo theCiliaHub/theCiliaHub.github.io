@@ -4506,7 +4506,6 @@ const NCIL_ORG_FULL = [
 // --------------------------------------------------------------------------------------
 // NEW FUNCTION 1: NEVERS ET AL. 2017 HEATMAP RENDERER
 // --------------------------------------------------------------------------------------
-
 /**
  * Renders the phylogenetic heatmap based on Nevers et al. 2017 data.
  * @param {string[]} genes - Array of genes requested.
@@ -4514,38 +4513,36 @@ const NCIL_ORG_FULL = [
  */
 function renderNeversPhylogenyHeatmap(genes) {
     if (!neversPhylogenyCache) {
-        return {
-            html: `<div class="result-card"><h3>Heatmap Error</h3><p>Nevers et al. 2017 data not loaded. Please try again.</p></div>`,
-            plotData: null,
-            plotLayout: null,
-            plotId: null
-        };
+        return { html: `<div class="result-card"><h3>Heatmap Error</h3><p>Nevers et al. 2017 data not loaded. Please try again.</p></div>`, plotData: null, plotLayout: null, plotId: null };
     }
     
-    // Nevers data includes its own organism groups in organism_groups.all_organisms_list
+    // Assume CIL_ORG_FULL and NCIL_ORG_FULL are defined globally.
+    const CIL_COUNT = CIL_ORG_FULL.length;
+    const NCIL_COUNT = NCIL_ORG_FULL.length;
+
+    // --- 1. Map Target Organisms to Nevers Indices (CRITICAL FIX) ---
     const neversOrgList = neversPhylogenyCache.organism_groups?.all_organisms_list || [];
-    const neversOrgMap = new Map();
+    const neversOrgMap = new Map(); // <-- DEFINED LOCALLY
+    
+    // Loop 1: Map all Nevers list entries to their index using simplified keys.
     neversOrgList.forEach((name, index) => {
-        // Map simplified names to the Li index
-        liOrgMap.set(name, index);
-        liOrgMap.set(name.toLowerCase().replace(/[\s\.\(\)]/g, ''), index);
+        // Map using simplified keys (removing periods, brackets, spaces, and converting to lower case)
+        neversOrgMap.set(name.toLowerCase().replace(/[\s\.\(\)]/g, ''), index);
     });
 
-    // NOTE: For consistency and direct comparison, we will use the *same* 40 external target organisms
-    // but map them against the Nevers internal list indices.
     const targetOrganisms = CIL_ORG_FULL.concat(NCIL_ORG_FULL);
     
     const targetNeversIndices = targetOrganisms.map(orgName => {
-        // Find the index in the 99-organism Nevers list.
-        const officialNeversName = orgName.replace('Caenorhabditis elegans', 'Caenorhabditis elegans').replace('Homo sapiens', 'Homo sapiens'); // More nuanced normalization needed here
-        return neversOrgMap.get(officialNeversName) || neversOrgMap.get(officialNeversName.toLowerCase().replace(/[\s\.\(\)]/g, ''));
+        const simplifiedKey = orgName.toLowerCase().replace(/[\s\.]/g, '');
+        // Lookup in the locally defined map:
+        return neversOrgMap.get(simplifiedKey);
     });
 
     const geneLabels = genes.map(g => g.toUpperCase());
     const matrix = [];
     const textMatrix = [];
     
-    // --- Build the Matrix (Presence/Absence in Nevers data) ---
+    // --- 2. Build the Matrix (Presence/Absence in Nevers data) ---
     geneLabels.forEach(gene => {
         const geneData = neversPhylogenyCache.genes?.[gene];
         const presenceIndices = new Set(geneData ? geneData.s : []);
@@ -4554,14 +4551,14 @@ function renderNeversPhylogenyHeatmap(genes) {
 
         targetOrganisms.forEach((orgName, index) => {
             const neversIndex = targetNeversIndices[index];
-            const isCiliated = index < CIL_ORG_FULL.length; 
+            const isCiliated = index < CIL_COUNT; 
             const isPresent = neversIndex !== undefined && presenceIndices.has(neversIndex);
 
             let zValue = 0;
             let status = "Absent";
 
             if (isPresent) {
-                zValue = isCiliated ? 2 : 1; // Z=2 for CIL, Z=1 for NCIL presence
+                zValue = isCiliated ? 2 : 1; 
                 status = "Present";
             }
             
@@ -4577,18 +4574,25 @@ function renderNeversPhylogenyHeatmap(genes) {
 
     const plotContainer = 'nevers-phylogeny-heatmap-container';
 
-    // --- Plotly Data & Layout (DIFFERENT COLORSCALE) ---
+    // --- Plotly Data & Layout (DIFFERENT COLORSCALE: Teal/Pink) ---
     const NEVERS_COLORS = [
         [0/2, '#F0F0F0'],      // Z=0 (Absent) -> Light Gray
         [0.0001/2, '#F0A0A0'], // Z=1 (NCIL Hit) start -> Light Red/Pink
         [1/2, '#F0A0A0'],      // Z=1 (NCIL Hit) end
-        [1.0001/2, '#00A0A0'], // Z=2 (CIL Hit) start -> Teal/Cyan (DIFFERENT COLOR)
+        [1.0001/2, '#00A0A0'], // Z=2 (CIL Hit) start -> Teal/Cyan
         [2/2, '#00A0A0']       // Z=2 (CIL Hit) end
     ];
 
     const trace = {
         z: matrix,
-        x: targetOrganisms.map(name => name.replace('Caenorhabditis elegans', 'C. elegans')), 
+        // Use full organism names for X-axis ticks (Replace abbreviations for readability)
+        x: targetOrganisms.map(name => {
+            if (name === "H.sapiens") return "Human";
+            if (name === "M.musculus") return "Mouse";
+            if (name === "D.rerio") return "Zebrafish";
+            if (name.includes("elegans")) return "C. elegans";
+            return name.replace(/\./g, ' '); 
+        }), 
         y: geneLabels,
         type: 'heatmap',
         colorscale: NEVERS_COLORS,
@@ -4606,7 +4610,7 @@ function renderNeversPhylogenyHeatmap(genes) {
         yaxis: { title: 'Genes', automargin: true },
         shapes: [{
                 type: 'line',
-                xref: 'x', x0: CIL_ORG_FULL.length - 0.5, x1: CIL_ORG_FULL.length - 0.5, 
+                xref: 'x', x0: CIL_COUNT - 0.5, x1: CIL_COUNT - 0.5, 
                 yref: 'paper', y0: 0, y1: 1,
                 line: { color: 'black', width: 2 }
             }],
@@ -4618,10 +4622,10 @@ function renderNeversPhylogenyHeatmap(genes) {
     const htmlOutput = `
         <div class="result-card">
             <h3>Phylogenetic Heatmap for ${geneLabels.join(', ')} 🌍</h3>
-            <p>Data from <strong>Nevers et al. (2017)</strong>, mapped to a fixed panel of <strong>${CIL_ORG_FULL.length} Ciliated (Teal)</strong> and <strong>${NCIL_ORG_FULL.length} Non-Ciliated (Pink)</strong> organisms.</p>
+            <p>Data from <strong>Nevers et al. (2017)</strong>, mapped to a fixed panel of <strong>${CIL_COUNT} Ciliated (Teal)</strong> and <strong>${NCIL_COUNT} Non-Ciliated (Pink)</strong> organisms.</p>
             <div id="${plotContainer}" style="height: ${layout.height}px; width: 100%;"></div>
             <button class="download-button" onclick="downloadPlot('${plotContainer}', 'Phylogeny_Nevers2017')">Download Heatmap (PNG)</button>
-            <p style="font-size: 0.8em; color: #666; margin-top: 1rem; padding-top: 0.5rem;">
+            <p style="font-size: 0.8em; color: #666; margin-top: 1rem; border-top: 1px solid #eee; padding-top: 0.5rem;">
                 <strong>Source:</strong> Nevers, Y. et al. (2017) <em>Mol Biol Evol</em>. 
                 <a href="https://pubmed.ncbi.nlm.nih.gov/28460059/" target="_blank">[PMID: 28460059]</a>
             </p>
