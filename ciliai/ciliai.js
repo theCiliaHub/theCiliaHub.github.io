@@ -1082,7 +1082,12 @@ async function getPhylogenyGenesForOrganism(organismName) {
 
 function renderLiPhylogenyHeatmap(genes) {
     if (!liPhylogenyCache) {
-        return `<div class="result-card"><h3>Heatmap Error</h3><p>Li et al. 2014 data not loaded. Please try again.</p></div>`;
+        return {
+            html: `<div class="result-card"><h3>Heatmap Error</h3><p>Li et al. 2014 data not loaded. Please try again.</p></div>`,
+            plotData: null,
+            plotLayout: null,
+            plotId: null
+        };
     }
     
     const CIL_COUNT = CIL_ORG_FULL.length;
@@ -1137,7 +1142,7 @@ function renderLiPhylogenyHeatmap(genes) {
         }
     });
 
-    // --- 3. Plotting using Plotly (Optimized for Global Call) ---
+    // --- 3. Plotly Data & Layout Definition ---
     const plotContainer = 'li-phylogeny-heatmap-container';
 
     const trace = {
@@ -1175,7 +1180,6 @@ function renderLiPhylogenyHeatmap(genes) {
             // Line separating Ciliated (20) and Non-Ciliated (N) organisms columns
             {
                 type: 'line',
-                // Center the line after the 20th CIL organism
                 xref: 'x', x0: CIL_COUNT - 0.5, x1: CIL_COUNT - 0.5, 
                 yref: 'paper', y0: 0, y1: 1,
                 line: { color: 'black', width: 2 }
@@ -1185,10 +1189,7 @@ function renderLiPhylogenyHeatmap(genes) {
         height: Math.max(500, genes.length * 40 + 150)
     };
     
-    // Convert JS objects to JSON strings for embedding in the HTML output
-    const dataJson = JSON.stringify([trace]);
-    const layoutJson = JSON.stringify(layout);
-
+    // --- 4. HTML Output (No inline <script>) ---
     const htmlOutput = `
         <div class="result-card">
             <h3>Phylogenetic Heatmap for ${geneLabels.join(', ')} 🌍</h3>
@@ -1199,72 +1200,104 @@ function renderLiPhylogenyHeatmap(genes) {
                 **Source:** Li, Y. et al. (2014) <em>Cell</em>. <a href="https://pubmed.ncbi.nlm.nih.gov/24995987/" target="_blank">PMID: 24995987</a>
             </p>
         </div>
-        <script>
-            // CRITICAL FIX: Call the global execution wrapper to initiate plotting
-            window.initPhylogenyPlot('${plotContainer}', ${dataJson}, ${layoutJson});
-        </script>
     `;
 
-    return htmlOutput;
+    // --- 5. Return Structured Object for External Execution ---
+    return {
+        html: htmlOutput,
+        plotData: [trace],
+        plotLayout: layout,
+        plotId: plotContainer
+    };
 }
 
 /**
- * Executes the Plotly command globally after the container is added to the DOM.
- * @param {string} containerId - The ID of the HTML element to render into.
- * @param {object} traceData - The Plotly trace array.
- * @param {object} layoutData - The Plotly layout object.
+ * Safely handles the execution of the Plotly command.
  */
 window.initPhylogenyPlot = function(containerId, traceData, layoutData) {
-    const plotElement = document.getElementById(containerId);
-    if (plotElement && window.Plotly) {
-        // Use a slight delay to ensure browser rendering cycle catches up
-        setTimeout(() => {
+    // We keep the setTimeout(0) for maximum DOM safety.
+    setTimeout(() => {
+        const plotElement = document.getElementById(containerId);
+        if (plotElement && window.Plotly) {
             Plotly.newPlot(containerId, traceData, layoutData, { responsive: true, displayModeBar: false });
-        }, 0); 
-    } else {
-        console.error("Plotly initialization failed: Container or Plotly library not ready.");
-    }
+        } else {
+            console.error("Plotly initialization failed: Container or Plotly library not ready.");
+        }
+    }, 0); 
 };
 
+
+// This function assumes the following are defined globally:
+// - fetchLiPhylogenyData(), fetchNeversPhylogenyData()
+// - CIL_ORG_FULL, NCIL_ORG_FULL, liPhylogenyCache
+// - window.initPhylogenyPlot()
+// - window.extractMultipleGenes()
+
 async function handlePhylogenyVisualizationQuery(query) {
-    // Extracts gene symbols from query (e.g., "for WDR31, IFT88")
-    const geneMatch = query.match(/(?:for|of)\s+([A-Z0-9\-\.]+(?:,\s*[A-Z0-9\-\.]+)*)/i);
-    const inputGenes = geneMatch ? geneMatch[1].split(',').map(g => g.trim().toUpperCase()).filter(Boolean) : [];
+    const resultArea = document.getElementById('ai-result-area');
     
-    await fetchLiPhylogenyData();
+    // --- 1. Gene Extraction and Data Loading ---
+    // The router should be smart enough to extract genes regardless of the phrasing.
+    const inputGenes = extractMultipleGenes(query);
+    
+    // Ensure all necessary phylogenetic data is loaded before proceeding
+    await Promise.all([fetchLiPhylogenyData(), fetchNeversPhylogenyData()]);
+
     if (!liPhylogenyCache) {
-        return `<div class="result-card"><h3>Error</h3><p>Could not load phylogenetic data to run this analysis.</p></div>`;
+        return `<div class="result-card"><h3>Error</h3><p>Could not load phylogenetic data (Li et al. 2014) to run this analysis.</p></div>`;
     }
 
     // Identify available genes in the Li database (based on HUGO symbol 'g')
     const liGenes = new Set(Object.values(liPhylogenyCache.genes).map(g => g.g.toUpperCase()).filter(Boolean));
     const validGenes = inputGenes.filter(g => liGenes.has(g));
 
+    let finalGenes;
+
+    // --- 2. Handle Fallback/Default Genes ---
     if (validGenes.length === 0) {
-        // Fallback to a set of default genes if the user's gene is missing or if no gene was specified
-        const defaultGenes = ["IFT88", "ARL13B", "BBS1", "CEP290", "NPHP1", "WDR31", "HYLS1"];
+        // Fallback to a set of default genes if the user's gene is missing or none specified
+        const defaultGenes = ["IFT88", "ARL13B", "BBS1", "CEP290", "NPHP1", "WDR31", "HYLS1", "DYNC2H1"];
         const validDefaults = defaultGenes.filter(g => liGenes.has(g));
         
         if (validDefaults.length === 0) {
             return `<div class="result-card"><h3>Analysis Error</h3><p>The requested gene(s) were not found in the Li et al. 2014 phylogenetic dataset, and no default genes could be loaded.</p></div>`;
         }
+        finalGenes = validDefaults.slice(0, 5); // Use first 5 defaults if no valid genes provided
         
-        return renderLiPhylogenyHeatmap(validDefaults.slice(0, 5));
-    }
-    
-    // Combine user's genes with defaults up to 20 spots
-    let finalGenes = [...new Set(validGenes)];
-    if (finalGenes.length < 20) {
-        const defaultGenes = ["IFT88", "ARL13B", "BBS1", "CEP290", "NPHP1", "WDR31", "HYLS1", "DYNC2H1"];
-        for (const dGene of defaultGenes) {
-            if (finalGenes.length >= 20) break;
-            if (liGenes.has(dGene) && !finalGenes.includes(dGene)) {
-                finalGenes.push(dGene);
+    } else {
+        // Combine user's genes with defaults up to a maximum of 20 for the heatmap
+        finalGenes = [...new Set(validGenes)];
+        if (finalGenes.length < 20) {
+            const defaultGenes = ["IFT88", "ARL13B", "BBS1", "CEP290", "NPHP1", "WDR31", "HYLS1", "DYNC2H1"];
+            for (const dGene of defaultGenes) {
+                if (finalGenes.length >= 20) break;
+                if (liGenes.has(dGene) && !finalGenes.includes(dGene)) {
+                    finalGenes.push(dGene);
+                }
             }
         }
     }
+
+    // --- 3. Generate Structured Plot Results ---
+    // This calls the rendering logic but returns an object {html, plotData, plotLayout, plotId}
+    const plotResult = renderLiPhylogenyHeatmap(finalGenes);
     
-    return renderLiPhylogenyHeatmap(finalGenes);
+    // --- 4. Inject HTML and Execute Plotting Function ---
+    
+    // Set the HTML output. This step creates the required <div> container.
+    // NOTE: This will overwrite any previous content in resultArea.
+    resultArea.innerHTML = plotResult.html;
+
+    // Call the global execution utility, passing the structured data.
+    // This is the CRITICAL STEP that resolves the Plotly rendering issue.
+    window.initPhylogenyPlot(
+        plotResult.plotId, 
+        plotResult.plotData, 
+        plotResult.plotLayout
+    );
+    
+    // Return an empty string as the function has already updated the DOM
+    return "";
 }
 
 
