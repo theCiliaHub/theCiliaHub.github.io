@@ -4725,66 +4725,37 @@ async function getLiConservation(geneSymbol) {
     return formatLiGeneData(geneSymbol, geneEntry, liPhylogenyCache.summary);
 }
 
-// --- UPDATED CILIATED ORGANISMS (Replaced Cricetulus griseus and Leishmania mexicana) ---
 const CIL_ORG_FULL = [
-    "Homo sapiens", "Rattus norvegicus", "M.gallopavo", "Mus musculus", "Gallus gallus", 
-    "Xenopus tropicalis", "D.rerio", "Caenorhabditis elegans", "C.reinhardtii", 
-    "T.thermophila", "T.cruzi", "L.major", "T.vaginalis", 
-    "G.lamblia", "N.gruberi", "T.brucei", "V.carteri", 
-    "O.lucimarinus", "S.purpuratus", "C.intestinalis"
+    "Homo sapiens", "M.musculus", "D.rerio", "Xenopus tropicalis", "Gallus gallus", 
+    "S.purpuratus", "C.intestinalis", "H.magnipapillata", "T.thermophila", 
+    "C.reinhardtii", "V.carteri", "P.patens", "T.cruzi", 
+    "L.major", "T.vaginalis", "G.lamblia", "N.gruberi", 
+    "T.brucei", "V.carteri", "M.brevicollis"
 ];
 
-// --- UPDATED NON-CILIATED ORGANISMS (Removed 4 missing species, adjusted total count) ---
+// --- UPDATED NON-CILIATED ORGANISMS (Using known Li list entries, ensured 20 items) ---
 const NCIL_ORG_FULL = [
-    "S.cerevisiae", // Replacement for B. dendrobatidis
+    "S.cerevisiae", 
     "S.pombe", 
-    "U.maydis", // Replacement for P. graminis
+    "U.maydis", 
     "A.thaliana", 
     "O.sativa", 
     "Z.mays", 
-    "P.tricornutum", // Replacement for A. anophagefferens
-    "T.melanosporum", 
+    "P.tricornutum", 
+    "C.merolae", 
     "C.neoformans", 
+    "P.chrysosporium", 
+    "S.commune", 
+    "C.cinerea", 
+    "L.bicolor", 
+    "B.fuckeliana", 
     "S.sclerotiorum", 
+    "F.graminearum", 
     "M.grisea",
     "N.crassa",
-    "A.fumigatus",
-    "A.oryzae",
-    "A.niger",
-    "G.lamblia", // Replacement for B. hominis (G. lamblia is Ciliated, but this list needs balance)
-    "C.parvum", 
-    "E.histolytica",
-    "E.dispar",
-    "P.falciparum" 
-    
-    // NOTE: This list uses the abbreviated names from the Li source list for maximum compatibility.
-    // However, since G. lamblia and P. falciparum are Ciliated in nature, their placement here 
-    // violates the intent of a strictly non-ciliated list. Let's aim for a cleaner, 20-20 split 
-    // using ONLY the abbreviated Li names that are strictly non-ciliated.
-
-    // === Final Recommended NCIL List (Using Li list entries: 38-101) ===
-    "S.cerevisiae", // 101
-    "S.pombe", // 60
-    "U.maydis", // 53
-    "A.thaliana", // 42
-    "O.sativa", // 39
-    "Z.mays", // 38
-    "P.tricornutum", // 28
-    "C.merolae", // 29
-    "C.neoformans", // 54
-    "P.chrysosporium", // 55
-    "S.commune", // 56
-    "C.cinerea", // 57
-    "L.bicolor", // 58
-    "B.fuckeliana", // 61
-    "S.sclerotiorum", // 62
-    "F.graminearum", // 63
-    "M.grisea", // 64
-    "N.crassa", // 65
-    "P.anserina", // 66
-    "P.chrysogenum" // 67
+    "P.anserina", 
+    "P.chrysogenum"
 ];
-
 /**
  * Automated handler for all phylogenetic questions (Q1-Q7).
  * It fetches the pre-loaded Li/Nevers data for quick summary and triggers
