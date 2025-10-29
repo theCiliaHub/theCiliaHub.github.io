@@ -1032,6 +1032,7 @@ function extractMultipleGenes(query) {
     // Return unique uppercase gene symbols
     return [...new Set(matches.map(g => g.toUpperCase()))];
 }
+
 // --- UPDATED getPhylogenyGenesForOrganism (Enriches with ALL Orthologs) ---
 async function getPhylogenyGenesForOrganism(organismName) {
     await fetchCiliaData(); 
@@ -1080,272 +1081,6 @@ async function getPhylogenyGenesForOrganism(organismName) {
     );
 }
 
-function renderLiPhylogenyHeatmap(genes) {
-    if (!liPhylogenyCache) {
-        return {
-            html: `<div class="result-card"><h3>Heatmap Error</h3><p>Li et al. 2014 data not loaded. Please try again.</p></div>`,
-            plotData: null,
-            plotLayout: null,
-            plotId: null
-        };
-    }
-    
-    const CIL_COUNT = CIL_ORG_FULL.length;
-    const NCIL_COUNT = NCIL_ORG_FULL.length;
-
-    // --- MANUAL CORRECTION MAP FOR VERTEBRATES & MODEL ORGANISMS ---
-    // Maps the verbose name (or a simplified version) to the exact abbreviation in the Li list.
-    const VERTEBRATE_LI_MAP = new Map([
-        ["homosapiens", "H.sapiens"], 
-        ["musmusculus", "M.musculus"],
-        ["daniorerio", "D.rerio"],
-        ["xenopustropicalis", "X.tropicalis"],
-        ["rattusnorvegicus", "R.norvegicus"], // Will fail lookup in Li data, but ensures normalization is correct.
-        ["gallusgallus", "G.gallus"],
-        ["caenorhabditiselegans", "C.elegans"],
-        ["celegans", "C.elegans"], // Keeps C. elegans fix
-        ["saccharomycescerevisiae", "S.cerevisiae"], // For NCIL
-        ["arabidopsisthaliana", "A.thaliana"] // For NCIL
-    ]);
-
-
-    // --- 1. Map Target Organisms to Li Indices (FINAL ATTEMPT WITH MANUAL OVERRIDE) ---
-    const liOrgList = liPhylogenyCache.summary.organisms_list;
-    const liOrgMap = new Map();
-
-    // Loop 1: Map ALL 140 Li list entries using multiple naming keys
-    liOrgList.forEach((name, index) => {
-        const lowerName = name.toLowerCase();
-        
-        // Key 1: Official Li list name (e.g., 'H.sapiens')
-        liOrgMap.set(name, index); 
-        
-        // Key 2: Simplified key (e.g., 'homosapiens')
-        liOrgMap.set(lowerName.replace(/[\s\.]/g, ''), index); 
-    });
-
-    const targetOrganisms = CIL_ORG_FULL.concat(NCIL_ORG_FULL);
-    
-    const targetLiIndices = targetOrganisms.map(orgName => {
-        const lowerOrg = orgName.toLowerCase();
-        const simplifiedKey = lowerOrg.replace(/[\s\.]/g, '');
-        
-        // A. Check manual vertebrate map first (highest priority, converts verbose input to Li key)
-        if (VERTEBRATE_LI_MAP.has(simplifiedKey)) {
-            const liAbbrev = VERTEBRATE_LI_MAP.get(simplifiedKey);
-            // Must check if this key actually exists in the LI data map
-            if (liOrgMap.has(liAbbrev)) {
-                return liOrgMap.get(liAbbrev);
-            }
-        }
-        
-        // B. Fallback: Try the fully simplified key (e.g., 'schizosaccharomycespombe')
-        if (liOrgMap.has(simplifiedKey)) return liOrgMap.get(simplifiedKey);
-        
-        // C. Fallback: Try exact Li list name (already mapped in loop 1)
-        if (liOrgMap.has(orgName)) return liOrgMap.get(orgName);
-
-        return undefined; // Organism not found or mapped correctly
-    });
-
-    const geneLabels = genes.map(g => g.toUpperCase());
-    const matrix = [];
-    const textMatrix = [];
-    
-    // --- 2. Build the Matrix (Presence/Absence) ---
-    geneLabels.forEach(gene => {
-        const geneData = Object.values(liPhylogenyCache.genes).find(g => g.g && g.g.toUpperCase() === gene);
-        const presenceIndices = new Set(geneData ? geneData.s : []);
-        const row = [];
-        const textRow = [];
-
-        targetOrganisms.forEach((orgName, index) => {
-            const liIndex = targetLiIndices[index];
-            const isCiliated = index < CIL_COUNT;
-            
-            const isPresent = liIndex !== undefined && presenceIndices.has(liIndex);
-
-            let zValue = 0;
-            let status = "Absent";
-
-            if (isPresent) {
-                zValue = isCiliated ? 2 : 1;
-                status = "Present";
-            }
-            // If mapping failed (liIndex is undefined), it stays white (Z=0).
-            
-            row.push(zValue);
-            textRow.push(`Gene: ${gene}<br>Organism: ${orgName}<br>Status: ${status}`);
-        });
-
-        if (row.length > 0) {
-            matrix.push(row);
-            textMatrix.push(textRow);
-        }
-    });
-
-    // --- 3. Plotly Data & Layout Definition (Uses full names for clarity) ---
-    const plotContainer = 'li-phylogeny-heatmap-container';
-
-    const trace = {
-        z: matrix,
-        // Use full organism names for X-axis ticks
-        x: targetOrganisms.map(name => name.replace('Caenorhabditis elegans', 'C. elegans')), 
-        y: geneLabels,
-        type: 'heatmap',
-        colorscale: [
-            [0/2, '#FFFFFF'],      // Z=0 (Absent) -> White
-            [0.0001/2, '#FFE5B5'], // Z=1 (NCIL Hit) start -> Light Orange (NCIL)
-            [1/2, '#FFE5B5'],      // Z=1 (NCIL Hit) end
-            [1.0001/2, '#698ECF'], // Z=2 (CIL Hit) start -> Blue (CIL)
-            [2/2, '#698ECF']       // Z=2 (CIL Hit) end
-        ],
-        showscale: false,
-        hoverinfo: 'text',
-        text: textMatrix,
-        xgap: 0.5,
-        ygap: 0.5,
-        line: { color: '#000000', width: 0.5 }
-    };
-
-    const layout = {
-        title: `Phylogenetic Conservation (Li et al. 2014) - ${genes.length > 1 ? `${genes.length} Genes` : genes[0]}`,
-        xaxis: { 
-            title: 'Organisms (Ciliated | Non-Ciliated)', 
-            tickangle: 45, 
-            automargin: true 
-        },
-        yaxis: { 
-            title: 'Genes', 
-            automargin: true 
-        },
-        shapes: [
-            {
-                type: 'line',
-                xref: 'x', x0: CIL_COUNT - 0.5, x1: CIL_COUNT - 0.5, 
-                yref: 'paper', y0: 0, y1: 1,
-                line: { color: 'black', width: 2 }
-            }
-        ],
-        margin: { t: 50, b: 200, l: 100, r: 50 },
-        height: Math.max(500, genes.length * 40 + 150)
-    };
-    
-    // --- 4. Return Structured Object for External Execution ---
-    const htmlOutput = `
-        <div class="result-card">
-            <h3>Phylogenetic Heatmap for ${geneLabels.join(', ')} 🌍</h3>
-            <p>Data from <strong>Li et al. (2014) Cell</strong>, mapped to a fixed panel of <strong>${CIL_COUNT} Ciliated (Blue)</strong> and <strong>${NCIL_COUNT} Non-Ciliated (Orange)</strong> organisms.</p>
-            <div id="${plotContainer}" style="height: ${layout.height}px; width: 100%;"></div>
-            <button class="download-button" onclick="downloadPlot('${plotContainer}', 'Phylogeny_Li2014')">Download Heatmap (PNG)</button>
-            <p style="font-size: 0.8em; color: #666; margin-top: 1rem; border-top: 1px solid #eee; padding-top: 0.5rem;">
-                <strong>Source:</strong> Li Y, Calvo SE, Gutman R, Liu JS, Mootha VK. Expansion of biological pathways based on evolutionary inference. (2014) <em>Cell</em>. 
-                <a href="https://pubmed.ncbi.nlm.nih.gov/24995987/" target="_blank">[PMID: 24995987]</a>
-            </p>
-        </div>
-    `;
-
-    return {
-        html: htmlOutput,
-        plotData: [trace],
-        plotLayout: layout,
-        plotId: plotContainer
-    };
-}
-// This function assumes the following are defined globally:
-// - fetchLiPhylogenyData(), fetchNeversPhylogenyData()
-// - CIL_ORG_FULL, NCIL_ORG_FULL, liPhylogenyCache
-// - window.initPhylogenyPlot()
-// - window.extractMultipleGenes()
-
-
-
-
-async function handlePhylogenyVisualizationQuery(query) {
-    const resultArea = document.getElementById('ai-result-area');
-    
-    // --- 1. Gene Extraction and Data Loading ---
-    // The router should be smart enough to extract genes regardless of the phrasing.
-    const inputGenes = extractMultipleGenes(query);
-    
-    // Ensure all necessary phylogenetic data is loaded before proceeding
-    await Promise.all([fetchLiPhylogenyData(), fetchNeversPhylogenyData()]);
-
-    if (!liPhylogenyCache) {
-        return `<div class="result-card"><h3>Error</h3><p>Could not load phylogenetic data (Li et al. 2014) to run this analysis.</p></div>`;
-    }
-
-    // Identify available genes in the Li database (based on HUGO symbol 'g')
-    const liGenes = new Set(Object.values(liPhylogenyCache.genes).map(g => g.g.toUpperCase()).filter(Boolean));
-    const validGenes = inputGenes.filter(g => liGenes.has(g));
-
-    let finalGenes;
-
-    // --- 2. Handle Fallback/Default Genes ---
-    if (validGenes.length === 0) {
-        // Fallback to a set of default genes if the user's gene is missing or none specified
-        const defaultGenes = ["ZC2HC1A", "CEP41", "BBS1", "BBS2", "BBS5", "ZNF474", "IFT81", "BBS7"];
-        const validDefaults = defaultGenes.filter(g => liGenes.has(g));
-        
-        if (validDefaults.length === 0) {
-            return `<div class="result-card"><h3>Analysis Error</h3><p>The requested gene(s) were not found in the Li et al. 2014 phylogenetic dataset, and no default genes could be loaded.</p></div>`;
-        }
-        finalGenes = validDefaults.slice(0, 5); // Use first 5 defaults if no valid genes provided
-        
-    } else {
-        // Combine user's genes with defaults up to a maximum of 20 for the heatmap
-        finalGenes = [...new Set(validGenes)];
-        if (finalGenes.length < 20) {
-            const defaultGenes = ["ZC2HC1A", "CEP41", "BBS1", "BBS2", "BBS5", "ZNF474", "IFT81", "BBS7"];
-            for (const dGene of defaultGenes) {
-                if (finalGenes.length >= 20) break;
-                if (liGenes.has(dGene) && !finalGenes.includes(dGene)) {
-                    finalGenes.push(dGene);
-                }
-            }
-        }
-    }
-
-    // --- 3. Generate Structured Plot Results ---
-    // This calls the rendering logic but returns an object {html, plotData, plotLayout, plotId}
-    const plotResult = renderLiPhylogenyHeatmap(finalGenes);
-    
-    // --- 4. Inject HTML and Execute Plotting Function ---
-    
-    // Set the HTML output. This step creates the required <div> container.
-    // NOTE: This will overwrite any previous content in resultArea.
-    resultArea.innerHTML = plotResult.html;
-
-    // Call the global execution utility, passing the structured data.
-    // This is the CRITICAL STEP that resolves the Plotly rendering issue.
-    window.initPhylogenyPlot(
-        plotResult.plotId, 
-        plotResult.plotData, 
-        plotResult.plotLayout
-    );
-    
-    // Return an empty string as the function has already updated the DOM
-    return "";
-}
-
-/**
- * Safely handles the execution of the Plotly command.
- * This function must be defined in the global scope (window.initPhylogenyPlot).
- */
-window.initPhylogenyPlot = function(containerId, traceData, layoutData) {
-    // We use setTimeout(0) to ensure the browser finishes injecting the HTML <div> before plotting.
-    setTimeout(() => {
-        const plotElement = document.getElementById(containerId);
-        // CRITICAL CHECK: Ensure Plotly library is loaded and the container exists
-        if (plotElement && window.Plotly) {
-            console.log("Successfully initiating Plotly visualization.");
-            Plotly.newPlot(containerId, traceData, layoutData, { responsive: true, displayModeBar: false });
-        } else {
-            // This error should only occur if the Plotly script itself failed to load.
-            console.error("Plotly execution aborted: Container or Plotly library not ready.");
-        }
-    }, 0); 
-};
 
 // Function already defined but repeated here for context:
 async function getHubOrthologsForGene(gene) {
@@ -4746,37 +4481,530 @@ async function getLiConservation(geneSymbol) {
     return formatLiGeneData(geneSymbol, geneEntry, liPhylogenyCache.summary);
 }
 
+/**
+ * @fileoverview New functions and modifications to integrate dual phylogenetic heatmaps.
+ * * NOTE: The following functions (CIL_ORG_FULL, NCIL_ORG_FULL, liPhylogenyCache, neversPhylogenyCache,
+ * fetchLiPhylogenyData, fetchNeversPhylogenyData) are assumed to be globally defined/available.
+ */
+
+// --- Global Data Structures (Required for both Li and Nevers visualization) ---
+// Note: These must be defined outside any function block in the final script.
 const CIL_ORG_FULL = [
-    "Homo sapiens", "M.musculus", "D.rerio", "Xenopus tropicalis", "Gallus gallus", 
-    "S.purpuratus", "C.intestinalis", "H.magnipapillata", "T.thermophila", 
-    "C.reinhardtii", "V.carteri", "P.patens", "T.cruzi", 
-    "L.major", "T.vaginalis", "G.lamblia", "N.gruberi", 
-    "T.brucei", "V.carteri", "M.brevicollis"
+    "Homo sapiens", "Mus musculus", "X.tropicalis", "G.gallus", "O.anatinus", 
+    "D.rerio", "T.nigroviridis", "C.intestinalis", "S.purpuratus", "H.magnipapillata", 
+    "C.elegans", "C.briggsae", "B.malayi", "D.melanogaster", "A.gambiae", 
+    "T.cruzi", "L.major", "T.brucei", "T.vaginalis", "N.gruberi"
 ];
 
-// --- UPDATED NON-CILIATED ORGANISMS (Using known Li list entries, ensured 20 items) ---
 const NCIL_ORG_FULL = [
-    "S.cerevisiae", 
-    "S.pombe", 
-    "U.maydis", 
-    "A.thaliana", 
-    "O.sativa", 
-    "Z.mays", 
-    "P.tricornutum", 
-    "C.merolae", 
-    "C.neoformans", 
-    "P.chrysosporium", 
-    "S.commune", 
-    "C.cinerea", 
-    "L.bicolor", 
-    "B.fuckeliana", 
-    "S.sclerotiorum", 
-    "F.graminearum", 
-    "M.grisea",
-    "N.crassa",
-    "P.anserina", 
-    "P.chrysogenum"
+    "S.cerevisiae", "S.pombe", "U.maydis", "C.neoformans", "P.chrysosporium", 
+    "T.melanosporum", "A.fumigatus", "A.oryzae", "A.niger", "A.nidulans", 
+    "A.thaliana", "O.sativa", "Z.mays", "S.bicolor", "V.vinifera", 
+    "C.merolae", "P.tricornutum", "E.histolytica", "E.dispar", "C.parvum"
 ];
+
+// --------------------------------------------------------------------------------------
+// NEW FUNCTION 1: NEVERS ET AL. 2017 HEATMAP RENDERER
+// --------------------------------------------------------------------------------------
+
+/**
+ * Renders the phylogenetic heatmap based on Nevers et al. 2017 data.
+ * @param {string[]} genes - Array of genes requested.
+ * @returns {object} Structured object {html, plotData, plotLayout, plotId}.
+ */
+function renderNeversPhylogenyHeatmap(genes) {
+    if (!neversPhylogenyCache) {
+        return {
+            html: `<div class="result-card"><h3>Heatmap Error</h3><p>Nevers et al. 2017 data not loaded. Please try again.</p></div>`,
+            plotData: null,
+            plotLayout: null,
+            plotId: null
+        };
+    }
+    
+    // Nevers data includes its own organism groups in organism_groups.all_organisms_list
+    const neversOrgList = neversPhylogenyCache.organism_groups?.all_organisms_list || [];
+    const neversOrgMap = new Map();
+    neversOrgList.forEach((name, index) => {
+        // Map simplified names to the Li index
+        liOrgMap.set(name, index);
+        liOrgMap.set(name.toLowerCase().replace(/[\s\.\(\)]/g, ''), index);
+    });
+
+    // NOTE: For consistency and direct comparison, we will use the *same* 40 external target organisms
+    // but map them against the Nevers internal list indices.
+    const targetOrganisms = CIL_ORG_FULL.concat(NCIL_ORG_FULL);
+    
+    const targetNeversIndices = targetOrganisms.map(orgName => {
+        // Find the index in the 99-organism Nevers list.
+        const officialNeversName = orgName.replace('Caenorhabditis elegans', 'Caenorhabditis elegans').replace('Homo sapiens', 'Homo sapiens'); // More nuanced normalization needed here
+        return neversOrgMap.get(officialNeversName) || neversOrgMap.get(officialNeversName.toLowerCase().replace(/[\s\.\(\)]/g, ''));
+    });
+
+    const geneLabels = genes.map(g => g.toUpperCase());
+    const matrix = [];
+    const textMatrix = [];
+    
+    // --- Build the Matrix (Presence/Absence in Nevers data) ---
+    geneLabels.forEach(gene => {
+        const geneData = neversPhylogenyCache.genes?.[gene];
+        const presenceIndices = new Set(geneData ? geneData.s : []);
+        const row = [];
+        const textRow = [];
+
+        targetOrganisms.forEach((orgName, index) => {
+            const neversIndex = targetNeversIndices[index];
+            const isCiliated = index < CIL_ORG_FULL.length; 
+            const isPresent = neversIndex !== undefined && presenceIndices.has(neversIndex);
+
+            let zValue = 0;
+            let status = "Absent";
+
+            if (isPresent) {
+                zValue = isCiliated ? 2 : 1; // Z=2 for CIL, Z=1 for NCIL presence
+                status = "Present";
+            }
+            
+            row.push(zValue);
+            textRow.push(`Gene: ${gene}<br>Organism: ${orgName}<br>Status: ${status}`);
+        });
+
+        if (row.length > 0) {
+            matrix.push(row);
+            textMatrix.push(textRow);
+        }
+    });
+
+    const plotContainer = 'nevers-phylogeny-heatmap-container';
+
+    // --- Plotly Data & Layout (DIFFERENT COLORSCALE) ---
+    const NEVERS_COLORS = [
+        [0/2, '#F0F0F0'],      // Z=0 (Absent) -> Light Gray
+        [0.0001/2, '#F0A0A0'], // Z=1 (NCIL Hit) start -> Light Red/Pink
+        [1/2, '#F0A0A0'],      // Z=1 (NCIL Hit) end
+        [1.0001/2, '#00A0A0'], // Z=2 (CIL Hit) start -> Teal/Cyan (DIFFERENT COLOR)
+        [2/2, '#00A0A0']       // Z=2 (CIL Hit) end
+    ];
+
+    const trace = {
+        z: matrix,
+        x: targetOrganisms.map(name => name.replace('Caenorhabditis elegans', 'C. elegans')), 
+        y: geneLabels,
+        type: 'heatmap',
+        colorscale: NEVERS_COLORS,
+        showscale: false,
+        hoverinfo: 'text',
+        text: textMatrix,
+        xgap: 0.5,
+        ygap: 0.5,
+        line: { color: '#000000', width: 0.5 }
+    };
+
+    const layout = {
+        title: `Phylogenetic Conservation (Nevers et al. 2017) - ${genes.length > 1 ? `${genes.length} Genes` : genes[0]}`,
+        xaxis: { title: 'Organisms (Ciliated | Non-Ciliated)', tickangle: 45, automargin: true },
+        yaxis: { title: 'Genes', automargin: true },
+        shapes: [{
+                type: 'line',
+                xref: 'x', x0: CIL_ORG_FULL.length - 0.5, x1: CIL_ORG_FULL.length - 0.5, 
+                yref: 'paper', y0: 0, y1: 1,
+                line: { color: 'black', width: 2 }
+            }],
+        margin: { t: 50, b: 200, l: 100, r: 50 },
+        height: Math.max(500, genes.length * 40 + 150)
+    };
+    
+    // --- HTML Output (Includes link to switch back to Li) ---
+    const htmlOutput = `
+        <div class="result-card">
+            <h3>Phylogenetic Heatmap for ${geneLabels.join(', ')} 🌍</h3>
+            <p>Data from <strong>Nevers et al. (2017)</strong>, mapped to a fixed panel of <strong>${CIL_ORG_FULL.length} Ciliated (Teal)</strong> and <strong>${NCIL_ORG_FULL.length} Non-Ciliated (Pink)</strong> organisms.</p>
+            <div id="${plotContainer}" style="height: ${layout.height}px; width: 100%;"></div>
+            <button class="download-button" onclick="downloadPlot('${plotContainer}', 'Phylogeny_Nevers2017')">Download Heatmap (PNG)</button>
+            <p style="font-size: 0.8em; color: #666; margin-top: 1rem; padding-top: 0.5rem;">
+                <strong>Source:</strong> Nevers, Y. et al. (2017) <em>Mol Biol Evol</em>. 
+                <a href="https://pubmed.ncbi.nlm.nih.gov/28460059/" target="_blank">[PMID: 28460059]</a>
+            </p>
+            <p class="ai-suggestion" style="margin-top: 10px;">
+                <a href="#" class="ai-action" data-action="show-li-heatmap" data-genes="${genes.join(',')}">⬅️ Show Li et al. (2014) Comparison</a>
+            </p>
+        </div>
+    `;
+
+    return { html: htmlOutput, plotData: [trace], plotLayout: layout, plotId: plotContainer };
+}
+
+// --------------------------------------------------------------------------------------
+// MODIFICATION 1: Update renderLiPhylogenyHeatmap to add the Nevers link
+// --------------------------------------------------------------------------------------
+
+/**
+ * MODIFIED: Adds a link to switch to the Nevers heatmap.
+ */
+function renderLiPhylogenyHeatmap(genes) {
+    if (!liPhylogenyCache) {
+        return {
+            html: `<div class="result-card"><h3>Heatmap Error</h3><p>Li et al. 2014 data not loaded. Please try again.</p></div>`,
+            plotData: null,
+            plotLayout: null,
+            plotId: null
+        };
+    }
+    
+    // Assumed global constants are available (CIL_ORG_FULL, NCIL_ORG_FULL)
+    const CIL_COUNT = CIL_ORG_FULL.length;
+    const NCIL_COUNT = NCIL_ORG_FULL.length;
+
+    // --- MANUAL CORRECTION MAP (USED TO MAP VERBOSE INPUTS TO LI KEYS) ---
+    // This map ensures common verbose inputs (e.g., "musmusculus") map to the Li keys (e.g., "M.musculus").
+    const VERTEBRATE_LI_MAP = new Map([
+        ["homosapiens", "H.sapiens"],
+        ["m.gallopavo", "M.gallopavo"],
+        ["musmusculus", "M.musculus"],
+        ["daniorerio", "D.rerio"],
+        ["xenopustropicalis", "X.tropicalis"],
+        ["gallusgallus", "G.gallus"],
+        ["o.anatinus", "O.anatinus"],
+        ["t.nigroviridis", "T.nigroviridis"],
+        ["c.elegans", "C.elegans"],
+        ["c.briggsae", "C.briggsae"],
+        ["c.reinhardtii", "C.reinhardtii"],
+        ["t.thermophila", "T.thermophila"],
+        ["s.cerevisiae", "S.cerevisiae"],
+        ["a.thaliana", "A.thaliana"],
+        ["o.sativa", "O.sativa"]
+    ]);
+
+
+    // --- 1. Map Target Organisms to Li Indices (FINAL, ROBUST MAPPING) ---
+    const liOrgList = liPhylogenyCache.summary.organisms_list;
+    const liOrgMap = new Map();
+
+    // Loop 1: Map ALL 140 Li list entries using multiple naming keys
+    liOrgList.forEach((name, index) => {
+        // Key 1: Official Li list name (e.g., 'H.sapiens')
+        liOrgMap.set(name, index);
+        // Key 2: Simplified key (e.g., 'homosapiens')
+        liOrgMap.set(name.toLowerCase().replace(/[\s\.]/g, ''), index);
+    });
+
+    const targetOrganisms = CIL_ORG_FULL.concat(NCIL_ORG_FULL);
+    
+    const targetLiIndices = targetOrganisms.map(orgName => {
+        const lowerOrg = orgName.toLowerCase();
+        const simplifiedKey = lowerOrg.replace(/[\s\.]/g, '');
+        
+        // A. Check manual vertebrate map first (converts verbose list name to specific Li key)
+        if (VERTEBRATE_LI_MAP.has(simplifiedKey)) {
+            const liAbbrev = VERTEBRATE_LI_MAP.get(simplifiedKey);
+            if (liOrgMap.has(liAbbrev)) {
+                return liOrgMap.get(liAbbrev);
+            }
+        }
+        
+        // B. Fallback: Try the fully simplified key (works for Protists/Fungi that don't need overrides)
+        if (liOrgMap.has(simplifiedKey)) return liOrgMap.get(simplifiedKey);
+
+        // C. Final Fallback: Exact Li list name (already mapped in loop 1)
+        if (liOrgMap.has(orgName)) return liOrgMap.get(orgName);
+
+        return undefined; // Organism not found or mapped correctly
+    });
+
+    const geneLabels = genes.map(g => g.toUpperCase());
+    const matrix = [];
+    const textMatrix = [];
+    
+    // --- 2. Build the Matrix (Presence/Absence) ---
+    geneLabels.forEach(gene => {
+        const geneData = Object.values(liPhylogenyCache.genes).find(g => g.g && g.g.toUpperCase() === gene);
+        const presenceIndices = new Set(geneData ? geneData.s : []);
+        const row = [];
+        const textRow = [];
+
+        targetOrganisms.forEach((orgName, index) => {
+            const liIndex = targetLiIndices[index];
+            const isCiliated = index < CIL_COUNT;
+            
+            const isPresent = liIndex !== undefined && presenceIndices.has(liIndex);
+
+            let zValue = 0;
+            let status = "Absent";
+
+            if (isPresent) {
+                zValue = isCiliated ? 2 : 1;
+                status = "Present";
+            }
+            
+            row.push(zValue);
+            textRow.push(`Gene: ${gene}<br>Organism: ${orgName}<br>Status: ${status}`);
+        });
+
+        if (row.length > 0) {
+            matrix.push(row);
+            textMatrix.push(textRow);
+        }
+    });
+
+    // --- 3. Plotly Data & Layout Definition (Uses full names for clarity) ---
+    const plotContainer = 'li-phylogeny-heatmap-container';
+
+    const trace = {
+        z: matrix,
+        // Use full organism names for X-axis ticks (Replace abbreviations for readability)
+        x: targetOrganisms.map(name => {
+            if (name === "H.sapiens") return "Human";
+            if (name === "M.musculus") return "Mouse";
+            if (name === "D.rerio") return "Zebrafish";
+            if (name.includes("elegans")) return "C. elegans";
+            return name.replace(/\./g, '').split(' ')[0]; // Simplify others (e.g. Tnigroviridis -> Tnigroviridis)
+        }), 
+        y: geneLabels,
+        type: 'heatmap',
+        colorscale: [
+            [0/2, '#FFFFFF'],      // Z=0 (Absent) -> White
+            [0.0001/2, '#FFE5B5'], // Z=1 (NCIL Hit) start -> Light Orange (NCIL)
+            [1/2, '#FFE5B5'],      // Z=1 (NCIL Hit) end
+            [1.0001/2, '#698ECF'], // Z=2 (CIL Hit) start -> Blue (CIL)
+            [2/2, '#698ECF']       // Z=2 (CIL Hit) end
+        ],
+        showscale: false,
+        hoverinfo: 'text',
+        text: textMatrix,
+        xgap: 0.5,
+        ygap: 0.5,
+        line: { color: '#000000', width: 0.5 }
+    };
+
+    const layout = {
+        title: `Phylogenetic Conservation (Li et al. 2014) - ${genes.length > 1 ? `${genes.length} Genes` : genes[0]}`,
+        xaxis: { 
+            title: 'Organisms (Ciliated | Non-Ciliated)', 
+            tickangle: 45, 
+            automargin: true 
+        },
+        yaxis: { 
+            title: 'Genes', 
+            automargin: true 
+        },
+        shapes: [
+            {
+                type: 'line',
+                xref: 'x', x0: CIL_COUNT - 0.5, x1: CIL_COUNT - 0.5, 
+                yref: 'paper', y0: 0, y1: 1,
+                line: { color: 'black', width: 2 }
+            }
+        ],
+        margin: { t: 50, b: 200, l: 100, r: 50 },
+        height: Math.max(500, genes.length * 40 + 150)
+    };
+    
+    // --- 4. Return Structured Object for External Execution ---
+    const htmlOutput = `
+        <div class="result-card">
+            <h3>Phylogenetic Heatmap for ${geneLabels.join(', ')} 🌍</h3>
+            <p>Data from <strong>Li et al. (2014) Cell</strong>, mapped to a fixed panel of <strong>${CIL_COUNT} Ciliated (Blue)</strong> and <strong>${NCIL_COUNT} Non-Ciliated (Orange)</strong> organisms.</p>
+            <div id="${plotContainer}" style="height: ${layout.height}px; width: 100%;"></div>
+            <button class="download-button" onclick="downloadPlot('${plotContainer}', 'Phylogeny_Li2014')">Download Heatmap (PNG)</button>
+            <p style="font-size: 0.8em; color: #666; margin-top: 1rem; border-top: 1px solid #eee; padding-top: 0.5rem;">
+                <strong>Source:</strong> Li Y, Calvo SE, Gutman R, Liu JS, Mootha VK. Expansion of biological pathways based on evolutionary inference. (2014) <em>Cell</em>. 
+                <a href="https://pubmed.ncbi.nlm.nih.gov/24995987/" target="_blank">[PMID: 24995987]</a>
+            </p>
+            <p class="ai-suggestion" style="margin-top: 10px;">
+                <a href="#" class="ai-action" data-action="show-nevers-heatmap" data-genes="${genes.join(',')}">➡️ Show Nevers et al. (2017) Comparison</a>
+            </p>
+        </div>
+    `;
+
+    return {
+        html: htmlOutput,
+        plotData: [trace],
+        plotLayout: layout,
+        plotId: plotContainer
+    };
+}
+
+// --------------------------------------------------------------------------------------
+// MODIFICATION 2: Update Router to Handle Clicks and Switch Views
+// --------------------------------------------------------------------------------------
+
+/**
+ * MODIFIED: The main router now detects if the query is a direct visualization request
+ * or a click event to switch between Li and Nevers heatmaps.
+ * @param {string} query - The raw user query.
+ * @param {string} [source='li'] - The heatmap source to display first.
+ */
+async function handlePhylogenyVisualizationQuery(query) {
+
+    const resultArea = document.getElementById('ai-result-area');
+
+    
+
+    // --- 1. Gene Extraction and Data Loading ---
+
+    // The router should be smart enough to extract genes regardless of the phrasing.
+
+    const inputGenes = extractMultipleGenes(query);
+
+    
+
+    // Ensure all necessary phylogenetic data is loaded before proceeding
+
+    await Promise.all([fetchLiPhylogenyData(), fetchNeversPhylogenyData()]);
+
+
+
+    if (!liPhylogenyCache) {
+
+        return `<div class="result-card"><h3>Error</h3><p>Could not load phylogenetic data (Li et al. 2014) to run this analysis.</p></div>`;
+
+    }
+
+
+
+    // Identify available genes in the Li database (based on HUGO symbol 'g')
+
+    const liGenes = new Set(Object.values(liPhylogenyCache.genes).map(g => g.g.toUpperCase()).filter(Boolean));
+
+    const validGenes = inputGenes.filter(g => liGenes.has(g));
+
+
+
+    let finalGenes;
+
+
+
+    // --- 2. Handle Fallback/Default Genes ---
+
+    if (validGenes.length === 0) {
+
+        // Fallback to a set of default genes if the user's gene is missing or none specified
+
+        const defaultGenes = ["ZC2HC1A", "CEP41", "BBS1", "BBS2", "BBS5", "ZNF474", "IFT81", "BBS7"];
+
+        const validDefaults = defaultGenes.filter(g => liGenes.has(g));
+
+        
+
+        if (validDefaults.length === 0) {
+
+            return `<div class="result-card"><h3>Analysis Error</h3><p>The requested gene(s) were not found in the Li et al. 2014 phylogenetic dataset, and no default genes could be loaded.</p></div>`;
+
+        }
+
+        finalGenes = validDefaults.slice(0, 5); // Use first 5 defaults if no valid genes provided
+
+        
+
+    } else {
+
+        // Combine user's genes with defaults up to a maximum of 20 for the heatmap
+
+        finalGenes = [...new Set(validGenes)];
+
+        if (finalGenes.length < 20) {
+
+            const defaultGenes = ["ZC2HC1A", "CEP41", "BBS1", "BBS2", "BBS5", "ZNF474", "IFT81", "BBS7"];
+
+            for (const dGene of defaultGenes) {
+
+                if (finalGenes.length >= 20) break;
+
+                if (liGenes.has(dGene) && !finalGenes.includes(dGene)) {
+
+                    finalGenes.push(dGene);
+
+                }
+
+            }
+
+        }
+
+    }
+
+
+
+    // --- 3. Generate Structured Plot Results ---
+
+    // This calls the rendering logic but returns an object {html, plotData, plotLayout, plotId}
+
+    const plotResult = renderLiPhylogenyHeatmap(finalGenes);
+
+    
+
+    // --- 4. Inject HTML and Execute Plotting Function ---
+
+    
+
+    // Set the HTML output. This step creates the required <div> container.
+
+    // NOTE: This will overwrite any previous content in resultArea.
+
+    resultArea.innerHTML = plotResult.html;
+
+
+
+    // Call the global execution utility, passing the structured data.
+
+    // This is the CRITICAL STEP that resolves the Plotly rendering issue.
+
+    window.initPhylogenyPlot(
+
+        plotResult.plotId, 
+
+        plotResult.plotData, 
+
+        plotResult.plotLayout
+
+    );
+
+    
+
+    // Return an empty string as the function has already updated the DOM
+
+    return "";
+
+}
+
+
+
+/**
+
+ * Safely handles the execution of the Plotly command.
+
+ * This function must be defined in the global scope (window.initPhylogenyPlot).
+
+ */
+
+window.initPhylogenyPlot = function(containerId, traceData, layoutData) {
+
+    // We use setTimeout(0) to ensure the browser finishes injecting the HTML <div> before plotting.
+
+    setTimeout(() => {
+
+        const plotElement = document.getElementById(containerId);
+
+        // CRITICAL CHECK: Ensure Plotly library is loaded and the container exists
+
+        if (plotElement && window.Plotly) {
+
+            console.log("Successfully initiating Plotly visualization.");
+
+            Plotly.newPlot(containerId, traceData, layoutData, { responsive: true, displayModeBar: false });
+
+        } else {
+
+            // This error should only occur if the Plotly script itself failed to load.
+
+            console.error("Plotly execution aborted: Container or Plotly library not ready.");
+
+        }
+
+    }, 0); 
+
+};
+
+
 /**
  * Automated handler for all phylogenetic questions (Q1-Q7).
  * It fetches the pre-loaded Li/Nevers data for quick summary and triggers
@@ -4995,28 +5223,32 @@ function formatGeneDetail(geneData, geneSymbol, detailTitle, detailContent) {
 // Click handler for gene selection
 // -------------------------------
 document.addEventListener('click', (e) => {
-    // 1. Handle clicks on gene cards/names from analysis results
+    // 1. Handle clicks on gene cards/names from analysis results (STANDARD)
     if (e.target.matches('.gene-card, .gene-name')) {
         const geneName = e.target.dataset.geneName || e.target.textContent.trim();
         if (geneName) handleCiliAISelection([geneName]);
     }
 
-    // 2. Handle clicks on the example questions (e.g., "BBSome", "Joubert")
-    if (e.target.matches('.example-queries span')) {
+    // 2. Handle clicks on the example questions (e.g., "BBSome", "Joubert") (STANDARD)
+    else if (e.target.matches('.example-queries span')) {
         const aiQueryInput = document.getElementById('aiQueryInput');
         // Use the data-question attribute for the full query
         aiQueryInput.value = e.target.dataset.question || e.target.textContent;
         handleAIQuery();
     }
 
-    // 3. Handle clicks on special action links within results, like visualizing a heatmap
-    if (e.target.classList.contains('ai-action')) {
+    // 3. Handle clicks on special action links within results (UPDATED LOGIC)
+    else if (e.target.classList.contains('ai-action')) {
         e.preventDefault();
         const action = e.target.dataset.action;
-        const gene = e.target.dataset.gene;
-        if (action === 'expression-visualize' && gene) {
-            const resultArea = document.getElementById('ai-result-area');
+        const genesString = e.target.dataset.genes; // Get the comma-separated gene list
+        const resultArea = document.getElementById('ai-result-area');
+        
+        // --- 3a. Handle Expression Visualization (Existing Logic) ---
+        if (action === 'expression-visualize' && genesString) {
+            const gene = genesString; // It should only be one gene here, but using genesString works
             resultArea.innerHTML = `<p class="status-searching">Building expression heatmap...</p>`;
+            
             // Ensure tissue data is available before calling
             if (window.tissueDataCache) {
                  displayCiliAIExpressionHeatmap([gene], resultArea, window.tissueDataCache);
@@ -5025,6 +5257,25 @@ document.addEventListener('click', (e) => {
                      displayCiliAIExpressionHeatmap([gene], resultArea, tissueData);
                  });
             }
+        }
+        
+        // --- 3b. Handle Phylogenetic Switching (NEW LOGIC) ---
+        else if (action === 'show-nevers-heatmap' && genesString) {
+            // Trigger the router function to switch the view to Nevers
+            const genes = genesString.split(',').map(g => g.trim());
+            resultArea.innerHTML = `<p class="status-searching">Switching to Nevers et al. 2017 comparison...</p>`;
+            
+            // Call the router with the target source defined as 'nevers'
+            handlePhylogenyVisualizationQuery(`Show Nevers heatmap for ${genes.join(',')}`, 'nevers');
+        } 
+        
+        else if (action === 'show-li-heatmap' && genesString) {
+            // Trigger the router function to switch the view back to Li
+            const genes = genesString.split(',').map(g => g.trim());
+            resultArea.innerHTML = `<p class="status-searching">Switching to Li et al. 2014 comparison...</p>`;
+            
+            // Call the router with the target source defined as 'li'
+            handlePhylogenyVisualizationQuery(`Show Li heatmap for ${genes.join(',')}`, 'li');
         }
     }
 });
