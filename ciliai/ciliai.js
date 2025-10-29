@@ -4520,34 +4520,46 @@ function renderNeversPhylogenyHeatmap(genes) {
     const CIL_COUNT = CIL_ORG_FULL.length;
     const NCIL_COUNT = NCIL_ORG_FULL.length;
 
-    // --- 1. Map Target Organisms to Nevers Indices (CRITICAL FIX: Prioritize Exact Match) ---
+    // --- 1. Map Target Organisms to Nevers Indices (CRITICAL FIX) ---
     const neversOrgList = neversPhylogenyCache.organism_groups?.all_organisms_list || [];
-    const neversOrgMap = new Map(); // Defined locally
+    const neversOrgMap = new Map();
     
-    // Loop 1: Map all Nevers list entries using multiple naming keys.
+    // Loop 1: Map all Nevers list entries to their index using simplified keys.
     neversOrgList.forEach((name, index) => {
         const lowerName = name.toLowerCase();
         
-        // Key 1 (Highest Priority): Map the EXACT name string present in the source data.
+        // Key 1: Store the EXACT original name (in case the input matches perfectly)
         neversOrgMap.set(name, index);
         
-        // Key 2: Map the fully simplified key (removes all non-alphanumeric characters for robust fallback).
-        neversOrgMap.set(lowerName.replace(/[\s\.\(\)]/g, ''), index);
+        // Key 2 (The Robust Key): Remove parentheses/strain info and simplify.
+        const baseName = lowerName.replace(/\s*\(.*?\)\s*/g, '').trim();
+        const simplifiedKey = baseName.replace(/[\s\.]/g, '');
+
+        neversOrgMap.set(simplifiedKey, index);
+        
+        // Key 3: Map the two-part name (e.g., Danio rerio -> daniorerio)
+        const genusSpeciesKey = baseName.split(' ').slice(0, 2).join('');
+        if (genusSpeciesKey) neversOrgMap.set(genusSpeciesKey, index);
     });
+
     const targetOrganisms = CIL_ORG_FULL.concat(NCIL_ORG_FULL);
     
     const targetNeversIndices = targetOrganisms.map(orgName => {
         const lowerOrg = orgName.toLowerCase();
         const simplifiedKey = lowerOrg.replace(/[\s\.]/g, '');
         
-        // A. Try the official, exact name from the input list (CRITICAL FIX)
-        // This is necessary because Nevers keys often include parenthetical strain info.
-        if (neversOrgMap.has(orgName)) {
-            return neversOrgMap.get(orgName);
-        }
+        // A. Try the fully simplified key (Highest chance of matching H.sapiens, M.musculus)
+        if (neversOrgMap.has(simplifiedKey)) return neversOrgMap.get(simplifiedKey);
         
-        // B. Fallback: Use the fully simplified key (for protists/fungi with simple names)
-        return neversOrgMap.get(simplifiedKey);
+        // B. Try mapping the full official name (e.g., C. elegans -> Caenorhabditis elegans)
+        if (neversOrgMap.has(orgName)) return neversOrgMap.get(orgName);
+
+        // C. Specific Abbreviation Check (e.g., D.rerio, C.elegans)
+        const specificAbbrev = lowerOrg.replace(/\./g, '');
+        if (neversOrgMap.has(specificAbbrev)) return neversOrgMap.get(specificAbbrev);
+        
+        // If all else fails, return undefined.
+        return undefined;
     });
 
     const geneLabels = genes.map(g => g.toUpperCase());
@@ -4556,7 +4568,6 @@ function renderNeversPhylogenyHeatmap(genes) {
     
     // --- 2. Build the Matrix (Presence/Absence in Nevers data) ---
     geneLabels.forEach(gene => {
-        // NOTE: Nevers data is keyed directly by HUGO symbol, unlike Li data.
         const geneData = neversPhylogenyCache.genes?.[gene]; 
         const presenceIndices = new Set(geneData ? geneData.s : []);
         const row = [];
@@ -4587,13 +4598,10 @@ function renderNeversPhylogenyHeatmap(genes) {
 
     const plotContainer = 'nevers-phylogeny-heatmap-container';
 
-    // --- 3. Plotly Data & Layout (DIFFERENT COLORSCALE: Teal/Pink) ---
+    // --- 3. Plotly Data & Layout (Teal/Pink) ---
     const NEVERS_COLORS = [
-        [0/2, '#F0F0F0'],      // Z=0 (Absent) -> Light Gray
-        [0.0001/2, '#F0A0A0'], // Z=1 (NCIL Hit) start -> Light Red/Pink
-        [1/2, '#F0A0A0'],      // Z=1 (NCIL Hit) end
-        [1.0001/2, '#00A0A0'], // Z=2 (CIL Hit) start -> Teal/Cyan
-        [2/2, '#00A0A0']       // Z=2 (CIL Hit) end
+        [0/2, '#F0F0F0'], [0.0001/2, '#F0A0A0'], [1/2, '#F0A0A0'], 
+        [1.0001/2, '#00A0A0'], [2/2, '#00A0A0']
     ];
 
     const trace = {
@@ -4612,21 +4620,14 @@ function renderNeversPhylogenyHeatmap(genes) {
         showscale: false,
         hoverinfo: 'text',
         text: textMatrix,
-        xgap: 0.5,
-        ygap: 0.5,
-        line: { color: '#000000', width: 0.5 }
+        xgap: 0.5, ygap: 0.5, line: { color: '#000000', width: 0.5 }
     };
 
     const layout = {
         title: `Phylogenetic Conservation (Nevers et al. 2017) - ${genes.length > 1 ? `${genes.length} Genes` : genes[0]}`,
         xaxis: { title: 'Organisms (Ciliated | Non-Ciliated)', tickangle: 45, automargin: true },
         yaxis: { title: 'Genes', automargin: true },
-        shapes: [{
-                type: 'line',
-                xref: 'x', x0: CIL_COUNT - 0.5, x1: CIL_COUNT - 0.5, 
-                yref: 'paper', y0: 0, y1: 1,
-                line: { color: 'black', width: 2 }
-            }],
+        shapes: [{ type: 'line', xref: 'x', x0: CIL_COUNT - 0.5, x1: CIL_COUNT - 0.5, yref: 'paper', y0: 0, y1: 1, line: { color: 'black', width: 2 } }],
         margin: { t: 50, b: 200, l: 100, r: 50 },
         height: Math.max(500, genes.length * 40 + 150)
     };
@@ -4638,10 +4639,6 @@ function renderNeversPhylogenyHeatmap(genes) {
             <p>Data from <strong>Nevers et al. (2017)</strong>, mapped to a fixed panel of <strong>${CIL_COUNT} Ciliated (Teal)</strong> and <strong>${NCIL_COUNT} Non-Ciliated (Pink)</strong> organisms.</p>
             <div id="${plotContainer}" style="height: ${layout.height}px; width: 100%;"></div>
             <button class="download-button" onclick="downloadPlot('${plotContainer}', 'Phylogeny_Nevers2017')">Download Heatmap (PNG)</button>
-            <p style="font-size: 0.8em; color: #666; margin-top: 1rem; border-top: 1px solid #eee; padding-top: 0.5rem;">
-                <strong>Source:</strong> Nevers, Y. et al. (2017) <em>Mol Biol Evol</em>. 
-                <a href="https://pubmed.ncbi.nlm.nih.gov/28460059/" target="_blank">[PMID: 28460059]</a>
-            </p>
             <p class="ai-suggestion" style="margin-top: 10px;">
                 <a href="#" class="ai-action" data-action="show-li-heatmap" data-genes="${genes.join(',')}">⬅️ Show Li et al. (2014) Comparison</a>
             </p>
@@ -4650,6 +4647,7 @@ function renderNeversPhylogenyHeatmap(genes) {
 
     return { html: htmlOutput, plotData: [trace], plotLayout: layout, plotId: plotContainer };
 }
+
 /**
  * MODIFIED: Adds a link to switch to the Nevers heatmap.
  */
