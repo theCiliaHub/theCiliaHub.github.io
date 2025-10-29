@@ -1081,131 +1081,135 @@ async function getPhylogenyGenesForOrganism(organismName) {
 }
 
 function renderLiPhylogenyHeatmap(genes) {
-    if (!liPhylogenyCache) {
-        return `<div class="result-card"><h3>Heatmap Error</h3><p>Li et al. 2014 data not loaded. Please try again.</p></div>`;
-    }
+    if (!liPhylogenyCache) {
+        return `<div class="result-card"><h3>Heatmap Error</h3><p>Li et al. 2014 data not loaded. Please try again.</p></div>`;
+    }
+    
+    // CIL_ORG_FULL and NCIL_ORG_FULL are assumed to be correctly defined globally.
+    const CIL_COUNT = CIL_ORG_FULL.length;
+    const NCIL_COUNT = NCIL_ORG_FULL.length;
     
-    // --- 1. Map Target Organisms to Li Indices ---
-    const liOrgList = liPhylogenyCache.summary.organisms_list;
-    const liOrgMap = new Map();
-    liOrgList.forEach((name, index) => {
-        // Standardize names in the Li map for fuzzy lookup
-        liOrgMap.set(name.toLowerCase(), index); 
-    });
+    // --- 1. Map Target Organisms to Li Indices ---
+    const liOrgList = liPhylogenyCache.summary.organisms_list;
+    const liOrgMap = new Map();
+    liOrgList.forEach((name, index) => {
+        // Standardize names in the Li map for fuzzy lookup
+        liOrgMap.set(name.toLowerCase().replace(/c\.?\s*elegans/, 'c.elegans'), index); 
+    });
 
-    const targetOrganisms = CIL_ORG_FULL.concat(NCIL_ORG_FULL);
-    const targetLiIndices = targetOrganisms.map(orgName => {
-        // Get the index in the 140 list for the 40 target species
-        let nameToLookup = orgName.toLowerCase().replace(/c\.?\s*elegans/, 'c.elegans');
-        return liOrgMap.get(nameToLookup);
-    });
+    const targetOrganisms = CIL_ORG_FULL.concat(NCIL_ORG_FULL);
+    const targetLiIndices = targetOrganisms.map(orgName => {
+        let nameToLookup = orgName.toLowerCase().replace(/c\.?\s*elegans/, 'c.elegans');
+        return liOrgMap.get(nameToLookup);
+    });
 
-    const geneLabels = genes.map(g => g.toUpperCase());
-    const matrix = [];
-    const textMatrix = [];
-    
-    // --- 2. Build the Matrix (Z-scores: 2=CIL Hit, 1=NCIL Hit, 0=Absent) ---
-    geneLabels.forEach(gene => {
-        // Find the gene's entry, searching by the 'g' (gene symbol) field
-        const geneData = Object.values(liPhylogenyCache.genes).find(g => g.g.toUpperCase() === gene);
-        const presenceIndices = new Set(geneData ? geneData.s : []);
-        const row = [];
-        const textRow = [];
+    const geneLabels = genes.map(g => g.toUpperCase());
+    const matrix = [];
+    const textMatrix = [];
+    
+    // --- 2. Build the Matrix (Z-scores: 2=CIL Hit, 1=NCIL Hit, 0=Absent) ---
+    geneLabels.forEach(gene => {
+        const geneData = Object.values(liPhylogenyCache.genes).find(g => g.g && g.g.toUpperCase() === gene);
+        const presenceIndices = new Set(geneData ? geneData.s : []);
+        const row = [];
+        const textRow = [];
 
-        targetOrganisms.forEach((orgName, index) => {
-            const liIndex = targetLiIndices[index];
-            const isCiliated = index < CIL_ORG_FULL.length; 
-            const isPresent = liIndex !== undefined && presenceIndices.has(liIndex);
+        targetOrganisms.forEach((orgName, index) => {
+            const liIndex = targetLiIndices[index];
+            const isCiliated = index < CIL_COUNT; // Use CIL_COUNT here (20)
+            const isPresent = liIndex !== undefined && presenceIndices.has(liIndex);
 
-            let zValue = 0;
-            let status = "Absent";
+            let zValue = 0;
+            let status = "Absent";
 
-            if (isPresent) {
-                zValue = isCiliated ? 2 : 1;
-                status = "Present";
-            }
-            
-            row.push(zValue);
-            textRow.push(`Gene: ${gene}<br>Organism: ${orgName}<br>Status: ${status}`);
-        });
+            if (isPresent) {
+                zValue = isCiliated ? 2 : 1;
+                status = "Present";
+            }
+            
+            row.push(zValue);
+            textRow.push(`Gene: ${gene}<br>Organism: ${orgName}<br>Status: ${status}`);
+        });
 
-        if (row.length > 0) {
-            matrix.push(row);
-            textMatrix.push(textRow);
-        }
-    });
+        if (row.length > 0) {
+            matrix.push(row);
+            textMatrix.push(textRow);
+        }
+    });
 
-    // --- 3. Plotting using Plotly ---
-    const plotDivId = 'li-phylogeny-heatmap-plot';
+    // --- 3. Plotting using Plotly (Optimized for Async Rendering) ---
+    const plotContainer = 'li-phylogeny-heatmap-container';
 
-    const trace = {
-        z: matrix,
-        x: targetOrganisms.map(name => name.split(' ')[0].replace('reinhardtii', 'C.reinhardtii')), // Short names for ticks
-        y: geneLabels,
-        type: 'heatmap',
-        colorscale: [
-            [0/2, '#FFFFFF'],      // Z=0 (Absent) -> White
-            [0.0001/2, '#FFE5B5'], // Z=1 (NCIL Hit) start -> Light Orange (NCIL)
-            [1/2, '#FFE5B5'],      // Z=1 (NCIL Hit) end
-            [1.0001/2, '#698ECF'], // Z=2 (CIL Hit) start -> Blue (CIL)
-            [2/2, '#698ECF']       // Z=2 (CIL Hit) end
-        ],
-        showscale: false,
-        hoverinfo: 'text',
-        text: textMatrix,
-        xgap: 0.5,
-        ygap: 0.5,
-        line: { color: '#000000', width: 0.5 } // Black grid lines
-    };
+    const trace = {
+        z: matrix,
+        x: targetOrganisms.map(name => name.split(' ')[0].replace('reinhardtii', 'C.reinhardtii')), // Short names for ticks
+        y: geneLabels,
+        type: 'heatmap',
+        colorscale: [
+            [0/2, '#FFFFFF'],      // Z=0 (Absent) -> White
+            [0.0001/2, '#FFE5B5'], // Z=1 (NCIL Hit) start -> Light Orange (NCIL)
+            [1/2, '#FFE5B5'],      // Z=1 (NCIL Hit) end
+            [1.0001/2, '#698ECF'], // Z=2 (CIL Hit) start -> Blue (CIL)
+            [2/2, '#698ECF']       // Z=2 (CIL Hit) end
+        ],
+        showscale: false,
+        hoverinfo: 'text',
+        text: textMatrix,
+        xgap: 0.5,
+        ygap: 0.5,
+        line: { color: '#000000', width: 0.5 } // Black grid lines
+    };
 
-    const layout = {
-        title: `Phylogenetic Conservation (Li et al. 2014) - ${genes.length > 1 ? `${genes.length} Genes` : genes[0]}`,
-        xaxis: { 
-            title: 'Organisms (Ciliated | Non-Ciliated)', 
-            tickangle: 45, 
-            automargin: true 
-        },
-        yaxis: { 
-            title: 'Genes', 
-            automargin: true 
-        },
-        shapes: [
-            // Line separating Ciliated (20) and Non-Ciliated (20) organisms columns
-            {
-                type: 'line',
-                xref: 'x', x0: 19.5, x1: 19.5,
-                yref: 'paper', y0: 0, y1: 1,
-                line: { color: 'black', width: 2 }
-            }
-        ],
-        margin: { t: 50, b: 200, l: 100, r: 50 },
-        height: Math.max(500, genes.length * 40 + 150)
-    };
-    
-    const plotContainer = 'li-phylogeny-heatmap-container';
-    const htmlOutput = `
-        <div class="result-card">
-            <h3>Phylogenetic Heatmap for ${geneLabels.join(', ')} 🌍</h3>
-            <p>Data from **Li et al. (2014) Cell**, mapped to a fixed panel of **20 Ciliated (Blue)** and **20 Non-Ciliated (Orange)** organisms.</p>
-            <div id="${plotContainer}" style="height: ${layout.height}px; width: 100%;"></div>
-            <button class="download-button" onclick="downloadPlot('${plotContainer}', 'Phylogeny_Li2014')">Download Heatmap (PNG)</button>
-            <p style="font-size: 0.8em; color: #666; margin-top: 1rem; border-top: 1px solid #eee; padding-top: 0.5rem;">
-                **Source:** Li, Y. et al. (2014) <em>Cell</em>. <a href="https://pubmed.ncbi.nlm.nih.gov/24995987/" target="_blank">PMID: 24995987</a>
-            </p>
-        </div>
-        <script>
-            // Execute Plotly code after rendering the HTML
-            (function() {
-                const data = ${JSON.stringify([trace])};
-                const layout = ${JSON.stringify(layout)};
-                Plotly.newPlot('${plotContainer}', data, layout, { responsive: true, displayModeBar: false });
-            })();
-        </script>
-    `;
+    const layout = {
+        title: `Phylogenetic Conservation (Li et al. 2014) - ${genes.length > 1 ? `${genes.length} Genes` : genes[0]}`,
+        xaxis: { 
+            title: 'Organisms (Ciliated | Non-Ciliated)', 
+            tickangle: 45, 
+            automargin: true 
+        },
+        yaxis: { 
+            title: 'Genes', 
+            automargin: true 
+        },
+        shapes: [
+            // Line separating Ciliated (20) and Non-Ciliated (N) organisms columns
+            {
+                type: 'line',
+                xref: 'x', x0: CIL_COUNT - 0.5, x1: CIL_COUNT - 0.5, // Center the line after the 20th CIL organism
+                yref: 'paper', y0: 0, y1: 1,
+                line: { color: 'black', width: 2 }
+            }
+        ],
+        margin: { t: 50, b: 200, l: 100, r: 50 },
+        height: Math.max(500, genes.length * 40 + 150)
+    };
+    
+    const htmlOutput = `
+        <div class="result-card">
+            <h3>Phylogenetic Heatmap for ${geneLabels.join(', ')} 🌍</h3>
+            <p>Data from **Li et al. (2014) Cell**, mapped to a fixed panel of **${CIL_COUNT} Ciliated (Blue)** and **${NCIL_COUNT} Non-Ciliated (Orange)** organisms.</p>
+            <div id="${plotContainer}" style="height: ${layout.height}px; width: 100%;"></div>
+            <button class="download-button" onclick="downloadPlot('${plotContainer}', 'Phylogeny_Li2014')">Download Heatmap (PNG)</button>
+            <p style="font-size: 0.8em; color: #666; margin-top: 1rem; border-top: 1px solid #eee; padding-top: 0.5rem;">
+                **Source:** Li, Y. et al. (2014) <em>Cell</em>. <a href="https://pubmed.ncbi.nlm.nih.gov/24995987/" target="_blank">PMID: 24995987</a>
+            </p>
+        </div>
+        <script>
+            // CRITICAL FIX: Ensure Plotly runs after the element is available
+            (function() {
+                const data = ${JSON.stringify([trace])};
+                const layout = ${JSON.stringify(layout)};
+                
+                // Use a slight delay to allow the DOM to update completely
+                setTimeout(() => {
+                    Plotly.newPlot('${plotContainer}', data, layout, { responsive: true, displayModeBar: false });
+                }, 0); 
+            })();
+        </script>
+    `;
 
-    return htmlOutput;
+    return htmlOutput;
 }
-
 async function handlePhylogenyVisualizationQuery(query) {
     // Extracts gene symbols from query (e.g., "for WDR31, IFT88")
     const geneMatch = query.match(/(?:for|of)\s+([A-Z0-9\-\.]+(?:,\s*[A-Z0-9\-\.]+)*)/i);
