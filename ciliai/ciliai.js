@@ -1206,11 +1206,6 @@ function renderLiPhylogenyHeatmap(genes) {
     return htmlOutput;
 }
 
-#### 3. Router Function (Detects Phylogeny Queries)
-
-This function handles all 7 query types by extracting the gene(s) and calling the heatmap function.
-
-```javascript
 async function handlePhylogenyVisualizationQuery(query) {
     // Extracts gene symbols from query (e.g., "for WDR31, IFT88")
     const geneMatch = query.match(/(?:for|of)\s+([A-Z0-9\-\.]+(?:,\s*[A-Z0-9\-\.]+)*)/i);
