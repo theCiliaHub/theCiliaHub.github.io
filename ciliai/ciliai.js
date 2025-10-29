@@ -4820,48 +4820,59 @@ function renderLiPhylogenyHeatmap(genes) {
     };
 }
 
-/**
- * MODIFIED: The main router now detects if the query is a direct visualization request
- * or a click event to switch between Li and Nevers heatmaps.
- * @param {string} query - The raw user query.
- * @param {string} [source='li'] - The heatmap source to display first.
- */
 async function handlePhylogenyVisualizationQuery(query, source = 'li') {
     const resultArea = document.getElementById('ai-result-area');
-    
-    // --- 1. Gene Extraction and Data Loading (Pre-flight checks) ---
+    // --- 1. Gene Extraction and Data Loading ---
     const inputGenes = extractMultipleGenes(query);
+    // Ensure all necessary phylogenetic data is loaded before proceeding
+    // NOTE: This includes your request to use both Li and Nevers data sources.
     await Promise.all([fetchLiPhylogenyData(), fetchNeversPhylogenyData()]);
-
-    const liGenes = new Set(Object.values(liPhylogenyCache.genes).map(g => g.g.toUpperCase()).filter(Boolean));
-    const validGenes = inputGenes.filter(g => liGenes.has(g));
-
-    let finalGenes;
-    if (validGenes.length === 0) {
-        // Use default genes for initialization if none found
-        const defaultGenes = ["IFT88", "ARL13B", "BBS1", "CEP290", "NPHP1"];
-        finalGenes = defaultGenes.slice(0, 5);
-    } else {
-        // Use user's valid genes (up to 20)
-        finalGenes = validGenes.slice(0, 20);
+    if (!liPhylogenyCache) {
+        return `<div class="result-card"><h3>Error</h3><p>Could not load phylogenetic data (Li et al. 2014) to run this analysis.</p></div>`;
     }
-    // --- 2. Select Renderer based on source parameter ---
+    // Get all HUGO gene symbols available in the Li database
+    const allLiGenes = Object.values(liPhylogenyCache.genes).map(g => g.g.toUpperCase()).filter(Boolean);
+    const liGenesSet = new Set(allLiGenes);
+    const validUserGenes = inputGenes.filter(g => liGenesSet.has(g));
+    let finalGenes;
+    // --- DEFINITIVE DEFAULT GENES ---
+    // User-specified list used for context when input is lacking.
+    const definitiveDefaultGenes = ["ZC2HC1A", "CEP41", "BBS1", "BBS2", "BBS5", "ZNF474", "IFT81", "BBS7"];
+    
+    // --- 2. Determine Final Genes to Plot (Prioritize user input, fill up to 20 with defaults) ---
+    if (validUserGenes.length === 0) {
+        // If user provided no valid gene, show the first 5 definitive defaults
+        finalGenes = definitiveDefaultGenes.filter(g => liGenesSet.has(g)).slice(0, 5);
+        if (finalGenes.length === 0) {
+            return `<div class="result-card"><h3>Analysis Error</h3><p>The requested gene(s) were not found, and none of the default genes could be found in the phylogenetic dataset.</p></div>`;
+        }
+    } else {
+        // Start with user's valid genes
+        finalGenes = [...new Set(validUserGenes)];
+        
+        // Fill up to 20 genes using the definitive defaults for context
+        if (finalGenes.length < 20) {
+            for (const dGene of definitiveDefaultGenes) {
+                if (finalGenes.length >= 20) break;
+                if (liGenesSet.has(dGene) && !finalGenes.includes(dGene)) {
+                    finalGenes.push(dGene);
+                }
+            }
+        }
+    }
+    // --- 3. Select Renderer ---
     const renderer = (source === 'nevers') ? renderNeversPhylogenyHeatmap : renderLiPhylogenyHeatmap;
+    // --- 4. Generate Structured Plot Results ---
     const plotResult = renderer(finalGenes);
-    
-    // --- 3. Inject HTML and Execute Plotting Function ---
-    
-    // Set the HTML output.
+    // --- 5. Inject HTML and Execute Plotting Function ---
     resultArea.innerHTML = plotResult.html;
 
-    // Call the global execution utility, passing the structured data.
     window.initPhylogenyPlot(
         plotResult.plotId, 
         plotResult.plotData, 
         plotResult.plotLayout
     );
     
-    // Return an empty string as the function has already updated the DOM
     return "";
 }
 
