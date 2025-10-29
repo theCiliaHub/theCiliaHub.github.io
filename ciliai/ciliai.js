@@ -1284,7 +1284,7 @@ async function handlePhylogenyVisualizationQuery(query) {
     // --- 2. Handle Fallback/Default Genes ---
     if (validGenes.length === 0) {
         // Fallback to a set of default genes if the user's gene is missing or none specified
-        const defaultGenes = ["IFT88", "ARL13B", "BBS1", "CEP290", "NPHP1", "WDR31", "HYLS1", "DYNC2H1"];
+        const defaultGenes = ["ZC2HC1A", "CEP41", "BBS1", "BBS2", "BBS5", "ZNF474", "IFT81", "BBS7"];
         const validDefaults = defaultGenes.filter(g => liGenes.has(g));
         
         if (validDefaults.length === 0) {
@@ -1296,7 +1296,7 @@ async function handlePhylogenyVisualizationQuery(query) {
         // Combine user's genes with defaults up to a maximum of 20 for the heatmap
         finalGenes = [...new Set(validGenes)];
         if (finalGenes.length < 20) {
-            const defaultGenes = ["IFT88", "ARL13B", "BBS1", "CEP290", "NPHP1", "WDR31", "HYLS1", "DYNC2H1"];
+            const defaultGenes = ["ZC2HC1A", "CEP41", "BBS1", "BBS2", "BBS5", "ZNF474", "IFT81", "BBS7"];
             for (const dGene of defaultGenes) {
                 if (finalGenes.length >= 20) break;
                 if (liGenes.has(dGene) && !finalGenes.includes(dGene)) {
