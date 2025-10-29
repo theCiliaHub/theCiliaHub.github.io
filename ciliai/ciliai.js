@@ -4634,10 +4634,6 @@ function renderNeversPhylogenyHeatmap(genes) {
     return { html: htmlOutput, plotData: [trace], plotLayout: layout, plotId: plotContainer };
 }
 
-// --------------------------------------------------------------------------------------
-// MODIFICATION 1: Update renderLiPhylogenyHeatmap to add the Nevers link
-// --------------------------------------------------------------------------------------
-
 /**
  * MODIFIED: Adds a link to switch to the Nevers heatmap.
  */
@@ -4921,28 +4917,16 @@ async function handlePhylogenyVisualizationQuery(query) {
         }
 
     }
-
-
-
     // --- 3. Generate Structured Plot Results ---
-
     // This calls the rendering logic but returns an object {html, plotData, plotLayout, plotId}
-
     const plotResult = renderLiPhylogenyHeatmap(finalGenes);
-
-    
-
     // --- 4. Inject HTML and Execute Plotting Function ---
-
-    
 
     // Set the HTML output. This step creates the required <div> container.
 
     // NOTE: This will overwrite any previous content in resultArea.
 
     resultArea.innerHTML = plotResult.html;
-
-
 
     // Call the global execution utility, passing the structured data.
 
@@ -4957,25 +4941,38 @@ async function handlePhylogenyVisualizationQuery(query) {
         plotResult.plotLayout
 
     );
-
-    
-
     // Return an empty string as the function has already updated the DOM
 
     return "";
 
 }
 
+/**
+ * Global wrapper to handle clicks on the Li/Nevers switch links.
+ * This should be defined globally (e.g., window.switchPhylogenyView).
+ * @param {string} action - 'show-nevers-heatmap' or 'show-li-heatmap'.
+ * @param {string} genesString - Comma-separated list of genes.
+ */
+window.switchPhylogenyView = async function(action, genesString) {
+    const genes = genesString.split(',').map(g => g.trim()).filter(Boolean);
+    if (genes.length === 0) return;
 
+    const source = (action === 'show-nevers-heatmap') ? 'nevers' : 'li';
+    const query = `Show ${source} heatmap for ${genes.join(',')}`;
+    
+    // Clear the area before routing
+    const resultArea = document.getElementById('ai-result-area');
+    resultArea.innerHTML = `<p class="status-searching">Switching to ${source.toUpperCase()} comparison...</p>`;
+
+    // Call the primary router with the correct source parameter.
+    // The router function signature must be: handlePhylogenyVisualizationQuery(query, source)
+    await handlePhylogenyVisualizationQuery(query, source);
+};
 
 /**
-
  * Safely handles the execution of the Plotly command.
-
  * This function must be defined in the global scope (window.initPhylogenyPlot).
-
  */
-
 window.initPhylogenyPlot = function(containerId, traceData, layoutData) {
 
     // We use setTimeout(0) to ensure the browser finishes injecting the HTML <div> before plotting.
@@ -5220,7 +5217,7 @@ function formatGeneDetail(geneData, geneSymbol, detailTitle, detailContent) {
 }
 
 // -------------------------------
-// Click handler for gene selection
+// Click handler for all interactions (Gene selection, Quick queries, and Plot switching)
 // -------------------------------
 document.addEventListener('click', (e) => {
     // 1. Handle clicks on gene cards/names from analysis results (STANDARD)
@@ -5228,25 +5225,23 @@ document.addEventListener('click', (e) => {
         const geneName = e.target.dataset.geneName || e.target.textContent.trim();
         if (geneName) handleCiliAISelection([geneName]);
     }
-
-    // 2. Handle clicks on the example questions (e.g., "BBSome", "Joubert") (STANDARD)
+    // 2. Handle clicks on the example questions (e.g., "BBSome", "Joubert")
     else if (e.target.matches('.example-queries span')) {
         const aiQueryInput = document.getElementById('aiQueryInput');
         // Use the data-question attribute for the full query
         aiQueryInput.value = e.target.dataset.question || e.target.textContent;
         handleAIQuery();
     }
-
-    // 3. Handle clicks on special action links within results (UPDATED LOGIC)
+    // 3. Handle clicks on special action links within results, including plot switching
     else if (e.target.classList.contains('ai-action')) {
         e.preventDefault();
         const action = e.target.dataset.action;
-        const genesString = e.target.dataset.genes; // Get the comma-separated gene list
+        const genesString = e.target.dataset.genes; // Comma-separated list of genes
         const resultArea = document.getElementById('ai-result-area');
         
         // --- 3a. Handle Expression Visualization (Existing Logic) ---
         if (action === 'expression-visualize' && genesString) {
-            const gene = genesString; // It should only be one gene here, but using genesString works
+            const gene = genesString;
             resultArea.innerHTML = `<p class="status-searching">Building expression heatmap...</p>`;
             
             // Ensure tissue data is available before calling
@@ -5258,28 +5253,17 @@ document.addEventListener('click', (e) => {
                  });
             }
         }
-        
-        // --- 3b. Handle Phylogenetic Switching (NEW LOGIC) ---
-        else if (action === 'show-nevers-heatmap' && genesString) {
-            // Trigger the router function to switch the view to Nevers
-            const genes = genesString.split(',').map(g => g.trim());
-            resultArea.innerHTML = `<p class="status-searching">Switching to Nevers et al. 2017 comparison...</p>`;
-            
-            // Call the router with the target source defined as 'nevers'
-            handlePhylogenyVisualizationQuery(`Show Nevers heatmap for ${genes.join(',')}`, 'nevers');
-        } 
-        
-        else if (action === 'show-li-heatmap' && genesString) {
-            // Trigger the router function to switch the view back to Li
-            const genes = genesString.split(',').map(g => g.trim());
-            resultArea.innerHTML = `<p class="status-searching">Switching to Li et al. 2014 comparison...</p>`;
-            
-            // Call the router with the target source defined as 'li'
-            handlePhylogenyVisualizationQuery(`Show Li heatmap for ${genes.join(',')}`, 'li');
+        // --- 3b. Handle Phylogenetic Switching (CRITICAL NEW LOGIC) ---
+        // Actions: 'show-nevers-heatmap' or 'show-li-heatmap'
+        else if (action === 'show-nevers-heatmap' || action === 'show-li-heatmap') {
+            if (genesString) {
+                // Call the globally exposed wrapper function to handle the view switch.
+                // This function contains the logic to call handlePhylogenyVisualizationQuery(query, source).
+                window.switchPhylogenyView(action, genesString);
+            }
         }
     }
 });
-
 
 // --- Other Helper Functions (Updated to Remove Optional Chaining) ---
 function formatGeneDetail(geneData, geneSymbol, detailTitle, detailContent) {
