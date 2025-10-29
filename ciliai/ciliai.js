@@ -1090,21 +1090,46 @@ function renderLiPhylogenyHeatmap(genes) {
         };
     }
     
+    // Assumed global constants are available (CIL_ORG_FULL, NCIL_ORG_FULL)
     const CIL_COUNT = CIL_ORG_FULL.length;
     const NCIL_COUNT = NCIL_ORG_FULL.length;
 
-    // --- 1. Map Target Organisms to Li Indices ---
+    // --- 1. Map Target Organisms to Li Indices (CORRECTED MAPPING LOGIC) ---
     const liOrgList = liPhylogenyCache.summary.organisms_list;
     const liOrgMap = new Map();
+    
+    // Create a map keyed by simplified name (e.g., 'homo', 'c.elegans') pointing to the list index.
     liOrgList.forEach((name, index) => {
-        // Standardize names in the Li map for fuzzy lookup
-        liOrgMap.set(name.toLowerCase().replace(/c\.?\s*elegans/, 'c.elegans'), index); 
+        // Handle common abbreviated keys like 'H.sapiens' or 'C.elegans' directly
+        const simpleKey = name.toLowerCase()
+                                .replace(/\s*\(.*\)\s*/g, '') // Remove brackets/strain names
+                                .replace(/\./g, '')           // Remove periods (e.g., 'hsapiens')
+                                .split(' ')[0];               // Take the first word (e.g., 'homo')
+        liOrgMap.set(simpleKey, index);
+        // Also map common full names to catch variations (e.g., 'H.sapiens' -> 'hsapiens')
+        if (name.includes('.')) {
+            liOrgMap.set(name.toLowerCase().replace(/\./g, ''), index);
+        }
+        // Specific map for C. elegans due to multiple names
+        if (name.toLowerCase().includes('elegans')) {
+            liOrgMap.set('celegans', index);
+        }
     });
 
     const targetOrganisms = CIL_ORG_FULL.concat(NCIL_ORG_FULL);
     const targetLiIndices = targetOrganisms.map(orgName => {
-        let nameToLookup = orgName.toLowerCase().replace(/c\.?\s*elegans/, 'c.elegans');
-        return liOrgMap.get(nameToLookup);
+        // Normalize the Target Name to match the key used in liOrgMap
+        const normalizedName = orgName.toLowerCase()
+                                      .replace(/\s*\(.*\)\s*/g, '')
+                                      .replace(/\./g, '')
+                                      .split(' ')[0];
+                                      
+        // Fallback for organisms not found by the first word (e.g., C. elegans)
+        const keyToLookup = (normalizedName.includes('caenorhabditis') || normalizedName.includes('elegans')) 
+                            ? 'celegans' 
+                            : normalizedName;
+        
+        return liOrgMap.get(keyToLookup);
     });
 
     const geneLabels = genes.map(g => g.toUpperCase());
@@ -1113,7 +1138,6 @@ function renderLiPhylogenyHeatmap(genes) {
     
     // --- 2. Build the Matrix (Z-scores: 2=CIL Hit, 1=NCIL Hit, 0=Absent) ---
     geneLabels.forEach(gene => {
-        // Find the gene's entry, searching by the 'g' (gene symbol) field
         const geneData = Object.values(liPhylogenyCache.genes).find(g => g.g && g.g.toUpperCase() === gene);
         const presenceIndices = new Set(geneData ? geneData.s : []);
         const row = [];
@@ -1121,7 +1145,9 @@ function renderLiPhylogenyHeatmap(genes) {
 
         targetOrganisms.forEach((orgName, index) => {
             const liIndex = targetLiIndices[index];
-            const isCiliated = index < CIL_COUNT; // Use CIL_COUNT here (20)
+            const isCiliated = index < CIL_COUNT;
+            
+            // CRITICAL: Check presence only if we successfully mapped the organism to a Li index
             const isPresent = liIndex !== undefined && presenceIndices.has(liIndex);
 
             let zValue = 0;
@@ -1130,6 +1156,8 @@ function renderLiPhylogenyHeatmap(genes) {
             if (isPresent) {
                 zValue = isCiliated ? 2 : 1;
                 status = "Present";
+            } else if (liIndex === undefined) {
+                 status = "N/A (Map Fail)"; // Optional: for debugging
             }
             
             row.push(zValue);
@@ -1147,7 +1175,8 @@ function renderLiPhylogenyHeatmap(genes) {
 
     const trace = {
         z: matrix,
-        x: targetOrganisms.map(name => name.split(' ')[0].replace('reinhardtii', 'C.reinhardtii')), // Short names for ticks
+        // Use normalized name for ticks (first word, removing species designation dot if present)
+        x: targetOrganisms.map(name => name.split(' ')[0].replace('reinhardtii', 'C.reinhardtii')), 
         y: geneLabels,
         type: 'heatmap',
         colorscale: [
@@ -1162,13 +1191,13 @@ function renderLiPhylogenyHeatmap(genes) {
         text: textMatrix,
         xgap: 0.5,
         ygap: 0.5,
-        line: { color: '#000000', width: 0.5 } // Black grid lines
+        line: { color: '#000000', width: 0.5 }
     };
 
     const layout = {
         title: `Phylogenetic Conservation (Li et al. 2014) - ${genes.length > 1 ? `${genes.length} Genes` : genes[0]}`,
         xaxis: { 
-            title: 'Organisms (Ciliated | Non-Ciliated)', 
+            title: `Organisms (${CIL_COUNT} Ciliated | ${NCIL_COUNT} Non-Ciliated)`, 
             tickangle: 45, 
             automargin: true 
         },
@@ -1189,20 +1218,21 @@ function renderLiPhylogenyHeatmap(genes) {
         height: Math.max(500, genes.length * 40 + 150)
     };
     
-    // --- 4. HTML Output (No inline <script>) ---
+    // --- 4. Return Structured Object for External Execution ---
     const htmlOutput = `
-        <div class="result-card">
-            <h3>Phylogenetic Heatmap for ${geneLabels.join(', ')} 🌍</h3>
-            <p>Data from **Li et al. (2014) Cell**, mapped to a fixed panel of **${CIL_COUNT} Ciliated (Blue)** and **${NCIL_COUNT} Non-Ciliated (Orange)** organisms.</p>
-            <div id="${plotContainer}" style="height: ${layout.height}px; width: 100%;"></div>
-            <button class="download-button" onclick="downloadPlot('${plotContainer}', 'Phylogeny_Li2014')">Download Heatmap (PNG)</button>
-            <p style="font-size: 0.8em; color: #666; margin-top: 1rem; border-top: 1px solid #eee; padding-top: 0.5rem;">
-                **Source:** Li, Y. et al. (2014) <em>Cell</em>. <a href="https://pubmed.ncbi.nlm.nih.gov/24995987/" target="_blank">PMID: 24995987</a>
-            </p>
-        </div>
+    <div class="result-card">
+        <h3>Phylogenetic Heatmap for ${geneLabels.join(', ')} 🌍</h3>
+        <p>Data from **Li et al. (2014) Cell**, mapped to a fixed panel of **${CIL_COUNT} Ciliated (Blue)** and **${NCIL_COUNT} Non-Ciliated (Orange)** organisms.</p>
+        <div id="${plotContainer}" style="height: ${layout.height}px; width: 100%;"></div>
+        <button class="download-button" onclick="downloadPlot('${plotContainer}', 'Phylogeny_Li2014')">Download Heatmap (PNG)</button>
+        <p style="font-size: 0.8em; color: #666; margin-top: 1rem; border-top: 1px solid #eee; padding-top: 0.5rem;">
+            
+            // 🚨 CORRECTION APPLIED HERE: Replaced **Source:** with <strong>Source:</strong>
+            <strong>Source:</strong> Li Y, Calvo SE, Gutman R, Liu JS, Mootha VK. Expansion of biological pathways based on evolutionary inference. (2014) <em>Cell</em>. <a href="https://pubmed.ncbi.nlm.nih.gov/24995987/" target="_blank">PMID: 24995987</a>
+        </p>
+    </div>
     `;
 
-    // --- 5. Return Structured Object for External Execution ---
     return {
         html: htmlOutput,
         plotData: [trace],
