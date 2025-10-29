@@ -4820,131 +4820,49 @@ function renderLiPhylogenyHeatmap(genes) {
     };
 }
 
-// --------------------------------------------------------------------------------------
-// MODIFICATION 2: Update Router to Handle Clicks and Switch Views
-// --------------------------------------------------------------------------------------
-
 /**
  * MODIFIED: The main router now detects if the query is a direct visualization request
  * or a click event to switch between Li and Nevers heatmaps.
  * @param {string} query - The raw user query.
  * @param {string} [source='li'] - The heatmap source to display first.
  */
-async function handlePhylogenyVisualizationQuery(query) {
-
+async function handlePhylogenyVisualizationQuery(query, source = 'li') {
     const resultArea = document.getElementById('ai-result-area');
-
     
-
-    // --- 1. Gene Extraction and Data Loading ---
-
-    // The router should be smart enough to extract genes regardless of the phrasing.
-
+    // --- 1. Gene Extraction and Data Loading (Pre-flight checks) ---
     const inputGenes = extractMultipleGenes(query);
-
-    
-
-    // Ensure all necessary phylogenetic data is loaded before proceeding
-
     await Promise.all([fetchLiPhylogenyData(), fetchNeversPhylogenyData()]);
 
-
-
-    if (!liPhylogenyCache) {
-
-        return `<div class="result-card"><h3>Error</h3><p>Could not load phylogenetic data (Li et al. 2014) to run this analysis.</p></div>`;
-
-    }
-
-
-
-    // Identify available genes in the Li database (based on HUGO symbol 'g')
-
     const liGenes = new Set(Object.values(liPhylogenyCache.genes).map(g => g.g.toUpperCase()).filter(Boolean));
-
     const validGenes = inputGenes.filter(g => liGenes.has(g));
 
-
-
     let finalGenes;
-
-
-
-    // --- 2. Handle Fallback/Default Genes ---
-
     if (validGenes.length === 0) {
-
-        // Fallback to a set of default genes if the user's gene is missing or none specified
-
-        const defaultGenes = ["ZC2HC1A", "CEP41", "BBS1", "BBS2", "BBS5", "ZNF474", "IFT81", "BBS7"];
-
-        const validDefaults = defaultGenes.filter(g => liGenes.has(g));
-
-        
-
-        if (validDefaults.length === 0) {
-
-            return `<div class="result-card"><h3>Analysis Error</h3><p>The requested gene(s) were not found in the Li et al. 2014 phylogenetic dataset, and no default genes could be loaded.</p></div>`;
-
-        }
-
-        finalGenes = validDefaults.slice(0, 5); // Use first 5 defaults if no valid genes provided
-
-        
-
+        // Use default genes for initialization if none found
+        const defaultGenes = ["IFT88", "ARL13B", "BBS1", "CEP290", "NPHP1"];
+        finalGenes = defaultGenes.slice(0, 5);
     } else {
-
-        // Combine user's genes with defaults up to a maximum of 20 for the heatmap
-
-        finalGenes = [...new Set(validGenes)];
-
-        if (finalGenes.length < 20) {
-
-            const defaultGenes = ["ZC2HC1A", "CEP41", "BBS1", "BBS2", "BBS5", "ZNF474", "IFT81", "BBS7"];
-
-            for (const dGene of defaultGenes) {
-
-                if (finalGenes.length >= 20) break;
-
-                if (liGenes.has(dGene) && !finalGenes.includes(dGene)) {
-
-                    finalGenes.push(dGene);
-
-                }
-
-            }
-
-        }
-
+        // Use user's valid genes (up to 20)
+        finalGenes = validGenes.slice(0, 20);
     }
-    // --- 3. Generate Structured Plot Results ---
-    // This calls the rendering logic but returns an object {html, plotData, plotLayout, plotId}
-    const plotResult = renderLiPhylogenyHeatmap(finalGenes);
-    // --- 4. Inject HTML and Execute Plotting Function ---
-
-    // Set the HTML output. This step creates the required <div> container.
-
-    // NOTE: This will overwrite any previous content in resultArea.
-
+    // --- 2. Select Renderer based on source parameter ---
+    const renderer = (source === 'nevers') ? renderNeversPhylogenyHeatmap : renderLiPhylogenyHeatmap;
+    const plotResult = renderer(finalGenes);
+    
+    // --- 3. Inject HTML and Execute Plotting Function ---
+    
+    // Set the HTML output.
     resultArea.innerHTML = plotResult.html;
 
     // Call the global execution utility, passing the structured data.
-
-    // This is the CRITICAL STEP that resolves the Plotly rendering issue.
-
     window.initPhylogenyPlot(
-
         plotResult.plotId, 
-
         plotResult.plotData, 
-
         plotResult.plotLayout
-
     );
+    
     // Return an empty string as the function has already updated the DOM
-
     return "";
-
 }
 
 /**
@@ -5218,48 +5136,52 @@ function formatGeneDetail(geneData, geneSymbol, detailTitle, detailContent) {
 
 // -------------------------------
 // Click handler for all interactions (Gene selection, Quick queries, and Plot switching)
-// -------------------------------
 document.addEventListener('click', (e) => {
-    // 1. Handle clicks on gene cards/names from analysis results (STANDARD)
+    / 1. Handle clicks on gene cards/names from analysis results (STANDARD)
     if (e.target.matches('.gene-card, .gene-name')) {
         const geneName = e.target.dataset.geneName || e.target.textContent.trim();
         if (geneName) handleCiliAISelection([geneName]);
     }
-    // 2. Handle clicks on the example questions (e.g., "BBSome", "Joubert")
+
+    // 2. Handle clicks on the example questions (STANDARD)
     else if (e.target.matches('.example-queries span')) {
         const aiQueryInput = document.getElementById('aiQueryInput');
         // Use the data-question attribute for the full query
         aiQueryInput.value = e.target.dataset.question || e.target.textContent;
         handleAIQuery();
     }
-    // 3. Handle clicks on special action links within results, including plot switching
+    // 3. Handle clicks on special action links (UPDATED LOGIC)
     else if (e.target.classList.contains('ai-action')) {
         e.preventDefault();
         const action = e.target.dataset.action;
         const genesString = e.target.dataset.genes; // Comma-separated list of genes
         const resultArea = document.getElementById('ai-result-area');
-        
-        // --- 3a. Handle Expression Visualization (Existing Logic) ---
-        if (action === 'expression-visualize' && genesString) {
+
+        // --- 3a. Handle Phylogenetic Switching (CRITICAL NEW LOGIC) ---
+        if (action === 'show-nevers-heatmap' || action === 'show-li-heatmap') {
+            if (genesString) {
+                const genes = genesString.split(',').map(g => g.trim()).filter(Boolean);
+                // Determine the target source ('nevers' or 'li')
+                const source = action.includes('nevers') ? 'nevers' : 'li';
+                
+                resultArea.innerHTML = `<p class="status-searching">Switching to ${source.toUpperCase()} comparison...</p>`;
+                
+                // Call the main router with the explicit source parameter
+                // This ensures the correct renderer (Li or Nevers) is selected within the router.
+                handlePhylogenyVisualizationQuery(`Show ${source} heatmap for ${genes.join(',')}`, source);
+            }
+        }
+        // --- 3b. Handle Expression Visualization (Existing Logic) ---
+        else if (action === 'expression-visualize' && genesString) {
             const gene = genesString;
             resultArea.innerHTML = `<p class="status-searching">Building expression heatmap...</p>`;
             
-            // Ensure tissue data is available before calling
             if (window.tissueDataCache) {
                  displayCiliAIExpressionHeatmap([gene], resultArea, window.tissueDataCache);
             } else {
                  fetchTissueData().then(tissueData => {
                      displayCiliAIExpressionHeatmap([gene], resultArea, tissueData);
                  });
-            }
-        }
-        // --- 3b. Handle Phylogenetic Switching (CRITICAL NEW LOGIC) ---
-        // Actions: 'show-nevers-heatmap' or 'show-li-heatmap'
-        else if (action === 'show-nevers-heatmap' || action === 'show-li-heatmap') {
-            if (genesString) {
-                // Call the globally exposed wrapper function to handle the view switch.
-                // This function contains the logic to call handlePhylogenyVisualizationQuery(query, source).
-                window.switchPhylogenyView(action, genesString);
             }
         }
     }
