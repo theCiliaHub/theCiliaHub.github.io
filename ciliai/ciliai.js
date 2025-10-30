@@ -1119,26 +1119,39 @@ const questionRegistry = [
     { text: "What questions can I ask?", handler: async () => tellAboutCiliAI() },
     { text: "Give me an overview of your features", handler: async () => tellAboutCiliAI() },
 
-// ==================== PHYLOGENY QUERIES (VISUALIZATION) - UPDATED ====================
-// These queries now route to the unified analysis function.
-{ text: "Show evolutionary conservation of IFT88", handler: async () => getPhylogenyAnalysis(["IFT88"]) },
-{ text: "IFT88 conservation analysis", handler: async () => getPhylogenyAnalysis(["IFT88"]) },
-{ text: "What is the phylogeny of BBS1?", handler: async () => getPhylogenyAnalysis(["BBS1"]) },
-{ text: "BBS1 conservation heatmap", handler: async () => getPhylogenyAnalysis(["BBS1"]) },
-// ... (continue for all other specific gene entries: ARL13B, NPHP1, WDR31, CEP290) ...
-// The general catch-all queries must also be updated to call this new function:
-{ // Catches the most common conservation phrase for any gene (e.g., WDR54)
-    text: "Show evolutionary conservation of gene X", handler: async (q) => getPhylogenyAnalysis(extractMultipleGenes(q)) 
-},
-{ // Catches the "What is the phylogeny/comparison of" phrase 
-    text: "What is the phylogeny of gene X?", handler: async (q) => getPhylogenyAnalysis(extractMultipleGenes(q)) 
-},
-{ // Catches comparison formats
-    text: "Compare gene X phylogeny", handler: async (q) => getPhylogenyAnalysis(extractMultipleGenes(q)) 
-},
-{ // Catches the original 'Show the phylogenetic comparison' phrasing
-    text: "Show the phylogenetic comparison for gene X", handler: async (q) => getPhylogenyAnalysis(extractMultipleGenes(q)) 
-},
+// ==================== A. SPECIFIC GENE VISUALIZATION ====================
+    { text: "Show evolutionary conservation of IFT88", handler: async () => getPhylogenyAnalysis(["IFT88"]) },
+    { text: "IFT88 conservation analysis", handler: async () => getPhylogenyAnalysis(["IFT88"]) },
+    { text: "What is the phylogeny of BBS1?", handler: async () => getPhylogenyAnalysis(["BBS1"]) },
+    { text: "BBS1 conservation heatmap", handler: async () => getPhylogenyAnalysis(["BBS1"]) },
+    { text: "Show the phylogenetic comparison for ARL13B", handler: async () => getPhylogenyAnalysis(["ARL13B"]) },
+    { text: "Evolutionary profile of CEP290", handler: async () => getPhylogenyAnalysis(["CEP290"]) },
+    { text: "Heatmap for NPHP1 conservation", handler: async () => getPhylogenyAnalysis(["NPHP1"]) },
+    { text: "Phylogenetic analysis of DYNC2H1", handler: async () => getPhylogenyAnalysis(["DYNC2H1"]) },
+    { text: "Conservation map for IFT140", handler: async () => getPhylogenyAnalysis(["IFT140"]) },
+    { text: "Evolutionary heatmap for TTC8", handler: async () => getPhylogenyAnalysis(["TTC8"]) },
+
+// ==================== B. COMPARISON QUERIES (Multi-Gene Visualization) ====================
+    { text: "Compare IFT88 and IFT140 phylogeny", handler: async () => getPhylogenyAnalysis(["IFT88", "IFT140"]) },
+    { text: "Phylogeny comparison of BBS1 and BBS4", handler: async () => getPhylogenyAnalysis(["BBS1", "BBS4"]) },
+    { text: "Show conservation of NPHP1 vs CEP290", handler: async () => getPhylogenyAnalysis(["NPHP1", "CEP290"]) },
+    { text: "Compare the evolutionary history of DYNC2H1 and KIF3A", handler: async () => getPhylogenyAnalysis(["DYNC2H1", "KIF3A"]) },
+    
+// ==================== C. CLASSIFICATION & PATTERN QUESTIONS (List/Summary) ====================
+    { text: "List genes classified as Ciliary specific", handler: async () => getPhylogenyList('Ciliary_specific') },
+    { text: "Show Mammalian specific ciliary genes", handler: async () => getPhylogenyList('Mammalian_specific') },
+    { text: "Which genes are Vertebrate specific?", handler: async () => getPhylogenyList('Vertebrate_specific') },
+    { text: "List genes conserved across ALL organisms", handler: async () => getPhylogenyList('in_all_organisms') },
+    { text: "Show ciliary genes absent in fungi", handler: async () => getPhylogenyList('absent_in_fungi') },
+
+// ==================== D. SYNONYMS & CATCH-ALL ROUTERS ====================
+    // These now call the AI-like utility function for broader interpretation
+    { text: "Show evolutionary conservation of gene X", handler: async (q) => routePhylogenyAnalysis(q) },
+    { text: "What is the phylogeny of gene X?", handler: async (q) => routePhylogenyAnalysis(q) },
+    { text: "Compare gene X phylogeny", handler: async (q) => routePhylogenyAnalysis(q) },
+    { text: "Show conservation profile for gene X", handler: async (q) => routePhylogenyAnalysis(q) },
+    { text: "Phylogenetic analysis of gene X", handler: async (q) => routePhylogenyAnalysis(q) },
+    { text: "Evolutionary profile for gene X", handler: async (q) => routePhylogenyAnalysis(q) },
     
     // ==================== SOURCE QUERIES ====================
     { text: "What is the source for Ciliary genes in C. elegans?", handler: async () => tellAboutOrganismSources("C. elegans") },
@@ -4870,8 +4883,61 @@ function renderLiPhylogenyHeatmap(genes) {
         plotId: plotContainer
     };
 }
+/**
+ * Renders raw phylogenetic data for a list of genes into a detailed table.
+ * @param {string[]} genes - Array of genes requested.
+ * @returns {string} HTML table output.
+ */
+function renderPhylogenyTable(genes) {
+    // Assuming liPhylogenyCache and neversPhylogenyCache are loaded globally.
+    if (!liPhylogenyCache || !neversPhylogenyCache) {
+        return `<div class="result-card"><h3>Table Error</h3><p>Phylogenetic data is not fully loaded.</p></div>`;
+    }
 
-async function handlePhylogenyVisualizationQuery(query, source = 'li') {
+    const tableRows = genes.map(gene => {
+        const liEntry = Object.values(liPhylogenyCache.genes).find(g => g.g.toUpperCase() === gene);
+        const neversEntry = neversPhylogenyCache.genes?.[gene];
+        
+        const liClass = liEntry 
+            ? liPhylogenyCache.summary.class_list[liEntry.c].replace(/_/g, ' ') 
+            : 'N/A';
+        const liCount = liEntry?.s?.length || 0;
+        const neversCount = neversEntry?.s?.length || 0;
+        
+        return `
+            <tr>
+                <td><strong>${gene}</strong></td>
+                <td>${liClass}</td>
+                <td>${liCount} / 140</td>
+                <td>${neversCount} / 99</td>
+                <td><span data-action="visualize-heatmap" data-genes="${gene}">View Heatmap</span></td>
+            </tr>
+        `;
+    }).join('');
+
+    return `
+        <div class="result-card">
+            <h3>Phylogenetic Data Table for ${genes.join(', ')}</h3>
+            <table class="ciliopathy-table gene-detail-table" id="phylogeny-table">
+                <thead>
+                    <tr>
+                        <th>Gene</th>
+                        <th>Li Class (2014)</th>
+                        <th>Li Species Count (140)</th>
+                        <th>Nevers Species Count (99)</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>${tableRows}</tbody>
+            </table>
+            <p class="ai-suggestion" style="margin-top: 10px;">
+                <a href="#" class="ai-action" data-action="visualize-heatmap" data-genes="${genes.join(',')}">🖼️ Show Heatmap View</a>
+            </p>
+        </div>
+    `;
+}
+
+async function handlePhylogenyVisualizationQuery(query, source = 'li', view = 'heatmap') {
     const resultArea = document.getElementById('ai-result-area');
     // --- 1. Gene Extraction and Data Loading ---
     const inputGenes = extractMultipleGenes(query);
@@ -4889,7 +4955,7 @@ async function handlePhylogenyVisualizationQuery(query, source = 'li') {
     // --- DEFINITIVE DEFAULT GENES ---
     // User-specified list used for context when input is lacking.
     const definitiveDefaultGenes = ["ZC2HC1A", "CEP41", "BBS1", "BBS2", "BBS5", "ZNF474", "IFT81", "BBS7"];
-    
+   
     // --- 2. Determine Final Genes to Plot (Prioritize user input, fill up to 20 with defaults) ---
     if (validUserGenes.length === 0) {
         // If user provided no valid gene, show the first 5 definitive defaults
@@ -4910,6 +4976,12 @@ async function handlePhylogenyVisualizationQuery(query, source = 'li') {
                 }
             }
         }
+    }
+     // --- New View Selection ---
+    if (view === 'table') {
+        const tableHtml = renderPhylogenyTable(finalGenes);
+        document.getElementById('ai-result-area').innerHTML = tableHtml;
+        return "";
     }
     // --- 3. Select Renderer ---
     const renderer = (source === 'nevers') ? renderNeversPhylogenyHeatmap : renderLiPhylogenyHeatmap;
@@ -4980,7 +5052,50 @@ window.initPhylogenyPlot = function(containerId, traceData, layoutData) {
     }, 0); 
 
 };
+/**
+ * AI-like function to parse complex/synonym queries and route them to the correct handler.
+ * Used for all "gene X" questions in the questionRegistry.
+ * @param {string} query - The raw user query.
+ * @returns {Promise<string>} HTML output (either a list, table, or calls the heatmap).
+ */
+async function routePhylogenyAnalysis(query) {
+    // Note: extractMultipleGenes(q) is assumed to exist and returns an array of symbols.
+    const genes = extractMultipleGenes(query);
+    const qLower = query.toLowerCase();
 
+    // 1. Check for LIST INTENT (Classification or Pattern List)
+    if (qLower.includes('list') || qLower.includes('show genes') || qLower.includes('which genes are')) {
+        // Simple logic for classification lists (needs dedicated functions not provided here)
+        if (qLower.includes('mammalian specific')) {
+            return getPhylogenyList('Mammalian_specific'); // Needs separate implementation
+        }
+        if (qLower.includes('ciliary specific')) {
+            return getPhylogenyList('Ciliary_specific'); // Needs separate implementation
+        }
+        
+        // If the query contains a gene AND list keywords, fall through to table view.
+    }
+    
+    // 2. Check for TABLE INTENT (Implicit data review)
+    if (qLower.includes('table') || qLower.includes('view data') || qLower.includes('species count')) {
+         if (genes.length >= 1) {
+             // If genes are found, show the table view directly.
+             return handlePhylogenyVisualizationQuery(query, 'li', 'table');
+         }
+    }
+
+    // 3. Default to VISUALIZATION INTENT (Heatmap)
+    // All other conservation/phylogeny/heatmap/comparison queries default here.
+    if (genes.length >= 1) {
+        return handlePhylogenyVisualizationQuery(query, 'li', 'heatmap');
+    }
+
+    // 4. Fallback Error
+    return `<div class="result-card"><h3>Analysis Failed</h3><p>Could not identify a specific gene or a classification pattern in your request.</p></div>`;
+}
+
+// NOTE: The handler for all generic questions in the questionRegistry should be set to:
+// handler: async (q) => routePhylogenyAnalysis(q)
 
 /**
  * Automated handler for all phylogenetic questions (Q1-Q7).
