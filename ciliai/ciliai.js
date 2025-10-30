@@ -4896,28 +4896,32 @@ function renderLiPhylogenyHeatmap(genes) {
  * @returns {string} HTML table output.
  */
 function renderPhylogenyTable(genes) {
-    // Assuming liPhylogenyCache and neversPhylogenyCache are loaded globally.
+    // Assumed caches: liPhylogenyCache, neversPhylogenyCache, etc., are loaded globally.
     if (!liPhylogenyCache || !neversPhylogenyCache) {
         return `<div class="result-card"><h3>Table Error</h3><p>Phylogenetic data is not fully loaded.</p></div>`;
     }
 
     const tableRows = genes.map(gene => {
-        const liEntry = Object.values(liPhylogenyCache.genes).find(g => g.g.toUpperCase() === gene);
-        const neversEntry = neversPhylogenyCache.genes?.[gene];
+        const geneUpper = gene.toUpperCase();
         
+        // --- LI Data Lookup ---
+        const liEntry = Object.values(liPhylogenyCache.genes).find(g => g.g && g.g.toUpperCase() === geneUpper);
         const liClass = liEntry 
             ? liPhylogenyCache.summary.class_list[liEntry.c].replace(/_/g, ' ') 
             : 'N/A';
         const liCount = liEntry?.s?.length || 0;
+        
+        // --- NEVERS Data Lookup ---
+        const neversEntry = neversPhylogenyCache.genes?.[geneUpper];
         const neversCount = neversEntry?.s?.length || 0;
         
         return `
             <tr>
-                <td><strong>${gene}</strong></td>
+                <td><strong>${geneUpper}</strong></td>
                 <td>${liClass}</td>
                 <td>${liCount} / 140</td>
                 <td>${neversCount} / 99</td>
-                <td><span data-action="visualize-heatmap" data-genes="${gene}">View Heatmap</span></td>
+                <td><a href="#" class="ai-action" data-action="visualize-heatmap" data-genes="${geneUpper}">View Heatmap</a></td>
             </tr>
         `;
     }).join('');
@@ -5061,46 +5065,38 @@ window.initPhylogenyPlot = function(containerId, traceData, layoutData) {
 };
 /**
  * AI-like function to parse complex/synonym queries and route them to the correct handler.
- * Used for all "gene X" questions in the questionRegistry.
+ * This is the handler for all generic "gene X" questions.
  * @param {string} query - The raw user query.
- * @returns {Promise<string>} HTML output (either a list, table, or calls the heatmap).
+ * @returns {Promise<string>} HTML output (calls the handlePhylogenyVisualizationQuery).
  */
 async function routePhylogenyAnalysis(query) {
-    // Note: extractMultipleGenes(q) is assumed to exist and returns an array of symbols.
+    // NOTE: extractMultipleGenes(q) is assumed to exist and returns an array of symbols.
     const genes = extractMultipleGenes(query);
     const qLower = query.toLowerCase();
 
-    // 1. Check for LIST INTENT (e.g., "List genes classified as...")
-    if (qLower.includes('list') || qLower.includes('show genes') || qLower.includes('which genes are')) {
-        
-        // --- NOTE: These List functions (getPhylogenyList) need to be implemented ---
-        if (qLower.includes('mammalian specific')) {
-            return getPhylogenyList('Mammalian_specific');
-        }
-        if (qLower.includes('ciliary specific')) {
-            return getPhylogenyList('Ciliary_specific');
-        }
+    // 1. Check for LIST INTENT (Classification lists use a different, separate handler, assumed working)
+    if (qLower.includes('list') || qLower.includes('show genes')) {
+        // You would place specific classification checks here if needed, but for visualization queries, we ignore it.
     }
     
     // 2. Check for TABLE INTENT 
     if (qLower.includes('table') || qLower.includes('view data') || qLower.includes('species count')) {
          if (genes.length >= 1) {
-             // If genes are found, show the table view directly.
+             // Route to Table View
              return handlePhylogenyVisualizationQuery(query, 'li', 'table');
          }
     }
-
     // 3. Default to VISUALIZATION INTENT (Heatmap)
-    // This catches "Evolutionary profile for CC2D1A" and "Phylogenetic analysis of CC2D1A"
+    // This catches *all* remaining conservation/phylogeny/heatmap/comparison queries,
+    // including "Phylogenetic analysis of CC2D1A."
     if (genes.length >= 1) {
-        // Default visualization (Li et al. heatmap)
+        // Default visualization is the Li et al. heatmap
         return handlePhylogenyVisualizationQuery(query, 'li', 'heatmap');
     }
 
-    // 4. Fallback Error (Used if no gene or list keyword is found)
+    // 4. Fallback Error (If no gene or recognizable pattern is found)
     return `<div class="result-card"><h3>Analysis Failed</h3><p>Could not identify a specific gene or a classification pattern in your request. Please try one of the suggested questions or a known keyword.</p></div>`;
 }
-
 
 /**
  * Automated handler for all phylogenetic questions (Q1-Q7).
