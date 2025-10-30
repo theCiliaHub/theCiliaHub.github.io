@@ -5063,6 +5063,60 @@ window.initPhylogenyPlot = function(containerId, traceData, layoutData) {
     }, 0); 
 
 };
+
+/**
+ * Retrieves lists of genes based on Li et al. (2014) phylogenetic classification.
+ * This is the handler for questions like "Show Mammalian specific ciliary genes."
+ * @param {string} classification - The specific Li classification key (e.g., 'Vertebrate_specific').
+ * @returns {Promise<string>} HTML formatted list result.
+ */
+async function getPhylogenyList(classification) {
+    await fetchLiPhylogenyData(); 
+    
+    if (!liPhylogenyCache || !liPhylogenyCache.summary || !liPhylogenyCache.genes) {
+        return `<div class="result-card"><h3>List Error</h3><p>Phylogenetic classification data is currently unavailable.</p></div>`;
+    }
+
+    const targetClassLower = classification.toLowerCase();
+    const liGenes = liPhylogenyCache.genes;
+    const classList = liPhylogenyCache.summary.class_list;
+
+    let filteredGenes = [];
+    let title = "";
+
+    // Special handling for ABSENT IN FUNGI and ALL ORGANISMS
+    if (targetClassLower === 'absent in fungi') {
+        // Based on Li et al. classification definitions, this often corresponds to the Vertebrate_specific group
+        // or a filter against the main list. We will use Vertebrate_specific and Mammalian_specific as proxies.
+        filteredGenes = Object.values(liGenes).filter(entry => {
+            const entryClass = classList[entry.c] ? classList[entry.c].toLowerCase() : '';
+            // Fungus-related classes are typically indexes 53-101 in the list, but using classification is safer.
+            return entryClass.includes('vertebrate_specific') || entryClass.includes('mammalian_specific');
+        }).map(g => ({ gene: g.g, description: 'Likely lost in Fungi lineage' }));
+        title = "Genes Absent in Fungi (Vertebrate/Mammalian Specific)";
+
+    } else if (targetClassLower === 'in_all_organisms') {
+        // Check for genes with the maximum number of species (130-140) in Li's list
+        filteredGenes = Object.values(liGenes).filter(entry => entry.s.length >= 130)
+                                            .map(g => ({ gene: g.g, description: `Conserved in ${g.s.length}/140 species` }));
+        title = "Genes Conserved Across Nearly All Organisms";
+
+    } else {
+        // Standard classification lookup (e.g., Ciliary_specific, Mammalian_specific)
+        filteredGenes = Object.values(liGenes).filter(entry => {
+            const entryClass = classList[entry.c] ? classList[entry.c].toLowerCase() : '';
+            return entryClass.includes(targetClassLower);
+        }).map(g => ({ gene: g.g, description: `Class: ${targetClassLower.replace(/_/g, ' ')}` }));
+        title = `Genes Classified as ${targetClassLower.replace(/_/g, ' ')}`;
+    }
+    
+    if (filteredGenes.length === 0) {
+        return `<div class="result-card"><h3>${title}</h3><p class="status-not-found">No genes found matching this classification.</p></div>`;
+    }
+
+    return formatListResult(title, filteredGenes);
+}
+
 /**
  * AI-like function to parse complex/synonym queries and route them to the correct handler.
  * This is the handler for all generic "gene X" questions.
@@ -5099,55 +5153,103 @@ async function routePhylogenyAnalysis(query) {
 }
 
 /**
- * Automated handler for all phylogenetic questions (Q1-Q7).
- * It fetches the pre-loaded Li/Nevers data for quick summary and triggers
- * the visualization router to handle the heatmap rendering.
- * * @param {string[]} genes - Array of gene symbols requested (e.g., ["IFT88"]).
- * @returns {Promise<string>} HTML string containing the summary and the visualization call.
+ * Renders the initial summary for phylogenetic queries. Handles both single-gene (Q1-Q7)
+ * and multi-gene comparison outputs, and serves as the primary handler for all generic 
+ * visualization queries (Phylogenetic analysis of X, Compare Y phylogeny, etc.).
+ * * @param {string[]} genes - Array of genes requested by the user.
  */
 async function getPhylogenyAnalysis(genes) {
-    // 1. **BEST PRACTICE FIX:** Check for empty input immediately.
-    if (!Array.isArray(genes) || genes.length === 0) {
-        return `<div class="result-card"><h3>Analysis Error</h3><p>No valid gene symbol was provided for phylogenetic analysis.</p></div>`;
-    }
-    
-    // 1. Ensure data is loaded (these functions simply return the cached data if already fetched)
+    // 1. Data loading and validation (Assuming fetch functions populate global caches)
     await Promise.all([fetchLiPhylogenyData(), fetchNeversPhylogenyData()]);
 
-    const geneSymbol = genes[0].toUpperCase();
+    if (!liPhylogenyCache || !neversPhylogenyCache) {
+        return `<div class="result-card"><h3>Analysis Error</h3><p>Phylogenetic data sources (Li 2014 or Nevers 2017) failed to load.</p></div>`;
+    }
     
-    // --- Li Data Lookup ---
-    // Safely attempt to find the gene by its HUGO symbol within the Li cache's 'genes' object
-    const liEntry = Object.values(liPhylogenyCache?.genes || {}).find(g => g.g && g.g.toUpperCase() === geneSymbol);
-    const liSummary = liEntry 
-        ? (liPhylogenyCache.summary.class_list[liEntry.c] || 'Classification Unavailable')
-        : 'Not found in Li et al. (2014)';
+    // Get all HUGO gene symbols available in the Li database
+    const liGenesSet = new Set(Object.values(liPhylogenyCache.genes).map(g => g.g.toUpperCase()).filter(Boolean));
+    const validGeneSymbols = genes.map(g => g.toUpperCase()).filter(g => liGenesSet.has(g));
+    
+    if (validGeneSymbols.length === 0) {
+        return `<div class="result-card"><h3>Analysis Error</h3><p>None of the requested genes were found in the Li et al. 2014 phylogenetic dataset.</p></div>`;
+    }
 
-    // --- Nevers Data Lookup (Assumes Nevers is keyed by the HUGO Symbol for simplicity) ---
-    const neversEntry = neversPhylogenyCache?.genes?.[geneSymbol];
-    const neversSpeciesCount = neversEntry?.s?.length || 0;
-    const neversStatus = neversEntry 
-        ? `Found in ${neversSpeciesCount} species (Nevers et al. 2017)`
-        : 'Not found in Nevers et al. (2017)';
+    // --- Determine Output Mode ---
+    if (validGeneSymbols.length > 1 || validGeneSymbols.join(',') !== genes[0].toUpperCase()) {
+        
+        // --- MULTI-GENE COMPARISON MODE (Triggered by 2+ genes or a comparison query structure) ---
+        let summaryHtml = `
+            <div class="result-card">
+                <h3>Phylogenetic Comparison: ${validGeneSymbols.join(' vs ')} 📊</h3>
+                <table class="gene-detail-table">
+                    <thead>
+                        <tr>
+                            <th>Gene</th>
+                            <th>Li Class (2014)</th>
+                            <th>Nevers Species Count (99)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+        `;
+        
+        validGeneSymbols.forEach(gene => {
+            const liEntry = Object.values(liPhylogenyCache.genes).find(g => g.g && g.g.toUpperCase() === gene);
+            const neversEntry = neversPhylogenyCache.genes?.[gene];
 
-    const generalSummary = `
-        <div class="result-card">
-            <h3>Evolutionary Summary: ${geneSymbol} 🧬</h3>
-            <table class="gene-detail-table">
-                <tr><th>Li et al. (2014) Classification</th><td><strong>${liSummary.replace(/_/g, ' ')}</strong></td></tr>
-                <tr><th>Nevers et al. (2017) Status</th><td>${neversStatus}</td></tr>
-                <tr><th>Analysis</th><td>Visualization is based on the Li et al. (2014) data.</td></tr>
-            </table>
-        </div>
-    `;
+            // Safely extract and format data
+            const liClass = liEntry 
+                ? (liPhylogenyCache.summary.class_list[liEntry.c] || 'N/A').replace(/_/g, ' ') 
+                : 'N/A';
+            const neversCount = neversEntry?.s?.length || 0;
+            
+            summaryHtml += `
+                <tr>
+                    <td><strong>${gene}</strong></td>
+                    <td>${liClass}</td>
+                    <td>${neversCount}</td>
+                </tr>
+            `;
+        });
+        
+        summaryHtml += `
+                    </tbody>
+                </table>
+                <p class="ai-suggestion">
+                    The visualization below provides the detailed species map for comparison.
+                </p>
+            </div>
+        `;
+        
+        // Route to heatmap visualization
+        const visualizationHtml = await handlePhylogenyVisualizationQuery(`Show heatmap for ${validGeneSymbols.join(',')}`, 'li', 'heatmap');
+        return summaryHtml + visualizationHtml;
 
-    // 2. Route to Visualization (Handles the rendering of the heatmap)
-    // NOTE: We pass the actual gene symbol(s) to the router.
-    const visualizationHtml = await handlePhylogenyVisualizationQuery(`Show heatmap for ${genes.join(',')}`);
+    } else {
+        // --- SINGLE-GENE ANALYSIS MODE (Q1-Q7) ---
+        const geneSymbol = validGeneSymbols[0];
+        const liEntry = Object.values(liPhylogenyCache.genes).find(g => g.g && g.g.toUpperCase() === geneSymbol);
+        const neversEntry = neversPhylogenyCache?.genes?.[geneSymbol];
 
-    // 3. Combine the textual summary and the visual output
-    return generalSummary + visualizationHtml;
+        const liSummary = liEntry ? liPhylogenyCache.summary.class_list[liEntry.c] || 'Classification Unavailable' : 'Not found in Li et al. (2014)';
+        const neversSpeciesCount = neversEntry?.s?.length || 0;
+        const neversStatus = neversEntry ? `Found in ${neversSpeciesCount} species (Nevers et al. 2017)` : 'Not found in Nevers et al. (2017)';
+
+        const generalSummary = `
+            <div class="result-card">
+                <h3>Evolutionary Summary: ${geneSymbol} 🧬</h3>
+                <table class="gene-detail-table">
+                    <tr><th>Li et al. (2014) Classification</th><td><strong>${liSummary.replace(/_/g, ' ')}</strong></td></tr>
+                    <tr><th>Nevers et al. (2017) Status</th><td>${neversStatus}</td></tr>
+                </table>
+            </div>
+        `;
+        
+        // Route to heatmap visualization
+        const visualizationHtml = await handlePhylogenyVisualizationQuery(`Show heatmap for ${geneSymbol}`, 'li', 'heatmap');
+        return generalSummary + visualizationHtml;
+    }
 }
+
 /**
  * [NEW HELPER] Formats the output for the Li et al. 2014 data
  */
