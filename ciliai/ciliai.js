@@ -1108,6 +1108,18 @@ async function getHubOrthologsForGene(gene) {
 }
 
 
+// --- CRITICAL GENE ALIAS MAPPING for Search/Extraction ---
+// When user inputs IFT54, the code should search for TRAF3IP1, etc.
+// NOTE: These should be added to your global alias/extraction utility.
+const geneAliases = new Map([
+    ["IFT144", "WDR19"],
+    ["IFT139", "TTC21B"],
+    ["IFT121", "WDR35"],
+    ["IFT38", "CLUAP1"],       // NEW: CLUAP1 is IFT38
+    ["IFT54", "TRAF3IP1"],     // NEW: TRAF3IP1 is IFT54
+    ["BBS8", "TTC8"]           // NEW: TTC8 is BBS8
+]);
+
 const questionRegistry = [
     // ==================== META / GENERAL ====================
     { text: "What can you do?", handler: async () => tellAboutCiliAI() },
@@ -1161,7 +1173,17 @@ const questionRegistry = [
     { text: "Evolutionary comparison: IFT88, IFT140, IFT172", handler: async () => getPhylogenyAnalysis(["IFT88", "IFT140", "IFT172"]) },
     { text: "Compare conservation patterns of BBS proteins", handler: async () => getPhylogenyAnalysis(["BBS1", "BBS2", "BBS4", "BBS5", "BBS7", "BBS9"]) },
     { text: "Side-by-side phylogeny: NPHP1 vs NPHP4", handler: async () => getPhylogenyAnalysis(["NPHP1", "NPHP4"]) },
-    { text: "Multi-gene evolutionary analysis: IFT complex", handler: async () => getPhylogenyAnalysis(["IFT88", "IFT140", "IFT172", "IFT122"]) },
+    { text: "Multi-gene evolutionary analysis: IFT complex", handler: async () => getPhylogenyAnalysis(["WDR19", "IFT140", "TTC21B", "IFT122", "WDR35", "IFT43", "IFT172", "IFT80", "IFT57", "TRAF3IP1", "CLUAP1", "IFT20", "IFT88", "IFT81", "IFT74", "IFT70A", "IFT70B", "IFT56", "IFT52", "IFT46", "IFT27", "IFT25", "IFT22"]) },
+    { text: "Compare evolutionary history of IFT-A complex components", handler: async () => getPhylogenyAnalysis(["WDR19", "IFT140", "TTC21B", "IFT122", "WDR35", "IFT43"]) },
+    { text: "Phylogenetic analysis of the complete IFT-B complex", handler: async () => getPhylogenyAnalysis(["IFT172", "IFT80", "IFT57", "TRAF3IP1", "CLUAP1", "IFT20", "IFT88", "IFT81", "IFT74", "IFT70A", "IFT70B", "IFT56", "IFT52", "IFT46", "IFT27", "IFT25", "IFT22"]) },
+    { text: "Compare conservation of IFT-B1 core components", handler: async () => getPhylogenyAnalysis(["IFT172", "IFT80", "IFT57", "TRAF3IP1", "CLUAP1", "IFT20"]) },
+    { text: "Show conservation of IFT-B2 peripheral components", handler: async () => getPhylogenyAnalysis(["IFT88", "IFT81", "IFT74", "IFT70A", "IFT70B", "IFT56", "IFT52", "IFT46", "IFT27", "IFT25", "IFT22"]) },
+    { text: "Evolutionary profile for IFT complex B", handler: async () => getPhylogenyAnalysis(["IFT172", "IFT80", "IFT57", "TRAF3IP1", "CLUAP1", "IFT20", "IFT88", "IFT81", "IFT74", "IFT70A", "IFT70B", "IFT56", "IFT52", "IFT46", "IFT27", "IFT25", "IFT22"]) },
+    { text: "Evolutionary analysis of all BBSome components", handler: async () => getPhylogenyAnalysis(["BBS1", "BBS2", "BBS4", "BBS5", "BBS7", "TTC8", "BBS9", "BBS18"]) },
+    { text: "Compare conservation of Meckel Syndrome (MKS) module components", handler: async () => getPhylogenyAnalysis(["MKS1", "TMEM17", "TMEM67", "TMEM138", "B9D2", "B9D1", "CC2D2A", "TMEM107", "TMEM237", "TMEM231", "TMEM216", "TCTN1", "TCTN2", "TCTN3") },
+    { text: "Show evolutionary conservation of Nephronophthisis (NPHP) module genes", handler: async () => getPhylogenyAnalysis(["NPHP1", "NPHP3", "NPHP4", "RPGRIP1L", "IQCB1", "CEP290", "SDCCAG8"]) },
+    { text: "Phylogenetic analysis of core Transition Zone proteins", handler: async () => getPhylogenyAnalysis(["NPHP1", "MKS1", "CEP290", "AHI1", "RPGRIP1L", "TMEM67", "CC2D2A", "B9D1", "B9D2"]) },
+
 
 // ==================== C. CLASSIFICATION & PATTERN QUESTIONS (List/Summary - Expanded) ====================
     { text: "List genes classified as Ciliary specific", handler: async () => getPhylogenyList('Ciliary_specific') },
