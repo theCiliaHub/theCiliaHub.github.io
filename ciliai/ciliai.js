@@ -1119,30 +1119,106 @@ const questionRegistry = [
     { text: "What questions can I ask?", handler: async () => tellAboutCiliAI() },
     { text: "Give me an overview of your features", handler: async () => tellAboutCiliAI() },
 
-// ==================== A. SPECIFIC GENE VISUALIZATION ====================
+// ==================== A. SPECIFIC GENE VISUALIZATION (Expanded) ====================
     { text: "Show evolutionary conservation of IFT88", handler: async () => getPhylogenyAnalysis(["IFT88"]) },
     { text: "IFT88 conservation analysis", handler: async () => getPhylogenyAnalysis(["IFT88"]) },
+    { text: "IFT88 evolutionary profile", handler: async () => getPhylogenyAnalysis(["IFT88"]) },
+    { text: "IFT88 phylogenetic footprint", handler: async () => getPhylogenyAnalysis(["IFT88"]) },
+    { text: "IFT88 conservation pattern", handler: async () => getPhylogenyAnalysis(["IFT88"]) },
+    { text: "IFT88 evolutionary history", handler: async () => getPhylogenyAnalysis(["IFT88"]) },
+    { text: "IFT88 species distribution", handler: async () => getPhylogenyAnalysis(["IFT88"]) },
+    
     { text: "What is the phylogeny of BBS1?", handler: async () => getPhylogenyAnalysis(["BBS1"]) },
     { text: "BBS1 conservation heatmap", handler: async () => getPhylogenyAnalysis(["BBS1"]) },
+    { text: "BBS1 evolutionary conservation", handler: async () => getPhylogenyAnalysis(["BBS1"]) },
+    { text: "BBS1 phylogenetic analysis", handler: async () => getPhylogenyAnalysis(["BBS1"]) },
+    
     { text: "Show the phylogenetic comparison for ARL13B", handler: async () => getPhylogenyAnalysis(["ARL13B"]) },
+    { text: "ARL13B evolutionary map", handler: async () => getPhylogenyAnalysis(["ARL13B"]) },
+    { text: "ARL13B conservation profile", handler: async () => getPhylogenyAnalysis(["ARL13B"]) },
+    
     { text: "Evolutionary profile of CEP290", handler: async () => getPhylogenyAnalysis(["CEP290"]) },
+    { text: "CEP290 phylogenetic conservation", handler: async () => getPhylogenyAnalysis(["CEP290"]) },
+    { text: "CEP290 evolutionary footprint", handler: async () => getPhylogenyAnalysis(["CEP290"]) },
+    
     { text: "Heatmap for NPHP1 conservation", handler: async () => getPhylogenyAnalysis(["NPHP1"]) },
+    { text: "NPHP1 evolutionary pattern", handler: async () => getPhylogenyAnalysis(["NPHP1"]) },
+    
     { text: "Phylogenetic analysis of DYNC2H1", handler: async () => getPhylogenyAnalysis(["DYNC2H1"]) },
+    { text: "DYNC2H1 conservation map", handler: async () => getPhylogenyAnalysis(["DYNC2H1"]) },
+    
     { text: "Conservation map for IFT140", handler: async () => getPhylogenyAnalysis(["IFT140"]) },
+    { text: "IFT140 evolutionary distribution", handler: async () => getPhylogenyAnalysis(["IFT140"]) },
+    
     { text: "Evolutionary heatmap for TTC8", handler: async () => getPhylogenyAnalysis(["TTC8"]) },
+    { text: "TTC8 phylogenetic profile", handler: async () => getPhylogenyAnalysis(["TTC8"]) },
 
-// ==================== B. COMPARISON QUERIES (Multi-Gene Visualization) ====================
+// ==================== B. COMPARISON QUERIES (Multi-Gene Visualization - Expanded) ====================
     { text: "Compare IFT88 and IFT140 phylogeny", handler: async () => getPhylogenyAnalysis(["IFT88", "IFT140"]) },
     { text: "Phylogeny comparison of BBS1 and BBS4", handler: async () => getPhylogenyAnalysis(["BBS1", "BBS4"]) },
     { text: "Show conservation of NPHP1 vs CEP290", handler: async () => getPhylogenyAnalysis(["NPHP1", "CEP290"]) },
     { text: "Compare the evolutionary history of DYNC2H1 and KIF3A", handler: async () => getPhylogenyAnalysis(["DYNC2H1", "KIF3A"]) },
-    
-// ==================== C. CLASSIFICATION & PATTERN QUESTIONS (List/Summary) ====================
+    { text: "Evolutionary comparison: IFT88, IFT140, IFT172", handler: async () => getPhylogenyAnalysis(["IFT88", "IFT140", "IFT172"]) },
+    { text: "Compare conservation patterns of BBS proteins", handler: async () => getPhylogenyAnalysis(["BBS1", "BBS2", "BBS4", "BBS5", "BBS7", "BBS9"]) },
+    { text: "Side-by-side phylogeny: NPHP1 vs NPHP4", handler: async () => getPhylogenyAnalysis(["NPHP1", "NPHP4"]) },
+    { text: "Multi-gene evolutionary analysis: IFT complex", handler: async () => getPhylogenyAnalysis(["IFT88", "IFT140", "IFT172", "IFT122"]) },
+
+// ==================== C. CLASSIFICATION & PATTERN QUESTIONS (List/Summary - Expanded) ====================
     { text: "List genes classified as Ciliary specific", handler: async () => getPhylogenyList('Ciliary_specific') },
     { text: "Show Mammalian specific ciliary genes", handler: async () => getPhylogenyList('Mammalian_specific') },
     { text: "Which genes are Vertebrate specific?", handler: async () => getPhylogenyList('Vertebrate_specific') },
     { text: "List genes conserved across ALL organisms", handler: async () => getPhylogenyList('in_all_organisms') },
     { text: "Show ciliary genes absent in fungi", handler: async () => getPhylogenyList('absent_in_fungi') },
+    { text: "Genes with broad phylogenetic conservation", handler: async () => getPhylogenyList('in_all_organisms') },
+    { text: "Ubiquitous ciliary genes", handler: async () => getPhylogenyList('in_all_organisms') },
+    { text: "Ancient ciliary genes", handler: async () => getPhylogenyList('in_all_organisms') },
+    { text: "Recently evolved ciliary genes", handler: async () => getPhylogenyList('Mammalian_specific') },
+    { text: "Mammal-only ciliary components", handler: async () => getPhylogenyList('Mammalian_specific') },
+    { text: "Vertebrate-specific ciliary factors", handler: async () => getPhylogenyList('Vertebrate_specific') },
+    { text: "Fungi-missing ciliary genes", handler: async () => getPhylogenyList('absent_in_fungi') },
+
+// ==================== D. AUTOMATED QUESTION TEMPLATES ====================
+    // These generate questions for any gene in the database
+    { text: "GENE conservation analysis", handler: async (q) => routePhylogenyAnalysis(q), template: true },
+    { text: "Show phylogeny for GENE", handler: async (q) => routePhylogenyAnalysis(q), template: true },
+    { text: "Evolutionary profile of GENE", handler: async (q) => routePhylogenyAnalysis(q), template: true },
+    { text: "GENE evolutionary conservation", handler: async (q) => routePhylogenyAnalysis(q), template: true },
+    { text: "Phylogenetic analysis of GENE", handler: async (q) => routePhylogenyAnalysis(q), template: true },
+    { text: "GENE conservation heatmap", handler: async (q) => routePhylogenyAnalysis(q), template: true },
+    { text: "Compare GENE and GENE phylogeny", handler: async (q) => routePhylogenyAnalysis(q), template: true },
+    { text: "Evolutionary comparison: GENE vs GENE", handler: async (q) => routePhylogenyAnalysis(q), template: true },
+
+// ==================== E. SYNONYMS & CATCH-ALL ROUTERS (Expanded) ====================
+    { text: "Show evolutionary conservation of gene X", handler: async (q) => routePhylogenyAnalysis(q) },
+    { text: "What is the phylogeny of gene X?", handler: async (q) => routePhylogenyAnalysis(q) },
+    { text: "Compare gene X phylogeny", handler: async (q) => routePhylogenyAnalysis(q) },
+    { text: "Show conservation profile for gene X", handler: async (q) => routePhylogenyAnalysis(q) },
+    { text: "Phylogenetic analysis of gene X", handler: async (q) => routePhylogenyAnalysis(q) },
+    { text: "Evolutionary profile for gene X", handler: async (q) => routePhylogenyAnalysis(q) },
+    { text: "Gene X evolutionary history", handler: async (q) => routePhylogenyAnalysis(q) },
+    { text: "Gene X conservation pattern", handler: async (q) => routePhylogenyAnalysis(q) },
+    { text: "Gene X species distribution", handler: async (q) => routePhylogenyAnalysis(q) },
+    { text: "Gene X phylogenetic footprint", handler: async (q) => routePhylogenyAnalysis(q) },
+    { text: "Show evolutionary map for gene X", handler: async (q) => routePhylogenyAnalysis(q) },
+    { text: "Compare evolution of gene X and gene Y", handler: async (q) => routePhylogenyAnalysis(q) },
+    { text: "Side-by-side phylogeny: gene X vs gene Y", handler: async (q) => routePhylogenyAnalysis(q) },
+    { text: "Multi-gene evolutionary analysis", handler: async (q) => routePhylogenyAnalysis(q) },
+
+// ==================== F. DATA EXPLORATION & TABLE QUERIES ====================
+    { text: "Show conservation data table for IFT88", handler: async () => handlePhylogenyVisualizationQuery("IFT88", 'li', 'table') },
+    { text: "IFT88 species presence data", handler: async () => handlePhylogenyVisualizationQuery("IFT88", 'li', 'table') },
+    { text: "View raw conservation data for BBS1", handler: async () => handlePhylogenyVisualizationQuery("BBS1", 'li', 'table') },
+    { text: "BBS1 phylogenetic data table", handler: async () => handlePhylogenyVisualizationQuery("BBS1", 'li', 'table') },
+    { text: "Show data table for gene X", handler: async (q) => routePhylogenyAnalysis(q) },
+    { text: "Gene X species count data", handler: async (q) => routePhylogenyAnalysis(q) },
+    { text: "View conservation table for gene X", handler: async (q) => routePhylogenyAnalysis(q) },
+
+// ==================== G. COMPLEX PATTERN & DISCOVERY QUESTIONS ====================
+    { text: "Which ciliary genes are most conserved?", handler: async () => getPhylogenyList('in_all_organisms') },
+    { text: "Find genes with unique evolutionary patterns", handler: async () => getPhylogenyList('Ciliary_specific') },
+    { text: "Show genes with restricted phylogenetic distribution", handler: async () => getPhylogenyList('Mammalian_specific') },
+    { text: "Identify evolutionarily novel ciliary genes", handler: async () => getPhylogenyList('Mammalian_specific') },
+    { text: "Find ancient conserved ciliary machinery", handler: async () => getPhylogenyList('in_all_organisms') },
 
 // ==================== D. SYNONYMS & CATCH-ALL ROUTERS ====================
     // These now call the AI-like utility function for broader interpretation
@@ -1158,28 +1234,7 @@ const questionRegistry = [
     { text: "What is the source for Ciliary genes in mouse?", handler: async () => tellAboutOrganismSources("mouse") },
     { text: "What is the source for Ciliary genes in zebrafish?", handler: async () => tellAboutOrganismSources("zebrafish") },
     { text: "What is the source for Ciliary genes in drosophila?", handler: async () => tellAboutOrganismSources("drosophila") },
-// ==================== PHYLOGENY QUERIES (VISUALIZATION) ====================
-{ text: "Show evolutionary conservation of IFT88", handler: async () => displayPhylogenyComparison(["IFT88"]) },
-{ text: "IFT88 conservation analysis", handler: async () => displayPhylogenyComparison(["IFT88"]) },
-{ text: "What is the phylogeny of BBS1?", handler: async () => displayPhylogenyComparison(["BBS1"]) },
-{ text: "BBS1 conservation heatmap", handler: async () => displayPhylogenyComparison(["BBS1"]) },
-{ text: "Compare IFT88 phylogeny", handler: async () => displayPhylogenyComparison(["IFT88"]) },
-{ text: "Compare BBS1 phylogeny", handler: async () => displayPhylogenyComparison(["BBS1"]) },
-{ text: "Show the phylogenetic comparison for ARL13B", handler: async () => displayPhylogenyComparison(["ARL13B"]) },
-{ text: "Show heatmap for ARL13B", handler: async () => displayPhylogenyComparison(["ARL13B"]) },
-{ text: "NPHP1 phylogenetic analysis comparison", handler: async () => displayPhylogenyComparison(["NPHP1"]) },
-{ text: "Show NPHP1 phylogeny plot", handler: async () => displayPhylogenyComparison(["NPHP1"]) },
-{ text: "Show the phylogenetic comparison for WDR31", handler: async () => displayPhylogenyComparison(["WDR31"]) },
-{ text: "WDR31 evolutionary heatmap", handler: async () => displayPhylogenyComparison(["WDR31"]) },
-{ text: "Phylogenetic analysis of CEP290", handler: async () => displayPhylogenyComparison(["CEP290"]) },
-{ // Catches the most common conservation phrase for any gene (e.g., WDR54)
-text: "Show evolutionary conservation of gene X", handler: async (q) => plotPhylogenyFromQuery(q) },
-{ // Catches the "What is the phylogeny/comparison of" phrase 
-    text: "What is the phylogeny of gene X?", handler: async (q) => plotPhylogenyFromQuery(q) },
-{ // Catches comparison formats
-    text: "Compare gene X phylogeny", handler: async (q) => plotPhylogenyFromQuery(q) },
-{ // Catches the original 'Show the phylogenetic comparison' phrasing
-    text: "Show the phylogenetic comparison for gene X", handler: async (q) => plotPhylogenyFromQuery(q) },
+
 
 // --------------------------------------------------------------------------------------
 // --- List Queries (CILIARY/NON-CILIARY LISTS) ---
@@ -5067,10 +5122,11 @@ window.initPhylogenyPlot = function(containerId, traceData, layoutData) {
 /**
  * Retrieves lists of genes based on Li et al. (2014) phylogenetic classification.
  * This is the unified handler for all list requests (Vertebrate, Mammalian, Ciliary, Fungi-absent, All).
- * @param {string} classification - The specific Li classification keyword/synonym.
+ * * @param {string} classification - The specific Li classification keyword/synonym (e.g., 'Vertebrate_specific').
  * @returns {Promise<string>} HTML formatted list result.
  */
 async function getPhylogenyList(classification) {
+    // 1. Data Loading and Setup
     await fetchLiPhylogenyData(); 
     
     if (!liPhylogenyCache || !liPhylogenyCache.summary || !liPhylogenyCache.genes) {
@@ -5079,36 +5135,53 @@ async function getPhylogenyList(classification) {
 
     const qLower = classification.toLowerCase().replace(/\s/g, '_');
     const liGenes = liPhylogenyCache.genes;
-    const classList = liPhylogenyCache.summary.class_list;
+    const summary = liPhylogenyCache.summary;
+    const classList = summary.class_list;
 
     let targetClassificationKey = null;
     let title = "";
-
-    // 1. Map user keywords to Li's internal classification keys
+    let fallbackHtml = "";
+    
+    // 2. Map user keywords to Li's internal classification keys and check for data quality
     if (qLower.includes('vertebrate')) {
         targetClassificationKey = 'Vertebrate_specific';
         title = "Genes Specific to the Vertebrate Lineage";
-    } else if (qLower.includes('mammalian')) {
-        targetClassificationKey = 'Mammalian_specific';
-        title = "Genes Specific to the Mammalian Lineage";
-    } else if (qLower.includes('ciliary_specific') || qLower.includes('ciliary_genes')) {
+    } 
+    else if (qLower.includes('mammalian')) {
+        // --- CRITICAL FIX FOR MAMMALS (Classification is confirmed empty in source data) ---
+        if (summary.classification_summary.Mammalian_specific === 0) {
+            targetClassificationKey = 'Vertebrate_specific'; // Fallback/Proxy to the closest available group
+            title = "Genes Specific to the Mammalian Lineage (Data Proxy)";
+            fallbackHtml = `<p class="status-note" style="margin-top: 10px;">
+                ⚠️ **Note:** The Li et al. 2014 classification metadata reports **zero genes** for the 'Mammalian specific' group. We are displaying the **Vertebrate specific** list as the most phylogenetically proximal proxy.
+            </p>`;
+        } else {
+             targetClassificationKey = 'Mammalian_specific';
+             title = "Genes Specific to the Mammalian Lineage";
+        }
+    } 
+    else if (qLower.includes('ciliary_specific') || qLower.includes('ciliary_genes')) {
         targetClassificationKey = 'Ciliary_specific';
         title = "Genes Classified as Ciliary Specific";
-    } else if (qLower.includes('absent_in_fungi') || qLower.includes('not_in_fungi')) {
-        // Proxy for genes secondarily lost in Fungi is Vertebrate or Mammalian specific in the Li dataset.
+    } 
+    else if (qLower.includes('absent_in_fungi') || qLower.includes('not_in_fungi')) {
+        // Proxy using the Vertebrate_specific list, which excludes many fungal species
         targetClassificationKey = 'Vertebrate_specific'; 
         title = "Genes Likely Absent in Fungi (Proxy: Vertebrate/Mammalian Specific)";
-    } else if (qLower.includes('all_organisms') || qLower.includes('universally_conserved')) {
+    } 
+    else if (qLower.includes('all_organisms') || qLower.includes('universally_conserved')) {
         targetClassificationKey = 'Universally_Conserved_Proxy';
         title = "Genes Conserved Across Nearly All Organisms";
-    } else {
+    } 
+    else {
         return `<div class="result-card"><h3>List Error</h3><p class="status-not-found">Classification keyword not recognized for list generation: ${classification}.</p></div>`;
     }
     
-    // 2. Filter the genes based on the determined key
+    // 3. Filter the genes based on the determined key
     const filteredGenes = Object.values(liGenes).filter(entry => {
+        
         if (targetClassificationKey === 'Universally_Conserved_Proxy') {
-            // Check for genes present in >= 130 species (out of 140)
+            // Filter for genes present in 130 or more species (out of 140 total organisms in the Li list)
             return entry.s.length >= 130; 
         }
         
@@ -5120,12 +5193,20 @@ async function getPhylogenyList(classification) {
         
     }).map(g => ({ gene: g.g, description: `Class: ${title.split(':')[0]}` }));
     
+    // 4. Handle Empty Results
     if (filteredGenes.length === 0) {
         return `<div class="result-card"><h3>${title}</h3><p class="status-not-found">No genes found matching this classification.</p></div>`;
     }
 
-    // 3. Return the formatted list
-    return formatListResult(title, filteredGenes);
+    // 5. Return the formatted list (inserting the fallback explanation if triggered)
+    let resultHtml = formatListResult(title, filteredGenes);
+    
+    // Inject fallback message before closing div (must escape closing div)
+    if (fallbackHtml) {
+        resultHtml = resultHtml.replace(/<\/div>$/, `${fallbackHtml}</div>`);
+    }
+
+    return resultHtml;
 }
 
 
