@@ -1117,8 +1117,9 @@ const geneAliases = new Map([
     ["IFT121", "WDR35"],
     ["IFT38", "CLUAP1"],       // NEW: CLUAP1 is IFT38
     ["IFT54", "TRAF3IP1"],     // NEW: TRAF3IP1 is IFT54
+    // The previous last line was likely missing a comma:
     ["BBS8", "TTC8"]           // NEW: TTC8 is BBS8
-]);
+]); // <-- The parser sees the closing bracket ')' and throws an error
 
 const questionRegistry = [
     // ==================== META / GENERAL ====================
