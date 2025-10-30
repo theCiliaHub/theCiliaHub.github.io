@@ -5066,8 +5066,8 @@ window.initPhylogenyPlot = function(containerId, traceData, layoutData) {
 
 /**
  * Retrieves lists of genes based on Li et al. (2014) phylogenetic classification.
- * This is the unified handler for all list requests (Vertebrate, Mammalian, Ciliary, Fungi-absent).
- * @param {string} classification - The specific Li classification keyword (e.g., 'Vertebrate_specific', 'Mammalian_specific', 'absent_in_fungi').
+ * This is the unified handler for all list requests (Vertebrate, Mammalian, Ciliary, Fungi-absent, All).
+ * @param {string} classification - The specific Li classification keyword/synonym.
  * @returns {Promise<string>} HTML formatted list result.
  */
 async function getPhylogenyList(classification) {
@@ -5077,7 +5077,7 @@ async function getPhylogenyList(classification) {
         return `<div class="result-card"><h3>List Error</h3><p>Phylogenetic classification data is currently unavailable.</p></div>`;
     }
 
-    const targetClassLower = classification.toLowerCase();
+    const qLower = classification.toLowerCase().replace(/\s/g, '_');
     const liGenes = liPhylogenyCache.genes;
     const classList = liPhylogenyCache.summary.class_list;
 
@@ -5085,78 +5085,96 @@ async function getPhylogenyList(classification) {
     let title = "";
 
     // 1. Map user keywords to Li's internal classification keys
-    if (targetClassLower.includes('vertebrate')) {
+    if (qLower.includes('vertebrate')) {
         targetClassificationKey = 'Vertebrate_specific';
         title = "Genes Specific to the Vertebrate Lineage";
-    } else if (targetClassLower.includes('mammalian')) {
+    } else if (qLower.includes('mammalian')) {
         targetClassificationKey = 'Mammalian_specific';
         title = "Genes Specific to the Mammalian Lineage";
-    } else if (targetClassLower.includes('ciliary specific')) {
+    } else if (qLower.includes('ciliary_specific') || qLower.includes('ciliary_genes')) {
         targetClassificationKey = 'Ciliary_specific';
         title = "Genes Classified as Ciliary Specific";
-    } else if (targetClassLower.includes('absent in fungi')) {
-        // Since Li doesn't have an "Absent in Fungi" class, we proxy it as 'Vertebrate/Mammalian Specific'
-        // as these are often genes that were secondarily lost in Fungi.
-        targetClassificationKey = 'Vertebrate_specific';
-        title = "Genes Absent in Fungi (Proxy: Vertebrate/Mammalian Specific)";
-    } else if (targetClassLower.includes('all organisms')) {
-         // Placeholder logic for the already "answered" query
-         return getPhylogenyList('in_all_organisms_proxy'); // Route to the specialized handler
+    } else if (qLower.includes('absent_in_fungi') || qLower.includes('not_in_fungi')) {
+        // Proxy for genes secondarily lost in Fungi is Vertebrate or Mammalian specific in the Li dataset.
+        targetClassificationKey = 'Vertebrate_specific'; 
+        title = "Genes Likely Absent in Fungi (Proxy: Vertebrate/Mammalian Specific)";
+    } else if (qLower.includes('all_organisms') || qLower.includes('universally_conserved')) {
+        targetClassificationKey = 'Universally_Conserved_Proxy';
+        title = "Genes Conserved Across Nearly All Organisms";
     } else {
-        return `<div class="result-card"><h3>List Error</h3><p>Classification keyword not recognized.</p></div>`;
+        return `<div class="result-card"><h3>List Error</h3><p class="status-not-found">Classification keyword not recognized for list generation: ${classification}.</p></div>`;
     }
     
-    // 2. Filter the genes based on the classification index
+    // 2. Filter the genes based on the determined key
     const filteredGenes = Object.values(liGenes).filter(entry => {
-        if (targetClassificationKey === 'in_all_organisms_proxy') {
-            return entry.s.length >= 130; // Proxy for universally conserved
+        if (targetClassificationKey === 'Universally_Conserved_Proxy') {
+            // Check for genes present in >= 130 species (out of 140)
+            return entry.s.length >= 130; 
         }
         
         const entryClass = classList[entry.c] ? classList[entry.c].replace(/_/g, ' ') : '';
-        return entryClass.toLowerCase().includes(targetClassificationKey.replace(/_/g, ' ').toLowerCase());
+        const targetClass = targetClassificationKey.replace(/_/g, ' ');
         
-    }).map(g => ({ gene: g.g, description: `Class: ${targetClassificationKey.replace(/_/g, ' ')}` }));
+        // Match the entry's classification string against the target classification key
+        return entryClass.toLowerCase().includes(targetClass.toLowerCase());
+        
+    }).map(g => ({ gene: g.g, description: `Class: ${title.split(':')[0]}` }));
     
     if (filteredGenes.length === 0) {
         return `<div class="result-card"><h3>${title}</h3><p class="status-not-found">No genes found matching this classification.</p></div>`;
     }
 
+    // 3. Return the formatted list
     return formatListResult(title, filteredGenes);
 }
+
+
 /**
  * AI-like function to parse complex/synonym queries and route them to the correct handler.
- * This is the handler for all generic "gene X" questions.
+ * Used for all "gene X" questions and all list-based classification queries.
  * @param {string} query - The raw user query.
- * @returns {Promise<string>} HTML output (calls the handlePhylogenyVisualizationQuery).
+ * @returns {Promise<string>} HTML output (either a list, table, or calls the heatmap).
  */
 async function routePhylogenyAnalysis(query) {
-    // NOTE: extractMultipleGenes(q) is assumed to exist and returns an array of symbols.
     const genes = extractMultipleGenes(query);
     const qLower = query.toLowerCase();
 
-    // 1. Check for LIST INTENT (Classification lists use a different, separate handler, assumed working)
-    if (qLower.includes('list') || qLower.includes('show genes')) {
-        // You would place specific classification checks here if needed, but for visualization queries, we ignore it.
+    // 1. Check for LIST INTENT (Prioritized execution for all classification questions)
+    if (qLower.includes('list') || qLower.includes('show ciliary genes') || qLower.includes('which genes are')) {
+        
+        if (qLower.includes('vertebrate')) {
+            return getPhylogenyList('Vertebrate_specific');
+        }
+        if (qLower.includes('mammalian')) {
+            return getPhylogenyList('Mammalian_specific');
+        }
+        if (qLower.includes('ciliary specific') || qLower.includes('ciliary genes')) {
+            return getPhylogenyList('Ciliary_specific');
+        }
+        if (qLower.includes('absent in fungi') || qLower.includes('not in fungi')) {
+            return getPhylogenyList('absent_in_fungi');
+        }
+        if (qLower.includes('all organisms') || qLower.includes('universally conserved')) {
+            return getPhylogenyList('in_all_organisms');
+        }
     }
     
     // 2. Check for TABLE INTENT 
     if (qLower.includes('table') || qLower.includes('view data') || qLower.includes('species count')) {
          if (genes.length >= 1) {
-             // Route to Table View
              return handlePhylogenyVisualizationQuery(query, 'li', 'table');
          }
     }
+
     // 3. Default to VISUALIZATION INTENT (Heatmap)
-    // This catches *all* remaining conservation/phylogeny/heatmap/comparison queries,
-    // including "Phylogenetic analysis of CC2D1A."
     if (genes.length >= 1) {
-        // Default visualization is the Li et al. heatmap
         return handlePhylogenyVisualizationQuery(query, 'li', 'heatmap');
     }
 
-    // 4. Fallback Error (If no gene or recognizable pattern is found)
+    // 4. Fallback Error 
     return `<div class="result-card"><h3>Analysis Failed</h3><p>Could not identify a specific gene or a classification pattern in your request. Please try one of the suggested questions or a known keyword.</p></div>`;
 }
+
 
 /**
  * Renders the initial summary for phylogenetic queries. Handles both single-gene (Q1-Q7)
