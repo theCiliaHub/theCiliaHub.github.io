@@ -4681,7 +4681,7 @@ function renderNeversPhylogenyHeatmap(genes) {
         height: Math.max(500, genes.length * 40 + 150)
     };
     
-    // --- 4. HTML Output ---
+    // --- 4. HTML Output (Includes links) ---
     const htmlOutput = `
         <div class="result-card">
             <h3>Phylogenetic Heatmap for ${geneLabels.join(', ')} 🌍</h3>
@@ -4690,13 +4690,15 @@ function renderNeversPhylogenyHeatmap(genes) {
             <button class="download-button" onclick="downloadPlot('${plotContainer}', 'Phylogeny_Nevers2017')">Download Heatmap (PNG)</button>
             <p class="ai-suggestion" style="margin-top: 10px;">
                 <a href="#" class="ai-action" data-action="show-li-heatmap" data-genes="${genes.join(',')}">⬅️ Show Li et al. (2014) Comparison</a>
+                
+                // 💡 NEW: Table View Link
+                <span style="margin: 0 10px;">|</span>
+                <a href="#" class="ai-action" data-action="show-table-view" data-genes="${genes.join(',')}">📋 Show Data Table</a>
             </p>
         </div>
     `;
-
     return { html: htmlOutput, plotData: [trace], plotLayout: layout, plotId: plotContainer };
 }
-
 
 /**
  * MODIFIED: Adds a link to switch to the Nevers heatmap.
@@ -4872,17 +4874,22 @@ function renderLiPhylogenyHeatmap(genes) {
             </p>
             <p class="ai-suggestion" style="margin-top: 10px;">
                 <a href="#" class="ai-action" data-action="show-nevers-heatmap" data-genes="${genes.join(',')}">➡️ Show Nevers et al. (2017) Comparison</a>
+                
+                // 💡 NEW: Table View Link
+                <span style="margin: 0 10px;">|</span>
+                <a href="#" class="ai-action" data-action="show-table-view" data-genes="${genes.join(',')}">📋 Show Data Table</a>
             </p>
         </div>
     `;
 
-    return {
+   return {
         html: htmlOutput,
         plotData: [trace],
         plotLayout: layout,
         plotId: plotContainer
     };
 }
+
 /**
  * Renders raw phylogenetic data for a list of genes into a detailed table.
  * @param {string[]} genes - Array of genes requested.
@@ -5063,20 +5070,19 @@ async function routePhylogenyAnalysis(query) {
     const genes = extractMultipleGenes(query);
     const qLower = query.toLowerCase();
 
-    // 1. Check for LIST INTENT (Classification or Pattern List)
+    // 1. Check for LIST INTENT (e.g., "List genes classified as...")
     if (qLower.includes('list') || qLower.includes('show genes') || qLower.includes('which genes are')) {
-        // Simple logic for classification lists (needs dedicated functions not provided here)
+        
+        // --- NOTE: These List functions (getPhylogenyList) need to be implemented ---
         if (qLower.includes('mammalian specific')) {
-            return getPhylogenyList('Mammalian_specific'); // Needs separate implementation
+            return getPhylogenyList('Mammalian_specific');
         }
         if (qLower.includes('ciliary specific')) {
-            return getPhylogenyList('Ciliary_specific'); // Needs separate implementation
+            return getPhylogenyList('Ciliary_specific');
         }
-        
-        // If the query contains a gene AND list keywords, fall through to table view.
     }
     
-    // 2. Check for TABLE INTENT (Implicit data review)
+    // 2. Check for TABLE INTENT 
     if (qLower.includes('table') || qLower.includes('view data') || qLower.includes('species count')) {
          if (genes.length >= 1) {
              // If genes are found, show the table view directly.
@@ -5085,17 +5091,16 @@ async function routePhylogenyAnalysis(query) {
     }
 
     // 3. Default to VISUALIZATION INTENT (Heatmap)
-    // All other conservation/phylogeny/heatmap/comparison queries default here.
+    // This catches "Evolutionary profile for CC2D1A" and "Phylogenetic analysis of CC2D1A"
     if (genes.length >= 1) {
+        // Default visualization (Li et al. heatmap)
         return handlePhylogenyVisualizationQuery(query, 'li', 'heatmap');
     }
 
-    // 4. Fallback Error
-    return `<div class="result-card"><h3>Analysis Failed</h3><p>Could not identify a specific gene or a classification pattern in your request.</p></div>`;
+    // 4. Fallback Error (Used if no gene or list keyword is found)
+    return `<div class="result-card"><h3>Analysis Failed</h3><p>Could not identify a specific gene or a classification pattern in your request. Please try one of the suggested questions or a known keyword.</p></div>`;
 }
 
-// NOTE: The handler for all generic questions in the questionRegistry should be set to:
-// handler: async (q) => routePhylogenyAnalysis(q)
 
 /**
  * Automated handler for all phylogenetic questions (Q1-Q7).
@@ -5313,42 +5318,57 @@ function formatGeneDetail(geneData, geneSymbol, detailTitle, detailContent) {
 
 // Click handler for all interactions (Gene selection, Quick queries, and Plot switching)
 document.addEventListener('click', (e) => {
-    if (e.target.matches('.gene-card, .gene-name')) {
-        const geneName = e.target.dataset.geneName || e.target.textContent.trim();
+    // Ensure the event target or its parent is the specific element we want to listen to.
+    const target = e.target.closest('.ai-action, .gene-card, .gene-name, .example-queries span');
+
+    if (!target) return;
+    
+    // 1. Handle clicks on gene cards/names from analysis results (STANDARD)
+    if (target.matches('.gene-card, .gene-name')) {
+        const geneName = target.dataset.geneName || target.textContent.trim();
         if (geneName) handleCiliAISelection([geneName]);
     }
 
     // 2. Handle clicks on the example questions (STANDARD)
-    else if (e.target.matches('.example-queries span')) {
+    else if (target.matches('.example-queries span')) {
         const aiQueryInput = document.getElementById('aiQueryInput');
         // Use the data-question attribute for the full query
-        aiQueryInput.value = e.target.dataset.question || e.target.textContent;
+        aiQueryInput.value = target.dataset.question || target.textContent;
         handleAIQuery();
     }
+    
     // 3. Handle clicks on special action links (UPDATED LOGIC)
-    else if (e.target.classList.contains('ai-action')) {
+    else if (target.classList.contains('ai-action')) {
         e.preventDefault();
-        const action = e.target.dataset.action;
-        const genesString = e.target.dataset.genes; // Comma-separated list of genes
+        const action = target.dataset.action;
+        const genesString = target.dataset.genes; // Comma-separated list of genes
         const resultArea = document.getElementById('ai-result-area');
+        
+        if (!genesString) return;
+        const genes = genesString.split(',').map(g => g.trim()).filter(Boolean);
 
-        // --- 3a. Handle Phylogenetic Switching (CRITICAL NEW LOGIC) ---
+        // --- 3a. Handle Phylogenetic Switching (Heatmap <-> Heatmap) ---
         if (action === 'show-nevers-heatmap' || action === 'show-li-heatmap') {
-            if (genesString) {
-                const genes = genesString.split(',').map(g => g.trim()).filter(Boolean);
-                // Determine the target source ('nevers' or 'li')
-                const source = action.includes('nevers') ? 'nevers' : 'li';
-                
-                resultArea.innerHTML = `<p class="status-searching">Switching to ${source.toUpperCase()} comparison...</p>`;
-                
-                // Call the main router with the explicit source parameter
-                // This ensures the correct renderer (Li or Nevers) is selected within the router.
-                handlePhylogenyVisualizationQuery(`Show ${source} heatmap for ${genes.join(',')}`, source);
-            }
+            const source = action.includes('nevers') ? 'nevers' : 'li';
+            
+            // Inject a searching message before the router takes over
+            resultArea.innerHTML = `<p class="status-searching">Switching to ${source.toUpperCase()} comparison...</p>`;
+            
+            // CRITICAL: Call router forcing the 'heatmap' view
+            handlePhylogenyVisualizationQuery(`Show ${source} heatmap for ${genes.join(',')}`, source, 'heatmap');
+        } 
+        
+        // --- 3b. Handle Show Data Table Link (New Action) ---
+        else if (action === 'show-table-view') {
+            resultArea.innerHTML = `<p class="status-searching">Generating phylogenetic data table...</p>`;
+            
+            // CRITICAL: Call router forcing the 'table' view. Source defaults to 'li' for data consistency.
+            handlePhylogenyVisualizationQuery(`View data for ${genes.join(',')}`, 'li', 'table');
         }
-        // --- 3b. Handle Expression Visualization (Existing Logic) ---
-        else if (action === 'expression-visualize' && genesString) {
-            const gene = genesString;
+        
+        // --- 3c. Handle Expression Visualization (Existing Logic) ---
+        else if (action === 'expression-visualize') {
+            const gene = genes[0]; // Assuming expression-visualize is typically for one gene
             resultArea.innerHTML = `<p class="status-searching">Building expression heatmap...</p>`;
             
             if (window.tissueDataCache) {
