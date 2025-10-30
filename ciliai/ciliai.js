@@ -5026,31 +5026,44 @@ function renderPhylogenyTable(genes) {
     `;
 }
 
+/**
+ * Renders the phylogenetic visualization, acting as the main router for 
+ * heatmap switching and table view presentation.
+ * * @param {string} query - The raw user query (used for extracting genes).
+ * @param {string} [source='li'] - The heatmap source to display ('li' or 'nevers').
+ * @param {string} [view='heatmap'] - The output format requested ('heatmap' or 'table').
+ * @returns {string} Empty string, as the function updates the DOM directly.
+ */
 async function handlePhylogenyVisualizationQuery(query, source = 'li', view = 'heatmap') {
     const resultArea = document.getElementById('ai-result-area');
-    // --- 1. Gene Extraction and Data Loading ---
+    
+    // 1. Gene Extraction and Data Loading 
+    // NOTE: This assumes extractMultipleGenes() and the fetch functions are globally available.
     const inputGenes = extractMultipleGenes(query);
+    
     // Ensure all necessary phylogenetic data is loaded before proceeding
-    // NOTE: This includes your request to use both Li and Nevers data sources.
     await Promise.all([fetchLiPhylogenyData(), fetchNeversPhylogenyData()]);
+
     if (!liPhylogenyCache) {
         return `<div class="result-card"><h3>Error</h3><p>Could not load phylogenetic data (Li et al. 2014) to run this analysis.</p></div>`;
     }
+
     // Get all HUGO gene symbols available in the Li database
     const allLiGenes = Object.values(liPhylogenyCache.genes).map(g => g.g.toUpperCase()).filter(Boolean);
     const liGenesSet = new Set(allLiGenes);
     const validUserGenes = inputGenes.filter(g => liGenesSet.has(g));
+
     let finalGenes;
-    // --- DEFINITIVE DEFAULT GENES ---
+    
+    // --- Determine Genes to Plot (Prioritize user input, fill up to 20 with defaults) ---
     // User-specified list used for context when input is lacking.
     const definitiveDefaultGenes = ["ZC2HC1A", "CEP41", "BBS1", "BBS2", "BBS5", "ZNF474", "IFT81", "BBS7"];
-   
-    // --- 2. Determine Final Genes to Plot (Prioritize user input, fill up to 20 with defaults) ---
+    
     if (validUserGenes.length === 0) {
-        // If user provided no valid gene, show the first 5 definitive defaults
+        // Use default genes for initialization if none found
         finalGenes = definitiveDefaultGenes.filter(g => liGenesSet.has(g)).slice(0, 5);
         if (finalGenes.length === 0) {
-            return `<div class="result-card"><h3>Analysis Error</h3><p>The requested gene(s) were not found, and none of the default genes could be found in the phylogenetic dataset.</p></div>`;
+            return `<div class="result-card"><h3>Analysis Error</h3><p>The requested gene(s) were not found, and no default genes could be plotted.</p></div>`;
         }
     } else {
         // Start with user's valid genes
@@ -5066,28 +5079,40 @@ async function handlePhylogenyVisualizationQuery(query, source = 'li', view = 'h
             }
         }
     }
-     // --- New View Selection ---
+
+    // --- 2. Select Renderer based on requested view ---
+    let plotResult;
+    
     if (view === 'table') {
-        const tableHtml = renderPhylogenyTable(finalGenes);
-        document.getElementById('ai-result-area').innerHTML = tableHtml;
-        return "";
+        // Render the comparative table (HTML output only)
+        plotResult = {
+            html: renderPhylogenyTable(finalGenes),
+            plotId: null, plotData: null, plotLayout: null
+        };
+    } else {
+        // Render the Heatmap (Default or Switch action)
+        const renderer = (source === 'nevers') ? renderNeversPhylogenyHeatmap : renderLiPhylogenyHeatmap;
+        plotResult = renderer(finalGenes);
     }
-    // --- 3. Select Renderer ---
-    const renderer = (source === 'nevers') ? renderNeversPhylogenyHeatmap : renderLiPhylogenyHeatmap;
-    // --- 4. Generate Structured Plot Results ---
-    const plotResult = renderer(finalGenes);
-    // --- 5. Inject HTML and Execute Plotting Function ---
+    
+    // --- 3. Inject HTML and Execute Plotting Function ---
+    
+    // Set the HTML output.
     resultArea.innerHTML = plotResult.html;
 
-    window.initPhylogenyPlot(
-        plotResult.plotId, 
-        plotResult.plotData, 
-        plotResult.plotLayout
-    );
+    // Only attempt to plot if the view is 'heatmap'
+    if (view === 'heatmap' && plotResult.plotData) {
+        // Call the global execution utility for Plotly.
+        window.initPhylogenyPlot(
+            plotResult.plotId, 
+            plotResult.plotData, 
+            plotResult.plotLayout
+        );
+    }
     
+    // Return an empty string as the function has already updated the DOM
     return "";
 }
-
 /**
  * Global wrapper to handle clicks on the Li/Nevers switch links.
  * This should be defined globally (e.g., window.switchPhylogenyView).
