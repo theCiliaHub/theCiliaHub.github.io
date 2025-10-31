@@ -1251,6 +1251,126 @@ const questionRegistry = [
     { text: "Show conservation profile for gene X", handler: async (q) => routePhylogenyAnalysis(q) },
     { text: "Phylogenetic analysis of gene X", handler: async (q) => routePhylogenyAnalysis(q) },
     { text: "Evolutionary profile for gene X", handler: async (q) => routePhylogenyAnalysis(q) },
+
+    // ==================== A. SPECIFIC GENE VISUALIZATION (Expanded Synonyms) ====================
+[
+  "Show evolutionary conservation of GENE",
+  "Display evolutionary conservation for GENE",
+  "Visualize evolutionary pattern of GENE",
+  "Plot conservation heatmap for GENE",
+  "Create phylogenetic map of GENE",
+  "Generate conservation chart for GENE",
+  "What is the evolutionary profile of GENE?",
+  "Show conservation trend of GENE",
+  "Show phylogenetic distribution of GENE",
+  "View conservation footprint for GENE",
+  "Visualize GENE evolutionary history",
+  "Display evolutionary trace of GENE",
+  "Show ortholog distribution for GENE",
+  "Show interspecies conservation of GENE",
+  "Show comparative evolution of GENE",
+  "Show taxonomic spread of GENE",
+  "Show evolutionary lineage of GENE",
+  "Show how conserved GENE is across species",
+  "Which species have GENE?",
+  "Show species that contain GENE homologs",
+  "Where is GENE conserved?",
+  "Show GENE ortholog conservation",
+  "Display evolutionary depth of GENE",
+  "Show GENE cross-species presence",
+].map(text => ({ text, handler: async (q) => routePhylogenyAnalysis(q), template: true })),
+
+// ==================== B. COMPARISON QUERIES (Expanded) ====================
+[
+  "Compare GENE1 and GENE2 conservation",
+  "Compare evolutionary conservation of GENE1 and GENE2",
+  "Compare evolutionary patterns between GENE1 and GENE2",
+  "Show phylogenetic comparison of GENE1 vs GENE2",
+  "Display comparative phylogeny for GENE1 and GENE2",
+  "Visualize evolutionary similarity between GENE1 and GENE2",
+  "Show how GENE1 and GENE2 are conserved across species",
+  "Generate conservation heatmap comparing GENE1 and GENE2",
+  "Show ortholog comparison for GENE1 and GENE2",
+  "Compare lineage conservation: GENE1 vs GENE2",
+  "Compare evolutionary trajectories of GENE1 and GENE2",
+  "Compare phylogenetic footprints for GENE1 and GENE2",
+  "Cross-species comparison of GENE1 and GENE2 conservation",
+  "Compare conservation trends between GENE1 and GENE2",
+  "Evolutionary comparison for GENE1 and GENE2",
+].map(text => ({ text, handler: async (q) => routePhylogenyAnalysis(q), template: true })),
+
+// ==================== C. MULTI-GENE & COMPLEX SETS ====================
+[
+  "Show conservation of IFT complex genes",
+  "Compare evolution of IFT-A and IFT-B complexes",
+  "Compare evolutionary conservation of all BBSome components",
+  "Show phylogenetic relationship among NPHP module genes",
+  "Display conservation pattern of MKS module proteins",
+  "Show evolutionary map of ciliary transition zone components",
+  "Show conserved ciliary modules across species",
+  "Compare conservation patterns of ciliary transport machinery",
+  "Visualize phylogenetic tree of multiple ciliary genes",
+  "Show evolutionary relationship across intraflagellar transport genes",
+].map(text => ({ text, handler: async (q) => routePhylogenyAnalysis(q) })),
+
+// ==================== D. DATA TABLE & STRUCTURED OUTPUT VARIANTS ====================
+[
+  "Show raw conservation data for GENE",
+  "Display detailed species data for GENE",
+  "Show conservation table for GENE",
+  "List all species containing GENE",
+  "Show ortholog table for GENE",
+  "Display presence/absence data for GENE",
+  "Generate species conservation matrix for GENE",
+  "Show data matrix of GENE conservation",
+  "View species-level conservation report for GENE",
+].map(text => ({ text, handler: async (q) => handlePhylogenyVisualizationQuery(q, 'li', 'table'), template: true })),
+
+// ==================== E. CLASSIFICATION & SUMMARY PATTERNS (Synonym Expansion) ====================
+[
+  "List universally conserved ciliary genes",
+  "Which genes are conserved in all species?",
+  "Show ancient conserved ciliary genes",
+  "Find genes lost in fungi",
+  "Show ciliary genes present only in vertebrates",
+  "Which ciliary genes are mammal-specific?",
+  "List recently evolved ciliary genes",
+  "Show lineage-restricted ciliary components",
+  "Identify genes with narrow phylogenetic distribution",
+  "Find ciliary genes conserved across metazoans",
+  "Show deeply conserved ciliary genes",
+  "Which ciliary genes are missing in non-ciliated organisms?",
+].map(text => ({ text, handler: async () => getPhylogenyList('auto_detect') })),
+
+// ==================== F. GENERAL PURPOSE SYNONYMS (AI-Like Flexibility) ====================
+[
+  "Can you show the evolutionary map of GENE?",
+  "I'd like to see conservation of GENE",
+  "How conserved is GENE?",
+  "Which species contain GENE?",
+  "Is GENE conserved across animals?",
+  "What’s the cross-species conservation pattern for GENE?",
+  "Show me the phylogenetic tree of GENE",
+  "Display evolutionary relationship for GENE",
+  "Give me the conservation score for GENE",
+  "Show where GENE appears in evolution",
+  "Plot the evolution of GENE across taxa",
+  "Show me species with GENE homologs",
+  "Can you compare GENE1 with GENE2 evolution?",
+  "Which gene is more conserved: GENE1 or GENE2?",
+  "Compare conservation depth of GENE1 and GENE2",
+  "Which species share both GENE1 and GENE2?",
+].map(text => ({ text, handler: async (q) => routePhylogenyAnalysis(q), template: true })),
+
+// ==================== G. AUTOMATED SMART ROUTING & FUZZY MATCH (For AI extension) ====================
+[
+  { text: "Show evolution of any given gene", handler: async (q) => routePhylogenyAnalysis(q), template: true },
+  { text: "Compare conservation between any two genes", handler: async (q) => routePhylogenyAnalysis(q), template: true },
+  { text: "Generate conservation overview for multiple genes", handler: async (q) => routePhylogenyAnalysis(q), template: true },
+  { text: "Identify genes with unique evolutionary traits", handler: async () => getPhylogenyList('unique_patterns') },
+  { text: "Find genes with the broadest conservation spectrum", handler: async () => getPhylogenyList('in_all_organisms') },
+]
+
     
     // ==================== SOURCE QUERIES ====================
     { text: "What is the source for Ciliary genes in C. elegans?", handler: async () => tellAboutOrganismSources("C. elegans") },
