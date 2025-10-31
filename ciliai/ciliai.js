@@ -1018,9 +1018,11 @@ function extractMultipleGenes(query) {
     // This pattern matches uppercase names (3+ chars) OR common ciliary abbreviations (case-insensitive).
     const genePattern = /\b([A-Z0-9]{3,}|ift\d+|bbs\d+|arl\d+b|nphp\d+)\b/gi;
     const matches = query.match(genePattern);
+
     if (!matches) {
-        return [];
+        return []; // CRITICAL: Must return an empty array, not null/undefined
     }
+    
     // Words to exclude (preventing common English words like 'and', 'the', 'for' from being symbols)
     const noiseWords = new Set(["THE", "AND", "FOR", "BUT", "SHOW", "LIST", "GENE", "WHAT", "WHICH", "FIT"]);
     let finalGenes = [];
