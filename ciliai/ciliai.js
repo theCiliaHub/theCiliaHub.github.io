@@ -1369,7 +1369,6 @@ const questionRegistry = [
     { text: "What’s the cross-species conservation pattern for GENE?", handler: async (q) => routePhylogenyAnalysis(q), template: true },
     { text: "Show me the phylogenetic tree of GENE", handler: async (q) => routePhylogenyAnalysis(q), template: true },
     { text: "Show where GENE appears in evolution", handler: async (q) => routePhylogenyAnalysis(q), template: true },
-    { text: "Plot the evolution of GENE across taxa", handler: async (q) => routePhylogenyAnalysis(q), template: true },
     { text: "Which species contain GENE?", handler: async (q) => routePhylogenyAnalysis(q), template: true },
     { text: "Show GENE cross-species presence", handler: async (q) => routePhylogenyAnalysis(q), template: true },
     { text: "Display evolutionary depth of GENE", handler: async (q) => routePhylogenyAnalysis(q), template: true },
@@ -5450,19 +5449,33 @@ async function getPhylogenyList(classification) {
     return resultHtml;
 }
 
+/**
+ * AI-like function to parse complex/synonym queries and route them to the correct handler.
+ * This is the central function for all phylogenetic visualization and list requests.
+ * * @param {string} query - The raw user query.
+ * @returns {Promise<string>} HTML output.
+ */
 async function routePhylogenyAnalysis(query) {
-    // NOTE: This assumes extractMultipleGenes(query) is a robust global utility.
+    // NOTE: This assumes extractMultipleGenes(query) and comparison utilities are robust global utilities.
     const genes = extractMultipleGenes(query);
     const qLower = query.toLowerCase();
 
-    // 1. COMPLEX LIST INTENT (Classification and Patterns)
+    // 1. COMPLEX LIST INTENT (Vertebrate, Mammalian, Ciliary, Fungi-absent, All)
     if (qLower.includes('list') || qLower.includes('show ciliary genes') || qLower.includes('which genes are') || qLower.includes('find genes with')) {
         
-        // ... (Vertebrate, Mammalian, Ciliary, Fungi-absent, All lists logic remains here) ...
+        // This relies on the comprehensive getPhylogenyList logic defined previously.
         if (qLower.includes('vertebrate')) {
             return getPhylogenyList('Vertebrate_specific');
         }
-        // ... (remaining list checks) ...
+        if (qLower.includes('mammalian') || qLower.includes('recently evolved')) {
+            return getPhylogenyList('Mammalian_specific');
+        }
+        if (qLower.includes('ciliary specific') || qLower.includes('ciliary genes')) {
+            return getPhylogenyList('Ciliary_specific');
+        }
+        if (qLower.includes('absent in fungi') || qLower.includes('not in fungi')) {
+            return getPhylogenyList('absent_in_fungi');
+        }
         if (qLower.includes('all organisms') || qLower.includes('universally conserved') || qLower.includes('broadest conservation spectrum')) {
             return getPhylogenyList('in_all_organisms');
         }
@@ -5480,19 +5493,21 @@ async function routePhylogenyAnalysis(query) {
         }
     }
 
-    // 4. VISUALIZATION INTENT (CRITICAL FIX APPLIED HERE)
+    // 4. VISUALIZATION INTENT (CRITICAL FIX: Prioritizes Phylogeny/Taxa over general 'Plot' actions)
     
-    // Check for strong phylogenetic keywords OR a valid gene list.
-    if (genes.length >= 1 || qLower.includes('evolution') || qLower.includes('taxa') || qLower.includes('phylogenetic') || qLower.includes('plot')) {
+    // Check for strong phylogenetic keywords
+    const isPhylogenyMandate = qLower.includes('evolution') || qLower.includes('taxa') || qLower.includes('phylogenetic');
+    
+    if (genes.length >= 1 || isPhylogenyMandate) {
         
         // Use the extracted genes, or if no gene was extracted (as in generic templates), default to a common one.
         const geneForQuery = (genes.length >= 1) ? genes.join(',') : "IFT88"; 
         
-        // Route to the PHYLOGENY HEATMAP (This is the mandatory destination for 'evolution'/'taxa')
+        // Route to the PHYLOGENY HEATMAP (This is the correct destination for "evolution" and "taxa")
         return handlePhylogenyVisualizationQuery(geneForQuery, 'li', 'heatmap');
     }
 
-    // 5. Final Error
+    // 5. Final Error (Fallback)
     return `<div class="result-card"><h3>Analysis Failed</h3><p>Could not identify a gene or complex for visualization. Please try a specific gene symbol or a suggested question.</p></div>`;
 }
 
