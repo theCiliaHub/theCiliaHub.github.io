@@ -1336,7 +1336,7 @@ const questionRegistry = [
     { text: "Show evolutionary conservation of GENE", handler: async (q) => routePhylogenyAnalysis(q), template: true },
     { text: "How conserved is GENE?", handler: async (q) => routePhylogenyAnalysis(q), template: true },
     { text: "Plot the evolution of GENE across taxa", handler: async (q) => routePhylogenyAnalysis(q), template: true },
-
+    { text: "Display the evolution of GENE across taxa", handler: async (q) => routePhylogenyAnalysis(q), template: true },
     
 // ==================== 3. DATA OVERLAP & TABLE QUERIES ====================
 
@@ -5499,11 +5499,10 @@ async function routePhylogenyAnalysis(query) {
     const isPhylogenyMandate = qLower.includes('evolution') || qLower.includes('taxa') || qLower.includes('phylogenetic');
     
     if (genes.length >= 1 || isPhylogenyMandate) {
-        
-        // Use the extracted genes, or if no gene was extracted (as in generic templates), default to a common one.
+        // ... (This block correctly forces the phylogenetic heatmap) ...
         const geneForQuery = (genes.length >= 1) ? genes.join(',') : "IFT88"; 
         
-        // Route to the PHYLOGENY HEATMAP (This is the correct destination for "evolution" and "taxa")
+        // This is the correct destination for phylogeny plots
         return handlePhylogenyVisualizationQuery(geneForQuery, 'li', 'heatmap');
     }
 
