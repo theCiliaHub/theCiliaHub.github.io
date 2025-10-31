@@ -1013,24 +1013,34 @@ function getAllPhylogenyGenes() {
     return Object.keys(phylogenyDataCache); 
 }
 
-// --- NEW HELPER: Extract Multiple Genes Dynamically ---
-/**
- * Scans a query string to extract one or more gene symbols.
- * @param {string} query - The user's input query.
- * @returns {Array<string>} - A unique list of uppercase gene symbols found.
- */
+
 function extractMultipleGenes(query) {
-    // Looks for capital letters/numbers (3+ characters) or common ciliary gene patterns.
-    // The 'g' flag ensures all matches are found.
+    // This pattern matches uppercase names (3+ chars) OR common ciliary abbreviations (case-insensitive).
     const genePattern = /\b([A-Z0-9]{3,}|ift\d+|bbs\d+|arl\d+b|nphp\d+)\b/gi;
     const matches = query.match(genePattern);
-
     if (!matches) {
         return [];
     }
+    // Words to exclude (preventing common English words like 'and', 'the', 'for' from being symbols)
+    const noiseWords = new Set(["THE", "AND", "FOR", "BUT", "SHOW", "LIST", "GENE", "WHAT", "WHICH", "FIT"]);
+    let finalGenes = [];
+    // Process matches, apply aliases, and filter noise
+    matches.forEach(m => {
+        let symbol = m.toUpperCase();
+        
+        // 1. Apply Alias Lookup (e.g., IFT144 -> WDR19)
+        const aliasedSymbol = geneAliases.get(symbol);
+        if (aliasedSymbol) {
+            symbol = aliasedSymbol;
+        }
 
-    // Return unique uppercase gene symbols
-    return [...new Set(matches.map(g => g.toUpperCase()))];
+        // 2. Filter Noise and Single-Letter/Non-Standard Symbols
+        if (symbol.length >= 3 && !noiseWords.has(symbol)) {
+            finalGenes.push(symbol);
+        }
+    });
+    // Return only unique symbols
+    return [...new Set(finalGenes)];
 }
 
 // --- UPDATED getPhylogenyGenesForOrganism (Enriches with ALL Orthologs) ---
@@ -1295,7 +1305,6 @@ const questionRegistry = [
   { text: "Compare conservation trends between GENE1 and GENE2", handler: async (q) => routePhylogenyAnalysis(q), template: true },
   { text: "Evolutionary comparison for GENE1 and GENE2", handler: async (q) => routePhylogenyAnalysis(q), template: true },
  
-  
     // --- C. Multi-gene & complex sets ---
   { text: "Show conservation of IFT complex genes", handler: async (q) => routePhylogenyAnalysis(q) },
   { text: "Compare evolution of IFT-A and IFT-B complexes", handler: async (q) => routePhylogenyAnalysis(q) },
@@ -1319,6 +1328,24 @@ const questionRegistry = [
   { text: "Show data matrix of GENE conservation", handler: async (q) => handlePhylogenyVisualizationQuery(q, 'li', 'table'), template: true },
   { text: "View species-level conservation report for GENE", handler: async (q) => handlePhylogenyVisualizationQuery(q, 'li', 'table'), template: true },
 
+// --- Flexible Single-Gene Catch-Alls (CRITICAL FOR FAILURE FIXES) ---
+    { text: "Phylogenetic analysis of X", handler: async (q) => routePhylogenyAnalysis(q), template: true }, // Catches "Phylogenetic analysis of WDR27"
+    { text: "Evolutionary profile for X", handler: async (q) => routePhylogenyAnalysis(q), template: true }, // Catches "Evolutionary profile for WDR27"
+    { text: "Show evolutionary conservation of GENE", handler: async (q) => routePhylogenyAnalysis(q), template: true },
+    { text: "How conserved is GENE?", handler: async (q) => routePhylogenyAnalysis(q), template: true },
+    { text: "Plot the evolution of GENE across taxa", handler: async (q) => routePhylogenyAnalysis(q), template: true },
+
+// ==================== 3. DATA OVERLAP & TABLE QUERIES ====================
+
+    // Species Overlap Queries (Triggers compareGeneSpeciesOverlap inside router)
+    { text: "Which species share both GENE1 and GENE2?", handler: async (q) => routePhylogenyAnalysis(q), template: true },
+    { text: "Which species share both gene GENE1 and gene GENE2?", handler: async (q) => routePhylogenyAnalysis(q), template: true },
+    { text: "Do GENE1 and GENE2 share any conserved species?", handler: async (q) => routePhylogenyAnalysis(q), template: true },
+
+    // Table View Queries (Reroutes to table view of the currently displayed genes)
+    { text: "Show conservation table for GENE", handler: async (q) => routePhylogenyAnalysis(q, 'table'), template: true },
+    { text: "Display detailed species data for GENE", handler: async (q) => routePhylogenyAnalysis(q, 'table'), template: true },
+
   // --- E. Classification & summary patterns ---
   { text: "List universally conserved ciliary genes", handler: async () => getPhylogenyList('in_all_organisms') },
   { text: "Which genes are conserved in all species?", handler: async () => getPhylogenyList('in_all_organisms') },
@@ -1332,10 +1359,6 @@ const questionRegistry = [
   { text: "Find ciliary genes conserved across metazoans", handler: async () => getPhylogenyList('Vertebrate_specific') },
   { text: "Show deeply conserved ciliary genes", handler: async () => getPhylogenyList('in_all_organisms') },
   { text: "Which ciliary genes are missing in non-ciliated organisms?", handler: async () => getPhylogenyList('absent_in_fungi') },
-    
-    // The most concise and reliable single-gene patterns (which failed previously but are critical):
-    { text: "Phylogenetic analysis of X", handler: async (q) => routePhylogenyAnalysis(q), template: true },
-    { text: "Evolutionary profile for X", handler: async (q) => routePhylogenyAnalysis(q), template: true },
     
     // Comprehensive visualization synonyms:
     { text: "Show evolutionary conservation of GENE", handler: async (q) => routePhylogenyAnalysis(q), template: true },
@@ -4881,6 +4904,15 @@ function renderNeversPhylogenyHeatmap(genes) {
             <h3>Phylogenetic Heatmap for ${geneLabels.join(', ')} 🌍</h3>
             <p>Data from <strong>Nevers et al. (2017)</strong>, mapped to a fixed panel of <strong>${CIL_COUNT} Ciliated (Teal)</strong> and <strong>${NCIL_COUNT} Non-Ciliated (Pink)</strong> organisms.</p>
             <div id="${plotContainer}" style="height: ${layout.height}px; width: 100%;"></div>
+             <div class="add-gene-input" style="margin-top: 15px; display: flex; gap: 10px;">
+            <input type="text" id="addGeneInput" placeholder="Add gene for comparison (e.g., KIF3A)" 
+            style="flex-grow: 1; padding: 5px; border: 1px solid #ccc; border-radius: 4px;">
+            <button class="add-gene-btn" data-plot-id="${plotContainer}" data-genes="${genes.join(',')}"
+            onclick="addGeneToHeatmap(this);"
+            style="padding: 5px 10px; background-color: #f3f3f3; border: 1px solid #ccc; border-radius: 4px; cursor: pointer;">
+            + Add
+            </button>
+            </div>
             <button class="download-button" onclick="downloadPlot('${plotContainer}', 'Phylogeny_Nevers2017')">Download Heatmap (PNG)</button>
             <p class="ai-suggestion" style="margin-top: 10px;">
                 <a href="#" class="ai-action" data-action="show-li-heatmap" data-genes="${genes.join(',')}">⬅️ Show Li et al. (2014) Comparison</a>
@@ -5060,6 +5092,15 @@ function renderLiPhylogenyHeatmap(genes) {
         <div class="result-card">
             <h3>Phylogenetic Heatmap for ${geneLabels.join(', ')} 🌍</h3>
             <p>Data from <strong>Li et al. (2014) Cell</strong>, mapped to a fixed panel of <strong>${CIL_COUNT} Ciliated (Blue)</strong> and <strong>${NCIL_COUNT} Non-Ciliated (Orange)</strong> organisms.</p>
+            <div class="add-gene-input" style="margin-top: 15px; display: flex; gap: 10px;">
+            <input type="text" id="addGeneInput" placeholder="Add gene for comparison (e.g., KIF3A)" 
+            style="flex-grow: 1; padding: 5px; border: 1px solid #ccc; border-radius: 4px;">
+            <button class="add-gene-btn" data-plot-id="${plotContainer}" data-genes="${genes.join(',')}"
+            onclick="addGeneToHeatmap(this);"
+            style="padding: 5px 10px; background-color: #f3f3f3; border: 1px solid #ccc; border-radius: 4px; cursor: pointer;">
+            + Add
+            </button>
+            </div>
             <div id="${plotContainer}" style="height: ${layout.height}px; width: 100%;"></div>
             <button class="download-button" onclick="downloadPlot('${plotContainer}', 'Phylogeny_Li2014')">Download Heatmap (PNG)</button>
             <p style="font-size: 0.8em; color: #666; margin-top: 1rem; border-top: 1px solid #eee; padding-top: 0.5rem;">
@@ -5083,6 +5124,39 @@ function renderLiPhylogenyHeatmap(genes) {
         plotId: plotContainer
     };
 }
+
+/**
+ * Handles adding a gene from the text field to the existing heatmap view.
+ * @param {HTMLButtonElement} buttonElement - The 'Add' button element clicked.
+ */
+window.addGeneToHeatmap = function(buttonElement) {
+    const inputElement = document.getElementById('addGeneInput');
+    const newGene = inputElement.value.trim().toUpperCase();
+    
+    if (!newGene) {
+        alert("Please enter a gene symbol.");
+        return;
+    }
+    
+    // Get the current list of genes from the button's data attribute
+    const currentGenesString = buttonElement.dataset.genes;
+    
+    // Combine current genes with the new gene, ensuring uniqueness
+    let currentGenes = currentGenesString.split(',').map(g => g.trim()).filter(Boolean);
+    if (!currentGenes.includes(newGene)) {
+        currentGenes.push(newGene);
+    }
+
+    // Determine the current view source (Li or Nevers)
+    const currentSource = buttonElement.dataset.plotId.includes('nevers') ? 'nevers' : 'li';
+    
+    // Clear the input field
+    inputElement.value = '';
+
+    // Route the combined list back to the visualization router to generate the new heatmap
+    // Note: This relies on handlePhylogenyVisualizationQuery correctly handling the array input.
+    handlePhylogenyVisualizationQuery(`Compare ${currentGenes.join(', ')} phylogeny`, currentSource, 'heatmap');
+};
 
 /**
  * Renders raw phylogenetic data for a list of genes into a detailed table.
