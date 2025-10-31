@@ -1307,17 +1307,6 @@ const questionRegistry = [
   { text: "Compare conservation trends between GENE1 and GENE2", handler: async (q) => routePhylogenyAnalysis(q), template: true },
   { text: "Evolutionary comparison for GENE1 and GENE2", handler: async (q) => routePhylogenyAnalysis(q), template: true },
  
-    // --- C. Multi-gene & complex sets ---
-  { text: "Show conservation of IFT complex genes", handler: async (q) => routePhylogenyAnalysis(q) },
-  { text: "Compare evolution of IFT-A and IFT-B complexes", handler: async (q) => routePhylogenyAnalysis(q) },
-  { text: "Compare evolutionary conservation of all BBSome components", handler: async (q) => routePhylogenyAnalysis(q) },
-  { text: "Show phylogenetic relationship among NPHP module genes", handler: async (q) => routePhylogenyAnalysis(q) },
-  { text: "Display conservation pattern of MKS module proteins", handler: async (q) => routePhylogenyAnalysis(q) },
-  { text: "Show evolutionary map of ciliary transition zone components", handler: async (q) => routePhylogenyAnalysis(q) },
-  { text: "Show conserved ciliary modules across species", handler: async (q) => routePhylogenyAnalysis(q) },
-  { text: "Compare conservation patterns of ciliary transport machinery", handler: async (q) => routePhylogenyAnalysis(q) },
-  { text: "Visualize phylogenetic tree of multiple ciliary genes", handler: async (q) => routePhylogenyAnalysis(q) },
-  { text: "Show evolutionary relationship across intraflagellar transport genes", handler: async (q) => routePhylogenyAnalysis(q) },
 
   // --- D. Data table & structured outputs ---
   { text: "Show raw conservation data for GENE", handler: async (q) => handlePhylogenyVisualizationQuery(q, 'li', 'table'), template: true },
@@ -1335,8 +1324,9 @@ const questionRegistry = [
     { text: "Evolutionary profile for X", handler: async (q) => routePhylogenyAnalysis(q), template: true }, // Catches "Evolutionary profile for WDR27"
     { text: "Show evolutionary conservation of GENE", handler: async (q) => routePhylogenyAnalysis(q), template: true },
     { text: "How conserved is GENE?", handler: async (q) => routePhylogenyAnalysis(q), template: true },
-    { text: "Plot the evolution of GENE across taxa", handler: async (q) => routePhylogenyAnalysis(q), template: true },
-    { text: "Display the evolution of GENE across taxa", handler: async (q) => routePhylogenyAnalysis(q), template: true },
+    { text: "Evolution of GENE across taxa", handler: async (q) => routePhylogenyAnalysis(q), template: true },
+    { text: "Taxonomic distribution of GENE", handler: async (q) => routePhylogenyAnalysis(q), template: true },
+    { text: "Phylogenetic map for GENE", handler: async (q) => routePhylogenyAnalysis(q), template: true },
     
 // ==================== 3. DATA OVERLAP & TABLE QUERIES ====================
 
