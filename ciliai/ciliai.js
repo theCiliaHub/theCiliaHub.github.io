@@ -1349,6 +1349,7 @@ const questionRegistry = [
   { text: "Which gene is more conserved: GENE1 or GENE2?", handler: async (q) => routePhylogenyAnalysis(q), template: true },
   { text: "Compare conservation depth of GENE1 and GENE2", handler: async (q) => routePhylogenyAnalysis(q), template: true },
   { text: "Which species share both GENE1 and GENE2?", handler: async (q) => routePhylogenyAnalysis(q), template: true },
+  { text: "Which species share both gene X and gene Y?", handler: async (q) => routePhylogenyAnalysis(q) },
 
   // --- G. General-purpose discovery queries ---
   { text: "Show evolution of any given gene", handler: async (q) => routePhylogenyAnalysis(q), template: true },
@@ -1357,13 +1358,6 @@ const questionRegistry = [
   { text: "Identify genes with unique evolutionary traits", handler: async () => getPhylogenyList('unique_patterns') },
   { text: "Find genes with the broadest conservation spectrum", handler: async () => getPhylogenyList('in_all_organisms') },
 
-// ==================== G. AUTOMATED SMART ROUTING & FUZZY MATCH (For AI extension) ====================
-
-  { text: "Show evolution of any given gene", handler: async (q) => routePhylogenyAnalysis(q), template: true },
-  { text: "Compare conservation between any two genes", handler: async (q) => routePhylogenyAnalysis(q), template: true },
-  { text: "Generate conservation overview for multiple genes", handler: async (q) => routePhylogenyAnalysis(q), template: true },
-  { text: "Identify genes with unique evolutionary traits", handler: async () => getPhylogenyList('unique_patterns') },
-  { text: "Find genes with the broadest conservation spectrum", handler: async () => getPhylogenyList('in_all_organisms') },
     
     // ==================== SOURCE QUERIES ====================
     { text: "What is the source for Ciliary genes in C. elegans?", handler: async () => tellAboutOrganismSources("C. elegans") },
@@ -5369,53 +5363,103 @@ async function getPhylogenyList(classification) {
     return resultHtml;
 }
 
-
 /**
  * AI-like function to parse complex/synonym queries and route them to the correct handler.
- * Used for all "gene X" questions and all list-based classification queries.
+ * This is the central function for all phylogenetic visualization and list requests.
  * @param {string} query - The raw user query.
- * @returns {Promise<string>} HTML output (either a list, table, or calls the heatmap).
+ * @returns {Promise<string>} HTML output.
  */
 async function routePhylogenyAnalysis(query) {
+    // NOTE: This assumes extractMultipleGenes(query) is a robust global utility.
     const genes = extractMultipleGenes(query);
     const qLower = query.toLowerCase();
 
-    // 1. Check for LIST INTENT (Prioritized execution for all classification questions)
-    if (qLower.includes('list') || qLower.includes('show ciliary genes') || qLower.includes('which genes are')) {
+    // 1. COMPLEX LIST INTENT (Classification and Patterns)
+    if (qLower.includes('list') || qLower.includes('show ciliary genes') || qLower.includes('which genes are') || qLower.includes('find genes with')) {
         
+        // Vertebrate/Mammalian/Ciliary Specific
         if (qLower.includes('vertebrate')) {
             return getPhylogenyList('Vertebrate_specific');
         }
-        if (qLower.includes('mammalian')) {
+        if (qLower.includes('mammalian') || qLower.includes('recently evolved')) {
             return getPhylogenyList('Mammalian_specific');
         }
         if (qLower.includes('ciliary specific') || qLower.includes('ciliary genes')) {
             return getPhylogenyList('Ciliary_specific');
         }
+        
+        // Conservation Depth
         if (qLower.includes('absent in fungi') || qLower.includes('not in fungi')) {
             return getPhylogenyList('absent_in_fungi');
         }
-        if (qLower.includes('all organisms') || qLower.includes('universally conserved')) {
+        if (qLower.includes('all organisms') || qLower.includes('universally conserved') || qLower.includes('broadest conservation spectrum')) {
             return getPhylogenyList('in_all_organisms');
         }
     }
     
-    // 2. Check for TABLE INTENT 
+    // 2. SPECIES OVERLAP QUERY (e.g., Which species share both WDR27 and IFT20?)
+    if (genes.length === 2 && (qLower.includes('share') || qLower.includes('both') || qLower.includes('overlap'))) {
+        return compareGeneSpeciesOverlap(genes[0], genes[1]);
+    }
+
+    // 3. TABLE VIEW INTENT (Triggered by links or query)
     if (qLower.includes('table') || qLower.includes('view data') || qLower.includes('species count')) {
          if (genes.length >= 1) {
              return handlePhylogenyVisualizationQuery(query, 'li', 'table');
          }
     }
 
-    // 3. Default to VISUALIZATION INTENT (Heatmap)
+    // 4. VISUALIZATION INTENT (Default action for any remaining single or multi-gene query)
+    // This catches: "Phylogenetic analysis of WDR27", "Show evolutionary map for WDR27", 
+    // and multi-gene comparison templates that weren't caught in the registry.
     if (genes.length >= 1) {
         return handlePhylogenyVisualizationQuery(query, 'li', 'heatmap');
     }
 
-    // 4. Fallback Error 
-    return `<div class="result-card"><h3>Analysis Failed</h3><p>Could not identify a specific gene or a classification pattern in your request. Please try one of the suggested questions or a known keyword.</p></div>`;
+    // 5. FINAL FALLBACK: For generic visual intent without specific genes (e.g., "Show evolution of any given gene")
+    if (qLower.includes('evolution') || qLower.includes('conservation overview') || qLower.includes('phylogenetic')) {
+        // Trigger the default heatmap view using the internal default gene list for context.
+        return handlePhylogenyVisualizationQuery("IFT88", 'li', 'heatmap');
+    }
+
+    // 6. Final Error
+    return `<div class="result-card"><h3>Analysis Failed</h3><p>Could not identify a gene or complex for visualization. Please try a specific gene symbol or a suggested question.</p></div>`;
 }
 
+
+/**
+ * Finds the intersection of species lists between two genes.
+ * @param {string} geneA - First gene symbol.
+ * @param {string} geneB - Second gene symbol.
+ * @returns {Promise<string>} HTML result showing overlapping species.
+ */
+async function compareGeneSpeciesOverlap(geneA, geneB) {
+    await Promise.all([fetchLiPhylogenyData(), fetchNeversPhylogenyData()]);
+    
+    const dataA = liPhylogenyCache.genes[Object.keys(liPhylogenyCache.genes).find(k => liPhylogenyCache.genes[k].g.toUpperCase() === geneA.toUpperCase())];
+    const dataB = liPhylogenyCache.genes[Object.keys(liPhylogenyCache.genes).find(k => liPhylogenyCache.genes[k].g.toUpperCase() === geneB.toUpperCase())];
+    
+    if (!dataA || !dataB) {
+        return `<div class="result-card"><h3>Comparison Failed</h3><p class="status-not-found">One or both genes (${geneA}, ${geneB}) were not found in the Li et al. 2014 dataset.</p></div>`;
+    }
+
+    const speciesList = liPhylogenyCache.summary.organisms_list;
+    const speciesAIndices = new Set(dataA.s || []);
+    const speciesBIndices = new Set(dataB.s || []);
+    
+    // Find the intersection of indices
+    const overlapIndices = [...speciesAIndices].filter(index => speciesBIndices.has(index));
+    
+    const overlappingSpecies = overlapIndices.map(index => speciesList[index]).join(', ');
+
+    return `
+        <div class="result-card">
+            <h3>Shared Conservation: ${geneA} and ${geneB}</h3>
+            <p><strong>Total Shared Species:</strong> ${overlapIndices.length}</p>
+            <p><strong>Overlapping Species List:</strong> ${overlappingSpecies || 'None found.'}</p>
+        </div>
+    `;
+}
 
 /**
  * Renders the initial summary for phylogenetic queries. Handles both single-gene (Q1-Q7)
