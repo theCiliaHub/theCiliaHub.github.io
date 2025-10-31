@@ -1332,32 +1332,35 @@ const questionRegistry = [
   { text: "Find ciliary genes conserved across metazoans", handler: async () => getPhylogenyList('Vertebrate_specific') },
   { text: "Show deeply conserved ciliary genes", handler: async () => getPhylogenyList('in_all_organisms') },
   { text: "Which ciliary genes are missing in non-ciliated organisms?", handler: async () => getPhylogenyList('absent_in_fungi') },
-
-  // --- F. AI-like natural language variants ---
-  { text: "Can you show the evolutionary map of GENE?", handler: async (q) => routePhylogenyAnalysis(q), template: true },
-  { text: "I'd like to see conservation of GENE", handler: async (q) => routePhylogenyAnalysis(q), template: true },
-  { text: "How conserved is GENE?", handler: async (q) => routePhylogenyAnalysis(q), template: true },
-  { text: "Which species contain GENE?", handler: async (q) => routePhylogenyAnalysis(q), template: true },
-  { text: "Is GENE conserved across animals?", handler: async (q) => routePhylogenyAnalysis(q), template: true },
-  { text: "What’s the cross-species conservation pattern for GENE?", handler: async (q) => routePhylogenyAnalysis(q), template: true },
-  { text: "Show me the phylogenetic tree of GENE", handler: async (q) => routePhylogenyAnalysis(q), template: true },
-  { text: "Display evolutionary relationship for GENE", handler: async (q) => routePhylogenyAnalysis(q), template: true },
-  { text: "Give me the conservation score for GENE", handler: async (q) => routePhylogenyAnalysis(q), template: true },
-  { text: "Show where GENE appears in evolution", handler: async (q) => routePhylogenyAnalysis(q), template: true },
-  { text: "Plot the evolution of GENE across taxa", handler: async (q) => routePhylogenyAnalysis(q), template: true },
-  { text: "Show me species with GENE homologs", handler: async (q) => routePhylogenyAnalysis(q), template: true },
-  { text: "Can you compare GENE1 with GENE2 evolution?", handler: async (q) => routePhylogenyAnalysis(q), template: true },
-  { text: "Which gene is more conserved: GENE1 or GENE2?", handler: async (q) => routePhylogenyAnalysis(q), template: true },
-  { text: "Compare conservation depth of GENE1 and GENE2", handler: async (q) => routePhylogenyAnalysis(q), template: true },
-  { text: "Which species share both GENE1 and GENE2?", handler: async (q) => routePhylogenyAnalysis(q), template: true },
-  { text: "Which species share both gene GENE1 and gene GENE2?", handler: async (q) => routePhylogenyAnalysis(q), template: true },
-  { text: "Which species share both gene X and gene Y?", handler: async (q) => routePhylogenyAnalysis(q), template: true },
-  { text: "Do GENE1 and GENE2 share any conserved species?", handler: async (q) => routePhylogenyAnalysis(q), template: true },
-  { text: "Phylogenetic analysis of X", handler: async (q) => routePhylogenyAnalysis(q), template: true },
-  { text: "Evolutionary profile for X", handler: async (q) => routePhylogenyAnalysis(q), template: true },
-  { text: "Compare X and Y phylogeny", handler: async (q) => routePhylogenyAnalysis(q), template: true },
-
     
+    // The most concise and reliable single-gene patterns (which failed previously but are critical):
+    { text: "Phylogenetic analysis of X", handler: async (q) => routePhylogenyAnalysis(q), template: true },
+    { text: "Evolutionary profile for X", handler: async (q) => routePhylogenyAnalysis(q), template: true },
+    
+    // Comprehensive visualization synonyms:
+    { text: "Show evolutionary conservation of GENE", handler: async (q) => routePhylogenyAnalysis(q), template: true },
+    { text: "How conserved is GENE?", handler: async (q) => routePhylogenyAnalysis(q), template: true },
+    { text: "What’s the cross-species conservation pattern for GENE?", handler: async (q) => routePhylogenyAnalysis(q), template: true },
+    { text: "Show me the phylogenetic tree of GENE", handler: async (q) => routePhylogenyAnalysis(q), template: true },
+    { text: "Show where GENE appears in evolution", handler: async (q) => routePhylogenyAnalysis(q), template: true },
+    { text: "Plot the evolution of GENE across taxa", handler: async (q) => routePhylogenyAnalysis(q), template: true },
+    { text: "Which species contain GENE?", handler: async (q) => routePhylogenyAnalysis(q), template: true },
+    { text: "Show GENE cross-species presence", handler: async (q) => routePhylogenyAnalysis(q), template: true },
+    { text: "Display evolutionary depth of GENE", handler: async (q) => routePhylogenyAnalysis(q), template: true },
+
+    // Comparison Queries (Visualization)
+    { text: "Compare GENE1 and GENE2 conservation", handler: async (q) => routePhylogenyAnalysis(q), template: true },
+    { text: "Compare evolutionary patterns between GENE1 and GENE2", handler: async (q) => routePhylogenyAnalysis(q), template: true },
+    { text: "Show phylogenetic comparison of GENE1 vs GENE2", handler: async (q) => routePhylogenyAnalysis(q), template: true },
+    { text: "Compare conservation depth of GENE1 and GENE2", handler: async (q) => routePhylogenyAnalysis(q), template: true },
+    { text: "Compare X and Y phylogeny", handler: async (q) => routePhylogenyAnalysis(q), template: true },
+
+    // Overlap Queries (Data Intersection) - 
+    { text: "Which species share both GENE1 and GENE2?", handler: async (q) => routePhylogenyAnalysis(q), template: true },
+    { text: "Which species share both gene GENE1 and gene GENE2?", handler: async (q) => routePhylogenyAnalysis(q), template: true },
+    { text: "Which species share both gene X and gene Y?", handler: async (q) => routePhylogenyAnalysis(q), template: true },
+    { text: "Do GENE1 and GENE2 share any conserved species?", handler: async (q) => routePhylogenyAnalysis(q), template: true },
+   
     // --- G. General-purpose discovery queries ---
   { text: "Show evolution of any given gene", handler: async (q) => routePhylogenyAnalysis(q), template: true },
   { text: "Compare conservation between any two genes", handler: async (q) => routePhylogenyAnalysis(q), template: true },
