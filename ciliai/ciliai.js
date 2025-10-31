@@ -1294,8 +1294,9 @@ const questionRegistry = [
   { text: "Cross-species comparison of GENE1 and GENE2 conservation", handler: async (q) => routePhylogenyAnalysis(q), template: true },
   { text: "Compare conservation trends between GENE1 and GENE2", handler: async (q) => routePhylogenyAnalysis(q), template: true },
   { text: "Evolutionary comparison for GENE1 and GENE2", handler: async (q) => routePhylogenyAnalysis(q), template: true },
-
-  // --- C. Multi-gene & complex sets ---
+ 
+  
+    // --- C. Multi-gene & complex sets ---
   { text: "Show conservation of IFT complex genes", handler: async (q) => routePhylogenyAnalysis(q) },
   { text: "Compare evolution of IFT-A and IFT-B complexes", handler: async (q) => routePhylogenyAnalysis(q) },
   { text: "Compare evolutionary conservation of all BBSome components", handler: async (q) => routePhylogenyAnalysis(q) },
@@ -1350,8 +1351,14 @@ const questionRegistry = [
   { text: "Compare conservation depth of GENE1 and GENE2", handler: async (q) => routePhylogenyAnalysis(q), template: true },
   { text: "Which species share both GENE1 and GENE2?", handler: async (q) => routePhylogenyAnalysis(q), template: true },
   { text: "Which species share both gene GENE1 and gene GENE2?", handler: async (q) => routePhylogenyAnalysis(q), template: true },
+  { text: "Which species share both gene X and gene Y?", handler: async (q) => routePhylogenyAnalysis(q), template: true },
+  { text: "Do GENE1 and GENE2 share any conserved species?", handler: async (q) => routePhylogenyAnalysis(q), template: true },
+  { text: "Phylogenetic analysis of X", handler: async (q) => routePhylogenyAnalysis(q), template: true },
+  { text: "Evolutionary profile for X", handler: async (q) => routePhylogenyAnalysis(q), template: true },
+  { text: "Compare X and Y phylogeny", handler: async (q) => routePhylogenyAnalysis(q), template: true },
 
-  // --- G. General-purpose discovery queries ---
+    
+    // --- G. General-purpose discovery queries ---
   { text: "Show evolution of any given gene", handler: async (q) => routePhylogenyAnalysis(q), template: true },
   { text: "Compare conservation between any two genes", handler: async (q) => routePhylogenyAnalysis(q), template: true },
   { text: "Generate conservation overview for multiple genes", handler: async (q) => routePhylogenyAnalysis(q), template: true },
