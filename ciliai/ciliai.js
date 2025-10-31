@@ -1349,7 +1349,7 @@ const questionRegistry = [
   { text: "Which gene is more conserved: GENE1 or GENE2?", handler: async (q) => routePhylogenyAnalysis(q), template: true },
   { text: "Compare conservation depth of GENE1 and GENE2", handler: async (q) => routePhylogenyAnalysis(q), template: true },
   { text: "Which species share both GENE1 and GENE2?", handler: async (q) => routePhylogenyAnalysis(q), template: true },
-  { text: "Which species share both gene X and gene Y?", handler: async (q) => routePhylogenyAnalysis(q) },
+  { text: "Which species share both gene GENE1 and gene GENE2?", handler: async (q) => routePhylogenyAnalysis(q), template: true },
 
   // --- G. General-purpose discovery queries ---
   { text: "Show evolution of any given gene", handler: async (q) => routePhylogenyAnalysis(q), template: true },
