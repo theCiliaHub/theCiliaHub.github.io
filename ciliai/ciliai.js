@@ -1337,6 +1337,7 @@ const questionRegistry = [
     { text: "How conserved is GENE?", handler: async (q) => routePhylogenyAnalysis(q), template: true },
     { text: "Plot the evolution of GENE across taxa", handler: async (q) => routePhylogenyAnalysis(q), template: true },
 
+    
 // ==================== 3. DATA OVERLAP & TABLE QUERIES ====================
 
     // Species Overlap Queries (Triggers compareGeneSpeciesOverlap inside router)
@@ -5483,35 +5484,34 @@ async function routePhylogenyAnalysis(query) {
         }
     }
     
-    // 2. SPECIES OVERLAP QUERY (e.g., Which species share both WDR27 and IFT20?)
+    // 2. SPECIES OVERLAP QUERY
     if (genes.length === 2 && (qLower.includes('share') || qLower.includes('both') || qLower.includes('overlap'))) {
         return compareGeneSpeciesOverlap(genes[0], genes[1]);
     }
 
-    // 3. TABLE VIEW INTENT (Triggered by links or query)
+    // 3. TABLE VIEW INTENT
     if (qLower.includes('table') || qLower.includes('view data') || qLower.includes('species count')) {
-         if (genes.length >= 1) {
-             return handlePhylogenyVisualizationQuery(query, 'li', 'table');
-         }
+        if (genes.length >= 1) {
+            return handlePhylogenyVisualizationQuery(query, 'li', 'table');
+        }
     }
 
-    // 4. VISUALIZATION INTENT (Default action for any remaining single or multi-gene query)
-    // This catches: "Phylogenetic analysis of WDR27", "Show evolutionary map for WDR27", 
-    // and multi-gene comparison templates that weren't caught in the registry.
-    if (genes.length >= 1) {
-        return handlePhylogenyVisualizationQuery(query, 'li', 'heatmap');
+    // 4. VISUALIZATION INTENT (Default action for single/multi-gene queries AND generic visual queries)
+    
+    // CRITICAL FIX: If strong visual keywords ('plot', 'evolution', 'taxa') are present, 
+    // force routing to a heatmap, using IFT88 as a default if the gene extraction failed.
+    if (genes.length >= 1 || qLower.includes('evolution') || qLower.includes('taxa') || qLower.includes('phylogenetic') || qLower.includes('plot')) {
+        
+        // If a specific gene was extracted, use it. Otherwise, use the default IFT88.
+        const geneForDefault = (genes.length >= 1) ? genes.join(',') : "IFT88"; 
+        
+        // Route to the heatmap visualization
+        return handlePhylogenyVisualizationQuery(geneForDefault, 'li', 'heatmap');
     }
 
-    // 5. FINAL FALLBACK: For generic visual intent without specific genes (e.g., "Show evolution of any given gene")
-    if (qLower.includes('evolution') || qLower.includes('conservation overview') || qLower.includes('phylogenetic')) {
-        // Trigger the default heatmap view using the internal default gene list for context.
-        return handlePhylogenyVisualizationQuery("IFT88", 'li', 'heatmap');
-    }
-
-    // 6. Final Error
+    // 5. Final Error
     return `<div class="result-card"><h3>Analysis Failed</h3><p>Could not identify a gene or complex for visualization. Please try a specific gene symbol or a suggested question.</p></div>`;
 }
-
 
 /**
  * Finds the intersection of species lists between two genes.
