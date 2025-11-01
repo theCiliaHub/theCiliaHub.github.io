@@ -5559,7 +5559,6 @@ async function getPhylogenyAnalysis(genes) {
     }
 
     // --- Determine Genes to Plot (Using user-specified defaults if needed) ---
-    // NOTE: Gene calculation logic is simplified here as it was defined correctly elsewhere.
     const finalGenes = validGeneSymbols; // Use only the valid input genes for the core analysis.
 
     // --- 2. Determine Output Mode: Single vs. Comparison ---
