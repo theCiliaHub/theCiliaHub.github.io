@@ -4780,7 +4780,7 @@ function renderNeversPhylogenyHeatmap(genes) {
         return { html: `<div class="result-card"><h3>Heatmap Error</h3><p>Nevers et al. 2017 data not loaded. Please try again.</p></div>`, plotData: null, plotLayout: null, plotId: null };
     }
     
-    // --- CRITICAL CHANGE: Use NEVERS_CIL_PANEL and NEVERS_NCIL_PANEL as the source for the 40 organisms ---
+    // Assumed NEVERS_CIL_PANEL and NEVERS_NCIL_PANEL are globally available
     const CIL_COUNT = NEVERS_CIL_PANEL.length;
     const NCIL_COUNT = NEVERS_NCIL_PANEL.length;
 
@@ -4788,12 +4788,9 @@ function renderNeversPhylogenyHeatmap(genes) {
     const neversOrgList = neversPhylogenyCache.organism_groups?.all_organisms_list || [];
     const neversOrgMap = new Map(); 
     
-    // Loop 1: Map all Nevers list entries to their index using the EXACT string and simplified key.
+    // Mapping logic remains unchanged (ensures correct index lookup)
     neversOrgList.forEach((name, index) => {
-        // Key 1: Store the EXACT original name (Highest priority key)
         neversOrgMap.set(name, index);
-        
-        // Key 2: Map the fully simplified key (removes strain info, periods, spaces)
         const simplifiedKey = name.toLowerCase().replace(/\s*\(.*?\)\s*/g, '').replace(/[\s\.\(\)]/g, '');
         neversOrgMap.set(simplifiedKey, index);
     });
@@ -4802,13 +4799,8 @@ function renderNeversPhylogenyHeatmap(genes) {
     
     const targetNeversIndices = targetOrganisms.map(orgName => {
         const simplifiedKey = orgName.toLowerCase().replace(/[\s\.]/g, '');
-        
-        // Lookup 1: Try the exact verbose name from our panel (e.g., "Saccharomyces cerevisiae (strain...)")
         if (neversOrgMap.has(orgName)) return neversOrgMap.get(orgName);
-        
-        // Lookup 2: Try the simplified key (e.g., "saccharomycescerevisiae")
         if (neversOrgMap.has(simplifiedKey)) return neversOrgMap.get(simplifiedKey);
-        
         return undefined;
     });
 
@@ -4856,15 +4848,11 @@ function renderNeversPhylogenyHeatmap(genes) {
 
     const trace = {
         z: matrix,
-        // *** CRITICAL AXIS FIX: Strip parentheses for display labels ***
+        // CRITICAL AXIS FIX: Strip parentheses for display labels
         x: targetOrganisms.map(name => {
-            // Remove everything inside parentheses (strains) for the label only
             let cleanedName = name.replace(/\s*\(.*?\)\s*/g, '').trim();
-            
-            // Further clean up scientific abbreviations used in the list if necessary
             if (cleanedName.includes("D.rerio")) return "Zebrafish";
             if (cleanedName.includes("H.sapiens")) return "Human";
-            
             return cleanedName;
         }), 
         y: geneLabels,
@@ -4886,7 +4874,8 @@ function renderNeversPhylogenyHeatmap(genes) {
                 yref: 'paper', y0: 0, y1: 1,
                 line: { color: 'black', width: 2 }
             }],
-        margin: { t: 50, b: 200, l: 100, r: 50 },
+        // *** CRITICAL FIX: Increased left margin (l: 150) for label visibility ***
+        margin: { t: 50, b: 200, l: 150, r: 50 }, 
         height: Math.max(500, genes.length * 40 + 150)
     };
     
@@ -4917,6 +4906,7 @@ function renderNeversPhylogenyHeatmap(genes) {
     `;
     return { html: htmlOutput, plotData: [trace], plotLayout: layout, plotId: plotContainer };
 }
+
 
 /**
  * MODIFIED: Adds a link to switch to the Nevers heatmap.
@@ -5075,7 +5065,8 @@ function renderLiPhylogenyHeatmap(genes) {
                 line: { color: 'black', width: 2 }
             }
         ],
-        margin: { t: 50, b: 200, l: 100, r: 50 },
+        // *** CRITICAL FIX: Increased left margin (l: 150) for label visibility ***
+        margin: { t: 50, b: 200, l: 150, r: 50 }, 
         height: Math.max(500, genes.length * 40 + 150)
     };
     
@@ -5219,8 +5210,10 @@ function renderPhylogenyTable(genes) {
 async function handlePhylogenyVisualizationQuery(query, source = 'li', view = 'heatmap') {
     const resultArea = document.getElementById('ai-result-area');
     
+    // Set the new increased plotting limit to 30
+    const MAX_PLOTTED_GENES = 30; 
+    
     // 1. Gene Extraction and Data Loading 
-    // NOTE: This assumes extractMultipleGenes() and the fetch functions are globally available.
     const inputGenes = extractMultipleGenes(query);
     
     // Ensure all necessary phylogenetic data is loaded before proceeding
@@ -5236,27 +5229,36 @@ async function handlePhylogenyVisualizationQuery(query, source = 'li', view = 'h
     const validUserGenes = inputGenes.filter(g => liGenesSet.has(g));
 
     let finalGenes;
+    let truncationMessage = '';
     
-    // --- Determine Genes to Plot (Prioritize user input, fill up to 20 with defaults) ---
-    // User-specified list used for context when input is lacking.
+    // --- Determine Genes to Plot (Prioritize user input, fill with defaults) ---
     const definitiveDefaultGenes = ["ZC2HC1A", "CEP41", "BBS1", "BBS2", "BBS5", "ZNF474", "IFT81", "BBS7"];
     
     if (validUserGenes.length === 0) {
-        // Use default genes for initialization if none found
+        // Case 1: No valid user genes found - use default list
         finalGenes = definitiveDefaultGenes.filter(g => liGenesSet.has(g)).slice(0, 5);
         if (finalGenes.length === 0) {
             return `<div class="result-card"><h3>Analysis Error</h3><p>The requested gene(s) were not found, and no default genes could be plotted.</p></div>`;
         }
     } else {
-        // Start with user's valid genes
+        // Case 2: Use user's valid genes, applying the new limit
         finalGenes = [...new Set(validUserGenes)];
         
-        // Fill up to 20 genes using the definitive defaults for context
-        if (finalGenes.length < 20) {
+        if (finalGenes.length > MAX_PLOTTED_GENES) {
+            // Apply truncation and set message
+            const originalLength = finalGenes.length;
+            finalGenes = finalGenes.slice(0, MAX_PLOTTED_GENES);
+            truncationMessage = `<p class="status-note">⚠️ **Warning:** Only the first ${MAX_PLOTTED_GENES} genes were visualized for stable rendering. Total genes found: ${originalLength}.</p>`;
+        }
+        
+        // Fill remaining slots with defaults if needed and under the limit
+        let genesAdded = finalGenes.length;
+        if (genesAdded < MAX_PLOTTED_GENES) {
             for (const dGene of definitiveDefaultGenes) {
-                if (finalGenes.length >= 20) break;
+                if (genesAdded >= MAX_PLOTTED_GENES) break;
                 if (liGenesSet.has(dGene) && !finalGenes.includes(dGene)) {
                     finalGenes.push(dGene);
+                    genesAdded++;
                 }
             }
         }
@@ -5268,13 +5270,17 @@ async function handlePhylogenyVisualizationQuery(query, source = 'li', view = 'h
     if (view === 'table') {
         // Render the comparative table (HTML output only)
         plotResult = {
-            html: renderPhylogenyTable(finalGenes),
+            html: renderPhylogenyTable(finalGenes) + truncationMessage,
             plotId: null, plotData: null, plotLayout: null
         };
     } else {
         // Render the Heatmap (Default or Switch action)
         const renderer = (source === 'nevers') ? renderNeversPhylogenyHeatmap : renderLiPhylogenyHeatmap;
         plotResult = renderer(finalGenes);
+
+        // Append truncation message to heatmap HTML for large lists
+        // Note: The HTML output of renderLi/NeversHeatmap must have the ending HTML structure to allow for clean injection.
+        plotResult.html = plotResult.html.replace(/<\/div>\s*$/, `${truncationMessage}</div>`);
     }
     
     // --- 3. Inject HTML and Execute Plotting Function ---
@@ -5295,6 +5301,7 @@ async function handlePhylogenyVisualizationQuery(query, source = 'li', view = 'h
     // Return an empty string as the function has already updated the DOM
     return "";
 }
+
 /**
  * Global wrapper to handle clicks on the Li/Nevers switch links.
  * This should be defined globally (e.g., window.switchPhylogenyView).
