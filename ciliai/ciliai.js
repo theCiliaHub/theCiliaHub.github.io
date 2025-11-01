@@ -4830,7 +4830,7 @@ const NEVERS_NCIL_PANEL = [
 // --------------------------------------------------------------------------------------
 /**
  * Renders the phylogenetic heatmap based on Nevers et al. 2017 data.
- * @param {string[]} genes - Array of genes requested.
+ * @param {string[]} genes - Array of genes requested (already truncated to MAX_PLOTTED_GENES).
  * @returns {object} Structured object {html, plotData, plotLayout, plotId}.
  */
 function renderNeversPhylogenyHeatmap(genes) {
@@ -4842,11 +4842,10 @@ function renderNeversPhylogenyHeatmap(genes) {
     const CIL_COUNT = NEVERS_CIL_PANEL.length;
     const NCIL_COUNT = NEVERS_NCIL_PANEL.length;
 
-    // --- 1. Map Target Organisms to Nevers Indices (using NEVERS_CIL/NCIL_PANEL as source) ---
+    // --- 1. Map Target Organisms to Nevers Indices ---
     const neversOrgList = neversPhylogenyCache.organism_groups?.all_organisms_list || [];
     const neversOrgMap = new Map(); 
     
-    // Mapping logic remains unchanged (ensures correct index lookup)
     neversOrgList.forEach((name, index) => {
         neversOrgMap.set(name, index);
         const simplifiedKey = name.toLowerCase().replace(/\s*\(.*?\)\s*/g, '').replace(/[\s\.\(\)]/g, '');
@@ -4932,7 +4931,7 @@ function renderNeversPhylogenyHeatmap(genes) {
                 yref: 'paper', y0: 0, y1: 1,
                 line: { color: 'black', width: 2 }
             }],
-        // *** CRITICAL FIX: Increased left margin (l: 150) for label visibility ***
+        // *** CRITICAL FIX APPLIED HERE: Increased left margin (l: 150) ***
         margin: { t: 50, b: 200, l: 150, r: 50 }, 
         height: Math.max(500, genes.length * 40 + 150)
     };
