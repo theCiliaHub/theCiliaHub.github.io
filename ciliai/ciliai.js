@@ -5272,10 +5272,11 @@ async function handlePhylogenyVisualizationQuery(query, genes = [], source = 'li
     // 1. GENE RESOLUTION
     // -------------------------------------------------
     let inputGenes = [];
+
     if (Array.isArray(genes) && genes.length) {
-        inputGenes = genes.map(g => g.toUpperCase().trim()).filter(Boolean);
+    inputGenes = genes.map(g => g.toUpperCase().trim()).filter(Boolean);
     } else {
-        inputGenes = extractMultipleGenes(query);
+    inputGenes = extractMultipleGenes(query);
     }
 
     // -------------------------------------------------
