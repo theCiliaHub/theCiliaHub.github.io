@@ -1248,10 +1248,13 @@ const questionRegistry = [
       "TMEM237","TMEM231","TMEM216","TCTN1","TCTN2","TCTN3"
   ]) },
 
-{ text: "Show evolutionary conservation of Nephronophthisis (NPHP) module genes",
-  handler: async () => handlePhylogenyVisualizationQuery("", [
-      "NPHP1","NPHP3","NPHP4","RPGRIP1L","IQCB1","CEP290","SDCCAG8"
-  ]) },
+{ 
+  text: "Show evolutionary conservation of Nephronophthisis (NPHP) module genes",
+  handler: async () => handlePhylogenyVisualizationQuery("", 
+    ["NPHP1","NPHP3","NPHP4","RPGRIP1L","IQCB1","CEP290","SDCCAG8"],
+    'nevers'  // <-- Critical: Use Nevers dataset
+  )
+},
 
 // ==================== C. CLASSIFICATION & PATTERN QUESTIONS (List/Summary - Expanded) ====================
     { text: "List genes classified as Ciliary specific", handler: async () => getPhylogenyList('Ciliary_specific') },
@@ -5266,86 +5269,111 @@ async function handlePhylogenyVisualizationQuery(query, genes = [], source = 'li
     const MAX_PLOTTED_GENES = 30;
 
     // -------------------------------------------------
-    // 1. GENE RESOLUTION (explicit list wins)
+    // 1. GENE RESOLUTION
     // -------------------------------------------------
     let inputGenes = [];
-
     if (Array.isArray(genes) && genes.length) {
-        // Normalise to upper-case strings
         inputGenes = genes.map(g => g.toUpperCase().trim()).filter(Boolean);
     } else {
-        // Fallback to extraction from the raw query
         inputGenes = extractMultipleGenes(query);
     }
 
     // -------------------------------------------------
-    // 2. Load caches + validate against Li data
+    // 2. Load caches
     // -------------------------------------------------
     await Promise.all([fetchLiPhylogenyData(), fetchNeversPhylogenyData()]);
-    if (!liPhylogenyCache) {
-        return `<div class="result-card"><h3>Error</h3><p>Could not load phylogenetic data (Li et al. 2014).</p></div>`;
+    if (!liPhylogenyCache && source === 'li') {
+        return `<div class="result-card"><h3>Error</h3><p>Could not load Li et al. 2014 data.</p></div>`;
+    }
+    if (!neversPhylogenyCache && source === 'nevers') {
+        return `<div class="result-card"><h3>Error</h3><p>Could not load Nevers et al. 2017 data.</p></div>`;
     }
 
-    const liGenesSet = new Set(
-        Object.values(liPhylogenyCache.genes)
-              .map(g => g.g.toUpperCase())
-              .filter(Boolean)
-    );
+    // -------------------------------------------------
+    // 3. VALIDATE GENES AGAINST THE *TARGET* SOURCE
+    // -------------------------------------------------
+    let validGenes = [];
+    let missingGenes = [];
 
-    const validUserGenes = inputGenes.filter(g => liGenesSet.has(g));
+    if (source === 'nevers') {
+        const neversGeneSet = new Set(
+            Object.keys(neversPhylogenyCache.genes || {}).map(g => g.toUpperCase())
+        );
+        inputGenes.forEach(g => {
+            if (neversGeneSet.has(g)) {
+                validGenes.push(g);
+            } else {
+                missingGenes.push(g);
+            }
+        });
+    } else {
+        // Li source
+        const liGenesSet = new Set(
+            Object.values(liPhylogenyCache.genes)
+                  .map(g => g.g.toUpperCase())
+                  .filter(Boolean)
+        );
+        inputGenes.forEach(g => {
+            if (liGenesSet.has(g)) {
+                validGenes.push(g);
+            } else {
+                missingGenes.push(g);
+            }
+        });
+    }
+
     let finalGenes = [];
     let truncationMessage = '';
+    let warningMessage = '';
 
-    // -------------------------------------------------
-    // 3. Build final gene list (no defaults when user supplied genes)
-    // -------------------------------------------------
-    if (validUserGenes.length === 0) {
-        // ONLY when **nothing** was supplied (neither explicit nor extracted)
+    if (validGenes.length === 0) {
+        if (missingGenes.length > 0) {
+            warningMessage = `<p class="status-note">Warning: The following genes were not found in the ${source === 'nevers' ? 'Nevers et al. 2017' : 'Li et al. 2014'} dataset: <strong>${missingGenes.join(', ')}</strong>. Showing defaults.</p>`;
+        }
         const definitiveDefaultGenes = ["ZC2HC1A","CEP41","BBS1","BBS2","BBS5","ZNF474","IFT81","BBS7"];
-        finalGenes = definitiveDefaultGenes.filter(g => liGenesSet.has(g)).slice(0, 5);
+        const defaultSet = source === 'nevers'
+            ? new Set(Object.keys(neversPhylogenyCache.genes || {}).map(g => g.toUpperCase()))
+            : new Set(Object.values(liPhylogenyCache.genes).map(g => g.g.toUpperCase()));
+        finalGenes = definitiveDefaultGenes.filter(g => defaultSet.has(g)).slice(0, 5);
         if (!finalGenes.length) {
-            return `<div class="result-card"><h3>Analysis Error</h3><p>No genes found and no defaults available.</p></div>`;
+            return `<div class="result-card"><h3>Analysis Error</h3><p>No valid genes and no defaults available.</p></div>`;
         }
     } else {
-        finalGenes = [...new Set(validUserGenes)];
-
-        // Truncate large explicit lists (heat-map stability)
+        finalGenes = [...new Set(validGenes)];
+        if (missingGenes.length > 0) {
+            warningMessage = `<p class="status-note">Note: ${missingGenes.length} gene(s) not found in dataset: <em>${missingGenes.join(', ')}</em>. Showing ${finalGenes.length} valid gene(s).</p>`;
+        }
         if (finalGenes.length > MAX_PLOTTED_GENES) {
             const orig = finalGenes.length;
             finalGenes = finalGenes.slice(0, MAX_PLOTTED_GENES);
-            truncationMessage = `<p class="status-note">Warning: Only the first ${MAX_PLOTTED_GENES} genes are shown (you asked for ${orig}).</p>`;
+            truncationMessage = `<p class="status-note">Warning: Only first ${MAX_PLOTTED_GENES} genes shown (you requested ${orig}).</p>`;
         }
     }
 
     // -------------------------------------------------
-    // 4. Render according to requested view
+    // 4. RENDER
     // -------------------------------------------------
     let plotResult;
     if (view === 'table') {
         plotResult = {
-            html: renderPhylogenyTable(finalGenes) + truncationMessage,
+            html: renderPhylogenyTable(finalGenes) + warningMessage + truncationMessage,
             plotId: null, plotData: null, plotLayout: null
         };
     } else {
-        const renderer = (source === 'nevers') ? renderNeversPhylogenyHeatmap : renderLiPhylogenyHeatmap;
+        const renderer = source === 'nevers' ? renderNeversPhylogenyHeatmap : renderLiPhylogenyHeatmap;
         plotResult = renderer(finalGenes);
-        // Append truncation note inside the card
-        if (truncationMessage) {
-            plotResult.html = plotResult.html.replace(/<\/div>\s*$/, `${truncationMessage}</div>`);
+        let extraHtml = warningMessage + truncationMessage;
+        if (extraHtml) {
+            plotResult.html = plotResult.html.replace(/<\/div>\s*$/, `${extraHtml}</div>`);
         }
     }
 
     // -------------------------------------------------
-    // 5. Inject into DOM
+    // 5. INJECT
     // -------------------------------------------------
     resultArea.innerHTML = plotResult.html;
-
     if (view === 'heatmap' && plotResult.plotData) {
-        window.initPhylogenyPlot(
-            plotResult.plotId,
-            plotResult.plotData,
-            plotResult.plotLayout
-        );
+        window.initPhylogenyPlot(plotResult.plotId, plotResult.plotData, plotResult.plotLayout);
     }
 
     return "";
