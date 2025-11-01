@@ -5626,100 +5626,103 @@ async function compareGeneSpeciesOverlap(geneA, geneB) {
  * fetchLiPhylogenyData(), fetchNeversPhylogenyData(), handlePhylogenyVisualizationQuery().
  * * @param {string[]} genes - Array of genes requested by the user.
  */
+/**
+ * CORRECTED: Works with Li 2014 (array) + Nevers (object)
+ */
 async function getPhylogenyAnalysis(genes) {
-    // 1. Data loading and validation 
     await Promise.all([fetchLiPhylogenyData(), fetchNeversPhylogenyData()]);
-
     if (!liPhylogenyCache || !neversPhylogenyCache) {
-        return `<div class="result-card"><h3>Analysis Error</h3><p>Phylogenetic data sources (Li 2014 or Nevers 2017) failed to load.</p></div>`;
-    }
-    
-    // Get all HUGO gene symbols available in the Li database
-    const liGenesSet = new Set(Object.values(liPhylogenyCache.genes).map(g => g.g.toUpperCase()).filter(Boolean));
-    const validGeneSymbols = genes.map(g => g.toUpperCase()).filter(g => liGenesSet.has(g));
-    
-    if (validGeneSymbols.length === 0) {
-        return `<div class="result-card"><h3>Analysis Error</h3><p>None of the requested genes were found in the Li et al. 2014 phylogenetic dataset.</p></div>`;
+        return `<div class="result-card"><h3>Error</h3><p>Phylogenetic data failed to load.</p></div>`;
     }
 
-    // --- Determine Genes to Plot (Using user-specified defaults if needed) ---
-    const finalGenes = validGeneSymbols; // Use only the valid input genes for the core analysis.
+    const upperGenes = genes.map(g => g.toUpperCase()).filter(Boolean);
+    if (upperGenes.length === 0) {
+        return `<div class="result-card"><h3>Error</h3><p>No genes provided.</p></div>`;
+    }
 
-    // --- 2. Determine Output Mode: Single vs. Comparison ---
-    if (finalGenes.length > 1) {
-        
-        // --- MULTI-GENE COMPARISON MODE (Answers "Compare the evolutionary history of DYNC2H1 and KIF3A") ---
-        let summaryHtml = `
+    // --- CORRECT: Li is an ARRAY ---
+    const liGeneSet = new Set(
+        (Array.isArray(liPhylogenyCache.genes) 
+            ? liPhylogenyCache.genes 
+            : Object.values(liPhylogenyCache.genes)
+        ).map(g => g.g?.toUpperCase()).filter(Boolean)
+    );
+
+    // --- Nevers is an OBJECT ---
+    const neversGeneSet = new Set(
+        Object.keys(neversPhylogenyCache.genes || {}).map(g => g.toUpperCase())
+    );
+
+    // --- Find best source ---
+    const inLi = upperGenes.filter(g => liGeneSet.has(g));
+    const inNevers = upperGenes.filter(g => neversGeneSet.has(g));
+    const missing = upperGenes.filter(g => !inLi.includes(g) && !inNevers.includes(g));
+
+    const useLi = inLi.length >= inNevers.length;
+    const source = useLi ? 'li' : 'nevers';
+    const validGenes = useLi ? inLi : inNevers;
+
+    if (validGenes.length === 0) {
+        return `<div class="result-card"><h3>No Genes Found</h3><p>None of: <strong>${upperGenes.join(', ')}</strong> exist in either dataset.</p></div>`;
+    }
+
+    let warning = '';
+    if (missing.length > 0) {
+        warning = `<p class="status-note">Not found: <strong>${missing.join(', ')}</strong></p>`;
+    } else if (validGenes.length < upperGenes.length) {
+        const skipped = upperGenes.filter(g => !validGenes.includes(g));
+        warning = `<p class="status-note">Using ${source} dataset. Skipped (not in ${source}): <strong>${skipped.join(', ')}</strong></p>`;
+    }
+
+    // --- Single Gene ---
+    if (validGenes.length === 1) {
+        const gene = validGenes[0];
+        const liEntry = Array.isArray(liPhylogenyCache.genes)
+            ? liPhylogenyCache.genes.find(g => g.g?.toUpperCase() === gene)
+            : null;
+        const neversEntry = neversPhylogenyCache.genes?.[gene];
+        const liClass = liEntry ? (liPhylogenyCache.summary.class_list[liEntry.c] || 'N/A').replace(/_/g, ' ') : 'N/A';
+        const neversCount = neversEntry?.s?.length || 0;
+
+        const summary = `
             <div class="result-card">
-                <h3>Phylogenetic Comparison: ${finalGenes.join(' vs ')} 📊</h3>
+                <h3>${gene} — Evolutionary Profile</h3>
+                <p><strong>Source:</strong> ${source === 'li' ? 'Li et al. (2014)' : 'Nevers et al. (2017)'}</p>
                 <table class="gene-detail-table">
-                    <thead>
-                        <tr>
-                            <th>Gene</th>
-                            <th>Li Class (2014)</th>
-                            <th>Nevers Species Count (99)</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-        `;
-        
-        finalGenes.forEach(gene => {
-            const liEntry = Object.values(liPhylogenyCache.genes).find(g => g.g && g.g.toUpperCase() === gene);
-            const neversEntry = neversPhylogenyCache.genes?.[gene];
-
-            // Safely extract and format data
-            const liClass = liEntry 
-                ? (liPhylogenyCache.summary.class_list[liEntry.c] || 'N/A').replace(/_/g, ' ') 
-                : 'N/A';
-            const neversCount = neversEntry?.s?.length || 0;
-            
-            summaryHtml += `
-                <tr>
-                    <td><strong>${gene}</strong></td>
-                    <td>${liClass}</td>
-                    <td>${neversCount}</td>
-                </tr>
-            `;
-        });
-        
-        summaryHtml += `
-                    </tbody>
+                    <tr><th>Li Class</th><td>${liClass}</td></tr>
+                    <tr><th>Nevers Species</th><td>${neversCount || 'N/A'}</td></tr>
                 </table>
-                <p class="ai-suggestion">
-                    The visualization below provides the detailed species map for comparison.
-                </p>
-            </div>
-        `;
-        
-        // Route to heatmap visualization
-        const visualizationHtml = await handlePhylogenyVisualizationQuery(`Show heatmap for ${finalGenes.join(',')}`, 'li', 'heatmap');
-        return summaryHtml + visualizationHtml;
+                ${warning}
+            </div>`;
 
-    } else {
-        
-        // --- SINGLE-GENE ANALYSIS MODE (Answers "Show evolutionary conservation of WDR27") ---
-        const geneSymbol = finalGenes[0];
-        const liEntry = Object.values(liPhylogenyCache.genes).find(g => g.g && g.g.toUpperCase() === geneSymbol);
-        const neversEntry = neversPhylogenyCache?.genes?.[geneSymbol];
-
-        const liSummary = liEntry ? liPhylogenyCache.summary.class_list[liEntry.c] || 'Classification Unavailable' : 'Not found in Li et al. (2014)';
-        const neversSpeciesCount = neversEntry?.s?.length || 0;
-        const neversStatus = neversEntry ? `Found in ${neversSpeciesCount} species (Nevers et al. 2017)` : 'Not found in Nevers et al. (2017)';
-
-        const generalSummary = `
-            <div class="result-card">
-                <h3>Evolutionary Summary: ${geneSymbol} 🧬</h3>
-                <table class="gene-detail-table">
-                    <tr><th>Li et al. (2014) Classification</th><td><strong>${liSummary.replace(/_/g, ' ')}</strong></td></tr>
-                    <tr><th>Nevers et al. (2017) Status</th><td>${neversStatus}</td></tr>
-                </table>
-            </div>
-        `;
-        
-        // Route to heatmap visualization
-        const visualizationHtml = await handlePhylogenyVisualizationQuery(`Show heatmap for ${geneSymbol}`, 'li', 'heatmap');
-        return generalSummary + visualizationHtml;
+        const viz = await handlePhylogenyVisualizationQuery("", validGenes, source, 'heatmap');
+        return summary + viz;
     }
+
+    // --- Multi-Gene Comparison ---
+    let table = `
+        <div class="result-card">
+            <h3>Comparison: ${validGenes.join(' vs ')}</h3>
+            <p><strong>Source:</strong> ${source === 'li' ? 'Li et al. (2014)' : 'Nevers et al. (2017)'}</p>
+            ${warning}
+            <table class="gene-detail-table">
+                <thead><tr><th>Gene</th><th>Li Class</th><th>Nevers Species</th></tr></thead>
+                <tbody>`;
+
+    validGenes.forEach(gene => {
+        const liEntry = Array.isArray(liPhylogenyCache.genes)
+            ? liPhylogenyCache.genes.find(g => g.g?.toUpperCase() === gene)
+            : null;
+        const neversEntry = neversPhylogenyCache.genes?.[gene];
+        const liClass = liEntry ? (liPhylogenyCache.summary.class_list[liEntry.c] || 'N/A').replace(/_/g, ' ') : 'N/A';
+        const neversCount = neversEntry?.s?.length || 0;
+        table += `<tr><td><strong>${gene}</strong></td><td>${liClass}</td><td>${neversCount}</td></tr>`;
+    });
+
+    table += `</tbody></table></div>`;
+
+    const viz = await handlePhylogenyVisualizationQuery("", validGenes, source, 'heatmap');
+    return table + viz;
 }
 
 /**
