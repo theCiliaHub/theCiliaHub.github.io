@@ -1179,24 +1179,79 @@ const questionRegistry = [
     { text: "TTC8 phylogenetic profile", handler: async () => getPhylogenyAnalysis(["TTC8"]) },
 
 // ==================== B. COMPARISON QUERIES (Multi-Gene Visualization - Expanded) ====================
-    { text: "Compare IFT88 and IFT140 phylogeny", handler: async () => getPhylogenyAnalysis(["IFT88", "IFT140"]) },
-    { text: "Phylogeny comparison of BBS1 and BBS4", handler: async () => getPhylogenyAnalysis(["BBS1", "BBS4"]) },
-    { text: "Show conservation of NPHP1 vs CEP290", handler: async () => getPhylogenyAnalysis(["NPHP1", "CEP290"]) },
-    { text: "Compare the evolutionary history of DYNC2H1 and KIF3A", handler: async () => getPhylogenyAnalysis(["DYNC2H1", "KIF3A"]) },
-    { text: "Evolutionary comparison: IFT88, IFT140, IFT172", handler: async () => getPhylogenyAnalysis(["IFT88", "IFT140", "IFT172"]) },
-    { text: "Compare conservation patterns of BBS proteins", handler: async () => getPhylogenyAnalysis(["BBS1", "BBS2", "BBS4", "BBS5", "BBS7", "BBS9"]) },
-    { text: "Side-by-side phylogeny: NPHP1 vs NPHP4", handler: async () => getPhylogenyAnalysis(["NPHP1", "NPHP4"]) },
-    { text: "Multi-gene evolutionary analysis: IFT complex", handler: async () => getPhylogenyAnalysis(["WDR19", "IFT140", "TTC21B", "IFT122", "WDR35", "IFT43", "IFT172", "IFT80", "IFT57", "TRAF3IP1", "CLUAP1", "IFT20", "IFT88", "IFT81", "IFT74", "IFT70A", "IFT70B", "IFT56", "IFT52", "IFT46", "IFT27", "IFT25", "IFT22"]) },
-    { text: "Compare evolutionary history of IFT-A complex components", handler: async () => getPhylogenyAnalysis(["WDR19", "IFT140", "TTC21B", "IFT122", "WDR35", "IFT43"]) },
-    { text: "Phylogenetic analysis of the complete IFT-B complex", handler: async () => getPhylogenyAnalysis(["IFT172", "IFT80", "IFT57", "TRAF3IP1", "CLUAP1", "IFT20", "IFT88", "IFT81", "IFT74", "IFT70A", "IFT70B", "IFT56", "IFT52", "IFT46", "IFT27", "IFT25", "IFT22"]) },
-    { text: "Compare conservation of IFT-B1 core components", handler: async () => getPhylogenyAnalysis(["IFT172", "IFT80", "IFT57", "TRAF3IP1", "CLUAP1", "IFT20"]) },
-    { text: "Show conservation of IFT-B2 peripheral components", handler: async () => getPhylogenyAnalysis(["IFT88", "IFT81", "IFT74", "IFT70A", "IFT70B", "IFT56", "IFT52", "IFT46", "IFT27", "IFT25", "IFT22"]) },
-    { text: "Evolutionary profile for IFT complex B", handler: async () => getPhylogenyAnalysis(["IFT172", "IFT80", "IFT57", "TRAF3IP1", "CLUAP1", "IFT20", "IFT88", "IFT81", "IFT74", "IFT70A", "IFT70B", "IFT56", "IFT52", "IFT46", "IFT27", "IFT25", "IFT22"]) },
-    { text: "Evolutionary analysis of all BBSome components", handler: async () => getPhylogenyAnalysis(["BBS1", "BBS2", "BBS4", "BBS5", "BBS7", "TTC8", "BBS9", "BBS18"]) },
-    { text: "Compare conservation of Meckel Syndrome (MKS) module components", handler: async () => getPhylogenyAnalysis(["MKS1", "TMEM17", "TMEM67", "TMEM138", "B9D2", "B9D1", "CC2D2A", "TMEM107", "TMEM237", "TMEM231", "TMEM216", "TCTN1", "TCTN2", "TCTN3"]) },
-    { text: "Show evolutionary conservation of Nephronophthisis (NPHP) module genes", handler: async () => getPhylogenyAnalysis(["NPHP1", "NPHP3", "NPHP4", "RPGRIP1L", "IQCB1", "CEP290", "SDCCAG8"]) },
-    { text: "Phylogenetic analysis of core Transition Zone proteins", handler: async () => getPhylogenyAnalysis(["NPHP1", "MKS1", "CEP290", "AHI1", "RPGRIP1L", "TMEM67", "CC2D2A", "B9D1", "B9D2"]) },
+ // ---- Working (few genes) -------------------------------------------------
+{ text: "Compare IFT88 and IFT140 phylogeny",
+  handler: async () => handlePhylogenyVisualizationQuery("", ["IFT88","IFT140"]) },
 
+{ text: "Phylogeny comparison of BBS1 and BBS4",
+  handler: async () => handlePhylogenyVisualizationQuery("", ["BBS1","BBS4"]) },
+
+{ text: "Show conservation of NPHP1 vs CEP290",
+  handler: async () => handlePhylogenyVisualizationQuery("", ["NPHP1","CEP290"]) },
+
+{ text: "Evolutionary comparison: IFT88, IFT140, IFT172",
+  handler: async () => handlePhylogenyVisualizationQuery("", ["IFT88","IFT140","IFT172"]) },
+
+{ text: "Side-by-side phylogeny: NPHP1 vs NPHP4",
+  handler: async () => handlePhylogenyVisualizationQuery("", ["NPHP1","NPHP4"]) },
+
+// ---- Large groups (still heat-maps, truncation applies) -----------------
+{ text: "Compare the evolutionary history of DYNC2H1 and KIF3A",
+  handler: async () => handlePhylogenyVisualizationQuery("", ["DYNC2H1","KIF3A"]) },
+
+{ text: "Multi-gene evolutionary analysis: IFT complex",
+  handler: async () => handlePhylogenyVisualizationQuery("", [
+      "WDR19","IFT140","TTC21B","IFT122","WDR35","IFT43","IFT172","IFT80",
+      "IFT57","TRAF3IP1","CLUAP1","IFT20","IFT88","IFT81","IFT74","IFT70A",
+      "IFT70B","IFT56","IFT52","IFT46","IFT27","IFT25","IFT22"
+  ]) },
+
+{ text: "Compare evolutionary history of IFT-A complex components",
+  handler: async () => handlePhylogenyVisualizationQuery("", ["WDR19","IFT140","TTC21B","IFT122","WDR35","IFT43"]) },
+
+{ text: "Phylogenetic analysis of the complete IFT-B complex",
+  handler: async () => handlePhylogenyVisualizationQuery("", [
+      "IFT172","IFT80","IFT57","TRAF3IP1","CLUAP1","IFT20","IFT88","IFT81",
+      "IFT74","IFT70A","IFT70B","IFT56","IFT52","IFT46","IFT27","IFT25","IFT22"
+  ]) },
+
+{ text: "Evolutionary profile for IFT complex B",
+  handler: async () => handlePhylogenyVisualizationQuery("", [
+      "IFT172","IFT80","IFT57","TRAF3IP1","CLUAP1","IFT20","IFT88","IFT81",
+      "IFT74","IFT70A","IFT70B","IFT56","IFT52","IFT46","IFT27","IFT25","IFT22"
+  ]) },
+
+{ text: "Evolutionary analysis of all BBSome components",
+  handler: async () => handlePhylogenyVisualizationQuery("", ["BBS1","BBS2","BBS4","BBS5","BBS7","TTC8","BBS9","BBS18"]) },
+
+{ text: "Phylogenetic analysis of core Transition Zone proteins",
+  handler: async () => handlePhylogenyVisualizationQuery("", [
+      "NPHP1","MKS1","CEP290","AHI1","RPGRIP1L","TMEM67","CC2D2A","B9D1","B9D2"
+  ]) },
+
+// ---- Previously broken (now show the *real* genes) -----------------------
+{ text: "Compare conservation patterns of BBS proteins",
+  handler: async () => handlePhylogenyVisualizationQuery("", ["BBS1","BBS2","BBS4","BBS5","BBS7","BBS9"]) },
+
+{ text: "Compare conservation of IFT-B1 core components",
+  handler: async () => handlePhylogenyVisualizationQuery("", ["IFT172","IFT80","IFT57","TRAF3IP1","CLUAP1","IFT20"]) },
+
+{ text: "Show conservation of IFT-B2 peripheral components",
+  handler: async () => handlePhylogenyVisualizationQuery("", [
+      "IFT88","IFT81","IFT74","IFT70A","IFT70B","IFT56","IFT52","IFT46",
+      "IFT27","IFT25","IFT22"
+  ]) },
+
+{ text: "Compare conservation of Meckel Syndrome (MKS) module components",
+  handler: async () => handlePhylogenyVisualizationQuery("", [
+      "MKS1","TMEM17","TMEM67","TMEM138","B9D2","B9D1","CC2D2A","TMEM107",
+      "TMEM237","TMEM231","TMEM216","TCTN1","TCTN2","TCTN3"
+  ]) },
+
+{ text: "Show evolutionary conservation of Nephronophthisis (NPHP) module genes",
+  handler: async () => handlePhylogenyVisualizationQuery("", [
+      "NPHP1","NPHP3","NPHP4","RPGRIP1L","IQCB1","CEP290","SDCCAG8"
+  ]) },
 
 // ==================== C. CLASSIFICATION & PATTERN QUESTIONS (List/Summary - Expanded) ====================
     { text: "List genes classified as Ciliary specific", handler: async () => getPhylogenyList('Ciliary_specific') },
@@ -5200,105 +5255,99 @@ function renderPhylogenyTable(genes) {
 }
 
 /**
- * Renders the phylogenetic visualization, acting as the main router for 
- * heatmap switching and table view presentation.
- * * @param {string} query - The raw user query (used for extracting genes).
- * @param {string} [source='li'] - The heatmap source to display ('li' or 'nevers').
- * @param {string} [view='heatmap'] - The output format requested ('heatmap' or 'table').
- * @returns {string} Empty string, as the function updates the DOM directly.
+ * Main entry point for all phylogeny visualisations.
+ * @param {string} query               – Original user text (only used for gene extraction when `genes` is empty).
+ * @param {string[]} [genes=[]]        – **Explicit** gene list supplied by the handler (takes priority).
+ * @param {string}   [source='li']     – 'li' | 'nevers'
+ * @param {string}   [view='heatmap']  – 'heatmap' | 'table'
  */
-async function handlePhylogenyVisualizationQuery(query, source = 'li', view = 'heatmap') {
+async function handlePhylogenyVisualizationQuery(query, genes = [], source = 'li', view = 'heatmap') {
     const resultArea = document.getElementById('ai-result-area');
-    
-    // Set the new increased plotting limit to 30
-    const MAX_PLOTTED_GENES = 30; 
-    
-    // 1. Gene Extraction and Data Loading 
-    const inputGenes = extractMultipleGenes(query);
-    
-    // Ensure all necessary phylogenetic data is loaded before proceeding
-    await Promise.all([fetchLiPhylogenyData(), fetchNeversPhylogenyData()]);
+    const MAX_PLOTTED_GENES = 30;
 
-    if (!liPhylogenyCache) {
-        return `<div class="result-card"><h3>Error</h3><p>Could not load phylogenetic data (Li et al. 2014) to run this analysis.</p></div>`;
+    // -------------------------------------------------
+    // 1. GENE RESOLUTION (explicit list wins)
+    // -------------------------------------------------
+    let inputGenes = [];
+
+    if (Array.isArray(genes) && genes.length) {
+        // Normalise to upper-case strings
+        inputGenes = genes.map(g => g.toUpperCase().trim()).filter(Boolean);
+    } else {
+        // Fallback to extraction from the raw query
+        inputGenes = extractMultipleGenes(query);
     }
 
-    // Get all HUGO gene symbols available in the Li database
-    const allLiGenes = Object.values(liPhylogenyCache.genes).map(g => g.g.toUpperCase()).filter(Boolean);
-    const liGenesSet = new Set(allLiGenes);
-    const validUserGenes = inputGenes.filter(g => liGenesSet.has(g));
+    // -------------------------------------------------
+    // 2. Load caches + validate against Li data
+    // -------------------------------------------------
+    await Promise.all([fetchLiPhylogenyData(), fetchNeversPhylogenyData()]);
+    if (!liPhylogenyCache) {
+        return `<div class="result-card"><h3>Error</h3><p>Could not load phylogenetic data (Li et al. 2014).</p></div>`;
+    }
 
-    let finalGenes;
+    const liGenesSet = new Set(
+        Object.values(liPhylogenyCache.genes)
+              .map(g => g.g.toUpperCase())
+              .filter(Boolean)
+    );
+
+    const validUserGenes = inputGenes.filter(g => liGenesSet.has(g));
+    let finalGenes = [];
     let truncationMessage = '';
-    
-    // --- Determine Genes to Plot (Prioritize user input, fill with defaults) ---
-    const definitiveDefaultGenes = ["ZC2HC1A", "CEP41", "BBS1", "BBS2", "BBS5", "ZNF474", "IFT81", "BBS7"];
-    
+
+    // -------------------------------------------------
+    // 3. Build final gene list (no defaults when user supplied genes)
+    // -------------------------------------------------
     if (validUserGenes.length === 0) {
-        // Case 1: No valid user genes found - use default list
+        // ONLY when **nothing** was supplied (neither explicit nor extracted)
+        const definitiveDefaultGenes = ["ZC2HC1A","CEP41","BBS1","BBS2","BBS5","ZNF474","IFT81","BBS7"];
         finalGenes = definitiveDefaultGenes.filter(g => liGenesSet.has(g)).slice(0, 5);
-        if (finalGenes.length === 0) {
-            return `<div class="result-card"><h3>Analysis Error</h3><p>The requested gene(s) were not found, and no default genes could be plotted.</p></div>`;
+        if (!finalGenes.length) {
+            return `<div class="result-card"><h3>Analysis Error</h3><p>No genes found and no defaults available.</p></div>`;
         }
     } else {
-        // Case 2: Use user's valid genes, applying the new limit
         finalGenes = [...new Set(validUserGenes)];
-        
+
+        // Truncate large explicit lists (heat-map stability)
         if (finalGenes.length > MAX_PLOTTED_GENES) {
-            // Apply truncation and set message
-            const originalLength = finalGenes.length;
+            const orig = finalGenes.length;
             finalGenes = finalGenes.slice(0, MAX_PLOTTED_GENES);
-            truncationMessage = `<p class="status-note">⚠️ **Warning:** Only the first ${MAX_PLOTTED_GENES} genes were visualized for stable rendering. Total genes found: ${originalLength}.</p>`;
-        }
-        
-        // Fill remaining slots with defaults if needed and under the limit
-        let genesAdded = finalGenes.length;
-        if (genesAdded < MAX_PLOTTED_GENES) {
-            for (const dGene of definitiveDefaultGenes) {
-                if (genesAdded >= MAX_PLOTTED_GENES) break;
-                if (liGenesSet.has(dGene) && !finalGenes.includes(dGene)) {
-                    finalGenes.push(dGene);
-                    genesAdded++;
-                }
-            }
+            truncationMessage = `<p class="status-note">Warning: Only the first ${MAX_PLOTTED_GENES} genes are shown (you asked for ${orig}).</p>`;
         }
     }
 
-    // --- 2. Select Renderer based on requested view ---
+    // -------------------------------------------------
+    // 4. Render according to requested view
+    // -------------------------------------------------
     let plotResult;
-    
     if (view === 'table') {
-        // Render the comparative table (HTML output only)
         plotResult = {
             html: renderPhylogenyTable(finalGenes) + truncationMessage,
             plotId: null, plotData: null, plotLayout: null
         };
     } else {
-        // Render the Heatmap (Default or Switch action)
         const renderer = (source === 'nevers') ? renderNeversPhylogenyHeatmap : renderLiPhylogenyHeatmap;
         plotResult = renderer(finalGenes);
-
-        // Append truncation message to heatmap HTML for large lists
-        // Note: The HTML output of renderLi/NeversHeatmap must have the ending HTML structure to allow for clean injection.
-        plotResult.html = plotResult.html.replace(/<\/div>\s*$/, `${truncationMessage}</div>`);
+        // Append truncation note inside the card
+        if (truncationMessage) {
+            plotResult.html = plotResult.html.replace(/<\/div>\s*$/, `${truncationMessage}</div>`);
+        }
     }
-    
-    // --- 3. Inject HTML and Execute Plotting Function ---
-    
-    // Set the HTML output.
+
+    // -------------------------------------------------
+    // 5. Inject into DOM
+    // -------------------------------------------------
     resultArea.innerHTML = plotResult.html;
 
-    // Only attempt to plot if the view is 'heatmap'
     if (view === 'heatmap' && plotResult.plotData) {
-        // Call the global execution utility for Plotly.
         window.initPhylogenyPlot(
-            plotResult.plotId, 
-            plotResult.plotData, 
+            plotResult.plotId,
+            plotResult.plotData,
             plotResult.plotLayout
         );
     }
-    
-    // Return an empty string as the function has already updated the DOM
+
     return "";
 }
 
