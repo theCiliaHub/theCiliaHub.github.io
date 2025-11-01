@@ -1241,13 +1241,17 @@ const questionRegistry = [
       "IFT88","IFT81","IFT74","IFT70A","IFT70B","IFT56","IFT52","IFT46",
       "IFT27","IFT25","IFT22"
   ]) },
-
+   
 { text: "Compare conservation of Meckel Syndrome (MKS) module components",
+
   handler: async () => handlePhylogenyVisualizationQuery("", [
-      "MKS1","TMEM17","TMEM67","TMEM138","B9D2","B9D1","CC2D2A","TMEM107",
+
+    "MKS1","TMEM17","TMEM67","TMEM138","B9D2","B9D1","CC2D2A","TMEM107",
       "TMEM237","TMEM231","TMEM216","TCTN1","TCTN2","TCTN3"
   ]) },
 
+
+    
 { 
   text: "Show evolutionary conservation of Nephronophthisis (NPHP) module genes",
   handler: async () => handlePhylogenyVisualizationQuery("", 
