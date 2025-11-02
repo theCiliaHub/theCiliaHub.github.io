@@ -1121,17 +1121,93 @@ async function getHubOrthologsForGene(gene) {
 
 
 // --- CRITICAL GENE ALIAS MAPPING for Search/Extraction ---
+// --- COMPREHENSIVE GENE ALIAS MAPPING for Search/Extraction ---
 // When user inputs IFT54, the code should search for TRAF3IP1, etc.
-// NOTE: These should be added to your global alias/extraction utility.
 const geneAliases = new Map([
+    // BBS genes
+    ["BBS18", "BBIP1"],
+    
+    // IFT genes
     ["IFT144", "WDR19"],
     ["IFT139", "TTC21B"],
     ["IFT121", "WDR35"],
-    ["IFT38", "CLUAP1"],       // NEW: CLUAP1 is IFT38
-    ["IFT54", "TRAF3IP1"],     // NEW: TRAF3IP1 is IFT54
-    // The previous last line was likely missing a comma:
-    ["BBS8", "TTC8"]           // NEW: TTC8 is BBS8
-]); // <-- The parser sees the closing bracket ')' and throws an error
+    ["IFT38", "CLUAP1"],
+    ["IFT54", "TRAF3IP1"],
+    ["BBS8", "TTC8"],
+    
+    // Additional common aliases for ciliary genes
+    ["NPHP8", "RPGRIP1L"],
+    ["MKS5", "RPGRIP1L"],
+    ["MKS6", "CC2D2A"],
+    ["MKS2", "TMEM216"],
+    ["MKS3", "TMEM67"],
+    ["MKS4", "CEP290"],
+    ["NPHP6", "CEP290"],
+    ["SLSN6", "CEP290"],
+    ["JBTS5", "CEP290"],
+    ["BBS14", "CEP290"],
+    
+    // IFT complex aliases
+    ["IFT57", "HIPPI"],
+    ["IFT80", "WDR56"],
+    ["IFT172", "WDTC2"],
+    
+    // Other common aliases
+    ["INVS", "INVERSIN"],
+    ["INV", "INVERSIN"]
+]);
+
+function normalizeGeneName(gene) {
+    // First check if it's a known alias
+    const upperGene = gene.toUpperCase();
+    if (geneAliases.has(upperGene)) {
+        return geneAliases.get(upperGene);
+    }
+    
+    // Comprehensive gene mapping
+    const geneMap = {
+        // BBS genes (including BBIP1/BBS18)
+        "BBS1": "BBS1", "BBS2": "BBS2", "BBS4": "BBS4", "BBS5": "BBS5", 
+        "BBS7": "BBS7", "BBS9": "BBS9", "BBS18": "BBIP1", "BBIP1": "BBIP1",
+        "TTC8": "TTC8",  // BBS8
+        
+        // IFT-B1 genes (including aliases)
+        "IFT172": "IFT172", "IFT80": "IFT80", "IFT57": "IFT57", 
+        "TRAF3IP1": "TRAF3IP1", "IFT54": "TRAF3IP1",
+        "CLUAP1": "CLUAP1", "IFT38": "CLUAP1",
+        "IFT20": "IFT20",
+        
+        // IFT-B2 genes  
+        "IFT88": "IFT88", "IFT81": "IFT81", "IFT74": "IFT74", 
+        "IFT70A": "IFT70A", "IFT70B": "IFT70B", "IFT56": "IFT56", 
+        "IFT52": "IFT52", "IFT46": "IFT46", "IFT27": "IFT27", 
+        "IFT25": "IFT25", "IFT22": "IFT22",
+        
+        // IFT-A genes
+        "WDR19": "WDR19", "IFT144": "WDR19",
+        "TTC21B": "TTC21B", "IFT139": "TTC21B",
+        "WDR35": "WDR35", "IFT121": "WDR35",
+        
+        // MKS genes
+        "MKS1": "MKS1", "TMEM17": "TMEM17", "TMEM67": "TMEM67", 
+        "TMEM138": "TMEM138", "B9D2": "B9D2", "B9D1": "B9D1", 
+        "CC2D2A": "CC2D2A", "TMEM107": "TMEM107", "TMEM237": "TMEM237", 
+        "TMEM231": "TMEM231", "TMEM216": "TMEM216", "TCTN1": "TCTN1", 
+        "TCTN2": "TCTN2", "TCTN3": "TCTN3",
+        
+        // NPHP genes
+        "NPHP1": "NPHP1", "NPHP3": "NPHP3", "NPHP4": "NPHP4", 
+        "RPGRIP1L": "RPGRIP1L", "IQCB1": "IQCB1", "CEP290": "CEP290", 
+        "SDCCAG8": "SDCCAG8",
+        
+        // Other ciliary genes
+        "INVS": "INVS", "INVERSIN": "INVS",
+        "KIF3A": "KIF3A", "KIF3B": "KIF3B", "KIF17": "KIF17",
+        "ARL13B": "ARL13B", "ARL3": "ARL3", "ARL6": "ARL6"
+    };
+    
+    return geneMap[upperGene] || upperGene;
+}
 
 const questionRegistry = [
     // ==================== META / GENERAL ====================
@@ -1230,35 +1306,13 @@ const questionRegistry = [
   ]) },
 
 // ---- Previously broken (now show the *real* genes) -----------------------
-{ text: "Compare conservation patterns of BBS proteins",
-  handler: async () => handlePhylogenyVisualizationQuery("", ["BBS1","BBS2","BBS4","BBS5","BBS7","BBS9"]) },
-
-{ text: "Compare conservation of IFT-B1 core components",
-  handler: async () => handlePhylogenyVisualizationQuery("", ["IFT172","IFT80","IFT57","TRAF3IP1","CLUAP1","IFT20"]) },
-
-{ text: "Show conservation of IFT-B2 peripheral components",
-  handler: async () => handlePhylogenyVisualizationQuery("", [
-      "IFT88","IFT81","IFT74","IFT70A","IFT70B","IFT56","IFT52","IFT46",
-      "IFT27","IFT25","IFT22"
-  ]) },
-   
-{ text: "Compare conservation of Meckel Syndrome (MKS) module components",
-
-  handler: async () => handlePhylogenyVisualizationQuery("", [
-
-    "MKS1","TMEM17","TMEM67","TMEM138","B9D2","B9D1","CC2D2A","TMEM107",
-      "TMEM237","TMEM231","TMEM216","TCTN1","TCTN2","TCTN3"
-  ]) },
-
-
-    
-{ 
-  text: "Show evolutionary conservation of Nephronophthisis (NPHP) module genes",
-  handler: async () => handlePhylogenyVisualizationQuery("", 
-    ["NPHP1","NPHP3","NPHP4","RPGRIP1L","IQCB1","CEP290","SDCCAG8"],
-    'nevers'  // <-- Critical: Use Nevers dataset
-  )
-},
+// Update your predefined queries to use canonical names
+{ text: "Compare conservation patterns of BBS proteins", handler: async () => getPhylogenyAnalysis(["BBS1", "BBS2", "BBS4", "BBS5", "BBS7", "BBS9", "BBIP1", "TTC8"]) },
+{ text: "Compare conservation of IFT-B1 core components", handler: async () => getPhylogenyAnalysis(["IFT172", "IFT80", "IFT57", "TRAF3IP1", "CLUAP1", "IFT20"]) },
+{ text: "Show conservation of IFT-B2 peripheral components", handler: async () => getPhylogenyAnalysis(["IFT88", "IFT81", "IFT74", "IFT70A", "IFT70B", "IFT56", "IFT52", "IFT46", "IFT27", "IFT25", "IFT22"]) },
+{ text: "Compare conservation of IFT-A complex components", handler: async () => getPhylogenyAnalysis(["WDR19", "TTC21B", "WDR35"]) },
+{ text: "Compare conservation of Meckel Syndrome (MKS) module components", handler: async () => getPhylogenyAnalysis(["MKS1", "TMEM17", "TMEM67", "TMEM138", "B9D2", "B9D1", "CC2D2A", "TMEM107", "TMEM237", "TMEM231", "TMEM216", "TCTN1", "TCTN2", "TCTN3"]) },
+{ text: "Show evolutionary conservation of Nephronophthisis (NPHP) module genes", handler: async () => getPhylogenyAnalysis(["NPHP1", "NPHP3", "NPHP4", "RPGRIP1L", "IQCB1", "CEP290", "SDCCAG8"]) },
 
 // ==================== C. CLASSIFICATION & PATTERN QUESTIONS (List/Summary - Expanded) ====================
     { text: "List genes classified as Ciliary specific", handler: async () => getPhylogenyList('Ciliary_specific') },
@@ -2942,11 +2996,36 @@ async function mergePhylogenyCaches() {
 // --- NEW HELPER: Extract Multiple Genes Dynamically ---
 // This remains the same as previously defined, crucial for extracting genes from query.
 function extractMultipleGenes(query) {
-    const genePattern = /\b([A-Z0-9]{3,}|ift\d+|bbs\d+|arl\d+b|nphp\d+)\b/gi;
-    const matches = query.match(genePattern);
-    return matches ? [...new Set(matches.map(g => g.toUpperCase()))] : [];
+    const genePattern = /\b[A-Z0-9]{2,}(?:[-_][A-Z0-9]+)*\b/gi;
+    const matches = query.match(genePattern) || [];
+    
+    return matches.map(gene => {
+        const upperGene = gene.toUpperCase();
+        // Check if it's a known alias first
+        if (geneAliases.has(upperGene)) {
+            return geneAliases.get(upperGene);
+        }
+        return upperGene;
+    }).filter(gene => gene && gene.length >= 2);
+}
+function debugGeneDatasetPresence() {
+    console.log('=== DATASET GENE PRESENCE DEBUG ===');
+    
+    if (liPhylogenyCache) {
+        const liGeneList = Object.values(liPhylogenyCache.genes).map(g => g.g).sort();
+        console.log('Li et al. 2014 genes (' + liGeneList.length + '):', liGeneList.slice(0, 50)); // First 50
+    }
+    
+    if (neversPhylogenyCache) {
+        const neversGeneList = Object.keys(neversPhylogenyCache.genes).sort();
+        console.log('Nevers et al. 2017 genes (' + neversGeneList.length + '):', neversGeneList.slice(0, 50)); // First 50
+    }
+    
+    console.log('=== END DATASET DEBUG ===');
 }
 
+// Call this once after loading data to see what's actually available
+// debugGeneDatasetPresence();
 
 // --- UPDATED CENTRALIZED PHYLOGENY AND ORTHOLOG HANDLER (The Router) ---
 async function handlePhylogenyAndOrthologQuery(query) {
