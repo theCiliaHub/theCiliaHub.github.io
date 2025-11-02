@@ -3027,6 +3027,64 @@ function debugGeneDatasetPresence() {
 // Call this once after loading data to see what's actually available
 // debugGeneDatasetPresence();
 
+// Add this comprehensive debug function to identify the issue
+function debugGenePresence(genes, source) {
+    console.log('=== GENE PRESENCE DEBUG ===');
+    console.log('Requested genes:', genes);
+    console.log('Source:', source);
+    
+    const missingGenes = [];
+    const foundGenes = [];
+    
+    if (source === 'nevers' && neversPhylogenyCache) {
+        const neversGeneSet = new Set(Object.keys(neversPhylogenyCache.genes || {}));
+        console.log('Nevers gene set size:', neversGeneSet.size);
+        
+        genes.forEach(gene => {
+            const upperGene = gene.toUpperCase();
+            if (neversGeneSet.has(upperGene)) {
+                foundGenes.push(gene);
+                console.log(`✅ Nevers FOUND: ${gene}`);
+            } else {
+                missingGenes.push(gene);
+                console.log(`❌ Nevers MISSING: ${gene}`);
+            }
+        });
+        
+        // Show sample of available genes for comparison
+        const sampleGenes = Array.from(neversGeneSet).slice(0, 20);
+        console.log('Sample of available Nevers genes:', sampleGenes);
+    }
+    
+    if (source === 'li' && liPhylogenyCache) {
+        const liGeneSet = new Set(
+            Object.values(liPhylogenyCache.genes || {}).map(g => g?.g?.toUpperCase()).filter(Boolean)
+        );
+        console.log('Li gene set size:', liGeneSet.size);
+        
+        genes.forEach(gene => {
+            const upperGene = gene.toUpperCase();
+            if (liGeneSet.has(upperGene)) {
+                foundGenes.push(gene);
+                console.log(`✅ Li FOUND: ${gene}`);
+            } else {
+                missingGenes.push(gene);
+                console.log(`❌ Li MISSING: ${gene}`);
+            }
+        });
+        
+        // Show sample of available genes for comparison
+        const sampleGenes = Array.from(liGeneSet).slice(0, 20);
+        console.log('Sample of available Li genes:', sampleGenes);
+    }
+    
+    console.log('Found genes:', foundGenes);
+    console.log('Missing genes:', missingGenes);
+    console.log('=== END DEBUG ===');
+    
+    return { foundGenes, missingGenes };
+}
+
 // --- UPDATED CENTRALIZED PHYLOGENY AND ORTHOLOG HANDLER (The Router) ---
 async function handlePhylogenyAndOrthologQuery(query) {
     const safeQuery = typeof query === 'string' ? query : ''; 
@@ -5350,116 +5408,155 @@ async function handlePhylogenyVisualizationQuery(query, genes = [], source = 'li
     const resultArea = document.getElementById('ai-result-area');
     const MAX_PLOTTED_GENES = 30;
 
-    // -------------------------------------------------
+    console.log(`🔍 Phylogeny Query Debug:`, { query, genes, source, view });
+
     // 1. GENE RESOLUTION
-    // -------------------------------------------------
     let inputGenes = [];
-
-    if (Array.isArray(genes) && genes.length) {
-    inputGenes = genes.map(g => g.toUpperCase().trim()).filter(Boolean);
+    
+    if (Array.isArray(genes) && genes.length > 0) {
+        inputGenes = genes.map(g => g.trim()).filter(Boolean);
     } else {
-    inputGenes = extractMultipleGenes(query);
+        inputGenes = extractMultipleGenes(query);
     }
+    
+    console.log(`🔍 Input genes resolved:`, inputGenes);
 
-    // -------------------------------------------------
     // 2. Load caches
-    // -------------------------------------------------
     await Promise.all([fetchLiPhylogenyData(), fetchNeversPhylogenyData()]);
-    if (!liPhylogenyCache && source === 'li') {
-        return `<div class="result-card"><h3>Error</h3><p>Could not load Li et al. 2014 data.</p></div>`;
+    
+    // Check if caches are properly loaded
+    if (source === 'li' && (!liPhylogenyCache || !liPhylogenyCache.genes)) {
+        const errorMsg = `<div class="result-card"><h3>Error</h3><p>Li et al. 2014 data not loaded properly.</p></div>`;
+        resultArea.innerHTML = errorMsg;
+        return errorMsg;
     }
-    if (!neversPhylogenyCache && source === 'nevers') {
-        return `<div class="result-card"><h3>Error</h3><p>Could not load Nevers et al. 2017 data.</p></div>`;
-    }
-
-    // -------------------------------------------------
-    // 3. VALIDATE GENES AGAINST THE *TARGET* SOURCE
-    // -------------------------------------------------
-    let validGenes = [];
-    let missingGenes = [];
-
-    if (source === 'nevers') {
-        const neversGeneSet = new Set(
-            Object.keys(neversPhylogenyCache.genes || {}).map(g => g.toUpperCase())
-        );
-        inputGenes.forEach(g => {
-            if (neversGeneSet.has(g)) {
-                validGenes.push(g);
-            } else {
-                missingGenes.push(g);
-            }
-        });
-    } else {
-        // Li source
-        const liGenesSet = new Set(
-            Object.values(liPhylogenyCache.genes)
-                  .map(g => g.g.toUpperCase())
-                  .filter(Boolean)
-        );
-        inputGenes.forEach(g => {
-            if (liGenesSet.has(g)) {
-                validGenes.push(g);
-            } else {
-                missingGenes.push(g);
-            }
-        });
+    
+    if (source === 'nevers' && (!neversPhylogenyCache || !neversPhylogenyCache.genes)) {
+        const errorMsg = `<div class="result-card"><h3>Error</h3><p>Nevers et al. 2017 data not loaded properly.</p></div>`;
+        resultArea.innerHTML = errorMsg;
+        return errorMsg;
     }
 
+    // 3. DEBUG GENE PRESENCE
+    const { foundGenes, missingGenes } = debugGenePresence(inputGenes, source);
+    
     let finalGenes = [];
-    let truncationMessage = '';
     let warningMessage = '';
 
-    if (validGenes.length === 0) {
-        if (missingGenes.length > 0) {
-            warningMessage = `<p class="status-note">Warning: The following genes were not found in the ${source === 'nevers' ? 'Nevers et al. 2017' : 'Li et al. 2014'} dataset: <strong>${missingGenes.join(', ')}</strong>. Showing defaults.</p>`;
-        }
-        const definitiveDefaultGenes = ["ZC2HC1A","CEP41","BBS1","BBS2","BBS5","ZNF474","IFT81","BBS7"];
-        const defaultSet = source === 'nevers'
-            ? new Set(Object.keys(neversPhylogenyCache.genes || {}).map(g => g.toUpperCase()))
-            : new Set(Object.values(liPhylogenyCache.genes).map(g => g.g.toUpperCase()));
-        finalGenes = definitiveDefaultGenes.filter(g => defaultSet.has(g)).slice(0, 5);
-        if (!finalGenes.length) {
-            return `<div class="result-card"><h3>Analysis Error</h3><p>No valid genes and no defaults available.</p></div>`;
-        }
+    if (foundGenes.length === 0) {
+        // Provide informative default genes that we KNOW exist
+        const defaultGenes = source === 'nevers' 
+            ? Array.from(Object.keys(neversPhylogenyCache.genes)).slice(0, 5)
+            : Object.values(liPhylogenyCache.genes).slice(0, 5).map(g => g.g);
+            
+        finalGenes = defaultGenes;
+        warningMessage = `
+            <div class="status-note error">
+                <h4>⚠️ No Valid Genes Found</h4>
+                <p>None of your requested genes were found in the ${source === 'nevers' ? 'Nevers et al. 2017' : 'Li et al. 2014'} dataset.</p>
+                <p><strong>Requested:</strong> ${inputGenes.join(', ')}</p>
+                <p><strong>Showing defaults:</strong> ${finalGenes.join(', ')}</p>
+            </div>
+        `;
     } else {
-        finalGenes = [...new Set(validGenes)];
+        finalGenes = [...new Set(foundGenes)].slice(0, MAX_PLOTTED_GENES);
+        
         if (missingGenes.length > 0) {
-            warningMessage = `<p class="status-note">Note: ${missingGenes.length} gene(s) not found in dataset: <em>${missingGenes.join(', ')}</em>. Showing ${finalGenes.length} valid gene(s).</p>`;
+            warningMessage = `
+                <div class="status-note warning">
+                    <p><strong>Note:</strong> The following genes were not found: <em>${missingGenes.join(', ')}</em></p>
+                    <p>Showing ${finalGenes.length} valid gene(s): ${finalGenes.join(', ')}</p>
+                </div>
+            `;
         }
-        if (finalGenes.length > MAX_PLOTTED_GENES) {
-            const orig = finalGenes.length;
-            finalGenes = finalGenes.slice(0, MAX_PLOTTED_GENES);
-            truncationMessage = `<p class="status-note">Warning: Only first ${MAX_PLOTTED_GENES} genes shown (you requested ${orig}).</p>`;
-        }
-    }
-
-    // -------------------------------------------------
-    // 4. RENDER
-    // -------------------------------------------------
-    let plotResult;
-    if (view === 'table') {
-        plotResult = {
-            html: renderPhylogenyTable(finalGenes) + warningMessage + truncationMessage,
-            plotId: null, plotData: null, plotLayout: null
-        };
-    } else {
-        const renderer = source === 'nevers' ? renderNeversPhylogenyHeatmap : renderLiPhylogenyHeatmap;
-        plotResult = renderer(finalGenes);
-        let extraHtml = warningMessage + truncationMessage;
-        if (extraHtml) {
-            plotResult.html = plotResult.html.replace(/<\/div>\s*$/, `${extraHtml}</div>`);
+        
+        if (foundGenes.length > MAX_PLOTTED_GENES) {
+            warningMessage += `<p class="status-note">Limited to first ${MAX_PLOTTED_GENES} genes.</p>`;
         }
     }
 
-    // -------------------------------------------------
-    // 5. INJECT
-    // -------------------------------------------------
-    resultArea.innerHTML = plotResult.html;
-    if (view === 'heatmap' && plotResult.plotData) {
-        window.initPhylogenyPlot(plotResult.plotId, plotResult.plotData, plotResult.plotLayout);
-    }
+    console.log(`🎯 Final genes to render:`, finalGenes);
 
-    return "";
+    // 4. RENDER with comprehensive error handling
+    try {
+        let plotResult;
+        if (view === 'table') {
+            plotResult = {
+                html: renderPhylogenyTable(finalGenes) + warningMessage,
+                plotId: null, plotData: null, plotLayout: null
+            };
+        } else {
+            const renderer = source === 'nevers' ? renderNeversPhylogenyHeatmap : renderLiPhylogenyHeatmap;
+            plotResult = renderer(finalGenes);
+            
+            // Check if renderer failed
+            if (!plotResult || plotResult.html.includes('Heatmap Error') || !plotResult.plotData) {
+                throw new Error('Heatmap renderer failed to generate valid output');
+            }
+            
+            if (warningMessage) {
+                plotResult.html = plotResult.html.replace(/<\/div>\s*$/, `${warningMessage}</div>`);
+            }
+        }
+
+        // 5. INJECT and initialize plot
+        resultArea.innerHTML = plotResult.html;
+        if (view === 'heatmap' && plotResult.plotData && plotResult.plotId) {
+            console.log(`📊 Initializing Plotly for:`, plotResult.plotId);
+            window.initPhylogenyPlot(plotResult.plotId, plotResult.plotData, plotResult.plotLayout);
+        } else {
+            console.log(`⚠️ No plot to initialize - view: ${view}, plotId: ${plotResult.plotId}`);
+        }
+        
+        return "";
+    } catch (error) {
+        console.error('❌ Rendering error:', error);
+        const errorHtml = `
+            <div class="result-card error">
+                <h3>Visualization Error</h3>
+                <p>Failed to generate ${view} for genes: ${finalGenes.join(', ')}</p>
+                <p><strong>Error:</strong> ${error.message}</p>
+                ${warningMessage}
+                <details>
+                    <summary>Technical Details</summary>
+                    <pre>${error.stack}</pre>
+                </details>
+            </div>
+        `;
+        resultArea.innerHTML = errorHtml;
+        return errorHtml;
+    }
+}
+
+
+// Run this after your page loads to see which genes are actually available
+// testPhylogenyGenes();
+
+// Add this function to get reliable default genes
+function getReliableDefaultGenes(source) {
+    // Genes that are almost certainly in both datasets
+    const reliableGenes = ['KIF3A', 'KIF3B', 'IFT88', 'IFT81', 'BBS1', 'BBS2', 'BBS4'];
+    
+    if (source === 'nevers' && neversPhylogenyCache) {
+        const availableGenes = reliableGenes.filter(gene => 
+            neversPhylogenyCache.genes[gene.toUpperCase()]
+        );
+        return availableGenes.length > 0 ? availableGenes.slice(0, 5) 
+               : Object.keys(neversPhylogenyCache.genes).slice(0, 5);
+    }
+    
+    if (source === 'li' && liPhylogenyCache) {
+        const liGeneSet = new Set(
+            Object.values(liPhylogenyCache.genes).map(g => g.g.toUpperCase())
+        );
+        const availableGenes = reliableGenes.filter(gene => 
+            liGeneSet.has(gene.toUpperCase())
+        );
+        return availableGenes.length > 0 ? availableGenes.slice(0, 5)
+               : Object.values(liPhylogenyCache.genes).slice(0, 5).map(g => g.g);
+    }
+    
+    return ['KIF3A', 'KIF3B', 'IFT88', 'IFT81', 'BBS1']; // Fallback
 }
 
 /**
