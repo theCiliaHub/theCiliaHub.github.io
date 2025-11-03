@@ -1181,9 +1181,6 @@ const questionRegistry = [
 { text: "Compare conservation of IFT-B1 core components table", handler: async () => getComplexPhylogenyTable("IFT-B1 COMPLEX") },
 { text: "Show conservation of IFT-B2 peripheral components table", handler: async () => getComplexPhylogenyTable("IFT-B2 COMPLEX") },
 { text: "Evolutionary analysis of all BBSome components table", handler: async () => getComplexPhylogenyTable("BBSOME") },
-{ text: "Compare conservation of Meckel Syndrome (MKS) module components table", handler: async () => getComplexPhylogenyTable("MKS MODULE") },
-{ text: "Show evolutionary conservation of Nephronophthisis (NPHP) module genes table", handler: async () => getComplexPhylogenyTable("NPHP MODULE") },
-{ text: "Phylogenetic analysis of core Transition Zone proteins table", handler: async () => getComplexPhylogenyTable("TRANSITION ZONE") },
 
 // ==================== C. CLASSIFICATION & PATTERN QUESTIONS (List/Summary - Expanded) ====================
     { text: "List genes classified as Ciliary specific", handler: async () => getPhylogenyList('Ciliary_specific') },
@@ -4756,22 +4753,44 @@ function renderNeversPhylogenyHeatmap(genes) {
     };
     
     // --- 4. HTML Output (Includes links) ---
+    // --- HTML Output with Add Gene Control ---
     const htmlOutput = `
         <div class="result-card">
             <h3>Phylogenetic Heatmap for ${geneLabels.join(', ')} 🌍</h3>
-            <p>Data from <strong>Nevers et al. (2017)</strong>, mapped to a fixed panel of <strong>${CIL_COUNT} Ciliated (Teal)</strong> and <strong>${NCIL_COUNT} Non-Ciliated (Pink)</strong> organisms.</p>
+            <p>Data from <strong>Nevers et al. (2017) Mol. Biol. Evol.</strong> Ciliated organisms are **Teal** and Non-Ciliated are **Pink**.</p>
+            
+            <div class="add-gene-tab" style="padding: 10px; background-color: #f0f0f0; border-radius: 6px; margin-bottom: 15px;">
+                <h4>Add Gene for Comparison:</h4>
+                <div style="display: flex; gap: 10px;">
+                    <input type="text" id="addGeneInput" placeholder="Enter HUGO gene symbol (e.g., KIF3A)" 
+                    style="flex-grow: 1; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
+                    
+                    <button class="add-gene-btn" 
+                        data-current-genes="${genes.join(',')}" 
+                        data-plot-source="nevers" 
+                        onclick="window.addGeneToHeatmap(this);"
+                        style="padding: 8px 15px; background-color: #2c5aa0; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                        + Add to Heatmap
+                    </button>
+                </div>
+            </div>
+            
             <div id="${plotContainer}" style="height: ${layout.height}px; width: 100%;"></div>
             <button class="download-button" onclick="downloadPlot('${plotContainer}', 'Phylogeny_Nevers2017')">Download Heatmap (PNG)</button>
             <p class="ai-suggestion" style="margin-top: 10px;">
                 <a href="#" class="ai-action" data-action="show-li-heatmap" data-genes="${genes.join(',')}">⬅️ Show Li et al. (2014) Comparison</a>
-                
-                // 💡 NEW: Table View Link
                 <span style="margin: 0 10px;">|</span>
                 <a href="#" class="ai-action" data-action="show-table-view" data-genes="${genes.join(',')}">📋 Show Data Table</a>
             </p>
         </div>
     `;
-    return { html: htmlOutput, plotData: [trace], plotLayout: layout, plotId: plotContainer };
+
+    return {
+        html: htmlOutput,
+        plotData: [trace],
+        plotLayout: layout,
+        plotId: plotContainer
+    };
 }
 
 /**
@@ -4936,34 +4955,45 @@ function renderLiPhylogenyHeatmap(genes) {
     };
     
     // --- 4. Return Structured Object for External Execution ---
+    // --- HTML Output with Add Gene Control ---
     const htmlOutput = `
         <div class="result-card">
             <h3>Phylogenetic Heatmap for ${geneLabels.join(', ')} 🌍</h3>
-            <p>Data from <strong>Li et al. (2014) Cell</strong>, mapped to a fixed panel of <strong>${CIL_COUNT} Ciliated (Blue)</strong> and <strong>${NCIL_COUNT} Non-Ciliated (Orange)</strong> organisms.</p>
+            <p>Data from <strong>Nevers et al. (2017) Mol. Biol. Evol.</strong> Ciliated organisms are **Teal** and Non-Ciliated are **Pink**.</p>
+            
+            <div class="add-gene-tab" style="padding: 10px; background-color: #f0f0f0; border-radius: 6px; margin-bottom: 15px;">
+                <h4>Add Gene for Comparison:</h4>
+                <div style="display: flex; gap: 10px;">
+                    <input type="text" id="addGeneInput" placeholder="Enter HUGO gene symbol (e.g., KIF3A)" 
+                    style="flex-grow: 1; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
+                    
+                    <button class="add-gene-btn" 
+                        data-current-genes="${genes.join(',')}" 
+                        data-plot-source="nevers" 
+                        onclick="window.addGeneToHeatmap(this);"
+                        style="padding: 8px 15px; background-color: #2c5aa0; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                        + Add to Heatmap
+                    </button>
+                </div>
+            </div>
+            
             <div id="${plotContainer}" style="height: ${layout.height}px; width: 100%;"></div>
-            <button class="download-button" onclick="downloadPlot('${plotContainer}', 'Phylogeny_Li2014')">Download Heatmap (PNG)</button>
-            <p style="font-size: 0.8em; color: #666; margin-top: 1rem; border-top: 1px solid #eee; padding-top: 0.5rem;">
-                <strong>Source:</strong> Li Y, Calvo SE, Gutman R, Liu JS, Mootha VK. Expansion of biological pathways based on evolutionary inference. (2014) <em>Cell</em>. 
-                <a href="https://pubmed.ncbi.nlm.nih.gov/24995987/" target="_blank">[PMID: 24995987]</a>
-            </p>
+            <button class="download-button" onclick="downloadPlot('${plotContainer}', 'Phylogeny_Nevers2017')">Download Heatmap (PNG)</button>
             <p class="ai-suggestion" style="margin-top: 10px;">
-                <a href="#" class="ai-action" data-action="show-nevers-heatmap" data-genes="${genes.join(',')}">➡️ Show Nevers et al. (2017) Comparison</a>
-                
-                // 💡 NEW: Table View Link
+                <a href="#" class="ai-action" data-action="show-li-heatmap" data-genes="${genes.join(',')}">⬅️ Show Li et al. (2014) Comparison</a>
                 <span style="margin: 0 10px;">|</span>
                 <a href="#" class="ai-action" data-action="show-table-view" data-genes="${genes.join(',')}">📋 Show Data Table</a>
             </p>
         </div>
     `;
 
-   return {
+    return {
         html: htmlOutput,
         plotData: [trace],
         plotLayout: layout,
         plotId: plotContainer
     };
 }
-
 /**
  * Renders raw phylogenetic data for a list of genes into a detailed table.
  * @param {string[]} genes - Array of genes requested.
@@ -5023,64 +5053,67 @@ function renderPhylogenyTable(genes) {
 }
 
 /**
- * Renders the phylogenetic visualization, acting as the main router for 
- * heatmap switching and table view presentation.
- * * @param {string} query - The raw user query (used for extracting genes).
+ * @name handlePhylogenyVisualizationQuery
+ * @description Renders the phylogenetic visualization, acting as the main router for 
+ * heatmap switching and table view presentation. It enforces mandatory gene inclusion.
+ * * NOTE: This function is also responsible for dynamically adding the 8 definitiveDefaultGenes
+ * to the gene list before plotting or tabling.
+ * * @param {string} query - The raw user query (used for contextual query title).
+ * @param {string[]} [genes=[]] - Explicit array of genes passed by a complex handler (takes priority over query extraction).
  * @param {string} [source='li'] - The heatmap source to display ('li' or 'nevers').
  * @param {string} [view='heatmap'] - The output format requested ('heatmap' or 'table').
  * @returns {string} Empty string, as the function updates the DOM directly.
  */
-async function handlePhylogenyVisualizationQuery(query, source = 'li', view = 'heatmap') {
+async function handlePhylogenyVisualizationQuery(query, genes = [], source = 'li', view = 'heatmap') {
     const resultArea = document.getElementById('ai-result-area');
     
-    // 1. Gene Extraction and Data Loading 
-    // NOTE: This assumes extractMultipleGenes() and the fetch functions are globally available.
-    const inputGenes = extractMultipleGenes(query);
+    // --- Global Constants (Assumed to be defined globally) ---
+    const MAX_HEATMAP_GENES = 50;
+    const definitiveDefaultGenes = ["ZC2HC1A", "CEP41", "BBS1", "BBS2", "BBS5", "ZNF474", "IFT81", "BBS7"];
+    // ---------------------------------------------------------
     
-    // Ensure all necessary phylogenetic data is loaded before proceeding
+    // 1. Gene Extraction and Data Loading
+    
+    // A. Determine the raw list of genes to analyze
+    let rawInputGenes;
+    if (Array.isArray(genes) && genes.length > 0) {
+        rawInputGenes = genes;
+    } else {
+        // Fallback to extraction from the query string
+        rawInputGenes = extractMultipleGenes(query);
+    }
+    
+    // Ensure all necessary phylogenetic data is loaded
     await Promise.all([fetchLiPhylogenyData(), fetchNeversPhylogenyData()]);
 
     if (!liPhylogenyCache) {
         return `<div class="result-card"><h3>Error</h3><p>Could not load phylogenetic data (Li et al. 2014) to run this analysis.</p></div>`;
     }
 
-    // Get all HUGO gene symbols available in the Li database
-    const allLiGenes = Object.values(liPhylogenyCache.genes).map(g => g.g.toUpperCase()).filter(Boolean);
-    const liGenesSet = new Set(allLiGenes);
-    const validUserGenes = inputGenes.filter(g => liGenesSet.has(g));
+    // B. Validate against the Li dataset
+    const liGenesSet = new Set(Object.values(liPhylogenyCache.genes).map(g => g.g.toUpperCase()).filter(Boolean));
+    const validUserGenes = rawInputGenes.map(g => g.toUpperCase()).filter(g => liGenesSet.has(g));
 
-    let finalGenes;
+    // C. Combine mandatory defaults (8 genes) and valid user genes (new logic)
+    const mandatoryGenes = definitiveDefaultGenes.filter(g => liGenesSet.has(g));
     
-    // --- Determine Genes to Plot (Prioritize user input, fill up to 20 with defaults) ---
-    // User-specified list used for context when input is lacking.
-    const definitiveDefaultGenes = ["ZC2HC1A", "CEP41", "BBS1", "BBS2", "BBS5", "ZNF474", "IFT81", "BBS7"];
+    // Union of mandatory genes and user-supplied genes
+    let uniqueGenes = [...new Set([...mandatoryGenes, ...validUserGenes])];
     
-    if (validUserGenes.length === 0) {
-        // Use default genes for initialization if none found
-        finalGenes = definitiveDefaultGenes.filter(g => liGenesSet.has(g)).slice(0, 5);
-        if (finalGenes.length === 0) {
-            return `<div class="result-card"><h3>Analysis Error</h3><p>The requested gene(s) were not found, and no default genes could be plotted.</p></div>`;
-        }
-    } else {
-        // Start with user's valid genes
-        finalGenes = [...new Set(validUserGenes)];
-        
-        // Fill up to 20 genes using the definitive defaults for context
-        if (finalGenes.length < 20) {
-            for (const dGene of definitiveDefaultGenes) {
-                if (finalGenes.length >= 20) break;
-                if (liGenesSet.has(dGene) && !finalGenes.includes(dGene)) {
-                    finalGenes.push(dGene);
-                }
-            }
-        }
+    // Apply the MAX_HEATMAP_GENES limit (50)
+    const finalGenes = uniqueGenes.slice(0, MAX_HEATMAP_GENES);
+
+    // --- 2. Error and Status Checks ---
+    if (finalGenes.length === 0) {
+        return `<div class="result-card"><h3>Analysis Error</h3><p>None of the requested genes or mandatory default genes were found in the phylogenetic dataset.</p></div>`;
     }
 
-    // --- 2. Select Renderer based on requested view ---
+    // --- 3. Select Renderer based on requested view ---
     let plotResult;
     
     if (view === 'table') {
-        // Render the comparative table (HTML output only)
+        // Render the comparative table 
+        // NOTE: This assumes renderPhylogenyTable is robust enough to handle the combined list
         plotResult = {
             html: renderPhylogenyTable(finalGenes),
             plotId: null, plotData: null, plotLayout: null
@@ -5091,7 +5124,7 @@ async function handlePhylogenyVisualizationQuery(query, source = 'li', view = 'h
         plotResult = renderer(finalGenes);
     }
     
-    // --- 3. Inject HTML and Execute Plotting Function ---
+    // --- 4. Inject HTML and Execute Plotting Function ---
     
     // Set the HTML output.
     resultArea.innerHTML = plotResult.html;
@@ -5109,6 +5142,8 @@ async function handlePhylogenyVisualizationQuery(query, source = 'li', view = 'h
     // Return an empty string as the function has already updated the DOM
     return "";
 }
+
+
 /**
  * Global wrapper to handle clicks on the Li/Nevers switch links.
  * This should be defined globally (e.g., window.switchPhylogenyView).
@@ -5382,6 +5417,7 @@ async function routeComplexPhylogenyAnalysis(query) {
 /**
  * @name getPhylogenyAnalysis
  * @description Renders the initial summary for phylogenetic queries (single or multi-gene).
+ * It ensures definitiveDefaultGenes are always included.
  * @param {string[]} genes - Array of genes requested by the user.
  * @param {string} [displayMode='heatmap'] - Controls output: 'heatmap' or 'table'.
  * @returns {Promise<string>} HTML output (Summary + Visualization/Table).
@@ -5396,61 +5432,35 @@ async function getPhylogenyAnalysis(genes, displayMode = 'heatmap') {
     
     // Get all HUGO gene symbols available in the Li database
     const liGenesSet = new Set(Object.values(liPhylogenyCache.genes).map(g => g.g.toUpperCase()).filter(Boolean));
-    const validGeneSymbols = genes.map(g => g.toUpperCase()).filter(g => liGenesSet.has(g));
+
+    // Filter user-supplied genes (if any)
+    const validUserGenes = genes.map(g => g.toUpperCase()).filter(g => liGenesSet.has(g));
+
+    // --- CRITICAL ENHANCEMENT: Prepend Mandatory Defaults ---
+    const mandatoryGenes = definitiveDefaultGenes.filter(g => liGenesSet.has(g));
     
-    if (validGeneSymbols.length === 0) {
-        return `<div class="result-card"><h3>Analysis Error</h3><p>None of the requested genes were found in the Li et al. 2014 phylogenetic dataset.</p></div>`;
+    // Combine defaults and user genes, ensuring defaults come first and maintaining uniqueness.
+    let uniqueGenes = [...new Set([...mandatoryGenes, ...validUserGenes])];
+    
+    // Apply the max limit
+    const finalGenes = uniqueGenes.slice(0, MAX_HEATMAP_GENES);
+    
+    // --- Error/Warning Handling ---
+    let warningMessage = '';
+    if (finalGenes.length === 0) {
+        return `<div class="result-card"><h3>Analysis Error</h3><p>None of the requested genes or mandatory default genes were found in the phylogenetic dataset.</p></div>`;
     }
 
-    const finalGenes = validGeneSymbols;
-
-    // --- NEW: ROUTE TO TABLE MODE ---
-    if (displayMode === 'table') {
-        // Direct call to the new table function
-        return getPhylogenyTableAnalysis(finalGenes);
+    if (uniqueGenes.length > finalGenes.length) {
+         warningMessage = `<p class="status-note warning">Note: The heatmap is limited to the first **${MAX_HEATMAP_GENES} genes** for display performance.</p>`;
     }
-    // --- END NEW ROUTING ---
-
-    // --- 2. EXECUTE COMPARISON / SINGLE-GENE MODE (Original Heatmap Logic) ---
+    
+    // --- 2. EXECUTE COMPARISON / SINGLE-GENE MODE (Heatmap is Default) ---
+    
     let summaryHtml = '';
-
-    if (finalGenes.length > 1) {
-        // --- MULTI-GENE SUMMARY ---
-        summaryHtml = `
-            <div class="result-card">
-                <h3>Phylogenetic Comparison Summary: ${finalGenes.join(' vs ')} 📊</h3>
-                <p>Summary extracted from Li et al. (2014) and Nevers et al. (2017) data sets.</p>
-                <table class="gene-detail-table">
-                    <thead>
-                        <tr>
-                            <th>Gene</th>
-                            <th>Li Class (2014)</th>
-                            <th>Nevers Species Count (99)</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-        `;
-        
-        finalGenes.forEach(gene => {
-            const liEntry = Object.values(liPhylogenyCache.genes).find(g => g.g && g.g.toUpperCase() === gene);
-            const neversEntry = neversPhylogenyCache.genes?.[gene];
-
-            const liClass = liEntry ? (liPhylogenyCache.summary.class_list[liEntry.c] || 'N/A').replace(/_/g, ' ') : 'N/A';
-            const neversCount = neversEntry?.s?.length || 0;
-            
-            summaryHtml += `<tr><td><strong>${gene}</strong></td><td>${liClass}</td><td>${neversCount}</td></tr>`;
-        });
-        
-        summaryHtml += `
-                    </tbody>
-                </table>
-                <p class="ai-suggestion">
-                    <a href="#" class="ai-action" data-action="show-table-view" data-genes="${finalGenes.join(',')}">📋 Show Full Data Table</a>
-                </p>
-            </div>
-        `;
-    } else {
-        // --- SINGLE-GENE SUMMARY ---
+    
+    if (finalGenes.length === 1) {
+        // Single gene summary logic...
         const geneSymbol = finalGenes[0];
         const liEntry = Object.values(liPhylogenyCache.genes).find(g => g.g && g.g.toUpperCase() === geneSymbol);
         const neversEntry = neversPhylogenyCache?.genes?.[geneSymbol];
@@ -5465,17 +5475,28 @@ async function getPhylogenyAnalysis(genes, displayMode = 'heatmap') {
                     <tr><th>Li et al. (2014) Classification</th><td><strong>${liSummary.replace(/_/g, ' ')}</strong></td></tr>
                     <tr><th>Nevers et al. (2017) Status</th><td>${neversStatus}</td></tr>
                 </table>
+            </div>
+        `;
+    } else {
+        // Multi-gene summary table generation logic (Simplified preview)
+        summaryHtml = `
+            <div class="result-card">
+                <h3>Phylogenetic Comparison: ${finalGenes.length} Genes 📊</h3>
+                ${warningMessage}
                 <p class="ai-suggestion">
-                    <a href="#" class="ai-action" data-action="show-table-view" data-genes="${geneSymbol}">📋 Show Full Data Table</a>
+                    The heatmap below compares the conservation patterns of the requested genes and the **${mandatoryGenes.length} essential default genes**.
+                    <a href="#" class="ai-action" data-action="show-table-view" data-genes="${finalGenes.join(',')}">📋 Show Full Data Table</a>
                 </p>
             </div>
         `;
     }
-    
-    // Route to heatmap visualization (default mode)
-    const visualizationHtml = await handlePhylogenyVisualizationQuery(`Show heatmap for ${finalGenes.join(',')}`, finalGenes, 'li', 'heatmap');
+
+    // Route to heatmap visualization
+    const visualizationHtml = await handlePhylogenyVisualizationQuery(`Heatmap for ${finalGenes.join(', ')}`, finalGenes, 'li', 'heatmap');
     return summaryHtml + visualizationHtml;
 }
+
+
 
 /**
  * [NEW HELPER] Formats the output for the Li et al. 2014 data
