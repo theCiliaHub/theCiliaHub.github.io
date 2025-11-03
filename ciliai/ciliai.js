@@ -1013,36 +1013,24 @@ function getAllPhylogenyGenes() {
     return Object.keys(phylogenyDataCache); 
 }
 
-
+// --- NEW HELPER: Extract Multiple Genes Dynamically ---
+/**
+ * Scans a query string to extract one or more gene symbols.
+ * @param {string} query - The user's input query.
+ * @returns {Array<string>} - A unique list of uppercase gene symbols found.
+ */
 function extractMultipleGenes(query) {
-    // This pattern matches uppercase names (3+ chars) OR common ciliary abbreviations (case-insensitive).
+    // Looks for capital letters/numbers (3+ characters) or common ciliary gene patterns.
+    // The 'g' flag ensures all matches are found.
     const genePattern = /\b([A-Z0-9]{3,}|ift\d+|bbs\d+|arl\d+b|nphp\d+)\b/gi;
     const matches = query.match(genePattern);
 
     if (!matches) {
-        return []; // CRITICAL: Must return an empty array, not null/undefined
+        return [];
     }
-    
-    // Words to exclude (preventing common English words like 'and', 'the', 'for' from being symbols)
-    const noiseWords = new Set(["THE", "AND", "FOR", "BUT", "SHOW", "LIST", "GENE", "WHAT", "WHICH", "FIT"]);
-    let finalGenes = [];
-    // Process matches, apply aliases, and filter noise
-    matches.forEach(m => {
-        let symbol = m.toUpperCase();
-        
-        // 1. Apply Alias Lookup (e.g., IFT144 -> WDR19)
-        const aliasedSymbol = geneAliases.get(symbol);
-        if (aliasedSymbol) {
-            symbol = aliasedSymbol;
-        }
 
-        // 2. Filter Noise and Single-Letter/Non-Standard Symbols
-        if (symbol.length >= 3 && !noiseWords.has(symbol)) {
-            finalGenes.push(symbol);
-        }
-    });
-    // Return only unique symbols
-    return [...new Set(finalGenes)];
+    // Return unique uppercase gene symbols
+    return [...new Set(matches.map(g => g.toUpperCase()))];
 }
 
 // --- UPDATED getPhylogenyGenesForOrganism (Enriches with ALL Orthologs) ---
@@ -1263,132 +1251,13 @@ const questionRegistry = [
     { text: "Show conservation profile for gene X", handler: async (q) => routePhylogenyAnalysis(q) },
     { text: "Phylogenetic analysis of gene X", handler: async (q) => routePhylogenyAnalysis(q) },
     { text: "Evolutionary profile for gene X", handler: async (q) => routePhylogenyAnalysis(q) },
-
- // --- A. Single-gene evolutionary queries ---
-  { text: "Show evolutionary conservation of GENE", handler: async (q) => routePhylogenyAnalysis(q), template: true },
-  { text: "Display evolutionary conservation for GENE", handler: async (q) => routePhylogenyAnalysis(q), template: true },
-  { text: "Visualize evolutionary pattern of GENE", handler: async (q) => routePhylogenyAnalysis(q), template: true },
-  { text: "Plot conservation heatmap for GENE", handler: async (q) => routePhylogenyAnalysis(q), template: true },
-  { text: "Create phylogenetic map of GENE", handler: async (q) => routePhylogenyAnalysis(q), template: true },
-  { text: "Generate conservation chart for GENE", handler: async (q) => routePhylogenyAnalysis(q), template: true },
-  { text: "What is the evolutionary profile of GENE?", handler: async (q) => routePhylogenyAnalysis(q), template: true },
-  { text: "Show conservation trend of GENE", handler: async (q) => routePhylogenyAnalysis(q), template: true },
-  { text: "Show phylogenetic distribution of GENE", handler: async (q) => routePhylogenyAnalysis(q), template: true },
-  { text: "View conservation footprint for GENE", handler: async (q) => routePhylogenyAnalysis(q), template: true },
-  { text: "Visualize GENE evolutionary history", handler: async (q) => routePhylogenyAnalysis(q), template: true },
-  { text: "Display evolutionary trace of GENE", handler: async (q) => routePhylogenyAnalysis(q), template: true },
-  { text: "Show ortholog distribution for GENE", handler: async (q) => routePhylogenyAnalysis(q), template: true },
-  { text: "Show interspecies conservation of GENE", handler: async (q) => routePhylogenyAnalysis(q), template: true },
-  { text: "Show comparative evolution of GENE", handler: async (q) => routePhylogenyAnalysis(q), template: true },
-  { text: "Show taxonomic spread of GENE", handler: async (q) => routePhylogenyAnalysis(q), template: true },
-  { text: "Show evolutionary lineage of GENE", handler: async (q) => routePhylogenyAnalysis(q), template: true },
-  { text: "Show how conserved GENE is across species", handler: async (q) => routePhylogenyAnalysis(q), template: true },
-  { text: "Which species have GENE?", handler: async (q) => routePhylogenyAnalysis(q), template: true },
-  { text: "Show species that contain GENE homologs", handler: async (q) => routePhylogenyAnalysis(q), template: true },
-  { text: "Where is GENE conserved?", handler: async (q) => routePhylogenyAnalysis(q), template: true },
-  { text: "Show GENE ortholog conservation", handler: async (q) => routePhylogenyAnalysis(q), template: true },
-  { text: "Display evolutionary depth of GENE", handler: async (q) => routePhylogenyAnalysis(q), template: true },
-  { text: "Show GENE cross-species presence", handler: async (q) => routePhylogenyAnalysis(q), template: true },
-
-  // --- B. Comparison queries ---
-  { text: "Compare GENE1 and GENE2 conservation", handler: async (q) => routePhylogenyAnalysis(q), template: true },
-  { text: "Compare evolutionary conservation of GENE1 and GENE2", handler: async (q) => routePhylogenyAnalysis(q), template: true },
-  { text: "Compare evolutionary patterns between GENE1 and GENE2", handler: async (q) => routePhylogenyAnalysis(q), template: true },
-  { text: "Show phylogenetic comparison of GENE1 vs GENE2", handler: async (q) => routePhylogenyAnalysis(q), template: true },
-  { text: "Display comparative phylogeny for GENE1 and GENE2", handler: async (q) => routePhylogenyAnalysis(q), template: true },
-  { text: "Visualize evolutionary similarity between GENE1 and GENE2", handler: async (q) => routePhylogenyAnalysis(q), template: true },
-  { text: "Show how GENE1 and GENE2 are conserved across species", handler: async (q) => routePhylogenyAnalysis(q), template: true },
-  { text: "Generate conservation heatmap comparing GENE1 and GENE2", handler: async (q) => routePhylogenyAnalysis(q), template: true },
-  { text: "Show ortholog comparison for GENE1 and GENE2", handler: async (q) => routePhylogenyAnalysis(q), template: true },
-  { text: "Compare lineage conservation: GENE1 vs GENE2", handler: async (q) => routePhylogenyAnalysis(q), template: true },
-  { text: "Compare evolutionary trajectories of GENE1 and GENE2", handler: async (q) => routePhylogenyAnalysis(q), template: true },
-  { text: "Compare phylogenetic footprints for GENE1 and GENE2", handler: async (q) => routePhylogenyAnalysis(q), template: true },
-  { text: "Cross-species comparison of GENE1 and GENE2 conservation", handler: async (q) => routePhylogenyAnalysis(q), template: true },
-  { text: "Compare conservation trends between GENE1 and GENE2", handler: async (q) => routePhylogenyAnalysis(q), template: true },
-  { text: "Evolutionary comparison for GENE1 and GENE2", handler: async (q) => routePhylogenyAnalysis(q), template: true },
- 
-
-  // --- D. Data table & structured outputs ---
-  { text: "Show raw conservation data for GENE", handler: async (q) => handlePhylogenyVisualizationQuery(q, 'li', 'table'), template: true },
-  { text: "Display detailed species data for GENE", handler: async (q) => handlePhylogenyVisualizationQuery(q, 'li', 'table'), template: true },
-  { text: "Show conservation table for GENE", handler: async (q) => handlePhylogenyVisualizationQuery(q, 'li', 'table'), template: true },
-  { text: "List all species containing GENE", handler: async (q) => handlePhylogenyVisualizationQuery(q, 'li', 'table'), template: true },
-  { text: "Show ortholog table for GENE", handler: async (q) => handlePhylogenyVisualizationQuery(q, 'li', 'table'), template: true },
-  { text: "Display presence/absence data for GENE", handler: async (q) => handlePhylogenyVisualizationQuery(q, 'li', 'table'), template: true },
-  { text: "Generate species conservation matrix for GENE", handler: async (q) => handlePhylogenyVisualizationQuery(q, 'li', 'table'), template: true },
-  { text: "Show data matrix of GENE conservation", handler: async (q) => handlePhylogenyVisualizationQuery(q, 'li', 'table'), template: true },
-  { text: "View species-level conservation report for GENE", handler: async (q) => handlePhylogenyVisualizationQuery(q, 'li', 'table'), template: true },
-
-// --- Flexible Single-Gene Catch-Alls (CRITICAL FOR FAILURE FIXES) ---
-    { text: "Phylogenetic analysis of X", handler: async (q) => routePhylogenyAnalysis(q), template: true }, // Catches "Phylogenetic analysis of WDR27"
-    { text: "Evolutionary profile for X", handler: async (q) => routePhylogenyAnalysis(q), template: true }, // Catches "Evolutionary profile for WDR27"
-    { text: "Show evolutionary conservation of GENE", handler: async (q) => routePhylogenyAnalysis(q), template: true },
-    { text: "How conserved is GENE?", handler: async (q) => routePhylogenyAnalysis(q), template: true },
-    { text: "Evolution of GENE across taxa", handler: async (q) => routePhylogenyAnalysis(q), template: true },
-    { text: "Taxonomic distribution of GENE", handler: async (q) => routePhylogenyAnalysis(q), template: true },
-    { text: "Phylogenetic map for GENE", handler: async (q) => routePhylogenyAnalysis(q), template: true },
-    
-// ==================== 3. DATA OVERLAP & TABLE QUERIES ====================
-
-    // Species Overlap Queries (Triggers compareGeneSpeciesOverlap inside router)
-    { text: "Which species share both GENE1 and GENE2?", handler: async (q) => routePhylogenyAnalysis(q), template: true },
-    { text: "Which species share both gene GENE1 and gene GENE2?", handler: async (q) => routePhylogenyAnalysis(q), template: true },
-    { text: "Do GENE1 and GENE2 share any conserved species?", handler: async (q) => routePhylogenyAnalysis(q), template: true },
-
-    // Table View Queries (Reroutes to table view of the currently displayed genes)
-    { text: "Show conservation table for GENE", handler: async (q) => routePhylogenyAnalysis(q, 'table'), template: true },
-    { text: "Display detailed species data for GENE", handler: async (q) => routePhylogenyAnalysis(q, 'table'), template: true },
-
-  // --- E. Classification & summary patterns ---
-  { text: "List universally conserved ciliary genes", handler: async () => getPhylogenyList('in_all_organisms') },
-  { text: "Which genes are conserved in all species?", handler: async () => getPhylogenyList('in_all_organisms') },
-  { text: "Show ancient conserved ciliary genes", handler: async () => getPhylogenyList('in_all_organisms') },
-  { text: "Find genes lost in fungi", handler: async () => getPhylogenyList('absent_in_fungi') },
-  { text: "Show ciliary genes present only in vertebrates", handler: async () => getPhylogenyList('Vertebrate_specific') },
-  { text: "Which ciliary genes are mammal-specific?", handler: async () => getPhylogenyList('Mammalian_specific') },
-  { text: "List recently evolved ciliary genes", handler: async () => getPhylogenyList('Mammalian_specific') },
-  { text: "Show lineage-restricted ciliary components", handler: async () => getPhylogenyList('Mammalian_specific') },
-  { text: "Identify genes with narrow phylogenetic distribution", handler: async () => getPhylogenyList('Mammalian_specific') },
-  { text: "Find ciliary genes conserved across metazoans", handler: async () => getPhylogenyList('Vertebrate_specific') },
-  { text: "Show deeply conserved ciliary genes", handler: async () => getPhylogenyList('in_all_organisms') },
-  { text: "Which ciliary genes are missing in non-ciliated organisms?", handler: async () => getPhylogenyList('absent_in_fungi') },
-    
-    // Comprehensive visualization synonyms:
-    { text: "Show evolutionary conservation of GENE", handler: async (q) => routePhylogenyAnalysis(q), template: true },
-    { text: "How conserved is GENE?", handler: async (q) => routePhylogenyAnalysis(q), template: true },
-    { text: "What’s the cross-species conservation pattern for GENE?", handler: async (q) => routePhylogenyAnalysis(q), template: true },
-    { text: "Show me the phylogenetic tree of GENE", handler: async (q) => routePhylogenyAnalysis(q), template: true },
-    { text: "Show where GENE appears in evolution", handler: async (q) => routePhylogenyAnalysis(q), template: true },
-    { text: "Which species contain GENE?", handler: async (q) => routePhylogenyAnalysis(q), template: true },
-    { text: "Show GENE cross-species presence", handler: async (q) => routePhylogenyAnalysis(q), template: true },
-    { text: "Display evolutionary depth of GENE", handler: async (q) => routePhylogenyAnalysis(q), template: true },
-
-    // Comparison Queries (Visualization)
-    { text: "Compare GENE1 and GENE2 conservation", handler: async (q) => routePhylogenyAnalysis(q), template: true },
-    { text: "Compare evolutionary patterns between GENE1 and GENE2", handler: async (q) => routePhylogenyAnalysis(q), template: true },
-    { text: "Show phylogenetic comparison of GENE1 vs GENE2", handler: async (q) => routePhylogenyAnalysis(q), template: true },
-    { text: "Compare conservation depth of GENE1 and GENE2", handler: async (q) => routePhylogenyAnalysis(q), template: true },
-    { text: "Compare X and Y phylogeny", handler: async (q) => routePhylogenyAnalysis(q), template: true },
-
-    // Overlap Queries (Data Intersection) - 
-    { text: "Which species share both GENE1 and GENE2?", handler: async (q) => routePhylogenyAnalysis(q), template: true },
-    { text: "Which species share both gene GENE1 and gene GENE2?", handler: async (q) => routePhylogenyAnalysis(q), template: true },
-    { text: "Which species share both gene X and gene Y?", handler: async (q) => routePhylogenyAnalysis(q), template: true },
-    { text: "Do GENE1 and GENE2 share any conserved species?", handler: async (q) => routePhylogenyAnalysis(q), template: true },
-   
-    // --- G. General-purpose discovery queries ---
-  { text: "Show evolution of any given gene", handler: async (q) => routePhylogenyAnalysis(q), template: true },
-  { text: "Compare conservation between any two genes", handler: async (q) => routePhylogenyAnalysis(q), template: true },
-  { text: "Generate conservation overview for multiple genes", handler: async (q) => routePhylogenyAnalysis(q), template: true },
-  { text: "Identify genes with unique evolutionary traits", handler: async () => getPhylogenyList('unique_patterns') },
-  { text: "Find genes with the broadest conservation spectrum", handler: async () => getPhylogenyList('in_all_organisms') },
-
     
     // ==================== SOURCE QUERIES ====================
     { text: "What is the source for Ciliary genes in C. elegans?", handler: async () => tellAboutOrganismSources("C. elegans") },
     { text: "What is the source for Ciliary genes in mouse?", handler: async () => tellAboutOrganismSources("mouse") },
     { text: "What is the source for Ciliary genes in zebrafish?", handler: async () => tellAboutOrganismSources("zebrafish") },
     { text: "What is the source for Ciliary genes in drosophila?", handler: async () => tellAboutOrganismSources("drosophila") },
+
 
 // --------------------------------------------------------------------------------------
 // --- List Queries (CILIARY/NON-CILIARY LISTS) ---
@@ -4896,15 +4765,6 @@ function renderNeversPhylogenyHeatmap(genes) {
             <h3>Phylogenetic Heatmap for ${geneLabels.join(', ')} 🌍</h3>
             <p>Data from <strong>Nevers et al. (2017)</strong>, mapped to a fixed panel of <strong>${CIL_COUNT} Ciliated (Teal)</strong> and <strong>${NCIL_COUNT} Non-Ciliated (Pink)</strong> organisms.</p>
             <div id="${plotContainer}" style="height: ${layout.height}px; width: 100%;"></div>
-             <div class="add-gene-input" style="margin-top: 15px; display: flex; gap: 10px;">
-            <input type="text" id="addGeneInput" placeholder="Add gene for comparison (e.g., KIF3A)" 
-            style="flex-grow: 1; padding: 5px; border: 1px solid #ccc; border-radius: 4px;">
-            <button class="add-gene-btn" data-plot-id="${plotContainer}" data-genes="${genes.join(',')}"
-            onclick="addGeneToHeatmap(this);"
-            style="padding: 5px 10px; background-color: #f3f3f3; border: 1px solid #ccc; border-radius: 4px; cursor: pointer;">
-            + Add
-            </button>
-            </div>
             <button class="download-button" onclick="downloadPlot('${plotContainer}', 'Phylogeny_Nevers2017')">Download Heatmap (PNG)</button>
             <p class="ai-suggestion" style="margin-top: 10px;">
                 <a href="#" class="ai-action" data-action="show-li-heatmap" data-genes="${genes.join(',')}">⬅️ Show Li et al. (2014) Comparison</a>
@@ -5084,15 +4944,6 @@ function renderLiPhylogenyHeatmap(genes) {
         <div class="result-card">
             <h3>Phylogenetic Heatmap for ${geneLabels.join(', ')} 🌍</h3>
             <p>Data from <strong>Li et al. (2014) Cell</strong>, mapped to a fixed panel of <strong>${CIL_COUNT} Ciliated (Blue)</strong> and <strong>${NCIL_COUNT} Non-Ciliated (Orange)</strong> organisms.</p>
-            <div class="add-gene-input" style="margin-top: 15px; display: flex; gap: 10px;">
-            <input type="text" id="addGeneInput" placeholder="Add gene for comparison (e.g., KIF3A)" 
-            style="flex-grow: 1; padding: 5px; border: 1px solid #ccc; border-radius: 4px;">
-            <button class="add-gene-btn" data-plot-id="${plotContainer}" data-genes="${genes.join(',')}"
-            onclick="addGeneToHeatmap(this);"
-            style="padding: 5px 10px; background-color: #f3f3f3; border: 1px solid #ccc; border-radius: 4px; cursor: pointer;">
-            + Add
-            </button>
-            </div>
             <div id="${plotContainer}" style="height: ${layout.height}px; width: 100%;"></div>
             <button class="download-button" onclick="downloadPlot('${plotContainer}', 'Phylogeny_Li2014')">Download Heatmap (PNG)</button>
             <p style="font-size: 0.8em; color: #666; margin-top: 1rem; border-top: 1px solid #eee; padding-top: 0.5rem;">
@@ -5116,39 +4967,6 @@ function renderLiPhylogenyHeatmap(genes) {
         plotId: plotContainer
     };
 }
-
-/**
- * Handles adding a gene from the text field to the existing heatmap view.
- * @param {HTMLButtonElement} buttonElement - The 'Add' button element clicked.
- */
-window.addGeneToHeatmap = function(buttonElement) {
-    const inputElement = document.getElementById('addGeneInput');
-    const newGene = inputElement.value.trim().toUpperCase();
-    
-    if (!newGene) {
-        alert("Please enter a gene symbol.");
-        return;
-    }
-    
-    // Get the current list of genes from the button's data attribute
-    const currentGenesString = buttonElement.dataset.genes;
-    
-    // Combine current genes with the new gene, ensuring uniqueness
-    let currentGenes = currentGenesString.split(',').map(g => g.trim()).filter(Boolean);
-    if (!currentGenes.includes(newGene)) {
-        currentGenes.push(newGene);
-    }
-
-    // Determine the current view source (Li or Nevers)
-    const currentSource = buttonElement.dataset.plotId.includes('nevers') ? 'nevers' : 'li';
-    
-    // Clear the input field
-    inputElement.value = '';
-
-    // Route the combined list back to the visualization router to generate the new heatmap
-    // Note: This relies on handlePhylogenyVisualizationQuery correctly handling the array input.
-    handlePhylogenyVisualizationQuery(`Compare ${currentGenes.join(', ')} phylogeny`, currentSource, 'heatmap');
-};
 
 /**
  * Renders raw phylogenetic data for a list of genes into a detailed table.
@@ -5439,25 +5257,24 @@ async function getPhylogenyList(classification) {
     return resultHtml;
 }
 
+
 /**
  * AI-like function to parse complex/synonym queries and route them to the correct handler.
- * This is the central function for all phylogenetic visualization and list requests.
- * * @param {string} query - The raw user query.
- * @returns {Promise<string>} HTML output.
+ * Used for all "gene X" questions and all list-based classification queries.
+ * @param {string} query - The raw user query.
+ * @returns {Promise<string>} HTML output (either a list, table, or calls the heatmap).
  */
 async function routePhylogenyAnalysis(query) {
-    // NOTE: This assumes extractMultipleGenes(query) and comparison utilities are robust global utilities.
     const genes = extractMultipleGenes(query);
     const qLower = query.toLowerCase();
 
-    // 1. COMPLEX LIST INTENT (Vertebrate, Mammalian, Ciliary, Fungi-absent, All)
-    if (qLower.includes('list') || qLower.includes('show ciliary genes') || qLower.includes('which genes are') || qLower.includes('find genes with')) {
+    // 1. Check for LIST INTENT (Prioritized execution for all classification questions)
+    if (qLower.includes('list') || qLower.includes('show ciliary genes') || qLower.includes('which genes are')) {
         
-        // This relies on the comprehensive getPhylogenyList logic defined previously.
         if (qLower.includes('vertebrate')) {
             return getPhylogenyList('Vertebrate_specific');
         }
-        if (qLower.includes('mammalian') || qLower.includes('recently evolved')) {
+        if (qLower.includes('mammalian')) {
             return getPhylogenyList('Mammalian_specific');
         }
         if (qLower.includes('ciliary specific') || qLower.includes('ciliary genes')) {
@@ -5466,73 +5283,27 @@ async function routePhylogenyAnalysis(query) {
         if (qLower.includes('absent in fungi') || qLower.includes('not in fungi')) {
             return getPhylogenyList('absent_in_fungi');
         }
-        if (qLower.includes('all organisms') || qLower.includes('universally conserved') || qLower.includes('broadest conservation spectrum')) {
+        if (qLower.includes('all organisms') || qLower.includes('universally conserved')) {
             return getPhylogenyList('in_all_organisms');
         }
     }
     
-    // 2. SPECIES OVERLAP QUERY
-    if (genes.length === 2 && (qLower.includes('share') || qLower.includes('both') || qLower.includes('overlap'))) {
-        return compareGeneSpeciesOverlap(genes[0], genes[1]);
-    }
-
-    // 3. TABLE VIEW INTENT
+    // 2. Check for TABLE INTENT 
     if (qLower.includes('table') || qLower.includes('view data') || qLower.includes('species count')) {
-        if (genes.length >= 1) {
-            return handlePhylogenyVisualizationQuery(query, 'li', 'table');
-        }
+         if (genes.length >= 1) {
+             return handlePhylogenyVisualizationQuery(query, 'li', 'table');
+         }
     }
 
-    // 4. VISUALIZATION INTENT (CRITICAL FIX: Prioritizes Phylogeny/Taxa over general 'Plot' actions)
-    
-    // Check for strong phylogenetic keywords
-    const isPhylogenyMandate = qLower.includes('evolution') || qLower.includes('taxa') || qLower.includes('phylogenetic');
-    
-    if (genes.length >= 1 || isPhylogenyMandate) {
-        // ... (This block correctly forces the phylogenetic heatmap) ...
-        const geneForQuery = (genes.length >= 1) ? genes.join(',') : "IFT88"; 
-        
-        // This is the correct destination for phylogeny plots
-        return handlePhylogenyVisualizationQuery(geneForQuery, 'li', 'heatmap');
+    // 3. Default to VISUALIZATION INTENT (Heatmap)
+    if (genes.length >= 1) {
+        return handlePhylogenyVisualizationQuery(query, 'li', 'heatmap');
     }
 
-    // 5. Final Error (Fallback)
-    return `<div class="result-card"><h3>Analysis Failed</h3><p>Could not identify a gene or complex for visualization. Please try a specific gene symbol or a suggested question.</p></div>`;
+    // 4. Fallback Error 
+    return `<div class="result-card"><h3>Analysis Failed</h3><p>Could not identify a specific gene or a classification pattern in your request. Please try one of the suggested questions or a known keyword.</p></div>`;
 }
 
-/**
- * Finds the intersection of species lists between two genes.
- * @param {string} geneA - First gene symbol.
- * @param {string} geneB - Second gene symbol.
- * @returns {Promise<string>} HTML result showing overlapping species.
- */
-async function compareGeneSpeciesOverlap(geneA, geneB) {
-    await Promise.all([fetchLiPhylogenyData(), fetchNeversPhylogenyData()]);
-    
-    const dataA = liPhylogenyCache.genes[Object.keys(liPhylogenyCache.genes).find(k => liPhylogenyCache.genes[k].g.toUpperCase() === geneA.toUpperCase())];
-    const dataB = liPhylogenyCache.genes[Object.keys(liPhylogenyCache.genes).find(k => liPhylogenyCache.genes[k].g.toUpperCase() === geneB.toUpperCase())];
-    
-    if (!dataA || !dataB) {
-        return `<div class="result-card"><h3>Comparison Failed</h3><p class="status-not-found">One or both genes (${geneA}, ${geneB}) were not found in the Li et al. 2014 dataset.</p></div>`;
-    }
-
-    const speciesList = liPhylogenyCache.summary.organisms_list;
-    const speciesAIndices = new Set(dataA.s || []);
-    const speciesBIndices = new Set(dataB.s || []);
-    
-    // Find the intersection of indices
-    const overlapIndices = [...speciesAIndices].filter(index => speciesBIndices.has(index));
-    
-    const overlappingSpecies = overlapIndices.map(index => speciesList[index]).join(', ');
-
-    return `
-        <div class="result-card">
-            <h3>Shared Conservation: ${geneA} and ${geneB}</h3>
-            <p><strong>Total Shared Species:</strong> ${overlapIndices.length}</p>
-            <p><strong>Overlapping Species List:</strong> ${overlappingSpecies || 'None found.'}</p>
-        </div>
-    `;
-}
 
 /**
  * Renders the initial summary for phylogenetic queries. Handles both single-gene (Q1-Q7)
