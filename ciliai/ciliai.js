@@ -1183,7 +1183,7 @@ const questionRegistry = [
     { text: "Phylogenetic analysis of core Transition Zone proteins", handler: async () => getComplexPhylogenyAnalysis("TRANSITION ZONE") },
     { text: "Show evolutionary conservation of Nephronophthisis (NPHP) module genes", handler: async () => getComplexPhylogenyAnalysis("NPHP MODULE") },
     { text: "Show detailed phylogenetic data table for BBSome components",handler: async () => getComplexPhylogenyTable("BBSOME")},
-    { text: "Show Meckel Syndrome (MKS) phylogenetic table", handler: async () => getComplexPhylogenyTable("MKS MODULE") }
+    { text: "Show Meckel Syndrome (MKS) phylogenetic table", handler: async () => getComplexPhylogenyTable("MKS MODULE") },
 // ==================== C. CLASSIFICATION & PATTERN QUESTIONS (List/Summary - Expanded) ====================
     { text: "List genes classified as Ciliary specific", handler: async () => getPhylogenyList('Ciliary_specific') },
     { text: "Show Mammalian specific ciliary genes", handler: async () => getPhylogenyList('Mammalian_specific') },
