@@ -4216,92 +4216,93 @@ async function getCiliaryGenesForOrganism(organismName) {
     };
 }
 
-// --- Main AI Query Handler ---
+// --- Main AI Query Handler (Corrected Integration) ---
 window.handleAIQuery = async function() {
-    const aiQueryInput = document.getElementById('aiQueryInput');
-    const resultArea = document.getElementById('ai-result-area');
-    const query = aiQueryInput.value.trim();
-    if (!query) return;
+    const aiQueryInput = document.getElementById('aiQueryInput');
+    const resultArea = document.getElementById('ai-result-area');
+    const query = aiQueryInput.value.trim();
+    if (!query) return;
 
-    // --- FIX 1: Purge any existing Plotly plots from the result area ---
-    try { if (window.Plotly) window.Plotly.purge(resultArea); } catch (e) {}
+    // --- FIX 1: Purge any existing Plotly plots from the result area ---
+    try { if (window.Plotly) window.Plotly.purge(resultArea); } catch (e) {}
 
-    resultArea.style.display = 'block';
-    resultArea.innerHTML = `<p class="status-searching">CiliAI is thinking... 🧠</p>`;
-    
-    try {
-        // Await core CiliaHub data fetches ONLY. Phylogeny fetches run in the router.
-        await Promise.all([
-            fetchCiliaData(),
-            fetchScreenData(),
-            fetchTissueData(),
-            fetchCellxgeneData(),
-            fetchUmapData(),
-            getDomainData(),
-            fetchCorumComplexes()
-        ]);
-        console.log('ciliAI.js: All core data loaded for processing.');
+    resultArea.style.display = 'block';
+    resultArea.innerHTML = `<p class="status-searching">CiliAI is thinking... 🧠</p>`;
+    
+    try {
+        // Await core CiliaHub data fetches ONLY. Phylogeny fetches run in the router.
+        await Promise.all([
+            fetchCiliaData(),
+            fetchScreenData(),
+            fetchTissueData(),
+            fetchCellxgeneData(),
+            fetchUmapData(),
+            getDomainData(),
+            fetchCorumComplexes()
+        ]);
+        console.log('ciliAI.js: All core data loaded for processing.');
 
-        let resultHtml = '';
-        const qLower = query.toLowerCase();
-        let match;
+        let resultHtml = '';
+        const qLower = query.toLowerCase();
+        let match;
 
-        // =================================================================
-        // 🚨 CRITICAL FIX STEP: High-Priority Complex Module Routing
-        // =================================================================
-        resultHtml = await routeComplexPhylogenyAnalysis(query);
+        // =================================================================
+        // 🚨 CRITICAL FIX STEP: High-Priority Complex Module Routing
+        // =================================================================
+        resultHtml = await routeComplexPhylogenyAnalysis(query);
 
-        if (resultHtml === null) {
-            // ⬇️ FALLBACK to general keyword checks (for single genes or general comparisons)
+        if (resultHtml === null) {
+            // ⬇️ FALLBACK to general keyword checks (for single genes or general comparisons)
 
-            // **STEP 1:** Check for generic Phylogenetic/Visualization intent
-            if (qLower.includes('phylogeny') || qLower.includes('conservation') || 
-                qLower.includes('heatmap') || qLower.includes('comparison') || 
-                qLower.includes('tree')) {
-                
-                console.log('Routing to Phylogenetic Visualization Query...');
-                resultHtml = await handlePhylogenyVisualizationQuery(query);
-            }
-            
-            // **STEP 2:** FALLBACK to Original Registry/Comprehensive Lookup Logic
-            else {
-                const perfectMatch = questionRegistry.find(item => item.text.toLowerCase() === qLower);
-                if (perfectMatch) {
-                    console.log(`Registry match found: "${perfectMatch.text}"`);
-                    resultHtml = await perfectMatch.handler();
-                } 
-                else if ((match = qLower.match(/(?:tell me about|what is|describe)\s+(.+)/i))) {
-                    const term = match[1].trim();
-                    resultHtml = await getComprehensiveDetails(term);
-                } 
-                else {
-                    const potentialGenes = (query.match(/\b([A-Z0-9\-\.]{3,})\b/gi) || []);
-                    const genes = potentialGenes.filter(g => ciliaHubDataCache.some(hubGene => hubGene.gene.toUpperCase() === g.toUpperCase()));
-                    
-                    if (genes.length === 2 && (qLower.includes('compare') || qLower.includes('vs'))) {
-                        resultHtml = await displayCellxgeneBarChart(genes);
-                    } else if (genes.length === 1 && (qLower.includes('plot') || qLower.includes('show expression') || qLower.includes('visualize'))) {
-                        if (qLower.includes('umap')) {
-                            resultHtml = await displayUmapGeneExpression(genes[0]);
-                        } else {
-                            resultHtml = await displayCellxgeneBarChart(genes);
-                        }
-                    } else if (genes.length === 1 && qLower.length < (genes[0].length + 5)) {
-                        resultHtml = await getComprehensiveDetails(query);
-                    } else {
-                        resultHtml = `<p>Sorry, I didn’t understand that. Please try one of the suggested questions or a known keyword.</p>`;
-                    }
-            }
-        }
+            // **STEP 1:** Check for generic Phylogenetic/Visualization intent
+            if (qLower.includes('phylogeny') || qLower.includes('conservation') || 
+                qLower.includes('heatmap') || qLower.includes('comparison') || 
+                qLower.includes('tree')) {
+                
+                console.log('Routing to Phylogenetic Visualization Query...');
+                resultHtml = await handlePhylogenyVisualizationQuery(query);
+            }
+            
+            // **STEP 2:** FALLBACK to Original Registry/Comprehensive Lookup Logic
+            else {
+                const perfectMatch = questionRegistry.find(item => item.text.toLowerCase() === qLower);
+                if (perfectMatch) {
+                    console.log(`Registry match found: "${perfectMatch.text}"`);
+                    resultHtml = await perfectMatch.handler();
+                } 
+                else if ((match = qLower.match(/(?:tell me about|what is|describe)\s+(.+)/i))) {
+                    const term = match[1].trim();
+                    resultHtml = await getComprehensiveDetails(term);
+                } 
+                else {
+                    const potentialGenes = (query.match(/\b([A-Z0-9\-\.]{3,})\b/gi) || []);
+                    const genes = potentialGenes.filter(g => ciliaHubDataCache.some(hubGene => hubGene.gene.toUpperCase() === g.toUpperCase()));
+                    
+                    if (genes.length === 2 && (qLower.includes('compare') || qLower.includes('vs'))) {
+                        resultHtml = await displayCellxgeneBarChart(genes);
+                    } else if (genes.length === 1 && (qLower.includes('plot') || qLower.includes('show expression') || qLower.includes('visualize'))) {
+                        if (qLower.includes('umap')) {
+                            resultHtml = await displayUmapGeneExpression(genes[0]);
+                        } else {
+                            resultHtml = await displayCellxgeneBarChart(genes);
+                        }
+                    } else if (genes.length === 1 && qLower.length < (genes[0].length + 5)) {
+                        resultHtml = await getComprehensiveDetails(query);
+                    } else {
+                        resultHtml = `<p>Sorry, I didn’t understand that. Please try one of the suggested questions or a known keyword.</p>`;
+                    }
+                }
+            }
+        }
 
-        if (resultHtml !== "") {
-            resultArea.innerHTML = resultHtml;
-        }
+        if (resultHtml !== "") {
+            resultArea.innerHTML = resultHtml;
+        }
 
-    } catch (e) {
-        resultArea.innerHTML = `<p class="status-not-found">An internal CiliAI error occurred during your query. Please check the console for details. (Error: ${e.message})</p>`;
-        console.error("CiliAI Query Error:", e);
-    }
+    } catch (e) {
+        resultArea.innerHTML = `<p class="status-not-found">An internal CiliAI error occurred during your query. Please check the console for details. (Error: ${e.message})</p>`;
+        console.error("CiliAI Query Error:", e);
+    }
 };
 
 
