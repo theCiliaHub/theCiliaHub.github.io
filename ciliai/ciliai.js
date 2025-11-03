@@ -1174,17 +1174,16 @@ const questionRegistry = [
     { text: "Evolutionary comparison: IFT88, IFT140, IFT172", handler: async () => getPhylogenyAnalysis(["IFT88", "IFT140", "IFT172"]) },
     { text: "Compare conservation patterns of BBS proteins", handler: async () => getPhylogenyAnalysis(["BBS1", "BBS2", "BBS4", "BBS5", "BBS7", "BBS9"]) },
     { text: "Side-by-side phylogeny: NPHP1 vs NPHP4", handler: async () => getPhylogenyAnalysis(["NPHP1", "NPHP4"]) },
-    { text: "Multi-gene evolutionary analysis: IFT complex", handler: async () => getPhylogenyAnalysis(["WDR19", "IFT140", "TTC21B", "IFT122", "WDR35", "IFT43", "IFT172", "IFT80", "IFT57", "TRAF3IP1", "CLUAP1", "IFT20", "IFT88", "IFT81", "IFT74", "IFT70A", "IFT70B", "IFT56", "IFT52", "IFT46", "IFT27", "IFT25", "IFT22"]) },
-    { text: "Compare evolutionary history of IFT-A complex components", handler: async () => getPhylogenyAnalysis(["WDR19", "IFT140", "TTC21B", "IFT122", "WDR35", "IFT43"]) },
-    { text: "Phylogenetic analysis of the complete IFT-B complex", handler: async () => getPhylogenyAnalysis(["IFT172", "IFT80", "IFT57", "TRAF3IP1", "CLUAP1", "IFT20", "IFT88", "IFT81", "IFT74", "IFT70A", "IFT70B", "IFT56", "IFT52", "IFT46", "IFT27", "IFT25", "IFT22"]) },
-    { text: "Compare conservation of IFT-B1 core components", handler: async () => getPhylogenyAnalysis(["IFT172", "IFT80", "IFT57", "TRAF3IP1", "CLUAP1", "IFT20"]) },
-    { text: "Show conservation of IFT-B2 peripheral components", handler: async () => getPhylogenyAnalysis(["IFT88", "IFT81", "IFT74", "IFT70A", "IFT70B", "IFT56", "IFT52", "IFT46", "IFT27", "IFT25", "IFT22"]) },
-    { text: "Evolutionary profile for IFT complex B", handler: async () => getPhylogenyAnalysis(["IFT172", "IFT80", "IFT57", "TRAF3IP1", "CLUAP1", "IFT20", "IFT88", "IFT81", "IFT74", "IFT70A", "IFT70B", "IFT56", "IFT52", "IFT46", "IFT27", "IFT25", "IFT22"]) },
-    { text: "Evolutionary analysis of all BBSome components", handler: async () => getPhylogenyAnalysis(["BBS1", "BBS2", "BBS4", "BBS5", "BBS7", "TTC8", "BBS9", "BBS18"]) },
-    { text: "Compare conservation of Meckel Syndrome (MKS) module components", handler: async () => getPhylogenyAnalysis(["MKS1", "TMEM17", "TMEM67", "TMEM138", "B9D2", "B9D1", "CC2D2A", "TMEM107", "TMEM237", "TMEM231", "TMEM216", "TCTN1", "TCTN2", "TCTN3"]) },
-    { text: "Show evolutionary conservation of Nephronophthisis (NPHP) module genes", handler: async () => getPhylogenyAnalysis(["NPHP1", "NPHP3", "NPHP4", "RPGRIP1L", "IQCB1", "CEP290", "SDCCAG8"]) },
-    { text: "Phylogenetic analysis of core Transition Zone proteins", handler: async () => getPhylogenyAnalysis(["NPHP1", "MKS1", "CEP290", "AHI1", "RPGRIP1L", "TMEM67", "CC2D2A", "B9D1", "B9D2"]) },
-
+    { text: "Multi-gene evolutionary analysis: IFT complex table", handler: async () => getComplexPhylogenyTable("IFT COMPLEX") },
+{ text: "Compare evolutionary history of IFT-A complex components table", handler: async () => getComplexPhylogenyTable("IFT-A COMPLEX") },
+{ text: "Phylogenetic analysis of the complete IFT-B complex table", handler: async () => getComplexPhylogenyTable("IFT-B COMPLEX") },
+{ text: "Evolutionary profile for IFT complex B table", handler: async () => getComplexPhylogenyTable("IFT-B COMPLEX") },
+{ text: "Compare conservation of IFT-B1 core components table", handler: async () => getComplexPhylogenyTable("IFT-B1 COMPLEX") },
+{ text: "Show conservation of IFT-B2 peripheral components table", handler: async () => getComplexPhylogenyTable("IFT-B2 COMPLEX") },
+{ text: "Evolutionary analysis of all BBSome components table", handler: async () => getComplexPhylogenyTable("BBSOME") },
+{ text: "Compare conservation of Meckel Syndrome (MKS) module components table", handler: async () => getComplexPhylogenyTable("MKS MODULE") },
+{ text: "Show evolutionary conservation of Nephronophthisis (NPHP) module genes table", handler: async () => getComplexPhylogenyTable("NPHP MODULE") },
+{ text: "Phylogenetic analysis of core Transition Zone proteins table", handler: async () => getComplexPhylogenyTable("TRANSITION ZONE") },
 
 // ==================== C. CLASSIFICATION & PATTERN QUESTIONS (List/Summary - Expanded) ====================
     { text: "List genes classified as Ciliary specific", handler: async () => getPhylogenyList('Ciliary_specific') },
@@ -5304,16 +5303,37 @@ async function routePhylogenyAnalysis(query) {
     return `<div class="result-card"><h3>Analysis Failed</h3><p>Could not identify a specific gene or a classification pattern in your request. Please try one of the suggested questions or a known keyword.</p></div>`;
 }
 
+// NEW HANDLER FUNCTION to be placed in global scope
+async function getComplexPhylogenyTable(complexName) {
+    const geneMaps = {
+        "IFT COMPLEX": ["WDR19", "IFT140", "TTC21B", "IFT122", "WDR35", "IFT43", "IFT172", "IFT80", "IFT57", "TRAF3IP1", "CLUAP1", "IFT20", "IFT88", "IFT81", "IFT74", "IFT70A", "IFT70B", "IFT56", "IFT52", "IFT46", "IFT27", "IFT25", "IFT22"],
+        "IFT-A COMPLEX": ["WDR19", "IFT140", "TTC21B", "IFT122", "WDR35", "IFT43"],
+        "IFT-B COMPLEX": ["IFT172", "IFT80", "IFT57", "TRAF3IP1", "CLUAP1", "IFT20", "IFT88", "IFT81", "IFT74", "IFT70A", "IFT70B", "IFT56", "IFT52", "IFT46", "IFT27", "IFT25", "IFT22"],
+        "IFT-B1 COMPLEX": ["IFT172", "IFT80", "IFT57", "TRAF3IP1", "CLUAP1", "IFT20"], 
+        "IFT-B2 COMPLEX": ["IFT88", "IFT81", "IFT74", "IFT70A", "IFT70B", "IFT56", "IFT52", "IFT46", "IFT27", "IFT25", "IFT22"], 
+        "BBSOME": ["BBS1", "BBS2", "BBS4", "BBS5", "BBS7", "TTC8", "BBS9", "BBIP1"],
+        "TRANSITION ZONE": ["NPHP1", "MKS1", "CEP290", "AHI1", "RPGRIP1L", "TMEM67", "CC2D2A", "B9D1", "B9D2"],
+        "MKS MODULE": ["MKS1", "TMEM17", "TMEM67", "TMEM138", "B9D2", "B9D1", "CC2D2A", "TMEM107", "TMEM237", "TMEM231", "TMEM216", "TCTN1", "TCTN2", "TCTN3"],
+        "NPHP MODULE": ["NPHP1", "NPHP3", "NPHP4", "RPGRIP1L", "IQCB1", "CEP290", "SDCCAG8"]
+    };
+    const key = complexName.toUpperCase().replace(' COMPONENTS', '').replace(' PROTEINS', '').replace(' ANALYSIS', '').replace(' MODULE', '');
+    const genes = geneMaps[key];
+
+    if (!genes) {
+        return `<div class="result-card"><h3>Error</h3><p>Gene list not defined for complex: <strong>${complexName}</strong>.</p></div>`;
+    }
+    // Route to the dedicated table renderer
+    return getPhylogenyTableAnalysis(genes);
+}
 
 /**
- * Renders the initial summary for phylogenetic queries. Handles both single-gene (Q1-Q7)
- * and multi-gene comparison outputs, and serves as the primary handler for all generic 
- * visualization queries (Phylogenetic analysis of X, Compare Y phylogeny, etc.).
- * * NOTE: This function relies on external functions: 
- * fetchLiPhylogenyData(), fetchNeversPhylogenyData(), handlePhylogenyVisualizationQuery().
- * * @param {string[]} genes - Array of genes requested by the user.
+ * @name getPhylogenyAnalysis
+ * @description Renders the initial summary for phylogenetic queries (single or multi-gene).
+ * @param {string[]} genes - Array of genes requested by the user.
+ * @param {string} [displayMode='heatmap'] - Controls output: 'heatmap' or 'table'.
+ * @returns {Promise<string>} HTML output (Summary + Visualization/Table).
  */
-async function getPhylogenyAnalysis(genes) {
+async function getPhylogenyAnalysis(genes, displayMode = 'heatmap') {
     // 1. Data loading and validation 
     await Promise.all([fetchLiPhylogenyData(), fetchNeversPhylogenyData()]);
 
@@ -5329,17 +5349,24 @@ async function getPhylogenyAnalysis(genes) {
         return `<div class="result-card"><h3>Analysis Error</h3><p>None of the requested genes were found in the Li et al. 2014 phylogenetic dataset.</p></div>`;
     }
 
-    // --- Determine Genes to Plot (Using user-specified defaults if needed) ---
-    // NOTE: Gene calculation logic is simplified here as it was defined correctly elsewhere.
-    const finalGenes = validGeneSymbols; // Use only the valid input genes for the core analysis.
+    const finalGenes = validGeneSymbols;
 
-    // --- 2. Determine Output Mode: Single vs. Comparison ---
+    // --- NEW: ROUTE TO TABLE MODE ---
+    if (displayMode === 'table') {
+        // Direct call to the new table function
+        return getPhylogenyTableAnalysis(finalGenes);
+    }
+    // --- END NEW ROUTING ---
+
+    // --- 2. EXECUTE COMPARISON / SINGLE-GENE MODE (Original Heatmap Logic) ---
+    let summaryHtml = '';
+
     if (finalGenes.length > 1) {
-        
-        // --- MULTI-GENE COMPARISON MODE (Answers "Compare the evolutionary history of DYNC2H1 and KIF3A") ---
-        let summaryHtml = `
+        // --- MULTI-GENE SUMMARY ---
+        summaryHtml = `
             <div class="result-card">
-                <h3>Phylogenetic Comparison: ${finalGenes.join(' vs ')} 📊</h3>
+                <h3>Phylogenetic Comparison Summary: ${finalGenes.join(' vs ')} 📊</h3>
+                <p>Summary extracted from Li et al. (2014) and Nevers et al. (2017) data sets.</p>
                 <table class="gene-detail-table">
                     <thead>
                         <tr>
@@ -5355,59 +5382,46 @@ async function getPhylogenyAnalysis(genes) {
             const liEntry = Object.values(liPhylogenyCache.genes).find(g => g.g && g.g.toUpperCase() === gene);
             const neversEntry = neversPhylogenyCache.genes?.[gene];
 
-            // Safely extract and format data
-            const liClass = liEntry 
-                ? (liPhylogenyCache.summary.class_list[liEntry.c] || 'N/A').replace(/_/g, ' ') 
-                : 'N/A';
+            const liClass = liEntry ? (liPhylogenyCache.summary.class_list[liEntry.c] || 'N/A').replace(/_/g, ' ') : 'N/A';
             const neversCount = neversEntry?.s?.length || 0;
             
-            summaryHtml += `
-                <tr>
-                    <td><strong>${gene}</strong></td>
-                    <td>${liClass}</td>
-                    <td>${neversCount}</td>
-                </tr>
-            `;
+            summaryHtml += `<tr><td><strong>${gene}</strong></td><td>${liClass}</td><td>${neversCount}</td></tr>`;
         });
         
         summaryHtml += `
                     </tbody>
                 </table>
                 <p class="ai-suggestion">
-                    The visualization below provides the detailed species map for comparison.
+                    <a href="#" class="ai-action" data-action="show-table-view" data-genes="${finalGenes.join(',')}">📋 Show Full Data Table</a>
                 </p>
             </div>
         `;
-        
-        // Route to heatmap visualization
-        const visualizationHtml = await handlePhylogenyVisualizationQuery(`Show heatmap for ${finalGenes.join(',')}`, 'li', 'heatmap');
-        return summaryHtml + visualizationHtml;
-
     } else {
-        
-        // --- SINGLE-GENE ANALYSIS MODE (Answers "Show evolutionary conservation of WDR27") ---
+        // --- SINGLE-GENE SUMMARY ---
         const geneSymbol = finalGenes[0];
         const liEntry = Object.values(liPhylogenyCache.genes).find(g => g.g && g.g.toUpperCase() === geneSymbol);
         const neversEntry = neversPhylogenyCache?.genes?.[geneSymbol];
-
         const liSummary = liEntry ? liPhylogenyCache.summary.class_list[liEntry.c] || 'Classification Unavailable' : 'Not found in Li et al. (2014)';
         const neversSpeciesCount = neversEntry?.s?.length || 0;
         const neversStatus = neversEntry ? `Found in ${neversSpeciesCount} species (Nevers et al. 2017)` : 'Not found in Nevers et al. (2017)';
 
-        const generalSummary = `
+        summaryHtml = `
             <div class="result-card">
                 <h3>Evolutionary Summary: ${geneSymbol} 🧬</h3>
                 <table class="gene-detail-table">
                     <tr><th>Li et al. (2014) Classification</th><td><strong>${liSummary.replace(/_/g, ' ')}</strong></td></tr>
                     <tr><th>Nevers et al. (2017) Status</th><td>${neversStatus}</td></tr>
                 </table>
+                <p class="ai-suggestion">
+                    <a href="#" class="ai-action" data-action="show-table-view" data-genes="${geneSymbol}">📋 Show Full Data Table</a>
+                </p>
             </div>
         `;
-        
-        // Route to heatmap visualization
-        const visualizationHtml = await handlePhylogenyVisualizationQuery(`Show heatmap for ${geneSymbol}`, 'li', 'heatmap');
-        return generalSummary + visualizationHtml;
     }
+    
+    // Route to heatmap visualization (default mode)
+    const visualizationHtml = await handlePhylogenyVisualizationQuery(`Show heatmap for ${finalGenes.join(',')}`, finalGenes, 'li', 'heatmap');
+    return summaryHtml + visualizationHtml;
 }
 
 /**
@@ -5465,6 +5479,72 @@ function formatComparisonResult(title, tissue, list1, list2) {
                 </div>
             </div>
             ${referenceHtml}
+        </div>
+    `;
+}
+
+// NEW FUNCTION: Renders the combined Li/Nevers data in a comparative table format.
+/**
+ * @name getPhylogenyTableAnalysis
+ * @description Generates a detailed comparison table showing Li and Nevers classification and species counts for a list of genes.
+ * @param {string[]} genes - Array of validated gene symbols to analyze.
+ * @returns {Promise<string>} HTML table containing phylogenetic data.
+ */
+async function getPhylogenyTableAnalysis(genes) {
+    // Ensure data caches are loaded
+    await Promise.all([fetchLiPhylogenyData(), fetchNeversPhylogenyData()]);
+
+    if (!liPhylogenyCache || !neversPhylogenyCache) {
+        return `<div class="result-card"><h3>Data Error</h3><p>Phylogenetic data (Li 2014 or Nevers 2017) failed to load for table generation.</p></div>`;
+    }
+
+    const tableRows = genes.map(gene => {
+        const geneUpper = gene.toUpperCase();
+
+        // --- LI Data Lookup (Li et al. 2014) ---
+        const liEntry = Object.values(liPhylogenyCache.genes).find(g => g.g && g.g.toUpperCase() === geneUpper);
+        const liClass = liEntry
+            ? (liPhylogenyCache.summary.class_list[liEntry.c] || 'N/A').replace(/_/g, ' ')
+            : 'N/A';
+        const liCount = liEntry?.s?.length || 0;
+
+        // --- NEVERS Data Lookup (Nevers et al. 2017) ---
+        const neversEntry = neversPhylogenyCache.genes?.[geneUpper];
+        const neversCount = neversEntry?.s?.length || 0;
+
+        return `
+            <tr>
+                <td><strong>${geneUpper}</strong></td>
+                <td>${liClass}</td>
+                <td>${liCount} / 140</td>
+                <td>${neversCount} / 99</td>
+                <td><a href="#" class="ai-action" data-action="visualize-heatmap" data-genes="${geneUpper}">Show Heatmap</a></td>
+            </tr>
+        `;
+    }).join('');
+
+    return `
+        <div class="result-card">
+            <h3>Phylogenetic Data Table for ${genes.join(', ')} 📋</h3>
+            <p>Comparative summary of conservation status based on two major phylogenetic screens.</p>
+            <table class="ciliopathy-table gene-detail-table" id="phylogeny-table-download">
+                <thead>
+                    <tr>
+                        <th>Gene</th>
+                        <th>Li Class (2014)</th>
+                        <th>Li Species Count (140)</th>
+                        <th>Nevers Species Count (99)</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${tableRows}
+                </tbody>
+            </table>
+            <button class="download-button" onclick="downloadTable('phylogeny-table-download', 'Phylogeny_Data_Table')">Download CSV</button>
+            <p class="ai-suggestion" style="margin-top: 10px;">
+                <a href="#" class="ai-action" data-action="visualize-heatmap" data-genes="${genes.join(',')}">🖼️ Show Heatmap View</a>
+            </p>
         </div>
     `;
 }
