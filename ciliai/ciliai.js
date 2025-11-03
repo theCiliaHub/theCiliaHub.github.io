@@ -32,8 +32,10 @@ const COMPLEX_GENE_MAPS = {
     "BBSOME": ["BBS1", "BBS2", "BBS4", "BBS5", "BBS7", "TTC8", "BBS9", "BBIP1"],
     "TRANSITION ZONE": ["NPHP1", "MKS1", "CEP290", "AHI1", "RPGRIP1L", "TMEM67", "CC2D2A", "B9D1", "B9D2"],
     "MKS MODULE": ["MKS1", "TMEM17", "TMEM67", "TMEM138", "B9D2", "B9D1", "CC2D2A", "TMEM107", "TMEM237", "TMEM231", "TMEM216", "TCTN1", "TCTN2", "TCTN3"],
-    "NPHP MODULE": ["NPHP1", "NPHP3", "NPHP4", "RPGRIP1L", "IQCB1", "CEP290", "SDCCAG8"]
+    "NPHP MODULE": ["NPHP1", "NPHP3", "NPHP4", "RPGRIP1L", "IQCB1", "CEP290", "SDCCAG8"],
+    "BBS PROTEINS": ["BBS1", "BBS2", "BBS4", "BBS5", "BBS7", "TTC8", "BBS9", "BBIP1"]
 };
+
 // --- Global Data Structures (Required for both Li and Nevers visualization) ---
 // Note: These must be defined outside any function block in the final script.
 const CIL_ORG_FULL = [
@@ -5030,13 +5032,33 @@ async function getComplexPhylogenyAnalysis(complexName) {
         return `<div class="result-card"><h3>Error</h3><p>Gene list not defined for complex: <strong>${complexName}</strong>.</p></div>`;
     }
 
-    // Use Li as default, override to Nevers for TZ/NPHP modules (as requested/intended)
+    // Determine source: Use Nevers for NPHP/TZ/MKS as originally requested for those modules
     const source = (key.includes("NPHP") || key.includes("TRANSITION") || key.includes("MKS")) ? 'nevers' : 'li'; 
-    const queryTitle = `Phylogenetic conservation of ${complexName} (${genes.length} genes)`;
+    const queryTitle = `Evolutionary conservation of ${complexName} (${genes.length} genes)`;
 
-    return handlePhylogenyVisualizationQuery(queryTitle, genes, source, 'heatmap');
+    // User Rule #2 Violation Fix: For this specific function, return the data table directly
+    // and rely on the UI links to show the heatmap.
+    return getComplexPhylogenyTable(complexName); 
 }
-window.getComplexPhylogenyAnalysis = getComplexPhylogenyAnalysis;
+window.getComplexPhylogenyAnalysis = getComplexPhylogenyAnalysis; // Exposed Globally
+
+/**
+ * @name getComplexPhylogenyTable (Table View)
+ * @description Retrieves the gene list for a complex and requests a data table.
+ */
+async function getComplexPhylogenyTable(complexName) {
+    const key = complexName.toUpperCase().replace(/ COMPONENTS| PROTEINS| ANALYSIS| MODULE| COMPLEX| FOR/g, '').trim();
+    const genes = COMPLEX_GENE_MAPS[key];
+
+    if (!genes) {
+        return `<div class="result-card"><h3>Error</h3><p>Gene list not defined for complex: <strong>${complexName}</strong>.</p></div>`;
+    }
+    const queryTitle = `Phylogenetic data table for ${complexName} (Li 2014 Default)`;
+    
+    // Always call with 'table' view and 'li' source
+    return handlePhylogenyVisualizationQuery(queryTitle, genes, 'li', 'table');
+}
+window.getComplexPhylogenyTable = getComplexPhylogenyTable; // Exposed Globally
 
 /**
  * Renders raw phylogenetic data for a list of genes into a detailed table.
@@ -5096,13 +5118,19 @@ function renderPhylogenyTable(genes) {
     `;
 }
 
-// ---------------------------------------------------------
-// --- Main Visualization Router (Fixed Logic & Compliance with User Rules) ---
-
+/**
+ * @name handlePhylogenyVisualizationQuery
+ * @description Renders the phylogenetic visualization or table.
+ * @param {string} query - The raw user query/title.
+ * @param {string[]} [genes=[]] - Explicit array of genes passed by a complex helper.
+ * @param {string} [source='li'] - The heatmap source to display ('li' or 'nevers').
+ * @param {string} [view='heatmap'] - The output format requested ('heatmap' or 'table').
+ */
 async function handlePhylogenyVisualizationQuery(query, genes = [], source = 'li', view = 'heatmap') {
     const resultArea = document.getElementById('ai-result-area');
+    const MAX_HEATMAP_GENES = 50;
     
-    // 1. Gene Extraction and Data Loading
+    // 1. Gene Extraction and Validation
     let rawInputGenes = (Array.isArray(genes) && genes.length) ? genes : extractMultipleGenes(query);
     
     await Promise.all([fetchLiPhylogenyData(), fetchNeversPhylogenyData()]);
@@ -5111,40 +5139,41 @@ async function handlePhylogenyVisualizationQuery(query, genes = [], source = 'li
         return `<div class="result-card"><h3>Error</h3><p>Could not load phylogenetic data (Li et al. 2014) to run this analysis.</p></div>`;
     }
 
-    // 2. Gene Validation
     const liGenesSet = new Set(Object.values(liPhylogenyCache.genes).map(g => g.g.toUpperCase()).filter(Boolean));
     const validUserGenes = rawInputGenes.map(g => g.toUpperCase()).filter(g => liGenesSet.has(g));
 
-    // 3. Combine mandatory defaults (8 genes) and valid user genes
-    const mandatoryGenes = definitiveDefaultGenes.filter(g => liGenesSet.has(g));
-    let uniqueGenes = [...new Set([...mandatoryGenes, ...validUserGenes])];
-    
-    const finalGenes = uniqueGenes.slice(0, MAX_HEATMAP_GENES);
-
-    // 4. Implement User Rule: If view is 'heatmap', default to Li (source='li') unless explicitly requested Nevers.
-    if (view === 'heatmap' && source !== 'nevers') {
-        source = 'li';
+    // 2. Gene List Consolidation (CRITICAL FIX: Prevent defaults if a specific complex list was provided)
+    let finalGenes;
+    if (Array.isArray(genes) && genes.length > 0) {
+        // A specific list (e.g., IFT-A COMPLEX) was requested. Use ONLY the valid genes from that list.
+        finalGenes = validUserGenes.slice(0, MAX_HEATMAP_GENES);
+    } else {
+        // Generic query (e.g., "phylogeny of IFT88") or query with no valid genes. Include defaults.
+        const mandatoryGenes = definitiveDefaultGenes.filter(g => liGenesSet.has(g));
+        finalGenes = [...new Set([...mandatoryGenes, ...validUserGenes])].slice(0, MAX_HEATMAP_GENES);
     }
-    
-    // 5. Render based on view (Table is prioritized as primary non-heatmap response)
-    let plotResult;
-    
+
+    if (finalGenes.length === 0) {
+        return `<div class="result-card"><h3>Analysis Error</h3><p>The genes specified in your request (${rawInputGenes.join(', ')}) were not found in the phylogenetic dataset.</p></div>`;
+    }
+
+    // 3. Render based on view (Table is prioritized and mandated for complex queries)
     if (view === 'table') {
-        // Render the comparative table (Fixed to call the consolidated helper)
+        // Mandate Table View (User Instruction Compliance)
         return getPhylogenyTableAnalysis(finalGenes);
         
     } else {
-        // Render the Heatmap (Heatmap output required)
+        // Heatmap View (Default Li, unless specified)
         const renderer = (source === 'nevers') ? renderNeversPhylogenyHeatmap : renderLiPhylogenyHeatmap;
-        plotResult = renderer(finalGenes);
-    }
-    
-    // 6. Inject HTML and Execute Plotting Function (No plotting needed based on user request)
-    resultArea.innerHTML = plotResult.html;
-    
-    return plotResult.html;
-}
+        const plotResult = renderer(finalGenes);
 
+        // Inject HTML and ensure the addGeneToHeatmap handler is available
+        resultArea.innerHTML = plotResult.html;
+        window.initPhylogenyPlot(plotResult.plotId, plotResult.plotData, plotResult.plotLayout);
+        
+        return "";
+    }
+}
 
 /**
  * Global wrapper to handle clicks on the Li/Nevers switch links.
@@ -5336,24 +5365,6 @@ async function routePhylogenyAnalysis(query) {
     // 4. Fallback Error 
     return `<div class="result-card"><h3>Analysis Failed</h3><p>Could not identify a specific gene or a classification pattern in your request. Please try one of the suggested questions or a known keyword.</p></div>`;
 }
-
-/**
- * @name getComplexPhylogenyTable (Table View)
- * @description Retrieves the gene list for a complex and requests a data table.
- */
-async function getComplexPhylogenyTable(complexName) {
-    const key = complexName.toUpperCase().replace(/ COMPONENTS| PROTEINS| ANALYSIS| MODULE| COMPLEX| FOR/g, '').trim();
-    const genes = COMPLEX_GENE_MAPS[key];
-
-    if (!genes) {
-        return `<div class="result-card"><h3>Error</h3><p>Gene list not defined for complex: <strong>${complexName}</strong>.</p></div>`;
-    }
-    const queryTitle = `Phylogenetic conservation data for ${complexName} Table`;
-    
-    // Always call with 'table' view
-    return handlePhylogenyVisualizationQuery(queryTitle, genes, 'li', 'table');
-}
-window.getComplexPhylogenyTable = getComplexPhylogenyTable;
 
 /**
  * @name routeComplexPhylogenyAnalysis
