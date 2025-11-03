@@ -5010,11 +5010,7 @@ function renderLiPhylogenyHeatmap(genes) {
 // Add this immediately after the definition of window.switchPhylogenyView
 // or right before the document.addEventListener block.
 
-//**
- * Global function to handle adding a gene from the text field to the existing heatmap view.
- * Attached to window object to resolve Uncaught TypeError.
- * @param {HTMLButtonElement} buttonElement - The 'Add' button element clicked.
- */
+
 window.addGeneToHeatmap = function(buttonElement) {
     const inputElement = document.getElementById('addGeneInput');
     const newGene = inputElement.value.trim().toUpperCase();
