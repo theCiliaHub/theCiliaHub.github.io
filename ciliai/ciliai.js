@@ -1179,86 +1179,24 @@ const questionRegistry = [
     { text: "TTC8 phylogenetic profile", handler: async () => getPhylogenyAnalysis(["TTC8"]) },
 
 // ==================== B. COMPARISON QUERIES (Multi-Gene Visualization - Expanded) ====================
- // ---- Working (few genes) -------------------------------------------------
-{ text: "Compare IFT88 and IFT140 phylogeny",
-  handler: async () => handlePhylogenyVisualizationQuery("", ["IFT88","IFT140"]) },
+    { text: "Compare IFT88 and IFT140 phylogeny", handler: async () => getPhylogenyAnalysis(["IFT88", "IFT140"]) },
+    { text: "Phylogeny comparison of BBS1 and BBS4", handler: async () => getPhylogenyAnalysis(["BBS1", "BBS4"]) },
+    { text: "Show conservation of NPHP1 vs CEP290", handler: async () => getPhylogenyAnalysis(["NPHP1", "CEP290"]) },
+    { text: "Compare the evolutionary history of DYNC2H1 and KIF3A", handler: async () => getPhylogenyAnalysis(["DYNC2H1", "KIF3A"]) },
+    { text: "Evolutionary comparison: IFT88, IFT140, IFT172", handler: async () => getPhylogenyAnalysis(["IFT88", "IFT140", "IFT172"]) },
+    { text: "Compare conservation patterns of BBS proteins", handler: async () => getPhylogenyAnalysis(["BBS1", "BBS2", "BBS4", "BBS5", "BBS7", "BBS9"]) },
+    { text: "Side-by-side phylogeny: NPHP1 vs NPHP4", handler: async () => getPhylogenyAnalysis(["NPHP1", "NPHP4"]) },
+    { text: "Multi-gene evolutionary analysis: IFT complex", handler: async () => getPhylogenyAnalysis(["WDR19", "IFT140", "TTC21B", "IFT122", "WDR35", "IFT43", "IFT172", "IFT80", "IFT57", "TRAF3IP1", "CLUAP1", "IFT20", "IFT88", "IFT81", "IFT74", "IFT70A", "IFT70B", "IFT56", "IFT52", "IFT46", "IFT27", "IFT25", "IFT22"]) },
+    { text: "Compare evolutionary history of IFT-A complex components", handler: async () => getPhylogenyAnalysis(["WDR19", "IFT140", "TTC21B", "IFT122", "WDR35", "IFT43"]) },
+    { text: "Phylogenetic analysis of the complete IFT-B complex", handler: async () => getPhylogenyAnalysis(["IFT172", "IFT80", "IFT57", "TRAF3IP1", "CLUAP1", "IFT20", "IFT88", "IFT81", "IFT74", "IFT70A", "IFT70B", "IFT56", "IFT52", "IFT46", "IFT27", "IFT25", "IFT22"]) },
+    { text: "Compare conservation of IFT-B1 core components", handler: async () => getPhylogenyAnalysis(["IFT172", "IFT80", "IFT57", "TRAF3IP1", "CLUAP1", "IFT20"]) },
+    { text: "Show conservation of IFT-B2 peripheral components", handler: async () => getPhylogenyAnalysis(["IFT88", "IFT81", "IFT74", "IFT70A", "IFT70B", "IFT56", "IFT52", "IFT46", "IFT27", "IFT25", "IFT22"]) },
+    { text: "Evolutionary profile for IFT complex B", handler: async () => getPhylogenyAnalysis(["IFT172", "IFT80", "IFT57", "TRAF3IP1", "CLUAP1", "IFT20", "IFT88", "IFT81", "IFT74", "IFT70A", "IFT70B", "IFT56", "IFT52", "IFT46", "IFT27", "IFT25", "IFT22"]) },
+    { text: "Evolutionary analysis of all BBSome components", handler: async () => getPhylogenyAnalysis(["BBS1", "BBS2", "BBS4", "BBS5", "BBS7", "TTC8", "BBS9", "BBS18"]) },
+    { text: "Compare conservation of Meckel Syndrome (MKS) module components", handler: async () => getPhylogenyAnalysis(["MKS1", "TMEM17", "TMEM67", "TMEM138", "B9D2", "B9D1", "CC2D2A", "TMEM107", "TMEM237", "TMEM231", "TMEM216", "TCTN1", "TCTN2", "TCTN3"]) },
+    { text: "Show evolutionary conservation of Nephronophthisis (NPHP) module genes", handler: async () => getPhylogenyAnalysis(["NPHP1", "NPHP3", "NPHP4", "RPGRIP1L", "IQCB1", "CEP290", "SDCCAG8"]) },
+    { text: "Phylogenetic analysis of core Transition Zone proteins", handler: async () => getPhylogenyAnalysis(["NPHP1", "MKS1", "CEP290", "AHI1", "RPGRIP1L", "TMEM67", "CC2D2A", "B9D1", "B9D2"]) },
 
-{ text: "Phylogeny comparison of BBS1 and BBS4",
-  handler: async () => handlePhylogenyVisualizationQuery("", ["BBS1","BBS4"]) },
-
-{ text: "Show conservation of NPHP1 vs CEP290",
-  handler: async () => handlePhylogenyVisualizationQuery("", ["NPHP1","CEP290"]) },
-
-{ text: "Evolutionary comparison: IFT88, IFT140, IFT172",
-  handler: async () => handlePhylogenyVisualizationQuery("", ["IFT88","IFT140","IFT172"]) },
-
-{ text: "Side-by-side phylogeny: NPHP1 vs NPHP4",
-  handler: async () => handlePhylogenyVisualizationQuery("", ["NPHP1","NPHP4"]) },
-
-// ---- Large groups (still heat-maps, truncation applies) -----------------
-{ text: "Compare the evolutionary history of DYNC2H1 and KIF3A",
-  handler: async () => handlePhylogenyVisualizationQuery("", ["DYNC2H1","KIF3A"]) },
-
-{ text: "Multi-gene evolutionary analysis: IFT complex",
-  handler: async () => handlePhylogenyVisualizationQuery("", [
-      "WDR19","IFT140","TTC21B","IFT122","WDR35","IFT43","IFT172","IFT80",
-      "IFT57","TRAF3IP1","CLUAP1","IFT20","IFT88","IFT81","IFT74","IFT70A",
-      "IFT70B","IFT56","IFT52","IFT46","IFT27","IFT25","IFT22"
-  ]) },
-
-{ text: "Compare evolutionary history of IFT-A complex components",
-  handler: async () => handlePhylogenyVisualizationQuery("", ["WDR19","IFT140","TTC21B","IFT122","WDR35","IFT43"]) },
-
-{ text: "Phylogenetic analysis of the complete IFT-B complex",
-  handler: async () => handlePhylogenyVisualizationQuery("", [
-      "IFT172","IFT80","IFT57","TRAF3IP1","CLUAP1","IFT20","IFT88","IFT81",
-      "IFT74","IFT70A","IFT70B","IFT56","IFT52","IFT46","IFT27","IFT25","IFT22"
-  ]) },
-
-{ text: "Evolutionary profile for IFT complex B",
-  handler: async () => handlePhylogenyVisualizationQuery("", [
-      "IFT172","IFT80","IFT57","TRAF3IP1","CLUAP1","IFT20","IFT88","IFT81",
-      "IFT74","IFT70A","IFT70B","IFT56","IFT52","IFT46","IFT27","IFT25","IFT22"
-  ]) },
-
-{ text: "Evolutionary analysis of all BBSome components",
-  handler: async () => handlePhylogenyVisualizationQuery("", ["BBS1","BBS2","BBS4","BBS5","BBS7","TTC8","BBS9","BBS18"]) },
-
-{ text: "Phylogenetic analysis of core Transition Zone proteins",
-  handler: async () => handlePhylogenyVisualizationQuery("", [
-      "NPHP1","MKS1","CEP290","AHI1","RPGRIP1L","TMEM67","CC2D2A","B9D1","B9D2"
-  ]) },
-
-// ---- Previously broken (now show the *real* genes) -----------------------
-{ text: "Compare conservation patterns of BBS proteins",
-  handler: async () => handlePhylogenyVisualizationQuery("", ["BBS1","BBS2","BBS4","BBS5","BBS7","BBS9"]) },
-
-{ text: "Compare conservation of IFT-B1 core components",
-  handler: async () => handlePhylogenyVisualizationQuery("", ["IFT172","IFT80","IFT57","TRAF3IP1","CLUAP1","IFT20"]) },
-
-{ text: "Show conservation of IFT-B2 peripheral components",
-  handler: async () => handlePhylogenyVisualizationQuery("", [
-      "IFT88","IFT81","IFT74","IFT70A","IFT70B","IFT56","IFT52","IFT46",
-      "IFT27","IFT25","IFT22"
-  ]) },
-   
-{ text: "Compare conservation of Meckel Syndrome (MKS) module components",
-
-  handler: async () => handlePhylogenyVisualizationQuery("", [
-
-    "MKS1","TMEM17","TMEM67","TMEM138","B9D2","B9D1","CC2D2A","TMEM107",
-      "TMEM237","TMEM231","TMEM216","TCTN1","TCTN2","TCTN3"
-  ]) },
-
-
-    
-{ 
-  text: "Show evolutionary conservation of Nephronophthisis (NPHP) module genes",
-  handler: async () => handlePhylogenyVisualizationQuery("", 
-    ["NPHP1","NPHP3","NPHP4","RPGRIP1L","IQCB1","CEP290","SDCCAG8"],
-    'nevers'  // <-- Critical: Use Nevers dataset
-  )
-},
 
 // ==================== C. CLASSIFICATION & PATTERN QUESTIONS (List/Summary - Expanded) ====================
     { text: "List genes classified as Ciliary specific", handler: async () => getPhylogenyList('Ciliary_specific') },
@@ -4834,7 +4772,7 @@ const NEVERS_NCIL_PANEL = [
 // --------------------------------------------------------------------------------------
 /**
  * Renders the phylogenetic heatmap based on Nevers et al. 2017 data.
- * @param {string[]} genes - Array of genes requested (already truncated to MAX_PLOTTED_GENES).
+ * @param {string[]} genes - Array of genes requested.
  * @returns {object} Structured object {html, plotData, plotLayout, plotId}.
  */
 function renderNeversPhylogenyHeatmap(genes) {
@@ -4842,16 +4780,20 @@ function renderNeversPhylogenyHeatmap(genes) {
         return { html: `<div class="result-card"><h3>Heatmap Error</h3><p>Nevers et al. 2017 data not loaded. Please try again.</p></div>`, plotData: null, plotLayout: null, plotId: null };
     }
     
-    // Assumed NEVERS_CIL_PANEL and NEVERS_NCIL_PANEL are globally available
+    // --- CRITICAL CHANGE: Use NEVERS_CIL_PANEL and NEVERS_NCIL_PANEL as the source for the 40 organisms ---
     const CIL_COUNT = NEVERS_CIL_PANEL.length;
     const NCIL_COUNT = NEVERS_NCIL_PANEL.length;
 
-    // --- 1. Map Target Organisms to Nevers Indices ---
+    // --- 1. Map Target Organisms to Nevers Indices (using NEVERS_CIL/NCIL_PANEL as source) ---
     const neversOrgList = neversPhylogenyCache.organism_groups?.all_organisms_list || [];
     const neversOrgMap = new Map(); 
     
+    // Loop 1: Map all Nevers list entries to their index using the EXACT string and simplified key.
     neversOrgList.forEach((name, index) => {
+        // Key 1: Store the EXACT original name (Highest priority key)
         neversOrgMap.set(name, index);
+        
+        // Key 2: Map the fully simplified key (removes strain info, periods, spaces)
         const simplifiedKey = name.toLowerCase().replace(/\s*\(.*?\)\s*/g, '').replace(/[\s\.\(\)]/g, '');
         neversOrgMap.set(simplifiedKey, index);
     });
@@ -4860,8 +4802,13 @@ function renderNeversPhylogenyHeatmap(genes) {
     
     const targetNeversIndices = targetOrganisms.map(orgName => {
         const simplifiedKey = orgName.toLowerCase().replace(/[\s\.]/g, '');
+        
+        // Lookup 1: Try the exact verbose name from our panel (e.g., "Saccharomyces cerevisiae (strain...)")
         if (neversOrgMap.has(orgName)) return neversOrgMap.get(orgName);
+        
+        // Lookup 2: Try the simplified key (e.g., "saccharomycescerevisiae")
         if (neversOrgMap.has(simplifiedKey)) return neversOrgMap.get(simplifiedKey);
+        
         return undefined;
     });
 
@@ -4909,11 +4856,15 @@ function renderNeversPhylogenyHeatmap(genes) {
 
     const trace = {
         z: matrix,
-        // CRITICAL AXIS FIX: Strip parentheses for display labels
+        // *** CRITICAL AXIS FIX: Strip parentheses for display labels ***
         x: targetOrganisms.map(name => {
+            // Remove everything inside parentheses (strains) for the label only
             let cleanedName = name.replace(/\s*\(.*?\)\s*/g, '').trim();
+            
+            // Further clean up scientific abbreviations used in the list if necessary
             if (cleanedName.includes("D.rerio")) return "Zebrafish";
             if (cleanedName.includes("H.sapiens")) return "Human";
+            
             return cleanedName;
         }), 
         y: geneLabels,
@@ -4935,8 +4886,7 @@ function renderNeversPhylogenyHeatmap(genes) {
                 yref: 'paper', y0: 0, y1: 1,
                 line: { color: 'black', width: 2 }
             }],
-        // *** CRITICAL FIX APPLIED HERE: Increased left margin (l: 150) ***
-        margin: { t: 50, b: 200, l: 150, r: 50 }, 
+        margin: { t: 50, b: 200, l: 100, r: 50 },
         height: Math.max(500, genes.length * 40 + 150)
     };
     
@@ -4967,7 +4917,6 @@ function renderNeversPhylogenyHeatmap(genes) {
     `;
     return { html: htmlOutput, plotData: [trace], plotLayout: layout, plotId: plotContainer };
 }
-
 
 /**
  * MODIFIED: Adds a link to switch to the Nevers heatmap.
@@ -5126,8 +5075,7 @@ function renderLiPhylogenyHeatmap(genes) {
                 line: { color: 'black', width: 2 }
             }
         ],
-        // *** CRITICAL FIX: Increased left margin (l: 150) for label visibility ***
-        margin: { t: 50, b: 200, l: 150, r: 50 }, 
+        margin: { t: 50, b: 200, l: 100, r: 50 },
         height: Math.max(500, genes.length * 40 + 150)
     };
     
@@ -5261,128 +5209,92 @@ function renderPhylogenyTable(genes) {
 }
 
 /**
- * Main entry point for all phylogeny visualisations.
- * @param {string} query               – Original user text (only used for gene extraction when `genes` is empty).
- * @param {string[]} [genes=[]]        – **Explicit** gene list supplied by the handler (takes priority).
- * @param {string}   [source='li']     – 'li' | 'nevers'
- * @param {string}   [view='heatmap']  – 'heatmap' | 'table'
+ * Renders the phylogenetic visualization, acting as the main router for 
+ * heatmap switching and table view presentation.
+ * * @param {string} query - The raw user query (used for extracting genes).
+ * @param {string} [source='li'] - The heatmap source to display ('li' or 'nevers').
+ * @param {string} [view='heatmap'] - The output format requested ('heatmap' or 'table').
+ * @returns {string} Empty string, as the function updates the DOM directly.
  */
-async function handlePhylogenyVisualizationQuery(query, genes = [], source = 'li', view = 'heatmap') {
+async function handlePhylogenyVisualizationQuery(query, source = 'li', view = 'heatmap') {
     const resultArea = document.getElementById('ai-result-area');
-    const MAX_PLOTTED_GENES = 30;
-
-    // -------------------------------------------------
-    // 1. GENE RESOLUTION
-    // -------------------------------------------------
-    let inputGenes = [];
-
-    if (Array.isArray(genes) && genes.length) {
-    inputGenes = genes.map(g => g.toUpperCase().trim()).filter(Boolean);
-    } else {
-    inputGenes = extractMultipleGenes(query);
-    }
-
-    // -------------------------------------------------
-    // 2. Load caches
-    // -------------------------------------------------
+    
+    // 1. Gene Extraction and Data Loading 
+    // NOTE: This assumes extractMultipleGenes() and the fetch functions are globally available.
+    const inputGenes = extractMultipleGenes(query);
+    
+    // Ensure all necessary phylogenetic data is loaded before proceeding
     await Promise.all([fetchLiPhylogenyData(), fetchNeversPhylogenyData()]);
-    if (!liPhylogenyCache && source === 'li') {
-        return `<div class="result-card"><h3>Error</h3><p>Could not load Li et al. 2014 data.</p></div>`;
-    }
-    if (!neversPhylogenyCache && source === 'nevers') {
-        return `<div class="result-card"><h3>Error</h3><p>Could not load Nevers et al. 2017 data.</p></div>`;
+
+    if (!liPhylogenyCache) {
+        return `<div class="result-card"><h3>Error</h3><p>Could not load phylogenetic data (Li et al. 2014) to run this analysis.</p></div>`;
     }
 
-    // -------------------------------------------------
-    // 3. VALIDATE GENES AGAINST THE *TARGET* SOURCE
-    // -------------------------------------------------
-    let validGenes = [];
-    let missingGenes = [];
+    // Get all HUGO gene symbols available in the Li database
+    const allLiGenes = Object.values(liPhylogenyCache.genes).map(g => g.g.toUpperCase()).filter(Boolean);
+    const liGenesSet = new Set(allLiGenes);
+    const validUserGenes = inputGenes.filter(g => liGenesSet.has(g));
 
-    if (source === 'nevers') {
-        const neversGeneSet = new Set(
-            Object.keys(neversPhylogenyCache.genes || {}).map(g => g.toUpperCase())
-        );
-        inputGenes.forEach(g => {
-            if (neversGeneSet.has(g)) {
-                validGenes.push(g);
-            } else {
-                missingGenes.push(g);
-            }
-        });
-    } else {
-        // Li source
-        const liGenesSet = new Set(
-            Object.values(liPhylogenyCache.genes)
-                  .map(g => g.g.toUpperCase())
-                  .filter(Boolean)
-        );
-        inputGenes.forEach(g => {
-            if (liGenesSet.has(g)) {
-                validGenes.push(g);
-            } else {
-                missingGenes.push(g);
-            }
-        });
-    }
-
-    let finalGenes = [];
-    let truncationMessage = '';
-    let warningMessage = '';
-
-    if (validGenes.length === 0) {
-        if (missingGenes.length > 0) {
-            warningMessage = `<p class="status-note">Warning: The following genes were not found in the ${source === 'nevers' ? 'Nevers et al. 2017' : 'Li et al. 2014'} dataset: <strong>${missingGenes.join(', ')}</strong>. Showing defaults.</p>`;
-        }
-        const definitiveDefaultGenes = ["ZC2HC1A","CEP41","BBS1","BBS2","BBS5","ZNF474","IFT81","BBS7"];
-        const defaultSet = source === 'nevers'
-            ? new Set(Object.keys(neversPhylogenyCache.genes || {}).map(g => g.toUpperCase()))
-            : new Set(Object.values(liPhylogenyCache.genes).map(g => g.g.toUpperCase()));
-        finalGenes = definitiveDefaultGenes.filter(g => defaultSet.has(g)).slice(0, 5);
-        if (!finalGenes.length) {
-            return `<div class="result-card"><h3>Analysis Error</h3><p>No valid genes and no defaults available.</p></div>`;
+    let finalGenes;
+    
+    // --- Determine Genes to Plot (Prioritize user input, fill up to 20 with defaults) ---
+    // User-specified list used for context when input is lacking.
+    const definitiveDefaultGenes = ["ZC2HC1A", "CEP41", "BBS1", "BBS2", "BBS5", "ZNF474", "IFT81", "BBS7"];
+    
+    if (validUserGenes.length === 0) {
+        // Use default genes for initialization if none found
+        finalGenes = definitiveDefaultGenes.filter(g => liGenesSet.has(g)).slice(0, 5);
+        if (finalGenes.length === 0) {
+            return `<div class="result-card"><h3>Analysis Error</h3><p>The requested gene(s) were not found, and no default genes could be plotted.</p></div>`;
         }
     } else {
-        finalGenes = [...new Set(validGenes)];
-        if (missingGenes.length > 0) {
-            warningMessage = `<p class="status-note">Note: ${missingGenes.length} gene(s) not found in dataset: <em>${missingGenes.join(', ')}</em>. Showing ${finalGenes.length} valid gene(s).</p>`;
-        }
-        if (finalGenes.length > MAX_PLOTTED_GENES) {
-            const orig = finalGenes.length;
-            finalGenes = finalGenes.slice(0, MAX_PLOTTED_GENES);
-            truncationMessage = `<p class="status-note">Warning: Only first ${MAX_PLOTTED_GENES} genes shown (you requested ${orig}).</p>`;
+        // Start with user's valid genes
+        finalGenes = [...new Set(validUserGenes)];
+        
+        // Fill up to 20 genes using the definitive defaults for context
+        if (finalGenes.length < 20) {
+            for (const dGene of definitiveDefaultGenes) {
+                if (finalGenes.length >= 20) break;
+                if (liGenesSet.has(dGene) && !finalGenes.includes(dGene)) {
+                    finalGenes.push(dGene);
+                }
+            }
         }
     }
 
-    // -------------------------------------------------
-    // 4. RENDER
-    // -------------------------------------------------
+    // --- 2. Select Renderer based on requested view ---
     let plotResult;
+    
     if (view === 'table') {
+        // Render the comparative table (HTML output only)
         plotResult = {
-            html: renderPhylogenyTable(finalGenes) + warningMessage + truncationMessage,
+            html: renderPhylogenyTable(finalGenes),
             plotId: null, plotData: null, plotLayout: null
         };
     } else {
-        const renderer = source === 'nevers' ? renderNeversPhylogenyHeatmap : renderLiPhylogenyHeatmap;
+        // Render the Heatmap (Default or Switch action)
+        const renderer = (source === 'nevers') ? renderNeversPhylogenyHeatmap : renderLiPhylogenyHeatmap;
         plotResult = renderer(finalGenes);
-        let extraHtml = warningMessage + truncationMessage;
-        if (extraHtml) {
-            plotResult.html = plotResult.html.replace(/<\/div>\s*$/, `${extraHtml}</div>`);
-        }
     }
-
-    // -------------------------------------------------
-    // 5. INJECT
-    // -------------------------------------------------
+    
+    // --- 3. Inject HTML and Execute Plotting Function ---
+    
+    // Set the HTML output.
     resultArea.innerHTML = plotResult.html;
-    if (view === 'heatmap' && plotResult.plotData) {
-        window.initPhylogenyPlot(plotResult.plotId, plotResult.plotData, plotResult.plotLayout);
-    }
 
+    // Only attempt to plot if the view is 'heatmap'
+    if (view === 'heatmap' && plotResult.plotData) {
+        // Call the global execution utility for Plotly.
+        window.initPhylogenyPlot(
+            plotResult.plotId, 
+            plotResult.plotData, 
+            plotResult.plotLayout
+        );
+    }
+    
+    // Return an empty string as the function has already updated the DOM
     return "";
 }
-
 /**
  * Global wrapper to handle clicks on the Li/Nevers switch links.
  * This should be defined globally (e.g., window.switchPhylogenyView).
@@ -5630,103 +5542,101 @@ async function compareGeneSpeciesOverlap(geneA, geneB) {
  * fetchLiPhylogenyData(), fetchNeversPhylogenyData(), handlePhylogenyVisualizationQuery().
  * * @param {string[]} genes - Array of genes requested by the user.
  */
-/**
- * CORRECTED: Works with Li 2014 (array) + Nevers (object)
- */
 async function getPhylogenyAnalysis(genes) {
+    // 1. Data loading and validation 
     await Promise.all([fetchLiPhylogenyData(), fetchNeversPhylogenyData()]);
+
     if (!liPhylogenyCache || !neversPhylogenyCache) {
-        return `<div class="result-card"><h3>Error</h3><p>Phylogenetic data failed to load.</p></div>`;
+        return `<div class="result-card"><h3>Analysis Error</h3><p>Phylogenetic data sources (Li 2014 or Nevers 2017) failed to load.</p></div>`;
+    }
+    
+    // Get all HUGO gene symbols available in the Li database
+    const liGenesSet = new Set(Object.values(liPhylogenyCache.genes).map(g => g.g.toUpperCase()).filter(Boolean));
+    const validGeneSymbols = genes.map(g => g.toUpperCase()).filter(g => liGenesSet.has(g));
+    
+    if (validGeneSymbols.length === 0) {
+        return `<div class="result-card"><h3>Analysis Error</h3><p>None of the requested genes were found in the Li et al. 2014 phylogenetic dataset.</p></div>`;
     }
 
-    const upperGenes = genes.map(g => g.toUpperCase()).filter(Boolean);
-    if (upperGenes.length === 0) {
-        return `<div class="result-card"><h3>Error</h3><p>No genes provided.</p></div>`;
-    }
+    // --- Determine Genes to Plot (Using user-specified defaults if needed) ---
+    // NOTE: Gene calculation logic is simplified here as it was defined correctly elsewhere.
+    const finalGenes = validGeneSymbols; // Use only the valid input genes for the core analysis.
 
-    // --- CORRECT: Li is an ARRAY ---
-    const liGeneSet = new Set(
-        (Array.isArray(liPhylogenyCache.genes) 
-            ? liPhylogenyCache.genes 
-            : Object.values(liPhylogenyCache.genes)
-        ).map(g => g.g?.toUpperCase()).filter(Boolean)
-    );
-
-    // --- Nevers is an OBJECT ---
-    const neversGeneSet = new Set(
-        Object.keys(neversPhylogenyCache.genes || {}).map(g => g.toUpperCase())
-    );
-
-    // --- Find best source ---
-    const inLi = upperGenes.filter(g => liGeneSet.has(g));
-    const inNevers = upperGenes.filter(g => neversGeneSet.has(g));
-    const missing = upperGenes.filter(g => !inLi.includes(g) && !inNevers.includes(g));
-
-    const useLi = inLi.length >= inNevers.length;
-    const source = useLi ? 'li' : 'nevers';
-    const validGenes = useLi ? inLi : inNevers;
-
-    if (validGenes.length === 0) {
-        return `<div class="result-card"><h3>No Genes Found</h3><p>None of: <strong>${upperGenes.join(', ')}</strong> exist in either dataset.</p></div>`;
-    }
-
-    let warning = '';
-    if (missing.length > 0) {
-        warning = `<p class="status-note">Not found: <strong>${missing.join(', ')}</strong></p>`;
-    } else if (validGenes.length < upperGenes.length) {
-        const skipped = upperGenes.filter(g => !validGenes.includes(g));
-        warning = `<p class="status-note">Using ${source} dataset. Skipped (not in ${source}): <strong>${skipped.join(', ')}</strong></p>`;
-    }
-
-    // --- Single Gene ---
-    if (validGenes.length === 1) {
-        const gene = validGenes[0];
-        const liEntry = Array.isArray(liPhylogenyCache.genes)
-            ? liPhylogenyCache.genes.find(g => g.g?.toUpperCase() === gene)
-            : null;
-        const neversEntry = neversPhylogenyCache.genes?.[gene];
-        const liClass = liEntry ? (liPhylogenyCache.summary.class_list[liEntry.c] || 'N/A').replace(/_/g, ' ') : 'N/A';
-        const neversCount = neversEntry?.s?.length || 0;
-
-        const summary = `
+    // --- 2. Determine Output Mode: Single vs. Comparison ---
+    if (finalGenes.length > 1) {
+        
+        // --- MULTI-GENE COMPARISON MODE (Answers "Compare the evolutionary history of DYNC2H1 and KIF3A") ---
+        let summaryHtml = `
             <div class="result-card">
-                <h3>${gene} — Evolutionary Profile</h3>
-                <p><strong>Source:</strong> ${source === 'li' ? 'Li et al. (2014)' : 'Nevers et al. (2017)'}</p>
+                <h3>Phylogenetic Comparison: ${finalGenes.join(' vs ')} 📊</h3>
                 <table class="gene-detail-table">
-                    <tr><th>Li Class</th><td>${liClass}</td></tr>
-                    <tr><th>Nevers Species</th><td>${neversCount || 'N/A'}</td></tr>
+                    <thead>
+                        <tr>
+                            <th>Gene</th>
+                            <th>Li Class (2014)</th>
+                            <th>Nevers Species Count (99)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+        `;
+        
+        finalGenes.forEach(gene => {
+            const liEntry = Object.values(liPhylogenyCache.genes).find(g => g.g && g.g.toUpperCase() === gene);
+            const neversEntry = neversPhylogenyCache.genes?.[gene];
+
+            // Safely extract and format data
+            const liClass = liEntry 
+                ? (liPhylogenyCache.summary.class_list[liEntry.c] || 'N/A').replace(/_/g, ' ') 
+                : 'N/A';
+            const neversCount = neversEntry?.s?.length || 0;
+            
+            summaryHtml += `
+                <tr>
+                    <td><strong>${gene}</strong></td>
+                    <td>${liClass}</td>
+                    <td>${neversCount}</td>
+                </tr>
+            `;
+        });
+        
+        summaryHtml += `
+                    </tbody>
                 </table>
-                ${warning}
-            </div>`;
+                <p class="ai-suggestion">
+                    The visualization below provides the detailed species map for comparison.
+                </p>
+            </div>
+        `;
+        
+        // Route to heatmap visualization
+        const visualizationHtml = await handlePhylogenyVisualizationQuery(`Show heatmap for ${finalGenes.join(',')}`, 'li', 'heatmap');
+        return summaryHtml + visualizationHtml;
 
-        const viz = await handlePhylogenyVisualizationQuery("", validGenes, source, 'heatmap');
-        return summary + viz;
+    } else {
+        
+        // --- SINGLE-GENE ANALYSIS MODE (Answers "Show evolutionary conservation of WDR27") ---
+        const geneSymbol = finalGenes[0];
+        const liEntry = Object.values(liPhylogenyCache.genes).find(g => g.g && g.g.toUpperCase() === geneSymbol);
+        const neversEntry = neversPhylogenyCache?.genes?.[geneSymbol];
+
+        const liSummary = liEntry ? liPhylogenyCache.summary.class_list[liEntry.c] || 'Classification Unavailable' : 'Not found in Li et al. (2014)';
+        const neversSpeciesCount = neversEntry?.s?.length || 0;
+        const neversStatus = neversEntry ? `Found in ${neversSpeciesCount} species (Nevers et al. 2017)` : 'Not found in Nevers et al. (2017)';
+
+        const generalSummary = `
+            <div class="result-card">
+                <h3>Evolutionary Summary: ${geneSymbol} 🧬</h3>
+                <table class="gene-detail-table">
+                    <tr><th>Li et al. (2014) Classification</th><td><strong>${liSummary.replace(/_/g, ' ')}</strong></td></tr>
+                    <tr><th>Nevers et al. (2017) Status</th><td>${neversStatus}</td></tr>
+                </table>
+            </div>
+        `;
+        
+        // Route to heatmap visualization
+        const visualizationHtml = await handlePhylogenyVisualizationQuery(`Show heatmap for ${geneSymbol}`, 'li', 'heatmap');
+        return generalSummary + visualizationHtml;
     }
-
-    // --- Multi-Gene Comparison ---
-    let table = `
-        <div class="result-card">
-            <h3>Comparison: ${validGenes.join(' vs ')}</h3>
-            <p><strong>Source:</strong> ${source === 'li' ? 'Li et al. (2014)' : 'Nevers et al. (2017)'}</p>
-            ${warning}
-            <table class="gene-detail-table">
-                <thead><tr><th>Gene</th><th>Li Class</th><th>Nevers Species</th></tr></thead>
-                <tbody>`;
-
-    validGenes.forEach(gene => {
-        const liEntry = Array.isArray(liPhylogenyCache.genes)
-            ? liPhylogenyCache.genes.find(g => g.g?.toUpperCase() === gene)
-            : null;
-        const neversEntry = neversPhylogenyCache.genes?.[gene];
-        const liClass = liEntry ? (liPhylogenyCache.summary.class_list[liEntry.c] || 'N/A').replace(/_/g, ' ') : 'N/A';
-        const neversCount = neversEntry?.s?.length || 0;
-        table += `<tr><td><strong>${gene}</strong></td><td>${liClass}</td><td>${neversCount}</td></tr>`;
-    });
-
-    table += `</tbody></table></div>`;
-
-    const viz = await handlePhylogenyVisualizationQuery("", validGenes, source, 'heatmap');
-    return table + viz;
 }
 
 /**
