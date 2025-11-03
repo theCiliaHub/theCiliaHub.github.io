@@ -21,6 +21,78 @@ let corumDataCache = {
     loaded: false
 };
 
+const definitiveDefaultGenes = ["ZC2HC1A", "CEP41", "BBS1", "BBS2", "BBS5", "ZNF474", "IFT81", "BBS7"];
+const MAX_HEATMAP_GENES = 50;
+
+// --- Global Data Structures (Required for both Li and Nevers visualization) ---
+// Note: These must be defined outside any function block in the final script.
+const CIL_ORG_FULL = [
+    "Homo sapiens", "Mus musculus", "X.tropicalis", "G.gallus", "O.anatinus", 
+    "D.rerio", "T.nigroviridis", "C.intestinalis", "S.purpuratus", "H.magnipapillata", 
+    "C.elegans", "C.briggsae", "B.malayi", "D.melanogaster", "A.gambiae", 
+    "T.cruzi", "L.major", "T.brucei", "T.vaginalis", "N.gruberi"
+];
+
+const NCIL_ORG_FULL = [
+    "S.cerevisiae", "S.pombe", "U.maydis", "C.neoformans", "P.chrysosporium", 
+    "T.melanosporum", "A.fumigatus", "A.oryzae", "A.niger", "A.nidulans", 
+    "A.thaliana", "O.sativa", "Z.mays", "S.bicolor", "V.vinifera", 
+    "C.merolae", "P.tricornutum", "E.histolytica", "E.dispar", "C.parvum"
+];
+
+// --- NEW GLOBAL CONSTANTS (Nevers-Specific Panel) ---
+
+// 20 Ciliated Organisms (Includes conserved protists and vertebrates)
+const NEVERS_CIL_PANEL = [
+    "Homo sapiens", // Index 78
+    "Mus musculus", // Index 81
+    "Danio rerio", // Index 72
+    "Xenopus tropicalis", // Index 73
+    "Gallus gallus", // Index 76
+    "Caenorhabditis elegans", // Index 86
+    "Tetrahymena thermophila (strain SB210)", // Index 30
+    "Chlamydomonas reinhardtii", // Index 10
+    "Micromonas sp. (strain RCC299 / NOUM17)", // Index 12
+    "Trypanosoma cruzi", // Index 5
+    "Leishmania major", // Index 7
+    "Giardia intestinalis (strain ATCC 50803 / WB clone C6)", // Index 1
+    "Trichomonas vaginalis", // Index 0
+    "Strongylocentrotus purpuratus", // Index 66
+    "Ciona intestinalis", // Index 69
+    "Physcomitrella patens subsp. patens", // Index 15
+    "Paramecium tetraurelia", // Index 28
+    "Volvox carteri", // Index 9
+    "Amphimedon queenslandica", // Index 63
+    "Monosiga brevicollis" // Index 60
+];
+
+// 12 Non-Ciliated Organisms (Includes fungi, plants, and non-ciliated protists)
+const NEVERS_NCIL_PANEL = [
+    "Saccharomyces cerevisiae (strain ATCC 204508 / S288c)",
+    "Schizosaccharomyces pombe (strain 972 / ATCC 24843)",
+    "Cryptococcus neoformans var. neoformans serotype D (strain JEC21 / ATCC MYA-565)",
+    "Ustilago maydis (strain 521 / FGSC 9021)",
+    "Candida albicans (strain WO-1)",
+    "Arabidopsis thaliana",
+    "Brachypodium distachyon",
+    "Sorghum bicolor",
+    "Vitis vinifera",
+    "Cryptosporidium parvum (strain Iowa II)",
+    "Entamoeba histolytica",
+    "Encephalitozoon cuniculi (strain GB-M1)"
+];
+
+// --- Complex Gene Maps (For new helper functions) ---
+const COMPLEX_GENE_MAPS = {
+    "IFT COMPLEX": ["WDR19", "IFT140", "TTC21B", "IFT122", "WDR35", "IFT43", "IFT172", "IFT80", "IFT57", "TRAF3IP1", "CLUAP1", "IFT20", "IFT88", "IFT81", "IFT74", "IFT70A", "IFT70B", "IFT56", "IFT52", "IFT46", "IFT27", "IFT25", "IFT22"],
+    "IFT-A COMPLEX": ["WDR19", "IFT140", "TTC21B", "IFT122", "WDR35", "IFT43"],
+    "IFT-B COMPLEX": ["IFT172", "IFT80", "IFT57", "TRAF3IP1", "CLUAP1", "IFT20", "IFT88", "IFT81", "IFT74", "IFT70A", "IFT70B", "IFT56", "IFT52", "IFT46", "IFT27", "IFT25", "IFT22"],
+    "BBSOME": ["BBS1", "BBS2", "BBS4", "BBS5", "BBS7", "TTC8", "BBS9", "BBIP1"],
+    "TRANSITION ZONE": ["NPHP1", "MKS1", "CEP290", "AHI1", "RPGRIP1L", "TMEM67", "CC2D2A", "B9D1", "B9D2"],
+    "MKS MODULE": ["MKS1", "TMEM17", "TMEM67", "TMEM138", "B9D2", "B9D1", "CC2D2A", "TMEM107", "TMEM237", "TMEM231", "TMEM216", "TCTN1", "TCTN2", "TCTN3"],
+    "NPHP MODULE": ["NPHP1", "NPHP3", "NPHP4", "RPGRIP1L", "IQCB1", "CEP290", "SDCCAG8"],
+    "BBS PROTEINS": ["BBS1", "BBS2", "BBS4", "BBS5", "BBS7", "TTC8", "BBS9", "BBIP1"]
+};
 
 // --- NEW: Reusable scRNA-seq Data Reference ---
 const SC_RNA_SEQ_REFERENCE_HTML = `
@@ -1019,19 +1091,14 @@ function getAllPhylogenyGenes() {
  * @param {string} query - The user's input query.
  * @returns {Array<string>} - A unique list of uppercase gene symbols found.
  */
+// --- CRITICAL FIX L2: Improved Gene Extraction ---
 function extractMultipleGenes(query) {
-    // Looks for capital letters/numbers (3+ characters) or common ciliary gene patterns.
-    // The 'g' flag ensures all matches are found.
-    const genePattern = /\b([A-Z0-9]{3,}|ift\d+|bbs\d+|arl\d+b|nphp\d+)\b/gi;
+    // Improved regex to capture IFT, BBS, NPHP followed by numbers, and generic 3+ capital chars
+    const genePattern = /\b([A-Z]{3,}[0-9]*|IFT\d+|BBS\d+|NPHP\d+)\b/gi;
     const matches = query.match(genePattern);
-
-    if (!matches) {
-        return [];
-    }
-
-    // Return unique uppercase gene symbols
-    return [...new Set(matches.map(g => g.toUpperCase()))];
+    return matches ? [...new Set(matches.map(g => g.toUpperCase()))] : [];
 }
+
 
 // --- UPDATED getPhylogenyGenesForOrganism (Enriches with ALL Orthologs) ---
 async function getPhylogenyGenesForOrganism(organismName) {
@@ -1177,12 +1244,11 @@ const questionRegistry = [
     { text: "Compare evolutionary history of IFT-A complex components",handler: async () => getComplexPhylogenyAnalysis("IFT-A COMPLEX") },
     { text: "Phylogenetic analysis of the complete IFT-B complex", handler: async () => getComplexPhylogenyAnalysis("IFT-B COMPLEX") },
     { text: "Evolutionary analysis of all BBSome components", handler: async () => getComplexPhylogenyAnalysis("BBSOME") },
-    { text: "Compare conservation patterns of BBS proteins", handler: async () => getComplexPhylogenyAnalysis("BBSOME") // Uses BBSOME map },
-    // --- Transition Zone & Modules (Now use the correct Table/Heatmap functions) ---
-    // Heatmap using the new helper
+    { text: "Compare conservation patterns of BBS proteins", handler: async () => getComplexPhylogenyAnalysis("BBSOME") },
+    // --- Transition Zone & Modules ( Table/Heatmap functions) ---
     { text: "Phylogenetic analysis of core Transition Zone proteins", handler: async () => getComplexPhylogenyAnalysis("TRANSITION ZONE") },
     { text: "Show evolutionary conservation of Nephronophthisis (NPHP) module genes", handler: async () => getComplexPhylogenyAnalysis("NPHP MODULE") },
-    { text: "Show detailed phylogenetic data table for BBSome components",handler: async () => getComplexPhylogenyTable("BBSOME")},
+    { text: "Show detailed phylogenetic data table for BBSome components", handler: async () => getComplexPhylogenyTable("BBSOME")},
     { text: "Show Meckel Syndrome (MKS) phylogenetic table", handler: async () => getComplexPhylogenyTable("MKS MODULE") },
 // ==================== C. CLASSIFICATION & PATTERN QUESTIONS (List/Summary - Expanded) ====================
     { text: "List genes classified as Ciliary specific", handler: async () => getPhylogenyList('Ciliary_specific') },
@@ -2744,6 +2810,7 @@ async function mergePhylogenyCaches() {
     
     return phylogenyDataCache;
 }
+
 // --- NEW HELPER: Extract Multiple Genes Dynamically ---
 // This remains the same as previously defined, crucial for extracting genes from query.
 function extractMultipleGenes(query) {
@@ -4573,63 +4640,6 @@ async function getLiConservation(geneSymbol) {
  * fetchLiPhylogenyData, fetchNeversPhylogenyData) are assumed to be globally defined/available.
  */
 
-// --- Global Data Structures (Required for both Li and Nevers visualization) ---
-// Note: These must be defined outside any function block in the final script.
-const CIL_ORG_FULL = [
-    "Homo sapiens", "Mus musculus", "X.tropicalis", "G.gallus", "O.anatinus", 
-    "D.rerio", "T.nigroviridis", "C.intestinalis", "S.purpuratus", "H.magnipapillata", 
-    "C.elegans", "C.briggsae", "B.malayi", "D.melanogaster", "A.gambiae", 
-    "T.cruzi", "L.major", "T.brucei", "T.vaginalis", "N.gruberi"
-];
-
-const NCIL_ORG_FULL = [
-    "S.cerevisiae", "S.pombe", "U.maydis", "C.neoformans", "P.chrysosporium", 
-    "T.melanosporum", "A.fumigatus", "A.oryzae", "A.niger", "A.nidulans", 
-    "A.thaliana", "O.sativa", "Z.mays", "S.bicolor", "V.vinifera", 
-    "C.merolae", "P.tricornutum", "E.histolytica", "E.dispar", "C.parvum"
-];
-
-// --- NEW GLOBAL CONSTANTS (Nevers-Specific Panel) ---
-
-// 20 Ciliated Organisms (Includes conserved protists and vertebrates)
-const NEVERS_CIL_PANEL = [
-    "Homo sapiens", // Index 78
-    "Mus musculus", // Index 81
-    "Danio rerio", // Index 72
-    "Xenopus tropicalis", // Index 73
-    "Gallus gallus", // Index 76
-    "Caenorhabditis elegans", // Index 86
-    "Tetrahymena thermophila (strain SB210)", // Index 30
-    "Chlamydomonas reinhardtii", // Index 10
-    "Micromonas sp. (strain RCC299 / NOUM17)", // Index 12
-    "Trypanosoma cruzi", // Index 5
-    "Leishmania major", // Index 7
-    "Giardia intestinalis (strain ATCC 50803 / WB clone C6)", // Index 1
-    "Trichomonas vaginalis", // Index 0
-    "Strongylocentrotus purpuratus", // Index 66
-    "Ciona intestinalis", // Index 69
-    "Physcomitrella patens subsp. patens", // Index 15
-    "Paramecium tetraurelia", // Index 28
-    "Volvox carteri", // Index 9
-    "Amphimedon queenslandica", // Index 63
-    "Monosiga brevicollis" // Index 60
-];
-
-// 12 Non-Ciliated Organisms (Includes fungi, plants, and non-ciliated protists)
-const NEVERS_NCIL_PANEL = [
-    "Saccharomyces cerevisiae (strain ATCC 204508 / S288c)",
-    "Schizosaccharomyces pombe (strain 972 / ATCC 24843)",
-    "Cryptococcus neoformans var. neoformans serotype D (strain JEC21 / ATCC MYA-565)",
-    "Ustilago maydis (strain 521 / FGSC 9021)",
-    "Candida albicans (strain WO-1)",
-    "Arabidopsis thaliana",
-    "Brachypodium distachyon",
-    "Sorghum bicolor",
-    "Vitis vinifera",
-    "Cryptosporidium parvum (strain Iowa II)",
-    "Entamoeba histolytica",
-    "Encephalitozoon cuniculi (strain GB-M1)"
-];
 
 // --------------------------------------------------------------------------------------
 // NEW FUNCTION 1: NEVERS ET AL. 2017 HEATMAP RENDERER
@@ -5000,9 +5010,9 @@ function renderLiPhylogenyHeatmap(genes) {
 // Add this immediately after the definition of window.switchPhylogenyView
 // or right before the document.addEventListener block.
 
-/**
- * Global wrapper to handle adding a gene from the text field to the existing heatmap view.
- * This MUST be globally exposed via window.addGeneToHeatmap.
+//**
+ * Global function to handle adding a gene from the text field to the existing heatmap view.
+ * Attached to window object to resolve Uncaught TypeError.
  * @param {HTMLButtonElement} buttonElement - The 'Add' button element clicked.
  */
 window.addGeneToHeatmap = function(buttonElement) {
@@ -5014,55 +5024,36 @@ window.addGeneToHeatmap = function(buttonElement) {
         return;
     }
     
-    // Get the current list of genes from the button's data attribute
-    const currentGenesString = buttonElement.dataset.genes;
-    
-    // Combine current genes with the new gene, ensuring uniqueness
+    const currentGenesString = buttonElement.dataset.currentGenes; // CRITICAL: Use data-current-genes
     let currentGenes = currentGenesString.split(',').map(g => g.trim()).filter(Boolean);
     if (!currentGenes.includes(newGene)) {
         currentGenes.push(newGene);
     }
 
-    // Determine the current view source (Li or Nevers) from the button's plot-id attribute
-    const currentSource = buttonElement.dataset.plotId.includes('nevers') ? 'nevers' : 'li';
+    // Determine the current view source from the button's data attribute
+    const currentSource = buttonElement.dataset.plotSource || 'li';
     
-    // Clear the input field
     inputElement.value = '';
 
-    // Route the combined list back to the visualization router to generate the new heatmap
+    // Route the combined list back to the visualization router
     handlePhylogenyVisualizationQuery(`Compare ${currentGenes.join(', ')} phylogeny`, currentGenes, currentSource, 'heatmap');
 };
 
-// --- Also ensure this is globally exposed ---
+// --- CRITICAL FIX C3: Expose New Complex Helpers Globally ---
+window.getComplexPhylogenyAnalysis = getComplexPhylogenyAnalysis;
 window.getComplexPhylogenyTable = getComplexPhylogenyTable;
 
-// --- And this new function from the previous step is exposed ---
-window.getComplexPhylogenyAnalysis = getComplexPhylogenyAnalysis;
-
 // Define this new function below the previous code block:
+// --- CRITICAL FIX C3: Define New Complex Handler for Visualization ---
 async function getComplexPhylogenyAnalysis(complexName) {
-    const geneMaps = {
-        // ... (Your geneMaps definitions)
-        "IFT COMPLEX": ["WDR19", "IFT140", "TTC21B", "IFT122", "WDR35", "IFT43", "IFT172", "IFT80", "IFT57", "TRAF3IP1", "CLUAP1", "IFT20", "IFT88", "IFT81", "IFT74", "IFT70A", "IFT70B", "IFT56", "IFT52", "IFT46", "IFT27", "IFT25", "IFT22"],
-        "IFT-A COMPLEX": ["WDR19", "IFT140", "TTC21B", "IFT122", "WDR35", "IFT43"],
-        "IFT-B COMPLEX": ["IFT172", "IFT80", "IFT57", "TRAF3IP1", "CLUAP1", "IFT20", "IFT88", "IFT81", "IFT74", "IFT70A", "IFT70B", "IFT56", "IFT52", "IFT46", "IFT27", "IFT25", "IFT22"],
-        "IFT-B1 COMPLEX": ["IFT172", "IFT80", "IFT57", "TRAF3IP1", "CLUAP1", "IFT20"],
-        "IFT-B2 COMPLEX": ["IFT88", "IFT81", "IFT74", "IFT70A", "IFT70B", "IFT56", "IFT52", "IFT46", "IFT27", "IFT25", "IFT22"],
-        "BBSOME": ["BBS1", "BBS2", "BBS4", "BBS5", "BBS7", "TTC8", "BBS9", "BBIP1"],
-        "TRANSITION ZONE": ["NPHP1", "MKS1", "CEP290", "AHI1", "RPGRIP1L", "TMEM67", "CC2D2A", "B9D1", "B9D2"],
-        "MKS MODULE": ["MKS1", "TMEM17", "TMEM67", "TMEM138", "B9D2", "B9D1", "CC2D2A", "TMEM107", "TMEM237", "TMEM231", "TMEM216", "TCTN1", "TCTN2", "TCTN3"],
-        "NPHP MODULE": ["NPHP1", "NPHP3", "NPHP4", "RPGRIP1L", "IQCB1", "CEP290", "SDCCAG8"],
-        "BBS PROTEINS": ["BBS1", "BBS2", "BBS4", "BBS5", "BBS7", "TTC8", "BBS9", "BBIP1"] 
-    };
-
     const key = complexName.toUpperCase().replace(/ COMPONENTS| PROTEINS| MODULE| ANALYSIS| COMPLEX/g, '').trim();
-    const genes = geneMaps[key];
+    const genes = COMPLEX_GENE_MAPS[key];
 
     if (!genes) {
         return `<div class="result-card"><h3>Error</h3><p>Gene list not defined for complex: <strong>${complexName}</strong>.</p></div>`;
     }
 
-    // Determine data source: Use Nevers for NPHP/TZ queries, otherwise default to Li
+    // Source Selection Logic: Use Nevers for NPHP/TZ queries, otherwise default to Li
     const source = (key.includes("NPHP") || key.includes("TRANSITION")) ? 'nevers' : 'li'; 
     const queryTitle = `Evolutionary conservation of ${complexName} (${genes.length} genes)`;
 
@@ -5127,86 +5118,45 @@ function renderPhylogenyTable(genes) {
     `;
 }
 
-/**
- * @name handlePhylogenyVisualizationQuery
- * @description Renders the phylogenetic visualization, acting as the main router for 
- * heatmap switching and table view presentation. It enforces mandatory gene inclusion.
- * * NOTE: This function is also responsible for dynamically adding the 8 definitiveDefaultGenes
- * to the gene list before plotting or tabling.
- * * @param {string} query - The raw user query (used for contextual query title).
- * @param {string[]} [genes=[]] - Explicit array of genes passed by a complex handler (takes priority over query extraction).
- * @param {string} [source='li'] - The heatmap source to display ('li' or 'nevers').
- * @param {string} [view='heatmap'] - The output format requested ('heatmap' or 'table').
- * @returns {string} Empty string, as the function updates the DOM directly.
- */
+// --- CRITICAL FIX L3: Corrected main visualization router ---
 async function handlePhylogenyVisualizationQuery(query, genes = [], source = 'li', view = 'heatmap') {
     const resultArea = document.getElementById('ai-result-area');
     
-    // --- Global Constants (Assumed to be defined globally) ---
-    const MAX_HEATMAP_GENES = 50;
-    const definitiveDefaultGenes = ["ZC2HC1A", "CEP41", "BBS1", "BBS2", "BBS5", "ZNF474", "IFT81", "BBS7"];
-    // ---------------------------------------------------------
-    
     // 1. Gene Extraction and Data Loading
+    let rawInputGenes = (Array.isArray(genes) && genes.length) ? genes : extractMultipleGenes(query);
     
-    // A. Determine the raw list of genes to analyze
-    let rawInputGenes;
-    if (Array.isArray(genes) && genes.length > 0) {
-        rawInputGenes = genes;
-    } else {
-        // Fallback to extraction from the query string
-        rawInputGenes = extractMultipleGenes(query);
-    }
-    
-    // Ensure all necessary phylogenetic data is loaded
     await Promise.all([fetchLiPhylogenyData(), fetchNeversPhylogenyData()]);
 
     if (!liPhylogenyCache) {
         return `<div class="result-card"><h3>Error</h3><p>Could not load phylogenetic data (Li et al. 2014) to run this analysis.</p></div>`;
     }
 
-    // B. Validate against the Li dataset
+    // 2. Gene Validation (against Li dataset, as it's the more comprehensive standard)
     const liGenesSet = new Set(Object.values(liPhylogenyCache.genes).map(g => g.g.toUpperCase()).filter(Boolean));
     const validUserGenes = rawInputGenes.map(g => g.toUpperCase()).filter(g => liGenesSet.has(g));
 
-    // C. Combine mandatory defaults (8 genes) and valid user genes (new logic)
+    // 3. Combine mandatory defaults (8 genes) and valid user genes
     const mandatoryGenes = definitiveDefaultGenes.filter(g => liGenesSet.has(g));
-    
-    // Union of mandatory genes and user-supplied genes
     let uniqueGenes = [...new Set([...mandatoryGenes, ...validUserGenes])];
     
-    // Apply the MAX_HEATMAP_GENES limit (50)
     const finalGenes = uniqueGenes.slice(0, MAX_HEATMAP_GENES);
 
-    // --- 2. Error and Status Checks ---
-    if (finalGenes.length === 0) {
-        return `<div class="result-card"><h3>Analysis Error</h3><p>None of the requested genes or mandatory default genes were found in the phylogenetic dataset.</p></div>`;
-    }
-
-    // --- 3. Select Renderer based on requested view ---
+    // 4. Render and Inject
     let plotResult;
-    
     if (view === 'table') {
-        // Render the comparative table 
-        // NOTE: This assumes renderPhylogenyTable is robust enough to handle the combined list
         plotResult = {
-            html: renderPhylogenyTable(finalGenes),
+            html: await getPhylogenyTableAnalysis(finalGenes), // Call to new table analysis helper
             plotId: null, plotData: null, plotLayout: null
         };
     } else {
-        // Render the Heatmap (Default or Switch action)
         const renderer = (source === 'nevers') ? renderNeversPhylogenyHeatmap : renderLiPhylogenyHeatmap;
         plotResult = renderer(finalGenes);
     }
     
-    // --- 4. Inject HTML and Execute Plotting Function ---
-    
-    // Set the HTML output.
+    // Inject HTML and Execute Plotting Function
     resultArea.innerHTML = plotResult.html;
 
-    // Only attempt to plot if the view is 'heatmap'
     if (view === 'heatmap' && plotResult.plotData) {
-        // Call the global execution utility for Plotly.
         window.initPhylogenyPlot(
             plotResult.plotId, 
             plotResult.plotData, 
@@ -5214,7 +5164,6 @@ async function handlePhylogenyVisualizationQuery(query, genes = [], source = 'li
         );
     }
     
-    // Return an empty string as the function has already updated the DOM
     return "";
 }
 
@@ -5410,32 +5359,15 @@ async function routePhylogenyAnalysis(query) {
     return `<div class="result-card"><h3>Analysis Failed</h3><p>Could not identify a specific gene or a classification pattern in your request. Please try one of the suggested questions or a known keyword.</p></div>`;
 }
 
-/**
- * @name getComplexPhylogenyTable
- * @description Retrieves the predefined gene list for a complex and calls the table renderer directly.
- * @param {string} complexName - The complex name (e.g., 'MKS MODULE').
- * @returns {Promise<string>} HTML table output from getPhylogenyTableAnalysis.
- */
 async function getComplexPhylogenyTable(complexName) {
-    const geneMaps = {
-        "IFT COMPLEX": ["WDR19", "IFT140", "TTC21B", "IFT122", "WDR35", "IFT43", "IFT172", "IFT80", "IFT57", "TRAF3IP1", "CLUAP1", "IFT20", "IFT88", "IFT81", "IFT74", "IFT70A", "IFT70B", "IFT56", "IFT52", "IFT46", "IFT27", "IFT25", "IFT22"],
-        "IFT-A COMPLEX": ["WDR19", "IFT140", "TTC21B", "IFT122", "WDR35", "IFT43"],
-        "IFT-B COMPLEX": ["IFT172", "IFT80", "IFT57", "TRAF3IP1", "CLUAP1", "IFT20", "IFT88", "IFT81", "IFT74", "IFT70A", "IFT70B", "IFT56", "IFT52", "IFT46", "IFT27", "IFT25", "IFT22"],
-        "IFT-B1 COMPLEX": ["IFT172", "IFT80", "IFT57", "TRAF3IP1", "CLUAP1", "IFT20"], 
-        "IFT-B2 COMPLEX": ["IFT88", "IFT81", "IFT74", "IFT70A", "IFT70B", "IFT56", "IFT52", "IFT46", "IFT27", "IFT25", "IFT22"], 
-        "BBSOME": ["BBS1", "BBS2", "BBS4", "BBS5", "BBS7", "TTC8", "BBS9", "BBIP1"],
-        "TRANSITION ZONE": ["NPHP1", "MKS1", "CEP290", "AHI1", "RPGRIP1L", "TMEM67", "CC2D2A", "B9D1", "B9D2"],
-        "MKS MODULE": ["MKS1", "TMEM17", "TMEM67", "TMEM138", "B9D2", "B9D1", "CC2D2A", "TMEM107", "TMEM237", "TMEM231", "TMEM216", "TCTN1", "TCTN2", "TCTN3"],
-        "NPHP MODULE": ["NPHP1", "NPHP3", "NPHP4", "RPGRIP1L", "IQCB1", "CEP290", "SDCCAG8"]
-    };
-    const key = complexName.toUpperCase().replace(' COMPONENTS', '').replace(' PROTEINS', '').replace(' ANALYSIS', '').replace(' MODULE', '');
-    const genes = geneMaps[key];
+    const key = complexName.toUpperCase().replace(/ COMPONENTS| PROTEINS| ANALYSIS| MODULE| COMPLEX/g, '').trim();
+    const genes = COMPLEX_GENE_MAPS[key];
 
     if (!genes) {
         return `<div class="result-card"><h3>Error</h3><p>Gene list not defined for complex: <strong>${complexName}</strong>.</p></div>`;
     }
-    // CRITICAL: Call the analysis router forcing 'table' mode.
     const queryTitle = `Phylogenetic conservation data for ${complexName}`;
+    // Always use the table renderer logic
     return handlePhylogenyVisualizationQuery(queryTitle, genes, 'li', 'table');
 }
 
