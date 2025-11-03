@@ -4518,98 +4518,98 @@ async function getCiliaryGenesForOrganism(organismName) {
     };
 }
 
-// --- Main AI Query Handler ---
+// --- Main AI Query Handler (Fully Updated) ---
 window.handleAIQuery = async function() {
-    const aiQueryInput = document.getElementById('aiQueryInput');
-    const resultArea = document.getElementById('ai-result-area');
-    const query = aiQueryInput.value.trim();
-    if (!query) return;
+    const aiQueryInput = document.getElementById('aiQueryInput');
+    const resultArea = document.getElementById('ai-result-area');
+    const query = aiQueryInput.value.trim();
+    if (!query) return;
 
-    // --- FIX 1: Purge any existing Plotly plots from the result area ---
-    try { if (window.Plotly) window.Plotly.purge(resultArea); } catch (e) {}
+    // --- FIX 1: Purge any existing Plotly plots from the result area ---
+    try { if (window.Plotly) window.Plotly.purge(resultArea); } catch (e) {}
 
-    resultArea.style.display = 'block';
-    resultArea.innerHTML = `<p class="status-searching">CiliAI is thinking... 🧠</p>`;
-    
-    try {
-        // Await core CiliaHub data fetches ONLY. Phylogeny fetches run in the router.
-        await Promise.all([
-            fetchCiliaData(),
-            fetchScreenData(),
-            fetchTissueData(),
-            fetchCellxgeneData(),
-            fetchUmapData(),
-            getDomainData(),
-            fetchCorumComplexes()
-            // Removed redundant phylogeny fetches from here
-        ]);
-        console.log('ciliAI.js: All core data loaded for processing.');
+    resultArea.style.display = 'block';
+    resultArea.innerHTML = `<p class="status-searching">CiliAI is thinking... 🧠</p>`;
+    
+    try {
+        // Await core CiliaHub data fetches ONLY. Phylogeny fetches run in the router.
+        await Promise.all([
+            fetchCiliaData(),
+            fetchScreenData(),
+            fetchTissueData(),
+            fetchCellxgeneData(),
+            fetchUmapData(),
+            getDomainData(),
+            fetchCorumComplexes()
+        ]);
+        console.log('ciliAI.js: All core data loaded for processing.');
 
-        let resultHtml = '';
-        const qLower = query.toLowerCase();
-        let match;
+        let resultHtml = '';
+        const qLower = query.toLowerCase();
+        let match;
 
-        // =================================================================
-        // **NEW ROUTING PRIORITY:** Handle Phylogeny/Heatmap Queries (Q1-Q7)
-        // =================================================================
-        if (qLower.includes('phylogeny') || qLower.includes('conservation') || 
-            qLower.includes('heatmap') || qLower.includes('comparison') || 
-            qLower.includes('tree')) {
-            
-            console.log('Routing to Phylogenetic Visualization Query...');
-            resultHtml = await handlePhylogenyVisualizationQuery(query);
-        }
-        // =================================================================
-        // **FALLBACK TO ORIGINAL LOGIC**
-        // =================================================================
-        
-        else {
-            const perfectMatch = questionRegistry.find(item => item.text.toLowerCase() === qLower);
-            if (perfectMatch) {
-                console.log(`Registry match found: "${perfectMatch.text}"`);
-                resultHtml = await perfectMatch.handler();
-            } 
-            else if ((match = qLower.match(/(?:tell me about|what is|describe)\s+(.+)/i))) {
-                const term = match[1].trim();
-                resultHtml = await getComprehensiveDetails(term);
-            } 
-            else {
-                const intent = intentParser.parse(query);
-                if (intent && typeof intent.handler === 'function') {
-                    console.log(`Intent parser match found: ${intent.intent} for entity: ${intent.entity}`);
-                    resultHtml = await intent.handler(intent.entity);
-                }
-                else {
-                    const potentialGenes = (query.match(/\b([A-Z0-9\-\.]{3,})\b/gi) || []);
-                    const genes = potentialGenes.filter(g => ciliaHubDataCache.some(hubGene => hubGene.gene.toUpperCase() === g.toUpperCase()));
-                    
-                    if (genes.length === 2 && (qLower.includes('compare') || qLower.includes('vs'))) {
-                        resultHtml = await displayCellxgeneBarChart(genes);
-                    } else if (genes.length === 1 && (qLower.includes('plot') || qLower.includes('show expression') || qLower.includes('visualize'))) {
-                        if (qLower.includes('umap')) {
-                            resultHtml = await displayUmapGeneExpression(genes[0]);
-                        } else {
-                            resultHtml = await displayCellxgeneBarChart(genes);
-                        }
-                    } else if (genes.length === 1 && qLower.length < (genes[0].length + 5)) {
-                        resultHtml = await getComprehensiveDetails(query);
-                    } else {
-                        resultHtml = `<p>Sorry, I didn’t understand that. Please try one of the suggested questions or a known keyword.</p>`;
-                    }
-                }
-            }
-        }
+        // =================================================================
+        // 🚨 STEP 1: HIGH-PRIORITY COMPLEX/MODULE ROUTING (FIX for failed gene extraction)
+        // =================================================================
+        resultHtml = await routeComplexPhylogenyAnalysis(query);
 
-        if (resultHtml !== "") {
-            resultArea.innerHTML = resultHtml;
-        }
+        if (resultHtml === null) {
 
-    } catch (e) {
-        resultArea.innerHTML = `<p class="status-not-found">An internal CiliAI error occurred during your query. Please check the console for details. (Error: ${e.message})</p>`;
-        console.error("CiliAI Query Error:", e);
-    }
+            // =================================================================
+            // 💡 STEP 2: FALLBACK to Phylogenetic Visualization based on keyword detection 
+            // (This handles single genes and fuzzy phrasing like "IFT88 conservation")
+            // =================================================================
+            if (qLower.includes('phylogeny') || qLower.includes('conservation') || 
+                qLower.includes('heatmap') || qLower.includes('comparison') || 
+                qLower.includes('tree')) {
+                
+                console.log('Routing to Phylogenetic Visualization Query...');
+                // The query string is passed here to rely on the robust gene extraction within the handler
+                resultHtml = await handlePhylogenyVisualizationQuery(query);
+            }
+            // =================================================================
+            // ⬇️ STEP 3: FALLBACK to Original Intent/Gene Lookup Logic
+            // =================================================================
+            else {
+                const perfectMatch = questionRegistry.find(item => item.text.toLowerCase() === qLower);
+                if (perfectMatch) {
+                    console.log(`Registry match found: "${perfectMatch.text}"`);
+                    resultHtml = await perfectMatch.handler();
+                } 
+                else if ((match = qLower.match(/(?:tell me about|what is|describe)\s+(.+)/i))) {
+                    const term = match[1].trim();
+                    resultHtml = await getComprehensiveDetails(term);
+                } 
+                else {
+                    const potentialGenes = (query.match(/\b([A-Z0-9\-\.]{3,})\b/gi) || []);
+                    const genes = potentialGenes.filter(g => ciliaHubDataCache.some(hubGene => hubGene.gene.toUpperCase() === g.toUpperCase()));
+                    
+                    if (genes.length === 2 && (qLower.includes('compare') || qLower.includes('vs'))) {
+                        resultHtml = await displayCellxgeneBarChart(genes);
+                    } else if (genes.length === 1 && (qLower.includes('plot') || qLower.includes('show expression') || qLower.includes('visualize'))) {
+                        if (qLower.includes('umap')) {
+                            resultHtml = await displayUmapGeneExpression(genes[0]);
+                        } else {
+                            resultHtml = await displayCellxgeneBarChart(genes);
+                        }
+                    } else if (genes.length === 1 && qLower.length < (genes[0].length + 5)) {
+                        resultHtml = await getComprehensiveDetails(query);
+                    } else {
+                        resultHtml = `<p>Sorry, I didn’t understand that. Please try one of the suggested questions or a known keyword.</p>`;
+                    }
+                }
+            }
+        }
+
+        if (resultHtml !== "") {
+            resultArea.innerHTML = resultHtml;
+        }
+
+    } catch (e) {
+        resultArea.innerHTML = `<p class="status-not-found">An internal CiliAI error occurred during your query. Please check the console for details. (Error: ${e.message})</p>`;
+        console.error("CiliAI Query Error:", e);
+    }
 };
-
 
 /**
  * Patches the main query handler to include Corum lookups.
@@ -5403,6 +5403,53 @@ async function getComplexPhylogenyAnalysis(complexName) {
     const queryTitle = `Evolutionary conservation of ${complexName} (${genes.length} genes)`;
 
     return handlePhylogenyVisualizationQuery(queryTitle, genes, source, 'heatmap');
+}
+
+// NEW ROUTER FUNCTION to handle complex-specific queries before gene extraction runs.
+async function routeComplexPhylogenyAnalysis(query) {
+    const qUpper = query.toUpperCase();
+
+    // Map common keywords (stripped of noise words by a regex matcher) to the complex name.
+    const complexKeywords = {
+        "IFT COMPLEX": "IFT COMPLEX",
+        "IFT A COMPLEX": "IFT-A COMPLEX",
+        "IFT B COMPLEX": "IFT-B COMPLEX",
+        "IFT B1 COMPLEX": "IFT-B1 COMPLEX",
+        "IFT B2 COMPLEX": "IFT-B2 COMPLEX",
+        "BBSOME": "BBSOME",
+        "BBS PROTEINS": "BBSOME",
+        "TRANSITION ZONE": "TRANSITION ZONE",
+        "MKS MODULE": "MKS MODULE",
+        "MECKEL SYNDROME MODULE": "MKS MODULE",
+        "NPHP MODULE": "NPHP MODULE",
+        "NEPHRONOPHTHISIS MODULE": "NPHP MODULE"
+    };
+
+    // Simplify the query for matching (strip common noise words like 'compare', 'analysis', 'of')
+    // This is similar to how your extraction logic works, but here we preserve the full complex name.
+    const simplifiedQuery = qUpper
+        .replace(/COMPARE|CONSERVATION|PATTERNS|EVOLUTIONARY|ANALYSIS|HISTORY|PROFILE|OF|THE|ALL|CORE|COMPLETE/g, '')
+        .trim()
+        .replace(/\s+/g, ' ');
+
+    let detectedComplex = null;
+    
+    // Iterate through the keywords to find the longest matching complex name in the query.
+    for (const [key, complexName] of Object.entries(complexKeywords)) {
+        if (qUpper.includes(key) || simplifiedQuery.includes(key.replace(/\s/g, ''))) {
+            detectedComplex = complexName;
+            break; 
+        }
+    }
+
+    if (detectedComplex) {
+        // Use the explicit handler that forces the correct gene list.
+        return getComplexPhylogenyAnalysis(detectedComplex);
+    }
+    
+    // If no complex is detected, return null/undefined so the central router can proceed
+    // to general single-gene extraction or fallback to other intents.
+    return null;
 }
 
 /**
