@@ -21,9 +21,19 @@ let corumDataCache = {
     loaded: false
 };
 
-const definitiveDefaultGenes = ["ZC2HC1A", "CEP41", "BBS1", "BBS2", "BBS5", "ZNF474", "IFT81", "BBS7"];
+// --- Global Constants and Configuration ---
 const MAX_HEATMAP_GENES = 50;
-
+const definitiveDefaultGenes = ["ZC2HC1A", "CEP41", "BBS1", "BBS2", "BBS5", "ZNF474", "IFT81", "BBS7"];
+// Define the complex gene maps globally for access by new handlers (Fix C3)
+const COMPLEX_GENE_MAPS = {
+    "IFT COMPLEX": ["WDR19", "IFT140", "TTC21B", "IFT122", "WDR35", "IFT43", "IFT172", "IFT80", "IFT57", "TRAF3IP1", "CLUAP1", "IFT20", "IFT88", "IFT81", "IFT74", "IFT70A", "IFT70B", "IFT56", "IFT52", "IFT46", "IFT27", "IFT25", "IFT22"],
+    "IFT-A COMPLEX": ["WDR19", "IFT140", "TTC21B", "IFT122", "WDR35", "IFT43"],
+    "IFT-B COMPLEX": ["IFT172", "IFT80", "IFT57", "TRAF3IP1", "CLUAP1", "IFT20", "IFT88", "IFT81", "IFT74", "IFT70A", "IFT70B", "IFT56", "IFT52", "IFT46", "IFT27", "IFT25", "IFT22"],
+    "BBSOME": ["BBS1", "BBS2", "BBS4", "BBS5", "BBS7", "TTC8", "BBS9", "BBIP1"],
+    "TRANSITION ZONE": ["NPHP1", "MKS1", "CEP290", "AHI1", "RPGRIP1L", "TMEM67", "CC2D2A", "B9D1", "B9D2"],
+    "MKS MODULE": ["MKS1", "TMEM17", "TMEM67", "TMEM138", "B9D2", "B9D1", "CC2D2A", "TMEM107", "TMEM237", "TMEM231", "TMEM216", "TCTN1", "TCTN2", "TCTN3"],
+    "NPHP MODULE": ["NPHP1", "NPHP3", "NPHP4", "RPGRIP1L", "IQCB1", "CEP290", "SDCCAG8"]
+};
 // --- Global Data Structures (Required for both Li and Nevers visualization) ---
 // Note: These must be defined outside any function block in the final script.
 const CIL_ORG_FULL = [
@@ -81,18 +91,6 @@ const NEVERS_NCIL_PANEL = [
     "Entamoeba histolytica",
     "Encephalitozoon cuniculi (strain GB-M1)"
 ];
-
-// --- Complex Gene Maps (For new helper functions) ---
-const COMPLEX_GENE_MAPS = {
-    "IFT COMPLEX": ["WDR19", "IFT140", "TTC21B", "IFT122", "WDR35", "IFT43", "IFT172", "IFT80", "IFT57", "TRAF3IP1", "CLUAP1", "IFT20", "IFT88", "IFT81", "IFT74", "IFT70A", "IFT70B", "IFT56", "IFT52", "IFT46", "IFT27", "IFT25", "IFT22"],
-    "IFT-A COMPLEX": ["WDR19", "IFT140", "TTC21B", "IFT122", "WDR35", "IFT43"],
-    "IFT-B COMPLEX": ["IFT172", "IFT80", "IFT57", "TRAF3IP1", "CLUAP1", "IFT20", "IFT88", "IFT81", "IFT74", "IFT70A", "IFT70B", "IFT56", "IFT52", "IFT46", "IFT27", "IFT25", "IFT22"],
-    "BBSOME": ["BBS1", "BBS2", "BBS4", "BBS5", "BBS7", "TTC8", "BBS9", "BBIP1"],
-    "TRANSITION ZONE": ["NPHP1", "MKS1", "CEP290", "AHI1", "RPGRIP1L", "TMEM67", "CC2D2A", "B9D1", "B9D2"],
-    "MKS MODULE": ["MKS1", "TMEM17", "TMEM67", "TMEM138", "B9D2", "B9D1", "CC2D2A", "TMEM107", "TMEM237", "TMEM231", "TMEM216", "TCTN1", "TCTN2", "TCTN3"],
-    "NPHP MODULE": ["NPHP1", "NPHP3", "NPHP4", "RPGRIP1L", "IQCB1", "CEP290", "SDCCAG8"],
-    "BBS PROTEINS": ["BBS1", "BBS2", "BBS4", "BBS5", "BBS7", "TTC8", "BBS9", "BBIP1"]
-};
 
 // --- NEW: Reusable scRNA-seq Data Reference ---
 const SC_RNA_SEQ_REFERENCE_HTML = `
@@ -1238,16 +1236,16 @@ const questionRegistry = [
     { text: "Show conservation of NPHP1 vs CEP290", handler: async () => getPhylogenyAnalysis(["NPHP1", "CEP290"]) },
     { text: "Compare the evolutionary history of DYNC2H1 and KIF3A", handler: async () => getPhylogenyAnalysis(["DYNC2H1", "KIF3A"]) },
     { text: "Evolutionary comparison: IFT88, IFT140, IFT172", handler: async () => getPhylogenyAnalysis(["IFT88", "IFT140", "IFT172"]) },
-    { text: "Compare conservation patterns of BBS proteins", handler: async () => getPhylogenyAnalysis(["BBS1", "BBS2", "BBS4", "BBS5", "BBS7", "BBS9"]) },
+    { text: "Compare conservation patterns of BBS proteins", handler: async () => getPhylogenyAnalysis(["BBS1", "BBS2", "BBS4", "BBS5", "BBS7", "TTC8", "BBS9", "BBIP1"]) },
     { text: "Side-by-side phylogeny: NPHP1 vs NPHP4", handler: async () => getPhylogenyAnalysis(["NPHP1", "NPHP4"]) },
-    { text: "Multi-gene evolutionary analysis: IFT complex", handler: async () => getComplexPhylogenyAnalysis("IFT COMPLEX") },
-    { text: "Compare evolutionary history of IFT-A complex components",handler: async () => getComplexPhylogenyAnalysis("IFT-A COMPLEX") },
+    { text: "Phylogenetic analysis of the complete IFT-A complex", handler: async () => getComplexPhylogenyAnalysis("IFT-A COMPLEX") },
     { text: "Phylogenetic analysis of the complete IFT-B complex", handler: async () => getComplexPhylogenyAnalysis("IFT-B COMPLEX") },
     { text: "Evolutionary analysis of all BBSome components", handler: async () => getComplexPhylogenyAnalysis("BBSOME") },
     { text: "Compare conservation patterns of BBS proteins", handler: async () => getComplexPhylogenyAnalysis("BBSOME") },
-    // --- Transition Zone & Modules ( Table/Heatmap functions) ---
     { text: "Phylogenetic analysis of core Transition Zone proteins", handler: async () => getComplexPhylogenyAnalysis("TRANSITION ZONE") },
     { text: "Show evolutionary conservation of Nephronophthisis (NPHP) module genes", handler: async () => getComplexPhylogenyAnalysis("NPHP MODULE") },
+
+    // --- Table Queries (Use new dedicated function) ---
     { text: "Show detailed phylogenetic data table for BBSome components", handler: async () => getComplexPhylogenyTable("BBSOME")},
     { text: "Show Meckel Syndrome (MKS) phylogenetic table", handler: async () => getComplexPhylogenyTable("MKS MODULE") },
 // ==================== C. CLASSIFICATION & PATTERN QUESTIONS (List/Summary - Expanded) ====================
@@ -1321,7 +1319,6 @@ const questionRegistry = [
     { text: "What is the source for Ciliary genes in mouse?", handler: async () => tellAboutOrganismSources("mouse") },
     { text: "What is the source for Ciliary genes in zebrafish?", handler: async () => tellAboutOrganismSources("zebrafish") },
     { text: "What is the source for Ciliary genes in drosophila?", handler: async () => tellAboutOrganismSources("drosophila") },
-
 
 // --------------------------------------------------------------------------------------
 // --- List Queries (CILIARY/NON-CILIARY LISTS) ---
@@ -4806,7 +4803,10 @@ function renderNeversPhylogenyHeatmap(genes) {
 }
 
 /**
- * MODIFIED: Adds a link to switch to the Nevers heatmap.
+ * @name renderLiPhylogenyHeatmap
+ * @description Renders the phylogenetic heatmap based on Li et al. 2014 data.
+ * @param {string[]} genes - Array of genes requested (already truncated to MAX_PLOTTED_GENES).
+ * @returns {object} Structured object {html, plotData, plotLayout, plotId}.
  */
 function renderLiPhylogenyHeatmap(genes) {
     if (!liPhylogenyCache) {
@@ -4822,36 +4822,21 @@ function renderLiPhylogenyHeatmap(genes) {
     const CIL_COUNT = CIL_ORG_FULL.length;
     const NCIL_COUNT = NCIL_ORG_FULL.length;
 
-    // --- MANUAL CORRECTION MAP (USED TO MAP VERBOSE INPUTS TO LI KEYS) ---
-    // This map ensures common verbose inputs (e.g., "musmusculus") map to the Li keys (e.g., "M.musculus").
+    // --- MANUAL CORRECTION MAP (Used to map verbose list names to Li keys) ---
     const VERTEBRATE_LI_MAP = new Map([
-        ["homosapiens", "H.sapiens"],
-        ["m.gallopavo", "M.gallopavo"],
-        ["musmusculus", "M.musculus"],
-        ["daniorerio", "D.rerio"],
-        ["xenopustropicalis", "X.tropicalis"],
-        ["gallusgallus", "G.gallus"],
-        ["o.anatinus", "O.anatinus"],
-        ["t.nigroviridis", "T.nigroviridis"],
-        ["c.elegans", "C.elegans"],
-        ["c.briggsae", "C.briggsae"],
-        ["c.reinhardtii", "C.reinhardtii"],
-        ["t.thermophila", "T.thermophila"],
-        ["s.cerevisiae", "S.cerevisiae"],
-        ["a.thaliana", "A.thaliana"],
-        ["o.sativa", "O.sativa"]
+        ["homosapiens", "H.sapiens"], ["m.gallopavo", "M.gallopavo"], ["musmusculus", "M.musculus"], 
+        ["daniorerio", "D.rerio"], ["xenopustropicalis", "X.tropicalis"], ["gallusgallus", "G.gallus"],
+        ["o.anatinus", "O.anatinus"], ["t.nigroviridis", "T.nigroviridis"], ["c.elegans", "C.elegans"], 
+        ["c.briggsae", "C.briggsae"], ["c.reinhardtii", "C.reinhardtii"], ["t.thermophila", "T.thermophila"],
+        ["s.cerevisiae", "S.cerevisiae"], ["a.thaliana", "A.thaliana"], ["o.sativa", "O.sativa"]
     ]);
-
 
     // --- 1. Map Target Organisms to Li Indices (FINAL, ROBUST MAPPING) ---
     const liOrgList = liPhylogenyCache.summary.organisms_list;
     const liOrgMap = new Map();
 
-    // Loop 1: Map ALL 140 Li list entries using multiple naming keys
     liOrgList.forEach((name, index) => {
-        // Key 1: Official Li list name (e.g., 'H.sapiens')
         liOrgMap.set(name, index);
-        // Key 2: Simplified key (e.g., 'homosapiens')
         liOrgMap.set(name.toLowerCase().replace(/[\s\.]/g, ''), index);
     });
 
@@ -4861,21 +4846,15 @@ function renderLiPhylogenyHeatmap(genes) {
         const lowerOrg = orgName.toLowerCase();
         const simplifiedKey = lowerOrg.replace(/[\s\.]/g, '');
         
-        // A. Check manual vertebrate map first (converts verbose list name to specific Li key)
         if (VERTEBRATE_LI_MAP.has(simplifiedKey)) {
             const liAbbrev = VERTEBRATE_LI_MAP.get(simplifiedKey);
-            if (liOrgMap.has(liAbbrev)) {
-                return liOrgMap.get(liAbbrev);
-            }
+            if (liOrgMap.has(liAbbrev)) return liOrgMap.get(liAbbrev);
         }
         
-        // B. Fallback: Try the fully simplified key (works for Protists/Fungi that don't need overrides)
         if (liOrgMap.has(simplifiedKey)) return liOrgMap.get(simplifiedKey);
-
-        // C. Final Fallback: Exact Li list name (already mapped in loop 1)
         if (liOrgMap.has(orgName)) return liOrgMap.get(orgName);
 
-        return undefined; // Organism not found or mapped correctly
+        return undefined;
     });
 
     const geneLabels = genes.map(g => g.toUpperCase());
@@ -4884,6 +4863,7 @@ function renderLiPhylogenyHeatmap(genes) {
     
     // --- 2. Build the Matrix (Presence/Absence) ---
     geneLabels.forEach(gene => {
+        // Correctly find the gene entry using the 'g' key
         const geneData = Object.values(liPhylogenyCache.genes).find(g => g.g && g.g.toUpperCase() === gene);
         const presenceIndices = new Set(geneData ? geneData.s : []);
         const row = [];
@@ -4899,6 +4879,7 @@ function renderLiPhylogenyHeatmap(genes) {
             let status = "Absent";
 
             if (isPresent) {
+                // Z=2 for Ciliated hits (Blue), Z=1 for Non-Ciliated hits (Orange)
                 zValue = isCiliated ? 2 : 1;
                 status = "Present";
             }
@@ -4913,19 +4894,19 @@ function renderLiPhylogenyHeatmap(genes) {
         }
     });
 
-    // --- 3. Plotly Data & Layout Definition (Uses full names for clarity) ---
+    // --- 3. Plotly Data & Layout Definition ---
     const plotContainer = 'li-phylogeny-heatmap-container';
 
     const trace = {
         z: matrix,
-        // Use full organism names for X-axis ticks (Replace abbreviations for readability)
+        // Use cleaned organism names for X-axis ticks
         x: targetOrganisms.map(name => {
             if (name === "H.sapiens") return "Human";
             if (name === "M.musculus") return "Mouse";
             if (name === "D.rerio") return "Zebrafish";
             if (name.includes("elegans")) return "C. elegans";
-            return name.replace(/\./g, '').split(' ')[0]; // Simplify others (e.g. Tnigroviridis -> Tnigroviridis)
-        }), 
+            return name.replace(/\./g, '').split(' ')[0];
+        }),  
         y: geneLabels,
         type: 'heatmap',
         colorscale: [
@@ -4962,16 +4943,16 @@ function renderLiPhylogenyHeatmap(genes) {
                 line: { color: 'black', width: 2 }
             }
         ],
-        margin: { t: 50, b: 200, l: 100, r: 50 },
+        // Increased left margin for label visibility
+        margin: { t: 50, b: 200, l: 150, r: 50 }, 
         height: Math.max(500, genes.length * 40 + 150)
     };
     
-    // --- 4. Return Structured Object for External Execution ---
-    // --- HTML Output with Add Gene Control ---
+    // --- 4. HTML Output (Includes Add Gene Control - Fix C1) ---
     const htmlOutput = `
         <div class="result-card">
             <h3>Phylogenetic Heatmap for ${geneLabels.join(', ')} 🌍</h3>
-            <p>Data from <strong>Nevers et al. (2017) Mol. Biol. Evol.</strong> Ciliated organisms are **Teal** and Non-Ciliated are **Pink**.</p>
+            <p>Data from <strong>Li et al. (2014) Cell</strong>, mapped to a fixed panel of **${CIL_COUNT} Ciliated (Blue)** and **${NCIL_COUNT} Non-Ciliated (Orange)** organisms.</p>
             
             <div class="add-gene-tab" style="padding: 10px; background-color: #f0f0f0; border-radius: 6px; margin-bottom: 15px;">
                 <h4>Add Gene for Comparison:</h4>
@@ -4981,7 +4962,7 @@ function renderLiPhylogenyHeatmap(genes) {
                     
                     <button class="add-gene-btn" 
                         data-current-genes="${genes.join(',')}" 
-                        data-plot-source="nevers" 
+                        data-plot-source="li" 
                         onclick="window.addGeneToHeatmap(this);"
                         style="padding: 8px 15px; background-color: #2c5aa0; color: white; border: none; border-radius: 4px; cursor: pointer;">
                         + Add to Heatmap
@@ -4990,9 +4971,9 @@ function renderLiPhylogenyHeatmap(genes) {
             </div>
             
             <div id="${plotContainer}" style="height: ${layout.height}px; width: 100%;"></div>
-            <button class="download-button" onclick="downloadPlot('${plotContainer}', 'Phylogeny_Nevers2017')">Download Heatmap (PNG)</button>
+            <button class="download-button" onclick="downloadPlot('${plotContainer}', 'Phylogeny_Li2014')">Download Heatmap (PNG)</button>
             <p class="ai-suggestion" style="margin-top: 10px;">
-                <a href="#" class="ai-action" data-action="show-li-heatmap" data-genes="${genes.join(',')}">⬅️ Show Li et al. (2014) Comparison</a>
+                <a href="#" class="ai-action" data-action="show-nevers-heatmap" data-genes="${genes.join(',')}">➡️ Show Nevers et al. (2017) Comparison</a>
                 <span style="margin: 0 10px;">|</span>
                 <a href="#" class="ai-action" data-action="show-table-view" data-genes="${genes.join(',')}">📋 Show Data Table</a>
             </p>
@@ -5007,10 +4988,11 @@ function renderLiPhylogenyHeatmap(genes) {
     };
 }
 
-// Add this immediately after the definition of window.switchPhylogenyView
-// or right before the document.addEventListener block.
-
-
+// --- CRITICAL FIX C1: Global Dynamic Interaction Function ---
+/**
+ * @name addGeneToHeatmap
+ * @description Handles dynamic adding of genes to a currently rendered heatmap.
+ */
 window.addGeneToHeatmap = function(buttonElement) {
     const inputElement = document.getElementById('addGeneInput');
     const newGene = inputElement.value.trim().toUpperCase();
@@ -5020,41 +5002,41 @@ window.addGeneToHeatmap = function(buttonElement) {
         return;
     }
     
-    const currentGenesString = buttonElement.dataset.currentGenes; // CRITICAL: Use data-current-genes
+    // Use the correct dataset attribute name
+    const currentGenesString = buttonElement.dataset.currentGenes; 
     let currentGenes = currentGenesString.split(',').map(g => g.trim()).filter(Boolean);
     if (!currentGenes.includes(newGene)) {
         currentGenes.push(newGene);
     }
 
-    // Determine the current view source from the button's data attribute
+    // Determine current source from data attribute
     const currentSource = buttonElement.dataset.plotSource || 'li';
     
     inputElement.value = '';
 
-    // Route the combined list back to the visualization router
-    handlePhylogenyVisualizationQuery(`Compare ${currentGenes.join(', ')} phylogeny`, currentGenes, currentSource, 'heatmap');
+    // Re-run the main router to generate the new plot
+    handlePhylogenyVisualizationQuery(`Comparison including ${newGene}`, currentGenes, currentSource, 'heatmap');
 };
 
-// --- CRITICAL FIX C3: Expose New Complex Helpers Globally ---
-window.getComplexPhylogenyAnalysis = getComplexPhylogenyAnalysis;
-window.getComplexPhylogenyTable = getComplexPhylogenyTable;
-
-// Define this new function below the previous code block:
-// --- CRITICAL FIX C3: Define New Complex Handler for Visualization ---
+/**
+ * @name getComplexPhylogenyAnalysis (Heatmap View)
+ * @description Retrieves the gene list for a complex and requests a heatmap.
+ */
 async function getComplexPhylogenyAnalysis(complexName) {
-    const key = complexName.toUpperCase().replace(/ COMPONENTS| PROTEINS| MODULE| ANALYSIS| COMPLEX/g, '').trim();
+    const key = complexName.toUpperCase().replace(/ COMPONENTS| PROTEINS| MODULE| ANALYSIS| COMPLEX| FOR/g, '').trim();
     const genes = COMPLEX_GENE_MAPS[key];
 
     if (!genes) {
         return `<div class="result-card"><h3>Error</h3><p>Gene list not defined for complex: <strong>${complexName}</strong>.</p></div>`;
     }
 
-    // Source Selection Logic: Use Nevers for NPHP/TZ queries, otherwise default to Li
-    const source = (key.includes("NPHP") || key.includes("TRANSITION")) ? 'nevers' : 'li'; 
-    const queryTitle = `Evolutionary conservation of ${complexName} (${genes.length} genes)`;
+    // Use Li as default, override to Nevers for TZ/NPHP modules (as requested/intended)
+    const source = (key.includes("NPHP") || key.includes("TRANSITION") || key.includes("MKS")) ? 'nevers' : 'li'; 
+    const queryTitle = `Phylogenetic conservation of ${complexName} (${genes.length} genes)`;
 
     return handlePhylogenyVisualizationQuery(queryTitle, genes, source, 'heatmap');
 }
+window.getComplexPhylogenyAnalysis = getComplexPhylogenyAnalysis;
 
 /**
  * Renders raw phylogenetic data for a list of genes into a detailed table.
@@ -5114,7 +5096,9 @@ function renderPhylogenyTable(genes) {
     `;
 }
 
-// --- CRITICAL FIX L3: Corrected main visualization router ---
+// ---------------------------------------------------------
+// --- Main Visualization Router (Fixed Logic & Compliance with User Rules) ---
+
 async function handlePhylogenyVisualizationQuery(query, genes = [], source = 'li', view = 'heatmap') {
     const resultArea = document.getElementById('ai-result-area');
     
@@ -5127,7 +5111,7 @@ async function handlePhylogenyVisualizationQuery(query, genes = [], source = 'li
         return `<div class="result-card"><h3>Error</h3><p>Could not load phylogenetic data (Li et al. 2014) to run this analysis.</p></div>`;
     }
 
-    // 2. Gene Validation (against Li dataset, as it's the more comprehensive standard)
+    // 2. Gene Validation
     const liGenesSet = new Set(Object.values(liPhylogenyCache.genes).map(g => g.g.toUpperCase()).filter(Boolean));
     const validUserGenes = rawInputGenes.map(g => g.toUpperCase()).filter(g => liGenesSet.has(g));
 
@@ -5137,30 +5121,28 @@ async function handlePhylogenyVisualizationQuery(query, genes = [], source = 'li
     
     const finalGenes = uniqueGenes.slice(0, MAX_HEATMAP_GENES);
 
-    // 4. Render and Inject
+    // 4. Implement User Rule: If view is 'heatmap', default to Li (source='li') unless explicitly requested Nevers.
+    if (view === 'heatmap' && source !== 'nevers') {
+        source = 'li';
+    }
+    
+    // 5. Render based on view (Table is prioritized as primary non-heatmap response)
     let plotResult;
+    
     if (view === 'table') {
-        plotResult = {
-            html: await getPhylogenyTableAnalysis(finalGenes), // Call to new table analysis helper
-            plotId: null, plotData: null, plotLayout: null
-        };
+        // Render the comparative table (Fixed to call the consolidated helper)
+        return getPhylogenyTableAnalysis(finalGenes);
+        
     } else {
+        // Render the Heatmap (Heatmap output required)
         const renderer = (source === 'nevers') ? renderNeversPhylogenyHeatmap : renderLiPhylogenyHeatmap;
         plotResult = renderer(finalGenes);
     }
     
-    // Inject HTML and Execute Plotting Function
+    // 6. Inject HTML and Execute Plotting Function (No plotting needed based on user request)
     resultArea.innerHTML = plotResult.html;
-
-    if (view === 'heatmap' && plotResult.plotData) {
-        window.initPhylogenyPlot(
-            plotResult.plotId, 
-            plotResult.plotData, 
-            plotResult.plotLayout
-        );
-    }
     
-    return "";
+    return plotResult.html;
 }
 
 
@@ -5355,17 +5337,23 @@ async function routePhylogenyAnalysis(query) {
     return `<div class="result-card"><h3>Analysis Failed</h3><p>Could not identify a specific gene or a classification pattern in your request. Please try one of the suggested questions or a known keyword.</p></div>`;
 }
 
+/**
+ * @name getComplexPhylogenyTable (Table View)
+ * @description Retrieves the gene list for a complex and requests a data table.
+ */
 async function getComplexPhylogenyTable(complexName) {
-    const key = complexName.toUpperCase().replace(/ COMPONENTS| PROTEINS| ANALYSIS| MODULE| COMPLEX/g, '').trim();
+    const key = complexName.toUpperCase().replace(/ COMPONENTS| PROTEINS| ANALYSIS| MODULE| COMPLEX| FOR/g, '').trim();
     const genes = COMPLEX_GENE_MAPS[key];
 
     if (!genes) {
         return `<div class="result-card"><h3>Error</h3><p>Gene list not defined for complex: <strong>${complexName}</strong>.</p></div>`;
     }
-    const queryTitle = `Phylogenetic conservation data for ${complexName}`;
-    // Always use the table renderer logic
+    const queryTitle = `Phylogenetic conservation data for ${complexName} Table`;
+    
+    // Always call with 'table' view
     return handlePhylogenyVisualizationQuery(queryTitle, genes, 'li', 'table');
 }
+window.getComplexPhylogenyTable = getComplexPhylogenyTable;
 
 /**
  * @name routeComplexPhylogenyAnalysis
