@@ -4410,21 +4410,30 @@ async function getCiliaryGenesForOrganism(organismName) {
     };
 }
 
-// --- Main AI Query Handler ---
-window.handleAIQuery = async function() {
+// --- Main AI Query Handler (CiliAI v3) ---
+window.handleAIQuery = async function () {
     const aiQueryInput = document.getElementById('aiQueryInput');
     const resultArea = document.getElementById('ai-result-area');
+    if (!aiQueryInput || !resultArea) return;
+
     const query = aiQueryInput.value.trim();
     if (!query) return;
 
-    // --- FIX 1: Purge any existing Plotly plots from the result area ---
-    try { if (window.Plotly) window.Plotly.purge(resultArea); } catch (e) {}
+    // --- 1. Clean slate: Purge old plots ---
+    try {
+        if (window.Plotly && resultArea) {
+            window.Plotly.purge(resultArea);
+        }
+    } catch (e) { /* ignore */ }
 
     resultArea.style.display = 'block';
-    resultArea.innerHTML = `<p class="status-searching">CiliAI is thinking... 🧠</p>`;
-    
+    resultArea.innerHTML = `
+        <div class="status-searching">
+            <p>CiliAI is thinking... Thinking</p>
+        </div>`;
+
     try {
-        // Await core CiliaHub data fetches ONLY. Phylogeny fetches run in the router.
+        // --- 2. Load core data (phylogeny loaded only when needed) ---
         await Promise.all([
             fetchCiliaData(),
             fetchScreenData(),
@@ -4433,72 +4442,98 @@ window.handleAIQuery = async function() {
             fetchUmapData(),
             getDomainData(),
             fetchCorumComplexes()
-            // Removed redundant phylogeny fetches from here
         ]);
-        console.log('ciliAI.js: All core data loaded for processing.');
 
         let resultHtml = '';
-        const qLower = query.toLowerCase();
-        let match;
 
         // =================================================================
-        // **NEW ROUTING PRIORITY:** Handle Phylogeny/Heatmap Queries (Q1-Q7)
+        //  HIGH-PRIORITY ROUTER: Complex Phylogeny & Conservation Queries
         // =================================================================
-        if (qLower.includes('phylogeny') || qLower.includes('conservation') || 
-            qLower.includes('heatmap') || qLower.includes('comparison') || 
-            qLower.includes('tree')) {
-            
-            console.log('Routing to Phylogenetic Visualization Query...');
-            resultHtml = await handlePhylogenyVisualizationQuery(query);
+        const routedResult = await routeComplexPhylogenyAnalysis(query);
+        if (routedResult) {
+            console.log('Routed to complex phylogeny handler');
+            resultArea.innerHTML = routedResult;
+            resultArea.scrollIntoView({ behavior: 'smooth' });
+            return;
         }
+
         // =================================================================
-        // **FALLBACK TO ORIGINAL LOGIC**
+        //  STANDARD INTENT FLOW (unchanged from your logic)
         // =================================================================
-        
+        const qLower = query.toLowerCase();
+
+        // 1. Exact question registry match
+        const perfectMatch = questionRegistry.find(item => 
+            item.text.toLowerCase() === qLower
+        );
+        if (perfectMatch) {
+            resultHtml = await perfectMatch.handler();
+        }
+
+        // 2. "Tell me about X" pattern
+        else if (qLower.match(/(?:tell me about|what is|describe)\s+(.+)/i)) {
+            const term = qLower.match(/(?:tell me about|what is|describe)\s+(.+)/i)[1].trim();
+            resultHtml = await getComprehensiveDetails(term);
+        }
+
+        // 3. Intent parser (ciliopathy, complex, organism, etc.)
         else {
-            const perfectMatch = questionRegistry.find(item => item.text.toLowerCase() === qLower);
-            if (perfectMatch) {
-                console.log(`Registry match found: "${perfectMatch.text}"`);
-                resultHtml = await perfectMatch.handler();
-            } 
-            else if ((match = qLower.match(/(?:tell me about|what is|describe)\s+(.+)/i))) {
-                const term = match[1].trim();
-                resultHtml = await getComprehensiveDetails(term);
-            } 
+            const intent = intentParser.parse(query);
+            if (intent && typeof intent.handler === 'function') {
+                resultHtml = await intent.handler(intent.entity);
+            }
+
+            // 4. Gene-based fallbacks
             else {
-                const intent = intentParser.parse(query);
-                if (intent && typeof intent.handler === 'function') {
-                    console.log(`Intent parser match found: ${intent.intent} for entity: ${intent.entity}`);
-                    resultHtml = await intent.handler(intent.entity);
+                const potentialGenes = (query.match(/\b([A-Z0-9\-\.]{3,})\b/gi) || [])
+                    .map(g => g.toUpperCase());
+                const validGenes = potentialGenes.filter(g =>
+                    ciliaHubDataCache?.some(h => h.gene.toUpperCase() === g)
+                );
+
+                if (validGenes.length === 2 && (qLower.includes('compare') || qLower.includes('vs'))) {
+                    resultHtml = await displayCellxgeneBarChart(validGenes);
+                }
+                else if (validGenes.length === 1 && qLower.includes('umap')) {
+                    resultHtml = await displayUmapGeneExpression(validGenes[0]);
+                }
+                else if (validGenes.length === 1 && qLower.includes('plot') || qLower.includes('expression')) {
+                    resultHtml = await displayCellxgeneBarChart(validGenes);
+                }
+                else if (validGenes.length === 1 && query.length < (validGenes[0].length + 10)) {
+                    resultHtml = await getComprehensiveDetails(validGenes[0]);
                 }
                 else {
-                    const potentialGenes = (query.match(/\b([A-Z0-9\-\.]{3,})\b/gi) || []);
-                    const genes = potentialGenes.filter(g => ciliaHubDataCache.some(hubGene => hubGene.gene.toUpperCase() === g.toUpperCase()));
-                    
-                    if (genes.length === 2 && (qLower.includes('compare') || qLower.includes('vs'))) {
-                        resultHtml = await displayCellxgeneBarChart(genes);
-                    } else if (genes.length === 1 && (qLower.includes('plot') || qLower.includes('show expression') || qLower.includes('visualize'))) {
-                        if (qLower.includes('umap')) {
-                            resultHtml = await displayUmapGeneExpression(genes[0]);
-                        } else {
-                            resultHtml = await displayCellxgeneBarChart(genes);
-                        }
-                    } else if (genes.length === 1 && qLower.length < (genes[0].length + 5)) {
-                        resultHtml = await getComprehensiveDetails(query);
-                    } else {
-                        resultHtml = `<p>Sorry, I didn’t understand that. Please try one of the suggested questions or a known keyword.</p>`;
-                    }
+                    resultHtml = `
+                        <div class="result-card status-not-found">
+                            <h3>Hmm, I didn't understand</h3>
+                            <p>Try asking:</p>
+                            <ul>
+                                <li>"Compare conservation of MKS module"</li>
+                                <li>"Show BBSome phylogeny"</li>
+                                <li>"What is IFT88?"</li>
+                                <li>"Joubert syndrome genes"</li>
+                            </ul>
+                        </div>`;
                 }
             }
         }
 
-        if (resultHtml !== "") {
+        // --- Final render ---
+        if (resultHtml) {
             resultArea.innerHTML = resultHtml;
         }
 
-    } catch (e) {
-        resultArea.innerHTML = `<p class="status-not-found">An internal CiliAI error occurred during your query. Please check the console for details. (Error: ${e.message})</p>`;
-        console.error("CiliAI Query Error:", e);
+    } catch (error) {
+        console.error('CiliAI Query Failed:', error);
+        resultArea.innerHTML = `
+            <div class="result-card status-error">
+                <h3>Oops! Something went wrong</h3>
+                <p><strong>Error:</strong> ${error.message}</p>
+                <p>Please try again or check the console.</p>
+            </div>`;
+    } finally {
+        resultArea.scrollIntoView({ behavior: 'smooth' });
     }
 };
 
@@ -5260,6 +5295,58 @@ function renderPhylogenyTable(genes) {
     `;
 }
 
+
+// NEW: High-priority router for phylogeny comparisons of complexes/modules
+async function routeComplexPhylogenyAnalysis(query) {
+  const normalized = normalizeTerm(query);
+  
+  // Detect phylogeny/conservation intent
+  const phylogenyKeywords = [
+    'compare conservation', 'phylogeny', 'evolutionary conservation', 
+    'compare phylogeny', 'conservation of', 'phylogenetic analysis'
+  ];
+  const hasPhylogenyIntent = phylogenyKeywords.some(kw => normalized.includes(normalizeTerm(kw)));
+  if (!hasPhylogenyIntent) return null;
+
+  // Get known complexes from intent parser
+  const complexes = intentParser.getAllComplexes();
+  const sortedComplexes = [...complexes].sort((a, b) => b.length - a.length);
+
+  // Check for exact or partial matches to complex names
+  for (const complexName of sortedComplexes) {
+    if (normalized.includes(normalizeTerm(complexName))) {
+      return await getComplexPhylogenyAnalysis(complexName);
+    }
+  }
+
+  // Special mappings/aliases for common queries (e.g., "MKS module" -> "MKS Complex")
+  if (normalized.includes('meckel') && normalized.includes('syndrome') || normalized.includes('mks module')) {
+    return await getComplexPhylogenyAnalysis('MKS Complex');
+  }
+  if (normalized.includes('bbs module') || normalized.includes('bardet biedl module')) {
+    return await getComplexPhylogenyAnalysis('BBSome');
+  }
+  // Add more aliases as needed for other complexes (e.g., 'IFT A' -> 'IFT-A')
+
+  return null;
+}
+
+// NEW: Handler to analyze phylogeny for a complex's genes
+async function getComplexPhylogenyAnalysis(complexName) {
+  const genes = await getGenesByComplex(complexName);
+  if (!genes || genes.length === 0) {
+    console.warn(`No genes found for complex: ${complexName}`);
+    return `<div class="result-card status-not-found">No genes found for ${complexName}.</div>`;
+  }
+
+  const queryTitle = `Phylogenetic Conservation of ${complexName} Components`;
+  
+  // Delegate to the visualization handler (assume this exists; if not, implement it to generate HTML from phylogenyDataCache)
+  return await handlePhylogenyVisualizationQuery(queryTitle, genes);
+}
+
+
+
 /**
  * Main entry point for all phylogeny visualisations.
  * @param {string} query               – Original user text (only used for gene extraction when `genes` is empty).
@@ -5269,118 +5356,154 @@ function renderPhylogenyTable(genes) {
  */
 async function handlePhylogenyVisualizationQuery(query, genes = [], source = 'li', view = 'heatmap') {
     const resultArea = document.getElementById('ai-result-area');
+    if (!resultArea) {
+        console.error("Result area '#ai-result-area' not found.");
+        return;
+    }
+
     const MAX_PLOTTED_GENES = 30;
-
-    // -------------------------------------------------
-    // 1. GENE RESOLUTION
-    // -------------------------------------------------
     let inputGenes = [];
+    let sourceName = source === 'nevers' ? 'Nevers et al. 2017' : 'Li et al. 2014';
 
-    if (Array.isArray(genes) && genes.length) {
-    inputGenes = genes.map(g => g.toUpperCase().trim()).filter(Boolean);
-    } else {
-    inputGenes = extractMultipleGenes(query);
+    // -------------------------------------------------
+    // 1. GENE RESOLUTION – PRIORITY: EXPLICIT GENES
+    // -------------------------------------------------
+    if (Array.isArray(genes) && genes.length > 0) {
+        inputGenes = genes
+            .map(g => g.toUpperCase().trim())
+            .filter(g => g && /^[A-Z0-9-]+$/.test(g));
+        console.log(`Using ${inputGenes.length} explicit genes from handler:`, inputGenes);
+    } else if (query && typeof query === 'string') {
+        inputGenes = extractMultipleGenes(query);
+        console.log(`Extracted ${inputGenes.length} genes from query:`, inputGenes);
+    }
+
+    if (inputGenes.length === 0) {
+        resultArea.innerHTML = `
+            <div class="result-card status-not-found">
+                <h3>No Genes Found</h3>
+                <p>No valid gene symbols were provided or extracted from your query.</p>
+                <p><em>Try: "Compare conservation of BBSome" or "MKS module phylogeny"</em></p>
+            </div>`;
+        return;
     }
 
     // -------------------------------------------------
-    // 2. Load caches
+    // 2. LOAD PHYLOGENY DATA
     // -------------------------------------------------
-    await Promise.all([fetchLiPhylogenyData(), fetchNeversPhylogenyData()]);
-    if (!liPhylogenyCache && source === 'li') {
-        return `<div class="result-card"><h3>Error</h3><p>Could not load Li et al. 2014 data.</p></div>`;
-    }
-    if (!neversPhylogenyCache && source === 'nevers') {
-        return `<div class="result-card"><h3>Error</h3><p>Could not load Nevers et al. 2017 data.</p></div>`;
+    await Promise.all([
+        fetchLiPhylogenyData(),
+        fetchNeversPhylogenyData()
+    ]);
+
+    const cache = source === 'nevers' ? neversPhylogenyCache : liPhylogenyCache;
+    if (!cache || !cache.genes) {
+        resultArea.innerHTML = `
+            <div class="result-card status-error">
+                <h3>Data Unavailable</h3>
+                <p>Failed to load ${sourceName} phylogeny dataset.</p>
+            </div>`;
+        return;
     }
 
     // -------------------------------------------------
-    // 3. VALIDATE GENES AGAINST THE *TARGET* SOURCE
+    // 3. VALIDATE GENES AGAINST SELECTED SOURCE
     // -------------------------------------------------
-    let validGenes = [];
-    let missingGenes = [];
-
+    const validGeneSet = new Set();
     if (source === 'nevers') {
-        const neversGeneSet = new Set(
-            Object.keys(neversPhylogenyCache.genes || {}).map(g => g.toUpperCase())
-        );
-        inputGenes.forEach(g => {
-            if (neversGeneSet.has(g)) {
-                validGenes.push(g);
-            } else {
-                missingGenes.push(g);
-            }
-        });
+        Object.keys(cache.genes).forEach(g => validGeneSet.add(g.toUpperCase()));
     } else {
-        // Li source
-        const liGenesSet = new Set(
-            Object.values(liPhylogenyCache.genes)
-                  .map(g => g.g.toUpperCase())
-                  .filter(Boolean)
-        );
-        inputGenes.forEach(g => {
-            if (liGenesSet.has(g)) {
-                validGenes.push(g);
-            } else {
-                missingGenes.push(g);
-            }
+        Object.values(cache.genes).forEach(entry => {
+            if (entry.g) validGeneSet.add(entry.g.toUpperCase());
         });
     }
 
-    let finalGenes = [];
-    let truncationMessage = '';
-    let warningMessage = '';
+    const validGenes = [];
+    const missingGenes = [];
 
-    if (validGenes.length === 0) {
-        if (missingGenes.length > 0) {
-            warningMessage = `<p class="status-note">Warning: The following genes were not found in the ${source === 'nevers' ? 'Nevers et al. 2017' : 'Li et al. 2014'} dataset: <strong>${missingGenes.join(', ')}</strong>. Showing defaults.</p>`;
+    inputGenes.forEach(g => {
+        if (validGeneSet.has(g)) {
+            validGenes.push(g);
+        } else {
+            missingGenes.push(g);
         }
-        const definitiveDefaultGenes = ["ZC2HC1A","CEP41","BBS1","BBS2","BBS5","ZNF474","IFT81","BBS7"];
-        const defaultSet = source === 'nevers'
-            ? new Set(Object.keys(neversPhylogenyCache.genes || {}).map(g => g.toUpperCase()))
-            : new Set(Object.values(liPhylogenyCache.genes).map(g => g.g.toUpperCase()));
-        finalGenes = definitiveDefaultGenes.filter(g => defaultSet.has(g)).slice(0, 5);
-        if (!finalGenes.length) {
-            return `<div class="result-card"><h3>Analysis Error</h3><p>No valid genes and no defaults available.</p></div>`;
-        }
-    } else {
-        finalGenes = [...new Set(validGenes)];
-        if (missingGenes.length > 0) {
-            warningMessage = `<p class="status-note">Note: ${missingGenes.length} gene(s) not found in dataset: <em>${missingGenes.join(', ')}</em>. Showing ${finalGenes.length} valid gene(s).</p>`;
-        }
-        if (finalGenes.length > MAX_PLOTTED_GENES) {
-            const orig = finalGenes.length;
-            finalGenes = finalGenes.slice(0, MAX_PLOTTED_GENES);
-            truncationMessage = `<p class="status-note">Warning: Only first ${MAX_PLOTTED_GENES} genes shown (you requested ${orig}).</p>`;
-        }
-    }
+    });
 
     // -------------------------------------------------
-    // 4. RENDER
+    // 4. FINAL GENE LIST + FALLBACK LOGIC
+    // -------------------------------------------------
+    let finalGenes = validGenes;
+    let messages = [];
+
+    if (finalGenes.length === 0) {
+        messages.push(`<p class="status-note">Warning: None of your genes found in ${sourceName}.</p>`);
+        const fallback = ["BBS1", "BBS2", "IFT88", "ARL13B", "CEP290"];
+        finalGenes = fallback.filter(g => validGeneSet.has(g)).slice(0, 5);
+        if (finalGenes.length === 0) {
+            resultArea.innerHTML = `
+                <div class="result-card status-error">
+                    <h3>No Data Available</h3>
+                    <p>Even fallback genes are missing from the dataset.</p>
+                </div>`;
+            return;
+        }
+        messages.push(`<p>Showing 5 conserved ciliary genes instead.</p>`);
+    } else if (missingGenes.length > 0) {
+        messages.push(`
+            <p class="status-note">
+                Note: ${missingGenes.length} gene(s) not in dataset: 
+                <em>${missingGenes.slice(0, 10).join(', ')}${missingGenes.length > 10 ? '...' : ''}</em>
+            </p>`);
+    }
+
+    if (finalGenes.length > MAX_PLOTTED_GENES) {
+        messages.push(`
+            <p class="status-note">
+                Warning: Only showing first ${MAX_PLOTTED_GENES} of ${finalGenes.length} genes.
+            </p>`);
+        finalGenes = finalGenes.slice(0, MAX_PLOTTED_GENES);
+    }
+
+    const warningHtml = messages.length > 0 ? messages.join('') : '';
+
+    // -------------------------------------------------
+    // 5. RENDER VISUALIZATION
     // -------------------------------------------------
     let plotResult;
+
     if (view === 'table') {
         plotResult = {
-            html: renderPhylogenyTable(finalGenes) + warningMessage + truncationMessage,
-            plotId: null, plotData: null, plotLayout: null
+            html: renderPhylogenyTable(finalGenes, source) + warningHtml,
+            plotId: null
         };
     } else {
-        const renderer = source === 'nevers' ? renderNeversPhylogenyHeatmap : renderLiPhylogenyHeatmap;
+        // Heatmap
+        const renderer = source === 'nevers'
+            ? renderNeversPhylogenyHeatmap
+            : renderLiPhylogenyHeatmap;
+
         plotResult = renderer(finalGenes);
-        let extraHtml = warningMessage + truncationMessage;
-        if (extraHtml) {
-            plotResult.html = plotResult.html.replace(/<\/div>\s*$/, `${extraHtml}</div>`);
+        if (warningHtml) {
+            plotResult.html = plotResult.html.replace(
+                /(<\/div>\s*)$/,
+                `${warningHtml}</div>`
+            );
         }
     }
 
     // -------------------------------------------------
-    // 5. INJECT
+    // 6. INJECT RESULT
     // -------------------------------------------------
     resultArea.innerHTML = plotResult.html;
-    if (view === 'heatmap' && plotResult.plotData) {
-        window.initPhylogenyPlot(plotResult.plotId, plotResult.plotData, plotResult.plotLayout);
+
+    if (view === 'heatmap' && plotResult.plotId && plotResult.plotData) {
+        setTimeout(() => {
+            window.initPhylogenyPlot(plotResult.plotId, plotResult.plotData, plotResult.plotLayout);
+        }, 100);
     }
 
-    return "";
+    // Scroll to result
+    resultArea.scrollIntoView({ behavior: 'smooth' });
 }
 
 /**
