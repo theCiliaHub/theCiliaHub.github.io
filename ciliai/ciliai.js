@@ -1139,8 +1139,7 @@ const questionRegistry = [
     { text: "IFT88 phylogenetic footprint", handler: async () => getPhylogenyAnalysis(["IFT88"]) },
     { text: "IFT88 conservation pattern", handler: async () => getPhylogenyAnalysis(["IFT88"]) },
     { text: "IFT88 evolutionary history", handler: async () => getPhylogenyAnalysis(["IFT88"]) },
-    { text: "IFT88 species distribution", handler: async () => getPhylogenyAnalysis(["IFT88"]) },
-    
+    { text: "IFT88 species distribution", handler: async () => getPhylogenyAnalysis(["IFT88"]) }, 
     { text: "What is the phylogeny of BBS1?", handler: async () => getPhylogenyAnalysis(["BBS1"]) },
     { text: "BBS1 conservation heatmap", handler: async () => getPhylogenyAnalysis(["BBS1"]) },
     { text: "BBS1 evolutionary conservation", handler: async () => getPhylogenyAnalysis(["BBS1"]) },
@@ -1174,14 +1173,17 @@ const questionRegistry = [
     { text: "Evolutionary comparison: IFT88, IFT140, IFT172", handler: async () => getPhylogenyAnalysis(["IFT88", "IFT140", "IFT172"]) },
     { text: "Compare conservation patterns of BBS proteins", handler: async () => getPhylogenyAnalysis(["BBS1", "BBS2", "BBS4", "BBS5", "BBS7", "BBS9"]) },
     { text: "Side-by-side phylogeny: NPHP1 vs NPHP4", handler: async () => getPhylogenyAnalysis(["NPHP1", "NPHP4"]) },
-    { text: "Multi-gene evolutionary analysis: IFT complex table", handler: async () => getComplexPhylogenyTable("IFT COMPLEX") },
-{ text: "Compare evolutionary history of IFT-A complex components table", handler: async () => getComplexPhylogenyTable("IFT-A COMPLEX") },
-{ text: "Phylogenetic analysis of the complete IFT-B complex table", handler: async () => getComplexPhylogenyTable("IFT-B COMPLEX") },
-{ text: "Evolutionary profile for IFT complex B table", handler: async () => getComplexPhylogenyTable("IFT-B COMPLEX") },
-{ text: "Compare conservation of IFT-B1 core components table", handler: async () => getComplexPhylogenyTable("IFT-B1 COMPLEX") },
-{ text: "Show conservation of IFT-B2 peripheral components table", handler: async () => getComplexPhylogenyTable("IFT-B2 COMPLEX") },
-{ text: "Evolutionary analysis of all BBSome components table", handler: async () => getComplexPhylogenyTable("BBSOME") },
-
+    { text: "Multi-gene evolutionary analysis: IFT complex", handler: async () => getComplexPhylogenyAnalysis("IFT COMPLEX") },
+    { text: "Compare evolutionary history of IFT-A complex components",handler: async () => getComplexPhylogenyAnalysis("IFT-A COMPLEX") },
+    { text: "Phylogenetic analysis of the complete IFT-B complex", handler: async () => getComplexPhylogenyAnalysis("IFT-B COMPLEX") },
+    { text: "Evolutionary analysis of all BBSome components", handler: async () => getComplexPhylogenyAnalysis("BBSOME") },
+    { text: "Compare conservation patterns of BBS proteins", handler: async () => getComplexPhylogenyAnalysis("BBSOME") // Uses BBSOME map },
+    // --- Transition Zone & Modules (Now use the correct Table/Heatmap functions) ---
+    // Heatmap using the new helper
+    { text: "Phylogenetic analysis of core Transition Zone proteins", handler: async () => getComplexPhylogenyAnalysis("TRANSITION ZONE") },
+    { text: "Show evolutionary conservation of Nephronophthisis (NPHP) module genes", handler: async () => getComplexPhylogenyAnalysis("NPHP MODULE") },
+    { text: "Show detailed phylogenetic data table for BBSome components",handler: async () => getComplexPhylogenyTable("BBSOME")},
+    { text: "Show Meckel Syndrome (MKS) phylogenetic table", handler: async () => getComplexPhylogenyTable("MKS MODULE") }
 // ==================== C. CLASSIFICATION & PATTERN QUESTIONS (List/Summary - Expanded) ====================
     { text: "List genes classified as Ciliary specific", handler: async () => getPhylogenyList('Ciliary_specific') },
     { text: "Show Mammalian specific ciliary genes", handler: async () => getPhylogenyList('Mammalian_specific') },
@@ -4994,6 +4996,79 @@ function renderLiPhylogenyHeatmap(genes) {
         plotId: plotContainer
     };
 }
+
+// Add this immediately after the definition of window.switchPhylogenyView
+// or right before the document.addEventListener block.
+
+/**
+ * Global wrapper to handle adding a gene from the text field to the existing heatmap view.
+ * This MUST be globally exposed via window.addGeneToHeatmap.
+ * @param {HTMLButtonElement} buttonElement - The 'Add' button element clicked.
+ */
+window.addGeneToHeatmap = function(buttonElement) {
+    const inputElement = document.getElementById('addGeneInput');
+    const newGene = inputElement.value.trim().toUpperCase();
+    
+    if (!newGene) {
+        alert("Please enter a gene symbol.");
+        return;
+    }
+    
+    // Get the current list of genes from the button's data attribute
+    const currentGenesString = buttonElement.dataset.genes;
+    
+    // Combine current genes with the new gene, ensuring uniqueness
+    let currentGenes = currentGenesString.split(',').map(g => g.trim()).filter(Boolean);
+    if (!currentGenes.includes(newGene)) {
+        currentGenes.push(newGene);
+    }
+
+    // Determine the current view source (Li or Nevers) from the button's plot-id attribute
+    const currentSource = buttonElement.dataset.plotId.includes('nevers') ? 'nevers' : 'li';
+    
+    // Clear the input field
+    inputElement.value = '';
+
+    // Route the combined list back to the visualization router to generate the new heatmap
+    handlePhylogenyVisualizationQuery(`Compare ${currentGenes.join(', ')} phylogeny`, currentGenes, currentSource, 'heatmap');
+};
+
+// --- Also ensure this is globally exposed ---
+window.getComplexPhylogenyTable = getComplexPhylogenyTable;
+
+// --- And this new function from the previous step is exposed ---
+window.getComplexPhylogenyAnalysis = getComplexPhylogenyAnalysis;
+
+// Define this new function below the previous code block:
+async function getComplexPhylogenyAnalysis(complexName) {
+    const geneMaps = {
+        // ... (Your geneMaps definitions)
+        "IFT COMPLEX": ["WDR19", "IFT140", "TTC21B", "IFT122", "WDR35", "IFT43", "IFT172", "IFT80", "IFT57", "TRAF3IP1", "CLUAP1", "IFT20", "IFT88", "IFT81", "IFT74", "IFT70A", "IFT70B", "IFT56", "IFT52", "IFT46", "IFT27", "IFT25", "IFT22"],
+        "IFT-A COMPLEX": ["WDR19", "IFT140", "TTC21B", "IFT122", "WDR35", "IFT43"],
+        "IFT-B COMPLEX": ["IFT172", "IFT80", "IFT57", "TRAF3IP1", "CLUAP1", "IFT20", "IFT88", "IFT81", "IFT74", "IFT70A", "IFT70B", "IFT56", "IFT52", "IFT46", "IFT27", "IFT25", "IFT22"],
+        "IFT-B1 COMPLEX": ["IFT172", "IFT80", "IFT57", "TRAF3IP1", "CLUAP1", "IFT20"],
+        "IFT-B2 COMPLEX": ["IFT88", "IFT81", "IFT74", "IFT70A", "IFT70B", "IFT56", "IFT52", "IFT46", "IFT27", "IFT25", "IFT22"],
+        "BBSOME": ["BBS1", "BBS2", "BBS4", "BBS5", "BBS7", "TTC8", "BBS9", "BBIP1"],
+        "TRANSITION ZONE": ["NPHP1", "MKS1", "CEP290", "AHI1", "RPGRIP1L", "TMEM67", "CC2D2A", "B9D1", "B9D2"],
+        "MKS MODULE": ["MKS1", "TMEM17", "TMEM67", "TMEM138", "B9D2", "B9D1", "CC2D2A", "TMEM107", "TMEM237", "TMEM231", "TMEM216", "TCTN1", "TCTN2", "TCTN3"],
+        "NPHP MODULE": ["NPHP1", "NPHP3", "NPHP4", "RPGRIP1L", "IQCB1", "CEP290", "SDCCAG8"],
+        "BBS PROTEINS": ["BBS1", "BBS2", "BBS4", "BBS5", "BBS7", "TTC8", "BBS9", "BBIP1"] 
+    };
+
+    const key = complexName.toUpperCase().replace(/ COMPONENTS| PROTEINS| MODULE| ANALYSIS| COMPLEX/g, '').trim();
+    const genes = geneMaps[key];
+
+    if (!genes) {
+        return `<div class="result-card"><h3>Error</h3><p>Gene list not defined for complex: <strong>${complexName}</strong>.</p></div>`;
+    }
+
+    // Determine data source: Use Nevers for NPHP/TZ queries, otherwise default to Li
+    const source = (key.includes("NPHP") || key.includes("TRANSITION")) ? 'nevers' : 'li'; 
+    const queryTitle = `Evolutionary conservation of ${complexName} (${genes.length} genes)`;
+
+    return handlePhylogenyVisualizationQuery(queryTitle, genes, source, 'heatmap');
+}
+
 /**
  * Renders raw phylogenetic data for a list of genes into a detailed table.
  * @param {string[]} genes - Array of genes requested.
