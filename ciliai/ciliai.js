@@ -1004,14 +1004,16 @@ async function routeComplexPhylogenyAnalysis(query) {
  * This directly addresses the IFT, MKS, and NPHP failures by mapping them to known forms.
  */
 function standardizeComplexName(complexName) {
-    const nameUpper = complexName.toUpperCase().replace(/COMPLEX|MODULE|\(S\)/G, '').trim();
+    // FIX: Changed the regex flag from uppercase /G to lowercase /g, 
+    // and moved it to the correct position (after the closing slash)
+    const nameUpper = complexName.toUpperCase().replace(/COMPLEX|MODULE|\(S\)/g, '').trim();
 
     const standardizationMap = {
         'IFT-A': 'IFT-A complex',
         'IFT-B': 'IFT-B complex',
         'IFT': 'Intraflagellar transport (IFT) complex',
-        'MKS': 'MKS Complex', // Using the hard-coded map name as standard
-        'NPHP': 'NPHP Complex', // Using the hard-coded map name as standard
+        'MKS': 'MKS Complex', 
+        'NPHP': 'NPHP Complex', 
         'TRANSITION ZONE': 'Transition Zone Complex',
         'RADIAL SPOKE': 'Radial Spoke',
         'CENTRAL PAIR': 'Central Pair',
