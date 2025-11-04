@@ -680,16 +680,18 @@ function getComplexesByGene(geneSymbol) {
  * @param {string} complexName The complex name (can be partial).
  * @returns {Array<Object>} List of complexes matching the name.
  */
+/**
+ * Retrieves subunits for a given complex name from CORUM, safely handling missing data.
+ */
 function getSubunitsByComplexName(complexName) {
     if (!corumDataCache?.complexes) return [];
     const nameLower = (complexName || '').toLowerCase();
 
     return corumDataCache.complexes.filter(
-        c => c?.complex_name && c.complex_name.toLowerCase().includes(nameLower)
+        c => c && typeof c.complex_name === 'string' &&
+             c.complex_name.toLowerCase().includes(nameLower)
     );
 }
-
-
 
 /**
  * Fetches the new domain database (enriched, depleted, gene map).
@@ -818,59 +820,78 @@ async function getLiteratureEvidence(gene) {
 /**
  * Retrieves components for a complex name, prioritizing CORUM data.
  * NOTE: This assumes the corrected 'fetchCorumComplexes' is running.
+/**
+ * Retrieves gene components for a given complex name, integrating Curated, CORUM, and CiliaHub sources.
+ * This version includes robust error handling for undefined entries and safer filtering.
  */
 async function getGenesByComplex(complexName) {
-    // Ensure all data is ready, including the newly added CORUM fetch
+    // --- Ensure data readiness ---
     await Promise.all([fetchCorumComplexes(), fetchCiliaData()]);
 
-    // Apply standardization
+    // --- Apply name normalization ---
     const standardizedName = standardizeComplexName(complexName);
+    const nameUpperKey = standardizedName.toUpperCase()
+        .replace(' COMPLEX', '').replace(' MODULE', '').trim();
     const nameLower = standardizedName.toLowerCase();
-    
-    // --- 2. Check CORUM Cache (High Priority) ---
-const corumEntry = corumDataCache?.byNameLower?.[nameLower];
-if (corumEntry && Array.isArray(corumEntry.subunits)) {
-    const validSubunits = corumEntry.subunits.filter(
-        s => s && typeof s.gene_name === 'string' && s.gene_name.trim() !== ''
-    );
 
-    if (validSubunits.length > 0) {
-        return validSubunits.map(subunit => ({
-            gene: subunit.gene_name,
-            description: `Complex: ${corumEntry.complex_name} (CORUM ID: ${corumEntry.complex_id})`,
-            source: 'CORUM'
+    // --- 1. Check Curated Gene Maps (Highest Priority) ---
+    const curatedGeneMaps = getComplexPhylogenyTableMap();
+    const curatedGenes = curatedGeneMaps?.[nameUpperKey];
+
+    if (Array.isArray(curatedGenes) && curatedGenes.length > 0) {
+        return curatedGenes.map(gene => ({
+            gene: gene,
+            description: `Complex: ${standardizedName} (Curated List)`,
+            source: 'Curated'
         }));
     }
-}
 
-    // --- 2. Fallback to CiliaHub Gene Annotations (Fixed Logic) ---
+    // --- 2. Check CORUM Cache (High Priority) ---
+    const corumEntry = corumDataCache?.byNameLower?.[nameLower];
+    if (corumEntry && Array.isArray(corumEntry.subunits)) {
+        const validSubunits = corumEntry.subunits.filter(
+            s => s && typeof s.gene_name === 'string' && s.gene_name.trim() !== ''
+        );
+
+        if (validSubunits.length > 0) {
+            return validSubunits.map(subunit => ({
+                gene: subunit.gene_name,
+                description: `Complex: ${corumEntry.complex_name} (CORUM ID: ${corumEntry.complex_id})`,
+                source: 'CORUM'
+            }));
+        }
+    }
+
+    // --- 3. Fallback to CiliaHub Gene Annotations ---
     const complexRegex = new RegExp(standardizedName.replace(/[-\s]/g, '[-\\s]?'), 'i');
-    
-    const complexGenes = ciliaHubDataCache.filter(gene => 
-        // FIX: Ensure complex_names is an array and check if each element is a string before matching
-        gene.complex_names && Array.isArray(gene.complex_names) && gene.complex_names.some(cn => 
-            typeof cn === 'string' && cn.match(complexRegex)
+    const complexGenes = ciliaHubDataCache.filter(gene =>
+        gene &&
+        Array.isArray(gene.complex_names) &&
+        gene.complex_names.some(
+            cn => typeof cn === 'string' && complexRegex.test(cn)
         )
     ).map(gene => ({
         gene: gene.gene,
         description: `Complex: ${gene.complex_names?.join(', ') || 'Unknown'}`,
         source: 'CiliaHub'
     }));
-    
-    // 3. Fallback to searching functional summary if no direct hit
+
     if (complexGenes.length > 0) return complexGenes;
 
-    const relatedGenes = ciliaHubDataCache.filter(gene => 
-        gene.functional_summary && gene.functional_summary.toLowerCase().includes(nameLower)
+    // --- 4. Final fallback: Search functional summaries ---
+    const relatedGenes = ciliaHubDataCache.filter(gene =>
+        gene &&
+        typeof gene.functional_summary === 'string' &&
+        gene.functional_summary.toLowerCase().includes(nameLower)
     ).map(gene => ({
         gene: gene.gene,
         description: gene.functional_summary?.substring(0, 100) + '...' || 'No description',
         source: 'CiliaHub - Summary Match'
     }));
-    
-    // Combine and return
+
     return relatedGenes;
 }
+
 
 async function compareComplexes(complexA, complexB) {
     const componentsA = await getGenesByComplex(complexA);
@@ -1007,6 +1028,7 @@ async function getCuratedComplexComponents(complexName) {
     // Fallback: This should ideally not be hit for these specific complexes.
     return [];
 }
+
 /**
  * Extracts and normalizes the curated gene map data for use by getGenesByComplex.
  * NOTE: This must be placed near getComplexPhylogenyTable so it can access the same data structure.
@@ -3729,12 +3751,12 @@ questionRegistry.push(
   
   // --- Protein Structure & Complexes ---
   { text: "Show protein domains of WDR35", handler: () => getGeneDomains("WDR35") },
-  { text: "List all components of the BBSome complex", handler: () => getGenesByComplex("BBSome") },
-  { text: "Display components of IFT-A complex", handler: () => getGenesByComplex("IFT-A") },
-  { text: "Display components of IFT-B complex", handler: () => getGenesByComplex("IFT-B") },
-  { text: "Show components of Transition Zone Complex", handler: () => getGenesByComplex("Transition Zone Complex") },
-  { text: "Display components of MKS Complex", handler: () => getGenesByComplex("MKS Complex") },
-  { text: "Show components of NPHP Complex", handler: () => getGenesByComplex("NPHP Complex") },
+  { text: "List all components of the BBSome complex", handler: async () => formatListResult("Components of BBSome", await getCuratedComplexComponents("BBSome")) },
+  { text: "Display components of IFT-A complex", handler: async () => formatListResult("Components of IFT-A", await getCuratedComplexComponents("IFT-A")) },
+  { text: "Display components of IFT-B complex", handler: async () => formatListResult("Components of IFT-B", await getCuratedComplexComponents("IFT-B")) },
+  { text: "Show components of Transition Zone Complex", handler: async () => formatListResult("Components of Transition Zone Complex", await getCuratedComplexComponents("Transition Zone")) },
+  { text: "Display components of MKS Complex", handler: async () => formatListResult("Components of MKS Complex", await getCuratedComplexComponents("MKS")) },
+  { text: "Show components of NPHP Complex", handler: async () => formatListResult("Components of NPHP Complex", await getCuratedComplexComponents("NPHP")) },
   
   // --- Ciliary Status ---
   { text: "Is DYNC2H1 a ciliary gene?", handler: () => checkCiliaryStatus("DYNC2H1") },
