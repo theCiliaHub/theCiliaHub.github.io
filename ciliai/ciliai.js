@@ -1653,10 +1653,10 @@ async function visualizeDomainArchitecture(geneName) {
     return html;
 }
 
-//**
- * @name displayDomainComparison
- * @description Compares domain names between two genes and renders the results using a CiliaHub-compatible color scheme.
+/**
+ * @description Compares domain names between two genes and renders the results using a CiliaHub-compatible color scheme
  */
+//**
 async function displayDomainComparison(geneA, geneB) {
     // Note: This relies on the fixed compareDomainArchitecture(geneA, geneB) function being defined elsewhere.
     const comparison = await compareDomainArchitecture(geneA, geneB);
