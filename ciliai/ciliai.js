@@ -1432,44 +1432,40 @@ async function resolveDomainQuery(query) {
  * @name getDomainsByGene
  * @description Retrieves all domain details for a single gene from the structured domain map.
  */
-async function getDomainsByGene(geneName) {
-    if (!CILI_AI_DOMAIN_DB) await getDomainData();
-    
-    const domainMap = CILI_AI_DOMAIN_DB?.gene_domain_map; 
-    if (!domainMap) return [];
+async function getDomainsByGene(gene) {
+  if (!gene || typeof gene !== "string") {
+    console.warn(`[getDomainsByGene] ❌ Invalid gene input:`, gene);
+    return [];
+  }
 
-    const geneUpper = geneName.toUpperCase();
+  const normalized = gene.trim().toUpperCase();
+  console.log(`[getDomainsByGene] 🔍 Looking up domains for: ${normalized}`);
 
-    // 🔍 Try direct lookup first
-    let geneDomains = domainMap[geneUpper];
-
-    // 🩹 Case-insensitive fallback if not found
-    if (!geneDomains) {
-        const matchedKey = Object.keys(domainMap).find(
-            key => key.toUpperCase() === geneUpper
-        );
-        if (matchedKey) {
-            geneDomains = domainMap[matchedKey];
-            console.log(`🔎 [getDomainsByGene] Case-insensitive match found: "${matchedKey}" for "${geneName}"`);
-        } else {
-            console.warn(`⚠️ [getDomainsByGene] No domain entry found for gene: "${geneName}"`);
-        }
+  try {
+    if (!window.domainDatabase || Object.keys(window.domainDatabase).length === 0) {
+      console.error(`[getDomainsByGene] ⚠️ Domain database not loaded yet.`);
+      return [];
     }
 
-    if (!geneDomains || geneDomains.length === 0) return [];
+    // Try direct match and fallbacks
+    const entry =
+      window.domainDatabase[normalized] ||
+      window.domainDatabase[normalized.replace(/[\s-]/g, "_")] ||
+      Object.entries(window.domainDatabase).find(([k]) => k.includes(normalized))?.[1];
 
-    // 🧩 Normalize and return clean domain objects
-    return geneDomains.map(domain => ({
-        gene: geneName,
-        domain_name: domain.description || domain.domain_id || 'Unknown', 
-        domain_type: domain.type || 'Structure',
-        start: domain.start || 0,
-        end: domain.end || 0,
-        length: (domain.end > 0 && domain.start > 0) ? (domain.end - domain.start) : 0,
-        description: domain.description || 'No description available',
-        source: 'New Domain Database'
-    }));
+    if (!entry) {
+      console.warn(`[getDomainsByGene] ⚠️ No domain entry found for gene: "${normalized}"`);
+      return [];
+    }
+
+    console.log(`[getDomainsByGene] ✅ Found ${entry.length} domain(s) for ${normalized}`);
+    return entry;
+  } catch (err) {
+    console.error(`[getDomainsByGene] 💥 Error while fetching domains for ${normalized}:`, err);
+    return [];
+  }
 }
+
 
 // --------------------------------------------------------------------------------------
 
