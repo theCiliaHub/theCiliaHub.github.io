@@ -818,9 +818,6 @@ async function getLiteratureEvidence(gene) {
  */
 
 /**
- * Retrieves components for a complex name, prioritizing CORUM data.
- * NOTE: This assumes the corrected 'fetchCorumComplexes' is running.
-/**
  * Retrieves gene components for a given complex name, integrating Curated, CORUM, and CiliaHub sources.
  * This version includes robust error handling for undefined entries and safer filtering.
  */
@@ -830,13 +827,16 @@ async function getGenesByComplex(complexName) {
 
     // --- Apply name normalization ---
     const standardizedName = standardizeComplexName(complexName);
-    const nameUpperKey = standardizedName.toUpperCase()
-        .replace(' COMPLEX', '').replace(' MODULE', '').trim();
+    
+    // 💡 FIX 1: Use the FULL standardized name as the key for the Curated Map.
+    const nameUpperKey = standardizedName.toUpperCase().trim(); 
+    
     const nameLower = standardizedName.toLowerCase();
 
     // --- 1. Check Curated Gene Maps (Highest Priority) ---
     const curatedGeneMaps = getComplexPhylogenyTableMap();
-    const curatedGenes = curatedGeneMaps?.[nameUpperKey];
+    // Use simple bracket notation for safety, checking for existence before accessing.
+    const curatedGenes = curatedGeneMaps[nameUpperKey]; 
 
     if (Array.isArray(curatedGenes) && curatedGenes.length > 0) {
         return curatedGenes.map(gene => ({
@@ -845,7 +845,6 @@ async function getGenesByComplex(complexName) {
             source: 'Curated'
         }));
     }
-
     // --- 2. Check CORUM Cache (High Priority) ---
     const corumEntry = corumDataCache?.byNameLower?.[nameLower];
     if (corumEntry && Array.isArray(corumEntry.subunits)) {
@@ -1004,10 +1003,12 @@ async function routeComplexPhylogenyAnalysis(query) {
  */
 async function getCuratedComplexComponents(complexName) {
     const curatedGeneMaps = getComplexPhylogenyTableMap(); 
-    const standardizedName = standardizeComplexName(complexName); // Calls the fixed function
-    const mapKey = standardizedName.toUpperCase()
-        .replace(' COMPLEX', '').replace(' MODULE', '').trim();
-    const genes = curatedGeneMaps[mapKey];
+    const standardizedName = standardizeComplexName(complexName);
+
+    // 💡 FIX 2: Use the FULL standardized name as the key for the Curated Map.
+    const mapKey = standardizedName.toUpperCase().trim(); 
+    
+    const genes = curatedGeneMaps[mapKey]; // Direct lookup with the full key
 
     if (genes && genes.length > 0) {
         return genes.map(gene => ({
