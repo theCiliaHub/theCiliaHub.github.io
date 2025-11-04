@@ -1397,37 +1397,64 @@ async function getGenesByComplex(complexName) {
 
 /**
  * @name resolveDomainQuery
- * @description Routes domain-related queries to the correct list or gene handler.
+ * @description Routes domain-related queries (Comparison, Enriched, Depleted, Specific Motifs).
+ * This must be defined globally.
  * @param {string} query - The raw user query.
  */
 async function resolveDomainQuery(query) {
     const qLower = query.toLowerCase();
 
-    // 1. Check for ENRICHED/DEPLETED LIST requests
-    if (qLower.includes('enriched domain') || qLower.includes('show enriched')) {
-        // This assumes displayEnrichedDomains() returns the formatted HTML (as implemented in your source code)
-        return displayEnrichedDomains();
-    }
-    if (qLower.includes('depleted domain') || qLower.includes('show depleted') || qLower.includes('domains absent')) {
-        // This assumes displayDepletedDomains() returns the formatted HTML (as implemented in your source code)
-        return displayDepletedDomains();
-    }
-
-    // 2. Check for Specific DOMAIN NAME lookup (e.g., "Show WD40 proteins")
-    // This requires extracting the domain name (e.g., WD40, EF-hand)
-    const domainKeywords = ['wd40', 'leucine-rich repeat', 'iq motif', 'ef-hand', 'kinase', 'atpase', 'zinc finger']; 
-
-    for (const keyword of domainKeywords) {
-        if (qLower.includes(keyword)) {
-            // This assumes findGenesByNewDomainDB() returns the formatted list (as implemented in your source code)
-            return findGenesByNewDomainDB(keyword);
+    // ====================================================================
+    // ⭐ FIX: Comparison Logic
+    // ====================================================================
+    
+    // Check for explicit comparison keywords AND that the query is about domains
+    if (qLower.includes('vs') || qLower.includes('and') || qLower.includes('comparison') || qLower.includes('architecture')) {
+        
+        // Use the robust utility to pull ALL potential gene names from the query
+        // This should correctly extract ['IFT88', 'IFT81'] from the string.
+        const genes = extractMultipleGenes(query); 
+        
+        if (genes.length >= 2 && (qLower.includes('domain') || qLower.includes('architecture'))) {
+            // Compare the first two valid genes found
+            const geneA = genes[0];
+            const geneB = genes[1];
+            
+            console.log(`Domain comparison detected: Routing ${geneA} vs ${geneB}.`);
+            return displayDomainComparison(geneA, geneB);
         }
     }
     
-    // 3. Fallback for unrecognized domain syntax
-    return `<div class="result-card"><h3>Domain Query Failed</h3><p>Could not identify a specific domain name or list type. Try "Show WD40 domain proteins" or "List enriched domains."</p></div>`;
+    // ====================================================================
+    // 1. Check for ENRICHED/DEPLETED LIST requests (Unchanged)
+    // ====================================================================
+    if (qLower.includes('enriched domain') || qLower.includes('show enriched')) {
+        return displayEnrichedDomains();
+    }
+    if (qLower.includes('depleted domain') || qLower.includes('show depleted') || qLower.includes('domains absent')) {
+        return displayDepletedDomains();
+    }
+    // ====================================================================
+    // 2. Check for Specific DOMAIN NAME lookup (Unchanged)
+    // ====================================================================
+    const domainKeywords = ['wd40', 'leucine-rich repeat', 'iq motif', 'ef-hand', 'kinase', 'atpase', 'zinc finger']; 
+    for (const keyword of domainKeywords) {
+        if (qLower.includes(keyword)) {
+            return formatListResult(`Genes with ${keyword} domain`, await getGenesByDomain(keyword));
+        }
+    }
+    
+    // 3. Fallback for single gene display (Unchanged)
+    const singleGeneMatch = query.match(/(?:domains?|architecture)\s+(?:of|for)\s+([A-Z0-9]+)/i);
+    if (singleGeneMatch) {
+        return visualizeDomainArchitecture(singleGeneMatch[1].toUpperCase());
+    }
+
+    return `<div class="result-card"><h3>Domain Query Failed</h3><p>Could not interpret the domain query. Please try comparing two genes (e.g., "IFT88 vs IFT81") or requesting a specific domain list.</p></div>`;
 }
 
+// NOTE: The implementation of resolvePhylogeneticQuery is correct as provided previously 
+// and should be placed globally to address the other console error.
 /**
  * @name getDomainsByGene
  * @description Retrieves all domain details for a single gene from the structured domain map.
