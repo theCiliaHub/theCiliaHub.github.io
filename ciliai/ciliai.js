@@ -873,6 +873,25 @@ async function getGenesByComplex(complexName) {
     return relatedGenes;
 }
 
+async function compareComplexes(complexA, complexB) {
+    const componentsA = await getGenesByComplex(complexA);
+    const componentsB = await getGenesByComplex(complexB);
+
+    const listToHtml = (geneList, title) => {
+        if (!geneList || geneList.length === 0) return `<h4>${title}</h4><p>No components found.</p>`;
+        return `<h4>${title} (${geneList.length})</h4><ul class="gene-list" style="list-style-type: none; padding-left: 0;">${geneList.map(g => `<li>${g.gene}</li>`).join('')}</ul>`;
+    };
+
+    return `
+    <div class="result-card">
+        <h3>Comparison: ${complexA} vs ${complexB}</h3>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+            <div>${listToHtml(componentsA, complexA)}</div>
+            <div>${listToHtml(componentsB, complexB)}</div>
+        </div>
+    </div>`;
+}
+
 
 async function getGenesByFunction(functionalCategory) {
     await fetchCiliaData();
@@ -960,6 +979,35 @@ async function routeComplexPhylogenyAnalysis(query) {
     return null; // Continue to the standard phylogenetic router
 }
 
+/**
+ * @name getCuratedComplexComponents
+ * @description Retrieves gene lists for major complexes directly from the curated map.
+ */
+async function getCuratedComplexComponents(complexName) {
+    // getComplexPhylogenyTableMap() provides the single source of truth for all curated lists
+    const curatedGeneMaps = getComplexPhylogenyTableMap(); 
+    
+    // Use the standardization function to normalize the input name
+    const standardizedName = standardizeComplexName(complexName);
+    
+    // Normalize the name to match the keys in the map (e.g., 'IFT-A Complex' -> 'IFT-A COMPLEX')
+    const mapKey = standardizedName.toUpperCase()
+        .replace(' COMPLEX', '').replace(' MODULE', '').trim();
+
+    const genes = curatedGeneMaps[mapKey];
+
+    if (genes && genes.length > 0) {
+        // Format the genes array into the required {gene: name, description: ..., source: ...} structure
+        return genes.map(gene => ({
+            gene: gene,
+            description: `${standardizedName} (Curated List)`,
+            source: 'Curated'
+        }));
+    }
+    
+    // Fallback: This should ideally not be hit for these specific complexes.
+    return [];
+}
 /**
  * Extracts and normalizes the curated gene map data for use by getGenesByComplex.
  * NOTE: This must be placed near getComplexPhylogenyTable so it can access the same data structure.
@@ -1933,60 +1981,50 @@ const questionRegistry = [
     { text: "List AAA domain proteins", handler: async () => findGenesByNewDomainDB("AAA") },
 
     // ==================== PROTEIN COMPLEXES ====================
-    // BBSome
-    { text: "Give me the list of BBSome components", handler: async () => formatListResult("Components of BBSome", await getGenesByComplex("BBSome")) },
-    { text: "List all components of the BBSome complex", handler: async () => formatListResult("Components of BBSome", await getGenesByComplex("BBSome")) },
-    { text: "What proteins are in the BBSome?", handler: async () => formatListResult("Components of BBSome", await getGenesByComplex("BBSome")) },
-    { text: "Members of the BBSome.", handler: async () => formatListResult("Components of BBSome", await getGenesByComplex("BBSome")) },
-    { text: "Show BBSome subunits", handler: async () => formatListResult("Components of BBSome", await getGenesByComplex("BBSome")) },
-    { text: "BBSome complex members", handler: async () => formatListResult("Components of BBSome", await getGenesByComplex("BBSome")) },
-    { text: "Which genes make up the BBSome?", handler: async () => formatListResult("Components of BBSome", await getGenesByComplex("BBSome")) },
-    
-    // IFT complexes
-    { text: "Display components of IFT-A complex", handler: async () => formatListResult("Components of IFT-A", await getGenesByComplex("IFT-A")) },
-    { text: "IFT-A complex members", handler: async () => formatListResult("Components of IFT-A", await getGenesByComplex("IFT-A")) },
-    { text: "Show IFT-A subunits", handler: async () => formatListResult("Components of IFT-A", await getGenesByComplex("IFT-A")) },
-    { text: "What proteins are in IFT-A?", handler: async () => formatListResult("Components of IFT-A", await getGenesByComplex("IFT-A")) },
-    
-    { text: "Display components of IFT-B complex", handler: async () => formatListResult("Components of IFT-B", await getGenesByComplex("IFT-B")) },
-    { text: "IFT-B complex members", handler: async () => formatListResult("Components of IFT-B", await getGenesByComplex("IFT-B")) },
-    { text: "Show IFT-B subunits", handler: async () => formatListResult("Components of IFT-B", await getGenesByComplex("IFT-B")) },
-    { text: "List IFT-B proteins", handler: async () => formatListResult("Components of IFT-B", await getGenesByComplex("IFT-B")) },
-    
-    { text: "List intraflagellar transport (IFT) components", handler: async () => formatListResult("IFT Components", await getGenesByComplex("IFT")) },
-    { text: "Show all IFT proteins", handler: async () => formatListResult("IFT Components", await getGenesByComplex("IFT")) },
-    { text: "Which genes are part of IFT?", handler: async () => formatListResult("IFT Components", await getGenesByComplex("IFT")) },
-    
-    // Transition zone complexes
-    { text: "Show components of Transition Zone Complex", handler: async () => formatListResult("Components of Transition Zone Complex", await getGenesByComplex("Transition Zone Complex")) },
-    { text: "Transition zone complex members", handler: async () => formatListResult("Components of Transition Zone Complex", await getGenesByComplex("Transition Zone Complex")) },
-    { text: "List transition zone proteins", handler: async () => formatListResult("Components of Transition Zone Complex", await getGenesByComplex("Transition Zone Complex")) },
-    
-    { text: "Display components of MKS Complex", handler: async () => formatListResult("Components of MKS Complex", await getGenesByComplex("MKS Complex")) },
-    { text: "MKS complex members", handler: async () => formatListResult("Components of MKS Complex", await getGenesByComplex("MKS Complex")) },
-    { text: "Show MKS module proteins", handler: async () => formatListResult("Components of MKS Complex", await getGenesByComplex("MKS Complex")) },
-    
-    { text: "Show components of NPHP Complex", handler: async () => formatListResult("Components of NPHP Complex", await getGenesByComplex("NPHP Complex")) },
-    { text: "NPHP complex members", handler: async () => formatListResult("Components of NPHP Complex", await getGenesByComplex("NPHP Complex")) },
-    { text: "List NPHP module proteins", handler: async () => formatListResult("Components of NPHP Complex", await getGenesByComplex("NPHP Complex")) },
-    
-    // Comparisons
-    { text: "Compare IFT-A and IFT-B complex composition", handler: async () => compareComplexes("IFT-A", "IFT-B") },
-    { text: "Compare composition of IFT-A vs IFT-B.", handler: async () => compareComplexes("IFT-A", "IFT-B") },
-    { text: "What's the difference between IFT-A and IFT-B?", handler: async () => compareComplexes("IFT-A", "IFT-B") },
-    { text: "IFT-A versus IFT-B comparison", handler: async () => compareComplexes("IFT-A", "IFT-B") },
-    { text: "How do IFT-A and IFT-B differ?", handler: async () => compareComplexes("IFT-A", "IFT-B") },
-    
-    { text: "Find IFT-A and IFT-B complex genes", handler: async () => getGenesByMultipleComplexes(["IFT-A", "IFT-B"]) },
-    
-    // Additional complexes
-    { text: "Show dynein arm components", handler: async () => formatListResult("Dynein Arm Components", await getGenesByComplex("dynein")) },
-    { text: "List outer dynein arm proteins", handler: async () => formatListResult("ODA Components", await getGenesByComplex("outer dynein arm")) },
-    { text: "Show inner dynein arm proteins", handler: async () => formatListResult("IDA Components", await getGenesByComplex("inner dynein arm")) },
-    { text: "Display radial spoke proteins", handler: async () => formatListResult("Radial Spoke Components", await getGenesByComplex("radial spoke")) },
-    { text: "Show central pair complex proteins", handler: async () => formatListResult("Central Pair Components", await getGenesByComplex("central pair")) },
-    { text: "List nexin-dynein regulatory complex components", handler: async () => formatListResult("N-DRC Components", await getGenesByComplex("N-DRC")) },
-    { text: "Show exocyst complex members", handler: async () => formatListResult("Exocyst Complex", await getGenesByComplex("exocyst")) },
+   // ==================== PROTEIN COMPLEXES (UPDATED HANDLERS) ====================
+
+// --- BBSome ---
+{ text: "Give me the list of BBSome components", handler: async () => formatListResult("Components of BBSome", await getCuratedComplexComponents("BBSome")) },
+{ text: "List all components of the BBSome complex", handler: async () => formatListResult("Components of BBSome", await getCuratedComplexComponents("BBSome")) },
+{ text: "What proteins are in the BBSome?", handler: async () => formatListResult("Components of BBSome", await getCuratedComplexComponents("BBSome")) },
+{ text: "Members of the BBSome.", handler: async () => formatListResult("Components of BBSome", await getCuratedComplexComponents("BBSome")) },
+{ text: "Show BBSome subunits", handler: async () => formatListResult("Components of BBSome", await getCuratedComplexComponents("BBSome")) },
+{ text: "BBSome complex members", handler: async () => formatListResult("Components of BBSome", await getCuratedComplexComponents("BBSome")) },
+{ text: "Which genes make up the BBSome?", handler: async () => formatListResult("Components of BBSome", await getCuratedComplexComponents("BBSome")) },
+
+// --- IFT complexes ---
+{ text: "Display components of IFT-A complex", handler: async () => formatListResult("Components of IFT-A", await getCuratedComplexComponents("IFT-A")) },
+{ text: "IFT-A complex members", handler: async () => formatListResult("Components of IFT-A", await getCuratedComplexComponents("IFT-A")) },
+{ text: "Show IFT-A subunits", handler: async () => formatListResult("Components of IFT-A", await getCuratedComplexComponents("IFT-A")) },
+{ text: "What proteins are in IFT-A?", handler: async () => formatListResult("Components of IFT-A", await getCuratedComplexComponents("IFT-A")) },
+
+{ text: "Display components of IFT-B complex", handler: async () => formatListResult("Components of IFT-B", await getCuratedComplexComponents("IFT-B")) },
+{ text: "IFT-B complex members", handler: async () => formatListResult("Components of IFT-B", await getCuratedComplexComponents("IFT-B")) },
+{ text: "Show IFT-B subunits", handler: async () => formatListResult("Components of IFT-B", await getCuratedComplexComponents("IFT-B")) },
+{ text: "List IFT-B proteins", handler: async () => formatListResult("Components of IFT-B", await getCuratedComplexComponents("IFT-B")) },
+
+{ text: "List intraflagellar transport (IFT) components", handler: async () => formatListResult("IFT Components", await getCuratedComplexComponents("IFT")) },
+{ text: "Show all IFT proteins", handler: async () => formatListResult("IFT Components", await getCuratedComplexComponents("IFT")) },
+{ text: "Which genes are part of IFT?", handler: async () => formatListResult("IFT Components", await getCuratedComplexComponents("IFT")) },
+
+// --- Transition zone complexes ---
+{ text: "Show components of Transition Zone Complex", handler: async () => formatListResult("Components of Transition Zone Complex", await getCuratedComplexComponents("Transition Zone")) },
+{ text: "Transition zone complex members", handler: async () => formatListResult("Components of Transition Zone Complex", await getCuratedComplexComponents("Transition Zone")) },
+{ text: "List transition zone proteins", handler: async () => formatListResult("Components of Transition Zone Complex", await getCuratedComplexComponents("Transition Zone")) },
+{ text: "Display components of MKS Complex", handler: async () => formatListResult("Components of MKS Complex", await getCuratedComplexComponents("MKS")) },
+{ text: "MKS complex members", handler: async () => formatListResult("Components of MKS Complex", await getCuratedComplexComponents("MKS")) },
+{ text: "Show MKS module proteins", handler: async () => formatListResult("Components of MKS Complex", await getCuratedComplexComponents("MKS")) },
+{ text: "Show components of NPHP Complex", handler: async () => formatListResult("Components of NPHP Complex", await getCuratedComplexComponents("NPHP")) },
+{ text: "NPHP complex members", handler: async () => formatListResult("Components of NPHP Complex", await getCuratedComplexComponents("NPHP")) },
+{ text: "List NPHP module proteins", handler: async () => formatListResult("Components of NPHP Complex", await getCuratedComplexComponents("NPHP")) },
+// --- Additional complexes ---
+{ text: "Show dynein arm components", handler: async () => formatListResult("Dynein Arm Components", await getCuratedComplexComponents("dynein arm")) },
+{ text: "List outer dynein arm proteins", handler: async () => formatListResult("ODA Components", await getCuratedComplexComponents("outer dynein arm")) },
+{ text: "Show inner dynein arm proteins", handler: async () => formatListResult("IDA Components", await getCuratedComplexComponents("inner dynein arm")) },
+{ text: "Display radial spoke proteins", handler: async () => formatListResult("Radial Spoke Components", await getCuratedComplexComponents("radial spoke")) },
+{ text: "Show central pair complex proteins", handler: async () => formatListResult("Central Pair Components", await getCuratedComplexComponents("central pair")) },
+{ text: "List nexin-dynein regulatory complex components", handler: async () => formatListResult("N-DRC Components", await getCuratedComplexComponents("N-DRC")) },
+{ text: "Show exocyst complex members", handler: async () => formatListResult("Exocyst Complex", await getCuratedComplexComponents("exocyst")) },
 
     // ==================== CILIOPATHIES & DISEASES ====================
     // Bardet-Biedl Syndrome
@@ -3452,24 +3490,6 @@ async function getGeneCiliaEffects(gene) {
         </div>`;
 }
 
-async function compareComplexes(complexA, complexB) {
-    const componentsA = await getGenesByComplex(complexA);
-    const componentsB = await getGenesByComplex(complexB);
-
-    const listToHtml = (geneList, title) => {
-        if (!geneList || geneList.length === 0) return `<h4>${title}</h4><p>No components found.</p>`;
-        return `<h4>${title} (${geneList.length})</h4><ul class="gene-list" style="list-style-type: none; padding-left: 0;">${geneList.map(g => `<li>${g.gene}</li>`).join('')}</ul>`;
-    };
-
-    return `
-    <div class="result-card">
-        <h3>Comparison: ${complexA} vs ${complexB}</h3>
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
-            <div>${listToHtml(componentsA, complexA)}</div>
-            <div>${listToHtml(componentsB, complexB)}</div>
-        </div>
-    </div>`;
-}
 
 /**
  * Displays a grouped bar chart of multiple genes' expression across cell types.
