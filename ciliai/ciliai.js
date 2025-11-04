@@ -1429,71 +1429,88 @@ async function resolveDomainQuery(query) {
 }
 
 /**
- * Get all domains for a specific gene
+ * @name getDomainsByGene
+ * @description Retrieves all domain details for a single gene from the structured domain map.
  */
 async function getDomainsByGene(geneName) {
-    await getDomainData();
+    if (!CILI_AI_DOMAIN_DB) await getDomainData();
+    
+    const domainMap = CILI_AI_DOMAIN_DB?.gene_domain_map; 
+    if (!domainMap) return [];
+    
     const geneUpper = geneName.toUpperCase();
     
-    const geneDomains = domainDataCache.filter(entry => 
-        entry.gene && entry.gene.toUpperCase() === geneUpper
-    );
+    // 💡 FIX: Access the domains array directly by gene key.
+    const geneDomains = domainMap[geneUpper]; 
     
-    if (geneDomains.length === 0) {
+    if (!geneDomains || geneDomains.length === 0) {
         return [];
     }
     
+    // Map the simplified domain object structure to the expected output format.
     return geneDomains.map(domain => ({
-        gene: domain.gene,
-        domain_name: domain.domain_name || 'Unknown',
-        domain_type: domain.domain_type || 'Unknown',
-        start: domain.start,
-        end: domain.end,
-        length: domain.end - domain.start,
+        gene: geneName,
+        // The display name can be the description or the ID
+        domain_name: domain.description || domain.domain_id || 'Unknown', 
+        domain_type: domain.type || 'Structure',
+        start: domain.start || 0,
+        end: domain.end || 0,
+        length: (domain.end - domain.start) > 0 ? (domain.end - domain.start) : 0,
         description: domain.description || 'No description available',
-        source: 'Domain Database'
+        source: 'New Domain Database'
     }));
 }
 
+// --------------------------------------------------------------------------------------
+
 /**
- * Get all genes containing a specific domain
+ * @name getGenesByDomain
+ * @description Finds all genes containing a specific domain name/type from the structured domain map.
  */
 async function getGenesByDomain(domainName) {
-    await getDomainData();
+    if (!CILI_AI_DOMAIN_DB) await getDomainData();
+    
+    const domainMap = CILI_AI_DOMAIN_DB?.gene_domain_map;
+    if (!domainMap) return [];
+
     const domainLower = domainName.toLowerCase();
+    const matchingGenes = [];
     
-    const matchingGenes = domainDataCache.filter(entry =>
-        entry.domain_name && entry.domain_name.toLowerCase().includes(domainLower)
-    );
-    
-    // Group by gene to avoid duplicates
-    const geneMap = new Map();
-    matchingGenes.forEach(entry => {
-        if (!geneMap.has(entry.gene)) {
-            geneMap.set(entry.gene, {
-                gene: entry.gene,
-                domains: [],
-                domain_count: 0
+    // Iterate through all genes in the map
+    for (const geneUpper in domainMap) {
+        const domains = domainMap[geneUpper];
+        
+        const matchingDomains = domains.filter(entry => {
+            return (entry.domain_id && entry.domain_id.toLowerCase().includes(domainLower)) ||
+                   (entry.description && entry.description.toLowerCase().includes(domainLower));
+        });
+
+        if (matchingDomains.length > 0) {
+            // Group and summarize the matches for the output format
+            const domainNames = matchingDomains.map(d => d.description || d.domain_id).join(', ');
+            matchingGenes.push({
+                gene: geneUpper,
+                description: `Contains ${matchingDomains.length} ${domainName} feature(s): ${domainNames}`,
+                source: 'Domain Database'
             });
         }
-        geneMap.get(entry.gene).domains.push(entry.domain_name);
-        geneMap.get(entry.gene).domain_count++;
-    });
+    }
     
-    return Array.from(geneMap.values()).map(item => ({
-        gene: item.gene,
-        description: `Contains ${item.domain_count} ${domainName} domain(s): ${item.domains.join(', ')}`,
-        source: 'Domain Database'
-    }));
+    return matchingGenes;
 }
 
+// --------------------------------------------------------------------------------------
+
 /**
- * Compare domain architecture between genes
+ * @name compareDomainArchitecture
+ * @description Compares domain names between two genes.
  */
 async function compareDomainArchitecture(geneA, geneB) {
+    // Both calls now use the fixed getDomainsByGene
     const domainsA = await getDomainsByGene(geneA);
     const domainsB = await getDomainsByGene(geneB);
     
+    // Use 'domain_name' property from the fixed getDomainsByGene output
     const domainNamesA = new Set(domainsA.map(d => d.domain_name));
     const domainNamesB = new Set(domainsB.map(d => d.domain_name));
     
@@ -1501,42 +1518,56 @@ async function compareDomainArchitecture(geneA, geneB) {
     const uniqueA = [...domainNamesA].filter(d => !domainNamesB.has(d));
     const uniqueB = [...domainNamesB].filter(d => !domainNamesA.has(d));
     
+    // Ensure the size calculation is based on unique names, avoiding division by zero.
+    const maxUniqueSize = Math.max(domainNamesA.size, domainNamesB.size);
+    const similarity = maxUniqueSize > 0 ? (shared.length / maxUniqueSize) : 0;
+    
     return {
         geneA: { gene: geneA, domains: domainsA, total: domainsA.length },
         geneB: { gene: geneB, domains: domainsB, total: domainsB.length },
         shared: shared,
         uniqueA: uniqueA,
         uniqueB: uniqueB,
-        similarity: shared.length / Math.max(domainNamesA.size, domainNamesB.size)
+        similarity: similarity
     };
 }
 
+
 /**
- * Get domain composition for a complex
+ * @name getDomainCompositionByComplex
+ * @description Get domain composition for a complex (using getDomainsByGene).
  */
 async function getDomainCompositionByComplex(complexName) {
-    const components = await getGenesByComplex(complexName);
-    await getDomainData();
+    // This relies on the successful getGenesByComplex (which is stabilized)
+    const components = await getGenesByComplex(complexName); 
     
     const domainStats = new Map();
     
     for (const component of components) {
-        const domains = await getDomainsByGene(component.gene);
+        // This call is now stable and uses the correct CILI_AI_DOMAIN_DB structure
+        const domains = await getDomainsByGene(component.gene); 
+        
         domains.forEach(domain => {
-            const key = domain.domain_name;
+            const key = domain.domain_name; // Use the processed domain_name
             if (!domainStats.has(key)) {
                 domainStats.set(key, {
                     domain: key,
                     count: 0,
-                    genes: []
+                    genes: new Set() // Use a Set to track unique genes
                 });
             }
             domainStats.get(key).count++;
-            domainStats.get(key).genes.push(component.gene);
+            domainStats.get(key).genes.add(component.gene);
         });
     }
     
+    // Convert the Set of genes to a list and sort by domain count
     return Array.from(domainStats.values())
+        .map(item => ({
+            domain: item.domain,
+            count: item.count,
+            genes: Array.from(item.genes)
+        }))
         .sort((a, b) => b.count - a.count);
 }
 
@@ -2163,31 +2194,31 @@ const questionRegistry = [
     { text: "How can you help me?", handler: async () => tellAboutCiliAI() },
     { text: "What questions can I ask?", handler: async () => tellAboutCiliAI() },
     { text: "Give me an overview of your features", handler: async () => tellAboutCiliAI() },
-// Single gene domain queries
-    { text: "What domains does IFT88 have?", handler: async () => visualizeDomainArchitecture("IFT88") },
-    { text: "Show domain architecture of IFT88", handler: async () => visualizeDomainArchitecture("IFT88") },
-    { text: "Display domains in IFT88", handler: async () => visualizeDomainArchitecture("IFT88") },
-    { text: "IFT88 domain structure", handler: async () => visualizeDomainArchitecture("IFT88") },
-    { text: "List domains of IFT88", handler: async () => formatListResult("IFT88 Domains", await getDomainsByGene("IFT88")) },
-    // Domain-to-gene queries
-    { text: "Which genes have WD40 domains?", handler: async () => formatListResult("Genes with WD40 domains", await getGenesByDomain("WD40")) },
-    { text: "Show genes containing TPR domains", handler: async () => formatListResult("Genes with TPR domains", await getGenesByDomain("TPR")) },
-    { text: "List proteins with coiled-coil domains", handler: async () => formatListResult("Genes with coiled-coil", await getGenesByDomain("coiled-coil")) },
-    { text: "Genes with AAA+ ATPase domains", handler: async () => formatListResult("Genes with AAA+ ATPase", await getGenesByDomain("AAA")) },
-    // Domain comparisons
-    { text: "Compare domains of IFT88 and IFT81", handler: async () => displayDomainComparison("IFT88", "IFT81") },
-    { text: "Domain architecture comparison IFT88 vs IFT81", handler: async () => displayDomainComparison("IFT88", "IFT81") },
-    // Complex domain composition
-    { text: "What domains are in the IFT-B complex?", handler: async () => {
-        const composition = await getDomainCompositionByComplex("IFT-B");
-        let html = `<div class="result-card"><h3>Domain Composition: IFT-B Complex</h3><table class="data-table">
-            <thead><tr><th>Domain</th><th>Frequency</th><th>Found in Genes</th></tr></thead><tbody>`;
-        composition.forEach(item => {
-            html += `<tr><td><strong>${item.domain}</strong></td><td>${item.count}</td><td>${item.genes.join(', ')}</td></tr>`;
-        });
-        html += `</tbody></table></div>`;
-        return html;
-    }},
+// --- Single gene domain queries ---
+{ text: "What domains does IFT88 have?", handler: async () => visualizeDomainArchitecture("IFT88") },
+{ text: "Show domain architecture of IFT88", handler: async () => visualizeDomainArchitecture("IFT88") },
+{ text: "Display domains in IFT88", handler: async () => visualizeDomainArchitecture("IFT88") },
+{ text: "IFT88 domain structure", handler: async () => visualizeDomainArchitecture("IFT88") },
+{ text: "List domains of IFT88", handler: async () => formatListResult("IFT88 Domains", await getDomainsByGene("IFT88")) },
+// --- Domain-to-gene queries ---
+{ text: "Which genes have WD40 domains?", handler: async () => formatListResult("Genes with WD40 domains", await getGenesByDomain("WD40")) },
+{ text: "Show genes containing TPR domains", handler: async () => formatListResult("Genes with TPR domains", await getGenesByDomain("TPR")) },
+{ text: "List proteins with coiled-coil domains", handler: async () => formatListResult("Genes with coiled-coil", await getGenesByDomain("coiled-coil")) },
+{ text: "Genes with AAA+ ATPase domains", handler: async () => formatListResult("Genes with AAA+ ATPase", await getGenesByDomain("AAA")) },
+// --- Domain comparisons ---
+{ text: "Compare domains of IFT88 and IFT81", handler: async () => displayDomainComparison("IFT88", "IFT81") },
+{ text: "Domain architecture comparison IFT88 vs IFT81", handler: async () => displayDomainComparison("IFT88", "IFT81") },
+// --- Complex domain composition ---
+{ text: "What domains are in the IFT-B complex?", handler: async () => {
+    const composition = await getDomainCompositionByComplex("IFT-B");
+    let html = `<div class="result-card"><h3>Domain Composition: IFT-B Complex</h3><table class="data-table">
+        <thead><tr><th>Domain</th><th>Frequency</th><th>Found in Genes</th></tr></thead><tbody>`;
+    composition.forEach(item => {
+        html += `<tr><td><strong>${item.domain}</strong></td><td>${item.count}</td><td>${item.genes.join(', ')}</td></tr>`;
+    });
+    html += `</tbody></table></div>`;
+    return html;
+}},
 // ==================== A. SPECIFIC GENE VISUALIZATION (Expanded) ====================
     { text: "Show evolutionary conservation of IFT88", handler: async () => getPhylogenyAnalysis(["IFT88"]) },
     { text: "IFT88 conservation analysis", handler: async () => getPhylogenyAnalysis(["IFT88"]) },
@@ -2568,13 +2599,11 @@ const questionRegistry = [
     { text: "Which genes are at the basal body?", handler: async () => formatListResult("Genes localizing to basal body", await getGenesByLocalization("basal body")) },
     { text: "List basal body proteins", handler: async () => formatListResult("Proteins localizing to basal body", await getGenesByLocalization("basal body")) },
     
-    
     // Axoneme
     { text: "Which genes localize to axoneme?", handler: async () => formatListResult("Genes localizing to axoneme", await getGenesByLocalization("axoneme")) },
     { text: "Axonemal genes", handler: async () => formatListResult("Genes localizing to axoneme", await getGenesByLocalization("axoneme")) },
     { text: "Show axoneme proteins", handler: async () => formatListResult("Genes localizing to axoneme", await getGenesByLocalization("axoneme")) },
     { text: "List axonemal proteins", handler: async () => formatListResult("Genes localizing to axoneme", await getGenesByLocalization("axoneme")) },
-    
     // Transition fibers
     { text: "Show transition fiber proteins", handler: async () => formatListResult("Proteins localizing to transition fiber", await getGenesByLocalization("transition fiber")) },
     { text: "Transition fiber genes", handler: async () => formatListResult("Proteins localizing to transition fiber", await getGenesByLocalization("transition fiber")) },
