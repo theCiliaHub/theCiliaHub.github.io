@@ -1397,100 +1397,78 @@ async function getGenesByComplex(complexName) {
 
 /**
  * @name resolveDomainQuery
- * @description Routes domain-related queries (Comparison, Enriched, Depleted, Specific Motifs).
- * This must be defined globally.
+ * @description Routes domain-related queries to the correct list or gene handler.
  * @param {string} query - The raw user query.
  */
 async function resolveDomainQuery(query) {
     const qLower = query.toLowerCase();
 
-    // ====================================================================
-    // ⭐ FIX: Comparison Logic
-    // ====================================================================
-    
-    // Check for explicit comparison keywords AND that the query is about domains
-    if (qLower.includes('vs') || qLower.includes('and') || qLower.includes('comparison') || qLower.includes('architecture')) {
-        
-        // Use the robust utility to pull ALL potential gene names from the query
-        // This should correctly extract ['IFT88', 'IFT81'] from the string.
-        const genes = extractMultipleGenes(query); 
-        
-        if (genes.length >= 2 && (qLower.includes('domain') || qLower.includes('architecture'))) {
-            // Compare the first two valid genes found
-            const geneA = genes[0];
-            const geneB = genes[1];
-            
-            console.log(`Domain comparison detected: Routing ${geneA} vs ${geneB}.`);
-            return displayDomainComparison(geneA, geneB);
-        }
-    }
-    
-    // ====================================================================
-    // 1. Check for ENRICHED/DEPLETED LIST requests (Unchanged)
-    // ====================================================================
+    // 1. Check for ENRICHED/DEPLETED LIST requests
     if (qLower.includes('enriched domain') || qLower.includes('show enriched')) {
+        // This assumes displayEnrichedDomains() returns the formatted HTML (as implemented in your source code)
         return displayEnrichedDomains();
     }
     if (qLower.includes('depleted domain') || qLower.includes('show depleted') || qLower.includes('domains absent')) {
+        // This assumes displayDepletedDomains() returns the formatted HTML (as implemented in your source code)
         return displayDepletedDomains();
     }
-    // ====================================================================
-    // 2. Check for Specific DOMAIN NAME lookup (Unchanged)
-    // ====================================================================
+
+    // 2. Check for Specific DOMAIN NAME lookup (e.g., "Show WD40 proteins")
+    // This requires extracting the domain name (e.g., WD40, EF-hand)
     const domainKeywords = ['wd40', 'leucine-rich repeat', 'iq motif', 'ef-hand', 'kinase', 'atpase', 'zinc finger']; 
+
     for (const keyword of domainKeywords) {
         if (qLower.includes(keyword)) {
-            return formatListResult(`Genes with ${keyword} domain`, await getGenesByDomain(keyword));
+            // This assumes findGenesByNewDomainDB() returns the formatted list (as implemented in your source code)
+            return findGenesByNewDomainDB(keyword);
         }
     }
     
-    // 3. Fallback for single gene display (Unchanged)
-    const singleGeneMatch = query.match(/(?:domains?|architecture)\s+(?:of|for)\s+([A-Z0-9]+)/i);
-    if (singleGeneMatch) {
-        return visualizeDomainArchitecture(singleGeneMatch[1].toUpperCase());
-    }
-
-    return `<div class="result-card"><h3>Domain Query Failed</h3><p>Could not interpret the domain query. Please try comparing two genes (e.g., "IFT88 vs IFT81") or requesting a specific domain list.</p></div>`;
+    // 3. Fallback for unrecognized domain syntax
+    return `<div class="result-card"><h3>Domain Query Failed</h3><p>Could not identify a specific domain name or list type. Try "Show WD40 domain proteins" or "List enriched domains."</p></div>`;
 }
 
-// NOTE: The implementation of resolvePhylogeneticQuery is correct as provided previously 
-// and should be placed globally to address the other console error.
 /**
  * @name getDomainsByGene
  * @description Retrieves all domain details for a single gene from the structured domain map.
  */
-async function getDomainsByGene(gene) {
-  if (!gene || typeof gene !== "string") {
-    console.warn("[getDomainsByGene] ❌ Invalid gene input:", gene);
-    return [];
-  }
-  
-  const normalized = gene.trim().toUpperCase();
-  console.log(`[getDomainsByGene] 🔍 Looking up domains for: ${normalized}`);
-  
-  try {
-    if (!window.domainDatabase || Object.keys(window.domainDatabase).length === 0) {
-      console.error("[getDomainsByGene] ⚠️ Domain database not loaded yet.");
-      return [];
+async function getDomainsByGene(geneName) {
+    if (!CILI_AI_DOMAIN_DB) await getDomainData();
+    
+    const domainMap = CILI_AI_DOMAIN_DB?.gene_domain_map; 
+    if (!domainMap) return [];
+
+    const geneUpper = geneName.toUpperCase();
+
+    // 🔍 Try direct lookup first
+    let geneDomains = domainMap[geneUpper];
+
+    // 🩹 Case-insensitive fallback if not found
+    if (!geneDomains) {
+        const matchedKey = Object.keys(domainMap).find(
+            key => key.toUpperCase() === geneUpper
+        );
+        if (matchedKey) {
+            geneDomains = domainMap[matchedKey];
+            console.log(`🔎 [getDomainsByGene] Case-insensitive match found: "${matchedKey}" for "${geneName}"`);
+        } else {
+            console.warn(`⚠️ [getDomainsByGene] No domain entry found for gene: "${geneName}"`);
+        }
     }
-    
-    // Try direct match and fallbacks
-    const entry =
-      window.domainDatabase[normalized] ||
-      window.domainDatabase[normalized.replace(/[\s-]/g, "_")] ||
-      Object.entries(window.domainDatabase).find(([k]) => k.includes(normalized))?.[1];
-    
-    if (!entry) {
-      console.warn(`[getDomainsByGene] ⚠️ No domain entry found for gene: "${normalized}"`);
-      return [];
-    }
-    
-    console.log(`[getDomainsByGene] ✅ Found ${entry.length} domain(s) for ${normalized}`);
-    return entry;
-  } catch (err) {
-    console.error(`[getDomainsByGene] 💥 Error while fetching domains for ${normalized}:`, err);
-    return [];
-  }
+
+    if (!geneDomains || geneDomains.length === 0) return [];
+
+    // 🧩 Normalize and return clean domain objects
+    return geneDomains.map(domain => ({
+        gene: geneName,
+        domain_name: domain.description || domain.domain_id || 'Unknown', 
+        domain_type: domain.type || 'Structure',
+        start: domain.start || 0,
+        end: domain.end || 0,
+        length: (domain.end > 0 && domain.start > 0) ? (domain.end - domain.start) : 0,
+        description: domain.description || 'No description available',
+        source: 'New Domain Database'
+    }));
 }
 
 // --------------------------------------------------------------------------------------
@@ -1533,93 +1511,60 @@ async function getGenesByDomain(domainName) {
 
 /**
  * @name compareDomainArchitecture
- * @description Compares unique domain names between two genes, with safe guards against placeholder or invalid tokens.
+ * @description Compares unique domain names between two genes.
  */
 async function compareDomainArchitecture(geneA, geneB) {
-  // 🧩 SAFETY FIX: Normalize and clean inputs
-  const normalize = (g) => (g ? g.trim().toUpperCase() : "");
-  geneA = normalize(geneA);
-  geneB = normalize(geneB);
-  
-  // Filter out tokens that are NOT gene symbols
-  const invalidTokens = ["ARCHITECTURE", "DOMAIN", "STRUCTURE", "COMPARISON", "VS", "AND", "", null, undefined];
-  
-  // Handle invalid or swapped inputs
-  if (invalidTokens.includes(geneA) && !invalidTokens.includes(geneB)) {
-    console.warn(`⚠️ Invalid geneA (${geneA}). Swapping with geneB (${geneB}).`);
-    [geneA, geneB] = [geneB, geneA];
-  } else if (invalidTokens.includes(geneB)) {
-    console.warn(`⚠️ Invalid geneB: "${geneB}". Aborting comparison.`);
+    // 🧩 SAFETY FIX: Filter out non-gene tokens accidentally passed
+    const invalidTokens = ["ARCHITECTURE", "DOMAIN", "STRUCTURE", "COMPARISON", "VS"];
+    if (invalidTokens.includes(geneA.toUpperCase())) {
+        console.warn(`⚠️ Invalid gene name passed as geneA: "${geneA}". Swapping arguments.`);
+        [geneA, geneB] = [geneB, geneA]; // Swap them
+    }
+
+    if (invalidTokens.includes(geneB.toUpperCase())) {
+        console.warn(`⚠️ Invalid gene name passed as geneB: "${geneB}". Comparison aborted.`);
+        return {
+            geneA: { gene: geneA, domains: [], total: 0 },
+            geneB: { gene: geneB, domains: [], total: 0 },
+            shared: [],
+            uniqueA: [],
+            uniqueB: [],
+            similarity: 0
+        };
+    }
+
+    // ✅ Fetch domains safely
+    const domainsA = await getDomainsByGene(geneA);
+    const domainsB = await getDomainsByGene(geneB);
+
+    // Extract domain names
+    const domainNamesA = new Set(domainsA.map(d => d.domain_name));
+    const domainNamesB = new Set(domainsB.map(d => d.domain_name));
+
+    // Compare sets
+    const shared = [...domainNamesA].filter(d => domainNamesB.has(d));
+    const uniqueA = [...domainNamesA].filter(d => !domainNamesB.has(d));
+    const uniqueB = [...domainNamesB].filter(d => !domainNamesA.has(d));
+
+    // Compute similarity (avoid divide-by-zero)
+    const maxUniqueSize = Math.max(domainNamesA.size, domainNamesB.size);
+    const similarity = maxUniqueSize > 0 ? (shared.length / maxUniqueSize) : 0;
+
+    // ✅ Logging for debugging
+    console.log(`🧬 Domain comparison complete:
+    ${geneA}: ${domainsA.length} domains
+    ${geneB}: ${domainsB.length} domains
+    Shared: ${shared.length} | Similarity: ${(similarity * 100).toFixed(1)}%`);
+
+    // Return structured result
     return {
-      error: `❌ Invalid gene name: ${geneB}`,
-      geneA: { gene: geneA, domains: [], total: 0 },
-      geneB: { gene: geneB, domains: [], total: 0 },
-      shared: [],
-      uniqueA: [],
-      uniqueB: [],
-      similarity: 0
+        geneA: { gene: geneA, domains: domainsA, total: domainsA.length },
+        geneB: { gene: geneB, domains: domainsB, total: domainsB.length },
+        shared,
+        uniqueA,
+        uniqueB,
+        similarity
     };
-  }
-  
-  console.log(`🔬 Domain Architecture Comparison: ${geneA} vs ${geneB}`);
-  
-  // ✅ Fetch domains safely
-  const domainsA = await getDomainsByGene(geneA);
-  const domainsB = await getDomainsByGene(geneB);
-  
-  // Check which genes are missing
-  const missingGenes = [];
-  if (!domainsA || domainsA.length === 0) missingGenes.push(geneA);
-  if (!domainsB || domainsB.length === 0) missingGenes.push(geneB);
-  
-  if (missingGenes.length > 0) {
-    const errorMsg = missingGenes.length === 2
-      ? `❌ Neither ${geneA} nor ${geneB} were found in the database`
-      : `❌ ${missingGenes[0]} was not found in the database`;
-    
-    console.warn(`⚠️ [compareDomainArchitecture] ${errorMsg}`);
-    
-    return {
-      error: errorMsg,
-      geneA: { gene: geneA, domains: domainsA || [], total: domainsA?.length || 0 },
-      geneB: { gene: geneB, domains: domainsB || [], total: domainsB?.length || 0 },
-      shared: [],
-      uniqueA: [],
-      uniqueB: [],
-      similarity: 0
-    };
-  }
-  
-  // ✅ FIX: Extract domain IDs (not domain_name)
-  // Use domain_id as the primary identifier for comparison
-  const domainNamesA = new Set(domainsA.map(d => d.domain_id || d.domain_name || d.name || d));
-  const domainNamesB = new Set(domainsB.map(d => d.domain_id || d.domain_name || d.name || d));
-  
-  // Compare sets
-  const shared = [...domainNamesA].filter(d => domainNamesB.has(d));
-  const uniqueA = [...domainNamesA].filter(d => !domainNamesB.has(d));
-  const uniqueB = [...domainNamesB].filter(d => !domainNamesA.has(d));
-  
-  // Compute similarity safely
-  const maxUniqueSize = Math.max(domainNamesA.size, domainNamesB.size);
-  const similarity = maxUniqueSize > 0 ? shared.length / maxUniqueSize : 0;
-  
-  // ✅ Debug logging
-  console.log(`🧬 Comparison complete:
-  ${geneA}: ${domainNamesA.size} unique domain(s)
-  ${geneB}: ${domainNamesB.size} unique domain(s)
-  Shared: ${shared.length}
-  Similarity: ${(similarity * 100).toFixed(1)}%`);
-  
-  // ✅ Structured result
-  return {
-    geneA: { gene: geneA, domains: domainsA, total: domainsA.length },
-    geneB: { gene: geneB, domains: domainsB, total: domainsB.length },
-    shared,
-    uniqueA,
-    uniqueB,
-    similarity
-  };
 }
 
 /**
