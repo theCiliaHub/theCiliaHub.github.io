@@ -237,7 +237,6 @@ function normalizeTerm(s) {
     return String(s).toLowerCase().replace(/[._\-\s]+/g, ' ').trim();
 }
 
-
 // --- Main AI Query Handler ---
 window.handleAIQuery = async function() {
     const aiQueryInput = document.getElementById('aiQueryInput');
@@ -278,24 +277,25 @@ window.handleAIQuery = async function() {
         } 
         
         // =================================================================
-        // **NEW ROUTING PRIORITY 2:** Handle General Phylogenetic Queries
-        // =================================================================
-        else if (qLower.includes('phylogeny') || qLower.includes('conservation') || 
-                       qLower.includes('heatmap') || qLower.includes('comparison') || 
-                       qLower.includes('tree')) {
-            
-            console.log('Routing to General Phylogenetic Query Resolver...');
-            resultHtml = await resolvePhylogeneticQuery(query); 
-        }
-        
-        // =================================================================
-        // ⭐ NEW ROUTING PRIORITY 3: Handle Domain Queries ⭐
+        // ⭐ NEW ROUTING PRIORITY 2: Handle Domain Queries (Comparison, Enriched, Depleted, Specific Motifs) ⭐
         // =================================================================
         else if (qLower.includes('domain') || qLower.includes('motif') || 
-                 qLower.includes('enriched') || qLower.includes('depleted')) {
+                 qLower.includes('enriched') || qLower.includes('depleted') ||
+                 qLower.includes('architecture comparison')) {
             
             console.log('Routing to Domain Query Resolver...');
             resultHtml = await resolveDomainQuery(query);
+        }
+
+        // =================================================================
+        // **NEW ROUTING PRIORITY 3:** Handle General Phylogenetic Queries (FIXES REFERENCE ERROR)
+        // =================================================================
+        else if (qLower.includes('phylogeny') || qLower.includes('conservation') || 
+                   qLower.includes('heatmap') || qLower.includes('comparison') || 
+                   qLower.includes('tree')) {
+            
+            console.log('Routing to General Phylogenetic Query Resolver...');
+            resultHtml = await resolvePhylogeneticQuery(query); 
         }
 
         // =================================================================
@@ -347,7 +347,6 @@ window.handleAIQuery = async function() {
         console.error("CiliAI Query Error:", e);
     }
 };
-
 
 /**
  * Patches the main query handler to include Corum lookups.
@@ -1198,7 +1197,6 @@ async function getCuratedComplexComponents(complexName) {
 }
 // Add window.getCuratedComplexComponents = getCuratedComplexComponents; if needed
 
-
 /**
  * Extracts and normalizes the curated gene map data for use by getGenesByComplex.
  * NOTE: This must be placed near getComplexPhylogenyTable so it can access the same data structure.
@@ -1708,6 +1706,86 @@ const domainIntents = [
         }
     }
 ];
+
+/**
+ * @name resolveDomainQuery
+ * @description Routes domain-related queries (including comparisons and lists).
+ * This must be defined globally.
+ * @param {string} query - The raw user query.
+ */
+async function resolveDomainQuery(query) {
+    const qLower = query.toLowerCase();
+
+    // Pattern for Domain Comparison: "Domain architecture comparison IFT88 vs IFT81"
+    const comparisonMatch = query.match(/([A-Z0-9\-]+)\s+(?:vs|and|comparison)\s+([A-Z0-9\-]+)/i);
+
+    if (comparisonMatch) {
+        // The regex captures the genes directly from the sentence structure
+        const geneA = comparisonMatch[1].toUpperCase();
+        const geneB = comparisonMatch[2].toUpperCase();
+        
+        // This answers the user's direct request: "Domain architecture comparison IFT88 vs IFT81"
+        return displayDomainComparison(geneA, geneB);
+    }
+
+    // 1. Check for ENRICHED/DEPLETED LIST requests (Assumes these functions exist)
+    if (qLower.includes('enriched domain') || qLower.includes('show enriched')) {
+        return displayEnrichedDomains();
+    }
+    if (qLower.includes('depleted domain') || qLower.includes('show depleted') || qLower.includes('domains absent')) {
+        return displayDepletedDomains();
+    }
+
+    // 2. Check for Specific DOMAIN NAME lookup 
+    const domainKeywords = ['wd40', 'leucine-rich repeat', 'iq motif', 'ef-hand', 'kinase', 'atpase', 'zinc finger']; 
+    for (const keyword of domainKeywords) {
+        if (qLower.includes(keyword)) {
+            // Assumes getGenesByDomain is wrapped in a formatter, or findGenesByNewDomainDB exists
+            return formatListResult(`Genes with ${keyword} domain`, await getGenesByDomain(keyword));
+        }
+    }
+    
+    // 3. Fallback for single gene domain architecture display
+    const singleGeneMatch = query.match(/domains?\s+(?:of|for)\s+([A-Z0-9]+)/i);
+    if (singleGeneMatch) {
+        return visualizeDomainArchitecture(singleGeneMatch[1].toUpperCase());
+    }
+
+    return `<div class="result-card"><h3>Domain Query Failed</h3><p>Could not interpret the domain query. Please try comparing two genes (e.g., "IFT88 vs IFT81") or requesting a specific domain list.</p></div>`;
+}
+/**
+ * @name resolvePhylogeneticQuery
+ * @description Routes generic phylogenetic queries to the correct list or visualization.
+ * This MUST be defined globally to fix the ReferenceError.
+ * @param {string} query - The raw user query.
+ */
+async function resolvePhylogeneticQuery(query) {
+    // Assumes extractMultipleGenes is globally defined and works.
+    const genes = extractMultipleGenes(query); 
+    const qLower = query.toLowerCase();
+
+    // 1. Single Gene or Multi-Gene Plotting Request
+    if (genes.length >= 1) {
+        const geneList = genes.join(',');
+        // This calls the final visualization layer (defaulting to Li data, heatmap view)
+        return handlePhylogenyVisualizationQuery(`Phylogeny of ${geneList}`, 'li', 'heatmap');
+    }
+    
+    // 2. Complex Phylogeny (General request, not asking for TABLE)
+    const complexMatch = qLower.match(/(ift|bbsome|mks|nphp)\s+(complex|module)/);
+    if (complexMatch) {
+        const complexName = complexMatch[0];
+        // Note: You would need to look up genes for this complex before calling handlePhylogenyVisualizationQuery
+        return `<div class="result-card"><h3>Phylogeny Pending</h3><p>Please rephrase as a table query, e.g., "${complexName} table."</p></div>`;
+    }
+
+    // 3. Classification List Request (e.g., 'List vertebrate conserved genes')
+    if (qLower.includes('list') || qLower.includes('ciliary only') || qLower.includes('vertebrate')) {
+        return getPhylogenyList(query); // Assumes this is defined and works
+    }
+    
+    return `<div class="result-card"><h3>Phylogeny Error</h3><p>Could not interpret the phylogenetic query. Please specify a gene, complex, or list type.</p></div>`;
+}
 
 
 
