@@ -1434,28 +1434,25 @@ async function resolveDomainQuery(query) {
  */
 async function getDomainsByGene(geneName) {
     if (!CILI_AI_DOMAIN_DB) await getDomainData();
-    
     const domainMap = CILI_AI_DOMAIN_DB?.gene_domain_map; 
     if (!domainMap) return [];
-    
     const geneUpper = geneName.toUpperCase();
-    
-    // 💡 FIX: Access the domains array directly by gene key.
+    // FIX: Access the domains array directly by gene key using the proper global cache.
     const geneDomains = domainMap[geneUpper]; 
     
     if (!geneDomains || geneDomains.length === 0) {
         return [];
     }
-    
     // Map the simplified domain object structure to the expected output format.
     return geneDomains.map(domain => ({
         gene: geneName,
-        // The display name can be the description or the ID
+        // FIX: Ensure domain_name is robustly extracted from description or ID
         domain_name: domain.description || domain.domain_id || 'Unknown', 
         domain_type: domain.type || 'Structure',
         start: domain.start || 0,
         end: domain.end || 0,
-        length: (domain.end - domain.start) > 0 ? (domain.end - domain.start) : 0,
+        // Calculate length safely
+        length: (domain.end > 0 && domain.start > 0) ? (domain.end - domain.start) : 0, 
         description: domain.description || 'No description available',
         source: 'New Domain Database'
     }));
@@ -1499,18 +1496,16 @@ async function getGenesByDomain(domainName) {
     return matchingGenes;
 }
 
-// --------------------------------------------------------------------------------------
-
 /**
  * @name compareDomainArchitecture
- * @description Compares domain names between two genes.
+ * @description Compares unique domain names between two genes.
  */
 async function compareDomainArchitecture(geneA, geneB) {
     // Both calls now use the fixed getDomainsByGene
     const domainsA = await getDomainsByGene(geneA);
     const domainsB = await getDomainsByGene(geneB);
     
-    // Use 'domain_name' property from the fixed getDomainsByGene output
+    // FIX: Use 'domain_name' property from the fixed getDomainsByGene output
     const domainNamesA = new Set(domainsA.map(d => d.domain_name));
     const domainNamesB = new Set(domainsB.map(d => d.domain_name));
     
@@ -1654,31 +1649,27 @@ async function visualizeDomainArchitecture(geneName) {
 }
 
 /**
- * @description Compares domain names between two genes and renders the results using a CiliaHub-compatible color scheme
+ * @name displayDomainComparison
+ * @description Renders the domain comparison results in an HTML card with the new CiliAI color scheme.
+ * This is the function called directly by the Domain Router.
  */
-//**
 async function displayDomainComparison(geneA, geneB) {
-    // Note: This relies on the fixed compareDomainArchitecture(geneA, geneB) function being defined elsewhere.
     const comparison = await compareDomainArchitecture(geneA, geneB);
     
     // Define the light blue color scheme
     const COLOR_UNIQUE = '#E3F4FC'; // Very light blue
-    const COLOR_SHARED = '#B8E3F5'; // Medium light blue
-    const COLOR_UNIQUE_B = '#E3F4FC'; // Also use very light blue
+    const COLOR_SHARED = '#E3F4FC'; // Very light blue
     const COLOR_TEXT = '#2C5AA0'; // CiliaHub Blue
 
-    // Check if the output is malformed (e.g., if one gene is missing)
-    const geneAName = comparison.geneA.gene.toUpperCase().replace('ARCHITECTURE', 'GENE A');
-    const geneBName = comparison.geneB.gene.toUpperCase().replace('ARCHITECTURE', 'GENE B');
-    
-    // Ensure the output is accurate even if the input was partially garbage (like 'ARCHITECTURE vs IFT88')
-    const similarityValue = comparison.similarity ? comparison.similarity : 0.0;
+    const geneAName = comparison.geneA.gene.toUpperCase();
+    const geneBName = comparison.geneB.gene.toUpperCase();
+    const similarityValue = comparison.similarity;
 
     let html = `<div class="result-card">
         <h3>🔬 Domain Architecture Comparison: ${geneAName} vs ${geneBName}</h3>
         
         <p style="color: #666; margin-bottom: 15px;">
-            Similarity is calculated based on the number of shared domains divided by the maximum number of unique domains between the two genes.
+            Similarity is based on the fraction of shared unique domains relative to the largest set.
         </p>
 
         <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; margin: 20px 0; text-align: center;">
@@ -1702,7 +1693,7 @@ async function displayDomainComparison(geneA, geneB) {
                 </p>
             </div>
             
-            <div style="background: ${COLOR_UNIQUE_B}; border: 1px solid ${COLOR_SHARED}; padding: 15px; border-radius: 5px;">
+            <div style="background: ${COLOR_UNIQUE}; border: 1px solid ${COLOR_SHARED}; padding: 15px; border-radius: 5px;">
                 <h4 style="color: ${COLOR_TEXT}; margin-top: 0;">${geneBName} Only</h4>
                 <p><strong>${comparison.uniqueB.length}</strong> unique domain(s)</p>
                 <ul style="list-style: none; padding: 0; font-size: 0.9em; color: #333;">
