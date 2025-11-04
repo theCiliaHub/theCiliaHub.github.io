@@ -1028,22 +1028,56 @@ async function getCuratedComplexComponents(complexName) {
  */
 function getComplexPhylogenyTableMap() {
     return {
+        // --- Core IFT machinery ---
         "IFT COMPLEX": ["WDR19", "IFT140", "TTC21B", "IFT122", "WDR35", "IFT43", "IFT172", "IFT80", "IFT57", "TRAF3IP1", "CLUAP1", "IFT20", "IFT88", "IFT81", "IFT74", "IFT70A", "IFT70B", "IFT56", "IFT52", "IFT46", "IFT27", "IFT25", "IFT22"],
         "IFT-A COMPLEX": ["WDR19", "IFT140", "TTC21B", "IFT122", "WDR35", "IFT43"],
         "IFT-B COMPLEX": ["IFT172", "IFT80", "IFT57", "TRAF3IP1", "CLUAP1", "IFT20", "IFT88", "IFT81", "IFT74", "IFT70A", "IFT70B", "IFT56", "IFT52", "IFT46", "IFT27", "IFT25", "IFT22"],
         "IFT-B1 COMPLEX": ["IFT172", "IFT80", "IFT57", "TRAF3IP1", "CLUAP1", "IFT20"],
         "IFT-B2 COMPLEX": ["IFT88", "IFT81", "IFT74", "IFT70A", "IFT70B", "IFT56", "IFT52", "IFT46", "IFT27", "IFT25", "IFT22"],
+        
+        // ⭐ NEW/UPDATED MOTOR COMPLEX (Combines IFT MOTORS and INTRAFLAGELLAR TRANSPORT MOTORS)
+        "IFT MOTOR COMPLEX": ["KIF3A", "KIF3B", "KIF17", "DYNC2H1", "DYNC2LI1", "WDR34", "WDR60"], 
+        "INTRAFLAGELLAR TRANSPORT MOTORS": ["KIF3A", "KIF3B", "KIF17", "DYNC2H1", "DYNC2LI1", "WDR34", "WDR60"],
+        
+        // --- BBSome and trafficking ---
         "BBSOME": ["BBS1", "BBS2", "BBS4", "BBS5", "BBS7", "TTC8", "BBS9", "BBIP1"],
+        "EXOCYST": ["EXOC1", "EXOC2", "EXOC3", "EXOC4", "EXOC5", "EXOC6", "EXOC7", "EXOC8"],
+
+        // --- Transition zone modules ---
         "TRANSITION ZONE": ["NPHP1", "MKS1", "CEP290", "AHI1", "RPGRIP1L", "TMEM67", "CC2D2A", "B9D1", "B9D2"],
         "MKS MODULE": ["MKS1", "TMEM17", "TMEM67", "TMEM138", "B9D2", "B9D1", "CC2D2A", "TMEM107", "TMEM237", "TMEM231", "TMEM216", "TCTN1", "TCTN2", "TCTN3"],
         "NPHP MODULE": ["NPHP1", "NPHP3", "NPHP4", "RPGRIP1L", "IQCB1", "CEP290", "SDCCAG8"],
-        "EXOCYST": ["EXOC1", "EXOC2", "EXOC3", "EXOC4", "EXOC5", "EXOC6", "EXOC7", "EXOC8"],
+
+        // --- Basal body & appendage components (Consolidated) ---
+        "BASAL BODY": ["CEP164", "CEP83", "SCLT1", "CEP89", "LRRC45", "ODF2", "CEP128", "CEP135", "CETN2", "CETN3", "POC1B", "FBF1", "CCDC41", "CCDC120", "OFD1"], 
+        "CENTRIOLE DISTAL APPENDAGES": ["CEP164", "SCLT1", "CEP89", "LRRC45", "CEP123", "ANKRD26", "FOPNL", "CEP128", "CEP135", "FBF1", "CCDC41", "CCDC120"],
+        "CENTRIOLE SUBDISTAL APPENDAGES": ["CEP128", "ODF2", "CCDC120", "NIN", "NINL", "CEP170", "CCDC68", "CCDC102B"],
+        "CENTRIOLAR SATELLITES": ["PCM1", "CEP131", "CEP290", "OFD1", "AZI1", "CEP72", "SSX2IP"],
+        
+        // --- Transition fiber & ciliary gate ---
+        "TRANSITION FIBER": ["CEP164", "CEP83", "SCLT1", "CEP89", "LRRC45", "CEP123", "CEP350", "CEP44"],
+
+        // --- Axonemal and motility machinery ---
         "CILIARY TIP": ["HYDIN", "IQCA1", "CATSPER2", "KIF19A", "KIF7", "CCDC78", "CCDC33", "SPEF1", "CEP104", "CSPP1", "TOGARAM1", "ARMC9", "MAPRE1", "MAPRE3", "CCDC66"],
         "RADIAL SPOKE": ["RSPH1", "RSPH3", "RSPH4A", "RSPH6A", "RSPH9", "RSPH10B", "RSPH23", "RSPH16", "DRC1", "DRC3", "DRC4", "DRC5"],
         "CENTRAL PAIR": ["HYDIN", "SPAG6", "SPAG16", "SPAG17", "POC1A", "CEP131", "CFAP43", "CFAP44", "CFAP45", "CFAP47"],
         "DYNEIN ARM": ["DNAH1", "DNAH2", "DNAH5", "DNAH6", "DNAH7", "DNAH8", "DNAH9", "DNAH10", "DNAH11", "DNALI1", "DNAI1", "DNAI2", "DNAAF1", "DNAAF2", "DNAAF3", "DNAAF4", "LRRC6", "CCDC103"],
         "OUTER DYNEIN ARM": ["DNAH5", "DNAH11", "DNAH17", "DNAH18", "DNAI1", "DNAI2", "DNAAF1", "DNAAF2", "DNAAF3", "DNAAF4", "LRRC6", "CCDC103", "WDR63"],
-        "INNER DYNEIN ARM": ["DNAH2", "DNAH7", "DNAH10", "DNALI1", "DNAL4", "DNAAF5", "CCDC40", "CCDC114", "CCDC151"]
+        "INNER DYNEIN ARM": ["DNAH2", "DNAH7", "DNAH10", "DNALI1", "DNAL4", "DNAAF5", "CCDC40", "CCDC114", "CCDC151"],
+        "NEXIN-DYNEIN REGULATORY COMPLEX": ["GAS8", "GAS2L2", "CCDC39", "CCDC40", "CCDC164", "CCDC65"], // New DRC
+        
+        // --- Ciliary rootlet & anchoring ---
+        "ROOTLETIN COMPLEX": ["CROCC", "CROCC2", "CEP68", "CEP44", "ODF2"],
+        "CENTRIOLE LINKER": ["CEP68", "CEP250", "C-NAP1", "ROCK1", "NEK2"],
+
+        // --- Ciliary signaling hubs ---
+        "SHH SIGNALING": ["SMO", "PTCH1", "GLI1", "GLI2", "GLI3", "SUFU", "KIF7", "TULP3", "IFT172", "IFT81", "ARL13B"],
+        "GPCR COMPLEX": ["GPR161", "GPR175", "GPR22", "GPR83", "ADCY3", "RXFP2", "SSTR3", "NPY2R", "HTR6"],
+        "HEDGEHOG TRAFFICKING COMPLEX": ["ARL13B", "INPP5E", "TULP3", "IFT172", "KIF7", "BBS4", "BBS5", "SMO"],
+
+        // --- Centrosome & PCM components ---
+        "CENTROSOME": ["CEP152", "CEP192", "PLK4", "STIL", "SAS6", "CEP135", "CETN2", "PCNT", "CDK5RAP2", "CEP215"],
+        "PEROXISOMAL COMPLEX": ["PEX1", "PEX2", "PEX3", "PEX5", "PEX6", "PEX10", "PEX12", "PEX13", "PEX14", "PEX19"]
     };
 }
 
@@ -1059,8 +1093,7 @@ function standardizeComplexName(complexName) {
     const nameUpper = complexName.toUpperCase()
         .replace(/COMPLEX|MODULE|\(S\)|PROTEINS/g, '')
         .trim();
-
-    // 2. Definitive mapping table
+   // 2. Definitive mapping table
     const standardizationMap = {
         'IFT-A': 'IFT-A COMPLEX',
         'IFT-B': 'IFT-B COMPLEX',
@@ -1070,15 +1103,27 @@ function standardizeComplexName(complexName) {
         'MKS': 'MKS MODULE',
         'NPHP': 'NPHP MODULE',
         'EXOCYST': 'EXOCYST',
+        'CILIARY TIP': 'CILIARY TIP',
+        // ⭐ IFT MOTORS (Consolidated Mappings)
+        'IFT MOTORS': 'IFT MOTOR COMPLEX',
+        'INTRAFLAGELLAR TRANSPORT MOTORS': 'IFT MOTOR COMPLEX',
+        'KINESIN-2': 'IFT MOTOR COMPLEX',
+        'DYNEIN-2': 'IFT MOTOR COMPLEX',
+        // ⭐ NEW BASAL BODY/APPENDAGE MAPPINGS
+        'BASAL BODY': 'BASAL BODY', // Existing, but crucial
+        'DISTAL APPENDAGES': 'CENTRIOLE DISTAL APPENDAGES',
+        'SUBDISTAL APPENDAGES': 'CENTRIOLE SUBDISTAL APPENDAGES',
+        'CENTRIOLAR SATELLITES': 'CENTRIOLAR SATELLITES',
+        // ⭐ NEW AXONEMAL MAPPINGS
+        'NEXIN': 'NEXIN-DYNEIN REGULATORY COMPLEX',
+        'DRC': 'NEXIN-DYNEIN REGULATORY COMPLEX',
         // Axonemal components
         'DYNEIN ARM': 'DYNEIN ARM',
         'OUTER DYNEIN ARM': 'OUTER DYNEIN ARM',
         'INNER DYNEIN ARM': 'INNER DYNEIN ARM',
         'RADIAL SPOKE': 'RADIAL SPOKE',
         'CENTRAL PAIR': 'CENTRAL PAIR',
-        'CILIARY TIP': 'CILIARY TIP'
     };
-    
     // 3. Find the longest, best match in the map
     for (const [key, standardName] of Object.entries(standardizationMap)) {
         if (nameUpper.includes(key.toUpperCase())) {
@@ -2075,6 +2120,7 @@ const questionRegistry = [
 { text: "Show components of NPHP Complex", handler: async () => formatListResult("Components of NPHP Complex", await getCuratedComplexComponents("NPHP")) },
 { text: "NPHP complex members", handler: async () => formatListResult("Components of NPHP Complex", await getCuratedComplexComponents("NPHP")) },
 { text: "List NPHP module proteins", handler: async () => formatListResult("Components of NPHP Complex", await getCuratedComplexComponents("NPHP")) },
+    
 // --- Additional complexes ---
 { text: "Show dynein arm components", handler: async () => formatListResult("Dynein Arm Components", await getCuratedComplexComponents("dynein arm")) },
 { text: "List outer dynein arm proteins", handler: async () => formatListResult("ODA Components", await getCuratedComplexComponents("outer dynein arm")) },
@@ -2083,7 +2129,44 @@ const questionRegistry = [
 { text: "Show central pair complex proteins", handler: async () => formatListResult("Central Pair Components", await getCuratedComplexComponents("central pair")) },
 { text: "List nexin-dynein regulatory complex components", handler: async () => formatListResult("N-DRC Components", await getCuratedComplexComponents("N-DRC")) },
 { text: "Show exocyst complex members", handler: async () => formatListResult("Exocyst Complex", await getCuratedComplexComponents("exocyst")) },
-
+// --- IFT Motors (Kinesin-2 and Dynein-2) ---
+{ text: "Show components of the IFT Motor Complex", handler: async () => formatListResult("IFT Motor Complex Components", await getCuratedComplexComponents("IFT MOTOR COMPLEX")) },
+{ text: "List genes in the IFT Motor Complex", handler: async () => formatListResult("IFT Motor Complex Components", await getCuratedComplexComponents("IFT MOTOR COMPLEX")) },
+{ text: "Display components of intraflagellar transport motors", handler: async () => formatListResult("IFT Motor Complex Components", await getCuratedComplexComponents("INTRAFLAGELLAR TRANSPORT MOTORS")) },
+{ text: "Kinesin-2 and Dynein-2 complex members", handler: async () => formatListResult("IFT Motor Complex Components", await getCuratedComplexComponents("IFT MOTORS")) },
+{ text: "Show components of the IFT Motors complex", handler: async () => formatListResult("IFT Motor Complex Components", await getCuratedComplexComponents("IFT MOTORS")) },
+{ text: "List Kinesin-2 components", handler: async () => formatListResult("IFT Motor Complex Components", await getCuratedComplexComponents("KINESIN-2")) },
+{ text: "Display Dynein-2 subunits", handler: async () => formatListResult("IFT Motor Complex Components", await getCuratedComplexComponents("DYNEIN-2")) },
+// --- Nexin-Dynein Regulatory Complex (DRC) ---
+{ text: "Show components of the Nexin-Dynein Regulatory Complex", handler: async () => formatListResult("Nexin-Dynein Regulatory Complex Components", await getCuratedComplexComponents("NEXIN-DYNEIN REGULATORY COMPLEX")) },
+{ text: "List genes in the DRC complex", handler: async () => formatListResult("Nexin-Dynein Regulatory Complex Components", await getCuratedComplexComponents("DRC")) },
+{ text: "Components of the Nexin-Dynein complex", handler: async () => formatListResult("Nexin-Dynein Regulatory Complex Components", await getCuratedComplexComponents("NEXIN")) },
+{ text: "DRC complex members", handler: async () => formatListResult("Nexin-Dynein Regulatory Complex Components", await getCuratedComplexComponents("DRC")) },
+// --- Basal Body & Appendages ---
+{ text: "Show Basal Body components", handler: async () => formatListResult("Basal Body Components", await getCuratedComplexComponents("BASAL BODY")) },
+{ text: "List proteins in the Basal Body", handler: async () => formatListResult("Basal Body Components", await getCuratedComplexComponents("BASAL BODY")) },
+{ text: "Display components of Centriolar Satellites", handler: async () => formatListResult("Centriolar Satellite Components", await getCuratedComplexComponents("CENTRIOLAR SATELLITES")) },
+{ text: "Centriolar Satellite proteins", handler: async () => formatListResult("Centriolar Satellite Components", await getCuratedComplexComponents("CENTRIOLAR SATELLITES")) },
+{ text: "Show Centriole Distal Appendages components", handler: async () => formatListResult("Centriole Distal Appendage Components", await getCuratedComplexComponents("CENTRIOLE DISTAL APPENDAGES")) },
+{ text: "List Centriole Subdistal Appendages components", handler: async () => formatListResult("Centriole Subdistal Appendage Components", await getCuratedComplexComponents("CENTRIOLE SUBDISTAL APPENDAGES")) },
+// --- Centrosome / Anchoring ---
+{ text: "Show Centrosome components", handler: async () => formatListResult("Centrosome Components", await getCuratedComplexComponents("CENTROSOME")) },
+{ text: "List proteins in the Centrosome", handler: async () => formatListResult("Centrosome Components", await getCuratedComplexComponents("CENTROSOME")) },
+{ text: "Show components of the Rootletin Complex", handler: async () => formatListResult("Rootletin Complex Components", await getCuratedComplexComponents("ROOTLETIN COMPLEX")) },
+{ text: "List proteins in the Centriole Linker", handler: async () => formatListResult("Centriole Linker Components", await getCuratedComplexComponents("CENTRIOLE LINKER")) },
+{ text: "Show Centriolar Satellites components", handler: async () => formatListResult("Centriolar Satellite Components", await getCuratedComplexComponents("CENTRIOLAR SATELLITES")) },
+{ text: "List Satellite proteins", handler: async () => formatListResult("Centriolar Satellite Components", await getCuratedComplexComponents("CENTRIOLAR SATELLITES")) },
+{ text: "Which genes are in Centriolar Satellites?", handler: async () => formatListResult("Centriolar Satellite Components", await getCuratedComplexComponents("CENTRIOLAR SATELLITES")) },
+// --- Signaling Hubs ---
+{ text: "List components of the SHH Signaling complex", handler: async () => formatListResult("SHH Signaling Components", await getCuratedComplexComponents("SHH SIGNALING")) },
+{ text: "Show genes in Hedgehog Trafficking Complex", handler: async () => formatListResult("Hedgehog Trafficking Complex Components", await getCuratedComplexComponents("HEDGEHOG TRAFFICKING COMPLEX")) },
+// ==================== CILIARY TIP COMPONENTS (Curated List) ====================
+{ text: "Show components of the Ciliary Tip", handler: async () => formatListResult("Ciliary Tip Components", await getCuratedComplexComponents("CILIARY TIP")) },
+{ text: "List genes localized to the Ciliary Tip", handler: async () => formatListResult("Ciliary Tip Components", await getCuratedComplexComponents("CILIARY TIP")) },
+{ text: "Display Ciliary Tip enriched proteins", handler: async () => formatListResult("Ciliary Tip Components", await getCuratedComplexComponents("CILIARY TIP")) },
+{ text: "What proteins are at the ciliary tip?", handler: async () => formatListResult("Ciliary Tip Components", await getCuratedComplexComponents("CILIARY TIP")) },
+{ text: "Genes at the Ciliary Tip", handler: async () => formatListResult("Ciliary Tip Components", await getCuratedComplexComponents("CILIARY TIP")) },
+{ text: "Show Ciliary Tip complex members", handler: async () => formatListResult("Ciliary Tip Components", await getCuratedComplexComponents("CILIARY TIP")) },
     // ==================== CILIOPATHIES & DISEASES ====================
     // Bardet-Biedl Syndrome
     { text: "List genes associated with Bardet–Biedl syndrome", handler: async () => { const { genes, description } = await getCiliopathyGenes("Bardet–Biedl syndrome"); return formatListResult("Genes for Bardet–Biedl syndrome", genes, description); }},
