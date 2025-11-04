@@ -1653,41 +1653,62 @@ async function visualizeDomainArchitecture(geneName) {
     return html;
 }
 
-/**
- * Compare domain architecture in HTML format
+//**
+ * @name displayDomainComparison
+ * @description Compares domain names between two genes and renders the results using a CiliaHub-compatible color scheme.
  */
 async function displayDomainComparison(geneA, geneB) {
+    // Note: This relies on the fixed compareDomainArchitecture(geneA, geneB) function being defined elsewhere.
     const comparison = await compareDomainArchitecture(geneA, geneB);
     
+    // Define the light blue color scheme
+    const COLOR_UNIQUE = '#E3F4FC'; // Very light blue
+    const COLOR_SHARED = '#B8E3F5'; // Medium light blue
+    const COLOR_UNIQUE_B = '#E3F4FC'; // Also use very light blue
+    const COLOR_TEXT = '#2C5AA0'; // CiliaHub Blue
+
+    // Check if the output is malformed (e.g., if one gene is missing)
+    const geneAName = comparison.geneA.gene.toUpperCase().replace('ARCHITECTURE', 'GENE A');
+    const geneBName = comparison.geneB.gene.toUpperCase().replace('ARCHITECTURE', 'GENE B');
+    
+    // Ensure the output is accurate even if the input was partially garbage (like 'ARCHITECTURE vs IFT88')
+    const similarityValue = comparison.similarity ? comparison.similarity : 0.0;
+
     let html = `<div class="result-card">
-        <h3>🔬 Domain Architecture Comparison: ${geneA} vs ${geneB}</h3>
-        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; margin: 20px 0;">
+        <h3>🔬 Domain Architecture Comparison: ${geneAName} vs ${geneBName}</h3>
+        
+        <p style="color: #666; margin-bottom: 15px;">
+            Similarity is calculated based on the number of shared domains divided by the maximum number of unique domains between the two genes.
+        </p>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; margin: 20px 0; text-align: center;">
             
-            <div style="background: #e3f2fd; padding: 15px; border-radius: 5px;">
-                <h4>${geneA} Only</h4>
+            <div style="background: ${COLOR_UNIQUE}; border: 1px solid ${COLOR_SHARED}; padding: 15px; border-radius: 5px;">
+                <h4 style="color: ${COLOR_TEXT}; margin-top: 0;">${geneAName} Only</h4>
                 <p><strong>${comparison.uniqueA.length}</strong> unique domain(s)</p>
-                <ul style="list-style: none; padding: 0;">
+                <ul style="list-style: none; padding: 0; font-size: 0.9em; color: #333;">
                     ${comparison.uniqueA.map(d => `<li>• ${d}</li>`).join('')}
                 </ul>
             </div>
             
-            <div style="background: #c8e6c9; padding: 15px; border-radius: 5px;">
-                <h4>Shared Domains</h4>
+            <div style="background: ${COLOR_SHARED}; border: 2px solid ${COLOR_TEXT}; padding: 15px; border-radius: 5px;">
+                <h4 style="color: ${COLOR_TEXT}; margin-top: 0;">Shared Domains</h4>
                 <p><strong>${comparison.shared.length}</strong> domain(s)</p>
-                <ul style="list-style: none; padding: 0;">
+                <ul style="list-style: none; padding: 0; font-size: 0.9em; color: #333;">
                     ${comparison.shared.map(d => `<li>✓ ${d}</li>`).join('')}
                 </ul>
-                <p style="margin-top: 10px;"><strong>Similarity:</strong> ${(comparison.similarity * 100).toFixed(1)}%</p>
+                <p style="margin-top: 10px; font-weight: bold; color: ${COLOR_TEXT};">
+                    Similarity: ${(similarityValue * 100).toFixed(1)}%
+                </p>
             </div>
             
-            <div style="background: #fff3e0; padding: 15px; border-radius: 5px;">
-                <h4>${geneB} Only</h4>
+            <div style="background: ${COLOR_UNIQUE_B}; border: 1px solid ${COLOR_SHARED}; padding: 15px; border-radius: 5px;">
+                <h4 style="color: ${COLOR_TEXT}; margin-top: 0;">${geneBName} Only</h4>
                 <p><strong>${comparison.uniqueB.length}</strong> unique domain(s)</p>
-                <ul style="list-style: none; padding: 0;">
+                <ul style="list-style: none; padding: 0; font-size: 0.9em; color: #333;">
                     ${comparison.uniqueB.map(d => `<li>• ${d}</li>`).join('')}
                 </ul>
             </div>
-            
         </div>
     </div>`;
     
@@ -1786,18 +1807,21 @@ async function resolveDomainQuery(query) {
 }
 /**
  * @name resolvePhylogeneticQuery
- * @description Routes generic phylogenetic queries to the correct list or visualization.
- * This MUST be defined globally to fix the ReferenceError.
- * @param {string} query - The raw user query.
+ * @description Routes generic phylogenetic queries (non-table) to the correct list or visualization.
+ * This MUST be defined globally to fix the ReferenceError encountered in the main router.
+ * @param {string} query - The raw user query (e.g., "IFT88 conservation").
  */
 async function resolvePhylogeneticQuery(query) {
-    // Assumes extractMultipleGenes is globally defined and works.
+    // NOTE: This relies on global helper extractMultipleGenes(query) being defined.
     const genes = extractMultipleGenes(query); 
     const qLower = query.toLowerCase();
 
     // 1. Single Gene or Multi-Gene Plotting Request
     if (genes.length >= 1) {
+        // If one or more genes are found, assume the user wants a visualization.
         const geneList = genes.join(',');
+        console.log(`Phylogeny resolver routing ${genes.length} gene(s) to heatmap.`);
+        
         // This calls the final visualization layer (defaulting to Li data, heatmap view)
         return handlePhylogenyVisualizationQuery(`Phylogeny of ${geneList}`, 'li', 'heatmap');
     }
@@ -1806,16 +1830,18 @@ async function resolvePhylogeneticQuery(query) {
     const complexMatch = qLower.match(/(ift|bbsome|mks|nphp)\s+(complex|module)/);
     if (complexMatch) {
         const complexName = complexMatch[0];
-        // Note: You would need to look up genes for this complex before calling handlePhylogenyVisualizationQuery
-        return `<div class="result-card"><h3>Phylogeny Pending</h3><p>Please rephrase as a table query, e.g., "${complexName} table."</p></div>`;
+        // Since it's a visualization query but not a 'table' query, we currently default to plotting the complex members.
+        // NOTE: For stability, the system should either ask the user to specify 'table' or run the full query.
+        return `<div class="result-card"><h3>Phylogeny Pending</h3><p>To view the phylogenetic data for the <strong>${complexName.toUpperCase()}</strong>, please rephrase your query as a table request, e.g., "${complexName} table."</p></div>`;
     }
 
     // 3. Classification List Request (e.g., 'List vertebrate conserved genes')
     if (qLower.includes('list') || qLower.includes('ciliary only') || qLower.includes('vertebrate')) {
-        return getPhylogenyList(query); // Assumes this is defined and works
+        // Assuming getPhylogenyList is defined and handles classification keywords
+        return getPhylogenyList(query);
     }
     
-    return `<div class="result-card"><h3>Phylogeny Error</h3><p>Could not interpret the phylogenetic query. Please specify a gene, complex, or list type.</p></div>`;
+    return `<div class="result-card"><h3>Phylogeny Error</h3><p>Could not interpret the phylogenetic query. Please specify a gene (e.g., IFT88) or list type.</p></div>`;
 }
 
 
