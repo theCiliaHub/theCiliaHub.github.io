@@ -1000,34 +1000,26 @@ async function routeComplexPhylogenyAnalysis(query) {
 }
 
 /**
- * @name getCuratedComplexComponents
- * @description Retrieves gene lists for major complexes directly from the curated map.
+ * Retrieves gene lists for major complexes directly from the curated map.
  */
 async function getCuratedComplexComponents(complexName) {
-    // getComplexPhylogenyTableMap() provides the single source of truth for all curated lists
     const curatedGeneMaps = getComplexPhylogenyTableMap(); 
-    
-    // Use the standardization function to normalize the input name
-    const standardizedName = standardizeComplexName(complexName);
-    
-    // Normalize the name to match the keys in the map (e.g., 'IFT-A Complex' -> 'IFT-A COMPLEX')
+    const standardizedName = standardizeComplexName(complexName); // Calls the fixed function
     const mapKey = standardizedName.toUpperCase()
         .replace(' COMPLEX', '').replace(' MODULE', '').trim();
-
     const genes = curatedGeneMaps[mapKey];
 
     if (genes && genes.length > 0) {
-        // Format the genes array into the required {gene: name, description: ..., source: ...} structure
         return genes.map(gene => ({
             gene: gene,
             description: `${standardizedName} (Curated List)`,
             source: 'Curated'
         }));
     }
-    
-    // Fallback: This should ideally not be hit for these specific complexes.
     return [];
 }
+// Add window.getCuratedComplexComponents = getCuratedComplexComponents; if needed
+
 
 /**
  * Extracts and normalizes the curated gene map data for use by getGenesByComplex.
@@ -1052,6 +1044,50 @@ function getComplexPhylogenyTableMap() {
         "OUTER DYNEIN ARM": ["DNAH5", "DNAH11", "DNAH17", "DNAH18", "DNAI1", "DNAI2", "DNAAF1", "DNAAF2", "DNAAF3", "DNAAF4", "LRRC6", "CCDC103", "WDR63"],
         "INNER DYNEIN ARM": ["DNAH2", "DNAH7", "DNAH10", "DNALI1", "DNAL4", "DNAAF5", "CCDC40", "CCDC114", "CCDC151"]
     };
+}
+
+/**
+ * @name standardizeComplexName
+ * @description Normalizes user input for known ciliary complexes, mapping common synonyms
+ * (e.g., IFT-A, MKS) to a consistent internal name for stable lookup.
+ * @param {string} complexName - The raw user query term (e.g., "IFT-A complex members").
+ * @returns {string} The standardized name (e.g., "IFT-A complex").
+ */
+function standardizeComplexName(complexName) {
+    // 1. Clean the input: Remove common suffixes (COMPLEX, MODULE, (S), PROTEINS) and fix regex flag (using 'g')
+    const nameUpper = complexName.toUpperCase()
+        .replace(/COMPLEX|MODULE|\(S\)|PROTEINS/g, '')
+        .trim();
+
+    // 2. Definitive mapping table
+    const standardizationMap = {
+        'IFT-A': 'IFT-A COMPLEX',
+        'IFT-B': 'IFT-B COMPLEX',
+        'IFT': 'IFT COMPLEX',
+        'BBSOME': 'BBSOME',
+        'TRANSITION ZONE': 'TRANSITION ZONE',
+        'MKS': 'MKS MODULE',
+        'NPHP': 'NPHP MODULE',
+        'EXOCYST': 'EXOCYST',
+        // Axonemal components
+        'DYNEIN ARM': 'DYNEIN ARM',
+        'OUTER DYNEIN ARM': 'OUTER DYNEIN ARM',
+        'INNER DYNEIN ARM': 'INNER DYNEIN ARM',
+        'RADIAL SPOKE': 'RADIAL SPOKE',
+        'CENTRAL PAIR': 'CENTRAL PAIR',
+        'CILIARY TIP': 'CILIARY TIP'
+    };
+    
+    // 3. Find the longest, best match in the map
+    for (const [key, standardName] of Object.entries(standardizationMap)) {
+        if (nameUpper.includes(key.toUpperCase())) {
+            // Return the value from the map (which is the standardized name)
+            return standardName;
+        }
+    }
+
+    // 4. Return original input if no standardization applies (for CORUM/CiliaHub fallback)
+    return complexName;
 }
 
 // NOTE: getComplexPhylogenyTableMap() must be defined separately (as you received).
