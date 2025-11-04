@@ -891,44 +891,6 @@ async function getGenesByFunction(functionalCategory) {
     return results;
 }
 
-async function getComplexPhylogenyTable(complexName) {
-    const geneMaps = {
-        "IFT COMPLEX": ["WDR19", "IFT140", "TTC21B", "IFT122", "WDR35", "IFT43", "IFT172", "IFT80", "IFT57", "TRAF3IP1", "CLUAP1", "IFT20", "IFT88", "IFT81", "IFT74", "IFT70A", "IFT70B", "IFT56", "IFT52", "IFT46", "IFT27", "IFT25", "IFT22"],
-        "IFT-A COMPLEX": ["WDR19", "IFT140", "TTC21B", "IFT122", "WDR35", "IFT43"],
-        "IFT-B COMPLEX": ["IFT172", "IFT80", "IFT57", "TRAF3IP1", "CLUAP1", "IFT20", "IFT88", "IFT81", "IFT74", "IFT70A", "IFT70B", "IFT56", "IFT52", "IFT46", "IFT27", "IFT25", "IFT22"],
-        "IFT-B1 COMPLEX": ["IFT172", "IFT80", "IFT57", "TRAF3IP1", "CLUAP1", "IFT20"], 
-        "IFT-B2 COMPLEX": ["IFT88", "IFT81", "IFT74", "IFT70A", "IFT70B", "IFT56", "IFT52", "IFT46", "IFT27", "IFT25", "IFT22"], 
-        "BBSOME": ["BBS1", "BBS2", "BBS4", "BBS5", "BBS7", "TTC8", "BBS9", "BBIP1"],
-        "TRANSITION ZONE": ["NPHP1", "MKS1", "CEP290", "AHI1", "RPGRIP1L", "TMEM67", "CC2D2A", "B9D1", "B9D2"],
-        "MKS MODULE": ["MKS1", "TMEM17", "TMEM67", "TMEM138", "B9D2", "B9D1", "CC2D2A", "TMEM107", "TMEM237", "TMEM231", "TMEM216", "TCTN1", "TCTN2", "TCTN3"],
-        "NPHP MODULE": ["NPHP1", "NPHP3", "NPHP4", "RPGRIP1L", "IQCB1", "CEP290", "SDCCAG8"],
-        "EXOCYST": ["EXOC1", "EXOC2", "EXOC3", "EXOC4", "EXOC5", "EXOC6", "EXOC7", "EXOC8"],
-        
-        // 1. UPDATED CILIARY TIP LOCALIZING PROTEINS (USING YOUR LIST)
-        "CILIARY TIP": ["HYDIN", "IQCA1", "CATSPER2", "KIF19A", "KIF7", "CCDC78", "CCDC33", "SPEF1", "CEP104", "CSPP1", "TOGARAM1", "ARMC9", "MAPRE1", "MAPRE3", "CCDC66"],
-        
-        // 2. AXONEMAL COMPLEX DATA (PREVIOUSLY ADDED)
-        "RADIAL SPOKE": ["RSPH1", "RSPH3", "RSPH4A", "RSPH6A", "RSPH9", "RSPH10B", "RSPH23", "RSPH16", "DRC1", "DRC3", "DRC4", "DRC5"],
-        "CENTRAL PAIR": ["HYDIN", "SPAG6", "SPAG16", "SPAG17", "POC1A", "CEP131", "CFAP43", "CFAP44", "CFAP45", "CFAP47"],
-        "DYNEIN ARM": ["DNAH1", "DNAH2", "DNAH5", "DNAH6", "DNAH7", "DNAH8", "DNAH9", "DNAH10", "DNAH11", "DNALI1", "DNAI1", "DNAI2", "DNAAF1", "DNAAF2", "DNAAF3", "DNAAF4", "LRRC6", "CCDC103"],
-        "OUTER DYNEIN ARM": ["DNAH5", "DNAH11", "DNAH17", "DNAH18", "DNAI1", "DNAI2", "DNAAF1", "DNAAF2", "DNAAF3", "DNAAF4", "LRRC6", "CCDC103", "WDR63"],
-        "INNER DYNEIN ARM": ["DNAH2", "DNAH7", "DNAH10", "DNALI1", "DNAL4", "DNAAF5", "CCDC40", "CCDC114", "CCDC151"]
-    };
-    
-    // Key processing remains the same
-    const key = complexName.toUpperCase()
-        .replace(' COMPONENTS', '').replace(' PROTEINS', '')
-        .replace(' ANALYSIS', '').replace(' MODULE', '').replace(' COMPLEX', '').replace(' LOCALIZING', '')
-        .trim();
-        
-    const genes = geneMaps[key];
-
-    if (!genes) {
-        return `<div class="result-card"><h3>Error</h3><p>Gene list not defined for complex: <strong>${complexName}</strong>.</p></div>`;
-    }
-    const queryTitle = `Phylogenetic conservation data for ${complexName}`;
-    return handlePhylogenyVisualizationQuery(queryTitle, genes, 'li', 'table');
-}
 
 /**
  * @name routeComplexPhylogenyAnalysis
@@ -998,42 +960,113 @@ async function routeComplexPhylogenyAnalysis(query) {
     return null; // Continue to the standard phylogenetic router
 }
 
-
 /**
- * Standardizes common ciliary complex names for robust searching across CiliaHub and CORUM.
- * This directly addresses the IFT, MKS, and NPHP failures by mapping them to known forms.
+ * Extracts and normalizes the curated gene map data for use by getGenesByComplex.
+ * NOTE: This must be placed near getComplexPhylogenyTable so it can access the same data structure.
  */
-function standardizeComplexName(complexName) {
-    // FIX: Changed the regex flag from uppercase /G to lowercase /g, 
-    // and moved it to the correct position (after the closing slash)
-    const nameUpper = complexName.toUpperCase().replace(/COMPLEX|MODULE|\(S\)/g, '').trim();
-
-    const standardizationMap = {
-        'IFT-A': 'IFT-A complex',
-        'IFT-B': 'IFT-B complex',
-        'IFT': 'Intraflagellar transport (IFT) complex',
-        'MKS': 'MKS Complex', 
-        'NPHP': 'NPHP Complex', 
-        'TRANSITION ZONE': 'Transition Zone Complex',
-        'RADIAL SPOKE': 'Radial Spoke',
-        'CENTRAL PAIR': 'Central Pair',
-        'DYNEIN ARM': 'Dynein arm',
-        'OUTER DYNEIN ARM': 'Outer dynein arm',
-        'INNER DYNEIN ARM': 'Inner dynein arm',
-        'EXOCYST': 'Exocyst complex',
-        'BBSOME': 'BBSome'
+function getComplexPhylogenyTableMap() {
+    return {
+        "IFT COMPLEX": ["WDR19", "IFT140", "TTC21B", "IFT122", "WDR35", "IFT43", "IFT172", "IFT80", "IFT57", "TRAF3IP1", "CLUAP1", "IFT20", "IFT88", "IFT81", "IFT74", "IFT70A", "IFT70B", "IFT56", "IFT52", "IFT46", "IFT27", "IFT25", "IFT22"],
+        "IFT-A COMPLEX": ["WDR19", "IFT140", "TTC21B", "IFT122", "WDR35", "IFT43"],
+        "IFT-B COMPLEX": ["IFT172", "IFT80", "IFT57", "TRAF3IP1", "CLUAP1", "IFT20", "IFT88", "IFT81", "IFT74", "IFT70A", "IFT70B", "IFT56", "IFT52", "IFT46", "IFT27", "IFT25", "IFT22"],
+        "IFT-B1 COMPLEX": ["IFT172", "IFT80", "IFT57", "TRAF3IP1", "CLUAP1", "IFT20"],
+        "IFT-B2 COMPLEX": ["IFT88", "IFT81", "IFT74", "IFT70A", "IFT70B", "IFT56", "IFT52", "IFT46", "IFT27", "IFT25", "IFT22"],
+        "BBSOME": ["BBS1", "BBS2", "BBS4", "BBS5", "BBS7", "TTC8", "BBS9", "BBIP1"],
+        "TRANSITION ZONE": ["NPHP1", "MKS1", "CEP290", "AHI1", "RPGRIP1L", "TMEM67", "CC2D2A", "B9D1", "B9D2"],
+        "MKS MODULE": ["MKS1", "TMEM17", "TMEM67", "TMEM138", "B9D2", "B9D1", "CC2D2A", "TMEM107", "TMEM237", "TMEM231", "TMEM216", "TCTN1", "TCTN2", "TCTN3"],
+        "NPHP MODULE": ["NPHP1", "NPHP3", "NPHP4", "RPGRIP1L", "IQCB1", "CEP290", "SDCCAG8"],
+        "EXOCYST": ["EXOC1", "EXOC2", "EXOC3", "EXOC4", "EXOC5", "EXOC6", "EXOC7", "EXOC8"],
+        "CILIARY TIP": ["HYDIN", "IQCA1", "CATSPER2", "KIF19A", "KIF7", "CCDC78", "CCDC33", "SPEF1", "CEP104", "CSPP1", "TOGARAM1", "ARMC9", "MAPRE1", "MAPRE3", "CCDC66"],
+        "RADIAL SPOKE": ["RSPH1", "RSPH3", "RSPH4A", "RSPH6A", "RSPH9", "RSPH10B", "RSPH23", "RSPH16", "DRC1", "DRC3", "DRC4", "DRC5"],
+        "CENTRAL PAIR": ["HYDIN", "SPAG6", "SPAG16", "SPAG17", "POC1A", "CEP131", "CFAP43", "CFAP44", "CFAP45", "CFAP47"],
+        "DYNEIN ARM": ["DNAH1", "DNAH2", "DNAH5", "DNAH6", "DNAH7", "DNAH8", "DNAH9", "DNAH10", "DNAH11", "DNALI1", "DNAI1", "DNAI2", "DNAAF1", "DNAAF2", "DNAAF3", "DNAAF4", "LRRC6", "CCDC103"],
+        "OUTER DYNEIN ARM": ["DNAH5", "DNAH11", "DNAH17", "DNAH18", "DNAI1", "DNAI2", "DNAAF1", "DNAAF2", "DNAAF3", "DNAAF4", "LRRC6", "CCDC103", "WDR63"],
+        "INNER DYNEIN ARM": ["DNAH2", "DNAH7", "DNAH10", "DNALI1", "DNAL4", "DNAAF5", "CCDC40", "CCDC114", "CCDC151"]
     };
-    
-    // Check for fuzzy/partial match on simplified name
-    for (const [key, standardName] of Object.entries(standardizationMap)) {
-        if (nameUpper.includes(key.toUpperCase())) {
-            return standardName;
-        }
-    }
-
-    return complexName; // Return original name if no standardization applies
 }
 
+// NOTE: getComplexPhylogenyTableMap() must be defined separately (as you received).
+async function getComplexPhylogenyTable(complexName) {
+    const geneMaps = getComplexPhylogenyTableMap(); 
+    
+    // Key processing remains the same
+    const key = complexName.toUpperCase()
+        .replace(' COMPONENTS', '').replace(' PROTEINS', '')
+        .replace(' ANALYSIS', '').replace(' MODULE', '').replace(' COMPLEX', '').replace(' LOCALIZING', '')
+        .trim();
+        
+    const genes = geneMaps[key];
+
+    if (!genes) {
+        return `<div class="result-card"><h3>Error</h3><p>Gene list not defined for complex: <strong>${complexName}</strong>.</p></div>`;
+    }
+    const queryTitle = `Phylogenetic conservation data for ${complexName}`;
+    return handlePhylogenyVisualizationQuery(queryTitle, genes, 'li', 'table');
+}
+
+async function getGenesByComplex(complexName) {
+    // Ensure data is ready
+    await Promise.all([fetchCorumComplexes(), fetchCiliaData()]);
+
+    // Note: getComplexPhylogenyTableMap is a new helper function 
+    // to access the geneMaps without executing the entire phyl table logic.
+    const curatedGeneMaps = getComplexPhylogenyTableMap(); 
+
+    // Apply standardization to match keys in the maps
+    const standardizedName = standardizeComplexName(complexName);
+    const nameUpperKey = standardizedName.toUpperCase()
+        .replace(' COMPLEX', '').replace(' MODULE', '').trim();
+    const nameLower = standardizedName.toLowerCase();
+    
+    // --- 1. Check Curated GeneMaps (Highest Priority) ---
+    const curatedGenes = curatedGeneMaps[nameUpperKey];
+
+    if (curatedGenes) {
+        return curatedGenes.map(gene => ({
+            gene: gene,
+            description: `Complex: ${standardizedName} (Curated List)`,
+            source: 'Curated'
+        }));
+    }
+
+    // --- 2. Check CORUM Cache (High Priority) ---
+    const corumEntry = corumDataCache.byNameLower[nameLower];
+    
+    if (corumEntry) {
+        return corumEntry.subunits.map(subunit => ({
+            gene: subunit.gene_name,
+            description: `Complex: ${corumEntry.complex_name} (CORUM ID: ${corumEntry.complex_id})`,
+            source: 'CORUM'
+        }));
+    }
+
+    // --- 3. Fallback to CiliaHub Gene Annotations (Fixed Logic) ---
+    const complexRegex = new RegExp(standardizedName.replace(/[-\s]/g, '[-\\s]?'), 'i');
+    
+    const complexGenes = ciliaHubDataCache.filter(gene => 
+        // FIX: Ensure complex_names is an array and check for strings
+        gene.complex_names && Array.isArray(gene.complex_names) && gene.complex_names.some(cn => 
+            typeof cn === 'string' && cn.match(complexRegex)
+        )
+    ).map(gene => ({
+        gene: gene.gene,
+        description: `Complex: ${gene.complex_names?.join(', ') || 'Unknown'}`,
+        source: 'CiliaHub'
+    }));
+    
+    // 4. Fallback to searching functional summary
+    if (complexGenes.length > 0) return complexGenes;
+
+    const relatedGenes = ciliaHubDataCache.filter(gene => 
+        gene.functional_summary && gene.functional_summary.toLowerCase().includes(nameLower)
+    ).map(gene => ({
+        gene: gene.gene,
+        description: gene.functional_summary?.substring(0, 100) + '...' || 'No description',
+        source: 'CiliaHub - Summary Match'
+    }));
+    
+    return relatedGenes;
+}
 
 /**
  * @##########################END OF COMPLEX RELATED QUETIONS AND HELPER##################################
