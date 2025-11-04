@@ -48,6 +48,8 @@ const CILI_AI_DB = {
     "BBS1": { "summary": { "lof_length": "Inhibits / Restricts", "percentage_ciliated": "Reduced cilia numbers", "source": "Expert DB" }, "evidence": [{ "id": "12118255", "source": "pubmed", "context": "Mutated in Bardet-Biedl syndrome (type 1) OMIM 209901." }] }
 };
 
+
+
 // --- Main Page Display Function (REPLACEMENT) ---
 window.displayCiliAIPage = async function displayCiliAIPage() {
     const contentArea = document.querySelector('.content-area');
@@ -604,8 +606,7 @@ async function fetchCellxgeneData() {
 }
 
 /**
- * Fetches and processes CORUM Human Complex data.
- * @returns {Promise<Object>} The CORUM data cache object.
+ * FETCHES and CORUM Human Complex data.
  */
 async function fetchCorumComplexes() {
     if (corumDataCache.loaded) return corumDataCache;
@@ -814,6 +815,266 @@ async function getLiteratureEvidence(gene) {
             ${evidenceSnippets}
         </div>`;
 }
+
+/**
+ * @##########################BEGINNING OF COMPLEX RELATED QUETIONS AND HELPER CORUM##################################
+ */
+
+/**
+ * Retrieves components for a complex name, prioritizing CORUM data.
+ * NOTE: This assumes the corrected 'fetchCorumComplexes' is running.
+ */
+async function getGenesByComplex(complexName) {
+    // Ensure all data is ready, including the newly added CORUM fetch
+    await Promise.all([fetchCorumComplexes(), fetchCiliaData()]);
+
+    // Apply standardization
+    const standardizedName = standardizeComplexName(complexName);
+    const nameLower = standardizedName.toLowerCase();
+    
+    // --- 1. Check CORUM Cache (Priority Source for Complex Composition) ---
+    const corumEntry = corumDataCache.byNameLower[nameLower];
+    
+    if (corumEntry) {
+        // Return a standardized format for CORUM data
+        return corumEntry.subunits.map(subunit => ({
+            gene: subunit.gene_name,
+            description: `Complex: ${corumEntry.complex_name} (CORUM ID: ${corumEntry.complex_id})`,
+            source: 'CORUM'
+        }));
+    }
+
+    // --- 2. Fallback to CiliaHub Gene Annotations (Fixed Logic) ---
+    const complexRegex = new RegExp(standardizedName.replace(/[-\s]/g, '[-\\s]?'), 'i');
+    
+    const complexGenes = ciliaHubDataCache.filter(gene => 
+        // FIX: Ensure complex_names is an array and check if each element is a string before matching
+        gene.complex_names && Array.isArray(gene.complex_names) && gene.complex_names.some(cn => 
+            typeof cn === 'string' && cn.match(complexRegex)
+        )
+    ).map(gene => ({
+        gene: gene.gene,
+        description: `Complex: ${gene.complex_names?.join(', ') || 'Unknown'}`,
+        source: 'CiliaHub'
+    }));
+    
+    // 3. Fallback to searching functional summary if no direct hit
+    if (complexGenes.length > 0) return complexGenes;
+
+    const relatedGenes = ciliaHubDataCache.filter(gene => 
+        gene.functional_summary && gene.functional_summary.toLowerCase().includes(nameLower)
+    ).map(gene => ({
+        gene: gene.gene,
+        description: gene.functional_summary?.substring(0, 100) + '...' || 'No description',
+        source: 'CiliaHub - Summary Match'
+    }));
+    
+    // Combine and return
+    return relatedGenes;
+}
+
+
+async function getGenesByFunction(functionalCategory) {
+    await fetchCiliaData();
+    const categoryRegex = new RegExp(functionalCategory.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+    
+    const results = ciliaHubDataCache
+        .filter(gene => 
+            Array.isArray(gene.functional_category) && 
+            gene.functional_category.some(cat => cat.match(categoryRegex))
+        )
+        .map(gene => ({ 
+            gene: gene.gene, 
+            description: `Functional Category: ${gene.functional_category?.join(', ') || 'Unknown'}` 
+        }));
+        
+    return results;
+}
+
+async function getComplexPhylogenyTable(complexName) {
+    const geneMaps = {
+        "IFT COMPLEX": ["WDR19", "IFT140", "TTC21B", "IFT122", "WDR35", "IFT43", "IFT172", "IFT80", "IFT57", "TRAF3IP1", "CLUAP1", "IFT20", "IFT88", "IFT81", "IFT74", "IFT70A", "IFT70B", "IFT56", "IFT52", "IFT46", "IFT27", "IFT25", "IFT22"],
+        "IFT-A COMPLEX": ["WDR19", "IFT140", "TTC21B", "IFT122", "WDR35", "IFT43"],
+        "IFT-B COMPLEX": ["IFT172", "IFT80", "IFT57", "TRAF3IP1", "CLUAP1", "IFT20", "IFT88", "IFT81", "IFT74", "IFT70A", "IFT70B", "IFT56", "IFT52", "IFT46", "IFT27", "IFT25", "IFT22"],
+        "IFT-B1 COMPLEX": ["IFT172", "IFT80", "IFT57", "TRAF3IP1", "CLUAP1", "IFT20"], 
+        "IFT-B2 COMPLEX": ["IFT88", "IFT81", "IFT74", "IFT70A", "IFT70B", "IFT56", "IFT52", "IFT46", "IFT27", "IFT25", "IFT22"], 
+        "BBSOME": ["BBS1", "BBS2", "BBS4", "BBS5", "BBS7", "TTC8", "BBS9", "BBIP1"],
+        "TRANSITION ZONE": ["NPHP1", "MKS1", "CEP290", "AHI1", "RPGRIP1L", "TMEM67", "CC2D2A", "B9D1", "B9D2"],
+        "MKS MODULE": ["MKS1", "TMEM17", "TMEM67", "TMEM138", "B9D2", "B9D1", "CC2D2A", "TMEM107", "TMEM237", "TMEM231", "TMEM216", "TCTN1", "TCTN2", "TCTN3"],
+        "NPHP MODULE": ["NPHP1", "NPHP3", "NPHP4", "RPGRIP1L", "IQCB1", "CEP290", "SDCCAG8"],
+        "EXOCYST": ["EXOC1", "EXOC2", "EXOC3", "EXOC4", "EXOC5", "EXOC6", "EXOC7", "EXOC8"],
+        
+        // 1. UPDATED CILIARY TIP LOCALIZING PROTEINS (USING YOUR LIST)
+        "CILIARY TIP": ["HYDIN", "IQCA1", "CATSPER2", "KIF19A", "KIF7", "CCDC78", "CCDC33", "SPEF1", "CEP104", "CSPP1", "TOGARAM1", "ARMC9", "MAPRE1", "MAPRE3", "CCDC66"],
+        
+        // 2. AXONEMAL COMPLEX DATA (PREVIOUSLY ADDED)
+        "RADIAL SPOKE": ["RSPH1", "RSPH3", "RSPH4A", "RSPH6A", "RSPH9", "RSPH10B", "RSPH23", "RSPH16", "DRC1", "DRC3", "DRC4", "DRC5"],
+        "CENTRAL PAIR": ["HYDIN", "SPAG6", "SPAG16", "SPAG17", "POC1A", "CEP131", "CFAP43", "CFAP44", "CFAP45", "CFAP47"],
+        "DYNEIN ARM": ["DNAH1", "DNAH2", "DNAH5", "DNAH6", "DNAH7", "DNAH8", "DNAH9", "DNAH10", "DNAH11", "DNALI1", "DNAI1", "DNAI2", "DNAAF1", "DNAAF2", "DNAAF3", "DNAAF4", "LRRC6", "CCDC103"],
+        "OUTER DYNEIN ARM": ["DNAH5", "DNAH11", "DNAH17", "DNAH18", "DNAI1", "DNAI2", "DNAAF1", "DNAAF2", "DNAAF3", "DNAAF4", "LRRC6", "CCDC103", "WDR63"],
+        "INNER DYNEIN ARM": ["DNAH2", "DNAH7", "DNAH10", "DNALI1", "DNAL4", "DNAAF5", "CCDC40", "CCDC114", "CCDC151"]
+    };
+    
+    // Key processing remains the same
+    const key = complexName.toUpperCase()
+        .replace(' COMPONENTS', '').replace(' PROTEINS', '')
+        .replace(' ANALYSIS', '').replace(' MODULE', '').replace(' COMPLEX', '').replace(' LOCALIZING', '')
+        .trim();
+        
+    const genes = geneMaps[key];
+
+    if (!genes) {
+        return `<div class="result-card"><h3>Error</h3><p>Gene list not defined for complex: <strong>${complexName}</strong>.</p></div>`;
+    }
+    const queryTitle = `Phylogenetic conservation data for ${complexName}`;
+    return handlePhylogenyVisualizationQuery(queryTitle, genes, 'li', 'table');
+}
+
+/**
+ * @name routeComplexPhylogenyAnalysis
+ * @description High-priority router to detect complex module queries and execute the correct helper function,
+ * bypassing flawed general query parsing.
+ * @param {string} query - The raw user query.
+ * @returns {Promise<string|null>} HTML output (if complex match) or null (to continue standard routing).
+ */
+async function routeComplexPhylogenyAnalysis(query) {
+    const qUpper = query.toUpperCase();
+
+    // Map the expected user input keyword combinations (including the word "TABLE")
+    const complexMap = {
+        "IFT COMPLEX TABLE": "IFT COMPLEX",
+        "IFT-A COMPLEX TABLE": "IFT-A COMPLEX",
+        "IFT-B COMPLEX TABLE": "IFT-B COMPLEX",
+        "IFT-B1 CORE COMPONENTS TABLE": "IFT-B1 COMPLEX",
+        "IFT-B2 PERIPHERAL COMPONENTS TABLE": "IFT-B2 COMPLEX",
+        "BBSOME COMPONENTS TABLE": "BBSOME",
+        "MKS MODULE COMPONENTS TABLE": "MKS MODULE",
+        "NPHP MODULE GENES TABLE": "NPHP MODULE",
+        "TRANSITION ZONE PROTEINS TABLE": "TRANSITION ZONE",
+        
+        // --- NEW ENTRIES ---
+        "EXOCYST COMPLEX COMPONENTS TABLE": "EXOCYST",
+        "CILIARY TIP PROTEINS TABLE": "CILIARY TIP",
+        "CILIARY TIP LOCALIZING PROTEINS TABLE": "CILIARY TIP",
+        "RADIAL SPOKE PROTEINS TABLE": "RADIAL SPOKE",
+        "CENTRAL PAIR COMPLEX TABLE": "CENTRAL PAIR",
+        "DYNEIN ARM COMPONENTS TABLE": "DYNEIN ARM",
+        "OUTER DYNEIN ARM PROTEINS TABLE": "OUTER DYNEIN ARM",
+        "INNER DYNEIN ARM PROTEINS TABLE": "INNER DYNEIN ARM",
+
+        // Add permutations without 'components' or 'genes' but include 'table'
+        "IFT COMPLEX TABLE": "IFT COMPLEX",
+        "IFT-A TABLE": "IFT-A COMPLEX",
+        "BBSOME TABLE": "BBSOME",
+        "MKS MODULE TABLE": "MKS MODULE",
+        "NPHP MODULE TABLE": "NPHP MODULE",
+        "EXOCYST TABLE": "EXOCYST",
+        "CILIARY TIP TABLE": "CILIARY TIP",
+        "RADIAL SPOKE TABLE": "RADIAL SPOKE",
+        "CENTRAL PAIR TABLE": "CENTRAL PAIR",
+        "DYNEIN ARM TABLE": "DYNEIN ARM",
+        "OUTER DYNEIN ARM TABLE": "OUTER DYNEIN ARM",
+        "INNER DYNEIN ARM TABLE": "INNER DYNEIN ARM"
+    };
+
+    // Simplify the query string to check for module + table intent
+    const simplifiedQuery = qUpper.replace(/COMPARE|CONSERVATION|EVOLUTIONARY|SHOW|OF|THE|ANALYSIS|\s+/g, ' ').trim();
+    
+    let detectedComplex = null;
+
+    // Look for a direct match, prioritizing the combination with 'TABLE'
+    for (const [key, name] of Object.entries(complexMap)) {
+        if (qUpper.includes(key.replace(/\s/g, ' '))) {
+            detectedComplex = name;
+            break;
+        }
+    }
+
+    if (detectedComplex) {
+        // Execute the dedicated table handler directly
+        return getComplexPhylogenyTable(detectedComplex);
+    }
+    
+    return null; // Continue to the standard phylogenetic router
+}
+
+
+/**
+ * Standardizes common ciliary complex names for robust searching across CiliaHub and CORUM.
+ * This directly addresses the IFT, MKS, and NPHP failures by mapping them to known forms.
+ */
+function standardizeComplexName(complexName) {
+    const nameUpper = complexName.toUpperCase().replace(/COMPLEX|MODULE|\(S\)/G, '').trim();
+
+    const standardizationMap = {
+        'IFT-A': 'IFT-A complex',
+        'IFT-B': 'IFT-B complex',
+        'IFT': 'Intraflagellar transport (IFT) complex',
+        'MKS': 'MKS Complex', // Using the hard-coded map name as standard
+        'NPHP': 'NPHP Complex', // Using the hard-coded map name as standard
+        'TRANSITION ZONE': 'Transition Zone Complex',
+        'RADIAL SPOKE': 'Radial Spoke',
+        'CENTRAL PAIR': 'Central Pair',
+        'DYNEIN ARM': 'Dynein arm',
+        'OUTER DYNEIN ARM': 'Outer dynein arm',
+        'INNER DYNEIN ARM': 'Inner dynein arm',
+        'EXOCYST': 'Exocyst complex',
+        'BBSOME': 'BBSome'
+    };
+    
+    // Check for fuzzy/partial match on simplified name
+    for (const [key, standardName] of Object.entries(standardizationMap)) {
+        if (nameUpper.includes(key.toUpperCase())) {
+            return standardName;
+        }
+    }
+
+    return complexName; // Return original name if no standardization applies
+}
+
+
+/**
+ * @##########################END OF COMPLEX RELATED QUETIONS AND HELPER##################################
+ */
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 /**
  * Displays a UMAP plot where each cell is colored by the expression of a specific gene,
@@ -4147,70 +4408,6 @@ async function getGenesWithDomain(domainName) {
     return results;
 }
 
-/**
- * Retrieves components for a complex name, prioritizing CORUM data.
- * NOTE: This assumes the corrected 'fetchCorumComplexes' is running.
- */
-async function getGenesByComplex(complexName) {
-    // Ensure all data is ready, including the newly added CORUM fetch
-    await Promise.all([fetchCorumComplexes(), fetchCiliaData()]);
-
-    const nameLower = complexName.toLowerCase();
-    
-    // --- 1. Check CORUM Cache (Priority Source for Complex Composition) ---
-    const corumEntry = corumDataCache.byNameLower[nameLower];
-    
-    if (corumEntry) {
-        // Return a standardized format for CORUM data
-        return corumEntry.subunits.map(subunit => ({
-            gene: subunit.gene_name,
-            description: `Complex: ${corumEntry.complex_name} (CORUM ID: ${corumEntry.complex_id})`,
-            source: 'CORUM'
-        }));
-    }
-
-    // --- 2. Fallback to CiliaHub Gene Annotations (Legacy/Secondary Source) ---
-    const complexRegex = new RegExp(complexName, 'i');
-    
-    const complexGenes = ciliaHubDataCache.filter(gene => 
-        // Checks if the gene's own record mentions the complex name
-        gene.complex_names && gene.complex_names.some(cn => cn.match(complexRegex))
-    ).map(gene => ({
-        gene: gene.gene,
-        description: `Complex: ${gene.complex_names?.join(', ') || 'Unknown'}`,
-        source: 'CiliaHub'
-    }));
-    
-    // 3. Fallback to searching functional summary if no direct hit
-    if (complexGenes.length > 0) return complexGenes;
-
-    const relatedGenes = ciliaHubDataCache.filter(gene => 
-        gene.functional_summary && gene.functional_summary.toLowerCase().includes(nameLower)
-    ).map(gene => ({
-        gene: gene.gene,
-        description: gene.functional_summary?.substring(0, 100) + '...' || 'No description',
-        source: 'CiliaHub'
-    }));
-    
-    // Combine and return
-    return relatedGenes;
-}
-async function getGenesByFunction(functionalCategory) {
-    await fetchCiliaData();
-    const categoryRegex = new RegExp(functionalCategory.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
-    
-    const results = ciliaHubDataCache
-        .filter(gene => 
-            Array.isArray(gene.functional_category) && 
-            gene.functional_category.some(cat => cat.match(categoryRegex))
-        )
-        .map(gene => ({ 
-            gene: gene.gene, 
-            description: `Functional Category: ${gene.functional_category?.join(', ') || 'Unknown'}` 
-        }));
-        
-    return results;
-}
 // Rule 5 & 7: General phylogeny-related queries
 
 async function getPhylogenyGenes({ type }) {
@@ -4371,7 +4568,6 @@ window.handleAIQuery = async function() {
             fetchUmapData(),
             getDomainData(),
             fetchCorumComplexes()
-            // Removed redundant phylogeny fetches from here
         ]);
         console.log('ciliAI.js: All core data loaded for processing.');
 
@@ -4380,33 +4576,48 @@ window.handleAIQuery = async function() {
         let match;
 
         // =================================================================
-        // **NEW ROUTING PRIORITY:** Handle Phylogeny/Heatmap Queries (Q1-Q7)
+        // **NEW ROUTING PRIORITY 1:** Handle Curated Phylogenetic Table Queries
         // =================================================================
-        if (qLower.includes('phylogeny') || qLower.includes('conservation') || 
-            qLower.includes('heatmap') || qLower.includes('comparison') || 
-            qLower.includes('tree')) {
+        // This leverages the hard-coded gene lists (IFT, Dynein, etc.) for phylogenetic tables.
+        const complexTableResult = await routeComplexPhylogenyAnalysis(query);
+        if (complexTableResult) {
+            console.log("Query resolved by High-Priority Complex Phylogeny Table Router.");
+            resultHtml = complexTableResult;
+        } 
+        
+        // =================================================================
+        // **NEW ROUTING PRIORITY 2:** Handle General Phylogenetic Queries
+        // =================================================================
+        else if (qLower.includes('phylogeny') || qLower.includes('conservation') || 
+                   qLower.includes('heatmap') || qLower.includes('comparison') || 
+                   qLower.includes('tree')) {
             
-            console.log('Routing to Phylogenetic Visualization Query...');
-            resultHtml = await handlePhylogenyVisualizationQuery(query);
+            console.log('Routing to General Phylogenetic Query Resolver...');
+            // Assuming resolvePhylogeneticQuery is a new function to parse entity and call
+            // handlePhylogenyVisualizationQuery with the correct parameters (gene/complex list).
+            resultHtml = await resolvePhylogeneticQuery(query); 
         }
+
         // =================================================================
         // **FALLBACK TO ORIGINAL LOGIC**
         // =================================================================
-        
         else {
             const perfectMatch = questionRegistry.find(item => item.text.toLowerCase() === qLower);
             if (perfectMatch) {
                 console.log(`Registry match found: "${perfectMatch.text}"`);
                 resultHtml = await perfectMatch.handler();
-            } 
+            }  
             else if ((match = qLower.match(/(?:tell me about|what is|describe)\s+(.+)/i))) {
                 const term = match[1].trim();
+                // This will use the FIXED getGenesByComplex for terms that are complexes
                 resultHtml = await getComprehensiveDetails(term);
-            } 
+            }  
             else {
                 const intent = intentParser.parse(query);
                 if (intent && typeof intent.handler === 'function') {
                     console.log(`Intent parser match found: ${intent.intent} for entity: ${intent.entity}`);
+                    // Ensure the intent handler calls the FIXED getGenesByComplex 
+                    // for COMPLEX intents
                     resultHtml = await intent.handler(intent.entity);
                 }
                 else {
