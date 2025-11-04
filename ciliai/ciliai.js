@@ -238,6 +238,187 @@ function normalizeTerm(s) {
 }
 
 
+// --- Main AI Query Handler ---
+window.handleAIQuery = async function() {
+    const aiQueryInput = document.getElementById('aiQueryInput');
+    const resultArea = document.getElementById('ai-result-area');
+    const query = aiQueryInput.value.trim();
+    if (!query) return;
+
+    // --- FIX 1: Purge any existing Plotly plots from the result area ---
+    try { if (window.Plotly) window.Plotly.purge(resultArea); } catch (e) {}
+
+    resultArea.style.display = 'block';
+    resultArea.innerHTML = `<p class="status-searching">CiliAI is thinking... 🧠</p>`;
+    
+    try {
+        // Await core CiliaHub data fetches ONLY. Phylogeny fetches run in the router.
+        await Promise.all([
+            fetchCiliaData(),
+            fetchScreenData(),
+            fetchTissueData(),
+            fetchCellxgeneData(),
+            fetchUmapData(),
+            getDomainData(), // Domain data is loaded here
+            fetchCorumComplexes()
+        ]);
+        console.log('ciliAI.js: All core data loaded for processing.');
+
+        let resultHtml = '';
+        const qLower = query.toLowerCase();
+        let match;
+
+        // =================================================================
+        // **NEW ROUTING PRIORITY 1:** Handle Curated Phylogenetic Table Queries
+        // =================================================================
+        const complexTableResult = await routeComplexPhylogenyAnalysis(query);
+        if (complexTableResult) {
+            console.log("Query resolved by High-Priority Complex Phylogeny Table Router.");
+            resultHtml = complexTableResult;
+        } 
+        
+        // =================================================================
+        // **NEW ROUTING PRIORITY 2:** Handle General Phylogenetic Queries
+        // =================================================================
+        else if (qLower.includes('phylogeny') || qLower.includes('conservation') || 
+                       qLower.includes('heatmap') || qLower.includes('comparison') || 
+                       qLower.includes('tree')) {
+            
+            console.log('Routing to General Phylogenetic Query Resolver...');
+            resultHtml = await resolvePhylogeneticQuery(query); 
+        }
+        
+        // =================================================================
+        // ⭐ NEW ROUTING PRIORITY 3: Handle Domain Queries ⭐
+        // =================================================================
+        else if (qLower.includes('domain') || qLower.includes('motif') || 
+                 qLower.includes('enriched') || qLower.includes('depleted')) {
+            
+            console.log('Routing to Domain Query Resolver...');
+            resultHtml = await resolveDomainQuery(query);
+        }
+
+        // =================================================================
+        // **FALLBACK TO ORIGINAL LOGIC**
+        // =================================================================
+        else {
+            const perfectMatch = questionRegistry.find(item => item.text.toLowerCase() === qLower);
+            if (perfectMatch) {
+                console.log(`Registry match found: "${perfectMatch.text}"`);
+                resultHtml = await perfectMatch.handler();
+            }  
+            else if ((match = qLower.match(/(?:tell me about|what is|describe)\s+(.+)/i))) {
+                const term = match[1].trim();
+                resultHtml = await getComprehensiveDetails(term);
+            }  
+            else {
+                const intent = intentParser.parse(query);
+                if (intent && typeof intent.handler === 'function') {
+                    console.log(`Intent parser match found: ${intent.intent} for entity: ${intent.entity}`);
+                    resultHtml = await intent.handler(intent.entity);
+                }
+                else {
+                    const potentialGenes = (query.match(/\b([A-Z0-9\-\.]{3,})\b/gi) || []);
+                    const genes = potentialGenes.filter(g => ciliaHubDataCache.some(hubGene => hubGene.gene.toUpperCase() === g.toUpperCase()));
+                    
+                    if (genes.length === 2 && (qLower.includes('compare') || qLower.includes('vs'))) {
+                        resultHtml = await displayCellxgeneBarChart(genes);
+                    } else if (genes.length === 1 && (qLower.includes('plot') || qLower.includes('show expression') || qLower.includes('visualize'))) {
+                        if (qLower.includes('umap')) {
+                            resultHtml = await displayUmapGeneExpression(genes[0]);
+                        } else {
+                            resultHtml = await displayCellxgeneBarChart(genes);
+                        }
+                    } else if (genes.length === 1 && qLower.length < (genes[0].length + 5)) {
+                        resultHtml = await getComprehensiveDetails(query);
+                    } else {
+                        resultHtml = `<p>Sorry, I didn’t understand that. Please try one of the suggested questions or a known keyword.</p>`;
+                    }
+                }
+            }
+        }
+
+        if (resultHtml !== "") {
+            resultArea.innerHTML = resultHtml;
+        }
+
+    } catch (e) {
+        resultArea.innerHTML = `<p class="status-not-found">An internal CiliAI error occurred during your query. Please check the console for details. (Error: ${e.message})</p>`;
+        console.error("CiliAI Query Error:", e);
+    }
+};
+
+
+/**
+ * Patches the main query handler to include Corum lookups.
+ * NOTE: This function must be placed AFTER window.handleAIQuery is defined.
+ */
+function patchAIQueryHandler() {
+    const originalHandler = window.handleAIQuery;
+
+    window.handleAIQuery = async function(event) {
+        // 1. Ensure CORUM data is loaded alongside other promises
+        await fetchCorumComplexes();
+        
+        const aiQueryInput = document.getElementById('aiQueryInput');
+        const resultArea = document.getElementById('ai-result-area');
+        const query = aiQueryInput.value.trim();
+        const qLower = query.toLowerCase();
+
+        // --- CUSTOM COMPLEX PARSING (Replaces the crash-prone regex) ---
+        
+        // Pattern 1: Subunits/components/members OF <complex name>
+        if (qLower.includes('subunits of') || qLower.includes('components of') || qLower.includes('members of')) {
+            const complexMatch = qLower.match(/(?:subunits|components|members)\s+of\s+(.+)/i);
+            const complexName = complexMatch ? complexMatch[1].trim() : null;
+
+            if (complexName) {
+                const results = getSubunitsByComplexName(complexName);
+                if (results.length > 0) {
+                    let html = `<div class="result-card"><h3>Complex Subunits Matching "${complexName}"</h3><ul>`;
+                    results.forEach(entry => {
+                        html += `<li><b>${entry.complexName}</b> (${entry.subunits.length} subunits): 
+                                 <small>${entry.subunits.map(s => s.toUpperCase()).join(', ')}</small></li>`;
+                    });
+                    html += '</ul></div>';
+                    resultArea.innerHTML = html;
+                    resultArea.style.display = 'block';
+                    return; // Handled
+                }
+            }
+        }
+        
+        // Pattern 2: Complexes FOR <gene>
+        if (qLower.includes('complexes for') || qLower.includes('complexes of') || qLower.includes('complexes containing')) {
+            const geneMatch = qLower.match(/(?:complexes|subunits)\s+(?:for|of|containing)\s+([A-Za-z0-9\-]+)/i);
+            const gene = geneMatch ? geneMatch[1].toUpperCase() : null;
+
+            if (gene) {
+                const complexes = getComplexesByGene(gene);
+                if (complexes.length > 0) {
+                    let html = `<div class="result-card"><h3>🧬 CORUM Complexes containing ${gene}</h3><ul>`;
+                    complexes.forEach(c => {
+                        html += `<li><b>${c.complexName}</b> (Total subunits: ${c.subunits.length})</li>`;
+                    });
+                    html += '</ul></div>';
+                    resultArea.innerHTML = html;
+                    resultArea.style.display = 'block';
+                    return; // Handled
+                }
+            }
+        }
+
+        // --- END CUSTOM COMPLEX PARSING ---
+
+        // 2. If not a CORUM query, fall back to the original handling
+        return originalHandler.apply(this, arguments);
+    };
+}
+
+// --- Execute CORUM Integration Patch ---
+patchAIQueryHandler(); 
+
+
 // =============================================================================
 // REPLACEMENT: The definitive "Brain" of CiliAI, merging all features correctly.
 // =============================================================================
@@ -693,10 +874,6 @@ function getSubunitsByComplexName(complexName) {
     );
 }
 
-/**
- * Fetches the new domain database (enriched, depleted, gene map).
- * URL: https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/cili_ai_domain_database.json
- */
 /**
  * Fetches the new domain database (enriched, depleted, gene map).
  * URL: https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/cili_ai_domain_database.json
@@ -1221,6 +1398,323 @@ async function getGenesByComplex(complexName) {
 }
 
 /**
+ * @name resolveDomainQuery
+ * @description Routes domain-related queries to the correct list or gene handler.
+ * @param {string} query - The raw user query.
+ */
+async function resolveDomainQuery(query) {
+    const qLower = query.toLowerCase();
+
+    // 1. Check for ENRICHED/DEPLETED LIST requests
+    if (qLower.includes('enriched domain') || qLower.includes('show enriched')) {
+        // This assumes displayEnrichedDomains() returns the formatted HTML (as implemented in your source code)
+        return displayEnrichedDomains();
+    }
+    if (qLower.includes('depleted domain') || qLower.includes('show depleted') || qLower.includes('domains absent')) {
+        // This assumes displayDepletedDomains() returns the formatted HTML (as implemented in your source code)
+        return displayDepletedDomains();
+    }
+
+    // 2. Check for Specific DOMAIN NAME lookup (e.g., "Show WD40 proteins")
+    // This requires extracting the domain name (e.g., WD40, EF-hand)
+    const domainKeywords = ['wd40', 'leucine-rich repeat', 'iq motif', 'ef-hand', 'kinase', 'atpase', 'zinc finger']; 
+
+    for (const keyword of domainKeywords) {
+        if (qLower.includes(keyword)) {
+            // This assumes findGenesByNewDomainDB() returns the formatted list (as implemented in your source code)
+            return findGenesByNewDomainDB(keyword);
+        }
+    }
+    
+    // 3. Fallback for unrecognized domain syntax
+    return `<div class="result-card"><h3>Domain Query Failed</h3><p>Could not identify a specific domain name or list type. Try "Show WD40 domain proteins" or "List enriched domains."</p></div>`;
+}
+
+/**
+ * Get all domains for a specific gene
+ */
+async function getDomainsByGene(geneName) {
+    await getDomainData();
+    const geneUpper = geneName.toUpperCase();
+    
+    const geneDomains = domainDataCache.filter(entry => 
+        entry.gene && entry.gene.toUpperCase() === geneUpper
+    );
+    
+    if (geneDomains.length === 0) {
+        return [];
+    }
+    
+    return geneDomains.map(domain => ({
+        gene: domain.gene,
+        domain_name: domain.domain_name || 'Unknown',
+        domain_type: domain.domain_type || 'Unknown',
+        start: domain.start,
+        end: domain.end,
+        length: domain.end - domain.start,
+        description: domain.description || 'No description available',
+        source: 'Domain Database'
+    }));
+}
+
+/**
+ * Get all genes containing a specific domain
+ */
+async function getGenesByDomain(domainName) {
+    await getDomainData();
+    const domainLower = domainName.toLowerCase();
+    
+    const matchingGenes = domainDataCache.filter(entry =>
+        entry.domain_name && entry.domain_name.toLowerCase().includes(domainLower)
+    );
+    
+    // Group by gene to avoid duplicates
+    const geneMap = new Map();
+    matchingGenes.forEach(entry => {
+        if (!geneMap.has(entry.gene)) {
+            geneMap.set(entry.gene, {
+                gene: entry.gene,
+                domains: [],
+                domain_count: 0
+            });
+        }
+        geneMap.get(entry.gene).domains.push(entry.domain_name);
+        geneMap.get(entry.gene).domain_count++;
+    });
+    
+    return Array.from(geneMap.values()).map(item => ({
+        gene: item.gene,
+        description: `Contains ${item.domain_count} ${domainName} domain(s): ${item.domains.join(', ')}`,
+        source: 'Domain Database'
+    }));
+}
+
+/**
+ * Compare domain architecture between genes
+ */
+async function compareDomainArchitecture(geneA, geneB) {
+    const domainsA = await getDomainsByGene(geneA);
+    const domainsB = await getDomainsByGene(geneB);
+    
+    const domainNamesA = new Set(domainsA.map(d => d.domain_name));
+    const domainNamesB = new Set(domainsB.map(d => d.domain_name));
+    
+    const shared = [...domainNamesA].filter(d => domainNamesB.has(d));
+    const uniqueA = [...domainNamesA].filter(d => !domainNamesB.has(d));
+    const uniqueB = [...domainNamesB].filter(d => !domainNamesA.has(d));
+    
+    return {
+        geneA: { gene: geneA, domains: domainsA, total: domainsA.length },
+        geneB: { gene: geneB, domains: domainsB, total: domainsB.length },
+        shared: shared,
+        uniqueA: uniqueA,
+        uniqueB: uniqueB,
+        similarity: shared.length / Math.max(domainNamesA.size, domainNamesB.size)
+    };
+}
+
+/**
+ * Get domain composition for a complex
+ */
+async function getDomainCompositionByComplex(complexName) {
+    const components = await getGenesByComplex(complexName);
+    await getDomainData();
+    
+    const domainStats = new Map();
+    
+    for (const component of components) {
+        const domains = await getDomainsByGene(component.gene);
+        domains.forEach(domain => {
+            const key = domain.domain_name;
+            if (!domainStats.has(key)) {
+                domainStats.set(key, {
+                    domain: key,
+                    count: 0,
+                    genes: []
+                });
+            }
+            domainStats.get(key).count++;
+            domainStats.get(key).genes.push(component.gene);
+        });
+    }
+    
+    return Array.from(domainStats.values())
+        .sort((a, b) => b.count - a.count);
+}
+
+/**
+ * Visualize domain architecture for a gene
+ */
+async function visualizeDomainArchitecture(geneName) {
+    const domains = await getDomainsByGene(geneName);
+    
+    if (domains.length === 0) {
+        return `<div class="result-card">
+            <h3>Domain Architecture: ${geneName}</h3>
+            <p>No domain information available for ${geneName}.</p>
+        </div>`;
+    }
+    
+    // Sort domains by start position
+    domains.sort((a, b) => a.start - b.start);
+    
+    const maxPosition = Math.max(...domains.map(d => d.end));
+    
+    let html = `<div class="result-card">
+        <h3>🧬 Domain Architecture: ${geneName}</h3>
+        <div style="margin: 20px 0;">
+            <div style="position: relative; height: 100px; background: #f0f0f0; border-radius: 5px;">`;
+    
+    // Color palette for domains
+    const colors = ['#3498db', '#e74c3c', '#2ecc71', '#f39c12', '#9b59b6', '#1abc9c', '#e67e22'];
+    
+    domains.forEach((domain, idx) => {
+        const left = (domain.start / maxPosition) * 100;
+        const width = ((domain.end - domain.start) / maxPosition) * 100;
+        const color = colors[idx % colors.length];
+        
+        html += `
+            <div style="position: absolute; 
+                        left: ${left}%; 
+                        width: ${width}%; 
+                        top: 30px; 
+                        height: 40px; 
+                        background: ${color}; 
+                        border: 2px solid #333;
+                        border-radius: 5px;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        color: white;
+                        font-size: 10px;
+                        font-weight: bold;
+                        overflow: hidden;"
+                 title="${domain.domain_name} (${domain.start}-${domain.end})">
+                ${domain.domain_name}
+            </div>`;
+    });
+    
+    html += `</div></div>
+        <h4>Domain Details:</h4>
+        <table class="data-table" style="width: 100%; margin-top: 10px;">
+            <thead>
+                <tr>
+                    <th>Domain</th>
+                    <th>Type</th>
+                    <th>Position</th>
+                    <th>Length</th>
+                    <th>Description</th>
+                </tr>
+            </thead>
+            <tbody>`;
+    
+    domains.forEach(domain => {
+        html += `
+            <tr>
+                <td><strong>${domain.domain_name}</strong></td>
+                <td>${domain.domain_type}</td>
+                <td>${domain.start}-${domain.end}</td>
+                <td>${domain.length} aa</td>
+                <td>${domain.description}</td>
+            </tr>`;
+    });
+    
+    html += `</tbody></table></div>`;
+    
+    return html;
+}
+
+/**
+ * Compare domain architecture in HTML format
+ */
+async function displayDomainComparison(geneA, geneB) {
+    const comparison = await compareDomainArchitecture(geneA, geneB);
+    
+    let html = `<div class="result-card">
+        <h3>🔬 Domain Architecture Comparison: ${geneA} vs ${geneB}</h3>
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; margin: 20px 0;">
+            
+            <div style="background: #e3f2fd; padding: 15px; border-radius: 5px;">
+                <h4>${geneA} Only</h4>
+                <p><strong>${comparison.uniqueA.length}</strong> unique domain(s)</p>
+                <ul style="list-style: none; padding: 0;">
+                    ${comparison.uniqueA.map(d => `<li>• ${d}</li>`).join('')}
+                </ul>
+            </div>
+            
+            <div style="background: #c8e6c9; padding: 15px; border-radius: 5px;">
+                <h4>Shared Domains</h4>
+                <p><strong>${comparison.shared.length}</strong> domain(s)</p>
+                <ul style="list-style: none; padding: 0;">
+                    ${comparison.shared.map(d => `<li>✓ ${d}</li>`).join('')}
+                </ul>
+                <p style="margin-top: 10px;"><strong>Similarity:</strong> ${(comparison.similarity * 100).toFixed(1)}%</p>
+            </div>
+            
+            <div style="background: #fff3e0; padding: 15px; border-radius: 5px;">
+                <h4>${geneB} Only</h4>
+                <p><strong>${comparison.uniqueB.length}</strong> unique domain(s)</p>
+                <ul style="list-style: none; padding: 0;">
+                    ${comparison.uniqueB.map(d => `<li>• ${d}</li>`).join('')}
+                </ul>
+            </div>
+            
+        </div>
+    </div>`;
+    
+    return html;
+}
+
+// Add to your standardizeComplexName or create similar for domains
+function standardizeDomainName(domainName) {
+    const domainMap = {
+        'WD40': 'WD40',
+        'WD REPEAT': 'WD40',
+        'TPR': 'TPR',
+        'TETRATRICOPEPTIDE': 'TPR',
+        'COILED COIL': 'coiled-coil',
+        'COIL': 'coiled-coil',
+        'AAA': 'AAA',
+        'ATPASE': 'AAA',
+        'DYNEIN': 'Dynein',
+        'KINESIN': 'Kinesin'
+    };
+    
+    const upper = domainName.toUpperCase();
+    for (const [key, standard] of Object.entries(domainMap)) {
+        if (upper.includes(key)) return standard;
+    }
+    return domainName;
+}
+
+// Add domain intent patterns to your intent parser
+const domainIntents = [
+    {
+        pattern: /(?:what\s+)?domains?\s+(?:does|in|of)\s+([A-Z0-9\-]+)/i,
+        intent: 'DOMAIN_BY_GENE',
+        handler: async (gene) => visualizeDomainArchitecture(gene)
+    },
+    {
+        pattern: /(?:which|what)\s+genes?\s+(?:have|contain|with)\s+(.+?)\s+domain/i,
+        intent: 'GENES_BY_DOMAIN',
+        handler: async (domain) => formatListResult(`Genes with ${domain}`, await getGenesByDomain(domain))
+    },
+    {
+        pattern: /compare\s+domains?\s+(?:of\s+)?([A-Z0-9\-]+)\s+(?:and|vs)\s+([A-Z0-9\-]+)/i,
+        intent: 'COMPARE_DOMAINS',
+        handler: async (query) => {
+            const match = query.match(/([A-Z0-9\-]+)\s+(?:and|vs)\s+([A-Z0-9\-]+)/i);
+            return displayDomainComparison(match[1], match[2]);
+        }
+    }
+];
+
+
+
+
+
+
+/**
  * @##########################END OF COMPLEX RELATED QUETIONS AND HELPER##################################
  */
 
@@ -1591,7 +2085,31 @@ const questionRegistry = [
     { text: "How can you help me?", handler: async () => tellAboutCiliAI() },
     { text: "What questions can I ask?", handler: async () => tellAboutCiliAI() },
     { text: "Give me an overview of your features", handler: async () => tellAboutCiliAI() },
-
+// Single gene domain queries
+    { text: "What domains does IFT88 have?", handler: async () => visualizeDomainArchitecture("IFT88") },
+    { text: "Show domain architecture of IFT88", handler: async () => visualizeDomainArchitecture("IFT88") },
+    { text: "Display domains in IFT88", handler: async () => visualizeDomainArchitecture("IFT88") },
+    { text: "IFT88 domain structure", handler: async () => visualizeDomainArchitecture("IFT88") },
+    { text: "List domains of IFT88", handler: async () => formatListResult("IFT88 Domains", await getDomainsByGene("IFT88")) },
+    // Domain-to-gene queries
+    { text: "Which genes have WD40 domains?", handler: async () => formatListResult("Genes with WD40 domains", await getGenesByDomain("WD40")) },
+    { text: "Show genes containing TPR domains", handler: async () => formatListResult("Genes with TPR domains", await getGenesByDomain("TPR")) },
+    { text: "List proteins with coiled-coil domains", handler: async () => formatListResult("Genes with coiled-coil", await getGenesByDomain("coiled-coil")) },
+    { text: "Genes with AAA+ ATPase domains", handler: async () => formatListResult("Genes with AAA+ ATPase", await getGenesByDomain("AAA")) },
+    // Domain comparisons
+    { text: "Compare domains of IFT88 and IFT81", handler: async () => displayDomainComparison("IFT88", "IFT81") },
+    { text: "Domain architecture comparison IFT88 vs IFT81", handler: async () => displayDomainComparison("IFT88", "IFT81") },
+    // Complex domain composition
+    { text: "What domains are in the IFT-B complex?", handler: async () => {
+        const composition = await getDomainCompositionByComplex("IFT-B");
+        let html = `<div class="result-card"><h3>Domain Composition: IFT-B Complex</h3><table class="data-table">
+            <thead><tr><th>Domain</th><th>Frequency</th><th>Found in Genes</th></tr></thead><tbody>`;
+        composition.forEach(item => {
+            html += `<tr><td><strong>${item.domain}</strong></td><td>${item.count}</td><td>${item.genes.join(', ')}</td></tr>`;
+        });
+        html += `</tbody></table></div>`;
+        return html;
+    }},
 // ==================== A. SPECIFIC GENE VISUALIZATION (Expanded) ====================
     { text: "Show evolutionary conservation of IFT88", handler: async () => getPhylogenyAnalysis(["IFT88"]) },
     { text: "IFT88 conservation analysis", handler: async () => getPhylogenyAnalysis(["IFT88"]) },
@@ -1609,20 +2127,15 @@ const questionRegistry = [
     { text: "Show the phylogenetic comparison for ARL13B", handler: async () => getPhylogenyAnalysis(["ARL13B"]) },
     { text: "ARL13B evolutionary map", handler: async () => getPhylogenyAnalysis(["ARL13B"]) },
     { text: "ARL13B conservation profile", handler: async () => getPhylogenyAnalysis(["ARL13B"]) },
-    
     { text: "Evolutionary profile of CEP290", handler: async () => getPhylogenyAnalysis(["CEP290"]) },
     { text: "CEP290 phylogenetic conservation", handler: async () => getPhylogenyAnalysis(["CEP290"]) },
     { text: "CEP290 evolutionary footprint", handler: async () => getPhylogenyAnalysis(["CEP290"]) },
-    
     { text: "Heatmap for NPHP1 conservation", handler: async () => getPhylogenyAnalysis(["NPHP1"]) },
     { text: "NPHP1 evolutionary pattern", handler: async () => getPhylogenyAnalysis(["NPHP1"]) },
-    
     { text: "Phylogenetic analysis of DYNC2H1", handler: async () => getPhylogenyAnalysis(["DYNC2H1"]) },
     { text: "DYNC2H1 conservation map", handler: async () => getPhylogenyAnalysis(["DYNC2H1"]) },
-    
     { text: "Conservation map for IFT140", handler: async () => getPhylogenyAnalysis(["IFT140"]) },
-    { text: "IFT140 evolutionary distribution", handler: async () => getPhylogenyAnalysis(["IFT140"]) },
-    
+    { text: "IFT140 evolutionary distribution", handler: async () => getPhylogenyAnalysis(["IFT140"]) }, 
     { text: "Evolutionary heatmap for TTC8", handler: async () => getPhylogenyAnalysis(["TTC8"]) },
     { text: "TTC8 phylogenetic profile", handler: async () => getPhylogenyAnalysis(["TTC8"]) },
 
@@ -1977,11 +2490,6 @@ const questionRegistry = [
     { text: "Which genes are at the basal body?", handler: async () => formatListResult("Genes localizing to basal body", await getGenesByLocalization("basal body")) },
     { text: "List basal body proteins", handler: async () => formatListResult("Proteins localizing to basal body", await getGenesByLocalization("basal body")) },
     
-    // Ciliary tip
-    { text: "Display genes at ciliary tip", handler: async () => formatListResult("Genes localizing to ciliary tip", await getGenesByLocalization("ciliary tip")) },
-    { text: "Ciliary tip genes", handler: async () => formatListResult("Genes localizing to ciliary tip", await getGenesByLocalization("ciliary tip")) },
-    { text: "What genes localize to the ciliary tip?", handler: async () => formatListResult("Genes localizing to ciliary tip", await getGenesByLocalization("ciliary tip")) },
-    { text: "Show ciliary tip proteins", handler: async () => formatListResult("Genes localizing to ciliary tip", await getGenesByLocalization("ciliary tip")) },
     
     // Axoneme
     { text: "Which genes localize to axoneme?", handler: async () => formatListResult("Genes localizing to axoneme", await getGenesByLocalization("axoneme")) },
@@ -2162,12 +2670,40 @@ const questionRegistry = [
 { text: "List components of the SHH Signaling complex", handler: async () => formatListResult("SHH Signaling Components", await getCuratedComplexComponents("SHH SIGNALING")) },
 { text: "Show genes in Hedgehog Trafficking Complex", handler: async () => formatListResult("Hedgehog Trafficking Complex Components", await getCuratedComplexComponents("HEDGEHOG TRAFFICKING COMPLEX")) },
 // ==================== CILIARY TIP COMPONENTS (Curated List) ====================
+{ text: "Tell me about Ciliary Tip proteins", handler: async () => formatListResult("Ciliary Tip Components", await getCuratedComplexComponents("CILIARY TIP")) },       
+{ text: "Tell me about components of the Ciliary Tip", handler: async () => formatListResult("Ciliary Tip Components", await getCuratedComplexComponents("CILIARY TIP")) },    
 { text: "Show components of the Ciliary Tip", handler: async () => formatListResult("Ciliary Tip Components", await getCuratedComplexComponents("CILIARY TIP")) },
 { text: "List genes localized to the Ciliary Tip", handler: async () => formatListResult("Ciliary Tip Components", await getCuratedComplexComponents("CILIARY TIP")) },
 { text: "Display Ciliary Tip enriched proteins", handler: async () => formatListResult("Ciliary Tip Components", await getCuratedComplexComponents("CILIARY TIP")) },
 { text: "What proteins are at the ciliary tip?", handler: async () => formatListResult("Ciliary Tip Components", await getCuratedComplexComponents("CILIARY TIP")) },
 { text: "Genes at the Ciliary Tip", handler: async () => formatListResult("Ciliary Tip Components", await getCuratedComplexComponents("CILIARY TIP")) },
 { text: "Show Ciliary Tip complex members", handler: async () => formatListResult("Ciliary Tip Components", await getCuratedComplexComponents("CILIARY TIP")) },
+// Additional natural variations
+{ text: "What are the ciliary tip components?", handler: async () => formatListResult("Ciliary Tip Components", await getCuratedComplexComponents("CILIARY TIP")) },
+{ text: "Which proteins localize to the ciliary tip?", handler: async () => formatListResult("Ciliary Tip Components", await getCuratedComplexComponents("CILIARY TIP")) },
+{ text: "Show me ciliary tip proteins", handler: async () => formatListResult("Ciliary Tip Components", await getCuratedComplexComponents("CILIARY TIP")) },
+{ text: "List ciliary tip genes", handler: async () => formatListResult("Ciliary Tip Components", await getCuratedComplexComponents("CILIARY TIP")) },
+{ text: "Ciliary tip protein list", handler: async () => formatListResult("Ciliary Tip Components", await getCuratedComplexComponents("CILIARY TIP")) },
+{ text: "Give me the ciliary tip components", handler: async () => formatListResult("Ciliary Tip Components", await getCuratedComplexComponents("CILIARY TIP")) },
+{ text: "What genes are in the ciliary tip?", handler: async () => formatListResult("Ciliary Tip Components", await getCuratedComplexComponents("CILIARY TIP")) },
+{ text: "Proteins found at the ciliary tip", handler: async () => formatListResult("Ciliary Tip Components", await getCuratedComplexComponents("CILIARY TIP")) },
+{ text: "Ciliary tip composition", handler: async () => formatListResult("Ciliary Tip Components", await getCuratedComplexComponents("CILIARY TIP")) },
+{ text: "Components of ciliary tip", handler: async () => formatListResult("Ciliary Tip Components", await getCuratedComplexComponents("CILIARY TIP")) },
+{ text: "Ciliary tip gene list", handler: async () => formatListResult("Ciliary Tip Components", await getCuratedComplexComponents("CILIARY TIP")) },
+// Informal/conversational
+{ text: "Tell me what's at the ciliary tip", handler: async () => formatListResult("Ciliary Tip Components", await getCuratedComplexComponents("CILIARY TIP")) },
+{ text: "What's in the ciliary tip?", handler: async () => formatListResult("Ciliary Tip Components", await getCuratedComplexComponents("CILIARY TIP")) },
+{ text: "Ciliary tip contents", handler: async () => formatListResult("Ciliary Tip Components", await getCuratedComplexComponents("CILIARY TIP")) },
+// Research-oriented phrasing
+{ text: "Ciliary tip proteome", handler: async () => formatListResult("Ciliary Tip Components", await getCuratedComplexComponents("CILIARY TIP")) },
+{ text: "Distal tip proteins", handler: async () => formatListResult("Ciliary Tip Components", await getCuratedComplexComponents("CILIARY TIP")) },
+{ text: "Proteins enriched at the ciliary distal tip", handler: async () => formatListResult("Ciliary Tip Components", await getCuratedComplexComponents("CILIARY TIP")) },
+{ text: "Ciliary distal tip components", handler: async () => formatListResult("Ciliary Tip Components", await getCuratedComplexComponents("CILIARY TIP")) },
+{ text: "What comprises the ciliary tip?", handler: async () => formatListResult("Ciliary Tip Components", await getCuratedComplexComponents("CILIARY TIP")) },
+// Action verbs
+{ text: "Find ciliary tip proteins", handler: async () => formatListResult("Ciliary Tip Components", await getCuratedComplexComponents("CILIARY TIP")) },
+{ text: "Search ciliary tip components", handler: async () => formatListResult("Ciliary Tip Components", await getCuratedComplexComponents("CILIARY TIP")) },
+{ text: "Retrieve ciliary tip genes", handler: async () => formatListResult("Ciliary Tip Components", await getCuratedComplexComponents("CILIARY TIP")) },
     // ==================== CILIOPATHIES & DISEASES ====================
     // Bardet-Biedl Syndrome
     { text: "List genes associated with Bardet–Biedl syndrome", handler: async () => { const { genes, description } = await getCiliopathyGenes("Bardet–Biedl syndrome"); return formatListResult("Genes for Bardet–Biedl syndrome", genes, description); }},
@@ -2875,8 +3411,6 @@ const questionRegistry = [
     { text: "Where exactly is EFCAB7 localized?", handler: async () => getGeneLocalization("EFCAB7") },
     { text: "List genes at the ciliary base", handler: async () => formatListResult("Genes localizing to basal body", await getGenesByLocalization("basal body")) },
     { text: "Which proteins are in the axoneme?", handler: async () => formatListResult("Genes localizing to axoneme", await getGenesByLocalization("axoneme")) },
-    { text: "Ciliary tip proteins list", handler: async () => formatListResult("Genes localizing to ciliary tip", await getGenesByLocalization("ciliary tip")) },
-
 
     // ==================== EXPRESSION / VISUALIZATION (Synonyms) ====================
     { text: "Tissue distribution of BBS1", handler: async () => getGeneExpression("BBS1") },
@@ -4541,6 +5075,20 @@ async function getComprehensiveDetails(term) {
         // Ensure all data caches are populated before searching for the gene.
         await fetchCiliaData();
     }
+    // Add domain section
+    const domains = await getDomainsByGene(term);
+    if (domains.length > 0) {
+        html += `<div class="info-section">
+            <h4>🧬 Domain Architecture</h4>
+            <ul class="info-list">`;
+        domains.forEach(domain => {
+            html += `<li><strong>${domain.domain_name}</strong> (${domain.start}-${domain.end}): ${domain.description}</li>`;
+        });
+        html += `</ul>
+            <button onclick="window.handleAIQuery.call({value: 'Show domain architecture of ${term}'})" 
+                    class="action-button">Visualize Domains</button>
+        </div>`;
+    }
     
     // Find the gene's integrated data entry.
     const geneData = ciliaHubDataCache.find(g => g.gene.toUpperCase() === upperTerm);
@@ -4742,181 +5290,6 @@ async function getCiliaryGenesForOrganism(organismName) {
     };
 }
 
-// --- Main AI Query Handler ---
-window.handleAIQuery = async function() {
-    const aiQueryInput = document.getElementById('aiQueryInput');
-    const resultArea = document.getElementById('ai-result-area');
-    const query = aiQueryInput.value.trim();
-    if (!query) return;
-
-    // --- FIX 1: Purge any existing Plotly plots from the result area ---
-    try { if (window.Plotly) window.Plotly.purge(resultArea); } catch (e) {}
-
-    resultArea.style.display = 'block';
-    resultArea.innerHTML = `<p class="status-searching">CiliAI is thinking... 🧠</p>`;
-    
-    try {
-        // Await core CiliaHub data fetches ONLY. Phylogeny fetches run in the router.
-        await Promise.all([
-            fetchCiliaData(),
-            fetchScreenData(),
-            fetchTissueData(),
-            fetchCellxgeneData(),
-            fetchUmapData(),
-            getDomainData(),
-            fetchCorumComplexes()
-        ]);
-        console.log('ciliAI.js: All core data loaded for processing.');
-
-        let resultHtml = '';
-        const qLower = query.toLowerCase();
-        let match;
-
-        // =================================================================
-        // **NEW ROUTING PRIORITY 1:** Handle Curated Phylogenetic Table Queries
-        // =================================================================
-        // This leverages the hard-coded gene lists (IFT, Dynein, etc.) for phylogenetic tables.
-        const complexTableResult = await routeComplexPhylogenyAnalysis(query);
-        if (complexTableResult) {
-            console.log("Query resolved by High-Priority Complex Phylogeny Table Router.");
-            resultHtml = complexTableResult;
-        } 
-        
-        // =================================================================
-        // **NEW ROUTING PRIORITY 2:** Handle General Phylogenetic Queries
-        // =================================================================
-        else if (qLower.includes('phylogeny') || qLower.includes('conservation') || 
-                   qLower.includes('heatmap') || qLower.includes('comparison') || 
-                   qLower.includes('tree')) {
-            
-            console.log('Routing to General Phylogenetic Query Resolver...');
-            // Assuming resolvePhylogeneticQuery is a new function to parse entity and call
-            // handlePhylogenyVisualizationQuery with the correct parameters (gene/complex list).
-            resultHtml = await resolvePhylogeneticQuery(query); 
-        }
-
-        // =================================================================
-        // **FALLBACK TO ORIGINAL LOGIC**
-        // =================================================================
-        else {
-            const perfectMatch = questionRegistry.find(item => item.text.toLowerCase() === qLower);
-            if (perfectMatch) {
-                console.log(`Registry match found: "${perfectMatch.text}"`);
-                resultHtml = await perfectMatch.handler();
-            }  
-            else if ((match = qLower.match(/(?:tell me about|what is|describe)\s+(.+)/i))) {
-                const term = match[1].trim();
-                // This will use the FIXED getGenesByComplex for terms that are complexes
-                resultHtml = await getComprehensiveDetails(term);
-            }  
-            else {
-                const intent = intentParser.parse(query);
-                if (intent && typeof intent.handler === 'function') {
-                    console.log(`Intent parser match found: ${intent.intent} for entity: ${intent.entity}`);
-                    // Ensure the intent handler calls the FIXED getGenesByComplex 
-                    // for COMPLEX intents
-                    resultHtml = await intent.handler(intent.entity);
-                }
-                else {
-                    const potentialGenes = (query.match(/\b([A-Z0-9\-\.]{3,})\b/gi) || []);
-                    const genes = potentialGenes.filter(g => ciliaHubDataCache.some(hubGene => hubGene.gene.toUpperCase() === g.toUpperCase()));
-                    
-                    if (genes.length === 2 && (qLower.includes('compare') || qLower.includes('vs'))) {
-                        resultHtml = await displayCellxgeneBarChart(genes);
-                    } else if (genes.length === 1 && (qLower.includes('plot') || qLower.includes('show expression') || qLower.includes('visualize'))) {
-                        if (qLower.includes('umap')) {
-                            resultHtml = await displayUmapGeneExpression(genes[0]);
-                        } else {
-                            resultHtml = await displayCellxgeneBarChart(genes);
-                        }
-                    } else if (genes.length === 1 && qLower.length < (genes[0].length + 5)) {
-                        resultHtml = await getComprehensiveDetails(query);
-                    } else {
-                        resultHtml = `<p>Sorry, I didn’t understand that. Please try one of the suggested questions or a known keyword.</p>`;
-                    }
-                }
-            }
-        }
-
-        if (resultHtml !== "") {
-            resultArea.innerHTML = resultHtml;
-        }
-
-    } catch (e) {
-        resultArea.innerHTML = `<p class="status-not-found">An internal CiliAI error occurred during your query. Please check the console for details. (Error: ${e.message})</p>`;
-        console.error("CiliAI Query Error:", e);
-    }
-};
-
-
-/**
- * Patches the main query handler to include Corum lookups.
- * NOTE: This function must be placed AFTER window.handleAIQuery is defined.
- */
-function patchAIQueryHandler() {
-    const originalHandler = window.handleAIQuery;
-
-    window.handleAIQuery = async function(event) {
-        // 1. Ensure CORUM data is loaded alongside other promises
-        await fetchCorumComplexes();
-        
-        const aiQueryInput = document.getElementById('aiQueryInput');
-        const resultArea = document.getElementById('ai-result-area');
-        const query = aiQueryInput.value.trim();
-        const qLower = query.toLowerCase();
-
-        // --- CUSTOM COMPLEX PARSING (Replaces the crash-prone regex) ---
-        
-        // Pattern 1: Subunits/components/members OF <complex name>
-        if (qLower.includes('subunits of') || qLower.includes('components of') || qLower.includes('members of')) {
-            const complexMatch = qLower.match(/(?:subunits|components|members)\s+of\s+(.+)/i);
-            const complexName = complexMatch ? complexMatch[1].trim() : null;
-
-            if (complexName) {
-                const results = getSubunitsByComplexName(complexName);
-                if (results.length > 0) {
-                    let html = `<div class="result-card"><h3>Complex Subunits Matching "${complexName}"</h3><ul>`;
-                    results.forEach(entry => {
-                        html += `<li><b>${entry.complexName}</b> (${entry.subunits.length} subunits): 
-                                 <small>${entry.subunits.map(s => s.toUpperCase()).join(', ')}</small></li>`;
-                    });
-                    html += '</ul></div>';
-                    resultArea.innerHTML = html;
-                    resultArea.style.display = 'block';
-                    return; // Handled
-                }
-            }
-        }
-        
-        // Pattern 2: Complexes FOR <gene>
-        if (qLower.includes('complexes for') || qLower.includes('complexes of') || qLower.includes('complexes containing')) {
-            const geneMatch = qLower.match(/(?:complexes|subunits)\s+(?:for|of|containing)\s+([A-Za-z0-9\-]+)/i);
-            const gene = geneMatch ? geneMatch[1].toUpperCase() : null;
-
-            if (gene) {
-                const complexes = getComplexesByGene(gene);
-                if (complexes.length > 0) {
-                    let html = `<div class="result-card"><h3>🧬 CORUM Complexes containing ${gene}</h3><ul>`;
-                    complexes.forEach(c => {
-                        html += `<li><b>${c.complexName}</b> (Total subunits: ${c.subunits.length})</li>`;
-                    });
-                    html += '</ul></div>';
-                    resultArea.innerHTML = html;
-                    resultArea.style.display = 'block';
-                    return; // Handled
-                }
-            }
-        }
-
-        // --- END CUSTOM COMPLEX PARSING ---
-
-        // 2. If not a CORUM query, fall back to the original handling
-        return originalHandler.apply(this, arguments);
-    };
-}
-
-// --- Execute CORUM Integration Patch ---
-patchAIQueryHandler(); 
 
 // --- Initial Data Load (Must call fetchCorumComplexes for complex queries to work) ---
 (async function initializeCorum() {
