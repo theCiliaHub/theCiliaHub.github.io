@@ -1434,25 +1434,38 @@ async function resolveDomainQuery(query) {
  */
 async function getDomainsByGene(geneName) {
     if (!CILI_AI_DOMAIN_DB) await getDomainData();
+    
     const domainMap = CILI_AI_DOMAIN_DB?.gene_domain_map; 
     if (!domainMap) return [];
+
     const geneUpper = geneName.toUpperCase();
-    // FIX: Access the domains array directly by gene key using the proper global cache.
-    const geneDomains = domainMap[geneUpper]; 
-    
-    if (!geneDomains || geneDomains.length === 0) {
-        return [];
+
+    // 🔍 Try direct lookup first
+    let geneDomains = domainMap[geneUpper];
+
+    // 🩹 Case-insensitive fallback if not found
+    if (!geneDomains) {
+        const matchedKey = Object.keys(domainMap).find(
+            key => key.toUpperCase() === geneUpper
+        );
+        if (matchedKey) {
+            geneDomains = domainMap[matchedKey];
+            console.log(`🔎 [getDomainsByGene] Case-insensitive match found: "${matchedKey}" for "${geneName}"`);
+        } else {
+            console.warn(`⚠️ [getDomainsByGene] No domain entry found for gene: "${geneName}"`);
+        }
     }
-    // Map the simplified domain object structure to the expected output format.
+
+    if (!geneDomains || geneDomains.length === 0) return [];
+
+    // 🧩 Normalize and return clean domain objects
     return geneDomains.map(domain => ({
         gene: geneName,
-        // FIX: Ensure domain_name is robustly extracted from description or ID
         domain_name: domain.description || domain.domain_id || 'Unknown', 
         domain_type: domain.type || 'Structure',
         start: domain.start || 0,
         end: domain.end || 0,
-        // Calculate length safely
-        length: (domain.end > 0 && domain.start > 0) ? (domain.end - domain.start) : 0, 
+        length: (domain.end > 0 && domain.start > 0) ? (domain.end - domain.start) : 0,
         description: domain.description || 'No description available',
         source: 'New Domain Database'
     }));
