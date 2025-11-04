@@ -1507,61 +1507,85 @@ async function getGenesByDomain(domainName) {
 
 /**
  * @name compareDomainArchitecture
- * @description Compares unique domain names between two genes.
+ * @description Compares unique domain names between two genes, with safe guards against placeholder or invalid tokens.
  */
 async function compareDomainArchitecture(geneA, geneB) {
-    // 🧩 SAFETY FIX: Filter out non-gene tokens accidentally passed
-    const invalidTokens = ["ARCHITECTURE", "DOMAIN", "STRUCTURE", "COMPARISON", "VS"];
-    if (invalidTokens.includes(geneA.toUpperCase())) {
-        console.warn(`⚠️ Invalid gene name passed as geneA: "${geneA}". Swapping arguments.`);
-        [geneA, geneB] = [geneB, geneA]; // Swap them
-    }
+  // 🧩 SAFETY FIX: Normalize and clean inputs
+  const normalize = (g) => (g ? g.trim().toUpperCase() : "");
+  geneA = normalize(geneA);
+  geneB = normalize(geneB);
 
-    if (invalidTokens.includes(geneB.toUpperCase())) {
-        console.warn(`⚠️ Invalid gene name passed as geneB: "${geneB}". Comparison aborted.`);
-        return {
-            geneA: { gene: geneA, domains: [], total: 0 },
-            geneB: { gene: geneB, domains: [], total: 0 },
-            shared: [],
-            uniqueA: [],
-            uniqueB: [],
-            similarity: 0
-        };
-    }
+  // Filter out tokens that are NOT gene symbols
+  const invalidTokens = ["ARCHITECTURE", "DOMAIN", "STRUCTURE", "COMPARISON", "VS", "AND", "", null, undefined];
 
-    // ✅ Fetch domains safely
-    const domainsA = await getDomainsByGene(geneA);
-    const domainsB = await getDomainsByGene(geneB);
-
-    // Extract domain names
-    const domainNamesA = new Set(domainsA.map(d => d.domain_name));
-    const domainNamesB = new Set(domainsB.map(d => d.domain_name));
-
-    // Compare sets
-    const shared = [...domainNamesA].filter(d => domainNamesB.has(d));
-    const uniqueA = [...domainNamesA].filter(d => !domainNamesB.has(d));
-    const uniqueB = [...domainNamesB].filter(d => !domainNamesA.has(d));
-
-    // Compute similarity (avoid divide-by-zero)
-    const maxUniqueSize = Math.max(domainNamesA.size, domainNamesB.size);
-    const similarity = maxUniqueSize > 0 ? (shared.length / maxUniqueSize) : 0;
-
-    // ✅ Logging for debugging
-    console.log(`🧬 Domain comparison complete:
-    ${geneA}: ${domainsA.length} domains
-    ${geneB}: ${domainsB.length} domains
-    Shared: ${shared.length} | Similarity: ${(similarity * 100).toFixed(1)}%`);
-
-    // Return structured result
+  // Handle invalid or swapped inputs
+  if (invalidTokens.includes(geneA) && !invalidTokens.includes(geneB)) {
+    console.warn(`⚠️ Invalid geneA (${geneA}). Swapping with geneB (${geneB}).`);
+    [geneA, geneB] = [geneB, geneA];
+  } else if (invalidTokens.includes(geneB)) {
+    console.warn(`⚠️ Invalid geneB: "${geneB}". Aborting comparison.`);
     return {
-        geneA: { gene: geneA, domains: domainsA, total: domainsA.length },
-        geneB: { gene: geneB, domains: domainsB, total: domainsB.length },
-        shared,
-        uniqueA,
-        uniqueB,
-        similarity
+      error: `❌ None of these genes were found: ${geneA}, ${geneB}`,
+      geneA: { gene: geneA, domains: [], total: 0 },
+      geneB: { gene: geneB, domains: [], total: 0 },
+      shared: [],
+      uniqueA: [],
+      uniqueB: [],
+      similarity: 0
     };
+  }
+
+  console.log(`🔬 Domain Architecture Comparison: ${geneA} vs ${geneB}`);
+
+  // ✅ Fetch domains safely
+  const domainsA = await getDomainsByGene(geneA);
+  const domainsB = await getDomainsByGene(geneB);
+
+  if ((!domainsA || domainsA.length === 0) && (!domainsB || domainsB.length === 0)) {
+    console.warn(`⚠️ [compareDomainArchitecture] Neither gene has domain data: ${geneA}, ${geneB}`);
+    return {
+      error: `❌ None of these genes were found in the domain database: ${geneA}, ${geneB}`,
+      geneA: { gene: geneA, domains: [], total: 0 },
+      geneB: { gene: geneB, domains: [], total: 0 },
+      shared: [],
+      uniqueA: [],
+      uniqueB: [],
+      similarity: 0
+    };
+  }
+
+  // Extract domain names (handle cases where structure differs)
+  const domainNamesA = new Set(domainsA.map(d => d.domain_name || d.name || d));
+  const domainNamesB = new Set(domainsB.map(d => d.domain_name || d.name || d));
+
+  // Compare sets
+  const shared = [...domainNamesA].filter(d => domainNamesB.has(d));
+  const uniqueA = [...domainNamesA].filter(d => !domainNamesB.has(d));
+  const uniqueB = [...domainNamesB].filter(d => !domainNamesA.has(d));
+
+  // Compute similarity safely
+  const maxUniqueSize = Math.max(domainNamesA.size, domainNamesB.size);
+  const similarity = maxUniqueSize > 0 ? shared.length / maxUniqueSize : 0;
+
+  // ✅ Debug logging
+  console.log(`🧬 Comparison complete:
+  ${geneA}: ${domainNamesA.size} unique domain(s)
+  ${geneB}: ${domainNamesB.size} unique domain(s)
+  Shared: ${shared.length}
+  Similarity: ${(similarity * 100).toFixed(1)}%`);
+
+  // ✅ Structured result
+  return {
+    geneA: { gene: geneA, domains: domainsA, total: domainsA.length },
+    geneB: { gene: geneB, domains: domainsB, total: domainsB.length },
+    shared,
+    uniqueA,
+    uniqueB,
+    similarity
+  };
 }
+
+
 
 /**
  * @name getDomainCompositionByComplex
