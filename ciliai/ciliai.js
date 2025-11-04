@@ -1105,7 +1105,7 @@ function standardizeComplexName(complexName) {
         'EXOCYST': 'EXOCYST',
         'CILIARY TIP': 'CILIARY TIP',
         // ⭐ IFT MOTORS (Consolidated Mappings)
-        'IFT MOTORS': 'IFT MOTOR COMPLEX',
+        'IFT MOTOR': 'IFT MOTOR COMPLEX',
         'INTRAFLAGELLAR TRANSPORT MOTORS': 'IFT MOTOR COMPLEX',
         'KINESIN-2': 'IFT MOTOR COMPLEX',
         'DYNEIN-2': 'IFT MOTOR COMPLEX',
@@ -1125,13 +1125,14 @@ function standardizeComplexName(complexName) {
         'CENTRAL PAIR': 'CENTRAL PAIR',
     };
     // 3. Find the longest, best match in the map
-    for (const [key, standardName] of Object.entries(standardizationMap)) {
+    // ⭐ FIX: Sort the keys in descending order of length to ensure 'IFT MOTOR' matches before 'IFT'
+    const sortedKeys = Object.keys(standardizationMap).sort((a, b) => b.length - a.length);
+
+    for (const key of sortedKeys) {
         if (nameUpper.includes(key.toUpperCase())) {
-            // Return the value from the map (which is the standardized name)
-            return standardName;
+            return standardizationMap[key];
         }
     }
-
     // 4. Return original input if no standardization applies (for CORUM/CiliaHub fallback)
     return complexName;
 }
