@@ -1434,30 +1434,30 @@ async function resolveDomainQuery(query) {
  */
 async function getDomainsByGene(gene) {
   if (!gene || typeof gene !== "string") {
-    console.warn(`[getDomainsByGene] ❌ Invalid gene input:`, gene);
+    console.warn("[getDomainsByGene] ❌ Invalid gene input:", gene);
     return [];
   }
-
+  
   const normalized = gene.trim().toUpperCase();
   console.log(`[getDomainsByGene] 🔍 Looking up domains for: ${normalized}`);
-
+  
   try {
     if (!window.domainDatabase || Object.keys(window.domainDatabase).length === 0) {
-      console.error(`[getDomainsByGene] ⚠️ Domain database not loaded yet.`);
+      console.error("[getDomainsByGene] ⚠️ Domain database not loaded yet.");
       return [];
     }
-
+    
     // Try direct match and fallbacks
     const entry =
       window.domainDatabase[normalized] ||
       window.domainDatabase[normalized.replace(/[\s-]/g, "_")] ||
       Object.entries(window.domainDatabase).find(([k]) => k.includes(normalized))?.[1];
-
+    
     if (!entry) {
       console.warn(`[getDomainsByGene] ⚠️ No domain entry found for gene: "${normalized}"`);
       return [];
     }
-
+    
     console.log(`[getDomainsByGene] ✅ Found ${entry.length} domain(s) for ${normalized}`);
     return entry;
   } catch (err) {
@@ -1465,7 +1465,6 @@ async function getDomainsByGene(gene) {
     return [];
   }
 }
-
 
 // --------------------------------------------------------------------------------------
 
@@ -1514,10 +1513,10 @@ async function compareDomainArchitecture(geneA, geneB) {
   const normalize = (g) => (g ? g.trim().toUpperCase() : "");
   geneA = normalize(geneA);
   geneB = normalize(geneB);
-
+  
   // Filter out tokens that are NOT gene symbols
   const invalidTokens = ["ARCHITECTURE", "DOMAIN", "STRUCTURE", "COMPARISON", "VS", "AND", "", null, undefined];
-
+  
   // Handle invalid or swapped inputs
   if (invalidTokens.includes(geneA) && !invalidTokens.includes(geneB)) {
     console.warn(`⚠️ Invalid geneA (${geneA}). Swapping with geneB (${geneB}).`);
@@ -1525,7 +1524,7 @@ async function compareDomainArchitecture(geneA, geneB) {
   } else if (invalidTokens.includes(geneB)) {
     console.warn(`⚠️ Invalid geneB: "${geneB}". Aborting comparison.`);
     return {
-      error: `❌ None of these genes were found: ${geneA}, ${geneB}`,
+      error: `❌ Invalid gene name: ${geneB}`,
       geneA: { gene: geneA, domains: [], total: 0 },
       geneB: { gene: geneB, domains: [], total: 0 },
       shared: [],
@@ -1534,46 +1533,57 @@ async function compareDomainArchitecture(geneA, geneB) {
       similarity: 0
     };
   }
-
+  
   console.log(`🔬 Domain Architecture Comparison: ${geneA} vs ${geneB}`);
-
+  
   // ✅ Fetch domains safely
   const domainsA = await getDomainsByGene(geneA);
   const domainsB = await getDomainsByGene(geneB);
-
-  if ((!domainsA || domainsA.length === 0) && (!domainsB || domainsB.length === 0)) {
-    console.warn(`⚠️ [compareDomainArchitecture] Neither gene has domain data: ${geneA}, ${geneB}`);
+  
+  // Check which genes are missing
+  const missingGenes = [];
+  if (!domainsA || domainsA.length === 0) missingGenes.push(geneA);
+  if (!domainsB || domainsB.length === 0) missingGenes.push(geneB);
+  
+  if (missingGenes.length > 0) {
+    const errorMsg = missingGenes.length === 2
+      ? `❌ Neither ${geneA} nor ${geneB} were found in the database`
+      : `❌ ${missingGenes[0]} was not found in the database`;
+    
+    console.warn(`⚠️ [compareDomainArchitecture] ${errorMsg}`);
+    
     return {
-      error: `❌ None of these genes were found in the domain database: ${geneA}, ${geneB}`,
-      geneA: { gene: geneA, domains: [], total: 0 },
-      geneB: { gene: geneB, domains: [], total: 0 },
+      error: errorMsg,
+      geneA: { gene: geneA, domains: domainsA || [], total: domainsA?.length || 0 },
+      geneB: { gene: geneB, domains: domainsB || [], total: domainsB?.length || 0 },
       shared: [],
       uniqueA: [],
       uniqueB: [],
       similarity: 0
     };
   }
-
-  // Extract domain names (handle cases where structure differs)
-  const domainNamesA = new Set(domainsA.map(d => d.domain_name || d.name || d));
-  const domainNamesB = new Set(domainsB.map(d => d.domain_name || d.name || d));
-
+  
+  // ✅ FIX: Extract domain IDs (not domain_name)
+  // Use domain_id as the primary identifier for comparison
+  const domainNamesA = new Set(domainsA.map(d => d.domain_id || d.domain_name || d.name || d));
+  const domainNamesB = new Set(domainsB.map(d => d.domain_id || d.domain_name || d.name || d));
+  
   // Compare sets
   const shared = [...domainNamesA].filter(d => domainNamesB.has(d));
   const uniqueA = [...domainNamesA].filter(d => !domainNamesB.has(d));
   const uniqueB = [...domainNamesB].filter(d => !domainNamesA.has(d));
-
+  
   // Compute similarity safely
   const maxUniqueSize = Math.max(domainNamesA.size, domainNamesB.size);
   const similarity = maxUniqueSize > 0 ? shared.length / maxUniqueSize : 0;
-
+  
   // ✅ Debug logging
   console.log(`🧬 Comparison complete:
   ${geneA}: ${domainNamesA.size} unique domain(s)
   ${geneB}: ${domainNamesB.size} unique domain(s)
   Shared: ${shared.length}
   Similarity: ${(similarity * 100).toFixed(1)}%`);
-
+  
   // ✅ Structured result
   return {
     geneA: { gene: geneA, domains: domainsA, total: domainsA.length },
@@ -1584,8 +1594,6 @@ async function compareDomainArchitecture(geneA, geneB) {
     similarity
   };
 }
-
-
 
 /**
  * @name getDomainCompositionByComplex
