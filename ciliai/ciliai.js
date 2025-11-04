@@ -681,19 +681,14 @@ function getComplexesByGene(geneSymbol) {
  * @returns {Array<Object>} List of complexes matching the name.
  */
 function getSubunitsByComplexName(complexName) {
-    if (!corumDataCache.loaded) {
-        console.warn('CORUM data not loaded yet.');
-        return [];
-    }
-    const qLower = complexName.toLowerCase();
-    
-    // Check main complex list for matches
-    const results = corumDataCache.list.filter(c => 
-        c.complexName.toLowerCase().includes(qLower)
+    if (!corumDataCache?.complexes) return [];
+    const nameLower = (complexName || '').toLowerCase();
+
+    return corumDataCache.complexes.filter(
+        c => c?.complex_name && c.complex_name.toLowerCase().includes(nameLower)
     );
-    
-    return results;
 }
+
 
 
 /**
@@ -832,17 +827,21 @@ async function getGenesByComplex(complexName) {
     const standardizedName = standardizeComplexName(complexName);
     const nameLower = standardizedName.toLowerCase();
     
-    // --- 1. Check CORUM Cache (Priority Source for Complex Composition) ---
-    const corumEntry = corumDataCache.byNameLower[nameLower];
-    
-    if (corumEntry) {
-        // Return a standardized format for CORUM data
-        return corumEntry.subunits.map(subunit => ({
+    // --- 2. Check CORUM Cache (High Priority) ---
+const corumEntry = corumDataCache?.byNameLower?.[nameLower];
+if (corumEntry && Array.isArray(corumEntry.subunits)) {
+    const validSubunits = corumEntry.subunits.filter(
+        s => s && typeof s.gene_name === 'string' && s.gene_name.trim() !== ''
+    );
+
+    if (validSubunits.length > 0) {
+        return validSubunits.map(subunit => ({
             gene: subunit.gene_name,
             description: `Complex: ${corumEntry.complex_name} (CORUM ID: ${corumEntry.complex_id})`,
             source: 'CORUM'
         }));
     }
+}
 
     // --- 2. Fallback to CiliaHub Gene Annotations (Fixed Logic) ---
     const complexRegex = new RegExp(standardizedName.replace(/[-\s]/g, '[-\\s]?'), 'i');
