@@ -1514,32 +1514,58 @@ async function getGenesByDomain(domainName) {
  * @description Compares unique domain names between two genes.
  */
 async function compareDomainArchitecture(geneA, geneB) {
-    // Both calls now use the fixed getDomainsByGene
+    // 🧩 SAFETY FIX: Filter out non-gene tokens accidentally passed
+    const invalidTokens = ["ARCHITECTURE", "DOMAIN", "STRUCTURE", "COMPARISON", "VS"];
+    if (invalidTokens.includes(geneA.toUpperCase())) {
+        console.warn(`⚠️ Invalid gene name passed as geneA: "${geneA}". Swapping arguments.`);
+        [geneA, geneB] = [geneB, geneA]; // Swap them
+    }
+
+    if (invalidTokens.includes(geneB.toUpperCase())) {
+        console.warn(`⚠️ Invalid gene name passed as geneB: "${geneB}". Comparison aborted.`);
+        return {
+            geneA: { gene: geneA, domains: [], total: 0 },
+            geneB: { gene: geneB, domains: [], total: 0 },
+            shared: [],
+            uniqueA: [],
+            uniqueB: [],
+            similarity: 0
+        };
+    }
+
+    // ✅ Fetch domains safely
     const domainsA = await getDomainsByGene(geneA);
     const domainsB = await getDomainsByGene(geneB);
-    
-    // FIX: Use 'domain_name' property from the fixed getDomainsByGene output
+
+    // Extract domain names
     const domainNamesA = new Set(domainsA.map(d => d.domain_name));
     const domainNamesB = new Set(domainsB.map(d => d.domain_name));
-    
+
+    // Compare sets
     const shared = [...domainNamesA].filter(d => domainNamesB.has(d));
     const uniqueA = [...domainNamesA].filter(d => !domainNamesB.has(d));
     const uniqueB = [...domainNamesB].filter(d => !domainNamesA.has(d));
-    
-    // Ensure the size calculation is based on unique names, avoiding division by zero.
+
+    // Compute similarity (avoid divide-by-zero)
     const maxUniqueSize = Math.max(domainNamesA.size, domainNamesB.size);
     const similarity = maxUniqueSize > 0 ? (shared.length / maxUniqueSize) : 0;
-    
+
+    // ✅ Logging for debugging
+    console.log(`🧬 Domain comparison complete:
+    ${geneA}: ${domainsA.length} domains
+    ${geneB}: ${domainsB.length} domains
+    Shared: ${shared.length} | Similarity: ${(similarity * 100).toFixed(1)}%`);
+
+    // Return structured result
     return {
         geneA: { gene: geneA, domains: domainsA, total: domainsA.length },
         geneB: { gene: geneB, domains: domainsB, total: domainsB.length },
-        shared: shared,
-        uniqueA: uniqueA,
-        uniqueB: uniqueB,
-        similarity: similarity
+        shared,
+        uniqueA,
+        uniqueB,
+        similarity
     };
 }
-
 
 /**
  * @name getDomainCompositionByComplex
