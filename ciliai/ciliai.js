@@ -1464,6 +1464,37 @@ async function resolveDomainQuery(query) {
     // Final fallback handles cases where extraction fails entirely
     return `<div class="result-card"><h3>Domain Query Failed</h3><p>Could not interpret the comparison or list request. Please try comparing two valid gene symbols (e.g., IFT88 vs IFT81).</p></div>`;
 }
+
+/**
+ * @name getDomainComparisonGenes
+ * @description Safely extracts exactly two gene symbols from a typical domain comparison query, 
+ * guaranteeing that non-gene noise words are excluded.
+ * * @param {string} query - The raw user query (e.g., "Domain architecture comparison IFT88 vs IFT81").
+ * @returns {Array<string>} An array containing the two uppercase gene symbols (e.g., ["IFT88", "IFT81"]).
+ */
+function getDomainComparisonGenes(query) {
+    // 1. Use a strict pattern to isolate two words separated by the comparison term.
+    // This looks for GENE1 + (VS/AND/COMPARISON) + GENE2.
+    const comparisonPattern = /\b([A-Z0-9\-]{3,})\s+(?:vs|and|comparison)\s+([A-Z0-9\-]{3,})\b/i;
+    
+    const match = query.toUpperCase().match(comparisonPattern);
+
+    if (match && match.length >= 3) {
+        const geneA = match[1];
+        const geneB = match[2];
+
+        // 2. Filter against known noise words that might be captured (e.g., ARCHITECTURE, DOMAIN)
+        const noiseWords = new Set(['ARCHITECTURE', 'COMPARISON', 'DOMAIN', 'MOTIF']);
+        
+        const genes = [geneA, geneB].filter(g => !noiseWords.has(g));
+
+        if (genes.length === 2) {
+            return genes;
+        }
+    }
+    return [];
+}
+
 /**
  * @name getDomainsByGene
  * @description Retrieves all domain details for a single gene from the structured domain map.
@@ -1476,8 +1507,7 @@ async function getDomainsByGene(geneName) {
     
     const geneUpper = geneName.toUpperCase();
     
-    // 🔍 FIX: Robust Case-Insensitive Lookup
-    // Find the actual key in the map that matches the uppercase gene name
+    // FIX: Robust Case-Insensitive Lookup
     const matchedKey = Object.keys(domainMap).find(
         key => key.toUpperCase() === geneUpper
     );
@@ -1485,11 +1515,9 @@ async function getDomainsByGene(geneName) {
     const geneDomains = matchedKey ? domainMap[matchedKey] : null;
 
     if (!geneDomains || geneDomains.length === 0) {
-        // Return empty array if not found, allowing the calling function to handle the error message.
         return [];
     }
     
-    // ... (rest of the mapping and return logic remains the same)
     return geneDomains.map(domain => ({
         gene: geneName,
         domain_name: domain.description || domain.domain_id || 'Unknown', 
@@ -1501,8 +1529,6 @@ async function getDomainsByGene(geneName) {
         source: 'New Domain Database'
     }));
 }
-
-// --------------------------------------------------------------------------------------
 
 /**
  * @name getGenesByDomain
@@ -1527,7 +1553,6 @@ async function getGenesByDomain(domainName) {
         });
 
         if (matchingDomains.length > 0) {
-            // Group and summarize the matches for the output format
             const domainNames = matchingDomains.map(d => d.description || d.domain_id).join(', ');
             matchingGenes.push({
                 gene: geneUpper,
@@ -1809,25 +1834,22 @@ const domainIntents = [
 
 /**
  * @name resolveDomainQuery
- * @description Routes domain-related queries (including comparisons and lists).
- * This must be defined globally.
- * @param {string} query - The raw user query.
+ * @description Routes domain-related queries (Comparison, Enriched/Depleted Lists, Specific Motifs).
+ * This MUST be defined globally.
+ * * @param {string} query - The raw user query.
  */
 async function resolveDomainQuery(query) {
     const qLower = query.toLowerCase();
 
-    // Pattern for Domain Comparison: "Domain architecture comparison IFT88 vs IFT81"
-    const comparisonMatch = query.match(/([A-Z0-9\-]+)\s+(?:vs|and|comparison)\s+([A-Z0-9\-]+)/i);
+    // 1. Check for specific Gene Domain Comparison
+    const genes = getDomainComparisonGenes(query);
 
-    if (comparisonMatch) {
-    const geneA = comparisonMatch[1].toUpperCase();
-    const geneB = comparisonMatch[2].toUpperCase();
-    
-    // This directly calls your fixed comparison and display function
-    return displayDomainComparison(geneA, geneB); 
+    if (genes && genes.length === 2) {
+        // Success: Found two valid genes, route to comparison
+        return displayDomainComparison(genes[0], genes[1]);
     }
 
-    // 1. Check for ENRICHED/DEPLETED LIST requests (Assumes these functions exist)
+    // 2. Check for ENRICHED/DEPLETED LIST requests
     if (qLower.includes('enriched domain') || qLower.includes('show enriched')) {
         return displayEnrichedDomains();
     }
@@ -1835,7 +1857,7 @@ async function resolveDomainQuery(query) {
         return displayDepletedDomains();
     }
 
-    // 2. Check for Specific DOMAIN NAME lookup 
+    // 3. Check for Specific DOMAIN NAME lookup 
     const domainKeywords = ['wd40', 'leucine-rich repeat', 'iq motif', 'ef-hand', 'kinase', 'atpase', 'zinc finger']; 
     for (const keyword of domainKeywords) {
         if (qLower.includes(keyword)) {
@@ -1844,14 +1866,16 @@ async function resolveDomainQuery(query) {
         }
     }
     
-    // 3. Fallback for single gene domain architecture display
-    const singleGeneMatch = query.match(/domains?\s+(?:of|for)\s+([A-Z0-9]+)/i);
+    // 4. Fallback for single gene display
+    const singleGeneMatch = query.match(/domains?\s+(?:of|for|in)\s+([A-Z0-9]+)/i);
     if (singleGeneMatch) {
         return visualizeDomainArchitecture(singleGeneMatch[1].toUpperCase());
     }
 
-    return `<div class="result-card"><h3>Domain Query Failed</h3><p>Could not interpret the domain query. Please try comparing two genes (e.g., "IFT88 vs IFT81") or requesting a specific domain list.</p></div>`;
+    // Final fallback handles cases where extraction fails entirely
+    return `<div class="result-card"><h3>Domain Query Failed</h3><p>Could not interpret the comparison or list request. Please try comparing two valid gene symbols (e.g., IFT88 vs IFT81).</p></div>`;
 }
+
 /**
  * @name resolvePhylogeneticQuery
  * @description Routes generic phylogenetic queries (non-table) to the correct list or visualization.
