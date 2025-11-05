@@ -1915,8 +1915,6 @@ async function resolvePhylogeneticQuery(query) {
     return `<div class="result-card"><h3>Phylogeny Error</h3><p>Could not interpret the phylogenetic query. Please specify a gene (e.g., IFT88) or list type.</p></div>`;
 }
 
-
-
 /**
  * @name getDomainsForMultipleGenesTable
  * @description Retrieves and presents the unique domain architecture for two or more genes in a comparative table format.
@@ -2029,9 +2027,105 @@ async function routeMultiGeneDomainTable(query) {
 
 
 
+/**@##########################BEGINNING OF DOMAIN RELATED QUETIONS AND HELPER##################################
+ * @##########################BEGINNING OF DOMAIN RELATED QUETIONS AND HELPER##################################
+/**@##########################BEGINNING OF DOMAIN RELATED QUETIONS AND HELPER##################################
+/**
+ * @name generateDomainEnrichmentHeatmap
+ * @description Generates and displays a statistical heatmap showing the Odds Ratio (OR) 
+ * and P-adjusted value for the top enriched and depleted domains in ciliary genes.
+ * @returns {Promise<string>} HTML output containing the Plotly heatmap.
+ */
+async function generateDomainEnrichmentHeatmap() {
+    if (!CILI_AI_DOMAIN_DB) await getDomainData();
+    
+    const db = CILI_AI_DOMAIN_DB;
+    if (!db || !db.enriched_domains || !db.depleted_or_absent_domains) {
+        return `<div class="result-card status-not-found"><h3>Domain Heatmap Failed</h3><p>Could not load the statistical domain database (cili_ai_domain_database.json).</p></div>`;
+    }
 
+    // 1. Prepare and combine data (top 15 of each category)
+    const enriched = Object.values(db.enriched_domains)
+        .sort((a, b) => b.odds_ratio - a.odds_ratio) // Sort by highest enrichment
+        .slice(0, 15)
+        .map(d => ({ ...d, category: 'Enriched' }));
 
+    const depleted = Object.values(db.depleted_or_absent_domains)
+        .sort((a, b) => a.odds_ratio - b.odds_ratio) // Sort by lowest enrichment (most depleted)
+        .slice(0, 15)
+        .map(d => ({ ...d, category: 'Depleted' }));
 
+    const domains = enriched.concat(depleted);
+    const domainLabels = domains.map(d => d.domain_id);
+    
+    // 2. Build Plotly Matrix Data
+    // We will display two metrics: Odds Ratio and -log10(P-adjusted)
+    const oddsRatioValues = domains.map(d => d.odds_ratio);
+    const negLogPvalues = domains.map(d => -Math.log10(d.p_adj));
+    
+    const zMatrix = [oddsRatioValues, negLogPvalues];
+    const xLabels = ['Odds Ratio (OR)', '-log10(P-adjusted)'];
+
+    // Define colorscale centered around 1.0 (neutral OR)
+    const MAX_OR = Math.max(...oddsRatioValues.filter(or => or < Infinity));
+    const MIN_OR = Math.min(...oddsRatioValues);
+    const COLOR_MAX = Math.max(MAX_OR, 1.0 / MIN_OR); // Symmetric scale limit
+    
+    const trace = {
+        z: zMatrix,
+        x: xLabels,
+        y: domainLabels.reverse(), // Reverse for better vertical display
+        type: 'heatmap',
+        colorscale: 'RdBu',
+        zmin: 1.0 / COLOR_MAX, // Symmetrical minimum (below 1.0)
+        zmax: COLOR_MAX,       // Symmetrical maximum (above 1.0)
+        zmid: 1.0,             // Center at 1.0 (no effect)
+        colorbar: {
+            title: 'Odds Ratio'
+        },
+        hoverongaps: false,
+        hoverinfo: 'text',
+        text: zMatrix.map((row, i) => row.map((val, j) => {
+            const metric = xLabels[j];
+            const domain = domainLabels.reverse()[i];
+            
+            if (metric === 'Odds Ratio (OR)') {
+                 return `${domain} <br> OR: ${val.toFixed(2)}`;
+            } else {
+                 return `${domain} <br> P-adj: 10^${-val.toFixed(1)}`;
+            }
+        }))
+    };
+
+    const layout = {
+        title: `Statistical Enrichment of Top Ciliary Domains (${domains.length} total)`,
+        xaxis: { 
+            automargin: true,
+            side: 'top' // Place axis labels on top
+        },
+        yaxis: { 
+            title: 'Domain Name',
+            automargin: true,
+            tickangle: 0
+        },
+        margin: { t: 80, b: 50, l: 300, r: 50 }, // Increased left margin for domain labels
+        height: Math.max(700, domains.length * 30 + 100)
+    };
+    
+    const plotDivId = 'domain-enrichment-heatmap';
+
+    let htmlOutput = `<div class="result-card">
+        <h3>Domain Enrichment Statistics</h3>
+        <p>This heatmap shows the statistical behavior of the top 15 enriched (Red) and depleted (Blue) domains. The color scale is centered around 1.0 (neutral Odds Ratio).</p>
+        <div id="${plotDivId}" style="height: ${layout.height}px; width: 100%;"></div>
+        <button class="download-button" onclick="downloadPlot('${plotDivId}', 'Domain_Enrichment_Heatmap')">Download Heatmap (PNG)</button>
+    </div>`;
+
+    // 4. Execute the plot (requires Plotly to be loaded)
+    window.initPhylogenyPlot(plotDivId, [trace], layout);
+
+    return htmlOutput;
+}
 
 
 
@@ -2424,6 +2518,9 @@ const questionRegistry = [
     html += `</tbody></table></div>`;
     return html;
 }},
+    // ==================== DOMAIN HEATMAP VISUALIZATION (Expanded) ====================
+{ text: "Generate domain enrichment heatmap", handler: async () => generateDomainEnrichmentHeatmap() },
+    
 // ==================== A. SPECIFIC GENE VISUALIZATION (Expanded) ====================
     { text: "Show evolutionary conservation of IFT88", handler: async () => getPhylogenyAnalysis(["IFT88"]) },
     { text: "IFT88 conservation analysis", handler: async () => getPhylogenyAnalysis(["IFT88"]) },
