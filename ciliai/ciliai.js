@@ -1465,256 +1465,6 @@ async function resolveDomainQuery(query) {
     return `<div class="result-card"><h3>Domain Query Failed</h3><p>Could not interpret the comparison or list request. Please try comparing two valid gene symbols (e.g., IFT88 vs IFT81).</p></div>`;
 }
 
-/**
- * @name getDomainComparisonGenes
- * @description Safely extracts exactly two gene symbols from a typical domain comparison query, 
- * guaranteeing that non-gene noise words are excluded.
- * * @param {string} query - The raw user query (e.g., "Domain architecture comparison IFT88 vs IFT81").
- * @returns {Array<string>} An array containing the two uppercase gene symbols (e.g., ["IFT88", "IFT81"]).
- */
-function getDomainComparisonGenes(query) {
-    // 1. Use a strict pattern to isolate two words separated by the comparison term.
-    // This looks for GENE1 + (VS/AND/COMPARISON) + GENE2.
-    const comparisonPattern = /\b([A-Z0-9\-]{3,})\s+(?:vs|and|comparison)\s+([A-Z0-9\-]{3,})\b/i;
-    
-    const match = query.toUpperCase().match(comparisonPattern);
-
-    if (match && match.length >= 3) {
-        const geneA = match[1];
-        const geneB = match[2];
-
-        // 2. Filter against known noise words that might be captured (e.g., ARCHITECTURE, DOMAIN)
-        const noiseWords = new Set(['ARCHITECTURE', 'COMPARISON', 'DOMAIN', 'MOTIF']);
-        
-        const genes = [geneA, geneB].filter(g => !noiseWords.has(g));
-
-        if (genes.length === 2) {
-            return genes;
-        }
-    }
-    return [];
-}
-
-/**
- * @name getDomainsByGene
- * @description Retrieves all domain details for a single gene from the structured domain map.
- */
-async function getDomainsByGene(geneName) {
-    if (!CILI_AI_DOMAIN_DB) await getDomainData();
-    
-    const domainMap = CILI_AI_DOMAIN_DB?.gene_domain_map; 
-    if (!domainMap) return [];
-    
-    const geneUpper = geneName.toUpperCase();
-    
-    // FIX: Robust Case-Insensitive Lookup
-    const matchedKey = Object.keys(domainMap).find(
-        key => key.toUpperCase() === geneUpper
-    );
-    
-    const geneDomains = matchedKey ? domainMap[matchedKey] : null;
-
-    if (!geneDomains || geneDomains.length === 0) {
-        return [];
-    }
-    
-    return geneDomains.map(domain => ({
-        gene: geneName,
-        domain_name: domain.description || domain.domain_id || 'Unknown', 
-        domain_type: domain.type || 'Structure',
-        start: domain.start || 0,
-        end: domain.end || 0,
-        length: (domain.end > 0 && domain.start > 0) ? (domain.end - domain.start) : 0, 
-        description: domain.description || 'No description available',
-        source: 'New Domain Database'
-    }));
-}
-
-/**
- * @name getGenesByDomain
- * @description Finds all genes containing a specific domain name/type from the structured domain map.
- */
-async function getGenesByDomain(domainName) {
-    if (!CILI_AI_DOMAIN_DB) await getDomainData();
-    
-    const domainMap = CILI_AI_DOMAIN_DB?.gene_domain_map;
-    if (!domainMap) return [];
-
-    const domainLower = domainName.toLowerCase();
-    const matchingGenes = [];
-    
-    // Iterate through all genes in the map
-    for (const geneUpper in domainMap) {
-        const domains = domainMap[geneUpper];
-        
-        const matchingDomains = domains.filter(entry => {
-            return (entry.domain_id && entry.domain_id.toLowerCase().includes(domainLower)) ||
-                   (entry.description && entry.description.toLowerCase().includes(domainLower));
-        });
-
-        if (matchingDomains.length > 0) {
-            const domainNames = matchingDomains.map(d => d.description || d.domain_id).join(', ');
-            matchingGenes.push({
-                gene: geneUpper,
-                description: `Contains ${matchingDomains.length} ${domainName} feature(s): ${domainNames}`,
-                source: 'Domain Database'
-            });
-        }
-    }
-    
-    return matchingGenes;
-}
-
-/**
- * @name compareDomainArchitecture
- * @description Compares unique domain names between two genes.
- */
-async function compareDomainArchitecture(geneA, geneB) {
-    // Both calls now use the fixed getDomainsByGene
-    const domainsA = await getDomainsByGene(geneA);
-    const domainsB = await getDomainsByGene(geneB);
-    
-    // FIX: Use 'domain_name' property from the fixed getDomainsByGene output
-    const domainNamesA = new Set(domainsA.map(d => d.domain_name));
-    const domainNamesB = new Set(domainsB.map(d => d.domain_name));
-    
-    const shared = [...domainNamesA].filter(d => domainNamesB.has(d));
-    const uniqueA = [...domainNamesA].filter(d => !domainNamesB.has(d));
-    const uniqueB = [...domainNamesB].filter(d => !domainNamesA.has(d));
-    
-    // Ensure the size calculation is based on unique names, avoiding division by zero.
-    const maxUniqueSize = Math.max(domainNamesA.size, domainNamesB.size);
-    const similarity = maxUniqueSize > 0 ? (shared.length / maxUniqueSize) : 0;
-    
-    return {
-        geneA: { gene: geneA, domains: domainsA, total: domainsA.length },
-        geneB: { gene: geneB, domains: domainsB, total: domainsB.length },
-        shared: shared,
-        uniqueA: uniqueA,
-        uniqueB: uniqueB,
-        similarity: similarity
-    };
-}
-
-/**
- * @name getDomainCompositionByComplex
- * @description Get domain composition for a complex (using getDomainsByGene).
- */
-async function getDomainCompositionByComplex(complexName) {
-    // This relies on the successful getGenesByComplex (which is stabilized)
-    const components = await getGenesByComplex(complexName); 
-    
-    const domainStats = new Map();
-    
-    for (const component of components) {
-        // This call is now stable and uses the correct CILI_AI_DOMAIN_DB structure
-        const domains = await getDomainsByGene(component.gene); 
-        
-        domains.forEach(domain => {
-            const key = domain.domain_name; // Use the processed domain_name
-            if (!domainStats.has(key)) {
-                domainStats.set(key, {
-                    domain: key,
-                    count: 0,
-                    genes: new Set() // Use a Set to track unique genes
-                });
-            }
-            domainStats.get(key).count++;
-            domainStats.get(key).genes.add(component.gene);
-        });
-    }
-    
-    // Convert the Set of genes to a list and sort by domain count
-    return Array.from(domainStats.values())
-        .map(item => ({
-            domain: item.domain,
-            count: item.count,
-            genes: Array.from(item.genes)
-        }))
-        .sort((a, b) => b.count - a.count);
-}
-
-/**
- * Visualize domain architecture for a gene
- */
-async function visualizeDomainArchitecture(geneName) {
-    const domains = await getDomainsByGene(geneName);
-    
-    if (domains.length === 0) {
-        return `<div class="result-card">
-            <h3>Domain Architecture: ${geneName}</h3>
-            <p>No domain information available for ${geneName}.</p>
-        </div>`;
-    }
-    
-    // Sort domains by start position
-    domains.sort((a, b) => a.start - b.start);
-    
-    const maxPosition = Math.max(...domains.map(d => d.end));
-    
-    let html = `<div class="result-card">
-        <h3>🧬 Domain Architecture: ${geneName}</h3>
-        <div style="margin: 20px 0;">
-            <div style="position: relative; height: 100px; background: #f0f0f0; border-radius: 5px;">`;
-    
-    // Color palette for domains
-    const colors = ['#3498db', '#e74c3c', '#2ecc71', '#f39c12', '#9b59b6', '#1abc9c', '#e67e22'];
-    
-    domains.forEach((domain, idx) => {
-        const left = (domain.start / maxPosition) * 100;
-        const width = ((domain.end - domain.start) / maxPosition) * 100;
-        const color = colors[idx % colors.length];
-        
-        html += `
-            <div style="position: absolute; 
-                        left: ${left}%; 
-                        width: ${width}%; 
-                        top: 30px; 
-                        height: 40px; 
-                        background: ${color}; 
-                        border: 2px solid #333;
-                        border-radius: 5px;
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
-                        color: white;
-                        font-size: 10px;
-                        font-weight: bold;
-                        overflow: hidden;"
-                 title="${domain.domain_name} (${domain.start}-${domain.end})">
-                ${domain.domain_name}
-            </div>`;
-    });
-    
-    html += `</div></div>
-        <h4>Domain Details:</h4>
-        <table class="data-table" style="width: 100%; margin-top: 10px;">
-            <thead>
-                <tr>
-                    <th>Domain</th>
-                    <th>Type</th>
-                    <th>Position</th>
-                    <th>Length</th>
-                    <th>Description</th>
-                </tr>
-            </thead>
-            <tbody>`;
-    
-    domains.forEach(domain => {
-        html += `
-            <tr>
-                <td><strong>${domain.domain_name}</strong></td>
-                <td>${domain.domain_type}</td>
-                <td>${domain.start}-${domain.end}</td>
-                <td>${domain.length} aa</td>
-                <td>${domain.description}</td>
-            </tr>`;
-    });
-    
-    html += `</tbody></table></div>`;
-    
-    return html;
-}
 
   
 /**
@@ -1915,7 +1665,48 @@ async function resolvePhylogeneticQuery(query) {
     return `<div class="result-card"><h3>Phylogeny Error</h3><p>Could not interpret the phylogenetic query. Please specify a gene (e.g., IFT88) or list type.</p></div>`;
 }
 
+/**
+ * @name getDomainsByGene
+ * @description Retrieves all domain details for a single gene from the structured domain map.
+ * This is used by getDomainsForMultipleGenesTable.
+ * * NOTE: Assumes CILI_AI_DOMAIN_DB is a global object containing gene_domain_map.
+ * @param {string} geneName - The gene symbol (e.g., "IFT88").
+ * @returns {Promise<Array<Object>>} A Promise resolving to an array of processed domain objects.
+ */
+async function getDomainsByGene(geneName) {
+    if (!CILI_AI_DOMAIN_DB) await getDomainData(); // Ensure the domain cache is loaded
+    
+    const domainMap = CILI_AI_DOMAIN_DB?.gene_domain_map; 
+    if (!domainMap) return [];
+    
+    const geneUpper = geneName.toUpperCase();
+    
+    // 1. Robust Case-Insensitive Lookup: Find the actual key in the map that matches the uppercase gene name.
+    const matchedKey = Object.keys(domainMap).find(
+        key => key.toUpperCase() === geneUpper
+    );
+    
+    const geneDomains = matchedKey ? domainMap[matchedKey] : null;
 
+    if (!geneDomains || geneDomains.length === 0) {
+        // Return empty array if not found, allowing the calling function to handle the missing data.
+        return [];
+    }
+    
+    // 2. Normalize and return clean domain objects
+    return geneDomains.map(domain => ({
+        gene: geneName,
+        // Use description as the main domain name if available, otherwise fall back to ID
+        domain_name: domain.description || domain.domain_id || 'Unknown Domain', 
+        domain_type: domain.type || 'Structure',
+        start: domain.start || 0,
+        end: domain.end || 0,
+        // Calculate length safely, handling potential undefined/zero values
+        length: (domain.end > 0 && domain.start > 0) ? (domain.end - domain.start) : 0, 
+        description: domain.description || 'No description available',
+        source: 'New Domain Database'
+    }));
+}
 
 /**
  * @name getDomainsForMultipleGenesTable
@@ -2004,7 +1795,25 @@ async function getDomainsForMultipleGenesTable(geneSymbols) {
     return tableHtml;
 }
 
+/**
+ * @name routeMultiGeneDomainTable
+ * @description Extracts multiple gene symbols from a single query and routes them to the comparative domain table.
+ * @param {string} query - The raw user query (e.g., "Display domains of IFT88, IFT81, and WDR19").
+ */
+async function routeMultiGeneDomainTable(query) {
+    // Rely on the globally defined extractMultipleGenes(query) function
+    const genes = extractMultipleGenes(query); 
+    
+    if (genes.length < 2) {
+        return `<div class="result-card"><h3>Domain List Failed</h3><p>Please specify at least two valid gene symbols for the domain matrix (e.g., IFT88, IFT81, WDR19).</p></div>`;
+    }
+    
+    // Limit to a reasonable number (e.g., 10) for table stability
+    const finalGenes = genes.slice(0, 10);
 
+    // Call the stable matrix function
+    return getDomainsForMultipleGenesTable(finalGenes);
+}
 /**
  * @##########################END OF COMPLEX RELATED QUETIONS AND HELPER##################################
  */
@@ -2377,7 +2186,7 @@ const questionRegistry = [
     { text: "What questions can I ask?", handler: async () => tellAboutCiliAI() },
     { text: "Give me an overview of your features", handler: async () => tellAboutCiliAI() },
 // --- Single gene domain queries ---
-{ text: "Display domains of IFT88 and IFT81", handler: async () => getDomainsForMultipleGenesTable(["IFT88", "IFT81"]) },
+
 { text: "What domains does IFT88 have?", handler: async () => visualizeDomainArchitecture("IFT88") },
 { text: "Show domain architecture of IFT88", handler: async () => visualizeDomainArchitecture("IFT88") },
 { text: "Display domains in IFT88", handler: async () => visualizeDomainArchitecture("IFT88") },
@@ -2389,6 +2198,12 @@ const questionRegistry = [
 { text: "List proteins with coiled-coil domains", handler: async () => formatListResult("Genes with coiled-coil", await getGenesByDomain("coiled-coil")) },
 { text: "Genes with AAA+ ATPase domains", handler: async () => formatListResult("Genes with AAA+ ATPase", await getGenesByDomain("AAA")) },
 // --- Domain comparisons ---
+  { text: "Display domains of IFT88 and IFT81", handler: async () => getDomainsForMultipleGenesTable(["IFT88", "IFT81"]) },
+{ text: "Show domain architecture for IFT88, IFT81, and WDR19", handler: async () => routeMultiGeneDomainTable("Show domain architecture for IFT88, IFT81, and WDR19") },
+{ text: "List domains of multiple genes (e.g., BBS1, BBS2, BBS4)", handler: async () => routeMultiGeneDomainTable("List domains of BBS1, BBS2, BBS4, NPHP1, and MKS1") },
+{ text: "Compare domain architecture of these 5 genes", handler: async (query) => routeMultiGeneDomainTable(query) // Assumes the query contains the genes},
+{text: "Show domain matrix for X genes", handler: async (query) => routeMultiGeneDomainTable(query) },
+
 { text: "Compare domains of IFT88 and IFT81", handler: async () => displayDomainComparison("IFT88", "IFT81") },
 { text: "Domain architecture comparison IFT88 vs IFT81", handler: async () => displayDomainComparison("IFT88", "IFT81") },
 // --- Complex domain composition ---
