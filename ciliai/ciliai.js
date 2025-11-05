@@ -237,92 +237,18 @@ function normalizeTerm(s) {
     return String(s).toLowerCase().replace(/[._\-\s]+/g, ' ').trim();
 }
 
-// === INJECT CSS ONCE ===
-(function injectCiliaCardCSS() {
-    if (document.getElementById('cilia-card-styles')) return;
-    const style = document.createElement('style');
-    style.id = 'cilia-card-styles';
-    style.textContent = `
-        .cilia-card {
-            background: linear-gradient(135deg, #0d1b2a, #1b263b);
-            border: 1px solid #00b4d8;
-            border-radius: 16px;
-            margin: 16px 0;
-            padding: 16px;
-            color: #e0e1dd;
-            font-family: system-ui, -apple-system, sans-serif;
-            box-shadow: 0 4px 20px rgba(0, 180, 216, 0.3);
-            position: relative;
-            animation: fadeIn 0.4s ease-out;
-        }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
-        .card-toolbar {
-            text-align: right;
-            margin-bottom: 8px;
-            opacity: 0.9;
-        }
-        .card-toolbar button {
-            background: #00b4d8;
-            color: white;
-            border: none;
-            padding: 6px 10px;
-            margin-left: 6px;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 12px;
-            font-weight: 600;
-            transition: all 0.2s;
-        }
-        .card-toolbar button:hover { background: #00d4ff; transform: scale(1.05); }
-        .card-toolbar button:active { transform: scale(0.98); }
-        .card-content { line-height: 1.6; }
-        .follow-up {
-            margin-top: 16px;
-            display: flex;
-            gap: 8px;
-            align-items: center;
-        }
-        .follow-up input {
-            flex: 1;
-            padding: 10px 12px;
-            border: 1px solid #00b4d8;
-            border-radius: 10px;
-            background: #112240;
-            color: #e0e1dd;
-            font-size: 14px;
-            outline: none;
-            transition: all 0.2s;
-        }
-        .follow-up input:focus {
-            border-color: #00d4ff;
-            box-shadow: 0 0 0 2px rgba(0, 212, 255, 0.3);
-        }
-        .follow-up input::placeholder { color: #778da9; }
-        .follow-up button {
-            background: #00b4d8;
-            color: white;
-            border: none;
-            padding: 10px 12px;
-            border-radius: 10px;
-            cursor: pointer;
-            font-size: 14px;
-        }
-        .follow-up button:hover { background: #00d4ff; }
-    `;
-    document.head.appendChild(style);
-})();
-
-// === MAIN AI QUERY HANDLER (v3 - FULLY SELF-CONTAINED) ===
+// --- Main AI Query Handler (UPGRADED v2) ---
 window.handleAIQuery = async function() {
     const aiQueryInput = document.getElementById('aiQueryInput');
     const resultArea = document.getElementById('ai-result-area');
     const query = aiQueryInput.value.trim();
     if (!query) return;
 
+    // --- FIX 1: Purge Plotly ---
     try { if (window.Plotly) window.Plotly.purge(resultArea); } catch (e) {}
 
     resultArea.style.display = 'block';
-    resultArea.innerHTML = `<p class="status-searching">CiliAI is thinking...</p>`;
+    resultArea.innerHTML = `<p class="status-searching">CiliAI is thinking... Thinking</p>`;
 
     try {
         await Promise.all([
@@ -337,74 +263,90 @@ window.handleAIQuery = async function() {
 
         // === 1. SMART PREPROCESSOR ===
         const pre = preprocessQuery(query);
-        const qNorm = pre.normalized;
+        const qNormalized = pre.normalized;
         const entities = pre.entities;
         window.lastQueryContext = { original: query, entities };
 
         let resultHtml = '';
+        let match;
 
-        // === PRIORITY ROUTERS ===
+        // === PRIORITY ROUTING (unchanged) ===
         const complexTableResult = await routeComplexPhylogenyAnalysis(query);
         if (complexTableResult) {
             resultHtml = complexTableResult;
         }
-        else if (qNorm.includes('domain') || qNorm.includes('motif') || qNorm.includes('enriched') || qNorm.includes('depleted') || qNorm.includes('architecture comparison')) {
+        else if (qNormalized.includes('domain') || qNormalized.includes('motif') ||
+                 qNormalized.includes('enriched') || qNormalized.includes('depleted') ||
+                 qNormalized.includes('architecture comparison')) {
             resultHtml = await resolveDomainQuery(query);
         }
-        else if (qNorm.includes('phylogeny') || qNorm.includes('conservation') || qNorm.includes('heatmap') || qNorm.includes('comparison') || qNorm.includes('tree')) {
+        else if (qNormalized.includes('phylogeny') || qNormalized.includes('conservation') ||
+                 qNormalized.includes('heatmap') || qNormalized.includes('comparison') ||
+                 qNormalized.includes('tree')) {
             resultHtml = await resolvePhylogeneticQuery(query);
         }
-        // === FALLBACK: 100% REGISTRY + SMART GENE HANDLING ===
+        // === FALLBACK: 100% Registry Coverage + Smarter Parsing ===
         else {
-            const regMatch = questionRegistry.find(r =>
-                r.text.toLowerCase() === qNorm ||
-                qNorm.includes(r.text.toLowerCase().replace(/[^\w]/g, ''))
+            // 1. Perfect registry match
+            const perfectMatch = questionRegistry.find(item =>
+                item.text.toLowerCase() === qNormalized
             );
-            if (regMatch) {
-                resultHtml = await regMatch.handler();
+            if (perfectMatch) {
+                resultHtml = await perfectMatch.handler();
             }
-            else if (query.match(/(?:tell me about|what is|describe)\s+(.+)/i)) {
-                const term = query.match(/(?:tell me about|what is|describe)\s+(.+)/i)[1].trim();
-                resultHtml = await getComprehensiveDetails(term);
+            // 2. Partial registry match (e.g. user types "what is IFT")
+            else if (questionRegistry.some(item =>
+                qNormalized.includes(item.text.toLowerCase().replace(/[^\w]/g, ''))
+            )) {
+                const partial = questionRegistry.find(item =>
+                    qNormalized.includes(item.text.toLowerCase().replace(/[^\w]/g, ''))
+                );
+                resultHtml = await partial.handler();
             }
+            // 3. "Tell me about X"
+            else if ((match = query.match(/(?:tell me about|what is|describe)\s+(.+)/i))) {
+                resultHtml = await getComprehensiveDetails(match[1].trim());
+            }
+            // 4. Intent parser
             else {
                 const intent = intentParser.parse(query);
-                if (intent?.handler) {
+                if (intent && typeof intent.handler === 'function') {
                     resultHtml = await intent.handler(intent.entity);
                 }
+                // 5. Gene detection with visuals
                 else if (entities.genes.length > 0) {
-                    const g = entities.genes;
-                    if (g.length === 2 && (qNorm.includes('compare') || qNorm.includes('vs'))) {
-                        resultHtml = await displayCellxgeneBarChart(g);
-                    } else if (qNorm.includes('umap')) {
-                        resultHtml = await displayUmapGeneExpression(g[0]);
-                    } else if (qNorm.includes('plot') || qNorm.includes('expression')) {
-                        resultHtml = await displayCellxgeneBarChart(g);
+                    const genes = entities.genes;
+                    if (genes.length === 2 && (qNormalized.includes('compare') || qNormalized.includes('vs'))) {
+                        resultHtml = await displayCellxgeneBarChart(genes);
+                    } else if (qNormalized.includes('umap')) {
+                        resultHtml = await displayUmapGeneExpression(genes[0]);
+                    } else if (qNormalized.includes('plot') || qNormalized.includes('expression')) {
+                        resultHtml = await displayCellxgeneBarChart(genes);
                     } else {
-                        resultHtml = await getComprehensiveDetails(g[0]);
+                        resultHtml = await getComprehensiveDetails(genes[0]);
                     }
                 }
                 else {
-                    resultHtml = `<p>Sorry, I didn’t understand. Try a gene, domain (e.g. <code>PF00078</code>), or one of the suggested questions!</p>`;
+                    resultHtml = `<p>Sorry, I didn’t understand. Try a gene, domain (e.g. PF00078), or one of the suggested questions!</p>`;
                 }
             }
         }
 
-        // === RENDER CILIA CARD ===
+        // === 2. & 3. CILIA CARD + FOLLOW-UP ===
         if (resultHtml) {
-            const cardId = 'card-' + Date.now();
-            const escapedQuery = query.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+            const cardId = 'cilia-card-' + Date.now();
             resultArea.innerHTML = `
-                <div class="cilia-card" id="${cardId}" data-query="${escapedQuery}">
+                <div class="cilia-card" id="${cardId}" data-query="${escapeHtml(query)}">
                     <div class="card-toolbar">
-                        <button onclick="copyCiliaCard('${cardId}')">Copy</button>
-                        <button onclick="shareOnX('${cardId}')">Share</button>
+                        <button title="Copy" onclick="copyCiliaCard('${cardId}')">Copy</button>
+                        <button title="Share on X" onclick="shareOnX('${cardId}')">Share</button>
                     </div>
-                    <div class="card-content">${resultHtml}</div>
+                    <div class="card-content">
+                        ${resultHtml}
+                    </div>
                     <div class="follow-up">
-                        <input type="text" placeholder="Ask about this result..." 
+                        <input type="text" placeholder="Ask about this result…" 
                                onkeydown="if(event.key==='Enter') followUpCilia(this, '${cardId}')">
-                        <button onclick="this.previousElementSibling.dispatchEvent(new KeyboardEvent('keydown', {key:'Enter'}))">Send</button>
                     </div>
                 </div>`;
         }
@@ -415,55 +357,23 @@ window.handleAIQuery = async function() {
     }
 };
 
-// === PREPROCESSOR ===
+// === PREPROCESSOR (synonyms + entities) ===
 function preprocessQuery(q) {
-    let norm = q.toLowerCase()
+    let normalized = q.toLowerCase()
         .replace(/\bconserved?\b/g, 'phylogeny')
         .replace(/\b(motile|primary|9\+2|9\+0)\b/g, 'cilia type')
         .replace(/\bvs?\.?\b|\bversus\b/gi, ' compare ')
-        .replace(/\bshow|plot|graph|bar|chart\b/g, 'expression')
-        .replace(/\bwhere|locali[sz]e|express\b/g, 'tissue');
+        .replace(/\bshow|plot|graph\b/g, 'expression')
+        .replace(/\bwhere|localization\b/g, 'tissue');
 
     const genes = [...q.matchAll(/\b([A-Z][A-Z0-9]{2,})\b/g)]
         .map(m => m[0].toUpperCase())
-        .filter(g => (window.ciliaHubDataCache || []).some(d => d.gene.toUpperCase() === g));
+        .filter(g => ciliaHubDataCache?.some(d => d.gene.toUpperCase() === g));
 
     const domains = [...q.matchAll(/\b(PF\d{5}|SM\d{5})\b/gi)].map(m => m[0].toUpperCase());
 
-    return { normalized: norm, entities: { genes, domains } };
+    return { normalized, entities: { genes, domains } };
 }
-
-// === CARD UTILS ===
-function copyCiliaCard(id) {
-    const card = document.getElementById(id);
-    const text = card.querySelector('.card-content').innerText +
-                 `\n\n— Answered by CiliAI\nhttps://theciliahub.github.io/#/ciliai`;
-    navigator.clipboard.writeText(text).then(() => {
-        const btn = event.target;
-        const orig = btn.innerText;
-        btn.innerText = 'Copied!';
-        setTimeout(() => btn.innerText = orig, 1500);
-    });
-}
-
-function shareOnX(id) {
-    const card = document.getElementById(id);
-    const text = card.querySelector('.card-content').innerText.substring(0, 200) + '...';
-    const url = 'https://theciliahub.github.io/#/ciliai';
-    const tweet = encodeURIComponent(`${text}\n\nCiliAI\n${url}`);
-    window.open(`https://x.com/intent/tweet?text=${tweet}`, '_blank');
-}
-
-function followUpCilia(input, cardId) {
-    const follow = input.value.trim();
-    if (!follow) return;
-    const original = document.getElementById(cardId).dataset.query;
-    const full = `${original} → ${follow}`;
-    document.getElementById('aiQueryInput').value = full;
-    input.value = '';
-    window.handleAIQuery();
-}
-
 /**
  * Patches the main query handler to include Corum lookups.
  * NOTE: This function must be placed AFTER window.handleAIQuery is defined.
@@ -2177,9 +2087,9 @@ async function routeMultiGeneDomainTable(query) {
 
 
 
-
-
-
+/**
+ * @##########################BEGİNNING OF SINGLE CELL RNA-SEQ EXPRESSION##################################
+ */
 
 
 /**
