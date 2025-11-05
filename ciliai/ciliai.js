@@ -1395,45 +1395,42 @@ async function getGenesByComplex(complexName) {
     return relatedGenes;
 }
 
-/**
- * @name resolveDomainQuery
- * @description Routes domain-related queries (Comparison, Enriched, Depleted, Specific Motifs).
- * This MUST be defined globally.
- * @param {string} query - The raw user query.
- */
 async function resolveDomainQuery(query) {
     const qLower = query.toLowerCase();
 
-    // Pattern for Domain Comparison:
-    const comparisonMatch = query.match(/([A-Z0-9\-]+)\s+(?:vs|and|comparison)\s+([A-Z0-9\-]+)/i);
+    // Pattern for Domain Comparison: "Domain architecture comparison IFT88 vs IFT81"
+    const comparisonMatch = query.match(/(?:domains?|architecture|comparison)?\s*([A-Z0-9\-]+)\s+(?:vs|and|comparison)\s+([A-Z0-9\-]+)/i);
 
-    if (comparisonMatch && (qLower.includes('domain') || qLower.includes('architecture'))) {
-        
-        // --- Gene Extraction for Comparison ---
-        // 1. Extract potential genes (IFT88, IFT81)
+    if (comparisonMatch) {
+        // --- Gene Extraction and Filtration ---
         const geneA = comparisonMatch[1].toUpperCase();
         const geneB = comparisonMatch[2].toUpperCase();
         
-        // 2. Filter out known noise that often gets extracted in this context
-        const noiseWords = new Set(['ARCHITECTURE', 'DOMAIN', 'COMPARE', 'COMPARISON']);
+        // Define a set of noise words that should NEVER be treated as gene symbols in this context
+        const noiseWords = new Set(['ARCHITECTURE', 'COMPARISON', 'DOMAIN', 'MOTIF']);
         
         const genes = [geneA, geneB].filter(g => !noiseWords.has(g));
 
         if (genes.length === 2) {
-            // This is the correct destination and logic for the user's specific query.
+            // Success: Found two valid genes, route to comparison
             return displayDomainComparison(genes[0], genes[1]);
         }
     }
-    // ... (The rest of the resolveDomainQuery logic remains unchanged for lists and lookups)
+
+    // 1. Check for ENRICHED/DEPLETED LIST requests 
+    if (qLower.includes('enriched domain') || qLower.includes('show enriched')) {
+        return displayEnrichedDomains();
+    }
+    // ... (rest of the list logic) ...
     
-    // ...
-    // Fallback for single gene domain architecture display
+    // 3. Fallback for single gene domain architecture display
     const singleGeneMatch = query.match(/domains?\s+(?:of|for)\s+([A-Z0-9]+)/i);
     if (singleGeneMatch) {
         return visualizeDomainArchitecture(singleGeneMatch[1].toUpperCase());
     }
 
-    return `<div class="result-card"><h3>Domain Query Failed</h3><p>Could not interpret the domain query. Please try comparing two genes (e.g., "IFT88 vs IFT81") or requesting a specific domain list.</p></div>`;
+    // Final fallback handles cases where extraction fails entirely
+    return `<div class="result-card"><h3>Domain Query Failed</h3><p>Could not interpret the comparison or list request. Please try comparing two valid gene symbols (e.g., IFT88 vs IFT81).</p></div>`;
 }
 
 /**
