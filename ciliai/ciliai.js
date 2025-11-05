@@ -286,6 +286,26 @@ window.handleAIQuery = async function() {
             console.log('Routing to Domain Query Resolver...');
             resultHtml = await resolveDomainQuery(query);
         }
+            // =================================================================
+        // ⭐ NEW ROUTING PRIORITY 3: Handle Domain Queries (Comparison, Enriched, Depleted, Specific Motifs) ⭐
+        // =================================================================
+        else if (qLower.includes('domain') || qLower.includes('motif') || 
+                 qLower.includes('enriched') || qLower.includes('depleted') ||
+                 qLower.includes('architecture comparison')) {
+            
+            console.log('Routing to Domain Query Resolver...');
+            
+            // This is the CRITICAL integration point for the new custom analysis feature
+            if (qLower.includes('analyze') || qLower.includes('status of genes')) {
+                const genes = extractMultipleGenes(query);
+                if (genes.length > 0) {
+                    // Call the new analysis function for custom lists
+                    return analyzeGeneListDomainEnrichment(genes);
+                }
+            }
+            // Fallback for simple list requests (e.g., "list enriched domains")
+            resultHtml = await resolveDomainQuery(query);
+        }
 
         // =================================================================
         // **NEW ROUTING PRIORITY 3:** Handle General Phylogenetic Queries (FIXES REFERENCE ERROR)
@@ -1882,6 +1902,13 @@ async function resolveDomainQuery(query) {
  * This MUST be defined globally to fix the ReferenceError encountered in the main router.
  * @param {string} query - The raw user query (e.g., "IFT88 conservation").
  */
+/**
+ * @name resolvePhylogeneticQuery
+ * @description Routes general phylogenetic queries (non-table) to the visualization pipeline.
+ * This function must be defined globally to resolve the previous ReferenceError.
+ * @param {string} query - The raw user query (e.g., "IFT88 conservation").
+ * @returns {Promise<string>} HTML output (Heatmap or Error).
+ */
 async function resolvePhylogeneticQuery(query) {
     // NOTE: This relies on global helper extractMultipleGenes(query) being defined.
     const genes = extractMultipleGenes(query); 
@@ -1889,26 +1916,25 @@ async function resolvePhylogeneticQuery(query) {
 
     // 1. Single Gene or Multi-Gene Plotting Request
     if (genes.length >= 1) {
-        // If one or more genes are found, assume the user wants a visualization.
         const geneList = genes.join(',');
         console.log(`Phylogeny resolver routing ${genes.length} gene(s) to heatmap.`);
         
         // This calls the final visualization layer (defaulting to Li data, heatmap view)
+        // handlePhylogenyVisualizationQuery is assumed to handle the plotting logic.
         return handlePhylogenyVisualizationQuery(`Phylogeny of ${geneList}`, 'li', 'heatmap');
     }
     
     // 2. Complex Phylogeny (General request, not asking for TABLE)
+    // This provides a helpful error message instead of failing silently.
     const complexMatch = qLower.match(/(ift|bbsome|mks|nphp)\s+(complex|module)/);
     if (complexMatch) {
         const complexName = complexMatch[0];
-        // Since it's a visualization query but not a 'table' query, we currently default to plotting the complex members.
-        // NOTE: For stability, the system should either ask the user to specify 'table' or run the full query.
-        return `<div class="result-card"><h3>Phylogeny Pending</h3><p>To view the phylogenetic data for the <strong>${complexName.toUpperCase()}</strong>, please rephrase your query as a table request, e.g., "${complexName} table."</p></div>`;
+        return `<div class="result-card"><h3>Phylogeny Pending</h3><p>To view the detailed phylogenetic data for the <strong>${complexName.toUpperCase()}</strong>, please rephrase your query as a table request, e.g., "${complexName} table."</p></div>`;
     }
 
     // 3. Classification List Request (e.g., 'List vertebrate conserved genes')
     if (qLower.includes('list') || qLower.includes('ciliary only') || qLower.includes('vertebrate')) {
-        // Assuming getPhylogenyList is defined and handles classification keywords
+        // Assumes getPhylogenyList is defined and handles classification keywords
         return getPhylogenyList(query);
     }
     
@@ -2126,6 +2152,108 @@ async function generateDomainEnrichmentHeatmap() {
 
     return htmlOutput;
 }
+
+/**
+ * @name analyzeGeneListDomainEnrichment
+ * @description Compares a user-supplied gene list against the statistically Enriched/Depleted 
+ * domains in the CILI_AI_DOMAIN_DB to find over- or under-represented domains in the list.
+ * @param {string[]} geneSymbols - Array of genes to analyze.
+ * @returns {Promise<string>} HTML formatted table showing domain statistics.
+ */
+async function analyzeGeneListDomainEnrichment(geneSymbols) {
+    if (!CILI_AI_DOMAIN_DB) await getDomainData();
+
+    const db = CILI_AI_DOMAIN_DB;
+    if (!db || !db.enriched_domains || !db.depleted_or_absent_domains || !db.gene_domain_map) {
+        return `<div class="result-card status-not-found"><h3>Enrichment Analysis Failed</h3><p>Statistical domain database not available.</p></div>`;
+    }
+
+    if (!geneSymbols || geneSymbols.length === 0) {
+        return `<div class="result-card status-not-found"><h3>Analysis Failed</h3><p>Please provide a list of gene symbols for enrichment analysis.</p></div>`;
+    }
+
+    // 1. Identify Target Domains (Top 5 Enriched, Top 5 Depleted)
+    const topEnriched = Object.values(db.enriched_domains)
+        .sort((a, b) => b.odds_ratio - a.odds_ratio)
+        .slice(0, 5);
+
+    const topDepleted = Object.values(db.depleted_or_absent_domains)
+        .sort((a, b) => a.odds_ratio - b.odds_ratio)
+        .slice(0, 5);
+
+    const targetDomains = topEnriched.concat(topDepleted);
+    const domainStats = new Map();
+
+    // 2. Count Domains in User's List
+    const userGeneSet = new Set(geneSymbols.map(g => g.toUpperCase()));
+    const totalUserGenes = userGeneSet.size;
+
+    for (const gene of userGeneSet) {
+        const domains = db.gene_domain_map[gene];
+        if (domains) {
+            domains.forEach(domain => {
+                const domainKey = domain.domain_id;
+                
+                // Check if this domain is one of our targets (enriched or depleted)
+                const targetEntry = targetDomains.find(d => d.domain_id === domainKey);
+                
+                if (targetEntry) {
+                    if (!domainStats.has(domainKey)) {
+                        domainStats.set(domainKey, {
+                            name: targetEntry.description || targetEntry.domain_id,
+                            category: targetEntry.category,
+                            frequency: 0,
+                            genes: new Set(),
+                            base_or: targetEntry.odds_ratio // The original OR value
+                        });
+                    }
+                    domainStats.get(domainKey).frequency++;
+                    domainStats.get(domainKey).genes.add(gene);
+                }
+            });
+        }
+    }
+
+    // 3. Generate Output Table
+    let tableRows = '';
+    const sortedStats = Array.from(domainStats.values())
+        .sort((a, b) => b.frequency - a.frequency);
+
+    sortedStats.forEach(item => {
+        const percentage = ((item.genes.size / totalUserGenes) * 100).toFixed(1);
+        const style = item.category === 'Enriched' ? 'background-color: #e8f4fd;' : 'background-color: #f7f7f7; color: #cc3333;';
+        
+        tableRows += `
+            <tr style="${style}">
+                <td><strong>${item.name}</strong></td>
+                <td>${item.category}</td>
+                <td>${item.base_or.toFixed(2)}</td>
+                <td>${item.genes.size} / ${totalUserGenes} (${percentage}%)</td>
+                <td style="font-size: 0.9em;">${Array.from(item.genes).join(', ')}</td>
+            </tr>`;
+    });
+
+    return `
+        <div class="result-card">
+            <h3>Custom Domain Enrichment Analysis (${totalUserGenes} Genes)</h3>
+            <p>Analyzed your list for the presence of the top statistically ${topEnriched.length} enriched and ${topDepleted.length} depleted domains in the ciliary proteome.</p>
+            <table class="ciliopathy-table">
+                <thead>
+                    <tr>
+                        <th style="width: 25%;">Domain Name</th>
+                        <th style="width: 10%;">Category</th>
+                        <th style="width: 15%;">Ciliary OR</th>
+                        <th style="width: 20%;">In Your List (Count / %)</th>
+                        <th>Genes Found</th>
+                    </tr>
+                </thead>
+                <tbody>${tableRows}</tbody>
+            </table>
+        </div>`;
+}
+
+
+
 
 
 
@@ -2519,7 +2647,8 @@ const questionRegistry = [
     return html;
 }},
     // ==================== DOMAIN HEATMAP VISUALIZATION (Expanded) ====================
-{ text: "Generate domain enrichment heatmap", handler: async () => generateDomainEnrichmentHeatmap() },
+{ text: "Analyze domain enrichment for genes: IFT88, BBS1, CEP290", handler: async () => analyzeGeneListDomainEnrichment(["IFT88", "BBS1", "CEP290"]) },
+{ text: "Show enrichment status of genes X, Y, Z", handler: async (query) => { const genes = extractMultipleGenes(query); return analyzeGeneListDomainEnrichment(genes); } },
     
 // ==================== A. SPECIFIC GENE VISUALIZATION (Expanded) ====================
     { text: "Show evolutionary conservation of IFT88", handler: async () => getPhylogenyAnalysis(["IFT88"]) },
