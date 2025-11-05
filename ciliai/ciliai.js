@@ -1816,6 +1816,36 @@ async function routeMultiGeneDomainTable(query) {
 }
 
 /**
+ * @name getDomainComparisonGenes
+ * @description Safely extracts exactly two gene symbols from a typical domain comparison query, 
+ * guaranteeing that non-gene noise words are excluded.
+ * * @param {string} query - The raw user query (e.g., "Domain architecture comparison IFT88 vs IFT81").
+ * @returns {Array<string>} An array containing the two uppercase gene symbols (e.g., ["IFT88", "IFT81"]).
+ */
+function getDomainComparisonGenes(query) {
+    // 1. Use a strict pattern to isolate two words separated by the comparison term.
+    // This looks for GENE1 + (VS/AND/COMPARISON) + GENE2.
+    const comparisonPattern = /\b([A-Z0-9\-]{3,})\s+(?:vs|and|comparison)\s+([A-Z0-9\-]{3,})\b/i;
+    
+    const match = query.toUpperCase().match(comparisonPattern);
+
+    if (match && match.length >= 3) {
+        const geneA = match[1];
+        const geneB = match[2];
+
+        // 2. Filter against known noise words that might be captured (e.g., ARCHITECTURE, DOMAIN)
+        const noiseWords = new Set(['ARCHITECTURE', 'COMPARISON', 'DOMAIN', 'MOTIF']);
+        
+        const genes = [geneA, geneB].filter(g => !noiseWords.has(g));
+
+        if (genes.length === 2) {
+            return genes;
+        }
+    }
+    return [];
+}
+
+/**
  * @##########################END OF COMPLEX RELATED QUETIONS AND HELPER##################################
  */
 
