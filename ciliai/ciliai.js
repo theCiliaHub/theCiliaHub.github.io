@@ -1814,6 +1814,7 @@ async function routeMultiGeneDomainTable(query) {
     // Call the stable matrix function
     return getDomainsForMultipleGenesTable(finalGenes);
 }
+
 /**
  * @##########################END OF COMPLEX RELATED QUETIONS AND HELPER##################################
  */
@@ -2198,12 +2199,12 @@ const questionRegistry = [
 { text: "List proteins with coiled-coil domains", handler: async () => formatListResult("Genes with coiled-coil", await getGenesByDomain("coiled-coil")) },
 { text: "Genes with AAA+ ATPase domains", handler: async () => formatListResult("Genes with AAA+ ATPase", await getGenesByDomain("AAA")) },
 // --- Domain comparisons ---
+{ text: "Compare IFT88 and IFT140 phylogeny", handler: async () => getPhylogenyAnalysis(["IFT88", "IFT140"]) },
+{ text: "Show domain architecture for IFT88, IFT81, and WDR19", handler: async () => routeMultiGeneDomainTable("Show domain architecture for IFT88, IFT81, and WDR19") },     
+{ text: "List domains of multiple genes (e.g., BBS1, BBS2, BBS4)", handler: async () => routeMultiGeneDomainTable("List domains of BBS1, BBS2, BBS4, NPHP1, and MKS1") }, 
+{ text: "Compare domain architecture of these 5 genes", handler: async (query) => routeMultiGeneDomainTable(query)}, 
+{ text: "Show domain matrix for X genes", handler: async (query) => routeMultiGeneDomainTable(query) },    
 { text: "Display domains of IFT88 and IFT81", handler: async () => getDomainsForMultipleGenesTable(["IFT88", "IFT81"]) },
-{ text: "Show domain architecture for IFT88, IFT81, and WDR19", handler: async () => routeMultiGeneDomainTable("Show domain architecture for IFT88, IFT81, and WDR19") },
-{ text: "List domains of multiple genes (e.g., BBS1, BBS2, BBS4)", handler: async () => routeMultiGeneDomainTable("List domains of BBS1, BBS2, BBS4, NPHP1, and MKS1") },
-{ text: "Compare domain architecture of these 5 genes", handler: async (query) => routeMultiGeneDomainTable(query) },
-{text: "Show domain matrix for X genes", handler: async (query) => routeMultiGeneDomainTable(query) },
-
 { text: "Compare domains of IFT88 and IFT81", handler: async () => displayDomainComparison("IFT88", "IFT81") },
 { text: "Domain architecture comparison IFT88 vs IFT81", handler: async () => displayDomainComparison("IFT88", "IFT81") },
 // --- Complex domain composition ---
@@ -2246,8 +2247,7 @@ const questionRegistry = [
     { text: "Evolutionary heatmap for TTC8", handler: async () => getPhylogenyAnalysis(["TTC8"]) },
     { text: "TTC8 phylogenetic profile", handler: async () => getPhylogenyAnalysis(["TTC8"]) },
 
-// ==================== B. COMPARISON QUERIES (Multi-Gene Visualization - Expanded) ====================
-    { text: "Compare IFT88 and IFT140 phylogeny", handler: async () => getPhylogenyAnalysis(["IFT88", "IFT140"]) },
+// ==================== B. COMPARISON QUERIES (Multi-Gene Visualization - Expanded) ===================
     { text: "Phylogeny comparison of BBS1 and BBS4", handler: async () => getPhylogenyAnalysis(["BBS1", "BBS4"]) },
     { text: "Show conservation of NPHP1 vs CEP290", handler: async () => getPhylogenyAnalysis(["NPHP1", "CEP290"]) },
     { text: "Compare the evolutionary history of DYNC2H1 and KIF3A", handler: async () => getPhylogenyAnalysis(["DYNC2H1", "KIF3A"]) },
@@ -2397,7 +2397,6 @@ const questionRegistry = [
     { text: "Phylogenetic map for GENE", handler: async (q) => routePhylogenyAnalysis(q), template: true },
     
 // ==================== 3. DATA OVERLAP & TABLE QUERIES ====================
-
     // Species Overlap Queries (Triggers compareGeneSpeciesOverlap inside router)
     { text: "Which species share both GENE1 and GENE2?", handler: async (q) => routePhylogenyAnalysis(q), template: true },
     { text: "Which species share both gene GENE1 and gene GENE2?", handler: async (q) => routePhylogenyAnalysis(q), template: true },
@@ -2450,8 +2449,6 @@ const questionRegistry = [
   { text: "Generate conservation overview for multiple genes", handler: async (q) => routePhylogenyAnalysis(q), template: true },
   { text: "Identify genes with unique evolutionary traits", handler: async () => getPhylogenyList('unique_patterns') },
   { text: "Find genes with the broadest conservation spectrum", handler: async () => getPhylogenyList('in_all_organisms') },
-
-    
     // ==================== SOURCE QUERIES ====================
     { text: "What is the source for Ciliary genes in C. elegans?", handler: async () => tellAboutOrganismSources("C. elegans") },
     { text: "What is the source for Ciliary genes in mouse?", handler: async () => tellAboutOrganismSources("mouse") },
