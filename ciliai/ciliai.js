@@ -1915,29 +1915,94 @@ async function resolvePhylogeneticQuery(query) {
     return `<div class="result-card"><h3>Phylogeny Error</h3><p>Could not interpret the phylogenetic query. Please specify a gene (e.g., IFT88) or list type.</p></div>`;
 }
 
+
+
 /**
- * @name extractTwoGenesForComparison
- * @description Uses the robust extractMultipleGenes, then applies a final filter to ensure 
- * only two contextually relevant gene symbols remain for domain comparison.
- * * NOTE: This function assumes that the current query in handleAIQuery is a comparison query.
- * @param {string} query - The raw user query.
- * @returns {Array<string>} The first two valid gene symbols found.
+ * @name getDomainsForMultipleGenesTable
+ * @description Retrieves and presents the unique domain architecture for two or more genes in a comparative table format.
+ * @param {string[]} geneSymbols - An array of gene symbols (e.g., ["IFT88", "IFT81", "WDR19"]).
+ * @returns {Promise<string>} HTML output containing the comparative domain table.
  */
-function extractTwoGenesForComparison(query) {
-    // 1. Use the pre-existing, reliable gene extraction function
-    let genes = extractMultipleGenes(query); 
+async function getDomainsForMultipleGenesTable(geneSymbols) {
+    // ⭐ INTEGRATION FIX: Ensure core data (including CORUM and CiliaHub) is loaded
+    await Promise.all([
+        fetchCorumComplexes(), // Ensures CORUM is ready (though not strictly needed here)
+        fetchCiliaData(),      // Ensures ciliaHubDataCache is ready for validation/display
+        getDomainData()        // Ensures domain map is ready
+    ]);
 
-    // 2. Add specific context-based noise words that might be extracted
-    // (These words are often capitalized in the query and bypass generic English noise filtering)
-    const contextNoise = new Set(['ARCHITECTURE', 'COMPARISON', 'DOMAIN']);
+    if (!geneSymbols || geneSymbols.length < 2) {
+        return `<div class="result-card status-not-found">
+                    <h3>Domain Comparison Error</h3>
+                    <p>Please provide at least two gene symbols for comparison.</p>
+                </div>`;
+    }
+
+    const domainMap = CILI_AI_DOMAIN_DB?.gene_domain_map;
+    if (!domainMap || Object.keys(domainMap).length < 2) {
+        return `<div class="result-card status-not-found"><h3>Random Comparison Failed</h3><p>Domain database is not loaded or contains insufficient data for comparison.</p></div>`;
+    }
+
+    // 1. Data Retrieval and Consolidation
+    const geneData = new Map();
+    const allUniqueDomains = new Set();
+    const fetchPromises = geneSymbols.map(async (gene) => {
+        // Relies on the fixed getDomainsByGene function for stable data lookup
+        const domains = await getDomainsByGene(gene); // getDomainsByGene now uses loaded CILI_AI_DOMAIN_DB
+        
+        const uniqueDomainNames = new Set(domains.map(d => d.domain_name));
+        
+        geneData.set(gene, {
+            domains: uniqueDomainNames,
+            totalCount: domains.length
+        });
+        
+        uniqueDomainNames.forEach(d => allUniqueDomains.add(d));
+    });
+
+    await Promise.all(fetchPromises);
+
+    // 2. Build Table Headers
+    // Filter out genes for which no domain data was found after the fetch
+    const sortedGenes = geneSymbols.filter(gene => geneData.get(gene)?.domains.size > 0);
+    if (sortedGenes.length < 2) {
+        return `<div class="result-card status-not-found">
+                    <h3>Domain Comparison Failed</h3>
+                    <p>Could not find domain data for at least two of the requested genes (${geneSymbols.join(', ')}).</p>
+                </div>`;
+    }
     
-    genes = genes.filter(g => !contextNoise.has(g));
+    let tableHtml = `<div class="result-card">
+        <h3>Domain Architecture Matrix: ${sortedGenes.join(' vs ')}</h3>
+        <p>Presence (✓) or Absence (—) of unique domain types across the selected genes.</p>
+        
+        <table class="data-table" style="width: 100%; margin-top: 15px;">
+            <thead>
+                <tr>
+                    <th style="width: 40%;">Domain Name</th>`;
+                    
+    sortedGenes.forEach(gene => {
+        tableHtml += `<th>${gene}</th>`;
+    });
+    tableHtml += `</tr></thead><tbody>`;
 
-    // 3. Return only the first two genes for the binary comparison
-    return genes.slice(0, 2); 
+    // 3. Build Table Rows (Matrix View)
+    Array.from(allUniqueDomains).sort().forEach(domainName => {
+        tableHtml += `<tr><td><strong>${domainName}</strong></td>`;
+        
+        sortedGenes.forEach(gene => {
+            const hasDomain = geneData.get(gene)?.domains.has(domainName);
+            tableHtml += `<td style="text-align: center; font-weight: ${hasDomain ? 'bold' : 'normal'}; color: ${hasDomain ? '#28a745' : '#888'};">
+                            ${hasDomain ? '✓' : '—'}
+                          </td>`;
+        });
+        tableHtml += `</tr>`;
+    });
+
+    tableHtml += `</tbody></table></div>`;
+
+    return tableHtml;
 }
-
-
 
 
 /**
@@ -2312,6 +2377,7 @@ const questionRegistry = [
     { text: "What questions can I ask?", handler: async () => tellAboutCiliAI() },
     { text: "Give me an overview of your features", handler: async () => tellAboutCiliAI() },
 // --- Single gene domain queries ---
+{ text: "Display domains of IFT88 and IFT81", handler: async () => getDomainsForMultipleGenesTable(["IFT88", "IFT81"]) },
 { text: "What domains does IFT88 have?", handler: async () => visualizeDomainArchitecture("IFT88") },
 { text: "Show domain architecture of IFT88", handler: async () => visualizeDomainArchitecture("IFT88") },
 { text: "Display domains in IFT88", handler: async () => visualizeDomainArchitecture("IFT88") },
