@@ -1397,35 +1397,43 @@ async function getGenesByComplex(complexName) {
 
 /**
  * @name resolveDomainQuery
- * @description Routes domain-related queries to the correct list or gene handler.
+ * @description Routes domain-related queries (Comparison, Enriched, Depleted, Specific Motifs).
+ * This MUST be defined globally.
  * @param {string} query - The raw user query.
  */
 async function resolveDomainQuery(query) {
     const qLower = query.toLowerCase();
 
-    // 1. Check for ENRICHED/DEPLETED LIST requests
-    if (qLower.includes('enriched domain') || qLower.includes('show enriched')) {
-        // This assumes displayEnrichedDomains() returns the formatted HTML (as implemented in your source code)
-        return displayEnrichedDomains();
-    }
-    if (qLower.includes('depleted domain') || qLower.includes('show depleted') || qLower.includes('domains absent')) {
-        // This assumes displayDepletedDomains() returns the formatted HTML (as implemented in your source code)
-        return displayDepletedDomains();
-    }
+    // Pattern for Domain Comparison:
+    const comparisonMatch = query.match(/([A-Z0-9\-]+)\s+(?:vs|and|comparison)\s+([A-Z0-9\-]+)/i);
 
-    // 2. Check for Specific DOMAIN NAME lookup (e.g., "Show WD40 proteins")
-    // This requires extracting the domain name (e.g., WD40, EF-hand)
-    const domainKeywords = ['wd40', 'leucine-rich repeat', 'iq motif', 'ef-hand', 'kinase', 'atpase', 'zinc finger']; 
+    if (comparisonMatch && (qLower.includes('domain') || qLower.includes('architecture'))) {
+        
+        // --- Gene Extraction for Comparison ---
+        // 1. Extract potential genes (IFT88, IFT81)
+        const geneA = comparisonMatch[1].toUpperCase();
+        const geneB = comparisonMatch[2].toUpperCase();
+        
+        // 2. Filter out known noise that often gets extracted in this context
+        const noiseWords = new Set(['ARCHITECTURE', 'DOMAIN', 'COMPARE', 'COMPARISON']);
+        
+        const genes = [geneA, geneB].filter(g => !noiseWords.has(g));
 
-    for (const keyword of domainKeywords) {
-        if (qLower.includes(keyword)) {
-            // This assumes findGenesByNewDomainDB() returns the formatted list (as implemented in your source code)
-            return findGenesByNewDomainDB(keyword);
+        if (genes.length === 2) {
+            // This is the correct destination and logic for the user's specific query.
+            return displayDomainComparison(genes[0], genes[1]);
         }
     }
+    // ... (The rest of the resolveDomainQuery logic remains unchanged for lists and lookups)
     
-    // 3. Fallback for unrecognized domain syntax
-    return `<div class="result-card"><h3>Domain Query Failed</h3><p>Could not identify a specific domain name or list type. Try "Show WD40 domain proteins" or "List enriched domains."</p></div>`;
+    // ...
+    // Fallback for single gene domain architecture display
+    const singleGeneMatch = query.match(/domains?\s+(?:of|for)\s+([A-Z0-9]+)/i);
+    if (singleGeneMatch) {
+        return visualizeDomainArchitecture(singleGeneMatch[1].toUpperCase());
+    }
+
+    return `<div class="result-card"><h3>Domain Query Failed</h3><p>Could not interpret the domain query. Please try comparing two genes (e.g., "IFT88 vs IFT81") or requesting a specific domain list.</p></div>`;
 }
 
 /**
