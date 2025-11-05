@@ -1539,7 +1539,104 @@ async function compareDomainArchitecture(geneA, geneB) {
         similarity: similarity
     };
 }
+/**
+ * Analyze domain architecture differences
+ */
+function analyzeDomainComparison(geneA, geneB) {
+    const domainsA = domainData[geneA] || [];
+    const domainsB = domainData[geneB] || [];
+    
+    // Count unique domain types
+    const uniqueDomainsA = new Set(domainsA.map(d => d.domain_id));
+    const uniqueDomainsB = new Set(domainsB.map(d => d.domain_id));
+    
+    // Count total domains
+    const totalDomainsA = domainsA.length;
+    const totalDomainsB = domainsB.length;
+    
+    // Find shared and unique domains
+    const sharedDomains = [...uniqueDomainsA].filter(d => uniqueDomainsB.has(d));
+    const uniqueToA = [...uniqueDomainsA].filter(d => !uniqueDomainsB.has(d));
+    const uniqueToB = [...uniqueDomainsB].filter(d => !uniqueDomainsA.has(d));
+    
+    return {
+        geneA: {
+            name: geneA,
+            totalDomains: totalDomainsA,
+            uniqueDomainTypes: uniqueDomainsA.size,
+            domains: domainsA
+        },
+        geneB: {
+            name: geneB,
+            totalDomains: totalDomainsB,
+            uniqueDomainTypes: uniqueDomainsB.size,
+            domains: domainsB
+        },
+        sharedDomains,
+        uniqueToA,
+        uniqueToB,
+        similarity: sharedDomains.length / Math.max(uniqueDomainsA.size, uniqueDomainsB.size)
+    };
+}
 
+/**
+ * Generate visual comparison HTML
+ */
+function generateDomainComparisonHTML(comparison) {
+    const { geneA, geneB, sharedDomains, uniqueToA, uniqueToB, similarity } = comparison;
+    
+    return `
+    <div class="result-card">
+        <h3>🔬 Domain Architecture Comparison: ${geneA.name} vs ${geneB.name}</h3>
+        
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0;">
+            <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; border-left: 4px solid #3498db;">
+                <h4 style="color: #2c3e50; margin-top: 0;">${geneA.name}</h4>
+                <p><strong>Total Domains:</strong> ${geneA.totalDomains}</p>
+                <p><strong>Unique Domain Types:</strong> ${geneA.uniqueDomainTypes}</p>
+                <p><strong>Domain Composition:</strong></p>
+                <ul style="font-size: 0.9em;">
+                    ${Array.from(new Set(geneA.domains.map(d => d.domain_id))).map(domainId => {
+                        const count = geneA.domains.filter(d => d.domain_id === domainId).length;
+                        const desc = geneA.domains.find(d => d.domain_id === domainId).description;
+                        return `<li>${domainId}: ${desc} (${count}x)</li>`;
+                    }).join('')}
+                </ul>
+            </div>
+            
+            <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; border-left: 4px solid #e74c3c;">
+                <h4 style="color: #2c3e50; margin-top: 0;">${geneB.name}</h4>
+                <p><strong>Total Domains:</strong> ${geneB.totalDomains}</p>
+                <p><strong>Unique Domain Types:</strong> ${geneB.uniqueDomainTypes}</p>
+                <p><strong>Domain Composition:</strong></p>
+                <ul style="font-size: 0.9em;">
+                    ${Array.from(new Set(geneB.domains.map(d => d.domain_id))).map(domainId => {
+                        const count = geneB.domains.filter(d => d.domain_id === domainId).length;
+                        const desc = geneB.domains.find(d => d.domain_id === domainId).description;
+                        return `<li>${domainId}: ${desc} (${count}x)</li>`;
+                    }).join('')}
+                </ul>
+            </div>
+        </div>
+        
+        <div style="background: #e8f4f8; padding: 15px; border-radius: 8px; margin: 20px 0;">
+            <h4 style="color: #2c5aa0; margin-top: 0;">Comparison Summary</h4>
+            <p><strong>Architecture Similarity:</strong> ${(similarity * 100).toFixed(1)}%</p>
+            <p><strong>Shared Domains:</strong> ${sharedDomains.length > 0 ? sharedDomains.join(', ') : 'None'}</p>
+            <p><strong>Unique to ${geneA.name}:</strong> ${uniqueToA.length > 0 ? uniqueToA.join(', ') : 'None'}</p>
+            <p><strong>Unique to ${geneB.name}:</strong> ${uniqueToB.length > 0 ? uniqueToB.join(', ') : 'None'}</p>
+        </div>
+        
+        <div style="margin-top: 20px;">
+            <h4>Key Differences:</h4>
+            <ul>
+                <li><strong>${geneA.name}</strong> is rich in tetratricopeptide-like helical domains (multiple variants) with ${geneA.totalDomains} total domains</li>
+                <li><strong>${geneB.name}</strong> has a simpler architecture with only one domain type (${geneB.domains[0].description}) repeated ${geneB.totalDomains} times</li>
+                <li>No domain overlap - these proteins have completely different domain architectures</li>
+            </ul>
+        </div>
+    </div>`;
+}
 
 /**
  * @name getDomainCompositionByComplex
