@@ -1437,35 +1437,30 @@ async function getDomainsByGene(geneName) {
     
     const domainMap = CILI_AI_DOMAIN_DB?.gene_domain_map; 
     if (!domainMap) return [];
-
+    
     const geneUpper = geneName.toUpperCase();
+    
+    // 🔍 FIX: Robust Case-Insensitive Lookup
+    // Find the actual key in the map that matches the uppercase gene name
+    const matchedKey = Object.keys(domainMap).find(
+        key => key.toUpperCase() === geneUpper
+    );
+    
+    const geneDomains = matchedKey ? domainMap[matchedKey] : null;
 
-    // 🔍 Try direct lookup first
-    let geneDomains = domainMap[geneUpper];
-
-    // 🩹 Case-insensitive fallback if not found
-    if (!geneDomains) {
-        const matchedKey = Object.keys(domainMap).find(
-            key => key.toUpperCase() === geneUpper
-        );
-        if (matchedKey) {
-            geneDomains = domainMap[matchedKey];
-            console.log(`🔎 [getDomainsByGene] Case-insensitive match found: "${matchedKey}" for "${geneName}"`);
-        } else {
-            console.warn(`⚠️ [getDomainsByGene] No domain entry found for gene: "${geneName}"`);
-        }
+    if (!geneDomains || geneDomains.length === 0) {
+        // Return empty array if not found, allowing the calling function to handle the error message.
+        return [];
     }
-
-    if (!geneDomains || geneDomains.length === 0) return [];
-
-    // 🧩 Normalize and return clean domain objects
+    
+    // ... (rest of the mapping and return logic remains the same)
     return geneDomains.map(domain => ({
         gene: geneName,
         domain_name: domain.description || domain.domain_id || 'Unknown', 
         domain_type: domain.type || 'Structure',
         start: domain.start || 0,
         end: domain.end || 0,
-        length: (domain.end > 0 && domain.start > 0) ? (domain.end - domain.start) : 0,
+        length: (domain.end > 0 && domain.start > 0) ? (domain.end - domain.start) : 0, 
         description: domain.description || 'No description available',
         source: 'New Domain Database'
     }));
@@ -1660,25 +1655,39 @@ async function visualizeDomainArchitecture(geneName) {
     return html;
 }
 
+  
 /**
  * @name displayDomainComparison
- * @description Renders the domain comparison results in an HTML card with the new CiliAI color scheme.
- * This is the function called directly by the Domain Router.
+ * @description Renders the domain comparison results in an HTML card.
  */
 async function displayDomainComparison(geneA, geneB) {
-    const comparison = await compareDomainArchitecture(geneA, geneB);
+    // Ensure inputs are clean and uppercase for internal processing
+    const geneA_UPPER = geneA.toUpperCase();
+    const geneB_UPPER = geneB.toUpperCase();
+
+    // The compareDomainArchitecture handles the lookup and returns the standardized result
+    const comparison = await compareDomainArchitecture(geneA_UPPER, geneB_UPPER);
+    
+    // Check if the lookup failed for either gene (as indicated by the console errors)
+    if (comparison.geneA.total === 0 && comparison.geneB.total === 0) {
+         return `<div class="result-card"><h3>Comparison Failed</h3><p class="status-not-found">Neither **${geneA_UPPER}** nor **${geneB_UPPER}** were found in the domain database. Please check the spelling.</p></div>`;
+    }
+    if (comparison.geneA.total === 0) {
+         return `<div class="result-card"><h3>Comparison Failed</h3><p class="status-not-found">Could not find domain data for **${geneA_UPPER}**.</p></div>`;
+    }
+    if (comparison.geneB.total === 0) {
+         return `<div class="result-card"><h3>Comparison Failed</h3><p class="status-not-found">Could not find domain data for **${geneB_UPPER}**.</p></div>`;
+    }
     
     // Define the light blue color scheme
     const COLOR_UNIQUE = '#E3F4FC'; // Very light blue
     const COLOR_SHARED = '#E3F4FC'; // Very light blue
     const COLOR_TEXT = '#2C5AA0'; // CiliaHub Blue
-
-    const geneAName = comparison.geneA.gene.toUpperCase();
-    const geneBName = comparison.geneB.gene.toUpperCase();
+    
     const similarityValue = comparison.similarity;
 
     let html = `<div class="result-card">
-        <h3>🔬 Domain Architecture Comparison: ${geneAName} vs ${geneBName}</h3>
+        <h3>🔬 Domain Architecture Comparison: ${geneA_UPPER} vs ${geneB_UPPER}</h3>
         
         <p style="color: #666; margin-bottom: 15px;">
             Similarity is based on the fraction of shared unique domains relative to the largest set.
@@ -1687,7 +1696,7 @@ async function displayDomainComparison(geneA, geneB) {
         <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; margin: 20px 0; text-align: center;">
             
             <div style="background: ${COLOR_UNIQUE}; border: 1px solid ${COLOR_SHARED}; padding: 15px; border-radius: 5px;">
-                <h4 style="color: ${COLOR_TEXT}; margin-top: 0;">${geneAName} Only</h4>
+                <h4 style="color: ${COLOR_TEXT}; margin-top: 0;">${geneA_UPPER} Only</h4>
                 <p><strong>${comparison.uniqueA.length}</strong> unique domain(s)</p>
                 <ul style="list-style: none; padding: 0; font-size: 0.9em; color: #333;">
                     ${comparison.uniqueA.map(d => `<li>• ${d}</li>`).join('')}
@@ -1706,7 +1715,7 @@ async function displayDomainComparison(geneA, geneB) {
             </div>
             
             <div style="background: ${COLOR_UNIQUE}; border: 1px solid ${COLOR_SHARED}; padding: 15px; border-radius: 5px;">
-                <h4 style="color: ${COLOR_TEXT}; margin-top: 0;">${geneBName} Only</h4>
+                <h4 style="color: ${COLOR_TEXT}; margin-top: 0;">${geneB_UPPER} Only</h4>
                 <p><strong>${comparison.uniqueB.length}</strong> unique domain(s)</p>
                 <ul style="list-style: none; padding: 0; font-size: 0.9em; color: #333;">
                     ${comparison.uniqueB.map(d => `<li>• ${d}</li>`).join('')}
