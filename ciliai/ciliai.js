@@ -1419,55 +1419,47 @@ async function getGenesByComplex(complexName) {
  * @name resolveDomainQuery
  * @description Routes domain-related queries (Comparison, Enriched/Depleted Lists, Specific Motifs) 
  * using prioritized keyword matching.
- * This MUST be defined globally.
  * @param {string} query - The raw user query.
  */
 async function resolveDomainQuery(query) {
     const qLower = query.toLowerCase();
 
-    // ====================================================================
-    // 1. CUSTOM GENE LIST ENRICHMENT ANALYSIS (New Priority)
-    // ====================================================================
+    // 1. CUSTOM GENE LIST ENRICHMENT ANALYSIS (FIXED PATH)
+    // Check if the query asks for "analyze" or "enrichment status" AND contains extractable genes.
     if (qLower.includes('analyze domain enrichment') || qLower.includes('show enrichment status of genes')) {
-        const genesToAnalyze = getGenesForCustomDomainAnalysis(query);
+        
+        // Use the robust base extractor to pull the list of genes (e.g., ['IFT88', 'BBS1', 'CEP290'])
+        const genesToAnalyze = extractMultipleGenes(query); 
         
         if (genesToAnalyze.length >= 1) {
             console.log(`Routing ${genesToAnalyze.length} genes to custom domain enrichment analysis.`);
-            // This calls the function implemented in the previous step
+            // This calls the working analysis function defined in the previous steps
             return analyzeGeneListDomainEnrichment(genesToAnalyze); 
         }
-        // If extraction failed, proceed to simple list/fallback.
     }
     
-    // ====================================================================
-    // 2. DOMAIN COMPARISON CHECK (Targeting the IFT88 vs IFT81 pattern)
-    // ====================================================================
-    const comparisonMatch = query.match(/([A-Z0-9\-]+)\s+(?:vs|and|comparison)\s+([A-Z0-9\-]+)/i);
-
-    if (comparisonMatch && (qLower.includes('domain') || qLower.includes('architecture'))) {
-        
-        // Use the simpler filter here, assuming general extraction already removed words like 'DOMAIN'
-        const geneA = comparisonMatch[1].toUpperCase();
-        const geneB = comparisonMatch[2].toUpperCase();
-        
-        // This relies on the original flawed extraction logic being circumvented by the priority check above.
-        // It directly executes the comparison function.
-        return displayDomainComparison(geneA, geneB);
-    }
-
-    // ====================================================================
-    // 3. ENRICHED/DEPLETED LIST REQUESTS (Simple lookups)
-    // ====================================================================
-    if (qLower.includes('enriched domain') || qLower.includes('show enriched')) {
-        return displayEnrichedDomains();
+    // 2. ENRICHED/DEPLETED LIST REQUESTS (Simple lookups)
+    if (qLower.includes('enriched domain') || qLower.includes('show enriched') || qLower.includes('enrichment heatmap')) {
+        // This is a list/heatmap request, not a gene list input
+        return generateDomainEnrichmentHeatmap();
     }
     if (qLower.includes('depleted domain') || qLower.includes('show depleted') || qLower.includes('domains absent')) {
         return displayDepletedDomains();
     }
 
-    // ====================================================================
-    // 4. FALLBACK: SINGLE GENE VISUALIZATION (e.g., "Show domains of IFT88")
-    // ====================================================================
+    // 3. DOMAIN COMPARISON CHECK (Targeting the IFT88 vs IFT81 pattern)
+    // NOTE: This comparison should still work with the pattern match below if the user inputs were IFT88 and IFT81
+    const comparisonMatch = query.match(/([A-Z0-9\-]+)\s+(?:vs|and|comparison)\s+([A-Z0-9\-]+)/i);
+
+    if (comparisonMatch && (qLower.includes('domain') || qLower.includes('architecture'))) {
+        const geneA = comparisonMatch[1].toUpperCase();
+        const geneB = comparisonMatch[2].toUpperCase();
+        
+        // This resolves the user's explicit IFT88 vs IFT81 query
+        return displayDomainComparison(geneA, geneB);
+    }
+    
+    // 4. FALLBACK: SINGLE GENE VISUALIZATION
     const singleGeneMatch = query.match(/domains?\s+(?:of|for|in)\s+([A-Z0-9]+)/i);
     if (singleGeneMatch) {
         return visualizeDomainArchitecture(singleGeneMatch[1].toUpperCase());
@@ -1476,6 +1468,7 @@ async function resolveDomainQuery(query) {
     // Final fallback handles cases where extraction fails entirely
     return `<div class="result-card"><h3>Domain Query Failed</h3><p>Could not interpret the comparison or list request. Please try comparing two valid gene symbols (e.g., IFT88 vs IFT81).</p></div>`;
 }
+
 
 
 /**
