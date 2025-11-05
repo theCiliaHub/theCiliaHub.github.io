@@ -1419,41 +1419,44 @@ async function getGenesByComplex(complexName) {
  * @name resolveDomainQuery
  * @description Routes domain-related queries (Comparison, Enriched/Depleted Lists, Specific Motifs) 
  * using prioritized keyword matching.
- * @param {string} query - The raw user query (e.g., "Domain architecture comparison IFT88 vs IFT81").
+ * This MUST be defined globally.
+ * @param {string} query - The raw user query.
  */
 async function resolveDomainQuery(query) {
     const qLower = query.toLowerCase();
 
     // ====================================================================
-    // 1. DOMAIN COMPARISON CHECK (Targeting the IFT88 vs IFT81 pattern)
+    // 1. CUSTOM GENE LIST ENRICHMENT ANALYSIS (New Priority)
     // ====================================================================
-    // Pattern: Matches a word (A) vs/and/comparison (B). This is where the crash was occurring.
+    if (qLower.includes('analyze domain enrichment') || qLower.includes('show enrichment status of genes')) {
+        const genesToAnalyze = getGenesForCustomDomainAnalysis(query);
+        
+        if (genesToAnalyze.length >= 1) {
+            console.log(`Routing ${genesToAnalyze.length} genes to custom domain enrichment analysis.`);
+            // This calls the function implemented in the previous step
+            return analyzeGeneListDomainEnrichment(genesToAnalyze); 
+        }
+        // If extraction failed, proceed to simple list/fallback.
+    }
+    
+    // ====================================================================
+    // 2. DOMAIN COMPARISON CHECK (Targeting the IFT88 vs IFT81 pattern)
+    // ====================================================================
     const comparisonMatch = query.match(/([A-Z0-9\-]+)\s+(?:vs|and|comparison)\s+([A-Z0-9\-]+)/i);
 
     if (comparisonMatch && (qLower.includes('domain') || qLower.includes('architecture'))) {
         
-        // Define a set of noise words that should NEVER be treated as gene symbols
-        // NOTE: We rely on the rest of the query parsing logic (in the main router)
-        // to handle the rest of the filtration, but this is essential for this block.
-        const internalNoiseWords = new Set(['DOMAIN', 'ARCHITECTURE', 'COMPARISON', 'MOTIF']);
+        // Use the simpler filter here, assuming general extraction already removed words like 'DOMAIN'
+        const geneA = comparisonMatch[1].toUpperCase();
+        const geneB = comparisonMatch[2].toUpperCase();
         
-        // Capture the two words matched by the regex
-        const geneA_raw = comparisonMatch[1].toUpperCase();
-        const geneB_raw = comparisonMatch[2].toUpperCase();
-
-        // Filter the raw matches against the noise list
-        const genes = [geneA_raw, geneB_raw].filter(g => g.length >= 3 && !internalNoiseWords.has(g));
-
-        if (genes.length === 2) {
-            // Success: Found two valid genes, route to comparison
-            // NOTE: The handler will use the fixed getDomainsByGene for data retrieval.
-            return displayDomainComparison(genes[0], genes[1]);
-        }
-        // If two genes weren't found (e.g., ARCHITECTURE vs IFT88), proceed to fallback.
+        // This relies on the original flawed extraction logic being circumvented by the priority check above.
+        // It directly executes the comparison function.
+        return displayDomainComparison(geneA, geneB);
     }
 
     // ====================================================================
-    // 2. ENRICHED/DEPLETED LIST REQUESTS
+    // 3. ENRICHED/DEPLETED LIST REQUESTS (Simple lookups)
     // ====================================================================
     if (qLower.includes('enriched domain') || qLower.includes('show enriched')) {
         return displayEnrichedDomains();
@@ -1462,17 +1465,6 @@ async function resolveDomainQuery(query) {
         return displayDepletedDomains();
     }
 
-    // ====================================================================
-    // 3. SPECIFIC DOMAIN NAME LOOKUP (e.g., "Which genes have WD40 domains?")
-    // ====================================================================
-    const domainKeywords = ['wd40', 'leucine-rich repeat', 'iq motif', 'ef-hand', 'kinase', 'atpase', 'zinc finger']; 
-    for (const keyword of domainKeywords) {
-        if (qLower.includes(keyword)) {
-            // Assumes getGenesByDomain is defined and returns a list wrapped in formatListResult
-            return formatListResult(`Genes with ${keyword} domain`, await getGenesByDomain(keyword));
-        }
-    }
-    
     // ====================================================================
     // 4. FALLBACK: SINGLE GENE VISUALIZATION (e.g., "Show domains of IFT88")
     // ====================================================================
@@ -1484,6 +1476,7 @@ async function resolveDomainQuery(query) {
     // Final fallback handles cases where extraction fails entirely
     return `<div class="result-card"><h3>Domain Query Failed</h3><p>Could not interpret the comparison or list request. Please try comparing two valid gene symbols (e.g., IFT88 vs IFT81).</p></div>`;
 }
+
 
 /**
  * @name getDomainComparisonGenes
@@ -2151,6 +2144,21 @@ async function generateDomainEnrichmentHeatmap() {
     window.initPhylogenyPlot(plotDivId, [trace], layout);
 
     return htmlOutput;
+}
+
+/**
+ * @name getGenesForCustomDomainAnalysis
+ * @description Safely extracts a list of genes for analysis from a phrase like "Analyze domain enrichment for: GENE1, GENE2".
+ * It relies on the globally defined extractMultipleGenes for general parsing.
+ * @param {string} query - The raw user query.
+ * @returns {Array<string>} A list of uppercase gene symbols (max 10).
+ */
+function getGenesForCustomDomainAnalysis(query) {
+    // Rely on the robust general extraction function
+    const genes = extractMultipleGenes(query); 
+    
+    // Apply a limit for analysis stability
+    return genes.slice(0, 10); 
 }
 
 /**
