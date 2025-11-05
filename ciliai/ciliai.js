@@ -1395,36 +1395,68 @@ async function getGenesByComplex(complexName) {
     return relatedGenes;
 }
 
+/**
+ * @name resolveDomainQuery
+ * @description Routes domain-related queries (Comparison, Enriched/Depleted Lists, Specific Motifs) 
+ * using prioritized keyword matching.
+ * @param {string} query - The raw user query (e.g., "Domain architecture comparison IFT88 vs IFT81").
+ */
 async function resolveDomainQuery(query) {
     const qLower = query.toLowerCase();
 
-    // Pattern for Domain Comparison: "Domain architecture comparison IFT88 vs IFT81"
-    const comparisonMatch = query.match(/(?:domains?|architecture|comparison)?\s*([A-Z0-9\-]+)\s+(?:vs|and|comparison)\s+([A-Z0-9\-]+)/i);
+    // ====================================================================
+    // 1. DOMAIN COMPARISON CHECK (Targeting the IFT88 vs IFT81 pattern)
+    // ====================================================================
+    // Pattern: Matches a word (A) vs/and/comparison (B). This is where the crash was occurring.
+    const comparisonMatch = query.match(/([A-Z0-9\-]+)\s+(?:vs|and|comparison)\s+([A-Z0-9\-]+)/i);
 
-    if (comparisonMatch) {
-        // --- Gene Extraction and Filtration ---
-        const geneA = comparisonMatch[1].toUpperCase();
-        const geneB = comparisonMatch[2].toUpperCase();
+    if (comparisonMatch && (qLower.includes('domain') || qLower.includes('architecture'))) {
         
-        // Define a set of noise words that should NEVER be treated as gene symbols in this context
-        const noiseWords = new Set(['ARCHITECTURE', 'COMPARISON', 'DOMAIN', 'MOTIF']);
+        // Define a set of noise words that should NEVER be treated as gene symbols
+        // NOTE: We rely on the rest of the query parsing logic (in the main router)
+        // to handle the rest of the filtration, but this is essential for this block.
+        const internalNoiseWords = new Set(['DOMAIN', 'ARCHITECTURE', 'COMPARISON', 'MOTIF']);
         
-        const genes = [geneA, geneB].filter(g => !noiseWords.has(g));
+        // Capture the two words matched by the regex
+        const geneA_raw = comparisonMatch[1].toUpperCase();
+        const geneB_raw = comparisonMatch[2].toUpperCase();
+
+        // Filter the raw matches against the noise list
+        const genes = [geneA_raw, geneB_raw].filter(g => g.length >= 3 && !internalNoiseWords.has(g));
 
         if (genes.length === 2) {
             // Success: Found two valid genes, route to comparison
+            // NOTE: The handler will use the fixed getDomainsByGene for data retrieval.
             return displayDomainComparison(genes[0], genes[1]);
         }
+        // If two genes weren't found (e.g., ARCHITECTURE vs IFT88), proceed to fallback.
     }
 
-    // 1. Check for ENRICHED/DEPLETED LIST requests 
+    // ====================================================================
+    // 2. ENRICHED/DEPLETED LIST REQUESTS
+    // ====================================================================
     if (qLower.includes('enriched domain') || qLower.includes('show enriched')) {
         return displayEnrichedDomains();
     }
-    // ... (rest of the list logic) ...
+    if (qLower.includes('depleted domain') || qLower.includes('show depleted') || qLower.includes('domains absent')) {
+        return displayDepletedDomains();
+    }
+
+    // ====================================================================
+    // 3. SPECIFIC DOMAIN NAME LOOKUP (e.g., "Which genes have WD40 domains?")
+    // ====================================================================
+    const domainKeywords = ['wd40', 'leucine-rich repeat', 'iq motif', 'ef-hand', 'kinase', 'atpase', 'zinc finger']; 
+    for (const keyword of domainKeywords) {
+        if (qLower.includes(keyword)) {
+            // Assumes getGenesByDomain is defined and returns a list wrapped in formatListResult
+            return formatListResult(`Genes with ${keyword} domain`, await getGenesByDomain(keyword));
+        }
+    }
     
-    // 3. Fallback for single gene domain architecture display
-    const singleGeneMatch = query.match(/domains?\s+(?:of|for)\s+([A-Z0-9]+)/i);
+    // ====================================================================
+    // 4. FALLBACK: SINGLE GENE VISUALIZATION (e.g., "Show domains of IFT88")
+    // ====================================================================
+    const singleGeneMatch = query.match(/domains?\s+(?:of|for|in)\s+([A-Z0-9]+)/i);
     if (singleGeneMatch) {
         return visualizeDomainArchitecture(singleGeneMatch[1].toUpperCase());
     }
@@ -1432,7 +1464,6 @@ async function resolveDomainQuery(query) {
     // Final fallback handles cases where extraction fails entirely
     return `<div class="result-card"><h3>Domain Query Failed</h3><p>Could not interpret the comparison or list request. Please try comparing two valid gene symbols (e.g., IFT88 vs IFT81).</p></div>`;
 }
-
 /**
  * @name getDomainsByGene
  * @description Retrieves all domain details for a single gene from the structured domain map.
@@ -1860,7 +1891,27 @@ async function resolvePhylogeneticQuery(query) {
     return `<div class="result-card"><h3>Phylogeny Error</h3><p>Could not interpret the phylogenetic query. Please specify a gene (e.g., IFT88) or list type.</p></div>`;
 }
 
+/**
+ * @name extractTwoGenesForComparison
+ * @description Uses the robust extractMultipleGenes, then applies a final filter to ensure 
+ * only two contextually relevant gene symbols remain for domain comparison.
+ * * NOTE: This function assumes that the current query in handleAIQuery is a comparison query.
+ * @param {string} query - The raw user query.
+ * @returns {Array<string>} The first two valid gene symbols found.
+ */
+function extractTwoGenesForComparison(query) {
+    // 1. Use the pre-existing, reliable gene extraction function
+    let genes = extractMultipleGenes(query); 
 
+    // 2. Add specific context-based noise words that might be extracted
+    // (These words are often capitalized in the query and bypass generic English noise filtering)
+    const contextNoise = new Set(['ARCHITECTURE', 'COMPARISON', 'DOMAIN']);
+    
+    genes = genes.filter(g => !contextNoise.has(g));
+
+    // 3. Return only the first two genes for the binary comparison
+    return genes.slice(0, 2); 
+}
 
 
 
