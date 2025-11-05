@@ -2198,10 +2198,10 @@ const questionRegistry = [
 { text: "List proteins with coiled-coil domains", handler: async () => formatListResult("Genes with coiled-coil", await getGenesByDomain("coiled-coil")) },
 { text: "Genes with AAA+ ATPase domains", handler: async () => formatListResult("Genes with AAA+ ATPase", await getGenesByDomain("AAA")) },
 // --- Domain comparisons ---
-  { text: "Display domains of IFT88 and IFT81", handler: async () => getDomainsForMultipleGenesTable(["IFT88", "IFT81"]) },
+{ text: "Display domains of IFT88 and IFT81", handler: async () => getDomainsForMultipleGenesTable(["IFT88", "IFT81"]) },
 { text: "Show domain architecture for IFT88, IFT81, and WDR19", handler: async () => routeMultiGeneDomainTable("Show domain architecture for IFT88, IFT81, and WDR19") },
 { text: "List domains of multiple genes (e.g., BBS1, BBS2, BBS4)", handler: async () => routeMultiGeneDomainTable("List domains of BBS1, BBS2, BBS4, NPHP1, and MKS1") },
-{ text: "Compare domain architecture of these 5 genes", handler: async (query) => routeMultiGeneDomainTable(query) // Assumes the query contains the genes},
+{ text: "Compare domain architecture of these 5 genes", handler: async (query) => routeMultiGeneDomainTable(query) },
 {text: "Show domain matrix for X genes", handler: async (query) => routeMultiGeneDomainTable(query) },
 
 { text: "Compare domains of IFT88 and IFT81", handler: async () => displayDomainComparison("IFT88", "IFT81") },
