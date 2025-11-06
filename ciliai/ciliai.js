@@ -50,183 +50,112 @@ const CILI_AI_DB = {
 
 
 
-// --- Main Page Display Function (REPLACEMENT) ---
-window.displayCiliAIPage = async function displayCiliAIPage() {
-    const contentArea = document.querySelector('.content-area');
-    if (!contentArea) {
-        console.error('Content area not found');
-        return;
-    }
-    contentArea.className = 'content-area content-area-full';
-    const ciliaPanel = document.querySelector('.cilia-panel');
-    if (ciliaPanel) {
-        ciliaPanel.style.display = 'none';
-    }
+// ==================== SEMANTIC INTENT RESOLVER ====================
+// Detects user intent using keyword clusters and fuzzy semantic matching.
+// Designed for CiliaHub’s CiliAI natural-language interface.
+async function resolveSemanticIntent(query) {
+    const qLower = query.toLowerCase().trim();
 
-    try {
-        contentArea.innerHTML = `
-            <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
-            <script src="https://cdn.jsdelivr.net/npm/cytoscape@3.23.0/dist/cytoscape.min.js"></script>
-            <div class="ciliai-container">
-                <div class="ciliai-header">
-                    <h1>CiliAI</h1>
-                    <p>Your AI-powered partner for discovering gene-cilia relationships.</p>
-                </div>
-                <div class="ciliai-main-content">
-                    <div class="ai-query-section">
-                        <h3>Ask a Question</h3>
-                        <div class="ai-input-group autocomplete-wrapper">
-                            <input type="text" id="aiQueryInput" class="ai-query-input" placeholder="What's on your mind? Try a gene name or a question...">
-                            <div id="aiQuerySuggestions" class="suggestions-container"></div>
-                            <button class="ai-query-btn" id="aiQueryBtn">Ask CiliAI</button>
-                        </div>
-                        <div class="example-queries">
-                            <p>
-                               <strong>Try asking:</strong> 
-        <span data-question="What can you do?">About CiliAI</span>, 
-        <span data-question="Show genes for Joubert syndrome">Joubert syndrome</span>, 
-        <span data-question="List ciliary genes in C. elegans">c. elegans</span>, 
-        <span data-question="Plot UMAP expression for FOXJ1">UMAP plot for FOXJ1</span>,
-        <span data-question="Compare ARL13B and FOXJ1 expression in lung scRNA-seq">Compare ARL13B vs FOXJ1</span>,
-        <span data-question="Which Joubert Syndrome genes are expressed in ciliated cells?">Joubert genes in ciliated cells</span>
-                            </p>
-                        </div>
-                        <div id="ai-result-area" class="results-section" style="display: none; margin-top: 1.5rem; padding: 1rem;"></div>
-                    </div>
-                    
-                    <div class="input-section">
-                        <h3>Analyze Gene Phenotypes</h3>
-                        <div class="input-group">
-                            <label for="geneInput">Gene Symbols:</label>
-                            <div class="autocomplete-wrapper">
-                                <textarea id="geneInput" class="gene-input-textarea" placeholder="Start typing a gene symbol (e.g., IFT88)..."></textarea>
-                                <div id="geneSuggestions" class="suggestions-container"></div>
-                            </div>
-                        </div>
-                        <div class="input-group">
-                            <label>Analysis Mode:</label>
-                            <div class="mode-selector">
-                                <div class="mode-option">
-                                    <input type="radio" id="hybrid" name="mode" value="hybrid" checked aria-label="Hybrid mode">
-                                    <label for="hybrid" title="Combines database, screen data, and real-time AI literature mining.">
-                                        <span class="mode-icon">🔬</span>
-                                        <div><strong>Hybrid</strong><br><small>DB + Screens + Literature</small></div>
-                                    </label>
-                                </div>
-                                <div class="mode-option">
-                                    <input type="radio" id="expert" name="mode" value="expert" aria-label="Expert only mode">
-                                    <label for="expert" title="Queries only our internal database and screen data.">
-                                        <span class="mode-icon">🏛️</span>
-                                        <div><strong>Expert Only</strong><br><small>Curated DB + Screens</small></div>
-                                    </label>
-                                </div>
-                                <div class="mode-option">
-                                    <input type="radio" id="nlp" name="mode" value="nlp" aria-label="Literature only mode">
-                                    <label for="nlp" title="Performs a live AI-powered search across PubMed.">
-                                        <span class="mode-icon">📚</span>
-                                        <div><strong>Literature Only</strong><br><small>Live AI text mining</small></div>
-                                    </label>
-                                </div>
-                            </div>
-                        </div>
-                        <button class="analyze-btn" id="analyzeBtn">🔍 Analyze Genes</button>
-                    </div>
-                    <div id="resultsSection" class="results-section" style="display: none;">
-                        <h2>Analysis Results</h2>
-                        <button class="visualize-btn" id="visualizeBtn" style="display: none;">📊 Visualize Results</button>
-                        <div id="plot-display-area" style="margin-top: 1rem;"></div>
-                        <div id="resultsContainer"></div>
-                    </div>
-                </div>
-            </div>
-            <style>
-                .ciliai-container { font-family: 'Arial', sans-serif; max-width: 950px; margin: 2rem auto; padding: 2rem; background-color: #f9f9f9; border-radius: 12px; }
-                .ciliai-header { text-align: center; margin-bottom: 2rem; }
-                .ciliai-header h1 { font-size: 2.8rem; color: #2c5aa0; margin: 0; }
-                .ciliai-header p { font-size: 1.2rem; color: #555; margin-top: 0.5rem; }
-                .ai-query-section { background-color: #e8f4fd; border: 1px solid #bbdefb; padding: 1.5rem 2rem; border-radius: 8px; margin-bottom: 2rem; }
-                .ai-query-section h3 { margin-top: 0; color: #2c5aa0; }
-                .ai-input-group { position: relative; display: flex; gap: 10px; }
-                .ai-query-input { flex-grow: 1; padding: 0.8rem; border: 1px solid #ccc; border-radius: 4px; font-size: 1rem; }
-                .ai-query-btn { padding: 0.8rem 1.2rem; font-size: 1rem; background-color: #2c5aa0; color: white; border: none; border-radius: 4px; cursor: pointer; transition: background-color 0.2s; }
-                .ai-query-btn:hover { background-color: #1e4273; }
-                .example-queries { margin-top: 1rem; font-size: 0.9rem; color: #555; text-align: left; }
-                .example-queries span { background-color: #d1e7fd; padding: 4px 10px; border-radius: 12px; font-family: 'Arial', sans-serif; cursor: pointer; margin: 4px; display: inline-block; transition: background-color 0.2s; border: 1px solid #b1d7fc;}
-                .example-queries span:hover { background-color: #b1d7fc; }
-                .input-section { background-color: #fff; padding: 2rem; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
-                .input-group { margin-bottom: 1.5rem; }
-                .input-group label { display: block; font-weight: bold; margin-bottom: 0.5rem; color: #333; }
-                .gene-input-textarea { width: 100%; box-sizing: border-box; padding: 0.8rem; border: 1px solid #ccc; border-radius: 4px; font-size: 1rem; min-height: 80px; resize: vertical; }
-                .mode-selector { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; }
-                .mode-option input[type="radio"] { display: none; }
-                .mode-option label { display: flex; align-items: center; gap: 10px; padding: 1rem; border: 2px solid #ddd; border-radius: 8px; cursor: pointer; transition: all 0.2s; }
-                .mode-option input[type="radio"]:checked + label { border-color: #2c5aa0; background-color: #e8f4fd; box-shadow: 0 0 5px rgba(44, 90, 160, 0.3); }
-                .mode-icon { font-size: 1.8rem; }
-                .analyze-btn { width: 100%; padding: 1rem; font-size: 1.1rem; font-weight: bold; background-color: #28a745; color: white; border: none; border-radius: 8px; cursor: pointer; transition: background-color 0.2s; }
-                .analyze-btn:hover:not([disabled]) { background-color: #218838; }
-                .results-section { margin-top: 2rem; padding: 2rem; background-color: #fff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
-                .result-card { border: 1px solid #ddd; border-radius: 8px; padding: 1.5rem; margin-bottom: 1.5rem; }
-                .result-card h3 { margin-top: 0; color: #2c5aa0; }
-                .ciliopathy-table, .expression-table, .gene-detail-table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
-                .ciliopathy-table th, .ciliopathy-table td, .expression-table th, .expression-table td, .gene-detail-table th, .gene-detail-table td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-                .ciliopathy-table th, .expression-table th, .gene-detail-table th { background-color: #e8f4fd; color: #2c5aa0; }
-                .suggestions-container { position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid #ccc; z-index: 1000; max-height: 200px; overflow-y: auto; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-                .suggestion-item { padding: 10px; cursor: pointer; }
-                .suggestion-item:hover { background-color: #f0f0f0; }
+    // --- Define semantic clusters for major biological contexts ---
+    const intentClusters = {
+        ciliary_tip: [
+            "ciliary tip", "distal tip", "tip proteins", "tip components", 
+            "tip composition", "proteins at the ciliary tip", "ciliary tip complex",
+            "enriched at the tip", "distal region", "ciliary tip proteome"
+        ],
+        domain: [
+            "domain", "motif", "architecture", "protein fold", "domain organization",
+            "enriched", "depleted"
+        ],
+        phylogeny: [
+            "phylogeny", "evolution", "conservation", "ortholog", "paralog", "species tree",
+            "evolutionary profile", "conservation heatmap", "conserved"
+        ],
+        complex: [
+            "complex", "interactome", "binding partners", "corum", "protein interaction",
+            "ift", "bbsome", "dynein", "mks", "nphp", "radial spoke", "axoneme", "transition zone"
+        ],
+        expression: [
+            "expression", "umap", "tissue", "cell type", "where expressed", "scRNA",
+            "single-cell", "transcript", "abundance", "expression pattern", "plot" // Added 'plot' for plotting intents
+        ],
+        disease: [
+            "mutation", "variant", "pathogenic", "ciliopathy", "disease", "syndrome",
+            "bbs", "joubert", "mks", "pcd", "lca"
+        ],
+        localization: [
+            "localize", "location", "subcellular", "basal body", "transition zone", "centrosome", "axoneme"
+        ],
+        phenotype: [
+            "knockdown", "phenotype", "effect", "shorter cilia", "longer cilia", "cilia length", "cilia number"
+        ]
+    };
 
-                /* --- ADDED CSS FOR DOWNLOAD BUTTON AND PLOT CARD --- */
-                .download-button {
-                    background-color: #28a745; /* Green */
-                    color: white;
-                    padding: 8px 14px;
-                    border: none;
-                    border-radius: 4px;
-                    cursor: pointer;
-                    font-size: 0.9em;
-                    font-weight: bold;
-                    margin-top: 15px;
-                    transition: background-color 0.3s ease;
-                }
-                .download-button:hover {
-                    background-color: #218838;
-                }
-                /* This re-defines .result-card to ensure it has the correct padding for plots */
-                .result-card {
-                    padding: 20px;
-                    background-color: #fff;
-                    border-radius: 8px;
-                    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-                    margin-top: 1.5rem;
-                    border: 1px solid #ddd; /* Kept original border */
-                    margin-bottom: 1.5rem; /* Kept original margin-bottom */
-                }
-            </style>
-        `;
-    } catch (error) {
-        console.error('Failed to inject CiliAI HTML:', error);
-        contentArea.innerHTML = '<p>Error: Failed to load CiliAI interface.</p>';
-        return;
+    // --- Rule-based fuzzy detection ---
+    let detectedIntent = null;
+    for (const [intent, phrases] of Object.entries(intentClusters)) {
+        if (phrases.some(p => qLower.includes(p))) {
+            detectedIntent = intent;
+            break;
+        }
     }
 
-  await Promise.all([
-        fetchCiliaData(),         // Your original gene data
-        fetchScreenData(),       // Your original screen data
-        fetchPhylogenyData(),     // Your original phylogeny data
-        fetchTissueData(),       // Your original tissue data
-        fetchCellxgeneData(),     // Your original cellxgene data
-        fetchUmapData(),           // Your original umap data
-        getDomainData(),           // --- NEW ---
-        fetchNeversPhylogenyData(), // --- NEW ---
-        fetchLiPhylogenyData(),  // --- NEW ---
-        fetchCorumComplexes()     
-    ]);
-    // NEW: Merge after fetches
-    await mergePhylogenyCaches();
-    console.log('ciliAI.js: All data loaded (including new domain and phylogeny sources).');
-    
-    setTimeout(setupCiliAIEventListeners, 0);
-};
+    // --- Handle Ciliary Tip as a special semantic case ---
+    if (detectedIntent === "ciliary_tip") {
+        const title = "Ciliary Tip Components";
+        const data = await getCuratedComplexComponents("CILIARY TIP"); 
+        return formatListResult(title, data); 
+    }
 
+    // --- Domain, Phylogeny, Complex, etc. can route to their resolvers ---
+    if (detectedIntent === "domain") {
+        return await resolveDomainQuery(query);
+    } else if (detectedIntent === "phylogeny") {
+        return await resolvePhylogeneticQuery(query);
+    } else if (detectedIntent === "complex") {
+        // If a specific complex name is in the query (e.g., 'IFT-A'), call the specific handler
+        const complexMatch = qLower.match(/(ift-a|ift-b|bbsome|mks|nphp|dynein-2)/);
+        if (complexMatch && complexMatch[1]) {
+             const complexName = complexMatch[1].toUpperCase();
+             const data = await getCuratedComplexComponents(complexName);
+             return formatListResult(`Components of ${complexName} Complex`, data);
+        }
+        return await routeComplexPhylogenyAnalysis(query);
+    } else if (detectedIntent === "expression") {
+        // Try extracting gene symbols for plotting fallback
+        const genes = (query.match(/\b[A-Z0-9\-]{3,}\b/g) || []);
+        if (genes.length > 0) {
+            // Priority for UMAP if the word is included
+            if (qLower.includes('umap') && genes.length === 1) {
+                return await displayUmapGeneExpression(genes[0]);
+            }
+            // Default to comparative bar chart
+            return await displayCellxgeneBarChart(genes);
+        } else {
+            return `<p>🧬 Please specify a gene to show expression data.</p>`;
+        }
+    } else if (detectedIntent === "disease") {
+        // If it looks like a list request for a specific disease (e.g., "Joubert genes")
+        const diseaseMatch = qLower.match(/(joubert syndrome|bardet-biedl syndrome|mks|pcd|lca)/i);
+        if (diseaseMatch) {
+             const diseaseName = diseaseMatch[1];
+             const { genes, description } = await getCiliopathyGenes(diseaseName);
+             return formatListResult(`Genes for ${diseaseName}`, genes, description);
+        }
+        return `<p>🩺 Disease-related query detected. This module is focused on known disease terms (e.g., Joubert Syndrome).</p>`;
+    } else if (detectedIntent === "localization") {
+        const locationMatch = qLower.match(/(basal body|transition zone|axoneme|centrosome|ciliary membrane)/);
+        if (locationMatch && locationMatch[1]) {
+             const data = await getGenesByLocalization(locationMatch[1]);
+             return formatListResult(`Genes localizing to ${locationMatch[1]}`, data);
+        } else {
+            return `<p>📍 Localization query detected. Please be more specific (e.g., "genes in the basal body").</p>`;
+        }
+    }
+
+    // --- Default fallback ---
+    return null;
+}
 // --- Helper Functions ---
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 function debounce(fn, delay) { let timeout; return function(...args) { clearTimeout(timeout); timeout = setTimeout(() => fn(...args), delay); }; }
@@ -251,11 +180,12 @@ async function resolveSemanticIntent(query) {
             "enriched at the tip", "distal region", "ciliary tip proteome"
         ],
         domain: [
-            "domain", "motif", "architecture", "protein fold", "domain organization"
+            "domain", "motif", "architecture", "protein fold", "domain organization",
+            "enriched", "depleted"
         ],
         phylogeny: [
             "phylogeny", "evolution", "conservation", "ortholog", "paralog", "species tree",
-            "evolutionary profile", "conservation heatmap"
+            "evolutionary profile", "conservation heatmap", "conserved"
         ],
         complex: [
             "complex", "interactome", "binding partners", "corum", "protein interaction",
@@ -263,13 +193,12 @@ async function resolveSemanticIntent(query) {
         ],
         expression: [
             "expression", "umap", "tissue", "cell type", "where expressed", "scRNA",
-            "single-cell", "transcript", "abundance", "expression pattern"
+            "single-cell", "transcript", "abundance", "expression pattern", "plot" // Added 'plot' for plotting intents
         ],
         disease: [
             "mutation", "variant", "pathogenic", "ciliopathy", "disease", "syndrome",
             "bbs", "joubert", "mks", "pcd", "lca"
         ],
-        // Added for flexibility on existing handlers that may not be complex/gene-specific
         localization: [
             "localize", "location", "subcellular", "basal body", "transition zone", "centrosome", "axoneme"
         ],
@@ -290,50 +219,60 @@ async function resolveSemanticIntent(query) {
     // --- Handle Ciliary Tip as a special semantic case ---
     if (detectedIntent === "ciliary_tip") {
         const title = "Ciliary Tip Components";
-        // NOTE: Assuming getCuratedComplexComponents is defined elsewhere
         const data = await getCuratedComplexComponents("CILIARY TIP"); 
-        // NOTE: Assuming formatListResult is defined elsewhere
         return formatListResult(title, data); 
     }
 
     // --- Domain, Phylogeny, Complex, etc. can route to their resolvers ---
-    // NOTE: Assuming resolveDomainQuery, resolvePhylogeneticQuery, routeComplexPhylogenyAnalysis are defined elsewhere
     if (detectedIntent === "domain") {
         return await resolveDomainQuery(query);
     } else if (detectedIntent === "phylogeny") {
         return await resolvePhylogeneticQuery(query);
     } else if (detectedIntent === "complex") {
+        // If a specific complex name is in the query (e.g., 'IFT-A'), call the specific handler
+        const complexMatch = qLower.match(/(ift-a|ift-b|bbsome|mks|nphp|dynein-2)/);
+        if (complexMatch && complexMatch[1]) {
+             const complexName = complexMatch[1].toUpperCase();
+             const data = await getCuratedComplexComponents(complexName);
+             return formatListResult(`Components of ${complexName} Complex`, data);
+        }
         return await routeComplexPhylogenyAnalysis(query);
     } else if (detectedIntent === "expression") {
-        // Try extracting gene symbols if possible for plotting fallback
+        // Try extracting gene symbols for plotting fallback
         const genes = (query.match(/\b[A-Z0-9\-]{3,}\b/g) || []);
         if (genes.length > 0) {
-            // NOTE: Assuming displayCellxgeneBarChart is defined elsewhere
+            // Priority for UMAP if the word is included
+            if (qLower.includes('umap') && genes.length === 1) {
+                return await displayUmapGeneExpression(genes[0]);
+            }
+            // Default to comparative bar chart
             return await displayCellxgeneBarChart(genes);
         } else {
             return `<p>🧬 Please specify a gene to show expression data.</p>`;
         }
     } else if (detectedIntent === "disease") {
-        // Fallback for disease until a robust disease resolver is implemented
-        return `<p>🩺 Disease-related query detected. This module will be available soon. Try a specific query like "List genes for Joubert Syndrome".</p>`;
+        // If it looks like a list request for a specific disease (e.g., "Joubert genes")
+        const diseaseMatch = qLower.match(/(joubert syndrome|bardet-biedl syndrome|mks|pcd|lca)/i);
+        if (diseaseMatch) {
+             const diseaseName = diseaseMatch[1];
+             const { genes, description } = await getCiliopathyGenes(diseaseName);
+             return formatListResult(`Genes for ${diseaseName}`, genes, description);
+        }
+        return `<p>🩺 Disease-related query detected. This module is focused on known disease terms (e.g., Joubert Syndrome).</p>`;
     } else if (detectedIntent === "localization") {
-        // Fallback for localization, attempting to extract the location keyword
-        const locationMatch = qLower.match(/(basal body|transition zone|axoneme|centrosome)/);
+        const locationMatch = qLower.match(/(basal body|transition zone|axoneme|centrosome|ciliary membrane)/);
         if (locationMatch && locationMatch[1]) {
-             // NOTE: Assuming getGenesByLocalization and formatListResult are defined elsewhere
              const data = await getGenesByLocalization(locationMatch[1]);
              return formatListResult(`Genes localizing to ${locationMatch[1]}`, data);
         } else {
             return `<p>📍 Localization query detected. Please be more specific (e.g., "genes in the basal body").</p>`;
         }
-    } else if (detectedIntent === "phenotype") {
-         // Fallback for phenotype queries
-         return `<p>🔎 Phenotype/Screen query detected. Please use a specific gene (e.g., "What happens to cilia when KIF3A is knocked down?") or a specific phenotype (e.g., "Find genes causing short cilia").</p>`;
     }
 
     // --- Default fallback ---
     return null;
 }
+
 
 // --- Main AI Query Handler ---
 window.handleAIQuery = async function() {
@@ -362,7 +301,6 @@ window.handleAIQuery = async function() {
         console.log('ciliAI.js: All core data loaded for processing.');
 
         // 🧠 NEW ROUTING PRIORITY 0: Try resolving semantic intent before keyword routing
-        // NOTE: 'resolveSemanticIntent' must be defined outside this function.
         const semanticResult = await resolveSemanticIntent(query);
         if (semanticResult) {
             resultArea.innerHTML = semanticResult;
@@ -453,6 +391,7 @@ window.handleAIQuery = async function() {
         console.error("CiliAI Query Error:", e);
     }
 };
+
 
 /**
  * Patches the main query handler to include Corum lookups.
