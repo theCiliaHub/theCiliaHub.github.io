@@ -249,16 +249,18 @@ async function resolveSemanticIntent(query) {
     // Assuming extractMultipleGenes is defined globally
     const allExtractedGenes = extractMultipleGenes(query); 
 
-    // --- Rule-based fuzzy detection ---
+    // --- Rule-based fuzzy detection for combined/specific queries ---
     let diseaseMatch = null;
     let phenotypeMatch = null;
 
     // Detect Disease first
     const diseaseNames = [
         "bardet-biedl syndrome", "joubert syndrome", "meckel-gruber syndrome",
-        "primary ciliary dyskinesia", "nephronophthisis", "bbs", "nphp", "mks", "ciliopathy"
+        "primary ciliary dyskinesia", "nephronophthisis", "bbs", "nphp", "mks", "ciliopathy",
+        // Crucial Synonyms missed in extraction pattern:
+        "genetics of", "genetics" // Catches "genetics of Joubert Syndrome"
     ];
-    for (const name of diseaseNames.sort((a, b) => b.length - a.length)) { // Use sorting for longest match priority
+    for (const name of diseaseNames.sort((a, b) => b.length - a.length)) {
          if (qLower.includes(name.toLowerCase())) {
              diseaseMatch = name;
              break;
@@ -279,12 +281,11 @@ async function resolveSemanticIntent(query) {
     // =================================================================================
     if (diseaseMatch && phenotypeMatch) {
         console.log(`Fuzzy match: Routing combined DISEASE (${diseaseMatch}) + PHENOTYPE (${phenotypeMatch}) query.`);
-        // NOTE: Assumes getDiseaseGenesByPhenotype is correctly defined and handles the logic.
         return getDiseaseGenesByPhenotype(diseaseMatch, phenotypeMatch);
     }
     
     // =================================================================================
-    // PRIORITY 2: GENERIC SINGLE INTENT RESOLUTION (Using Fuzzy Keywords)
+    // PRIORITY 2: GENERIC INTENT RESOLUTION (Using Fuzzy Keywords)
     // =================================================================================
 
     let detectedIntent = null;
@@ -301,52 +302,50 @@ async function resolveSemanticIntent(query) {
     } else if (qLower.includes("localization") || qLower.includes("basal body")) {
         detectedIntent = "localization";
     } else if (qLower.includes("phenotype") || qLower.includes("knockdown")) {
-        // Only if a phenotype query was detected but didn't match a disease (e.g., "Find genes causing short cilia")
         detectedIntent = "phenotype"; 
     }
 
     // --- Execute Standard Intent Routing ---
 
-    if (detectedIntent === "ciliary_tip") {
-        const title = "Ciliary Tip Components";
-        // Assumes getCuratedComplexComponents is defined
-        const data = await getCuratedComplexComponents("CILIARY TIP");
-        return formatListResult(title, data);
-    }
-    else if (detectedIntent === "domain") {
-        // Assumes resolveDomainQuery is defined
+    if (detectedIntent === "domain") {
         return await resolveDomainQuery(query);
     } 
     else if (detectedIntent === "phylogeny") {
-        // Assumes resolvePhylogeneticQuery is defined
         return await resolvePhylogeneticQuery(query);
     } 
     else if (detectedIntent === "complex") {
-        // Assumes routeComplexPhylogenyAnalysis and getGenesByComplex are defined
         const tableResult = await routeComplexPhylogenyAnalysis(query);
         if (tableResult) return tableResult;
         return await getGenesByComplex(query); 
     } 
     else if (detectedIntent === "localization") {
-        const locationMatch = qLower.match(/(basal body|transition zone|axoneme|centrosome|ciliary membrane)/);
+        const locationMatch = qLower.match(/(basal body|transition zone|axoneme|centrosome|ciliary membrane|ciliary tip)/);
         if (locationMatch) {
+            const locationTerm = locationMatch[1].toUpperCase() === 'CILIARY TIP' ? 'CILIARY TIP' : locationMatch[1];
+            if (locationMatch[1].includes('ciliary tip')) {
+                const data = await getCuratedComplexComponents("CILIARY TIP");
+                return formatListResult("Ciliary Tip Components", data);
+            }
             const data = await getGenesByLocalization(locationMatch[1]);
             return formatListResult(`Genes localizing to ${locationMatch[1]}`, data);
         }
     } 
     else if (detectedIntent === "expression") {
-         const genes = allExtractedGenes.slice(0, 2);
-         if (genes.length === 1 && qLower.includes('umap')) return displayUmapGeneExpression(genes[0]);
-         if (genes.length >= 1) return displayCellxgeneBarChart(genes);
+         // RESTORED FOXJ1 LOGIC: Identify the single gene and route to the correct visualization.
+         const genes = allExtractedGenes.slice(0, 1);
+         if (genes.length === 1) {
+            if (qLower.includes('umap')) return displayUmapGeneExpression(genes[0]);
+            return displayCellxgeneBarChart(genes);
+         }
     }
-    else if (detectedIntent === "phenotype") {
-        // Simple phenotype list handling (e.g., "Find genes causing short cilia")
-        if (phenotypeMatch) {
-            return getGenesByScreenPhenotype(phenotypeMatch);
-        }
+    else if (detectedIntent === "disease") {
+        // RESTORED JOUBERT SYNDROME LOGIC: Handle general disease queries (e.g., "Tell me about genetics of Joubert Syndrome")
+        const standardName = diseaseMatch.replace(/\b\w/g, l => l.toUpperCase());
+        const { genes, description } = await getCiliopathyGenes(diseaseMatch);
+        return formatListResult(`Genes for ${standardName}`, genes, description);
     }
-
-    // --- Default fallback ---
+    
+    // --- Final Fallback to Registry or Single Gene Lookup ---
     return null;
 }
 
