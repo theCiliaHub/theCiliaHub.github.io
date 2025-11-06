@@ -239,7 +239,8 @@ function normalizeTerm(s) {
 
 // ==================== SEMANTIC INTENT RESOLVER ====================
 // Detects user intent using keyword clusters and fuzzy semantic matching.
-// Designed for CiliaHub’s CiliAI natural-language interface.
+// ==================== SEMANTIC INTENT RESOLVER (UPDATED) ====================
+// Detects user intent using keyword clusters and fuzzy semantic matching.
 async function resolveSemanticIntent(query) {
     const qLower = query.toLowerCase().trim();
 
@@ -251,11 +252,12 @@ async function resolveSemanticIntent(query) {
             "enriched at the tip", "distal region", "ciliary tip proteome"
         ],
         domain: [
-            "domain", "motif", "architecture", "protein fold", "domain organization"
+            "domain", "motif", "architecture", "protein fold", "domain organization",
+            "enriched", "depleted"
         ],
         phylogeny: [
             "phylogeny", "evolution", "conservation", "ortholog", "paralog", "species tree",
-            "evolutionary profile", "conservation heatmap"
+            "evolutionary profile", "conservation heatmap", "conserved"
         ],
         complex: [
             "complex", "interactome", "binding partners", "corum", "protein interaction",
@@ -263,15 +265,18 @@ async function resolveSemanticIntent(query) {
         ],
         expression: [
             "expression", "umap", "tissue", "cell type", "where expressed", "scRNA",
-            "single-cell", "transcript", "abundance", "expression pattern"
+            "single-cell", "transcript", "abundance", "expression pattern", "plot"
         ],
         disease: [
             "mutation", "variant", "pathogenic", "ciliopathy", "disease", "syndrome",
-            "bbs", "joubert", "mks", "pcd", "lca"
+            "bbs", "joubert", "mks", "pcd", "lca", "nephronophthisis", "polycystic kidney disease"
         ],
-        // Added for flexibility on existing handlers that may not be complex/gene-specific
+        disease_classification: [
+            "primary ciliopathy", "secondary ciliopathy", "motile ciliopathy", "atypical ciliopathy",
+            "primary disease", "secondary disease", "motile disease", "atypical disease", "ciliopathy classification"
+        ],
         localization: [
-            "localize", "location", "subcellular", "basal body", "transition zone", "centrosome", "axoneme"
+            "localize", "location", "subcellular", "basal body", "transition zone", "centrosome", "axoneme", "ciliary membrane"
         ],
         phenotype: [
             "knockdown", "phenotype", "effect", "shorter cilia", "longer cilia", "cilia length", "cilia number"
@@ -287,53 +292,108 @@ async function resolveSemanticIntent(query) {
         }
     }
 
-    // --- Handle Ciliary Tip as a special semantic case ---
+    // --- Intent Resolution Logic ---
+
     if (detectedIntent === "ciliary_tip") {
         const title = "Ciliary Tip Components";
-        // NOTE: Assuming getCuratedComplexComponents is defined elsewhere
-        const data = await getCuratedComplexComponents("CILIARY TIP"); 
-        // NOTE: Assuming formatListResult is defined elsewhere
+        const data = await getCuratedComplexComponents("CILIARY TIP");
         return formatListResult(title, data); 
     }
 
-    // --- Domain, Phylogeny, Complex, etc. can route to their resolvers ---
-    // NOTE: Assuming resolveDomainQuery, resolvePhylogeneticQuery, routeComplexPhylogenyAnalysis are defined elsewhere
-    if (detectedIntent === "domain") {
+    // --- Disease Classification List Handler (Primary, Motile, etc.) ---
+    else if (detectedIntent === "disease_classification") {
+        let classification = null;
+        if (qLower.includes('primary ciliopathy') || qLower.includes('primary disease')) {
+            classification = "Primary Ciliopathies";
+        } else if (qLower.includes('motile ciliopathy') || qLower.includes('motile disease')) {
+            classification = "Motile Ciliopathies";
+        } else if (qLower.includes('secondary ciliopathy') || qLower.includes('secondary disease')) {
+            classification = "Secondary Diseases"; 
+        } else if (qLower.includes('atypical ciliopathy') || qLower.includes('atypical disease')) {
+            classification = "Atypical Ciliopathies";
+        }
+        
+        if (classification) {
+             const genes = await getGenesByCiliopathyClassification(classification);
+             return formatListResult(`Genes classified as ${classification}`, genes);
+        }
+    }
+    / --- Specific Disease List Handler (Joubert, BBS, NPHP, etc.) ---
+else if (detectedIntent === "disease") {
+    // List of major diseases and aliases to explicitly check against the query (qLower).
+    // Prioritize long names for best match accuracy.
+    const diseaseNames = [
+        // Major Syndromes/Diseases from the list:
+        "bardet-biedl syndrome", "joubert syndrome", "meckel-gruber syndrome",
+        "primary ciliary dyskinesia", "leber congenital amaurosis", "nephronophthisis",
+        "polycystic kidney disease", "autosomal dominant polycystic kidney disease",
+        "autosomal recessive polycystic kidney disease", "short-rib thoracic dysplasia",
+        "senior-løken syndrome", "cranioectodermal dysplasia",
+        // Common Aliases and General Terms:
+        "nphp", "bbs", "mks", "pcd", "ciliopathy", "syndrome"
+    ]; 
+    
+    let targetDisease = null;
+    // Iterate over names (sorted by length for better matching on multi-word terms)
+    for (const name of diseaseNames.sort((a, b) => b.length - a.length)) {
+        if (qLower.includes(name)) {
+            targetDisease = name;
+            break;
+        }
+    }
+    
+    if (targetDisease) {
+        // Map aliases to full names for the getCiliopathyGenes handler
+        const standardName = targetDisease.toUpperCase() === 'BBS' ? 'Bardet–Biedl Syndrome' :
+                             targetDisease.toUpperCase() === 'MKS' ? 'Meckel–Gruber Syndrome' : 
+                             targetDisease.toUpperCase() === 'PCD' ? 'Primary Ciliary Dyskinesia' :
+                             targetDisease.toUpperCase() === 'NPHP' ? 'Nephronophthisis' : // NPHP maps to Nephronophthisis
+                             targetDisease; // Handles full names like "Joubert Syndrome"
+        
+        // Assuming getCiliopathyGenes, formatListResult, and the required data are defined elsewhere
+        const { genes, description } = await getCiliopathyGenes(standardName);
+        const titleCaseName = standardName.replace(/\b\w/g, l => l.toUpperCase());
+        return formatListResult(`Genes for ${titleCaseName}`, genes, description);
+    }
+    
+    // Fallback if generic disease keywords were used but no specific disease was matched
+    return `<p>🩺 Disease query detected, but no specific disease or classification was identified for listing genes. Please try a query like "List genes for Joubert Syndrome".</p>`;
+}
+    // --- Other Intents Routing ---
+    else if (detectedIntent === "domain") {
         return await resolveDomainQuery(query);
     } else if (detectedIntent === "phylogeny") {
         return await resolvePhylogeneticQuery(query);
     } else if (detectedIntent === "complex") {
+        // Simple fallback to complex phylogeny analysis
         return await routeComplexPhylogenyAnalysis(query);
     } else if (detectedIntent === "expression") {
-        // Try extracting gene symbols if possible for plotting fallback
         const genes = (query.match(/\b[A-Z0-9\-]{3,}\b/g) || []);
         if (genes.length > 0) {
-            // NOTE: Assuming displayCellxgeneBarChart is defined elsewhere
+            if (qLower.includes('umap') && genes.length === 1) {
+                return await displayUmapGeneExpression(genes[0]);
+            }
             return await displayCellxgeneBarChart(genes);
         } else {
             return `<p>🧬 Please specify a gene to show expression data.</p>`;
         }
-    } else if (detectedIntent === "disease") {
-        // Fallback for disease until a robust disease resolver is implemented
-        return `<p>🩺 Disease-related query detected. This module will be available soon. Try a specific query like "List genes for Joubert Syndrome".</p>`;
     } else if (detectedIntent === "localization") {
-        // Fallback for localization, attempting to extract the location keyword
-        const locationMatch = qLower.match(/(basal body|transition zone|axoneme|centrosome)/);
+        const locationMatch = qLower.match(/(basal body|transition zone|axoneme|centrosome|ciliary membrane)/);
         if (locationMatch && locationMatch[1]) {
-             // NOTE: Assuming getGenesByLocalization and formatListResult are defined elsewhere
              const data = await getGenesByLocalization(locationMatch[1]);
              return formatListResult(`Genes localizing to ${locationMatch[1]}`, data);
         } else {
             return `<p>📍 Localization query detected. Please be more specific (e.g., "genes in the basal body").</p>`;
         }
     } else if (detectedIntent === "phenotype") {
-         // Fallback for phenotype queries
-         return `<p>🔎 Phenotype/Screen query detected. Please use a specific gene (e.g., "What happens to cilia when KIF3A is knocked down?") or a specific phenotype (e.g., "Find genes causing short cilia").</p>`;
+        return `<p>🔎 Phenotype/Screen query detected. Please use a specific gene (e.g., "What happens to cilia when KIF3A is knocked down?") or a specific phenotype (e.g., "Find genes causing short cilia").</p>`;
     }
 
     // --- Default fallback ---
     return null;
 }
+
+
 
 // --- Main AI Query Handler ---
 window.handleAIQuery = async function() {
@@ -528,26 +588,22 @@ patchAIQueryHandler();
 // REPLACEMENT: The definitive "Brain" of CiliAI, merging all features correctly.
 // =============================================================================
 function createIntentParser() {
-    // RESTORED: Your full, comprehensive list of diseases.
-    const classifiedDiseases = {
-        "Primary Ciliopathies": [
-            "Acrocallosal Syndrome", "Alström Syndrome", "Autosomal Dominant Polycystic Kidney Disease",
-            "Autosomal Recessive Polycystic Kidney Disease", "Bardet–Biedl Syndrome", "COACH Syndrome",
-            "Cranioectodermal Dysplasia", "Ellis-van Creveld Syndrome", "Hydrolethalus Syndrome", "Infantile Polycystic Kidney Disease",
-            "Joubert Syndrome", "Leber Congenital Amaurosis", "Meckel–Gruber Syndrome", "Nephronophthisis", "Orofaciodigital Syndrome",
-            "Senior-Løken Syndrome", "Short-rib Thoracic Dysplasia", "Skeletal Ciliopathy", "Retinal Ciliopathy", "Syndromic Ciliopathy",
-            "Al-Gazali-Bakalinova Syndrome", "Bazex-Dupré-Christol Syndrome", "Bilateral Polycystic Kidney Disease", "Biliary, Renal, Neurologic, and Skeletal Syndrome",
-            "Caroli Disease", "Carpenter Syndrome", "Complex Lethal Osteochondrodysplasia", "Greig Cephalopolysyndactyly Syndrome", "Kallmann Syndrome", "Lowe Oculocerebrorenal Syndrome",
-            "McKusick-Kaufman Syndrome", "Morbid Obesity and Spermatogenic Failure", "Polycystic Kidney Disease", "RHYNS Syndrome", "Renal-hepatic-pancreatic Dysplasia", "Retinal Dystrophy", "STAR Syndrome",
-            "Smith-Lemli-Opitz Syndrome", "Spondylometaphyseal Dysplasia", "Stromme Syndrome", "Weyers Acrofacial Dysostosis", "Hydrocephalus"
-        ],
-        "Motile Ciliopathies": [
-            "Primary Ciliary Dyskinesia", "Birt-Hogg-Dubé Syndrome", "Juvenile Myoclonic Epilepsy"
-        ],
-        "Atypical Ciliopathies": [
-            "Biliary Ciliopathy", "Chronic Obstructive Pulmonary Disease", "Ciliopathy", "Ciliopathy - Retinal dystrophy", "Golgipathies or Ciliopathy", "Hepatic Ciliopathy", "Male Infertility and Ciliopathy", "Male infertility", "Microcephaly and Chorioretinopathy Type 3", "Mucociliary Clearance Disorder", "Notch-mediated Ciliopathy", "Primary Endocardial Fibroelastosis", "Retinal Degeneration"
-        ]
-    };
+    const CILIOPATHY_CLASSIFICATION = {
+    { "Primary Ciliopathies": [ "Acrocallosal Syndrome", "Alström Syndrome", "Autosomal Dominant Polycystic Kidney Disease",
+                                "Autosomal Recessive Polycystic Kidney Disease", "Bardet–Biedl Syndrome", "COACH Syndrome",
+                                "Cranioectodermal Dysplasia", "Ellis-van Creveld Syndrome", "Hydrolethalus Syndrome", "Infantile Polycystic Kidney Disease",
+                                "Joubert Syndrome", "Leber Congenital Amaurosis", "Meckel–Gruber Syndrome", "Nephronophthisis", "Orofaciodigital Syndrome",
+                                "Senior-Løken Syndrome", "Short-rib Thoracic Dysplasia", "Skeletal Ciliopathy", "Retinal Ciliopathy", "Syndromic Ciliopathy",
+                                "Al-Gazali-Bakalinova Syndrome", "Bazex-Dupré-Christol Syndrome", "Bilateral Polycystic Kidney Disease", "Biliary, Renal, Neurologic, and Skeletal Syndrome",
+                                "Caroli Disease", "Carpenter Syndrome", "Complex Lethal Osteochondrodysplasia", "Greig Cephalopolysyndactyly Syndrome", "Kallmann Syndrome", "Lowe Oculocerebrorenal Syndrome",
+                                "McKusick-Kaufman Syndrome", "Morbid Obesity and Spermatogenic Failure", "Polycystic Kidney Disease", "RHYNS Syndrome", "Renal-hepatic-pancreatic Dysplasia", "Retinal Dystrophy", "STAR Syndrome",
+                                "Smith-Lemli-Opitz Syndrome", "Spondylometaphyseal Dysplasia", "Stromme Syndrome", "Weyers Acrofacial Dysostosis" ], ,
+    "Motile Ciliopathies": [ "Primary Ciliary Dyskinesia", "Birt-Hogg-Dubé Syndrome", "Juvenile Myoclonic Epilepsy" ],
+    "Secondary Diseases": [ "Ataxia-telangiectasia-like Disorder", "Birt-Hogg-Dubé Syndrome", "Cone-Rod Dystrophy", "Cornelia de Lange Syndrome",
+                           "Holoprosencephaly", "Juvenile Myoclonic Epilepsy", "Medulloblastoma", "Retinitis Pigmentosa", "Spinocerebellar Ataxia", "Bazex-Dupré-Christol Syndrome", "Lowe Oculocerebrorenal Syndrome",
+                           "McKusick-Kaufman Syndrome", "Pallister-Hall Syndrome", "Simpson-Golabi-Behmel Syndrome", "Townes-Brocks Syndrome", "Usher Syndrome", "Visceral Heterotaxy" ],
+    "Atypical Ciliopathies": [ "Biliary Ciliopathy", "Chronic Obstructive Pulmonary Disease", "Ciliopathy", "Ciliopathy - Retinal dystrophy", "Golgipathies or Ciliopathy", "Hepatic Ciliopathy", "Male Infertility and Ciliopathy", "Male infertility", "Microcephaly and Chorioretinopathy Type 3", "Mucociliary Clearance Disorder", "Notch-mediated Ciliopathy", "Primary Endocardial Fibroelastosis", "Retinal Ciliopathy", "Retinal Degeneration", "Skeletal Ciliopathy", "Syndromic Ciliopathy" ] };
+    
     const aliases = ["BBS", "Joubert", "NPHP", "MKS"];
     const allDiseases = [...Object.values(classifiedDiseases).flat(), ...aliases];
 
