@@ -237,6 +237,104 @@ function normalizeTerm(s) {
     return String(s).toLowerCase().replace(/[._\-\s]+/g, ' ').trim();
 }
 
+// ==================== SEMANTIC INTENT RESOLVER ====================
+// Detects user intent using keyword clusters and fuzzy semantic matching.
+// Designed for CiliaHub’s CiliAI natural-language interface.
+async function resolveSemanticIntent(query) {
+    const qLower = query.toLowerCase().trim();
+
+    // --- Define semantic clusters for major biological contexts ---
+    const intentClusters = {
+        ciliary_tip: [
+            "ciliary tip", "distal tip", "tip proteins", "tip components", 
+            "tip composition", "proteins at the ciliary tip", "ciliary tip complex",
+            "enriched at the tip", "distal region", "ciliary tip proteome"
+        ],
+        domain: [
+            "domain", "motif", "architecture", "protein fold", "domain organization"
+        ],
+        phylogeny: [
+            "phylogeny", "evolution", "conservation", "ortholog", "paralog", "species tree",
+            "evolutionary profile", "conservation heatmap"
+        ],
+        complex: [
+            "complex", "interactome", "binding partners", "corum", "protein interaction",
+            "ift", "bbsome", "dynein", "mks", "nphp", "radial spoke", "axoneme", "transition zone"
+        ],
+        expression: [
+            "expression", "umap", "tissue", "cell type", "where expressed", "scRNA",
+            "single-cell", "transcript", "abundance", "expression pattern"
+        ],
+        disease: [
+            "mutation", "variant", "pathogenic", "ciliopathy", "disease", "syndrome",
+            "bbs", "joubert", "mks", "pcd", "lca"
+        ],
+        // Added for flexibility on existing handlers that may not be complex/gene-specific
+        localization: [
+            "localize", "location", "subcellular", "basal body", "transition zone", "centrosome", "axoneme"
+        ],
+        phenotype: [
+            "knockdown", "phenotype", "effect", "shorter cilia", "longer cilia", "cilia length", "cilia number"
+        ]
+    };
+
+    // --- Rule-based fuzzy detection ---
+    let detectedIntent = null;
+    for (const [intent, phrases] of Object.entries(intentClusters)) {
+        if (phrases.some(p => qLower.includes(p))) {
+            detectedIntent = intent;
+            break;
+        }
+    }
+
+    // --- Handle Ciliary Tip as a special semantic case ---
+    if (detectedIntent === "ciliary_tip") {
+        const title = "Ciliary Tip Components";
+        // NOTE: Assuming getCuratedComplexComponents is defined elsewhere
+        const data = await getCuratedComplexComponents("CILIARY TIP"); 
+        // NOTE: Assuming formatListResult is defined elsewhere
+        return formatListResult(title, data); 
+    }
+
+    // --- Domain, Phylogeny, Complex, etc. can route to their resolvers ---
+    // NOTE: Assuming resolveDomainQuery, resolvePhylogeneticQuery, routeComplexPhylogenyAnalysis are defined elsewhere
+    if (detectedIntent === "domain") {
+        return await resolveDomainQuery(query);
+    } else if (detectedIntent === "phylogeny") {
+        return await resolvePhylogeneticQuery(query);
+    } else if (detectedIntent === "complex") {
+        return await routeComplexPhylogenyAnalysis(query);
+    } else if (detectedIntent === "expression") {
+        // Try extracting gene symbols if possible for plotting fallback
+        const genes = (query.match(/\b[A-Z0-9\-]{3,}\b/g) || []);
+        if (genes.length > 0) {
+            // NOTE: Assuming displayCellxgeneBarChart is defined elsewhere
+            return await displayCellxgeneBarChart(genes);
+        } else {
+            return `<p>🧬 Please specify a gene to show expression data.</p>`;
+        }
+    } else if (detectedIntent === "disease") {
+        // Fallback for disease until a robust disease resolver is implemented
+        return `<p>🩺 Disease-related query detected. This module will be available soon. Try a specific query like "List genes for Joubert Syndrome".</p>`;
+    } else if (detectedIntent === "localization") {
+        // Fallback for localization, attempting to extract the location keyword
+        const locationMatch = qLower.match(/(basal body|transition zone|axoneme|centrosome)/);
+        if (locationMatch && locationMatch[1]) {
+             // NOTE: Assuming getGenesByLocalization and formatListResult are defined elsewhere
+             const data = await getGenesByLocalization(locationMatch[1]);
+             return formatListResult(`Genes localizing to ${locationMatch[1]}`, data);
+        } else {
+            return `<p>📍 Localization query detected. Please be more specific (e.g., "genes in the basal body").</p>`;
+        }
+    } else if (detectedIntent === "phenotype") {
+         // Fallback for phenotype queries
+         return `<p>🔎 Phenotype/Screen query detected. Please use a specific gene (e.g., "What happens to cilia when KIF3A is knocked down?") or a specific phenotype (e.g., "Find genes causing short cilia").</p>`;
+    }
+
+    // --- Default fallback ---
+    return null;
+}
+
 // --- Main AI Query Handler ---
 window.handleAIQuery = async function() {
     const aiQueryInput = document.getElementById('aiQueryInput');
@@ -263,6 +361,14 @@ window.handleAIQuery = async function() {
         ]);
         console.log('ciliAI.js: All core data loaded for processing.');
 
+        // 🧠 NEW ROUTING PRIORITY 0: Try resolving semantic intent before keyword routing
+        // NOTE: 'resolveSemanticIntent' must be defined outside this function.
+        const semanticResult = await resolveSemanticIntent(query);
+        if (semanticResult) {
+            resultArea.innerHTML = semanticResult;
+            return; // Stop further routing — intent handled semantically
+        }
+
         let resultHtml = '';
         const qLower = query.toLowerCase();
         let match;
@@ -274,7 +380,7 @@ window.handleAIQuery = async function() {
         if (complexTableResult) {
             console.log("Query resolved by High-Priority Complex Phylogeny Table Router.");
             resultHtml = complexTableResult;
-        } 
+        }
         
         // =================================================================
         // ⭐ NEW ROUTING PRIORITY 2: Handle Domain Queries (Comparison, Enriched, Depleted, Specific Motifs) ⭐
@@ -291,8 +397,8 @@ window.handleAIQuery = async function() {
         // **NEW ROUTING PRIORITY 3:** Handle General Phylogenetic Queries (FIXES REFERENCE ERROR)
         // =================================================================
         else if (qLower.includes('phylogeny') || qLower.includes('conservation') || 
-                   qLower.includes('heatmap') || qLower.includes('comparison') || 
-                   qLower.includes('tree')) {
+                 qLower.includes('heatmap') || qLower.includes('comparison') || 
+                 qLower.includes('tree')) {
             
             console.log('Routing to General Phylogenetic Query Resolver...');
             resultHtml = await resolvePhylogeneticQuery(query); 
@@ -3078,41 +3184,6 @@ const questionRegistry = [
 // --- Signaling Hubs ---
 { text: "List components of the SHH Signaling complex", handler: async () => formatListResult("SHH Signaling Components", await getCuratedComplexComponents("SHH SIGNALING")) },
 { text: "Show genes in Hedgehog Trafficking Complex", handler: async () => formatListResult("Hedgehog Trafficking Complex Components", await getCuratedComplexComponents("HEDGEHOG TRAFFICKING COMPLEX")) },
-// ==================== CILIARY TIP COMPONENTS (Curated List) ====================
-{ text: "Tell me about Ciliary Tip proteins", handler: async () => formatListResult("Ciliary Tip Components", await getCuratedComplexComponents("CILIARY TIP")) },       
-{ text: "Tell me about components of the Ciliary Tip", handler: async () => formatListResult("Ciliary Tip Components", await getCuratedComplexComponents("CILIARY TIP")) },    
-{ text: "Show components of the Ciliary Tip", handler: async () => formatListResult("Ciliary Tip Components", await getCuratedComplexComponents("CILIARY TIP")) },
-{ text: "List genes localized to the Ciliary Tip", handler: async () => formatListResult("Ciliary Tip Components", await getCuratedComplexComponents("CILIARY TIP")) },
-{ text: "Display Ciliary Tip enriched proteins", handler: async () => formatListResult("Ciliary Tip Components", await getCuratedComplexComponents("CILIARY TIP")) },
-{ text: "What proteins are at the ciliary tip?", handler: async () => formatListResult("Ciliary Tip Components", await getCuratedComplexComponents("CILIARY TIP")) },
-{ text: "Genes at the Ciliary Tip", handler: async () => formatListResult("Ciliary Tip Components", await getCuratedComplexComponents("CILIARY TIP")) },
-{ text: "Show Ciliary Tip complex members", handler: async () => formatListResult("Ciliary Tip Components", await getCuratedComplexComponents("CILIARY TIP")) },
-// Additional natural variations
-{ text: "What are the ciliary tip components?", handler: async () => formatListResult("Ciliary Tip Components", await getCuratedComplexComponents("CILIARY TIP")) },
-{ text: "Which proteins localize to the ciliary tip?", handler: async () => formatListResult("Ciliary Tip Components", await getCuratedComplexComponents("CILIARY TIP")) },
-{ text: "Show me ciliary tip proteins", handler: async () => formatListResult("Ciliary Tip Components", await getCuratedComplexComponents("CILIARY TIP")) },
-{ text: "List ciliary tip genes", handler: async () => formatListResult("Ciliary Tip Components", await getCuratedComplexComponents("CILIARY TIP")) },
-{ text: "Ciliary tip protein list", handler: async () => formatListResult("Ciliary Tip Components", await getCuratedComplexComponents("CILIARY TIP")) },
-{ text: "Give me the ciliary tip components", handler: async () => formatListResult("Ciliary Tip Components", await getCuratedComplexComponents("CILIARY TIP")) },
-{ text: "What genes are in the ciliary tip?", handler: async () => formatListResult("Ciliary Tip Components", await getCuratedComplexComponents("CILIARY TIP")) },
-{ text: "Proteins found at the ciliary tip", handler: async () => formatListResult("Ciliary Tip Components", await getCuratedComplexComponents("CILIARY TIP")) },
-{ text: "Ciliary tip composition", handler: async () => formatListResult("Ciliary Tip Components", await getCuratedComplexComponents("CILIARY TIP")) },
-{ text: "Components of ciliary tip", handler: async () => formatListResult("Ciliary Tip Components", await getCuratedComplexComponents("CILIARY TIP")) },
-{ text: "Ciliary tip gene list", handler: async () => formatListResult("Ciliary Tip Components", await getCuratedComplexComponents("CILIARY TIP")) },
-// Informal/conversational
-{ text: "Tell me what's at the ciliary tip", handler: async () => formatListResult("Ciliary Tip Components", await getCuratedComplexComponents("CILIARY TIP")) },
-{ text: "What's in the ciliary tip?", handler: async () => formatListResult("Ciliary Tip Components", await getCuratedComplexComponents("CILIARY TIP")) },
-{ text: "Ciliary tip contents", handler: async () => formatListResult("Ciliary Tip Components", await getCuratedComplexComponents("CILIARY TIP")) },
-// Research-oriented phrasing
-{ text: "Ciliary tip proteome", handler: async () => formatListResult("Ciliary Tip Components", await getCuratedComplexComponents("CILIARY TIP")) },
-{ text: "Distal tip proteins", handler: async () => formatListResult("Ciliary Tip Components", await getCuratedComplexComponents("CILIARY TIP")) },
-{ text: "Proteins enriched at the ciliary distal tip", handler: async () => formatListResult("Ciliary Tip Components", await getCuratedComplexComponents("CILIARY TIP")) },
-{ text: "Ciliary distal tip components", handler: async () => formatListResult("Ciliary Tip Components", await getCuratedComplexComponents("CILIARY TIP")) },
-{ text: "What comprises the ciliary tip?", handler: async () => formatListResult("Ciliary Tip Components", await getCuratedComplexComponents("CILIARY TIP")) },
-// Action verbs
-{ text: "Find ciliary tip proteins", handler: async () => formatListResult("Ciliary Tip Components", await getCuratedComplexComponents("CILIARY TIP")) },
-{ text: "Search ciliary tip components", handler: async () => formatListResult("Ciliary Tip Components", await getCuratedComplexComponents("CILIARY TIP")) },
-{ text: "Retrieve ciliary tip genes", handler: async () => formatListResult("Ciliary Tip Components", await getCuratedComplexComponents("CILIARY TIP")) },
     // ==================== CILIOPATHIES & DISEASES ====================
     // Bardet-Biedl Syndrome
     { text: "List genes associated with Bardet–Biedl syndrome", handler: async () => { const { genes, description } = await getCiliopathyGenes("Bardet–Biedl syndrome"); return formatListResult("Genes for Bardet–Biedl syndrome", genes, description); }},
