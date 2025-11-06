@@ -239,15 +239,13 @@ function normalizeTerm(s) {
 
 // ==================== SEMANTIC INTENT RESOLVER ====================
 // Detects user intent using keyword clusters and fuzzy semantic matching.
-// ==================== SEMANTIC INTENT RESOLVER (UPDATED) ====================
-// Detects user intent using keyword clusters and fuzzy semantic matching.
 async function resolveSemanticIntent(query) {
     const qLower = query.toLowerCase().trim();
 
     // --- Define semantic clusters for major biological contexts ---
     const intentClusters = {
         ciliary_tip: [
-            "ciliary tip", "distal tip", "tip proteins", "tip components", 
+            "ciliary tip", "distal tip", "tip proteins", "tip components",
             "tip composition", "proteins at the ciliary tip", "ciliary tip complex",
             "enriched at the tip", "distal region", "ciliary tip proteome"
         ],
@@ -318,47 +316,49 @@ async function resolveSemanticIntent(query) {
              return formatListResult(`Genes classified as ${classification}`, genes);
         }
     }
-    / --- Specific Disease List Handler (Joubert, BBS, NPHP, etc.) ---
-else if (detectedIntent === "disease") {
-    // List of major diseases and aliases to explicitly check against the query (qLower).
-    // Prioritize long names for best match accuracy.
-    const diseaseNames = [
-        // Major Syndromes/Diseases from the list:
-        "bardet-biedl syndrome", "joubert syndrome", "meckel-gruber syndrome",
-        "primary ciliary dyskinesia", "leber congenital amaurosis", "nephronophthisis",
-        "polycystic kidney disease", "autosomal dominant polycystic kidney disease",
-        "autosomal recessive polycystic kidney disease", "short-rib thoracic dysplasia",
-        "senior-løken syndrome", "cranioectodermal dysplasia",
-        // Common Aliases and General Terms:
-        "nphp", "bbs", "mks", "pcd", "ciliopathy", "syndrome"
-    ]; 
-    
-    let targetDisease = null;
-    // Iterate over names (sorted by length for better matching on multi-word terms)
-    for (const name of diseaseNames.sort((a, b) => b.length - a.length)) {
-        if (qLower.includes(name)) {
-            targetDisease = name;
-            break;
-        }
-    }
-    
-    if (targetDisease) {
-        // Map aliases to full names for the getCiliopathyGenes handler
-        const standardName = targetDisease.toUpperCase() === 'BBS' ? 'Bardet–Biedl Syndrome' :
-                             targetDisease.toUpperCase() === 'MKS' ? 'Meckel–Gruber Syndrome' : 
-                             targetDisease.toUpperCase() === 'PCD' ? 'Primary Ciliary Dyskinesia' :
-                             targetDisease.toUpperCase() === 'NPHP' ? 'Nephronophthisis' : // NPHP maps to Nephronophthisis
-                             targetDisease; // Handles full names like "Joubert Syndrome"
+
+    // --- Specific Disease List Handler (Joubert, BBS, NPHP, etc.) ---
+    else if (detectedIntent === "disease") {
+        // List of major diseases and aliases to explicitly check against the query (qLower).
+        // Prioritize long names for best match accuracy.
+        const diseaseNames = [
+            // Major Syndromes/Diseases:
+            "bardet-biedl syndrome", "joubert syndrome", "meckel-gruber syndrome",
+            "primary ciliary dyskinesia", "leber congenital amaurosis", "nephronophthisis",
+            "polycystic kidney disease", "autosomal dominant polycystic kidney disease",
+            "autosomal recessive polycystic kidney disease", "short-rib thoracic dysplasia",
+            "senior-løken syndrome", "cranioectodermal dysplasia",
+            // Common Aliases and General Terms:
+            "nphp", "bbs", "mks", "pcd", "ciliopathy", "syndrome"
+        ];
         
-        // Assuming getCiliopathyGenes, formatListResult, and the required data are defined elsewhere
-        const { genes, description } = await getCiliopathyGenes(standardName);
-        const titleCaseName = standardName.replace(/\b\w/g, l => l.toUpperCase());
-        return formatListResult(`Genes for ${titleCaseName}`, genes, description);
+        let targetDisease = null;
+        // Iterate over names (sorted by length for better matching on multi-word terms)
+        for (const name of diseaseNames.sort((a, b) => b.length - a.length)) {
+            if (qLower.includes(name)) {
+                targetDisease = name;
+                break;
+            }
+        }
+        
+        if (targetDisease) {
+            // Map aliases to full names for the getCiliopathyGenes handler
+            const standardName = targetDisease.toUpperCase() === 'BBS' ? 'Bardet–Biedl Syndrome' :
+                                 targetDisease.toUpperCase() === 'MKS' ? 'Meckel–Gruber Syndrome' : 
+                                 targetDisease.toUpperCase() === 'PCD' ? 'Primary Ciliary Dyskinesia' :
+                                 targetDisease.toUpperCase() === 'NPHP' ? 'Nephronophthisis' :
+                                 targetDisease; 
+            
+            // Assuming getCiliopathyGenes, formatListResult, and the required data are defined elsewhere
+            const { genes, description } = await getCiliopathyGenes(standardName);
+            const titleCaseName = standardName.replace(/\b\w/g, l => l.toUpperCase());
+            return formatListResult(`Genes for ${titleCaseName}`, genes, description);
+        }
+        
+        // Fallback if generic disease keywords were used but no specific disease was matched
+        return `<p>🩺 Disease query detected, but no specific disease or classification was identified for listing genes. Please try a query like "List genes for Joubert Syndrome".</p>`;
     }
     
-    // Fallback if generic disease keywords were used but no specific disease was matched
-    return `<p>🩺 Disease query detected, but no specific disease or classification was identified for listing genes. Please try a query like "List genes for Joubert Syndrome".</p>`;
-}
     // --- Other Intents Routing ---
     else if (detectedIntent === "domain") {
         return await resolveDomainQuery(query);
@@ -392,8 +392,6 @@ else if (detectedIntent === "disease") {
     // --- Default fallback ---
     return null;
 }
-
-
 
 // --- Main AI Query Handler ---
 window.handleAIQuery = async function() {
