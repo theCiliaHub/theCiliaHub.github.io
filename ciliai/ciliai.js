@@ -2244,55 +2244,69 @@ async function routeMultiGeneDomainTable(query) {
  * @##########################BEGINNING OF EXPRESSION RELATED QUETIONS AND HELPER##################################
 /**@##########################BEGINNING OF EXPRESSION RELATED QUETIONS AND HELPER##################################
 /**
-// =============================================================================
-// NEW: GENERALIZED LOCALIZATION + PHENOTYPE FILTERING FUNCTION
-// =============================================================================
-
 /**
  * @name getLocalizationPhenotypeGenes
- * @description Finds genes localizing to a specified compartment that also cause short/absent cilia phenotypes.
- * @param {string} localizationTerm - The target subcellular compartment (e.g., "basal body", "cilia", "transition zone").
+ * @description Finds genes localizing to a specified compartment that also match a specific phenotype.
+ * @param {string} localizationTerm - The target subcellular compartment (e.g., "basal body").
+ * @param {string} phenotypeTerm - The phenotype filter ("short cilia", "longer cilia", "no effect").
  */
-async function getLocalizationPhenotypeGenes(localizationTerm) {
+async function getLocalizationPhenotypeGenes(localizationTerm, phenotypeTerm) {
     await fetchCiliaData(); 
 
-    // 1. Get genes localizing to the target compartment
+    // 1. Get genes localizing to the target compartment (Localization Filter)
     const targetGenes = await getGenesByLocalization(localizationTerm); 
     const targetGeneSet = new Set(targetGenes.map(g => g.gene.toUpperCase()));
 
-    // 2. Define phenotype filter keywords (same logic for short/absent cilia)
-    const lengthKeywords = ['shorter', 'short', 'absent'];
-    const numberKeywords = ['reduced', 'decreased', 'fewer', 'loss'];
+    // 2. Define phenotype filter keywords based on the phenotypeTerm
+    const phenotypeLower = phenotypeTerm.toLowerCase();
     
+    // Default keywords for filtering (now dynamic based on phenotypeTerm)
+    let lengthKeywords = [];
+    let numberKeywords = [];
+
+    // --- Dynamic Phenotype Mapping ---
+    if (phenotypeLower.includes('short')) {
+        lengthKeywords = ['shorter', 'short', 'absent'];
+        numberKeywords = ['reduced', 'decreased', 'fewer', 'loss'];
+    } else if (phenotypeLower.includes('longer')) {
+        lengthKeywords = ['longer', 'long'];
+    } else if (phenotypeLower.includes('no effect')) {
+        lengthKeywords = ['no effect', 'not reported']; // For LoF effect
+        numberKeywords = ['no effect', 'not reported']; // For ciliation effect
+    }
+    
+    // --- Phenotype Filter Logic ---
     const results = ciliaHubDataCache
         .filter(gene => {
             const geneUpper = gene.gene.toUpperCase();
-            if (!targetGeneSet.has(geneUpper)) return false; // Must localize to target area
-
-            // Check 1: Short Cilia (lof_effects)
-            const lofEffect = gene.lof_effects ? gene.lof_effects.toLowerCase() : "";
-            const isShortCilia = lengthKeywords.some(kw => lofEffect.includes(kw));
             
-            // Check 2: Low Ciliation (percent_ciliated_cells_effects)
+            // Step 2.1: Apply Localization Filter
+            if (!targetGeneSet.has(geneUpper)) return false; 
+            
+            // Step 2.2: Apply Phenotype Filter (Must match at least one criterion)
+            const lofEffect = gene.lof_effects ? gene.lof_effects.toLowerCase() : "";
             const numberEffect = gene.percent_ciliated_cells_effects ? gene.percent_ciliated_cells_effects.toLowerCase() : "";
-            const isLowCiliation = numberKeywords.some(kw => numberEffect.includes(kw));
+            
+            // Check for match based on defined keywords
+            const matchesLength = lengthKeywords.some(kw => lofEffect.includes(kw));
+            const matchesNumber = numberKeywords.some(kw => numberEffect.includes(kw));
 
-            // Must match either short length OR reduced number
-            return isShortCilia || isLowCiliation;
+            // Return true if either length or number criteria are met
+            return matchesLength || matchesNumber; 
         })
         .map(g => ({
-    gene: g.gene,
-    // --- NEW: Separate Localization and Phenotype Data for the Table ---
-    localization_detail: g.localization.join(', '), 
-    lof_effect_detail: g.lof_effects || 'N/A', 
-    // The main description will now be the full, raw string (or a composite summary if needed)
-    description: `Location: ${g.localization.join(', ')}. LoF: ${g.lof_effects || 'N/A'}`
-}))
+            gene: g.gene,
+            // Prepare enhanced table data structure
+            localization_detail: g.localization ? g.localization.join(', ') : 'N/A',
+            lof_effect_detail: g.lof_effects || 'N/A',
+            description: `LoF: ${g.lof_effects || 'N/A'}`
+        }))
         .sort((a, b) => a.gene.localeCompare(b.gene));
 
-    const title = `${localizationTerm} Genes Causing Short Cilia`;
+    const title = `${localizationTerm} Genes Causing ${phenotypeTerm}`;
     return formatListResult(title, results);
 }
+
 
 // =============================================================================
 // OLD FUNCTION NOW SIMPLIFIED TO CALL THE NEW GENERALIZED ONE
@@ -3449,8 +3463,8 @@ const questionRegistry = [
 { text: "Show nuclear localizing genes causing short cilia", handler: async () => getLocalizationPhenotypeGenes("Nucleus") },
 
 // --- BASAL BODY ---
-{ text: "Show basal body genes causing short cilia", handler: async () => getLocalizationPhenotypeGenes("basal body") },
-{ text: "Basal body genes with cilia defects", handler: async () => getLocalizationPhenotypeGenes("basal body") },
+{ text: "Show basal body genes causing short cilia", handler: async () => getLocalizationPhenotypeGenes("basal body", "short cilia") },
+{ text: "Basal body genes with cilia defects", handler: async () => getLocalizationPhenotypeGenes("basal body", "short cilia") },
 { text: "Which basal body proteins affect cilia length", handler: async () => getLocalizationPhenotypeGenes("basal body") },
 { text: "Find basal body genes reducing cilia", handler: async () => getLocalizationPhenotypeGenes("basal body") },
 { text: "Basal body proteins causing cilia phenotypes", handler: async () => getLocalizationPhenotypeGenes("basal body") },
