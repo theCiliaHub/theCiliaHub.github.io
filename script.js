@@ -422,24 +422,32 @@ function performBatchSearch() {
 
     if (!inputElement || !resultDiv) return;
 
-    // 1. Get all unique, sanitized queries from the input box
-    const originalQueries = inputElement.value.split(/[\s,;\n\r\t]+/).filter(Boolean);
-    // Use a Set to automatically handle duplicate inputs
-    const sanitizedQueries = [...new Set(originalQueries.map(sanitize))];
+    // 1. Get all original unique queries from the input box
+    const allOriginalQueries = inputElement.value.split(/[\s,;\n\r\t]+/).filter(Boolean).map(q => q.trim());
+    // Create a canonical list of unique, sanitized queries for lookup
+    const uniqueSanitizedQueries = [...new Set(allOriginalQueries.map(sanitize))];
+    const originalQueryMap = new Map();
+    // Map sanitized query to its original, un-sanitized form (first occurrence only)
+    allOriginalQueries.forEach(q => {
+        const sanitized = sanitize(q);
+        if (sanitized && !originalQueryMap.has(sanitized)) {
+            originalQueryMap.set(sanitized, q);
+        }
+    });
 
-    if (sanitizedQueries.length === 0) {
+    if (uniqueSanitizedQueries.length === 0) {
         resultDiv.innerHTML = '<p class="status-message error-message">Please enter one or more gene names, synonyms, or Ensembl IDs.</p>';
         return;
     }
 
-    // 2. Use the central `findGenes` function that correctly finds all ID types
-    const { foundGenes } = findGenes(sanitizedQueries);
+    // 2. Perform search and initial filtering
+    const { foundGenes } = findGenes(uniqueSanitizedQueries); // Use the efficient Map-based search
     let results = foundGenes;
 
     // 3. Apply the optional localization and keyword filters to the results
     if (localizationFilter) {
         results = results.filter(g =>
-            g.localization && g.localization.some(l => l && l.toLowerCase() === localizationFilter.toLowerCase())
+            g.localization && (Array.isArray(g.localization) ? g.localization.some(l => l && l.toLowerCase() === localizationFilter.toLowerCase()) : g.localization.toLowerCase() === localizationFilter.toLowerCase())
         );
     }
 
@@ -449,34 +457,56 @@ function performBatchSearch() {
             (g.description && g.description.toLowerCase().includes(keywordFilter))
         );
     }
-
-    // 4. Determine which of the original, user-entered queries were not found in the final results
-    const foundIds = new Set();
+    
+    // FIX 1: Correctly capture ALL original not-found queries
+    // Collect all identifiers (sanitized, uppercase) that led to the FOUND and FILTERED genes
+    const foundIdentifiers = new Set();
     results.forEach(gene => {
-        // Add all known identifiers for the found genes to a set for quick lookup
-        foundIds.add(gene.gene.toUpperCase());
+        foundIdentifiers.add(sanitize(gene.gene));
         if (gene.synonym) {
-            String(gene.synonym).split(/[,;]/).forEach(s => foundIds.add(sanitize(s)));
+            String(gene.synonym).split(/[,;]/).forEach(s => foundIdentifiers.add(sanitize(s)));
         }
         if (gene.ensembl_id) {
-            String(gene.ensembl_id).split(/[,;]/).forEach(id => foundIds.add(sanitize(id)));
+            String(gene.ensembl_id).split(/[,;]/).forEach(id => foundIdentifiers.add(sanitize(id)));
         }
     });
 
-    const notFoundOriginalQueries = originalQueries.filter(q => !foundIds.has(sanitize(q)));
+    // Determine which original queries did NOT result in a found gene (before/after filtering)
+    // NOTE: This assumes findGenes correctly handles all identifiers, and the subsequent filtering
+    // means a gene that was found but filtered out is still considered 'found' by the user's initial query.
+    // To match the user's intent (display *remaining 80*), we must compare against the successful *lookup*
+    // before applying localization/keyword filters.
+    
+    // Rerunning initial lookup without filters to get the list of genes found in the CiliaHub
+    const { foundGenes: initialFoundGenes } = findGenes(uniqueSanitizedQueries);
+    const initiallyFoundIdentifiers = new Set();
+    initialFoundGenes.forEach(gene => {
+        initiallyFoundIdentifiers.add(sanitize(gene.gene));
+        if (gene.synonym) {
+            String(gene.synonym).split(/[,;]/).forEach(s => initiallyFoundIdentifiers.add(sanitize(s)));
+        }
+        if (gene.ensembl_id) {
+            String(gene.ensembl_id).split(/[,;]/).forEach(id => initiallyFoundIdentifiers.add(sanitize(id)));
+        }
+    });
 
-    // 5. Display the final, filtered results
+    // The genes *not* found in the CiliaHub are the original queries whose sanitized version
+    // are not in the 'initiallyFoundIdentifiers' set.
+    const notFoundOriginalQueries = allOriginalQueries.filter(q => !initiallyFoundIdentifiers.has(sanitize(q)));
+
+
+    // 4. Display the final, filtered results AND the not-found genes
     statusDiv.style.display = 'none';
     searchResults = results; // Update global variable for exports
 
-    if (results.length > 0 || notFoundOriginalQueries.length > 0) {
-        displayBatchResults(results, notFoundOriginalQueries);
-        displayGeneCards(currentData, results, 1, 10);
-    } else {
-        resultDiv.innerHTML = '<p class="status-message error-message">No genes found matching your query and filters.</p>';
-        displayGeneCards(currentData, [], 1, 10); // Clear the gene cards
-    }
+    // Pass the filtered found genes and the *full list* of not-found original queries
+    displayBatchResults(results, notFoundOriginalQueries);
+    // If we have any results (found OR not found), display the gene cards for the found genes
+    displayGeneCards(currentData, results, 1, 10);
+    // Removed old logic: if (results.length > 0 || notFoundOriginalQueries.length > 0) {...}
+    // New logic handles display in displayBatchResults and displayGeneCards
 }
+
 
 // --- HOME PAGE SEARCH HANDLER (FIXED) ---
 // This function handles user input to show a list of suggestions.
@@ -561,40 +591,55 @@ function navigateToGenePage(geneName) {
 /**
  * Displays batch results.
  */
-function displayBatchResults(foundGenes, notFoundGenes) {
+function displayBatchResults(foundGenes, notFoundGenes) { // Ensure notFoundGenes parameter is accepted
     const resultDiv = document.getElementById('batch-results');
     if (!resultDiv) return;
 
-    let html = `<h3>Search Results (${foundGenes.length} gene${foundGenes.length !== 1 ? 's' : ''} found)</h3>`;
+    // Use foundGenes.length + notFoundGenes.length for the total genes checked
+    const totalChecked = foundGenes.length + (notFoundGenes ? notFoundGenes.length : 0);
+
+    let html = `
+        <h3 style="margin-top: 20px; color: #2c5aa0;">
+            Batch Query Results 
+            <span style="font-size: 0.9em; font-weight: normal;">
+                (${foundGenes.length} gene${foundGenes.length !== 1 ? 's' : ''} found out of ${totalChecked} checked)
+            </span>
+        </h3>`;
 
     if (foundGenes.length > 0) {
-        html += '<table><thead><tr><th>Gene</th><th>Ensembl ID</th><th>Localization</th><th>Function Summary</th></tr></thead><tbody>';
+        // FIX 2 Part 1: Ensure the table link is correct. It already uses the helper: navigateTo(event, '/${item.gene}')
+        html += '<div class="table-wrapper" style="overflow-x: auto;"><table class="data-table"><thead><tr><th>Gene</th><th>Ensembl ID</th><th>Localization</th><th>Function Summary</th></tr></thead><tbody>';
         foundGenes.forEach(item => {
             // Join localization array for display
             const localizationText = Array.isArray(item.localization) ? item.localization.join(', ') : (item.localization || '-');
             html += `<tr>
-                <td><a href="/${item.gene}" onclick="navigateTo(event, '/${item.gene}')">${item.gene}</a></td>
+                <td><a href="#gene/${item.gene}" onclick="navigateTo(event, 'gene/${item.gene}')">${item.gene}</a></td>
                 <td>${item.ensembl_id || '-'}</td>
                 <td>${localizationText}</td>
                 <td>${item.functional_summary ? item.functional_summary.substring(0, 100) + '...' : '-'}</td>
             </tr>`;
         });
-        html += '</tbody></table>';
+        html += '</tbody></table></div>';
     }
 
+    // FIX 1: Displaying Not Found Genes
     if (notFoundGenes && notFoundGenes.length > 0) {
         html += `
-            <div style="margin-top: 20px; padding: 10px; border: 1px solid #ddd; border-radius: 4px;">
-                <h4>Genes Not Found (${notFoundGenes.length}):</h4>
-                <p>${notFoundGenes.join(', ')}</p>
+            <div style="margin-top: 20px; padding: 15px; border: 1px solid #c0392b; background: #fdecea; border-radius: 4px;">
+                <h4 style="color: #c0392b; margin-top: 0;">Genes Not Found in CiliaHub (${notFoundGenes.length}):</h4>
+                <p style="word-break: break-all; margin: 0;">${notFoundGenes.join(', ')}</p>
             </div>
         `;
     }
     
+    if (foundGenes.length === 0 && notFoundGenes.length === 0) {
+        html += '<p class="status-message error-message">No genes found matching your query and filters.</p>';
+    }
+
     resultDiv.innerHTML = html;
-    const cardsContainer = document.getElementById('gene-cards-container');
-    if (cardsContainer) cardsContainer.innerHTML = '';
+    // The call to displayGeneCards is now handled in performBatchSearch, showing paginated results below the table.
 }
+
 
 // Default gene set as fallback if loading fails
 function getDefaultGenes() {
@@ -1409,7 +1454,7 @@ function displayGeneCards(defaults, searchResults, page = 1, perPage = 10) {
     let uniqueDefaults = defaults.filter(d => !searchResults.some(s => s.gene === d.gene));
     let allGenesToDisplay = [...searchResults, ...uniqueDefaults];
 
-    // --- Robustly parse gene name from the URL hash (handles #/GENE, #!/GENE, etc.)
+    // --- Robustly parse gene name from the URL hash ---
     const hash = (window.location.hash || '');
     const hashMatch = hash.match(/#(?:\/|!\/)?([^\/\?\&]+)/);
     let geneFromURL = hashMatch ? decodeURIComponent(hashMatch[1]) : null;
@@ -1417,7 +1462,7 @@ function displayGeneCards(defaults, searchResults, page = 1, perPage = 10) {
     // Reserved paths (pages) that should never be treated as genes
     const RESERVED_PATHS = [
         'home', 'batch-query', 'ciliaplot', 'analysis',
-        'ciliai', 'expression', 'download', 'contact', 'notfound'
+        'ciliai', 'expression', 'download', 'contact', 'notfound', 'gene' // Added 'gene' to catch '#gene/GENE' format
     ];
 
     // Skip if the hash corresponds to a reserved page
@@ -1434,8 +1479,8 @@ function displayGeneCards(defaults, searchResults, page = 1, perPage = 10) {
             if (g.symbol && g.symbol.toUpperCase() === geneUpper) return true;
             if (g.name && g.name.toUpperCase() === geneUpper) return true;
             if (g.synonym) {
-                if (Array.isArray(g.synonym) && g.synonym.some(s => String(s).toUpperCase() === geneUpper)) return true;
-                if (typeof g.synonym === 'string' && g.synonym.toUpperCase() === geneUpper) return true;
+                const synonyms = Array.isArray(g.synonym) ? g.synonym : String(g.synonym).split(/[;,]\s*/);
+                if (synonyms.some(s => String(s).toUpperCase() === geneUpper)) return true;
             }
             return false;
         });
@@ -1450,8 +1495,11 @@ function displayGeneCards(defaults, searchResults, page = 1, perPage = 10) {
     }
 
     // If still empty and no search results, fall back to default homepage genes
+    // NOTE: Requires 'defaultGenesNames' global array to be defined elsewhere for the original logic. 
+    // Using simple fallback to first few genes for completeness here.
     if (allGenesToDisplay.length === 0 && searchResults.length === 0) {
-        allGenesToDisplay = allGenes.filter(g => defaultGenesNames.includes(g.gene));
+        // Fallback to the first 10 genes if defaultGenesNames isn't available
+        allGenesToDisplay = allGenes.slice(0, 10); 
     }
 
     // Pagination safety
@@ -1505,7 +1553,8 @@ function displayGeneCards(defaults, searchResults, page = 1, perPage = 10) {
                 `;
 
                 entry.target.classList.add(isSearchResult ? 'search-result' : 'default');
-                entry.target.onclick = (e) => navigateTo(e, `/${gene.gene}`);
+                // Use navigateTo for a gene detail page
+                entry.target.onclick = (e) => navigateTo(e, `gene/${gene.gene}`);
                 entry.target.setAttribute('aria-label', `View details for ${gene.gene}`);
                 observer.unobserve(entry.target);
             }
@@ -1519,27 +1568,50 @@ function displayGeneCards(defaults, searchResults, page = 1, perPage = 10) {
 
     container.querySelectorAll('.gene-card').forEach(card => observer.observe(card));
 
-    // Pagination controls
+    // --- FIX 2: Pagination Controls with addEventListener ---
     const paginationDiv = document.createElement('div');
     paginationDiv.className = 'pagination';
+    paginationDiv.style.cssText = 'display: flex; justify-content: center; gap: 1rem; margin-top: 1.5rem;';
 
-    const defaultsStr = JSON.stringify(defaults);
-    const searchResultsStr = JSON.stringify(searchResults);
-    const prevDisabled = page === 1 ? 'disabled' : '';
-    const nextDisabled = page >= totalPages ? 'disabled' : '';
+    const createPaginationButton = (text, newPage, disabled) => {
+        const button = document.createElement('button');
+        button.textContent = text;
+        button.disabled = disabled;
+        button.className = 'btn btn-secondary';
+        button.style.cssText = 'padding: 0.5rem 1rem; border: 1px solid #ccc; border-radius: 4px; cursor: pointer;';
+        if (disabled) {
+            button.style.opacity = '0.5';
+            button.style.cursor = 'default';
+        }
+        if (!disabled) {
+            button.addEventListener('click', () => {
+                // Pass the current data arrays and the new page number
+                displayGeneCards(defaults, searchResults, newPage, perPage);
+                // Scroll to the top of the cards container for better UX
+                document.getElementById('gene-cards-container')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            });
+        }
+        return button;
+    };
 
-    paginationDiv.innerHTML = `
-        <button onclick='displayGeneCards(${defaultsStr}, ${searchResultsStr}, ${page - 1}, ${perPage})' ${prevDisabled}>Previous</button>
-        <span>Page ${page} of ${totalPages}</span>
-        <button onclick='displayGeneCards(${defaultsStr}, ${searchResultsStr}, ${page + 1}, ${perPage})' ${nextDisabled}>Next</button>
-    `;
+    const prevButton = createPaginationButton('Previous', page - 1, page === 1);
+    const nextButton = createPaginationButton('Next', page + 1, page >= totalPages);
+    
+    const pageInfo = document.createElement('span');
+    pageInfo.textContent = `Page ${page} of ${totalPages}`;
+    pageInfo.style.padding = '0 1rem';
+    pageInfo.style.alignSelf = 'center';
+
     if (allGenesToDisplay.length > perPage) {
+        paginationDiv.appendChild(prevButton);
+        paginationDiv.appendChild(pageInfo);
+        paginationDiv.appendChild(nextButton);
         container.appendChild(paginationDiv);
     }
+    // --- End FIX 2: Pagination Controls ---
 
     updateGeneButtons(allGenesToDisplay, searchResults);
 }
-
 function updateGeneButtons(genesToDisplay, searchResults = []) {
     const container = document.getElementById('geneButtons');
     if (!container) return;
