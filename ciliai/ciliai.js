@@ -237,81 +237,71 @@ function normalizeTerm(s) {
     return String(s).toLowerCase().replace(/[._\-\s]+/g, ' ').trim();
 }
 
+
+
+
 // ==================== SEMANTIC INTENT RESOLVER ====================
 // Detects user intent using keyword clusters and fuzzy semantic matching.
+
+// --- NEW GLOBAL CONSTANTS (for Localization + Phenotype Priority Check) ---
+const localizationTerms = [
+    "basal body", "transition zone", "cilia", "axoneme", "centrosome", 
+    "ciliary membrane", "nucleus", "lysosome", "mitochondria", "ciliary tip"
+];
+const phenotypeTerms = [
+    "short cilia", "longer cilia", "cilia length", "cilia defects", 
+    "decreased ciliation", "loss of cilia", "reduced cilia", "increase", "decrease", "no effect"
+];
+
 async function resolveSemanticIntent(query) {
     const qLower = query.toLowerCase().trim();
 
     // --- Define semantic clusters for major biological contexts ---
     const intentClusters = {
-        ciliary_tip: [
-            "ciliary tip", "distal tip", "tip proteins", "tip components",
-            "tip composition", "proteins at the ciliary tip", "ciliary tip complex",
-            "enriched at the tip", "distal region", "ciliary tip proteome"
-        ],
-        domain: [
-            "domain", "motif", "architecture", "protein fold", "domain organization",
-            "enriched", "depleted"
-        ],
-        phylogeny: [
-            "phylogeny", "evolution", "conservation", "ortholog", "paralog", "species tree",
-            "evolutionary profile", "conservation heatmap", "conserved"
-        ],
-        complex: [
-            "complex", "interactome", "binding partners", "corum", "protein interaction",
-            "ift", "bbsome", "dynein", "mks", "nphp", "radial spoke", "axoneme", "transition zone"
-        ],
-        expression: [
-            "expression", "umap", "tissue", "cell type", "where expressed", "scRNA",
-            "single-cell", "transcript", "abundance", "expression pattern", "plot"
-        ],
-        disease: [
-            "mutation", "variant", "pathogenic", "ciliopathy", "disease", "syndrome",
-            "bbs", "joubert", "mks", "pcd", "lca", "nephronophthisis", "polycystic kidney disease"
-        ],
-        disease_classification: [
-            "primary ciliopathy", "secondary ciliopathy", "motile ciliopathy", "atypical ciliopathy",
-            "primary disease", "secondary disease", "motile disease", "atypical disease", "ciliopathy classification"
-        ],
-        localization: [
-            "localize", "location", "subcellular", "basal body", "transition zone",
-            "centrosome", "axoneme", "ciliary membrane"
-        ],
-        phenotype: [
-            "knockdown", "phenotype", "effect", "shorter cilia", "longer cilia",
-            "cilia length", "cilia number", "decreased ciliation", "loss of cilia"
-        ]
-    };
-
-    // --- Priority Rule: Combined "disease" + "phenotype" ---
-    const diseaseNames = [
-        "bardet-biedl syndrome", "joubert syndrome", "meckel-gruber syndrome",
-        "primary ciliary dyskinesia", "leber congenital amaurosis", "nephronophthisis",
-        "polycystic kidney disease", "autosomal dominant polycystic kidney disease",
-        "autosomal recessive polycystic kidney disease", "short-rib thoracic dysplasia",
-        "senior-løken syndrome", "cranioectodermal dysplasia",
-        "nphp", "bbs", "mks", "pcd", "ciliopathy", "syndrome"
-    ];
-
-    const phenotypeTerms = [
-        "phenotype", "short cilia", "long cilia", "cilia length", "cilia number",
-        "decreased ciliation", "loss of cilia", "reduced cilia", "increase", "decrease"
-    ];
+        ciliary_tip: ["ciliary tip", "distal tip", "tip proteins", "tip components", "tip composition", "proteins at the ciliary tip", "ciliary tip complex", "enriched at the tip", "distal region", "ciliary tip proteome"],
+        domain: ["domain", "motif", "architecture", "protein fold", "domain organization", "enriched", "depleted"],
+        phylogeny: ["phylogeny", "evolution", "conservation", "ortholog", "paralog", "species tree", "evolutionary profile", "conservation heatmap", "conserved"],
+        complex: ["complex", "interactome", "binding partners", "corum", "protein interaction", "ift", "bbsome", "dynein", "mks", "nphp", "radial spoke", "axoneme", "transition zone"],
+        expression: ["expression", "umap", "tissue", "cell type", "where expressed", "scRNA", "single-cell", "transcript", "abundance", "expression pattern", "plot"],
+        disease: ["mutation", "variant", "pathogenic", "ciliopathy", "disease", "syndrome", "bbs", "joubert", "mks", "pcd", "lca", "nephronophthisis", "polycystic kidney disease"],
+        disease_classification: ["primary ciliopathy", "secondary ciliopathy", "motile ciliopathy", "atypical ciliopathy", "primary disease", "secondary disease", "motile disease", "atypical disease", "ciliopathy classification"],
+        localization: ["localize", "location", "subcellular", "basal body", "transition zone", "centrosome", "axoneme", "ciliary membrane"],
+        phenotype: ["knockdown", "phenotype", "effect", "shorter cilia", "longer cilia", "cilia length", "cilia number", "decreased ciliation", "loss of cilia"]
+ };
+// --- Priority Rule 1: Combined "disease" + "phenotype" ---
+    const diseaseNames = ["bardet-biedl syndrome", "joubert syndrome", "meckel-gruber syndrome", "primary ciliary dyskinesia", "leber congenital amaurosis", "nephronophthisis", "polycystic kidney disease", "autosomal dominant polycystic kidney disease", "autosomal recessive polycystic kidney disease", "short-rib thoracic dysplasia", "senior-løken syndrome", "cranioectodermal dysplasia", "nphp", "bbs", "mks", "pcd", "ciliopathy", "syndrome"];
+    
+    // Note: The phenotypeTerms array from the old code is now merged with the global one above, 
+    // but the matching logic below uses explicit definitions for backward compatibility in this block.
+    const strictPhenotypeTerms = ["phenotype", "short cilia", "long cilia", "cilia length", "cilia number", "decreased ciliation", "loss of cilia", "reduced cilia", "increase", "decrease"];
 
     const matchedDisease = diseaseNames.find(name => qLower.includes(name));
-    const matchedPhenotype = phenotypeTerms.find(term => qLower.includes(term));
+    const matchedStrictPhenotype = strictPhenotypeTerms.find(term => qLower.includes(term));
 
-    if (matchedDisease && matchedPhenotype) {
+    if (matchedDisease && matchedStrictPhenotype) {
         const standardDisease =
             matchedDisease.toUpperCase() === "BBS" ? "Bardet–Biedl Syndrome" :
             matchedDisease.toUpperCase() === "MKS" ? "Meckel–Gruber Syndrome" :
             matchedDisease.toUpperCase() === "PCD" ? "Primary Ciliary Dyskinesia" :
             matchedDisease.toUpperCase() === "NPHP" ? "Nephronophthisis" :
             matchedDisease;
-        return await getDiseaseGenesByPhenotype(standardDisease, matchedPhenotype);
+        // Uses the helper that handles both the disease and the phenotypic filter
+        return await getDiseaseGenesByPhenotype(standardDisease, matchedStrictPhenotype);
     }
 
-    // --- Rule-based fuzzy detection ---
+    // --------------------------------------------------------------------------
+    // ⭐ NEW PRIORITY RULE 2: Combined "localization" + "phenotype" (The Fix) ⭐
+    // --------------------------------------------------------------------------
+    const matchedLocalization = localizationTerms.find(name => qLower.includes(name));
+    const matchedPhenotype = phenotypeTerms.find(term => qLower.includes(term));
+
+    if (matchedLocalization && matchedPhenotype) {
+        // This handles questions like "Show basal body genes causing short cilia"
+        return await getLocalizationPhenotypeGenes(matchedLocalization, matchedPhenotype);
+    }
+    // --------------------------------------------------------------------------
+    
+    // --- Rule-based fuzzy detection (Fallback) ---
     let detectedIntent = null;
     for (const [intent, phrases] of Object.entries(intentClusters)) {
         if (phrases.some(p => qLower.includes(p))) {
@@ -320,7 +310,8 @@ async function resolveSemanticIntent(query) {
         }
     }
 
-    // --- Intent Resolution Logic ---
+    // --- Intent Resolution Logic (Uses detectedIntent) ---
+
     if (detectedIntent === "ciliary_tip") {
         const title = "Ciliary Tip Components";
         const data = await getCuratedComplexComponents("CILIARY TIP");
@@ -329,6 +320,7 @@ async function resolveSemanticIntent(query) {
 
     // --- Disease Classification Handler ---
     else if (detectedIntent === "disease_classification") {
+        // ... (existing logic) ...
         let classification = null;
         if (qLower.includes('primary ciliopathy') || qLower.includes('primary disease')) {
             classification = "Primary Ciliopathies";
@@ -346,16 +338,10 @@ async function resolveSemanticIntent(query) {
         }
     }
 
-    // --- Specific Disease Handler ---
+    // --- Specific Disease Handler (Generic List) ---
     else if (detectedIntent === "disease") {
-        const diseaseList = [
-            "bardet-biedl syndrome", "joubert syndrome", "meckel-gruber syndrome",
-            "primary ciliary dyskinesia", "leber congenital amaurosis", "nephronophthisis",
-            "polycystic kidney disease", "autosomal dominant polycystic kidney disease",
-            "autosomal recessive polycystic kidney disease", "short-rib thoracic dysplasia",
-            "senior-løken syndrome", "cranioectodermal dysplasia",
-            "nphp", "bbs", "mks", "pcd", "ciliopathy", "syndrome"
-        ];
+        // ... (existing logic) ...
+        const diseaseList = ["bardet-biedl syndrome", "joubert syndrome", "meckel-gruber syndrome", "primary ciliary dyskinesia", "leber congenital amaurosis", "nephronophthisis", "polycystic kidney disease", "autosomal dominant polycystic kidney disease", "autosomal recessive polycystic kidney disease", "short-rib thoracic dysplasia", "senior-løken syndrome", "cranioectodermal dysplasia", "nphp", "bbs", "mks", "pcd", "ciliopathy", "syndrome"];
 
         let targetDisease = null;
         for (const name of diseaseList.sort((a, b) => b.length - a.length)) {
@@ -409,18 +395,19 @@ async function resolveSemanticIntent(query) {
         }
     }
 
-    // --- Localization Handler ---
+    // --- Localization Handler (Generic List) ---
     else if (detectedIntent === "localization") {
         const locationMatch = qLower.match(/(basal body|transition zone|axoneme|centrosome|ciliary membrane)/);
         if (locationMatch && locationMatch[1]) {
-            const data = await getGenesByLocalization(locationMatch[1]);
+            // NOTE: This will now only handle UNFILTERED requests, as filtered ones were caught above.
+            const data = await getGenesByLocalization(locationMatch[1]); 
             return formatListResult(`Genes localizing to ${locationMatch[1]}`, data);
         } else {
             return `<p>📍 Localization query detected. Please be more specific (e.g., "genes in the basal body").</p>`;
         }
     }
 
-    // --- Phenotype Handler ---
+    // --- Phenotype Handler (Generic List) ---
     else if (detectedIntent === "phenotype") {
         return `<p>🔎 Phenotype/Screen query detected. Please use a specific gene (e.g., "What happens to cilia when KIF3A is knocked down?") or a specific phenotype (e.g., "Find genes causing short cilia").</p>`;
     }
@@ -428,6 +415,8 @@ async function resolveSemanticIntent(query) {
     // --- Default fallback ---
     return null;
 }
+
+
 
 // --- Main AI Query Handler ---
 window.handleAIQuery = async function() {
