@@ -1196,7 +1196,9 @@ async function getLiteratureEvidence(gene) {
         </div>`;
 }
 
-/**
+/**@##########################BEGINNING OF COMPLEX RELATED QUETIONS AND HELPER CORUM##################################
+ * @##########################BEGINNING OF COMPLEX RELATED QUETIONS AND HELPER CORUM##################################
+ * @##########################BEGINNING OF COMPLEX RELATED QUETIONS AND HELPER CORUM##################################
  * @##########################BEGINNING OF COMPLEX RELATED QUETIONS AND HELPER CORUM##################################
  */
 
@@ -2231,6 +2233,83 @@ async function routeMultiGeneDomainTable(query) {
 /**
  * @##########################END OF COMPLEX RELATED QUETIONS AND HELPER##################################
  */
+
+
+
+
+
+
+
+/**@##########################BEGINNING OF EXPRESSION RELATED QUETIONS AND HELPER##################################
+ * @##########################BEGINNING OF EXPRESSION RELATED QUETIONS AND HELPER##################################
+/**@##########################BEGINNING OF EXPRESSION RELATED QUETIONS AND HELPER##################################
+/**
+// =============================================================================
+// NEW: GENERALIZED LOCALIZATION + PHENOTYPE FILTERING FUNCTION
+// =============================================================================
+
+/**
+ * @name getLocalizationPhenotypeGenes
+ * @description Finds genes localizing to a specified compartment that also cause short/absent cilia phenotypes.
+ * @param {string} localizationTerm - The target subcellular compartment (e.g., "basal body", "cilia", "transition zone").
+ */
+async function getLocalizationPhenotypeGenes(localizationTerm) {
+    await fetchCiliaData(); 
+
+    // 1. Get genes localizing to the target compartment
+    const targetGenes = await getGenesByLocalization(localizationTerm); 
+    const targetGeneSet = new Set(targetGenes.map(g => g.gene.toUpperCase()));
+
+    // 2. Define phenotype filter keywords (same logic for short/absent cilia)
+    const lengthKeywords = ['shorter', 'short', 'absent'];
+    const numberKeywords = ['reduced', 'decreased', 'fewer', 'loss'];
+    
+    const results = ciliaHubDataCache
+        .filter(gene => {
+            const geneUpper = gene.gene.toUpperCase();
+            if (!targetGeneSet.has(geneUpper)) return false; // Must localize to target area
+
+            // Check 1: Short Cilia (lof_effects)
+            const lofEffect = gene.lof_effects ? gene.lof_effects.toLowerCase() : "";
+            const isShortCilia = lengthKeywords.some(kw => lofEffect.includes(kw));
+            
+            // Check 2: Low Ciliation (percent_ciliated_cells_effects)
+            const numberEffect = gene.percent_ciliated_cells_effects ? gene.percent_ciliated_cells_effects.toLowerCase() : "";
+            const isLowCiliation = numberKeywords.some(kw => numberEffect.includes(kw));
+
+            // Must match either short length OR reduced number
+            return isShortCilia || isLowCiliation;
+        })
+        .map(g => ({
+            gene: g.gene,
+            description: `Location: ${g.localization.join(', ')}. LoF: ${g.lof_effects || 'N/A'}`
+        }))
+        .sort((a, b) => a.gene.localeCompare(b.gene));
+
+    const title = `${localizationTerm} Genes Causing Short Cilia`;
+    return formatListResult(title, results);
+}
+
+// =============================================================================
+// OLD FUNCTION NOW SIMPLIFIED TO CALL THE NEW GENERALIZED ONE
+// =============================================================================
+
+/**
+ * @name getTransitionZoneShortCiliaGenes
+ * @description Simplified wrapper to call the generalized function.
+ */
+async function getTransitionZoneShortCiliaGenes() {
+    // Call the new general function with the specific compartment term
+    return getLocalizationPhenotypeGenes("transition zone");
+}
+
+
+/**@##########################END OF EXPRESSION RELATED QUETIONS AND HELPER##################################
+ * @##########################END OF EXPRESSION RELATED QUETIONS AND HELPER##################################
+/**@##########################END OF EXPRESSION RELATED QUETIONS AND HELPER##################################
+/**
+
+
 
 
 
@@ -3284,7 +3363,12 @@ const questionRegistry = [
     { text: "Basal body genes", handler: async () => formatListResult("Genes localizing to basal body", await getGenesByLocalization("basal body")) },
     { text: "Which genes are at the basal body?", handler: async () => formatListResult("Genes localizing to basal body", await getGenesByLocalization("basal body")) },
     { text: "List basal body proteins", handler: async () => formatListResult("Proteins localizing to basal body", await getGenesByLocalization("basal body")) },
-    
+
+    // Localization (Basal body, Transition zonei cilia) and Screen Related questions 
+    { text: "Show Basal Body genes causing short cilia", handler: async () => getLocalizationPhenotypeGenes("basal body") },
+    { text: "List ciliary proteins that cause short cilia", handler: async () => getLocalizationPhenotypeGenes("cilium") },
+    { text: "Show Transition Zone proteins causing short cilia", handler: async () => getLocalizationPhenotypeGenes("transition zone") },
+
     // Axoneme
     { text: "Which genes localize to axoneme?", handler: async () => formatListResult("Genes localizing to axoneme", await getGenesByLocalization("axoneme")) },
     { text: "Axonemal genes", handler: async () => formatListResult("Genes localizing to axoneme", await getGenesByLocalization("axoneme")) },
