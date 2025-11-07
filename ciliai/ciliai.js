@@ -2250,40 +2250,34 @@ async function routeMultiGeneDomainTable(query) {
  * @param {string} localizationTerm - The target subcellular compartment (e.g., "basal body").
  * @param {string} phenotypeTerm - The phenotype filter ("short cilia", "longer cilia", "no effect").
  */
+/**
+ * @name getLocalizationPhenotypeGenes (CORRECTED IMPLEMENTATION)
+ * @description Finds genes localizing to a compartment that match a specific phenotype.
+ */
 async function getLocalizationPhenotypeGenes(localizationTerm, phenotypeTerm) {
-    await fetchCiliaData(); 
+    // 1. Get ONLY the raw gene data objects for the target localization (FIX)
+    const localizationGenes = await getLocalizationGenesData(localizationTerm); 
+    const localizationGeneSet = new Set(localizationGenes.map(g => g.gene.toUpperCase()));
 
-    // 1. Get genes localizing to the target compartment (Localization Filter)
-    const targetGenes = await getGenesByLocalization(localizationTerm); 
-    const targetGeneSet = new Set(targetGenes.map(g => g.gene.toUpperCase()));
-
-    // 2. Define phenotype filter keywords based on the phenotypeTerm
     const phenotypeLower = phenotypeTerm.toLowerCase();
     
-    // Default keywords for filtering (now dynamic based on phenotypeTerm)
+    // ... (rest of the keyword mapping logic) ...
     let lengthKeywords = [];
     let numberKeywords = [];
 
-    // --- Dynamic Phenotype Mapping ---
     if (phenotypeLower.includes('short')) {
         lengthKeywords = ['shorter', 'short', 'absent'];
         numberKeywords = ['reduced', 'decreased', 'fewer', 'loss'];
     } else if (phenotypeLower.includes('longer')) {
         lengthKeywords = ['longer', 'long'];
     } else if (phenotypeLower.includes('no effect')) {
-        lengthKeywords = ['no effect', 'not reported']; // For LoF effect
-        numberKeywords = ['no effect', 'not reported']; // For ciliation effect
+        lengthKeywords = ['no effect', 'not reported'];
+        numberKeywords = ['no effect', 'not reported'];
     }
     
-    // --- Phenotype Filter Logic ---
-    const results = ciliaHubDataCache
+    // --- Phenotype Filter Logic (using the reliable localizationGenes list) ---
+    const results = localizationGenes
         .filter(gene => {
-            const geneUpper = gene.gene.toUpperCase();
-            
-            // Step 2.1: Apply Localization Filter
-            if (!targetGeneSet.has(geneUpper)) return false; 
-            
-            // Step 2.2: Apply Phenotype Filter (Must match at least one criterion)
             const lofEffect = gene.lof_effects ? gene.lof_effects.toLowerCase() : "";
             const numberEffect = gene.percent_ciliated_cells_effects ? gene.percent_ciliated_cells_effects.toLowerCase() : "";
             
@@ -2292,6 +2286,7 @@ async function getLocalizationPhenotypeGenes(localizationTerm, phenotypeTerm) {
             const matchesNumber = numberKeywords.some(kw => numberEffect.includes(kw));
 
             // Return true if either length or number criteria are met
+            // (Note: The localization filter is already applied by using localizationGenes)
             return matchesLength || matchesNumber; 
         })
         .map(g => ({
@@ -2306,11 +2301,6 @@ async function getLocalizationPhenotypeGenes(localizationTerm, phenotypeTerm) {
     const title = `${localizationTerm} Genes Causing ${phenotypeTerm}`;
     return formatListResult(title, results);
 }
-
-
-// =============================================================================
-// OLD FUNCTION NOW SIMPLIFIED TO CALL THE NEW GENERALIZED ONE
-// =============================================================================
 
 /**
  * @name getTransitionZoneShortCiliaGenes
@@ -2489,6 +2479,25 @@ async function getComplexPhenotypeGenes(complexName) {
     
     const title = `${complexName} Genes Causing Short Cilia`;
     return formatListResult(title, results);
+}
+
+/**
+ * @name getLocalizationGenesData (NEW INTERNAL HELPER)
+ * @description Retrieves raw gene data objects that match a specific localization term.
+ * @param {string} locationName - The subcellular location (e.g., "basal body").
+ * @returns {Promise<Array<Object>>} Array of raw CiliaHub gene objects.
+ */
+async function getLocalizationGenesData(locationName) {
+    await fetchCiliaData();
+    const locationTerms = locationName.split(/\s+or\s+/).map(normalizeTerm);
+
+    const results = ciliaHubDataCache
+        .filter(gene => gene.localization && gene.localization.some(loc => 
+            locationTerms.some(term => normalizeTerm(loc).includes(term))
+        ));
+
+    // Return the raw filtered gene objects for further processing
+    return results; 
 }
 
 /**
