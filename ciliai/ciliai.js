@@ -2494,25 +2494,38 @@ async function getLocalizationPhenotypeGenes(localizationTerm, phenotypeTerm) {
         lengthKeywords = ['no effect', 'not reported', 'no change'];
         numberKeywords = ['no effect', 'not reported', 'no change'];
     }
-    
-    // 3. Phenotype Filter Logic (Applied directly to the genePool)
-    const results = genePool
-        .filter(gene => {
-            const lofEffect = (gene.lof_effects || '').toLowerCase();
-            const numberEffect = (gene.percent_ciliated_cells_effects || '').toLowerCase();
-            
-            const matchesLength = lengthKeywords.some(kw => lofEffect.includes(kw));
-            const matchesNumber = numberKeywords.some(kw => numberEffect.includes(kw));
 
-            if (phenotypeLower.includes('no effect')) {
-                 const isLoFNeutral = lengthKeywords.some(kw => lofEffect.includes(kw));
-                 const isNumberNeutral = numberKeywords.some(kw => numberEffect.includes(kw));
-                 return isLoFNeutral && isNumberNeutral;
-            } else if (phenotypeLower.includes('short') || phenotypeLower.includes('long')) {
-                 return matchesLength || matchesNumber;
-            }
-            return false;
-        })
+    // --- Phenotype Filter Logic (CRITICAL REVISION) ---
+const results = genePool // Using the genePool retrieved by getGeneListByTerm
+    .filter(gene => {
+        // Step 1: Normalize fields (ensuring nulls are handled with empty strings)
+        const lofEffect = (gene.lof_effects || '').toLowerCase();
+        const numberEffect = (gene.percent_ciliated_cells_effects || '').toLowerCase();
+        
+        // Step 2: Check for presence of ANY relevant phenotype data
+        const hasPhenoData = lofEffect.length > 0 || numberEffect.length > 0;
+        if (!hasPhenoData) return false; // Exclude if both fields are empty/null
+
+        // Step 3: Check for match based on defined keywords (short/long/no effect)
+        const matchesLength = lengthKeywords.some(kw => lofEffect.includes(kw));
+        const matchesNumber = numberKeywords.some(kw => numberEffect.includes(kw));
+
+        // CRITICAL LOGIC CHECK
+        // For 'no effect', we must find explicit neutrality in both fields
+        if (phenotypeLower.includes('no effect')) {
+             const isLoFNeutral = lengthKeywords.some(kw => lofEffect.includes(kw));
+             const isNumberNeutral = numberKeywords.some(kw => numberEffect.includes(kw));
+             return isLoFNeutral && isNumberNeutral;
+        } 
+        
+        // For 'short' or 'long' (the problem queries), return true if EITHER field matches a positive keyword
+        // This ensures the filter applies and is not overly sensitive to blank fields.
+        else if (phenotypeLower.includes('short') || phenotypeLower.includes('long')) {
+             return matchesLength || matchesNumber;
+        }
+
+        return false;
+    })
         .map(g => ({
             gene: g.gene,
             localization_detail: g.localization ? g.localization.join(', ') : 'N/A',
