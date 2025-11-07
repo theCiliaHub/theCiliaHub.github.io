@@ -412,7 +412,6 @@ async function initializeApp() {
 // Start the entire application
 initializeApp();
 
-
 function performBatchSearch() {
     const inputElement = document.getElementById('batch-genes-input');
     const localizationFilter = document.getElementById('localization-filter')?.value;
@@ -426,25 +425,33 @@ function performBatchSearch() {
     const allOriginalQueries = inputElement.value.split(/[\s,;\n\r\t]+/).filter(Boolean).map(q => q.trim());
     // Create a canonical list of unique, sanitized queries for lookup
     const uniqueSanitizedQueries = [...new Set(allOriginalQueries.map(sanitize))];
-    const originalQueryMap = new Map();
-    // Map sanitized query to its original, un-sanitized form (first occurrence only)
-    allOriginalQueries.forEach(q => {
-        const sanitized = sanitize(q);
-        if (sanitized && !originalQueryMap.has(sanitized)) {
-            originalQueryMap.set(sanitized, q);
-        }
-    });
-
+    
     if (uniqueSanitizedQueries.length === 0) {
         resultDiv.innerHTML = '<p class="status-message error-message">Please enter one or more gene names, synonyms, or Ensembl IDs.</p>';
         return;
     }
 
-    // 2. Perform search and initial filtering
-    const { foundGenes } = findGenes(uniqueSanitizedQueries); // Use the efficient Map-based search
-    let results = foundGenes;
+    // 2. Perform search using the centralized lookup function
+    const { foundGenes: initialFoundGenes } = findGenes(uniqueSanitizedQueries); // Genes found in the Hub
 
-    // 3. Apply the optional localization and keyword filters to the results
+    // Collect all identifiers (sanitized, uppercase) that led to the FOUND genes
+    const initiallyFoundIdentifiers = new Set();
+    initialFoundGenes.forEach(gene => {
+        initiallyFoundIdentifiers.add(sanitize(gene.gene));
+        if (gene.synonym) {
+            String(gene.synonym).split(/[,;]/).forEach(s => initiallyFoundIdentifiers.add(sanitize(s)));
+        }
+        if (gene.ensembl_id) {
+            String(gene.ensembl_id).split(/[,;]/).forEach(id => initiallyFoundIdentifiers.add(sanitize(id)));
+        }
+    });
+
+    // Determine which original queries did NOT result in an initial match
+    const notFoundOriginalQueries = allOriginalQueries.filter(q => !initiallyFoundIdentifiers.has(sanitize(q)));
+
+    // 3. Apply the optional localization and keyword filters to the *found* results
+    let results = initialFoundGenes;
+
     if (localizationFilter) {
         results = results.filter(g =>
             g.localization && (Array.isArray(g.localization) ? g.localization.some(l => l && l.toLowerCase() === localizationFilter.toLowerCase()) : g.localization.toLowerCase() === localizationFilter.toLowerCase())
@@ -458,55 +465,15 @@ function performBatchSearch() {
         );
     }
     
-    // FIX 1: Correctly capture ALL original not-found queries
-    // Collect all identifiers (sanitized, uppercase) that led to the FOUND and FILTERED genes
-    const foundIdentifiers = new Set();
-    results.forEach(gene => {
-        foundIdentifiers.add(sanitize(gene.gene));
-        if (gene.synonym) {
-            String(gene.synonym).split(/[,;]/).forEach(s => foundIdentifiers.add(sanitize(s)));
-        }
-        if (gene.ensembl_id) {
-            String(gene.ensembl_id).split(/[,;]/).forEach(id => foundIdentifiers.add(sanitize(id)));
-        }
-    });
-
-    // Determine which original queries did NOT result in a found gene (before/after filtering)
-    // NOTE: This assumes findGenes correctly handles all identifiers, and the subsequent filtering
-    // means a gene that was found but filtered out is still considered 'found' by the user's initial query.
-    // To match the user's intent (display *remaining 80*), we must compare against the successful *lookup*
-    // before applying localization/keyword filters.
-    
-    // Rerunning initial lookup without filters to get the list of genes found in the CiliaHub
-    const { foundGenes: initialFoundGenes } = findGenes(uniqueSanitizedQueries);
-    const initiallyFoundIdentifiers = new Set();
-    initialFoundGenes.forEach(gene => {
-        initiallyFoundIdentifiers.add(sanitize(gene.gene));
-        if (gene.synonym) {
-            String(gene.synonym).split(/[,;]/).forEach(s => initiallyFoundIdentifiers.add(sanitize(s)));
-        }
-        if (gene.ensembl_id) {
-            String(gene.ensembl_id).split(/[,;]/).forEach(id => initiallyFoundIdentifiers.add(sanitize(id)));
-        }
-    });
-
-    // The genes *not* found in the CiliaHub are the original queries whose sanitized version
-    // are not in the 'initiallyFoundIdentifiers' set.
-    const notFoundOriginalQueries = allOriginalQueries.filter(q => !initiallyFoundIdentifiers.has(sanitize(q)));
-
-
-    // 4. Display the final, filtered results AND the not-found genes
+    // 4. Display the results
     statusDiv.style.display = 'none';
-    searchResults = results; // Update global variable for exports
+    searchResults = results; 
 
     // Pass the filtered found genes and the *full list* of not-found original queries
     displayBatchResults(results, notFoundOriginalQueries);
-    // If we have any results (found OR not found), display the gene cards for the found genes
+    // Display gene cards for the *filtered* found genes
     displayGeneCards(currentData, results, 1, 10);
-    // Removed old logic: if (results.length > 0 || notFoundOriginalQueries.length > 0) {...}
-    // New logic handles display in displayBatchResults and displayGeneCards
 }
-
 
 // --- HOME PAGE SEARCH HANDLER (FIXED) ---
 // This function handles user input to show a list of suggestions.
@@ -589,29 +556,33 @@ function navigateToGenePage(geneName) {
 
 
 /**
- * Displays batch results.
+ * Displays batch results, including a table of found genes and a list of genes 
+ * not found in the CiliaHub database.
+ * @param {Array<Object>} foundGenes - Array of gene objects found in the database (filtered).
+ * @param {Array<string>} notFoundGenes - Array of original user queries that did not map to a gene (FIX 1).
  */
-function displayBatchResults(foundGenes, notFoundGenes) { // Ensure notFoundGenes parameter is accepted
+function displayBatchResults(foundGenes, notFoundGenes) { 
     const resultDiv = document.getElementById('batch-results');
     if (!resultDiv) return;
 
-    // Use foundGenes.length + notFoundGenes.length for the total genes checked
+    // Calculate the total number of genes checked
     const totalChecked = foundGenes.length + (notFoundGenes ? notFoundGenes.length : 0);
 
     let html = `
         <h3 style="margin-top: 20px; color: #2c5aa0;">
-            Batch Query Results 
+            Batch Query Results 🧬
             <span style="font-size: 0.9em; font-weight: normal;">
-                (${foundGenes.length} gene${foundGenes.length !== 1 ? 's' : ''} found out of ${totalChecked} checked)
+                (${foundGenes.length} gene${foundGenes.length !== 1 ? 's' : ''} found out of ${totalChecked} total)
             </span>
         </h3>`;
 
+    // --- Display Found Genes Table ---
     if (foundGenes.length > 0) {
-        // FIX 2 Part 1: Ensure the table link is correct. It already uses the helper: navigateTo(event, '/${item.gene}')
         html += '<div class="table-wrapper" style="overflow-x: auto;"><table class="data-table"><thead><tr><th>Gene</th><th>Ensembl ID</th><th>Localization</th><th>Function Summary</th></tr></thead><tbody>';
         foundGenes.forEach(item => {
-            // Join localization array for display
+            // The link is functional (FIX 2 confirmed)
             const localizationText = Array.isArray(item.localization) ? item.localization.join(', ') : (item.localization || '-');
+            
             html += `<tr>
                 <td><a href="#gene/${item.gene}" onclick="navigateTo(event, 'gene/${item.gene}')">${item.gene}</a></td>
                 <td>${item.ensembl_id || '-'}</td>
@@ -622,24 +593,23 @@ function displayBatchResults(foundGenes, notFoundGenes) { // Ensure notFoundGene
         html += '</tbody></table></div>';
     }
 
-    // FIX 1: Displaying Not Found Genes
+    // --- Display Not Found Genes (FIX 1) ---
     if (notFoundGenes && notFoundGenes.length > 0) {
         html += `
-            <div style="margin-top: 20px; padding: 15px; border: 1px solid #c0392b; background: #fdecea; border-radius: 4px;">
-                <h4 style="color: #c0392b; margin-top: 0;">Genes Not Found in CiliaHub (${notFoundGenes.length}):</h4>
-                <p style="word-break: break-all; margin: 0;">${notFoundGenes.join(', ')}</p>
+            <div style="margin-top: 20px; padding: 15px; border: 1px solid #c0392b; background: #fdecea; border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                <h4 style="color: #c0392b; margin-top: 0;">❌ Genes Not Found in CiliaHub (${notFoundGenes.length}):</h4>
+                <p style="word-break: break-all; margin: 0; font-size: 0.95rem;">${notFoundGenes.join(', ')}</p>
             </div>
         `;
     }
     
-    if (foundGenes.length === 0 && notFoundGenes.length === 0) {
+    // --- Message if neither found nor not-found list is populated ---
+    if (foundGenes.length === 0 && (notFoundGenes ? notFoundGenes.length === 0 : true)) {
         html += '<p class="status-message error-message">No genes found matching your query and filters.</p>';
     }
 
     resultDiv.innerHTML = html;
-    // The call to displayGeneCards is now handled in performBatchSearch, showing paginated results below the table.
 }
-
 
 // Default gene set as fallback if loading fails
 function getDefaultGenes() {
