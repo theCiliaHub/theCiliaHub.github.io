@@ -559,9 +559,10 @@ function navigateToGenePage(geneName) {
  * Displays batch results, including a table of found genes and a list of genes 
  * not found in the CiliaHub database.
  * @param {Array<Object>} foundGenes - Array of gene objects found in the database (filtered).
- * @param {Array<string>} notFoundGenes - Array of original user queries that did not map to a gene (FIX 1).
+ * @param {Array<string>} notFoundGenes - Array of original user queries that did not map to a gene.
  */
 function displayBatchResults(foundGenes, notFoundGenes) { 
+    // ... (content of displayBatchResults remains the same, as the fix was in the data source: performBatchSearch) ...
     const resultDiv = document.getElementById('batch-results');
     if (!resultDiv) return;
 
@@ -580,7 +581,6 @@ function displayBatchResults(foundGenes, notFoundGenes) {
     if (foundGenes.length > 0) {
         html += '<div class="table-wrapper" style="overflow-x: auto;"><table class="data-table"><thead><tr><th>Gene</th><th>Ensembl ID</th><th>Localization</th><th>Function Summary</th></tr></thead><tbody>';
         foundGenes.forEach(item => {
-            // The link is functional (FIX 2 confirmed)
             const localizationText = Array.isArray(item.localization) ? item.localization.join(', ') : (item.localization || '-');
             
             html += `<tr>
@@ -593,7 +593,7 @@ function displayBatchResults(foundGenes, notFoundGenes) {
         html += '</tbody></table></div>';
     }
 
-    // --- Display Not Found Genes (FIX 1) ---
+    // --- Display Not Found Genes (FIXED using the original names) ---
     if (notFoundGenes && notFoundGenes.length > 0) {
         html += `
             <div style="margin-top: 20px; padding: 15px; border: 1px solid #c0392b; background: #fdecea; border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
@@ -1344,59 +1344,90 @@ function performSingleSearch() {
 
 
 function performBatchSearch() {
-    const queries = document.getElementById('batch-genes-input').value
-        .split(/[\s,\n]+/)
-        .filter(Boolean)
-        .map(q => q.trim().toUpperCase());
+    const inputElement = document.getElementById('batch-genes-input');
     const localizationFilter = document.getElementById('localization-filter')?.value;
     const keywordFilter = document.getElementById('keyword-filter')?.value.toLowerCase();
     const statusDiv = document.getElementById('status-message');
+    const resultDiv = document.getElementById('batch-results');
 
-    if (queries.length === 0) {
-        statusDiv.innerHTML = `<span class="error-message">Please enter at least one gene name.</span>`;
-        statusDiv.style.display = 'block';
+    if (!inputElement || !resultDiv) return;
+
+    // 1. Map all original, unique queries to their sanitized keys.
+    const allOriginalQueries = inputElement.value.split(/[\s,;\n\r\t]+/).filter(Boolean).map(q => q.trim());
+    const originalQueryMap = new Map(); // Key: Sanitized Name (for lookup), Value: Original Input Name (for display)
+
+    allOriginalQueries.forEach(q => {
+        const sanitizedKey = sanitize(q);
+        // We add the original query to the map only if the sanitized version isn't already there.
+        // This handles duplicates and ensures the 'original name' is the one the user typed.
+        if (sanitizedKey && !originalQueryMap.has(sanitizedKey)) {
+            originalQueryMap.set(sanitizedKey, q);
+        }
+    });
+
+    // Extract the unique set of sanitized keys for the lookup function
+    const uniqueSanitizedQueries = [...originalQueryMap.keys()];
+    
+    if (uniqueSanitizedQueries.length === 0) {
+        resultDiv.innerHTML = '<p class="status-message error-message">Please enter one or more gene names, synonyms, or Ensembl IDs.</p>';
         return;
     }
 
-    let results = allGenes.filter(g =>
-        queries.some(q => {
-            // Use sanitized gene field directly, no need for replace(/\s/g, '')
-            if (g.gene && g.gene.toUpperCase() === q) {
-                return true;
+    // 2. Perform search using the centralized lookup function.
+    const { foundGenes: initialFoundGenes } = findGenes(uniqueSanitizedQueries); 
+
+    // Collect all identifiers (sanitized, uppercase) that resulted in a successful initial gene match.
+    const initiallyFoundIdentifiers = new Set();
+    initialFoundGenes.forEach(gene => {
+        // Add the canonical gene name
+        initiallyFoundIdentifiers.add(sanitize(gene.gene));
+        // Add all associated identifiers (synonyms, ensembl)
+        if (gene.synonym) {
+            String(gene.synonym).split(/[,;]/).forEach(s => initiallyFoundIdentifiers.add(sanitize(s)));
+        }
+        if (gene.ensembl_id) {
+            String(gene.ensembl_id).split(/[,;]/).forEach(id => initiallyFoundIdentifiers.add(sanitize(id)));
+        }
+    });
+
+    // Determine which *original* query strings were not found in the CiliaHub.
+    const notFoundOriginalQueries = [];
+    originalQueryMap.forEach((originalName, sanitizedKey) => {
+        // If the sanitized query key did NOT lead to a found gene object, add the original name to the notFound list.
+        if (!initiallyFoundIdentifiers.has(sanitizedKey)) {
+            // Check if the original name itself (sanitized) is not present in the found identifiers set.
+            // This captures cases where an ortholog was searched but the official human name wasn't returned.
+            // Using the map guarantees we retrieve the correct user-typed string.
+            if (!initialFoundGenes.some(g => sanitize(g.gene) === sanitizedKey)) {
+                 notFoundOriginalQueries.push(originalName);
             }
-            if (g.synonym) {
-                const synonyms = g.synonym.toUpperCase().split(',').map(s => s.trim());
-                if (synonyms.includes(q)) {
-                    return true;
-                }
-            }
-            return false;
-        })
-    );
+        }
+    });
+
+    // 3. Apply the optional localization and keyword filters to the *found* results.
+    let results = initialFoundGenes;
 
     if (localizationFilter) {
-        results = results.filter(g => g.localization && g.localization.includes(localizationFilter));
+        results = results.filter(g =>
+            g.localization && (Array.isArray(g.localization) ? g.localization.some(l => l && l.toLowerCase() === localizationFilter.toLowerCase()) : g.localization.toLowerCase() === localizationFilter.toLowerCase())
+        );
     }
-
     if (keywordFilter) {
         results = results.filter(g =>
             (g.functional_summary && g.functional_summary.toLowerCase().includes(keywordFilter)) ||
             (g.description && g.description.toLowerCase().includes(keywordFilter))
         );
-    }
-
+    }    
+    // 4. Display the results
     statusDiv.style.display = 'none';
-    searchResults = results;
+    searchResults = results; 
 
-    if (results.length > 0) {
-        displayBatchResults(results);
-        displayGeneCards(currentData, results, 1, 10);
-    } else {
-        statusDiv.innerHTML = `<span class="error-message">No genes found matching your query.</span>`;
-        statusDiv.style.display = 'block';
-        displayGeneCards(currentData, [], 1, 10);
-    }
+    // Pass the filtered found genes and the *full list* of not-found original queries
+    displayBatchResults(results, notFoundOriginalQueries);
+    // Display gene cards for the *filtered* found genes
+    displayGeneCards(currentData, results, 1, 10);
 }
+
 
 function handleCSVUpload(event) {
     const file = event.target.files[0];
