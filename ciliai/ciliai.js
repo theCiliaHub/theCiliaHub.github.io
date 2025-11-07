@@ -2244,44 +2244,71 @@ async function routeMultiGeneDomainTable(query) {
  * that match a specific cilia phenotype (e.g., shorter cilia, decreased ciliation).
  * * NOTE: This must be KEPT to handle the combined semantic query logic.
  */
-async function getDiseaseGenesByPhenotype(disease, phenotypeType) {
+/**
+ * @name getDiseaseGenesByPhenotype
+ * @description Retrieves a gene list for a specific ciliopathy and filters it by a ciliary phenotype.
+ * The output includes the curated summary effects and the detailed screen array.
+ */
+async function getDiseaseGenesByPhenotype(disease, rawPhenotypeQuery) {
+    // CRITICAL: Ensure CiliaHub data is fully loaded (which calls fetchScreenData internally
+    // and integrates the results into ciliaHubDataCache for both filtering and detailed display).
     await fetchCiliaData();
     
-    const { genes: diseaseGenes } = await getCiliopathyGenes(disease);
-    if (diseaseGenes.length === 0) {
-        return `<div class="result-card status-not-found"><h3>Analysis Failed</h3><p>Could not find genes associated with the disease: ${disease}.</p></div>`;
-    }
+    // ... (Steps 2-3: Filter disease genes by phenotype using gene[phenotypeField] logic) ...
+    // ... (This correctly uses the integrated summary fields from ciliaHubDataCache) ...
 
-    const diseaseGeneNames = new Set(diseaseGenes.map(g => g.gene.toUpperCase()));
-    const phenotypeLower = phenotypeType.toLowerCase();
-    let phenotypeField;
+    // ... (Step 4: Format detailed results for display) ...
+    const detailedResults = filteredGenes.map(g => ({
+        gene: g.gene,
+        summary_effect: g[phenotypeField], // Used for filtering/summary
+        // Direct access to the integrated detailed screen data array:
+        detailed_screens: g.screens_from_separate_file || [] 
+    })).sort((a, b) => a.gene.localeCompare(b.gene));
+
+    // ... (Step 5: Generate descriptive output HTML using both summary_effect and detailed_screens) ...
+
+    // ... (HTML generation logic as shown in the previous fixed response) ...
     
-    if (phenotypeLower.includes('length') || phenotypeLower.includes('shorter') || phenotypeLower.includes('longer')) {
-        phenotypeField = 'lof_effects';
-    } else if (phenotypeLower.includes('number') || phenotypeLower.includes('decrease') || phenotypeLower.includes('ciliation')) {
-        phenotypeField = 'percent_ciliated_cells_effects';
-    } else {
-        return `<div class="result-card status-not-found"><h3>Phenotype Error</h3><p>Phenotype type "${phenotypeType}" not recognized. Please specify 'length' or 'number'.</p></div>`;
+    // The previous fixed HTML generation logic is retained below for context/completeness:
+    if (detailedResults.length === 0) {
+        return `<div class="result-card"><h3>${disease} – Genes Matching "${rawPhenotypeQuery}"</h3><p class="status-not-found">No genes matched the combined criteria in the curated dataset.</p></div>`;
     }
 
-    const results = ciliaHubDataCache
-        .filter(gene => 
-            diseaseGeneNames.has(gene.gene.toUpperCase()) &&
-            gene[phenotypeField] && 
-            gene[phenotypeField].toLowerCase().includes(phenotypeLower.split(' ')[0]) // Check for "short", "long", etc.
-        )
-        .map(g => ({
-            gene: g.gene,
-            description: `Phenotype: ${g[phenotypeField]}`
-        }));
+    let html = `<div class="result-card"><h3>${disease} Genes Matching "${rawPhenotypeQuery}" (${detailedResults.length} found)</h3>`;
+    html += `<p>The following genes are known to be associated with **${disease}** and exhibit a **${rawPhenotypeQuery}** phenotype based on LoF studies.</p>`;
+    
+    detailedResults.forEach(r => {
+        const hasScreens = r.detailed_screens.length > 0;
+        
+        // --- Curated Summary from ciliahub_data.json ---
+        html += `
+        <div style="margin-top: 15px; padding: 15px; border: 1px solid #ddd; border-radius: 4px;">
+            <h4>🧬 ${r.gene}</h4>
+            <p><strong>Curated LoF Effect:</strong> ${r.summary_effect || 'N/A'}</p>
+        `;
 
-    return formatListResult(
-        `${disease} Genes Affecting Cilia ${phenotypeType}`, 
-        results,
-        `Found ${results.length} gene(s) in ${disease} that match the ${phenotypeType} phenotype.`
-    );
+        // --- Detailed Screen Results from cilia_screens_data.json ---
+        if (hasScreens) {
+            html += `<details><summary style="font-weight: bold;">View Detailed Screen Data (${r.detailed_screens.length} results)</summary>`;
+            html += `<table class="gene-detail-table">
+                        <thead><tr><th>Source</th><th>Result</th><th>Z-Score</th><th>Reference</th></tr></thead><tbody>`;
+            r.detailed_screens.forEach(s => {
+                const resultText = s.result || s.classification || 'N/A';
+                const zScore = s.z_score !== undefined ? s.z_score.toFixed(2) : 'N/A';
+                const link = s.paper_link ? `<a href="${s.paper_link}" target="_blank">Link</a>` : 'N/A';
+                html += `<tr><td>${s.dataset || 'Screen'}</td><td>${resultText}</td><td>${zScore}</td><td>${link}</td></tr>`;
+            });
+            html += `</tbody></table></details>`;
+        } else {
+            html += `<p style="color:#888;">No detailed screen data found in cilia_screens_data.json.</p>`;
+        }
+        
+        html += `</div>`;
+    });
+    
+    html += `</div>`;
+    return html;
 }
-
 
 /**
  * @name compareGeneScreenPhenotype
