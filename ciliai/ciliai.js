@@ -2239,43 +2239,74 @@ async function routeMultiGeneDomainTable(query) {
 /**@##########################BEGINNING OF SCREEN RELATED QUETIONS AND HELPER##################################
 /**
 /**
- * @name getDiseaseGenesByPhenotype
- * @description Retrieves a gene list for a specific ciliopathy and filters it to show only genes
- * that match a specific cilia phenotype (e.g., shorter cilia, decreased ciliation).
- * * NOTE: This must be KEPT to handle the combined semantic query logic.
- */
 /**
  * @name getDiseaseGenesByPhenotype
- * @description Retrieves a gene list for a specific ciliopathy and filters it by a ciliary phenotype.
- * The output includes the curated summary effects and the detailed screen array.
+ * @description Retrieves a gene list for a specific ciliopathy and filters it by a ciliary phenotype 
+ * (e.g., shorter cilia, decreased ciliation). The output includes both curated and detailed screen data.
+ * @param {string} disease - The name of the ciliopathy (e.g., "Joubert Syndrome").
+ * @param {string} rawPhenotypeQuery - The raw query phrase (e.g., "short cilia").
+ * @returns {Promise<string>} HTML formatted list result with detailed screen data.
  */
 async function getDiseaseGenesByPhenotype(disease, rawPhenotypeQuery) {
-    // CRITICAL: Ensure CiliaHub data is fully loaded (which calls fetchScreenData internally
-    // and integrates the results into ciliaHubDataCache for both filtering and detailed display).
+    // 1. Ensure all CiliaHub data is fully loaded (which calls fetchScreenData internally)
     await fetchCiliaData();
     
-    // ... (Steps 2-3: Filter disease genes by phenotype using gene[phenotypeField] logic) ...
-    // ... (This correctly uses the integrated summary fields from ciliaHubDataCache) ...
+    // 2. Get all genes associated with the disease (relying on correct getCiliopathyGenes implementation)
+    const { genes: diseaseGenes } = await getCiliopathyGenes(disease);
+    if (diseaseGenes.length === 0) {
+        return `<div class="result-card status-not-found"><h3>Analysis Failed</h3><p>Could not find genes associated with the disease: ${disease}.</p></div>`;
+    }
 
-    // ... (Step 4: Format detailed results for display) ...
+    const diseaseGeneNames = new Set(diseaseGenes.map(g => g.gene.toUpperCase()));
+    const phenotypeLower = rawPhenotypeQuery.toLowerCase();
+    
+    let phenotypeField;
+    let effectKeywords = [];
+
+    // --- Determine Filtering Fields and Keywords ---
+    if (phenotypeLower.includes('length') || phenotypeLower.includes('shorter') || phenotypeLower.includes('longer') || phenotypeLower.includes('short')) {
+        phenotypeField = 'lof_effects';
+        if (phenotypeLower.includes('short')) effectKeywords = ['shorter', 'short', 'absent'];
+        else if (phenotypeLower.includes('long')) effectKeywords = ['longer', 'long'];
+    
+    } else if (phenotypeLower.includes('number') || phenotypeLower.includes('decrease') || phenotypeLower.includes('ciliation') || phenotypeLower.includes('loss')) {
+        phenotypeField = 'percent_ciliated_cells_effects';
+        if (phenotypeLower.includes('decrease') || phenotypeLower.includes('loss') || phenotypeLower.includes('reduced')) effectKeywords = ['reduced', 'decreased', 'fewer', 'loss'];
+        else if (phenotypeLower.includes('increase')) effectKeywords = ['increased', 'more'];
+    
+    } else {
+        return `<div class="result-card status-not-found"><h3>Phenotype Error</h3><p>Phenotype type "${rawPhenotypeQuery}" not recognized. Please specify 'length' or 'number' effects (e.g., 'short cilia').</p></div>`;
+    }
+    
+    // 3. Filter disease genes based on the stored summary phenotype data
+    //    The result is explicitly named filteredGenes to fix the 'is not defined' error.
+    const filteredGenes = ciliaHubDataCache
+        .filter(gene => {
+            const geneUpper = gene.gene.toUpperCase();
+            if (!diseaseGeneNames.has(geneUpper)) return false; 
+            
+            const effectText = gene[phenotypeField] ? gene[phenotypeField].toLowerCase() : "";
+            if (!effectText) return false; 
+            
+            return effectKeywords.some(kw => effectText.includes(kw));
+        });
+
+    // 4. Format detailed results for display, accessing integrated screen data
     const detailedResults = filteredGenes.map(g => ({
         gene: g.gene,
-        summary_effect: g[phenotypeField], // Used for filtering/summary
-        // Direct access to the integrated detailed screen data array:
+        summary_effect: g[phenotypeField], // Curated summary for filtering confirmation
+        // Access integrated screen data (from cilia_screens_data.json)
         detailed_screens: g.screens_from_separate_file || [] 
     })).sort((a, b) => a.gene.localeCompare(b.gene));
 
-    // ... (Step 5: Generate descriptive output HTML using both summary_effect and detailed_screens) ...
 
-    // ... (HTML generation logic as shown in the previous fixed response) ...
-    
-    // The previous fixed HTML generation logic is retained below for context/completeness:
+    // 5. Generate comprehensive output HTML
     if (detailedResults.length === 0) {
         return `<div class="result-card"><h3>${disease} – Genes Matching "${rawPhenotypeQuery}"</h3><p class="status-not-found">No genes matched the combined criteria in the curated dataset.</p></div>`;
     }
 
     let html = `<div class="result-card"><h3>${disease} Genes Matching "${rawPhenotypeQuery}" (${detailedResults.length} found)</h3>`;
-    html += `<p>The following genes are known to be associated with **${disease}** and exhibit a **${rawPhenotypeQuery}** phenotype based on LoF studies.</p>`;
+    html += `<p>The following genes are associated with **${disease}** and exhibit a **${rawPhenotypeQuery}** phenotype based on **LoF** studies.</p>`;
     
     detailedResults.forEach(r => {
         const hasScreens = r.detailed_screens.length > 0;
@@ -2284,7 +2315,7 @@ async function getDiseaseGenesByPhenotype(disease, rawPhenotypeQuery) {
         html += `
         <div style="margin-top: 15px; padding: 15px; border: 1px solid #ddd; border-radius: 4px;">
             <h4>🧬 ${r.gene}</h4>
-            <p><strong>Curated LoF Effect:</strong> ${r.summary_effect || 'N/A'}</p>
+            <p><strong>Curated LoF Effect (${phenotypeField}):</strong> ${r.summary_effect || 'N/A'}</p>
         `;
 
         // --- Detailed Screen Results from cilia_screens_data.json ---
@@ -2309,7 +2340,6 @@ async function getDiseaseGenesByPhenotype(disease, rawPhenotypeQuery) {
     html += `</div>`;
     return html;
 }
-
 /**
  * @name compareGeneScreenPhenotype
  * @description Displays a side-by-side table comparing the primary LoF phenotype (length and number) for a list of genes.
