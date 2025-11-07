@@ -2226,17 +2226,17 @@ async function routeMultiGeneDomainTable(query) {
  * that match a specific cilia phenotype (e.g., shorter cilia, decreased ciliation).
  * * NOTE: This must be KEPT to handle the combined semantic query logic.
  */
-// ✅ Unified async function to get disease genes by phenotype type
 async function getDiseaseGenesByPhenotype(disease, phenotypeType) {
     // Fetch both curated and screen datasets
-    const [ciliaData, screenData] = await Promise.all([
+    const [ciliaData, screenDataRaw] = await Promise.all([
         fetchCiliaData(),
         fetchScreenData()
     ]);
 
+    // **FIX START:** Ensure screenData is a valid iterable array.
+    const screenData = Array.isArray(screenDataRaw) ? screenDataRaw : [];
     const matchedGenes = new Set();
-
-    // 🧩 Match disease genes from ciliaData
+    // 🧩 Match disease genes from ciliaData (no change needed here)
     for (const gene of Object.keys(ciliaData)) {
         const record = ciliaData[gene];
         const diseaseMatches =
