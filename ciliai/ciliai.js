@@ -302,14 +302,41 @@ async function resolveSemanticIntent(query) {
     const matchedPhenotype = phenotypeTerms.find(term => qLower.includes(term));
 
     if (matchedDisease && matchedPhenotype) {
-        const standardDisease =
-            matchedDisease.toUpperCase() === "BBS" ? "Bardet–Biedl Syndrome" :
-            matchedDisease.toUpperCase() === "MKS" ? "Meckel–Gruber Syndrome" :
-            matchedDisease.toUpperCase() === "PCD" ? "Primary Ciliary Dyskinesia" :
-            matchedDisease.toUpperCase() === "NPHP" ? "Nephronophthisis" :
-            matchedDisease;
+    // --- Normalize disease name ---
+    const standardDisease =
+        matchedDisease.toUpperCase() === "BBS" ? "Bardet–Biedl Syndrome" :
+        matchedDisease.toUpperCase() === "MKS" ? "Meckel–Gruber Syndrome" :
+        matchedDisease.toUpperCase() === "PCD" ? "Primary Ciliary Dyskinesia" :
+        matchedDisease.toUpperCase() === "NPHP" ? "Nephronophthisis" :
+        matchedDisease;
+
+    // --- NEW phenotype type classifier ---
+    let phenotypeType = null;
+    const p = matchedPhenotype.toLowerCase();
+
+    if (p.includes("short") || p.includes("long") || p.includes("length")) {
+        phenotypeType = "length";
+    } else if (
+        p.includes("number") ||
+        p.includes("decreased") ||
+        p.includes("loss") ||
+        p.includes("reduced") ||
+        p.includes("ciliation") ||
+        p.includes("increase") ||
+        p.includes("decrease")
+    ) {
+        phenotypeType = "number";
+    }
+
+    // --- Return disease + phenotype gene list ---
+    if (phenotypeType) {
+        return await getDiseaseGenesByPhenotype(standardDisease, phenotypeType);
+    } else {
+        // fallback to existing behavior if type not recognized
         return await getDiseaseGenesByPhenotype(standardDisease, matchedPhenotype);
     }
+}
+
 
     // --- Rule-based fuzzy detection ---
     let detectedIntent = null;
