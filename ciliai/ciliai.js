@@ -2281,9 +2281,13 @@ async function getLocalizationPhenotypeGenes(localizationTerm) {
             return isShortCilia || isLowCiliation;
         })
         .map(g => ({
-            gene: g.gene,
-            description: `Location: ${g.localization.join(', ')}. LoF: ${g.lof_effects || 'N/A'}`
-        }))
+    gene: g.gene,
+    // --- NEW: Separate Localization and Phenotype Data for the Table ---
+    localization_detail: g.localization.join(', '), 
+    lof_effect_detail: g.lof_effects || 'N/A', 
+    // The main description will now be the full, raw string (or a composite summary if needed)
+    description: `Location: ${g.localization.join(', ')}. LoF: ${g.lof_effects || 'N/A'}`
+}))
         .sort((a, b) => a.gene.localeCompare(b.gene));
 
     const title = `${localizationTerm} Genes Causing Short Cilia`;
@@ -2419,6 +2423,60 @@ async function getDiseaseGenesByPhenotype(disease, rawPhenotypeQuery) {
     html += `</div>`;
     return html;
 }
+
+/**
+ * @name getComplexPhenotypeGenes
+ * @description Finds genes in a specified complex that cause short/absent cilia phenotypes.
+ * * NOTE: This function relies on the external function getComplexPhylogenyTableMap() 
+ * to retrieve the gene list for the complex.
+ * * @param {string} complexName - The complex name (e.g., "IFT-B COMPLEX", "CILIARY TIP")
+ */
+async function getComplexPhenotypeGenes(complexName) {
+    await fetchCiliaData(); // Ensures ciliaHubDataCache is ready
+
+    // 1. Get the complex gene list from the static map
+    const complexMap = getComplexPhylogenyTableMap();
+    const complexGenes = complexMap[complexName.toUpperCase()];
+    
+    if (!complexGenes || complexGenes.length === 0) {
+        return formatListResult(`Complex Not Found: ${complexName}`, []);
+    }
+    
+    const complexGeneSet = new Set(complexGenes.map(g => g.toUpperCase()));
+    
+    // 2. Define phenotype filter keywords (same logic for short/absent cilia)
+    const lengthKeywords = ['shorter', 'short', 'absent'];
+    const numberKeywords = ['reduced', 'decreased', 'fewer', 'loss'];
+    
+    // 3. Filter ciliahub data for genes in this complex with short cilia phenotypes
+    const results = ciliaHubDataCache
+        .filter(gene => {
+            const geneUpper = gene.gene.toUpperCase();
+            if (!complexGeneSet.has(geneUpper)) return false; // Must be in complex
+            
+            // Check 1: Short Cilia (lof_effects)
+            const lofEffect = gene.lof_effects ? gene.lof_effects.toLowerCase() : "";
+            const isShortCilia = lengthKeywords.some(kw => lofEffect.includes(kw));
+            
+            // Check 2: Low Ciliation (percent_ciliated_cells_effects)
+            const numberEffect = gene.percent_ciliated_cells_effects ? gene.percent_ciliated_cells_effects.toLowerCase() : "";
+            const isLowCiliation = numberKeywords.some(kw => numberEffect.includes(kw));
+            
+            return isShortCilia || isLowCiliation;
+        })
+        .map(g => ({
+            gene: g.gene,
+            // Prepare enhanced table data structure (Localization, LoF Effect)
+            localization_detail: g.localization ? g.localization.join(', ') : 'N/A',
+            lof_effect_detail: g.lof_effects || 'N/A',
+            description: `LoF: ${g.lof_effects || 'N/A'}`
+        }))
+        .sort((a, b) => a.gene.localeCompare(b.gene));
+    
+    const title = `${complexName} Genes Causing Short Cilia`;
+    return formatListResult(title, results);
+}
+
 /**
  * @name compareGeneScreenPhenotype
  * @description Displays a side-by-side table comparing the primary LoF phenotype (length and number) for a list of genes.
@@ -3364,16 +3422,188 @@ const questionRegistry = [
     { text: "Which genes are at the basal body?", handler: async () => formatListResult("Genes localizing to basal body", await getGenesByLocalization("basal body")) },
     { text: "List basal body proteins", handler: async () => formatListResult("Proteins localizing to basal body", await getGenesByLocalization("basal body")) },
 
-    // Localization (Basal body, Transition zonei cilia) and Screen Related questions 
-    { text: "Show Basal Body genes causing short cilia", handler: async () => getLocalizationPhenotypeGenes("basal body") },
-    { text: "List ciliary proteins that cause short cilia", handler: async () => getLocalizationPhenotypeGenes("cilium") },
-    { text: "Show Transition Zone proteins causing short cilia", handler: async () => getLocalizationPhenotypeGenes("transition zone") },
+    // Localization (Basal body, Transition zonei cilia) and Screen Related questions
+    // --- MITOCHONDRIA ---
+{ text: "Show mitochondria genes causing short cilia", handler: async () => getLocalizationPhenotypeGenes("Mitochondria") },
+{ text: "Mitochondrial genes with cilia defects", handler: async () => getLocalizationPhenotypeGenes("Mitochondria") },
+{ text: "Which mitochondrial proteins affect cilia length", handler: async () => getLocalizationPhenotypeGenes("Mitochondria") },
+{ text: "Find mitochondria genes reducing cilia", handler: async () => getLocalizationPhenotypeGenes("Mitochondria") },
+{ text: "Mitochondrial proteins causing cilia phenotypes", handler: async () => getLocalizationPhenotypeGenes("Mitochondria") },
+{ text: "List mitochondria genes with short cilia effects", handler: async () => getLocalizationPhenotypeGenes("Mitochondria") },
 
+// --- LYSOSOMES ---
+{ text: "Show lysosome genes causing short cilia", handler: async () => getLocalizationPhenotypeGenes("Lysosomes") },
+{ text: "Lysosomal genes with cilia defects", handler: async () => getLocalizationPhenotypeGenes("Lysosomes") },
+{ text: "Which lysosomal proteins affect cilia length", handler: async () => getLocalizationPhenotypeGenes("Lysosomes") },
+{ text: "Find lysosome genes reducing cilia", handler: async () => getLocalizationPhenotypeGenes("Lysosomes") },
+{ text: "Lysosomal proteins causing cilia phenotypes", handler: async () => getLocalizationPhenotypeGenes("Lysosomes") },
+{ text: "List lysosome genes with short cilia effects", handler: async () => getLocalizationPhenotypeGenes("Lysosomes") },
+
+// --- NUCLEUS ---
+{ text: "Show nucleus genes causing short cilia", handler: async () => getLocalizationPhenotypeGenes("Nucleus") },
+{ text: "Nuclear genes with cilia defects", handler: async () => getLocalizationPhenotypeGenes("Nucleus") },
+{ text: "Which nuclear proteins affect cilia length", handler: async () => getLocalizationPhenotypeGenes("Nucleus") },
+{ text: "Find nucleus genes reducing cilia", handler: async () => getLocalizationPhenotypeGenes("Nucleus") },
+{ text: "Nuclear proteins causing cilia phenotypes", handler: async () => getLocalizationPhenotypeGenes("Nucleus") },
+{ text: "List nuclear genes with short cilia effects", handler: async () => getLocalizationPhenotypeGenes("Nucleus") },
+{ text: "Show nuclear localizing genes causing short cilia", handler: async () => getLocalizationPhenotypeGenes("Nucleus") },
+
+// --- BASAL BODY ---
+{ text: "Show basal body genes causing short cilia", handler: async () => getLocalizationPhenotypeGenes("basal body") },
+{ text: "Basal body genes with cilia defects", handler: async () => getLocalizationPhenotypeGenes("basal body") },
+{ text: "Which basal body proteins affect cilia length", handler: async () => getLocalizationPhenotypeGenes("basal body") },
+{ text: "Find basal body genes reducing cilia", handler: async () => getLocalizationPhenotypeGenes("basal body") },
+{ text: "Basal body proteins causing cilia phenotypes", handler: async () => getLocalizationPhenotypeGenes("basal body") },
+{ text: "List basal body genes with short cilia effects", handler: async () => getLocalizationPhenotypeGenes("basal body") },
+{ text: "Which basal body proteins lead to shortened cilia", handler: async () => getLocalizationPhenotypeGenes("basal body") },
+{ text: "Basal body proteins that shorten cilia", handler: async () => getLocalizationPhenotypeGenes("basal body") },
+
+// --- CILIA ---
+{ text: "List ciliary proteins that cause short cilia", handler: async () => getLocalizationPhenotypeGenes("cilia") },
+{ text: "Ciliary genes with cilia defects", handler: async () => getLocalizationPhenotypeGenes("cilia") },
+{ text: "Which ciliary proteins affect cilia length", handler: async () => getLocalizationPhenotypeGenes("cilia") },
+{ text: "Find cilia genes reducing cilia length", handler: async () => getLocalizationPhenotypeGenes("cilia") },
+{ text: "Ciliary proteins causing cilia phenotypes", handler: async () => getLocalizationPhenotypeGenes("cilia") },
+{ text: "Show cilia genes with short cilia effects", handler: async () => getLocalizationPhenotypeGenes("cilia") },
+{ text: "Cilia proteins that shorten cilia", handler: async () => getLocalizationPhenotypeGenes("cilia") },
+
+// --- TRANSITION ZONE ---
+{ text: "Show transition zone proteins causing short cilia", handler: async () => getLocalizationPhenotypeGenes("transition zone") },
+{ text: "Transition zone genes with cilia defects", handler: async () => getLocalizationPhenotypeGenes("transition zone") },
+{ text: "Which transition zone proteins affect cilia length", handler: async () => getLocalizationPhenotypeGenes("transition zone") },
+{ text: "Find transition zone genes reducing cilia", handler: async () => getLocalizationPhenotypeGenes("transition zone") },
+{ text: "Transition zone proteins causing cilia phenotypes", handler: async () => getLocalizationPhenotypeGenes("transition zone") },
+{ text: "List transition zone genes with short cilia effects", handler: async () => getLocalizationPhenotypeGenes("transition zone") },
+{ text: "Show transition zone genes causing short cilia", handler: async () => getLocalizationPhenotypeGenes("transition zone") },
+{ text: "Short cilia with transition zone localizations", handler: async () => getLocalizationPhenotypeGenes("transition zone") },
+{ text: "Genes causing short cilia in transition zone", handler: async () => getLocalizationPhenotypeGenes("transition zone") },
+
+// --- CENTROSOME ---
+{ text: "Show centrosome genes causing short cilia", handler: async () => getLocalizationPhenotypeGenes("Centrosome") },
+{ text: "Centrosomal genes with cilia defects", handler: async () => getLocalizationPhenotypeGenes("Centrosome") },
+{ text: "Which centrosome proteins affect cilia length", handler: async () => getLocalizationPhenotypeGenes("Centrosome") },
+{ text: "Find centrosome genes reducing cilia", handler: async () => getLocalizationPhenotypeGenes("Centrosome") },
+{ text: "Centrosome proteins causing cilia phenotypes", handler: async () => getLocalizationPhenotypeGenes("Centrosome") },
+{ text: "List centrosome genes with short cilia effects", handler: async () => getLocalizationPhenotypeGenes("Centrosome") },
+
+// --- CILIARY TIP ---
+{ text: "Show ciliary tip proteins causing short cilia", handler: async () => getLocalizationPhenotypeGenes("ciliary tip") },
+{ text: "Ciliary tip genes with cilia defects", handler: async () => getLocalizationPhenotypeGenes("ciliary tip") },
+{ text: "Which ciliary tip proteins affect cilia length", handler: async () => getLocalizationPhenotypeGenes("ciliary tip") },
+{ text: "Find ciliary tip genes reducing cilia", handler: async () => getLocalizationPhenotypeGenes("ciliary tip") },
+{ text: "Ciliary tip proteins causing cilia phenotypes", handler: async () => getLocalizationPhenotypeGenes("ciliary tip") },
+{ text: "List ciliary tip genes with short cilia effects", handler: async () => getLocalizationPhenotypeGenes("ciliary tip") },
+
+// --- AXONEME ---
+{ text: "List axonemal genes causing short cilia", handler: async () => getLocalizationPhenotypeGenes("cilia") },
+{ text: "Axoneme genes with cilia defects", handler: async () => getLocalizationPhenotypeGenes("cilia") },
+{ text: "Which axonemal proteins affect cilia length", handler: async () => getLocalizationPhenotypeGenes("cilia") },
+{ text: "Find axoneme genes reducing cilia", handler: async () => getLocalizationPhenotypeGenes("cilia") },
+{ text: "Axonemal proteins causing cilia phenotypes", handler: async () => getLocalizationPhenotypeGenes("cilia") },
+{ text: "Show axoneme genes with short cilia effects", handler: async () => getLocalizationPhenotypeGenes("cilia") },
+// --- CILIARY TIP COMPLEX ---
+{ text: "List ciliary tip genes causing short cilia", handler: async () => getComplexPhenotypeGenes("CILIARY TIP") },
+{ text: "Show ciliary tip proteins with cilia defects", handler: async () => getComplexPhenotypeGenes("CILIARY TIP") },
+{ text: "Which ciliary tip genes affect cilia length", handler: async () => getComplexPhenotypeGenes("CILIARY TIP") },
+{ text: "Find ciliary tip proteins causing cilia phenotypes", handler: async () => getComplexPhenotypeGenes("CILIARY TIP") },
+{ text: "Ciliary tip complex genes with short or long cilia", handler: async () => getComplexPhenotypeGenes("CILIARY TIP") },
+{ text: "Show all ciliary tip complex proteins", handler: async () => getGenesByComplex("CILIARY TIP") },
+
+// --- IFT-A COMPLEX ---
+{ text: "List IFT-A proteins causing short cilia", handler: async () => getComplexPhenotypeGenes("IFT-A COMPLEX") },
+{ text: "Show IFT-A complex genes with cilia defects", handler: async () => getComplexPhenotypeGenes("IFT-A COMPLEX") },
+{ text: "Which IFT-A genes affect cilia length", handler: async () => getComplexPhenotypeGenes("IFT-A COMPLEX") },
+{ text: "Find IFT-A proteins causing cilia phenotypes", handler: async () => getComplexPhenotypeGenes("IFT-A COMPLEX") },
+{ text: "IFT-A complex genes with short or long cilia", handler: async () => getComplexPhenotypeGenes("IFT-A COMPLEX") },
+{ text: "Show all IFT-A complex proteins", handler: async () => getGenesByComplex("IFT-A COMPLEX") },
+
+// --- IFT-B COMPLEX ---
+{ text: "List IFT-B proteins causing short cilia", handler: async () => getComplexPhenotypeGenes("IFT-B COMPLEX") },
+{ text: "Show IFT-B complex genes with cilia defects", handler: async () => getComplexPhenotypeGenes("IFT-B COMPLEX") },
+{ text: "Which IFT-B genes affect cilia length", handler: async () => getComplexPhenotypeGenes("IFT-B COMPLEX") },
+{ text: "Find IFT-B proteins causing cilia phenotypes", handler: async () => getComplexPhenotypeGenes("IFT-B COMPLEX") },
+{ text: "IFT-B complex genes with short or long cilia", handler: async () => getComplexPhenotypeGenes("IFT-B COMPLEX") },
+{ text: "Show all IFT-B complex proteins", handler: async () => getGenesByComplex("IFT-B COMPLEX") },
+
+// --- IFT-B1 COMPLEX ---
+{ text: "List IFT-B1 proteins causing short cilia", handler: async () => getComplexPhenotypeGenes("IFT-B1 COMPLEX") },
+{ text: "Show IFT-B1 complex genes with cilia defects", handler: async () => getComplexPhenotypeGenes("IFT-B1 COMPLEX") },
+{ text: "Which IFT-B1 genes affect cilia length", handler: async () => getComplexPhenotypeGenes("IFT-B1 COMPLEX") },
+{ text: "IFT-B1 complex genes with cilia phenotypes", handler: async () => getComplexPhenotypeGenes("IFT-B1 COMPLEX") },
+
+// --- IFT-B2 COMPLEX ---
+{ text: "List IFT-B2 proteins causing short cilia", handler: async () => getComplexPhenotypeGenes("IFT-B2 COMPLEX") },
+{ text: "Show IFT-B2 complex genes with cilia defects", handler: async () => getComplexPhenotypeGenes("IFT-B2 COMPLEX") },
+{ text: "Which IFT-B2 genes affect cilia length", handler: async () => getComplexPhenotypeGenes("IFT-B2 COMPLEX") },
+{ text: "IFT-B2 complex genes with cilia phenotypes", handler: async () => getComplexPhenotypeGenes("IFT-B2 COMPLEX") },
+
+// --- IFT COMPLEX (all IFT genes) ---
+{ text: "List IFT complex proteins causing short cilia", handler: async () => getComplexPhenotypeGenes("IFT COMPLEX") },
+{ text: "Show all IFT complex genes with cilia defects", handler: async () => getComplexPhenotypeGenes("IFT COMPLEX") },
+{ text: "Which IFT genes affect cilia length", handler: async () => getComplexPhenotypeGenes("IFT COMPLEX") },
+{ text: "Find IFT proteins causing cilia phenotypes", handler: async () => getComplexPhenotypeGenes("IFT COMPLEX") },
+{ text: "Intraflagellar transport genes with cilia defects", handler: async () => getComplexPhenotypeGenes("IFT COMPLEX") },
+{ text: "Show all IFT complex proteins", handler: async () => getGenesByComplex("IFT COMPLEX") },
+
+// --- IFT MOTOR COMPLEX ---
+{ text: "List motor proteins causing short cilia", handler: async () => getComplexPhenotypeGenes("IFT MOTOR COMPLEX") },
+{ text: "Show IFT motor complex genes with cilia defects", handler: async () => getComplexPhenotypeGenes("IFT MOTOR COMPLEX") },
+{ text: "Which motor proteins affect cilia length", handler: async () => getComplexPhenotypeGenes("IFT MOTOR COMPLEX") },
+{ text: "Find IFT motor genes causing cilia phenotypes", handler: async () => getComplexPhenotypeGenes("IFT MOTOR COMPLEX") },
+{ text: "IFT motor complex genes with short or long cilia", handler: async () => getComplexPhenotypeGenes("IFT MOTOR COMPLEX") },
+{ text: "Show all IFT motor proteins", handler: async () => getGenesByComplex("IFT MOTOR COMPLEX") },
+{ text: "List intraflagellar transport motors", handler: async () => getGenesByComplex("INTRAFLAGELLAR TRANSPORT MOTORS") },
+
+// --- BBSOME ---
+{ text: "List BBSome proteins causing short cilia", handler: async () => getComplexPhenotypeGenes("BBSOME") },
+{ text: "Show BBSome genes with cilia defects", handler: async () => getComplexPhenotypeGenes("BBSOME") },
+{ text: "Which BBSome proteins affect cilia length", handler: async () => getComplexPhenotypeGenes("BBSOME") },
+{ text: "Find BBSome genes causing cilia phenotypes", handler: async () => getComplexPhenotypeGenes("BBSOME") },
+{ text: "BBSome complex genes with cilia effects", handler: async () => getComplexPhenotypeGenes("BBSOME") },
+// --- TRANSITION ZONE ---
+{ text: "List transition zone proteins causing short cilia", handler: async () => getComplexPhenotypeGenes("TRANSITION ZONE") },
+{ text: "Show transition zone genes with cilia defects", handler: async () => getComplexPhenotypeGenes("TRANSITION ZONE") },
+{ text: "Which transition zone proteins affect cilia length", handler: async () => getComplexPhenotypeGenes("TRANSITION ZONE") },
+{ text: "Find transition zone genes causing cilia phenotypes", handler: async () => getComplexPhenotypeGenes("TRANSITION ZONE") },
+{ text: "Transition zone complex genes with cilia effects", handler: async () => getComplexPhenotypeGenes("TRANSITION ZONE") },
+// --- MKS MODULE ---
+{ text: "List MKS module proteins causing short cilia", handler: async () => getComplexPhenotypeGenes("MKS MODULE") },
+{ text: "Show MKS module genes with cilia defects", handler: async () => getComplexPhenotypeGenes("MKS MODULE") },
+{ text: "Which MKS module proteins affect cilia length", handler: async () => getComplexPhenotypeGenes("MKS MODULE") },
+{ text: "MKS module genes with cilia phenotypes", handler: async () => getComplexPhenotypeGenes("MKS MODULE") },
+// --- NPHP MODULE ---
+{ text: "List NPHP module proteins causing short cilia", handler: async () => getComplexPhenotypeGenes("NPHP MODULE") },
+{ text: "Show NPHP module genes with cilia defects", handler: async () => getComplexPhenotypeGenes("NPHP MODULE") },
+{ text: "Which NPHP module proteins affect cilia length", handler: async () => getComplexPhenotypeGenes("NPHP MODULE") },
+{ text: "NPHP module genes with cilia phenotypes", handler: async () => getComplexPhenotypeGenes("NPHP MODULE") },
+
+// --- DYNEIN ARM ---
+{ text: "List dynein arm proteins causing short cilia", handler: async () => getComplexPhenotypeGenes("DYNEIN ARM") },
+{ text: "Show dynein arm genes with cilia defects", handler: async () => getComplexPhenotypeGenes("DYNEIN ARM") },
+{ text: "Which dynein arm proteins affect cilia length", handler: async () => getComplexPhenotypeGenes("DYNEIN ARM") },
+{ text: "Dynein arm genes with cilia phenotypes", handler: async () => getComplexPhenotypeGenes("DYNEIN ARM") },
+// --- OUTER DYNEIN ARM ---
+{ text: "List outer dynein arm proteins causing short cilia", handler: async () => getComplexPhenotypeGenes("OUTER DYNEIN ARM") },
+{ text: "Show outer dynein arm genes with cilia defects", handler: async () => getComplexPhenotypeGenes("OUTER DYNEIN ARM") },
+{ text: "Which outer dynein proteins affect cilia length", handler: async () => getComplexPhenotypeGenes("OUTER DYNEIN ARM") },
+// --- INNER DYNEIN ARM ---
+{ text: "List inner dynein arm proteins causing short cilia", handler: async () => getComplexPhenotypeGenes("INNER DYNEIN ARM") },
+{ text: "Show inner dynein arm genes with cilia defects", handler: async () => getComplexPhenotypeGenes("INNER DYNEIN ARM") },
+{ text: "Which inner dynein proteins affect cilia length", handler: async () => getComplexPhenotypeGenes("INNER DYNEIN ARM") },
+// --- RADIAL SPOKE ---
+{ text: "List radial spoke proteins causing short cilia", handler: async () => getComplexPhenotypeGenes("RADIAL SPOKE") },
+{ text: "Show radial spoke genes with cilia defects", handler: async () => getComplexPhenotypeGenes("RADIAL SPOKE") },
+{ text: "Which radial spoke proteins affect cilia length", handler: async () => getComplexPhenotypeGenes("RADIAL SPOKE") },
+// --- CENTRAL PAIR ---
+{ text: "List central pair proteins causing short cilia", handler: async () => getComplexPhenotypeGenes("CENTRAL PAIR") },
+{ text: "Show central pair genes with cilia defects", handler: async () => getComplexPhenotypeGenes("CENTRAL PAIR") },
+{ text: "Which central pair proteins affect cilia length", handler: async () => getComplexPhenotypeGenes("CENTRAL PAIR") },
+    
     // Axoneme
-    { text: "Which genes localize to axoneme?", handler: async () => formatListResult("Genes localizing to axoneme", await getGenesByLocalization("axoneme")) },
-    { text: "Axonemal genes", handler: async () => formatListResult("Genes localizing to axoneme", await getGenesByLocalization("axoneme")) },
-    { text: "Show axoneme proteins", handler: async () => formatListResult("Genes localizing to axoneme", await getGenesByLocalization("axoneme")) },
-    { text: "List axonemal proteins", handler: async () => formatListResult("Genes localizing to axoneme", await getGenesByLocalization("axoneme")) },
+    { text: "Which genes localize to axoneme?", handler: async () => formatListResult("Genes localizing to axoneme", await getGenesByLocalization("cilia")) },
+    { text: "Axonemal genes", handler: async () => formatListResult("Genes localizing to axoneme", await getGenesByLocalization("cilia")) },
+    { text: "Show axoneme proteins", handler: async () => formatListResult("Genes localizing to axoneme", await getGenesByLocalization("cilia")) },
+    { text: "List axonemal proteins", handler: async () => formatListResult("Genes localizing to axoneme", await getGenesByLocalization("cilia")) },
     // Transition fibers
     { text: "Show transition fiber proteins", handler: async () => formatListResult("Proteins localizing to transition fiber", await getGenesByLocalization("transition fiber")) },
     { text: "Transition fiber genes", handler: async () => formatListResult("Proteins localizing to transition fiber", await getGenesByLocalization("transition fiber")) },
@@ -7512,71 +7742,70 @@ function formatGeneDetail(geneData, geneSymbol, detailTitle, detailContent) {
   `;
 }
 
-// --- FINAL UPDATED formatListResult (Accepts 5 arguments) ---
+
+// --- CRITICAL CORRECTION TO formatListResult ---
+// The formatListResult function must now accept a different signature or intelligently detect the new structure.
+// This is how the formatListResult function needs to be adapted to display the three columns:
 
 function formatListResult(title, geneList, citationHtml = '', speciesCode = '', targetKey = null) {
     if (!geneList || geneList.length === 0) {
-        // ... (unchanged)
         return `<div class="result-card"><h3>${title}</h3><p class="status-not-found">No matching genes found.</p></div>`;
     }
 
     const displayedGenes = geneList.slice(0, 100);
-    const showOrthologColumn = targetKey && targetKey !== null;
     
-    // Determine species name for the ortholog column header
-    const orthologSpeciesName = speciesCode.replace(/(\w\.\w+)\s*/, '').replace('drosophila', 'Fly').replace('elegans', 'C. elegans').trim() || 'Ortholog';
-
-    // Determine the most accurate label for the Human Gene Column
-    let humanColumnLabel = "Human Gene";
-    if (title.includes("Genes Conserved")) {
-        humanColumnLabel = "Human Disease Gene"; // Best label for conserved disease lists
-    }
+    // --- CHECK FOR NEW STRUCTURE ---
+    // If the gene objects contain 'localization_detail' and 'lof_effect_detail', use the enhanced table.
+    const isEnhancedTable = displayedGenes.length > 0 && 
+                            displayedGenes[0].hasOwnProperty('localization_detail') &&
+                            displayedGenes[0].hasOwnProperty('lof_effect_detail');
     
-    // --- Build Table Rows ---
-    const tableRows = displayedGenes.map(g => {
-        let cells = `<td><strong>${g.gene}</strong></td>`;
-        
-        if (showOrthologColumn) {
-            // Access the ortholog name using the dynamic key (g[targetKey])
-            const orthologName = g[targetKey] || 'N/A';
-            cells += `<td>${orthologName}</td>`;
-        }
-        
-        cells += `<td>${g.description.substring(0, 100)}${g.description.length > 100 ? '...' : ''}</td>`;
-        return `<tr>${cells}</tr>`;
-    }).join('');
-
     // --- Build Table Header ---
     let tableHeader = `
     <thead>
         <tr>
-            <th class="sortable">${humanColumnLabel}</th>`;
-    
-    if (showOrthologColumn) {
-        tableHeader += `<th class="sortable">${orthologSpeciesName} Ortholog</th>`;
-    }
-    
-    tableHeader += `
-            <th>Disease/Conservation Info</th>
+            <th class="sortable">Human Gene</th>`;
+
+    if (isEnhancedTable) {
+        tableHeader += `
+            <th class="sortable">Ciliary Localization</th>
+            <th class="sortable">LoF Phenotype (Cilia Length/Number)</th>
         </tr>
     </thead>`;
+    } else {
+        // Fallback to old single-column display
+        tableHeader += `<th>Disease/Conservation Info</th></tr></thead>`;
+    }
+
+
+    // --- Build Table Rows ---
+    const tableRows = displayedGenes.map(g => {
+        let cells = `<td><strong>${g.gene}</strong></td>`;
+        
+        if (isEnhancedTable) {
+            cells += `<td>${g.localization_detail}</td>`;
+            cells += `<td style="font-weight: bold;">${g.lof_effect_detail}</td>`;
+        } else {
+            cells += `<td>${g.description.substring(0, 100)}${g.description.length > 100 ? '...' : ''}</td>`;
+        }
+        
+        return `<tr>${cells}</tr>`;
+    }).join('');
+
 
     // --- Final HTML Structure ---
-    const tableHtml = `
-    <table class="ciliopathy-table" id="download-table-content">
-        ${tableHeader}
-        <tbody>${tableRows}</tbody>
-    </table>
-    ${geneList.length > 100 ? `<p><a href="https://theciliahub.github.io/" target="_blank">View full list (${geneList.length} genes) in CiliaHub</a></p>` : ''}`;
-    
+    // ... (rest of the formatting for download buttons and wrapping divs remains the same)
     const titleHtml = `<h3>${title} (${geneList.length} found)</h3>`;
     const downloadButtonHtml = `<button class="download-button" onclick="downloadTable('download-table-content', '${title.replace(/[^a-z0-9]/gi, '_')}')">Download CSV</button>`;
-
 
     return `
     <div class="result-card">
         ${titleHtml}
-        ${tableHtml}
+        <table class="ciliopathy-table" id="download-table-content">
+            ${tableHeader}
+            <tbody>${tableRows}</tbody>
+        </table>
+        ${geneList.length > 100 ? `<p><a href="https://theciliahub.github.io/" target="_blank">View full list (${geneList.length} genes) in CiliaHub</a></p>` : ''}
         ${downloadButtonHtml}
         ${citationHtml}
     </div>`;
