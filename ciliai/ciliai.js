@@ -302,35 +302,13 @@ async function resolveSemanticIntent(query) {
     const matchedPhenotype = phenotypeTerms.find(term => qLower.includes(term));
 
     if (matchedDisease && matchedPhenotype) {
-        const disease = matchedDisease.trim();
-        const phenotype = matchedPhenotype.toLowerCase();
-
-        // --- Classify phenotype type ---
-        let phenotypeType = null;
-        if (phenotype.includes("short") || phenotype.includes("long") || phenotype.includes("length")) {
-            phenotypeType = "length";
-        } else if (
-            phenotype.includes("number") ||
-            phenotype.includes("ciliation") ||
-            phenotype.includes("loss") ||
-            phenotype.includes("decreased")
-        ) {
-            phenotypeType = "number";
-        }
-
-        // --- Fetch and format result ---
-        const results = await getDiseaseGenesByPhenotype(disease, phenotypeType);
-
-        if (!results?.genes?.length) {
-            return `No matching genes found for ${disease} with ${phenotypeType || phenotype}.`;
-        }
-
-        // --- Generate display ---
-        const formatted = results.genes.map(r =>
-            `🧬 **${r.gene}** (${r.source}) – Phenotype: ${phenotypeType}`
-        ).join("\n\n");
-
-        return `### ${disease} – Genes Affecting Cilia ${phenotypeType || phenotype}\n\n${formatted}`;
+        const standardDisease =
+            matchedDisease.toUpperCase() === "BBS" ? "Bardet–Biedl Syndrome" :
+            matchedDisease.toUpperCase() === "MKS" ? "Meckel–Gruber Syndrome" :
+            matchedDisease.toUpperCase() === "PCD" ? "Primary Ciliary Dyskinesia" :
+            matchedDisease.toUpperCase() === "NPHP" ? "Nephronophthisis" :
+            matchedDisease;
+        return await getDiseaseGenesByPhenotype(standardDisease, matchedPhenotype);
     }
 
     // --- Rule-based fuzzy detection ---
@@ -342,18 +320,25 @@ async function resolveSemanticIntent(query) {
         }
     }
 
-    // --- Intent-specific Routing ---
+    // --- Intent Resolution Logic ---
     if (detectedIntent === "ciliary_tip") {
+        const title = "Ciliary Tip Components";
         const data = await getCuratedComplexComponents("CILIARY TIP");
-        return formatListResult("Ciliary Tip Components", data);
+        return formatListResult(title, data);
     }
 
-    if (detectedIntent === "disease_classification") {
+    // --- Disease Classification Handler ---
+    else if (detectedIntent === "disease_classification") {
         let classification = null;
-        if (qLower.includes('primary')) classification = "Primary Ciliopathies";
-        else if (qLower.includes('motile')) classification = "Motile Ciliopathies";
-        else if (qLower.includes('secondary')) classification = "Secondary Ciliopathies";
-        else if (qLower.includes('atypical')) classification = "Atypical Ciliopathies";
+        if (qLower.includes('primary ciliopathy') || qLower.includes('primary disease')) {
+            classification = "Primary Ciliopathies";
+        } else if (qLower.includes('motile ciliopathy') || qLower.includes('motile disease')) {
+            classification = "Motile Ciliopathies";
+        } else if (qLower.includes('secondary ciliopathy') || qLower.includes('secondary disease')) {
+            classification = "Secondary Diseases";
+        } else if (qLower.includes('atypical ciliopathy') || qLower.includes('atypical disease')) {
+            classification = "Atypical Ciliopathies";
+        }
 
         if (classification) {
             const genes = await getGenesByCiliopathyClassification(classification);
@@ -361,55 +346,88 @@ async function resolveSemanticIntent(query) {
         }
     }
 
-    if (detectedIntent === "disease") {
-        const targetDisease = diseaseNames.find(name => qLower.includes(name));
+    // --- Specific Disease Handler ---
+    else if (detectedIntent === "disease") {
+        const diseaseList = [
+            "bardet-biedl syndrome", "joubert syndrome", "meckel-gruber syndrome",
+            "primary ciliary dyskinesia", "leber congenital amaurosis", "nephronophthisis",
+            "polycystic kidney disease", "autosomal dominant polycystic kidney disease",
+            "autosomal recessive polycystic kidney disease", "short-rib thoracic dysplasia",
+            "senior-løken syndrome", "cranioectodermal dysplasia",
+            "nphp", "bbs", "mks", "pcd", "ciliopathy", "syndrome"
+        ];
+
+        let targetDisease = null;
+        for (const name of diseaseList.sort((a, b) => b.length - a.length)) {
+            if (qLower.includes(name)) {
+                targetDisease = name;
+                break;
+            }
+        }
+
         if (targetDisease) {
-            const { genes, description } = await getCiliopathyGenes(targetDisease);
-            const titleCaseName = targetDisease.replace(/\b\w/g, l => l.toUpperCase());
+            const standardName =
+                targetDisease.toUpperCase() === "BBS" ? "Bardet–Biedl Syndrome" :
+                targetDisease.toUpperCase() === "MKS" ? "Meckel–Gruber Syndrome" :
+                targetDisease.toUpperCase() === "PCD" ? "Primary Ciliary Dyskinesia" :
+                targetDisease.toUpperCase() === "NPHP" ? "Nephronophthisis" :
+                targetDisease;
+
+            const { genes, description } = await getCiliopathyGenes(standardName);
+            const titleCaseName = standardName.replace(/\b\w/g, l => l.toUpperCase());
             return formatListResult(`Genes for ${titleCaseName}`, genes, description);
         }
-        return `<p>🩺 Disease query detected, but no specific disease was identified. Try "List genes for Joubert Syndrome".</p>`;
+
+        return `<p>🩺 Disease query detected, but no specific disease or classification was identified for listing genes. Please try a query like "List genes for Joubert Syndrome".</p>`;
     }
 
-    if (detectedIntent === "domain") {
+    // --- Domain Handler ---
+    else if (detectedIntent === "domain") {
         return await resolveDomainQuery(query);
     }
 
-    if (detectedIntent === "phylogeny") {
+    // --- Phylogeny Handler ---
+    else if (detectedIntent === "phylogeny") {
         return await resolvePhylogeneticQuery(query);
     }
 
-    if (detectedIntent === "complex") {
+    // --- Complex Handler ---
+    else if (detectedIntent === "complex") {
         return await routeComplexPhylogenyAnalysis(query);
     }
 
-    if (detectedIntent === "expression") {
+    // --- Expression Handler ---
+    else if (detectedIntent === "expression") {
         const genes = (query.match(/\b[A-Z0-9\-]{3,}\b/g) || []);
         if (genes.length > 0) {
-            if (qLower.includes('umap') && genes.length === 1)
+            if (qLower.includes('umap') && genes.length === 1) {
                 return await displayUmapGeneExpression(genes[0]);
+            }
             return await displayCellxgeneBarChart(genes);
+        } else {
+            return `<p>🧬 Please specify a gene to show expression data.</p>`;
         }
-        return `<p>🧬 Please specify a gene to show expression data.</p>`;
     }
 
-    if (detectedIntent === "localization") {
-        const locMatch = qLower.match(/(basal body|transition zone|axoneme|centrosome|ciliary membrane)/);
-        if (locMatch) {
-            const data = await getGenesByLocalization(locMatch[1]);
-            return formatListResult(`Genes localizing to ${locMatch[1]}`, data);
+    // --- Localization Handler ---
+    else if (detectedIntent === "localization") {
+        const locationMatch = qLower.match(/(basal body|transition zone|axoneme|centrosome|ciliary membrane)/);
+        if (locationMatch && locationMatch[1]) {
+            const data = await getGenesByLocalization(locationMatch[1]);
+            return formatListResult(`Genes localizing to ${locationMatch[1]}`, data);
+        } else {
+            return `<p>📍 Localization query detected. Please be more specific (e.g., "genes in the basal body").</p>`;
         }
-        return `<p>📍 Please specify a ciliary compartment (e.g., "genes in the basal body").</p>`;
     }
 
-    if (detectedIntent === "phenotype") {
-        return `<p>🔎 Phenotype query detected. Try "Find genes causing short cilia" or "genes reducing ciliation".</p>`;
+    // --- Phenotype Handler ---
+    else if (detectedIntent === "phenotype") {
+        return `<p>🔎 Phenotype/Screen query detected. Please use a specific gene (e.g., "What happens to cilia when KIF3A is knocked down?") or a specific phenotype (e.g., "Find genes causing short cilia").</p>`;
     }
 
     // --- Default fallback ---
-    return `<p>🤔 I couldn’t understand that query. Try asking about a specific disease, gene, or phenotype.</p>`;
+    return null;
 }
-
 
 // --- Main AI Query Handler ---
 window.handleAIQuery = async function() {
@@ -2227,83 +2245,41 @@ async function routeMultiGeneDomainTable(query) {
  * * NOTE: This must be KEPT to handle the combined semantic query logic.
  */
 async function getDiseaseGenesByPhenotype(disease, phenotypeType) {
-    // Fetch both curated and screen datasets
-    const [ciliaData, screenDataRaw] = await Promise.all([
-        fetchCiliaData(),
-        fetchScreenData()
-    ]);
-
-    // **FIX START:** Ensure screenData is a valid iterable array.
-    const screenData = Array.isArray(screenDataRaw) ? screenDataRaw : [];
-    const matchedGenes = new Set();
-    // 🧩 Match disease genes from ciliaData (no change needed here)
-    for (const gene of Object.keys(ciliaData)) {
-        const record = ciliaData[gene];
-        const diseaseMatches =
-            record.diseases &&
-            record.diseases.some(d =>
-                d.toLowerCase().includes(disease.toLowerCase())
-            );
-
-        if (diseaseMatches) {
-            if (
-                phenotypeType === 'length' &&
-                (record.cilia_length === 'short' || record.cilia_length === 'long')
-            ) {
-                matchedGenes.add(gene);
-            } else if (
-                phenotypeType === 'number' &&
-                (record.ciliation === 'decreased' || record.ciliation === 'increased')
-            ) {
-                matchedGenes.add(gene);
-            }
-        }
+    await fetchCiliaData();
+    
+    const { genes: diseaseGenes } = await getCiliopathyGenes(disease);
+    if (diseaseGenes.length === 0) {
+        return `<div class="result-card status-not-found"><h3>Analysis Failed</h3><p>Could not find genes associated with the disease: ${disease}.</p></div>`;
     }
 
-    // 🧬 Match phenotype hits from screenData
-    for (const hit of screenData) {
-        const gene = hit.gene_symbol || hit.gene;
-        if (!gene) continue;
-
-        const diseaseMatch =
-            hit.disease &&
-            hit.disease.toLowerCase().includes(disease.toLowerCase());
-
-        if (diseaseMatch) {
-            if (
-                phenotypeType === 'length' &&
-                (hit.cilia_length === 'short' || hit.cilia_length === 'long')
-            ) {
-                matchedGenes.add(gene);
-            } else if (
-                phenotypeType === 'number' &&
-                (hit.percent_ciliated_cells === 'decreased' ||
-                 hit.percent_ciliated_cells === 'increased')
-            ) {
-                matchedGenes.add(gene);
-            }
-        }
+    const diseaseGeneNames = new Set(diseaseGenes.map(g => g.gene.toUpperCase()));
+    const phenotypeLower = phenotypeType.toLowerCase();
+    let phenotypeField;
+    
+    if (phenotypeLower.includes('length') || phenotypeLower.includes('shorter') || phenotypeLower.includes('longer')) {
+        phenotypeField = 'lof_effects';
+    } else if (phenotypeLower.includes('number') || phenotypeLower.includes('decrease') || phenotypeLower.includes('ciliation')) {
+        phenotypeField = 'percent_ciliated_cells_effects';
+    } else {
+        return `<div class="result-card status-not-found"><h3>Phenotype Error</h3><p>Phenotype type "${phenotypeType}" not recognized. Please specify 'length' or 'number'.</p></div>`;
     }
 
-    // 🧾 Format result
-    const resultArray = Array.from(matchedGenes);
-    if (resultArray.length === 0) {
-        return `No ${phenotypeType} phenotype genes found for ${disease}.`;
-    }
+    const results = ciliaHubDataCache
+        .filter(gene => 
+            diseaseGeneNames.has(gene.gene.toUpperCase()) &&
+            gene[phenotypeField] && 
+            gene[phenotypeField].toLowerCase().includes(phenotypeLower.split(' ')[0]) // Check for "short", "long", etc.
+        )
+        .map(g => ({
+            gene: g.gene,
+            description: `Phenotype: ${g[phenotypeField]}`
+        }));
 
-    // 🧠 Optional: You can display full gene info if needed
-    const detailedResults = resultArray.map(g => ({
-        gene: g,
-        source: ciliaData[g]?.source || 'Screen dataset',
-        phenotypeType
-    }));
-
-    return {
-        disease,
-        phenotypeType,
-        count: resultArray.length,
-        genes: detailedResults
-    };
+    return formatListResult(
+        `${disease} Genes Affecting Cilia ${phenotypeType}`, 
+        results,
+        `Found ${results.length} gene(s) in ${disease} that match the ${phenotypeType} phenotype.`
+    );
 }
 
 
