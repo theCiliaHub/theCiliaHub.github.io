@@ -2439,68 +2439,82 @@ async function getLocalizationGenesData(locationName) {
     return results; 
 }
 
+/**
+ * @name getGeneListByTerm
+ * @description Retrieves a gene list using the most specific internal source available.
+ * @param {string} term - The localization/complex name (e.g., "CILIARY TIP", "Mitochondria").
+ * @returns {Promise<Array<Object>>} Array of raw CiliaHub gene objects.
+ */
+async function getGeneListByTerm(term) {
+    const termUpper = term.toUpperCase();
+    
+    // Check 1: STATIC COMPLEX MAPS (Most Precise - e.g., CILIARY TIP, IFT-B)
+    const complexMap = getComplexPhylogenyTableMap();
+    const staticGenes = complexMap[termUpper];
+
+    if (staticGenes && staticGenes.length > 0) {
+        // Retrieve and map the full CiliaHub data for each gene in the static list
+        await fetchCiliaData(); 
+        const staticGeneSet = new Set(staticGenes);
+        return ciliaHubDataCache.filter(g => staticGeneSet.has(g.gene.toUpperCase()));
+    }
+
+    // Check 2: DYNAMIC LOCALIZATION FIELD (Flexible - e.g., Mitochondria, Nucleus)
+    return getLocalizationGenesData(term); 
+}
+
 
 /**
- * @name getLocalizationPhenotypeGenes
- * @description Finds genes localizing to a compartment that also match a specific phenotype.
- * @param {string} localizationTerm - The target subcellular compartment (e.g., "basal body").
- * @param {string} phenotypeTerm - The phenotype filter ("short cilia", "longer cilia", "no effect").
+ * @name getLocalizationPhenotypeGenes (FINAL CORRECTED IMPLEMENTATION)
+ * @description Finds genes localizing to a compartment/complex that also match a specific phenotype.
  */
 async function getLocalizationPhenotypeGenes(localizationTerm, phenotypeTerm) {
-    // 1. Get ONLY the raw gene data objects for the target localization
-    const localizationGenes = await getLocalizationGenesData(localizationTerm); 
+    // 1. Get the gene pool from the best source (static map OR dynamic localization field)
+    // NOTE: This call now replaces both 'getLocalizationGenesData' and complex lookup logic.
+    const genePool = await getGeneListByTerm(localizationTerm); 
     
-    if (localizationGenes.length === 0) {
-        return formatListResult(`${localizationTerm} Genes`, [], `No genes found localized to ${localizationTerm}.`);
+    if (genePool.length === 0) {
+        return formatListResult(`${localizationTerm} Genes`, [], `No genes found for ${localizationTerm}.`);
     }
 
     const phenotypeLower = phenotypeTerm.toLowerCase();
     
-    // 2. Define dynamic phenotype filter keywords
+    // 2. Define dynamic phenotype filter keywords (remains the same robust logic)
+    // ... (lengthKeywords, numberKeywords mapping logic) ...
+    
     let lengthKeywords = [];
     let numberKeywords = [];
-
-    // --- Dynamic Keyword Mapping ---
     if (phenotypeLower.includes('short')) {
-        // Extended keywords for better coverage of assembly failure/shortness
         lengthKeywords = ['shorter', 'short', 'absent', 'no cilia', 'failure to assemble', 'severe defect'];
         numberKeywords = ['reduced', 'decreased', 'fewer', 'loss', 'severe defect', 'no cilia'];
     } else if (phenotypeLower.includes('longer')) {
         lengthKeywords = ['longer', 'long', 'increased length'];
-        numberKeywords = ['increased', 'more']; // Less common, but good to include
+        numberKeywords = ['increased', 'more'];
     } else if (phenotypeLower.includes('no effect')) {
         lengthKeywords = ['no effect', 'not reported', 'no change'];
         numberKeywords = ['no effect', 'not reported', 'no change'];
     }
     
-    // --- 3. Phenotype Filter Logic ---
-    const results = localizationGenes
+    // 3. Phenotype Filter Logic (Applied directly to the genePool)
+    const results = genePool
         .filter(gene => {
             const lofEffect = (gene.lof_effects || '').toLowerCase();
             const numberEffect = (gene.percent_ciliated_cells_effects || '').toLowerCase();
             
-            // Check for match based on defined keywords
             const matchesLength = lengthKeywords.some(kw => lofEffect.includes(kw));
             const matchesNumber = numberKeywords.some(kw => numberEffect.includes(kw));
 
-            // CRITICAL LOGIC CHECK
             if (phenotypeLower.includes('no effect')) {
-                 // For 'no effect', we require BOTH primary fields to indicate neutrality
                  const isLoFNeutral = lengthKeywords.some(kw => lofEffect.includes(kw));
                  const isNumberNeutral = numberKeywords.some(kw => numberEffect.includes(kw));
                  return isLoFNeutral && isNumberNeutral;
             } else if (phenotypeLower.includes('short') || phenotypeLower.includes('long')) {
-                 // For 'short' or 'long' (positive effect), return true if EITHER field matches a positive keyword
-                 // This ensures that even if cilia number is reduced OR length is short, it counts.
                  return matchesLength || matchesNumber;
             }
-
-            // Fallback
             return false;
         })
         .map(g => ({
             gene: g.gene,
-            // Prepare enhanced table data structure
             localization_detail: g.localization ? g.localization.join(', ') : 'N/A',
             lof_effect_detail: g.lof_effects || 'N/A',
             description: `LoF: ${g.lof_effects || 'N/A'}`
