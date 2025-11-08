@@ -238,30 +238,6 @@ function normalizeTerm(s) {
 }
 
 
-
-
-// ==================== SEMANTIC INTENT RESOLVER ====================
-// Detects user intent using keyword clusters and fuzzy semantic matching.
-
-// --- NEW GLOBAL CONSTANTS (for Localization + Phenotype Priority Check) ---
-// Full list for general localization intent detection (including non-ciliary organelles)
-const localizationTerms = [
-    "basal body", "transition zone", "cilia", "axoneme", "centrosome", "ciliary membrane",
-    "Ciliary associated gene", "flagella", "Cytosol", "Nucleus", "Lysosomes", 
-    "Mitochondria", "Microbody", "Peroxisome", "Microtubules", "Ribosome", "Endosome",
-    "ciliary tip"
-];
-// Subset for the specific "Localization + Phenotype" combined rule (Rule 2)
-// This list contains only the ciliary/centrosomal locations expected to have phenotype data in the DB.
-const ciliaryLocalizationTerms = [
-    "basal body", "transition zone", "cilia", "axoneme", "centrosome",
-    "ciliary membrane", "ciliary tip", "flagella" // 'flagella' added as it's ciliary-related
-];
-const phenotypeTerms = [
-    "short cilia", "longer cilia", "cilia length", "cilia defects", 
-    "decreased ciliation", "loss of cilia", "reduced cilia", "increase", "decrease", "no effect"
-];
-
 // ==================== SEMANTIC INTENT RESOLVER ====================
 // Detects user intent using keyword clusters and fuzzy semantic matching.
 
