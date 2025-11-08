@@ -2443,14 +2443,7 @@ async function getLocalizationGenesData(locationName) {
 
     return results; 
 }
-
-/**
- * @name getGeneListByTerm
- * @description Retrieves a gene list using the most specific internal source available.
- * @param {string} term - The localization/complex name (e.g., "CILIARY TIP", "Mitochondria").
- * @returns {Promise<Array<Object>>} Array of raw CiliaHub gene objects.
- */
-a/**
+ /**
  * @name getGeneListByTerm
  * @description Retrieves a gene list using the most specific internal source available.
  * @param {string} term - The localization/complex name (e.g., "CILIARY TIP", "Mitochondria").
