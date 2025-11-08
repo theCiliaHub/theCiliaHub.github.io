@@ -238,7 +238,7 @@ function normalizeTerm(s) {
 }
 
 
-// ==================== SEMANTIC INTENT RESOLVER (Final Fix) ====================
+/// ==================== SEMANTIC INTENT RESOLVER (Definitive Fix) ====================
 // Detects user intent using keyword clusters and fuzzy semantic matching.
 
 // --- GLOBAL CONSTANTS ---
@@ -249,20 +249,15 @@ const localizationTerms = [
     "ciliary tip"
 ];
 
-const ciliaryLocalizationTerms = [
-    "basal body", "transition zone", "cilia", "axoneme", "centrosome",
-    "ciliary membrane", "ciliary tip", "flagella"
-];
-
 const phenotypeTerms = [
-    "short cilia", "longer cilia", "cilia length", "cilia defects", 
+    "short cilia", "shorter cilia", "longer cilia", "cilia length", "cilia defects", 
     "decreased ciliation", "loss of cilia", "reduced cilia", "increase", "decrease", "no effect"
 ];
 
 async function resolveSemanticIntent(query) {
     const qLower = query.toLowerCase().trim();
 
-    // --- Define semantic clusters for major biological contexts (Localization cluster removed) ---
+    // --- Define semantic clusters for major biological contexts (No longer includes 'localization' or 'phenotype') ---
     const intentClusters = {
         ciliary_tip: ["ciliary tip", "distal tip", "tip proteins", "tip components", "tip composition", "proteins at the ciliary tip", "ciliary tip complex", "enriched at the tip", "distal region", "ciliary tip proteome"],
         domain: ["domain", "motif", "architecture", "protein fold", "domain organization", "enriched", "depleted"],
@@ -270,16 +265,12 @@ async function resolveSemanticIntent(query) {
         complex: ["complex", "interactome", "binding partners", "corum", "protein interaction", "ift", "bbsome", "dynein", "mks", "nphp", "radial spoke", "axoneme", "transition zone"],
         expression: ["expression", "umap", "tissue", "cell type", "where expressed", "scRNA", "single-cell", "transcript", "abundance", "expression pattern", "plot"],
         disease: ["mutation", "variant", "pathogenic", "ciliopathy", "disease", "syndrome", "bbs", "joubert", "mks", "pcd", "lca", "nephronophthisis", "polycystic kidney disease"],
-        disease_classification: ["primary ciliopathy", "secondary ciliopathy", "motile ciliopathy", "atypical ciliopathy", "primary disease", "secondary disease", "motile disease", "atypical disease", "ciliopathy classification"],
-        // localization intent is now handled by explicit checks below
-        phenotype: ["knockdown", "phenotype", "effect", "shorter cilia", "longer cilia", "cilia length", "cilia number", "decreased ciliation", "loss of cilia"]
+        disease_classification: ["primary ciliopathy", "secondary ciliopathy", "motile ciliopathy", "atypical ciliopathy", "primary disease", "secondary disease", "motile disease", "atypical disease", "ciliopathy classification"]
     };
     
     // --- Priority Rule 1: Combined "disease" + "phenotype" (No Change) ---
     const diseaseNames = ["bardet-biedl syndrome", "joubert syndrome", "meckel-gruber syndrome", "primary ciliary dyskinesia", "leber congenital amaurosis", "nephronophthisis", "polycystic kidney disease", "autosomal dominant polycystic kidney disease", "autosomal recessive polycystic kidney disease", "short-rib thoracic dysplasia", "senior-løken syndrome", "cranioectodermal dysplasia", "nphp", "bbs", "mks", "pcd", "ciliopathy", "syndrome"];
-    
     const strictPhenotypeTerms = ["phenotype", "short cilia", "long cilia", "cilia length", "cilia number", "decreased ciliation", "loss of cilia", "reduced cilia", "increase", "decrease"];
-
     const matchedDisease = diseaseNames.find(name => qLower.includes(name));
     const matchedStrictPhenotype = strictPhenotypeTerms.find(term => qLower.includes(term));
 
@@ -294,29 +285,36 @@ async function resolveSemanticIntent(query) {
     }
 
     // --------------------------------------------------------------------------
-    // ⭐ PRIORITY RULE 2 & 3: Localization + Phenotype / Localization Only ⭐
-    // This combined block now handles all localization cases robustly.
+    // ⭐ PRIORITY RULES 2 & 3: ALL Localization + Phenotype / Localization Only / Phenotype Only ⭐
+    // This block handles all localization- and phenotype-related queries.
     // --------------------------------------------------------------------------
     const allLocalizationTermsLower = localizationTerms.map(term => term.toLowerCase());
     const matchedLocalization = allLocalizationTermsLower.find(name => qLower.includes(name));
     const matchedPhenotype = phenotypeTerms.find(term => qLower.includes(term));
 
     if (matchedLocalization) {
-        // Special case: "Ciliary associated gene" returns the whole list, regardless of phenotype filter
+        // Case A: Ciliary associated gene (returns the whole list)
         if (matchedLocalization.includes("ciliary associated gene")) {
             const data = await getCuratedComplexComponents("CILIARY ASSOCIATED GENES");
             return formatListResult(`All Ciliary Associated Genes`, data);
         } 
         
+        // Case B: Localization + Phenotype (e.g., "Show mitochondria genes causing shorter cilia")
         if (matchedPhenotype) {
-            // ⭐ CORE FIX: Handle ALL Localization + Phenotype combinations here. 
-            // This includes both ciliary (Basal body, cilia) and non-ciliary (Mitochondria) locations.
+            // This now correctly executes the combined filter for ALL locations.
             return await getLocalizationPhenotypeGenes(matchedLocalization, matchedPhenotype);
-        } else {
-            // Generic Localization List (e.g., "Show Mitochondria genes")
+        } 
+        
+        // Case C: Localization Only (e.g., "Show Mitochondria genes")
+        else {
             const data = await getGenesByLocalization(matchedLocalization); 
             return formatListResult(`Genes localizing to ${matchedLocalization}`, data);
         }
+    } else if (matchedPhenotype) {
+        // Case D: Phenotype Only (e.g., "Find genes causing short cilia")
+        // This handles queries that only contain a phenotype term without a specific gene or localization.
+        const data = await getGenesByPhenotype(matchedPhenotype);
+        return formatListResult(`Genes associated with ${matchedPhenotype}`, data);
     }
     // --------------------------------------------------------------------------
     
@@ -330,7 +328,7 @@ async function resolveSemanticIntent(query) {
     }
 
     // --- Intent Resolution Logic (Uses detectedIntent) ---
-    // All handlers here remain the same as they cover non-localization topics.
+    // ... (All other intent handlers remain the same) ...
 
     if (detectedIntent === "ciliary_tip") {
         const title = "Ciliary Tip Components";
@@ -413,14 +411,10 @@ async function resolveSemanticIntent(query) {
         }
     }
 
-    // --- Phenotype Handler (Generic List) ---
-    else if (detectedIntent === "phenotype") {
-        return `<p>🔎 Phenotype/Screen query detected. Please use a specific gene (e.g., "What happens to cilia when KIF3A is knocked down?") or a specific phenotype (e.g., "Find genes causing short cilia").</p>`;
-    }
-
     // --- Default fallback ---
     return null;
 }
+
 
 // --- Main AI Query Handler ---
 window.handleAIQuery = async function() {
