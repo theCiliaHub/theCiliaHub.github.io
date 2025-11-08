@@ -2506,7 +2506,6 @@ async function getGeneListByTerm(term) {
     return getLocalizationGenesData(term); 
 }
 
-
 /**
  * @name getLocalizationPhenotypeGenes (FINAL CORRECTED IMPLEMENTATION)
  * @description Finds genes localizing to a compartment/complex that also match a specific phenotype.
@@ -2515,21 +2514,22 @@ async function getLocalizationPhenotypeGenes(localizationQuery, phenotypeQuery) 
     try {
         const genes = await fetchCiliaData();
         if (!genes || !Array.isArray(genes)) {
-            throw new Error("Invalid gene dataset returned");
+            throw new Error("Invalid or missing gene dataset");
         }
 
         const locQueryLower = localizationQuery.toLowerCase().trim();
         const phenoQueryLower = phenotypeQuery.toLowerCase().trim();
 
-        // --- Define keyword clusters for phenotype interpretation ---
+        // --- Keyword clusters for phenotype matching ---
         const shortKeywords = ['short', 'shorter', 'reduced length', 'decreased length', 'truncated'];
         const longKeywords = ['long', 'longer', 'elongated', 'increased length', 'extended'];
         const missingKeywords = ['absent', 'missing', 'no cilia', 'loss', 'defective'];
         const abnormalKeywords = ['abnormal', 'irregular', 'disorganized', 'defective'];
         const noEffectKeywords = ['no effect', 'no change', 'not affected', 'normal'];
 
-        // --- Helper function to classify LoF phenotype text ---
+        // --- Helper: check phenotype match safely ---
         function matchesPhenotype(lofText) {
+            if (!lofText || typeof lofText !== "string") return false;
             const t = lofText.toLowerCase();
             if (phenoQueryLower.includes("short")) {
                 return shortKeywords.some(k => t.includes(k));
@@ -2542,29 +2542,31 @@ async function getLocalizationPhenotypeGenes(localizationQuery, phenotypeQuery) 
             } else if (phenoQueryLower.includes("no effect") || phenoQueryLower.includes("normal")) {
                 return noEffectKeywords.some(k => t.includes(k));
             } else {
-                // Generic keyword match
                 return t.includes(phenoQueryLower);
             }
         }
 
         // --- MAIN FILTER ---
         const matchedGenes = genes.filter(gene => {
-            // Handle missing fields gracefully
-            const localizationText = (gene.localization || "").toLowerCase();
-            const lofEffectText = (gene.lof_effects || "").toLowerCase();
+            // Handle localization robustly
+            let localizationArray = [];
 
-            // 1. Localization check (independent)
-            const matchesLocalization =
-                localizationText.split(/[,;|]/).some(loc => loc.trim().includes(locQueryLower));
+            if (Array.isArray(gene.localization)) {
+                localizationArray = gene.localization.map(x => String(x).toLowerCase());
+            } else if (typeof gene.localization === "string") {
+                localizationArray = gene.localization
+                    .split(/[,;|]/)
+                    .map(x => x.trim().toLowerCase())
+                    .filter(Boolean);
+            }
 
-            // 2. Phenotype check (independent)
-            const matchesPheno = matchesPhenotype(lofEffectText);
+            const matchesLocalization = localizationArray.some(loc => loc.includes(locQueryLower));
+            const matchesPheno = matchesPhenotype(gene.lof_effects);
 
-            // Both must be true
             return matchesLocalization && matchesPheno;
         });
 
-        // --- OUTPUT ---
+        // --- OUTPUT SECTION ---
         if (matchedGenes.length === 0) {
             return `
                 <div class="result-card status-not-found">
@@ -2578,10 +2580,10 @@ async function getLocalizationPhenotypeGenes(localizationQuery, phenotypeQuery) 
             .map(
                 g => `
                 <div class="gene-item">
-                    🧬 <b>${g.gene_symbol}</b><br>
-                    <i>Localization:</i> ${g.localization || 'N/A'}<br>
+                    🧬 <b>${g.gene_symbol || g.gene}</b><br>
+                    <i>Localization:</i> ${Array.isArray(g.localization) ? g.localization.join(', ') : g.localization || 'N/A'}<br>
                     <i>Curated LoF Effect:</i> ${g.lof_effects || 'N/A'}<br>
-                    <a href="#" class="view-details" data-gene="${g.gene_symbol}">View Detailed Screen Data</a>
+                    <a href="#" class="view-details" data-gene="${g.gene_symbol || g.gene}">View Detailed Screen Data</a>
                 </div>`
             )
             .join("\n");
