@@ -2511,75 +2511,122 @@ async function getGeneListByTerm(term) {
  * @name getLocalizationPhenotypeGenes (FINAL CORRECTED IMPLEMENTATION)
  * @description Finds genes localizing to a compartment/complex that also match a specific phenotype.
  */
-async function getLocalizationPhenotypeGenes(localizationFilter, phenotypeFilter) {
-    const response = await fetch('ciliaGenes.json');
-    const genes = await response.json();
+async function getLocalizationPhenotypeGenes(localizationQuery, rawPhenotypeQuery) {
+    // 1. Ensure all CiliaHub data is fully loaded
+    await fetchCiliaData();
 
-    const filteredGenes = genes.filter(gene => {
-        const localizationMatch = localizationFilter === 'all' ||
-            (gene.Localization && gene.Localization.toLowerCase().includes(localizationFilter.toLowerCase()));
+    const localizationLower = localizationQuery.toLowerCase();
+    const phenotypeLower = rawPhenotypeQuery.toLowerCase();
 
-        if (!phenotypeFilter || phenotypeFilter === 'all') {
-            return localizationMatch;
-        }
-
-        const phenotypeLower = gene.Phenotype ? gene.Phenotype.toLowerCase() : '';
-
-        // Keyword groups
-        const lengthKeywords = ['length', 'elongated', 'short', 'shortened', 'decreased', 'increased'];
-        const numberKeywords = ['number', 'count', 'abundance', 'frequency', 'increased', 'decreased', 'reduced'];
-
-        let phenotypeMatch = false;
-
-        // --- Handle increased / elongated cases ---
-        if (
-            phenotypeLower.includes('increased') ||
-            phenotypeLower.includes('elongated') ||
-            phenotypeLower.includes('long')
-        ) {
-            if (lengthKeywords.some(k => phenotypeLower.includes(k))) {
-                gene.lengthCategory = 'Increased';
-                phenotypeMatch = phenotypeFilter === 'increased';
-            }
-            if (numberKeywords.some(k => phenotypeLower.includes(k))) {
-                gene.numberCategory = 'Increased';
-                phenotypeMatch = phenotypeFilter === 'increased';
-            }
-        }
-
-        // --- Handle decreased / shortened cases ---
-        else if (
-            phenotypeLower.includes('decreased') ||
-            phenotypeLower.includes('short') ||
-            phenotypeLower.includes('reduced')
-        ) {
-            if (lengthKeywords.some(k => phenotypeLower.includes(k))) {
-                gene.lengthCategory = 'Decreased';
-                phenotypeMatch = phenotypeFilter === 'decreased';
-            }
-            if (numberKeywords.some(k => phenotypeLower.includes(k))) {
-                gene.numberCategory = 'Decreased';
-                phenotypeMatch = phenotypeFilter === 'decreased';
-            }
-        }
-
-        // --- Handle no effect cases ---
-        else if (
-            phenotypeLower.includes('no effect') ||
-            phenotypeLower.includes('no change') ||
-            phenotypeLower.includes('not reported')
-        ) {
-            gene.lengthCategory = 'No Effect';
-            gene.numberCategory = 'No Effect';
-            phenotypeMatch = phenotypeFilter === 'no effect';
-        }
-
-        return localizationMatch && phenotypeMatch;
+    // 2. Filter genes based on localization
+    const localizationGenes = ciliaHubDataCache.filter(gene => {
+        const locList = (gene.localization || '')
+            .split(',')
+            .map(l => l.trim().toLowerCase());
+        return locList.includes(localizationLower);
     });
 
-    return filteredGenes;
-}
+    if (localizationGenes.length === 0) {
+        return `<div class="result-card status-not-found"><h3>Analysis Failed</h3><p>No genes found for localization: "${localizationQuery}".</p></div>`;
+    }
 
+    // 3. Determine phenotype filtering field and keywords
+    let phenotypeField;
+    let effectKeywords = [];
+
+    if (
+        phenotypeLower.includes('length') ||
+        phenotypeLower.includes('shorter') ||
+        phenotypeLower.includes('longer') ||
+        phenotypeLower.includes('short') ||
+        phenotypeLower.includes('long')
+    ) {
+        phenotypeField = 'lof_effects';
+        if (phenotypeLower.includes('short')) {
+            effectKeywords = ['shorter', 'short', 'absent', 'reduced'];
+        } else if (phenotypeLower.includes('long')) {
+            effectKeywords = ['longer', 'long', 'elongated', 'increased'];
+        }
+    } else if (
+        phenotypeLower.includes('number') ||
+        phenotypeLower.includes('decrease') ||
+        phenotypeLower.includes('ciliation') ||
+        phenotypeLower.includes('loss') ||
+        phenotypeLower.includes('reduced')
+    ) {
+        phenotypeField = 'percent_ciliated_cells_effects';
+        if (
+            phenotypeLower.includes('decrease') ||
+            phenotypeLower.includes('loss') ||
+            phenotypeLower.includes('reduced')
+        ) {
+            effectKeywords = ['reduced', 'decreased', 'fewer', 'loss', 'diminished'];
+        } else if (phenotypeLower.includes('increase')) {
+            effectKeywords = ['increased', 'more', 'elevated'];
+        }
+    } else if (
+        phenotypeLower.includes('no effect') ||
+        phenotypeLower.includes('no change') ||
+        phenotypeLower.includes('not reported')
+    ) {
+        phenotypeField = 'lof_effects'; // default safe fallback
+        effectKeywords = ['no effect', 'no change', 'not reported'];
+    } else {
+        return `<div class="result-card status-not-found"><h3>Phenotype Error</h3><p>Phenotype type "${rawPhenotypeQuery}" not recognized. Please specify 'length', 'number', or 'no effect' related queries.</p></div>`;
+    }
+
+    // 4. Filter genes based on phenotype
+    const filteredGenes = localizationGenes.filter(gene => {
+        const effectText = (gene[phenotypeField] || '').toLowerCase();
+        if (!effectText) return false;
+
+        return effectKeywords.some(kw => effectText.includes(kw));
+    });
+
+    // 5. Prepare detailed results
+    const detailedResults = filteredGenes.map(g => ({
+        gene: g.gene,
+        summary_effect: g[phenotypeField],
+        detailed_screens: g.screens_from_separate_file || []
+    })).sort((a, b) => a.gene.localeCompare(b.gene));
+
+    // 6. Generate output HTML
+    if (detailedResults.length === 0) {
+        return `<div class="result-card"><h3>Genes in "${localizationQuery}" – Matching "${rawPhenotypeQuery}"</h3><p class="status-not-found">No genes matched the combined criteria in the curated dataset.</p></div>`;
+    }
+
+    let html = `<div class="result-card"><h3>Genes in "${localizationQuery}" Matching "${rawPhenotypeQuery}" (${detailedResults.length} found)</h3>`;
+    html += `<p>The following genes localized to <strong>${localizationQuery}</strong> and exhibit a <strong>${rawPhenotypeQuery}</strong> phenotype based on <strong>LoF</strong> studies.</p>`;
+
+    detailedResults.forEach(r => {
+        const hasScreens = r.detailed_screens.length > 0;
+        html += `
+        <div style="margin-top: 15px; padding: 15px; border: 1px solid #ddd; border-radius: 4px;">
+            <h4>🧬 ${r.gene}</h4>
+            <p><strong>Curated LoF Effect (${phenotypeField}):</strong> ${r.summary_effect || 'N/A'}</p>
+        `;
+
+        if (hasScreens) {
+            html += `<details><summary style="font-weight: bold;">View Detailed Screen Data (${r.detailed_screens.length} results)</summary>`;
+            html += `<table class="gene-detail-table">
+                        <thead><tr><th>Source</th><th>Result</th><th>Z-Score</th><th>Reference</th></tr></thead><tbody>`;
+            r.detailed_screens.forEach(s => {
+                const resultText = s.result || s.classification || 'N/A';
+                const zScore = s.z_score !== undefined ? s.z_score.toFixed(2) : 'N/A';
+                const link = s.paper_link ? `<a href="${s.paper_link}" target="_blank">Link</a>` : 'N/A';
+                html += `<tr><td>${s.dataset || 'Screen'}</td><td>${resultText}</td><td>${zScore}</td><td>${link}</td></tr>`;
+            });
+            html += `</tbody></table></details>`;
+        } else {
+            html += `<p style="color:#888;">No detailed screen data found in cilia_screens_data.json.</p>`;
+        }
+
+        html += `</div>`;
+    });
+
+    html += `</div>`;
+    return html;
+}
 
 /**
  * @name compareGeneScreenPhenotype
