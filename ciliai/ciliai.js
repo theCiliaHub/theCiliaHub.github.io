@@ -267,14 +267,22 @@ async function resolveSemanticIntent(query) {
         disease_classification: ["primary ciliopathy", "secondary ciliopathy", "motile ciliopathy", "atypical ciliopathy", "primary disease", "secondary disease", "motile disease", "atypical disease", "ciliopathy classification"],
         localization: ["localize", "location", "subcellular", "basal body", "transition zone", "centrosome", "axoneme", "ciliary membrane"],
         phenotype: ["knockdown", "phenotype", "effect", "shorter cilia", "longer cilia", "cilia length", "cilia number", "decreased ciliation", "loss of cilia"]
- };
-// --- Priority Rule 1: Combined "disease" + "phenotype" ---
+    };
+
+    // --- NEW GLOBAL CONSTANTS (for Localization + Phenotype Priority Check) ---
+    const localizationTerms = [
+        "basal body", "transition zone", "cilia", "axoneme", "centrosome",  
+        "ciliary membrane", "nucleus", "lysosome", "mitochondria", "ciliary tip"
+    ];
+    const phenotypeTerms = [
+        "short cilia", "longer cilia", "cilia length", "cilia defects",  
+        "decreased ciliation", "loss of cilia", "reduced cilia", "increase", "decrease", "no effect"
+    ];
     const diseaseNames = ["bardet-biedl syndrome", "joubert syndrome", "meckel-gruber syndrome", "primary ciliary dyskinesia", "leber congenital amaurosis", "nephronophthisis", "polycystic kidney disease", "autosomal dominant polycystic kidney disease", "autosomal recessive polycystic kidney disease", "short-rib thoracic dysplasia", "senior-løken syndrome", "cranioectodermal dysplasia", "nphp", "bbs", "mks", "pcd", "ciliopathy", "syndrome"];
-    
-    // Note: The phenotypeTerms array from the old code is now merged with the global one above, 
-    // but the matching logic below uses explicit definitions for backward compatibility in this block.
     const strictPhenotypeTerms = ["phenotype", "short cilia", "long cilia", "cilia length", "cilia number", "decreased ciliation", "loss of cilia", "reduced cilia", "increase", "decrease"];
 
+
+    // --- Priority Rule 1: Combined "disease" + "phenotype" ---
     const matchedDisease = diseaseNames.find(name => qLower.includes(name));
     const matchedStrictPhenotype = strictPhenotypeTerms.find(term => qLower.includes(term));
 
@@ -290,7 +298,7 @@ async function resolveSemanticIntent(query) {
     }
 
     // --------------------------------------------------------------------------
-    // ⭐ NEW PRIORITY RULE 2: Combined "localization" + "phenotype" (The Fix) ⭐
+    // ⭐ PRIORITY RULE 2: Combined "localization" + "phenotype" (THE FIX) ⭐
     // --------------------------------------------------------------------------
     const matchedLocalization = localizationTerms.find(name => qLower.includes(name));
     const matchedPhenotype = phenotypeTerms.find(term => qLower.includes(term));
@@ -320,7 +328,6 @@ async function resolveSemanticIntent(query) {
 
     // --- Disease Classification Handler ---
     else if (detectedIntent === "disease_classification") {
-        // ... (existing logic) ...
         let classification = null;
         if (qLower.includes('primary ciliopathy') || qLower.includes('primary disease')) {
             classification = "Primary Ciliopathies";
@@ -340,7 +347,6 @@ async function resolveSemanticIntent(query) {
 
     // --- Specific Disease Handler (Generic List) ---
     else if (detectedIntent === "disease") {
-        // ... (existing logic) ...
         const diseaseList = ["bardet-biedl syndrome", "joubert syndrome", "meckel-gruber syndrome", "primary ciliary dyskinesia", "leber congenital amaurosis", "nephronophthisis", "polycystic kidney disease", "autosomal dominant polycystic kidney disease", "autosomal recessive polycystic kidney disease", "short-rib thoracic dysplasia", "senior-løken syndrome", "cranioectodermal dysplasia", "nphp", "bbs", "mks", "pcd", "ciliopathy", "syndrome"];
 
         let targetDisease = null;
@@ -399,14 +405,13 @@ async function resolveSemanticIntent(query) {
     else if (detectedIntent === "localization") {
         const locationMatch = qLower.match(/(basal body|transition zone|axoneme|centrosome|ciliary membrane)/);
         if (locationMatch && locationMatch[1]) {
-            // NOTE: This will now only handle UNFILTERED requests, as filtered ones were caught above.
-            const data = await getGenesByLocalization(locationMatch[1]); 
+            // NOTE: This now only handles UNFILTERED requests, as filtered ones were caught above.
+            const data = await getGenesByLocalization(locationMatch[1]);  
             return formatListResult(`Genes localizing to ${locationMatch[1]}`, data);
         } else {
             return `<p>📍 Localization query detected. Please be more specific (e.g., "genes in the basal body").</p>`;
         }
     }
-
     // --- Phenotype Handler (Generic List) ---
     else if (detectedIntent === "phenotype") {
         return `<p>🔎 Phenotype/Screen query detected. Please use a specific gene (e.g., "What happens to cilia when KIF3A is knocked down?") or a specific phenotype (e.g., "Find genes causing short cilia").</p>`;
@@ -2445,6 +2450,12 @@ async function getLocalizationGenesData(locationName) {
  * @param {string} term - The localization/complex name (e.g., "CILIARY TIP", "Mitochondria").
  * @returns {Promise<Array<Object>>} Array of raw CiliaHub gene objects.
  */
+a/**
+ * @name getGeneListByTerm
+ * @description Retrieves a gene list using the most specific internal source available.
+ * @param {string} term - The localization/complex name (e.g., "CILIARY TIP", "Mitochondria").
+ * @returns {Promise<Array<Object>>} Array of raw CiliaHub gene objects.
+ */
 async function getGeneListByTerm(term) {
     const termUpper = term.toUpperCase();
     
@@ -2456,11 +2467,24 @@ async function getGeneListByTerm(term) {
         // Retrieve and map the full CiliaHub data for each gene in the static list
         await fetchCiliaData(); 
         const staticGeneSet = new Set(staticGenes);
+        // Returns the raw CiliaHub objects for subsequent filtering
         return ciliaHubDataCache.filter(g => staticGeneSet.has(g.gene.toUpperCase()));
     }
 
     // Check 2: DYNAMIC LOCALIZATION FIELD (Flexible - e.g., Mitochondria, Nucleus)
-    return getLocalizationGenesData(term); 
+    // NOTE: This relies on fetchCiliaData having already ensured gene.localization is an array.
+    await fetchCiliaData(); 
+    const locationTerms = term.split(/\s+or\s+/).map(normalizeTerm);
+
+    const results = ciliaHubDataCache
+        .filter(gene => {
+            // Check if gene.localization is an array (guaranteed by fetchCiliaData)
+            return Array.isArray(gene.localization) && gene.localization.some(loc => 
+                locationTerms.some(term => normalizeTerm(loc).includes(term))
+            );
+        });
+
+    return results; 
 }
 
 
@@ -2470,7 +2494,6 @@ async function getGeneListByTerm(term) {
  */
 async function getLocalizationPhenotypeGenes(localizationTerm, phenotypeTerm) {
     // 1. Get the gene pool from the best source (static map OR dynamic localization field)
-    // NOTE: This call now replaces both 'getLocalizationGenesData' and complex lookup logic.
     const genePool = await getGeneListByTerm(localizationTerm); 
     
     if (genePool.length === 0) {
@@ -2479,57 +2502,59 @@ async function getLocalizationPhenotypeGenes(localizationTerm, phenotypeTerm) {
 
     const phenotypeLower = phenotypeTerm.toLowerCase();
     
-    // 2. Define dynamic phenotype filter keywords (remains the same robust logic)
-    // ... (lengthKeywords, numberKeywords mapping logic) ...
-    
+    // 2. Define dynamic phenotype filter keywords
     let lengthKeywords = [];
     let numberKeywords = [];
+
+    // Define keywords based on phenotype term
     if (phenotypeLower.includes('short')) {
         lengthKeywords = ['shorter', 'short', 'absent', 'no cilia', 'failure to assemble', 'severe defect'];
         numberKeywords = ['reduced', 'decreased', 'fewer', 'loss', 'severe defect', 'no cilia'];
-    } else if (phenotypeLower.includes('longer')) {
-        lengthKeywords = ['longer', 'long', 'increased length'];
-        numberKeywords = ['increased', 'more'];
-    } else if (phenotypeLower.includes('no effect')) {
-        lengthKeywords = ['no effect', 'not reported', 'no change'];
-        numberKeywords = ['no effect', 'not reported', 'no change'];
+    } else if (phenotypeLower.includes('longer') || phenotypeLower.includes('long')) {
+        lengthKeywords = ['longer', 'long', 'increased length', 'increase length'];
+        numberKeywords = ['increased', 'more', 'increase'];
+    } else if (phenotypeLower.includes('no effect') || phenotypeLower.includes('neutral')) {
+        lengthKeywords = ['no effect', 'no change'];
+        numberKeywords = ['no effect', 'no change'];
     }
 
-    // --- Phenotype Filter Logic (CRITICAL REVISION) ---
-const results = genePool // Using the genePool retrieved by getGeneListByTerm
-    .filter(gene => {
-        // Step 1: Normalize fields (ensuring nulls are handled with empty strings)
-        const lofEffect = (gene.lof_effects || '').toLowerCase();
-        const numberEffect = (gene.percent_ciliated_cells_effects || '').toLowerCase();
-        
-        // Step 2: Check for presence of ANY relevant phenotype data
-        const hasPhenoData = lofEffect.length > 0 || numberEffect.length > 0;
-        if (!hasPhenoData) return false; // Exclude if both fields are empty/null
+    // --- Phenotype Filter Logic (CRITICAL REVISION for dual field search) ---
+    const results = genePool // Using the genePool retrieved by getGeneListByTerm
+        .filter(gene => {
+            // Step 1: Normalize fields (ensuring nulls are handled with empty strings)
+            const lofEffect = (gene.lof_effects || '').toLowerCase();
+            const numberEffect = (gene.percent_ciliated_cells_effects || '').toLowerCase();
+            
+            // Exclude if both fields are non-informative for the filter type
+            const hasPhenoData = lofEffect.length > 0 || numberEffect.length > 0;
+            // IMPORTANT: If we're looking for 'short' or 'long' and data is missing, we skip.
+            if (!hasPhenoData && !phenotypeLower.includes('no effect')) return false; 
 
-        // Step 3: Check for match based on defined keywords (short/long/no effect)
-        const matchesLength = lengthKeywords.some(kw => lofEffect.includes(kw));
-        const matchesNumber = numberKeywords.some(kw => numberEffect.includes(kw));
+            // Step 2: Check for match based on defined keywords
+            const matchesLength = lengthKeywords.some(kw => lofEffect.includes(kw));
+            const matchesNumber = numberKeywords.some(kw => numberEffect.includes(kw));
 
-        // CRITICAL LOGIC CHECK
-        // For 'no effect', we must find explicit neutrality in both fields
-        if (phenotypeLower.includes('no effect')) {
-             const isLoFNeutral = lengthKeywords.some(kw => lofEffect.includes(kw));
-             const isNumberNeutral = numberKeywords.some(kw => numberEffect.includes(kw));
-             return isLoFNeutral && isNumberNeutral;
-        } 
-        
-        // For 'short' or 'long' (the problem queries), return true if EITHER field matches a positive keyword
-        // This ensures the filter applies and is not overly sensitive to blank fields.
-        else if (phenotypeLower.includes('short') || phenotypeLower.includes('long')) {
-             return matchesLength || matchesNumber;
-        }
+            // CRITICAL LOGIC: If looking for short/long, succeed if EITHER field matches a positive keyword.
+            if (phenotypeLower.includes('short') || phenotypeLower.includes('long')) {
+                return matchesLength || matchesNumber;
+            }
+            
+            // For 'no effect', require explicit neutrality in BOTH summary fields.
+            else if (phenotypeLower.includes('no effect')) {
+                 // Check if BOTH are explicitly marked neutral (or are empty/unavailable, which often implies neutrality).
+                 // For robust safety, we match the keyword *or* ensure the field is simply "Not Reported" if the user insists on "no effect."
+                 const isLoFNeutral = lengthKeywords.some(kw => lofEffect.includes(kw)) || lofEffect.includes('not reported');
+                 const isNumberNeutral = numberKeywords.some(kw => numberEffect.includes(kw)) || numberEffect.includes('not reported');
+                 return isLoFNeutral && isNumberNeutral;
+            }
 
-        return false;
-    })
+            return false;
+        })
         .map(g => ({
             gene: g.gene,
+            // These properties are required by formatListResult for the enhanced table display:
             localization_detail: g.localization ? g.localization.join(', ') : 'N/A',
-            lof_effect_detail: g.lof_effects || 'N/A',
+            lof_effect_detail: g.lof_effects || g.percent_ciliated_cells_effects || 'N/A', // Display the most descriptive effect
             description: `LoF: ${g.lof_effects || 'N/A'}`
         }))
         .sort((a, b) => a.gene.localeCompare(b.gene));
