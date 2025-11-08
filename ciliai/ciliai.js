@@ -2512,17 +2512,21 @@ async function getGeneListByTerm(term) {
  * @description Finds genes localizing to a compartment/complex that also match a specific phenotype.
  */
 async function getLocalizationPhenotypeGenes(localizationQuery, rawPhenotypeQuery) {
-    // 1. Ensure all CiliaHub data is fully loaded
     await fetchCiliaData();
 
     const localizationLower = localizationQuery.toLowerCase();
     const phenotypeLower = rawPhenotypeQuery.toLowerCase();
 
-    // 2. Filter genes based on localization
+    // 1. Filter genes based on localization (normalize to array)
     const localizationGenes = ciliaHubDataCache.filter(gene => {
-        const locList = (gene.localization || '')
-            .split(',')
-            .map(l => l.trim().toLowerCase());
+        let locList = [];
+
+        if (Array.isArray(gene.localization)) {
+            locList = gene.localization.map(l => l.toLowerCase());
+        } else if (typeof gene.localization === 'string') {
+            locList = gene.localization.split(',').map(l => l.trim().toLowerCase());
+        }
+
         return locList.includes(localizationLower);
     });
 
@@ -2530,7 +2534,7 @@ async function getLocalizationPhenotypeGenes(localizationQuery, rawPhenotypeQuer
         return `<div class="result-card status-not-found"><h3>Analysis Failed</h3><p>No genes found for localization: "${localizationQuery}".</p></div>`;
     }
 
-    // 3. Determine phenotype filtering field and keywords
+    // 2. Determine phenotype filtering field and keywords
     let phenotypeField;
     let effectKeywords = [];
 
@@ -2569,28 +2573,27 @@ async function getLocalizationPhenotypeGenes(localizationQuery, rawPhenotypeQuer
         phenotypeLower.includes('no change') ||
         phenotypeLower.includes('not reported')
     ) {
-        phenotypeField = 'lof_effects'; // default safe fallback
+        phenotypeField = 'lof_effects';
         effectKeywords = ['no effect', 'no change', 'not reported'];
     } else {
         return `<div class="result-card status-not-found"><h3>Phenotype Error</h3><p>Phenotype type "${rawPhenotypeQuery}" not recognized. Please specify 'length', 'number', or 'no effect' related queries.</p></div>`;
     }
 
-    // 4. Filter genes based on phenotype
+    // 3. Filter genes based on phenotype
     const filteredGenes = localizationGenes.filter(gene => {
         const effectText = (gene[phenotypeField] || '').toLowerCase();
         if (!effectText) return false;
-
         return effectKeywords.some(kw => effectText.includes(kw));
     });
 
-    // 5. Prepare detailed results
+    // 4. Prepare detailed results
     const detailedResults = filteredGenes.map(g => ({
         gene: g.gene,
         summary_effect: g[phenotypeField],
         detailed_screens: g.screens_from_separate_file || []
     })).sort((a, b) => a.gene.localeCompare(b.gene));
 
-    // 6. Generate output HTML
+    // 5. Generate output HTML
     if (detailedResults.length === 0) {
         return `<div class="result-card"><h3>Genes in "${localizationQuery}" – Matching "${rawPhenotypeQuery}"</h3><p class="status-not-found">No genes matched the combined criteria in the curated dataset.</p></div>`;
     }
