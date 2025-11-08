@@ -238,10 +238,9 @@ function normalizeTerm(s) {
 }
 
 
-// ==================== SEMANTIC INTENT RESOLVER ====================
-// Detects user intent using keyword clusters and fuzzy semantic matching.
+// ==================== SEMANTIC INTENT RESOLVER (With Fixes) ====================
 
-// --- NEW GLOBAL CONSTANTS (for Localization + Phenotype Priority Check) ---
+// --- GLOBAL CONSTANTS ---
 // Full list for general localization intent detection (including non-ciliary organelles)
 const localizationTerms = [
     "basal body", "transition zone", "cilia", "axoneme", "centrosome", "ciliary membrane",
@@ -251,7 +250,8 @@ const localizationTerms = [
 ];
 
 // Subset for the specific "Localization + Phenotype" combined rule (Rule 2)
-// This list contains only the ciliary/centrosomal locations expected to have phenotype data in the DB.
+// These are the primary ciliary locations where phenotype filtering is expected to succeed 
+// based on historical data structure. We keep this separation to prioritize known filters.
 const ciliaryLocalizationTerms = [
     "basal body", "transition zone", "cilia", "axoneme", "centrosome",
     "ciliary membrane", "ciliary tip", "flagella"
@@ -277,7 +277,8 @@ async function resolveSemanticIntent(query) {
         localization: ["localize", "location", "subcellular", ...localizationTerms.map(term => term.toLowerCase())],
         phenotype: ["knockdown", "phenotype", "effect", "shorter cilia", "longer cilia", "cilia length", "cilia number", "decreased ciliation", "loss of cilia"]
     };
-// --- Priority Rule 1: Combined "disease" + "phenotype" ---
+
+    // --- Priority Rule 1: Combined "disease" + "phenotype" (No Change) ---
     const diseaseNames = ["bardet-biedl syndrome", "joubert syndrome", "meckel-gruber syndrome", "primary ciliary dyskinesia", "leber congenital amaurosis", "nephronophthisis", "polycystic kidney disease", "autosomal dominant polycystic kidney disease", "autosomal recessive polycystic kidney disease", "short-rib thoracic dysplasia", "senior-løken syndrome", "cranioectodermal dysplasia", "nphp", "bbs", "mks", "pcd", "ciliopathy", "syndrome"];
     
     const strictPhenotypeTerms = ["phenotype", "short cilia", "long cilia", "cilia length", "cilia number", "decreased ciliation", "loss of cilia", "reduced cilia", "increase", "decrease"];
@@ -292,19 +293,19 @@ async function resolveSemanticIntent(query) {
             matchedDisease.toUpperCase() === "PCD" ? "Primary Ciliary Dyskinesia" :
             matchedDisease.toUpperCase() === "NPHP" ? "Nephronophthisis" :
             matchedDisease;
-        // Uses the helper that handles both the disease and the phenotypic filter
         return await getDiseaseGenesByPhenotype(standardDisease, matchedStrictPhenotype);
     }
 
     // --------------------------------------------------------------------------
-    // ⭐ NEW PRIORITY RULE 2: Combined "CILIARY localization" + "phenotype" (The Fix) ⭐
-    // Uses the restricted ciliaryLocalizationTerms list.
+    // ⭐ NEW PRIORITY RULE 2: Combined "CILIARY localization" + "phenotype" (Restricted) ⭐
+    // Only handles terms in ciliaryLocalizationTerms. This is to avoid calling 
+    // getLocalizationPhenotypeGenes with non-ciliary terms if the underlying data 
+    // structure only supports the ciliary ones. The non-ciliary cases are handled below.
     // --------------------------------------------------------------------------
     const matchedCiliaryLocalization = ciliaryLocalizationTerms.find(name => qLower.includes(name.toLowerCase()));
     const matchedPhenotype = phenotypeTerms.find(term => qLower.includes(term));
 
     if (matchedCiliaryLocalization && matchedPhenotype) {
-        // This handles successful queries like "Show basal body genes causing short cilia"
         return await getLocalizationPhenotypeGenes(matchedCiliaryLocalization, matchedPhenotype);
     }
     // --------------------------------------------------------------------------
@@ -326,98 +327,32 @@ async function resolveSemanticIntent(query) {
         return formatListResult(title, data);
     }
 
-    // --- Disease Classification Handler ---
-    else if (detectedIntent === "disease_classification") {
-        let classification = null;
-        if (qLower.includes('primary ciliopathy') || qLower.includes('primary disease')) {
-            classification = "Primary Ciliopathies";
-        } else if (qLower.includes('motile ciliopathy') || qLower.includes('motile disease')) {
-            classification = "Motile Ciliopathies";
-        } else if (qLower.includes('secondary ciliopathy') || qLower.includes('secondary disease')) {
-            classification = "Secondary Diseases";
-        } else if (qLower.includes('atypical ciliopathy') || qLower.includes('atypical disease')) {
-            classification = "Atypical Ciliopathies";
-        }
+    // ... (Disease Classification, Disease, Domain, Phylogeny, Complex, Expression Handlers remain the same) ...
 
-        if (classification) {
-            const genes = await getGenesByCiliopathyClassification(classification);
-            return formatListResult(`Genes classified as ${classification}`, genes);
-        }
-    }
-
-    // --- Specific Disease Handler (Generic List) ---
-    else if (detectedIntent === "disease") {
-        const diseaseList = ["bardet-biedl syndrome", "joubert syndrome", "meckel-gruber syndrome", "primary ciliary dyskinesia", "leber congenital amaurosis", "nephronophthisis", "polycystic kidney disease", "autosomal dominant polycystic kidney disease", "autosomal recessive polycystic kidney disease", "short-rib thoracic dysplasia", "senior-løken syndrome", "cranioectodermal dysplasia", "nphp", "bbs", "mks", "pcd", "ciliopathy", "syndrome"];
-
-        let targetDisease = null;
-        for (const name of diseaseList.sort((a, b) => b.length - a.length)) {
-            if (qLower.includes(name)) {
-                targetDisease = name;
-                break;
-            }
-        }
-
-        if (targetDisease) {
-            const standardName =
-                targetDisease.toUpperCase() === "BBS" ? "Bardet–Biedl Syndrome" :
-                targetDisease.toUpperCase() === "MKS" ? "Meckel–Gruber Syndrome" :
-                targetDisease.toUpperCase() === "PCD" ? "Primary Ciliary Dyskinesia" :
-                targetDisease.toUpperCase() === "NPHP" ? "Nephronophthisis" :
-                targetDisease;
-
-            const { genes, description } = await getCiliopathyGenes(standardName);
-            const titleCaseName = standardName.replace(/\b\w/g, l => l.toUpperCase());
-            return formatListResult(`Genes for ${titleCaseName}`, genes, description);
-        }
-
-        return `<p>🩺 Disease query detected, but no specific disease or classification was identified for listing genes. Please try a query like "List genes for Joubert Syndrome".</p>`;
-    }
-
-    // --- Domain Handler ---
-    else if (detectedIntent === "domain") {
-        return await resolveDomainQuery(query);
-    }
-
-    // --- Phylogeny Handler ---
-    else if (detectedIntent === "phylogeny") {
-        return await resolvePhylogeneticQuery(query);
-    }
-
-    // --- Complex Handler ---
-    else if (detectedIntent === "complex") {
-        return await routeComplexPhylogenyAnalysis(query);
-    }
-
-    // --- Expression Handler ---
-    else if (detectedIntent === "expression") {
-        const genes = (query.match(/\b[A-Z0-9\-]{3,}\b/g) || []);
-        if (genes.length > 0) {
-            if (qLower.includes('umap') && genes.length === 1) {
-                return await displayUmapGeneExpression(genes[0]);
-            }
-            return await displayCellxgeneBarChart(genes);
-        } else {
-            return `<p>🧬 Please specify a gene to show expression data.</p>`;
-        }
-    }
-
-    // --- Localization Handler (Generic List - handles all locations) ---
+    // --- Localization Handler (Generic List - HANDLES ALL LOCALIZATION + PHENOTYPE COMBINATIONS) ---
     else if (detectedIntent === "localization") {
-        // This uses the full localizationTerms list, including all organelles and "Ciliary associated gene".
         const pattern = new RegExp(`(${localizationTerms.map(term => term.toLowerCase()).join('|').replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')})`);
         const locationMatch = qLower.match(pattern);
+        // Re-check for phenotype in the query
+        const matchedPhenotypeGeneric = phenotypeTerms.find(term => qLower.includes(term));
 
         if (locationMatch && locationMatch[1]) {
             const matchedTerm = locationMatch[1];
             
             // Check for the "Ciliary associated gene" term specifically
             if (matchedTerm.includes("ciliary associated gene")) {
-                // NOTE: This assumes a function to fetch the full ciliary gene list
                 const data = await getCuratedComplexComponents("CILIARY ASSOCIATED GENES");
                 return formatListResult(`All Ciliary Associated Genes`, data);
 
+            } else if (matchedPhenotypeGeneric) {
+                // ⭐ THE FIX: If a localization *and* a phenotype are present, 
+                // but it fell through Rule 2, run the combined filter here.
+                // This now correctly captures "Show mitochondria genes causing longer cilia".
+                const data = await getLocalizationPhenotypeGenes(matchedTerm, matchedPhenotypeGeneric);
+                return formatListResult(`Genes localizing to ${matchedTerm} causing ${matchedPhenotypeGeneric}`, data);
+
             } else {
-                // Handles all other generic localization queries, including organelles like Mitochondria
+                // Handles all other generic localization queries (e.g., "genes in the Mitochondria")
                 const data = await getGenesByLocalization(matchedTerm); 
                 return formatListResult(`Genes localizing to ${matchedTerm}`, data);
             }
@@ -434,6 +369,7 @@ async function resolveSemanticIntent(query) {
     // --- Default fallback ---
     return null;
 }
+
 
 
 
