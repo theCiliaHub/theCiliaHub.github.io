@@ -2480,80 +2480,75 @@ async function getGeneListByTerm(term) {
     return results; 
 }
 
-
-/**
- * @name getLocalizationPhenotypeGenes (FINAL CORRECTED IMPLEMENTATION)
- * @description Finds genes localizing to a compartment/complex that also match a specific phenotype.
- */
-async function getLocalizationPhenotypeGenes(localizationTerm, phenotypeTerm) {
-    // 1. Get the gene pool from the best source (static map OR dynamic localization field)
+async function getLocalizationPhenotypeGenes(localizationTerm, rawPhenotypeQuery) {
+    
+    // 1. Establish Gene Pool (Only Lyosome-localized genes)
     const genePool = await getGeneListByTerm(localizationTerm); 
     
     if (genePool.length === 0) {
         return formatListResult(`${localizationTerm} Genes`, [], `No genes found for ${localizationTerm}.`);
     }
 
-    const phenotypeLower = phenotypeTerm.toLowerCase();
+    const phenotypeLower = rawPhenotypeQuery.toLowerCase();
     
     // 2. Define dynamic phenotype filter keywords
     let lengthKeywords = [];
     let numberKeywords = [];
 
-    // Define keywords based on phenotype term
+    // --- Determine Phenotype Keywords (copied from successful disease logic) ---
     if (phenotypeLower.includes('short')) {
-        lengthKeywords = ['shorter', 'short', 'absent', 'no cilia', 'failure to assemble', 'severe defect'];
-        numberKeywords = ['reduced', 'decreased', 'fewer', 'loss', 'severe defect', 'no cilia'];
+        lengthKeywords = ['shorter', 'short', 'absent', 'no cilia'];
+        numberKeywords = ['reduced', 'decreased', 'fewer', 'loss'];
     } else if (phenotypeLower.includes('longer') || phenotypeLower.includes('long')) {
-        lengthKeywords = ['longer', 'long', 'increased length', 'increase length'];
+        lengthKeywords = ['longer', 'long', 'increased length'];
         numberKeywords = ['increased', 'more', 'increase'];
     } else if (phenotypeLower.includes('no effect') || phenotypeLower.includes('neutral')) {
         lengthKeywords = ['no effect', 'no change'];
         numberKeywords = ['no effect', 'no change'];
+    } else {
+        // Fallback for unrecognized phenotype terms
+        lengthKeywords = ['shorter', 'reduced', 'loss']; 
+        numberKeywords = ['reduced', 'decreased', 'loss'];
     }
-
-    // --- Phenotype Filter Logic (CRITICAL REVISION for dual field search) ---
-    const results = genePool // Using the genePool retrieved by getGeneListByTerm
+    
+    // 3. Filter the Localization Gene Pool by Phenotype
+    const filteredResults = genePool 
         .filter(gene => {
-            // Step 1: Normalize fields (ensuring nulls are handled with empty strings)
             const lofEffect = (gene.lof_effects || '').toLowerCase();
             const numberEffect = (gene.percent_ciliated_cells_effects || '').toLowerCase();
             
-            // Exclude if both fields are non-informative for the filter type
-            const hasPhenoData = lofEffect.length > 0 || numberEffect.length > 0;
-            // IMPORTANT: If we're looking for 'short' or 'long' and data is missing, we skip.
-            if (!hasPhenoData && !phenotypeLower.includes('no effect')) return false; 
-
-            // Step 2: Check for match based on defined keywords
+            // Check for match in length field OR number field
             const matchesLength = lengthKeywords.some(kw => lofEffect.includes(kw));
             const matchesNumber = numberKeywords.some(kw => numberEffect.includes(kw));
 
-            // CRITICAL LOGIC: If looking for short/long, succeed if EITHER field matches a positive keyword.
+            // CRITICAL: Apply the combined filter logic (EITHER field must match for 'short'/'long' queries)
             if (phenotypeLower.includes('short') || phenotypeLower.includes('long')) {
-                return matchesLength || matchesNumber;
+                return matchesLength || matchesNumber; 
             }
             
-            // For 'no effect', require explicit neutrality in BOTH summary fields.
+            // For 'no effect', require explicit neutrality in both fields
             else if (phenotypeLower.includes('no effect')) {
-                 // Check if BOTH are explicitly marked neutral (or are empty/unavailable, which often implies neutrality).
-                 // For robust safety, we match the keyword *or* ensure the field is simply "Not Reported" if the user insists on "no effect."
-                 const isLoFNeutral = lengthKeywords.some(kw => lofEffect.includes(kw)) || lofEffect.includes('not reported');
-                 const isNumberNeutral = numberKeywords.some(kw => numberEffect.includes(kw)) || numberEffect.includes('not reported');
-                 return isLoFNeutral && isNumberNeutral;
+                 const isLoFNeutral = lengthKeywords.some(kw => lofEffect.includes(kw));
+                 const isNumberNeutral = numberKeywords.some(kw => numberEffect.includes(kw));
+                 // We relax the 'no effect' check to include 'Not Reported' as neutral in this context:
+                 const isNotReported = lofEffect.includes('not reported') || numberEffect.includes('not reported');
+                 
+                 return (isLoFNeutral && isNumberNeutral) || isNotReported;
             }
 
             return false;
         })
         .map(g => ({
             gene: g.gene,
-            // These properties are required by formatListResult for the enhanced table display:
             localization_detail: g.localization ? g.localization.join(', ') : 'N/A',
-            lof_effect_detail: g.lof_effects || g.percent_ciliated_cells_effects || 'N/A', // Display the most descriptive effect
+            // Ensure display shows the most relevant effect, prioritizing length.
+            lof_effect_detail: g.lof_effects || g.percent_ciliated_cells_effects || 'N/A', 
             description: `LoF: ${g.lof_effects || 'N/A'}`
         }))
         .sort((a, b) => a.gene.localeCompare(b.gene));
 
-    const title = `${localizationTerm} Genes Causing ${phenotypeTerm}`;
-    return formatListResult(title, results);
+    const title = `${localizationTerm} Genes Causing ${rawPhenotypeQuery}`;
+    return formatListResult(title, filteredResults);
 }
 
 
