@@ -231,13 +231,6 @@ window.displayCiliAIPage = async function displayCiliAIPage() {
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 function debounce(fn, delay) { let timeout; return function(...args) { clearTimeout(timeout); timeout = setTimeout(() => fn(...args), delay); }; }
 
-function normalizeTerm(s) {
-    if (!s) return '';
-    // UPDATED: Now replaces periods, hyphens, underscores, and spaces with a single space.
-    return String(s).toLowerCase().replace(/[._\-\s]+/g, ' ').trim();
-}
-
-
 
 
 // ==================== SEMANTIC INTENT RESOLVER ====================
@@ -2444,6 +2437,7 @@ async function getLocalizationGenesData(locationName) {
     return results; 
 }
  /**
+ /**
  * @name getGeneListByTerm
  * @description Retrieves a gene list using the most specific internal source available.
  * @param {string} term - The localization/complex name (e.g., "CILIARY TIP", "Mitochondria").
@@ -2472,23 +2466,49 @@ async function getGeneListByTerm(term) {
     const results = ciliaHubDataCache
         .filter(gene => {
             // Check if gene.localization is an array (guaranteed by fetchCiliaData)
-            return Array.isArray(gene.localization) && gene.localization.some(loc => 
-                locationTerms.some(term => normalizeTerm(loc).includes(term))
-            );
+            if (!Array.isArray(gene.localization)) {
+                return false;
+            }
+            
+            // Check if ANY localization term matches ANY of our search terms
+            return gene.localization.some(loc => {
+                const normalizedLoc = normalizeTerm(loc);
+                return locationTerms.some(term => normalizedLoc.includes(term));
+            });
         });
 
+    console.log(`getGeneListByTerm("${term}") found ${results.length} genes`);
+    if (results.length > 0) {
+        console.log(`Sample genes for ${term}:`, results.slice(0, 3).map(g => g.gene));
+    }
+    
     return results; 
 }
 
 /**
+ * @name normalizeTerm
+ * @description Normalizes terms for consistent comparison
+ * @param {string} term - The term to normalize
+ * @returns {string} Normalized term
+ */
+function normalizeTerm(term) {
+    if (!term) return '';
+    return term.toLowerCase().trim();
+}
+
+
+/**
  * @name getLocalizationPhenotypeGenes
  * @description Enhanced function to find genes by localization that cause specific phenotypes
- * Now uses exact terminology matching the data
  */
 async function getLocalizationPhenotypeGenes(localizationTerm, rawPhenotypeQuery) {
     
+    console.log(`Starting getLocalizationPhenotypeGenes for: ${localizationTerm} causing ${rawPhenotypeQuery}`);
+    
     // 1. Establish Gene Pool (localization-specific genes)
     const genePool = await getGeneListByTerm(localizationTerm); 
+    
+    console.log(`Gene pool for ${localizationTerm}: ${genePool.length} genes`);
     
     if (genePool.length === 0) {
         return formatListResult(`${localizationTerm} Genes`, [], `No genes found for ${localizationTerm}.`);
@@ -2496,27 +2516,7 @@ async function getLocalizationPhenotypeGenes(localizationTerm, rawPhenotypeQuery
 
     const phenotypeLower = rawPhenotypeQuery.toLowerCase();
     
-    // 2. Define phenotype filter keywords using EXACT data terminology
-    let lengthKeywords = [];
-    let numberKeywords = [];
-
-    // --- Determine Phenotype Keywords based on actual data terms ---
-    if (phenotypeLower.includes('short')) {
-        lengthKeywords = ['shorter cilia', 'shorter', 'short'];
-        numberKeywords = ['decreased'];
-    } else if (phenotypeLower.includes('longer') || phenotypeLower.includes('long')) {
-        lengthKeywords = ['longer cilia', 'longer', 'long'];
-        numberKeywords = ['increased'];
-    } else if (phenotypeLower.includes('no effect') || phenotypeLower.includes('neutral')) {
-        lengthKeywords = ['no effect'];
-        numberKeywords = ['no effect'];
-    } else {
-        // Fallback using actual data terms
-        lengthKeywords = ['shorter cilia', 'shorter']; 
-        numberKeywords = ['decreased'];
-    }
-    
-    // 3. Enhanced Filtering with Comprehensive Evidence Detection
+    // 2. Enhanced Filtering with Comprehensive Evidence Detection
     const filteredResults = genePool 
         .filter(gene => {
             // For short cilia queries, use enhanced evidence detection
@@ -2524,115 +2524,36 @@ async function getLocalizationPhenotypeGenes(localizationTerm, rawPhenotypeQuery
                 return hasEnhancedShortCiliaEvidence(gene);
             }
             
-            // For long cilia queries, use similar enhanced detection but for long phenotypes
+            // For long cilia queries, use enhanced detection
             if (phenotypeLower.includes('long')) {
                 return hasEnhancedLongCiliaEvidence(gene);
             }
             
-            // For other phenotypes, use the original keyword matching logic
-            const lofEffect = (gene.lof_effects || '').toLowerCase();
-            const numberEffect = (gene.percent_ciliated_cells_effects || '').toLowerCase();
-            
-            const matchesLength = lengthKeywords.some(kw => lofEffect.includes(kw));
-            const matchesNumber = numberKeywords.some(kw => numberEffect.includes(kw));
-
-            if (phenotypeLower.includes('short') || phenotypeLower.includes('long')) {
-                return matchesLength || matchesNumber; 
-            }
-            
-            else if (phenotypeLower.includes('no effect')) {
-                 const isLoFNeutral = lengthKeywords.some(kw => lofEffect.includes(kw));
-                 const isNumberNeutral = numberKeywords.some(kw => numberEffect.includes(kw));
-                 const isNotReported = lofEffect.includes('not reported') || numberEffect.includes('not reported');
-                 
-                 return (isLoFNeutral && isNumberNeutral) || isNotReported;
-            }
-
-            return false;
+            // For other phenotypes, use simple keyword matching
+            return hasSimplePhenotypeEvidence(gene, phenotypeLower);
         })
         .map(g => ({
             gene: g.gene,
             localization_detail: g.localization ? g.localization.join(', ') : 'N/A',
-            // Enhanced evidence display for short/long cilia queries
-            lof_effect_detail: (phenotypeLower.includes('short') || phenotypeLower.includes('long')) ? 
-                getPhenotypeEvidence(g, phenotypeLower) : 
-                (g.lof_effects || g.percent_ciliated_cells_effects || 'N/A'),
-            description: (phenotypeLower.includes('short') || phenotypeLower.includes('long')) ? 
-                `Evidence: ${getPhenotypeEvidence(g, phenotypeLower)}` : 
-                `LoF: ${g.lof_effects || 'N/A'} | % Cells: ${g.percent_ciliated_cells_effects || 'N/A'}`
+            // Enhanced evidence display
+            lof_effect_detail: getPhenotypeEvidence(g, phenotypeLower),
+            description: `Evidence: ${getPhenotypeEvidence(g, phenotypeLower)}`
         }))
         .sort((a, b) => a.gene.localeCompare(b.gene));
 
+    console.log(`Filtered results for ${localizationTerm} causing ${rawPhenotypeQuery}: ${filteredResults.length} genes`);
+    
     const title = `${localizationTerm} Genes Causing ${rawPhenotypeQuery}`;
     return formatListResult(title, filteredResults);
-}
-
-/**
- * @name hasEnhancedLongCiliaEvidence
- * @description Evidence detection for longer cilia phenotypes
- * @param {Object} gene - Gene object from ciliahub_data
- * @returns {boolean}
- */
-function hasEnhancedLongCiliaEvidence(gene) {
-    const longCiliaKeywords = ['longer cilia', 'longer', 'long', 'increased'];
-    const shortCiliaKeywords = ['shorter cilia', 'shorter', 'short', 'decreased'];
-    
-    const lofEffect = (gene.lof_effects || '').toLowerCase();
-    const percentEffect = (gene.percent_ciliated_cells_effects || '').toLowerCase();
-    const overexpressEffect = (gene.overexpression_effects || '').toLowerCase();
-    
-    const hasLongEvidence = longCiliaKeywords.some(keyword => 
-        lofEffect.includes(keyword) || percentEffect.includes(keyword) || overexpressEffect.includes(keyword)
-    ) && !lofEffect.includes('not reported');
-    
-    const hasContradictoryEvidence = shortCiliaKeywords.some(keyword =>
-        lofEffect.includes(keyword) || percentEffect.includes(keyword) || overexpressEffect.includes(keyword)
-    );
-    
-    return hasLongEvidence && !hasContradictoryEvidence;
-}
-
-/**
- * @name getPhenotypeEvidence
- * @description Generates evidence summary for any phenotype
- * @param {Object} gene - Gene object
- * @param {string} phenotype - The phenotype query
- * @returns {string} Evidence summary
- */
-function getPhenotypeEvidence(gene, phenotype) {
-    const evidence = [];
-    const phenoLower = phenotype.toLowerCase();
-    
-    // Always show relevant effects regardless of phenotype
-    if (gene.lof_effects && !gene.lof_effects.toLowerCase().includes('not reported')) {
-        evidence.push(`LoF: ${gene.lof_effects}`);
-    }
-    
-    if (gene.percent_ciliated_cells_effects && !gene.percent_ciliated_cells_effects.toLowerCase().includes('not reported')) {
-        evidence.push(`% Cells: ${gene.percent_ciliated_cells_effects}`);
-    }
-    
-    if (gene.overexpression_effects && !gene.overexpression_effects.toLowerCase().includes('not reported')) {
-        evidence.push(`Overexpression: ${gene.overexpression_effects}`);
-    }
-    
-    return evidence.length > 0 ? evidence.join(' | ') : 'Not Reported';
 }
 /**
  * @name hasEnhancedShortCiliaEvidence
  * @description Comprehensive short cilia evidence detection using multiple data sources
- * @param {Object} gene - Gene object from ciliahub_data
- * @returns {boolean}
  */
 function hasEnhancedShortCiliaEvidence(gene) {
     // Use the exact terminology found in the data
-    const shortCiliaKeywords = [
-        'shorter cilia', 'shorter', 'short', 'decreased'
-    ];
-    
-    const longCiliaKeywords = [
-        'longer cilia', 'longer', 'long', 'increased'
-    ];
+    const shortCiliaKeywords = ['shorter cilia', 'shorter', 'short', 'decreased'];
+    const longCiliaKeywords = ['longer cilia', 'longer', 'long', 'increased'];
     
     // 1. Check LoF effects field for short cilia evidence
     const lofEffect = (gene.lof_effects || '').toLowerCase();
@@ -2640,7 +2561,7 @@ function hasEnhancedShortCiliaEvidence(gene) {
         lofEffect.includes(keyword) && !lofEffect.includes('not reported')
     );
     
-    // Also check if LoF explicitly mentions "longer" - we want to exclude these for short cilia queries
+    // Check if LoF explicitly mentions "longer" - exclude these
     const hasLoFLongEvidence = longCiliaKeywords.some(keyword => 
         lofEffect.includes(keyword) && !lofEffect.includes('not reported')
     );
@@ -2655,27 +2576,34 @@ function hasEnhancedShortCiliaEvidence(gene) {
         percentEffect.includes(keyword) && !percentEffect.includes('not reported')
     );
 
-    // 3. Check screen data for negative regulator classification
+    // 3. Check overexpression effects
+    const overexpressEffect = (gene.overexpression_effects || '').toLowerCase();
+    const hasOverexpressShortEvidence = shortCiliaKeywords.some(keyword =>
+        overexpressEffect.includes(keyword) && !overexpressEffect.includes('not reported')
+    );
+
+    // 4. Check screen data for negative regulator classification
     let hasScreenEvidence = false;
     if (gene.screens && Array.isArray(gene.screens)) {
         hasScreenEvidence = gene.screens.some(screen => {
             const classification = (screen.classification || '').toLowerCase();
             return classification.includes('negative regulator') || 
-                   (screen.z_score && screen.z_score < -2); // Significant negative z-score
+                   (screen.z_score && screen.z_score < -2);
         });
     }
 
-    // 4. Check functional summary for short cilia evidence
+    // 5. Check functional summary for short cilia evidence
     const functionalSummary = (gene.functional_summary || '').toLowerCase();
     const hasFunctionalEvidence = shortCiliaKeywords.some(keyword =>
         functionalSummary.includes(keyword)
     );
 
-    // 5. Check ciliopathy association (indirect evidence)
+    // 6. Check ciliopathy association (indirect evidence)
     const hasCiliopathy = gene.ciliopathy && gene.ciliopathy.length > 0;
 
     // Return true if we have evidence of short cilia AND no contradictory evidence of long cilia
-    const hasShortEvidence = hasLoFShortEvidence || hasPercentShortEvidence || hasScreenEvidence || 
+    const hasShortEvidence = hasLoFShortEvidence || hasPercentShortEvidence || 
+                            hasOverexpressShortEvidence || hasScreenEvidence || 
                             hasFunctionalEvidence || hasCiliopathy;
     
     const hasContradictoryEvidence = hasLoFLongEvidence || hasPercentLongEvidence;
@@ -2684,72 +2612,162 @@ function hasEnhancedShortCiliaEvidence(gene) {
 }
 
 /**
- * @name getShortCiliaEvidence
- * @description Generates evidence summary for short cilia phenotype using exact data terminology
- * @param {Object} gene - Gene object
- * @returns {string} Evidence summary
+ * @name hasEnhancedLongCiliaEvidence
+ * @description Evidence detection for longer cilia phenotypes
  */
-function getShortCiliaEvidence(gene) {
+function hasEnhancedLongCiliaEvidence(gene) {
+    const longCiliaKeywords = ['longer cilia', 'longer', 'long', 'increased'];
+    const shortCiliaKeywords = ['shorter cilia', 'shorter', 'short', 'decreased'];
+    
+    const lofEffect = (gene.lof_effects || '').toLowerCase();
+    const percentEffect = (gene.percent_ciliated_cells_effects || '').toLowerCase();
+    const overexpressEffect = (gene.overexpression_effects || '').toLowerCase();
+    
+    const hasLongEvidence = longCiliaKeywords.some(keyword => 
+        (lofEffect.includes(keyword) || 
+         percentEffect.includes(keyword) || 
+         overexpressEffect.includes(keyword)) &&
+        !lofEffect.includes('not reported')
+    );
+    
+    const hasContradictoryEvidence = shortCiliaKeywords.some(keyword =>
+        lofEffect.includes(keyword) || percentEffect.includes(keyword) || overexpressEffect.includes(keyword)
+    );
+    
+    return hasLongEvidence && !hasContradictoryEvidence;
+}
+
+
+/**
+ * @name hasSimplePhenotypeEvidence
+ * @description Simple keyword matching for other phenotypes
+ */
+function hasSimplePhenotypeEvidence(gene, phenotypeLower) {
+    let keywords = [];
+    
+    if (phenotypeLower.includes('no effect')) {
+        keywords = ['no effect'];
+    }
+    
+    const lofEffect = (gene.lof_effects || '').toLowerCase();
+    const percentEffect = (gene.percent_ciliated_cells_effects || '').toLowerCase();
+    
+    return keywords.some(kw => 
+        lofEffect.includes(kw) || percentEffect.includes(kw)
+    );
+}
+
+/**
+ * @name getPhenotypeEvidence
+ * @description Generates evidence summary for any phenotype
+ */
+function getPhenotypeEvidence(gene, phenotype) {
     const evidence = [];
     
-    // LoF evidence - using exact field names from data
+    // Always show relevant effects
     if (gene.lof_effects && !gene.lof_effects.toLowerCase().includes('not reported')) {
-        if (gene.lof_effects.toLowerCase().includes('shorter') || 
-            gene.lof_effects.toLowerCase().includes('short') ||
-            gene.lof_effects.toLowerCase().includes('decreased')) {
-            evidence.push(`LoF: ${gene.lof_effects}`);
-        }
+        evidence.push(`LoF: ${gene.lof_effects}`);
     }
     
-    // Percent ciliated cells effects
     if (gene.percent_ciliated_cells_effects && !gene.percent_ciliated_cells_effects.toLowerCase().includes('not reported')) {
-        if (gene.percent_ciliated_cells_effects.toLowerCase().includes('decreased')) {
-            evidence.push(`% Ciliated Cells: ${gene.percent_ciliated_cells_effects}`);
-        }
+        evidence.push(`% Cells: ${gene.percent_ciliated_cells_effects}`);
     }
     
-    // Overexpression effects (sometimes shows shorter cilia)
     if (gene.overexpression_effects && !gene.overexpression_effects.toLowerCase().includes('not reported')) {
-        if (gene.overexpression_effects.toLowerCase().includes('shorter') || 
-            gene.overexpression_effects.toLowerCase().includes('short')) {
-            evidence.push(`Overexpression: ${gene.overexpression_effects}`);
-        }
+        evidence.push(`Overexpression: ${gene.overexpression_effects}`);
     }
     
-    // Screen evidence
-    if (gene.screens && Array.isArray(gene.screens)) {
-        const negativeScreens = gene.screens.filter(screen => {
+    // Add screen evidence for short/long cilia
+    if ((phenotype.includes('short') || phenotype.includes('long')) && 
+        gene.screens && Array.isArray(gene.screens)) {
+        const relevantScreens = gene.screens.filter(screen => {
             const classification = (screen.classification || '').toLowerCase();
             return classification.includes('negative regulator') || 
-                   (screen.z_score && screen.z_score < -2);
+                   classification.includes('positive regulator');
         });
         
-        if (negativeScreens.length > 0) {
-            const screenEvidence = negativeScreens.map(screen => 
-                `${screen.dataset}: ${screen.classification || 'Negative regulator'}`
+        if (relevantScreens.length > 0) {
+            const screenEvidence = relevantScreens.map(screen => 
+                `${screen.dataset}: ${screen.classification}`
             ).join('; ');
             evidence.push(`Screens: ${screenEvidence}`);
         }
     }
     
-    // Ciliopathy evidence
-    if (gene.ciliopathy) {
-        evidence.push(`Ciliopathy: ${gene.ciliopathy}`);
-    }
-    
-    // Functional summary evidence
-    if (gene.functional_summary) {
-        const shortKeywords = ['shorter cilia', 'shorter', 'short', 'decreased cilia'];
-        const hasFunctionalEvidence = shortKeywords.some(keyword => 
-            gene.functional_summary.toLowerCase().includes(keyword)
-        );
-        if (hasFunctionalEvidence) {
-            evidence.push('Functional evidence');
-        }
-    }
-    
-    return evidence.length > 0 ? evidence.join(' | ') : 'Limited evidence';
+    return evidence.length > 0 ? evidence.join(' | ') : 'Not Reported';
 }
+
+// Update the semantic intent resolver to handle mitochondrial variations
+function enhanceSemanticIntentResolver() {
+    // Add comprehensive localization terms including variations
+    const enhancedLocalizationTerms = [
+        "basal body", "transition zone", "cilia", "axoneme", "centrosome", 
+        "ciliary membrane", "nucleus", "lysosome", "mitochondria", "ciliary tip",
+        "lysosomal", "mitochondrial", "nuclear", "flagella", "centriole"
+    ];
+    
+    const enhancedPhenotypeTerms = [
+        "short cilia", "longer cilia", "cilia length", "cilia defects", 
+        "decreased ciliation", "loss of cilia", "reduced cilia", "increase", 
+        "decrease", "no effect", "shorter cilia", "absent cilia"
+    ];
+
+    // Update the global arrays if they exist
+    if (typeof localizationTerms !== 'undefined') {
+        // Clear and replace to ensure we have the right terms
+        localizationTerms.length = 0;
+        localizationTerms.push(...enhancedLocalizationTerms);
+    }
+    
+    if (typeof phenotypeTerms !== 'undefined') {
+        phenotypeTerms.length = 0;
+        phenotypeTerms.push(...enhancedPhenotypeTerms);
+    }
+}
+
+// Test function to debug mitochondrial gene retrieval
+async function testMitochondrialGenes() {
+    await fetchCiliaData();
+    const mitochondrialGenes = ciliaHubDataCache.filter(gene => 
+        gene.localization && Array.isArray(gene.localization) && 
+        gene.localization.some(loc => 
+            loc.toLowerCase().includes('mitochondria') || 
+            loc.toLowerCase().includes('mitochondrial')
+        )
+    );
+    
+    console.log(`Total mitochondrial genes found: ${mitochondrialGenes.length}`);
+    console.log('Sample mitochondrial genes:', mitochondrialGenes.slice(0, 5).map(g => ({
+        gene: g.gene,
+        localization: g.localization,
+        lof_effects: g.lof_effects
+    })));
+    
+    // Test short cilia evidence
+    const shortCiliaMitochondrial = mitochondrialGenes.filter(hasEnhancedShortCiliaEvidence);
+    console.log(`Mitochondrial genes with short cilia evidence: ${shortCiliaMitochondrial.length}`);
+    console.log('Sample short cilia mitochondrial genes:', shortCiliaMitochondrial.map(g => ({
+        gene: g.gene,
+        localization: g.localization,
+        lof_effects: g.lof_effects,
+        percent_effects: g.percent_ciliated_cells_effects
+    })));
+}
+
+// Initialize enhancements
+if (typeof window !== 'undefined') {
+    document.addEventListener('DOMContentLoaded', function() {
+        enhanceSemanticIntentResolver();
+        console.log('Enhanced localization and phenotype detection loaded');
+        
+        // Run test when debugging
+        // testMitochondrialGenes();
+    });
+}
+
+
+
+
 /**
  * @name enhanceSemanticIntentResolver
  * @description Enhances the semantic intent resolver to better handle short cilia queries
