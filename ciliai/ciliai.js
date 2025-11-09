@@ -733,6 +733,20 @@ const intentParser = createIntentParser();
 
 // --- Data Fetching and Caching (Updated with New Integration Logic) ---
 
+// --- Helper: Array Normalizer ---
+const processToArray = (field) => {
+    if (typeof field === 'string') {
+        // Split by comma or semi-colon, trim whitespace, and filter empty strings
+        return field.split(/[,\;]/).map(item => item.trim()).filter(Boolean);
+    }
+    if (Array.isArray(field)) {
+        return field;
+    }
+    return [];
+};
+
+// --- Data Fetching and Caching (Updated with New Integration Logic) ---
+
 async function fetchCiliaData() {
     if (ciliaHubDataCache) return ciliaHubDataCache;
     try {
@@ -744,65 +758,43 @@ async function fetchCiliaData() {
         // Fetch screen data for merging
         const screenData = await fetchScreenData(); // Ensure screen data is loaded
 
-        const processToArray = (field) => {
-            if (typeof field === 'string') return field.split(',').map(item => item.trim()).filter(Boolean);
-            if (Array.isArray(field)) return field;
-            return [];
-        };
-
         ciliaHubDataCache = data.map(gene => {
             const geneUpper = gene.gene.toUpperCase();
-
-            // 1. Map core gene fields to arrays where appropriate
+            
+            // 1. Map core gene fields to arrays where appropriate (THE FIX)
             const processedGene = {
                 ...gene,
                 functional_category: processToArray(gene.functional_category),
                 domain_descriptions: processToArray(gene.domain_descriptions),
                 ciliopathy: processToArray(gene.ciliopathy),
-                localization: processToArray(gene.localization),
+                localization: processToArray(gene.localization), // FIX: Guarantees Array<string>
                 complex_names: processToArray(gene.complex_names),
                 complex_components: processToArray(gene.complex_components)
             };
 
-            // 2. Add Cilia Effects from ciliahub_data.json
-            // These fields are correctly sourced from the main ciliahub_data.json.
-            const effectsFromHub = {
-                overexpression_effects: processedGene.overexpression_effects || "Not Reported",
-                lof_effects: processedGene.lof_effects || "Not Reported",
-                percent_ciliated_cells_effects: processedGene.percent_ciliated_cells_effects || "Not Reported",
-            };
-
-            // 3. Merge in custom effects on cilia if the gene is found in screenData, 
-            // but explicitly ignoring the 'screens' field in the main data.
-            // Note: The logic requires that the new 'effects' data comes from 
-            // ciliahub_data.json (which we've done in point #2) 
-            // AND the screen data should be integrated with gene data for display.
-            // The request states "Please add effects on cilia together with cilia_screens_data.json."
-            // We interpret this as ensuring both the core effects (from the old 'screens' in the hub)
-            // and the detailed screens (from the separate JSON) are present for a gene.
+            // 2. Integrate screen data (THE FIX)
             const screensFromSeparateFile = screenData[geneUpper] || [];
 
-            // 4. Ensure new requested fields are added (they should be present but are mapped for clarity)
-            const newIntegratedFields = {
-                // These are the new requested fields, ensuring they exist:
+            // 3. Merge all fields, including orthologs and effects
+            return { 
+                ...processedGene, 
+                // Add the screens array from the separate file
+                screens_from_separate_file: screensFromSeparateFile,
+                
+                // Add the other curated fields
                 ciliopathy_classification: processedGene.ciliopathy_classification || "Not Classified",
                 ortholog_mouse: processedGene.ortholog_mouse || "N/A",
                 ortholog_c_elegans: processedGene.ortholog_c_elegans || "N/A",
                 ortholog_xenopus: processedGene.ortholog_xenopus || "N/A",
                 ortholog_zebrafish: processedGene.ortholog_zebrafish || "N/A",
                 ortholog_drosophila: processedGene.ortholog_drosophila || "N/A",
-                
-                // Add the explicit effects from the Hub for use in gene summary:
-                ...effectsFromHub, 
-
-                // Add the screens array from the separate file for the comprehensive details card:
-                screens_from_separate_file: screensFromSeparateFile
+                overexpression_effects: processedGene.overexpression_effects || "Not Reported",
+                lof_effects: processedGene.lof_effects || "Not Reported",
+                percent_ciliated_cells_effects: processedGene.percent_ciliated_cells_effects || "Not Reported"
             };
-
-            return { ...processedGene, ...newIntegratedFields };
         });
 
-        console.log('CiliaHub data loaded and formatted with new orthologs, classification, and screens integration successfully.');
+        console.log('CiliaHub data loaded and formatted with normalization and screens integration.');
         return ciliaHubDataCache;
     } catch (error) {
         console.error("Failed to fetch CiliaHub data:", error);
@@ -812,7 +804,6 @@ async function fetchCiliaData() {
 }
 
 
-// --- UPDATED fetchScreenData function (to be replaced in your code) ---
 async function fetchScreenData() {
     if (screenDataCache) return screenDataCache;
     try {
@@ -821,14 +812,13 @@ async function fetchScreenData() {
         const data = await response.json();
         screenDataCache = data;
         
-        // --- NEW: Populate allGeneSymbols cache with screen genes ---
+        // --- Populate allGeneSymbols cache with screen genes ---
         const screenGenes = Object.keys(data);
         if (!allGeneSymbols) {
             allGeneSymbols = new Set(screenGenes);
         } else {
             screenGenes.forEach(gene => allGeneSymbols.add(gene));
         }
-        // This process needs to be finalized in fetchCiliaData too for complete coverage.
 
         console.log('Screen data loaded successfully:', Object.keys(data).length, 'genes');
         return screenDataCache;
@@ -839,61 +829,24 @@ async function fetchScreenData() {
     }
 }
 
+/**
+ * REPLACED: This function no longer loads phylogeny_summary.json.
+ * It is now a wrapper to ensure both modern phylogeny files are loaded.
+ */
 async function fetchPhylogenyData() {
     if (phylogenyDataCache) return phylogenyDataCache;
+    
     try {
-        const response = await fetch('https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/phylogeny_summary.json');
-        if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
-        const raw = await response.json();
-        const unified = {};
-        // Map class to query categories
-        const classToCategory = {
-            'Ciliary-only': 'ciliated_only_genes',
-            'Present-in-both': 'in_all_organisms',
-            'Non-ciliary': 'nonciliary_only_genes' // Adjust if class names differ
-        };
-        // Process ciliated_only_genes, nonciliary_only_genes, in_all_organisms if present
-        if (raw.ciliated_only_genes) {
-            raw.ciliated_only_genes
-                .filter(g => typeof g === 'string' && g)
-                .forEach(g => unified[g.trim().toUpperCase()] = { sym: g.trim(), category: 'ciliated_only_genes', species: [] });
-        }
-        if (raw.nonciliary_only_genes) {
-            raw.nonciliary_only_genes
-                .filter(g => typeof g === 'string' && g)
-                .forEach(g => unified[g.trim().toUpperCase()] = { sym: g.trim(), category: 'nonciliary_only_genes', species: [] });
-        }
-        if (raw.in_all_organisms) {
-            raw.in_all_organisms
-                .filter(g => typeof g === 'string' && g)
-                .forEach(g => unified[g.trim().toUpperCase()] = { sym: g.trim(), category: 'in_all_organisms', species: [] });
-        }
-        // Process summary array
-        if (raw.summary && Array.isArray(raw.summary)) {
-            raw.summary.forEach(item => {
-                const gene = (item.sym || '').trim().toUpperCase();
-                const cat = (item.class || '').trim();
-                if (gene) {
-                    unified[gene] = {
-                        sym: item.sym, // Retain original sym
-                        category: classToCategory[cat] || cat.toLowerCase().replace(/[\s-]+/g, '_'),
-                        species: Array.isArray(item.species) ? item.species.map(s => s.trim()) : []
-                    };
-                }
-            });
-        }
-        phylogenyDataCache = unified;
-        console.log(`Phylogeny data normalized: ${Object.keys(unified).length} entries`);
-        // Log genes with C.elegans
-        const celegansGenes = Object.entries(unified)
-            .filter(([_, data]) => data.species.includes('C.elegans'))
-            .map(([gene, data]) => ({ gene: data.sym, species: data.species, category: data.category }));
-        console.log(`Genes with C.elegans: ${celegansGenes.length}`, celegansGenes.slice(0, 5));
-        return phylogenyDataCache;
+        await Promise.all([
+            fetchLiPhylogenyData(),
+            fetchNeversPhylogenyData()
+        ]);
+        phylogenyDataCache = true; // Mark as loaded
+        return true;
     } catch (error) {
-        console.error('Failed to fetch phylogeny summary data:', error);
-        phylogenyDataCache = {};
-        return phylogenyDataCache;
+         console.error('Failed to load one or more phylogeny datasets:', error);
+         phylogenyDataCache = false;
+         return false;
     }
 }
 
@@ -905,6 +858,7 @@ async function fetchTissueData() {
         const tsv = await response.text();
         const lines = tsv.trim().split(/\r?\n/);
         if (lines.length < 2) throw new Error('Empty or invalid TSV file');
+        
         const data = {};
         for (let i = 1; i < lines.length; i++) {
             const parts = lines[i].split('\t');
@@ -924,21 +878,16 @@ async function fetchTissueData() {
         return window.tissueDataCache;
     } catch (error) {
         console.error('Failed to fetch tissue data:', error);
-        window.tissueDataCache = {
-            'IFT88': { 'Kidney Cortex': 8.45, 'Kidney Medulla': 12.67 },
-            'ARL13B': { 'Brain': 5.2, 'Kidney': 3.1, 'Testis': 9.8 }
-        };
+        window.tissueDataCache = {}; // Set empty on failure
         return window.tissueDataCache;
     }
 }
+// Make sure it's globally available if called directly from HTML
 window.fetchTissueData = fetchTissueData;
 
 async function fetchUmapData() {
     if (umapDataCache) return umapDataCache;
-
-    // Use the correct Raw URL you've provided
     const dataUrl = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/umap_data.json';
-
     try {
         console.log('Fetching pre-computed UMAP data...');
         const response = await fetch(dataUrl);
@@ -953,35 +902,23 @@ async function fetchUmapData() {
 }
 
 async function fetchCellxgeneData() {
-    // Check if data is already in cache
     if (cellxgeneDataCache) return cellxgeneDataCache;
-
-    // Use the correct Raw URL you've provided
     const dataUrl = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/cellxgene_data.json';
-
     try {
         console.log('Fetching Cellxgene single-cell data...');
         const response = await fetch(dataUrl);
-        if (!response.ok) {
-            throw new Error(`HTTP error! Status: ${response.status}`);
-        }
+        if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
         const jsonData = await response.json();
-        
         cellxgeneDataCache = jsonData;
-        
         console.log(`✅ Cellxgene data loaded successfully for ${Object.keys(jsonData).length} genes.`);
         return cellxgeneDataCache;
-
     } catch (error) {
         console.error('Failed to fetch or parse Cellxgene data:', error);
-        cellxgeneDataCache = null; // Set to null on failure
+        cellxgeneDataCache = null;
         return null;
     }
 }
 
-/**
- * FETCHES and CORUM Human Complex data.
- */
 async function fetchCorumComplexes() {
     if (corumDataCache.loaded) return corumDataCache;
     const dataUrl = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/corum_humanComplexes.json';
@@ -991,33 +928,26 @@ async function fetchCorumComplexes() {
         const response = await fetch(dataUrl);
         if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
         
-        // Handle single object vs. array format for robustness
         const rawData = await response.json();
         const data = Array.isArray(rawData) ? rawData : [rawData]; 
 
         data.forEach(entry => {
-            // CRITICAL FIX 1: Check for complex_name and subunits array
             if (!entry || !entry.complex_name || !Array.isArray(entry.subunits)) return; 
             
             const complexNameLower = entry.complex_name.toLowerCase();
             
-            // Store the whole entry for complex name lookup
             corumDataCache.byNameLower[complexNameLower] = entry; 
             corumDataCache.list.push(entry);
 
-            // Populate byGene lookup
             entry.subunits.forEach(subunit => {
-                // CRITICAL FIX 2: Access gene symbol from the subunit object's 'gene_name' field
                 const geneSymbol = subunit.gene_name;
                 if (!geneSymbol) return; 
 
                 const g = geneSymbol.toUpperCase();
                 if (!corumDataCache.byGene[g]) corumDataCache.byGene[g] = [];
                 
-                // Store a lighter reference to the complex, listing all gene symbols
                 corumDataCache.byGene[g].push({
                     complexName: entry.complex_name,
-                    // Map the subunits array of objects back to an array of uppercase gene symbols
                     subunits: entry.subunits.map(s => s.gene_name.toUpperCase()) 
                 });
             });
@@ -1028,11 +958,66 @@ async function fetchCorumComplexes() {
         return corumDataCache;
     } catch (err) {
         console.error('Failed to fetch CORUM data:', err);
-        // Set loaded to true to prevent endless retry loop
         corumDataCache.loaded = true; 
         return corumDataCache;
     }
 }
+
+async function getDomainData() {
+    if (CILI_AI_DOMAIN_DB) return CILI_AI_DOMAIN_DB;
+    const dataUrl = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/cili_ai_domain_database.json';
+    try {
+        const response = await fetch(dataUrl);
+        if (!response.ok) {
+            console.error(`Error fetching domain DB: ${response.status} ${response.statusText}`);
+            return null;
+        }
+        CILI_AI_DOMAIN_DB = await response.json();
+        console.log('✅ New Domain Database (cili_ai_domain_database.json) loaded successfully.');
+        return CILI_AI_DOMAIN_DB;
+    } catch (error) {
+        console.error(`Network error or JSON parsing error for Domain DB: ${error}`);
+        return null;
+    }
+}
+
+/**
+ * NEW: Fetches the Nevers et al. 2017 phylogeny matrix.
+ */
+async function fetchNeversPhylogenyData() {
+    if (neversPhylogenyCache) return neversPhylogenyCache;
+    const dataUrl = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/nevers_et_al_2017_matrix_optimized.json';
+    try {
+        const response = await fetch(dataUrl);
+        if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+        neversPhylogenyCache = await response.json();
+        console.log('✅ Nevers et al. 2017 Phylogeny data loaded successfully.');
+        return neversPhylogenyCache;
+    } catch (error) {
+        console.error('Failed to fetch Nevers et al. 2017 phylogeny data:', error);
+        return null;
+    }
+}
+
+/**
+ * NEW: Fetches the Li et al. 2014 phylogeny matrix.
+ */
+async function fetchLiPhylogenyData() {
+    if (liPhylogenyCache) return liPhylogenyCache;
+    const dataUrl = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/li_et_al_2014_matrix_optimized.json';
+    try {
+        const response = await fetch(dataUrl);
+        if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+        liPhylogenyCache = await response.json();
+        console.log('✅ Li et al. 2014 Phylogeny data loaded successfully.');
+        return liPhylogenyCache;
+    } catch (error) {
+        console.error('Failed to fetch Li et al. 2014 phylogeny data:', error);
+        return null;
+    }
+}
+
+
 
 /**
  * Helper function to get complex details by gene symbol.
@@ -1089,43 +1074,6 @@ async function getDomainData() {
     }
 }
 
-/**
- * Fetches the Nevers et al. 2017 phylogeny matrix.
- * URL: https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/nevers_et_al_2017_matrix_optimized.json
- */
-async function fetchNeversPhylogenyData() {
-    if (neversPhylogenyCache) return neversPhylogenyCache;
-    const dataUrl = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/nevers_et_al_2017_matrix_optimized.json';
-    try {
-        const response = await fetch(dataUrl);
-        if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
-        neversPhylogenyCache = await response.json();
-        console.log('✅ Nevers et al. 2017 Phylogeny data loaded successfully.');
-        return neversPhylogenyCache;
-    } catch (error) {
-        console.error('Failed to fetch Nevers et al. 2017 phylogeny data:', error);
-        return null;
-    }
-}
-
-/**
- * Fetches the Li et al. 2014 phylogeny matrix.
- * URL: https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/li_et_al_2014_matrix_optimized.json
- */
-async function fetchLiPhylogenyData() {
-    if (liPhylogenyCache) return liPhylogenyCache;
-    const dataUrl = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/li_et_al_2014_matrix_optimized.json';
-    try {
-        const response = await fetch(dataUrl);
-        if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
-        liPhylogenyCache = await response.json();
-        console.log('✅ Li et al. 2014 Phylogeny data loaded successfully.');
-        return liPhylogenyCache;
-    } catch (error) {
-        console.error('Failed to fetch Li et al. 2014 phylogeny data:', error);
-        return null;
-    }
-}
 
 /**
  * New function to describe CiliAI's capabilities, listing all available data types.
