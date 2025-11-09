@@ -2246,26 +2246,72 @@ function norm(term) {
  * Returns every gene whose `localization` field contains the given term.
  * Works with the raw objects from ciliahub_data.json.
  */
+/**
+ * Returns genes whose localization field contains the requested term.
+ * - Handles singular/plural (cilium → cilia, axoneme → cilia)
+ * - Removes "Ciliary associated gene" from results
+ * - Returns full localization string
+ */
 async function getGenesByLocalization(localizationTerm) {
-    await fetchCiliaData();                     // guarantees ciliaHubDataCache exists
-    const needle = norm(localizationTerm);
+    await fetchCiliaData(); // ensure cache is loaded
 
-    return ciliaHubDataCache
+    // === 1. Normalize input term ===
+    const termMap = {
+        mitochondria: 'mitochondria',
+        mitochondrial: 'mitochondria',
+        basal: 'basal body',
+        'basal body': 'basal body',
+        cilia: 'cilia',
+        cilium: 'cilia',
+        axoneme: 'cilia',
+        'transition zone': 'transition zone',
+        centrosome: 'centrosome',
+        'ciliary membrane': 'ciliary membrane',
+        lysosome: 'lysosome',
+        lysosomal: 'lysosome',
+        nucleus: 'nucleus',
+        nuclear: 'nucleus'
+    };
+    const needle = (termMap[localizationTerm.toLowerCase().trim()] || localizationTerm.toLowerCase().trim());
+
+    // === 2. Filter genes ===
+    const matches = ciliaHubDataCache
         .filter(g => {
             if (!g.localization) return false;
-            const locs = Array.isArray(g.localization)
+
+            // Split localization into array
+            const locArray = Array.isArray(g.localization)
                 ? g.localization
                 : g.localization.split(',').map(s => s.trim());
-            return locs.some(l => norm(l).includes(needle));
-        })
-        .map(g => ({
-            gene: g.gene,
-            localization: Array.isArray(g.localization)
-                ? g.localization.join(', ')
-                : g.localization
-        }));
-}
 
+            // Check if any part contains the needle
+            return locArray.some(loc => {
+                const clean = loc.toLowerCase().trim();
+                return clean.includes(needle) && clean !== 'ciliary associated gene';
+            });
+        })
+        .map(g => {
+            // Preserve full original localization string
+            const fullLoc = Array.isArray(g.localization)
+                ? g.localization.join(', ')
+                : g.localization;
+
+            // Remove "Ciliary associated gene" from display
+            const displayLoc = fullLoc
+                .split(',')
+                .map(s => s.trim())
+                .filter(s => s.toLowerCase() !== 'ciliary associated gene')
+                .join(', ') || 'N/A';
+
+            return {
+                gene: g.gene,
+                localization: displayLoc
+            };
+        })
+        .sort((a, b) => a.gene.localeCompare(b.gene));
+
+    return matches;
+}
 
 
 /**
@@ -2281,7 +2327,7 @@ function formatLocalizationTable(title, genes) {
         <thead>
             <tr>
                 <th>Human Gene</th>
-                <th>Localization</th>
+                <th>Ciliary Localization</th>
             </tr>
         </thead>
         <tbody>`;
@@ -2289,7 +2335,7 @@ function formatLocalizationTable(title, genes) {
     genes.forEach(g => {
         html += `<tr>
             <td><strong>${g.gene}</strong></td>
-            <td>${g.localization || 'N/A'}</td>
+            <td>${g.localization}</td>
         </tr>`;
     });
 
@@ -3765,23 +3811,12 @@ const questionRegistry = [
     { text: "Give me a list of ciliary genes", handler: async () => getAllCiliaryGenes() },
     { text: "Show all cilia-related genes", handler: async () => getAllCiliaryGenes() },
     { text: "List every ciliary gene", handler: async () => getAllCiliaryGenes() },
-
+// --- Localization-based gene retrieval (IMPROVED) ---
 {
     text: "Display mitochondrial genes",
     handler: async () => {
         const genes = await getGenesByLocalization("mitochondria");
         return formatLocalizationTable("Mitochondrial Genes", genes);
-    }
-},
-{
-    text: "Show mitochondrial and ciliary genes",
-    handler: async () => {
-        const mito = await getGenesByLocalization("mitochondria");
-        const ciliary = await getGenesByLocalization("cilia");
-        const combined = [...mito, ...ciliary]
-            .filter((v, i, a) => a.findIndex(t => t.gene === v.gene) === i) // dedupe
-            .sort((a, b) => a.gene.localeCompare(b.gene));
-        return formatLocalizationTable("Mitochondrial + Ciliary Genes", combined);
     }
 },
 {
@@ -3796,6 +3831,17 @@ const questionRegistry = [
     handler: async () => {
         const genes = await getGenesByLocalization("cilia");
         return formatLocalizationTable("Ciliary Genes", genes);
+    }
+},
+{
+    text: "Show mitochondrial and ciliary genes",
+    handler: async () => {
+        const mito = await getGenesByLocalization("mitochondria");
+        const cilia = await getGenesByLocalization("cilia");
+        const combined = [...mito, ...cilia]
+            .filter((v, i, a) => a.findIndex(t => t.gene === v.gene) === i)
+            .sort((a, b) => a.gene.localeCompare(b.gene));
+        return formatLocalizationTable("Mitochondrial + Ciliary Genes", combined);
     }
 },
 {
