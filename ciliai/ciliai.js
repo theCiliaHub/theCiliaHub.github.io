@@ -2493,7 +2493,16 @@ async function getGeneListByTerm(term) {
  */
 function normalizeTerm(term) {
     if (!term) return '';
-    return term.toLowerCase().trim();
+    let norm = term.toLowerCase().trim();
+    const map = {
+        'mitochondrial': 'mitochondria',
+        'lysosomal': 'lysosome',
+        'nuclear': 'nucleus',
+        'cilium': 'cilia',
+        'ciliary': 'cilia'
+        
+    };
+    return map[norm] || norm;
 }
 
 
@@ -2546,10 +2555,6 @@ async function getLocalizationPhenotypeGenes(localizationTerm, rawPhenotypeQuery
     const title = `${localizationTerm} Genes Causing ${rawPhenotypeQuery}`;
     return formatListResult(title, filteredResults);
 }
-/**
- * @name hasEnhancedShortCiliaEvidence
- * @description Comprehensive short cilia evidence detection using multiple data sources
- */
 function hasEnhancedShortCiliaEvidence(gene) {
     // Use the exact terminology found in the data
     const shortCiliaKeywords = ['shorter cilia', 'shorter', 'short', 'decreased'];
@@ -2584,8 +2589,8 @@ function hasEnhancedShortCiliaEvidence(gene) {
 
     // 4. Check screen data for negative regulator classification
     let hasScreenEvidence = false;
-    if (gene.screens && Array.isArray(gene.screens)) {
-        hasScreenEvidence = gene.screens.some(screen => {
+    if (gene.screens_from_separate_file && Array.isArray(gene.screens_from_separate_file)) {
+        hasScreenEvidence = gene.screens_from_separate_file.some(screen => {
             const classification = (screen.classification || '').toLowerCase();
             return classification.includes('negative regulator') || 
                    (screen.z_score && screen.z_score < -2);
@@ -2679,8 +2684,8 @@ function getPhenotypeEvidence(gene, phenotype) {
     
     // Add screen evidence for short/long cilia
     if ((phenotype.includes('short') || phenotype.includes('long')) && 
-        gene.screens && Array.isArray(gene.screens)) {
-        const relevantScreens = gene.screens.filter(screen => {
+        gene.screens_from_separate_file && Array.isArray(gene.screens_from_separate_file)) {
+        const relevantScreens = gene.screens_from_separate_file.filter(screen => {
             const classification = (screen.classification || '').toLowerCase();
             return classification.includes('negative regulator') || 
                    classification.includes('positive regulator');
