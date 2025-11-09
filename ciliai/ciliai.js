@@ -2511,50 +2511,38 @@ function normalizeTerm(term) {
  * @description Enhanced function to find genes by localization that cause specific phenotypes
  */
 async function getLocalizationPhenotypeGenes(localizationTerm, rawPhenotypeQuery) {
-    
     console.log(`Starting getLocalizationPhenotypeGenes for: ${localizationTerm} causing ${rawPhenotypeQuery}`);
-    
-    // 1. Establish Gene Pool (localization-specific genes)
-    const genePool = await getGeneListByTerm(localizationTerm); 
-    
-    console.log(`Gene pool for ${localizationTerm}: ${genePool.length} genes`);
-    
+
+    const genePool = await getGeneListByTerm(localizationTerm);
     if (genePool.length === 0) {
         return formatListResult(`${localizationTerm} Genes`, [], `No genes found for ${localizationTerm}.`);
     }
 
     const phenotypeLower = rawPhenotypeQuery.toLowerCase();
-    
-    // 2. Enhanced Filtering with Comprehensive Evidence Detection
-    const filteredResults = genePool 
+
+    const filteredResults = genePool
         .filter(gene => {
-            // For short cilia queries, use enhanced evidence detection
-            if (phenotypeLower.includes('short')) {
-                return hasEnhancedShortCiliaEvidence(gene);
-            }
-            
-            // For long cilia queries, use enhanced detection
-            if (phenotypeLower.includes('long')) {
-                return hasEnhancedLongCiliaEvidence(gene);
-            }
-            
-            // For other phenotypes, use simple keyword matching
+            if (phenotypeLower.includes('short')) return hasEnhancedShortCiliaEvidence(gene);
+            if (phenotypeLower.includes('long'))  return hasEnhancedLongCiliaEvidence(gene);
             return hasSimplePhenotypeEvidence(gene, phenotypeLower);
         })
         .map(g => ({
             gene: g.gene,
-            localization_detail: g.localization ? g.localization.join(', ') : 'N/A',
-            // Enhanced evidence display
+            // ---- NEW: always provide a localization string ----
+            localization_detail: Array.isArray(g.localization)
+                ? g.localization.join(', ')
+                : 'N/A',
+            // evidence string (used in the description column)
             lof_effect_detail: getPhenotypeEvidence(g, phenotypeLower),
             description: `Evidence: ${getPhenotypeEvidence(g, phenotypeLower)}`
         }))
         .sort((a, b) => a.gene.localeCompare(b.gene));
 
-    console.log(`Filtered results for ${localizationTerm} causing ${rawPhenotypeQuery}: ${filteredResults.length} genes`);
-    
     const title = `${localizationTerm} Genes Causing ${rawPhenotypeQuery}`;
     return formatListResult(title, filteredResults);
 }
+
+
 function hasEnhancedShortCiliaEvidence(gene) {
     // Use the exact terminology found in the data
     const shortCiliaKeywords = ['shorter cilia', 'shorter', 'short', 'decreased'];
@@ -8080,69 +8068,47 @@ function formatGeneDetail(geneData, geneSymbol, detailTitle, detailContent) {
 // The formatListResult function must now accept a different signature or intelligently detect the new structure.
 // This is how the formatListResult function needs to be adapted to display the three columns:
 
-function formatListResult(title, geneList, citationHtml = '', speciesCode = '', targetKey = null) {
-    if (!geneList || geneList.length === 0) {
-        return `<div class="result-card"><h3>${title}</h3><p class="status-not-found">No matching genes found.</p></div>`;
+/**
+ * @name formatListResult
+ * @description Generic HTML formatter for any gene list that contains
+ *              {gene, localization_detail, lof_effect_detail, description}
+ */
+function formatListResult(title, results, extraInfo = '') {
+    if (!results || results.length === 0) {
+        return `<div class="result-card status-not-found"><h3>${title}</h3><p>No genes matched the criteria.</p>${extraInfo}</div>`;
     }
 
-    const displayedGenes = geneList.slice(0, 100);
-    
-    // --- CHECK FOR NEW STRUCTURE ---
-    // If the gene objects contain 'localization_detail' and 'lof_effect_detail', use the enhanced table.
-    const isEnhancedTable = displayedGenes.length > 0 && 
-                            displayedGenes[0].hasOwnProperty('localization_detail') &&
-                            displayedGenes[0].hasOwnProperty('lof_effect_detail');
-    
-    // --- Build Table Header ---
-    let tableHeader = `
-    <thead>
-        <tr>
-            <th class="sortable">Human Gene</th>`;
+    let html = `<div class="result-card"><h3>${title} (${results.length} found)</h3>`;
+    if (extraInfo) html += `<p>${extraInfo}</p>`;
 
-    if (isEnhancedTable) {
-        tableHeader += `
-            <th class="sortable">Ciliary Localization</th>
-            <th class="sortable">LoF Phenotype (Cilia Length/Number)</th>
-        </tr>
-    </thead>`;
-    } else {
-        // Fallback to old single-column display
-        tableHeader += `<th>Disease/Conservation Info</th></tr></thead>`;
-    }
+    // ---- TABLE WITH LOCALIZATION COLUMN ----
+    html += `
+    <table class="gene-detail-table">
+        <thead>
+            <tr>
+                <th>Human Gene</th>
+                <th>Ciliary Localization</th>
+                <th>LoF Phenotype (Cilia Length/Number)</th>
+            </tr>
+        </thead>
+        <tbody>`;
 
+    results.forEach(r => {
+        html += `
+            <tr>
+                <td><strong>${r.gene}</strong></td>
+                <td>${r.localization_detail || 'N/A'}</td>
+                <td>${r.lof_effect_detail || 'Not Reported'}</td>
+            </tr>`;
+    });
 
-    // --- Build Table Rows ---
-    const tableRows = displayedGenes.map(g => {
-        let cells = `<td><strong>${g.gene}</strong></td>`;
-        
-        if (isEnhancedTable) {
-            cells += `<td>${g.localization_detail}</td>`;
-            cells += `<td style="font-weight: bold;">${g.lof_effect_detail}</td>`;
-        } else {
-            cells += `<td>${g.description.substring(0, 100)}${g.description.length > 100 ? '...' : ''}</td>`;
-        }
-        
-        return `<tr>${cells}</tr>`;
-    }).join('');
-
-
-    // --- Final HTML Structure ---
-    // ... (rest of the formatting for download buttons and wrapping divs remains the same)
-    const titleHtml = `<h3>${title} (${geneList.length} found)</h3>`;
-    const downloadButtonHtml = `<button class="download-button" onclick="downloadTable('download-table-content', '${title.replace(/[^a-z0-9]/gi, '_')}')">Download CSV</button>`;
-
-    return `
-    <div class="result-card">
-        ${titleHtml}
-        <table class="ciliopathy-table" id="download-table-content">
-            ${tableHeader}
-            <tbody>${tableRows}</tbody>
-        </table>
-        ${geneList.length > 100 ? `<p><a href="https://theciliahub.github.io/" target="_blank">View full list (${geneList.length} genes) in CiliaHub</a></p>` : ''}
-        ${downloadButtonHtml}
-        ${citationHtml}
+    html += `
+        </tbody>
+    </table>
     </div>`;
+    return html;
 }
+
 
 // ----------------------------------------------------------------------
 // NEW FUNCTIONALITY: CLIENT-SIDE CSV DOWNLOAD
