@@ -417,22 +417,35 @@ async function resolveSemanticIntent(query) {
 }
 
 
-
 // --- Main AI Query Handler ---
 window.handleAIQuery = async function() {
+    // --- Get DOM elements ---
     const queryInput = document.getElementById('aiQueryInput');
     const resultArea = document.getElementById('query-output');
+
+    // --- Safety checks ---
+    if (!queryInput) {
+        console.error("ERROR: #aiQueryInput element not found in DOM.");
+        return;
+    }
+    if (!resultArea) {
+        console.error("ERROR: #query-output element not found in DOM.");
+        return;
+    }
+
     const query = queryInput.value.trim();
     const qLower = query.toLowerCase();
 
     if (!query) return;
+
+    // --- Show loading message ---
     resultArea.innerHTML = `<p class="result-card status-searching">🧠 CiliAI is thinking...</p>`;
-    
+
     try {
-        // --- Purge Plotly ---
+        // --- Purge Plotly if present ---
         try { if (window.Plotly) Plotly.purge(resultArea); } catch (e) {}
 
-        // --- Await all core data (Ensures caches are ready) ---
+        // --- Await all core data ---
         await Promise.all([
             fetchCiliaData(),
             getDomainData(),
@@ -457,7 +470,7 @@ window.handleAIQuery = async function() {
         }
 
         // =================================================================
-        // PRIORITY 2: Semantic Intent (Location + Phenotype, Disease + Phenotype)
+        // PRIORITY 2: Semantic Intent
         // =================================================================
         if (!htmlResult) {
             const semanticResult = await resolveSemanticIntent(query);
@@ -468,12 +481,12 @@ window.handleAIQuery = async function() {
         }
 
         // =================================================================
-        // PRIORITY 3: Dedicated Routers (Phylogeny, Domain, CORUM)
+        // PRIORITY 3: Dedicated Routers
         // =================================================================
         if (!htmlResult) {
             console.log(`Routing via: Priority 3 (Dedicated Routers)`);
-            
-            // --- Ciliopathy Module Queries (from new intentParser) ---
+
+            // --- Ciliopathy Module Queries ---
             if (qLower.includes('joubert') && qLower.includes('ciliated cells')) {
                 htmlResult = await intentParser.getJoubertGenesInCiliatedCells();
             } 
@@ -485,7 +498,7 @@ window.handleAIQuery = async function() {
                 }
             }
             
-            // --- CORUM Queries (from old patchAIQueryHandler) ---
+            // --- CORUM Queries ---
             else if (qLower.includes('subunits of') || qLower.includes('components of') || qLower.includes('members of')) {
                 const complexMatch = qLower.match(/(?:subunits|components|members)\s+of\s+(.+)/i);
                 if (complexMatch) {
@@ -513,10 +526,9 @@ window.handleAIQuery = async function() {
         }
 
         // =================================================================
-        // PRIORITY 4: Simple Keyword Parser (FIXED)
+        // PRIORITY 4: Simple Keyword Parser
         // =================================================================
         if (!htmlResult) {
-            // This now uses the .parse() method of our NEW unified intentParser
             const intent = intentParser.parse(query);
             if (intent && typeof intent.handler === 'function') {
                 console.log(`Routing via: Priority 4 (intentParser.parse()) - Matched ${intent.intent}`);
@@ -525,7 +537,7 @@ window.handleAIQuery = async function() {
         }
 
         // =================================================================
-        // PRIORITY 5: Fallback (Gene Details or Error)
+        // PRIORITY 5: Fallback
         // =================================================================
         if (!htmlResult) {
             console.log(`Routing via: Priority 5 (Fallback)`);
@@ -533,12 +545,11 @@ window.handleAIQuery = async function() {
                 const term = match[1].trim();
                 htmlResult = await getComprehensiveDetails(term);
             } else {
-                // Check if the query is just a single gene name
                 const potentialGenes = (query.match(/\b([A-Z0-9\-\.]{3,})\b/gi) || []).map(g => g.toUpperCase());
                 if (potentialGenes.length === 1 && qLower.length < (potentialGenes[0].length + 5)) {
-                     if (ciliaHubDataCache.some(g => g.gene.toUpperCase() === potentialGenes[0])) {
+                    if (ciliaHubDataCache.some(g => g.gene.toUpperCase() === potentialGenes[0])) {
                         htmlResult = await getComprehensiveDetails(potentialGenes[0]);
-                     }
+                    }
                 } 
                 
                 if (!htmlResult) {
@@ -547,6 +558,7 @@ window.handleAIQuery = async function() {
             }
         }
 
+        // --- Render result ---
         resultArea.innerHTML = htmlResult;
 
     } catch (e) {
@@ -554,6 +566,8 @@ window.handleAIQuery = async function() {
         resultArea.innerHTML = `<p class="result-card status-error">An internal CiliAI error occurred: ${e.message}</p>`;
     }
 };
+
+
 
 
 /**
