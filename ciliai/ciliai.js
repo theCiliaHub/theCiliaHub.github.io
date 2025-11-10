@@ -550,7 +550,6 @@ window.handleAIQuery = async function() {
         console.error("CiliAI Query Error:", e);
     }
 };
-
 // =============================================================================
 // REPLACEMENT: The new, unified "Brain" of CiliAI (replaces old createIntentParser)
 // This function contains both the simple keyword parser (.parse)
@@ -618,6 +617,128 @@ function createIntentParser() {
         return formatListResult("Joubert Genes Expressed in Ciliated Cells", results); // Uses GLOBAL formatter
     }
 
+    // --- Function: Orthologs Finder (Uses GLOBAL helpers) ---
+    async function getOrthologs(disease, organism) {
+        await fetchCiliaData();
+        // Uses GLOBAL getCiliopathyGenes
+        const { genes: diseaseGenes } = await getCiliopathyGenes(disease); 
+        
+        const orthologKeyMap = {
+            'c. elegans': 'ortholog_c_elegans',
+            'mouse': 'ortholog_mouse',
+            'zebrafish': 'ortholog_zebrafish',
+            'xenopus': 'ortholog_xenopus',
+            'drosophila': 'ortholog_drosophila'
+        };
+        const orthologKey = orthologKeyMap[organism.toLowerCase()];
+    
+        if (!orthologKey) {
+            return formatListResult(`${disease} Orthologs in ${organism}`, [], `Ortholog key for "${organism}" not found.`);
+        }
+    
+        const results = diseaseGenes
+            .map(g => ciliaHubDataCache.find(cg => cg.gene === g.gene)) // Uses GLOBAL ciliaHubDataCache
+            .filter(g => g && g[orthologKey] && g[orthologKey] !== 'N/A')
+            .map(g => ({ gene: g.gene, description: `${organism} Ortholog: ${g[orthologKey]}` }));
+            
+        return formatListResult(`${disease} Orthologs in ${organism}`, results);
+    }
+
+    // --- Entity Keywords for simple parsing (from OLD parser) ---
+    const entityKeywords = [
+        {
+            type: 'FUNCTIONAL_CATEGORY',
+            keywords: ['kinesin motors', 'dynein motors', 'Ciliary assembly/disassembly', 'Signaling', 'Motile cilium', 'Motor protein', 'Transport', 'Protein modification', 'Cytoskeletal', 'cilium assembly', 'basal body docking', 'retrograde IFT'],
+            handler: async (term) => formatListResult(`Genes in Functional Category: ${term}`, await getGenesByFunction(term)),
+            autocompleteTemplate: (term) => `Show me ${term} genes`
+        },
+        {
+            type: 'COMPLEX',
+            keywords: ['BBSome', 'IFT-A', 'IFT-B', 'Transition Zone Complex', 'MKS Complex', 'NPHP Complex'],
+            handler: async (term) => formatListResult(`Components of ${term}`, await getGenesByComplex(term)),
+            autocompleteTemplate: (term) => `Display components of ${term} complex`
+        },
+        {
+            type: 'CILIOPATHY',
+            keywords: [...new Set(allDiseases)], // USES THE NEW LARGE LIST
+            handler: async (term) => {
+                const titleTerm = term.toUpperCase() === 'BBS' ? 'Bardet–Biedl Syndrome' :
+                                term.toUpperCase() === 'MKS' ? 'Meckel–Gruber Syndrome' : term;
+                const { genes, description } = await getCiliopathyGenes(term);
+                return formatListResult(`Genes for ${titleTerm}`, genes, description);
+            },
+            autocompleteTemplate: (term) => `Display genes for ${term}`
+        },
+        {
+            type: 'LOCALIZATION',
+            keywords: ['basal body', 'axoneme', 'transition zone', 'centrosome', 'cilium', 'lysosome', 'ciliary tip', 'transition fiber'],
+            handler: async (term) => formatListResult(`Genes localizing to ${term}`, await getGenesByLocalization(term)),
+            autocompleteTemplate: (term) => `Show me ${term} localizing genes`
+        },
+        {
+            type: 'ORGANISM',
+            keywords: [
+                // ... (Full list of 140 organisms) ...
+                "Prokaryote", "E.cuniculi", "E.histolytica", "E.dispar", "G.lamblia", "T.vaginalis", "T.brucei", "T.cruzi", "L.infantum",
+                "L.major", "L.braziliensis", "T.gondii", "C.hominis", "C.parvum", "B.bovis", "T.annulata", "T.parva", "P.knowlesi", "P.vivax",
+                "P.falciparum", "P.chabaudi", "P.berghei", "P.yoelii", "P.tetraurelia", "T.thermophila", "P.infestans", "T.pseudonana",
+                "P.tricornutum", "C.merolae", "N.gruberi", "O.lucimarinus", "O.tauri", "C.reinhardtii", "V.carteri", "P.patens",
+                "S.moellendorffii", "S.bicolor", "Z.mays", "O.sativa", "B.distachyon", "A.lyrata", "A.thaliana", "L.japonicus", "M.truncatula",
+                "V.vinifera", "P.trichocarpa", "R.communis", "T.trahens", "D.discoideum", "A.macrogynus", "S.punctatus", "M.globosa", "U.maydis",
+                "C.neoformans", "P.chrysosporium", "S.commune", "C.cinerea", "L.bicolor", "S.pombe", "B.fuckeliana", "S.sclerotiorum",
+                "F.graminearum", "M.grisea", "N.crassa", "P.anserina", "P.chrysogenum", "A.clavatus", "A.fumigatus", "N.fischeri", "A.flavus",
+                "A.oryzae", "A.niger", "A.nidulans", "U.reesii", "C.immitis", "C.posadasii", "P.nodorum", "T.melanosporum", "Y.lipolytica",
+                "P.pastoris", "C.lusitaniae", "D.hansenii", "M.guilliermondii", "S.stipitis", "L.elongisporus", "C.tropicalis", "C.albicans",
+                "C.dubliniensis", "K.lactis", "A.gossypii", "K.waltii", "L.thermotolerans", "Z.rouxii", "V.polyspora", "C.glabrata", "S.bayanus",
+                "S.mikatae", "S.cerevisiae", "S.paradoxus", "S.arctica", "C.owczarzaki", "M.brevicollis", "S.rosetta", "S.mansoni", "B.malayi",
+                "C.briggsae", "C.elegans", "D.pulex", "A.pisum", "P.humanus", "A.mellifera", "N.vitripennis", "B.mori", "T.castaneum",
+                "D.melanogaster", "D.pseudoobscura", "A.gambiae", "A.aegypti", "C.quinquefasciatus", "B.floridae", "T.adhaerens", "S.purpuratus",
+                "H.magnipapillata", "N.vectensis", "C.intestinalis", "D.rerio", "O.latipes", "F.rubripes", "T.nigroviridis", "X.tropicalis",
+                "G.gallus", "M.gallopavo", "O.anatinus", "M.domestica", "S.scrofa", "M.musculus", "C.familiaris", "B.taurus", "H.sapiens",
+                "worm", "human", "mouse", "zebrafish", "fly", "yeast"
+            ],
+            handler: async (term) => {
+                const { genes, description, speciesCode } = await getCiliaryGenesForOrganism(term);
+                return formatListResult(`Ciliary genes in ${speciesCode}`, genes, description); 
+            },
+            autocompleteTemplate: (term) => `Display ciliary genes in ${term}`
+        },
+        {
+            type: 'DOMAIN',
+            keywords: ['WD40', 'Leucine-rich repeat', 'IQ motif', 'calmodulin-binding', 'EF-hand', 'coiled-coil', 'CTS', 'ciliary targeting sequences', 'ciliary localization signals'],
+            handler: async (term) => formatListResult(`${term} domain-containing proteins`, await getGenesWithDomain(term)),
+            autocompleteTemplate: (term) => `Show ${term} domain containing proteins`
+        }
+    ];
+
+    // --- Return Public API (Unified) ---
+    return {
+        // --- New Module Methods ---
+        classifiedDiseases,
+        allDiseases,
+        getJoubertGenesInCiliatedCells,
+        getOrthologs,
+        
+        // --- Old Parser Methods ---
+        parse: (query) => {
+            const normalizedQuery = normalizeTerm(query); // Uses GLOBAL normalizeTerm
+            for (const entityType of entityKeywords) {
+                const sortedKeywords = [...entityType.keywords].sort((a, b) => b.length - a.length);
+                for (const keyword of sortedKeywords) {
+                    const keywordRegex = new RegExp(`\\b${normalizeTerm(keyword).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i'); // Uses GLOBAL normalizeTerm
+                    if (keywordRegex.test(normalizedQuery)) {
+                        return { intent: entityType.type, entity: keyword, handler: entityType.handler };
+                    }
+                }
+            }
+            return null;
+        },
+        getKnownKeywords: () => entityKeywords.flatMap(e => e.keywords.map(k => ({ keyword: k, suggestion: e.autocompleteTemplate(k) }))),
+        getAllDiseases: () => [...new Set(allDiseases)],
+        getAllComplexes: () => entityKeywords.find(e => e.type === 'COMPLEX').keywords,
+        getAllGenes: () => ciliaHubDataCache ? ciliaHubDataCache.map(g => g.gene) : []
+    };
+}
 
     
 
