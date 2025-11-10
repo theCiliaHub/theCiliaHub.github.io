@@ -735,6 +735,22 @@ const intentParser = createIntentParser();
 
 // --- Data Fetching and Caching (Updated with New Integration Logic) ---
 
+const processToArray = (field) => {
+    if (typeof field === 'string') {
+        // Split by comma OR semi-colon, trim, and filter empty strings
+        return field.split(/[,\;]/).map(item => item.trim()).filter(Boolean);
+    }
+    if (Array.isArray(field)) {
+        return field.map(item => item.trim()).filter(Boolean);
+    }
+    return [];
+};
+
+/**
+ * REPLACEMENT: fetchCiliaData
+ * This version defensively normalizes all multi-value fields (localization, ciliopathy, etc.)
+ * into clean arrays, fixing the root cause of the filtering failures.
+ */
 async function fetchCiliaData() {
     if (ciliaHubDataCache) return ciliaHubDataCache;
     try {
@@ -746,65 +762,43 @@ async function fetchCiliaData() {
         // Fetch screen data for merging
         const screenData = await fetchScreenData(); // Ensure screen data is loaded
 
-        const processToArray = (field) => {
-            if (typeof field === 'string') return field.split(',').map(item => item.trim()).filter(Boolean);
-            if (Array.isArray(field)) return field;
-            return [];
-        };
-
         ciliaHubDataCache = data.map(gene => {
             const geneUpper = gene.gene.toUpperCase();
 
-            // 1. Map core gene fields to arrays where appropriate
+            // 1. Map core gene fields to arrays using the robust helper
             const processedGene = {
                 ...gene,
                 functional_category: processToArray(gene.functional_category),
                 domain_descriptions: processToArray(gene.domain_descriptions),
                 ciliopathy: processToArray(gene.ciliopathy),
-                localization: processToArray(gene.localization),
+                localization: processToArray(gene.localization), // FIX: Guarantees Array<string>
                 complex_names: processToArray(gene.complex_names),
                 complex_components: processToArray(gene.complex_components)
             };
 
-            // 2. Add Cilia Effects from ciliahub_data.json
-            // These fields are correctly sourced from the main ciliahub_data.json.
-            const effectsFromHub = {
-                overexpression_effects: processedGene.overexpression_effects || "Not Reported",
-                lof_effects: processedGene.lof_effects || "Not Reported",
-                percent_ciliated_cells_effects: processedGene.percent_ciliated_cells_effects || "Not Reported",
-            };
-
-            // 3. Merge in custom effects on cilia if the gene is found in screenData, 
-            // but explicitly ignoring the 'screens' field in the main data.
-            // Note: The logic requires that the new 'effects' data comes from 
-            // ciliahub_data.json (which we've done in point #2) 
-            // AND the screen data should be integrated with gene data for display.
-            // The request states "Please add effects on cilia together with cilia_screens_data.json."
-            // We interpret this as ensuring both the core effects (from the old 'screens' in the hub)
-            // and the detailed screens (from the separate JSON) are present for a gene.
+            // 2. Integrate screen data
             const screensFromSeparateFile = screenData[geneUpper] || [];
 
-            // 4. Ensure new requested fields are added (they should be present but are mapped for clarity)
-            const newIntegratedFields = {
-                // These are the new requested fields, ensuring they exist:
+            // 3. Merge all fields, including orthologs and effects
+            return { 
+                ...processedGene, 
+                // Add the screens array from the separate file
+                screens_from_separate_file: screensFromSeparateFile,
+                
+                // Add the other curated fields (with defaults)
                 ciliopathy_classification: processedGene.ciliopathy_classification || "Not Classified",
                 ortholog_mouse: processedGene.ortholog_mouse || "N/A",
                 ortholog_c_elegans: processedGene.ortholog_c_elegans || "N/A",
                 ortholog_xenopus: processedGene.ortholog_xenopus || "N/A",
                 ortholog_zebrafish: processedGene.ortholog_zebrafish || "N/A",
                 ortholog_drosophila: processedGene.ortholog_drosophila || "N/A",
-                
-                // Add the explicit effects from the Hub for use in gene summary:
-                ...effectsFromHub, 
-
-                // Add the screens array from the separate file for the comprehensive details card:
-                screens_from_separate_file: screensFromSeparateFile
+                overexpression_effects: processedGene.overexpression_effects || "Not Reported",
+                lof_effects: processedGene.lof_effects || "Not Reported",
+                percent_ciliated_cells_effects: processedGene.percent_ciliated_cells_effects || "Not Reported"
             };
-
-            return { ...processedGene, ...newIntegratedFields };
         });
 
-        console.log('CiliaHub data loaded and formatted with new orthologs, classification, and screens integration successfully.');
+        console.log('CiliaHub data loaded and formatted with robust normalization and screens integration.');
         return ciliaHubDataCache;
     } catch (error) {
         console.error("Failed to fetch CiliaHub data:", error);
@@ -812,7 +806,6 @@ async function fetchCiliaData() {
         return ciliaHubDataCache;
     }
 }
-
 
 // --- UPDATED fetchScreenData function (to be replaced in your code) ---
 async function fetchScreenData() {
