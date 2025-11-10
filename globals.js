@@ -65,6 +65,9 @@ async function handleRouteChange() {
         if (el) el.style.display = 'none';
     });
 
+    // --- SPA Cleanup for CiliAI ---
+    clearCiliAI();
+
     // Determine gene to display if any
     let geneToDisplay = null;
 
@@ -110,6 +113,7 @@ async function handleRouteChange() {
 
     console.log("Routing completed. Path:", path, "Gene:", geneToDisplay ? geneToDisplay.gene : "N/A");
 }
+
 
 // =============================================================================
 // URL HELPERS
@@ -172,4 +176,20 @@ function initGlobalEventListeners() {
             panzoom.zoom(panzoom.getScale() * (e.deltaY > 0 ? 0.9 : 1.1));
         });
     }
+}
+
+
+// --- Clear CiliAI elements and unbind listeners ---
+function clearCiliAI() {
+    const aiContainer = document.querySelector('.ciliai-container');
+    if (aiContainer) aiContainer.remove(); // remove the whole container
+
+    const btn = document.getElementById('aiQueryButton');
+    if (btn) btn.removeEventListener('click', handleAIQuery);
+
+    const input = document.getElementById('aiQueryInput');
+    if (input) input.removeEventListener('keypress', handleAIQueryEnterKey);
+
+    const output = document.getElementById('query-output');
+    if (output) output.innerHTML = '';
 }
