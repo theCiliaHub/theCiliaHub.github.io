@@ -21,7 +21,6 @@ let corumDataCache = {
     loaded: false
 };
 
-
 // --- NEW: Reusable scRNA-seq Data Reference ---
 const SC_RNA_SEQ_REFERENCE_HTML = `
 <p style="font-size: 0.8em; color: #666; margin-top: 1rem; border-top: 1px solid #eee; padding-top: 0.5rem;">
@@ -47,7 +46,6 @@ const CILI_AI_DB = {
     "ARL13B": { "summary": { "lof_length": "Inhibits / Restricts", "percentage_ciliated": "Reduced cilia numbers", "source": "Expert DB" }, "evidence": [{ "id": "21940428", "source": "pubmed", "context": "The small GTPase ARL13B is critical for ciliary structure; its absence leads to stunted cilia with abnormal morphology and axonemal defects." }] },
     "BBS1": { "summary": { "lof_length": "Inhibits / Restricts", "percentage_ciliated": "Reduced cilia numbers", "source": "Expert DB" }, "evidence": [{ "id": "12118255", "source": "pubmed", "context": "Mutated in Bardet-Biedl syndrome (type 1) OMIM 209901." }] }
 };
-
 
 
 // --- Main Page Display Function (REPLACEMENT) ---
@@ -84,10 +82,12 @@ window.displayCiliAIPage = async function displayCiliAIPage() {
                             <p>
                                <strong>Try asking:</strong> 
         <span data-question="What can you do?">About CiliAI</span>, 
-        <span data-question="Show genes for Joubert syndrome">Joubert syndrome</span>, 
-        <span data-question="List ciliary genes in C. elegans">c. elegans</span>, 
-        <span data-question="Plot UMAP expression for FOXJ1">UMAP plot for FOXJ1</span>,
-        <span data-question="Compare ARL13B and FOXJ1 expression in lung scRNA-seq">Compare ARL13B vs FOXJ1</span>,
+        <span data-question="Show genes for Joubert syndrome">List genes for Joubert syndrome</span>, 
+        <span data-question="List ciliary genes in C. elegans">List potential ciliary genes in C. elegans (Phylogenetic)</span>, 
+        <span data-question="Plot UMAP expression for FOXJ1">Display expression for FOXJ1 in Lung</span>,
+        <span data-question="Compare ARL13B and FOXJ1 expression in lung scRNA-seq">Compare ARL13B and FOXJ1 expression in lung scRNA-seq</span>,
+        <span data-question="Compare phylogeny of BBS1 and CEP290.">Compare phylogeny of BBS1 and CEP290</span>,
+        <span data-question="What proteins are enriched at the ciliary tip?">What proteins are enriched at the ciliary tip?</span>,
         <span data-question="Which Joubert Syndrome genes are expressed in ciliated cells?">Joubert genes in ciliated cells</span>
                             </p>
                         </div>
@@ -237,6 +237,187 @@ function normalizeTerm(s) {
     return String(s).toLowerCase().replace(/[._\-\s]+/g, ' ').trim();
 }
 
+
+
+
+// ==================== SEMANTIC INTENT RESOLVER ====================
+// Detects user intent using keyword clusters and fuzzy semantic matching.
+
+// --- NEW GLOBAL CONSTANTS (for Localization + Phenotype Priority Check) ---
+const localizationTerms = [
+    "basal body", "transition zone", "cilia", "axoneme", "centrosome", 
+    "ciliary membrane", "nucleus", "lysosome", "mitochondria", "ciliary tip"
+];
+const phenotypeTerms = [
+    "short cilia", "longer cilia", "cilia length", "cilia defects", 
+    "decreased ciliation", "loss of cilia", "reduced cilia", "increase", "decrease", "no effect"
+];
+
+async function resolveSemanticIntent(query) {
+    const qLower = query.toLowerCase().trim();
+
+    // --- Define semantic clusters for major biological contexts ---
+    const intentClusters = {
+        ciliary_tip: ["ciliary tip", "distal tip", "tip proteins", "tip components", "tip composition", "proteins at the ciliary tip", "ciliary tip complex", "enriched at the tip", "distal region", "ciliary tip proteome"],
+        domain: ["domain", "motif", "architecture", "protein fold", "domain organization", "enriched", "depleted"],
+        phylogeny: ["phylogeny", "evolution", "conservation", "ortholog", "paralog", "species tree", "evolutionary profile", "conservation heatmap", "conserved"],
+        complex: ["complex", "interactome", "binding partners", "corum", "protein interaction", "ift", "bbsome", "dynein", "mks", "nphp", "radial spoke", "axoneme", "transition zone"],
+        expression: ["expression", "umap", "tissue", "cell type", "where expressed", "scRNA", "single-cell", "transcript", "abundance", "expression pattern", "plot"],
+        disease: ["mutation", "variant", "pathogenic", "ciliopathy", "disease", "syndrome", "bbs", "joubert", "mks", "pcd", "lca", "nephronophthisis", "polycystic kidney disease"],
+        disease_classification: ["primary ciliopathy", "secondary ciliopathy", "motile ciliopathy", "atypical ciliopathy", "primary disease", "secondary disease", "motile disease", "atypical disease", "ciliopathy classification"],
+        localization: ["localize", "location", "subcellular", "basal body", "transition zone", "centrosome", "axoneme", "ciliary membrane"],
+        phenotype: ["knockdown", "phenotype", "effect", "shorter cilia", "longer cilia", "cilia length", "cilia number", "decreased ciliation", "loss of cilia"]
+ };
+// --- Priority Rule 1: Combined "disease" + "phenotype" ---
+    const diseaseNames = ["bardet-biedl syndrome", "joubert syndrome", "meckel-gruber syndrome", "primary ciliary dyskinesia", "leber congenital amaurosis", "nephronophthisis", "polycystic kidney disease", "autosomal dominant polycystic kidney disease", "autosomal recessive polycystic kidney disease", "short-rib thoracic dysplasia", "senior-løken syndrome", "cranioectodermal dysplasia", "nphp", "bbs", "mks", "pcd", "ciliopathy", "syndrome"];
+    
+    // Note: The phenotypeTerms array from the old code is now merged with the global one above, 
+    // but the matching logic below uses explicit definitions for backward compatibility in this block.
+    const strictPhenotypeTerms = ["phenotype", "short cilia", "long cilia", "cilia length", "cilia number", "decreased ciliation", "loss of cilia", "reduced cilia", "increase", "decrease"];
+
+    const matchedDisease = diseaseNames.find(name => qLower.includes(name));
+    const matchedStrictPhenotype = strictPhenotypeTerms.find(term => qLower.includes(term));
+
+    if (matchedDisease && matchedStrictPhenotype) {
+        const standardDisease =
+            matchedDisease.toUpperCase() === "BBS" ? "Bardet–Biedl Syndrome" :
+            matchedDisease.toUpperCase() === "MKS" ? "Meckel–Gruber Syndrome" :
+            matchedDisease.toUpperCase() === "PCD" ? "Primary Ciliary Dyskinesia" :
+            matchedDisease.toUpperCase() === "NPHP" ? "Nephronophthisis" :
+            matchedDisease;
+        // Uses the helper that handles both the disease and the phenotypic filter
+        return await getDiseaseGenesByPhenotype(standardDisease, matchedStrictPhenotype);
+    }
+
+    // --------------------------------------------------------------------------
+    // ⭐ NEW PRIORITY RULE 2: Combined "localization" + "phenotype" (The Fix) ⭐
+    // --------------------------------------------------------------------------
+    const matchedLocalization = localizationTerms.find(name => qLower.includes(name));
+    const matchedPhenotype = phenotypeTerms.find(term => qLower.includes(term));
+
+    if (matchedLocalization && matchedPhenotype) {
+        // This handles questions like "Show basal body genes causing short cilia"
+        return await getLocalizationPhenotypeGenes(matchedLocalization, matchedPhenotype);
+    }
+    // --------------------------------------------------------------------------
+    
+    // --- Rule-based fuzzy detection (Fallback) ---
+    let detectedIntent = null;
+    for (const [intent, phrases] of Object.entries(intentClusters)) {
+        if (phrases.some(p => qLower.includes(p))) {
+            detectedIntent = intent;
+            break;
+        }
+    }
+
+    // --- Intent Resolution Logic (Uses detectedIntent) ---
+
+    if (detectedIntent === "ciliary_tip") {
+        const title = "Ciliary Tip Components";
+        const data = await getCuratedComplexComponents("CILIARY TIP");
+        return formatListResult(title, data);
+    }
+
+    // --- Disease Classification Handler ---
+    else if (detectedIntent === "disease_classification") {
+        // ... (existing logic) ...
+        let classification = null;
+        if (qLower.includes('primary ciliopathy') || qLower.includes('primary disease')) {
+            classification = "Primary Ciliopathies";
+        } else if (qLower.includes('motile ciliopathy') || qLower.includes('motile disease')) {
+            classification = "Motile Ciliopathies";
+        } else if (qLower.includes('secondary ciliopathy') || qLower.includes('secondary disease')) {
+            classification = "Secondary Diseases";
+        } else if (qLower.includes('atypical ciliopathy') || qLower.includes('atypical disease')) {
+            classification = "Atypical Ciliopathies";
+        }
+
+        if (classification) {
+            const genes = await getGenesByCiliopathyClassification(classification);
+            return formatListResult(`Genes classified as ${classification}`, genes);
+        }
+    }
+
+    // --- Specific Disease Handler (Generic List) ---
+    else if (detectedIntent === "disease") {
+        // ... (existing logic) ...
+        const diseaseList = ["bardet-biedl syndrome", "joubert syndrome", "meckel-gruber syndrome", "primary ciliary dyskinesia", "leber congenital amaurosis", "nephronophthisis", "polycystic kidney disease", "autosomal dominant polycystic kidney disease", "autosomal recessive polycystic kidney disease", "short-rib thoracic dysplasia", "senior-løken syndrome", "cranioectodermal dysplasia", "nphp", "bbs", "mks", "pcd", "ciliopathy", "syndrome"];
+
+        let targetDisease = null;
+        for (const name of diseaseList.sort((a, b) => b.length - a.length)) {
+            if (qLower.includes(name)) {
+                targetDisease = name;
+                break;
+            }
+        }
+
+        if (targetDisease) {
+            const standardName =
+                targetDisease.toUpperCase() === "BBS" ? "Bardet–Biedl Syndrome" :
+                targetDisease.toUpperCase() === "MKS" ? "Meckel–Gruber Syndrome" :
+                targetDisease.toUpperCase() === "PCD" ? "Primary Ciliary Dyskinesia" :
+                targetDisease.toUpperCase() === "NPHP" ? "Nephronophthisis" :
+                targetDisease;
+
+            const { genes, description } = await getCiliopathyGenes(standardName);
+            const titleCaseName = standardName.replace(/\b\w/g, l => l.toUpperCase());
+            return formatListResult(`Genes for ${titleCaseName}`, genes, description);
+        }
+
+        return `<p>🩺 Disease query detected, but no specific disease or classification was identified for listing genes. Please try a query like "List genes for Joubert Syndrome".</p>`;
+    }
+
+    // --- Domain Handler ---
+    else if (detectedIntent === "domain") {
+        return await resolveDomainQuery(query);
+    }
+
+    // --- Phylogeny Handler ---
+    else if (detectedIntent === "phylogeny") {
+        return await resolvePhylogeneticQuery(query);
+    }
+
+    // --- Complex Handler ---
+    else if (detectedIntent === "complex") {
+        return await routeComplexPhylogenyAnalysis(query);
+    }
+
+    // --- Expression Handler ---
+    else if (detectedIntent === "expression") {
+        const genes = (query.match(/\b[A-Z0-9\-]{3,}\b/g) || []);
+        if (genes.length > 0) {
+            if (qLower.includes('umap') && genes.length === 1) {
+                return await displayUmapGeneExpression(genes[0]);
+            }
+            return await displayCellxgeneBarChart(genes);
+        } else {
+            return `<p>🧬 Please specify a gene to show expression data.</p>`;
+        }
+    }
+
+    // --- Localization Handler (Generic List) ---
+    else if (detectedIntent === "localization") {
+        const locationMatch = qLower.match(/(basal body|transition zone|axoneme|centrosome|ciliary membrane)/);
+        if (locationMatch && locationMatch[1]) {
+            // NOTE: This will now only handle UNFILTERED requests, as filtered ones were caught above.
+            const data = await getGenesByLocalization(locationMatch[1]); 
+            return formatListResult(`Genes localizing to ${locationMatch[1]}`, data);
+        } else {
+            return `<p>📍 Localization query detected. Please be more specific (e.g., "genes in the basal body").</p>`;
+        }
+    }
+
+    // --- Phenotype Handler (Generic List) ---
+    else if (detectedIntent === "phenotype") {
+        return `<p>🔎 Phenotype/Screen query detected. Please use a specific gene (e.g., "What happens to cilia when KIF3A is knocked down?") or a specific phenotype (e.g., "Find genes causing short cilia").</p>`;
+    }
+
+    // --- Default fallback ---
+    return null;
+}
+
+
+
 // --- Main AI Query Handler ---
 window.handleAIQuery = async function() {
     const aiQueryInput = document.getElementById('aiQueryInput');
@@ -263,6 +444,14 @@ window.handleAIQuery = async function() {
         ]);
         console.log('ciliAI.js: All core data loaded for processing.');
 
+        // 🧠 NEW ROUTING PRIORITY 0: Try resolving semantic intent before keyword routing
+        // NOTE: 'resolveSemanticIntent' must be defined outside this function.
+        const semanticResult = await resolveSemanticIntent(query);
+        if (semanticResult) {
+            resultArea.innerHTML = semanticResult;
+            return; // Stop further routing — intent handled semantically
+        }
+
         let resultHtml = '';
         const qLower = query.toLowerCase();
         let match;
@@ -274,7 +463,7 @@ window.handleAIQuery = async function() {
         if (complexTableResult) {
             console.log("Query resolved by High-Priority Complex Phylogeny Table Router.");
             resultHtml = complexTableResult;
-        } 
+        }
         
         // =================================================================
         // ⭐ NEW ROUTING PRIORITY 2: Handle Domain Queries (Comparison, Enriched, Depleted, Specific Motifs) ⭐
@@ -291,8 +480,8 @@ window.handleAIQuery = async function() {
         // **NEW ROUTING PRIORITY 3:** Handle General Phylogenetic Queries (FIXES REFERENCE ERROR)
         // =================================================================
         else if (qLower.includes('phylogeny') || qLower.includes('conservation') || 
-                   qLower.includes('heatmap') || qLower.includes('comparison') || 
-                   qLower.includes('tree')) {
+                 qLower.includes('heatmap') || qLower.includes('comparison') || 
+                 qLower.includes('tree')) {
             
             console.log('Routing to General Phylogenetic Query Resolver...');
             resultHtml = await resolvePhylogeneticQuery(query); 
@@ -422,9 +611,9 @@ patchAIQueryHandler();
 // REPLACEMENT: The definitive "Brain" of CiliAI, merging all features correctly.
 // =============================================================================
 function createIntentParser() {
-    // RESTORED: Your full, comprehensive list of diseases.
+    // NOTE: This object must be named 'classifiedDiseases' to match its usage below
     const classifiedDiseases = {
-        "Primary Ciliopathies": [
+        "Primary Ciliopathies": [ 
             "Acrocallosal Syndrome", "Alström Syndrome", "Autosomal Dominant Polycystic Kidney Disease",
             "Autosomal Recessive Polycystic Kidney Disease", "Bardet–Biedl Syndrome", "COACH Syndrome",
             "Cranioectodermal Dysplasia", "Ellis-van Creveld Syndrome", "Hydrolethalus Syndrome", "Infantile Polycystic Kidney Disease",
@@ -433,16 +622,24 @@ function createIntentParser() {
             "Al-Gazali-Bakalinova Syndrome", "Bazex-Dupré-Christol Syndrome", "Bilateral Polycystic Kidney Disease", "Biliary, Renal, Neurologic, and Skeletal Syndrome",
             "Caroli Disease", "Carpenter Syndrome", "Complex Lethal Osteochondrodysplasia", "Greig Cephalopolysyndactyly Syndrome", "Kallmann Syndrome", "Lowe Oculocerebrorenal Syndrome",
             "McKusick-Kaufman Syndrome", "Morbid Obesity and Spermatogenic Failure", "Polycystic Kidney Disease", "RHYNS Syndrome", "Renal-hepatic-pancreatic Dysplasia", "Retinal Dystrophy", "STAR Syndrome",
-            "Smith-Lemli-Opitz Syndrome", "Spondylometaphyseal Dysplasia", "Stromme Syndrome", "Weyers Acrofacial Dysostosis", "Hydrocephalus"
+            "Smith-Lemli-Opitz Syndrome", "Spondylometaphyseal Dysplasia", "Stromme Syndrome", "Weyers Acrofacial Dysostosis", "Hydrocephalus" // Added Hydrocephalus back
+        ], 
+        "Motile Ciliopathies": [ 
+            "Primary Ciliary Dyskinesia", "Birt-Hogg-Dubé Syndrome", "Juvenile Myoclonic Epilepsy" 
         ],
-        "Motile Ciliopathies": [
-            "Primary Ciliary Dyskinesia", "Birt-Hogg-Dubé Syndrome", "Juvenile Myoclonic Epilepsy"
+        "Secondary Diseases": [ 
+            "Ataxia-telangiectasia-like Disorder", "Birt-Hogg-Dubé Syndrome", "Cone-Rod Dystrophy", "Cornelia de Lange Syndrome",
+            "Holoprosencephaly", "Juvenile Myoclonic Epilepsy", "Medulloblastoma", "Retinitis Pigmentosa", "Spinocerebellar Ataxia", "Bazex-Dupré-Christol Syndrome", "Lowe Oculocerebrorenal Syndrome",
+            "McKusick-Kaufman Syndrome", "Pallister-Hall Syndrome", "Simpson-Golabi-Behmel Syndrome", "Townes-Brocks Syndrome", "Usher Syndrome", "Visceral Heterotaxy" 
         ],
-        "Atypical Ciliopathies": [
-            "Biliary Ciliopathy", "Chronic Obstructive Pulmonary Disease", "Ciliopathy", "Ciliopathy - Retinal dystrophy", "Golgipathies or Ciliopathy", "Hepatic Ciliopathy", "Male Infertility and Ciliopathy", "Male infertility", "Microcephaly and Chorioretinopathy Type 3", "Mucociliary Clearance Disorder", "Notch-mediated Ciliopathy", "Primary Endocardial Fibroelastosis", "Retinal Degeneration"
+        "Atypical Ciliopathies": [ 
+            "Biliary Ciliopathy", "Chronic Obstructive Pulmonary Disease", "Ciliopathy", "Ciliopathy - Retinal dystrophy", "Golgipathies or Ciliopathy", "Hepatic Ciliopathy", "Male Infertility and Ciliopathy", "Male infertility", "Microcephaly and Chorioretinopathy Type 3", "Mucociliary Clearance Disorder", "Notch-mediated Ciliopathy", "Primary Endocardial Fibroelastosis", "Retinal Ciliopathy", "Retinal Degeneration", "Skeletal Ciliopathy", "Syndromic Ciliopathy" 
         ]
     };
+    
+    // Use the explicit classification list and common aliases
     const aliases = ["BBS", "Joubert", "NPHP", "MKS"];
+    // NOTE: Object.values(classifiedDiseases) is correct here.
     const allDiseases = [...Object.values(classifiedDiseases).flat(), ...aliases];
 
     const entityKeywords = [
@@ -533,7 +730,6 @@ function createIntentParser() {
         getAllGenes: () => ciliaHubDataCache ? ciliaHubDataCache.map(g => g.gene) : []
     };
 }
-
 
 const intentParser = createIntentParser();
 
@@ -989,7 +1185,9 @@ async function getLiteratureEvidence(gene) {
         </div>`;
 }
 
-/**
+/**@##########################BEGINNING OF COMPLEX RELATED QUETIONS AND HELPER CORUM##################################
+ * @##########################BEGINNING OF COMPLEX RELATED QUETIONS AND HELPER CORUM##################################
+ * @##########################BEGINNING OF COMPLEX RELATED QUETIONS AND HELPER CORUM##################################
  * @##########################BEGINNING OF COMPLEX RELATED QUETIONS AND HELPER CORUM##################################
  */
 
@@ -2027,6 +2225,391 @@ async function routeMultiGeneDomainTable(query) {
 
 
 
+
+
+
+
+/**@##########################BEGINNING OF EXPRESSION RELATED QUETIONS AND HELPER##################################
+ * @##########################BEGINNING OF EXPRESSION RELATED QUETIONS AND HELPER##################################
+/**@##########################BEGINNING OF EXPRESSION RELATED QUETIONS AND HELPER##################################
+/**
+
+
+
+
+/**@##########################END OF EXPRESSION RELATED QUETIONS AND HELPER##################################
+ * @##########################END OF EXPRESSION RELATED QUETIONS AND HELPER##################################
+/**@##########################END OF EXPRESSION RELATED QUETIONS AND HELPER##################################
+/**
+
+
+
+
+
+/**@##########################BEGINNING OF SCREEN RELATED QUETIONS AND HELPER##################################
+ * @##########################BEGINNING OF SCREEN RELATED QUETIONS AND HELPER##################################
+/**@##########################BEGINNING OF SCREEN RELATED QUETIONS AND HELPER##################################
+
+/**
+ * @name getTransitionZoneShortCiliaGenes
+ * @description Simplified wrapper to call the generalized function.
+ */
+async function getTransitionZoneShortCiliaGenes() {
+    // Call the new general function with the specific compartment term
+    return getLocalizationPhenotypeGenes("transition zone");
+}
+/**
+/**
+/**
+ * @name getDiseaseGenesByPhenotype
+ * @description Retrieves a gene list for a specific ciliopathy and filters it by a ciliary phenotype 
+ * (e.g., shorter cilia, decreased ciliation). The output includes both curated and detailed screen data.
+ * @param {string} disease - The name of the ciliopathy (e.g., "Joubert Syndrome").
+ * @param {string} rawPhenotypeQuery - The raw query phrase (e.g., "short cilia").
+ * @returns {Promise<string>} HTML formatted list result with detailed screen data.
+ */
+async function getDiseaseGenesByPhenotype(disease, rawPhenotypeQuery) {
+    // 1. Ensure all CiliaHub data is fully loaded (which calls fetchScreenData internally)
+    await fetchCiliaData();
+    
+    // 2. Get all genes associated with the disease (relying on correct getCiliopathyGenes implementation)
+    const { genes: diseaseGenes } = await getCiliopathyGenes(disease);
+    if (diseaseGenes.length === 0) {
+        return `<div class="result-card status-not-found"><h3>Analysis Failed</h3><p>Could not find genes associated with the disease: ${disease}.</p></div>`;
+    }
+
+    const diseaseGeneNames = new Set(diseaseGenes.map(g => g.gene.toUpperCase()));
+    const phenotypeLower = rawPhenotypeQuery.toLowerCase();
+    
+    let phenotypeField;
+    let effectKeywords = [];
+
+    // --- Determine Filtering Fields and Keywords ---
+    if (phenotypeLower.includes('length') || phenotypeLower.includes('shorter') || phenotypeLower.includes('longer') || phenotypeLower.includes('short')) {
+        phenotypeField = 'lof_effects';
+        if (phenotypeLower.includes('short')) effectKeywords = ['shorter', 'short', 'absent'];
+        else if (phenotypeLower.includes('long')) effectKeywords = ['longer', 'long'];
+    
+    } else if (phenotypeLower.includes('number') || phenotypeLower.includes('decrease') || phenotypeLower.includes('ciliation') || phenotypeLower.includes('loss')) {
+        phenotypeField = 'percent_ciliated_cells_effects';
+        if (phenotypeLower.includes('decrease') || phenotypeLower.includes('loss') || phenotypeLower.includes('reduced')) effectKeywords = ['reduced', 'decreased', 'fewer', 'loss'];
+        else if (phenotypeLower.includes('increase')) effectKeywords = ['increased', 'more'];
+    
+    } else {
+        return `<div class="result-card status-not-found"><h3>Phenotype Error</h3><p>Phenotype type "${rawPhenotypeQuery}" not recognized. Please specify 'length' or 'number' effects (e.g., 'short cilia').</p></div>`;
+    }
+    
+    // 3. Filter disease genes based on the stored summary phenotype data
+    //    The result is explicitly named filteredGenes to fix the 'is not defined' error.
+    const filteredGenes = ciliaHubDataCache
+        .filter(gene => {
+            const geneUpper = gene.gene.toUpperCase();
+            if (!diseaseGeneNames.has(geneUpper)) return false; 
+            
+            const effectText = gene[phenotypeField] ? gene[phenotypeField].toLowerCase() : "";
+            if (!effectText) return false; 
+            
+            return effectKeywords.some(kw => effectText.includes(kw));
+        });
+
+    // 4. Format detailed results for display, accessing integrated screen data
+    const detailedResults = filteredGenes.map(g => ({
+        gene: g.gene,
+        summary_effect: g[phenotypeField], // Curated summary for filtering confirmation
+        // Access integrated screen data (from cilia_screens_data.json)
+        detailed_screens: g.screens_from_separate_file || [] 
+    })).sort((a, b) => a.gene.localeCompare(b.gene));
+
+
+    // 5. Generate comprehensive output HTML
+    if (detailedResults.length === 0) {
+        return `<div class="result-card"><h3>${disease} – Genes Matching "${rawPhenotypeQuery}"</h3><p class="status-not-found">No genes matched the combined criteria in the curated dataset.</p></div>`;
+    }
+
+    let html = `<div class="result-card"><h3>${disease} Genes Matching "${rawPhenotypeQuery}" (${detailedResults.length} found)</h3>`;
+    html += `<p>The following genes are associated with **${disease}** and exhibit a **${rawPhenotypeQuery}** phenotype based on **LoF** studies.</p>`;
+    
+    detailedResults.forEach(r => {
+        const hasScreens = r.detailed_screens.length > 0;
+        
+        // --- Curated Summary from ciliahub_data.json ---
+        html += `
+        <div style="margin-top: 15px; padding: 15px; border: 1px solid #ddd; border-radius: 4px;">
+            <h4>🧬 ${r.gene}</h4>
+            <p><strong>Curated LoF Effect (${phenotypeField}):</strong> ${r.summary_effect || 'N/A'}</p>
+        `;
+
+        // --- Detailed Screen Results from cilia_screens_data.json ---
+        if (hasScreens) {
+            html += `<details><summary style="font-weight: bold;">View Detailed Screen Data (${r.detailed_screens.length} results)</summary>`;
+            html += `<table class="gene-detail-table">
+                        <thead><tr><th>Source</th><th>Result</th><th>Z-Score</th><th>Reference</th></tr></thead><tbody>`;
+            r.detailed_screens.forEach(s => {
+                const resultText = s.result || s.classification || 'N/A';
+                const zScore = s.z_score !== undefined ? s.z_score.toFixed(2) : 'N/A';
+                const link = s.paper_link ? `<a href="${s.paper_link}" target="_blank">Link</a>` : 'N/A';
+                html += `<tr><td>${s.dataset || 'Screen'}</td><td>${resultText}</td><td>${zScore}</td><td>${link}</td></tr>`;
+            });
+            html += `</tbody></table></details>`;
+        } else {
+            html += `<p style="color:#888;">No detailed screen data found in cilia_screens_data.json.</p>`;
+        }
+        
+        html += `</div>`;
+    });
+    
+    html += `</div>`;
+    return html;
+}
+
+/**
+ * @name getComplexPhenotypeGenes
+ * @description Finds genes in a specified complex that cause short/absent cilia phenotypes.
+ * * NOTE: This function relies on the external function getComplexPhylogenyTableMap() 
+ * to retrieve the gene list for the complex.
+ * * @param {string} complexName - The complex name (e.g., "IFT-B COMPLEX", "CILIARY TIP")
+ */
+async function getComplexPhenotypeGenes(complexName) {
+    await fetchCiliaData(); // Ensures ciliaHubDataCache is ready
+
+    // 1. Get the complex gene list from the static map
+    const complexMap = getComplexPhylogenyTableMap();
+    const complexGenes = complexMap[complexName.toUpperCase()];
+    
+    if (!complexGenes || complexGenes.length === 0) {
+        return formatListResult(`Complex Not Found: ${complexName}`, []);
+    }
+    
+    const complexGeneSet = new Set(complexGenes.map(g => g.toUpperCase()));
+    
+    // 2. Define phenotype filter keywords (same logic for short/absent cilia)
+    const lengthKeywords = ['shorter', 'short', 'absent'];
+    const numberKeywords = ['reduced', 'decreased', 'fewer', 'loss'];
+    
+    // 3. Filter ciliahub data for genes in this complex with short cilia phenotypes
+    const results = ciliaHubDataCache
+        .filter(gene => {
+            const geneUpper = gene.gene.toUpperCase();
+            if (!complexGeneSet.has(geneUpper)) return false; // Must be in complex
+            
+            // Check 1: Short Cilia (lof_effects)
+            const lofEffect = gene.lof_effects ? gene.lof_effects.toLowerCase() : "";
+            const isShortCilia = lengthKeywords.some(kw => lofEffect.includes(kw));
+            
+            // Check 2: Low Ciliation (percent_ciliated_cells_effects)
+            const numberEffect = gene.percent_ciliated_cells_effects ? gene.percent_ciliated_cells_effects.toLowerCase() : "";
+            const isLowCiliation = numberKeywords.some(kw => numberEffect.includes(kw));
+            
+            return isShortCilia || isLowCiliation;
+        })
+        .map(g => ({
+            gene: g.gene,
+            // Prepare enhanced table data structure (Localization, LoF Effect)
+            localization_detail: g.localization ? g.localization.join(', ') : 'N/A',
+            lof_effect_detail: g.lof_effects || 'N/A',
+            description: `LoF: ${g.lof_effects || 'N/A'}`
+        }))
+        .sort((a, b) => a.gene.localeCompare(b.gene));
+    
+    const title = `${complexName} Genes Causing Short Cilia`;
+    return formatListResult(title, results);
+}
+
+/**
+ * @name getLocalizationGenesData (REQUIRED HELPER)
+ * @description Retrieves raw CiliaHub gene objects matching a specific localization term.
+ * * NOTE: This must be implemented to ensure the filtering chain receives a raw Array<Object>, not HTML.
+ * @param {string} locationName - The subcellular location (e.g., "basal body").
+ * @returns {Promise<Array<Object>>} Array of raw CiliaHub gene objects.
+ */
+async function getLocalizationGenesData(locationName) {
+    // Assuming fetchCiliaData() loads all data into the global ciliaHubDataCache
+    await fetchCiliaData(); 
+    const locationTerms = locationName.split(/\s+or\s+/).map(normalizeTerm);
+
+    const results = ciliaHubDataCache
+        .filter(gene => {
+            // Filter to include genes where ANY of the gene's localization terms 
+            // match ANY of the input location terms (e.g., "basal body").
+            return gene.localization && gene.localization.some(loc => 
+                locationTerms.some(term => normalizeTerm(loc).includes(term))
+            );
+        });
+
+    return results; 
+}
+
+/**
+ * @name getGeneListByTerm
+ * @description Retrieves a gene list using the most specific internal source available.
+ * @param {string} term - The localization/complex name (e.g., "CILIARY TIP", "Mitochondria").
+ * @returns {Promise<Array<Object>>} Array of raw CiliaHub gene objects.
+ */
+async function getGeneListByTerm(term) {
+    const termUpper = term.toUpperCase();
+    
+    // Check 1: STATIC COMPLEX MAPS (Most Precise - e.g., CILIARY TIP, IFT-B)
+    const complexMap = getComplexPhylogenyTableMap();
+    const staticGenes = complexMap[termUpper];
+
+    if (staticGenes && staticGenes.length > 0) {
+        // Retrieve and map the full CiliaHub data for each gene in the static list
+        await fetchCiliaData(); 
+        const staticGeneSet = new Set(staticGenes);
+        return ciliaHubDataCache.filter(g => staticGeneSet.has(g.gene.toUpperCase()));
+    }
+
+    // Check 2: DYNAMIC LOCALIZATION FIELD (Flexible - e.g., Mitochondria, Nucleus)
+    return getLocalizationGenesData(term); 
+}
+
+
+/**
+ * @name getLocalizationPhenotypeGenes (FINAL CORRECTED IMPLEMENTATION)
+ * @description Finds genes localizing to a compartment/complex that also match a specific phenotype.
+ */
+async function getLocalizationPhenotypeGenes(localizationTerm, phenotypeTerm) {
+    // 1. Get the gene pool from the best source (static map OR dynamic localization field)
+    // NOTE: This call now replaces both 'getLocalizationGenesData' and complex lookup logic.
+    const genePool = await getGeneListByTerm(localizationTerm); 
+    
+    if (genePool.length === 0) {
+        return formatListResult(`${localizationTerm} Genes`, [], `No genes found for ${localizationTerm}.`);
+    }
+
+    const phenotypeLower = phenotypeTerm.toLowerCase();
+    
+    // 2. Define dynamic phenotype filter keywords (remains the same robust logic)
+    // ... (lengthKeywords, numberKeywords mapping logic) ...
+    
+    let lengthKeywords = [];
+    let numberKeywords = [];
+    if (phenotypeLower.includes('short')) {
+        lengthKeywords = ['shorter', 'short', 'absent', 'no cilia', 'failure to assemble', 'severe defect'];
+        numberKeywords = ['reduced', 'decreased', 'fewer', 'loss', 'severe defect', 'no cilia'];
+    } else if (phenotypeLower.includes('longer')) {
+        lengthKeywords = ['longer', 'long', 'increased length'];
+        numberKeywords = ['increased', 'more'];
+    } else if (phenotypeLower.includes('no effect')) {
+        lengthKeywords = ['no effect', 'not reported', 'no change'];
+        numberKeywords = ['no effect', 'not reported', 'no change'];
+    }
+
+    // --- Phenotype Filter Logic (CRITICAL REVISION) ---
+const results = genePool // Using the genePool retrieved by getGeneListByTerm
+    .filter(gene => {
+        // Step 1: Normalize fields (ensuring nulls are handled with empty strings)
+        const lofEffect = (gene.lof_effects || '').toLowerCase();
+        const numberEffect = (gene.percent_ciliated_cells_effects || '').toLowerCase();
+        
+        // Step 2: Check for presence of ANY relevant phenotype data
+        const hasPhenoData = lofEffect.length > 0 || numberEffect.length > 0;
+        if (!hasPhenoData) return false; // Exclude if both fields are empty/null
+
+        // Step 3: Check for match based on defined keywords (short/long/no effect)
+        const matchesLength = lengthKeywords.some(kw => lofEffect.includes(kw));
+        const matchesNumber = numberKeywords.some(kw => numberEffect.includes(kw));
+
+        // CRITICAL LOGIC CHECK
+        // For 'no effect', we must find explicit neutrality in both fields
+        if (phenotypeLower.includes('no effect')) {
+             const isLoFNeutral = lengthKeywords.some(kw => lofEffect.includes(kw));
+             const isNumberNeutral = numberKeywords.some(kw => numberEffect.includes(kw));
+             return isLoFNeutral && isNumberNeutral;
+        } 
+        
+        // For 'short' or 'long' (the problem queries), return true if EITHER field matches a positive keyword
+        // This ensures the filter applies and is not overly sensitive to blank fields.
+        else if (phenotypeLower.includes('short') || phenotypeLower.includes('long')) {
+             return matchesLength || matchesNumber;
+        }
+
+        return false;
+    })
+        .map(g => ({
+            gene: g.gene,
+            localization_detail: g.localization ? g.localization.join(', ') : 'N/A',
+            lof_effect_detail: g.lof_effects || 'N/A',
+            description: `LoF: ${g.lof_effects || 'N/A'}`
+        }))
+        .sort((a, b) => a.gene.localeCompare(b.gene));
+
+    const title = `${localizationTerm} Genes Causing ${phenotypeTerm}`;
+    return formatListResult(title, results);
+}
+
+
+/**
+ * @name compareGeneScreenPhenotype
+ * @description Displays a side-by-side table comparing the primary LoF phenotype (length and number) for a list of genes.
+ * @param {string[]} geneSymbols - Array of gene symbols.
+ */
+async function compareGeneScreenPhenotype(geneSymbols) {
+    if (!ciliaHubDataCache) await fetchCiliaData();
+    
+    let tableBody = '';
+    const validGenes = geneSymbols.filter(g => g.trim()).slice(0, 5); // Limit to 5 for display
+
+    for (const gene of validGenes) {
+        const geneData = ciliaHubDataCache.find(g => g.gene.toUpperCase() === gene.toUpperCase());
+        
+        const lof = geneData?.lof_effects || "N/A";
+        const percent = geneData?.percent_ciliated_cells_effects || "N/A";
+
+        tableBody += `
+            <tr>
+                <td><strong>${gene.toUpperCase()}</strong></td>
+                <td>${lof}</td>
+                <td>${percent}</td>
+            </tr>
+        `;
+    }
+
+    if (tableBody === '') {
+        return `<div class="result-card status-not-found"><h3>Phenotype Comparison</h3><p>Could not find ciliary phenotype data for the requested genes.</p></div>`;
+    }
+
+    const html = `
+        <div class="result-card">
+            <h3>Functional Phenotype Comparison (${validGenes.length} Genes)</h3>
+            <table class="gene-detail-table">
+                <thead>
+                    <tr>
+                        <th>Gene</th>
+                        <th>LoF Effect on Cilia Length</th>
+                        <th>LoF Effect on % Ciliated Cells</th>
+                    </tr>
+                </thead>
+                <tbody>${tableBody}</tbody>
+            </table>
+            <p style="font-size: 0.8em; color: #666; margin-top: 1rem;">
+                LoF = Loss-of-Function (e.g., Knockdown or Knockout phenotype).
+            </p>
+        </div>
+    `;
+    return html;
+}
+
+
+
+
+
+
+
+
+
+
+/**@##########################END OF SCREEN RELATED QUETIONS AND HELPER##################################
+ * @##########################END OF SCREEN RELATED QUETIONS AND HELPER##################################
+/**@##########################END OF SCREEN RELATED QUETIONS AND HELPER##################################
+/**
+
+
+
+
+
+
+
 /**@##########################BEGINNING OF DOMAIN RELATED QUETIONS AND HELPER##################################
  * @##########################BEGINNING OF DOMAIN RELATED QUETIONS AND HELPER##################################
 /**@##########################BEGINNING OF DOMAIN RELATED QUETIONS AND HELPER##################################
@@ -2900,12 +3483,189 @@ const questionRegistry = [
     { text: "Basal body genes", handler: async () => formatListResult("Genes localizing to basal body", await getGenesByLocalization("basal body")) },
     { text: "Which genes are at the basal body?", handler: async () => formatListResult("Genes localizing to basal body", await getGenesByLocalization("basal body")) },
     { text: "List basal body proteins", handler: async () => formatListResult("Proteins localizing to basal body", await getGenesByLocalization("basal body")) },
+
+    // Localization (Basal body, Transition zonei cilia) and Screen Related questions
+    // --- MITOCHONDRIA ---
+{ text: "Show mitochondria genes causing short cilia", handler: async () => getLocalizationPhenotypeGenes("Mitochondria") },
+{ text: "Mitochondrial genes with cilia defects", handler: async () => getLocalizationPhenotypeGenes("Mitochondria") },
+{ text: "Which mitochondrial proteins affect cilia length", handler: async () => getLocalizationPhenotypeGenes("Mitochondria") },
+{ text: "Find mitochondria genes reducing cilia", handler: async () => getLocalizationPhenotypeGenes("Mitochondria") },
+{ text: "Mitochondrial proteins causing cilia phenotypes", handler: async () => getLocalizationPhenotypeGenes("Mitochondria") },
+{ text: "List mitochondria genes with short cilia effects", handler: async () => getLocalizationPhenotypeGenes("Mitochondria") },
+
+// --- LYSOSOMES ---
+{ text: "Show lysosome genes causing short cilia", handler: async () => getLocalizationPhenotypeGenes("Lysosomes") },
+{ text: "Lysosomal genes with cilia defects", handler: async () => getLocalizationPhenotypeGenes("Lysosomes") },
+{ text: "Which lysosomal proteins affect cilia length", handler: async () => getLocalizationPhenotypeGenes("Lysosomes") },
+{ text: "Find lysosome genes reducing cilia", handler: async () => getLocalizationPhenotypeGenes("Lysosomes") },
+{ text: "Lysosomal proteins causing cilia phenotypes", handler: async () => getLocalizationPhenotypeGenes("Lysosomes") },
+{ text: "List lysosome genes with short cilia effects", handler: async () => getLocalizationPhenotypeGenes("Lysosomes") },
+
+// --- NUCLEUS ---
+{ text: "Show nucleus genes causing short cilia", handler: async () => getLocalizationPhenotypeGenes("Nucleus") },
+{ text: "Nuclear genes with cilia defects", handler: async () => getLocalizationPhenotypeGenes("Nucleus") },
+{ text: "Which nuclear proteins affect cilia length", handler: async () => getLocalizationPhenotypeGenes("Nucleus") },
+{ text: "Find nucleus genes reducing cilia", handler: async () => getLocalizationPhenotypeGenes("Nucleus") },
+{ text: "Nuclear proteins causing cilia phenotypes", handler: async () => getLocalizationPhenotypeGenes("Nucleus") },
+{ text: "List nuclear genes with short cilia effects", handler: async () => getLocalizationPhenotypeGenes("Nucleus") },
+{ text: "Show nuclear localizing genes causing short cilia", handler: async () => getLocalizationPhenotypeGenes("Nucleus") },
+
+// --- BASAL BODY ---
+{ text: "Show basal body genes causing short cilia", handler: async () => getLocalizationPhenotypeGenes("basal body", "short cilia") },
+{ text: "Basal body genes with cilia defects", handler: async () => getLocalizationPhenotypeGenes("basal body", "short cilia") },
+{ text: "Which basal body proteins affect cilia length", handler: async () => getLocalizationPhenotypeGenes("basal body") },
+{ text: "Find basal body genes reducing cilia", handler: async () => getLocalizationPhenotypeGenes("basal body") },
+{ text: "Basal body proteins causing cilia phenotypes", handler: async () => getLocalizationPhenotypeGenes("basal body") },
+{ text: "List basal body genes with short cilia effects", handler: async () => getLocalizationPhenotypeGenes("basal body") },
+{ text: "Which basal body proteins lead to shortened cilia", handler: async () => getLocalizationPhenotypeGenes("basal body") },
+{ text: "Basal body proteins that shorten cilia", handler: async () => getLocalizationPhenotypeGenes("basal body") },
+
+// --- CILIA ---
+{ text: "List ciliary proteins that cause short cilia", handler: async () => getLocalizationPhenotypeGenes("cilia") },
+{ text: "Ciliary genes with cilia defects", handler: async () => getLocalizationPhenotypeGenes("cilia") },
+{ text: "Which ciliary proteins affect cilia length", handler: async () => getLocalizationPhenotypeGenes("cilia") },
+{ text: "Find cilia genes reducing cilia length", handler: async () => getLocalizationPhenotypeGenes("cilia") },
+{ text: "Ciliary proteins causing cilia phenotypes", handler: async () => getLocalizationPhenotypeGenes("cilia") },
+{ text: "Show cilia genes with short cilia effects", handler: async () => getLocalizationPhenotypeGenes("cilia") },
+{ text: "Cilia proteins that shorten cilia", handler: async () => getLocalizationPhenotypeGenes("cilia") },
+
+// --- TRANSITION ZONE ---
+{ text: "Show transition zone proteins causing short cilia", handler: async () => getLocalizationPhenotypeGenes("transition zone") },
+{ text: "Transition zone genes with cilia defects", handler: async () => getLocalizationPhenotypeGenes("transition zone") },
+{ text: "Which transition zone proteins affect cilia length", handler: async () => getLocalizationPhenotypeGenes("transition zone") },
+{ text: "Find transition zone genes reducing cilia", handler: async () => getLocalizationPhenotypeGenes("transition zone") },
+{ text: "Transition zone proteins causing cilia phenotypes", handler: async () => getLocalizationPhenotypeGenes("transition zone") },
+{ text: "List transition zone genes with short cilia effects", handler: async () => getLocalizationPhenotypeGenes("transition zone") },
+{ text: "Show transition zone genes causing short cilia", handler: async () => getLocalizationPhenotypeGenes("transition zone") },
+{ text: "Short cilia with transition zone localizations", handler: async () => getLocalizationPhenotypeGenes("transition zone") },
+{ text: "Genes causing short cilia in transition zone", handler: async () => getLocalizationPhenotypeGenes("transition zone") },
+
+// --- CENTROSOME ---
+{ text: "Show centrosome genes causing short cilia", handler: async () => getLocalizationPhenotypeGenes("Centrosome") },
+{ text: "Centrosomal genes with cilia defects", handler: async () => getLocalizationPhenotypeGenes("Centrosome") },
+{ text: "Which centrosome proteins affect cilia length", handler: async () => getLocalizationPhenotypeGenes("Centrosome") },
+{ text: "Find centrosome genes reducing cilia", handler: async () => getLocalizationPhenotypeGenes("Centrosome") },
+{ text: "Centrosome proteins causing cilia phenotypes", handler: async () => getLocalizationPhenotypeGenes("Centrosome") },
+{ text: "List centrosome genes with short cilia effects", handler: async () => getLocalizationPhenotypeGenes("Centrosome") },
+
+// --- CILIARY TIP ---
+{ text: "Show ciliary tip proteins causing short cilia", handler: async () => getLocalizationPhenotypeGenes("ciliary tip") },
+{ text: "Ciliary tip genes with cilia defects", handler: async () => getLocalizationPhenotypeGenes("ciliary tip") },
+{ text: "Which ciliary tip proteins affect cilia length", handler: async () => getLocalizationPhenotypeGenes("ciliary tip") },
+{ text: "Find ciliary tip genes reducing cilia", handler: async () => getLocalizationPhenotypeGenes("ciliary tip") },
+{ text: "Ciliary tip proteins causing cilia phenotypes", handler: async () => getLocalizationPhenotypeGenes("ciliary tip") },
+{ text: "List ciliary tip genes with short cilia effects", handler: async () => getLocalizationPhenotypeGenes("ciliary tip") },
+
+// --- AXONEME ---
+{ text: "List axonemal genes causing short cilia", handler: async () => getLocalizationPhenotypeGenes("cilia") },
+{ text: "Axoneme genes with cilia defects", handler: async () => getLocalizationPhenotypeGenes("cilia") },
+{ text: "Which axonemal proteins affect cilia length", handler: async () => getLocalizationPhenotypeGenes("cilia") },
+{ text: "Find axoneme genes reducing cilia", handler: async () => getLocalizationPhenotypeGenes("cilia") },
+{ text: "Axonemal proteins causing cilia phenotypes", handler: async () => getLocalizationPhenotypeGenes("cilia") },
+{ text: "Show axoneme genes with short cilia effects", handler: async () => getLocalizationPhenotypeGenes("cilia") },
+// --- CILIARY TIP COMPLEX ---
+{ text: "List ciliary tip genes causing short cilia", handler: async () => getComplexPhenotypeGenes("CILIARY TIP") },
+{ text: "Show ciliary tip proteins with cilia defects", handler: async () => getComplexPhenotypeGenes("CILIARY TIP") },
+{ text: "Which ciliary tip genes affect cilia length", handler: async () => getComplexPhenotypeGenes("CILIARY TIP") },
+{ text: "Find ciliary tip proteins causing cilia phenotypes", handler: async () => getComplexPhenotypeGenes("CILIARY TIP") },
+{ text: "Ciliary tip complex genes with short or long cilia", handler: async () => getComplexPhenotypeGenes("CILIARY TIP") },
+{ text: "Show all ciliary tip complex proteins", handler: async () => getGenesByComplex("CILIARY TIP") },
+
+// --- IFT-A COMPLEX ---
+{ text: "List IFT-A proteins causing short cilia", handler: async () => getComplexPhenotypeGenes("IFT-A COMPLEX") },
+{ text: "Show IFT-A complex genes with cilia defects", handler: async () => getComplexPhenotypeGenes("IFT-A COMPLEX") },
+{ text: "Which IFT-A genes affect cilia length", handler: async () => getComplexPhenotypeGenes("IFT-A COMPLEX") },
+{ text: "Find IFT-A proteins causing cilia phenotypes", handler: async () => getComplexPhenotypeGenes("IFT-A COMPLEX") },
+{ text: "IFT-A complex genes with short or long cilia", handler: async () => getComplexPhenotypeGenes("IFT-A COMPLEX") },
+{ text: "Show all IFT-A complex proteins", handler: async () => getGenesByComplex("IFT-A COMPLEX") },
+
+// --- IFT-B COMPLEX ---
+{ text: "List IFT-B proteins causing short cilia", handler: async () => getComplexPhenotypeGenes("IFT-B COMPLEX") },
+{ text: "Show IFT-B complex genes with cilia defects", handler: async () => getComplexPhenotypeGenes("IFT-B COMPLEX") },
+{ text: "Which IFT-B genes affect cilia length", handler: async () => getComplexPhenotypeGenes("IFT-B COMPLEX") },
+{ text: "Find IFT-B proteins causing cilia phenotypes", handler: async () => getComplexPhenotypeGenes("IFT-B COMPLEX") },
+{ text: "IFT-B complex genes with short or long cilia", handler: async () => getComplexPhenotypeGenes("IFT-B COMPLEX") },
+{ text: "Show all IFT-B complex proteins", handler: async () => getGenesByComplex("IFT-B COMPLEX") },
+
+// --- IFT-B1 COMPLEX ---
+{ text: "List IFT-B1 proteins causing short cilia", handler: async () => getComplexPhenotypeGenes("IFT-B1 COMPLEX") },
+{ text: "Show IFT-B1 complex genes with cilia defects", handler: async () => getComplexPhenotypeGenes("IFT-B1 COMPLEX") },
+{ text: "Which IFT-B1 genes affect cilia length", handler: async () => getComplexPhenotypeGenes("IFT-B1 COMPLEX") },
+{ text: "IFT-B1 complex genes with cilia phenotypes", handler: async () => getComplexPhenotypeGenes("IFT-B1 COMPLEX") },
+
+// --- IFT-B2 COMPLEX ---
+{ text: "List IFT-B2 proteins causing short cilia", handler: async () => getComplexPhenotypeGenes("IFT-B2 COMPLEX") },
+{ text: "Show IFT-B2 complex genes with cilia defects", handler: async () => getComplexPhenotypeGenes("IFT-B2 COMPLEX") },
+{ text: "Which IFT-B2 genes affect cilia length", handler: async () => getComplexPhenotypeGenes("IFT-B2 COMPLEX") },
+{ text: "IFT-B2 complex genes with cilia phenotypes", handler: async () => getComplexPhenotypeGenes("IFT-B2 COMPLEX") },
+
+// --- IFT COMPLEX (all IFT genes) ---
+{ text: "List IFT complex proteins causing short cilia", handler: async () => getComplexPhenotypeGenes("IFT COMPLEX") },
+{ text: "Show all IFT complex genes with cilia defects", handler: async () => getComplexPhenotypeGenes("IFT COMPLEX") },
+{ text: "Which IFT genes affect cilia length", handler: async () => getComplexPhenotypeGenes("IFT COMPLEX") },
+{ text: "Find IFT proteins causing cilia phenotypes", handler: async () => getComplexPhenotypeGenes("IFT COMPLEX") },
+{ text: "Intraflagellar transport genes with cilia defects", handler: async () => getComplexPhenotypeGenes("IFT COMPLEX") },
+{ text: "Show all IFT complex proteins", handler: async () => getGenesByComplex("IFT COMPLEX") },
+
+// --- IFT MOTOR COMPLEX ---
+{ text: "List motor proteins causing short cilia", handler: async () => getComplexPhenotypeGenes("IFT MOTOR COMPLEX") },
+{ text: "Show IFT motor complex genes with cilia defects", handler: async () => getComplexPhenotypeGenes("IFT MOTOR COMPLEX") },
+{ text: "Which motor proteins affect cilia length", handler: async () => getComplexPhenotypeGenes("IFT MOTOR COMPLEX") },
+{ text: "Find IFT motor genes causing cilia phenotypes", handler: async () => getComplexPhenotypeGenes("IFT MOTOR COMPLEX") },
+{ text: "IFT motor complex genes with short or long cilia", handler: async () => getComplexPhenotypeGenes("IFT MOTOR COMPLEX") },
+{ text: "Show all IFT motor proteins", handler: async () => getGenesByComplex("IFT MOTOR COMPLEX") },
+{ text: "List intraflagellar transport motors", handler: async () => getGenesByComplex("INTRAFLAGELLAR TRANSPORT MOTORS") },
+
+// --- BBSOME ---
+{ text: "List BBSome proteins causing short cilia", handler: async () => getComplexPhenotypeGenes("BBSOME") },
+{ text: "Show BBSome genes with cilia defects", handler: async () => getComplexPhenotypeGenes("BBSOME") },
+{ text: "Which BBSome proteins affect cilia length", handler: async () => getComplexPhenotypeGenes("BBSOME") },
+{ text: "Find BBSome genes causing cilia phenotypes", handler: async () => getComplexPhenotypeGenes("BBSOME") },
+{ text: "BBSome complex genes with cilia effects", handler: async () => getComplexPhenotypeGenes("BBSOME") },
+// --- TRANSITION ZONE ---
+{ text: "List transition zone proteins causing short cilia", handler: async () => getComplexPhenotypeGenes("TRANSITION ZONE") },
+{ text: "Show transition zone genes with cilia defects", handler: async () => getComplexPhenotypeGenes("TRANSITION ZONE") },
+{ text: "Which transition zone proteins affect cilia length", handler: async () => getComplexPhenotypeGenes("TRANSITION ZONE") },
+{ text: "Find transition zone genes causing cilia phenotypes", handler: async () => getComplexPhenotypeGenes("TRANSITION ZONE") },
+{ text: "Transition zone complex genes with cilia effects", handler: async () => getComplexPhenotypeGenes("TRANSITION ZONE") },
+// --- MKS MODULE ---
+{ text: "List MKS module proteins causing short cilia", handler: async () => getComplexPhenotypeGenes("MKS MODULE") },
+{ text: "Show MKS module genes with cilia defects", handler: async () => getComplexPhenotypeGenes("MKS MODULE") },
+{ text: "Which MKS module proteins affect cilia length", handler: async () => getComplexPhenotypeGenes("MKS MODULE") },
+{ text: "MKS module genes with cilia phenotypes", handler: async () => getComplexPhenotypeGenes("MKS MODULE") },
+// --- NPHP MODULE ---
+{ text: "List NPHP module proteins causing short cilia", handler: async () => getComplexPhenotypeGenes("NPHP MODULE") },
+{ text: "Show NPHP module genes with cilia defects", handler: async () => getComplexPhenotypeGenes("NPHP MODULE") },
+{ text: "Which NPHP module proteins affect cilia length", handler: async () => getComplexPhenotypeGenes("NPHP MODULE") },
+{ text: "NPHP module genes with cilia phenotypes", handler: async () => getComplexPhenotypeGenes("NPHP MODULE") },
+
+// --- DYNEIN ARM ---
+{ text: "List dynein arm proteins causing short cilia", handler: async () => getComplexPhenotypeGenes("DYNEIN ARM") },
+{ text: "Show dynein arm genes with cilia defects", handler: async () => getComplexPhenotypeGenes("DYNEIN ARM") },
+{ text: "Which dynein arm proteins affect cilia length", handler: async () => getComplexPhenotypeGenes("DYNEIN ARM") },
+{ text: "Dynein arm genes with cilia phenotypes", handler: async () => getComplexPhenotypeGenes("DYNEIN ARM") },
+// --- OUTER DYNEIN ARM ---
+{ text: "List outer dynein arm proteins causing short cilia", handler: async () => getComplexPhenotypeGenes("OUTER DYNEIN ARM") },
+{ text: "Show outer dynein arm genes with cilia defects", handler: async () => getComplexPhenotypeGenes("OUTER DYNEIN ARM") },
+{ text: "Which outer dynein proteins affect cilia length", handler: async () => getComplexPhenotypeGenes("OUTER DYNEIN ARM") },
+// --- INNER DYNEIN ARM ---
+{ text: "List inner dynein arm proteins causing short cilia", handler: async () => getComplexPhenotypeGenes("INNER DYNEIN ARM") },
+{ text: "Show inner dynein arm genes with cilia defects", handler: async () => getComplexPhenotypeGenes("INNER DYNEIN ARM") },
+{ text: "Which inner dynein proteins affect cilia length", handler: async () => getComplexPhenotypeGenes("INNER DYNEIN ARM") },
+// --- RADIAL SPOKE ---
+{ text: "List radial spoke proteins causing short cilia", handler: async () => getComplexPhenotypeGenes("RADIAL SPOKE") },
+{ text: "Show radial spoke genes with cilia defects", handler: async () => getComplexPhenotypeGenes("RADIAL SPOKE") },
+{ text: "Which radial spoke proteins affect cilia length", handler: async () => getComplexPhenotypeGenes("RADIAL SPOKE") },
+// --- CENTRAL PAIR ---
+{ text: "List central pair proteins causing short cilia", handler: async () => getComplexPhenotypeGenes("CENTRAL PAIR") },
+{ text: "Show central pair genes with cilia defects", handler: async () => getComplexPhenotypeGenes("CENTRAL PAIR") },
+{ text: "Which central pair proteins affect cilia length", handler: async () => getComplexPhenotypeGenes("CENTRAL PAIR") },
     
     // Axoneme
-    { text: "Which genes localize to axoneme?", handler: async () => formatListResult("Genes localizing to axoneme", await getGenesByLocalization("axoneme")) },
-    { text: "Axonemal genes", handler: async () => formatListResult("Genes localizing to axoneme", await getGenesByLocalization("axoneme")) },
-    { text: "Show axoneme proteins", handler: async () => formatListResult("Genes localizing to axoneme", await getGenesByLocalization("axoneme")) },
-    { text: "List axonemal proteins", handler: async () => formatListResult("Genes localizing to axoneme", await getGenesByLocalization("axoneme")) },
+    { text: "Which genes localize to axoneme?", handler: async () => formatListResult("Genes localizing to axoneme", await getGenesByLocalization("cilia")) },
+    { text: "Axonemal genes", handler: async () => formatListResult("Genes localizing to axoneme", await getGenesByLocalization("cilia")) },
+    { text: "Show axoneme proteins", handler: async () => formatListResult("Genes localizing to axoneme", await getGenesByLocalization("cilia")) },
+    { text: "List axonemal proteins", handler: async () => formatListResult("Genes localizing to axoneme", await getGenesByLocalization("cilia")) },
     // Transition fibers
     { text: "Show transition fiber proteins", handler: async () => formatListResult("Proteins localizing to transition fiber", await getGenesByLocalization("transition fiber")) },
     { text: "Transition fiber genes", handler: async () => formatListResult("Proteins localizing to transition fiber", await getGenesByLocalization("transition fiber")) },
@@ -3078,41 +3838,6 @@ const questionRegistry = [
 // --- Signaling Hubs ---
 { text: "List components of the SHH Signaling complex", handler: async () => formatListResult("SHH Signaling Components", await getCuratedComplexComponents("SHH SIGNALING")) },
 { text: "Show genes in Hedgehog Trafficking Complex", handler: async () => formatListResult("Hedgehog Trafficking Complex Components", await getCuratedComplexComponents("HEDGEHOG TRAFFICKING COMPLEX")) },
-// ==================== CILIARY TIP COMPONENTS (Curated List) ====================
-{ text: "Tell me about Ciliary Tip proteins", handler: async () => formatListResult("Ciliary Tip Components", await getCuratedComplexComponents("CILIARY TIP")) },       
-{ text: "Tell me about components of the Ciliary Tip", handler: async () => formatListResult("Ciliary Tip Components", await getCuratedComplexComponents("CILIARY TIP")) },    
-{ text: "Show components of the Ciliary Tip", handler: async () => formatListResult("Ciliary Tip Components", await getCuratedComplexComponents("CILIARY TIP")) },
-{ text: "List genes localized to the Ciliary Tip", handler: async () => formatListResult("Ciliary Tip Components", await getCuratedComplexComponents("CILIARY TIP")) },
-{ text: "Display Ciliary Tip enriched proteins", handler: async () => formatListResult("Ciliary Tip Components", await getCuratedComplexComponents("CILIARY TIP")) },
-{ text: "What proteins are at the ciliary tip?", handler: async () => formatListResult("Ciliary Tip Components", await getCuratedComplexComponents("CILIARY TIP")) },
-{ text: "Genes at the Ciliary Tip", handler: async () => formatListResult("Ciliary Tip Components", await getCuratedComplexComponents("CILIARY TIP")) },
-{ text: "Show Ciliary Tip complex members", handler: async () => formatListResult("Ciliary Tip Components", await getCuratedComplexComponents("CILIARY TIP")) },
-// Additional natural variations
-{ text: "What are the ciliary tip components?", handler: async () => formatListResult("Ciliary Tip Components", await getCuratedComplexComponents("CILIARY TIP")) },
-{ text: "Which proteins localize to the ciliary tip?", handler: async () => formatListResult("Ciliary Tip Components", await getCuratedComplexComponents("CILIARY TIP")) },
-{ text: "Show me ciliary tip proteins", handler: async () => formatListResult("Ciliary Tip Components", await getCuratedComplexComponents("CILIARY TIP")) },
-{ text: "List ciliary tip genes", handler: async () => formatListResult("Ciliary Tip Components", await getCuratedComplexComponents("CILIARY TIP")) },
-{ text: "Ciliary tip protein list", handler: async () => formatListResult("Ciliary Tip Components", await getCuratedComplexComponents("CILIARY TIP")) },
-{ text: "Give me the ciliary tip components", handler: async () => formatListResult("Ciliary Tip Components", await getCuratedComplexComponents("CILIARY TIP")) },
-{ text: "What genes are in the ciliary tip?", handler: async () => formatListResult("Ciliary Tip Components", await getCuratedComplexComponents("CILIARY TIP")) },
-{ text: "Proteins found at the ciliary tip", handler: async () => formatListResult("Ciliary Tip Components", await getCuratedComplexComponents("CILIARY TIP")) },
-{ text: "Ciliary tip composition", handler: async () => formatListResult("Ciliary Tip Components", await getCuratedComplexComponents("CILIARY TIP")) },
-{ text: "Components of ciliary tip", handler: async () => formatListResult("Ciliary Tip Components", await getCuratedComplexComponents("CILIARY TIP")) },
-{ text: "Ciliary tip gene list", handler: async () => formatListResult("Ciliary Tip Components", await getCuratedComplexComponents("CILIARY TIP")) },
-// Informal/conversational
-{ text: "Tell me what's at the ciliary tip", handler: async () => formatListResult("Ciliary Tip Components", await getCuratedComplexComponents("CILIARY TIP")) },
-{ text: "What's in the ciliary tip?", handler: async () => formatListResult("Ciliary Tip Components", await getCuratedComplexComponents("CILIARY TIP")) },
-{ text: "Ciliary tip contents", handler: async () => formatListResult("Ciliary Tip Components", await getCuratedComplexComponents("CILIARY TIP")) },
-// Research-oriented phrasing
-{ text: "Ciliary tip proteome", handler: async () => formatListResult("Ciliary Tip Components", await getCuratedComplexComponents("CILIARY TIP")) },
-{ text: "Distal tip proteins", handler: async () => formatListResult("Ciliary Tip Components", await getCuratedComplexComponents("CILIARY TIP")) },
-{ text: "Proteins enriched at the ciliary distal tip", handler: async () => formatListResult("Ciliary Tip Components", await getCuratedComplexComponents("CILIARY TIP")) },
-{ text: "Ciliary distal tip components", handler: async () => formatListResult("Ciliary Tip Components", await getCuratedComplexComponents("CILIARY TIP")) },
-{ text: "What comprises the ciliary tip?", handler: async () => formatListResult("Ciliary Tip Components", await getCuratedComplexComponents("CILIARY TIP")) },
-// Action verbs
-{ text: "Find ciliary tip proteins", handler: async () => formatListResult("Ciliary Tip Components", await getCuratedComplexComponents("CILIARY TIP")) },
-{ text: "Search ciliary tip components", handler: async () => formatListResult("Ciliary Tip Components", await getCuratedComplexComponents("CILIARY TIP")) },
-{ text: "Retrieve ciliary tip genes", handler: async () => formatListResult("Ciliary Tip Components", await getCuratedComplexComponents("CILIARY TIP")) },
     // ==================== CILIOPATHIES & DISEASES ====================
     // Bardet-Biedl Syndrome
     { text: "List genes associated with Bardet–Biedl syndrome", handler: async () => { const { genes, description } = await getCiliopathyGenes("Bardet–Biedl syndrome"); return formatListResult("Genes for Bardet–Biedl syndrome", genes, description); }},
@@ -7079,71 +7804,70 @@ function formatGeneDetail(geneData, geneSymbol, detailTitle, detailContent) {
   `;
 }
 
-// --- FINAL UPDATED formatListResult (Accepts 5 arguments) ---
+
+// --- CRITICAL CORRECTION TO formatListResult ---
+// The formatListResult function must now accept a different signature or intelligently detect the new structure.
+// This is how the formatListResult function needs to be adapted to display the three columns:
 
 function formatListResult(title, geneList, citationHtml = '', speciesCode = '', targetKey = null) {
     if (!geneList || geneList.length === 0) {
-        // ... (unchanged)
         return `<div class="result-card"><h3>${title}</h3><p class="status-not-found">No matching genes found.</p></div>`;
     }
 
     const displayedGenes = geneList.slice(0, 100);
-    const showOrthologColumn = targetKey && targetKey !== null;
     
-    // Determine species name for the ortholog column header
-    const orthologSpeciesName = speciesCode.replace(/(\w\.\w+)\s*/, '').replace('drosophila', 'Fly').replace('elegans', 'C. elegans').trim() || 'Ortholog';
-
-    // Determine the most accurate label for the Human Gene Column
-    let humanColumnLabel = "Human Gene";
-    if (title.includes("Genes Conserved")) {
-        humanColumnLabel = "Human Disease Gene"; // Best label for conserved disease lists
-    }
+    // --- CHECK FOR NEW STRUCTURE ---
+    // If the gene objects contain 'localization_detail' and 'lof_effect_detail', use the enhanced table.
+    const isEnhancedTable = displayedGenes.length > 0 && 
+                            displayedGenes[0].hasOwnProperty('localization_detail') &&
+                            displayedGenes[0].hasOwnProperty('lof_effect_detail');
     
-    // --- Build Table Rows ---
-    const tableRows = displayedGenes.map(g => {
-        let cells = `<td><strong>${g.gene}</strong></td>`;
-        
-        if (showOrthologColumn) {
-            // Access the ortholog name using the dynamic key (g[targetKey])
-            const orthologName = g[targetKey] || 'N/A';
-            cells += `<td>${orthologName}</td>`;
-        }
-        
-        cells += `<td>${g.description.substring(0, 100)}${g.description.length > 100 ? '...' : ''}</td>`;
-        return `<tr>${cells}</tr>`;
-    }).join('');
-
     // --- Build Table Header ---
     let tableHeader = `
     <thead>
         <tr>
-            <th class="sortable">${humanColumnLabel}</th>`;
-    
-    if (showOrthologColumn) {
-        tableHeader += `<th class="sortable">${orthologSpeciesName} Ortholog</th>`;
-    }
-    
-    tableHeader += `
-            <th>Disease/Conservation Info</th>
+            <th class="sortable">Human Gene</th>`;
+
+    if (isEnhancedTable) {
+        tableHeader += `
+            <th class="sortable">Ciliary Localization</th>
+            <th class="sortable">LoF Phenotype (Cilia Length/Number)</th>
         </tr>
     </thead>`;
+    } else {
+        // Fallback to old single-column display
+        tableHeader += `<th>Disease/Conservation Info</th></tr></thead>`;
+    }
+
+
+    // --- Build Table Rows ---
+    const tableRows = displayedGenes.map(g => {
+        let cells = `<td><strong>${g.gene}</strong></td>`;
+        
+        if (isEnhancedTable) {
+            cells += `<td>${g.localization_detail}</td>`;
+            cells += `<td style="font-weight: bold;">${g.lof_effect_detail}</td>`;
+        } else {
+            cells += `<td>${g.description.substring(0, 100)}${g.description.length > 100 ? '...' : ''}</td>`;
+        }
+        
+        return `<tr>${cells}</tr>`;
+    }).join('');
+
 
     // --- Final HTML Structure ---
-    const tableHtml = `
-    <table class="ciliopathy-table" id="download-table-content">
-        ${tableHeader}
-        <tbody>${tableRows}</tbody>
-    </table>
-    ${geneList.length > 100 ? `<p><a href="https://theciliahub.github.io/" target="_blank">View full list (${geneList.length} genes) in CiliaHub</a></p>` : ''}`;
-    
+    // ... (rest of the formatting for download buttons and wrapping divs remains the same)
     const titleHtml = `<h3>${title} (${geneList.length} found)</h3>`;
     const downloadButtonHtml = `<button class="download-button" onclick="downloadTable('download-table-content', '${title.replace(/[^a-z0-9]/gi, '_')}')">Download CSV</button>`;
-
 
     return `
     <div class="result-card">
         ${titleHtml}
-        ${tableHtml}
+        <table class="ciliopathy-table" id="download-table-content">
+            ${tableHeader}
+            <tbody>${tableRows}</tbody>
+        </table>
+        ${geneList.length > 100 ? `<p><a href="https://theciliahub.github.io/" target="_blank">View full list (${geneList.length} genes) in CiliaHub</a></p>` : ''}
         ${downloadButtonHtml}
         ${citationHtml}
     </div>`;
