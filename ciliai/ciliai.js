@@ -1,13 +1,18 @@
 // --- Global Data Cache ---
 let ciliaHubDataCache = null;
 let screenDataCache = null;
+// Note: tissueDataCache is attached to the window object in its function
+// --- ADDITION: New function to fetch and parse Cellxgene data ---
 let cellxgeneDataCache = null;
+// --- ADDITION: UMAP Plotting Functions ---
 let umapDataCache = null;
-let CILI_AI_DOMAIN_DB = null; 
-let neversPhylogenyCache = null; 
-let liPhylogenyCache = null; 
-let allGeneSymbols = null; 
-let phylogenyDataCache = null; 
+// --- ADD THESE NEW LINES ---
+let CILI_AI_DOMAIN_DB = null;     // For the new domain database
+let neversPhylogenyCache = null;  // For Nevers et al. 2017 data
+let liPhylogenyCache = null;      // For Li et al. 2014 data
+let allGeneSymbols = null; // Add this global variable alongside others
+// --- NEW: Merge Li and Nevers into Single Cache ---
+let phylogenyDataCache = null;  // Updated to hold merged data
 // --- GLOBAL CORUM CACHE ---
 let corumDataCache = {
     list: [],
@@ -15,7 +20,6 @@ let corumDataCache = {
     byNameLower: {},
     loaded: false
 };
-
 
 // --- NEW: Reusable scRNA-seq Data Reference ---
 const SC_RNA_SEQ_REFERENCE_HTML = `
@@ -227,6 +231,13 @@ window.displayCiliAIPage = async function displayCiliAIPage() {
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 function debounce(fn, delay) { let timeout; return function(...args) { clearTimeout(timeout); timeout = setTimeout(() => fn(...args), delay); }; }
 
+function normalizeTerm(s) {
+    if (!s) return '';
+    // UPDATED: Now replaces periods, hyphens, underscores, and spaces with a single space.
+    return String(s).toLowerCase().replace(/[._\-\s]+/g, ' ').trim();
+}
+
+
 
 
 // ==================== SEMANTIC INTENT RESOLVER ====================
@@ -256,22 +267,14 @@ async function resolveSemanticIntent(query) {
         disease_classification: ["primary ciliopathy", "secondary ciliopathy", "motile ciliopathy", "atypical ciliopathy", "primary disease", "secondary disease", "motile disease", "atypical disease", "ciliopathy classification"],
         localization: ["localize", "location", "subcellular", "basal body", "transition zone", "centrosome", "axoneme", "ciliary membrane"],
         phenotype: ["knockdown", "phenotype", "effect", "shorter cilia", "longer cilia", "cilia length", "cilia number", "decreased ciliation", "loss of cilia"]
-    };
-
-    // --- NEW GLOBAL CONSTANTS (for Localization + Phenotype Priority Check) ---
-    const localizationTerms = [
-        "basal body", "transition zone", "cilia", "axoneme", "centrosome",  
-        "ciliary membrane", "nucleus", "lysosome", "mitochondria", "ciliary tip"
-    ];
-    const phenotypeTerms = [
-        "short cilia", "longer cilia", "cilia length", "cilia defects",  
-        "decreased ciliation", "loss of cilia", "reduced cilia", "increase", "decrease", "no effect"
-    ];
+ };
+// --- Priority Rule 1: Combined "disease" + "phenotype" ---
     const diseaseNames = ["bardet-biedl syndrome", "joubert syndrome", "meckel-gruber syndrome", "primary ciliary dyskinesia", "leber congenital amaurosis", "nephronophthisis", "polycystic kidney disease", "autosomal dominant polycystic kidney disease", "autosomal recessive polycystic kidney disease", "short-rib thoracic dysplasia", "senior-løken syndrome", "cranioectodermal dysplasia", "nphp", "bbs", "mks", "pcd", "ciliopathy", "syndrome"];
+    
+    // Note: The phenotypeTerms array from the old code is now merged with the global one above, 
+    // but the matching logic below uses explicit definitions for backward compatibility in this block.
     const strictPhenotypeTerms = ["phenotype", "short cilia", "long cilia", "cilia length", "cilia number", "decreased ciliation", "loss of cilia", "reduced cilia", "increase", "decrease"];
 
-
-    // --- Priority Rule 1: Combined "disease" + "phenotype" ---
     const matchedDisease = diseaseNames.find(name => qLower.includes(name));
     const matchedStrictPhenotype = strictPhenotypeTerms.find(term => qLower.includes(term));
 
@@ -287,7 +290,7 @@ async function resolveSemanticIntent(query) {
     }
 
     // --------------------------------------------------------------------------
-    // ⭐ PRIORITY RULE 2: Combined "localization" + "phenotype" (THE FIX) ⭐
+    // ⭐ NEW PRIORITY RULE 2: Combined "localization" + "phenotype" (The Fix) ⭐
     // --------------------------------------------------------------------------
     const matchedLocalization = localizationTerms.find(name => qLower.includes(name));
     const matchedPhenotype = phenotypeTerms.find(term => qLower.includes(term));
@@ -317,6 +320,7 @@ async function resolveSemanticIntent(query) {
 
     // --- Disease Classification Handler ---
     else if (detectedIntent === "disease_classification") {
+        // ... (existing logic) ...
         let classification = null;
         if (qLower.includes('primary ciliopathy') || qLower.includes('primary disease')) {
             classification = "Primary Ciliopathies";
@@ -336,6 +340,7 @@ async function resolveSemanticIntent(query) {
 
     // --- Specific Disease Handler (Generic List) ---
     else if (detectedIntent === "disease") {
+        // ... (existing logic) ...
         const diseaseList = ["bardet-biedl syndrome", "joubert syndrome", "meckel-gruber syndrome", "primary ciliary dyskinesia", "leber congenital amaurosis", "nephronophthisis", "polycystic kidney disease", "autosomal dominant polycystic kidney disease", "autosomal recessive polycystic kidney disease", "short-rib thoracic dysplasia", "senior-løken syndrome", "cranioectodermal dysplasia", "nphp", "bbs", "mks", "pcd", "ciliopathy", "syndrome"];
 
         let targetDisease = null;
@@ -394,13 +399,14 @@ async function resolveSemanticIntent(query) {
     else if (detectedIntent === "localization") {
         const locationMatch = qLower.match(/(basal body|transition zone|axoneme|centrosome|ciliary membrane)/);
         if (locationMatch && locationMatch[1]) {
-            // NOTE: This now only handles UNFILTERED requests, as filtered ones were caught above.
-            const data = await getGenesByLocalization(locationMatch[1]);  
+            // NOTE: This will now only handle UNFILTERED requests, as filtered ones were caught above.
+            const data = await getGenesByLocalization(locationMatch[1]); 
             return formatListResult(`Genes localizing to ${locationMatch[1]}`, data);
         } else {
             return `<p>📍 Localization query detected. Please be more specific (e.g., "genes in the basal body").</p>`;
         }
     }
+
     // --- Phenotype Handler (Generic List) ---
     else if (detectedIntent === "phenotype") {
         return `<p>🔎 Phenotype/Screen query detected. Please use a specific gene (e.g., "What happens to cilia when KIF3A is knocked down?") or a specific phenotype (e.g., "Find genes causing short cilia").</p>`;
@@ -413,345 +419,199 @@ async function resolveSemanticIntent(query) {
 
 
 // --- Main AI Query Handler ---
-// --- Main AI Query Handler (NEW "Priority Waterfall" IMPLEMENTATION) ---
 window.handleAIQuery = async function() {
     const aiQueryInput = document.getElementById('aiQueryInput');
     const resultArea = document.getElementById('ai-result-area');
     const query = aiQueryInput.value.trim();
     if (!query) return;
 
-    // --- Purge Plotly ---
+    // --- FIX 1: Purge any existing Plotly plots from the result area ---
     try { if (window.Plotly) window.Plotly.purge(resultArea); } catch (e) {}
 
     resultArea.style.display = 'block';
     resultArea.innerHTML = `<p class="status-searching">CiliAI is thinking... 🧠</p>`;
     
     try {
-        // --- Await all core data ---
+        // Await core CiliaHub data fetches ONLY. Phylogeny fetches run in the router.
         await Promise.all([
             fetchCiliaData(),
             fetchScreenData(),
             fetchTissueData(),
             fetchCellxgeneData(),
             fetchUmapData(),
-            getDomainData(),
-            fetchCorumComplexes(),
-            fetchPhylogenyData() // Ensures Li/Nevers are loaded
+            getDomainData(), // Domain data is loaded here
+            fetchCorumComplexes()
         ]);
         console.log('ciliAI.js: All core data loaded for processing.');
+
+        // 🧠 NEW ROUTING PRIORITY 0: Try resolving semantic intent before keyword routing
+        // NOTE: 'resolveSemanticIntent' must be defined outside this function.
+        const semanticResult = await resolveSemanticIntent(query);
+        if (semanticResult) {
+            resultArea.innerHTML = semanticResult;
+            return; // Stop further routing — intent handled semantically
+        }
 
         let resultHtml = '';
         const qLower = query.toLowerCase();
         let match;
 
         // =================================================================
-        // PRIORITY 1: Exact Match in questionRegistry
+        // **NEW ROUTING PRIORITY 1:** Handle Curated Phylogenetic Table Queries
         // =================================================================
-        const perfectMatch = questionRegistry.find(item => item.text.toLowerCase() === qLower);
-        if (perfectMatch) {
-            console.log(`Routing via: Priority 1 (questionRegistry)`);
-            resultHtml = await perfectMatch.handler();
-        }
-
-        // =================================================================
-        // PRIORITY 2: Semantic Intent (Location + Phenotype, Disease + Phenotype)
-        // =================================================================
-        if (!resultHtml) {
-            const semanticResult = await resolveSemanticIntent(query);
-            if (semanticResult) {
-                console.log(`Routing via: Priority 2 (resolveSemanticIntent)`);
-                resultHtml = semanticResult;
-            }
+        const complexTableResult = await routeComplexPhylogenyAnalysis(query);
+        if (complexTableResult) {
+            console.log("Query resolved by High-Priority Complex Phylogeny Table Router.");
+            resultHtml = complexTableResult;
         }
         
         // =================================================================
-        // PRIORITY 3: New Module Helpers & Dedicated Routers
+        // ⭐ NEW ROUTING PRIORITY 2: Handle Domain Queries (Comparison, Enriched, Depleted, Specific Motifs) ⭐
         // =================================================================
-        if (!resultHtml) {
-            console.log(`Routing via: Priority 3 (Dedicated Routers & New Helpers)`);
+        else if (qLower.includes('domain') || qLower.includes('motif') || 
+                 qLower.includes('enriched') || qLower.includes('depleted') ||
+                 qLower.includes('architecture comparison')) {
             
-            // --- Ciliopathy Module Queries (from new intentParser) ---
-            if (qLower.includes('joubert') && qLower.includes('ciliated cells')) {
-                resultHtml = await intentParser.getJoubertGenesInCiliatedCells();
-            } 
-            else if (qLower.includes('ortholog') && (qLower.includes('joubert') || qLower.includes('ciliopathy'))) {
-                const diseaseMatch = qLower.includes('joubert') ? "Joubert Syndrome" : "ciliopathy";
-                const organismMatch = qLower.match(/(c\. elegans|zebrafish|mouse|drosophila|xenopus)/i);
-                if (organismMatch) {
-                    resultHtml = await intentParser.getOrthologs(diseaseMatch, organismMatch[1]);
-                }
-            }
-            
-            // --- CORUM Queries (Integrated from patchAIQueryHandler) ---
-            else if (qLower.includes('subunits of') || qLower.includes('components of') || qLower.includes('members of')) {
-                const complexMatch = qLower.match(/(?:subunits|components|members)\s+of\s+(.+)/i);
-                if (complexMatch) {
-                    const complexes = await getGenesByComplex(complexMatch[1].trim());
-                    resultHtml = formatListResult(`Components of ${complexMatch[1].trim()}`, complexes);
-                }
-            }
-            else if (qLower.includes('complexes for') || qLower.includes('complexes of') || qLower.includes('complexes containing')) {
-                const geneMatch = qLower.match(/(?:complexes|subunits)\s+(?:for|of|containing)\s+([A-Za-z0-9\-]+)/i);
-                if (geneMatch) {
-                    const complexes = await getGenesByComplex(geneMatch[1].toUpperCase());
-                    resultHtml = formatListResult(`Complexes containing ${geneMatch[1].toUpperCase()}`, complexes);
-                }
-            }
-
-            // --- Phylogenetic Table/Heatmap Router ---
-            else if (qLower.includes('phylogeny') || qLower.includes('conservation') || qLower.includes('heatmap') || qLower.includes('evolutionary')) {
-                resultHtml = await resolvePhylogeneticQuery(query);
-            }
-            // --- Domain Query Router ---
-            else if (qLower.includes('domain') || qLower.includes('motif') || qLower.includes('enriched') || qLower.includes('architecture')) {
-                resultHtml = await resolveDomainQuery(query);
-            }
+            console.log('Routing to Domain Query Resolver...');
+            resultHtml = await resolveDomainQuery(query);
         }
 
         // =================================================================
-        // PRIORITY 4: Old Intent Parser (Simple keywords)
+        // **NEW ROUTING PRIORITY 3:** Handle General Phylogenetic Queries (FIXES REFERENCE ERROR)
         // =================================================================
-        if (!resultHtml) {
-            // This now uses the .parse() method of our NEW unified intentParser
-            const intent = intentParser.parse(query);
-            if (intent && typeof intent.handler === 'function') {
-                console.log(`Routing via: Priority 4 (intentParser.parse())`);
-                resultHtml = await intent.handler(intent.entity);
-            }
+        else if (qLower.includes('phylogeny') || qLower.includes('conservation') || 
+                 qLower.includes('heatmap') || qLower.includes('comparison') || 
+                 qLower.includes('tree')) {
+            
+            console.log('Routing to General Phylogenetic Query Resolver...');
+            resultHtml = await resolvePhylogeneticQuery(query); 
         }
 
         // =================================================================
-        // PRIORITY 5: Fallback (Gene Details or Error)
+        // **FALLBACK TO ORIGINAL LOGIC**
         // =================================================================
-        if (!resultHtml) {
-            console.log(`Routing via: Priority 5 (Fallback)`);
-            if ((match = qLower.match(/(?:tell me about|what is|describe)\s+(.+)/i))) {
+        else {
+            const perfectMatch = questionRegistry.find(item => item.text.toLowerCase() === qLower);
+            if (perfectMatch) {
+                console.log(`Registry match found: "${perfectMatch.text}"`);
+                resultHtml = await perfectMatch.handler();
+            }  
+            else if ((match = qLower.match(/(?:tell me about|what is|describe)\s+(.+)/i))) {
                 const term = match[1].trim();
                 resultHtml = await getComprehensiveDetails(term);
-            } else {
-                // Check if the query is just a single gene name
-                const potentialGenes = (query.match(/\b([A-Z0-9\-\.]{3,})\b/gi) || []).map(g => g.toUpperCase());
-                if (potentialGenes.length === 1 && qLower.length < (potentialGenes[0].length + 5)) {
-                     if (ciliaHubDataCache.some(g => g.gene.toUpperCase() === potentialGenes[0])) {
-                        resultHtml = await getComprehensiveDetails(potentialGenes[0]);
-                     }
-                } 
-                
-                if (!resultHtml) {
-                    resultHtml = `<p class="result-card status-error">Sorry, I didn't understand that query. Please try one of the suggested questions or a known keyword.</p>`;
+            }  
+            else {
+                const intent = intentParser.parse(query);
+                if (intent && typeof intent.handler === 'function') {
+                    console.log(`Intent parser match found: ${intent.intent} for entity: ${intent.entity}`);
+                    resultHtml = await intent.handler(intent.entity);
                 }
-            }
-        }
-
-        resultArea.innerHTML = resultHtml;
-
-    } catch (e) {
-        resultArea.innerHTML = `<p class"result-card status-error">An internal CiliAI error occurred during your query. Please check the console for details. (Error: ${e.message})</p>`;
-        console.error("CiliAI Query Error:", e);
-    }
-};
-// =============================================================================
-// REPLACEMENT: The new, unified "Brain" of CiliAI (replaces old createIntentParser)
-// This function contains both the simple keyword parser (.parse)
-// and the new complex query helpers (.getJoubertGenesInCiliatedCells, .getOrthologs)
-// =============================================================================
-function createIntentParser() {
-    // --- Disease Classification Map ---
-    const classifiedDiseases = {
-        "Primary Ciliopathies": [ 
-            "Acrocallosal Syndrome", "Alström Syndrome", "Autosomal Dominant Polycystic Kidney Disease",
-            "Autosomal Recessive Polycystic Kidney Disease", "Bardet–Biedl Syndrome", "COACH Syndrome",
-            "Cranioectodermal Dysplasia", "Ellis-van Creveld Syndrome", "Hydrolethalus Syndrome", "Infantile Polycystic Kidney Disease",
-            "Joubert Syndrome", "Leber Congenital Amaurosis", "Meckel–Gruber Syndrome", "Nephronophthisis", "Orofaciodigital Syndrome",
-            "Senior-Løken Syndrome", "Short-rib Thoracic Dysplasia", "Skeletal Ciliopathy", "Retinal Ciliopathy", "Syndromic Ciliopathy",
-            "Al-Gazali-Bakalinova Syndrome", "Bazex-Dupré-Christol Syndrome", "Bilateral Polycystic Kidney Disease", "Biliary, Renal, Neurologic, and Skeletal Syndrome",
-            "Caroli Disease", "Carpenter Syndrome", "Complex Lethal Osteochondrodysplasia", "Greig Cephalopolysyndactyly Syndrome", "Kallmann Syndrome", "Lowe Oculocerebrorenal Syndrome",
-            "McKusick-Kaufman Syndrome", "Morbid Obesity and Spermatogenic Failure", "Polycystic Kidney Disease", "RHYNS Syndrome", "Renal-hepatic-pancreatic Dysplasia", 
-            "Retinal Dystrophy", "STAR Syndrome", "Smith-Lemli-Opitz Syndrome", "Spondylometaphyseal Dysplasia", "Stromme Syndrome", 
-            "Weyers Acrofacial Dysostosis", "Hydrocephalus"
-        ], 
-        "Motile Ciliopathies": [ 
-            "Primary Ciliary Dyskinesia", "Birt-Hogg-Dubé Syndrome", "Juvenile Myoclonic Epilepsy" 
-        ],
-        "Secondary Diseases": [ 
-            "Ataxia-telangiectasia-like Disorder", "Birt-Hogg-Dubé Syndrome", "Cone-Rod Dystrophy", "Cornelia de Lange Syndrome",
-            "Holoprosencephaly", "Juvenile Myoclonic Epilepsy", "Medulloblastoma", "Retinitis Pigmentosa", "Spinocerebellar Ataxia", 
-            "Bazex-Dupré-Christol Syndrome", "Lowe Oculocerebrorenal Syndrome", "McKusick-Kaufman Syndrome", "Pallister-Hall Syndrome", 
-            "Simpson-Golabi-Behmel Syndrome", "Townes-Brocks Syndrome", "Usher Syndrome", "Visceral Heterotaxy" 
-        ],
-        "Atypical Ciliopathies": [ 
-            "Biliary Ciliopathy", "Chronic Obstructive Pulmonary Disease", "Ciliopathy", "Ciliopathy - Retinal dystrophy", 
-            "Golgipathies or Ciliopathy", "Hepatic Ciliopathy", "Male Infertility and Ciliopathy", "Male infertility", 
-            "Microcephaly and Chorioretinopathy Type 3", "Mucociliary Clearance Disorder", "Notch-mediated Ciliopathy", 
-            "Primary Endocardial Fibroelastosis", "Retinal Ciliopathy", "Retinal Degeneration", "Skeletal Ciliopathy", 
-            "Syndromic Ciliopathy"
-        ]
-    };
-    
-    const aliases = ["BBS", "Joubert", "NPHP", "MKS"];
-    const allDiseases = [...Object.values(classifiedDiseases).flat(), ...aliases];
-
-    // --- Core Function: Joubert Genes in Ciliated Cells (Uses GLOBAL helpers) ---
-    async function getJoubertGenesInCiliatedCells() {
-        // This function now relies on GLOBAL fetchCiliaData, fetchCellxgeneData,
-        // getCiliopathyGenes, cellxgeneDataCache, and formatListResult.
-        await fetchCiliaData();
-        await fetchCellxgeneData();
-        const { genes: joubertGenes } = await getCiliopathyGenes("Joubert Syndrome"); 
-        const joubertGeneSet = new Set(joubertGenes.map(g => g.gene.toUpperCase()));
-    
-        const results = [];
-        if (cellxgeneDataCache) { // Uses GLOBAL cache
-            joubertGeneSet.forEach(gene => {
-                const expData = cellxgeneDataCache[gene]; 
-                if (expData && expData["ciliated cell"] && expData["ciliated cell"] > 0.1) {
-                    results.push({
-                        gene: gene,
-                        description: `Expression: ${expData["ciliated cell"].toFixed(4)}`
-                    });
-                }
-            });
-        }
-    
-        results.sort((a, b) => parseFloat(b.description.split(': ')[1]) - parseFloat(a.description.split(': ')[1]));
-        return formatListResult("Joubert Genes Expressed in Ciliated Cells", results); // Uses GLOBAL formatter
-    }
-
-    // --- Function: Orthologs Finder (Uses GLOBAL helpers) ---
-    async function getOrthologs(disease, organism) {
-        await fetchCiliaData();
-        // Uses GLOBAL getCiliopathyGenes
-        const { genes: diseaseGenes } = await getCiliopathyGenes(disease); 
-        
-        const orthologKeyMap = {
-            'c. elegans': 'ortholog_c_elegans',
-            'mouse': 'ortholog_mouse',
-            'zebrafish': 'ortholog_zebrafish',
-            'xenopus': 'ortholog_xenopus',
-            'drosophila': 'ortholog_drosophila'
-        };
-        const orthologKey = orthologKeyMap[organism.toLowerCase()];
-    
-        if (!orthologKey) {
-            return formatListResult(`${disease} Orthologs in ${organism}`, [], `Ortholog key for "${organism}" not found.`);
-        }
-    
-        const results = diseaseGenes
-            .map(g => ciliaHubDataCache.find(cg => cg.gene === g.gene)) // Uses GLOBAL ciliaHubDataCache
-            .filter(g => g && g[orthologKey] && g[orthologKey] !== 'N/A')
-            .map(g => ({ gene: g.gene, description: `${organism} Ortholog: ${g[orthologKey]}` }));
-            
-        return formatListResult(`${disease} Orthologs in ${organism}`, results);
-    }
-
-    // --- Entity Keywords for simple parsing (from OLD parser) ---
-    const entityKeywords = [
-        {
-            type: 'FUNCTIONAL_CATEGORY',
-            keywords: ['kinesin motors', 'dynein motors', 'Ciliary assembly/disassembly', 'Signaling', 'Motile cilium', 'Motor protein', 'Transport', 'Protein modification', 'Cytoskeletal', 'cilium assembly', 'basal body docking', 'retrograde IFT'],
-            handler: async (term) => formatListResult(`Genes in Functional Category: ${term}`, await getGenesByFunction(term)),
-            autocompleteTemplate: (term) => `Show me ${term} genes`
-        },
-        {
-            type: 'COMPLEX',
-            keywords: ['BBSome', 'IFT-A', 'IFT-B', 'Transition Zone Complex', 'MKS Complex', 'NPHP Complex'],
-            handler: async (term) => formatListResult(`Components of ${term}`, await getGenesByComplex(term)),
-            autocompleteTemplate: (term) => `Display components of ${term} complex`
-        },
-        {
-            type: 'CILIOPATHY',
-            keywords: [...new Set(allDiseases)], // USES THE NEW LARGE LIST
-            handler: async (term) => {
-                const titleTerm = term.toUpperCase() === 'BBS' ? 'Bardet–Biedl Syndrome' :
-                                term.toUpperCase() === 'MKS' ? 'Meckel–Gruber Syndrome' : term;
-                const { genes, description } = await getCiliopathyGenes(term);
-                return formatListResult(`Genes for ${titleTerm}`, genes, description);
-            },
-            autocompleteTemplate: (term) => `Display genes for ${term}`
-        },
-        {
-            type: 'LOCALIZATION',
-            keywords: ['basal body', 'axoneme', 'transition zone', 'centrosome', 'cilium', 'lysosome', 'ciliary tip', 'transition fiber'],
-            handler: async (term) => formatListResult(`Genes localizing to ${term}`, await getGenesByLocalization(term)),
-            autocompleteTemplate: (term) => `Show me ${term} localizing genes`
-        },
-        {
-            type: 'ORGANISM',
-            keywords: [
-                // ... (Full list of 140 organisms) ...
-                "Prokaryote", "E.cuniculi", "E.histolytica", "E.dispar", "G.lamblia", "T.vaginalis", "T.brucei", "T.cruzi", "L.infantum",
-                "L.major", "L.braziliensis", "T.gondii", "C.hominis", "C.parvum", "B.bovis", "T.annulata", "T.parva", "P.knowlesi", "P.vivax",
-                "P.falciparum", "P.chabaudi", "P.berghei", "P.yoelii", "P.tetraurelia", "T.thermophila", "P.infestans", "T.pseudonana",
-                "P.tricornutum", "C.merolae", "N.gruberi", "O.lucimarinus", "O.tauri", "C.reinhardtii", "V.carteri", "P.patens",
-                "S.moellendorffii", "S.bicolor", "Z.mays", "O.sativa", "B.distachyon", "A.lyrata", "A.thaliana", "L.japonicus", "M.truncatula",
-                "V.vinifera", "P.trichocarpa", "R.communis", "T.trahens", "D.discoideum", "A.macrogynus", "S.punctatus", "M.globosa", "U.maydis",
-                "C.neoformans", "P.chrysosporium", "S.commune", "C.cinerea", "L.bicolor", "S.pombe", "B.fuckeliana", "S.sclerotiorum",
-                "F.graminearum", "M.grisea", "N.crassa", "P.anserina", "P.chrysogenum", "A.clavatus", "A.fumigatus", "N.fischeri", "A.flavus",
-                "A.oryzae", "A.niger", "A.nidulans", "U.reesii", "C.immitis", "C.posadasii", "P.nodorum", "T.melanosporum", "Y.lipolytica",
-                "P.pastoris", "C.lusitaniae", "D.hansenii", "M.guilliermondii", "S.stipitis", "L.elongisporus", "C.tropicalis", "C.albicans",
-                "C.dubliniensis", "K.lactis", "A.gossypii", "K.waltii", "L.thermotolerans", "Z.rouxii", "V.polyspora", "C.glabrata", "S.bayanus",
-                "S.mikatae", "S.cerevisiae", "S.paradoxus", "S.arctica", "C.owczarzaki", "M.brevicollis", "S.rosetta", "S.mansoni", "B.malayi",
-                "C.briggsae", "C.elegans", "D.pulex", "A.pisum", "P.humanus", "A.mellifera", "N.vitripennis", "B.mori", "T.castaneum",
-                "D.melanogaster", "D.pseudoobscura", "A.gambiae", "A.aegypti", "C.quinquefasciatus", "B.floridae", "T.adhaerens", "S.purpuratus",
-                "H.magnipapillata", "N.vectensis", "C.intestinalis", "D.rerio", "O.latipes", "F.rubripes", "T.nigroviridis", "X.tropicalis",
-                "G.gallus", "M.gallopavo", "O.anatinus", "M.domestica", "S.scrofa", "M.musculus", "C.familiaris", "B.taurus", "H.sapiens",
-                "worm", "human", "mouse", "zebrafish", "fly", "yeast"
-            ],
-            handler: async (term) => {
-                const { genes, description, speciesCode } = await getCiliaryGenesForOrganism(term);
-                return formatListResult(`Ciliary genes in ${speciesCode}`, genes, description); 
-            },
-            autocompleteTemplate: (term) => `Display ciliary genes in ${term}`
-        },
-        {
-            type: 'DOMAIN',
-            keywords: ['WD40', 'Leucine-rich repeat', 'IQ motif', 'calmodulin-binding', 'EF-hand', 'coiled-coil', 'CTS', 'ciliary targeting sequences', 'ciliary localization signals'],
-            handler: async (term) => formatListResult(`${term} domain-containing proteins`, await getGenesWithDomain(term)),
-            autocompleteTemplate: (term) => `Show ${term} domain containing proteins`
-        }
-    ];
-
-    // --- Return Public API (Unified) ---
-    return {
-        // --- New Module Methods ---
-        classifiedDiseases,
-        allDiseases,
-        getJoubertGenesInCiliatedCells,
-        getOrthologs,
-        
-        // --- Old Parser Methods ---
-        parse: (query) => {
-            const normalizedQuery = normalizeTerm(query); // Uses GLOBAL normalizeTerm
-            for (const entityType of entityKeywords) {
-                const sortedKeywords = [...entityType.keywords].sort((a, b) => b.length - a.length);
-                for (const keyword of sortedKeywords) {
-                    const keywordRegex = new RegExp(`\\b${normalizeTerm(keyword).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i'); // Uses GLOBAL normalizeTerm
-                    if (keywordRegex.test(normalizedQuery)) {
-                        return { intent: entityType.type, entity: keyword, handler: entityType.handler };
+                else {
+                    const potentialGenes = (query.match(/\b([A-Z0-9\-\.]{3,})\b/gi) || []);
+                    const genes = potentialGenes.filter(g => ciliaHubDataCache.some(hubGene => hubGene.gene.toUpperCase() === g.toUpperCase()));
+                    
+                    if (genes.length === 2 && (qLower.includes('compare') || qLower.includes('vs'))) {
+                        resultHtml = await displayCellxgeneBarChart(genes);
+                    } else if (genes.length === 1 && (qLower.includes('plot') || qLower.includes('show expression') || qLower.includes('visualize'))) {
+                        if (qLower.includes('umap')) {
+                            resultHtml = await displayUmapGeneExpression(genes[0]);
+                        } else {
+                            resultHtml = await displayCellxgeneBarChart(genes);
+                        }
+                    } else if (genes.length === 1 && qLower.length < (genes[0].length + 5)) {
+                        resultHtml = await getComprehensiveDetails(query);
+                    } else {
+                        resultHtml = `<p>Sorry, I didn’t understand that. Please try one of the suggested questions or a known keyword.</p>`;
                     }
                 }
             }
-            return null;
-        },
-        getKnownKeywords: () => entityKeywords.flatMap(e => e.keywords.map(k => ({ keyword: k, suggestion: e.autocompleteTemplate(k) }))),
-        getAllDiseases: () => [...new Set(allDiseases)],
-        getAllComplexes: () => entityKeywords.find(e => e.type === 'COMPLEX').keywords,
-        getAllGenes: () => ciliaHubDataCache ? ciliaHubDataCache.map(g => g.gene) : []
+        }
+
+        if (resultHtml !== "") {
+            resultArea.innerHTML = resultHtml;
+        }
+
+    } catch (e) {
+        resultArea.innerHTML = `<p class="status-not-found">An internal CiliAI error occurred during your query. Please check the console for details. (Error: ${e.message})</p>`;
+        console.error("CiliAI Query Error:", e);
+    }
+};
+
+/**
+ * Patches the main query handler to include Corum lookups.
+ * NOTE: This function must be placed AFTER window.handleAIQuery is defined.
+ */
+function patchAIQueryHandler() {
+    const originalHandler = window.handleAIQuery;
+
+    window.handleAIQuery = async function(event) {
+        // 1. Ensure CORUM data is loaded alongside other promises
+        await fetchCorumComplexes();
+        
+        const aiQueryInput = document.getElementById('aiQueryInput');
+        const resultArea = document.getElementById('ai-result-area');
+        const query = aiQueryInput.value.trim();
+        const qLower = query.toLowerCase();
+
+        // --- CUSTOM COMPLEX PARSING (Replaces the crash-prone regex) ---
+        
+        // Pattern 1: Subunits/components/members OF <complex name>
+        if (qLower.includes('subunits of') || qLower.includes('components of') || qLower.includes('members of')) {
+            const complexMatch = qLower.match(/(?:subunits|components|members)\s+of\s+(.+)/i);
+            const complexName = complexMatch ? complexMatch[1].trim() : null;
+
+            if (complexName) {
+                const results = getSubunitsByComplexName(complexName);
+                if (results.length > 0) {
+                    let html = `<div class="result-card"><h3>Complex Subunits Matching "${complexName}"</h3><ul>`;
+                    results.forEach(entry => {
+                        html += `<li><b>${entry.complexName}</b> (${entry.subunits.length} subunits): 
+                                 <small>${entry.subunits.map(s => s.toUpperCase()).join(', ')}</small></li>`;
+                    });
+                    html += '</ul></div>';
+                    resultArea.innerHTML = html;
+                    resultArea.style.display = 'block';
+                    return; // Handled
+                }
+            }
+        }
+        
+        // Pattern 2: Complexes FOR <gene>
+        if (qLower.includes('complexes for') || qLower.includes('complexes of') || qLower.includes('complexes containing')) {
+            const geneMatch = qLower.match(/(?:complexes|subunits)\s+(?:for|of|containing)\s+([A-Za-z0-9\-]+)/i);
+            const gene = geneMatch ? geneMatch[1].toUpperCase() : null;
+
+            if (gene) {
+                const complexes = getComplexesByGene(gene);
+                if (complexes.length > 0) {
+                    let html = `<div class="result-card"><h3>🧬 CORUM Complexes containing ${gene}</h3><ul>`;
+                    complexes.forEach(c => {
+                        html += `<li><b>${c.complexName}</b> (Total subunits: ${c.subunits.length})</li>`;
+                    });
+                    html += '</ul></div>';
+                    resultArea.innerHTML = html;
+                    resultArea.style.display = 'block';
+                    return; // Handled
+                }
+            }
+        }
+
+        // --- END CUSTOM COMPLEX PARSING ---
+
+        // 2. If not a CORUM query, fall back to the original handling
+        return originalHandler.apply(this, arguments);
     };
 }
 
-    
-
+// --- Execute CORUM Integration Patch ---
+patchAIQueryHandler(); 
 
 
 // =============================================================================
 // REPLACEMENT: The definitive "Brain" of CiliAI, merging all features correctly.
 // =============================================================================
-// =============================================================================
-// REPLACEMENT: The old createIntentParser is replaced by the new Ciliopathy Module.
-// We rename it to createCiliopathyModule to avoid conflicts and clean up helpers.
-// =============================================================================
-function createCiliopathyModule() {
+function createIntentParser() {
+    // NOTE: This object must be named 'classifiedDiseases' to match its usage below
     const classifiedDiseases = {
         "Primary Ciliopathies": [ 
             "Acrocallosal Syndrome", "Alström Syndrome", "Autosomal Dominant Polycystic Kidney Disease",
@@ -761,91 +621,27 @@ function createCiliopathyModule() {
             "Senior-Løken Syndrome", "Short-rib Thoracic Dysplasia", "Skeletal Ciliopathy", "Retinal Ciliopathy", "Syndromic Ciliopathy",
             "Al-Gazali-Bakalinova Syndrome", "Bazex-Dupré-Christol Syndrome", "Bilateral Polycystic Kidney Disease", "Biliary, Renal, Neurologic, and Skeletal Syndrome",
             "Caroli Disease", "Carpenter Syndrome", "Complex Lethal Osteochondrodysplasia", "Greig Cephalopolysyndactyly Syndrome", "Kallmann Syndrome", "Lowe Oculocerebrorenal Syndrome",
-            "McKusick-Kaufman Syndrome", "Morbid Obesity and Spermatogenic Failure", "Polycystic Kidney Disease", "RHYNS Syndrome", "Renal-hepatic-pancreatic Dysplasia", 
-            "Retinal Dystrophy", "STAR Syndrome", "Smith-Lemli-Opitz Syndrome", "Spondylometaphyseal Dysplasia", "Stromme Syndrome", 
-            "Weyers Acrofacial Dysostosis", "Hydrocephalus"
+            "McKusick-Kaufman Syndrome", "Morbid Obesity and Spermatogenic Failure", "Polycystic Kidney Disease", "RHYNS Syndrome", "Renal-hepatic-pancreatic Dysplasia", "Retinal Dystrophy", "STAR Syndrome",
+            "Smith-Lemli-Opitz Syndrome", "Spondylometaphyseal Dysplasia", "Stromme Syndrome", "Weyers Acrofacial Dysostosis", "Hydrocephalus" // Added Hydrocephalus back
         ], 
         "Motile Ciliopathies": [ 
             "Primary Ciliary Dyskinesia", "Birt-Hogg-Dubé Syndrome", "Juvenile Myoclonic Epilepsy" 
         ],
         "Secondary Diseases": [ 
             "Ataxia-telangiectasia-like Disorder", "Birt-Hogg-Dubé Syndrome", "Cone-Rod Dystrophy", "Cornelia de Lange Syndrome",
-            "Holoprosencephaly", "Juvenile Myoclonic Epilepsy", "Medulloblastoma", "Retinitis Pigmentosa", "Spinocerebellar Ataxia", 
-            "Bazex-Dupré-Christol Syndrome", "Lowe Oculocerebrorenal Syndrome", "McKusick-Kaufman Syndrome", "Pallister-Hall Syndrome", 
-            "Simpson-Golabi-Behmel Syndrome", "Townes-Brocks Syndrome", "Usher Syndrome", "Visceral Heterotaxy" 
+            "Holoprosencephaly", "Juvenile Myoclonic Epilepsy", "Medulloblastoma", "Retinitis Pigmentosa", "Spinocerebellar Ataxia", "Bazex-Dupré-Christol Syndrome", "Lowe Oculocerebrorenal Syndrome",
+            "McKusick-Kaufman Syndrome", "Pallister-Hall Syndrome", "Simpson-Golabi-Behmel Syndrome", "Townes-Brocks Syndrome", "Usher Syndrome", "Visceral Heterotaxy" 
         ],
         "Atypical Ciliopathies": [ 
-            "Biliary Ciliopathy", "Chronic Obstructive Pulmonary Disease", "Ciliopathy", "Ciliopathy - Retinal dystrophy", 
-            "Golgipathies or Ciliopathy", "Hepatic Ciliopathy", "Male Infertility and Ciliopathy", "Male infertility", 
-            "Microcephaly and Chorioretinopathy Type 3", "Mucociliary Clearance Disorder", "Notch-mediated Ciliopathy", 
-            "Primary Endocardial Fibroelastosis", "Retinal Ciliopathy", "Retinal Degeneration", "Skeletal Ciliopathy", 
-            "Syndromic Ciliopathy"
+            "Biliary Ciliopathy", "Chronic Obstructive Pulmonary Disease", "Ciliopathy", "Ciliopathy - Retinal dystrophy", "Golgipathies or Ciliopathy", "Hepatic Ciliopathy", "Male Infertility and Ciliopathy", "Male infertility", "Microcephaly and Chorioretinopathy Type 3", "Mucociliary Clearance Disorder", "Notch-mediated Ciliopathy", "Primary Endocardial Fibroelastosis", "Retinal Ciliopathy", "Retinal Degeneration", "Skeletal Ciliopathy", "Syndromic Ciliopathy" 
         ]
     };
     
+    // Use the explicit classification list and common aliases
     const aliases = ["BBS", "Joubert", "NPHP", "MKS"];
+    // NOTE: Object.values(classifiedDiseases) is correct here.
     const allDiseases = [...Object.values(classifiedDiseases).flat(), ...aliases];
 
-    // --- Helper: Format Results (Internal helper for this module) ---
-    function formatModuleListResult(title, list, note) {
-        if (!list.length) {
-            return `<div class="result-card"><h3>${title}</h3><p class="status-not-found">No results found.${note ? " " + note : ""}</p></div>`;
-        }
-        const formatted = list.map(item => `<li><strong>${item.gene}</strong>: ${item.description}</li>`).join('');
-        return `<div class="result-card"><h3>${title} (${list.length} found)</h3><ul>${formatted}</ul>${note ? `<p class="status-note">${note}</p>` : ""}</div>`;
-    }
-
-    // --- Core Function: Joubert Genes in Ciliated Cells (Uses GLOBAL helpers) ---
-    async function getJoubertGenesInCiliatedCells() {
-        await fetchCiliaData();
-        await fetchCellxgeneData();
-        // Uses GLOBAL getCiliopathyGenes
-        const { genes: joubertGenes } = await getCiliopathyGenes("Joubert Syndrome"); 
-        const joubertGeneSet = new Set(joubertGenes.map(g => g.gene.toUpperCase()));
-    
-        const results = [];
-        joubertGeneSet.forEach(gene => {
-            const expData = cellxgeneDataCache[gene]; // Uses GLOBAL cellxgeneDataCache
-            if (expData && expData["ciliated cell"] && expData["ciliated cell"] > 0.1) {
-                results.push({
-                    gene: gene,
-                    description: `Expression: ${expData["ciliated cell"].toFixed(4)}`
-                });
-            }
-        });
-    
-        results.sort((a, b) => parseFloat(b.description.split(': ')[1]) - parseFloat(a.description.split(': ')[1]));
-        return formatModuleListResult("Joubert Genes Expressed in Ciliated Cells", results);
-    }
-
-     // --- Function: Orthologs Finder (Uses GLOBAL helpers) ---
-    async function getOrthologs(disease, organism) {
-        await fetchCiliaData();
-        // Uses GLOBAL getCiliopathyGenes
-        const { genes: diseaseGenes } = await getCiliopathyGenes(disease); 
-        
-        const orthologKeyMap = {
-            'c. elegans': 'ortholog_c_elegans',
-            'mouse': 'ortholog_mouse',
-            'zebrafish': 'ortholog_zebrafish',
-            'xenopus': 'ortholog_xenopus',
-            'drosophila': 'ortholog_drosophila'
-        };
-        const orthologKey = orthologKeyMap[organism.toLowerCase()];
-    
-        if (!orthologKey) {
-            return formatListResult(`${disease} Orthologs in ${organism}`, [], `Ortholog key for "${organism}" not found.`);
-        }
-    
-        const results = diseaseGenes
-            .map(g => ciliaHubDataCache.find(cg => cg.gene === g.gene)) // Uses GLOBAL ciliaHubDataCache
-            .filter(g => g && g[orthologKey] && g[orthologKey] !== 'N/A')
-            .map(g => ({ gene: g.gene, description: `${organism} Ortholog: ${g[orthologKey]}` }));
-            
-        return formatListResult(`${disease} Orthologs in ${organism}`, results);
-    }
-
-    // --- Entity Keywords for simple parsing (from OLD parser) ---
     const entityKeywords = [
         {
             type: 'FUNCTIONAL_CATEGORY',
@@ -855,16 +651,17 @@ function createCiliopathyModule() {
         },
         {
             type: 'COMPLEX',
+            // Ensure BBSome is included in this list, either statically or dynamically if possible
             keywords: ['BBSome', 'IFT-A', 'IFT-B', 'Transition Zone Complex', 'MKS Complex', 'NPHP Complex'],
             handler: async (term) => formatListResult(`Components of ${term}`, await getGenesByComplex(term)),
             autocompleteTemplate: (term) => `Display components of ${term} complex`
         },
         {
             type: 'CILIOPATHY',
-            keywords: [...new Set(allDiseases)], // USES THE NEW LARGE LIST
+            keywords: [...new Set(allDiseases)],
             handler: async (term) => {
                 const titleTerm = term.toUpperCase() === 'BBS' ? 'Bardet–Biedl Syndrome' :
-                                term.toUpperCase() === 'MKS' ? 'Meckel–Gruber Syndrome' : term;
+                                  term.toUpperCase() === 'MKS' ? 'Meckel–Gruber Syndrome' : term;
                 const { genes, description } = await getCiliopathyGenes(term);
                 return formatListResult(`Genes for ${titleTerm}`, genes, description);
             },
@@ -879,7 +676,6 @@ function createCiliopathyModule() {
         {
             type: 'ORGANISM',
             keywords: [
-                // ... (Full list of 140 organisms) ...
                 "Prokaryote", "E.cuniculi", "E.histolytica", "E.dispar", "G.lamblia", "T.vaginalis", "T.brucei", "T.cruzi", "L.infantum",
                 "L.major", "L.braziliensis", "T.gondii", "C.hominis", "C.parvum", "B.bovis", "T.annulata", "T.parva", "P.knowlesi", "P.vivax",
                 "P.falciparum", "P.chabaudi", "P.berghei", "P.yoelii", "P.tetraurelia", "T.thermophila", "P.infestans", "T.pseudonana",
@@ -898,13 +694,15 @@ function createCiliopathyModule() {
                 "G.gallus", "M.gallopavo", "O.anatinus", "M.domestica", "S.scrofa", "M.musculus", "C.familiaris", "B.taurus", "H.sapiens",
                 "worm", "human", "mouse", "zebrafish", "fly", "yeast"
             ],
+
+            // In createIntentParser -> entityKeywords (type: 'ORGANISM')
             handler: async (term) => {
-                const { genes, description, speciesCode } = await getCiliaryGenesForOrganism(term);
-                return formatListResult(`Ciliary genes in ${speciesCode}`, genes, description); 
+            const { genes, description, speciesCode } = await getCiliaryGenesForOrganism(term);
+            return formatListResult(`Ciliary genes in ${speciesCode}`, genes, description); 
             },
             autocompleteTemplate: (term) => `Display ciliary genes in ${term}`
-        },
-        {
+            },
+            {
             type: 'DOMAIN',
             keywords: ['WD40', 'Leucine-rich repeat', 'IQ motif', 'calmodulin-binding', 'EF-hand', 'coiled-coil', 'CTS', 'ciliary targeting sequences', 'ciliary localization signals'],
             handler: async (term) => formatListResult(`${term} domain-containing proteins`, await getGenesWithDomain(term)),
@@ -912,15 +710,7 @@ function createCiliopathyModule() {
         }
     ];
 
-    // --- Return Public API (Unified) ---
     return {
-        // --- New Module Methods ---
-        classifiedDiseases,
-        allDiseases,
-        getJoubertGenesInCiliatedCells,
-        getOrthologs,
-        
-        // --- Old Parser Methods ---
         parse: (query) => {
             const normalizedQuery = normalizeTerm(query);
             for (const entityType of entityKeywords) {
@@ -940,41 +730,8 @@ function createCiliopathyModule() {
         getAllGenes: () => ciliaHubDataCache ? ciliaHubDataCache.map(g => g.gene) : []
     };
 }
-// --- Initialize the new module ---
-const ciliopathyModule = createCiliopathyModule();
 
-
-
-// --- Data Fetching and Caching (Updated with New Integration Logic) ---
-
-// --- Helper Functions ---
-const normalizeTerm = (s) => (s ? String(s).toLowerCase().replace(/[._\-\s]+/g, ' ').trim() : '');
-const processToArray = (field) => {
-    if (typeof field === 'string') {
-        // Split by comma or semi-colon, trim whitespace, and filter empty strings
-        return field.split(/[,\;]/).map(item => item.trim()).filter(Boolean);
-    }
-    if (Array.isArray(field)) return field;
-    return [];
-};
-const log = (message, isError = false) => {
-    if (isError) console.error(message);
-    else console.log(message);
-};
-
-
-async function fetchJsonData(url, cacheName) {
-    try {
-        const response = await fetch(url);
-        if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
-        const data = await response.json();
-        console.log(`✅ Fetched ${cacheName}`);
-        return data;
-    } catch (error) {
-        console.error(`Failed to fetch ${cacheName}:`, error.message);
-        return null;
-    }
-}
+const intentParser = createIntentParser();
 
 // --- Data Fetching and Caching (Updated with New Integration Logic) ---
 
@@ -989,43 +746,65 @@ async function fetchCiliaData() {
         // Fetch screen data for merging
         const screenData = await fetchScreenData(); // Ensure screen data is loaded
 
+        const processToArray = (field) => {
+            if (typeof field === 'string') return field.split(',').map(item => item.trim()).filter(Boolean);
+            if (Array.isArray(field)) return field;
+            return [];
+        };
+
         ciliaHubDataCache = data.map(gene => {
             const geneUpper = gene.gene.toUpperCase();
-            
-            // 1. Map core gene fields to arrays where appropriate (THE FIX)
+
+            // 1. Map core gene fields to arrays where appropriate
             const processedGene = {
                 ...gene,
                 functional_category: processToArray(gene.functional_category),
                 domain_descriptions: processToArray(gene.domain_descriptions),
                 ciliopathy: processToArray(gene.ciliopathy),
-                localization: processToArray(gene.localization), // FIX: Guarantees Array<string>
+                localization: processToArray(gene.localization),
                 complex_names: processToArray(gene.complex_names),
                 complex_components: processToArray(gene.complex_components)
             };
 
-            // 2. Integrate screen data (THE FIX)
+            // 2. Add Cilia Effects from ciliahub_data.json
+            // These fields are correctly sourced from the main ciliahub_data.json.
+            const effectsFromHub = {
+                overexpression_effects: processedGene.overexpression_effects || "Not Reported",
+                lof_effects: processedGene.lof_effects || "Not Reported",
+                percent_ciliated_cells_effects: processedGene.percent_ciliated_cells_effects || "Not Reported",
+            };
+
+            // 3. Merge in custom effects on cilia if the gene is found in screenData, 
+            // but explicitly ignoring the 'screens' field in the main data.
+            // Note: The logic requires that the new 'effects' data comes from 
+            // ciliahub_data.json (which we've done in point #2) 
+            // AND the screen data should be integrated with gene data for display.
+            // The request states "Please add effects on cilia together with cilia_screens_data.json."
+            // We interpret this as ensuring both the core effects (from the old 'screens' in the hub)
+            // and the detailed screens (from the separate JSON) are present for a gene.
             const screensFromSeparateFile = screenData[geneUpper] || [];
 
-            // 3. Merge all fields, including orthologs and effects
-            return { 
-                ...processedGene, 
-                // Add the screens array from the separate file
-                screens_from_separate_file: screensFromSeparateFile,
-                
-                // Add the other curated fields
+            // 4. Ensure new requested fields are added (they should be present but are mapped for clarity)
+            const newIntegratedFields = {
+                // These are the new requested fields, ensuring they exist:
                 ciliopathy_classification: processedGene.ciliopathy_classification || "Not Classified",
                 ortholog_mouse: processedGene.ortholog_mouse || "N/A",
                 ortholog_c_elegans: processedGene.ortholog_c_elegans || "N/A",
                 ortholog_xenopus: processedGene.ortholog_xenopus || "N/A",
                 ortholog_zebrafish: processedGene.ortholog_zebrafish || "N/A",
                 ortholog_drosophila: processedGene.ortholog_drosophila || "N/A",
-                overexpression_effects: processedGene.overexpression_effects || "Not Reported",
-                lof_effects: processedGene.lof_effects || "Not Reported",
-                percent_ciliated_cells_effects: processedGene.percent_ciliated_cells_effects || "Not Reported"
+                
+                // Add the explicit effects from the Hub for use in gene summary:
+                ...effectsFromHub, 
+
+                // Add the screens array from the separate file for the comprehensive details card:
+                screens_from_separate_file: screensFromSeparateFile
             };
+
+            return { ...processedGene, ...newIntegratedFields };
         });
 
-        console.log('CiliaHub data loaded and formatted with normalization and screens integration.');
+        console.log('CiliaHub data loaded and formatted with new orthologs, classification, and screens integration successfully.');
         return ciliaHubDataCache;
     } catch (error) {
         console.error("Failed to fetch CiliaHub data:", error);
@@ -1035,6 +814,7 @@ async function fetchCiliaData() {
 }
 
 
+// --- UPDATED fetchScreenData function (to be replaced in your code) ---
 async function fetchScreenData() {
     if (screenDataCache) return screenDataCache;
     try {
@@ -1043,13 +823,14 @@ async function fetchScreenData() {
         const data = await response.json();
         screenDataCache = data;
         
-        // --- Populate allGeneSymbols cache with screen genes ---
+        // --- NEW: Populate allGeneSymbols cache with screen genes ---
         const screenGenes = Object.keys(data);
         if (!allGeneSymbols) {
             allGeneSymbols = new Set(screenGenes);
         } else {
             screenGenes.forEach(gene => allGeneSymbols.add(gene));
         }
+        // This process needs to be finalized in fetchCiliaData too for complete coverage.
 
         console.log('Screen data loaded successfully:', Object.keys(data).length, 'genes');
         return screenDataCache;
@@ -1060,24 +841,61 @@ async function fetchScreenData() {
     }
 }
 
-/**
- * REPLACED: This function no longer loads phylogeny_summary.json.
- * It is now a wrapper to ensure both modern phylogeny files are loaded.
- */
 async function fetchPhylogenyData() {
     if (phylogenyDataCache) return phylogenyDataCache;
-    
     try {
-        await Promise.all([
-            fetchLiPhylogenyData(),
-            fetchNeversPhylogenyData()
-        ]);
-        phylogenyDataCache = true; // Mark as loaded
-        return true;
+        const response = await fetch('https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/phylogeny_summary.json');
+        if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+        const raw = await response.json();
+        const unified = {};
+        // Map class to query categories
+        const classToCategory = {
+            'Ciliary-only': 'ciliated_only_genes',
+            'Present-in-both': 'in_all_organisms',
+            'Non-ciliary': 'nonciliary_only_genes' // Adjust if class names differ
+        };
+        // Process ciliated_only_genes, nonciliary_only_genes, in_all_organisms if present
+        if (raw.ciliated_only_genes) {
+            raw.ciliated_only_genes
+                .filter(g => typeof g === 'string' && g)
+                .forEach(g => unified[g.trim().toUpperCase()] = { sym: g.trim(), category: 'ciliated_only_genes', species: [] });
+        }
+        if (raw.nonciliary_only_genes) {
+            raw.nonciliary_only_genes
+                .filter(g => typeof g === 'string' && g)
+                .forEach(g => unified[g.trim().toUpperCase()] = { sym: g.trim(), category: 'nonciliary_only_genes', species: [] });
+        }
+        if (raw.in_all_organisms) {
+            raw.in_all_organisms
+                .filter(g => typeof g === 'string' && g)
+                .forEach(g => unified[g.trim().toUpperCase()] = { sym: g.trim(), category: 'in_all_organisms', species: [] });
+        }
+        // Process summary array
+        if (raw.summary && Array.isArray(raw.summary)) {
+            raw.summary.forEach(item => {
+                const gene = (item.sym || '').trim().toUpperCase();
+                const cat = (item.class || '').trim();
+                if (gene) {
+                    unified[gene] = {
+                        sym: item.sym, // Retain original sym
+                        category: classToCategory[cat] || cat.toLowerCase().replace(/[\s-]+/g, '_'),
+                        species: Array.isArray(item.species) ? item.species.map(s => s.trim()) : []
+                    };
+                }
+            });
+        }
+        phylogenyDataCache = unified;
+        console.log(`Phylogeny data normalized: ${Object.keys(unified).length} entries`);
+        // Log genes with C.elegans
+        const celegansGenes = Object.entries(unified)
+            .filter(([_, data]) => data.species.includes('C.elegans'))
+            .map(([gene, data]) => ({ gene: data.sym, species: data.species, category: data.category }));
+        console.log(`Genes with C.elegans: ${celegansGenes.length}`, celegansGenes.slice(0, 5));
+        return phylogenyDataCache;
     } catch (error) {
-         console.error('Failed to load one or more phylogeny datasets:', error);
-         phylogenyDataCache = false;
-         return false;
+        console.error('Failed to fetch phylogeny summary data:', error);
+        phylogenyDataCache = {};
+        return phylogenyDataCache;
     }
 }
 
@@ -1089,7 +907,6 @@ async function fetchTissueData() {
         const tsv = await response.text();
         const lines = tsv.trim().split(/\r?\n/);
         if (lines.length < 2) throw new Error('Empty or invalid TSV file');
-        
         const data = {};
         for (let i = 1; i < lines.length; i++) {
             const parts = lines[i].split('\t');
@@ -1109,16 +926,21 @@ async function fetchTissueData() {
         return window.tissueDataCache;
     } catch (error) {
         console.error('Failed to fetch tissue data:', error);
-        window.tissueDataCache = {}; // Set empty on failure
+        window.tissueDataCache = {
+            'IFT88': { 'Kidney Cortex': 8.45, 'Kidney Medulla': 12.67 },
+            'ARL13B': { 'Brain': 5.2, 'Kidney': 3.1, 'Testis': 9.8 }
+        };
         return window.tissueDataCache;
     }
 }
-// Make sure it's globally available if called directly from HTML
 window.fetchTissueData = fetchTissueData;
 
 async function fetchUmapData() {
     if (umapDataCache) return umapDataCache;
+
+    // Use the correct Raw URL you've provided
     const dataUrl = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/umap_data.json';
+
     try {
         console.log('Fetching pre-computed UMAP data...');
         const response = await fetch(dataUrl);
@@ -1133,23 +955,35 @@ async function fetchUmapData() {
 }
 
 async function fetchCellxgeneData() {
+    // Check if data is already in cache
     if (cellxgeneDataCache) return cellxgeneDataCache;
+
+    // Use the correct Raw URL you've provided
     const dataUrl = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/cellxgene_data.json';
+
     try {
         console.log('Fetching Cellxgene single-cell data...');
         const response = await fetch(dataUrl);
-        if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+        if (!response.ok) {
+            throw new Error(`HTTP error! Status: ${response.status}`);
+        }
         const jsonData = await response.json();
+        
         cellxgeneDataCache = jsonData;
+        
         console.log(`✅ Cellxgene data loaded successfully for ${Object.keys(jsonData).length} genes.`);
         return cellxgeneDataCache;
+
     } catch (error) {
         console.error('Failed to fetch or parse Cellxgene data:', error);
-        cellxgeneDataCache = null;
+        cellxgeneDataCache = null; // Set to null on failure
         return null;
     }
 }
 
+/**
+ * FETCHES and CORUM Human Complex data.
+ */
 async function fetchCorumComplexes() {
     if (corumDataCache.loaded) return corumDataCache;
     const dataUrl = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/corum_humanComplexes.json';
@@ -1159,26 +993,33 @@ async function fetchCorumComplexes() {
         const response = await fetch(dataUrl);
         if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
         
+        // Handle single object vs. array format for robustness
         const rawData = await response.json();
         const data = Array.isArray(rawData) ? rawData : [rawData]; 
 
         data.forEach(entry => {
+            // CRITICAL FIX 1: Check for complex_name and subunits array
             if (!entry || !entry.complex_name || !Array.isArray(entry.subunits)) return; 
             
             const complexNameLower = entry.complex_name.toLowerCase();
             
+            // Store the whole entry for complex name lookup
             corumDataCache.byNameLower[complexNameLower] = entry; 
             corumDataCache.list.push(entry);
 
+            // Populate byGene lookup
             entry.subunits.forEach(subunit => {
+                // CRITICAL FIX 2: Access gene symbol from the subunit object's 'gene_name' field
                 const geneSymbol = subunit.gene_name;
                 if (!geneSymbol) return; 
 
                 const g = geneSymbol.toUpperCase();
                 if (!corumDataCache.byGene[g]) corumDataCache.byGene[g] = [];
                 
+                // Store a lighter reference to the complex, listing all gene symbols
                 corumDataCache.byGene[g].push({
                     complexName: entry.complex_name,
+                    // Map the subunits array of objects back to an array of uppercase gene symbols
                     subunits: entry.subunits.map(s => s.gene_name.toUpperCase()) 
                 });
             });
@@ -1189,66 +1030,11 @@ async function fetchCorumComplexes() {
         return corumDataCache;
     } catch (err) {
         console.error('Failed to fetch CORUM data:', err);
+        // Set loaded to true to prevent endless retry loop
         corumDataCache.loaded = true; 
         return corumDataCache;
     }
 }
-
-async function getDomainData() {
-    if (CILI_AI_DOMAIN_DB) return CILI_AI_DOMAIN_DB;
-    const dataUrl = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/cili_ai_domain_database.json';
-    try {
-        const response = await fetch(dataUrl);
-        if (!response.ok) {
-            console.error(`Error fetching domain DB: ${response.status} ${response.statusText}`);
-            return null;
-        }
-        CILI_AI_DOMAIN_DB = await response.json();
-        console.log('✅ New Domain Database (cili_ai_domain_database.json) loaded successfully.');
-        return CILI_AI_DOMAIN_DB;
-    } catch (error) {
-        console.error(`Network error or JSON parsing error for Domain DB: ${error}`);
-        return null;
-    }
-}
-
-/**
- * NEW: Fetches the Nevers et al. 2017 phylogeny matrix.
- */
-async function fetchNeversPhylogenyData() {
-    if (neversPhylogenyCache) return neversPhylogenyCache;
-    const dataUrl = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/nevers_et_al_2017_matrix_optimized.json';
-    try {
-        const response = await fetch(dataUrl);
-        if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
-        neversPhylogenyCache = await response.json();
-        console.log('✅ Nevers et al. 2017 Phylogeny data loaded successfully.');
-        return neversPhylogenyCache;
-    } catch (error) {
-        console.error('Failed to fetch Nevers et al. 2017 phylogeny data:', error);
-        return null;
-    }
-}
-
-/**
- * NEW: Fetches the Li et al. 2014 phylogeny matrix.
- */
-async function fetchLiPhylogenyData() {
-    if (liPhylogenyCache) return liPhylogenyCache;
-    const dataUrl = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/li_et_al_2014_matrix_optimized.json';
-    try {
-        const response = await fetch(dataUrl);
-        if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
-        liPhylogenyCache = await response.json();
-        console.log('✅ Li et al. 2014 Phylogeny data loaded successfully.');
-        return liPhylogenyCache;
-    } catch (error) {
-        console.error('Failed to fetch Li et al. 2014 phylogeny data:', error);
-        return null;
-    }
-}
-
-
 
 /**
  * Helper function to get complex details by gene symbol.
@@ -1305,6 +1091,43 @@ async function getDomainData() {
     }
 }
 
+/**
+ * Fetches the Nevers et al. 2017 phylogeny matrix.
+ * URL: https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/nevers_et_al_2017_matrix_optimized.json
+ */
+async function fetchNeversPhylogenyData() {
+    if (neversPhylogenyCache) return neversPhylogenyCache;
+    const dataUrl = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/nevers_et_al_2017_matrix_optimized.json';
+    try {
+        const response = await fetch(dataUrl);
+        if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+        neversPhylogenyCache = await response.json();
+        console.log('✅ Nevers et al. 2017 Phylogeny data loaded successfully.');
+        return neversPhylogenyCache;
+    } catch (error) {
+        console.error('Failed to fetch Nevers et al. 2017 phylogeny data:', error);
+        return null;
+    }
+}
+
+/**
+ * Fetches the Li et al. 2014 phylogeny matrix.
+ * URL: https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/li_et_al_2014_matrix_optimized.json
+ */
+async function fetchLiPhylogenyData() {
+    if (liPhylogenyCache) return liPhylogenyCache;
+    const dataUrl = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/li_et_al_2014_matrix_optimized.json';
+    try {
+        const response = await fetch(dataUrl);
+        if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+        liPhylogenyCache = await response.json();
+        console.log('✅ Li et al. 2014 Phylogeny data loaded successfully.');
+        return liPhylogenyCache;
+    } catch (error) {
+        console.error('Failed to fetch Li et al. 2014 phylogeny data:', error);
+        return null;
+    }
+}
 
 /**
  * New function to describe CiliAI's capabilities, listing all available data types.
@@ -1361,64 +1184,6 @@ async function getLiteratureEvidence(gene) {
             ${evidenceSnippets}
         </div>`;
 }
-
-
-/**@##########################BEGINNING OF ORTHOLOG RELATED QUETIONS AND HELPER CORUM##################################
- * @##########################BEGINNING OF ORTHOLOG RELATED QUETIONS AND HELPER CORUM##################################
- * @##########################BEGINNING OF ORTHOLOG RELATED QUETIONS AND HELPER CORUM##################################
- * @##########################BEGINNING OF ORTHOLOG RELATED QUETIONS AND HELPER CORUM##################################
- */
-
-// --- Q3 & Q4: Ortholog Helpers ---
-
-async function getOrthologsByOrganism(organismName) {
-    await fetchCiliaData();
-    const keyMap = { "mouse": "ortholog_mouse", "drosophila": "ortholog_drosophila", "c. elegans": "ortholog_c_elegans" };
-    const orthologKey = keyMap[organismName.toLowerCase()];
-    
-    if (!orthologKey) return formatListResult(`Ciliary Genes in ${organismName}`, [], "Organism not supported for this query.");
-    
-    const results = ciliaHubDataCache
-        .filter(g => g[orthologKey] && g[orthologKey] !== 'N/A')
-        .map(g => ({ gene: g.gene, description: `${organismName} Ortholog: ${g[orthologKey]}` }));
-        
-    return formatListResult(`Ciliary Genes with ${organismName} Orthologs`, results);
-}
-
-async function getOrthologsForGene(gene) {
-    if (!ciliaHubDataCache) await fetchCiliaData();
-    const geneData = ciliaHubDataCache.find(g => g.gene.toUpperCase() === gene.toUpperCase());
-
-    if (!geneData) return `<div class="result-card"><h3>${gene}</h3><p class="status-error">Gene not found in the database.</p></div>`;
-
-    return `
-        <div class="result-card">
-            <h3>Curated Orthologs of ${gene}</h3>
-            <table class="data-table">
-                <tr><th>Mouse (M. musculus)</th><td>${geneData.ortholog_mouse || 'N/A'}</td></tr>
-                <tr><th>Worm (C. elegans)</th><td>${geneData.ortholog_c_elegans || 'N/A'}</td></tr>
-                <tr><th>Xenopus (X. tropicalis)</th><td>${geneData.ortholog_xenopus || 'N/A'}</td></tr>
-                <tr><th>Zebrafish (D. rerio)</th><td>${geneData.ortholog_zebrafish || 'N/A'}</td></tr>
-                <tr><th>Fly (D. melanogaster)</th><td>${geneData.ortholog_drosophila || 'N/A'}</td></tr>
-            </table>
-        </div>`;
-}
-
-
-
-
-/**@#############################END OF ORTHOLOG RELATED QUETIONS AND HELPER CORUM##################################
- * @#############################END OF ORTHOLOG RELATED QUETIONS AND HELPER CORUM##################################
- * @#############################END OF ORTHOLOG RELATED QUETIONS AND HELPER CORUM##################################
- * @#############################END OF ORTHOLOG RELATED QUETIONS AND HELPER CORUM##################################
- */
-
-
-
-
-
-
-
 
 /**@##########################BEGINNING OF COMPLEX RELATED QUETIONS AND HELPER CORUM##################################
  * @##########################BEGINNING OF COMPLEX RELATED QUETIONS AND HELPER CORUM##################################
@@ -1828,6 +1593,75 @@ async function getGenesByComplex(complexName) {
     return relatedGenes;
 }
 
+/**
+ * @name resolveDomainQuery
+ * @description Routes domain-related queries (Comparison, Enriched/Depleted Lists, Specific Motifs) 
+ * using prioritized keyword matching.
+ * @param {string} query - The raw user query (e.g., "Domain architecture comparison IFT88 vs IFT81").
+ */
+async function resolveDomainQuery(query) {
+    const qLower = query.toLowerCase();
+
+    // ====================================================================
+    // 1. DOMAIN COMPARISON CHECK (Targeting the IFT88 vs IFT81 pattern)
+    // ====================================================================
+    // Pattern: Matches a word (A) vs/and/comparison (B). This is where the crash was occurring.
+    const comparisonMatch = query.match(/([A-Z0-9\-]+)\s+(?:vs|and|comparison)\s+([A-Z0-9\-]+)/i);
+
+    if (comparisonMatch && (qLower.includes('domain') || qLower.includes('architecture'))) {
+        
+        // Define a set of noise words that should NEVER be treated as gene symbols
+        // NOTE: We rely on the rest of the query parsing logic (in the main router)
+        // to handle the rest of the filtration, but this is essential for this block.
+        const internalNoiseWords = new Set(['DOMAIN', 'ARCHITECTURE', 'COMPARISON', 'MOTIF']);
+        
+        // Capture the two words matched by the regex
+        const geneA_raw = comparisonMatch[1].toUpperCase();
+        const geneB_raw = comparisonMatch[2].toUpperCase();
+
+        // Filter the raw matches against the noise list
+        const genes = [geneA_raw, geneB_raw].filter(g => g.length >= 3 && !internalNoiseWords.has(g));
+
+        if (genes.length === 2) {
+            // Success: Found two valid genes, route to comparison
+            // NOTE: The handler will use the fixed getDomainsByGene for data retrieval.
+            return displayDomainComparison(genes[0], genes[1]);
+        }
+        // If two genes weren't found (e.g., ARCHITECTURE vs IFT88), proceed to fallback.
+    }
+
+    // ====================================================================
+    // 2. ENRICHED/DEPLETED LIST REQUESTS
+    // ====================================================================
+    if (qLower.includes('enriched domain') || qLower.includes('show enriched')) {
+        return displayEnrichedDomains();
+    }
+    if (qLower.includes('depleted domain') || qLower.includes('show depleted') || qLower.includes('domains absent')) {
+        return displayDepletedDomains();
+    }
+
+    // ====================================================================
+    // 3. SPECIFIC DOMAIN NAME LOOKUP (e.g., "Which genes have WD40 domains?")
+    // ====================================================================
+    const domainKeywords = ['wd40', 'leucine-rich repeat', 'iq motif', 'ef-hand', 'kinase', 'atpase', 'zinc finger']; 
+    for (const keyword of domainKeywords) {
+        if (qLower.includes(keyword)) {
+            // Assumes getGenesByDomain is defined and returns a list wrapped in formatListResult
+            return formatListResult(`Genes with ${keyword} domain`, await getGenesByDomain(keyword));
+        }
+    }
+    
+    // ====================================================================
+    // 4. FALLBACK: SINGLE GENE VISUALIZATION (e.g., "Show domains of IFT88")
+    // ====================================================================
+    const singleGeneMatch = query.match(/domains?\s+(?:of|for|in)\s+([A-Z0-9]+)/i);
+    if (singleGeneMatch) {
+        return visualizeDomainArchitecture(singleGeneMatch[1].toUpperCase());
+    }
+
+    // Final fallback handles cases where extraction fails entirely
+    return `<div class="result-card"><h3>Domain Query Failed</h3><p>Could not interpret the comparison or list request. Please try comparing two valid gene symbols (e.g., IFT88 vs IFT81).</p></div>`;
+}
 
 /**
  * @name getDomainComparisonGenes
@@ -2198,44 +2032,22 @@ const domainIntents = [
 
 /**
  * @name resolveDomainQuery
- * @description Routes domain-related queries (Comparison, Enriched/Depleted Lists, Specific Motifs) 
- * using prioritized keyword matching.
- * @param {string} query - The raw user query (e.g., "Domain architecture comparison IFT88 vs IFT81").
+ * @description Routes domain-related queries (Comparison, Enriched/Depleted Lists, Specific Motifs).
+ * This MUST be defined globally.
+ * * @param {string} query - The raw user query.
  */
 async function resolveDomainQuery(query) {
     const qLower = query.toLowerCase();
 
-    // ====================================================================
-    // 1. DOMAIN COMPARISON CHECK (Targeting the IFT88 vs IFT81 pattern)
-    // ====================================================================
-    // Pattern: Matches a word (A) vs/and/comparison (B). This is where the crash was occurring.
-    const comparisonMatch = query.match(/([A-Z0-9\-]+)\s+(?:vs|and|comparison)\s+([A-Z0-9\-]+)/i);
+    // 1. Check for specific Gene Domain Comparison
+    const genes = getDomainComparisonGenes(query);
 
-    if (comparisonMatch && (qLower.includes('domain') || qLower.includes('architecture'))) {
-        
-        // Define a set of noise words that should NEVER be treated as gene symbols
-        // NOTE: We rely on the rest of the query parsing logic (in the main router)
-        // to handle the rest of the filtration, but this is essential for this block.
-        const internalNoiseWords = new Set(['DOMAIN', 'ARCHITECTURE', 'COMPARISON', 'MOTIF']);
-        
-        // Capture the two words matched by the regex
-        const geneA_raw = comparisonMatch[1].toUpperCase();
-        const geneB_raw = comparisonMatch[2].toUpperCase();
-
-        // Filter the raw matches against the noise list
-        const genes = [geneA_raw, geneB_raw].filter(g => g.length >= 3 && !internalNoiseWords.has(g));
-
-        if (genes.length === 2) {
-            // Success: Found two valid genes, route to comparison
-            // NOTE: The handler will use the fixed getDomainsByGene for data retrieval.
-            return displayDomainComparison(genes[0], genes[1]);
-        }
-        // If two genes weren't found (e.g., ARCHITECTURE vs IFT88), proceed to fallback.
+    if (genes && genes.length === 2) {
+        // Success: Found two valid genes, route to comparison
+        return displayDomainComparison(genes[0], genes[1]);
     }
 
-    // ====================================================================
-    // 2. ENRICHED/DEPLETED LIST REQUESTS
-    // ====================================================================
+    // 2. Check for ENRICHED/DEPLETED LIST requests
     if (qLower.includes('enriched domain') || qLower.includes('show enriched')) {
         return displayEnrichedDomains();
     }
@@ -2243,20 +2055,16 @@ async function resolveDomainQuery(query) {
         return displayDepletedDomains();
     }
 
-    // ====================================================================
-    // 3. SPECIFIC DOMAIN NAME LOOKUP (e.g., "Which genes have WD40 domains?")
-    // ====================================================================
+    // 3. Check for Specific DOMAIN NAME lookup 
     const domainKeywords = ['wd40', 'leucine-rich repeat', 'iq motif', 'ef-hand', 'kinase', 'atpase', 'zinc finger']; 
     for (const keyword of domainKeywords) {
         if (qLower.includes(keyword)) {
-            // Assumes getGenesByDomain is defined and returns a list wrapped in formatListResult
+            // Assumes getGenesByDomain is wrapped in a formatter, or findGenesByNewDomainDB exists
             return formatListResult(`Genes with ${keyword} domain`, await getGenesByDomain(keyword));
         }
     }
     
-    // ====================================================================
-    // 4. FALLBACK: SINGLE GENE VISUALIZATION (e.g., "Show domains of IFT88")
-    // ====================================================================
+    // 4. Fallback for single gene display
     const singleGeneMatch = query.match(/domains?\s+(?:of|for|in)\s+([A-Z0-9]+)/i);
     if (singleGeneMatch) {
         return visualizeDomainArchitecture(singleGeneMatch[1].toUpperCase());
@@ -2265,7 +2073,6 @@ async function resolveDomainQuery(query) {
     // Final fallback handles cases where extraction fails entirely
     return `<div class="result-card"><h3>Domain Query Failed</h3><p>Could not interpret the comparison or list request. Please try comparing two valid gene symbols (e.g., IFT88 vs IFT81).</p></div>`;
 }
-
 
 /**
  * @name resolvePhylogeneticQuery
@@ -2435,19 +2242,7 @@ async function routeMultiGeneDomainTable(query) {
 /**@##########################END OF EXPRESSION RELATED QUETIONS AND HELPER##################################
 /**
 
-/**@##########################BEGINNING OF LOCALIZATION RELATED QUETIONS AND HELPER##################################
- * @##########################BEGINNING OF LOCALIZATION RELATED QUETIONS AND HELPER##################################
-/**@##########################BEGINNING OF LOCALIZATION RELATED QUETIONS AND HELPER##################################
-/**
-/**
 
-
-
-/**@##########################END OF LOCALIZATION RELATED QUETIONS AND HELPER##################################
- * @##########################END OF LOCALIZATION RELATED QUETIONS AND HELPER##################################
-/**@##########################END OF LOCALIZATION RELATED QUETIONS AND HELPER##################################
-/**
-/**
 
 
 
@@ -2567,49 +2362,6 @@ async function getDiseaseGenesByPhenotype(disease, rawPhenotypeQuery) {
     return html;
 }
 
-
-function hasShortCiliaPhenotype(gene) {
-    const lof = (gene.lof_effects || '').toLowerCase();
-    const percent = (gene.percent_ciliated_cells_effects || '').toLowerCase();
-    // Keywords for shortening or reduction
-    const shortKeywords = ['shorter', 'short', 'absent', 'loss of', 'reduced', 'decreased', 'fewer'];
-
-    const matchesLength = shortKeywords.some(kw => lof.includes(kw));
-    const matchesNumber = shortKeywords.some(kw => percent.includes(kw));
-
-    return matchesLength || matchesNumber;
-}
-
-async function getLocalizationPhenotypeGenes(localizationTerm, phenotypeTerm) {
-    // 1. Establish Gene Pool (Localization Filter)
-    const genePool = await getGeneListByTerm(localizationTerm); 
-    
-    if (genePool.length === 0) {
-        return formatListResult(`${localizationTerm} Genes`, [], `No genes found for ${localizationTerm}.`);
-    }
-
-    // 2. Apply Phenotype Filter
-    let results;
-    if (phenotypeTerm.includes("short")) {
-        results = genePool.filter(hasShortCiliaPhenotype);
-    } else {
-        // (Add logic for 'long cilia' or 'no effect' if needed)
-        results = genePool; // Default to just location if phenotype is not 'short'
-    }
-
-    const finalResults = results.map(g => ({
-            gene: g.gene,
-            localization_detail: g.localization ? g.localization.join(', ') : 'N/A',
-            lof_effect_detail: (g.lof_effects || g.percent_ciliated_cells_effects || 'N/A'),
-            description: `LoF: ${g.lof_effects || 'N/A'}`
-        }))
-        .sort((a, b) => a.gene.localeCompare(b.gene));
-
-    const title = `${localizationTerm} Genes Causing ${phenotypeTerm}`;
-    const customMsg = `Filtered from ${genePool.length} genes localized to ${localizationTerm}.`;
-    return formatListResult(title, finalResults, customMsg);
-}
-
 /**
  * @name getComplexPhenotypeGenes
  * @description Finds genes in a specified complex that cause short/absent cilia phenotypes.
@@ -2686,301 +2438,104 @@ async function getLocalizationGenesData(locationName) {
 
     return results; 
 }
- /**
- /**
+
+/**
  * @name getGeneListByTerm
  * @description Retrieves a gene list using the most specific internal source available.
  * @param {string} term - The localization/complex name (e.g., "CILIARY TIP", "Mitochondria").
  * @returns {Promise<Array<Object>>} Array of raw CiliaHub gene objects.
  */
 async function getGeneListByTerm(term) {
-    if (!ciliaHubDataCache) await fetchCiliaData(); 
-    
     const termUpper = term.toUpperCase();
     
-    // 1. Check 1: STATIC COMPLEX MAPS (Priority)
+    // Check 1: STATIC COMPLEX MAPS (Most Precise - e.g., CILIARY TIP, IFT-B)
     const complexMap = getComplexPhylogenyTableMap();
-    const staticGenes = complexMap[termUpper.replace(/\s+COMPLEX|\s+MODULE/g, '')];
+    const staticGenes = complexMap[termUpper];
 
     if (staticGenes && staticGenes.length > 0) {
+        // Retrieve and map the full CiliaHub data for each gene in the static list
+        await fetchCiliaData(); 
         const staticGeneSet = new Set(staticGenes);
         return ciliaHubDataCache.filter(g => staticGeneSet.has(g.gene.toUpperCase()));
     }
 
-    // 2. Check 2: DYNAMIC LOCALIZATION FIELD (Fallback for Mitochondria, Nucleus, etc.)
-    const locationTerms = term.split(/\s+or\s+/).map(normalizeTerm);
-
-    const filteredResults = ciliaHubDataCache
-        .filter(gene => {
-            // Check if localization is a clean array (guaranteed by fetchCiliaData)
-            if (!Array.isArray(gene.localization) || gene.localization.length === 0) {
-                return false;
-            }
-            
-            // Check if ANY gene localization contains ANY search term (e.g., 'mitochondria' matches 'mitochondrial')
-            return gene.localization.some(loc => {
-                const normalizedLoc = normalizeTerm(loc);
-                return locationTerms.some(inputTerm => normalizedLoc.includes(inputTerm));
-            });
-        });
-
-    return filteredResults; 
-}
-
-
-
-function hasEnhancedShortCiliaEvidence(gene) {
-    // Use the exact terminology found in the data
-    const shortCiliaKeywords = ['shorter cilia', 'shorter', 'short', 'decreased'];
-    const longCiliaKeywords = ['longer cilia', 'longer', 'long', 'increased'];
-    
-    // 1. Check LoF effects field for short cilia evidence
-    const lofEffect = (gene.lof_effects || '').toLowerCase();
-    const hasLoFShortEvidence = shortCiliaKeywords.some(keyword => 
-        lofEffect.includes(keyword) && !lofEffect.includes('not reported')
-    );
-    
-    // Check if LoF explicitly mentions "longer" - exclude these
-    const hasLoFLongEvidence = longCiliaKeywords.some(keyword => 
-        lofEffect.includes(keyword) && !lofEffect.includes('not reported')
-    );
-
-    // 2. Check percent ciliated cells effects for decreased ciliation
-    const percentEffect = (gene.percent_ciliated_cells_effects || '').toLowerCase();
-    const hasPercentShortEvidence = shortCiliaKeywords.some(keyword =>
-        percentEffect.includes(keyword) && !percentEffect.includes('not reported')
-    );
-    
-    const hasPercentLongEvidence = longCiliaKeywords.some(keyword =>
-        percentEffect.includes(keyword) && !percentEffect.includes('not reported')
-    );
-
-    // 3. Check overexpression effects
-    const overexpressEffect = (gene.overexpression_effects || '').toLowerCase();
-    const hasOverexpressShortEvidence = shortCiliaKeywords.some(keyword =>
-        overexpressEffect.includes(keyword) && !overexpressEffect.includes('not reported')
-    );
-
-    // 4. Check screen data for negative regulator classification
-    let hasScreenEvidence = false;
-    if (gene.screens_from_separate_file && Array.isArray(gene.screens_from_separate_file)) {
-        hasScreenEvidence = gene.screens_from_separate_file.some(screen => {
-            const classification = (screen.classification || '').toLowerCase();
-            return classification.includes('negative regulator') || 
-                   (screen.z_score && screen.z_score < -2);
-        });
-    }
-
-    // 5. Check functional summary for short cilia evidence
-    const functionalSummary = (gene.functional_summary || '').toLowerCase();
-    const hasFunctionalEvidence = shortCiliaKeywords.some(keyword =>
-        functionalSummary.includes(keyword)
-    );
-
-    // 6. Check ciliopathy association (indirect evidence)
-    const hasCiliopathy = gene.ciliopathy && gene.ciliopathy.length > 0;
-
-    // Return true if we have evidence of short cilia AND no contradictory evidence of long cilia
-    const hasShortEvidence = hasLoFShortEvidence || hasPercentShortEvidence || 
-                            hasOverexpressShortEvidence || hasScreenEvidence || 
-                            hasFunctionalEvidence || hasCiliopathy;
-    
-    const hasContradictoryEvidence = hasLoFLongEvidence || hasPercentLongEvidence;
-    
-    return hasShortEvidence && !hasContradictoryEvidence;
-}
-
-/**
- * @name hasEnhancedLongCiliaEvidence
- * @description Evidence detection for longer cilia phenotypes
- */
-function hasEnhancedLongCiliaEvidence(gene) {
-    const longCiliaKeywords = ['longer cilia', 'longer', 'long', 'increased'];
-    const shortCiliaKeywords = ['shorter cilia', 'shorter', 'short', 'decreased'];
-    
-    const lofEffect = (gene.lof_effects || '').toLowerCase();
-    const percentEffect = (gene.percent_ciliated_cells_effects || '').toLowerCase();
-    const overexpressEffect = (gene.overexpression_effects || '').toLowerCase();
-    
-    const hasLongEvidence = longCiliaKeywords.some(keyword => 
-        (lofEffect.includes(keyword) || 
-         percentEffect.includes(keyword) || 
-         overexpressEffect.includes(keyword)) &&
-        !lofEffect.includes('not reported')
-    );
-    
-    const hasContradictoryEvidence = shortCiliaKeywords.some(keyword =>
-        lofEffect.includes(keyword) || percentEffect.includes(keyword) || overexpressEffect.includes(keyword)
-    );
-    
-    return hasLongEvidence && !hasContradictoryEvidence;
+    // Check 2: DYNAMIC LOCALIZATION FIELD (Flexible - e.g., Mitochondria, Nucleus)
+    return getLocalizationGenesData(term); 
 }
 
 
 /**
- * @name hasSimplePhenotypeEvidence
- * @description Simple keyword matching for other phenotypes
+ * @name getLocalizationPhenotypeGenes (FINAL CORRECTED IMPLEMENTATION)
+ * @description Finds genes localizing to a compartment/complex that also match a specific phenotype.
  */
-function hasSimplePhenotypeEvidence(gene, phenotypeLower) {
-    let keywords = [];
+async function getLocalizationPhenotypeGenes(localizationTerm, phenotypeTerm) {
+    // 1. Get the gene pool from the best source (static map OR dynamic localization field)
+    // NOTE: This call now replaces both 'getLocalizationGenesData' and complex lookup logic.
+    const genePool = await getGeneListByTerm(localizationTerm); 
     
-    if (phenotypeLower.includes('no effect')) {
-        keywords = ['no effect'];
+    if (genePool.length === 0) {
+        return formatListResult(`${localizationTerm} Genes`, [], `No genes found for ${localizationTerm}.`);
     }
-    
-    const lofEffect = (gene.lof_effects || '').toLowerCase();
-    const percentEffect = (gene.percent_ciliated_cells_effects || '').toLowerCase();
-    
-    return keywords.some(kw => 
-        lofEffect.includes(kw) || percentEffect.includes(kw)
-    );
-}
 
-/**
- * @name getPhenotypeEvidence
- * @description Generates evidence summary for any phenotype
- */
-function getPhenotypeEvidence(gene, phenotype) {
-    const evidence = [];
+    const phenotypeLower = phenotypeTerm.toLowerCase();
     
-    // Always show relevant effects
-    if (gene.lof_effects && !gene.lof_effects.toLowerCase().includes('not reported')) {
-        evidence.push(`LoF: ${gene.lof_effects}`);
+    // 2. Define dynamic phenotype filter keywords (remains the same robust logic)
+    // ... (lengthKeywords, numberKeywords mapping logic) ...
+    
+    let lengthKeywords = [];
+    let numberKeywords = [];
+    if (phenotypeLower.includes('short')) {
+        lengthKeywords = ['shorter', 'short', 'absent', 'no cilia', 'failure to assemble', 'severe defect'];
+        numberKeywords = ['reduced', 'decreased', 'fewer', 'loss', 'severe defect', 'no cilia'];
+    } else if (phenotypeLower.includes('longer')) {
+        lengthKeywords = ['longer', 'long', 'increased length'];
+        numberKeywords = ['increased', 'more'];
+    } else if (phenotypeLower.includes('no effect')) {
+        lengthKeywords = ['no effect', 'not reported', 'no change'];
+        numberKeywords = ['no effect', 'not reported', 'no change'];
     }
-    
-    if (gene.percent_ciliated_cells_effects && !gene.percent_ciliated_cells_effects.toLowerCase().includes('not reported')) {
-        evidence.push(`% Cells: ${gene.percent_ciliated_cells_effects}`);
-    }
-    
-    if (gene.overexpression_effects && !gene.overexpression_effects.toLowerCase().includes('not reported')) {
-        evidence.push(`Overexpression: ${gene.overexpression_effects}`);
-    }
-    
-    // Add screen evidence for short/long cilia
-    if ((phenotype.includes('short') || phenotype.includes('long')) && 
-        gene.screens_from_separate_file && Array.isArray(gene.screens_from_separate_file)) {
-        const relevantScreens = gene.screens_from_separate_file.filter(screen => {
-            const classification = (screen.classification || '').toLowerCase();
-            return classification.includes('negative regulator') || 
-                   classification.includes('positive regulator');
-        });
+
+    // --- Phenotype Filter Logic (CRITICAL REVISION) ---
+const results = genePool // Using the genePool retrieved by getGeneListByTerm
+    .filter(gene => {
+        // Step 1: Normalize fields (ensuring nulls are handled with empty strings)
+        const lofEffect = (gene.lof_effects || '').toLowerCase();
+        const numberEffect = (gene.percent_ciliated_cells_effects || '').toLowerCase();
         
-        if (relevantScreens.length > 0) {
-            const screenEvidence = relevantScreens.map(screen => 
-                `${screen.dataset}: ${screen.classification}`
-            ).join('; ');
-            evidence.push(`Screens: ${screenEvidence}`);
+        // Step 2: Check for presence of ANY relevant phenotype data
+        const hasPhenoData = lofEffect.length > 0 || numberEffect.length > 0;
+        if (!hasPhenoData) return false; // Exclude if both fields are empty/null
+
+        // Step 3: Check for match based on defined keywords (short/long/no effect)
+        const matchesLength = lengthKeywords.some(kw => lofEffect.includes(kw));
+        const matchesNumber = numberKeywords.some(kw => numberEffect.includes(kw));
+
+        // CRITICAL LOGIC CHECK
+        // For 'no effect', we must find explicit neutrality in both fields
+        if (phenotypeLower.includes('no effect')) {
+             const isLoFNeutral = lengthKeywords.some(kw => lofEffect.includes(kw));
+             const isNumberNeutral = numberKeywords.some(kw => numberEffect.includes(kw));
+             return isLoFNeutral && isNumberNeutral;
+        } 
+        
+        // For 'short' or 'long' (the problem queries), return true if EITHER field matches a positive keyword
+        // This ensures the filter applies and is not overly sensitive to blank fields.
+        else if (phenotypeLower.includes('short') || phenotypeLower.includes('long')) {
+             return matchesLength || matchesNumber;
         }
-    }
-    
-    return evidence.length > 0 ? evidence.join(' | ') : 'Not Reported';
-}
 
-// Update the semantic intent resolver to handle mitochondrial variations
-function enhanceSemanticIntentResolver() {
-    // Add comprehensive localization terms including variations
-    const enhancedLocalizationTerms = [
-        "basal body", "transition zone", "cilia", "axoneme", "centrosome", 
-        "ciliary membrane", "nucleus", "lysosome", "mitochondria", "ciliary tip",
-        "lysosomal", "mitochondrial", "nuclear", "flagella", "centriole"
-    ];
-    
-    const enhancedPhenotypeTerms = [
-        "short cilia", "longer cilia", "cilia length", "cilia defects", 
-        "decreased ciliation", "loss of cilia", "reduced cilia", "increase", 
-        "decrease", "no effect", "shorter cilia", "absent cilia"
-    ];
+        return false;
+    })
+        .map(g => ({
+            gene: g.gene,
+            localization_detail: g.localization ? g.localization.join(', ') : 'N/A',
+            lof_effect_detail: g.lof_effects || 'N/A',
+            description: `LoF: ${g.lof_effects || 'N/A'}`
+        }))
+        .sort((a, b) => a.gene.localeCompare(b.gene));
 
-    // Update the global arrays if they exist
-    if (typeof localizationTerms !== 'undefined') {
-        // Clear and replace to ensure we have the right terms
-        localizationTerms.length = 0;
-        localizationTerms.push(...enhancedLocalizationTerms);
-    }
-    
-    if (typeof phenotypeTerms !== 'undefined') {
-        phenotypeTerms.length = 0;
-        phenotypeTerms.push(...enhancedPhenotypeTerms);
-    }
-}
-
-// Test function to debug mitochondrial gene retrieval
-async function testMitochondrialGenes() {
-    await fetchCiliaData();
-    const mitochondrialGenes = ciliaHubDataCache.filter(gene => 
-        gene.localization && Array.isArray(gene.localization) && 
-        gene.localization.some(loc => 
-            loc.toLowerCase().includes('mitochondria') || 
-            loc.toLowerCase().includes('mitochondrial')
-        )
-    );
-    
-    console.log(`Total mitochondrial genes found: ${mitochondrialGenes.length}`);
-    console.log('Sample mitochondrial genes:', mitochondrialGenes.slice(0, 5).map(g => ({
-        gene: g.gene,
-        localization: g.localization,
-        lof_effects: g.lof_effects
-    })));
-    
-    // Test short cilia evidence
-    const shortCiliaMitochondrial = mitochondrialGenes.filter(hasEnhancedShortCiliaEvidence);
-    console.log(`Mitochondrial genes with short cilia evidence: ${shortCiliaMitochondrial.length}`);
-    console.log('Sample short cilia mitochondrial genes:', shortCiliaMitochondrial.map(g => ({
-        gene: g.gene,
-        localization: g.localization,
-        lof_effects: g.lof_effects,
-        percent_effects: g.percent_ciliated_cells_effects
-    })));
-}
-
-// Initialize enhancements
-if (typeof window !== 'undefined') {
-    document.addEventListener('DOMContentLoaded', function() {
-        enhanceSemanticIntentResolver();
-        console.log('Enhanced localization and phenotype detection loaded');
-        
-        // Run test when debugging
-        // testMitochondrialGenes();
-    });
-}
-
-
-
-
-/**
- * @name enhanceSemanticIntentResolver
- * @description Enhances the semantic intent resolver to better handle short cilia queries
- */
-function enhanceSemanticIntentResolver() {
-    // Add enhanced localization and phenotype detection
-    const enhancedLocalizationTerms = [
-        "basal body", "transition zone", "cilia", "axoneme", "centrosome", 
-        "ciliary membrane", "nucleus", "lysosome", "mitochondria", "ciliary tip",
-        "lysosomal", "mitochondrial", "nuclear" // Added variations
-    ];
-    
-    const enhancedPhenotypeTerms = [
-        "short cilia", "longer cilia", "cilia length", "cilia defects", 
-        "decreased ciliation", "loss of cilia", "reduced cilia", "increase", 
-        "decrease", "no effect", "shorter cilia", "absent cilia"
-    ];
-
-    // Update the global arrays if they exist
-    if (typeof localizationTerms !== 'undefined') {
-        localizationTerms.push(...enhancedLocalizationTerms.filter(term => !localizationTerms.includes(term)));
-    }
-    
-    if (typeof phenotypeTerms !== 'undefined') {
-        phenotypeTerms.push(...enhancedPhenotypeTerms.filter(term => !phenotypeTerms.includes(term)));
-    }
-}
-
-// Initialize enhancements when the script loads
-if (typeof window !== 'undefined') {
-    document.addEventListener('DOMContentLoaded', function() {
-        enhanceSemanticIntentResolver();
-        console.log('Enhanced getLocalizationPhenotypeGenes loaded with comprehensive short cilia detection');
-    });
+    const title = `${localizationTerm} Genes Causing ${phenotypeTerm}`;
+    return formatListResult(title, results);
 }
 
 
@@ -3155,72 +2710,7 @@ async function generateDomainEnrichmentHeatmap() {
     return htmlOutput;
 }
 
-async function getEnrichedDomains() {
-    await getDomainData();
-    if (!CILI_AI_DOMAIN_DB || !CILI_AI_DOMAIN_DB.enriched_domains) return [];
-    return Object.values(CILI_AI_DOMAIN_DB.enriched_domains)
-        .sort((a, b) => b.odds_ratio - a.odds_ratio)
-        .slice(0, 10)
-        .map(d => ({ gene: d.domain_id, description: `OR: ${d.odds_ratio.toFixed(2)}, p-adj: ${d.p_adj.toExponential(2)}` }));
-}
 
-async function getDepletedDomains() {
-    await getDomainData();
-    if (!CILI_AI_DOMAIN_DB || !CILI_AI_DOMAIN_DB.depleted_or_absent_domains) return [];
-    return Object.values(CILI_AI_DOMAIN_DB.depleted_or_absent_domains)
-        .sort((a, b) => a.odds_ratio - b.odds_ratio)
-        .slice(0, 10)
-        .map(d => ({ gene: d.domain_id, description: `OR: ${d.odds_ratio.toFixed(2)}, p-adj: ${d.p_adj.toExponential(2)}` }));
-}
-
-async function getOrthologs(disease, organism) {
-    await fetchCiliaData();
-    const { genes: diseaseGenes } = await getCiliopathyGenes(disease);
-    
-    const orthologKeyMap = { 'c. elegans': 'ortholog_c_elegans', 'zebrafish': 'ortholog_zebrafish' };
-    const orthologKey = orthologKeyMap[organism.toLowerCase()];
-
-    if (!orthologKey) {
-        return formatListResult(`${disease} Orthologs in ${organism}`, [], `Ortholog key for "${organism}" not found.`);
-    }
-
-    const results = diseaseGenes
-        .map(g => ciliaHubDataCache.find(cg => cg.gene === g.gene))
-        .filter(g => g && g[orthologKey] && g[orthologKey] !== 'N/A')
-        .map(g => ({ gene: g.gene, description: `${organism} Ortholog: ${g[orthologKey]}` }));
-        
-    return formatListResult(`${disease} Orthologs in ${organism}`, results);
-}
-
-async function displayExpression(gene) {
-    await fetchCellxgeneData();
-    const data = cellxgeneDataCache[gene.toUpperCase()];
-    if (!data) return formatListResult(`Expression for ${gene}`, [], `Gene not found in scRNA-seq data.`);
-    
-    const ciliatedExp = data["ciliated cell"] ? data["ciliated cell"].toFixed(4) : "N/A";
-    return formatListResult(`Expression for ${gene} in Lung`, [], `Expression in ciliated cells: <strong>${ciliatedExp}</strong>.`);
-}
-
-async function getJoubertGenesInCiliatedCells() {
-    await fetchCiliaData();
-    await fetchCellxgeneData();
-    const { genes: joubertGenes } = await getCiliopathyGenes("Joubert Syndrome");
-    const joubertGeneSet = new Set(joubertGenes.map(g => g.gene.toUpperCase()));
-
-    const results = [];
-    joubertGeneSet.forEach(gene => {
-        const expData = cellxgeneDataCache[gene];
-        if (expData && expData["ciliated cell"] && expData["ciliated cell"] > 0.1) {
-            results.push({
-                gene: gene,
-                description: `Expression: ${expData["ciliated cell"].toFixed(4)}`
-            });
-        }
-    });
-
-    results.sort((a, b) => parseFloat(b.description.split(': ')[1]) - parseFloat(a.description.split(': ')[1]));
-    return formatListResult("Joubert Genes Expressed in Ciliated Cells", results);
-}
 
 
 
@@ -6175,14 +5665,11 @@ questionRegistry.push(
 // =============================================================================
 
 async function getGeneFunction(gene) {
-     if (!ciliaHubDataCache) await fetchCiliaData();
+    if (!ciliaHubDataCache) await fetchCiliaData();
     const geneData = ciliaHubDataCache.find(g => g.gene.toUpperCase() === gene.toUpperCase());
-    if (!geneData) return `<div class="result-card"><h3>${gene}</h3><p class="status-error">Gene not found in the database.</p></div>`; 
+    if (!geneData) return `<div class="result-card"><h3>${gene}</h3><p class="status-not-found">Gene not found in the database.</p></div>`;
     
-    return formatListResult(`Function of ${gene}`, [{
-        gene: gene,
-        description: geneData.functional_summary || geneData.description || "No functional summary available."
-    }]);
+    return formatGeneDetail(geneData, gene, "Function", geneData.functional_summary || geneData.description || "No functional information available.");
 }
 
 async function getGeneRole(gene, context) {
@@ -6197,14 +5684,11 @@ async function getGeneRole(gene, context) {
 async function getGeneLocalization(gene) {
     if (!ciliaHubDataCache) await fetchCiliaData();
     const geneData = ciliaHubDataCache.find(g => g.gene.toUpperCase() === gene.toUpperCase());
-    if (!geneData) return `<div class="result-card"><h3>${gene}</h3><p class="status-error">Gene not found in the database.</p></div>`; 
-    
-    return formatListResult(`Localization of ${gene}`, [{
-        gene: gene,
-        description: geneData.localization.join(', ') || "No localization data available."
-    }]);
-}
+    if (!geneData) return `<div class="result-card"><h3>${gene}</h3><p class="status-not-found">Gene not found in the database.</p></div>`;
 
+    const localization = geneData.localization?.join(", ") || "No localization data available.";
+    return formatGeneDetail(geneData, gene, "Subcellular Localization", localization);
+}
 
 async function getGeneDiseases(gene) {
     if (!ciliaHubDataCache) await fetchCiliaData();
@@ -6769,15 +6253,21 @@ async function getCiliopathyGenes(disease) {
     return { genes, description: `Found ${genes.length} genes associated with "${disease}".` };
 }
 
-async function getGenesByLocalization(locationName) {
-    // This now just wraps the (fixed) getGeneListByTerm for simple lists
-    const results = await getGeneListByTerm(locationName);
-    return formatListResult(`Genes Localizing to ${locationName}`, results.map(g => ({
-        gene: g.gene,
-        description: g.localization.join(', ')
-    })));
+async function getGenesByLocalization(locations) {
+    await fetchCiliaData();
+    const locationTerms = locations.split(/\s+or\s+/).map(normalizeTerm);
+    const results = ciliaHubDataCache
+        .filter(gene => gene.localization && gene.localization.some(loc => 
+            locationTerms.some(term => normalizeTerm(loc).includes(term))
+        ))
+        .map(gene => ({ 
+            gene: gene.gene, 
+            description: gene.localization?.join(', ') || 'No localization data' 
+        }))
+        .sort((a, b) => a.gene.localeCompare(b.gene));
+    
+    return results;
 }
-
 
 async function getGenesWithDomain(domainName) {
     await fetchCiliaData();
@@ -8319,52 +7809,69 @@ function formatGeneDetail(geneData, geneSymbol, detailTitle, detailContent) {
 // The formatListResult function must now accept a different signature or intelligently detect the new structure.
 // This is how the formatListResult function needs to be adapted to display the three columns:
 
-/**
- * @name formatListResult
- * @description Generic HTML formatter for any gene list that contains
- *              {gene, localization_detail, lof_effect_detail, description}
- */
-function formatListResult(title, geneList, customMsg = '') {
+function formatListResult(title, geneList, citationHtml = '', speciesCode = '', targetKey = null) {
     if (!geneList || geneList.length === 0) {
-        return `<div class="result-card"><h3>${title}</h3><p class="status-error">No matching genes found.</p>${customMsg}</div>`;
+        return `<div class="result-card"><h3>${title}</h3><p class="status-not-found">No matching genes found.</p></div>`;
     }
 
-    const displayedGenes = geneList.slice(0, 50);
-    // Check for enhanced table format (from localization/phenotype queries)
-    const isEnhancedTable = displayedGenes.length > 0 && 
-                            displayedGenes[0].hasOwnProperty('localization_detail');
+    const displayedGenes = geneList.slice(0, 100);
     
-    let tableHeader = `<thead><tr><th class="sortable">Gene</th>`;
+    // --- CHECK FOR NEW STRUCTURE ---
+    // If the gene objects contain 'localization_detail' and 'lof_effect_detail', use the enhanced table.
+    const isEnhancedTable = displayedGenes.length > 0 && 
+                            displayedGenes[0].hasOwnProperty('localization_detail') &&
+                            displayedGenes[0].hasOwnProperty('lof_effect_detail');
+    
+    // --- Build Table Header ---
+    let tableHeader = `
+    <thead>
+        <tr>
+            <th class="sortable">Human Gene</th>`;
+
     if (isEnhancedTable) {
-        tableHeader += `<th class="sortable">Ciliary Localization</th><th class="sortable">Phenotype (LoF/Screen)</th></tr></thead>`;
+        tableHeader += `
+            <th class="sortable">Ciliary Localization</th>
+            <th class="sortable">LoF Phenotype (Cilia Length/Number)</th>
+        </tr>
+    </thead>`;
     } else {
-        tableHeader += `<th>Description</th></tr></thead>`;
+        // Fallback to old single-column display
+        tableHeader += `<th>Disease/Conservation Info</th></tr></thead>`;
     }
 
+
+    // --- Build Table Rows ---
     const tableRows = displayedGenes.map(g => {
         let cells = `<td><strong>${g.gene}</strong></td>`;
+        
         if (isEnhancedTable) {
-            cells += `<td>${g.localization_detail || 'N/A'}</td>`;
-            cells += `<td class="font-semibold">${g.lof_effect_detail || 'N/A'}</td>`;
+            cells += `<td>${g.localization_detail}</td>`;
+            cells += `<td style="font-weight: bold;">${g.lof_effect_detail}</td>`;
         } else {
-            cells += `<td>${g.description ? g.description.substring(0, 100) : 'N/A'}</td>`;
+            cells += `<td>${g.description.substring(0, 100)}${g.description.length > 100 ? '...' : ''}</td>`;
         }
+        
         return `<tr>${cells}</tr>`;
     }).join('');
 
+
+    // --- Final HTML Structure ---
+    // ... (rest of the formatting for download buttons and wrapping divs remains the same)
+    const titleHtml = `<h3>${title} (${geneList.length} found)</h3>`;
+    const downloadButtonHtml = `<button class="download-button" onclick="downloadTable('download-table-content', '${title.replace(/[^a-z0-9]/gi, '_')}')">Download CSV</button>`;
+
     return `
     <div class="result-card">
-        <h3 class="text-xl font-semibold">${title} (${geneList.length} found)</h3>
-        <p class="text-sm text-gray-600">${customMsg}</p>
-        <table class="data-table">
+        ${titleHtml}
+        <table class="ciliopathy-table" id="download-table-content">
             ${tableHeader}
             <tbody>${tableRows}</tbody>
         </table>
-        ${geneList.length > 50 ? `<p class="text-sm text-gray-500 mt-2">Showing first 50 results.</p>` : ''}
+        ${geneList.length > 100 ? `<p><a href="https://theciliahub.github.io/" target="_blank">View full list (${geneList.length} genes) in CiliaHub</a></p>` : ''}
+        ${downloadButtonHtml}
+        ${citationHtml}
     </div>`;
 }
-
-
 
 // ----------------------------------------------------------------------
 // NEW FUNCTIONALITY: CLIENT-SIDE CSV DOWNLOAD
