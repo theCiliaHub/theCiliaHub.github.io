@@ -2607,26 +2607,6 @@ async function getGeneListByTerm(term) {
 }
 
 
-/**
- * @name normalizeTerm
- * @description Normalizes terms for consistent comparison
- * @param {string} term - The term to normalize
- * @returns {string} Normalized term
- */
-function normalizeTerm(term) {
-    if (!term) return '';
-    let norm = term.toLowerCase().trim();
-    const map = {
-        'mitochondrial': 'mitochondria',
-        'lysosomal': 'lysosome',
-        'nuclear': 'nucleus',
-        'cilium': 'cilia',
-        'ciliary': 'cilia'
-        
-    };
-    return map[norm] || norm;
-}
-
 
 function hasEnhancedShortCiliaEvidence(gene) {
     // Use the exact terminology found in the data
