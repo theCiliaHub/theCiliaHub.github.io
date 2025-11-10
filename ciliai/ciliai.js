@@ -420,122 +420,141 @@ async function resolveSemanticIntent(query) {
 
 // --- Main AI Query Handler ---
 window.handleAIQuery = async function() {
-    const aiQueryInput = document.getElementById('aiQueryInput');
-    const resultArea = document.getElementById('ai-result-area');
-    const query = aiQueryInput.value.trim();
+    const queryInput = document.getElementById('aiQueryInput');
+    const resultArea = document.getElementById('query-output');
+    const query = queryInput.value.trim();
+    const qLower = query.toLowerCase();
+
     if (!query) return;
-
-    // --- FIX 1: Purge any existing Plotly plots from the result area ---
-    try { if (window.Plotly) window.Plotly.purge(resultArea); } catch (e) {}
-
-    resultArea.style.display = 'block';
-    resultArea.innerHTML = `<p class="status-searching">CiliAI is thinking... 🧠</p>`;
+    resultArea.innerHTML = `<p class="result-card status-searching">🧠 CiliAI is thinking...</p>`;
     
     try {
-        // Await core CiliaHub data fetches ONLY. Phylogeny fetches run in the router.
+        // --- Purge Plotly ---
+        try { if (window.Plotly) Plotly.purge(resultArea); } catch (e) {}
+
+        // --- Await all core data (Ensures caches are ready) ---
         await Promise.all([
             fetchCiliaData(),
-            fetchScreenData(),
-            fetchTissueData(),
+            getDomainData(),
             fetchCellxgeneData(),
+            fetchPhylogenyData(),
+            fetchCorumComplexes(),
             fetchUmapData(),
-            getDomainData(), // Domain data is loaded here
-            fetchCorumComplexes()
+            fetchTissueData()
         ]);
         console.log('ciliAI.js: All core data loaded for processing.');
 
-        // 🧠 NEW ROUTING PRIORITY 0: Try resolving semantic intent before keyword routing
-        // NOTE: 'resolveSemanticIntent' must be defined outside this function.
-        const semanticResult = await resolveSemanticIntent(query);
-        if (semanticResult) {
-            resultArea.innerHTML = semanticResult;
-            return; // Stop further routing — intent handled semantically
-        }
-
-        let resultHtml = '';
-        const qLower = query.toLowerCase();
+        let htmlResult = null;
         let match;
 
         // =================================================================
-        // **NEW ROUTING PRIORITY 1:** Handle Curated Phylogenetic Table Queries
+        // PRIORITY 1: Exact Match in questionRegistry
         // =================================================================
-        const complexTableResult = await routeComplexPhylogenyAnalysis(query);
-        if (complexTableResult) {
-            console.log("Query resolved by High-Priority Complex Phylogeny Table Router.");
-            resultHtml = complexTableResult;
-        }
-        
-        // =================================================================
-        // ⭐ NEW ROUTING PRIORITY 2: Handle Domain Queries (Comparison, Enriched, Depleted, Specific Motifs) ⭐
-        // =================================================================
-        else if (qLower.includes('domain') || qLower.includes('motif') || 
-                 qLower.includes('enriched') || qLower.includes('depleted') ||
-                 qLower.includes('architecture comparison')) {
-            
-            console.log('Routing to Domain Query Resolver...');
-            resultHtml = await resolveDomainQuery(query);
+        const perfectMatch = questionRegistry.find(item => item.text.toLowerCase() === qLower);
+        if (perfectMatch) {
+            console.log("Routing via: Priority 1 (questionRegistry)");
+            htmlResult = await perfectMatch.handler();
         }
 
         // =================================================================
-        // **NEW ROUTING PRIORITY 3:** Handle General Phylogenetic Queries (FIXES REFERENCE ERROR)
+        // PRIORITY 2: Semantic Intent (Location + Phenotype, Disease + Phenotype)
         // =================================================================
-        else if (qLower.includes('phylogeny') || qLower.includes('conservation') || 
-                 qLower.includes('heatmap') || qLower.includes('comparison') || 
-                 qLower.includes('tree')) {
-            
-            console.log('Routing to General Phylogenetic Query Resolver...');
-            resultHtml = await resolvePhylogeneticQuery(query); 
+        if (!htmlResult) {
+            const semanticResult = await resolveSemanticIntent(query);
+            if (semanticResult) {
+                console.log("Routing via: Priority 2 (resolveSemanticIntent)");
+                htmlResult = semanticResult;
+            }
         }
 
         // =================================================================
-        // **FALLBACK TO ORIGINAL LOGIC**
+        // PRIORITY 3: Dedicated Routers (Phylogeny, Domain, CORUM)
         // =================================================================
-        else {
-            const perfectMatch = questionRegistry.find(item => item.text.toLowerCase() === qLower);
-            if (perfectMatch) {
-                console.log(`Registry match found: "${perfectMatch.text}"`);
-                resultHtml = await perfectMatch.handler();
-            }  
-            else if ((match = qLower.match(/(?:tell me about|what is|describe)\s+(.+)/i))) {
-                const term = match[1].trim();
-                resultHtml = await getComprehensiveDetails(term);
-            }  
-            else {
-                const intent = intentParser.parse(query);
-                if (intent && typeof intent.handler === 'function') {
-                    console.log(`Intent parser match found: ${intent.intent} for entity: ${intent.entity}`);
-                    resultHtml = await intent.handler(intent.entity);
+        if (!htmlResult) {
+            console.log(`Routing via: Priority 3 (Dedicated Routers)`);
+            
+            // --- Ciliopathy Module Queries (from new intentParser) ---
+            if (qLower.includes('joubert') && qLower.includes('ciliated cells')) {
+                htmlResult = await intentParser.getJoubertGenesInCiliatedCells();
+            } 
+            else if (qLower.includes('ortholog') && (qLower.includes('joubert') || qLower.includes('ciliopathy'))) {
+                const diseaseMatch = qLower.includes('joubert') ? "Joubert Syndrome" : "ciliopathy";
+                const organismMatch = qLower.match(/(c\. elegans|zebrafish|mouse|drosophila|xenopus)/i);
+                if (organismMatch) {
+                    htmlResult = await intentParser.getOrthologs(diseaseMatch, organismMatch[1]);
                 }
-                else {
-                    const potentialGenes = (query.match(/\b([A-Z0-9\-\.]{3,})\b/gi) || []);
-                    const genes = potentialGenes.filter(g => ciliaHubDataCache.some(hubGene => hubGene.gene.toUpperCase() === g.toUpperCase()));
-                    
-                    if (genes.length === 2 && (qLower.includes('compare') || qLower.includes('vs'))) {
-                        resultHtml = await displayCellxgeneBarChart(genes);
-                    } else if (genes.length === 1 && (qLower.includes('plot') || qLower.includes('show expression') || qLower.includes('visualize'))) {
-                        if (qLower.includes('umap')) {
-                            resultHtml = await displayUmapGeneExpression(genes[0]);
-                        } else {
-                            resultHtml = await displayCellxgeneBarChart(genes);
-                        }
-                    } else if (genes.length === 1 && qLower.length < (genes[0].length + 5)) {
-                        resultHtml = await getComprehensiveDetails(query);
-                    } else {
-                        resultHtml = `<p>Sorry, I didn’t understand that. Please try one of the suggested questions or a known keyword.</p>`;
-                    }
+            }
+            
+            // --- CORUM Queries (from old patchAIQueryHandler) ---
+            else if (qLower.includes('subunits of') || qLower.includes('components of') || qLower.includes('members of')) {
+                const complexMatch = qLower.match(/(?:subunits|components|members)\s+of\s+(.+)/i);
+                if (complexMatch) {
+                    const complexes = await getGenesByComplex(complexMatch[1].trim());
+                    htmlResult = formatListResult(`Components of ${complexMatch[1].trim()}`, complexes);
+                }
+            }
+            else if (qLower.includes('complexes for') || qLower.includes('complexes of') || qLower.includes('complexes containing')) {
+                const geneMatch = qLower.match(/(?:complexes|subunits)\s+(?:for|of|containing)\s+([A-Za-z0-9\-]+)/i);
+                if (geneMatch) {
+                    const complexes = await getGenesByComplex(geneMatch[1].toUpperCase());
+                    htmlResult = formatListResult(`Complexes containing ${geneMatch[1].toUpperCase()}`, complexes);
+                }
+            }
+
+            // --- Phylogenetic Table/Heatmap Router ---
+            else if (qLower.includes('phylogeny') || qLower.includes('conservation') || qLower.includes('evolutionary')) {
+                const genes = (query.match(/\b([A-Z0-9\-]{3,})\b/gi) || []).map(g => g.toUpperCase());
+                htmlResult = await handlePhylogenyVisualizationQuery(genes, 'li', 'heatmap');
+            } 
+            // --- Domain Query Router ---
+            else if (qLower.includes('domain') || qLower.includes('architecture')) {
+                htmlResult = await resolveDomainQuery(query);
+            }
+        }
+
+        // =================================================================
+        // PRIORITY 4: Simple Keyword Parser (FIXED)
+        // =================================================================
+        if (!htmlResult) {
+            // This now uses the .parse() method of our NEW unified intentParser
+            const intent = intentParser.parse(query);
+            if (intent && typeof intent.handler === 'function') {
+                console.log(`Routing via: Priority 4 (intentParser.parse()) - Matched ${intent.intent}`);
+                htmlResult = await intent.handler(intent.entity);
+            }
+        }
+
+        // =================================================================
+        // PRIORITY 5: Fallback (Gene Details or Error)
+        // =================================================================
+        if (!htmlResult) {
+            console.log(`Routing via: Priority 5 (Fallback)`);
+            if ((match = qLower.match(/(?:tell me about|what is|describe)\s+(.+)/i))) {
+                const term = match[1].trim();
+                htmlResult = await getComprehensiveDetails(term);
+            } else {
+                // Check if the query is just a single gene name
+                const potentialGenes = (query.match(/\b([A-Z0-9\-\.]{3,})\b/gi) || []).map(g => g.toUpperCase());
+                if (potentialGenes.length === 1 && qLower.length < (potentialGenes[0].length + 5)) {
+                     if (ciliaHubDataCache.some(g => g.gene.toUpperCase() === potentialGenes[0])) {
+                        htmlResult = await getComprehensiveDetails(potentialGenes[0]);
+                     }
+                } 
+                
+                if (!htmlResult) {
+                    htmlResult = `<p class="result-card status-error">Sorry, I didn't understand that query. Please try one of the suggested questions or a known keyword.</p>`;
                 }
             }
         }
 
-        if (resultHtml !== "") {
-            resultArea.innerHTML = resultHtml;
-        }
+        resultArea.innerHTML = htmlResult;
 
     } catch (e) {
-        resultArea.innerHTML = `<p class="status-not-found">An internal CiliAI error occurred during your query. Please check the console for details. (Error: ${e.message})</p>`;
-        console.error("CiliAI Query Error:", e);
+        console.error("Error in handleAIQuery:", e);
+        resultArea.innerHTML = `<p class="result-card status-error">An internal CiliAI error occurred: ${e.message}</p>`;
     }
 };
+
 
 /**
  * Patches the main query handler to include Corum lookups.
@@ -607,11 +626,13 @@ function patchAIQueryHandler() {
 patchAIQueryHandler(); 
 
 
-// =============================================================================
-// REPLACEMENT: The definitive "Brain" of CiliAI, merging all features correctly.
-// =============================================================================
+/**
+ * REPLACEMENT: The new, unified "Brain" of CiliAI
+ * This function contains both the simple keyword parser (.parse)
+ * and the new complex query helpers (.getJoubertGenesInCiliatedCells, .getOrthologs)
+ */
 function createIntentParser() {
-    // NOTE: This object must be named 'classifiedDiseases' to match its usage below
+    // --- Disease Classification Map ---
     const classifiedDiseases = {
         "Primary Ciliopathies": [ 
             "Acrocallosal Syndrome", "Alström Syndrome", "Autosomal Dominant Polycystic Kidney Disease",
@@ -621,27 +642,82 @@ function createIntentParser() {
             "Senior-Løken Syndrome", "Short-rib Thoracic Dysplasia", "Skeletal Ciliopathy", "Retinal Ciliopathy", "Syndromic Ciliopathy",
             "Al-Gazali-Bakalinova Syndrome", "Bazex-Dupré-Christol Syndrome", "Bilateral Polycystic Kidney Disease", "Biliary, Renal, Neurologic, and Skeletal Syndrome",
             "Caroli Disease", "Carpenter Syndrome", "Complex Lethal Osteochondrodysplasia", "Greig Cephalopolysyndactyly Syndrome", "Kallmann Syndrome", "Lowe Oculocerebrorenal Syndrome",
-            "McKusick-Kaufman Syndrome", "Morbid Obesity and Spermatogenic Failure", "Polycystic Kidney Disease", "RHYNS Syndrome", "Renal-hepatic-pancreatic Dysplasia", "Retinal Dystrophy", "STAR Syndrome",
-            "Smith-Lemli-Opitz Syndrome", "Spondylometaphyseal Dysplasia", "Stromme Syndrome", "Weyers Acrofacial Dysostosis", "Hydrocephalus" // Added Hydrocephalus back
+            "McKusick-Kaufman Syndrome", "Morbid Obesity and Spermatogenic Failure", "Polycystic Kidney Disease", "RHYNS Syndrome", "Renal-hepatic-pancreatic Dysplasia", 
+            "Retinal Dystrophy", "STAR Syndrome", "Smith-Lemli-Opitz Syndrome", "Spondylometaphyseal Dysplasia", "Stromme Syndrome", 
+            "Weyers Acrofacial Dysostosis", "Hydrocephalus"
         ], 
         "Motile Ciliopathies": [ 
             "Primary Ciliary Dyskinesia", "Birt-Hogg-Dubé Syndrome", "Juvenile Myoclonic Epilepsy" 
         ],
         "Secondary Diseases": [ 
             "Ataxia-telangiectasia-like Disorder", "Birt-Hogg-Dubé Syndrome", "Cone-Rod Dystrophy", "Cornelia de Lange Syndrome",
-            "Holoprosencephaly", "Juvenile Myoclonic Epilepsy", "Medulloblastoma", "Retinitis Pigmentosa", "Spinocerebellar Ataxia", "Bazex-Dupré-Christol Syndrome", "Lowe Oculocerebrorenal Syndrome",
-            "McKusick-Kaufman Syndrome", "Pallister-Hall Syndrome", "Simpson-Golabi-Behmel Syndrome", "Townes-Brocks Syndrome", "Usher Syndrome", "Visceral Heterotaxy" 
+            "Holoprosencephaly", "Juvenile Myoclonic Epilepsy", "Medulloblastoma", "Retinitis Pigmentosa", "Spinocerebellar Ataxia", 
+            "Bazex-Dupré-Christol Syndrome", "Lowe Oculocerebrorenal Syndrome", "McKusick-Kaufman Syndrome", "Pallister-Hall Syndrome", 
+            "Simpson-Golabi-Behmel Syndrome", "Townes-Brocks Syndrome", "Usher Syndrome", "Visceral Heterotaxy" 
         ],
         "Atypical Ciliopathies": [ 
-            "Biliary Ciliopathy", "Chronic Obstructive Pulmonary Disease", "Ciliopathy", "Ciliopathy - Retinal dystrophy", "Golgipathies or Ciliopathy", "Hepatic Ciliopathy", "Male Infertility and Ciliopathy", "Male infertility", "Microcephaly and Chorioretinopathy Type 3", "Mucociliary Clearance Disorder", "Notch-mediated Ciliopathy", "Primary Endocardial Fibroelastosis", "Retinal Ciliopathy", "Retinal Degeneration", "Skeletal Ciliopathy", "Syndromic Ciliopathy" 
+            "Biliary Ciliopathy", "Chronic Obstructive Pulmonary Disease", "Ciliopathy", "Ciliopathy - Retinal dystrophy", 
+            "Golgipathies or Ciliopathy", "Hepatic Ciliopathy", "Male Infertility and Ciliopathy", "Male infertility", 
+            "Microcephaly and Chorioretinopathy Type 3", "Mucociliary Clearance Disorder", "Notch-mediated Ciliopathy", 
+            "Primary Endocardial Fibroelastosis", "Retinal Ciliopathy", "Retinal Degeneration", "Skeletal Ciliopathy", 
+            "Syndromic Ciliopathy"
         ]
     };
     
-    // Use the explicit classification list and common aliases
     const aliases = ["BBS", "Joubert", "NPHP", "MKS"];
-    // NOTE: Object.values(classifiedDiseases) is correct here.
     const allDiseases = [...Object.values(classifiedDiseases).flat(), ...aliases];
 
+    // --- Core Function: Joubert Genes in Ciliated Cells (Uses GLOBAL helpers) ---
+    async function getJoubertGenesInCiliatedCells() {
+        await fetchCiliaData();
+        await fetchCellxgeneData();
+        const { genes: joubertGenes } = await getCiliopathyGenes("Joubert Syndrome"); 
+        const joubertGeneSet = new Set(joubertGenes.map(g => g.gene.toUpperCase()));
+    
+        const results = [];
+        if (cellxgeneDataCache) { // Uses GLOBAL cache
+            joubertGeneSet.forEach(gene => {
+                const expData = cellxgeneDataCache[gene]; 
+                if (expData && expData["ciliated cell"] && expData["ciliated cell"] > 0.1) {
+                    results.push({
+                        gene: gene,
+                        description: `Expression: ${expData["ciliated cell"].toFixed(4)}`
+                    });
+                }
+            });
+        }
+    
+        results.sort((a, b) => parseFloat(b.description.split(': ')[1]) - parseFloat(a.description.split(': ')[1]));
+        return formatListResult("Joubert Genes Expressed in Ciliated Cells", results); // Uses GLOBAL formatter
+    }
+
+    // --- Function: Orthologs Finder (Uses GLOBAL helpers) ---
+    async function getOrthologs(disease, organism) {
+        await fetchCiliaData();
+        const { genes: diseaseGenes } = await getCiliopathyGenes(disease); 
+        
+        const orthologKeyMap = {
+            'c. elegans': 'ortholog_c_elegans',
+            'mouse': 'ortholog_mouse',
+            'zebrafish': 'ortholog_zebrafish',
+            'xenopus': 'ortholog_xenopus',
+            'drosophila': 'ortholog_drosophila'
+        };
+        const orthologKey = orthologKeyMap[organism.toLowerCase()];
+    
+        if (!orthologKey) {
+            return formatListResult(`${disease} Orthologs in ${organism}`, [], `Ortholog key for "${organism}" not found.`);
+        }
+    
+        const results = diseaseGenes
+            .map(g => ciliaHubDataCache.find(cg => cg.gene === g.gene)) // Uses GLOBAL ciliaHubDataCache
+            .filter(g => g && g[orthologKey] && g[orthologKey] !== 'N/A')
+            .map(g => ({ gene: g.gene, description: `${organism} Ortholog: ${g[orthologKey]}` }));
+            
+        return formatListResult(`${disease} Orthologs in ${organism}`, results);
+    }
+
+    // --- Entity Keywords for simple parsing (from OLD parser) ---
     const entityKeywords = [
         {
             type: 'FUNCTIONAL_CATEGORY',
@@ -651,17 +727,16 @@ function createIntentParser() {
         },
         {
             type: 'COMPLEX',
-            // Ensure BBSome is included in this list, either statically or dynamically if possible
             keywords: ['BBSome', 'IFT-A', 'IFT-B', 'Transition Zone Complex', 'MKS Complex', 'NPHP Complex'],
             handler: async (term) => formatListResult(`Components of ${term}`, await getGenesByComplex(term)),
             autocompleteTemplate: (term) => `Display components of ${term} complex`
         },
         {
             type: 'CILIOPATHY',
-            keywords: [...new Set(allDiseases)],
+            keywords: [...new Set(allDiseases)], // USES THE NEW LARGE LIST
             handler: async (term) => {
                 const titleTerm = term.toUpperCase() === 'BBS' ? 'Bardet–Biedl Syndrome' :
-                                  term.toUpperCase() === 'MKS' ? 'Meckel–Gruber Syndrome' : term;
+                                term.toUpperCase() === 'MKS' ? 'Meckel–Gruber Syndrome' : term;
                 const { genes, description } = await getCiliopathyGenes(term);
                 return formatListResult(`Genes for ${titleTerm}`, genes, description);
             },
@@ -669,13 +744,19 @@ function createIntentParser() {
         },
         {
             type: 'LOCALIZATION',
-            keywords: ['basal body', 'axoneme', 'transition zone', 'centrosome', 'cilium', 'lysosome', 'ciliary tip', 'transition fiber'],
+            // FIX: Add all localization terms here for the simple parser
+            keywords: [
+                'basal body', 'axoneme', 'transition zone', 'centrosome', 
+                'cilium', 'cilia', 'lysosome', 'ciliary tip', 'transition fiber',
+                'mitochondria', 'nucleus', 'flagella'
+            ],
             handler: async (term) => formatListResult(`Genes localizing to ${term}`, await getGenesByLocalization(term)),
             autocompleteTemplate: (term) => `Show me ${term} localizing genes`
         },
         {
             type: 'ORGANISM',
             keywords: [
+                // ... (Full list of 140 organisms) ...
                 "Prokaryote", "E.cuniculi", "E.histolytica", "E.dispar", "G.lamblia", "T.vaginalis", "T.brucei", "T.cruzi", "L.infantum",
                 "L.major", "L.braziliensis", "T.gondii", "C.hominis", "C.parvum", "B.bovis", "T.annulata", "T.parva", "P.knowlesi", "P.vivax",
                 "P.falciparum", "P.chabaudi", "P.berghei", "P.yoelii", "P.tetraurelia", "T.thermophila", "P.infestans", "T.pseudonana",
@@ -694,15 +775,13 @@ function createIntentParser() {
                 "G.gallus", "M.gallopavo", "O.anatinus", "M.domestica", "S.scrofa", "M.musculus", "C.familiaris", "B.taurus", "H.sapiens",
                 "worm", "human", "mouse", "zebrafish", "fly", "yeast"
             ],
-
-            // In createIntentParser -> entityKeywords (type: 'ORGANISM')
             handler: async (term) => {
-            const { genes, description, speciesCode } = await getCiliaryGenesForOrganism(term);
-            return formatListResult(`Ciliary genes in ${speciesCode}`, genes, description); 
+                const { genes, description, speciesCode } = await getCiliaryGenesForOrganism(term);
+                return formatListResult(`Ciliary genes in ${speciesCode}`, genes, description); 
             },
             autocompleteTemplate: (term) => `Display ciliary genes in ${term}`
-            },
-            {
+        },
+        {
             type: 'DOMAIN',
             keywords: ['WD40', 'Leucine-rich repeat', 'IQ motif', 'calmodulin-binding', 'EF-hand', 'coiled-coil', 'CTS', 'ciliary targeting sequences', 'ciliary localization signals'],
             handler: async (term) => formatListResult(`${term} domain-containing proteins`, await getGenesWithDomain(term)),
@@ -710,7 +789,15 @@ function createIntentParser() {
         }
     ];
 
+    // --- Return Public API (Unified) ---
     return {
+        // --- New Module Methods ---
+        classifiedDiseases,
+        allDiseases,
+        getJoubertGenesInCiliatedCells,
+        getOrthologs,
+        
+        // --- Old Parser Methods ---
         parse: (query) => {
             const normalizedQuery = normalizeTerm(query);
             for (const entityType of entityKeywords) {
