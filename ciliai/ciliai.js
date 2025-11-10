@@ -1,18 +1,20 @@
 // --- Global Data Cache ---
+// Core caches
 let ciliaHubDataCache = null;
 let screenDataCache = null;
-// Note: tissueDataCache is attached to the window object in its function
+// Note: tissueDataCache is attached to the window object in its own function
 // --- ADDITION: New function to fetch and parse Cellxgene data ---
 let cellxgeneDataCache = null;
 // --- ADDITION: UMAP Plotting Functions ---
 let umapDataCache = null;
-// --- ADD THESE NEW LINES ---
-let CILI_AI_DOMAIN_DB = null;     // For the new domain database
-let neversPhylogenyCache = null;  // For Nevers et al. 2017 data
-let liPhylogenyCache = null;      // For Li et al. 2014 data
-let allGeneSymbols = null; // Add this global variable alongside others
-// --- NEW: Merge Li and Nevers into Single Cache ---
-let phylogenyDataCache = null;  // Updated to hold merged data
+// --- ADDITION: Domain & Phylogeny Caches ---
+let CILI_AI_DOMAIN_DB = null;     // Domain database
+let neversPhylogenyCache = null;  // Nevers et al. 2017 dataset
+let liPhylogenyCache = null;      // Li et al. 2014 dataset
+let phylogenyDataCache = null;    // Unified cache merging both datasets
+// --- ADDITION: Global Gene List ---
+let allGeneSymbols = null;        // All unique gene symbols (merged from all sources)
+
 // --- GLOBAL CORUM CACHE ---
 let corumDataCache = {
     list: [],
@@ -20,6 +22,23 @@ let corumDataCache = {
     byNameLower: {},
     loaded: false
 };
+
+// --- Utility to collect all unique genes ---
+function getAllGenes() {
+    const genes = new Set([
+        ...(ciliaHubDataCache ? Array.from(ciliaHubDataCache.keys()) : []),
+        ...(screenDataCache ? Object.keys(screenDataCache) : []),
+        ...(window.tissueDataCache ? Object.keys(window.tissueDataCache) : []),
+        ...(CILI_AI_DOMAIN_DB ? Object.keys(CILI_AI_DOMAIN_DB) : [])
+    ]);
+    return Array.from(genes).sort();
+}
+
+initializeAppCaches().then(() => {
+    allGeneSymbols = getAllGenes();
+    console.log(`✅ Loaded ${allGeneSymbols.length} total unique genes.`);
+});
+
 
 // --- NEW: Reusable scRNA-seq Data Reference ---
 const SC_RNA_SEQ_REFERENCE_HTML = `
@@ -237,6 +256,27 @@ function normalizeTerm(s) {
     return String(s).toLowerCase().replace(/[._\-\s]+/g, ' ').trim();
 }
 
+async function handleUserQuery(geneName) {
+    console.log(`🔍 Querying all data for ${geneName}...`);
+    const data = await getCombinedDataForGene(geneName);
+    if (!data) {
+        console.warn(`No combined data found for ${geneName}.`);
+        return;
+    }
+
+    console.log("📊 Combined Data:", data);
+
+    // Example accesses
+    console.log("Functional Category:", data.core?.functional_category);
+    console.log("Localization:", data.core?.localization);
+    console.log("Tissue Expression (Kidney):", data.tissue_expression?.["Kidney"]);
+    console.log("Complex Membership:", data.complexes?.map(c => c.complexName));
+    console.log("Nevers Phylogeny (Human):", data.nevers_phylogeny?.["Homo sapiens"]);
+}
+
+// On page load
+#initializeAppCaches().then(() => handleUserQuery("IFT88"));
+
 
 
 
@@ -430,26 +470,19 @@ window.handleAIQuery = async function() {
 
     resultArea.style.display = 'block';
     resultArea.innerHTML = `<p class="status-searching">CiliAI is thinking... 🧠</p>`;
-    
-    try {
-        // Await core CiliaHub data fetches ONLY. Phylogeny fetches run in the router.
-        await Promise.all([
-            fetchCiliaData(),
-            fetchScreenData(),
-            fetchTissueData(),
-            fetchCellxgeneData(),
-            fetchUmapData(),
-            getDomainData(), // Domain data is loaded here
-            fetchCorumComplexes()
-        ]);
-        console.log('ciliAI.js: All core data loaded for processing.');
 
-        // 🧠 NEW ROUTING PRIORITY 0: Try resolving semantic intent before keyword routing
-        // NOTE: 'resolveSemanticIntent' must be defined outside this function.
-        const semanticResult = await resolveSemanticIntent(query);
-        if (semanticResult) {
-            resultArea.innerHTML = semanticResult;
-            return; // Stop further routing — intent handled semantically
+    try {
+        // ⚡ Load all core data caches in parallel (optimized, single run)
+        await initializeAppCaches();
+        console.log('✅ CiliAI: All core data caches ready.');
+
+        // 🧠 Priority 0 — Semantic intent resolution
+        if (typeof resolveSemanticIntent === "function") {
+            const semanticResult = await resolveSemanticIntent(query);
+            if (semanticResult) {
+                resultArea.innerHTML = semanticResult;
+                return;
+            }
         }
 
         let resultHtml = '';
@@ -457,40 +490,41 @@ window.handleAIQuery = async function() {
         let match;
 
         // =================================================================
-        // **NEW ROUTING PRIORITY 1:** Handle Curated Phylogenetic Table Queries
+        // 🔹 PRIORITY 1: Handle curated phylogenetic table queries
         // =================================================================
-        const complexTableResult = await routeComplexPhylogenyAnalysis(query);
-        if (complexTableResult) {
-            console.log("Query resolved by High-Priority Complex Phylogeny Table Router.");
-            resultHtml = complexTableResult;
+        if (typeof routeComplexPhylogenyAnalysis === "function") {
+            const complexTableResult = await routeComplexPhylogenyAnalysis(query);
+            if (complexTableResult) {
+                console.log("Query resolved by Complex Phylogeny Table Router.");
+                resultHtml = complexTableResult;
+            }
         }
-        
+
         // =================================================================
-        // ⭐ NEW ROUTING PRIORITY 2: Handle Domain Queries (Comparison, Enriched, Depleted, Specific Motifs) ⭐
+        // 🔹 PRIORITY 2: Domain / motif / enrichment queries
         // =================================================================
-        else if (qLower.includes('domain') || qLower.includes('motif') || 
-                 qLower.includes('enriched') || qLower.includes('depleted') ||
-                 qLower.includes('architecture comparison')) {
+        if (!resultHtml && (qLower.includes('domain') || qLower.includes('motif') ||
+            qLower.includes('enriched') || qLower.includes('depleted') ||
+            qLower.includes('architecture comparison'))) {
             
             console.log('Routing to Domain Query Resolver...');
             resultHtml = await resolveDomainQuery(query);
         }
 
         // =================================================================
-        // **NEW ROUTING PRIORITY 3:** Handle General Phylogenetic Queries (FIXES REFERENCE ERROR)
+        // 🔹 PRIORITY 3: General phylogenetic queries
         // =================================================================
-        else if (qLower.includes('phylogeny') || qLower.includes('conservation') || 
-                 qLower.includes('heatmap') || qLower.includes('comparison') || 
-                 qLower.includes('tree')) {
+        if (!resultHtml && (qLower.includes('phylogeny') || qLower.includes('conservation') ||
+            qLower.includes('heatmap') || qLower.includes('comparison') || qLower.includes('tree'))) {
             
             console.log('Routing to General Phylogenetic Query Resolver...');
-            resultHtml = await resolvePhylogeneticQuery(query); 
+            resultHtml = await resolvePhylogeneticQuery(query);
         }
 
         // =================================================================
-        // **FALLBACK TO ORIGINAL LOGIC**
+        // 🧩 FALLBACK: Standard registry, intent, and gene logic
         // =================================================================
-        else {
+        if (!resultHtml) {
             const perfectMatch = questionRegistry.find(item => item.text.toLowerCase() === qLower);
             if (perfectMatch) {
                 console.log(`Registry match found: "${perfectMatch.text}"`);
@@ -503,16 +537,17 @@ window.handleAIQuery = async function() {
             else {
                 const intent = intentParser.parse(query);
                 if (intent && typeof intent.handler === 'function') {
-                    console.log(`Intent parser match found: ${intent.intent} for entity: ${intent.entity}`);
+                    console.log(`Intent parser match: ${intent.intent} for entity: ${intent.entity}`);
                     resultHtml = await intent.handler(intent.entity);
-                }
-                else {
+                } else {
+                    // ✅ FIXED: Map-safe lookup for gene symbols
                     const potentialGenes = (query.match(/\b([A-Z0-9\-\.]{3,})\b/gi) || []);
-                    const genes = potentialGenes.filter(g => ciliaHubDataCache.some(hubGene => hubGene.gene.toUpperCase() === g.toUpperCase()));
-                    
+                    const genes = potentialGenes.filter(g => ciliaHubDataCache.has(g.toUpperCase()));
+
                     if (genes.length === 2 && (qLower.includes('compare') || qLower.includes('vs'))) {
                         resultHtml = await displayCellxgeneBarChart(genes);
-                    } else if (genes.length === 1 && (qLower.includes('plot') || qLower.includes('show expression') || qLower.includes('visualize'))) {
+                    } else if (genes.length === 1 && 
+                               (qLower.includes('plot') || qLower.includes('show expression') || qLower.includes('visualize'))) {
                         if (qLower.includes('umap')) {
                             resultHtml = await displayUmapGeneExpression(genes[0]);
                         } else {
@@ -527,35 +562,32 @@ window.handleAIQuery = async function() {
             }
         }
 
-        if (resultHtml !== "") {
+        if (resultHtml) {
             resultArea.innerHTML = resultHtml;
         }
 
     } catch (e) {
-        resultArea.innerHTML = `<p class="status-not-found">An internal CiliAI error occurred during your query. Please check the console for details. (Error: ${e.message})</p>`;
+        resultArea.innerHTML = `<p class="status-not-found">An internal CiliAI error occurred. Please check console for details. (Error: ${e.message})</p>`;
         console.error("CiliAI Query Error:", e);
     }
 };
 
 /**
- * Patches the main query handler to include Corum lookups.
- * NOTE: This function must be placed AFTER window.handleAIQuery is defined.
+ * ✅ CORUM Integration Patch
+ * Ensures that complex-related queries are handled before main AI routing.
  */
 function patchAIQueryHandler() {
     const originalHandler = window.handleAIQuery;
 
     window.handleAIQuery = async function(event) {
-        // 1. Ensure CORUM data is loaded alongside other promises
         await fetchCorumComplexes();
-        
+
         const aiQueryInput = document.getElementById('aiQueryInput');
         const resultArea = document.getElementById('ai-result-area');
         const query = aiQueryInput.value.trim();
         const qLower = query.toLowerCase();
 
-        // --- CUSTOM COMPLEX PARSING (Replaces the crash-prone regex) ---
-        
-        // Pattern 1: Subunits/components/members OF <complex name>
+        // --- CORUM: Subunit/Component queries ---
         if (qLower.includes('subunits of') || qLower.includes('components of') || qLower.includes('members of')) {
             const complexMatch = qLower.match(/(?:subunits|components|members)\s+of\s+(.+)/i);
             const complexName = complexMatch ? complexMatch[1].trim() : null;
@@ -571,12 +603,12 @@ function patchAIQueryHandler() {
                     html += '</ul></div>';
                     resultArea.innerHTML = html;
                     resultArea.style.display = 'block';
-                    return; // Handled
+                    return;
                 }
             }
         }
-        
-        // Pattern 2: Complexes FOR <gene>
+
+        // --- CORUM: Gene-to-complex queries ---
         if (qLower.includes('complexes for') || qLower.includes('complexes of') || qLower.includes('complexes containing')) {
             const geneMatch = qLower.match(/(?:complexes|subunits)\s+(?:for|of|containing)\s+([A-Za-z0-9\-]+)/i);
             const gene = geneMatch ? geneMatch[1].toUpperCase() : null;
@@ -591,21 +623,18 @@ function patchAIQueryHandler() {
                     html += '</ul></div>';
                     resultArea.innerHTML = html;
                     resultArea.style.display = 'block';
-                    return; // Handled
+                    return;
                 }
             }
         }
 
-        // --- END CUSTOM COMPLEX PARSING ---
-
-        // 2. If not a CORUM query, fall back to the original handling
+        // Fallback to original handler
         return originalHandler.apply(this, arguments);
     };
 }
 
 // --- Execute CORUM Integration Patch ---
-patchAIQueryHandler(); 
-
+patchAIQueryHandler();
 
 // =============================================================================
 // REPLACEMENT: The definitive "Brain" of CiliAI, merging all features correctly.
@@ -735,84 +764,152 @@ const intentParser = createIntentParser();
 
 // --- Data Fetching and Caching (Updated with New Integration Logic) ---
 
-/**
- * Helper to robustly process fields that might be strings or arrays.
- * FIX: Now splits on both commas AND semicolons.
- */
-const processToArray = (field) => {
-    if (typeof field === 'string') {
-        // Split by comma OR semi-colon, trim whitespace, and filter empty strings
-        return field.split(/[,\;]/).map(item => String(item).trim()).filter(Boolean);
-    }
-    if (Array.isArray(field)) {
-        // Ensure all array items are trimmed and non-empty
-        return field.map(item => String(item).trim()).filter(Boolean);
-    }
-    return [];
-};
+// --- Helper ---
+function processToArray(value) {
+    if (!value) return [];
+    if (Array.isArray(value)) return value;
+    return String(value).split(/[;,|]/).map(v => v.trim()).filter(Boolean);
+}
 
 /**
- * REPLACEMENT: fetchCiliaData
- * This version defensively normalizes all multi-value fields (localization, ciliopathy, etc.)
- * into clean arrays, fixing the root cause of the filtering failures.
+ * MODIFIED: Uses a Map keyed by gene symbol for O(1) lookups.
  */
 async function fetchCiliaData() {
-    if (ciliaHubDataCache) return ciliaHubDataCache;
+    if (ciliaHubDataCache instanceof Map && ciliaHubDataCache.size > 0) {
+        return ciliaHubDataCache;
+    }
+
     try {
-        // Fetch primary gene data
-        const response = await fetch('https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/ciliahub_data.json');
+        const url = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/ciliahub_data.json';
+        const response = await fetch(url);
         if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
         const data = await response.json();
 
-        // Fetch screen data for merging
-        const screenData = await fetchScreenData(); // Ensure screen data is loaded
+        const dataMap = new Map();
 
-        ciliaHubDataCache = data.map(gene => {
-            const geneUpper = gene.gene.toUpperCase();
+        data.forEach(gene => {
+            const geneUpper = (gene.gene || '').toUpperCase();
+            if (!geneUpper) return;
 
-            // 1. Map core gene fields to arrays using the robust helper
             const processedGene = {
                 ...gene,
                 functional_category: processToArray(gene.functional_category),
                 domain_descriptions: processToArray(gene.domain_descriptions),
                 ciliopathy: processToArray(gene.ciliopathy),
-                localization: processToArray(gene.localization), // FIX: Guarantees Array<string>
+                localization: processToArray(gene.localization),
                 complex_names: processToArray(gene.complex_names),
-                complex_components: processToArray(gene.complex_components)
+                complex_components: processToArray(gene.complex_components),
+                ciliopathy_classification: gene.ciliopathy_classification || "Not Classified",
+                ortholog_mouse: gene.ortholog_mouse || "N/A",
+                ortholog_c_elegans: gene.ortholog_c_elegans || "N/A",
+                ortholog_xenopus: gene.ortholog_xenopus || "N/A",
+                ortholog_zebrafish: gene.ortholog_zebrafish || "N/A",
+                ortholog_drosophila: gene.ortholog_drosophila || "N/A",
+                overexpression_effects: gene.overexpression_effects || "Not Reported",
+                lof_effects: gene.lof_effects || "Not Reported",
+                percent_ciliated_cells_effects: gene.percent_ciliated_cells_effects || "Not Reported"
             };
 
-            // 2. Integrate screen data
-            const screensFromSeparateFile = screenData[geneUpper] || [];
-
-            // 3. Merge all fields, including orthologs and effects
-            return { 
-                ...processedGene, 
-                // Add the screens array from the separate file
-                screens_from_separate_file: screensFromSeparateFile,
-                
-                // Add the other curated fields (with defaults)
-                ciliopathy_classification: processedGene.ciliopathy_classification || "Not Classified",
-                ortholog_mouse: processedGene.ortholog_mouse || "N/A",
-                ortholog_c_elegans: processedGene.ortholog_c_elegans || "N/A",
-                ortholog_xenopus: processedGene.ortholog_xenopus || "N/A",
-                ortholog_zebrafish: processedGene.ortholog_zebrafish || "N/A",
-                ortholog_drosophila: processedGene.ortholog_drosophila || "N/A",
-                overexpression_effects: processedGene.overexpression_effects || "Not Reported",
-                lof_effects: processedGene.lof_effects || "Not Reported",
-                percent_ciliated_cells_effects: processedGene.percent_ciliated_cells_effects || "Not Reported"
-            };
+            dataMap.set(geneUpper, processedGene);
         });
 
-        console.log('CiliaHub data loaded and formatted with robust normalization and screens integration.');
+        ciliaHubDataCache = dataMap;
+        console.log(`✅ Loaded ${dataMap.size} genes into CiliaHub Map cache.`);
         return ciliaHubDataCache;
+
     } catch (error) {
-        console.error("Failed to fetch CiliaHub data:", error);
-        ciliaHubDataCache = [];
+        console.error("❌ Failed to fetch CiliaHub data:", error);
+        ciliaHubDataCache = new Map();
         return ciliaHubDataCache;
     }
 }
 
+let isDataInitialized = false;
 
+/**
+ * Initializes all global data caches in parallel.
+ */
+async function initializeAppCaches() {
+    if (isDataInitialized) return true;
+
+    console.log("🧩 Initializing all dataset caches in parallel...");
+
+    try {
+        // Predefine all caches to prevent undefined references
+        window.ciliaHubDataCache = ciliaHubDataCache || new Map();
+        window.screenDataCache = screenDataCache || {};
+        window.tissueDataCache = tissueDataCache || {};
+        window.corumDataCache = corumDataCache || { byGene: {}, list: [], byNameLower: {}, loaded: false };
+        window.CILI_AI_DOMAIN_DB = CILI_AI_DOMAIN_DB || {};
+        window.neversPhylogenyCache = neversPhylogenyCache || {};
+        window.liPhylogenyCache = liPhylogenyCache || {};
+        window.cellxgeneDataCache = cellxgeneDataCache || {};
+        window.umapDataCache = umapDataCache || null;
+
+        await Promise.all([
+            fetchCiliaData(),
+            fetchScreenData(),
+            fetchTissueData(),
+            fetchCorumComplexes(),
+            getDomainData(),
+            fetchNeversPhylogenyData(),
+            fetchLiPhylogenyData(),
+            fetchCellxgeneData(),
+            fetchUmapData()
+        ]);
+
+        isDataInitialized = true;
+        console.log("✅ All caches initialized successfully.");
+        return true;
+    } catch (error) {
+        console.error("🚨 Critical error during initialization:", error);
+        isDataInitialized = false;
+        return false;
+    }
+}
+
+
+const unifiedGeneCache = new Map();
+
+/**
+ * Combines all datasets for a single gene into one object.
+ */
+async function getCombinedDataForGene(geneSymbol) {
+    if (!geneSymbol) return null;
+
+    // 1. Ensure data is ready
+    if (!isDataInitialized) await initializeAppCaches();
+
+    const geneUpper = geneSymbol.toUpperCase().trim();
+
+    // 2. If already cached, return quickly
+    if (unifiedGeneCache.has(geneUpper)) return unifiedGeneCache.get(geneUpper);
+
+    // 3. Build combined object
+    const combinedData = {
+        gene: geneUpper,
+        core: ciliaHubDataCache.get(geneUpper) || null,
+        screens: screenDataCache?.[geneUpper] || null,
+        tissue_expression: tissueDataCache?.[geneUpper] || null,
+        complexes: corumDataCache?.byGene?.[geneUpper] || null,
+        domains: CILI_AI_DOMAIN_DB?.[geneUpper] || null,
+        nevers_phylogeny: neversPhylogenyCache?.[geneUpper] || null,
+        li_phylogeny: liPhylogenyCache?.[geneUpper] || null,
+        cellxgene: cellxgeneDataCache?.[geneUpper] || null
+    };
+
+    const allNull = Object.entries(combinedData)
+        .filter(([k]) => k !== "gene")
+        .every(([, v]) => v === null);
+
+    if (allNull) {
+        console.warn(`⚠️ No data found for gene: ${geneUpper}`);
+        return null;
+    }
+
+    unifiedGeneCache.set(geneUpper, combinedData);
+    return combinedData;
+}
 
 // --- UPDATED fetchScreenData function (to be replaced in your code) ---
 async function fetchScreenData() {
