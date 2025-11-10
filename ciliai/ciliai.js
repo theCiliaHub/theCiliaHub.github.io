@@ -735,6 +735,27 @@ const intentParser = createIntentParser();
 
 // --- Data Fetching and Caching (Updated with New Integration Logic) ---
 
+/**
+ * Helper to robustly process fields that might be strings or arrays.
+ * FIX: Now splits on both commas AND semicolons.
+ */
+const processToArray = (field) => {
+    if (typeof field === 'string') {
+        // Split by comma OR semi-colon, trim whitespace, and filter empty strings
+        return field.split(/[,\;]/).map(item => String(item).trim()).filter(Boolean);
+    }
+    if (Array.isArray(field)) {
+        // Ensure all array items are trimmed and non-empty
+        return field.map(item => String(item).trim()).filter(Boolean);
+    }
+    return [];
+};
+
+/**
+ * REPLACEMENT: fetchCiliaData
+ * This version defensively normalizes all multi-value fields (localization, ciliopathy, etc.)
+ * into clean arrays, fixing the root cause of the filtering failures.
+ */
 async function fetchCiliaData() {
     if (ciliaHubDataCache) return ciliaHubDataCache;
     try {
@@ -746,65 +767,43 @@ async function fetchCiliaData() {
         // Fetch screen data for merging
         const screenData = await fetchScreenData(); // Ensure screen data is loaded
 
-        const processToArray = (field) => {
-            if (typeof field === 'string') return field.split(',').map(item => item.trim()).filter(Boolean);
-            if (Array.isArray(field)) return field;
-            return [];
-        };
-
         ciliaHubDataCache = data.map(gene => {
             const geneUpper = gene.gene.toUpperCase();
 
-            // 1. Map core gene fields to arrays where appropriate
+            // 1. Map core gene fields to arrays using the robust helper
             const processedGene = {
                 ...gene,
                 functional_category: processToArray(gene.functional_category),
                 domain_descriptions: processToArray(gene.domain_descriptions),
                 ciliopathy: processToArray(gene.ciliopathy),
-                localization: processToArray(gene.localization),
+                localization: processToArray(gene.localization), // FIX: Guarantees Array<string>
                 complex_names: processToArray(gene.complex_names),
                 complex_components: processToArray(gene.complex_components)
             };
 
-            // 2. Add Cilia Effects from ciliahub_data.json
-            // These fields are correctly sourced from the main ciliahub_data.json.
-            const effectsFromHub = {
-                overexpression_effects: processedGene.overexpression_effects || "Not Reported",
-                lof_effects: processedGene.lof_effects || "Not Reported",
-                percent_ciliated_cells_effects: processedGene.percent_ciliated_cells_effects || "Not Reported",
-            };
-
-            // 3. Merge in custom effects on cilia if the gene is found in screenData, 
-            // but explicitly ignoring the 'screens' field in the main data.
-            // Note: The logic requires that the new 'effects' data comes from 
-            // ciliahub_data.json (which we've done in point #2) 
-            // AND the screen data should be integrated with gene data for display.
-            // The request states "Please add effects on cilia together with cilia_screens_data.json."
-            // We interpret this as ensuring both the core effects (from the old 'screens' in the hub)
-            // and the detailed screens (from the separate JSON) are present for a gene.
+            // 2. Integrate screen data
             const screensFromSeparateFile = screenData[geneUpper] || [];
 
-            // 4. Ensure new requested fields are added (they should be present but are mapped for clarity)
-            const newIntegratedFields = {
-                // These are the new requested fields, ensuring they exist:
+            // 3. Merge all fields, including orthologs and effects
+            return { 
+                ...processedGene, 
+                // Add the screens array from the separate file
+                screens_from_separate_file: screensFromSeparateFile,
+                
+                // Add the other curated fields (with defaults)
                 ciliopathy_classification: processedGene.ciliopathy_classification || "Not Classified",
                 ortholog_mouse: processedGene.ortholog_mouse || "N/A",
                 ortholog_c_elegans: processedGene.ortholog_c_elegans || "N/A",
                 ortholog_xenopus: processedGene.ortholog_xenopus || "N/A",
                 ortholog_zebrafish: processedGene.ortholog_zebrafish || "N/A",
                 ortholog_drosophila: processedGene.ortholog_drosophila || "N/A",
-                
-                // Add the explicit effects from the Hub for use in gene summary:
-                ...effectsFromHub, 
-
-                // Add the screens array from the separate file for the comprehensive details card:
-                screens_from_separate_file: screensFromSeparateFile
+                overexpression_effects: processedGene.overexpression_effects || "Not Reported",
+                lof_effects: processedGene.lof_effects || "Not Reported",
+                percent_ciliated_cells_effects: processedGene.percent_ciliated_cells_effects || "Not Reported"
             };
-
-            return { ...processedGene, ...newIntegratedFields };
         });
 
-        console.log('CiliaHub data loaded and formatted with new orthologs, classification, and screens integration successfully.');
+        console.log('CiliaHub data loaded and formatted with robust normalization and screens integration.');
         return ciliaHubDataCache;
     } catch (error) {
         console.error("Failed to fetch CiliaHub data:", error);
@@ -812,6 +811,7 @@ async function fetchCiliaData() {
         return ciliaHubDataCache;
     }
 }
+
 
 
 // --- UPDATED fetchScreenData function (to be replaced in your code) ---
@@ -5667,15 +5667,20 @@ questionRegistry.push(
 async function getGeneFunction(gene) {
     if (!ciliaHubDataCache) await fetchCiliaData();
     const geneData = ciliaHubDataCache.find(g => g.gene.toUpperCase() === gene.toUpperCase());
-    if (!geneData) return `<div class="result-card"><h3>${gene}</h3><p class="status-not-found">Gene not found in the database.</p></div>`;
+    // FIX: Add guard clause
+    if (!geneData) return `<div class="result-card"><h3>${gene}</h3><p class="status-error">Gene not found in the database.</p></div>`; 
     
-    return formatGeneDetail(geneData, gene, "Function", geneData.functional_summary || geneData.description || "No functional information available.");
+    return formatListResult(`Function of ${gene}`, [{
+        gene: gene,
+        description: geneData.functional_summary || geneData.description || "No functional summary available."
+    }]);
 }
 
 async function getGeneRole(gene, context) {
     if (!ciliaHubDataCache) await fetchCiliaData();
     const geneData = ciliaHubDataCache.find(g => g.gene.toUpperCase() === gene.toUpperCase());
-    if (!geneData) return `<div class="result-card"><h3>${gene}</h3><p class="status-not-found">Gene not found in the database.</p></div>`;
+    // FIX: Add guard clause
+    if (!geneData) return `<div class="result-card"><h3>${gene}</h3><p class="status-error">Gene not found in the database.</p></div>`;
 
     const roleInfo = geneData.functional_summary || geneData.description || "No specific role information available.";
     return formatGeneDetail(geneData, gene, `Role in ${context}`, roleInfo);
@@ -5684,16 +5689,20 @@ async function getGeneRole(gene, context) {
 async function getGeneLocalization(gene) {
     if (!ciliaHubDataCache) await fetchCiliaData();
     const geneData = ciliaHubDataCache.find(g => g.gene.toUpperCase() === gene.toUpperCase());
-    if (!geneData) return `<div class="result-card"><h3>${gene}</h3><p class="status-not-found">Gene not found in the database.</p></div>`;
-
-    const localization = geneData.localization?.join(", ") || "No localization data available.";
-    return formatGeneDetail(geneData, gene, "Subcellular Localization", localization);
+    // FIX: Add guard clause
+    if (!geneData) return `<div class="result-card"><h3>${gene}</h3><p class="status-error">Gene not found in the database.</p></div>`; 
+    
+    return formatListResult(`Localization of ${gene}`, [{
+        gene: gene,
+        description: geneData.localization.join(', ') || "No localization data available."
+    }]);
 }
 
 async function getGeneDiseases(gene) {
     if (!ciliaHubDataCache) await fetchCiliaData();
     const geneData = ciliaHubDataCache.find(g => g.gene.toUpperCase() === gene.toUpperCase());
-    if (!geneData) return `<div class="result-card"><h3>${gene}</h3><p class="status-not-found">Gene not found in the database.</p></div>`;
+    // FIX: Add guard clause
+    if (!geneData) return `<div class="result-card"><h3>${gene}</h3><p class="status-error">Gene not found in the database.</p></div>`;
 
     const diseases = geneData.ciliopathy?.join(", ") || "No disease associations found.";
     return formatGeneDetail(geneData, gene, "Disease Associations", diseases);
@@ -5701,15 +5710,13 @@ async function getGeneDiseases(gene) {
 
 async function getGeneDomains(gene) {
     if (!ciliaHubDataCache) await fetchCiliaData();
-
     const geneData = ciliaHubDataCache.find(g => g.gene.toUpperCase() === gene.toUpperCase());
+    // FIX: Add guard clause
     if (!geneData) {
-        return `<div class="result-card"><h3>${gene}</h3><p class="status-not-found">Gene not found in the database.</p></div>`;
+        return `<div class="result-card"><h3>${gene}</h3><p class="status-error">Gene not found in the database.</p></div>`;
     }
-
+    // ... (rest of the function) ...
     const domains = geneData.domain_descriptions?.join(", ") || "No domain information available.";
-
-    // Detect domain categories
     const domainText = domains.toLowerCase();
     const categories = [];
 
@@ -5726,7 +5733,6 @@ async function getGeneDomains(gene) {
     if (/atpase|nucleotide binding/.test(domainText))
         categories.push("ATPase / Motor protein");
 
-    // Add categories to formatted output
     const domainCategorySummary = categories.length
         ? `<p><strong>Functional Domain Category:</strong> ${categories.join(", ")}</p>`
         : "";
@@ -5737,11 +5743,82 @@ async function getGeneDomains(gene) {
             <p><strong>Description:</strong> ${geneData.description || "No description available."}</p>
             <p><strong>Domains:</strong> ${domains}</p>
             ${domainCategorySummary}
-            <p><strong>Localization:</strong> ${geneData.localization || "Unknown"}</p>
+            <p><strong>Localization:</strong> ${geneData.localization.join(', ') || "Unknown"}</p>
             <p><strong>Functional Summary:</strong> ${geneData.functional_summary || "Not available."}</p>
         </div>
     `;
 }
+
+function formatGeneDetail(geneData, geneSymbol, detailTitle, detailContent) {
+    // FIX: Add guard clause
+    if (!geneData) {
+        return `<div class="result-card"><h3>${geneSymbol}</h3><p class="status-error">Gene not found in the database.</p></div>`;
+    }
+    return `
+        <div class="result-card">
+            <h3>${geneSymbol}</h3>
+            <h4>${detailTitle}</h4>
+            <p>${detailContent || 'No information available.'}</p>
+        </div>
+    `;
+}
+
+async function getComprehensiveDetails(term) {
+    const upperTerm = term.toUpperCase();
+    
+    // Check if it's a known complex (e.g., BBSome, IFT-A)
+    const isComplex = intentParser.getAllComplexes().some(c => c.toUpperCase() === upperTerm);
+    if (isComplex) {
+        // If it's a complex, retrieve the components list.
+        const results = await getGenesByComplex(term);
+        return formatListResult(`Components of ${term}`, results);
+    }
+
+    // Assume the term is a Gene Symbol and fetch data.
+    if (!ciliaHubDataCache) {
+        await fetchCiliaData();
+    }
+    
+    // Find the gene's integrated data entry.
+    const geneData = ciliaHubDataCache.find(g => g.gene.toUpperCase() === upperTerm);
+
+    // FIX: Add guard clause for WDR31 crash
+    if (!geneData) {
+        return `<div class="result-card"><h3>${upperTerm}</h3><p class="status-error">Gene not found in the CiliaHub database. Please check the symbol.</p></div>`;
+    }
+
+    // Add domain section
+    let html = ''; // Initialize html variable
+    const domains = await getDomainsByGene(term);
+    if (domains.length > 0) {
+        html += `<div class="info-section">
+            <h4>🧬 Domain Architecture</h4>
+            <ul class="info-list" style="list-style-type: disc; padding-left: 20px;">`;
+        domains.forEach(domain => {
+            html += `<li><strong>${domain.domain_name}</strong> (${domain.start}-${domain.end}): ${domain.description}</li>`;
+        });
+        html += `</ul>
+        </div>`;
+    }
+    
+    // Call the detailed formatter
+    // We append the domain HTML to the comprehensive details HTML
+    return formatComprehensiveGeneDetails(upperTerm, geneData) + html;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 async function generateDomainBasedQuestions() {
     if (!ciliaHubDataCache) await fetchCiliaData();
@@ -6190,47 +6267,6 @@ function updateIntentParser() {
 setTimeout(updateIntentParser, 1000);
 
 
-// =============================================================================
-// NEW: Helper function to get comprehensive details for "Tell me about..." queries
-// =============================================================================
-async function getComprehensiveDetails(term) {
-    const upperTerm = term.toUpperCase();
-    
-    // Check if it's a known complex (e.g., BBSome, IFT-A)
-    const isComplex = intentParser.getAllComplexes().some(c => c.toUpperCase() === upperTerm);
-    if (isComplex) {
-        // If it's a complex, retrieve the components list.
-        const results = await getGenesByComplex(term);
-        return formatListResult(`Components of ${term}`, results);
-    }
-
-    // Assume the term is a Gene Symbol and fetch data.
-    if (!ciliaHubDataCache) {
-        // Ensure all data caches are populated before searching for the gene.
-        await fetchCiliaData();
-    }
-    // Add domain section
-    const domains = await getDomainsByGene(term);
-    if (domains.length > 0) {
-        html += `<div class="info-section">
-            <h4>🧬 Domain Architecture</h4>
-            <ul class="info-list">`;
-        domains.forEach(domain => {
-            html += `<li><strong>${domain.domain_name}</strong> (${domain.start}-${domain.end}): ${domain.description}</li>`;
-        });
-        html += `</ul>
-            <button onclick="window.handleAIQuery.call({value: 'Show domain architecture of ${term}'})" 
-                    class="action-button">Visualize Domains</button>
-        </div>`;
-    }
-    
-    // Find the gene's integrated data entry.
-    const geneData = ciliaHubDataCache.find(g => g.gene.toUpperCase() === upperTerm);
-    
-    // Use the existing detailed formatter to present the integrated data (including 
-    // orthologs, classification, and screen data).
-    return formatComprehensiveGeneDetails(upperTerm, geneData);
-}
 
 // --- Query Helper Functions ---
 
@@ -7711,18 +7747,6 @@ function formatComprehensiveGeneDetails(geneSymbol, geneData) {
     `;
 }
 
-function formatGeneDetail(geneData, geneSymbol, detailTitle, detailContent) {
-    if (!geneData) {
-        return `<div class="result-card"><h3>${geneSymbol}</h3><p class="status-not-found">Gene not found in the database.</p></div>`;
-    }
-    return `
-        <div class="result-card">
-            <h3>${geneSymbol}</h3>
-            <h4>${detailTitle}</h4>
-            <p>${detailContent || 'No information available.'}</p>
-        </div>
-    `;
-}
 
 // Click handler for all interactions (Gene selection, Quick queries, and Plot switching)
 document.addEventListener('click', (e) => {
@@ -7789,20 +7813,6 @@ document.addEventListener('click', (e) => {
         }
     }
 });
-
-// --- Other Helper Functions (Updated to Remove Optional Chaining) ---
-function formatGeneDetail(geneData, geneSymbol, detailTitle, detailContent) {
-  if (!geneData) {
-    return `<div class="result-card"><h3>${geneSymbol}</h3><p class="status-not-found">Gene not found in the database.</p></div>`;
-  }
-  return `
-    <div class="result-card">
-      <h3>${geneSymbol}</h3>
-      <h4>${detailTitle}</h4>
-      <p>${detailContent || 'No information available.'}</p>
-    </div>
-  `;
-}
 
 
 // --- CRITICAL CORRECTION TO formatListResult ---
