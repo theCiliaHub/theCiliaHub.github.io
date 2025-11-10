@@ -248,7 +248,13 @@ window.displayCiliAIPage = async function displayCiliAIPage() {
 
 // --- Helper Functions ---
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-function debounce(fn, delay) { let timeout; return function(...args) { clearTimeout(timeout); timeout = setTimeout(() => fn(...args), delay); }; }
+function debounce(fn, delay) { 
+    let timeout; 
+    return function(...args) { 
+        clearTimeout(timeout); 
+        timeout = setTimeout(() => fn(...args), delay); 
+    }; 
+}
 
 function normalizeTerm(s) {
     if (!s) return '';
@@ -275,7 +281,8 @@ async function handleUserQuery(geneName) {
 }
 
 // On page load
-#initializeAppCaches().then(() => handleUserQuery("IFT88"));
+initializeAppCaches().then(() => handleUserQuery("IFT88"));
+
 
 
 
