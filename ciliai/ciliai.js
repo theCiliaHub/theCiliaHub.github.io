@@ -341,8 +341,6 @@ const CiliAIQuery = (() => {
     };
 })();
 
-
-
 // --- Main Page Display Function with full CSS ---
 window.displayCiliAIPage = async function displayCiliAIPage() {
     const contentArea = document.querySelector('.content-area');
@@ -477,7 +475,7 @@ window.displayCiliAIPage = async function displayCiliAIPage() {
         fetchLiPhylogenyData()
     ]);
 
-    // Merge phylogeny caches
+      // Merge phylogeny caches
     await mergePhylogenyCaches();
 
     console.log('✅ All CiliAI data loaded successfully.');
@@ -488,22 +486,6 @@ window.displayCiliAIPage = async function displayCiliAIPage() {
     // Pre-populate allGeneSymbols
     allGeneSymbols = getAllGenes();
     console.log(`✅ Loaded ${allGeneSymbols.length} unique genes.`);
-};
-
-// Merge phylogeny caches
-phylogenyDataCache = {
-    ...phylogenyDataCache,
-    ...neversPhylogenyCache,
-    ...liPhylogenyCache
-};
-    console.log('ciliAI.js: All data loaded successfully.');
-
-    // Initialize event listeners after fetches
-    setTimeout(setupCiliAIEventListeners, 0);
-
-    // Pre-populate allGeneSymbols
-    allGeneSymbols = getAllGenes();
-    console.log(`✅ Loaded ${allGeneSymbols.length} total unique genes.`);
 };
 
 // --- Helper Functions ---
