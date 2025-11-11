@@ -894,19 +894,16 @@ window.displayCiliAIPage = async function displayCiliAIPage() {
   console.log('ciliAI.js: Page HTML injected.');
 
        / NOTE: The "Analyze Gene Phenotypes" section is now hidden by default
-        // because its functions (runAnalysis, etc.) were removed.
         const analyzeSection = contentArea.querySelector('.input-section');
         if (analyzeSection) {
             analyzeSection.style.display = 'none';
             console.log('[CiliAI] "Analyze Gene Phenotypes" section hidden.');
         }
-
-        // KRİTİK: Listener'ları HTML'den sonra başlat
         ciliAI_waitForElements();
 
     } catch (err) {
         console.error('CiliAI HTML injection failed:', err);
-        contentArea.innerHTML = '<p>CiliAI yüklenemedi.</p>';
+        contentArea.innerHTML = '<p>CiliAI not uploaded.</p>';
     }
 };
     
