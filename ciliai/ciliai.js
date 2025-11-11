@@ -933,16 +933,16 @@ async function ciliAI_handleComplex(geneName) {
 // 6. 🔌 CiliAI EVENT HANDLERS & INITIALIZATION
 // ============================================================================
 // This section connects CiliAI to the HTML DOM.
-
 /**
  * Handles the query from the user input.
  * This function is attached to the "Send" button and "Enter" key.
  */
 async function ciliAI_handleQuery() {
-    // *** IMPORTANT: Update these IDs to match your HTML ***
-    const inputElement = document.getElementById('ciliai-input-box'); // Example ID
+    // *** IMPORTANT: This ID must match your HTML ***
+    const inputElement = document.getElementById('aiQueryInput'); // <-- THE FIX
+    
     if (!inputElement) {
-        console.error("[CiliAI] Cannot find input element '#ciliai-input-box'");
+        console.error("[CiliAI] Cannot find input element '#aiQueryInput'"); // Updated error
         return;
     }
     
@@ -951,7 +951,8 @@ async function ciliAI_handleQuery() {
     
     // Add user's message to chat UI
     ciliAI_updateChatWindow(query, 'user');
-    inputElement.value = ''; // Clear input
+    // We don't clear the input here, in case the query was from an example click
+    // inputElement.value = ''; // Let's clear it *after* the query
     
     try {
         // Call the main resolver
@@ -960,6 +961,9 @@ async function ciliAI_handleQuery() {
         console.error("[CiliAI] Query Error:", err);
         ciliAI_updateChatWindow("An error occurred: " + err.message, "error");
     }
+    
+    // Clear the input box *after* the query is processed
+    inputElement.value = '';
 }
 
 /**
@@ -968,11 +972,12 @@ async function ciliAI_handleQuery() {
  * @param {string} sender - The class name (e.g., "user", "ciliai", "error").
  */
 function ciliAI_updateChatWindow(message, sender) {
-    // *** IMPORTANT: Update this ID to match your HTML ***
-    const chatBox = document.getElementById('ciliai-chat-window'); // Example ID
+    // *** IMPORTANT: This ID must match your HTML ***
+    const chatBox = document.getElementById('ai-result-area'); // <-- THE FIX
     
     if (message === "Thinking...") {
         // Optional: Show a "typing" indicator
+        if (chatBox) chatBox.innerHTML = `<p class="status-searching">CiliAI is thinking... 🧠</p>`;
         return; 
     }
     
@@ -983,13 +988,32 @@ function ciliAI_updateChatWindow(message, sender) {
         return;
     }
 
-    // In a real app:
+    // Make sure the chatbox is visible
+    chatBox.style.display = 'block';
+
     const msgElement = document.createElement('div');
     msgElement.className = `ciliai-message ${sender}`; // Use prefixed class names
-    msgElement.innerHTML = message; // Assumes message can be HTML
-    chatBox.appendChild(msgElement);
+    
+    // Convert markdown bold to HTML bold
+    message = message.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    // Convert newlines to <br> tags
+    message = message.replace(/\n/g, '<br>');
+    
+    msgElement.innerHTML = message;
+
+    if (sender === 'user') {
+        // If it's a user message, overwrite the "Thinking..."
+        // This assumes the chat history is not preserved (which matches your HTML)
+        chatBox.innerHTML = ''; // Clear previous results
+        chatBox.appendChild(msgElement);
+    } else {
+        // If it's a CiliAI message, *replace* the "Thinking..."
+        chatBox.innerHTML = msgElement.innerHTML;
+    }
+    
     chatBox.scrollTop = chatBox.scrollHeight;
 }
+
 
 /**
  * Attaches all CiliAI event listeners to the DOM.
