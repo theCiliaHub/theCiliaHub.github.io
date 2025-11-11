@@ -13,6 +13,7 @@ let liPhylogenyCache = null;      // For Li et al. 2014 data
 let allGeneSymbols = null; // Add this global variable alongside others
 // --- NEW: Merge Li and Nevers into Single Cache ---
 let phylogenyDataCache = null;  // Updated to hold merged data
+const geneDataCache = new Map();
 // --- GLOBAL CORUM CACHE ---
 let corumDataCache = {
     list: [],
@@ -253,9 +254,14 @@ const phenotypeTerms = [
     "decreased ciliation", "loss of cilia", "reduced cilia", "increase", "decrease", "no effect"
 ];
 
-async function resolveSemanticIntent(query) {
-    const qLower = query.toLowerCase().trim();
-
+/**
+ * STAGE 1 HANDLER: Resolves complex, list-based, and non-gene queries.
+ * This is the new function you provided, integrated here.
+ * @param {string} qLower - The lowercased query.
+ * @param {string} query - The original query (for case-sensitive parts).
+ * @returns {Promise<string | null>} An HTML string for display, or null if no intent is matched.
+ */
+async function resolveComplexIntent(qLower, query) {
     // --- Define semantic clusters for major biological contexts ---
     const intentClusters = {
         ciliary_tip: ["ciliary tip", "distal tip", "tip proteins", "tip components", "tip composition", "proteins at the ciliary tip", "ciliary tip complex", "enriched at the tip", "distal region", "ciliary tip proteome"],
@@ -294,20 +300,23 @@ async function resolveSemanticIntent(query) {
             matchedDisease.toUpperCase() === "NPHP" ? "Nephronophthisis" :
             matchedDisease;
         // Uses the helper that handles both the disease and the phenotypic filter
-        return await getDiseaseGenesByPhenotype(standardDisease, matchedStrictPhenotype);
+        // We assume this helper function exists and returns an HTML string
+        // return await getDiseaseGenesByPhenotype(standardDisease, matchedStrictPhenotype);
+        console.log(`COMPLEX HANDLER: getDiseaseGenesByPhenotype("${standardDisease}", "${matchedStrictPhenotype}")`);
+        return `<p>Functionality for 'getDiseaseGenesByPhenotype' (Disease: ${standardDisease}, Phenotype: ${matchedStrictPhenotype}) is not yet implemented.</p>`; // Placeholder
     }
 
-    // --------------------------------------------------------------------------
-    // ⭐ PRIORITY RULE 2: Combined "localization" + "phenotype" (THE FIX) ⭐
-    // --------------------------------------------------------------------------
+    // --- Priority Rule 2: Combined "localization" + "phenotype" ---
     const matchedLocalization = localizationTerms.find(name => qLower.includes(name));
     const matchedPhenotype = phenotypeTerms.find(term => qLower.includes(term));
 
     if (matchedLocalization && matchedPhenotype) {
         // This handles questions like "Show basal body genes causing short cilia"
-        return await getLocalizationPhenotypeGenes(matchedLocalization, matchedPhenotype);
+        // We assume this helper function exists and returns an HTML string
+        // return await getLocalizationPhenotypeGenes(matchedLocalization, matchedPhenotype);
+        console.log(`COMPLEX HANDLER: getLocalizationPhenotypeGenes("${matchedLocalization}", "${matchedPhenotype}")`);
+        return `<p>Functionality for 'getLocalizationPhenotypeGenes' (Location: ${matchedLocalization}, Phenotype: ${matchedPhenotype}) is not yet implemented.</p>`; // Placeholder
     }
-    // --------------------------------------------------------------------------
     
     // --- Rule-based fuzzy detection (Fallback) ---
     let detectedIntent = null;
@@ -319,11 +328,14 @@ async function resolveSemanticIntent(query) {
     }
 
     // --- Intent Resolution Logic (Uses detectedIntent) ---
+    // (Note: These handlers now must exist and return HTML strings)
 
     if (detectedIntent === "ciliary_tip") {
-        const title = "Ciliary Tip Components";
-        const data = await getCuratedComplexComponents("CILIARY TIP");
-        return formatListResult(title, data);
+        // const title = "Ciliary Tip Components";
+        // const data = await getCuratedComplexComponents("CILIARY TIP");
+        // return formatListResult(title, data);
+        console.log("COMPLEX HANDLER: getCuratedComplexComponents('CILIARY TIP')");
+        return `<p>Functionality for 'getCuratedComplexComponents' (CILIARY TIP) is not yet implemented.</p>`; // Placeholder
     }
 
     // --- Disease Classification Handler ---
@@ -340,8 +352,10 @@ async function resolveSemanticIntent(query) {
         }
 
         if (classification) {
-            const genes = await getGenesByCiliopathyClassification(classification);
-            return formatListResult(`Genes classified as ${classification}`, genes);
+            // const genes = await getGenesByCiliopathyClassification(classification);
+            // return formatListResult(`Genes classified as ${classification}`, genes);
+            console.log(`COMPLEX HANDLER: getGenesByCiliopathyClassification("${classification}")`);
+            return `<p>Functionality for 'getGenesByCiliopathyClassification' (${classification}) is not yet implemented.</p>`; // Placeholder
         }
     }
 
@@ -365,9 +379,11 @@ async function resolveSemanticIntent(query) {
                 targetDisease.toUpperCase() === "NPHP" ? "Nephronophthisis" :
                 targetDisease;
 
-            const { genes, description } = await getCiliopathyGenes(standardName);
-            const titleCaseName = standardName.replace(/\b\w/g, l => l.toUpperCase());
-            return formatListResult(`Genes for ${titleCaseName}`, genes, description);
+            // const { genes, description } = await getCiliopathyGenes(standardName);
+            // const titleCaseName = standardName.replace(/\b\w/g, l => l.toUpperCase());
+            // return formatListResult(`Genes for ${titleCaseName}`, genes, description);
+            console.log(`COMPLEX HANDLER: getCiliopathyGenes("${standardName}")`);
+            return `<p>Functionality for 'getCiliopathyGenes' (${standardName}) is not yet implemented.</p>`; // Placeholder
         }
 
         return `<p>🩺 Disease query detected, but no specific disease or classification was identified for listing genes. Please try a query like "List genes for Joubert Syndrome".</p>`;
@@ -375,27 +391,54 @@ async function resolveSemanticIntent(query) {
 
     // --- Domain Handler ---
     else if (detectedIntent === "domain") {
-        return await resolveDomainQuery(query);
+        // We check if a gene name is present. If so, let the single-gene handler (Stage 2) catch it.
+        const geneRegex = /\b([A-Z0-9-]{3,})\b/i;
+        if (geneRegex.test(qLower)) {
+            return null; // Fallback to single-gene handler
+        }
+        // return await resolveDomainQuery(query);
+        console.log(`COMPLEX HANDLER: resolveDomainQuery("${query}")`);
+        return `<p>Functionality for 'resolveDomainQuery' (without a gene) is not yet implemented.</p>`; // Placeholder
     }
 
     // --- Phylogeny Handler ---
     else if (detectedIntent === "phylogeny") {
-        return await resolvePhylogeneticQuery(query);
+        // Check if a gene name is present. If so, let the single-gene handler (Stage 2) catch it.
+        const geneRegex = /\b([A-Z0-9-]{3,})\b/i;
+        if (geneRegex.test(qLower)) {
+            return null; // Fallback to single-gene handler
+        }
+        // return await resolvePhylogeneticQuery(query);
+        console.log(`COMPLEX HANDLER: resolvePhylogeneticQuery("${query}")`);
+        return `<p>Functionality for 'resolvePhylogeneticQuery' (without a gene) is not yet implemented.</p>`; // Placeholder
     }
 
     // --- Complex Handler ---
     else if (detectedIntent === "complex") {
-        return await routeComplexPhylogenyAnalysis(query);
+        // Check if a gene name is present. If so, let the single-gene handler (Stage 2) catch it.
+        const geneRegex = /\b([A-Z0-9-]{3,})\b/i;
+        if (geneRegex.test(qLower)) {
+            return null; // Fallback to single-gene handler
+        }
+        // return await routeComplexPhylogenyAnalysis(query);
+        console.log(`COMPLEX HANDLER: routeComplexPhylogenyAnalysis("${query}")`);
+        return `<p>Functionality for 'routeComplexPhylogenyAnalysis' (without a gene) is not yet implemented.</p>`; // Placeholder
     }
 
     // --- Expression Handler ---
     else if (detectedIntent === "expression") {
         const genes = (query.match(/\b[A-Z0-9\-]{3,}\b/g) || []);
         if (genes.length > 0) {
+            // This is a single-gene or multi-gene expression query, not a complex list query.
+            // We assume helper functions exist to handle plotting.
             if (qLower.includes('umap') && genes.length === 1) {
-                return await displayUmapGeneExpression(genes[0]);
+                // await displayUmapGeneExpression(genes[0]);
+                console.log(`COMPLEX HANDLER (PLOT): displayUmapGeneExpression("${genes[0]}")`);
+                return `<p>Showing UMAP plot for ${genes[0]}...</p>`; // Placeholder
             }
-            return await displayCellxgeneBarChart(genes);
+            // await displayCellxgeneBarChart(genes);
+            console.log(`COMPLEX HANDLER (PLOT): displayCellxgeneBarChart("${genes.join(', ')}")`);
+            return `<p>Showing expression bar chart for ${genes.join(', ')}...</p>`; // Placeholder
         } else {
             return `<p>🧬 Please specify a gene to show expression data.</p>`;
         }
@@ -406,21 +449,261 @@ async function resolveSemanticIntent(query) {
         const locationMatch = qLower.match(/(basal body|transition zone|axoneme|centrosome|ciliary membrane)/);
         if (locationMatch && locationMatch[1]) {
             // NOTE: This now only handles UNFILTERED requests, as filtered ones were caught above.
-            const data = await getGenesByLocalization(locationMatch[1]);  
-            return formatListResult(`Genes localizing to ${locationMatch[1]}`, data);
+            // const data = await getGenesByLocalization(locationMatch[1]);  
+            // return formatListResult(`Genes localizing to ${locationMatch[1]}`, data);
+            console.log(`COMPLEX HANDLER: getGenesByLocalization("${locationMatch[1]}")`);
+            return `<p>Functionality for 'getGenesByLocalization' (${locationMatch[1]}) is not yet implemented.</p>`; // Placeholder
         } else {
             return `<p>📍 Localization query detected. Please be more specific (e.g., "genes in the basal body").</p>`;
         }
     }
     // --- Phenotype Handler (Generic List) ---
     else if (detectedIntent === "phenotype") {
+        // Check if a gene name is present. If so, let the single-gene handler (Stage 2) catch it.
+        const geneRegex = /\b([A-Z0-9-]{3,})\b/i;
+        if (geneRegex.test(qLower)) {
+            return null; // Fallback to single-gene handler
+        }
         return `<p>🔎 Phenotype/Screen query detected. Please use a specific gene (e.g., "What happens to cilia when KIF3A is knocked down?") or a specific phenotype (e.g., "Find genes causing short cilia").</p>`;
     }
 
     // --- Default fallback ---
+    // No complex intent was matched, so we return null
+    // This tells the main function to proceed to Stage 2 (single-gene check)
     return null;
 }
 
+
+// ============================================================================
+// 5. 💬 "CONSUMER" HANDLER FUNCTIONS (for Single-Gene Queries)
+// ============================================================================
+// These functions are called by resolveSemanticIntent (Stage 2).
+// They all use the SAME `ensureGeneDataCached` function.
+
+/**
+ * Handles the "getSummary" intent. Provides a full overview.
+ * @param {string} geneName 
+ */
+async function handleGeneSummary(geneName) {
+    const geneData = await ensureGeneDataCached(geneName);
+    if (geneData.notFound) {
+        updateChatWindow(`Sorry, I could not find any data for the gene "${geneName}".`, "error");
+        return;
+    }
+
+    const geneSymbol = geneData.geneInfo?.Symbol || geneName.toUpperCase();
+    let responses = [];
+    responses.push(`Here's a summary for **${geneSymbol}**:`);
+
+    if (geneData.geneInfo?.Summary) {
+        responses.push(`**Summary:** ${geneData.geneInfo.Summary}`);
+    } else {
+        responses.push(`**Summary:** No summary is available for this gene.`);
+    }
+
+    let details = [];
+    if (geneData.ciliaLength) details.push(`It is a known **${geneData.ciliaLength.role}** of cilia length.`);
+    if (geneData.complex) details.push(`It is part of the **${geneData.complex.name}** protein complex.`);
+    if (geneData.domains) details.push(`It has known protein domains.`); // Simplified
+    if (geneData.phylogeny) details.push(`Phylogenetic data is available.`);
+    
+    if (details.length > 0) {
+        responses.push("\n**Key Details:**\n* " + details.join('\n* '));
+    }
+
+    updateChatWindow(responses.join('\n\n'), "ciliai");
+
+    // Example of triggering a plot after showing text
+    // if (geneData.phylogeny) {
+    //     plotNeversPhylogeny(geneData.phylogeny.nevers);
+    // }
+}
+
+/**
+ * Handles the "getPhylogeny" intent.
+ * @param {string} geneName 
+ */
+async function handlePhylogeny(geneName) {
+    const geneData = await ensureGeneDataCached(geneName);
+    if (geneData.notFound) {
+        updateChatWindow(`Sorry, I could not find data for "${geneName}".`, "error");
+        return;
+    }
+
+    if (!geneData.phylogeny) {
+        updateChatWindow(`No phylogeny data was found for **${geneName}**.`, "ciliai");
+        return;
+    }
+
+    let responses = [];
+    if (geneData.phylogeny.nevers) {
+        responses.push(`**Nevers et al. (2017) data found.**`);
+        // In a real app, you would call your plotting function here.
+        // plotNeversPhylogeny(geneData.phylogeny.nevers);
+        console.log("PLOTTER: Plotting Nevers data for", geneName);
+    }
+    if (geneData.phylogeny.li) {
+        responses.push(`**Li et al. (2016) data found.**`);
+        // In a real app, you would call your plotting function here.
+        // plotLiPhylogeny(geneData.phylogeny.li);
+        console.log("PLOTTER: Plotting Li data for", geneName);
+    }
+
+    updateChatWindow(responses.join('\n'), "ciliai");
+}
+
+/**
+ * Handles the "getDomains" intent.
+ * @param {string} geneName 
+ */
+async function handleDomains(geneName) {
+    const geneData = await ensureGeneDataCached(geneName);
+    if (geneData.notFound) {
+        updateChatWindow(`Sorry, I could not find data for "${geneName}".`, "error");
+        return;
+    }
+
+    if (!geneData.domains || geneData.domains.length === 0) {
+        updateChatWindow(`No protein domain information was found for **${geneName}**.`, "ciliai");
+        return;
+    }
+
+    // Assuming domains is an array of objects: [{name: "PF0001", ...}, ...]
+    const domainNames = geneData.domains.map(d => d.name).join(', ');
+    updateChatWindow(`**${geneName}** contains the following domains: **${domainNames}**.`, "ciliai");
+    
+    // Example: Trigger a domain plotting function
+    // plotDomains(geneData.domains);
+}
+
+/**
+ * Handles the "getCiliaLength" intent.
+ * @param {string} geneName 
+ */
+async function handleCiliaLength(geneName) {
+    const geneData = await ensureGeneDataCached(geneName);
+    if (geneData.notFound) {
+        updateChatWindow(`Sorry, I could not find data for "${geneName}".`, "error");
+        return;
+    }
+
+    if (!geneData.ciliaLength) {
+        updateChatWindow(`No specific cilia length data was found for **${geneName}**.`, "ciliai");
+        return;
+    }
+
+    // Assuming ciliaLength is an object: { role: "negative regulator", ... }
+    const role = geneData.ciliaLength.role;
+    updateChatWindow(`**${geneName}** is known as a **${role}** of cilia length.`, "ciliai");
+}
+
+/**
+ * Handles the "getComplex" intent.
+ * @param {string} geneName 
+ */
+async function handleComplex(geneName) {
+    const geneData = await ensureGeneDataCached(geneName);
+    if (geneData.notFound) {
+        updateChatWindow(`Sorry, I could not find data for "${geneName}".`, "error");
+        return;
+    }
+
+    if (!geneData.complex) {
+        updateChatWindow(`**${geneName}** is not listed as part of a known protein complex in our data.`, "ciliai");
+        return;
+    }
+
+    // Assuming complex is an object: { name: "IFT-B", members: [...] }
+    const complexName = geneData.complex.name;
+    const memberCount = geneData.complex.members.length;
+    updateChatWindow(`**${geneName}** is a member of the **${complexName}** complex, which has ${memberCount} members.`, "ciliai");
+}
+
+
+// ============================================================================
+// 6. 🚀 DUMMY/HELPER FUNCTIONS (for testing)
+// ============================================================================
+// (These are placeholder functions for your real implementations)
+
+/**
+ * DUMMY FUNCTION: Simulates updating the chat UI.
+ * @param {string} message - The message HTML or text to display.
+ * @param {string} sender - The class name for the sender (e.g., "user", "ciliai", "error").
+ */
+function updateChatWindow(message, sender) {
+    // Simple console log to show output
+    // Don't show "Thinking..." messages to avoid clutter
+    if (message === "Thinking...") return; 
+
+    const formattedMessage = message.replace(/<[^>]*>?/gm, ''); // Strip HTML for console
+    console.log(`[${sender.toUpperCase()}]: ${formattedMessage}`);
+    
+    // In a real app, you would manipulate the DOM here:
+    // const chatBox = document.getElementById('chat-box');
+    // const msgElement = document.createElement('div');
+    // msgElement.className = `chat-message ${sender}`;
+    // msgElement.innerHTML = message; // Use .innerHTML if message contains markdown/HTML
+    // chatBox.appendChild(msgElement);
+    // msgElement.scrollTop = chatBox.scrollHeight;
+}
+
+/**
+* DUMMY FUNCTION: Simulates handling user input from a text box.
+*/
+async function simulateUserInput(text) {
+    console.log(`\n--- USER SENDS: "${text}" ---`);
+    updateChatWindow(text, "user"); // Show user's message
+    await resolveSemanticIntent(text); // Process the message
+}
+
+/**
+ * DUMMY FUNCTION: Runs a series of tests for the new dual-stage system.
+ */
+async function runSimulation() {
+    console.log("--- SIMULATION START ---");
+
+    // === STAGE 1: Test Complex Queries ===
+    
+    // 1. Greet (should be caught by single-gene handler)
+    await simulateUserInput("Hello");
+
+    // 2. Complex Query: Disease
+    await simulateUserInput("List genes for Joubert Syndrome");
+
+    // 3. Complex Query: Localization + Phenotype
+    await simulateUserInput("show basal body genes causing short cilia");
+
+    // 4. Complex Query: Ciliary Tip
+    await simulateUserInput("what are the ciliary tip components?");
+    
+    // 5. Complex Query: Phenotype (ambiguous)
+    await simulateUserInput("what about genes that cause short cilia?");
+
+    // 6. Complex Query: Disease Classification
+    await simulateUserInput("list genes for primary ciliopathy");
+
+    // === STAGE 2: Test Single-Gene Fallback ===
+
+    // 7. Single Gene: Summary (will fetch)
+    await simulateUserInput("Tell me about IFT88"); 
+    
+    // 8. Single Gene: Specific question (from cache)
+    await simulateUserInput("what complex is ift88 in?");
+
+    // 9. Single Gene: Domain query (fallback from complex handler)
+    await simulateUserInput("ift88 domains");
+
+    // 10. Single Gene: Phylogeny query (fallback from complex handler)
+    await simulateUserInput("show conservation for IFT88");
+
+    // 11. Unknown query
+    await simulateUserInput("how is the weather?");
+
+    console.log("--- SIMULATION END ---");
+}
+
+// Uncomment the line below to run the simulation when this file is loaded
+// runSimulation();
 
 
 // --- Main AI Query Handler ---
@@ -1189,6 +1472,456 @@ async function getLiteratureEvidence(gene) {
             ${evidenceSnippets}
         </div>`;
 }
+
+/**@##########################BEGINNING OF GENE CATCHING RELATED QUETIONS AND HELPER CORUM##################################
+ * @##########################BEGINNING OF GENE CATCHING RELATED QUETIONS AND HELPER CORUM##################################
+ * @##########################BEGINNING OF GENE CATCHING RELATED QUETIONS AND HELPER CORUM##################################
+ * @##########################BEGINNING OF GENE CATCHING RELATED QUETIONS AND HELPER CORUM##################################
+ */
+/**
+ * CiliAI.js
+ * * Main JavaScript file for CiliAI operations, featuring a unified,
+ * gene-centric caching strategy for efficient data retrieval.
+ * All data fetches are consolidated through a single "gatekeeper" function
+ * `ensureGeneDataCached(geneName)`.
+ * * Author: [Your Name/Lab]
+ * Version: 2.0 (Unified Cache Architecture)
+ */
+
+// ============================================================================
+// 1. 🌎 GLOBAL CACHE
+// ============================================================================
+
+/**
+ * @type {Map<string, Promise<object>>}
+ * Global cache for all gene-related data.
+ * - Key: Gene name (e.g., "IFT88")
+ * - Value: A Promise that resolves to the combined data object for that gene.
+ *
+ * Storing the promise itself prevents "race conditions" where multiple
+ * requests for the same gene fire off before the first one completes.
+ */
+const geneDataCache = new Map();
+
+// ============================================================================
+// 2. 🧲 "GATEKEEPER" CACHING FUNCTION
+// ============================================================================
+
+/**
+ * Ensures all data for a specific gene is fetched and cached.
+ * This is the primary "gatekeeper" function for all gene data.
+ * It fetches all data types in parallel for maximum speed.
+ *
+ * @param {string} geneName - The human gene name (e.g., "IFT88"). Case-insensitive.
+ * @returns {Promise<object>} A promise that resolves to an object 
+ * containing all data for that gene (or a "notFound" state).
+ */
+async function ensureGeneDataCached(geneName) {
+    const upperGeneName = geneName.toUpperCase(); // Standardize key
+
+    // 1. [CACHE HIT] Check if the gene is already in the cache (or being fetched)
+    if (geneDataCache.has(upperGeneName)) {
+        // Return the existing promise (which may be resolved or in-flight)
+        return geneDataCache.get(upperGeneName);
+    }
+
+    // 2. [CACHE MISS] This is a new gene. Fetch all its data in parallel.
+    // We create a promise that will fetch everything.
+    const dataPromise = (async () => {
+        console.log(`[Cache MISS] Fetching all data for ${upperGeneName}...`);
+
+        // Use Promise.allSettled to ensure that even if one
+        // data source fails (e.g., no complex data), the others
+        // are still cached and returned.
+        const results = await Promise.allSettled([
+            fetchCiliaHubData_internal(upperGeneName),     // Main JSON file
+            fetchPhylogenyData_internal(upperGeneName),   // Combined (Nevers + Li)
+            fetchDomainData_internal(upperGeneName),       // Domain data
+            fetchCiliaLengthData_internal(upperGeneName),  // Cilia length data
+            fetchComplexData_internal(upperGeneName)       // Protein complex data
+            // ... add any other future data-fetching functions here
+        ]);
+
+        // 3. Collate the results into a single object
+        const ciliaHubResult = results[0].status === 'fulfilled' ? results[0].value : null;
+
+        const combinedData = {
+            // Spread the CiliaHub data (geneInfo, expression, etc.)
+            ...(ciliaHubResult || { geneInfo: null, expression: null }), 
+            
+            // Assign results from other fetches
+            phylogeny:   results[1].status === 'fulfilled' ? results[1].value : null,
+            domains:     results[2].status === 'fulfilled' ? results[2].value : null,
+            ciliaLength: results[3].status === 'fulfilled' ? results[3].value : null,
+            complex:     results[4].status === 'fulfilled' ? results[4].value : null,
+            lastFetched: new Date().toISOString()
+        };
+
+        // 4. Check if we got any data at all
+        // We check if the 'geneInfo' (from CiliaHub) is the primary indicator.
+        if (!combinedData.geneInfo) {
+            console.warn(`No data found for ${upperGeneName} in any key source.`);
+            // Cache a "not found" state to avoid re-fetching
+            const notFoundData = { notFound: true, ...combinedData };
+            // Store the *resolved* "not found" object
+            geneDataCache.set(upperGeneName, Promise.resolve(notFoundData)); 
+            return notFoundData;
+        }
+
+        // 5. Return the combined data
+        return combinedData;
+
+    })().catch(err => {
+        // Handle catastrophic failure (e.g., network down)
+        console.error(`Catastrophic failure fetching data for ${upperGeneName}:`, err);
+        // Remove the failed promise from the cache so we can try again
+        geneDataCache.delete(upperGeneName);
+        return { notFound: true, error: err.message }; // Return an error state
+    });
+
+    // 6. [IMPORTANT] Store the promise *itself* in the cache immediately.
+    // This prevents multiple, simultaneous fetches for the same gene.
+    geneDataCache.set(upperGeneName, dataPromise);
+
+    // 7. [OPTIMIZATION] Once the promise resolves, we replace the promise 
+    // in the cache with the *actual resolved data* for faster access next time.
+    dataPromise.then(data => {
+        geneDataCache.set(upperGeneName, Promise.resolve(data));
+    }).catch(() => {
+        // If it failed, we already removed it in the .catch() block above.
+        // This just prevents an "unhandled rejection" error in the console.
+    });
+
+    return dataPromise;
+}
+
+// ============================================================================
+// 3. 🛠️ "INTERNAL" HELPER FETCH FUNCTIONS
+// ============================================================================
+// These functions are ONLY called by ensureGeneDataCached.
+// They do NOT handle caching.
+// They fetch, find the specific gene's data, and return it or null.
+// ============================================================================
+
+/**
+ * [INTERNAL] Fetches data from the main ciliahub_data.json.
+ * This file contains gene info, expression, etc.
+ * @param {string} geneName - The human gene name (UPPERCASE)
+ * @returns {Promise<object | null>} An object with geneInfo and expression, or null.
+ */
+async function fetchCiliaHubData_internal(geneName) {
+    // *** IMPORTANT: Set your correct URL ***
+    const url = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/ciliahub_data.json';
+    try {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        const allData = await response.json();
+
+        // Find the specific gene (case-insensitive, using the provided UPPERCASE key)
+        const geneKey = Object.keys(allData.genes).find(key => key.toUpperCase() === geneName);
+        
+        if (geneKey) {
+            const geneInfo = allData.genes[geneKey];
+            const expressionData = allData.expression[geneKey] || null; // Example of adding expression
+            
+            // Return a combined object of all data from this file
+            return { 
+                geneInfo: geneInfo,
+                expression: expressionData
+                // ... add other top-level keys from this file if needed
+            };
+        }
+        return null; // Gene not found in this file
+    } catch (err) {
+        console.error(`Failed to fetch CiliaHub data for ${geneName}:`, err);
+        return null; // Return null on failure
+    }
+}
+
+/**
+ * [INTERNAL] Fetches and combines phylogeny data from both
+ * Nevers and Li datasets.
+ * @param {string} geneName - The human gene name (UPPERCASE)
+ * @returns {Promise<object | null>} A combined phylogeny object or null.
+ */
+async function fetchPhylogenyData_internal(geneName) {
+    // *** IMPORTANT: Set your correct URLs ***
+    const neversURL = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/data/Nevers2017_Data.json'; // Example path
+    const liURL = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/data/Li2016_Data.json';       // Example path
+
+    try {
+        // Fetch both in parallel
+        const neversPromise = fetch(neversURL).then(res => res.json());
+        const liPromise = fetch(liURL).then(res => res.json());
+        
+        const [neversResult, liResult] = await Promise.allSettled([neversPromise, liPromise]);
+
+        let combinedPhylogeny = {
+            nevers: null,
+            li: null
+        };
+
+        // Process Nevers data
+        if (neversResult.status === 'fulfilled') {
+            // Assuming Nevers data is an array of objects
+            const geneEntry = neversResult.value.find(entry => entry.Human_Gene_Name && entry.Human_Gene_Name.toUpperCase() === geneName);
+            if (geneEntry) {
+                combinedPhylogeny.nevers = geneEntry; // Store the whole entry
+            }
+        } else {
+            console.warn(`Could not load Nevers phylogeny for ${geneName}:`, neversResult.reason);
+        }
+
+        // Process Li data
+        if (liResult.status === 'fulfilled') {
+            // Assuming Li data is an array of objects
+            const geneEntry = liResult.value.find(entry => entry.Human_Gene_Name && entry.Human_Gene_Name.toUpperCase() === geneName);
+            if (geneEntry) {
+                combinedPhylogeny.li = geneEntry; // Store the whole entry
+            }
+        } else {
+            console.warn(`Could not load Li phylogeny for ${geneName}:`, liResult.reason);
+        }
+
+        // Return the combined object (or null if both failed)
+        if (combinedPhylogeny.nevers || combinedPhylogeny.li) {
+            return combinedPhylogeny;
+        } else {
+            return null;
+        }
+
+    } catch (err) {
+        console.error(`Failed to fetch phylogeny for ${geneName}:`, err);
+        return null;
+    }
+}
+
+/**
+ * [INTERNAL] Fetches domain data for a specific gene.
+ * @param {string} geneName - The human gene name (UPPERCASE)
+ * @returns {Promise<object | null>} The domain data or null.
+ */
+async function fetchDomainData_internal(geneName) {
+    // *** IMPORTANT: Set your correct URL ***
+    const url = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/data/protein_domains.json'; // Example path
+    try {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        const allDomainData = await response.json();
+        
+        // Assuming allDomainData is an object keyed by gene name
+        const geneDomainData = allDomainData[geneName] || null;
+
+        return geneDomainData; // Return data or null if not found
+    } catch (err) {
+        console.error(`Failed to fetch domain data for ${geneName}:`, err);
+        return null;
+    }
+}
+
+/**
+ * [INTERNAL] Fetches cilia length determination data.
+ * @param {string} geneName - The human gene name (UPPERCASE)
+ * @returns {Promise<object | null>} The length data or null.
+ */
+async function fetchCiliaLengthData_internal(geneName) {
+    // *** IMPORTANT: Set your correct URL ***
+    const url = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/data/cilia_length_data.json'; // Example path
+    try {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        const allLengthData = await response.json();
+
+        // Assuming allLengthData is an array of objects
+        const geneLengthData = allLengthData.find(entry => entry.gene && entry.gene.toUpperCase() === geneName);
+
+        return geneLengthData || null;
+    } catch (err) {
+        console.error(`Failed to fetch cilia length data for ${geneName}:`, err);
+        return null;
+    }
+}
+
+/**
+ * [INTERNAL] Fetches protein complex data.
+ * @param {string} geneName - The human gene name (UPPERCASE)
+ * @returns {Promise<object | null>} The complex data or null.
+ */
+async function fetchComplexData_internal(geneName) {
+    // *** IMPORTANT: Set your correct URL ***
+    const url = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/data/protein_complexes.json'; // Example path
+    try {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        const allComplexData = await response.json();
+
+        // Assuming allComplexData is an object where keys are complex names
+        // and values are objects with a 'members' array.
+        let foundComplex = null;
+        for (const complexName in allComplexData) {
+            const complex = allComplexData[complexName];
+            if (complex.members && complex.members.find(member => member.toUpperCase() === geneName)) {
+                foundComplex = {
+                    name: complexName,
+                    ...complex 
+                };
+                break; // Stop after finding the first complex
+            }
+        }
+
+        return foundComplex; // Return the complex object or null
+    } catch (err) {
+        console.error(`Failed to fetch complex data for ${geneName}:`, err);
+        return null;
+    }
+}
+
+
+// ============================================================================
+// 4. 🧠 "CONSUMER" FUNCTIONS (Example Handlers)
+// ============================================================================
+// These functions use the cached data to answer questions or build plots.
+// ============================================================================
+
+/**
+ * Example function that handles a user's complex question about a gene.
+ * This function would be called by your chat input handler.
+ * * @param {string} geneName - The gene name from the user input.
+ */
+async function handleComplexQuestion(geneName) {
+    // Show loading state to user
+    // e.g., updateChatWindow("Fetching data for " + geneName + "...", "system");
+    console.log(`--- Handling question for: ${geneName} ---`);
+
+    try {
+        // 1. Call the new gatekeeper function ONCE
+        // This will be instant (cache) or fetch everything (first time)
+        const geneData = await ensureGeneDataCached(geneName);
+
+        // 2. Check for "not found"
+        if (geneData.notFound) {
+            let message = `Sorry, I could not find any data for the gene "${geneName}".`;
+            if (geneData.error) {
+                message += ` (Error: ${geneData.error})`;
+            }
+            console.log(message);
+            // updateChatWindow(message, "error");
+            return;
+        }
+
+        // 3. Now you have ALL data available in one object!
+        // We can build a comprehensive response.
+        
+        let responses = [];
+        const geneSymbol = geneData.geneInfo?.Symbol || geneName.toUpperCase();
+        
+        responses.push(`Here's what I found for **${geneSymbol}**:`);
+
+        if (geneData.geneInfo?.Summary) {
+            responses.push(`**Summary:** ${geneData.geneInfo.Summary}`);
+        } else {
+            responses.push(`**Summary:** No summary is available for this gene.`);
+        }
+
+        let details = [];
+        if (geneData.ciliaLength) {
+            details.push(`It is a known **${geneData.ciliaLength.role}** of cilia length.`);
+        }
+
+        if (geneData.complex) {
+            details.push(`It is part of the **${geneData.complex.name}** protein complex.`);
+        }
+        
+        if (geneData.domains) {
+            // Assuming domains is an array of domain objects
+            const domainNames = geneData.domains.map(d => d.name).join(', ');
+            details.push(`Known protein domains include: **${domainNames}**.`);
+        }
+
+        if (geneData.phylogeny) {
+            let phyloInfo = [];
+            if (geneData.phylogeny.nevers) phyloInfo.push("Nevers et al. (2017)");
+            if (geneData.phylogeny.li) phyloInfo.push("Li et al. (2016)");
+            if (phyloInfo.length > 0) {
+                details.push(`Phylogenetic data is available from: **${phyloInfo.join(' and ')}**.`);
+            }
+        }
+
+        if (details.length > 0) {
+            responses.push("\n**Key Details:**\n* " + details.join('\n* '));
+        }
+
+        // Display the response to the user
+        const finalResponse = responses.join('\n\n');
+        
+        console.log(finalResponse);
+        // updateChatWindow(finalResponse, "ciliai"); // Example function call
+
+        // Now you can call your plotting functions with the cached data
+        // if (geneData.phylogeny) {
+        //     plotNeversPhylogeny(geneData.phylogeny.nevers);
+        //     plotLiPhylogeny(geneData.phylogeny.li);
+        // }
+
+    } catch (err) {
+        console.error(`Failed to display data for ${geneName}:`, err);
+        // Show an error message to the user
+        // updateChatWindow(`An error occurred while processing data for ${geneName}.`, "error");
+    }
+}
+
+// ============================================================================
+// 5. 🚀 EXAMPLE USAGE
+// ============================================================================
+// These functions would be defined in your main web page's script,
+// not necessarily in this file, but they show how to use the system.
+// ============================================================================
+
+/**
+ * DUMMY FUNCTION: Simulates updating the chat UI.
+ * @param {string} message - The message HTML or text to display.
+ * @param {string} sender - The class name for the sender (e.g., "user", "ciliai", "error").
+ */
+function updateChatWindow(message, sender) {
+    console.log(`[${sender.toUpperCase()}]: ${message.replace(/<[^>]*>?/gm, '')}`); // Log plain text
+    // In a real app:
+    // const chatBox = document.getElementById('chat-box');
+    // const msgElement = document.createElement('div');
+    // msgElement.className = `chat-message ${sender}`;
+    // msgElement.innerHTML = message; // Use .textContent if message is not HTML
+    // chatBox.appendChild(msgElement);
+    // chatBox.scrollTop = chatBox.scrollHeight;
+}
+
+/**
+ * DUMMY FUNCTION: Simulates handling user input.
+ */
+function simulateUserInput() {
+    console.log("--- SIMULATION START ---");
+    
+    // First call: Fetches data, will be slower
+    handleComplexQuestion("IFT88").then(() => {
+        console.log("--- First call (IFT88) complete ---");
+        
+        // Second call: Should be instantaneous (from cache)
+        handleComplexQuestion("IFT88").then(() => {
+            console.log("--- Second call (IFT88) complete (from cache) ---");
+            
+            // Third call: Fetches a different gene
+            handleComplexQuestion("MKS1").then(() => {
+                console.log("--- Third call (MKS1) complete ---");
+
+                // Fourth call: A gene that doesn't exist
+                handleComplexQuestion("FAKEGENE").then(() => {
+                     console.log("--- Fourth call (FAKEGENE) complete (not found) ---");
+                });
+            });
+        });
+    });
+}
+
+// Uncomment the line below to run the simulation when this file is loaded
+// simulateUserInput();
 
 /**@##########################BEGINNING OF COMPLEX RELATED QUETIONS AND HELPER CORUM##################################
  * @##########################BEGINNING OF COMPLEX RELATED QUETIONS AND HELPER CORUM##################################
