@@ -740,13 +740,17 @@ function ciliAI_waitForElements() {
 // This function should be in your main script.js or globals.js
 window.displayCiliAIPage = async function displayCiliAIPage() {
     const contentArea = document.querySelector('.content-area');
-    if (!contentArea) return;
+    if (!contentArea) {
+        console.error('[CiliAI] Error: .content-area not found.');
+        return;
+    }
 
     contentArea.className = 'content-area content-area-full';
     const ciliaPanel = document.querySelector('.cilia-panel');
     if (ciliaPanel) ciliaPanel.style.display = 'none';
 
     try {
+        // --- Inject full CiliAI HTML + CSS ---
         contentArea.innerHTML = `
             <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
             <script src="https://cdn.jsdelivr.net/npm/cytoscape@3.23.0/dist/cytoscape.min.js"></script>
@@ -790,16 +794,15 @@ window.displayCiliAIPage = async function displayCiliAIPage() {
                         </div>
                         <div class="input-group">
                             <label>Analysis Mode:</label>
-                            <div class="mode-selector">
-                                </div>
+                            <div class="mode-selector"></div>
                         </div>
                         <button class="analyze-btn" id="analyzeBtn">🔍 Analyze Genes</button>
                     </div>
-                    <div id="resultsSection" class="results-section" style="display: none;">
-                        </div>
+                    <div id="resultsSection" class="results-section" style="display: none;"></div>
                 </div>
             </div>
             <style>
+                /* Keep all existing CSS exactly as before */
                 .ciliai-container { font-family: 'Arial', sans-serif; max-width: 950px; margin: 2rem auto; padding: 2rem; background-color: #f9f9f9; border-radius: 12px; }
                 .ciliai-header { text-align: center; margin-bottom: 2rem; }
                 .ciliai-header h1 { font-size: 2.8rem; color: #2c5aa0; margin: 0; }
@@ -837,13 +840,8 @@ window.displayCiliAIPage = async function displayCiliAIPage() {
                 .download-button:hover { background-color: #218838; }
             </style>
         `;
-    } catch (error) {
-        console.error('Failed to inject CiliAI HTML:', error);
-        contentArea.innerHTML = '<p>Error: Failed to load CiliAI interface.</p>';
-        return;
-    }
-    
-  console.log('ciliAI.js: Page HTML injected.');
+
+        console.log('✅ CiliAI: Page HTML injected successfully.');
 
         const analyzeSection = contentArea.querySelector('.input-section');
         if (analyzeSection) {
@@ -851,15 +849,50 @@ window.displayCiliAIPage = async function displayCiliAIPage() {
             console.log('[CiliAI] Analyze section hidden.');
         }
 
-        ciliAI_waitForElements();  // KRİTİK
+        // Wait for all elements before proceeding
+        if (typeof ciliAI_waitForElements === 'function') {
+            ciliAI_waitForElements();
+        } else {
+            console.warn('[CiliAI] Warning: ciliAI_waitForElements() not found.');
+        }
 
     } catch (err) {
-        console.error('CiliAI HTML injection failed:', err);
-        contentArea.innerHTML = '<p>CiliAI yüklenemedi.</p>';
+        console.error('❌ CiliAI HTML injection failed:', err);
+        contentArea.innerHTML = '<p>Error: Failed to load CiliAI interface.</p>';
     }
 };
-    
-    
+
 
 // inside displayCiliAIPage(), right after the innerHTML assignment:
 ciliAI_waitForElements(); 
+
+/* ============================================================================
+ *  ✅ CLEAN GLOBAL EXPOSURE BLOCK
+ *  (Safe, minimal, and avoids duplication)
+ * ============================================================================
+ */
+
+function exposeCiliAIGlobals() {
+    // Check if already exposed
+    if (window.CiliAI && window.CiliAI.initialized) return;
+
+    window.CiliAI = {
+        // Core data access
+        getGeneData: ciliAI_getGeneData,
+        geneCache: ciliAI_geneCache,
+
+        // Core AI handlers
+        resolveIntent: ciliAI_resolveIntent,
+        resolveComplexIntent: ciliAI_resolveComplexIntent,
+
+        // Optional handlers (if other modules need them)
+        handleGeneSummary: ciliAI_handleGeneSummary,
+
+        // Metadata
+        version: "6.1",
+        initialized: true
+    };
+
+    console.log("%c✅ CiliAI global interface initialized", "color: #3fb950");
+})();
+
