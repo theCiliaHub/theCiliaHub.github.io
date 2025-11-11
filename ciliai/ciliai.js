@@ -382,8 +382,8 @@ async function ciliAI_fetchCiliaHubData_internal(geneName) {
  */
 async function ciliAI_fetchPhylogenyData_internal(geneName) {
     // *** IMPORTANT: Set your correct URLs ***
-    const neversURL = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/data/Nevers2017_Data.json'; // Example path
-    const liURL = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/data/Li2016_Data.json';       // Example path
+    const neversURL = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/nevers_et_al_2017_matrix_optimized.json;
+    const liURL = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/li_et_al_2014_matrix_optimized.json';
 
     try {
         const [neversResult, liResult] = await Promise.allSettled([
