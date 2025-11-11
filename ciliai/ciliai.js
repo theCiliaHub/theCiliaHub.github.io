@@ -485,13 +485,6 @@ async function ciliAI_fetchComplexData_internal(geneName) {
 // ============================================================================
 // 4. 🧠 CiliAI DUAL-STAGE INTENT RESOLVER
 // ============================================================================
-
-/**
- * Parses the user's query and calls the appropriate handler function.
- * This is the main entry point for all user input *to CiliAI*.
- *
- * @param {string} query - The raw user input.
- */
 async function ciliAI_resolveIntent(query) {
     console.log("[CiliAI LOG] 4. ciliAI_resolveIntent started.");
     const qLower = query.toLowerCase().trim();
@@ -515,8 +508,14 @@ async function ciliAI_resolveIntent(query) {
         
         // --- STAGE 2: Fallback to single-gene query resolution ---
 
-        const geneRegex = /\b([A-Z0-9-]{3,})\b/i;
-        const geneMatch = qLower.match(geneRegex);
+        // ====================================================================
+        // ** THE FIX **
+        // This RegEx is smarter. It looks for all-caps words (3+ chars) OR
+        // words with letters and numbers (like IFT88).
+        // It explicitly IGNORES common words like "show", "me", "what", "is".
+        // ====================================================================
+        const geneRegex = /\b(?!show\b|me\b|what\b|is\b|tell\b|about\b|for\b|genes\b)([A-Z]{3,}|[A-Z0-9]{3,})\b/i;
+        const geneMatch = query.match(geneRegex); // Match against the *original* query to preserve case
         const geneName = geneMatch ? geneMatch[1].toUpperCase() : null;
 
         console.log(`[CiliAI LOG] 6. Gene parsed: ${geneName}`);
@@ -581,6 +580,7 @@ async function ciliAI_resolveIntent(query) {
         ciliAI_updateChatWindow(`An unexpected error occurred: ${err.message}`, "error");
     }
 }
+
 
 /**
  * STAGE 1 HANDLER: Resolves complex, list-based, and non-gene queries.
