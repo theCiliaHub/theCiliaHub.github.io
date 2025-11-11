@@ -493,30 +493,33 @@ async function ciliAI_fetchComplexData_internal(geneName) {
  * @param {string} query - The raw user input.
  */
 async function ciliAI_resolveIntent(query) {
+    console.log("[CiliAI LOG] 4. ciliAI_resolveIntent started.");
     const qLower = query.toLowerCase().trim();
     
-    // Use the CiliAI-specific chat update function
     ciliAI_updateChatWindow("Thinking...", "system");
 
     try {
         // --- STAGE 1: Check for complex, list-based, or non-gene queries ---
-        const complexResult = await ciliAI_resolveComplexIntent(qLower, query); // Pass both for case-matching
+        console.log("[CiliAI LOG] 5. Trying Stage 1 (Complex Intent)...");
+        const complexResult = await ciliAI_resolveComplexIntent(qLower, query); 
         
         if (complexResult !== null) {
-            // `complexResult` is an HTML string or a command to plot
-            // If it's a string, display it.
+            console.log("[CiliAI LOG] 5a. Stage 1 Matched. Result:", complexResult);
             if (typeof complexResult === 'string') {
                 ciliAI_updateChatWindow(complexResult, "ciliai");
             }
-            // If it's an object (e.g., plot command), it was handled internally
             return; // Intent was handled. Stop here.
         }
 
+        console.log("[CiliAI LOG] 5b. Stage 1 Failed. Proceeding to Stage 2 (Single Gene)...");
+        
         // --- STAGE 2: Fallback to single-gene query resolution ---
 
         const geneRegex = /\b([A-Z0-9-]{3,})\b/i;
         const geneMatch = qLower.match(geneRegex);
         const geneName = geneMatch ? geneMatch[1].toUpperCase() : null;
+
+        console.log(`[CiliAI LOG] 6. Gene parsed: ${geneName}`);
 
         let intent = null;
         let params = { gene: geneName };
@@ -531,24 +534,24 @@ async function ciliAI_resolveIntent(query) {
         } else if (qLower.includes("complex") || qLower.includes("interact")) {
             intent = "getComplex";
         } else if (qLower.includes("summary") || qLower.includes("what is") || qLower.includes("tell me about")) {
-            intent = "getSummary";
-        } else if (geneName) {
-            // Default action if a gene name is present
             intent = "getSummary"; 
+        } else if (geneName) {
+            intent = "getSummary"; // Default action
         } else if (qLower.includes("hello") || qLower.includes("hi")) {
             intent = "greet";
         } else {
             intent = "unknown";
         }
 
+        console.log(`[CiliAI LOG] 7. Intent parsed: ${intent}`);
+
         // --- Action Dispatch (for single-gene queries) ---
         if (intent !== "greet" && intent !== "unknown" && !params.gene) {
+            console.warn("[CiliAI LOG] 7a. Intent needs gene, but none found.");
             ciliAI_updateChatWindow("Please specify a gene name for that request.", "ciliai");
             return;
         }
 
-        // Call the appropriate handler based on the intent
-        // These handlers will use `ciliAI_getGeneData`
         switch (intent) {
             case "getSummary":
                 await ciliAI_handleGeneSummary(params.gene);
@@ -569,6 +572,7 @@ async function ciliAI_resolveIntent(query) {
                 ciliAI_updateChatWindow("Hello! I am CiliAI. How can I help you learn about ciliary genes?", "ciliai");
                 break;
             default: // unknown
+                console.warn("[CiliAI LOG] 7b. Unknown intent.");
                 ciliAI_updateChatWindow("I'm sorry, I didn't understand that. Please ask about a specific gene (e.g., 'What is IFT88?') or a complex topic (e.g., 'List genes for Joubert Syndrome').", "ciliai");
         }
     
@@ -937,26 +941,39 @@ async function ciliAI_handleComplex(geneName) {
  * Handles the query from the user input.
  * This function is attached to the "Send" button and "Enter" key.
  */
+// ============================================================================
+// 6. 🔌 CiliAI EVENT HANDLERS & INITIALIZATION
+// ============================================================================
+// This section connects CiliAI to the HTML DOM.
+/**
+ * Handles the query from the user input.
+ * This function is attached to the "Send" button and "Enter" key.
+ */
 async function ciliAI_handleQuery() {
-    // *** IMPORTANT: This ID must match your HTML ***
-    const inputElement = document.getElementById('aiQueryInput'); // <-- THE FIX
+    console.log("[CiliAI LOG] 1. ciliAI_handleQuery fired.");
+    
+    const inputElement = document.getElementById('aiQueryInput');
     
     if (!inputElement) {
-        console.error("[CiliAI] Cannot find input element '#aiQueryInput'"); // Updated error
+        console.error("[CiliAI LOG] 1a. CRITICAL: Cannot find input element '#aiQueryInput'.");
+        return;
+    }
+
+    const query = inputElement.value;
+    if (!query.trim()) {
+        console.warn("[CiliAI LOG] 1b. Query is empty. Aborting.");
         return;
     }
     
-    const query = inputElement.value;
-    if (!query.trim()) return;
+    console.log(`[CiliAI LOG] 2. Query is: "${query}"`);
     
     // Add user's message to chat UI
     ciliAI_updateChatWindow(query, 'user');
-    // We don't clear the input here, in case the query was from an example click
-    // inputElement.value = ''; // Let's clear it *after* the query
     
     try {
-        // Call the main resolver
+        console.log("[CiliAI LOG] 3. Calling ciliAI_resolveIntent...");
         await ciliAI_resolveIntent(query); 
+        console.log("[CiliAI LOG] 8. ciliAI_resolveIntent finished.");
     } catch (err) {
         console.error("[CiliAI] Query Error:", err);
         ciliAI_updateChatWindow("An error occurred: " + err.message, "error");
@@ -965,6 +982,9 @@ async function ciliAI_handleQuery() {
     // Clear the input box *after* the query is processed
     inputElement.value = '';
 }
+
+
+
 
 /**
  * Updates the CiliAI chat UI.
