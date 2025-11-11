@@ -181,15 +181,13 @@ function initGlobalEventListeners() {
 
 // --- Clear CiliAI elements and unbind listeners ---
 function clearCiliAI() {
-    const aiContainer = document.querySelector('.ciliai-container');
-    if (aiContainer) aiContainer.remove(); // remove the whole container
+    const container = document.querySelector('.ciliai-container');
+    if (container) container.remove();
 
-    const btn = document.getElementById('aiQueryButton');
-    if (btn) btn.removeEventListener('click', handleAIQuery);
+    // Eski listener'ları temizle (gerekirse)
+    const oldBtn = document.getElementById('aiQueryBtn');
+    if (oldBtn) oldBtn.replaceWith(oldBtn.cloneNode(true));
 
-    const input = document.getElementById('aiQueryInput');
-    if (input) input.removeEventListener('keypress', handleAIQueryEnterKey);
-
-    const output = document.getElementById('query-output');
-    if (output) output.innerHTML = '';
+    const resultArea = document.getElementById('ai-result-area');
+    if (resultArea) resultArea.innerHTML = '';
 }
