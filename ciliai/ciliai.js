@@ -28,7 +28,7 @@
 /* 1. CILIARY GENE CACHE                                                      */
 /* -------------------------------------------------------------------------- */
 const ciliAI_geneCache = new Map();
-
+window.ciliAI_MasterDatabase = [];
 /* -------------------------------------------------------------------------- */
 /* 2. GATEKEEPER FUNCTION: GET ALL DATA FOR A GENE                             */
 /* -------------------------------------------------------------------------- */
@@ -138,29 +138,59 @@ async function ciliAI_fetchComplexData_internal(gene) {
     } catch (e) { console.error(`[CiliAI] Complex fetch error:`, e); return null; }
 }
 
-// 3e. Tissue expression
-async function ciliAI_fetchTissueData_internal(gene) {
+/**
+ * Fetches and parses the entire tissue consensus TSV file.
+ * Returns an object keyed by gene: { "TSPAN6": { "adipose tissue": 28.6, ... }, "TNPO1": ... }
+ */
+async function ciliAI_fetchAllTissueData_internal() {
     const url = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/rna_tissue_consensus.tsv';
+    
     try {
         const txt = await fetch(url).then(r => r.text());
         const lines = txt.split('\n');
         if (lines.length < 2) return null;
+        
         const headers = lines[0].split('\t');
-        const gIdx = headers.findIndex(h => /gene/i.test(h));
-        const tIdx = headers.findIndex(h => /tissue/i.test(h));
-        const vIdx = headers.findIndex(h => /nTPM/i.test(h));
-        if (gIdx === -1 || tIdx === -1 || vIdx === -1) return null;
-        const out = {};
+        
+        // --- CORRECTED COLUMN FINDERS ---
+        // Find columns by their exact, case-insensitive names
+        const gIdx = headers.findIndex(h => h.toLowerCase() === "gene name"); 
+        const tIdx = headers.findIndex(h => h.toLowerCase() === "tissue");
+        const vIdx = headers.findIndex(h => h.toLowerCase() === "ntpm");
+        // --- END CORRECTION ---
+
+        if (gIdx === -1 || tIdx === -1 || vIdx === -1) {
+            console.error(`[CiliAI] Could not parse tissue headers. Required: "Gene name", "Tissue", "nTPM".`);
+            return null;
+        }
+
+        const masterTissueObj = {}; 
+
         for (let i = 1; i < lines.length; i++) {
             const cols = lines[i].split('\t');
-            if (cols[gIdx]?.toUpperCase() === gene) {
-                out[cols[tIdx]] = parseFloat(cols[vIdx]);
+            
+            // Get data from the correct columns
+            const geneName = cols[gIdx]?.toUpperCase(); // This will be "TSPAN6"
+            const tissueName = cols[tIdx]?.toLowerCase(); // This will be "adipose tissue"
+            const nTPM = parseFloat(cols[vIdx]); // This will be 28.6
+
+            if (geneName && tissueName && !isNaN(nTPM)) {
+                if (!masterTissueObj[geneName]) {
+                    masterTissueObj[geneName] = {};
+                }
+                // Assign the nTPM value
+                masterTissueObj[geneName][tissueName] = nTPM;
             }
         }
-        return Object.keys(out).length ? out : null;
-    } catch (e) { console.error(`[CiliAI] Tissue fetch error:`, e); return null; }
+        
+        console.log(`[CiliAI] Master Tissue data parsed for ${Object.keys(masterTissueObj).length} genes.`);
+        return masterTissueObj;
+        
+    } catch (e) {
+        console.error(`[CiliAI] Master Tissue fetch error:`, e); 
+        return null; 
+    }
 }
-
 // 3f. scRNA / CellXGene data
 async function ciliAI_fetchScRnaData_internal(gene) {
     const url = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/cellxgene_data.json';
@@ -190,6 +220,128 @@ async function ciliAI_fetchUMAPData_internal(gene) {
         return key ? obj[key] : null;
     } catch (e) { console.error(`[CiliAI] UMAP fetch error:`, e); return null; }
 }
+
+// --- Add this to your main script (e.g., script.js or globals.js) ---
+
+/**
+ * Fetches and parses the entire tissue consensus TSV file.
+ * Returns an object keyed by gene: { "GENE1": { "lung": 10.5, ... }, "GENE2": ... }
+ */
+async function ciliAI_fetchAllTissueData_internal() {
+    const url = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/rna_tissue_consensus.tsv';
+    try {
+        const txt = await fetch(url).then(r => r.text());
+        const lines = txt.split('\n');
+        if (lines.length < 2) return null;
+        
+        const headers = lines[0].split('\t');
+        // Find column indices
+        const gIdx = headers.findIndex(h => /gene/i.test(h));
+        const tIdx = headers.findIndex(h => /tissue/i.test(h));
+        const vIdx = headers.findIndex(h => /nTPM/i.test(h));
+        if (gIdx === -1 || tIdx === -1 || vIdx === -1) {
+            console.error("[CiliAI] Could not parse tissue headers.");
+            return null;
+        }
+
+        const masterTissueObj = {}; // This will be { "GENE1": { "tissue1": 1.0, ... }, "GENE2": ... }
+
+        for (let i = 1; i < lines.length; i++) {
+            const cols = lines[i].split('\t');
+            const geneName = cols[gIdx]?.toUpperCase();
+            const tissueName = cols[tIdx];
+            const nTPM = parseFloat(cols[vIdx]);
+
+            if (geneName && tissueName && !isNaN(nTPM)) {
+                if (!masterTissueObj[geneName]) {
+                    masterTissueObj[geneName] = {};
+                }
+                masterTissueObj[geneName][tissueName] = nTPM;
+            }
+        }
+        console.log(`[CiliAI] Master Tissue data parsed for ${Object.keys(masterTissueObj).length} genes.`);
+        return masterTissueObj;
+    } catch (e) {
+        console.error(`[CiliAI] Master Tissue fetch error:`, e); 
+        return null; 
+    }
+}
+
+/**
+ * Run this function ONCE when the page loads.
+ * It will build the fully integrated database in window.ciliAI_MasterDatabase
+ */
+async function buildMasterDatabase() {
+    console.log("[CiliAI] Building Master Database...");
+    
+    // 1. Define all data source URLs
+    const urls = {
+        mainGeneList: 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/ciliahub_data.json',
+        domains: 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/cili_ai_domain_database.json',
+        complexes: 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/corum_humanComplexes.json',
+        scRNA: 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/cellxgene_data.json',
+        screens: 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/cilia_screens_data.json',
+        umap: 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/umap_data.json',
+        nevers: 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/nevers_et_al_2017_matrix_optimized.json',
+        li: 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/li_et_al_2014_matrix_optimized.json'
+    };
+
+    // 2. Fetch all data sources in parallel (except tissue)
+    const [
+        mainGeneList,
+        domains,
+        complexes,
+        scRNA,
+        screens,
+        umap,
+        nevers,
+        li,
+        tissue // <-- This one is fetched by our special parser
+    ] = await Promise.all([
+        fetch(urls.mainGeneList).then(r => r.json()),
+        fetch(urls.domains).then(r => r.json()),
+        fetch(urls.complexes).then(r => r.json()),
+        fetch(urls.scRNA).then(r => r.json()),
+        fetch(urls.screens).then(r => r.json()),
+        fetch(urls.umap).then(r => r.json()),
+        fetch(urls.nevers).then(r => r.json()),
+        fetch(urls.li).then(r => r.json()),
+        ciliAI_fetchAllTissueData_internal() // Use the new function here
+    ]);
+
+    // 3. Helper to find a gene's complex(es)
+    const getComplexes = (gene) => {
+        return complexes.filter(comp => comp.subunits?.some(s => s.gene_name?.toUpperCase() === gene));
+    };
+    
+    // 4. Combine all data for each gene
+    window.ciliAI_MasterDatabase = mainGeneList.map(geneEntry => {
+        const gene = geneEntry.gene.toUpperCase();
+        
+        // Build the combined phylogeny object
+        const phylogeny = {
+            nevers: nevers[gene] || null,
+            li: li[gene] || null
+        };
+
+        return {
+            ...geneEntry, // Base info (description, lof_effects, associated_diseases etc.)
+            domains: domains[gene] || null,
+            complexes: getComplexes(gene), // Returns an array of matching complexes
+            tissue: tissue[gene] || null,
+            scRNA: scRNA[gene] || null,
+            screens: screens[gene] || null,
+            umap: umap[gene] || null,
+            phylogeny: (phylogeny.nevers || phylogeny.li) ? phylogeny : null
+        };
+    });
+    
+    console.log(`✅ [CiliAI] Master Database built. ${window.ciliAI_MasterDatabase.length} genes integrated.`);
+}
+
+// --- IMPORTANT: Call the function to build the database ---
+// --- Place this in your main script's initialization logic ---
+buildMasterDatabase();
 
 
 // ============================================================================
@@ -312,6 +464,81 @@ async function ciliAI_queryGenes(filters = {}) {
 }
 // -------------------------------------------------------------------
 
+// --- Place in CiliAI.js ---
+
+/**
+ * Queries the pre-built master database.
+ * @param {object} filters - An object of filters, e.g.,
+ * { localization: "lysosome", phenotype: "short cilia", tissue: "lung", cell_type: "ciliated" }
+ */
+function ciliAI_masterQuery(filters) {
+    
+    if (!window.ciliAI_MasterDatabase || window.ciliAI_MasterDatabase.length === 0) {
+        console.error("[CiliAI] Master Database is not built or is empty!");
+        return [];
+    }
+    
+    return window.ciliAI_MasterDatabase.filter(gene => {
+        
+        // 1. Localization Filter
+        if (filters.localization) {
+            // Assuming localization is in 'gene.localization' or 'gene.functional_summary'
+            const loc = (gene.localization || "").toLowerCase();
+            const summary = (gene.functional_summary || "").toLowerCase();
+            if (!loc.includes(filters.localization) && !summary.includes(filters.localization)) {
+                 return false;
+            }
+        }
+        
+        // 2. Phenotype Filter (from lof_effects and screens)
+        if (filters.phenotype) {
+            const lof = (gene.lof_effects || "").toLowerCase();
+            const oe = (gene.overexpression_effects || "").toLowerCase();
+            
+            // Check main file
+            let hasPhenotype = lof.includes(filters.phenotype) || oe.includes(filters.phenotype);
+            
+            // Check detailed screens file if not found
+            if (!hasPhenotype && gene.screens) {
+                hasPhenotype = gene.screens.some(s => 
+                    s.result?.toLowerCase().includes(filters.phenotype) ||
+                    s.classification?.toLowerCase().includes(filters.phenotype)
+                );
+            }
+            if (!hasPhenotype) return false;
+        }
+        
+        // 3. Tissue Expression Filter (Threshold > 1 nTPM)
+        if (filters.tissue) {
+            if (!gene.tissue || !gene.tissue[filters.tissue] || gene.tissue[filters.tissue] < 1.0) {
+                 return false;
+            }
+        }
+        
+        // 4. scRNA Cell Type Filter (Threshold > 5% of cells)
+        if (filters.cell_type) {
+            // Find the cell type key (case-insensitive)
+            const cellTypeKey = Object.keys(gene.scRNA || {}).find(k => k.toLowerCase().includes(filters.cell_type));
+            
+            if (!cellTypeKey || !gene.scRNA[cellTypeKey] || gene.scRNA[cellTypeKey] < 0.05) {
+                 return false;
+            }
+        }
+        
+        // 5. Disease Filter
+        if (filters.disease) {
+             const diseases = (gene.associated_diseases || []).map(d => d.toLowerCase());
+             if (!diseases.some(d => d.includes(filters.disease))) {
+                 return false;
+             }
+        }
+
+        // If it passed all filters, keep it!
+        return true;
+    });
+}
+
+
 /**
  * Parses the user's query and calls the appropriate handler function.
  * This is the main entry point for all user input *to CiliAI*.
@@ -416,176 +643,69 @@ async function ciliAI_resolveIntent(query) {
     }
 }
 
-/**
+ /**
  * STAGE 1 HANDLER: Resolves complex, list-based, and non-gene queries.
  * @param {string} qLower - The lowercased query.
  * @param {string} query - The original query (for case-sensitive parts).
  * @returns {Promise<string | null>} An HTML string for display, or null if no intent is matched.
  */
 async function ciliAI_resolveComplexIntent(qLower, query) {
-    // --- Define semantic clusters for major biological contexts ---
-    const intentClusters = {
-        ciliary_tip: ["ciliary tip", "distal tip", "tip proteins", "tip components", "tip composition", "proteins at the ciliary tip", "ciliary tip complex", "enriched at the tip", "distal region", "ciliary tip proteome"],
-        domain: ["domain", "motif", "architecture", "protein fold", "domain organization", "enriched", "depleted"],
-        phylogeny: ["phylogeny", "evolution", "conservation", "ortholog", "paralog", "species tree", "evolutionary profile", "conservation heatmap", "conserved"],
-        complex: ["complex", "interactome", "binding partners", "corum", "protein interaction", "ift", "bbsome", "dynein", "mks", "nphp", "radial spoke", "axoneme", "transition zone"],
-        expression: ["expression", "umap", "tissue", "cell type", "where expressed", "scRNA", "single-cell", "transcript", "abundance", "expression pattern", "plot"],
-        disease: ["mutation", "variant", "pathogenic", "ciliopathy", "disease", "syndrome", "bbs", "joubert", "mks", "pcd", "lca", "nephronophthisis", "polycystic kidney disease"],
-        disease_classification: ["primary ciliopathy", "secondary ciliopathy", "motile ciliopathy", "atypical ciliopathy", "primary disease", "secondary disease", "motile disease", "atypical disease", "ciliopathy classification"],
-        localization: ["localize", "location", "subcellular", "basal body", "transition zone", "centrosome", "axoneme", "ciliary membrane"],
-        phenotype: ["knockdown", "phenotype", "effect", "shorter cilia", "longer cilia", "cilia length", "cilia number", "decreased ciliation", "loss of cilia"]
-    };
+    
+    // --- Define filter keywords ---
+    const localizationTerms = ["lysosome", "lysosomal", "basal body", "transition zone", "cilia", "axoneme", "centrosome", "ciliary membrane", "nucleus", "mitochondria", "ciliary tip"];
+    const phenotypeTerms = ["short cilia", "long cilia", "cilia length", "cilia defects", "decreased ciliation", "loss of cilia", "reduced cilia", "no cilia"];
+    const tissueTerms = ["lung", "kidney", "retina", "brain", "liver", "testis"];
+    const cellTypeTerms = ["ciliated cell", "epithelial cell", "neuron", "rod", "cone"];
+    const diseaseTerms = ["joubert", "bardet-biedl", "bbs", "mks", "meckel-gruber", "pcd", "nephronophthisis", "nphp", "polycystic kidney"];
 
-    // --- Terms for Priority Checks ---
-    const localizationTerms = [
-        "basal body", "transition zone", "cilia", "axoneme", "centrosome",  
-        "ciliary membrane", "nucleus", "lysosome", "mitochondria", "ciliary tip"
-    ];
-    const phenotypeTerms = [
-        "short cilia", "longer cilia", "cilia length", "cilia defects",  
-        "decreased ciliation", "loss of cilia", "reduced cilia", "increase", "decrease", "no effect"
-    ];
-    const diseaseNames = ["bardet-biedl syndrome", "joubert syndrome", "meckel-gruber syndrome", "primary ciliary dyskinesia", "leber congenital amaurosis", "nephronophthisis", "polycystic kidney disease", "autosomal dominant polycystic kidney disease", "autosomal recessive polycystic kidney disease", "short-rib thoracic dysplasia", "senior-løken syndrome", "cranioectodermal dysplasia", "nphp", "bbs", "mks", "pcd", "ciliopathy", "syndrome"];
-    const strictPhenotypeTerms = ["phenotype", "short cilia", "long cilia", "cilia length", "cilia number", "decreased ciliation", "loss of cilia", "reduced cilia", "increase", "decrease"];
+    // --- Filter Parsing ---
+    let filters = {};
+    
+    const locMatch = localizationTerms.find(name => qLower.includes(name));
+    if (locMatch) filters.localization = locMatch.replace("lysosomal", "lysosome"); // Standardize
+    
+    const phenoMatch = phenotypeTerms.find(term => qLower.includes(term));
+    if (phenoMatch) filters.phenotype = phenoMatch.replace("decreased ciliation", "reduced cilia"); // Standardize
+    
+    const tissueMatch = tissueTerms.find(term => qLower.includes(`in ${term}`) || qLower.includes(`in the ${term}`));
+    if (tissueMatch) filters.tissue = tissueMatch;
+    
+    const cellTypeMatch = cellTypeTerms.find(term => qLower.includes(term));
+    if (cellTypeMatch) filters.cell_type = cellTypeMatch.replace("ciliated cell", "ciliated"); // Standardize
+    
+    const diseaseMatch = diseaseTerms.find(term => qLower.includes(term));
+    if (diseaseMatch) filters.disease = diseaseMatch;
 
-    // --- Check for gene name ---
-    const geneRegex = /\b(?!show\b|me\b|what\b|is\b|tell\b|about\b|for\b|genes\b)([A-Z]{3,}|[A-Z0-9-]{3,})\b/i;
-    const hasGene = geneRegex.test(qLower);
-
-    // --- Priority Rule 1: Combined "disease" + "phenotype" ---
-    const matchedDisease = diseaseNames.find(name => qLower.includes(name));
-    const matchedStrictPhenotype = strictPhenotypeTerms.find(term => qLower.includes(term));
-
-    if (matchedDisease && matchedStrictPhenotype) {
-        const standardDisease =
-            matchedDisease.toUpperCase() === "BBS" ? "Bardet–Biedl Syndrome" :
-            matchedDisease.toUpperCase() === "MKS" ? "Meckel–Gruber Syndrome" :
-            matchedDisease.toUpperCase() === "PCD" ? "Primary Ciliary Dyskinesia" :
-            matchedDisease.toUpperCase() === "NPHP" ? "Nephronophthisis" :
-            matchedDisease;
-        console.log(`[CiliAI Complex] getDiseaseGenesByPhenotype("${standardDisease}", "${matchedStrictPhenotype}")`);
-        return `<p>Functionality for 'getDiseaseGenesByPhenotype' (Disease: ${standardDisease}, Phenotype: ${matchedStrictPhenotype}) is not yet implemented.</p>`; // Placeholder
-    }
-
-    // --- Priority Rule 2: Combined "localization" + "phenotype" ---
-    const matchedLocalization = localizationTerms.find(name => qLower.includes(name));
-    const matchedPhenotype = phenotypeTerms.find(term => qLower.includes(term));
-
-    if (matchedLocalization && matchedPhenotype) {
-        console.log(`[CiliAI Complex] getLocalizationPhenotypeGenes("${matchedLocalization}", "${matchedPhenotype}")`);
-        return `<p>Functionality for 'getLocalizationPhenotypeGenes' (Location: ${matchedLocalization}, Phenotype: ${matchedPhenotype}) is not yet implemented.</p>`; // Placeholder
+    // --- Query Execution ---
+    // If we found more than one filter, use the master query.
+    if (Object.keys(filters).length > 1) {
+        
+        console.log("[CiliAI Master Query] Running with filters:", filters);
+        const results = ciliAI_masterQuery(filters);
+        
+        if (results.length === 0) {
+            return `<p>No genes matched all criteria: ${JSON.stringify(filters)}</p>`;
+        }
+        
+        // Format the results
+        let html = `<p>Found <strong>${results.length}</strong> genes matching your criteria (<em>${Object.values(filters).join(', ')}</em>):</p>
+                    <table class="gene-detail-table">
+                        <thead><tr><th>Gene</th><th>Description</th></tr></thead>
+                        <tbody>`;
+        html += results.map(g => `<tr><td><strong>${g.gene}</strong></td><td>${g.description || 'No description.'}</td></tr>`).join('');
+        html += `   </tbody>
+                    </table>`;
+        return html;
     }
     
-    // --- Rule-based fuzzy detection (Fallback) ---
-    let detectedIntent = null;
-    for (const [intent, phrases] of Object.entries(intentClusters)) {
-        if (phrases.some(p => qLower.includes(p))) {
-            detectedIntent = intent;
-            break;
-        }
-    }
-
-    // --- If an intent is detected BUT a gene is also present, FALL BACK ---
-    if (hasGene && detectedIntent && 
-        ["phylogeny", "domain", "complex", "expression", "localization", "phenotype"].includes(detectedIntent)) {
-        return null; // Let Stage 2 (single-gene handler) take it
-    }
-
-    // --- Intent Resolution Logic (No gene present) ---
-
-    if (detectedIntent === "ciliary_tip") {
-        console.log("[CiliAI Complex] getCuratedComplexComponents('CILIARY TIP')");
-        return `<p>Functionality for 'getCuratedComplexComponents' (CILIARY TIP) is not yet implemented.</p>`; // Placeholder
-    }
-
-    // --- Disease Classification Handler ---
-    else if (detectedIntent === "disease_classification") {
-        let classification = null;
-        if (qLower.includes('primary ciliopathy') || qLower.includes('primary disease')) {
-            classification = "Primary Ciliopathies";
-        } else if (qLower.includes('motile ciliopathy') || qLower.includes('motile disease')) {
-            classification = "Motile Ciliopathies";
-        } else if (qLower.includes('secondary ciliopathy') || qLower.includes('secondary disease')) {
-            classification = "Secondary Diseases";
-        } else if (qLower.includes('atypical ciliopathy') || qLower.includes('atypical disease')) {
-            classification = "Atypical Ciliopathies";
-        }
-
-        if (classification) {
-            console.log(`[CiliAI Complex] getGenesByCiliopathyClassification("${classification}")`);
-            return `<p>Functionality for 'getGenesByCiliopathyClassification' (${classification}) is not yet implemented.</p>`; // Placeholder
-        }
-    }
-
-    // --- Specific Disease Handler (Generic List) ---
-    else if (detectedIntent === "disease") {
-        const diseaseList = ["bardet-biedl syndrome", "joubert syndrome", "meckel-gruber syndrome", "primary ciliary dyskinesia", "leber congenital amaurosis", "nephronophthisis", "polycystic kidney disease", "autosomal dominant polycystic kidney disease", "autosomal recessive polycystic kidney disease", "short-rib thoracic dysplasia", "senior-løken syndrome", "cranioectodermal dysplasia", "nphp", "bbs", "mks", "pcd", "ciliopathy", "syndrome"];
-
-        let targetDisease = null;
-        for (const name of diseaseList.sort((a, b) => b.length - a.length)) {
-            if (qLower.includes(name)) {
-                targetDisease = name;
-                break;
-            }
-        }
-
-        if (targetDisease) {
-            const standardName =
-                targetDisease.toUpperCase() === "BBS" ? "Bardet–Biedl Syndrome" :
-                targetDisease.toUpperCase() === "MKS" ? "Meckel–Gruber Syndrome" :
-                targetDisease.toUpperCase() === "PCD" ? "Primary Ciliary Dyskinesia" :
-                targetDisease.toUpperCase() === "NPHP" ? "Nephronophthisis" :
-                targetDisease;
-            console.log(`[CiliAI Complex] getCiliopathyGenes("${standardName}")`);
-            return `<p>Functionality for 'getCiliopathyGenes' (${standardName}) is not yet implemented.</p>`; // Placeholder
-        }
-
-        return `<p>🩺 Disease query detected, but no specific disease or classification was identified for listing genes. Please try a query like "List genes for Joubert Syndrome".</p>`;
-    }
-
-    // --- Domain Handler (No Gene) ---
-    else if (detectedIntent === "domain") {
-        console.log(`[CiliAI Complex] resolveDomainQuery("${query}")`);
-        return `<p>Functionality for 'resolveDomainQuery' (without a gene) is not yet implemented.</p>`; // Placeholder
-    }
-
-    // --- Phylogeny Handler (No Gene) ---
-    else if (detectedIntent === "phylogeny") {
-        console.log(`[CiliAI Complex] resolvePhylogeneticQuery("${query}")`);
-        return `<p>Functionality for 'resolvePhylogeneticQuery' (without a gene) is not yet implemented.</p>`; // Placeholder
-    }
-
-    // --- Complex Handler (No Gene) ---
-    else if (detectedIntent === "complex") {
-        console.log(`[CiliAI Complex] routeComplexPhylogenyAnalysis("${query}")`);
-        return `<p>Functionality for 'routeComplexPhylogenyAnalysis' (without a gene) is not yet implemented.</p>`; // Placeholder
-    }
-
-    // --- Expression Handler (No Gene) ---
-    else if (detectedIntent === "expression") {
-        return `<p>🧬 Please specify a gene to show expression data.</p>`;
-    }
-
-    // --- Localization Handler (Generic List) ---
-    else if (detectedIntent === "localization") {
-        const locationMatch = qLower.match(/(basal body|transition zone|axoneme|centrosome|ciliary membrane)/);
-        if (locationMatch && locationMatch[1]) {
-            console.log(`[CiliAI Complex] getGenesByLocalization("${locationMatch[1]}")`);
-            return `<p>Functionality for 'getGenesByLocalization' (${locationMatch[1]}) is not yet implemented.</p>`; // Placeholder
-        } else {
-            return `<p>📍 Localization query detected. Please be more specific (e.g., "genes in the basal body").</p>`;
-        }
-    }
-    // --- Phenotype Handler (Generic List) ---
-    else if (detectedIntent === "phenotype") {
-        return `<p>🔎 Phenotype/Screen query detected. Please use a specific gene (e.g., "What happens to cilia when KIF3A is knocked down?") or a specific phenotype (e.g., "Find genes causing short cilia").</p>`;
-    }
-
-    // --- Default fallback ---
-    return null;
+    // ... (rest of your existing logic for single disease/complex lists) ...
+    // e.g., if (qLower.includes("joubert syndrome")) { ... }
+    
+    // --- Fallback ---
+    return null; // Let Stage 2 (single-gene) handle it
 }
 
-
+     
 // ============================================================================
 // 5. 💬 CiliAI "CONSUMER" HANDLER FUNCTIONS (FINAL)
 // ============================================================================
