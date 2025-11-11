@@ -26,17 +26,100 @@ let corumDataCache = {
 // --- Utility to collect all unique genes ---
 function getAllGenes() {
     const genes = new Set([
-        ...(window.ciliaHubDataCache ? Array.from(window.ciliaHubDataCache.keys()) : []),
-        ...(window.screenDataCache ? Object.keys(window.screenDataCache) : []),
+        ...(ciliaHubDataCache instanceof Map ? Array.from(ciliaHubDataCache.keys()) : []),
+        ...(screenDataCache ? Object.keys(screenDataCache) : []),
         ...(window.tissueDataCache ? Object.keys(window.tissueDataCache) : []),
-        ...(window.CILI_AI_DOMAIN_DB ? Object.keys(window.CILI_AI_DOMAIN_DB) : [])
+        ...(CILI_AI_DOMAIN_DB ? Object.keys(CILI_AI_DOMAIN_DB) : [])
     ]);
     return Array.from(genes).sort();
 }
 
+// --- Fix: Always flatten and sanitize fetched data ---
+async function fetchCiliaData(url) {
+    console.log("📥 Fetching CiliaHub data...");
+
+    try {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(`HTTP ${response.status} while fetching ${url}`);
+
+        const raw = await response.json();
+
+        // ✅ Ensure we always return a flat Map structure
+        let parsed;
+        if (Array.isArray(raw)) {
+            parsed = new Map(raw.map(item => [item.gene_symbol || item.name, item]));
+        } else if (raw && typeof raw === "object") {
+            parsed = new Map(Object.entries(raw));
+        } else {
+            parsed = new Map();
+        }
+
+        console.log(`✅ CiliaHub data processed: ${parsed.size} entries.`);
+        return parsed;
+    } catch (err) {
+        console.error("🚨 Failed to fetch CiliaHub data:", err);
+        // Return an empty Map instead of null to prevent downstream .size / .entries errors
+        return new Map();
+    }
+}
 
 // --- Flags ---
 let isDataInitialized = false;
+
+// --- Main app startup ---
+async function initializeAppCaches() {
+    if (isDataInitialized) return; // Prevent double initialization
+
+    console.log("🧩 Initializing all dataset caches in parallel...");
+
+    try {
+        // Initialize all caches in parallel
+        const [
+            ciliaHub,
+            screen,
+            tissue,
+            corum,
+            domain,
+            nevers,
+            li,
+            cellxgene,
+            umap
+        ] = await Promise.all([
+            fetchCiliaData("https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/ciliahub_data.json"),
+            fetchScreenData("https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/cilia_screens_data.json"),
+            fetchTissueData("https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/rna_tissue_consensus.tsv"),
+            fetchCorumComplexes("https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/corum_humanComplexes.json"),
+            getDomainData("https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/cili_ai_domain_database.json"),
+            fetchNeversPhylogenyData("https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/nevers_et_al_2017_matrix_optimized.json"),
+            fetchLiPhylogenyData("https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/li_et_al_2014_matrix_optimized.json"),
+            fetchCellxgeneData("https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/cellxgene_data.json"),
+            fetchUmapData("https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/umap_data.json")
+        ]);
+
+        // Assign global caches
+        ciliaHubDataCache = ciliaHub || new Map();
+        screenDataCache = screen || {};
+        window.tissueDataCache = tissue || {};
+        corumDataCache = corum || { list: [], byGene: {}, byNameLower: {}, loaded: false };
+        CILI_AI_DOMAIN_DB = domain || {};
+        neversPhylogenyCache = nevers || {};
+        liPhylogenyCache = li || {};
+        cellxgeneDataCache = cellxgene || {};
+        umapDataCache = umap || {};
+
+        // Merge phylogenies safely
+        phylogenyDataCache = {
+            ...(neversPhylogenyCache ? Object.fromEntries(neversPhylogenyCache) : {}),
+            ...(liPhylogenyCache ? Object.fromEntries(liPhylogenyCache) : {})
+        };
+
+        isDataInitialized = true;
+        console.log("✅ All caches initialized successfully.");
+    } catch (error) {
+        console.error("🚨 Failed to initialize caches:", error);
+    }
+}
+
 
 // --- Main app startup ---
 initializeAppCaches().then(() => {
@@ -62,52 +145,6 @@ async function handleUserQuery(geneName) {
     console.log("Nevers Phylogeny (Human):", data.nevers_phylogeny?.["Homo sapiens"]);
 }
 
-// --- Initialization ---
-async function initializeAppCaches() {
-    if (isDataInitialized) return true;
-
-    console.log("🧩 Initializing all dataset caches in parallel...");
-
-    try {
-        await Promise.all([
-            fetchCiliaData(),
-            fetchScreenData(),
-            fetchTissueData(),
-            fetchCorumComplexes(),
-            getDomainData(),
-            fetchNeversPhylogenyData(),
-            fetchLiPhylogenyData(),
-            fetchCellxgeneData(),
-            fetchUmapData()
-        ]);
-
-        // Normalize ciliaHubDataCache
-        if (typeof ciliaHubDataCache !== "undefined" && ciliaHubDataCache && !Array.isArray(ciliaHubDataCache)) {
-            if (Array.isArray(ciliaHubDataCache.genes)) {
-                console.log("🔧 Normalizing ciliaHubDataCache from .genes property");
-                ciliaHubDataCache = ciliaHubDataCache.genes;
-            } else if (Array.isArray(ciliaHubDataCache.data)) {
-                console.log("🔧 Normalizing ciliaHubDataCache from .data property");
-                ciliaHubDataCache = ciliaHubDataCache.data;
-            } else if (Array.isArray(Object.values(ciliaHubDataCache)[0])) {
-                console.log("🔧 Normalizing ciliaHubDataCache from first array value");
-                ciliaHubDataCache = Object.values(ciliaHubDataCache)[0];
-            } else {
-                console.error("❌ Could not find valid array in ciliaHubDataCache:", ciliaHubDataCache);
-            }
-        }
-
-        console.log("🧩 ciliaHubDataCache check:", typeof ciliaHubDataCache, "Array?", Array.isArray(ciliaHubDataCache), "Length:", ciliaHubDataCache?.length);
-
-        isDataInitialized = true;
-        console.log("✅ All caches initialized successfully.");
-        return true;
-    } catch (error) {
-        console.error("🚨 Critical error during initialization:", error);
-        isDataInitialized = false;
-        return false;
-    }
-}
 
 // --- NEW: Reusable scRNA-seq Data Reference ---
 const SC_RNA_SEQ_REFERENCE_HTML = `
@@ -967,49 +1004,6 @@ function processToArray(value) {
     return String(value).split(/[;,|]/).map(v => v.trim()).filter(Boolean);
 }
 
-/**
- * Fetches and normalizes the main CiliaHub data.
- */
-async function fetchCiliaData() {
-    console.log("📥 Fetching CiliaHub data...");
-    try {
-        const response = await fetch("https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/ciliahub_data.json");
-        const rawData = await response.json();
-
-        // --- Normalize to a flat array ---
-        let normalizedData;
-
-        if (Array.isArray(rawData)) {
-            normalizedData = rawData;
-        } else if (Array.isArray(rawData.genes)) {
-            normalizedData = rawData.genes;
-        } else if (Array.isArray(rawData.data)) {
-            normalizedData = rawData.data;
-        } else if (Array.isArray(Object.values(rawData)[0])) {
-            normalizedData = Object.values(rawData)[0];
-        } else {
-            console.warn("⚠️ Unexpected CiliaHub JSON format. Defaulting to empty array.");
-            normalizedData = [];
-        }
-
-        // --- Optionally: convert to Map if your app prefers Map-based lookups ---
-        if (!window.ciliaHubDataCache) window.ciliaHubDataCache = new Map();
-
-        normalizedData.forEach(entry => {
-            if (entry && entry.gene_symbol) {
-                window.ciliaHubDataCache.set(entry.gene_symbol, entry);
-            }
-        });
-
-        console.log(`✅ Loaded ${ciliaHubDataCache.size} genes into CiliaHub Map cache.`);
-        return normalizedData;
-    } catch (error) {
-        console.error("🚨 Failed to fetch CiliaHub data:", error);
-        window.ciliaHubDataCache = new Map(); // fallback
-        return [];
-    }
-}
-
 
 
 const unifiedGeneCache = new Map();
@@ -1078,117 +1072,121 @@ async function getCombinedDataForGene(geneSymbol) {
 }
 
 // --- UPDATED fetchScreenData function (to be replaced in your code) ---
+// --- UPDATED fetchScreenData function ---
 async function fetchScreenData() {
     if (screenDataCache) return screenDataCache;
     try {
         const response = await fetch('https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/cilia_screens_data.json');
         if (!response.ok) throw new Error(`Failed to fetch screen data: ${response.statusText}`);
+
         const data = await response.json();
         screenDataCache = data;
-        
-        // --- NEW: Populate allGeneSymbols cache with screen genes ---
-        const screenGenes = Object.keys(data);
-        if (!allGeneSymbols) {
-            allGeneSymbols = new Set(screenGenes);
-        } else {
-            screenGenes.forEach(gene => allGeneSymbols.add(gene));
-        }
-        // This process needs to be finalized in fetchCiliaData too for complete coverage.
 
-        console.log('Screen data loaded successfully:', Object.keys(data).length, 'genes');
+        // --- Ensure global gene cache is updated ---
+        const screenGenes = Object.keys(data);
+        if (!allGeneSymbols) allGeneSymbols = new Set();
+        screenGenes.forEach(gene => allGeneSymbols.add(gene));
+
+        console.log(`✅ Screen data loaded: ${screenGenes.length} genes.`);
         return screenDataCache;
     } catch (error) {
-        console.error('Error fetching screen data:', error);
+        console.error('🚨 Error fetching screen data:', error);
         screenDataCache = {};
         return screenDataCache;
     }
 }
 
+
+// --- UPDATED fetchPhylogenyData function ---
 async function fetchPhylogenyData() {
     if (phylogenyDataCache) return phylogenyDataCache;
+
     try {
         const response = await fetch('https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/phylogeny_summary.json');
         if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+
         const raw = await response.json();
         const unified = {};
-        // Map class to query categories
+
         const classToCategory = {
             'Ciliary-only': 'ciliated_only_genes',
             'Present-in-both': 'in_all_organisms',
-            'Non-ciliary': 'nonciliary_only_genes' // Adjust if class names differ
+            'Non-ciliary': 'nonciliary_only_genes'
         };
-        // Process ciliated_only_genes, nonciliary_only_genes, in_all_organisms if present
-        if (raw.ciliated_only_genes) {
-            raw.ciliated_only_genes
-                .filter(g => typeof g === 'string' && g)
-                .forEach(g => unified[g.trim().toUpperCase()] = { sym: g.trim(), category: 'ciliated_only_genes', species: [] });
-        }
-        if (raw.nonciliary_only_genes) {
-            raw.nonciliary_only_genes
-                .filter(g => typeof g === 'string' && g)
-                .forEach(g => unified[g.trim().toUpperCase()] = { sym: g.trim(), category: 'nonciliary_only_genes', species: [] });
-        }
-        if (raw.in_all_organisms) {
-            raw.in_all_organisms
-                .filter(g => typeof g === 'string' && g)
-                .forEach(g => unified[g.trim().toUpperCase()] = { sym: g.trim(), category: 'in_all_organisms', species: [] });
-        }
-        // Process summary array
-        if (raw.summary && Array.isArray(raw.summary)) {
+
+        // --- Normalize arrays ---
+        ['ciliated_only_genes', 'nonciliary_only_genes', 'in_all_organisms'].forEach(key => {
+            if (Array.isArray(raw[key])) {
+                raw[key]
+                    .filter(g => typeof g === 'string' && g)
+                    .forEach(g => unified[g.trim().toUpperCase()] = { sym: g.trim(), category: key, species: [] });
+            }
+        });
+
+        // --- Normalize summary if available ---
+        if (Array.isArray(raw.summary)) {
             raw.summary.forEach(item => {
                 const gene = (item.sym || '').trim().toUpperCase();
                 const cat = (item.class || '').trim();
-                if (gene) {
-                    unified[gene] = {
-                        sym: item.sym, // Retain original sym
-                        category: classToCategory[cat] || cat.toLowerCase().replace(/[\s-]+/g, '_'),
-                        species: Array.isArray(item.species) ? item.species.map(s => s.trim()) : []
-                    };
-                }
+                if (!gene) return;
+
+                unified[gene] = {
+                    sym: item.sym,
+                    category: classToCategory[cat] || cat.toLowerCase().replace(/[\s-]+/g, '_'),
+                    species: Array.isArray(item.species) ? item.species.map(s => s.trim()) : []
+                };
             });
         }
+
         phylogenyDataCache = unified;
-        console.log(`Phylogeny data normalized: ${Object.keys(unified).length} entries`);
-        // Log genes with C.elegans
-        const celegansGenes = Object.entries(unified)
-            .filter(([_, data]) => data.species.includes('C.elegans'))
-            .map(([gene, data]) => ({ gene: data.sym, species: data.species, category: data.category }));
-        console.log(`Genes with C.elegans: ${celegansGenes.length}`, celegansGenes.slice(0, 5));
+        console.log(`✅ Phylogeny data normalized: ${Object.keys(unified).length} entries.`);
+
+        // Optional: Debug log for C.elegans genes
+        const celegansGenes = Object.values(unified).filter(v => v.species.includes('C.elegans'));
+        console.log(`🪱 Genes with C.elegans: ${celegansGenes.length}`);
         return phylogenyDataCache;
+
     } catch (error) {
-        console.error('Failed to fetch phylogeny summary data:', error);
+        console.error('🚨 Failed to fetch phylogeny summary data:', error);
         phylogenyDataCache = {};
         return phylogenyDataCache;
     }
 }
 
+
+// --- UPDATED fetchTissueData function ---
 async function fetchTissueData() {
     if (window.tissueDataCache) return window.tissueDataCache;
+
     try {
-        const response = await fetch('https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/rna_tissue_consensus.tsv');
+        const response = await fetch('https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/rna_tissue_consensus.tsv');
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+
         const tsv = await response.text();
         const lines = tsv.trim().split(/\r?\n/);
         if (lines.length < 2) throw new Error('Empty or invalid TSV file');
+
         const data = {};
         for (let i = 1; i < lines.length; i++) {
             const parts = lines[i].split('\t');
             if (parts.length < 4) continue;
             const [, geneSymbol, tissue, nTPMValue] = parts;
-            if (geneSymbol && tissue && nTPMValue) {
-                const gene = geneSymbol.toUpperCase().trim();
-                const nTPM = parseFloat(nTPMValue.trim());
-                if (!isNaN(nTPM)) {
-                    if (!data[gene]) data[gene] = {};
-                    data[gene][tissue.trim()] = nTPM;
-                }
-            }
+
+            const gene = geneSymbol?.trim().toUpperCase();
+            const nTPM = parseFloat(nTPMValue);
+            if (!gene || isNaN(nTPM)) continue;
+
+            if (!data[gene]) data[gene] = {};
+            data[gene][tissue.trim()] = nTPM;
         }
+
         window.tissueDataCache = data;
-        console.log('Tissue expression data loaded for', Object.keys(data).length, 'genes');
+        console.log(`✅ Tissue data loaded for ${Object.keys(data).length} genes.`);
         return window.tissueDataCache;
+
     } catch (error) {
-        console.error('Failed to fetch tissue data:', error);
+        console.error('🚨 Failed to fetch tissue data:', error);
+        // Provide fallback data
         window.tissueDataCache = {
             'IFT88': { 'Kidney Cortex': 8.45, 'Kidney Medulla': 12.67 },
             'ARL13B': { 'Brain': 5.2, 'Kidney': 3.1, 'Testis': 9.8 }
@@ -1198,92 +1196,83 @@ async function fetchTissueData() {
 }
 window.fetchTissueData = fetchTissueData;
 
+
+// --- UPDATED fetchUmapData function ---
 async function fetchUmapData() {
     if (umapDataCache) return umapDataCache;
-
-    // Use the correct Raw URL you've provided
     const dataUrl = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/umap_data.json';
 
     try {
-        console.log('Fetching pre-computed UMAP data...');
+        console.log('🧬 Fetching pre-computed UMAP data...');
         const response = await fetch(dataUrl);
         if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
-        umapDataCache = await response.json();
-        console.log(`✅ UMAP data loaded with ${umapDataCache.length} points.`);
+        const json = await response.json();
+
+        // ✅ Ensure array
+        umapDataCache = Array.isArray(json) ? json.flat() : [];
+        console.log(`✅ UMAP data loaded: ${umapDataCache.length} points.`);
         return umapDataCache;
+
     } catch (error) {
-        console.error('Failed to fetch UMAP data:', error);
-        return null;
+        console.error('🚨 Failed to fetch UMAP data:', error);
+        umapDataCache = [];
+        return umapDataCache;
     }
 }
 
-async function fetchCellxgeneData() {
-    // Check if data is already in cache
-    if (cellxgeneDataCache) return cellxgeneDataCache;
 
-    // Use the correct Raw URL you've provided
+// --- UPDATED fetchCellxgeneData function ---
+async function fetchCellxgeneData() {
+    if (cellxgeneDataCache) return cellxgeneDataCache;
     const dataUrl = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/cellxgene_data.json';
 
     try {
-        console.log('Fetching Cellxgene single-cell data...');
+        console.log('🧫 Fetching Cellxgene single-cell data...');
         const response = await fetch(dataUrl);
-        if (!response.ok) {
-            throw new Error(`HTTP error! Status: ${response.status}`);
-        }
-        const jsonData = await response.json();
-        
-        cellxgeneDataCache = jsonData;
-        
-        console.log(`✅ Cellxgene data loaded successfully for ${Object.keys(jsonData).length} genes.`);
+        if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+
+        const json = await response.json();
+        cellxgeneDataCache = json && typeof json === 'object' ? json : {};
+
+        console.log(`✅ Cellxgene data loaded for ${Object.keys(cellxgeneDataCache).length} genes.`);
         return cellxgeneDataCache;
 
     } catch (error) {
-        console.error('Failed to fetch or parse Cellxgene data:', error);
-        cellxgeneDataCache = null; // Set to null on failure
-        return null;
+        console.error('🚨 Failed to fetch or parse Cellxgene data:', error);
+        cellxgeneDataCache = {};
+        return cellxgeneDataCache;
     }
 }
 
-/**
- * FETCHES and CORUM Human Complex data.
- */
+
+// --- UPDATED fetchCorumComplexes function ---
 async function fetchCorumComplexes() {
     if (corumDataCache.loaded) return corumDataCache;
     const dataUrl = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/corum_humanComplexes.json';
 
     try {
-        console.log('Fetching CORUM complexes...');
+        console.log('🧩 Fetching CORUM complexes...');
         const response = await fetch(dataUrl);
         if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
-        
-        // Handle single object vs. array format for robustness
-        const rawData = await response.json();
-        const data = Array.isArray(rawData) ? rawData : [rawData]; 
 
-        data.forEach(entry => {
-            // CRITICAL FIX 1: Check for complex_name and subunits array
-            if (!entry || !entry.complex_name || !Array.isArray(entry.subunits)) return; 
-            
+        const rawData = await response.json();
+        const complexes = Array.isArray(rawData) ? rawData : [rawData];
+
+        complexes.forEach(entry => {
+            if (!entry?.complex_name || !Array.isArray(entry.subunits)) return;
             const complexNameLower = entry.complex_name.toLowerCase();
-            
-            // Store the whole entry for complex name lookup
-            corumDataCache.byNameLower[complexNameLower] = entry; 
+
+            corumDataCache.byNameLower[complexNameLower] = entry;
             corumDataCache.list.push(entry);
 
-            // Populate byGene lookup
             entry.subunits.forEach(subunit => {
-                // CRITICAL FIX 2: Access gene symbol from the subunit object's 'gene_name' field
-                const geneSymbol = subunit.gene_name;
-                if (!geneSymbol) return; 
+                const geneSymbol = subunit?.gene_name?.toUpperCase();
+                if (!geneSymbol) return;
 
-                const g = geneSymbol.toUpperCase();
-                if (!corumDataCache.byGene[g]) corumDataCache.byGene[g] = [];
-                
-                // Store a lighter reference to the complex, listing all gene symbols
-                corumDataCache.byGene[g].push({
+                if (!corumDataCache.byGene[geneSymbol]) corumDataCache.byGene[geneSymbol] = [];
+                corumDataCache.byGene[geneSymbol].push({
                     complexName: entry.complex_name,
-                    // Map the subunits array of objects back to an array of uppercase gene symbols
-                    subunits: entry.subunits.map(s => s.gene_name.toUpperCase()) 
+                    subunits: entry.subunits.map(s => s.gene_name.toUpperCase())
                 });
             });
         });
@@ -1291,13 +1280,14 @@ async function fetchCorumComplexes() {
         corumDataCache.loaded = true;
         console.log(`✅ Loaded ${corumDataCache.list.length} CORUM complexes.`);
         return corumDataCache;
+
     } catch (err) {
-        console.error('Failed to fetch CORUM data:', err);
-        // Set loaded to true to prevent endless retry loop
-        corumDataCache.loaded = true; 
+        console.error('🚨 Failed to fetch CORUM data:', err);
+        corumDataCache.loaded = true;
         return corumDataCache;
     }
 }
+
 
 /**
  * Helper function to get complex details by gene symbol.
