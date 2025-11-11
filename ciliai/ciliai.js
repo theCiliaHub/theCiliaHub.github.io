@@ -506,14 +506,13 @@ async function ciliAI_resolveIntent(query) {
         console.log("[CiliAI LOG] 5b. Stage 1 Failed. Proceeding to Stage 2 (Single Gene)...");
         
         // --- STAGE 2: Fallback to single-gene query resolution ---
-
         // ====================================================================
         // ** THE FIX **
         // This RegEx is smarter. It looks for all-caps words (3+ chars) OR
         // words with letters and numbers (like IFT88).
         // It explicitly IGNORES common words like "show", "me", "what", "is".
         // ====================================================================
-        const geneRegex = /\b(?!show\b|me\b|what\b|is\b|tell\b|about\b|for\b|genes\b)([A-Z]{3,}|[A-Z0-9]{3,})\b/i;
+        const geneRegex = /\b(?!show\b|me\b|what\b|is\b|tell\b|about\b|for\b|genes\b)([A-Z]{3,}|[A-Z0-9-]{3,})\b/i;
         const geneMatch = query.match(geneRegex); // Match against the *original* query to preserve case
         const geneName = geneMatch ? geneMatch[1].toUpperCase() : null;
 
@@ -940,18 +939,11 @@ async function ciliAI_handleComplex(geneName) {
  * Handles the query from the user input.
  * This function is attached to the "Send" button and "Enter" key.
  */
-// ============================================================================
-// 6. 🔌 CiliAI EVENT HANDLERS & INITIALIZATION
-// ============================================================================
-// This section connects CiliAI to the HTML DOM.
-/**
- * Handles the query from the user input.
- * This function is attached to the "Send" button and "Enter" key.
- */
 async function ciliAI_handleQuery() {
     console.log("[CiliAI LOG] 1. ciliAI_handleQuery fired.");
     
-    const inputElement = document.getElementById('aiQueryInput');
+    // *** This ID must match your HTML ***
+    const inputElement = document.getElementById('aiQueryInput'); 
     
     if (!inputElement) {
         console.error("[CiliAI LOG] 1a. CRITICAL: Cannot find input element '#aiQueryInput'.");
