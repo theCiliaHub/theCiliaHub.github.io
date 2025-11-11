@@ -26,19 +26,88 @@ let corumDataCache = {
 // --- Utility to collect all unique genes ---
 function getAllGenes() {
     const genes = new Set([
-        ...(ciliaHubDataCache ? Array.from(ciliaHubDataCache.keys()) : []),
-        ...(screenDataCache ? Object.keys(screenDataCache) : []),
+        ...(window.ciliaHubDataCache ? Array.from(window.ciliaHubDataCache.keys()) : []),
+        ...(window.screenDataCache ? Object.keys(window.screenDataCache) : []),
         ...(window.tissueDataCache ? Object.keys(window.tissueDataCache) : []),
-        ...(CILI_AI_DOMAIN_DB ? Object.keys(CILI_AI_DOMAIN_DB) : [])
+        ...(window.CILI_AI_DOMAIN_DB ? Object.keys(window.CILI_AI_DOMAIN_DB) : [])
     ]);
     return Array.from(genes).sort();
 }
 
+
+// --- Flags ---
+let isDataInitialized = false;
+
+// --- Main app startup ---
 initializeAppCaches().then(() => {
     allGeneSymbols = getAllGenes();
     console.log(`✅ Loaded ${allGeneSymbols.length} total unique genes.`);
+    handleUserQuery("IFT88");
 });
 
+// --- User query ---
+async function handleUserQuery(geneName) {
+    console.log(`🔍 Querying all data for ${geneName}...`);
+    const data = await getCombinedDataForGene(geneName);
+    if (!data) {
+        console.warn(`No combined data found for ${geneName}.`);
+        return;
+    }
+
+    console.log("📊 Combined Data:", data);
+    console.log("Functional Category:", data.core?.functional_category);
+    console.log("Localization:", data.core?.localization);
+    console.log("Tissue Expression (Kidney):", data.tissue_expression?.["Kidney"]);
+    console.log("Complex Membership:", data.complexes?.map(c => c.complexName));
+    console.log("Nevers Phylogeny (Human):", data.nevers_phylogeny?.["Homo sapiens"]);
+}
+
+// --- Initialization ---
+async function initializeAppCaches() {
+    if (isDataInitialized) return true;
+
+    console.log("🧩 Initializing all dataset caches in parallel...");
+
+    try {
+        await Promise.all([
+            fetchCiliaData(),
+            fetchScreenData(),
+            fetchTissueData(),
+            fetchCorumComplexes(),
+            getDomainData(),
+            fetchNeversPhylogenyData(),
+            fetchLiPhylogenyData(),
+            fetchCellxgeneData(),
+            fetchUmapData()
+        ]);
+
+        // Normalize ciliaHubDataCache
+        if (typeof ciliaHubDataCache !== "undefined" && ciliaHubDataCache && !Array.isArray(ciliaHubDataCache)) {
+            if (Array.isArray(ciliaHubDataCache.genes)) {
+                console.log("🔧 Normalizing ciliaHubDataCache from .genes property");
+                ciliaHubDataCache = ciliaHubDataCache.genes;
+            } else if (Array.isArray(ciliaHubDataCache.data)) {
+                console.log("🔧 Normalizing ciliaHubDataCache from .data property");
+                ciliaHubDataCache = ciliaHubDataCache.data;
+            } else if (Array.isArray(Object.values(ciliaHubDataCache)[0])) {
+                console.log("🔧 Normalizing ciliaHubDataCache from first array value");
+                ciliaHubDataCache = Object.values(ciliaHubDataCache)[0];
+            } else {
+                console.error("❌ Could not find valid array in ciliaHubDataCache:", ciliaHubDataCache);
+            }
+        }
+
+        console.log("🧩 ciliaHubDataCache check:", typeof ciliaHubDataCache, "Array?", Array.isArray(ciliaHubDataCache), "Length:", ciliaHubDataCache?.length);
+
+        isDataInitialized = true;
+        console.log("✅ All caches initialized successfully.");
+        return true;
+    } catch (error) {
+        console.error("🚨 Critical error during initialization:", error);
+        isDataInitialized = false;
+        return false;
+    }
+}
 
 // --- NEW: Reusable scRNA-seq Data Reference ---
 const SC_RNA_SEQ_REFERENCE_HTML = `
@@ -65,6 +134,128 @@ const CILI_AI_DB = {
     "ARL13B": { "summary": { "lof_length": "Inhibits / Restricts", "percentage_ciliated": "Reduced cilia numbers", "source": "Expert DB" }, "evidence": [{ "id": "21940428", "source": "pubmed", "context": "The small GTPase ARL13B is critical for ciliary structure; its absence leads to stunted cilia with abnormal morphology and axonemal defects." }] },
     "BBS1": { "summary": { "lof_length": "Inhibits / Restricts", "percentage_ciliated": "Reduced cilia numbers", "source": "Expert DB" }, "evidence": [{ "id": "12118255", "source": "pubmed", "context": "Mutated in Bardet-Biedl syndrome (type 1) OMIM 209901." }] }
 };
+
+// ==========================================
+// CiliAIQuery Module – Domain-Aware Queries
+// ==========================================
+const CiliAIQuery = (() => {
+    // Helper: normalize string
+    const normalize = (s) => s ? String(s).toLowerCase().replace(/[._\-\s]+/g, ' ').trim() : '';
+
+    // Helper: fetch all ciliaHub data as array
+    const allCiliaGenes = () => Array.from(ciliaHubDataCache.values());
+
+    // Helper: enrich gene info with domains from new DB
+    const attachDomains = (geneObj) => {
+        const geneName = geneObj.gene.toUpperCase();
+        const domainInfo = CILI_AI_DOMAIN_DB.gene_domain_map?.[geneName] || [];
+        return { ...geneObj, domains: domainInfo };
+    };
+
+    return {
+        // 1️⃣ Search by ciliopathy/disease name
+        async getCiliopathyGenes(disease) {
+            await fetchCiliaData();
+            const diseaseNorm = normalize(disease);
+            const diseaseRegex = new RegExp(diseaseNorm.replace(/\s+/g, '[\\s_\\-–]*').replace('syndrome', '(syndrome)?'), 'i');
+
+            const genes = allCiliaGenes()
+                .filter(g => g.ciliopathy?.some(c => normalize(c).match(diseaseRegex)))
+                .map(g => attachDomains({ gene: g.gene, description: g.ciliopathy?.join(', ') || 'No ciliopathy data' }))
+                .sort((a, b) => a.gene.localeCompare(b.gene));
+
+            return { genes, description: `Found ${genes.length} genes associated with "${disease}".` };
+        },
+
+        // 2️⃣ Search by organism
+        async getCiliaryGenesForOrganism(organismName) {
+            await fetchCiliaData();
+            await fetchPhylogenyData();
+
+            const ciliarySet = new Set(allCiliaGenes().map(g => g.gene.toUpperCase()));
+            const normalizedOrganism = normalize(organismName);
+            
+            const organismMap = {
+                'human': 'H.sapiens', 'homo sapiens': 'H.sapiens',
+                'mouse': 'M.musculus', 'mus musculus': 'M.musculus',
+                'worm': 'C.elegans', 'c. elegans': 'C.elegans', 'caenorhabditis elegans': 'C.elegans',
+                'fly': 'D.melanogaster', 'drosophila': 'D.melanogaster', 'drosophila melanogaster': 'D.melanogaster',
+                'zebrafish': 'D.rerio', 'danio rerio': 'D.rerio',
+                'yeast': 'S.cerevisiae', 'saccharomyces cerevisiae': 'S.cerevisiae',
+                'arabidopsis': 'A.thaliana', 'a. thaliana': 'A.thaliana',
+                'chicken': 'G.gallus', 'gallus gallus': 'G.gallus',
+                'chlamydomonas': 'C.reinhardtii', 'c. reinhardtii': 'C.reinhardtii',
+                'tetrahymena': 'T.thermophila', 't. thermophila': 'T.thermophila',
+                'plasmodium falciparum': 'P.falciparum'
+            };
+            const speciesCode = organismMap[normalizedOrganism] || organismName;
+            const speciesRegex = new RegExp(`^${normalize(speciesCode).replace(/\./g, '\\.?').replace(/\s/g, '\\s*')}$`, 'i');
+
+            const geneSynonyms = {
+                'OSM-5': 'IFT88', 'BBS-1': 'BBS1', 'CHE-11': 'IFT140', 'DHC-1': 'DYNC2H1',
+                'BBS-5': 'BBS5', 'XBOX-1': 'BBS4', 'DYF-1': 'IFT70'
+            };
+
+            const genes = Object.entries(phylogenyDataCache)
+                .filter(([gene, data]) => {
+                    const name = (data.sym || gene).toUpperCase();
+                    const stdName = geneSynonyms[name] || name;
+                    return ciliarySet.has(stdName) && data.species?.some(s => speciesRegex.test(normalize(s)));
+                })
+                .map(([gene, data]) => attachDomains({ gene: data.sym || gene, description: `Ciliary gene in ${speciesCode}` }));
+
+            return {
+                genes: genes.length ? genes : attachDomains(
+                    ['IFT88','BBS1','ARL13B','BBS10','NPHP1','AHI1','CEP290','MKS1','TTC8','OSM-5','CHE-11','DHC-1','BBS-1','BBS-5','XBOX-1','DYF-1']
+                        .filter(g => ciliarySet.has((geneSynonyms[g.toUpperCase()]||g).toUpperCase()))
+                        .map(g => ({ gene: g, description: `Known ciliary gene fallback for ${speciesCode}` }))
+                ),
+                description: `Found ${genes.length} ciliary genes for ${speciesCode}.`,
+                speciesCode
+            };
+        },
+
+        // 3️⃣ Search by localization
+        async getGenesByLocalization(locations) {
+            await fetchCiliaData();
+            const terms = locations.split(/\s+or\s+/).map(normalize);
+
+            const genes = allCiliaGenes()
+                .filter(g => g.localization?.some(loc => terms.some(t => normalize(loc).includes(t))))
+                .map(g => attachDomains({ gene: g.gene, description: g.localization?.join(', ') || 'No localization data' }))
+                .sort((a, b) => a.gene.localeCompare(b.gene));
+
+            return { genes, description: `Found ${genes.length} genes localized to ${locations}.` };
+        },
+
+        // 4️⃣ Search by domain
+        async getGenesWithDomain(domainName) {
+            await fetchCiliaData();
+            const regex = new RegExp(domainName.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'), 'i');
+
+            const genesFromCiliaHub = allCiliaGenes()
+                .filter(g => Array.isArray(g.domain_descriptions) && g.domain_descriptions.some(dd => dd.match(regex)))
+                .map(g => attachDomains({ gene: g.gene, description: `Domains: ${g.domain_descriptions?.join(', ')}` }));
+
+            const genesFromDomainDB = [];
+            if (CILI_AI_DOMAIN_DB.gene_domain_map) {
+                for (const [gene, domains] of Object.entries(CILI_AI_DOMAIN_DB.gene_domain_map)) {
+                    if (domains.some(d => (d.domain_id && d.domain_id.match(regex)) || (d.description && d.description.match(regex)))) {
+                        const matched = domains.filter(d => (d.domain_id && d.domain_id.match(regex)) || (d.description && d.description.match(regex)))
+                            .map(d => `${d.domain_id} (${d.description||'N/A'})`)
+                            .join('; ');
+                        genesFromDomainDB.push(attachDomains({ gene, description: `Domains: ${matched}` }));
+                    }
+                }
+            }
+
+            const allGenes = [...genesFromCiliaHub, ...genesFromDomainDB]
+                .sort((a,b) => a.gene.localeCompare(b.gene));
+
+            return { genes: allGenes, description: `Found ${allGenes.length} genes matching domain "${domainName}".` };
+        }
+    };
+})();
 
 
 // --- Main Page Display Function (REPLACEMENT) ---
@@ -256,9 +447,11 @@ function debounce(fn, delay) {
     }; 
 }
 
+/**
+ * Normalize a string for consistent matching.
+ */
 function normalizeTerm(s) {
     if (!s) return '';
-    // UPDATED: Now replaces periods, hyphens, underscores, and spaces with a single space.
     return String(s).toLowerCase().replace(/[._\-\s]+/g, ' ').trim();
 }
 
@@ -279,10 +472,6 @@ async function handleUserQuery(geneName) {
     console.log("Complex Membership:", data.complexes?.map(c => c.complexName));
     console.log("Nevers Phylogeny (Human):", data.nevers_phylogeny?.["Homo sapiens"]);
 }
-
-// On page load
-initializeAppCaches().then(() => handleUserQuery("IFT88"));
-
 
 
 
@@ -779,104 +968,77 @@ function processToArray(value) {
 }
 
 /**
- * MODIFIED: Uses a Map keyed by gene symbol for O(1) lookups.
+ * Fetches and normalizes the main CiliaHub data.
  */
 async function fetchCiliaData() {
-    if (ciliaHubDataCache instanceof Map && ciliaHubDataCache.size > 0) {
-        return ciliaHubDataCache;
-    }
-
+    console.log("📥 Fetching CiliaHub data...");
     try {
-        const url = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/ciliahub_data.json';
-        const response = await fetch(url);
-        if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
-        const data = await response.json();
+        const response = await fetch("https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/ciliahub_data.json");
+        const rawData = await response.json();
 
-        const dataMap = new Map();
+        // --- Normalize to a flat array ---
+        let normalizedData;
 
-        data.forEach(gene => {
-            const geneUpper = (gene.gene || '').toUpperCase();
-            if (!geneUpper) return;
+        if (Array.isArray(rawData)) {
+            normalizedData = rawData;
+        } else if (Array.isArray(rawData.genes)) {
+            normalizedData = rawData.genes;
+        } else if (Array.isArray(rawData.data)) {
+            normalizedData = rawData.data;
+        } else if (Array.isArray(Object.values(rawData)[0])) {
+            normalizedData = Object.values(rawData)[0];
+        } else {
+            console.warn("⚠️ Unexpected CiliaHub JSON format. Defaulting to empty array.");
+            normalizedData = [];
+        }
 
-            const processedGene = {
-                ...gene,
-                functional_category: processToArray(gene.functional_category),
-                domain_descriptions: processToArray(gene.domain_descriptions),
-                ciliopathy: processToArray(gene.ciliopathy),
-                localization: processToArray(gene.localization),
-                complex_names: processToArray(gene.complex_names),
-                complex_components: processToArray(gene.complex_components),
-                ciliopathy_classification: gene.ciliopathy_classification || "Not Classified",
-                ortholog_mouse: gene.ortholog_mouse || "N/A",
-                ortholog_c_elegans: gene.ortholog_c_elegans || "N/A",
-                ortholog_xenopus: gene.ortholog_xenopus || "N/A",
-                ortholog_zebrafish: gene.ortholog_zebrafish || "N/A",
-                ortholog_drosophila: gene.ortholog_drosophila || "N/A",
-                overexpression_effects: gene.overexpression_effects || "Not Reported",
-                lof_effects: gene.lof_effects || "Not Reported",
-                percent_ciliated_cells_effects: gene.percent_ciliated_cells_effects || "Not Reported"
-            };
+        // --- Optionally: convert to Map if your app prefers Map-based lookups ---
+        if (!window.ciliaHubDataCache) window.ciliaHubDataCache = new Map();
 
-            dataMap.set(geneUpper, processedGene);
+        normalizedData.forEach(entry => {
+            if (entry && entry.gene_symbol) {
+                window.ciliaHubDataCache.set(entry.gene_symbol, entry);
+            }
         });
 
-        ciliaHubDataCache = dataMap;
-        console.log(`✅ Loaded ${dataMap.size} genes into CiliaHub Map cache.`);
-        return ciliaHubDataCache;
-
+        console.log(`✅ Loaded ${ciliaHubDataCache.size} genes into CiliaHub Map cache.`);
+        return normalizedData;
     } catch (error) {
-        console.error("❌ Failed to fetch CiliaHub data:", error);
-        ciliaHubDataCache = new Map();
-        return ciliaHubDataCache;
+        console.error("🚨 Failed to fetch CiliaHub data:", error);
+        window.ciliaHubDataCache = new Map(); // fallback
+        return [];
     }
 }
 
-let isDataInitialized = false;
-
-/**
- * Initializes all global data caches in parallel.
- */
-async function initializeAppCaches() {
-    if (isDataInitialized) return true;
-
-    console.log("🧩 Initializing all dataset caches in parallel...");
-
-    try {
-        // Predefine all caches to prevent undefined references
-        window.ciliaHubDataCache = ciliaHubDataCache || new Map();
-        window.screenDataCache = screenDataCache || {};
-        window.tissueDataCache = tissueDataCache || {};
-        window.corumDataCache = corumDataCache || { byGene: {}, list: [], byNameLower: {}, loaded: false };
-        window.CILI_AI_DOMAIN_DB = CILI_AI_DOMAIN_DB || {};
-        window.neversPhylogenyCache = neversPhylogenyCache || {};
-        window.liPhylogenyCache = liPhylogenyCache || {};
-        window.cellxgeneDataCache = cellxgeneDataCache || {};
-        window.umapDataCache = umapDataCache || null;
-
-        await Promise.all([
-            fetchCiliaData(),
-            fetchScreenData(),
-            fetchTissueData(),
-            fetchCorumComplexes(),
-            getDomainData(),
-            fetchNeversPhylogenyData(),
-            fetchLiPhylogenyData(),
-            fetchCellxgeneData(),
-            fetchUmapData()
-        ]);
-
-        isDataInitialized = true;
-        console.log("✅ All caches initialized successfully.");
-        return true;
-    } catch (error) {
-        console.error("🚨 Critical error during initialization:", error);
-        isDataInitialized = false;
-        return false;
-    }
-}
 
 
 const unifiedGeneCache = new Map();
+
+function buildUnifiedGeneCache() {
+    unifiedGeneCache.clear();
+
+    // Merge from CiliaHub Map
+    if (ciliaHubDataCache instanceof Map) {
+        for (const [gene, data] of ciliaHubDataCache.entries()) {
+            unifiedGeneCache.set(gene, { core: data });
+        }
+    }
+
+    // Merge other caches
+    const otherCaches = [screenDataCache, tissueDataCache, CILI_AI_DOMAIN_DB];
+    otherCaches.forEach(cache => {
+        for (const [gene, data] of Object.entries(cache)) {
+            const geneUpper = gene.toUpperCase();
+            const entry = unifiedGeneCache.get(geneUpper) || {};
+            // Merge new data without overwriting existing
+            Object.assign(entry, data);
+            unifiedGeneCache.set(geneUpper, entry);
+        }
+    });
+}
+
+await initializeAppCaches();
+buildUnifiedGeneCache();
 
 /**
  * Combines all datasets for a single gene into one object.
@@ -6374,61 +6536,215 @@ setTimeout(updateIntentParser, 1000);
 
 // --- Query Helper Functions ---
 
-// Rule 1: Search for genes by ciliopathy/disease name
-// =============================================================================
-// REPLACEMENT: Corrected Data Fetching Functions
-// These functions now ONLY return raw data (arrays or objects), never HTML.
-// =============================================================================
-
+// --- Rule 1: Search for genes by ciliopathy/disease name ---
+/**
+ * [Core] Get genes associated with a specific ciliopathy/disease.
+ */
 async function getCiliopathyGenes(disease) {
     await fetchCiliaData();
+    await getDomainData();
+
     const diseaseLower = normalizeTerm(disease);
-    const diseaseRegex = new RegExp(diseaseLower.replace(/\s+/g, '[\\s_\\-–]*').replace('syndrome', '(syndrome)?'), 'i');
-    
-    const genes = ciliaHubDataCache
-        .filter(g => g.ciliopathy && g.ciliopathy.some(c => normalizeTerm(c).match(diseaseRegex)))
-        .map(g => ({ gene: g.gene, description: g.ciliopathy?.join(', ') || 'No ciliopathy data' }))
-        .sort((a, b) => a.gene.localeCompare(b.gene));
-    
-    return { genes, description: `Found ${genes.length} genes associated with "${disease}".` };
+    const diseaseRegex = new RegExp(
+        diseaseLower.replace(/\s+/g, '[\\s_\\-–]*').replace('syndrome', '(syndrome)?'),
+        'i'
+    );
+
+    const results = [];
+    for (const [geneSymbol, geneData] of ciliaHubDataCache.entries()) {
+        const matchesDisease = geneData.ciliopathy?.some(c => normalizeTerm(c).match(diseaseRegex));
+        if (matchesDisease) {
+            const domainInfo = CILI_AI_DOMAIN_DB?.gene_domain_map?.[geneSymbol] || [];
+            const domainDesc = domainInfo.length ? domainInfo.map(d => `${d.domain_id} (${d.description || 'N/A'})`).join('; ') : 'No domain data';
+            results.push({
+                gene: geneSymbol,
+                description: `${geneData.ciliopathy?.join(', ') || 'No ciliopathy data'} | Domains: ${domainDesc}`
+            });
+        }
+    }
+
+    return {
+        genes: results.sort((a, b) => a.gene.localeCompare(b.gene)),
+        description: `Found ${results.length} genes associated with "${disease}".`
+    };
 }
 
+
+// --- Get genes by localization ---
+// -----------------------------
+// Updated getGenesByLocalization
+// -----------------------------
+/**
+ * [Core] Get genes by localization (with domain integration)
+ */
 async function getGenesByLocalization(locations) {
     await fetchCiliaData();
+    await getDomainData();
+
     const locationTerms = locations.split(/\s+or\s+/).map(normalizeTerm);
-    const results = ciliaHubDataCache
-        .filter(gene => gene.localization && gene.localization.some(loc => 
+    const results = [];
+
+    for (const [geneSymbol, geneData] of ciliaHubDataCache.entries()) {
+        const matchesLocalization = geneData.localization?.some(loc =>
             locationTerms.some(term => normalizeTerm(loc).includes(term))
-        ))
-        .map(gene => ({ 
-            gene: gene.gene, 
-            description: gene.localization?.join(', ') || 'No localization data' 
-        }))
-        .sort((a, b) => a.gene.localeCompare(b.gene));
-    
-    return results;
+        );
+        if (matchesLocalization) {
+            const domainInfo = CILI_AI_DOMAIN_DB?.gene_domain_map?.[geneSymbol] || [];
+            const domainDesc = domainInfo.length ? domainInfo.map(d => `${d.domain_id} (${d.description || 'N/A'})`).join('; ') : 'No domain data';
+            results.push({
+                gene: geneSymbol,
+                description: `${geneData.localization?.join(', ') || 'No localization data'} | Domains: ${domainDesc}`
+            });
+        }
+    }
+
+    return results.sort((a, b) => a.gene.localeCompare(b.gene));
 }
 
+/**
+ * [Core] Get genes with a specific domain (from new domain DB)
+ */
 async function getGenesWithDomain(domainName) {
     await fetchCiliaData();
+    await getDomainData();
+
     const domainRegex = new RegExp(domainName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
-    
-    const results = ciliaHubDataCache
-        .filter(gene => 
-            Array.isArray(gene.domain_descriptions) && 
-            gene.domain_descriptions.some(dd => dd.match(domainRegex))
-        )
-        .map(gene => ({ 
-            gene: gene.gene, 
-            description: `Domains: ${gene.domain_descriptions?.join(', ') || 'No domain data'}` 
-        }))
-        .sort((a, b) => a.gene.localeCompare(b.gene));
-    
-    return results;
+    const results = [];
+
+    for (const [geneSymbol, geneData] of ciliaHubDataCache.entries()) {
+        const domainInfo = CILI_AI_DOMAIN_DB?.gene_domain_map?.[geneSymbol] || [];
+        const matchingDomains = domainInfo.filter(d =>
+            (d.domain_id && d.domain_id.match(domainRegex)) ||
+            (d.description && d.description.match(domainRegex))
+        );
+
+        if (matchingDomains.length > 0) {
+            const domainDesc = matchingDomains.map(d => `${d.domain_id} (${d.description || 'N/A'})`).join('; ');
+            results.push({
+                gene: geneSymbol,
+                description: `Domains: ${domainDesc}`
+            });
+        }
+    }
+
+    return results.sort((a, b) => a.gene.localeCompare(b.gene));
 }
 
-// Rule 5 & 7: General phylogeny-related queries
+// --- New DB: Find genes by domain (CILI_AI_DOMAIN_DB) ---
+async function findGenesByNewDomainDB(query) {
+    await getDomainData(); // ensures CILI_AI_DOMAIN_DB is loaded
+    if (!CILI_AI_DOMAIN_DB?.gene_domain_map) {
+        return `<div class="result-card"><h3>Domain Search</h3><p class="status-not-found">Could not load new gene-domain map.</p></div>`;
+    }
 
+    const geneMap = CILI_AI_DOMAIN_DB.gene_domain_map;
+    const queryRegex = new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+    const matchingGenes = [];
+
+    for (const [geneName, domains] of Object.entries(geneMap)) {
+        const hasMatch = domains.some(domain =>
+            (domain.domain_id && domain.domain_id.match(queryRegex)) ||
+            (domain.description && domain.description.match(queryRegex))
+        );
+
+        if (hasMatch) {
+            const matchedDomains = domains
+                .filter(d => (d.domain_id && d.domain_id.match(queryRegex)) || (d.description && d.description.match(queryRegex)))
+                .map(d => `${d.domain_id} (${d.description || 'N/A'})`)
+                .join('; ');
+
+            matchingGenes.push({ gene: geneName, description: `Domains: ${matchedDomains}` });
+        }
+    }
+
+    return formatListResult(`Ciliary Genes (New DB) with Domains matching "${query}"`, matchingGenes);
+}
+
+// --- Display domains for a specific gene (CILI_AI_DOMAIN_DB) ---
+async function displayDomainsForGene(geneSymbol) {
+    await getDomainData();
+    if (!CILI_AI_DOMAIN_DB?.gene_domain_map) {
+        return `<div class="result-card"><h3>${geneSymbol} Domains</h3><p class="status-not-found">Could not load gene-domain map.</p></div>`;
+    }
+
+    const geneUpper = geneSymbol.toUpperCase();
+    const domains = CILI_AI_DOMAIN_DB.gene_domain_map[geneUpper];
+
+    if (!domains || domains.length === 0) {
+        return `<div class="result-card"><h3>${geneSymbol} Domains</h3><p class="status-not-found">No domain information found for ${geneSymbol} in the new database.</p></div>`;
+    }
+
+    let listHtml = '<ul>';
+    for (const domain of domains) {
+        listHtml += `<li><strong>${domain.domain_id}</strong>: ${domain.description || 'N/A'}</li>`;
+    }
+    listHtml += '</ul>';
+
+    return `
+        <div class="result-card">
+            <h3>Domains for ${geneSymbol} (New DB)</h3>
+            ${listHtml}
+        </div>`;
+}
+
+// --- Display top enriched domains (CILI_AI_DOMAIN_DB) ---
+async function displayEnrichedDomains() {
+    await getDomainData();
+    const db = CILI_AI_DOMAIN_DB;
+
+    if (!db?.enriched_domains || Object.keys(db.enriched_domains).length === 0) {
+        return `<div class="result-card"><h3>Enriched Domains</h3><p class="status-not-found">No enriched domains found.</p></div>`;
+    }
+
+    let listHtml = '<ul>';
+    for (const domain of Object.values(db.enriched_domains).slice(0, 10)) {
+        listHtml += `<li>
+            <strong>${domain.domain_id}</strong> (${domain.description || 'N/A'})
+            <br>
+            <span class="details">Odds Ratio: ${domain.odds_ratio.toFixed(2)} (p-adj: ${domain.p_adj.toExponential(2)})</span>
+            <br>
+            <small>Found in ${domain.ciliary_count} ciliary genes (vs ${domain.background_count} background).</small>
+        </li>`;
+    }
+    listHtml += '</ul>';
+
+    return `
+        <div class="result-card">
+            <h3>Top 10 Enriched Domains (New DB)</h3>
+            ${listHtml}
+        </div>`;
+}
+
+// --- Display top depleted/absent domains (CILI_AI_DOMAIN_DB) ---
+async function displayDepletedDomains() {
+    await getDomainData();
+    const db = CILI_AI_DOMAIN_DB;
+
+    if (!db?.depleted_or_absent_domains || Object.keys(db.depleted_or_absent_domains).length === 0) {
+        return `<div class="result-card"><h3>Depleted/Absent Domains</h3><p class="status-not-found">No depleted domains found.</p></div>`;
+    }
+
+    let listHtml = '<ul>';
+    for (const domain of Object.values(db.depleted_or_absent_domains).slice(0, 10)) {
+        listHtml += `<li>
+            <strong>${domain.domain_id}</strong> (${domain.description || 'N/A'})
+            <br>
+            <span class="details">Odds Ratio: ${domain.odds_ratio.toFixed(3)} (p-adj: ${domain.p_adj.toExponential(2)})</span>
+            <br>
+            <small>Found in only ${domain.ciliary_count} ciliary genes (vs ${domain.background_count} background).</small>
+        </li>`;
+    }
+    listHtml += '</ul>';
+
+    return `
+        <div class="result-card">
+            <h3>Top 10 Depleted/Absent Domains (New DB)</h3>
+            <p>These domains are statistically rare or absent in the ciliary proteome.</p>
+            ${listHtml}
+        </div>`;
+}
+
+// --- Phylogeny queries ---
 async function getPhylogenyGenes({ type }) {
     await fetchPhylogenyData();
     const phy = phylogenyDataCache || {};
@@ -6442,7 +6758,6 @@ async function getPhylogenyGenes({ type }) {
                     .filter(([, v]) => v.category === 'ciliated_only_genes')
                     .map(([g, v]) => ({ gene: v.sym, description: 'Ciliary-only gene' }))
             };
-
         case 'in_all_organisms':
             return {
                 label: 'Genes Found in All Organisms',
@@ -6450,7 +6765,6 @@ async function getPhylogenyGenes({ type }) {
                     .filter(([, v]) => v.category === 'in_all_organisms')
                     .map(([g, v]) => ({ gene: v.sym, description: 'Present in all species analyzed' }))
             };
-
         case 'nonciliary_only_genes':
             return {
                 label: 'Non-Ciliary-Only Genes',
@@ -6458,35 +6772,27 @@ async function getPhylogenyGenes({ type }) {
                     .filter(([, v]) => v.category === 'nonciliary_only_genes')
                     .map(([g, v]) => ({ gene: v.sym, description: 'Non-ciliary-only gene' }))
             };
-
         case 'human_specific':
             return {
                 label: 'Human-Specific Genes',
                 genes: phyArray
-                    .filter(([, v]) =>
-                        Array.isArray(v.species) &&
-                        v.species.length === 1 &&
-                        v.species[0] === 'H.sapiens'
-                    )
+                    .filter(([, v]) => Array.isArray(v.species) && v.species.length === 1 && v.species[0] === 'H.sapiens')
                     .map(([g, v]) => ({ gene: v.sym, description: 'Human-specific gene' }))
             };
-
         default:
             return { label: 'Unknown Query', genes: [] };
     }
 }
 
-// Rule 1 & 3: Finds ciliary genes present in a specific organism
-
+/**
+ * [Core] Get ciliary genes for a specific organism (uses phylogeny + domain data)
+ */
 async function getCiliaryGenesForOrganism(organismName) {
     await fetchCiliaData();
     await fetchPhylogenyData();
-    
-    // Step 1: Get a set of all ciliary gene names for fast lookup (Existing Feature)
-    const ciliaryGeneSet = new Set(ciliaHubDataCache.map(g => g.gene.toUpperCase()));
-    console.log(`Ciliary genes in cache: ${ciliaHubDataCache.length}, Sample: ${ciliaHubDataCache.slice(0, 5).map(g => g.gene).join(', ')}`);
+    await getDomainData();
 
-    // Step 2: Map user-friendly names to species codes (NEW FEATURE: Greatly expanded map)
+    const ciliaryGeneSet = new Set(ciliaHubDataCache.keys());
     const organismMap = {
         'human': 'H.sapiens', 'homo sapiens': 'H.sapiens',
         'mouse': 'M.musculus', 'mus musculus': 'M.musculus',
@@ -6499,68 +6805,34 @@ async function getCiliaryGenesForOrganism(organismName) {
         'chlamydomonas': 'C.reinhardtii', 'c. reinhardtii': 'C.reinhardtii',
         'tetrahymena': 'T.thermophila', 't. thermophila': 'T.thermophila',
         'plasmodium falciparum': 'P.falciparum'
-        // This map handles common names. The logic below will fall back to use the direct input 
-        // (e.g., "X.tropicalis") if a common name is not found here.
-    };
-    
-    // Step 3: Gene synonym mapping for C. elegans (Existing Feature)
-    const geneSynonymMap = {
-        'OSM-5': 'IFT88',
-        'BBS-1': 'BBS1',
-        'CHE-11': 'IFT140',
-        'DHC-1': 'DYNC2H1',
-        'BBS-5': 'BBS5',
-        'XBOX-1': 'BBS4',
-        'DYF-1': 'IFT70'
     };
 
     const normalizedOrganism = normalizeTerm(organismName);
-    // Use the expanded map first, then fall back to the user's input directly
     const speciesCode = organismMap[normalizedOrganism] || organismName;
-    console.log(`Mapped organism "${organismName}" to species code "${speciesCode}"`);
-    
-    // Step 4: Normalize species codes for comparison (Existing Feature)
     const speciesRegex = new RegExp(`^${normalizeTerm(speciesCode).replace(/\./g, '\\.?').replace(/\s/g, '\\s*')}$`, 'i');
-    console.log(`Species regex: ${speciesRegex}`);
 
-    // Step 5: Filter phylogeny data for genes present in the organism (Existing Feature)
-    const genes = Object.entries(phylogenyDataCache)
-        .filter(([gene, data]) => {
-            const geneName = (data.sym || gene).toUpperCase();
-            const standardGeneName = geneSynonymMap[geneName] || geneName;
-            const isCiliary = ciliaryGeneSet.has(standardGeneName);
-            const hasSpecies = Array.isArray(data.species) && data.species.some(s => speciesRegex.test(normalizeTerm(s)));
-            // The detailed console.log is preserved from your original code
-            // console.log(`Checking gene ${geneName} (standard: ${standardGeneName}): isCiliary=${isCiliary}, hasSpecies=${hasSpecies}`);
-            return isCiliary && hasSpecies;
-        })
-        .map(([gene, data]) => ({ gene: data.sym || gene, description: `Ciliary gene found in ${speciesCode}` }));
-    
-    console.log(`Found ${genes.length} ciliary genes for ${speciesCode}`);
+    const geneSynonymMap = {
+        'OSM-5': 'IFT88', 'BBS-1': 'BBS1', 'CHE-11': 'IFT140', 'DHC-1': 'DYNC2H1',
+        'BBS-5': 'BBS5', 'XBOX-1': 'BBS4', 'DYF-1': 'IFT70'
+    };
 
-    // Step 6: Fallback if no genes are found (Existing Feature)
-    if (genes.length === 0) {
-        const knownCiliaryGenes = [
-            'IFT88', 'BBS1', 'ARL13B', 'BBS10', 'NPHP1', 'AHI1', 'CEP290', 'MKS1', 'TTC8',
-            'OSM-5', 'CHE-11', 'DHC-1', 'BBS-1', 'BBS-5', 'XBOX-1', 'DYF-1'
-        ];
-        const fallbackGenes = knownCiliaryGenes
-            .filter(gene => ciliaryGeneSet.has((geneSynonymMap[gene.toUpperCase()] || gene).toUpperCase()))
-            .map(gene => ({ gene, description: `Known ciliary gene (fallback) for ${speciesCode}` }));
-        
-        console.log(`Using fallback: ${fallbackGenes.length} genes (${fallbackGenes.map(g => g.gene).join(', ')})`);
-        
-        return {
-            genes: fallbackGenes,
-            description: `No specific ciliary genes found for ${speciesCode} in phylogeny data. Showing ${fallbackGenes.length} known ciliary genes.`,
-            speciesCode: speciesCode // NEW FEATURE: Returning the resolved species code
-        };
+    const results = [];
+    for (const [geneSymbol, phyData] of Object.entries(phylogenyDataCache)) {
+        const standardGene = geneSynonymMap[(phyData.sym || geneSymbol).toUpperCase()] || (phyData.sym || geneSymbol).toUpperCase();
+        if (!ciliaryGeneSet.has(standardGene)) continue;
+
+        const presentInSpecies = Array.isArray(phyData.species) && phyData.species.some(s => speciesRegex.test(normalizeTerm(s)));
+        if (presentInSpecies) {
+            const domainInfo = CILI_AI_DOMAIN_DB?.gene_domain_map?.[geneSymbol] || [];
+            const domainDesc = domainInfo.length ? domainInfo.map(d => `${d.domain_id} (${d.description || 'N/A'})`).join('; ') : 'No domain data';
+            results.push({ gene: standardGene, description: `Ciliary gene in ${speciesCode} | Domains: ${domainDesc}` });
+        }
     }
-    
+
     return {
-        genes,
-        description: `Found ${genes.length} ciliary genes present in ${speciesCode}.`,
-        speciesCode: speciesCode // NEW FEATURE: Returning the resolved species code
+        genes: results.sort((a, b) => a.gene.localeCompare(b.gene)),
+        description: `Found ${results.length} ciliary genes present in ${speciesCode}.`,
+        speciesCode
     };
 }
 
@@ -6570,136 +6842,7 @@ async function getCiliaryGenesForOrganism(organismName) {
     await fetchCorumComplexes();
 })();
 
-// Helper for the comparison query (updated titles and threshold)
-async function displayEnrichedDomains() {
-    const db = await getDomainData();
-    
-    if (!db || !db.enriched_domains) {
-        return `<div class="result-card"><h3>Enriched Domains</h3><p class="status-not-found">Could not load enriched domain data.</p></div>`;
-    }
 
-    // The data is an object, not an array, so we use Object.values()
-    const domains = Object.values(db.enriched_domains);
-    if (domains.length === 0) {
-        return `<div class="result-card"><h3>Enriched Domains</h3><p class="status-not-found">No enriched domains found in the data.</p></div>`;
-    }
-
-    let listHtml = '<ul>';
-    for (const domain of domains.slice(0, 10)) { // Show top 10
-        listHtml += `<li>
-            <strong>${domain.domain_id}</strong> (${domain.description || 'N/A'})
-            <br>
-            <span class="details">Odds Ratio: ${domain.odds_ratio.toFixed(2)} (p-adj: ${domain.p_adj.toExponential(2)})</span>
-            <br>
-            <small>Found in ${domain.ciliary_count} ciliary genes (vs ${domain.background_count} background).</small>
-        </li>`;
-    }
-    listHtml += '</ul>';
-
-    return `
-        <div class="result-card">
-            <h3>Top 10 Enriched Domains (New DB)</h3>
-            ${listHtml}
-        </div>`;
-}
-
-/**
- * [NEW HANDLER] CiliAI ASK function to display depleted/absent domains from the new DB.
- */
-async function displayDepletedDomains() {
-    const db = await getDomainData();
-    
-    if (!db || !db.depleted_or_absent_domains) {
-        return `<div class="result-card"><h3>Depleted/Absent Domains</h3><p class="status-not-found">Could not load depleted domain data.</p></div>`;
-    }
-
-    // The data is an object, not an array, so we use Object.values()
-    const domains = Object.values(db.depleted_or_absent_domains);
-    if (domains.length === 0) {
-        return `<div class="result-card"><h3>Depleted/Absent Domains</h3><p class="status-not-found">No depleted domains found in the data.</p></div>`;
-    }
-
-    let listHtml = '<ul>';
-    for (const domain of domains.slice(0, 10)) { // Show top 10
-        listHtml += `<li>
-            <strong>${domain.domain_id}</strong> (${domain.description || 'N/A'})
-            <br>
-            <span class="details">Odds Ratio: ${domain.odds_ratio.toFixed(3)} (p-adj: ${domain.p_adj.toExponential(2)})</span>
-            <br>
-            <small>Found in only ${domain.ciliary_count} ciliary genes (vs ${domain.background_count} background).</small>
-        </li>`;
-    }
-    listHtml += '</ul>';
-
-    return `
-        <div class="result-card">
-            <h3>Top 10 Depleted/Absent Domains (New DB)</h3>
-            <p>These domains are statistically rare or absent in the ciliary proteome.</p>
-            ${listHtml}
-        </div>`;
-}
-
-/**
- * [NEW HANDLER] CiliAI ASK function to find genes using the new structured domain map.
- * @param {string} query - The domain ID (e.g., "PF00069") or name (e.g., "WD40") to search for.
- */
-async function findGenesByNewDomainDB(query) {
-    const db = await getDomainData();
-    if (!db || !db.gene_domain_map) {
-        return `<div class="result-card"><h3>Domain Search</h3><p class="status-not-found">Could not load new gene-domain map.</p></div>`;
-    }
-
-    const geneMap = db.gene_domain_map;
-    const matchingGenes = [];
-    const queryRegex = new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'); 
-
-    for (const geneName in geneMap) {
-        const domains = geneMap[geneName]; // This is an array of domains
-        const hasMatch = domains.some(domain => 
-            (domain.domain_id && domain.domain_id.match(queryRegex)) ||
-            (domain.description && domain.description.match(queryRegex))
-        );
-        
-        if (hasMatch) {
-            const matchedDomains = domains
-                .filter(d => (d.domain_id && d.domain_id.match(queryRegex)) || (d.description && d.description.match(queryRegex)))
-                .map(d => `${d.domain_id} (${d.description || 'N/A'})`)
-                .join('; ');
-            matchingGenes.push({ gene: geneName, description: `Domains: ${matchedDomains}` });
-        }
-    }
-    return formatListResult(`Ciliary Genes (New DB) with Domains matching "${query}"`, matchingGenes);
-}
-
-/**
- * [NEW HANDLER] CiliAI ASK function to show domains for a specific gene from the new DB.
- * @param {string} geneSymbol - The gene symbol.
- */
-async function displayDomainsForGene(geneSymbol) {
-    const db = await getDomainData();
-    const geneUpper = geneSymbol.toUpperCase();
-
-    if (!db || !db.gene_domain_map) {
-        return `<div class="result-card"><h3>${geneSymbol} Domains</h3><p class="status-not-found">Could not load gene-domain map.</p></div>`;
-    }
-    const domains = db.gene_domain_map[geneUpper]; // Direct lookup
-
-    if (!domains || domains.length === 0) {
-        return `<div class="result-card"><h3>${geneSymbol} Domains</h3><p class="status-not-found">No domain information found for ${geneSymbol} in the new database.</p></div>`;
-    }
-
-    let listHtml = '<ul>';
-    domains.forEach(domain => {
-        listHtml += `<li><strong>${domain.domain_id}</strong>: ${domain.description || 'N/A'}</li>`;
-    });
-    listHtml += '</ul>';
-
-     return `
-        <div class="result-card">
-            <h3>Domains for ${geneSymbol} (New DB)</h3>
-            ${listHtml}
-        </div>`;
-}
 
 /**
  * [NEW HANDLER] CiliAI ASK function to get conservation from Nevers et al. 2017.
