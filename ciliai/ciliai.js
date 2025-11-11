@@ -788,18 +788,13 @@ function ciliAI_waitForElements() {
 // This function should be in your main script.js or globals.js
 window.displayCiliAIPage = async function displayCiliAIPage() {
     const contentArea = document.querySelector('.content-area');
-    if (!contentArea) {
-        console.error('Content area not found');
-        return;
-    }
+    if (!contentArea) return;
+
     contentArea.className = 'content-area content-area-full';
     const ciliaPanel = document.querySelector('.cilia-panel');
-    if (ciliaPanel) {
-        ciliaPanel.style.display = 'none';
-    }
+    if (ciliaPanel) ciliaPanel.style.display = 'none';
 
     try {
-        // Step 1: Inject the HTML
         contentArea.innerHTML = `
             <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
             <script src="https://cdn.jsdelivr.net/npm/cytoscape@3.23.0/dist/cytoscape.min.js"></script>
@@ -896,16 +891,26 @@ window.displayCiliAIPage = async function displayCiliAIPage() {
         return;
     }
     
-    console.log('ciliAI.js: Page HTML injected.');
-    
-    // NOTE: The "Analyze Gene Phenotypes" section is now hidden by default
-    // because its functions (runAnalysis, etc.) were removed.
-    const analyzeSection = contentArea.querySelector('.input-section');
-    if (analyzeSection) {
-        analyzeSection.style.display = 'none';
-        console.log('[CiliAI] "Analyze Gene Phenotypes" section hidden (functionality removed).');
+  console.log('ciliAI.js: Page HTML injected.');
+
+       / NOTE: The "Analyze Gene Phenotypes" section is now hidden by default
+        // because its functions (runAnalysis, etc.) were removed.
+        const analyzeSection = contentArea.querySelector('.input-section');
+        if (analyzeSection) {
+            analyzeSection.style.display = 'none';
+            console.log('[CiliAI] "Analyze Gene Phenotypes" section hidden.');
+        }
+
+        // KRİTİK: Listener'ları HTML'den sonra başlat
+        ciliAI_waitForElements();
+
+    } catch (err) {
+        console.error('CiliAI HTML injection failed:', err);
+        contentArea.innerHTML = '<p>CiliAI yüklenemedi.</p>';
     }
 };
+    
+    
 
 // inside displayCiliAIPage(), right after the innerHTML assignment:
 ciliAI_waitForElements();   // <-- THIS LINE
