@@ -227,13 +227,7 @@ window.displayCiliAIPage = async function displayCiliAIPage() {
     // NEW: Merge after fetches
     await mergePhylogenyCaches();
     console.log('ciliAI.js: All data loaded (including new domain and phylogeny sources).');
-    
-    // ====================================================================
-    // ** THE FIX **
-    // This now calls the correct, sandboxed initialization function
-    // `ciliAI_init` *after* the HTML is injected and data is loaded.
-    // ====================================================================
-    setTimeout(ciliAI_init, 0);
+
 };
 
 // --- Helper Functions ---
@@ -9457,6 +9451,69 @@ function renderScreenSummaryHeatmap(genes, screenData) {
     Plotly.newPlot('plot-display-area', [trace1, trace2], layout, { responsive: true });
 }
 
+// ============================================================================
+// 7. 🚀 RUN CiliAI (NEW ROBUST INITIALIZER)
+// ============================================================================
+
+/**
+ * Attaches all CiliAI event listeners to the DOM.
+ * This is the *only* place the listeners are added.
+ */
+function ciliAI_init_listeners() {
+    // *** IMPORTANT: Update these IDs to match your HTML ***
+    const sendButton = document.getElementById('aiQueryBtn');
+    const inputElement = document.getElementById('aiQueryInput');
+
+    if (sendButton && inputElement) {
+        sendButton.addEventListener('click', ciliAI_handleQuery);
+        
+        inputElement.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault(); 
+                ciliAI_handleQuery();
+            }
+        });
+
+        console.log("✅ [CiliAI] Event listeners successfully attached.");
+        return true; // Success
+    }
+    
+    return false; // Elements not found yet
+}
+
+/**
+ * This function waits for the CiliAI HTML elements (which are injected 
+ * by displayCiliAIPage) to appear in the DOM before attaching listeners.
+ */
+function ciliAI_waitForElements() {
+    console.log("[CiliAI] Waiting for elements 'aiQueryBtn' and 'aiQueryInput'...");
+
+    // Try to attach listeners immediately
+    if (ciliAI_init_listeners()) {
+        return; // Success, elements were already there
+    }
+
+    // If not found, set up an interval to check for them
+    let attempts = 0;
+    const maxAttempts = 50; // Check for 5 seconds (50 * 100ms)
+
+    const checkInterval = setInterval(() => {
+        attempts++;
+        if (ciliAI_init_listeners()) {
+            // Success! Elements are now loaded.
+            clearInterval(checkInterval);
+        } else if (attempts > maxAttempts) {
+            // Failed. Stop trying.
+            clearInterval(checkInterval);
+            console.error("[CiliAI] FAILED to find 'aiQueryBtn' or 'aiQueryInput' after 5 seconds.");
+            console.warn("[CiliAI] Send button not found. (Tried 'aiQueryBtn')");
+            console.warn("[CiliAI] Input box not found. (Tried 'aiQueryInput')");
+        }
+    }, 100);
+}
+
+// Start the process.
+ciliAI_waitForElements();
 
 // --- Global Exposure for Router ---
 window.fetchCorumComplexes = fetchCorumComplexes;
