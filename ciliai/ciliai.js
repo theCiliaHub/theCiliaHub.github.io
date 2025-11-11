@@ -35,16 +35,14 @@ function getAllGenes() {
 }
 
 // --- Fix: Always flatten and sanitize fetched data ---
-async function fetchCiliaData(url) {
-    console.log("📥 Fetching CiliaHub data...");
+async function fetchCiliaData(url = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/ciliahub_data.json') {
+    console.log("📥 Fetching CiliaHub data from:", url);
 
     try {
         const response = await fetch(url);
         if (!response.ok) throw new Error(`HTTP ${response.status} while fetching ${url}`);
-
+        
         const raw = await response.json();
-
-        // ✅ Ensure we always return a flat Map structure
         let parsed;
         if (Array.isArray(raw)) {
             parsed = new Map(raw.map(item => [item.gene_symbol || item.name, item]));
@@ -58,10 +56,10 @@ async function fetchCiliaData(url) {
         return parsed;
     } catch (err) {
         console.error("🚨 Failed to fetch CiliaHub data:", err);
-        // Return an empty Map instead of null to prevent downstream .size / .entries errors
         return new Map();
     }
 }
+
 
 // --- Flags ---
 let isDataInitialized = false;
