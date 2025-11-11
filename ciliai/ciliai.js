@@ -1037,9 +1037,6 @@ function buildUnifiedGeneCache() {
     });
 }
 
-await initializeAppCaches();
-buildUnifiedGeneCache();
-
 /**
  * Combines all datasets for a single gene into one object.
  */
