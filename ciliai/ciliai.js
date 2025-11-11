@@ -197,50 +197,24 @@ async function ciliAI_fetchUMAPData_internal(gene) {
 // ============================================================================
 
 // --- Main CiliAI query function ---
+// ---------------------- Full ciliAI_queryGenes ----------------------
 async function ciliAI_queryGenes(filters = {}) {
-    console.log("[CiliAI Query] Starting query with filters:", filters);
-
-    // --- Load the main dataset ---
-    const url = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/ciliahub_data.json';
-    const res = await fetch(url);
-    const allGenes = await res.json();
-
-    // --- Disease classifications ---
-    const classifiedDiseases = {
-        "Primary Ciliopathies": [ 
-            "Acrocallosal Syndrome", "Alström Syndrome", "Autosomal Dominant Polycystic Kidney Disease",
-            "Autosomal Recessive Polycystic Kidney Disease", "Bardet–Biedl Syndrome", "COACH Syndrome",
-            "Cranioectodermal Dysplasia", "Ellis-van Creveld Syndrome", "Hydrolethalus Syndrome", "Infantile Polycystic Kidney Disease",
-            "Joubert Syndrome", "Leber Congenital Amaurosis", "Meckel–Gruber Syndrome", "Nephronophthisis", "Orofaciodigital Syndrome",
-            "Senior-Løken Syndrome", "Short-rib Thoracic Dysplasia", "Skeletal Ciliopathy", "Retinal Ciliopathy", "Syndromic Ciliopathy",
-            "Al-Gazali-Bakalinova Syndrome", "Bazex-Dupré-Christol Syndrome", "Bilateral Polycystic Kidney Disease", "Biliary, Renal, Neurologic, and Skeletal Syndrome",
-            "Caroli Disease", "Carpenter Syndrome", "Complex Lethal Osteochondrodysplasia", "Greig Cephalopolysyndactyly Syndrome", "Kallmann Syndrome", "Lowe Oculocerebrorenal Syndrome",
-            "McKusick-Kaufman Syndrome", "Morbid Obesity and Spermatogenic Failure", "Polycystic Kidney Disease", "RHYNS Syndrome", "Renal-hepatic-pancreatic Dysplasia", "Retinal Dystrophy", "STAR Syndrome",
-            "Smith-Lemli-Opitz Syndrome", "Spondylometaphyseal Dysplasia", "Stromme Syndrome", "Weyers Acrofacial Dysostosis", "Hydrocephalus"
-        ], 
-        "Motile Ciliopathies": [ 
-            "Primary Ciliary Dyskinesia", "Birt-Hogg-Dubé Syndrome", "Juvenile Myoclonic Epilepsy" 
-        ],
-        "Secondary Diseases": [ 
-            "Ataxia-telangiectasia-like Disorder", "Birt-Hogg-Dubé Syndrome", "Cone-Rod Dystrophy", "Cornelia de Lange Syndrome",
-            "Holoprosencephaly", "Juvenile Myoclonic Epilepsy", "Medulloblastoma", "Retinitis Pigmentosa", "Spinocerebellar Ataxia", "Bazex-Dupré-Christol Syndrome", "Lowe Oculocerebrorenal Syndrome",
-            "McKusick-Kaufman Syndrome", "Pallister-Hall Syndrome", "Simpson-Golabi-Behmel Syndrome", "Townes-Brocks Syndrome", "Usher Syndrome", "Visceral Heterotaxy" 
-        ],
-        "Atypical Ciliopathies": [ 
-            "Biliary Ciliopathy", "Chronic Obstructive Pulmonary Disease", "Ciliopathy", "Ciliopathy - Retinal dystrophy", "Golgipathies or Ciliopathy", "Hepatic Ciliopathy", "Male Infertility and Ciliopathy", "Male infertility", "Microcephaly and Chorioretinopathy Type 3", "Mucociliary Clearance Disorder", "Notch-mediated Ciliopathy", "Primary Endocardial Fibroelastosis", "Retinal Ciliopathy", "Retinal Degeneration", "Skeletal Ciliopathy", "Syndromic Ciliopathy" 
-        ]
-    };
+    // Ensure data is loaded
+    if (!window.ciliaHubData || !Array.isArray(window.ciliaHubData)) {
+        console.error("CiliaHub data not loaded!");
+        return [];
+    }
 
     // --- Complexes ---
     const complexes = {
+        "BBSOME": ["BBS1","BBS2","BBS4","BBS5","BBS7","TTC8","BBS9","BBIP1"],
         "IFT COMPLEX": ["WDR19","IFT140","TTC21B","IFT122","WDR35","IFT43","IFT172","IFT80","IFT57","TRAF3IP1","CLUAP1","IFT20","IFT88","IFT81","IFT74","IFT70A","IFT70B","IFT56","IFT52","IFT46","IFT27","IFT25","IFT22"],
         "IFT-A COMPLEX": ["WDR19","IFT140","TTC21B","IFT122","WDR35","IFT43"],
         "IFT-B COMPLEX": ["IFT172","IFT80","IFT57","TRAF3IP1","CLUAP1","IFT20","IFT88","IFT81","IFT74","IFT70A","IFT70B","IFT56","IFT52","IFT46","IFT27","IFT25","IFT22"],
         "IFT-B1 COMPLEX": ["IFT172","IFT80","IFT57","TRAF3IP1","CLUAP1","IFT20"],
         "IFT-B2 COMPLEX": ["IFT88","IFT81","IFT74","IFT70A","IFT70B","IFT56","IFT52","IFT46","IFT27","IFT25","IFT22"],
-        "IFT MOTOR COMPLEX": ["KIF3A","KIF3B","KIF17","DYNC2H1","DYNC2LI1","WDR34","WDR60"], 
+        "IFT MOTOR COMPLEX": ["KIF3A","KIF3B","KIF17","DYNC2H1","DYNC2LI1","WDR34","WDR60"],
         "INTRAFLAGELLAR TRANSPORT MOTORS": ["KIF3A","KIF3B","KIF17","DYNC2H1","DYNC2LI1","WDR34","WDR60"],
-        "BBSOME": ["BBS1","BBS2","BBS4","BBS5","BBS7","TTC8","BBS9","BBIP1"],
         "EXOCYST": ["EXOC1","EXOC2","EXOC3","EXOC4","EXOC5","EXOC6","EXOC7","EXOC8"],
         "TRANSITION ZONE": ["NPHP1","MKS1","CEP290","AHI1","RPGRIP1L","TMEM67","CC2D2A","B9D1","B9D2"],
         "MKS MODULE": ["MKS1","TMEM17","TMEM67","TMEM138","B9D2","B9D1","CC2D2A","TMEM107","TMEM237","TMEM231","TMEM216","TCTN1","TCTN2","TCTN3"],
@@ -256,7 +230,7 @@ async function ciliAI_queryGenes(filters = {}) {
         "DYNEIN ARM": ["DNAH1","DNAH2","DNAH5","DNAH6","DNAH7","DNAH8","DNAH9","DNAH10","DNAH11","DNALI1","DNAI1","DNAI2","DNAAF1","DNAAF2","DNAAF3","DNAAF4","LRRC6","CCDC103"],
         "OUTER DYNEIN ARM": ["DNAH5","DNAH11","DNAH17","DNAH18","DNAI1","DNAI2","DNAAF1","DNAAF2","DNAAF3","DNAAF4","LRRC6","CCDC103","WDR63"],
         "INNER DYNEIN ARM": ["DNAH2","DNAH7","DNAH10","DNALI1","DNAL4","DNAAF5","CCDC40","CCDC114","CCDC151"],
-        "NEXIN-DYNEIN REGULATORY COMPLEX": ["GAS8","GAS2L2","CCDC39","CCDC40","CCDC164"],
+        "NEXIN-DYNEIN REGULATORY COMPLEX": ["GAS8","GAS2L2","CCDC39","CCDC40","CCDC164","CCDC65"],
         "ROOTLETIN COMPLEX": ["CROCC","CROCC2","CEP68","CEP44","ODF2"],
         "CENTRIOLE LINKER": ["CEP68","CEP250","C-NAP1","ROCK1","NEK2"],
         "SHH SIGNALING": ["SMO","PTCH1","GLI1","GLI2","GLI3","SUFU","KIF7","TULP3","IFT172","IFT81","ARL13B"],
@@ -266,35 +240,77 @@ async function ciliAI_queryGenes(filters = {}) {
         "PEROXISOMAL COMPLEX": ["PEX1","PEX2","PEX3","PEX5","PEX6","PEX10","PEX12","PEX13","PEX14","PEX19"]
     };
 
-    // --- Organisms ---
-    const organisms = ["Prokaryote","E.cuniculi","E.histolytica","E.dispar","G.lamblia","T.vaginalis","T.brucei","T.cruzi","L.infantum","L.major","L.braziliensis","T.gondii","C.hominis","C.parvum","B.bovis","T.annulata","T.parva","P.knowlesi","P.vivax","P.falciparum","P.chabaudi","P.berghei","P.yoelii","P.tetraurelia","T.thermophila","P.infestans","T.pseudonana","P.tricornutum","C.merolae","N.gruberi","O.lucimarinus","O.tauri","C.reinhardtii","V.carteri","P.patens","S.moellendorffii","S.bicolor","Z.mays","O.sativa","B.distachyon","A.lyrata","A.thaliana","L.japonicus","M.truncatula","V.vinifera","P.trichocarpa","R.communis","T.trahens","D.discoideum","A.macrogynus","S.punctatus","M.globosa","U.maydis","C.neoformans","P.chrysosporium","S.commune","C.cinerea","L.bicolor","S.pombe","B.fuckeliana","S.sclerotiorum","F.graminearum","M.grisea","N.crassa","P.anserina","P.chrysogenum","A.clavatus","A.fumigatus","N.fischeri","A.flavus","A.oryzae","A.niger","A.nidulans","U.reesii","C.immitis","C.posadasii","P.nodorum","T.melanosporum","Y.lipolytica","P.pastoris","C.lusitaniae","D.hansenii","M.guilliermondii","S.stipitis","L.elongisporus","C.tropicalis","C.albicans","C.dubliniensis","K.lactis","A.gossypii","K.waltii","L.thermotolerans","Z.rouxii","V.polyspora","C.glabrata","S.bayanus","S.mikatae","S.cerevisiae","S.paradoxus","S.arctica","C.owczarzaki","M.brevicollis","S.rosetta","S.mansoni","B.malayi","C.briggsae","C.elegans","D.pulex","A.pisum","P.humanus","A.mellifera","N.vitripennis","B.mori","T.castaneum","D.melanogaster","D.pseudoobscura","A.gambiae","A.aegypti","C.quinquefasciatus","B.floridae","T.adhaerens","S.purpuratus","H.magnipapillata","N.vectensis","C.intestinalis","D.rerio","O.latipes","F.rubripes","T.nigroviridis","X.tropicalis","G.gallus","M.gallopavo","O.anatinus","M.domestica","S.scrofa","M.musculus","C.familiaris","B.taurus","H.sapiens","worm","human","mouse","zebrafish","fly","yeast"];
+    // --- Disease Classes ---
+    const classifiedDiseases = {
+        "Primary Ciliopathies": [ "Acrocallosal Syndrome","Alström Syndrome","Autosomal Dominant Polycystic Kidney Disease","Autosomal Recessive Polycystic Kidney Disease","Bardet–Biedl Syndrome","COACH Syndrome","Cranioectodermal Dysplasia","Ellis-van Creveld Syndrome","Hydrolethalus Syndrome","Infantile Polycystic Kidney Disease","Joubert Syndrome","Leber Congenital Amaurosis","Meckel–Gruber Syndrome","Nephronophthisis","Orofaciodigital Syndrome","Senior-Løken Syndrome","Short-rib Thoracic Dysplasia","Skeletal Ciliopathy","Retinal Ciliopathy","Syndromic Ciliopathy","Al-Gazali-Bakalinova Syndrome","Bazex-Dupré-Christol Syndrome","Bilateral Polycystic Kidney Disease","Biliary, Renal, Neurologic, and Skeletal Syndrome","Caroli Disease","Carpenter Syndrome","Complex Lethal Osteochondrodysplasia","Greig Cephalopolysyndactyly Syndrome","Kallmann Syndrome","Lowe Oculocerebrorenal Syndrome","McKusick-Kaufman Syndrome","Morbid Obesity and Spermatogenic Failure","Polycystic Kidney Disease","RHYNS Syndrome","Renal-hepatic-pancreatic Dysplasia","Retinal Dystrophy","STAR Syndrome","Smith-Lemli-Opitz Syndrome","Spondylometaphyseal Dysplasia","Stromme Syndrome","Weyers Acrofacial Dysostosis","Hydrocephalus" ], 
+        "Motile Ciliopathies": [ "Primary Ciliary Dyskinesia","Birt-Hogg-Dubé Syndrome","Juvenile Myoclonic Epilepsy" ],
+        "Secondary Diseases": [ "Ataxia-telangiectasia-like Disorder","Birt-Hogg-Dubé Syndrome","Cone-Rod Dystrophy","Cornelia de Lange Syndrome","Holoprosencephaly","Juvenile Myoclonic Epilepsy","Medulloblastoma","Retinitis Pigmentosa","Spinocerebellar Ataxia","Bazex-Dupré-Christol Syndrome","Lowe Oculocerebrorenal Syndrome","McKusick-Kaufman Syndrome","Pallister-Hall Syndrome","Simpson-Golabi-Behmel Syndrome","Townes-Brocks Syndrome","Usher Syndrome","Visceral Heterotaxy" ],
+        "Atypical Ciliopathies": [ "Biliary Ciliopathy","Chronic Obstructive Pulmonary Disease","Ciliopathy","Ciliopathy - Retinal dystrophy","Golgipathies or Ciliopathy","Hepatic Ciliopathy","Male Infertility and Ciliopathy","Male infertility","Microcephaly and Chorioretinopathy Type 3","Mucociliary Clearance Disorder","Notch-mediated Ciliopathy","Primary Endocardial Fibroelastosis","Retinal Ciliopathy","Retinal Degeneration","Skeletal Ciliopathy","Syndromic Ciliopathy" ]
+    };
 
-    const results = [];
+    // --- Organism Keywords ---
+    const organismKeywords = ["human","mouse","fly","zebrafish","yeast","worm","prokaryote","E.cuniculi","E.histolytica","E.dispar","G.lamblia","T.vaginalis","T.brucei","T.cruzi","L.infantum","L.major","L.braziliensis","T.gondii","C.hominis","C.parvum","B.bovis","T.annulata","T.parva","P.knowlesi","P.vivax","P.falciparum","P.chabaudi","P.berghei","P.yoelii","P.tetraurelia","T.thermophila","P.infestans","T.pseudonana","P.tricornutum","C.merolae","N.gruberi","O.lucimarinus","O.tauri","C.reinhardtii","V.carteri","P.patens","S.moellendorffii","S.bicolor","Z.mays","O.sativa","B.distachyon","A.lyrata","A.thaliana","L.japonicus","M.truncatula","V.vinifera","P.trichocarpa","R.communis","T.trahens","D.discoideum","A.macrogynus","S.punctatus","M.globosa","U.maydis","C.neoformans","P.chrysosporium","S.commune","C.cinerea","L.bicolor","S.pombe","B.fuckeliana","S.sclerotiorum","F.graminearum","M.grisea","N.crassa","P.anserina","P.chrysogenum","A.clavatus","A.fumigatus","N.fischeri","A.flavus","A.oryzae","A.niger","A.nidulans","U.reesii","C.immitis","C.posadasii","P.nodorum","T.melanosporum","Y.lipolytica","P.pastoris","C.lusitaniae","D.hansenii","M.guilliermondii","S.stipitis","L.elongisporus","C.tropicalis","C.albicans","C.dubliniensis","K.lactis","A.gossypii","K.waltii","L.thermotolerans","Z.rouxii","V.polyspora","C.glabrata","S.bayanus","S.mikatae","S.cerevisiae","S.paradoxus","S.arctica","C.owczarzaki","M.brevicollis","S.rosetta","S.mansoni","B.malayi","C.briggsae","C.elegans","D.pulex","A.pisum","P.humanus","A.mellifera","N.vitripennis","B.mori","T.castaneum","D.melanogaster","D.pseudoobscura","A.gambiae","A.aegypti","C.quinquefasciatus","B.floridae","T.adhaerens","S.purpuratus","H.magnipapillata","N.vectensis","C.intestinalis","D.rerio","O.latipes","F.rubripes","T.nigroviridis","X.tropicalis","G.gallus","M.gallopavo","O.anatinus","M.domestica","S.scrofa","M.musculus","C.familiaris","B.taurus","H.sapiens"];
 
-    for (const geneData of allGenes) {
-        const geneName = geneData.gene;
-        const data = await ciliAI_getGeneData(geneName);
-        if (!data?.geneInfo) continue;
+    // --- Expand complexes into member genes ---
+    let filterGenes = filters.genes || [];
+    if (filters.complex) {
+        filters.complex.forEach(cpx => {
+            if (complexes[cpx]) filterGenes.push(...complexes[cpx]);
+        });
+    }
+    filterGenes = [...new Set(filterGenes.map(g => g.toUpperCase()))]; // unique uppercase
 
-        let match = true;
+    // --- Expand disease classes into diseases ---
+    let filterDiseases = [];
+    if (filters.disease_class) {
+        filters.disease_class.forEach(dc => {
+            if (classifiedDiseases[dc]) filterDiseases.push(...classifiedDiseases[dc]);
+        });
+    }
+    if (filters.disease) filterDiseases.push(...filters.disease);
+    filterDiseases = [...new Set(filterDiseases.map(d => d.toLowerCase()))];
 
-        // --- Filters ---
-        if (filters.gene && !geneName.toLowerCase().includes(filters.gene.toLowerCase())) match = false;
-        if (filters.localization && !data.geneInfo.localization?.toLowerCase().includes(filters.localization.toLowerCase())) match = false;
-        if (filters.functional_category && !data.geneInfo.functional_category?.toLowerCase().includes(filters.functional_category.toLowerCase())) match = false;
-        if (filters.complex && !complexes[filters.complex]?.includes(geneName)) match = false;
-        if (filters.diseaseCategory && !classifiedDiseases[filters.diseaseCategory]?.some(disease => data.geneInfo.description?.includes(disease))) match = false;
-        if (filters.organism && !Object.values(data.geneInfo).some(v => v === filters.organism || v === filters.organism.toLowerCase())) match = false;
-        if (filters.lof_effects && !data.geneInfo.lof_effects?.toLowerCase().includes(filters.lof_effects.toLowerCase())) match = false;
-        if (filters.overexpression_effects && !data.geneInfo.overexpression_effects?.toLowerCase().includes(filters.overexpression_effects.toLowerCase())) match = false;
-        if (filters.percent_ciliated_cells_effects && !data.geneInfo.percent_ciliated_cells_effects?.toLowerCase().includes(filters.percent_ciliated_cells_effects.toLowerCase())) match = false;
-
-        if (match) results.push(data);
+    // --- Organism filter ---
+    let filterOrganisms = [];
+    if (filters.organism) {
+        filterOrganisms = Array.isArray(filters.organism) ? filters.organism.map(o => o.toLowerCase()) : [filters.organism.toLowerCase()];
     }
 
-    console.log(`[CiliAI Query] Found ${results.length} genes matching filters.`);
+    // --- LOF / OE / Screens / Domains ---
+    const lofFilter = filters.lof_effects ? filters.lof_effects.toLowerCase() : null;
+    const oeFilter = filters.overexpression_effects ? filters.overexpression_effects.toLowerCase() : null;
+    const screenFilter = filters.screens ? filters.screens.map(s => s.toLowerCase()) : [];
+    const domainFilter = filters.domains ? filters.domains.map(d => d.toLowerCase()) : [];
+
+    // --- Filtering ---
+    const results = window.ciliaHubData.filter(gene => {
+        // Gene name / complex membership
+        if (filterGenes.length && !filterGenes.includes(gene.gene.toUpperCase())) return false;
+
+        // Organism
+        if (filterOrganisms.length && !filterOrganisms.some(org => (gene.organism || "").toLowerCase().includes(org))) return false;
+
+        // Diseases
+        if (filterDiseases.length && !gene.associated_diseases?.some(d => filterDiseases.includes(d.toLowerCase()))) return false;
+
+        // LOF
+        if (lofFilter && !(gene.lof_effects || "").toLowerCase().includes(lofFilter)) return false;
+
+        // Overexpression
+        if (oeFilter && !(gene.overexpression_effects || "").toLowerCase().includes(oeFilter)) return false;
+
+        // Screens
+        if (screenFilter.length && !gene.screens?.some(s => screenFilter.includes(s.toLowerCase()))) return false;
+
+        // Domains / PFAM
+        if (domainFilter.length && !gene.domain_descriptions?.some(d => domainFilter.includes(d.toLowerCase()))) return false;
+
+        return true;
+    });
+
     return results;
 }
+// -------------------------------------------------------------------
 
 /**
  * Parses the user's query and calls the appropriate handler function.
