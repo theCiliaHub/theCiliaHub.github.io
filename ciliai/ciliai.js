@@ -158,54 +158,6 @@ async function ciliAI_fetchScreenData_internal(gene) {
     } catch (e) { console.error(`[CiliAI] Screen fetch error:`, e); return null; }
 }
 
-/* -------------------------------------------------------------------------- */
-/* 4. DUAL-STAGE INTENT RESOLVER                                            */
-/* -------------------------------------------------------------------------- */
-async function ciliAI_resolveIntent(query) {
-    console.log("[CiliAI] resolveIntent start");
-    const q = query.toLowerCase().trim();
-    ciliAI_updateChatWindow("Thinking...", "system");
-
-    try {
-        const complex = await ciliAI_resolveComplexIntent(q, query);
-        if (complex !== null) {
-            if (typeof complex === "string") ciliAI_updateChatWindow(complex, "ciliai");
-            return;
-        }
-
-        const geneMatch = query.match(/\b(?!show|me|what|is|tell|about|for|genes\b)([A-Z]{3,}|[A-Z0-9-]{3,})\b/i);
-        const gene = geneMatch ? geneMatch[1].toUpperCase() : null;
-        let intent = "unknown";
-
-        if (q.includes("phylogeny") || q.includes("evolution") || q.includes("ortholog")) intent = "getPhylogeny";
-        else if (q.includes("domain") || q.includes("structure")) intent = "getDomains";
-        else if (q.includes("length") || q.includes("long") || q.includes("short")) intent = "getCiliaLength";
-        else if (q.includes("complex") || q.includes("interact")) intent = "getComplex";
-        else if (q.includes("expression") || q.includes("tissue") || q.includes("scrna")) intent = "getExpression";
-        else if (q.includes("summary") || q.includes("what is") || q.includes("tell me about")) intent = "getSummary";
-        else if (gene) intent = "getSummary";
-        else if (q.includes("hello") || q.includes("hi")) intent = "greet";
-
-        if (intent !== "greet" && intent !== "unknown" && !gene) {
-            ciliAI_updateChatWindow("Please specify a gene name.", "ciliai");
-            return;
-        }
-
-        switch (intent) {
-            case "getSummary":   await ciliAI_handleGeneSummary(gene); break;
-            case "getPhylogeny": await ciliAI_handlePhylogeny(gene); break;
-            case "getDomains":   await ciliAI_handleDomains(gene); break;
-            case "getCiliaLength":await ciliAI_handleCiliaLength(gene); break;
-            case "getComplex":   await ciliAI_handleComplex(gene); break;
-            case "getExpression":await ciliAI_handleExpression(gene); break;
-            case "greet":        ciliAI_updateChatWindow("Hello! I am CiliAI. Ask me about ciliary genes.", "ciliai"); break;
-            default:             ciliAI_updateChatWindow("I didn’t understand. Try a gene or a complex question.", "ciliai"); break;
-        }
-    } catch (e) {
-        console.error("[CiliAI] Intent error:", e);
-        ciliAI_updateChatWindow(`Error: ${e.message}`, "error");
-    }
-}
 
 // ============================================================================
 // 4. 🧠 CiliAI DUAL-STAGE INTENT RESOLVER (FINAL)
@@ -893,21 +845,21 @@ window.displayCiliAIPage = async function displayCiliAIPage() {
     
   console.log('ciliAI.js: Page HTML injected.');
 
-       / NOTE: The "Analyze Gene Phenotypes" section is now hidden by default
         const analyzeSection = contentArea.querySelector('.input-section');
         if (analyzeSection) {
             analyzeSection.style.display = 'none';
-            console.log('[CiliAI] "Analyze Gene Phenotypes" section hidden.');
+            console.log('[CiliAI] Analyze section hidden.');
         }
-        ciliAI_waitForElements();
+
+        ciliAI_waitForElements();  // KRİTİK
 
     } catch (err) {
         console.error('CiliAI HTML injection failed:', err);
-        contentArea.innerHTML = '<p>CiliAI not uploaded.</p>';
+        contentArea.innerHTML = '<p>CiliAI yüklenemedi.</p>';
     }
 };
     
     
 
 // inside displayCiliAIPage(), right after the innerHTML assignment:
-ciliAI_waitForElements();   // <-- THIS LINE
+ciliAI_waitForElements(); 
