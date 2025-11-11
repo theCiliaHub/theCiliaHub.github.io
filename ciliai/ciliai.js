@@ -1021,13 +1021,6 @@ function ciliAI_init() {
     console.log("CiliAI module initialized and event listeners attached.");
 }
 
-// ============================================================================
-// 7. 🚀 RUN CiliAI
-// ============================================================================
-
-// Wait for the full page to load before attaching listeners.
-document.addEventListener('DOMContentLoaded', ciliAI_init);
-
 
 // ============================================================================
 // 8. 🧪 CiliAI SIMULATION (for testing)
