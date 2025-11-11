@@ -1498,11 +1498,6 @@ async function getLiteratureEvidence(gene) {
  * - Key: Gene name (e.g., "IFT88")
  * - Value: A Promise that resolves to the combined data object for that gene.
  *
- * Storing the promise itself prevents "race conditions" where multiple
- * requests for the same gene fire off before the first one completes.
- */
-const geneDataCache = new Map();
-
 // ============================================================================
 // 2. 🧲 "GATEKEEPER" CACHING FUNCTION
 // ============================================================================
