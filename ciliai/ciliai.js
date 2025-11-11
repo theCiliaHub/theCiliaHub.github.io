@@ -1,12 +1,15 @@
-// Global caches
-let ciliaHubDataCache = new Map();
+// --- Global caches ---
+let ciliaHubDataCache = [];
+let screenDataCache = [];
 let phylogenyDataCache = {};
-let screenDataCache = {};
-let corumDataCache = {};
-let umapDataCache = {};
+let tissueDataCache = {};
 let cellxgeneDataCache = {};
-let domainDataCache = {};
-let isCiliAIDataLoaded = false;
+let umapDataCache = {};
+let CILI_AI_DOMAIN_DB = {};
+let corumComplexCache = {};
+let neversPhylogenyCache = {};
+let liPhylogenyCache = {};
+
 
 // --- Initialize all data asynchronously and cache ---
 async function initializeCiliAIData() {
@@ -339,30 +342,23 @@ const CiliAIQuery = (() => {
 })();
 
 
-// --- Main Page Display Function with Automatic Initialization ---
+
+// --- Main Page Display Function with full CSS ---
 window.displayCiliAIPage = async function displayCiliAIPage() {
     const contentArea = document.querySelector('.content-area');
-    if (!contentArea) {
-        console.error('Content area not found');
-        return;
-    }
+    if (!contentArea) return console.error('Content area not found');
     contentArea.className = 'content-area content-area-full';
 
     const ciliaPanel = document.querySelector('.cilia-panel');
-    if (ciliaPanel) {
-        ciliaPanel.style.display = 'none';
-    }
+    if (ciliaPanel) ciliaPanel.style.display = 'none';
 
-    // Inject CiliAI HTML and CSS (all CSS and example questions kept intact)
+    // Inject HTML & CSS
     try {
         contentArea.innerHTML = `
             <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
             <script src="https://cdn.jsdelivr.net/npm/cytoscape@3.23.0/dist/cytoscape.min.js"></script>
             <div class="ciliai-container">
-                <div class="ciliai-header">
-                    <h1>CiliAI</h1>
-                    <p>Your AI-powered partner for discovering gene-cilia relationships.</p>
-                </div>
+                <div class="ciliai-header"><h1>CiliAI</h1><p>Your AI-powered partner for discovering gene-cilia relationships.</p></div>
                 <div class="ciliai-main-content">
                     <div class="ai-query-section">
                         <h3>Ask a Question</h3>
@@ -378,15 +374,14 @@ window.displayCiliAIPage = async function displayCiliAIPage() {
                                <span data-question="Show genes for Joubert syndrome">List genes for Joubert syndrome</span>, 
                                <span data-question="List ciliary genes in C. elegans">List potential ciliary genes in C. elegans (Phylogenetic)</span>, 
                                <span data-question="Plot UMAP expression for FOXJ1">Display expression for FOXJ1 in Lung</span>,
-                               <span data-question="Compare ARL13B and FOXJ1 expression in lung scRNA-seq">Compare ARL13B and FOXJ1 expression in lung scRNA-seq</span>,
+                               <span data-question="Compare ARL13B and FOXJ1 expression in lung scRNA-seq">Compare ARL13B and FOXJ1 in lung scRNA-seq</span>,
                                <span data-question="Compare phylogeny of BBS1 and CEP290.">Compare phylogeny of BBS1 and CEP290</span>,
-                               <span data-question="What proteins are enriched at the ciliary tip?">What proteins are enriched at the ciliary tip?</span>,
+                               <span data-question="What proteins are enriched at the ciliary tip?">Proteins at ciliary tip?</span>,
                                <span data-question="Which Joubert Syndrome genes are expressed in ciliated cells?">Joubert genes in ciliated cells</span>
                             </p>
                         </div>
                         <div id="ai-result-area" class="results-section" style="display: none; margin-top: 1.5rem; padding: 1rem;"></div>
                     </div>
-                    
                     <div class="input-section">
                         <h3>Analyze Gene Phenotypes</h3>
                         <div class="input-group">
@@ -400,25 +395,16 @@ window.displayCiliAIPage = async function displayCiliAIPage() {
                             <label>Analysis Mode:</label>
                             <div class="mode-selector">
                                 <div class="mode-option">
-                                    <input type="radio" id="hybrid" name="mode" value="hybrid" checked aria-label="Hybrid mode">
-                                    <label for="hybrid" title="Combines database, screen data, and real-time AI literature mining.">
-                                        <span class="mode-icon">🔬</span>
-                                        <div><strong>Hybrid</strong><br><small>DB + Screens + Literature</small></div>
-                                    </label>
+                                    <input type="radio" id="hybrid" name="mode" value="hybrid" checked>
+                                    <label for="hybrid"><span class="mode-icon">🔬</span><div><strong>Hybrid</strong><br><small>DB + Screens + Literature</small></div></label>
                                 </div>
                                 <div class="mode-option">
-                                    <input type="radio" id="expert" name="mode" value="expert" aria-label="Expert only mode">
-                                    <label for="expert" title="Queries only our internal database and screen data.">
-                                        <span class="mode-icon">🏛️</span>
-                                        <div><strong>Expert Only</strong><br><small>Curated DB + Screens</small></div>
-                                    </label>
+                                    <input type="radio" id="expert" name="mode" value="expert">
+                                    <label for="expert"><span class="mode-icon">🏛️</span><div><strong>Expert Only</strong><br><small>Curated DB + Screens</small></div></label>
                                 </div>
                                 <div class="mode-option">
-                                    <input type="radio" id="nlp" name="mode" value="nlp" aria-label="Literature only mode">
-                                    <label for="nlp" title="Performs a live AI-powered search across PubMed.">
-                                        <span class="mode-icon">📚</span>
-                                        <div><strong>Literature Only</strong><br><small>Live AI text mining</small></div>
-                                    </label>
+                                    <input type="radio" id="nlp" name="mode" value="nlp">
+                                    <label for="nlp"><span class="mode-icon">📚</span><div><strong>Literature Only</strong><br><small>Live AI text mining</small></div></label>
                                 </div>
                             </div>
                         </div>
@@ -432,66 +418,43 @@ window.displayCiliAIPage = async function displayCiliAIPage() {
                     </div>
                 </div>
             </div>
+
             <style>
               .ciliai-container { font-family: 'Arial', sans-serif; max-width: 950px; margin: 2rem auto; padding: 2rem; background-color: #f9f9f9; border-radius: 12px; }
-.ciliai-header { text-align: center; margin-bottom: 2rem; }
-.ciliai-header h1 { font-size: 2.8rem; color: #2c5aa0; margin: 0; }
-.ciliai-header p { font-size: 1.2rem; color: #555; margin-top: 0.5rem; }
-.ai-query-section { background-color: #e8f4fd; border: 1px solid #bbdefb; padding: 1.5rem 2rem; border-radius: 8px; margin-bottom: 2rem; }
-.ai-query-section h3 { margin-top: 0; color: #2c5aa0; }
-.ai-input-group { position: relative; display: flex; gap: 10px; }
-.ai-query-input { flex-grow: 1; padding: 0.8rem; border: 1px solid #ccc; border-radius: 4px; font-size: 1rem; }
-.ai-query-btn { padding: 0.8rem 1.2rem; font-size: 1rem; background-color: #2c5aa0; color: white; border: none; border-radius: 4px; cursor: pointer; transition: background-color 0.2s; }
-.ai-query-btn:hover { background-color: #1e4273; }
-.example-queries { margin-top: 1rem; font-size: 0.9rem; color: #555; text-align: left; }
-.example-queries span { background-color: #d1e7fd; padding: 4px 10px; border-radius: 12px; font-family: 'Arial', sans-serif; cursor: pointer; margin: 4px; display: inline-block; transition: background-color 0.2s; border: 1px solid #b1d7fc; }
-.example-queries span:hover { background-color: #b1d7fc; }
-.input-section { background-color: #fff; padding: 2rem; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
-.input-group { margin-bottom: 1.5rem; }
-.input-group label { display: block; font-weight: bold; margin-bottom: 0.5rem; color: #333; }
-.gene-input-textarea { width: 100%; box-sizing: border-box; padding: 0.8rem; border: 1px solid #ccc; border-radius: 4px; font-size: 1rem; min-height: 80px; resize: vertical; }
-.mode-selector { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; }
-.mode-option input[type="radio"] { display: none; }
-.mode-option label { display: flex; align-items: center; gap: 10px; padding: 1rem; border: 2px solid #ddd; border-radius: 8px; cursor: pointer; transition: all 0.2s; }
-.mode-option input[type="radio"]:checked + label { border-color: #2c5aa0; background-color: #e8f4fd; box-shadow: 0 0 5px rgba(44, 90, 160, 0.3); }
-.mode-icon { font-size: 1.8rem; }
-.analyze-btn { width: 100%; padding: 1rem; font-size: 1.1rem; font-weight: bold; background-color: #28a745; color: white; border: none; border-radius: 8px; cursor: pointer; transition: background-color 0.2s; }
-.analyze-btn:hover:not([disabled]) { background-color: #218838; }
-.results-section { margin-top: 2rem; padding: 2rem; background-color: #fff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
-.result-card { border: 1px solid #ddd; border-radius: 8px; padding: 1.5rem; margin-bottom: 1.5rem; }
-.result-card h3 { margin-top: 0; color: #2c5aa0; }
-.ciliopathy-table, .expression-table, .gene-detail-table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
-.ciliopathy-table th, .ciliopathy-table td, .expression-table th, .expression-table td, .gene-detail-table th, .gene-detail-table td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-.ciliopathy-table th, .expression-table th, .gene-detail-table th { background-color: #e8f4fd; color: #2c5aa0; }
-.suggestions-container { position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid #ccc; z-index: 1000; max-height: 200px; overflow-y: auto; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-.suggestion-item { padding: 10px; cursor: pointer; }
-.suggestion-item:hover { background-color: #f0f0f0; }
-
-/* --- ADDED CSS FOR DOWNLOAD BUTTON AND PLOT CARD --- */
-.download-button {
-    background-color: #28a745;
-    color: white;
-    padding: 8px 14px;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 0.9em;
-    font-weight: bold;
-    margin-top: 15px;
-    transition: background-color 0.3s ease;
-}
-.download-button:hover { background-color: #218838; }
-/* This re-defines .result-card to ensure it has the correct padding for plots */
-.result-card {
-    padding: 20px;
-    background-color: #fff;
-    border-radius: 8px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-    margin-top: 1.5rem;
-    border: 1px solid #ddd;
-    margin-bottom: 1.5rem;
-}
-
+              .ciliai-header { text-align: center; margin-bottom: 2rem; }
+              .ciliai-header h1 { font-size: 2.8rem; color: #2c5aa0; margin: 0; }
+              .ciliai-header p { font-size: 1.2rem; color: #555; margin-top: 0.5rem; }
+              .ai-query-section { background-color: #e8f4fd; border: 1px solid #bbdefb; padding: 1.5rem 2rem; border-radius: 8px; margin-bottom: 2rem; }
+              .ai-query-section h3 { margin-top: 0; color: #2c5aa0; }
+              .ai-input-group { position: relative; display: flex; gap: 10px; }
+              .ai-query-input { flex-grow: 1; padding: 0.8rem; border: 1px solid #ccc; border-radius: 4px; font-size: 1rem; }
+              .ai-query-btn { padding: 0.8rem 1.2rem; font-size: 1rem; background-color: #2c5aa0; color: white; border: none; border-radius: 4px; cursor: pointer; transition: background-color 0.2s; }
+              .ai-query-btn:hover { background-color: #1e4273; }
+              .example-queries { margin-top: 1rem; font-size: 0.9rem; color: #555; text-align: left; }
+              .example-queries span { background-color: #d1e7fd; padding: 4px 10px; border-radius: 12px; font-family: 'Arial', sans-serif; cursor: pointer; margin: 4px; display: inline-block; transition: background-color 0.2s; border: 1px solid #b1d7fc; }
+              .example-queries span:hover { background-color: #b1d7fc; }
+              .input-section { background-color: #fff; padding: 2rem; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+              .input-group { margin-bottom: 1.5rem; }
+              .input-group label { display: block; font-weight: bold; margin-bottom: 0.5rem; color: #333; }
+              .gene-input-textarea { width: 100%; box-sizing: border-box; padding: 0.8rem; border: 1px solid #ccc; border-radius: 4px; font-size: 1rem; min-height: 80px; resize: vertical; }
+              .mode-selector { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; }
+              .mode-option input[type="radio"] { display: none; }
+              .mode-option label { display: flex; align-items: center; gap: 10px; padding: 1rem; border: 2px solid #ddd; border-radius: 8px; cursor: pointer; transition: all 0.2s; }
+              .mode-option input[type="radio"]:checked + label { border-color: #2c5aa0; background-color: #e8f4fd; box-shadow: 0 0 5px rgba(44, 90, 160, 0.3); }
+              .mode-icon { font-size: 1.8rem; }
+              .analyze-btn { width: 100%; padding: 1rem; font-size: 1.1rem; font-weight: bold; background-color: #28a745; color: white; border: none; border-radius: 8px; cursor: pointer; transition: background-color 0.2s; }
+              .analyze-btn:hover:not([disabled]) { background-color: #218838; }
+              .results-section { margin-top: 2rem; padding: 2rem; background-color: #fff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+              .result-card { border: 1px solid #ddd; border-radius: 8px; padding: 1.5rem; margin-bottom: 1.5rem; }
+              .result-card h3 { margin-top: 0; color: #2c5aa0; }
+              .ciliopathy-table, .expression-table, .gene-detail-table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+              .ciliopathy-table th, .ciliopathy-table td, .expression-table th, .expression-table td, .gene-detail-table th, .gene-detail-table td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+              .ciliopathy-table th, .expression-table th, .gene-detail-table th { background-color: #e8f4fd; color: #2c5aa0; }
+              .suggestions-container { position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid #ccc; z-index: 1000; max-height: 200px; overflow-y: auto; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+              .suggestion-item { padding: 10px; cursor: pointer; }
+              .suggestion-item:hover { background-color: #f0f0f0; }
+              .download-button { background-color: #28a745; color: white; padding: 8px 14px; border: none; border-radius: 4px; cursor: pointer; font-size: 0.9em; font-weight: bold; margin-top: 15px; transition: background-color 0.3s ease; }
+              .download-button:hover { background-color: #218838; }
             </style>
         `;
     } catch (error) {
@@ -500,23 +463,39 @@ window.displayCiliAIPage = async function displayCiliAIPage() {
         return;
     }
 
-    // --- FETCH ALL DATA IN PARALLEL (modern async/await) ---
+    // --- Fetch all data in parallel ---
     await Promise.all([
-        fetchCiliaData('https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/ciliahub_data.json'),
-        fetchScreenData('https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/cilia_screens_data.json'),
-        fetchPhylogenyData('https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/phylogeny_summary.json'),
-        fetchTissueData('https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/rna_tissue_consensus.tsv'),
-        fetchCellxgeneData('https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/cellxgene_data.json'),
-        fetchUmapData('https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/umap_data.json'),
-        getDomainData('https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/cili_ai_domain_database.json'),
-        fetchNeversPhylogenyData('https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/nevers_et_al_2017_matrix_optimized.json'),
-        fetchLiPhylogenyData('https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/li_et_al_2014_matrix_optimized.json'),
-        fetchCorumComplexes('https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/corum_humanComplexes.json')
+        fetchCiliaData(),
+        fetchScreenData(),
+        fetchPhylogenyData(),
+        fetchTissueData(),
+        fetchCellxgeneData(),
+        fetchUmapData(),
+        getDomainData(),
+        fetchCorumComplexes(),
+        fetchNeversPhylogenyData(),
+        fetchLiPhylogenyData()
     ]);
 
-    // Merge Nevers & Li phylogeny caches
+    // Merge phylogeny caches
     await mergePhylogenyCaches();
 
+    console.log('✅ All CiliAI data loaded successfully.');
+
+    // Initialize event listeners and autocomplete
+    setupCiliAIEventListeners();
+
+    // Pre-populate allGeneSymbols
+    allGeneSymbols = getAllGenes();
+    console.log(`✅ Loaded ${allGeneSymbols.length} unique genes.`);
+};
+
+// Merge phylogeny caches
+phylogenyDataCache = {
+    ...phylogenyDataCache,
+    ...neversPhylogenyCache,
+    ...liPhylogenyCache
+};
     console.log('ciliAI.js: All data loaded successfully.');
 
     // Initialize event listeners after fetches
@@ -1160,65 +1139,8 @@ function getSubunitsByComplexName(complexName) {
     );
 }
 
-/**
- * Fetches the new domain database (enriched, depleted, gene map).
- * URL: https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/cili_ai_domain_database.json
- */
-async function getDomainData() {
-    if (CILI_AI_DOMAIN_DB) return CILI_AI_DOMAIN_DB;
-    const dataUrl = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/cili_ai_domain_database.json';
-    try {
-        const response = await fetch(dataUrl);
-        if (!response.ok) {
-            console.error(`Error fetching domain DB: ${response.status} ${response.statusText}`);
-            return null;
-        }
-        CILI_AI_DOMAIN_DB = await response.json();
-        console.log('✅ New Domain Database (cili_ai_domain_database.json) loaded successfully.');
-        return CILI_AI_DOMAIN_DB;
-    } catch (error) {
-        console.error(`Network error or JSON parsing error for Domain DB: ${error}`);
-        return null;
-    }
-}
 
-/**
- * Fetches the Nevers et al. 2017 phylogeny matrix.
- * URL: https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/nevers_et_al_2017_matrix_optimized.json
- */
-async function fetchNeversPhylogenyData() {
-    if (neversPhylogenyCache) return neversPhylogenyCache;
-    const dataUrl = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/nevers_et_al_2017_matrix_optimized.json';
-    try {
-        const response = await fetch(dataUrl);
-        if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
-        neversPhylogenyCache = await response.json();
-        console.log('✅ Nevers et al. 2017 Phylogeny data loaded successfully.');
-        return neversPhylogenyCache;
-    } catch (error) {
-        console.error('Failed to fetch Nevers et al. 2017 phylogeny data:', error);
-        return null;
-    }
-}
 
-/**
- * Fetches the Li et al. 2014 phylogeny matrix.
- * URL: https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/li_et_al_2014_matrix_optimized.json
- */
-async function fetchLiPhylogenyData() {
-    if (liPhylogenyCache) return liPhylogenyCache;
-    const dataUrl = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/li_et_al_2014_matrix_optimized.json';
-    try {
-        const response = await fetch(dataUrl);
-        if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
-        liPhylogenyCache = await response.json();
-        console.log('✅ Li et al. 2014 Phylogeny data loaded successfully.');
-        return liPhylogenyCache;
-    } catch (error) {
-        console.error('Failed to fetch Li et al. 2014 phylogeny data:', error);
-        return null;
-    }
-}
 
 /**
  * New function to describe CiliAI's capabilities, listing all available data types.
