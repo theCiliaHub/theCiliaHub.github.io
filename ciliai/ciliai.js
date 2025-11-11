@@ -421,7 +421,7 @@ async function ciliAI_fetchPhylogenyData_internal(geneName) {
  */
 async function ciliAI_fetchDomainData_internal(geneName) {
     // *** IMPORTANT: Set your correct URL ***
-    const url = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/data/protein_domains.json'; // Example path
+    const url = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/cili_ai_domain_database.json';
     try {
         const response = await fetch(url);
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
@@ -433,24 +433,6 @@ async function ciliAI_fetchDomainData_internal(geneName) {
     }
 }
 
-/**
- * [INTERNAL] Fetches cilia length determination data.
- * @param {string} geneName - The human gene name (UPPERCASE)
- * @returns {Promise<object | null>}
- */
-async function ciliAI_fetchCiliaLengthData_internal(geneName) {
-    // *** IMPORTANT: Set your correct URL ***
-    const url = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/data/cilia_length_data.json'; // Example path
-    try {
-        const response = await fetch(url);
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-        const allLengthData = await response.json();
-        return allLengthData.find(entry => entry.gene && entry.gene.toUpperCase() === geneName) || null;
-    } catch (err) {
-        console.error(`[CiliAI] Failed to fetch cilia length data for ${geneName}:`, err);
-        return null;
-    }
-}
 
 /**
  * [INTERNAL] Fetches protein complex data.
@@ -459,7 +441,7 @@ async function ciliAI_fetchCiliaLengthData_internal(geneName) {
  */
 async function ciliAI_fetchComplexData_internal(geneName) {
     // *** IMPORTANT: Set your correct URL ***
-    const url = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/data/protein_complexes.json'; // Example path
+    const url = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/corum_humanComplexes.json'; // Example path
     try {
         const response = await fetch(url);
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
@@ -877,6 +859,7 @@ async function ciliAI_handleDomains(geneName) {
         return;
     }
 
+    // Assumes geneData.domains is an array of objects: [{ name: "PF..."}, ...]
     if (!geneData.domains || geneData.domains.length === 0) {
         ciliAI_updateChatWindow(`No protein domain information was found for **${geneName}**.`, "ciliai");
         return;
@@ -900,13 +883,24 @@ async function ciliAI_handleCiliaLength(geneName) {
         return;
     }
 
-    if (!geneData.ciliaLength) {
-        ciliAI_updateChatWindow(`No specific cilia length data was found for **${geneName}**.`, "ciliai");
+    // *** CORRECTION ***
+    // This data now lives inside the geneInfo object, fetched from ciliahub_data.json
+    if (!geneData.geneInfo) {
+        ciliAI_updateChatWindow(`No cilia length data was found for **${geneName}**.`, "ciliai");
         return;
     }
+    
+    const lof = geneData.geneInfo.lof_effects || "Not Reported";
+    const oe = geneData.geneInfo.overexpression_effects || "Not Reported";
+    const perc = geneData.geneInfo.percent_ciliated_cells_effects || "Not Reported";
 
-    const role = geneData.ciliaLength.role;
-    ciliAI_updateChatWindow(`**${geneName}** is known as a **${role}** of cilia length.`, "ciliai");
+    let responses = [];
+    responses.push(`Cilia phenotype effects for **${geneName}**:`);
+    responses.push(`* **Loss-of-function:** ${lof}`);
+    responses.push(`* **Overexpression:** ${oe}`);
+    responses.push(`* **% Ciliated Cells:** ${perc}`);
+
+    ciliAI_updateChatWindow(responses.join('\n'), "ciliai");
 }
 
 /**
@@ -921,7 +915,7 @@ async function ciliAI_handleComplex(geneName) {
     }
 
     if (!geneData.complex) {
-        ciliAI_updateChatWindow(`**${geneName}** is not listed as part of a known protein complex in our data.`, "ciliai");
+        ciliAI_updateChatWindow(`**${geneName}** is not listed as part of a known CORUM complex in our data.`, "ciliai");
         return;
     }
 
@@ -930,11 +924,70 @@ async function ciliAI_handleComplex(geneName) {
     ciliAI_updateChatWindow(`**${geneName}** is a member of the **${complexName}** complex, which has ${memberCount} members.`, "ciliai");
 }
 
+/**
+ * *** NEWLY ADDED ***
+ * Handles the "getExpression" intent (for tissue and scRNA).
+ * @param {string} geneName 
+ */
+async function ciliAI_handleExpression(geneName) {
+    const geneData = await ciliAI_getGeneData(geneName);
+    if (geneData.notFound) {
+        ciliAI_updateChatWindow(`Sorry, I could not find data for "${geneName}".`, "error");
+        return;
+    }
+
+    let responses = [];
+    responses.push(`Expression data for **${geneName}**:`);
+    
+    // 1. Check for Tissue Data
+    if (geneData.tissue) {
+        responses.push(`\n**Tissue Consensus Data:**`);
+        // Find top 3 tissues
+        const tissues = Object.entries(geneData.tissue)
+            .map(([tissue, nTPM]) => ({ tissue, nTPM: parseFloat(nTPM) }))
+            .filter(t => !isNaN(t.nTPM))
+            .sort((a, b) => b.nTPM - a.nTPM);
+            
+        if (tissues.length > 0) {
+            responses.push(`* Highest expression in: **${tissues[0].tissue}** (${tissues[0].nTPM} nTPM)`);
+            if (tissues.length > 1) responses.push(`* Second highest: **${tissues[1].tissue}** (${tissues[1].nTPM} nTPM)`);
+            if (tissues.length > 2) responses.push(`* Third highest: **${tissues[2].tissue}** (${tissues[2].nTPM} nTPM)`);
+        } else {
+            responses.push(`* No tissue consensus data found.`);
+        }
+    } else {
+        responses.push(`\n* No tissue consensus data found.`);
+    }
+    
+    // 2. Check for scRNA-seq Data
+    if (geneData.scRNA) {
+        responses.push(`\n**Single-Cell (scRNA-seq) Data:**`);
+        // Find top 3 cell types
+         const cells = Object.entries(geneData.scRNA)
+            .map(([cell, pct]) => ({ cell, pct: parseFloat(pct) }))
+            .filter(c => !isNaN(c.pct))
+            .sort((a, b) => b.pct - a.pct);
+            
+        if (cells.length > 0) {
+            responses.push(`* Highest expression in: **${cells[0].cell}** (${cells[0].pct.toFixed(2)}% of cells)`);
+            if (cells.length > 1) responses.push(`* Second highest: **${cells[1].cell}** (${cells[1].pct.toFixed(2)}% of cells)`);
+            if (cells.length > 2) responses.push(`* Third highest: **${cells[2].cell}** (${cells[2].pct.toFixed(2)}% of cells)`);
+        } else {
+            responses.push(`* No scRNA-seq data found.`);
+        }
+    } else {
+        responses.push(`\n* No scRNA-seq data found.`);
+    }
+
+    ciliAI_updateChatWindow(responses.join('\n'), "ciliai");
+}
+
 
 // ============================================================================
-// 6. 🔌 CiliAI EVENT HANDLERS & INITIALIZATION
+// 6. 🔌 CiliAI EVENT HANDLERS
 // ============================================================================
 // This section connects CiliAI to the HTML DOM.
+
 /**
  * Handles the query from the user input.
  * This function is attached to the "Send" button and "Enter" key.
@@ -974,26 +1027,25 @@ async function ciliAI_handleQuery() {
     inputElement.value = '';
 }
 
-
-
-
 /**
  * Updates the CiliAI chat UI.
  * @param {string} message - The message HTML or text to display.
  * @param {string} sender - The class name (e.g., "user", "ciliai", "error").
  */
 function ciliAI_updateChatWindow(message, sender) {
-    // *** IMPORTANT: This ID must match your HTML ***
-    const chatBox = document.getElementById('ai-result-area'); // <-- THE FIX
+    // *** This ID must match your HTML ***
+    const chatBox = document.getElementById('ai-result-area');
     
     if (message === "Thinking...") {
-        // Optional: Show a "typing" indicator
-        if (chatBox) chatBox.innerHTML = `<p class="status-searching">CiliAI is thinking... 🧠</p>`;
+        if (chatBox) {
+            chatBox.style.display = 'block'; // Make sure it's visible
+            chatBox.innerHTML = `<p class="status-searching">CiliAI is thinking... 🧠</p>`;
+        }
         return; 
     }
     
     if (!chatBox) {
-        // Fallback to console if the chat window doesn't exist
+        // Fallback to console
         const formattedMessage = message.replace(/<[^>]*>?/gm, '');
         console.log(`[CiliAI - ${sender.toUpperCase()}]: ${formattedMessage}`);
         return;
@@ -1003,7 +1055,7 @@ function ciliAI_updateChatWindow(message, sender) {
     chatBox.style.display = 'block';
 
     const msgElement = document.createElement('div');
-    msgElement.className = `ciliai-message ${sender}`; // Use prefixed class names
+    msgElement.className = `ciliai-message ${sender}`;
     
     // Convert markdown bold to HTML bold
     message = message.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
@@ -1013,8 +1065,6 @@ function ciliAI_updateChatWindow(message, sender) {
     msgElement.innerHTML = message;
 
     if (sender === 'user') {
-        // If it's a user message, overwrite the "Thinking..."
-        // This assumes the chat history is not preserved (which matches your HTML)
         chatBox.innerHTML = ''; // Clear previous results
         chatBox.appendChild(msgElement);
     } else {
@@ -1026,22 +1076,31 @@ function ciliAI_updateChatWindow(message, sender) {
 }
 
 
+// ============================================================================
+// 7. 🚀 RUN CiliAI (ROBUST INITIALIZER)
+// ============================================================================
+
 /**
  * Attaches all CiliAI event listeners to the DOM.
+ * This is the *only* place the listeners are added.
  */
-// INSIDE your ciliai.js file (NOT the code you just sent)
+function ciliAI_init_listeners() {
+    // *** These IDs must match your HTML ***
+    const sendButton = document.getElementById('aiQueryBtn');
+    const inputElement = document.getElementById('aiQueryInput');
+    const exampleQueriesContainer = document.querySelector('.example-queries'); 
 
-function ciliAI_init() {
-    // *** FIX THESE IDs ***
-    const sendButton = document.getElementById('aiQueryBtn'); // <-- MUST MATCH HTML
-    const inputElement = document.getElementById('aiQueryInput'); // <-- MUST MATCH HTML
+    let listenersAttached = true; // Start optimistic
 
+    // 1. Attach to Send Button
     if (sendButton) {
         sendButton.addEventListener('click', ciliAI_handleQuery);
     } else {
-        console.warn("[CiliAI] Send button not found. (Tried 'aiQueryBtn')"); 
+        console.warn("[CiliAI] Send button 'aiQueryBtn' not found.");
+        listenersAttached = false;
     }
 
+    // 2. Attach to Input Box (for 'Enter' key)
     if (inputElement) {
         inputElement.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
@@ -1050,11 +1109,77 @@ function ciliAI_init() {
             }
         });
     } else {
-        console.warn("[CiliAI] Input box not found. (Tried 'aiQueryInput')");
+        console.warn("[CiliAI] Input box 'aiQueryInput' not found.");
+        listenersAttached = false;
     }
 
-    console.log("CiliAI module initialized and event listeners attached.");
+    // 3. Attach to Example Queries Container
+    if (exampleQueriesContainer) {
+        exampleQueriesContainer.addEventListener('click', (e) => {
+            // Check if the clicked element is one of the <span> tags
+            if (e.target && e.target.matches('.example-queries span')) {
+                const query = e.target.dataset.question || e.target.textContent;
+                
+                // Put the query in the input box
+                const input = document.getElementById('aiQueryInput');
+                if (input) {
+                    input.value = query;
+                }
+                
+                // Manually trigger the query handler
+                ciliAI_handleQuery(); 
+            }
+        });
+    } else {
+        console.warn("[CiliAI] Example queries container '.example-queries' not found.");
+    }
+
+    // Final check
+    if (listenersAttached) {
+        console.log("✅ [CiliAI] Event listeners successfully attached.");
+        return true; // Success
+    }
+    
+    // Log explicit "not found" messages
+    if (!sendButton) console.warn("[CiliAI] Send button not found. (Tried 'aiQueryBtn')");
+    if (!inputElement) console.warn("[CiliAI] Input box not found. (Tried 'aiQueryInput')");
+
+    return false; // Elements not found yet
 }
+
+/**
+ * This function waits for the CiliAI HTML elements (which are injected 
+ * by displayCiliAIPage) to appear in the DOM before attaching listeners.
+ */
+function ciliAI_waitForElements() {
+    console.log("[CiliAI] Waiting for elements 'aiQueryBtn' and 'aiQueryInput'...");
+
+    // Try to attach listeners immediately
+    if (ciliAI_init_listeners()) {
+        return; // Success, elements were already there
+    }
+
+    // If not found, set up an interval to check for them
+    let attempts = 0;
+    const maxAttempts = 50; // Check for 5 seconds (50 * 100ms)
+
+    const checkInterval = setInterval(() => {
+        attempts++;
+        if (ciliAI_init_listeners()) {
+            // Success! Elements are now loaded.
+            clearInterval(checkInterval);
+        } else if (attempts > maxAttempts) {
+            // Failed. Stop trying.
+            clearInterval(checkInterval);
+            console.error("[CiliAI] FAILED to find 'aiQueryBtn' or 'aiQueryInput' after 5 seconds.");
+        }
+    }, 100);
+}
+
+// Start the process as soon as this file is loaded.
+// This replaces the old document.addEventListener('DOMContentLoaded', ciliAI_init);
+ciliAI_waitForElements();
+
 
 
 // ============================================================================
@@ -1063,36 +1188,55 @@ function ciliAI_init() {
 
 /**
  * DUMMY FUNCTION: Simulates handling user input from a text box.
+ * This is a helper for testing.
  */
 async function ciliAI_simulateUserInput(text) {
     console.log(`\n--- [CiliAI SIM] USER SENDS: "${text}" ---`);
-    ciliAI_updateChatWindow(text, "user"); // Show user's message
-    await ciliAI_resolveIntent(text); // Process the message
+    
+    // 1. Manually set the input box value
+    const inputElement = document.getElementById('aiQueryInput');
+    if (inputElement) {
+        inputElement.value = text;
+    } else {
+        console.error("[CiliAI SIM] Could not find input box '#aiQueryInput'");
+        return;
+    }
+    
+    // 2. Manually call the query handler
+    await ciliAI_handleQuery();
 }
 
 /**
  * DUMMY FUNCTION: Runs a series of tests for the new dual-stage system.
  */
 async function ciliAI_runSimulation() {
-    // Use a timeout to ensure the DOM is ready (for testing)
+    // Use a timeout to ensure the DOM is ready
     setTimeout(async () => {
         console.log("--- CiliAI SIMULATION START ---");
 
-        // === STAGE 1: Test Complex Queries ===
-        await ciliAI_simulateUserInput("List genes for Joubert Syndrome");
-        await ciliAI_simulateUserInput("show basal body genes causing short cilia");
+        // === Test 1: Single-gene summary (Fetch) ===
+        await ciliAI_simulateUserInput("Tell me about IFT88"); 
         
-        // === STAGE 2: Test Single-Gene Fallback ===
-        await ciliAI_simulateUserInput("Tell me about IFT88"); // Fetches
-        await ciliAI_simulateUserInput("what complex is ift88 in?"); // Cached
-        await ciliAI_simulateUserInput("ift88 domains"); // Cached
-        await ciliAI_simulateUserInput("how is the weather?"); // Unknown
+        // === Test 2: Single-gene specific (Cache) ===
+        setTimeout(async () => {
+            await ciliAI_simulateUserInput("what complex is IFT88 in?");
+        }, 3000); // Wait 3 seconds for first fetch
 
-        console.log("--- CiliAI SIMULATION END ---");
-    }, 1000); // Wait 1 sec
+        // === Test 3: Complex query (Placeholder) ===
+        setTimeout(async () => {
+            await ciliAI_simulateUserInput("List genes for Joubert syndrome");
+        }, 6000); // Wait 6 seconds
+        
+        // === Test 4: Single-gene expression (Fetch/Cache) ===
+        setTimeout(async () => {
+            await ciliAI_simulateUserInput("expression for IFT88");
+        }, 9000); // Wait 9 seconds
+
+        console.log("--- CiliAI SIMULATION END (tests are running) ---");
+    }, 2000); // Wait 2 seconds for page to load
 }
 
-// Uncomment the line below to run the simulation when this file is loaded
+// To run the test, uncomment this line:
 // ciliAI_runSimulation();
 
 
@@ -1223,308 +1367,7 @@ function createIntentParser() {
 
 const intentParser = createIntentParser();
 
-// --- Data Fetching and Caching (Updated with New Integration Logic) ---
 
-async function fetchCiliaData() {
-    if (ciliaHubDataCache) return ciliaHubDataCache;
-    try {
-        // Fetch primary gene data
-        const response = await fetch('https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/ciliahub_data.json');
-        if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
-        const data = await response.json();
-
-        // Fetch screen data for merging
-        const screenData = await fetchScreenData(); // Ensure screen data is loaded
-
-        const processToArray = (field) => {
-            if (typeof field === 'string') return field.split(',').map(item => item.trim()).filter(Boolean);
-            if (Array.isArray(field)) return field;
-            return [];
-        };
-
-        ciliaHubDataCache = data.map(gene => {
-            const geneUpper = gene.gene.toUpperCase();
-
-            // 1. Map core gene fields to arrays where appropriate
-            const processedGene = {
-                ...gene,
-                functional_category: processToArray(gene.functional_category),
-                domain_descriptions: processToArray(gene.domain_descriptions),
-                ciliopathy: processToArray(gene.ciliopathy),
-                localization: processToArray(gene.localization),
-                complex_names: processToArray(gene.complex_names),
-                complex_components: processToArray(gene.complex_components)
-            };
-
-            // 2. Add Cilia Effects from ciliahub_data.json
-            // These fields are correctly sourced from the main ciliahub_data.json.
-            const effectsFromHub = {
-                overexpression_effects: processedGene.overexpression_effects || "Not Reported",
-                lof_effects: processedGene.lof_effects || "Not Reported",
-                percent_ciliated_cells_effects: processedGene.percent_ciliated_cells_effects || "Not Reported",
-            };
-
-            // 3. Merge in custom effects on cilia if the gene is found in screenData, 
-            // but explicitly ignoring the 'screens' field in the main data.
-            // Note: The logic requires that the new 'effects' data comes from 
-            // ciliahub_data.json (which we've done in point #2) 
-            // AND the screen data should be integrated with gene data for display.
-            // The request states "Please add effects on cilia together with cilia_screens_data.json."
-            // We interpret this as ensuring both the core effects (from the old 'screens' in the hub)
-            // and the detailed screens (from the separate JSON) are present for a gene.
-            const screensFromSeparateFile = screenData[geneUpper] || [];
-
-            // 4. Ensure new requested fields are added (they should be present but are mapped for clarity)
-            const newIntegratedFields = {
-                // These are the new requested fields, ensuring they exist:
-                ciliopathy_classification: processedGene.ciliopathy_classification || "Not Classified",
-                ortholog_mouse: processedGene.ortholog_mouse || "N/A",
-                ortholog_c_elegans: processedGene.ortholog_c_elegans || "N/A",
-                ortholog_xenopus: processedGene.ortholog_xenopus || "N/A",
-                ortholog_zebrafish: processedGene.ortholog_zebrafish || "N/A",
-                ortholog_drosophila: processedGene.ortholog_drosophila || "N/A",
-                
-                // Add the explicit effects from the Hub for use in gene summary:
-                ...effectsFromHub, 
-
-                // Add the screens array from the separate file for the comprehensive details card:
-                screens_from_separate_file: screensFromSeparateFile
-            };
-
-            return { ...processedGene, ...newIntegratedFields };
-        });
-
-        console.log('CiliaHub data loaded and formatted with new orthologs, classification, and screens integration successfully.');
-        return ciliaHubDataCache;
-    } catch (error) {
-        console.error("Failed to fetch CiliaHub data:", error);
-        ciliaHubDataCache = [];
-        return ciliaHubDataCache;
-    }
-}
-
-
-// --- UPDATED fetchScreenData function (to be replaced in your code) ---
-async function fetchScreenData() {
-    if (screenDataCache) return screenDataCache;
-    try {
-        const response = await fetch('https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/cilia_screens_data.json');
-        if (!response.ok) throw new Error(`Failed to fetch screen data: ${response.statusText}`);
-        const data = await response.json();
-        screenDataCache = data;
-        
-        // --- NEW: Populate allGeneSymbols cache with screen genes ---
-        const screenGenes = Object.keys(data);
-        if (!allGeneSymbols) {
-            allGeneSymbols = new Set(screenGenes);
-        } else {
-            screenGenes.forEach(gene => allGeneSymbols.add(gene));
-        }
-        // This process needs to be finalized in fetchCiliaData too for complete coverage.
-
-        console.log('Screen data loaded successfully:', Object.keys(data).length, 'genes');
-        return screenDataCache;
-    } catch (error) {
-        console.error('Error fetching screen data:', error);
-        screenDataCache = {};
-        return screenDataCache;
-    }
-}
-
-async function fetchPhylogenyData() {
-    if (phylogenyDataCache) return phylogenyDataCache;
-    try {
-        const response = await fetch('https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/phylogeny_summary.json');
-        if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
-        const raw = await response.json();
-        const unified = {};
-        // Map class to query categories
-        const classToCategory = {
-            'Ciliary-only': 'ciliated_only_genes',
-            'Present-in-both': 'in_all_organisms',
-            'Non-ciliary': 'nonciliary_only_genes' // Adjust if class names differ
-        };
-        // Process ciliated_only_genes, nonciliary_only_genes, in_all_organisms if present
-        if (raw.ciliated_only_genes) {
-            raw.ciliated_only_genes
-                .filter(g => typeof g === 'string' && g)
-                .forEach(g => unified[g.trim().toUpperCase()] = { sym: g.trim(), category: 'ciliated_only_genes', species: [] });
-        }
-        if (raw.nonciliary_only_genes) {
-            raw.nonciliary_only_genes
-                .filter(g => typeof g === 'string' && g)
-                .forEach(g => unified[g.trim().toUpperCase()] = { sym: g.trim(), category: 'nonciliary_only_genes', species: [] });
-        }
-        if (raw.in_all_organisms) {
-            raw.in_all_organisms
-                .filter(g => typeof g === 'string' && g)
-                .forEach(g => unified[g.trim().toUpperCase()] = { sym: g.trim(), category: 'in_all_organisms', species: [] });
-        }
-        // Process summary array
-        if (raw.summary && Array.isArray(raw.summary)) {
-            raw.summary.forEach(item => {
-                const gene = (item.sym || '').trim().toUpperCase();
-                const cat = (item.class || '').trim();
-                if (gene) {
-                    unified[gene] = {
-                        sym: item.sym, // Retain original sym
-                        category: classToCategory[cat] || cat.toLowerCase().replace(/[\s-]+/g, '_'),
-                        species: Array.isArray(item.species) ? item.species.map(s => s.trim()) : []
-                    };
-                }
-            });
-        }
-        phylogenyDataCache = unified;
-        console.log(`Phylogeny data normalized: ${Object.keys(unified).length} entries`);
-        // Log genes with C.elegans
-        const celegansGenes = Object.entries(unified)
-            .filter(([_, data]) => data.species.includes('C.elegans'))
-            .map(([gene, data]) => ({ gene: data.sym, species: data.species, category: data.category }));
-        console.log(`Genes with C.elegans: ${celegansGenes.length}`, celegansGenes.slice(0, 5));
-        return phylogenyDataCache;
-    } catch (error) {
-        console.error('Failed to fetch phylogeny summary data:', error);
-        phylogenyDataCache = {};
-        return phylogenyDataCache;
-    }
-}
-
-async function fetchTissueData() {
-    if (window.tissueDataCache) return window.tissueDataCache;
-    try {
-        const response = await fetch('https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/rna_tissue_consensus.tsv');
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-        const tsv = await response.text();
-        const lines = tsv.trim().split(/\r?\n/);
-        if (lines.length < 2) throw new Error('Empty or invalid TSV file');
-        const data = {};
-        for (let i = 1; i < lines.length; i++) {
-            const parts = lines[i].split('\t');
-            if (parts.length < 4) continue;
-            const [, geneSymbol, tissue, nTPMValue] = parts;
-            if (geneSymbol && tissue && nTPMValue) {
-                const gene = geneSymbol.toUpperCase().trim();
-                const nTPM = parseFloat(nTPMValue.trim());
-                if (!isNaN(nTPM)) {
-                    if (!data[gene]) data[gene] = {};
-                    data[gene][tissue.trim()] = nTPM;
-                }
-            }
-        }
-        window.tissueDataCache = data;
-        console.log('Tissue expression data loaded for', Object.keys(data).length, 'genes');
-        return window.tissueDataCache;
-    } catch (error) {
-        console.error('Failed to fetch tissue data:', error);
-        window.tissueDataCache = {
-            'IFT88': { 'Kidney Cortex': 8.45, 'Kidney Medulla': 12.67 },
-            'ARL13B': { 'Brain': 5.2, 'Kidney': 3.1, 'Testis': 9.8 }
-        };
-        return window.tissueDataCache;
-    }
-}
-window.fetchTissueData = fetchTissueData;
-
-async function fetchUmapData() {
-    if (umapDataCache) return umapDataCache;
-
-    // Use the correct Raw URL you've provided
-    const dataUrl = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/umap_data.json';
-
-    try {
-        console.log('Fetching pre-computed UMAP data...');
-        const response = await fetch(dataUrl);
-        if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
-        umapDataCache = await response.json();
-        console.log(`✅ UMAP data loaded with ${umapDataCache.length} points.`);
-        return umapDataCache;
-    } catch (error) {
-        console.error('Failed to fetch UMAP data:', error);
-        return null;
-    }
-}
-
-async function fetchCellxgeneData() {
-    // Check if data is already in cache
-    if (cellxgeneDataCache) return cellxgeneDataCache;
-
-    // Use the correct Raw URL you've provided
-    const dataUrl = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/cellxgene_data.json';
-
-    try {
-        console.log('Fetching Cellxgene single-cell data...');
-        const response = await fetch(dataUrl);
-        if (!response.ok) {
-            throw new Error(`HTTP error! Status: ${response.status}`);
-        }
-        const jsonData = await response.json();
-        
-        cellxgeneDataCache = jsonData;
-        
-        console.log(`✅ Cellxgene data loaded successfully for ${Object.keys(jsonData).length} genes.`);
-        return cellxgeneDataCache;
-
-    } catch (error) {
-        console.error('Failed to fetch or parse Cellxgene data:', error);
-        cellxgeneDataCache = null; // Set to null on failure
-        return null;
-    }
-}
-
-/**
- * FETCHES and CORUM Human Complex data.
- */
-async function fetchCorumComplexes() {
-    if (corumDataCache.loaded) return corumDataCache;
-    const dataUrl = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/corum_humanComplexes.json';
-
-    try {
-        console.log('Fetching CORUM complexes...');
-        const response = await fetch(dataUrl);
-        if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
-        
-        // Handle single object vs. array format for robustness
-        const rawData = await response.json();
-        const data = Array.isArray(rawData) ? rawData : [rawData]; 
-
-        data.forEach(entry => {
-            // CRITICAL FIX 1: Check for complex_name and subunits array
-            if (!entry || !entry.complex_name || !Array.isArray(entry.subunits)) return; 
-            
-            const complexNameLower = entry.complex_name.toLowerCase();
-            
-            // Store the whole entry for complex name lookup
-            corumDataCache.byNameLower[complexNameLower] = entry; 
-            corumDataCache.list.push(entry);
-
-            // Populate byGene lookup
-            entry.subunits.forEach(subunit => {
-                // CRITICAL FIX 2: Access gene symbol from the subunit object's 'gene_name' field
-                const geneSymbol = subunit.gene_name;
-                if (!geneSymbol) return; 
-
-                const g = geneSymbol.toUpperCase();
-                if (!corumDataCache.byGene[g]) corumDataCache.byGene[g] = [];
-                
-                // Store a lighter reference to the complex, listing all gene symbols
-                corumDataCache.byGene[g].push({
-                    complexName: entry.complex_name,
-                    // Map the subunits array of objects back to an array of uppercase gene symbols
-                    subunits: entry.subunits.map(s => s.gene_name.toUpperCase()) 
-                });
-            });
-        });
-
-        corumDataCache.loaded = true;
-        console.log(`✅ Loaded ${corumDataCache.list.length} CORUM complexes.`);
-        return corumDataCache;
-    } catch (err) {
-        console.error('Failed to fetch CORUM data:', err);
-        // Set loaded to true to prevent endless retry loop
-        corumDataCache.loaded = true; 
-        return corumDataCache;
-    }
-}
 
 /**
  * Helper function to get complex details by gene symbol.
@@ -1559,65 +1402,6 @@ function getSubunitsByComplexName(complexName) {
     );
 }
 
-/**
- * Fetches the new domain database (enriched, depleted, gene map).
- * URL: https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/cili_ai_domain_database.json
- */
-async function getDomainData() {
-    if (CILI_AI_DOMAIN_DB) return CILI_AI_DOMAIN_DB;
-    const dataUrl = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/cili_ai_domain_database.json';
-    try {
-        const response = await fetch(dataUrl);
-        if (!response.ok) {
-            console.error(`Error fetching domain DB: ${response.status} ${response.statusText}`);
-            return null;
-        }
-        CILI_AI_DOMAIN_DB = await response.json();
-        console.log('✅ New Domain Database (cili_ai_domain_database.json) loaded successfully.');
-        return CILI_AI_DOMAIN_DB;
-    } catch (error) {
-        console.error(`Network error or JSON parsing error for Domain DB: ${error}`);
-        return null;
-    }
-}
-
-/**
- * Fetches the Nevers et al. 2017 phylogeny matrix.
- * URL: https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/nevers_et_al_2017_matrix_optimized.json
- */
-async function fetchNeversPhylogenyData() {
-    if (neversPhylogenyCache) return neversPhylogenyCache;
-    const dataUrl = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/nevers_et_al_2017_matrix_optimized.json';
-    try {
-        const response = await fetch(dataUrl);
-        if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
-        neversPhylogenyCache = await response.json();
-        console.log('✅ Nevers et al. 2017 Phylogeny data loaded successfully.');
-        return neversPhylogenyCache;
-    } catch (error) {
-        console.error('Failed to fetch Nevers et al. 2017 phylogeny data:', error);
-        return null;
-    }
-}
-
-/**
- * Fetches the Li et al. 2014 phylogeny matrix.
- * URL: https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/li_et_al_2014_matrix_optimized.json
- */
-async function fetchLiPhylogenyData() {
-    if (liPhylogenyCache) return liPhylogenyCache;
-    const dataUrl = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/li_et_al_2014_matrix_optimized.json';
-    try {
-        const response = await fetch(dataUrl);
-        if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
-        liPhylogenyCache = await response.json();
-        console.log('✅ Li et al. 2014 Phylogeny data loaded successfully.');
-        return liPhylogenyCache;
-    } catch (error) {
-        console.error('Failed to fetch Li et al. 2014 phylogeny data:', error);
-        return null;
-    }
-}
 
 /**
  * New function to describe CiliAI's capabilities, listing all available data types.
@@ -1681,65 +1465,36 @@ async function getLiteratureEvidence(gene) {
  * @##########################BEGINNING OF GENE CATCHING RELATED QUETIONS AND HELPER CORUM##################################
  */
 /**
- * CiliAI.js
- * * Main JavaScript file for CiliAI operations, featuring a unified,
- * gene-centric caching strategy for efficient data retrieval.
- * All data fetches are consolidated through a single "gatekeeper" function
- * `ensureGeneDataCached(geneName)`.
- * * Author: [Your Name/Lab]
- * Version: 2.0 (Unified Cache Architecture)
- */
-
-// ============================================================================
-// 1. 🌎 GLOBAL CACHE
-// ============================================================================
-
-/**
- * @type {Map<string, Promise<object>>}
- * Global cache for all gene-related data.
- * - Key: Gene name (e.g., "IFT88")
- * - Value: A Promise that resolves to the combined data object for that gene.
- *
-// ============================================================================
-// 2. 🧲 "GATEKEEPER" CACHING FUNCTION
-// ============================================================================
-
-/**
- * Ensures all data for a specific gene is fetched and cached.
- * This is the primary "gatekeeper" function for all gene data.
- * It fetches all data types in parallel for maximum speed.
+ * Ensures all data for a specific gene is fetched and cached *within CiliAI*.
+ * This is the primary "gatekeeper" function for all *single-gene* data.
  *
  * @param {string} geneName - The human gene name (e.g., "IFT88"). Case-insensitive.
  * @returns {Promise<object>} A promise that resolves to an object 
  * containing all data for that gene (or a "notFound" state).
  */
-async function ensureGeneDataCached(geneName) {
+async function ciliAI_getGeneData(geneName) {
     const upperGeneName = geneName.toUpperCase(); // Standardize key
 
-    // 1. [CACHE HIT] Check if the gene is already in the cache (or being fetched)
-    if (geneDataCache.has(upperGeneName)) {
-        // Return the existing promise (which may be resolved or in-flight)
-        return geneDataCache.get(upperGeneName);
+    // 1. [CACHE HIT]
+    if (ciliAI_geneCache.has(upperGeneName)) {
+        return ciliAI_geneCache.get(upperGeneName);
     }
 
-    // 2. [CACHE MISS] This is a new gene. Fetch all its data in parallel.
-    // We create a promise that will fetch everything.
+    // 2. [CACHE MISS]
     const dataPromise = (async () => {
-        console.log(`[Cache MISS] Fetching all data for ${upperGeneName}...`);
+        console.log(`[CiliAI Cache MISS] Fetching all data for ${upperGeneName}...`);
 
-        // Use Promise.allSettled to ensure that even if one
-        // data source fails (e.g., no complex data), the others
-        // are still cached and returned.
         const results = await Promise.allSettled([
-            fetchCiliaHubData_internal(upperGeneName),     // Main JSON file
-            fetchPhylogenyData_internal(upperGeneName),   // Combined (Nevers + Li)
-            fetchDomainData_internal(upperGeneName),       // Domain data
-            fetchCiliaLengthData_internal(upperGeneName),  // Cilia length data
-            fetchComplexData_internal(upperGeneName)       // Protein complex data
-            // ... add any other future data-fetching functions here
+            ciliAI_fetchCiliaHubData_internal(upperGeneName),     // Main JSON file (contains geneInfo, effects)
+            ciliAI_fetchPhylogenyData_internal(upperGeneName),   // Combined (Nevers + Li)
+            ciliAI_fetchDomainData_internal(upperGeneName),       // Domain data
+            ciliAI_fetchComplexData_internal(upperGeneName),      // Protein complex data (from CORUM)
+            ciliAI_fetchTissueData_internal(upperGeneName),       // Tissue consensus TSV
+            ciliAI_fetchScRnaData_internal(upperGeneName),        // scRNA-seq data
+            ciliAI_fetchScreenData_internal(upperGeneName)        // Separate screen data
         ]);
 
-        // 3. Collate the results into a single object
+        // 3. Collate the results
         const ciliaHubResult = results[0].status === 'fulfilled' ? results[0].value : null;
 
         const combinedData = {
@@ -1749,19 +1504,18 @@ async function ensureGeneDataCached(geneName) {
             // Assign results from other fetches
             phylogeny:   results[1].status === 'fulfilled' ? results[1].value : null,
             domains:     results[2].status === 'fulfilled' ? results[2].value : null,
-            ciliaLength: results[3].status === 'fulfilled' ? results[3].value : null,
-            complex:     results[4].status === 'fulfilled' ? results[4].value : null,
+            complex:     results[3].status === 'fulfilled' ? results[3].value : null,
+            tissue:      results[4].status === 'fulfilled' ? results[4].value : null, 
+            scRNA:       results[5].status === 'fulfilled' ? results[5].value : null,
+            screens:     results[6].status === 'fulfilled' ? results[6].value : null,
             lastFetched: new Date().toISOString()
         };
 
         // 4. Check if we got any data at all
-        // We check if the 'geneInfo' (from CiliaHub) is the primary indicator.
         if (!combinedData.geneInfo) {
-            console.warn(`No data found for ${upperGeneName} in any key source.`);
-            // Cache a "not found" state to avoid re-fetching
+            console.warn(`[CiliAI] No data found for ${upperGeneName} in any key source.`);
             const notFoundData = { notFound: true, ...combinedData };
-            // Store the *resolved* "not found" object
-            geneDataCache.set(upperGeneName, Promise.resolve(notFoundData)); 
+            ciliAI_geneCache.set(upperGeneName, Promise.resolve(notFoundData)); 
             return notFoundData;
         }
 
@@ -1769,126 +1523,93 @@ async function ensureGeneDataCached(geneName) {
         return combinedData;
 
     })().catch(err => {
-        // Handle catastrophic failure (e.g., network down)
-        console.error(`Catastrophic failure fetching data for ${upperGeneName}:`, err);
-        // Remove the failed promise from the cache so we can try again
-        geneDataCache.delete(upperGeneName);
-        return { notFound: true, error: err.message }; // Return an error state
+        console.error(`[CiliAI] Catastrophic failure fetching data for ${upperGeneName}:`, err);
+        ciliAI_geneCache.delete(upperGeneName);
+        return { notFound: true, error: err.message };
     });
 
-    // 6. [IMPORTANT] Store the promise *itself* in the cache immediately.
-    // This prevents multiple, simultaneous fetches for the same gene.
-    geneDataCache.set(upperGeneName, dataPromise);
+    // 6. Store the promise *itself* in the cache
+    ciliAI_geneCache.set(upperGeneName, dataPromise);
 
-    // 7. [OPTIMIZATION] Once the promise resolves, we replace the promise 
-    // in the cache with the *actual resolved data* for faster access next time.
+    // 7. [OPTIMIZATION] Replace promise with resolved data once complete
     dataPromise.then(data => {
-        geneDataCache.set(upperGeneName, Promise.resolve(data));
-    }).catch(() => {
-        // If it failed, we already removed it in the .catch() block above.
-        // This just prevents an "unhandled rejection" error in the console.
-    });
+        ciliAI_geneCache.set(upperGeneName, Promise.resolve(data));
+    }).catch(() => { /* Handled in the .catch() block above */ });
 
     return dataPromise;
 }
 
-// ============================================================================
-// 3. 🛠️ "INTERNAL" HELPER FETCH FUNCTIONS
-// ============================================================================
-// These functions are ONLY called by ensureGeneDataCached.
-// They do NOT handle caching.
-// They fetch, find the specific gene's data, and return it or null.
-// ============================================================================
-
 /**
- * [INTERNAL] Fetches data from the main ciliahub_data.json.
- * This file contains gene info, expression, etc.
+ * [INTERNAL] Fetches main data from ciliahub_data.json.
+ * This file is an ARRAY of gene objects.
  * @param {string} geneName - The human gene name (UPPERCASE)
- * @returns {Promise<object | null>} An object with geneInfo and expression, or null.
+ * @returns {Promise<object | null>}
  */
-async function fetchCiliaHubData_internal(geneName) {
-    // *** IMPORTANT: Set your correct URL ***
+async function ciliAI_fetchCiliaHubData_internal(geneName) {
     const url = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/ciliahub_data.json';
     try {
         const response = await fetch(url);
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-        const allData = await response.json();
+        const allData = await response.json(); // This is an ARRAY
 
-        // Find the specific gene (case-insensitive, using the provided UPPERCASE key)
-        const geneKey = Object.keys(allData.genes).find(key => key.toUpperCase() === geneName);
+        // Find the gene in the array
+        const geneInfo = allData.find(entry => entry.gene && entry.gene.toUpperCase() === geneName);
         
-        if (geneKey) {
-            const geneInfo = allData.genes[geneKey];
-            const expressionData = allData.expression[geneKey] || null; // Example of adding expression
-            
-            // Return a combined object of all data from this file
+        if (geneInfo) {
+            // This file contains geneInfo, expression (in screens), and length effects
+            // We return the *whole object* for that gene
+            // 'expression' key is used for the 'screens' array in this file
             return { 
                 geneInfo: geneInfo,
-                expression: expressionData
-                // ... add other top-level keys from this file if needed
+                expression: geneInfo.screens || null 
             };
         }
-        return null; // Gene not found in this file
+        return null;
     } catch (err) {
-        console.error(`Failed to fetch CiliaHub data for ${geneName}:`, err);
-        return null; // Return null on failure
+        console.error(`[CiliAI] Failed to fetch CiliaHub data for ${geneName}:`, err);
+        return null;
     }
 }
 
 /**
- * [INTERNAL] Fetches and combines phylogeny data from both
- * Nevers and Li datasets.
+ * [INTERNAL] Fetches and combines phylogeny data from Nevers and Li.
  * @param {string} geneName - The human gene name (UPPERCASE)
- * @returns {Promise<object | null>} A combined phylogeny object or null.
+ * @returns {Promise<object | null>}
  */
-async function fetchPhylogenyData_internal(geneName) {
-    // *** IMPORTANT: Set your correct URLs ***
-    const neversURL = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/data/Nevers2017_Data.json'; // Example path
-    const liURL = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/data/Li2016_Data.json';       // Example path
+async function ciliAI_fetchPhylogenyData_internal(geneName) {
+    const neversURL = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/nevers_et_al_2017_matrix_optimized.json';
+    const liURL = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/li_et_al_2014_matrix_optimized.json';
 
     try {
-        // Fetch both in parallel
-        const neversPromise = fetch(neversURL).then(res => res.json());
-        const liPromise = fetch(liURL).then(res => res.json());
-        
-        const [neversResult, liResult] = await Promise.allSettled([neversPromise, liPromise]);
+        const [neversResult, liResult] = await Promise.allSettled([
+            fetch(neversURL).then(res => res.json()),
+            fetch(liURL).then(res => res.json())
+        ]);
 
-        let combinedPhylogeny = {
-            nevers: null,
-            li: null
-        };
+        let combinedPhylogeny = { nevers: null, li: null };
 
-        // Process Nevers data
+        // Data is an OBJECT { "GENE": {...} }
         if (neversResult.status === 'fulfilled') {
-            // Assuming Nevers data is an array of objects
-            const geneEntry = neversResult.value.find(entry => entry.Human_Gene_Name && entry.Human_Gene_Name.toUpperCase() === geneName);
-            if (geneEntry) {
-                combinedPhylogeny.nevers = geneEntry; // Store the whole entry
+            if (neversResult.value && neversResult.value[geneName]) {
+                combinedPhylogeny.nevers = neversResult.value[geneName];
             }
         } else {
-            console.warn(`Could not load Nevers phylogeny for ${geneName}:`, neversResult.reason);
+            console.warn(`[CiliAI] Could not load Nevers phylogeny for ${geneName}:`, neversResult.reason);
         }
 
-        // Process Li data
+        // Data is an OBJECT { "GENE": {...} }
         if (liResult.status === 'fulfilled') {
-            // Assuming Li data is an array of objects
-            const geneEntry = liResult.value.find(entry => entry.Human_Gene_Name && entry.Human_Gene_Name.toUpperCase() === geneName);
-            if (geneEntry) {
-                combinedPhylogeny.li = geneEntry; // Store the whole entry
+             if (liResult.value && liResult.value[geneName]) {
+                combinedPhylogeny.li = liResult.value[geneName];
             }
         } else {
-            console.warn(`Could not load Li phylogeny for ${geneName}:`, liResult.reason);
+            console.warn(`[CiliAI] Could not load Li phylogeny for ${geneName}:`, liResult.reason);
         }
 
-        // Return the combined object (or null if both failed)
-        if (combinedPhylogeny.nevers || combinedPhylogeny.li) {
-            return combinedPhylogeny;
-        } else {
-            return null;
-        }
+        return (combinedPhylogeny.nevers || combinedPhylogeny.li) ? combinedPhylogeny : null;
 
     } catch (err) {
-        console.error(`Failed to fetch phylogeny for ${geneName}:`, err);
+        console.error(`[CiliAI] Failed to fetch phylogeny for ${geneName}:`, err);
         return null;
     }
 }
@@ -1896,11 +1617,10 @@ async function fetchPhylogenyData_internal(geneName) {
 /**
  * [INTERNAL] Fetches domain data for a specific gene.
  * @param {string} geneName - The human gene name (UPPERCASE)
- * @returns {Promise<object | null>} The domain data or null.
+ * @returns {Promise<object | null>}
  */
-async function fetchDomainData_internal(geneName) {
-    // *** IMPORTANT: Set your correct URL ***
-    const url = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/data/protein_domains.json'; // Example path
+async function ciliAI_fetchDomainData_internal(geneName) {
+    const url = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/protein_domains.json'; 
     try {
         const response = await fetch(url);
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
@@ -1909,216 +1629,140 @@ async function fetchDomainData_internal(geneName) {
         // Assuming allDomainData is an object keyed by gene name
         const geneDomainData = allDomainData[geneName] || null;
 
-        return geneDomainData; // Return data or null if not found
+        return geneDomainData; 
     } catch (err) {
-        console.error(`Failed to fetch domain data for ${geneName}:`, err);
+        console.error(`[CiliAI] Failed to fetch domain data for ${geneName}:`, err);
         return null;
     }
 }
 
 /**
- * [INTERNAL] Fetches cilia length determination data.
+ * [INTERNAL] Fetches protein complex data from CORUM.
  * @param {string} geneName - The human gene name (UPPERCASE)
- * @returns {Promise<object | null>} The length data or null.
+ * @returns {Promise<object | null>}
  */
-async function fetchCiliaLengthData_internal(geneName) {
-    // *** IMPORTANT: Set your correct URL ***
-    const url = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/data/cilia_length_data.json'; // Example path
+async function ciliAI_fetchComplexData_internal(geneName) {
+    const url = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/corum_humanComplexes.json';
     try {
         const response = await fetch(url);
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-        const allLengthData = await response.json();
+        const allComplexData = await response.json(); // This is an ARRAY
 
-        // Assuming allLengthData is an array of objects
-        const geneLengthData = allLengthData.find(entry => entry.gene && entry.gene.toUpperCase() === geneName);
-
-        return geneLengthData || null;
+        // Find the first complex that includes this gene
+        const foundComplex = allComplexData.find(complex => 
+            complex.subunits && Array.isArray(complex.subunits) &&
+            complex.subunits.some(subunit => subunit.gene_name && subunit.gene_name.toUpperCase() === geneName)
+        );
+        
+        if (foundComplex) {
+             // Return a simplified object
+             return {
+                name: foundComplex.complex_name,
+                members: foundComplex.subunits.map(s => s.gene_name)
+             };
+        }
+        return null;
     } catch (err) {
-        console.error(`Failed to fetch cilia length data for ${geneName}:`, err);
+        console.error(`[CiliAI] Failed to fetch complex data for ${geneName}:`, err);
         return null;
     }
 }
 
 /**
- * [INTERNAL] Fetches protein complex data.
+ * [INTERNAL] Fetches tissue expression data from the rna_tissue_consensus.tsv file.
  * @param {string} geneName - The human gene name (UPPERCASE)
- * @returns {Promise<object | null>} The complex data or null.
+ * @returns {Promise<object | null>} An object with tissue expression data or null.
  */
-async function fetchComplexData_internal(geneName) {
-    // *** IMPORTANT: Set your correct URL ***
-    const url = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/data/protein_complexes.json'; // Example path
-    try {
-        const response = await fetch(url);
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-        const allComplexData = await response.json();
-
-        // Assuming allComplexData is an object where keys are complex names
-        // and values are objects with a 'members' array.
-        let foundComplex = null;
-        for (const complexName in allComplexData) {
-            const complex = allComplexData[complexName];
-            if (complex.members && complex.members.find(member => member.toUpperCase() === geneName)) {
-                foundComplex = {
-                    name: complexName,
-                    ...complex 
-                };
-                break; // Stop after finding the first complex
-            }
-        }
-
-        return foundComplex; // Return the complex object or null
-    } catch (err) {
-        console.error(`Failed to fetch complex data for ${geneName}:`, err);
-        return null;
-    }
-}
-
-
-// ============================================================================
-// 4. 🧠 "CONSUMER" FUNCTIONS (Example Handlers)
-// ============================================================================
-// These functions use the cached data to answer questions or build plots.
-// ============================================================================
-
-/**
- * Example function that handles a user's complex question about a gene.
- * This function would be called by your chat input handler.
- * * @param {string} geneName - The gene name from the user input.
- */
-async function handleComplexQuestion(geneName) {
-    // Show loading state to user
-    // e.g., updateChatWindow("Fetching data for " + geneName + "...", "system");
-    console.log(`--- Handling question for: ${geneName} ---`);
-
-    try {
-        // 1. Call the new gatekeeper function ONCE
-        // This will be instant (cache) or fetch everything (first time)
-        const geneData = await ensureGeneDataCached(geneName);
-
-        // 2. Check for "not found"
-        if (geneData.notFound) {
-            let message = `Sorry, I could not find any data for the gene "${geneName}".`;
-            if (geneData.error) {
-                message += ` (Error: ${geneData.error})`;
-            }
-            console.log(message);
-            // updateChatWindow(message, "error");
-            return;
-        }
-
-        // 3. Now you have ALL data available in one object!
-        // We can build a comprehensive response.
-        
-        let responses = [];
-        const geneSymbol = geneData.geneInfo?.Symbol || geneName.toUpperCase();
-        
-        responses.push(`Here's what I found for **${geneSymbol}**:`);
-
-        if (geneData.geneInfo?.Summary) {
-            responses.push(`**Summary:** ${geneData.geneInfo.Summary}`);
-        } else {
-            responses.push(`**Summary:** No summary is available for this gene.`);
-        }
-
-        let details = [];
-        if (geneData.ciliaLength) {
-            details.push(`It is a known **${geneData.ciliaLength.role}** of cilia length.`);
-        }
-
-        if (geneData.complex) {
-            details.push(`It is part of the **${geneData.complex.name}** protein complex.`);
-        }
-        
-        if (geneData.domains) {
-            // Assuming domains is an array of domain objects
-            const domainNames = geneData.domains.map(d => d.name).join(', ');
-            details.push(`Known protein domains include: **${domainNames}**.`);
-        }
-
-        if (geneData.phylogeny) {
-            let phyloInfo = [];
-            if (geneData.phylogeny.nevers) phyloInfo.push("Nevers et al. (2017)");
-            if (geneData.phylogeny.li) phyloInfo.push("Li et al. (2016)");
-            if (phyloInfo.length > 0) {
-                details.push(`Phylogenetic data is available from: **${phyloInfo.join(' and ')}**.`);
-            }
-        }
-
-        if (details.length > 0) {
-            responses.push("\n**Key Details:**\n* " + details.join('\n* '));
-        }
-
-        // Display the response to the user
-        const finalResponse = responses.join('\n\n');
-        
-        console.log(finalResponse);
-        // updateChatWindow(finalResponse, "ciliai"); // Example function call
-
-        // Now you can call your plotting functions with the cached data
-        // if (geneData.phylogeny) {
-        //     plotNeversPhylogeny(geneData.phylogeny.nevers);
-        //     plotLiPhylogeny(geneData.phylogeny.li);
-        // }
-
-    } catch (err) {
-        console.error(`Failed to display data for ${geneName}:`, err);
-        // Show an error message to the user
-        // updateChatWindow(`An error occurred while processing data for ${geneName}.`, "error");
-    }
-}
-
-// ============================================================================
-// 5. 🚀 EXAMPLE USAGE
-// ============================================================================
-// These functions would be defined in your main web page's script,
-// not necessarily in this file, but they show how to use the system.
-// ============================================================================
-
-/**
- * DUMMY FUNCTION: Simulates updating the chat UI.
- * @param {string} message - The message HTML or text to display.
- * @param {string} sender - The class name for the sender (e.g., "user", "ciliai", "error").
- */
-function updateChatWindow(message, sender) {
-    console.log(`[${sender.toUpperCase()}]: ${message.replace(/<[^>]*>?/gm, '')}`); // Log plain text
-    // In a real app:
-    // const chatBox = document.getElementById('chat-box');
-    // const msgElement = document.createElement('div');
-    // msgElement.className = `chat-message ${sender}`;
-    // msgElement.innerHTML = message; // Use .textContent if message is not HTML
-    // chatBox.appendChild(msgElement);
-    // chatBox.scrollTop = chatBox.scrollHeight;
-}
-
-/**
- * DUMMY FUNCTION: Simulates handling user input.
- */
-function simulateUserInput() {
-    console.log("--- SIMULATION START ---");
+async function ciliAI_fetchTissueData_internal(geneName) {
+    const url = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/rna_tissue_consensus.tsv';
     
-    // First call: Fetches data, will be slower
-    handleComplexQuestion("IFT88").then(() => {
-        console.log("--- First call (IFT88) complete ---");
+    try {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
         
-        // Second call: Should be instantaneous (from cache)
-        handleComplexQuestion("IFT88").then(() => {
-            console.log("--- Second call (IFT88) complete (from cache) ---");
-            
-            // Third call: Fetches a different gene
-            handleComplexQuestion("MKS1").then(() => {
-                console.log("--- Third call (MKS1) complete ---");
+        const tsvData = await response.text();
+        const lines = tsvData.split('\n');
+        
+        if (lines.length < 2) throw new Error("TSV file is empty or has no header.");
 
-                // Fourth call: A gene that doesn't exist
-                handleComplexQuestion("FAKEGENE").then(() => {
-                     console.log("--- Fourth call (FAKEGENE) complete (not found) ---");
+        const headers = lines[0].split('\t');
+        const geneNameIndex = headers.findIndex(h => h.toLowerCase() === 'gene name' || h.toLowerCase() === 'gene');
+        
+        if (geneNameIndex === -1) throw new Error("Could not find 'Gene name' column in TSV header.");
+
+        for (let i = 1; i < lines.length; i++) {
+            const columns = lines[i].split('\t');
+            const currentGene = columns[geneNameIndex];
+            
+            if (currentGene && currentGene.toUpperCase() === geneName) {
+                const tissueData = {};
+                headers.forEach((header, index) => {
+                    if (index !== geneNameIndex) {
+                        tissueData[header] = columns[index];
+                    }
                 });
-            });
-        });
-    });
+                return tissueData; // Success!
+            }
+        }
+        return null; // Gene not found
+    } catch (err) {
+        console.error(`[CiliAI] Failed to fetch tissue data for ${geneName}:`, err);
+        return null;
+    }
 }
 
-// Uncomment the line below to run the simulation when this file is loaded
-// simulateUserInput();
+/**
+ * [INTERNAL] Fetches scRNA-seq data from cellxgene_data.json.
+ * @param {string} geneName - The human gene name (UPPERCASE)
+ * @returns {Promise<object | null>} An object with scRNA-seq data or null.
+ */
+async function ciliAI_fetchScRnaData_internal(geneName) {
+    const url = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/cellxgene_data.json';
+    
+    try {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        const allScRnaData = await response.json();
+        
+        // Data is an object { "GENE": {...} }
+        const geneKey = Object.keys(allScRnaData).find(key => key.toUpperCase() === geneName);
+        
+        if (geneKey) {
+            return allScRnaData[geneKey];
+        }
+        return null; // Gene not found
+    } catch (err) {
+        console.error(`[CiliAI] Failed to fetch scRNA-seq data for ${geneName}:`, err);
+        return null;
+    }
+}
+
+/**
+ * [INTERNAL] Fetches screen data.
+ * @param {string} geneName - The human gene name (UPPERCASE)
+ * @returns {Promise<object | null>}
+ */
+async function ciliAI_fetchScreenData_internal(geneName) {
+    const url = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/cilia_screens_data.json';
+    try {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        const allScreenData = await response.json(); // Data is { "GENE": [...] }
+
+        const geneKey = Object.keys(allScreenData).find(key => key.toUpperCase() === geneName);
+        
+        if (geneKey) {
+            return allScreenData[geneKey]; // Return the array of screen results
+        }
+        return null;
+    } catch (err) {
+        console.error(`[CiliAI] Failed to fetch screen data for ${geneName}:`, err);
+        return null;
+    }
+}
+
+
+
 
 /**@##########################BEGINNING OF COMPLEX RELATED QUETIONS AND HELPER CORUM##################################
  * @##########################BEGINNING OF COMPLEX RELATED QUETIONS AND HELPER CORUM##################################
@@ -9483,62 +9127,8 @@ function renderScreenSummaryHeatmap(genes, screenData) {
 // 7. 🚀 RUN CiliAI (NEW ROBUST INITIALIZER)
 // ============================================================================
 
-/**
- * Attaches all CiliAI event listeners to the DOM.
- * This is the *only* place the listeners are added.
- */
-function ciliAI_init_listeners() {
-    // *** IMPORTANT: Update these IDs to match your HTML ***
-    const sendButton = document.getElementById('aiQueryBtn');
-    const inputElement = document.getElementById('aiQueryInput');
 
-    if (sendButton && inputElement) {
-        sendButton.addEventListener('click', ciliAI_handleQuery);
-        
-        inputElement.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault(); 
-                ciliAI_handleQuery();
-            }
-        });
 
-        console.log("✅ [CiliAI] Event listeners successfully attached.");
-        return true; // Success
-    }
-    
-    return false; // Elements not found yet
-}
-
-/**
- * This function waits for the CiliAI HTML elements (which are injected 
- * by displayCiliAIPage) to appear in the DOM before attaching listeners.
- */
-function ciliAI_waitForElements() {
-    console.log("[CiliAI] Waiting for elements 'aiQueryBtn' and 'aiQueryInput'...");
-
-    // Try to attach listeners immediately
-    if (ciliAI_init_listeners()) {
-        return; // Success, elements were already there
-    }
-
-    // If not found, set up an interval to check for them
-    let attempts = 0;
-    const maxAttempts = 50; // Check for 5 seconds (50 * 100ms)
-
-    const checkInterval = setInterval(() => {
-        attempts++;
-        if (ciliAI_init_listeners()) {
-            // Success! Elements are now loaded.
-            clearInterval(checkInterval);
-        } else if (attempts > maxAttempts) {
-            // Failed. Stop trying.
-            clearInterval(checkInterval);
-            console.error("[CiliAI] FAILED to find 'aiQueryBtn' or 'aiQueryInput' after 5 seconds.");
-            console.warn("[CiliAI] Send button not found. (Tried 'aiQueryBtn')");
-            console.warn("[CiliAI] Input box not found. (Tried 'aiQueryInput')");
-        }
-    }, 100);
-}
 
 // Start the process.
 ciliAI_waitForElements();
