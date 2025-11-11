@@ -50,6 +50,7 @@ const CILI_AI_DB = {
 
 
 // --- Main Page Display Function (REPLACEMENT) ---
+// --- Main Page Display Function (REPLACEMENT) ---
 window.displayCiliAIPage = async function displayCiliAIPage() {
     const contentArea = document.querySelector('.content-area');
     if (!contentArea) {
@@ -81,15 +82,15 @@ window.displayCiliAIPage = async function displayCiliAIPage() {
                         </div>
                         <div class="example-queries">
                             <p>
-                               <strong>Try asking:</strong> 
-        <span data-question="What can you do?">About CiliAI</span>, 
-        <span data-question="Show genes for Joubert syndrome">List genes for Joubert syndrome</span>, 
-        <span data-question="List ciliary genes in C. elegans">List potential ciliary genes in C. elegans (Phylogenetic)</span>, 
-        <span data-question="Plot UMAP expression for FOXJ1">Display expression for FOXJ1 in Lung</span>,
-        <span data-question="Compare ARL13B and FOXJ1 expression in lung scRNA-seq">Compare ARL13B and FOXJ1 expression in lung scRNA-seq</span>,
-        <span data-question="Compare phylogeny of BBS1 and CEP290.">Compare phylogeny of BBS1 and CEP290</span>,
-        <span data-question="What proteins are enriched at the ciliary tip?">What proteins are enriched at the ciliary tip?</span>,
-        <span data-question="Which Joubert Syndrome genes are expressed in ciliated cells?">Joubert genes in ciliated cells</span>
+                                <strong>Try asking:</strong> 
+                                <span data-question="What can you do?">About CiliAI</span>, 
+                                <span data-question="Show genes for Joubert syndrome">List genes for Joubert syndrome</span>, 
+                                <span data-question="List ciliary genes in C. elegans">List potential ciliary genes in C. elegans (Phylogenetic)</span>, 
+                                <span data-question="Plot UMAP expression for FOXJ1">Display expression for FOXJ1 in Lung</span>,
+                                <span data-question="Compare ARL13B and FOXJ1 expression in lung scRNA-seq">Compare ARL13B and FOXJ1 expression in lung scRNA-seq</span>,
+                                <span data-question="Compare phylogeny of BBS1 and CEP290.">Compare phylogeny of BBS1 and CEP290</span>,
+                                <span data-question="What proteins are enriched at the ciliary tip?">What proteins are enriched at the ciliary tip?</span>,
+                                <span data-question="Which Joubert Syndrome genes are expressed in ciliated cells?">Joubert genes in ciliated cells</span>
                             </p>
                         </div>
                         <div id="ai-result-area" class="results-section" style="display: none; margin-top: 1.5rem; padding: 1rem;"></div>
@@ -209,22 +210,29 @@ window.displayCiliAIPage = async function displayCiliAIPage() {
         return;
     }
 
-  await Promise.all([
-        fetchCiliaData(),         // Your original gene data
-        fetchScreenData(),       // Your original screen data
-        fetchPhylogenyData(),     // Your original phylogeny data
-        fetchTissueData(),       // Your original tissue data
-        fetchCellxgeneData(),     // Your original cellxgene data
-        fetchUmapData(),           // Your original umap data
-        getDomainData(),           // --- NEW ---
-        fetchNeversPhylogenyData(), // --- NEW ---
-        fetchLiPhylogenyData(),  // --- NEW ---
-        fetchCorumComplexes()     
-    ]);
+    // Await all data fetches
+    await Promise.all([
+        fetchCiliaData(),        // Your original gene data
+        fetchScreenData(),       // Your original screen data
+        fetchPhylogenyData(),      // Your original phylogeny data
+        fetchTissueData(),       // Your original tissue data
+        fetchCellxgeneData(),      // Your original cellxgene data
+        fetchUmapData(),           // Your original umap data
+        getDomainData(),           // --- NEW ---
+        fetchNeversPhylogenyData(), // --- NEW ---
+        fetchLiPhylogenyData(),  // --- NEW ---
+        fetchCorumComplexes()      
+    ]);
+    
     // NEW: Merge after fetches
     await mergePhylogenyCaches();
-    console.log('ciliAI.js: All data loaded (including new domain and phylogeny sources).');
+    console.log('ciliAI.js: All data loaded (including new domain and phylogeny sources).');
     
+    // ====================================================================
+    // ** THE FIX **
+    // This now calls the correct, sandboxed initialization function
+    // `ciliAI_init` *after* the HTML is injected and data is loaded.
+    // ====================================================================
     setTimeout(ciliAI_init, 0);
 };
 
