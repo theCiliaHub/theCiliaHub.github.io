@@ -345,12 +345,24 @@ const CiliAIQuery = (() => {
 window.displayCiliAIPage = async function displayCiliAIPage() {
     const contentArea = document.querySelector('.content-area');
     if (!contentArea) return console.error('Content area not found');
+
     contentArea.className = 'content-area content-area-full';
 
     const ciliaPanel = document.querySelector('.cilia-panel');
     if (ciliaPanel) ciliaPanel.style.display = 'none';
 
-    // Inject HTML & CSS
+    // Ensure global caches and flags exist
+    window.ciliaHubDataCache = window.ciliaHubDataCache || new Map();
+    window.screenDataCache = window.screenDataCache || {};
+    window.phylogenyDataCache = window.phylogenyDataCache || {};
+    window.cellxgeneDataCache = window.cellxgeneDataCache || {};
+    window.umapDataCache = window.umapDataCache || {};
+    window.domainDataCache = window.domainDataCache || {};
+    window.corumDataCache = window.corumDataCache || {};
+    window.isCiliAIDataLoaded = window.isCiliAIDataLoaded || false;
+    window.allGeneSymbols = window.allGeneSymbols || [];
+
+    // Inject HTML + CSS
     try {
         contentArea.innerHTML = `
             <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
@@ -370,12 +382,9 @@ window.displayCiliAIPage = async function displayCiliAIPage() {
                                <strong>Try asking:</strong> 
                                <span data-question="What can you do?">About CiliAI</span>, 
                                <span data-question="Show genes for Joubert syndrome">List genes for Joubert syndrome</span>, 
-                               <span data-question="List ciliary genes in C. elegans">List potential ciliary genes in C. elegans (Phylogenetic)</span>, 
+                               <span data-question="List ciliary genes in C. elegans">List potential ciliary genes in C. elegans</span>, 
                                <span data-question="Plot UMAP expression for FOXJ1">Display expression for FOXJ1 in Lung</span>,
-                               <span data-question="Compare ARL13B and FOXJ1 expression in lung scRNA-seq">Compare ARL13B and FOXJ1 in lung scRNA-seq</span>,
-                               <span data-question="Compare phylogeny of BBS1 and CEP290.">Compare phylogeny of BBS1 and CEP290</span>,
-                               <span data-question="What proteins are enriched at the ciliary tip?">Proteins at ciliary tip?</span>,
-                               <span data-question="Which Joubert Syndrome genes are expressed in ciliated cells?">Joubert genes in ciliated cells</span>
+                               <span data-question="Compare ARL13B and FOXJ1 expression in lung scRNA-seq">Compare ARL13B and FOXJ1</span>
                             </p>
                         </div>
                         <div id="ai-result-area" class="results-section" style="display: none; margin-top: 1.5rem; padding: 1rem;"></div>
@@ -418,41 +427,31 @@ window.displayCiliAIPage = async function displayCiliAIPage() {
             </div>
 
             <style>
-              .ciliai-container { font-family: 'Arial', sans-serif; max-width: 950px; margin: 2rem auto; padding: 2rem; background-color: #f9f9f9; border-radius: 12px; }
-              .ciliai-header { text-align: center; margin-bottom: 2rem; }
-              .ciliai-header h1 { font-size: 2.8rem; color: #2c5aa0; margin: 0; }
-              .ciliai-header p { font-size: 1.2rem; color: #555; margin-top: 0.5rem; }
-              .ai-query-section { background-color: #e8f4fd; border: 1px solid #bbdefb; padding: 1.5rem 2rem; border-radius: 8px; margin-bottom: 2rem; }
-              .ai-query-section h3 { margin-top: 0; color: #2c5aa0; }
-              .ai-input-group { position: relative; display: flex; gap: 10px; }
-              .ai-query-input { flex-grow: 1; padding: 0.8rem; border: 1px solid #ccc; border-radius: 4px; font-size: 1rem; }
-              .ai-query-btn { padding: 0.8rem 1.2rem; font-size: 1rem; background-color: #2c5aa0; color: white; border: none; border-radius: 4px; cursor: pointer; transition: background-color 0.2s; }
-              .ai-query-btn:hover { background-color: #1e4273; }
-              .example-queries { margin-top: 1rem; font-size: 0.9rem; color: #555; text-align: left; }
-              .example-queries span { background-color: #d1e7fd; padding: 4px 10px; border-radius: 12px; font-family: 'Arial', sans-serif; cursor: pointer; margin: 4px; display: inline-block; transition: background-color 0.2s; border: 1px solid #b1d7fc; }
-              .example-queries span:hover { background-color: #b1d7fc; }
-              .input-section { background-color: #fff; padding: 2rem; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
-              .input-group { margin-bottom: 1.5rem; }
-              .input-group label { display: block; font-weight: bold; margin-bottom: 0.5rem; color: #333; }
-              .gene-input-textarea { width: 100%; box-sizing: border-box; padding: 0.8rem; border: 1px solid #ccc; border-radius: 4px; font-size: 1rem; min-height: 80px; resize: vertical; }
-              .mode-selector { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; }
-              .mode-option input[type="radio"] { display: none; }
-              .mode-option label { display: flex; align-items: center; gap: 10px; padding: 1rem; border: 2px solid #ddd; border-radius: 8px; cursor: pointer; transition: all 0.2s; }
-              .mode-option input[type="radio"]:checked + label { border-color: #2c5aa0; background-color: #e8f4fd; box-shadow: 0 0 5px rgba(44, 90, 160, 0.3); }
-              .mode-icon { font-size: 1.8rem; }
-              .analyze-btn { width: 100%; padding: 1rem; font-size: 1.1rem; font-weight: bold; background-color: #28a745; color: white; border: none; border-radius: 8px; cursor: pointer; transition: background-color 0.2s; }
-              .analyze-btn:hover:not([disabled]) { background-color: #218838; }
-              .results-section { margin-top: 2rem; padding: 2rem; background-color: #fff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
-              .result-card { border: 1px solid #ddd; border-radius: 8px; padding: 1.5rem; margin-bottom: 1.5rem; }
-              .result-card h3 { margin-top: 0; color: #2c5aa0; }
-              .ciliopathy-table, .expression-table, .gene-detail-table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
-              .ciliopathy-table th, .ciliopathy-table td, .expression-table th, .expression-table td, .gene-detail-table th, .gene-detail-table td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-              .ciliopathy-table th, .expression-table th, .gene-detail-table th { background-color: #e8f4fd; color: #2c5aa0; }
-              .suggestions-container { position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid #ccc; z-index: 1000; max-height: 200px; overflow-y: auto; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-              .suggestion-item { padding: 10px; cursor: pointer; }
-              .suggestion-item:hover { background-color: #f0f0f0; }
-              .download-button { background-color: #28a745; color: white; padding: 8px 14px; border: none; border-radius: 4px; cursor: pointer; font-size: 0.9em; font-weight: bold; margin-top: 15px; transition: background-color 0.3s ease; }
-              .download-button:hover { background-color: #218838; }
+              .ciliai-container { font-family: Arial,sans-serif; max-width:950px; margin:2rem auto; padding:2rem; background:#f9f9f9; border-radius:12px; }
+              .ciliai-header { text-align:center; margin-bottom:2rem; }
+              .ciliai-header h1 { font-size:2.8rem; color:#2c5aa0; margin:0; }
+              .ciliai-header p { font-size:1.2rem; color:#555; margin-top:0.5rem; }
+              .ai-query-section { background:#e8f4fd; border:1px solid #bbdefb; padding:1.5rem 2rem; border-radius:8px; margin-bottom:2rem; }
+              .ai-query-section h3 { margin-top:0; color:#2c5aa0; }
+              .ai-input-group { position:relative; display:flex; gap:10px; }
+              .ai-query-input { flex-grow:1; padding:0.8rem; border:1px solid #ccc; border-radius:4px; font-size:1rem; }
+              .ai-query-btn { padding:0.8rem 1.2rem; font-size:1rem; background:#2c5aa0; color:white; border:none; border-radius:4px; cursor:pointer; transition:background-color 0.2s; }
+              .ai-query-btn:hover { background:#1e4273; }
+              .example-queries span { background:#d1e7fd; padding:4px 10px; border-radius:12px; cursor:pointer; margin:4px; display:inline-block; transition:0.2s; border:1px solid #b1d7fc; }
+              .example-queries span:hover { background:#b1d7fc; }
+              .input-section { background:#fff; padding:2rem; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.05); }
+              .input-group { margin-bottom:1.5rem; }
+              .input-group label { display:block; font-weight:bold; margin-bottom:0.5rem; color:#333; }
+              .gene-input-textarea { width:100%; padding:0.8rem; border:1px solid #ccc; border-radius:4px; font-size:1rem; min-height:80px; resize:vertical; }
+              .mode-selector { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:1rem; }
+              .mode-option input[type="radio"] { display:none; }
+              .mode-option label { display:flex; align-items:center; gap:10px; padding:1rem; border:2px solid #ddd; border-radius:8px; cursor:pointer; transition:all 0.2s; }
+              .mode-option input[type="radio"]:checked + label { border-color:#2c5aa0; background:#e8f4fd; box-shadow:0 0 5px rgba(44,90,160,0.3); }
+              .mode-icon { font-size:1.8rem; }
+              .analyze-btn { width:100%; padding:1rem; font-size:1.1rem; font-weight:bold; background:#28a745; color:white; border:none; border-radius:8px; cursor:pointer; transition:0.2s; }
+              .analyze-btn:hover:not([disabled]) { background:#218838; }
+              .results-section { margin-top:2rem; padding:2rem; background:#fff; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.05); }
+              .suggestions-container { position:absolute; top:100%; left:0; right:0; background:#fff; border:1px solid #ccc; z-index:1000; max-height:200px; overflow-y:auto; box-shadow:0 4px 6px rgba(0,0,0,0.1); }
             </style>
         `;
     } catch (error) {
@@ -461,31 +460,21 @@ window.displayCiliAIPage = async function displayCiliAIPage() {
         return;
     }
 
-    // --- Fetch all data in parallel ---
-    await Promise.all([
-        fetchCiliaData(),
-        fetchScreenData(),
-        fetchPhylogenyData(),
-        fetchTissueData(),
-        fetchCellxgeneData(),
-        fetchUmapData(),
-        getDomainData(),
-        fetchCorumComplexes(),
-        fetchNeversPhylogenyData(),
-        fetchLiPhylogenyData()
-    ]);
+    // --- Ensure CiliAI data is loaded ---
+    if (!window.isCiliAIDataLoaded) {
+        await initializeCiliAIData();
+    }
 
-      // Merge phylogeny caches
-    await mergePhylogenyCaches();
+    // --- Set up event listeners & autocomplete ---
+    if (typeof setupCiliAIEventListeners === 'function') {
+        setupCiliAIEventListeners();
+    }
 
-    console.log('✅ All CiliAI data loaded successfully.');
-
-    // Initialize event listeners and autocomplete
-    setupCiliAIEventListeners();
-
-    // Pre-populate allGeneSymbols
-    allGeneSymbols = getAllGenes();
-    console.log(`✅ Loaded ${allGeneSymbols.length} unique genes.`);
+    // --- Pre-populate gene symbols ---
+    if (typeof getAllGenes === 'function') {
+        window.allGeneSymbols = getAllGenes();
+        console.log(`✅ Loaded ${window.allGeneSymbols.length} total unique genes.`);
+    }
 };
 
 // --- Helper Functions ---
@@ -9000,20 +8989,17 @@ function renderScreenSummaryHeatmap(genes, screenData) {
 }
 
 
-// --- Global Exposure for Router ---
+// --- Global Exposure for External Use ---
+window.displayCiliAIPage = displayCiliAIPage;             // Main page renderer
+window.setupCiliAIEventListeners = setupCiliAIEventListeners; // Needed if other scripts attach events
+window.handleAIQuery = handleAIQuery;                     // For triggering AI queries externally
+window.analyzeGenesFromInput = analyzeGenesFromInput;     // Trigger gene analysis externally
+window.runAnalysis = runAnalysis;                         // Core analysis runner
+window.displayCiliAIExpressionHeatmap = displayCiliAIExpressionHeatmap; // Visualization
+window.handleCiliAISelection = handleCiliAISelection;     // Selection handler
+
+// Optional: expose these only if other scripts require fetching data externally
+window.fetchScreenData = fetchScreenData;
 window.fetchCorumComplexes = fetchCorumComplexes;
 window.getComplexesByGene = getComplexesByGene;
 window.getSubunitsByComplexName = getSubunitsByComplexName;
-window.displayCiliAIPage = displayCiliAIPage;
-window.setupCiliAIEventListeners = setupCiliAIEventListeners;
-window.handleAIQuery = handleAIQuery;
-window.analyzeGenesFromInput = analyzeGenesFromInput;
-window.runAnalysis = runAnalysis;
-window.analyzeGeneViaAPI = analyzeGeneViaAPI;
-window.fetchScreenData = fetchScreenData;
-window.createResultCard = createResultCard;
-window.createPlaceholderCard = createPlaceholderCard;
-window.renderScreenSummaryHeatmap = renderScreenSummaryHeatmap;
-// Expose globally so other scripts can call them
-window.displayCiliAIExpressionHeatmap = displayCiliAIExpressionHeatmap;
-window.handleCiliAISelection = handleCiliAISelection;
