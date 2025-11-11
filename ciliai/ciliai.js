@@ -34,50 +34,46 @@ window.ciliAI_MasterDatabase = [];
 /* -------------------------------------------------------------------------- */
 async function ciliAI_getGeneData(geneName) {
     const upperGeneName = geneName.toUpperCase();
-    if (ciliAI_geneCache.has(upperGeneName)) return ciliAI_geneCache.get(upperGeneName);
 
-    const dataPromise = (async () => {
-        console.log(`[CiliAI Cache MISS] Fetching all data for ${upperGeneName}...`);
+    // Check cache first (this cache is for *single-gene lookups*)
+    if (ciliAI_geneCache.has(upperGeneName)) {
+        return ciliAI_geneCache.get(upperGeneName);
+    }
 
-        const results = await Promise.allSettled([
-            ciliAI_fetchCiliaHubData_internal(upperGeneName),
-            ciliAI_fetchPhylogenyData_internal(upperGeneName),
-            ciliAI_fetchDomainData_internal(upperGeneName),
-            ciliAI_fetchComplexData_internal(upperGeneName),
-            ciliAI_fetchTissueData_internal(upperGeneName),
-            ciliAI_fetchScRnaData_internal(upperGeneName),
-            ciliAI_fetchScreenData_internal(upperGeneName),
-            ciliAI_fetchUMAPData_internal(upperGeneName)
-        ]);
+    console.log(`[CiliAI Cache MISS] Finding ${upperGeneName} in Master Database...`);
 
+    // Find the gene in the master database
+    if (!window.ciliAI_MasterDatabase || window.ciliAI_MasterDatabase.length === 0) {
+        console.error("[CiliAI] Master Database is not built! Cannot get gene data.");
+        return { notFound: true, error: "Master Database not loaded." };
+    }
+
+    const geneData = window.ciliAI_MasterDatabase.find(g => g.gene.toUpperCase() === upperGeneName);
+
+    if (geneData) {
+        // We found it. Store it in the single-gene cache for next time.
+        // We create a "Promise.resolve" to mimic the old async behavior.
         const combinedData = {
-            ...(results[0].status === 'fulfilled' ? results[0].value : { geneInfo: null, expression: null }),
-            phylogeny: results[1].status === 'fulfilled' ? results[1].value : null,
-            domains  : results[2].status === 'fulfilled' ? results[2].value : null,
-            complex  : results[3].status === 'fulfilled' ? results[3].value : null,
-            tissue   : results[4].status === 'fulfilled' ? results[4].value : null,
-            scRNA    : results[5].status === 'fulfilled' ? results[5].value : null,
-            screens  : results[6].status === 'fulfilled' ? results[6].value : null,
-            umap     : results[7].status === 'fulfilled' ? results[7].value : null,
+            geneInfo: geneData, // The 'geneInfo' is the root of the master entry
+            phylogeny: geneData.phylogeny,
+            domains: geneData.domains,
+            complex: geneData.complexes, // Note: 'complexes' (plural) from master
+            tissue: geneData.tissue,
+            scRNA: geneData.scRNA,
+            screens: geneData.screens,
+            umap: geneData.umap,
             lastFetched: new Date().toISOString()
         };
-
-        if (!combinedData.geneInfo) {
-            const notFound = { notFound: true, ...combinedData };
-            ciliAI_geneCache.set(upperGeneName, Promise.resolve(notFound));
-            return notFound;
-        }
-
+        
+        ciliAI_geneCache.set(upperGeneName, Promise.resolve(combinedData));
         return combinedData;
-    })().catch(err => {
-        console.error(`[CiliAI] Fatal fetch error for ${upperGeneName}:`, err);
-        ciliAI_geneCache.delete(upperGeneName);
-        return { notFound: true, error: err.message };
-    });
-
-    ciliAI_geneCache.set(upperGeneName, dataPromise);
-    dataPromise.then(d => ciliAI_geneCache.set(upperGeneName, Promise.resolve(d)));
-    return dataPromise;
+    } else {
+        // Gene not found in the master database
+        console.warn(`[CiliAI] Gene ${upperGeneName} not found in Master Database.`);
+        const notFound = { notFound: true };
+        ciliAI_geneCache.set(upperGeneName, Promise.resolve(notFound)); // Cache the "not found" result
+        return notFound;
+    }
 }
 
 /* -------------------------------------------------------------------------- */
@@ -540,10 +536,12 @@ function ciliAI_masterQuery(filters) {
 
 
 /**
- * Parses the user's query and calls the appropriate handler function.
- * This is the main entry point for all user input *to CiliAI*.
+ * --------------------------------------------------------------------------
+ * 2. (FIXED) CILI-AI DUAL-STAGE INTENT RESOLVER
  *
- * @param {string} query - The raw user input.
+ * This function now has a "pre-check" for greetings and a smarter
+ * gene-parsing regex in Stage 2.
+ * --------------------------------------------------------------------------
  */
 async function ciliAI_resolveIntent(query) {
     console.log("[CiliAI LOG] 4. ciliAI_resolveIntent started.");
@@ -552,12 +550,19 @@ async function ciliAI_resolveIntent(query) {
     ciliAI_updateChatWindow("Thinking...", "system");
 
     try {
+        // --- PRE-CHECK: Check for simple greetings or "about" ---
+        if (qLower.includes("hello") || qLower.includes("hi") || qLower.includes("what can you do") || qLower.includes("about ciliai")) {
+             console.log("[CiliAI LOG] 4a. Greeting/About matched.");
+             ciliAI_updateChatWindow("Hello! I am CiliAI. I can answer questions about ciliary genes by integrating data on phylogeny, protein domains, expression, and phenotypes. How can I help?", "ciliai");
+             return;
+        }
+
         // --- STAGE 1: Check for complex, list-based, or non-gene queries ---
         console.log("[CiliAI LOG] 5. Trying Stage 1 (Complex Intent)...");
         const complexResult = await ciliAI_resolveComplexIntent(qLower, query); 
         
         if (complexResult !== null) {
-            console.log("[CiliAI LOG] 5a. Stage 1 Matched. Result:", complexResult);
+            console.log("[CiliAI LOG] 5a. Stage 1 Matched.");
             if (typeof complexResult === 'string') {
                 ciliAI_updateChatWindow(complexResult, "ciliai");
             }
@@ -568,12 +573,38 @@ async function ciliAI_resolveIntent(query) {
         
         // --- STAGE 2: Fallback to single-gene query resolution ---
         
-        // This RegEx looks for all-caps words (3+ chars) OR
-        // words with letters and numbers (like IFT88).
-        // It explicitly IGNORES common English words.
-        const geneRegex = /\b(?!show\b|me\b|what\b|is\b|tell\b|about\b|for\b|genes\b)([A-Z]{3,}|[A-Z0-9-]{3,})\b/i;
-        const geneMatch = query.match(geneRegex); // Match against the *original* query to preserve case
-        const geneName = geneMatch ? geneMatch[1].toUpperCase() : null;
+        // --- (FIXED) SMARTER GENE REGEX ---
+        // This regex now:
+        // 1. Excludes the problematic words (list, plot, compare, joubert, etc.)
+        // 2. Prioritizes gene-like patterns (e.g., ARL13B, IFT88, CEP290)
+        // 3. Tries to find genes after keywords like "for", "of", "about"
+        let geneName = null;
+        const stopWords = /\b(show|me|what|is|tell|about|for|genes|list|plot|compare|joubert|syndrome|proteins|phylogeny|expression|ciliai|can)\b/i;
+
+        // Try to find a gene-like word NOT in the stopWords list
+        // This looks for words with letters AND numbers (IFT88) or all-caps (BBS1)
+        const geneRegex = /\b([A-Z]{2,}[0-9]{1,}|[A-Z0-9]{3,6})\b/g;
+        let geneMatch;
+        let potentialGenes = [];
+        
+        while ((geneMatch = geneRegex.exec(query.toUpperCase())) !== null) {
+            if (!stopWords.test(geneMatch[1])) {
+                potentialGenes.push(geneMatch[1]);
+            }
+        }
+        
+        // If we found potential genes, pick the first one.
+        // This is still a simple heuristic but much better than before.
+        if (potentialGenes.length > 0) {
+             // Heuristic: prefer genes *after* a keyword if possible
+            const afterKeyword = query.match(/(?:for|of|about|gene)\s+([A-Z0-9-]{3,})/i);
+             if (afterKeyword && afterKeyword[1]) {
+                geneName = afterKeyword[1].toUpperCase();
+             } else {
+                geneName = potentialGenes[0]; // Default to the first valid one found
+             }
+        }
+        // --- END OF REGEX FIX ---
 
         console.log(`[CiliAI LOG] 6. Gene parsed: ${geneName}`);
 
@@ -590,13 +621,11 @@ async function ciliAI_resolveIntent(query) {
         } else if (qLower.includes("complex") || qLower.includes("interact")) {
             intent = "getComplex";
         } else if (qLower.includes("expression") || qLower.includes("tissue") || qLower.includes("scrna")) {
-            intent = "getExpression"; // New consolidated intent
+            intent = "getExpression"; 
         } else if (qLower.includes("summary") || qLower.includes("what is") || qLower.includes("tell me about")) {
             intent = "getSummary"; 
         } else if (geneName) {
             intent = "getSummary"; // Default action
-        } else if (qLower.includes("hello") || qLower.includes("hi")) {
-            intent = "greet";
         } else {
             intent = "unknown";
         }
@@ -604,9 +633,10 @@ async function ciliAI_resolveIntent(query) {
         console.log(`[CiliAI LOG] 7. Intent parsed: ${intent}`);
 
         // --- Action Dispatch (for single-gene queries) ---
-        if (intent !== "greet" && intent !== "unknown" && !params.gene) {
+        if (intent !== "unknown" && !params.gene) {
             console.warn("[CiliAI LOG] 7a. Intent needs gene, but none found.");
-            ciliAI_updateChatWindow("Please specify a gene name for that request.", "ciliai");
+            // This happens for "compare phylogeny" - Stage 1 should handle this!
+            ciliAI_updateChatWindow("I understood the topic but couldn't find a specific gene name in your query. Please try again, for example: 'What is IFT88?'", "ciliai");
             return;
         }
 
@@ -628,9 +658,6 @@ async function ciliAI_resolveIntent(query) {
                 break;
             case "getExpression": // Handles both tissue and scRNA
                 await ciliAI_handleExpression(params.gene);
-                break;
-            case "greet":
-                ciliAI_updateChatWindow("Hello! I am CiliAI. How can I help you learn about ciliary genes?", "ciliai");
                 break;
             default: // unknown
                 console.warn("[CiliAI LOG] 7b. Unknown intent.");
