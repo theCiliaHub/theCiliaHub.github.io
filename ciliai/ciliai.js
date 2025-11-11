@@ -873,26 +873,31 @@ ciliAI_waitForElements();
  */
 
 function exposeCiliAIGlobals() {
-    // Check if already exposed
+    // Prevent redefining if already initialized
     if (window.CiliAI && window.CiliAI.initialized) return;
 
+    // Define the global interface
     window.CiliAI = {
-        // Core data access
+        // --- Core data access ---
         getGeneData: ciliAI_getGeneData,
         geneCache: ciliAI_geneCache,
 
-        // Core AI handlers
+        // --- Core AI handlers ---
         resolveIntent: ciliAI_resolveIntent,
         resolveComplexIntent: ciliAI_resolveComplexIntent,
 
-        // Optional handlers (if other modules need them)
+        // --- Optional handlers (used by other modules) ---
         handleGeneSummary: ciliAI_handleGeneSummary,
 
-        // Metadata
+        // --- Metadata ---
         version: "6.1",
         initialized: true
     };
 
     console.log("%c✅ CiliAI global interface initialized", "color: #3fb950");
-})();
+}
+
+// ✅ Call it once to expose the globals
+exposeCiliAIGlobals();
+
 
