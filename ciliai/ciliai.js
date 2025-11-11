@@ -225,7 +225,7 @@ window.displayCiliAIPage = async function displayCiliAIPage() {
     await mergePhylogenyCaches();
     console.log('ciliAI.js: All data loaded (including new domain and phylogeny sources).');
     
-    setTimeout(setupCiliAIEventListeners, 0);
+    setTimeout(ciliAI_init, 0);
 };
 
 // --- Helper Functions ---
@@ -992,26 +992,28 @@ function ciliAI_updateChatWindow(message, sender) {
 /**
  * Attaches all CiliAI event listeners to the DOM.
  */
+// INSIDE your ciliai.js file (NOT the code you just sent)
+
 function ciliAI_init() {
-    // *** IMPORTANT: Update these IDs to match your HTML ***
-    const sendButton = document.getElementById('ciliai-send-button'); // Example ID
-    const inputElement = document.getElementById('ciliai-input-box'); // Example ID
+    // *** FIX THESE IDs ***
+    const sendButton = document.getElementById('aiQueryBtn'); // <-- MUST MATCH HTML
+    const inputElement = document.getElementById('aiQueryInput'); // <-- MUST MATCH HTML
 
     if (sendButton) {
         sendButton.addEventListener('click', ciliAI_handleQuery);
     } else {
-        console.warn("[CiliAI] Send button not found.");
+        console.warn("[CiliAI] Send button not found. (Tried 'aiQueryBtn')"); 
     }
 
     if (inputElement) {
         inputElement.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault(); // Prevent new line
+                e.preventDefault(); 
                 ciliAI_handleQuery();
             }
         });
     } else {
-        console.warn("[CiliAI] Input box not found.");
+        console.warn("[CiliAI] Input box not found. (Tried 'aiQueryInput')");
     }
 
     console.log("CiliAI module initialized and event listeners attached.");
@@ -9453,7 +9455,6 @@ window.fetchCorumComplexes = fetchCorumComplexes;
 window.getComplexesByGene = getComplexesByGene;
 window.getSubunitsByComplexName = getSubunitsByComplexName;
 window.displayCiliAIPage = displayCiliAIPage;
-window.setupCiliAIEventListeners = setupCiliAIEventListeners;
 window.analyzeGenesFromInput = analyzeGenesFromInput;
 window.runAnalysis = runAnalysis;
 window.analyzeGeneViaAPI = analyzeGeneViaAPI;
