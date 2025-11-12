@@ -244,7 +244,7 @@ async function loadCiliAIData() {
         return {
             ...geneObj,
             
-    _       // ✅ Screens (merged)
+           // ✅ Screens (merged)
             screens: allScreens,
             
             // ✅ Expression (scRNA + tissue)
