@@ -29,6 +29,15 @@
 /* -------------------------------------------------------------------------- */
 const ciliAI_geneCache = new Map();
 window.ciliAI_MasterDatabase = [];
+
+(async () => {
+  try {
+    await buildMasterDatabase();
+    // optionally initialize UI now, or let ciliai.js listen for event
+    console.log('CiliAI master DB ready');
+  } catch (e) { console.error(e) }
+})();
+
 /* -------------------------------------------------------------------------- */
 /* 2. GATEKEEPER FUNCTION: GET ALL DATA FOR A GENE                             */
 /* -------------------------------------------------------------------------- */
@@ -265,103 +274,317 @@ async function ciliAI_fetchAllTissueData_internal() {
 
 
 /**
- * ============================================================================
- * [CiliAI] MASTER DATABASE BUILDER (v11 - Domain Key Fix)
- *
- * WHAT IS FIXED:
- * 1. (CRITICAL) "IFT88 Domain Check: ❌ FAILED TO LINK"
- * - This bug implies the keys in `domains_raw` do not match the
- * `geneEntry.gene` key (e.g., "IFT88").
- * - This version adds a new "pre-processing" step that creates a
- * `domains_by_gene` object, forcing ALL keys from the raw domain
- * file to be uppercase, just like our main gene key.
- * - This ensures that `domains_by_gene["IFT88"]` will always
- * match, regardless of the original file's casing.
- * ============================================================================
+ * buildMasterDatabase v12
+ * - Fetches and merges 9 datasets into window.ciliAI_MasterDatabase (object keyed by gene symbol UPPERCASE)
+ * - Emits 'CiliAIMasterDBReady' when done
+ * - Robust normalization, trimming, dedupe
  */
-async function buildMasterDatabase() {
-    const sources = {
-        umap: 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/umap_data.json',
-        screens: 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/cilia_screens_data.json',
-        cellxgene: 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/cellxgene_data.json',
-        tissue: 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/rna_tissue_consensus.tsv',
-        complexes: 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/corum_humanComplexes.json',
-        domains: 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/cili_ai_domain_database.json',
-        proteome_nevers: 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/nevers_et_al_2017_matrix_optimized.json',
-        proteome_li: 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/li_et_al_2014_matrix_optimized.json',
-        core: 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/ciliahub_data.json'
-    };
 
-    // Fetch all in parallel
+async function buildMasterDatabase() {
+  console.log("[CiliAI] buildMasterDatabase v12 starting...");
+
+  // --- URLs (the 9 datasets you provided)
+  const urls = {
+    umap: 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/umap_data.json',
+    screens: 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/cilia_screens_data.json',
+    cellxgene: 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/cellxgene_data.json',
+    tissue_tsv: 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/rna_tissue_consensus.tsv',
+    corum: 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/corum_humanComplexes.json',
+    domains: 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/cili_ai_domain_database.json',
+    nevers: 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/nevers_et_al_2017_matrix_optimized.json',
+    li: 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/li_et_al_2014_matrix_optimized.json',
+    core: 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/ciliahub_data.json'
+  };
+
+  // --- helper normalizer
+  const normalize = s => (typeof s === 'string' ? s.trim().toUpperCase() : s);
+
+  try {
+    // 1) Fetch everything in parallel (tissue TSV will be fetched as text)
     const [
-        umapData,
-        screensData,
-        cellxgeneData,
-        tissueDataText,
-        complexesData,
-        domainsData,
-        proteomeNevers,
-        proteomeLi,
-        coreData
+      umapData,
+      screensData,
+      cellxgeneData,
+      tissueText,
+      corumData,
+      domainsRaw,
+      neversRaw,
+      liRaw,
+      coreData
     ] = await Promise.all([
-        fetch(sources.umap).then(r => r.json()),
-        fetch(sources.screens).then(r => r.json()),
-        fetch(sources.cellxgene).then(r => r.json()),
-        fetch(sources.tissue).then(r => r.text()),
-        fetch(sources.complexes).then(r => r.json()),
-        fetch(sources.domains).then(r => r.json()),
-        fetch(sources.proteome_nevers).then(r => r.json()),
-        fetch(sources.proteome_li).then(r => r.json()),
-        fetch(sources.core).then(r => r.json())
+      fetch(urls.umap).then(r => r.ok ? r.json() : Promise.resolve({})).catch(()=> ({})),
+      fetch(urls.screens).then(r => r.ok ? r.json() : Promise.resolve({})).catch(()=> ({})),
+      fetch(urls.cellxgene).then(r => r.ok ? r.json() : Promise.resolve({})).catch(()=> ({})),
+      fetch(urls.tissue_tsv).then(r => r.ok ? r.text() : Promise.resolve("")).catch(()=> ("")),
+      fetch(urls.corum).then(r => r.ok ? r.json() : Promise.resolve([])).catch(()=> ([])),
+      fetch(urls.domains).then(r => r.ok ? r.json() : Promise.resolve({})).catch(()=> ({})),
+      fetch(urls.nevers).then(r => r.ok ? r.json() : Promise.resolve({genes:{}})).catch(()=> ({genes:{}})),
+      fetch(urls.li).then(r => r.ok ? r.json() : Promise.resolve({genes:{}})).catch(()=> ({genes:{}})),
+      fetch(urls.core).then(r => r.ok ? r.json() : Promise.resolve([])).catch(()=> ([]))
     ]);
 
-    // Parse TSV (tissue expression)
-    const tissueData = tissueDataText.split('\n').slice(1).map(line => {
-        const [gene, tissue, value] = line.split('\t');
-        return { gene, tissue, value: parseFloat(value) };
-    });
+    console.log("[CiliAI] All remote fetches completed (some may be empty on error).");
 
-    // Create master dictionary
-    const masterDB = {};
-
-    for (const [gene, entry] of Object.entries(coreData)) {
-        const g = gene.trim().toUpperCase();
-        masterDB[g] = {
-            ...entry,
-            domains: domainsData[g] || [],
-            complexes: [],
-            screens: screensData[g] || {},
-            expression: cellxgeneData[g] || {},
-            tissue: tissueData.filter(t => t.gene === g),
-            umap: umapData[g] || null,
-            proteomics: {
-                nevers: proteomeNevers[g] || null,
-                li: proteomeLi[g] || null
-            }
-        };
+    // 2) Parse tissue TSV -> map: GENE -> [{tissue, value}, ...]
+    const tissueByGene = {};
+    if (tissueText && tissueText.length > 0) {
+      const lines = tissueText.split(/\r?\n/);
+      // assume header (gene\ttissue\texpression) or (gene\ttissue\tscore)
+      const header = lines.shift() || "";
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        const parts = line.split('\t');
+        // tolerant parsing: gene, tissue, value (if present)
+        const geneRaw = parts[0] || '';
+        const tissueName = parts[1] || '';
+        const value = parts[2] ? parseFloat(parts[2]) : null;
+        const g = normalize(geneRaw);
+        if (!g) continue;
+        if (!tissueByGene[g]) tissueByGene[g] = [];
+        tissueByGene[g].push({ tissue: tissueName, value });
+      }
     }
 
-    // Map complexes
-    for (const complex of complexesData) {
-        for (const subunit of complex.subunits) {
-            const g = subunit.trim().toUpperCase();
-            if (masterDB[g]) {
-                masterDB[g].complexes.push({
-                    complex_name: complex.complexName,
-                    category: complex.category || null
-                });
-            }
+    // 3) Normalize domain keys (upper-case)
+    const domainsByGene = {};
+    for (const rawKey in domainsRaw) {
+      const k = normalize(rawKey);
+      domainsByGene[k] = Array.isArray(domainsRaw[rawKey]) ? domainsRaw[rawKey].map(d => ({
+        domain_id: d.domain_id,
+        description: d.description
+      })) : [];
+    }
+    console.log(`[CiliAI] Domains normalized for ${Object.keys(domainsByGene).length} genes.`);
+
+    // 4) Normalize screens (upper-case keys)
+    const screensByGene = {};
+    for (const rawKey in screensData) {
+      const k = normalize(rawKey);
+      screensByGene[k] = Array.isArray(screensData[rawKey]) ? screensData[rawKey].map(s => ({ source: s.source || s.dataset || null, result: s.result || s.classification || null })) : [];
+    }
+
+    // 5) Normalize cellxgene (scRNA) data by gene upper-case
+    const scByGene = {};
+    for (const rawKey in cellxgeneData) {
+      const k = normalize(rawKey);
+      scByGene[k] = cellxgeneData[rawKey];
+    }
+
+    // 6) Normalize umap data
+    const umapByGene = {};
+    for (const rawKey in umapData) {
+      const k = normalize(rawKey);
+      umapByGene[k] = umapData[rawKey];
+    }
+
+    // 7) Coerce li & nevers phylogeny into gene->obj maps
+    //    - Li file sample earlier had 'genes' keyed by Entrez, each with .g symbol
+    const liByGene = {};
+    if (liRaw && liRaw.genes) {
+      for (const entrez in liRaw.genes) {
+        const rec = liRaw.genes[entrez];
+        if (rec && rec.g) {
+          const g = normalize(rec.g);
+          liByGene[g] = rec;
         }
+      }
+    }
+    const neversByGene = {};
+    if (neversRaw && neversRaw.genes) {
+      // sometimes keys are already gene symbols
+      for (const rawKey in neversRaw.genes) {
+        const rec = neversRaw.genes[rawKey];
+        const g = normalize(rawKey) || (rec && rec.g ? normalize(rec.g) : null);
+        if (g) neversByGene[g] = rec;
+      }
     }
 
-    window.masterDB = masterDB;
-    return masterDB;
+    // 8) Build CORUM complex lookup: gene -> [complexes...]
+    const complexesByGene = {};
+    if (Array.isArray(corumData)) {
+      for (const c of corumData) {
+        const complex_id = c.complex_id || c.complexId || null;
+        const complex_name = c.complex_name || c.complexName || c.name || null;
+        const subunits = Array.isArray(c.subunits) ? c.subunits : [];
+        const partner_genes = subunits.map(s => normalize(s.gene_name || s.geneName || s.g || s));
+        for (const pg of partner_genes) {
+          if (!pg) continue;
+          if (!complexesByGene[pg]) complexesByGene[pg] = [];
+          complexesByGene[pg].push({
+            complex_id,
+            complex_name,
+            partner_genes
+          });
+        }
+      }
+    }
+    console.log(`[CiliAI] CORUM complexes mapped for ${Object.keys(complexesByGene).length} genes.`);
+
+    // 9) Build masterDB from coreData (ciliahub_data.json). 
+    //    coreData may be an array (as in samples) or an object; handle both
+    const master = {}; // gene->record
+    if (Array.isArray(coreData)) {
+      for (const rec of coreData) {
+        if (!rec || !rec.gene) continue;
+        const geneKey = normalize(rec.gene);
+        if (!geneKey) continue;
+
+        // copy base record, but ensure consistent keys & normalization
+        const base = Object.assign({}, rec);
+        base.gene = geneKey;
+
+        // unify pfam_ids -> array
+        if (base.pfam_ids && !Array.isArray(base.pfam_ids)) base.pfam_ids = [base.pfam_ids];
+        if (base.domain_descriptions && !Array.isArray(base.domain_descriptions)) base.domain_descriptions = [base.domain_descriptions];
+
+        // screens: combine core record screens (array) + external screens
+        const hubScreens = Array.isArray(base.screens) ? base.screens.map(s => ({
+          dataset: s.dataset || s.source || null,
+          classification: s.classification || s.result || null,
+          z_score: s.z_score || null,
+          paper_link: s.paper_link || null
+        })) : [];
+        const externalScreens = screensByGene[geneKey] || [];
+
+        // final merge
+        master[geneKey] = {
+          ...base,
+          domains: domainsByGene[geneKey] || [],
+          pfam_ids: base.pfam_ids || [],
+          domain_descriptions: base.domain_descriptions || [],
+          complexes: complexesByGene[geneKey] || [],
+          screens: [...hubScreens, ...externalScreens],
+          tissue: tissueByGene[geneKey] || [],
+          scRNA: scByGene[geneKey] || null,
+          umap: umapByGene[geneKey] || null,
+          phylogeny: {
+            nevers: neversByGene[geneKey] || null,
+            li: liByGene[geneKey] || null
+          }
+        };
+      }
+    } else if (typeof coreData === 'object' && Object.keys(coreData).length > 0) {
+      // coreData might be an object keyed by gene
+      for (const rawKey in coreData) {
+        const rec = coreData[rawKey];
+        const geneKey = normalize(rec.gene || rawKey);
+        if (!geneKey) continue;
+
+        if (!rec.pfam_ids || Array.isArray(rec.pfam_ids) === false) {
+          // coerce
+          rec.pfam_ids = Array.isArray(rec.pfam_ids) ? rec.pfam_ids : (rec.pfam_ids ? [rec.pfam_ids] : []);
+        }
+        master[geneKey] = {
+          ...rec,
+          gene: geneKey,
+          domains: domainsByGene[geneKey] || [],
+          complexes: complexesByGene[geneKey] || [],
+          screens: [...(Array.isArray(rec.screens) ? rec.screens : []), ...(screensByGene[geneKey] || [])],
+          tissue: tissueByGene[geneKey] || [],
+          scRNA: scByGene[geneKey] || null,
+          umap: umapByGene[geneKey] || null,
+          phylogeny: {
+            nevers: neversByGene[geneKey] || null,
+            li: liByGene[geneKey] || null
+          }
+        };
+      }
+    }
+
+    // 10) Post-processing: dedupe domain entries & screens
+    for (const g in master) {
+      const e = master[g];
+      if (Array.isArray(e.domains)) {
+        const seen = new Set();
+        e.domains = e.domains.filter(d => {
+          const key = `${d.domain_id}||${d.description}`;
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
+      }
+      if (Array.isArray(e.screens)) {
+        const seenS = new Set();
+        e.screens = e.screens.filter(s => {
+          const key = `${s.source || s.dataset || ''}||${s.result || s.classification || ''}`;
+          if (seenS.has(key)) return false;
+          seenS.add(key);
+          return true;
+        });
+      }
+      if (!Array.isArray(e.complexes)) e.complexes = [];
+    }
+
+    // 11) Install to window and broadcast ready
+    window.ciliAI_MasterDatabase = master;
+    console.log(`✅ [CiliAI] Master Database built. ${Object.keys(master).length} genes integrated.`);
+    document.dispatchEvent(new Event('CiliAIMasterDBReady'));
+
+    // 12) Sanity checks
+    const forCheck = ['IFT88','ARL13B','BBS1'];
+    for (const ck of forCheck) {
+      const rec = master[ck];
+      console.log(`[CiliAI] Sanity ${ck}: ${rec ? 'FOUND' : 'MISSING'} | domains:${rec && rec.domains ? rec.domains.length : 0} | complexes:${rec && rec.complexes ? rec.complexes.length : 0} | screens:${rec && rec.screens ? rec.screens.length : 0}`);
+    }
+
+    return master;
+
+  } catch (err) {
+    console.error("❌ [CiliAI] buildMasterDatabase failed:", err);
+    throw err;
+  }
 }
 
+// Get full gene record (or null)
+function getGeneRecord(symbol) {
+  if (!window.ciliAI_MasterDatabase) return null;
+  const key = (symbol||'').trim().toUpperCase();
+  return window.ciliAI_MasterDatabase[key] || null;
+}
 
-// --- IMPORTANT: Call the function to build the database ---
-// --- Place this in your main script's initialization logic ---
-buildMasterDatabase();
+// Example: find genes by boolean filters (phenotype contains, localization contains, domain id)
+function findGenesByFilters({ phenotypeContains, localizationContains, tissueExpressedIn, domainId, phylogenyClass, complexName }) {
+  if (!window.ciliAI_MasterDatabase) return [];
+  const out = [];
+  for (const g in window.ciliAI_MasterDatabase) {
+    const rec = window.ciliAI_MasterDatabase[g];
+    // phenotype filter
+    if (phenotypeContains) {
+      const p = (rec.lof_effects || rec.percent_ciliated_cells_effects || rec.overexpression_effects || '').toUpperCase();
+      if (!p.includes(phenotypeContains.toUpperCase())) continue;
+    }
+    // localization
+    if (localizationContains) {
+      const loc = (rec.localization || '').toUpperCase();
+      if (!loc.includes(localizationContains.toUpperCase())) continue;
+    }
+    // tissue expression check: simple presence in tissue array
+    if (tissueExpressedIn) {
+      const t = rec.tissue || [];
+      if (!t.some(x => (x.tissue||'').toUpperCase().includes(tissueExpressedIn.toUpperCase()))) continue;
+    }
+    // domain
+    if (domainId) {
+      const domains = rec.domains || [];
+      if (!domains.some(d => (d.domain_id||'').toUpperCase() === domainId.toUpperCase())) continue;
+    }
+    // phylogeny: e.g., "Ciliary_specific" in li/nevers classification - user-defined mapping
+    if (phylogenyClass) {
+      const pN = rec.phylogeny && rec.phylogeny.nevers;
+      const pL = rec.phylogeny && rec.phylogeny.li;
+      const ok = (pN && ((pN.c && pN.c === phylogenyClass) || (pN.c && String(pN.c).toUpperCase() === phylogenyClass.toUpperCase()))) || (pL && pL.c === phylogenyClass);
+      if (!ok) continue;
+    }
+    // complex membership
+    if (complexName) {
+      const cms = rec.complexes || [];
+      if (!cms.some(c => (c.complex_name||'').toUpperCase().includes(complexName.toUpperCase()))) continue;
+    }
+    out.push(rec);
+  }
+  return out;
+}
+
 
 
 // ============================================================================
