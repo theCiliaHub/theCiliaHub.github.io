@@ -9,26 +9,26 @@ let neversPhylogenyCache = null;
 let umapDataCache = null;
 let cellxgeneDataCache = null;
 
-async function loadCiliAIData(timeoutMs = 20000) {
+// Replace your entire loadCiliAIData function with this fixed version:
+
+async function loadCiliAIData(timeoutMs = 30000) {
     const urls = {
         ciliahub: 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/ciliahub_data.json',
         umap: 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/umap_data.json',
         screens: 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/cilia_screens_data.json',
-        cellxgene:'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/cellxgene_data.json',
-        rna_tissue:'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/rna_tissue_consensus.tsv',
+        cellxgene: 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/cellxgene_data.json',
+        rna_tissue: 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/rna_tissue_consensus.tsv',
         corum: 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/corum_humanComplexes.json',
         domains: 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/cili_ai_domain_database.json',
-        nevers2017:'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/nevers_et_al_2017_matrix_optimized.json',
+        nevers2017: 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/nevers_et_al_2017_matrix_optimized.json',
         li2014: 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/li_et_al_2014_matrix_optimized.json'
     };
-
-    let umapCache = null;
-    let cellxgeneCache = null;
 
     async function safeFetch(url, type = 'json', timeout = timeoutMs) {
         const controller = new AbortController();
         const id = setTimeout(() => controller.abort(), timeout);
         try {
+            console.log(`Fetching: ${url}`);
             const res = await fetch(url, { signal: controller.signal });
             clearTimeout(id);
             if (!res.ok) throw new Error(`HTTP ${res.status} - ${url}`);
@@ -41,43 +41,17 @@ async function loadCiliAIData(timeoutMs = 20000) {
         }
     }
 
-    async function getUmapData() {
-        if (umapCache) return umapCache;
-        try {
-            const res = await fetch(urls.umap);
-            if (!res.ok) throw new Error('Failed to fetch UMAP data');
-            umapCache = await res.json();
-            window.CiliAI_UMAP = umapCache;
-            return umapCache;
-        } catch (err) {
-            console.error('Error fetching UMAP data:', err);
-            return null;
-        }
-    }
-
-    async function getCellxgeneData() {
-        if (cellxgeneCache) return cellxgeneCache;
-        try {
-            const res = await fetch(urls.cellxgene);
-            if (!res.ok) throw new Error('Failed to fetch Cellxgene data');
-            cellxgeneCache = await res.json();
-            window.CiliAI_snRNA = cellxgeneCache;
-            return cellxgeneCache;
-        } catch (err) {
-            console.error('Error fetching Cellxgene data:', err);
-            return null;
-        }
-    }
-
     console.log('CiliAI: fetching all data (parallel)...');
+    
+    // Fetch all data sources
     const [
         ciliahubRaw, umapRaw, screensRaw, cellxgeneRaw,
         rnaTsv, corumRaw, domainRaw, neversRaw, liRaw
     ] = await Promise.all([
         safeFetch(urls.ciliahub, 'json'),
-        getUmapData(),
+        safeFetch(urls.umap, 'json'),
         safeFetch(urls.screens, 'json'),
-        getCellxgeneData(),
+        safeFetch(urls.cellxgene, 'json'),
         safeFetch(urls.rna_tissue, 'tsv'),
         safeFetch(urls.corum, 'json'),
         safeFetch(urls.domains, 'json'),
@@ -85,254 +59,382 @@ async function loadCiliAIData(timeoutMs = 20000) {
         safeFetch(urls.li2014, 'json')
     ]);
 
-    window.liPhylogenyCache = liRaw || {};
-    window.neversPhylogenyCache = neversRaw || {};
+    console.log('Data fetch results:', {
+        ciliahub: ciliahubRaw ? `Array(${ciliahubRaw.length})` : 'failed',
+        umap: umapRaw ? 'loaded' : 'failed',
+        screens: screensRaw ? 'loaded' : 'failed',
+        cellxgene: cellxgeneRaw ? 'loaded' : 'failed',
+        rnaTissue: rnaTsv ? 'loaded' : 'failed',
+        corum: corumRaw ? 'loaded' : 'failed',
+        domains: domainRaw ? 'loaded' : 'failed',
+        nevers: neversRaw ? 'loaded' : 'failed',
+        li: liRaw ? 'loaded' : 'failed'
+    });
 
+    // ========== PROCESS INDIVIDUAL DATASETS ==========
+
+    // Process screens data
+    const screensByGene = {};
+    if (screensRaw && typeof screensRaw === 'object') {
+        Object.keys(screensRaw).forEach(geneKey => {
+            const key = geneKey.toUpperCase();
+            screensByGene[key] = screensRaw[geneKey].map(screen => ({
+                dataset: screen.source || screen.dataset || 'Unknown',
+                classification: screen.result || screen.classification || 'Not Reported',
+                paper_link: screen.paper_link || screen.paper || null,
+                mean_percent_ciliated: screen.mean_percent_ciliated ?? screen.mean ?? null,
+                sd_percent_ciliated: screen.sd_percent_ciliated ?? screen.sd ?? null,
+                z_score: screen.z_score ?? screen.z ?? null
+            }));
+        });
+    }
+    console.log(`Processed screens data: ${Object.keys(screensByGene).length} genes`);
+
+    // Process single-cell expression data
+    const scExpressionByGene = {};
+    if (cellxgeneRaw && typeof cellxgeneRaw === 'object') {
+        Object.keys(cellxgeneRaw).forEach(geneKey => {
+            scExpressionByGene[geneKey.toUpperCase()] = cellxgeneRaw[geneKey];
+        });
+    }
+
+    // Process tissue expression data
+    const tissueExpressionByGene = {};
     function parseTsvToObjects(text) {
         if (!text) return [];
         const lines = text.trim().split(/\r?\n/).filter(Boolean);
         if (!lines.length) return [];
         const header = lines.shift().split('\t').map(h => h.trim());
-        const norm = header.map(h => h.toLowerCase().replace(/\s+/g, '_'));
-        return lines.map(l => {
-            const cols = l.split('\t');
-            const o = {};
-            norm.forEach((k, i) => o[k] = cols[i] ?? '');
-            return o;
+        const normalizedHeader = header.map(h => h.toLowerCase().replace(/\s+/g, '_'));
+        return lines.map(line => {
+            const cols = line.split('\t');
+            const obj = {};
+            normalizedHeader.forEach((key, index) => {
+                obj[key] = cols[index] ?? '';
+            });
+            return obj;
         });
     }
 
-    const screensByGene = {};
-    if (screensRaw && typeof screensRaw === 'object') {
-        for (const k of Object.keys(screensRaw)) {
-            const list = Array.isArray(screensRaw[k]) ? screensRaw[k] : [];
-            const key = String(k).toUpperCase();
-            screensByGene[key] = list.map(i => ({
-                dataset: i.source || i.dataset || null,
-                classification: i.result || i.classification || null,
-                paper_link: i.paper_link || i.paper || i.link || null,
-                mean_percent_ciliated: i.mean_percent_ciliated ?? i.mean ?? null,
-                sd_percent_ciliated: i.sd_percent_ciliated ?? i.sd ?? null,
-                z_score: i.z_score ?? i.z ?? null
-            }));
-        }
-    }
-
-    const scExpressionByGene = {};
-    if (cellxgeneRaw && typeof cellxgeneRaw === 'object') {
-        for (const k of Object.keys(cellxgeneRaw)) {
-            scExpressionByGene[String(k).toUpperCase()] = cellxgeneRaw[k];
-        }
-    }
-
-    const tissueExpressionByGene = {};
     const rnaRows = parseTsvToObjects(rnaTsv);
-    for (const r of rnaRows) {
-        const g = r.gene_name || r.gene || r.gene_symbol || r.geneid || r.gene_id;
-        if (!g) continue;
-        const key = String(g).toUpperCase();
-        if (!tissueExpressionByGene[key]) tissueExpressionByGene[key] = {};
-        const val = parseFloat(r.ntpm ?? r.ntpms ?? r.tpm ?? r.value ?? NaN);
-        const tissue = r.tissue || r.tissue_name || r.tissue_type || r.sample || 'unknown';
-        tissueExpressionByGene[key][tissue] = Number.isFinite(val) ? val : null;
-    }
+    rnaRows.forEach(row => {
+        const geneName = row.gene_name || row.gene || row.gene_symbol || row.geneid || row.gene_id;
+        if (!geneName) return;
+        
+        const key = geneName.toUpperCase();
+        const tissue = row.tissue || row.tissue_name || row.tissue_type || row.sample || 'unknown';
+        const expressionValue = parseFloat(row.ntpm ?? row.ntpms ?? row.tpm ?? row.value ?? NaN);
+        
+        if (!tissueExpressionByGene[key]) {
+            tissueExpressionByGene[key] = {};
+        }
+        tissueExpressionByGene[key][tissue] = Number.isFinite(expressionValue) ? expressionValue : null;
+    });
 
+    // Process CORUM complexes
     const corumByGene = {};
     if (Array.isArray(corumRaw)) {
-        for (const c of corumRaw) {
-            const name = c.complex_name || c.name || c.complex || 'Unnamed';
-            const subs = Array.isArray(c.subunits) ? c.subunits : [];
-            const names = subs.map(s => (s.gene_name || s.gene || s.name || '').toString()).filter(Boolean);
-            for (const g of names) {
-                const key = g.toUpperCase();
-                if (!corumByGene[key]) corumByGene[key] = {};
-                corumByGene[key][name] = names;
-            }
-        }
+        corumRaw.forEach(complex => {
+            const complexName = complex.complex_name || complex.name || complex.complex || 'Unnamed Complex';
+            const subunits = Array.isArray(complex.subunits) ? complex.subunits : [];
+            const geneNames = subunits.map(subunit => 
+                (subunit.gene_name || subunit.gene || subunit.name || '').toString().toUpperCase()
+            ).filter(name => name);
+            
+            geneNames.forEach(geneName => {
+                if (!corumByGene[geneName]) {
+                    corumByGene[geneName] = {};
+                }
+                corumByGene[geneName][complexName] = geneNames;
+            });
+        });
     }
+    console.log(`Processed CORUM data: ${Object.keys(corumByGene).length} genes`);
 
+    // Process domain data
     const domainsByGene = {};
-    window.CiliAI_DomainData = domainRaw || {};
-    if (domainRaw?.enriched_domains) {
-        for (const dk of Object.keys(domainRaw.enriched_domains)) {
-            const d = domainRaw.enriched_domains[dk];
-            const desc = d.description || d.desc || '';
-            const pfam = d.domain_id || d.pfam || dk;
-            const genes = Array.isArray(d.ciliary_genes_with_domain) ? d.ciliary_genes_with_domain : d.genes || [];
-            for (const g of genes) {
-                const key = String(g).toUpperCase();
-                if (!domainsByGene[key]) domainsByGene[key] = { pfam_ids: [], domain_descriptions: [] };
-                if (pfam && !domainsByGene[key].pfam_ids.includes(pfam)) domainsByGene[key].pfam_ids.push(pfam);
-                if (desc && !domainsByGene[key].domain_descriptions.includes(desc)) domainsByGene[key].domain_descriptions.push(desc);
+    if (domainRaw && typeof domainRaw === 'object') {
+        Object.keys(domainRaw).forEach(geneKey => {
+            const key = geneKey.toUpperCase();
+            const domainEntries = domainRaw[geneKey];
+            if (Array.isArray(domainEntries)) {
+                domainsByGene[key] = {
+                    pfam_ids: [...new Set(domainEntries.map(d => d.domain_id).filter(Boolean))],
+                    domain_descriptions: [...new Set(domainEntries.map(d => d.description).filter(Boolean))]
+                };
             }
-        }
+        });
     }
+    console.log(`Processed domain data: ${Object.keys(domainsByGene).length} genes`);
 
-    const modulesByGene = {};
-    if (liRaw?.genes && liRaw?.summary?.class_list) {
-        for (const gk of Object.keys(liRaw.genes)) {
-            const o = liRaw.genes[gk];
-            const name = o.g || o.gene || gk;
-            const cls = liRaw.summary.class_list[o.c];
-            if (name && cls) {
-                const key = String(name).toUpperCase();
-                if (!modulesByGene[key]) modulesByGene[key] = [];
-                const pretty = cls.replace(/_/g, ' ');
-                if (!modulesByGene[key].includes(pretty)) modulesByGene[key].push(pretty);
+    // Process Li 2014 phylogeny data
+    const liMap = {};
+    if (liRaw?.genes) {
+        Object.keys(liRaw.genes).forEach(entrezId => {
+            const geneData = liRaw.genes[entrezId];
+            const geneSymbol = geneData.g || geneData.gene;
+            
+            if (geneSymbol) {
+                const key = geneSymbol.toUpperCase();
+                liMap[key] = {
+                    class: (Array.isArray(liRaw.summary?.class_list) && liRaw.summary.class_list[geneData.c]) || 'Unknown',
+                    class_id: geneData.c,
+                    species_data: geneData.s || [],
+                    entrez_id: geneData.e || entrezId
+                };
             }
-        }
+        });
     }
+    console.log(`Processed Li 2014 data: ${Object.keys(liMap).length} genes`);
 
-    // In the loadCiliAIData function, replace the phylogeny mapping section with this:
-
-// Create phylogeny maps for quick lookup
-const liMap = {};
-const neversMap = {};
-
-// Li 2014 phylogeny data - FIXED for Entrez ID keys
-if (liRaw?.genes) {
-    Object.keys(liRaw.genes).forEach(entrezId => {
-        const geneData = liRaw.genes[entrezId];
-        const geneSymbol = geneData.g || geneData.gene; // This contains the gene symbol
-        
-        if (geneSymbol) {
+    // Process Nevers 2017 phylogeny data
+    const neversMap = {};
+    if (neversRaw?.genes) {
+        Object.keys(neversRaw.genes).forEach(geneSymbol => {
+            if (geneSymbol === 'Gene Name') return;
+            
+            const geneData = neversRaw.genes[geneSymbol];
             const key = geneSymbol.toUpperCase();
-            liMap[key] = {
-                class: (Array.isArray(liRaw.summary?.class_list) && liRaw.summary.class_list[geneData.c]) || 'Unknown',
-                class_id: geneData.c,
-                species_data: geneData.s || [],
-                entrez_id: geneData.e || entrezId
-            };
-        }
-    });
-    
-    console.log('Li 2014 mapping complete. Total genes mapped:', Object.keys(liMap).length);
-    console.log('Sample Li mappings:', 
-        Object.keys(liMap).slice(0, 5).map(k => `${k} -> ${liMap[k]?.class}`)
-    );
-}
+            
+            if (geneData && geneData.s && Array.isArray(geneData.s) && geneData.s.length > 0) {
+                neversMap[key] = {
+                    species_count: geneData.s.length,
+                    species_data: geneData.s,
+                    in_ciliated_organisms: calculateCiliatedOrganisms(geneData.s, neversRaw)
+                };
+            }
+        });
+    }
+    console.log(`Processed Nevers 2017 data: ${Object.keys(neversMap).length} genes`);
 
-// Nevers 2017 phylogeny data - already uses gene symbols as keys
-if (neversRaw?.genes) {
-    Object.keys(neversRaw.genes).forEach(geneSymbol => {
-        // Skip the header entry
-        if (geneSymbol === 'Gene Name') return;
+    function calculateCiliatedOrganisms(speciesIndices, neversData) {
+        if (!neversData?.organism_groups?.ciliated_organisms) return speciesIndices.length;
         
-        const geneData = neversRaw.genes[geneSymbol];
-        const key = geneSymbol.toUpperCase();
-        
-        // Only process if it has valid data (not empty array)
-        if (geneData && geneData.s && Array.isArray(geneData.s) && geneData.s.length > 0) {
-            neversMap[key] = {
-                species_count: geneData.s.length,
-                species_data: geneData.s,
-                in_ciliated_organisms: calculateCiliatedOrganisms(geneData.s, neversRaw)
-            };
-        }
-    });
-    
-    console.log('Nevers 2017 mapping complete. Total genes mapped:', Object.keys(neversMap).length);
-    console.log('Sample Nevers mappings:',
-        Object.keys(neversMap).slice(0, 5).map(k => `${k} -> ${neversMap[k]?.species_count} species`)
-    );
-}
-
-// Helper function for Nevers data
-function calculateCiliatedOrganisms(speciesIndices, neversData) {
-    if (!neversData?.organism_groups?.ciliated_organisms) return speciesIndices.length;
-    
-    let ciliatedCount = 0;
-    speciesIndices.forEach(idx => {
-        if (idx < neversData.organism_groups.ciliated_organisms.length) {
-            ciliatedCount++;
-        }
-    });
-    return ciliatedCount;
-}
-
-// Make maps globally available for debugging
-window.liMap = liMap;
-window.neversMap = neversMap;
-
-    function extractCiliopathyInfo(o) {
-        const split = s => String(s).split(';').map(t => t.trim()).filter(Boolean);
-        const cili = new Set(), cls = new Set();
-        if (Array.isArray(o.ciliopathy)) o.ciliopathy.forEach(s => split(s).forEach(v => cili.add(v)));
-        else if (typeof o.ciliopathy === 'string' && o.ciliopathy) split(o.ciliopathy).forEach(v => cili.add(v));
-        if (Array.isArray(o.ciliopathies)) o.ciliopathies.forEach(s => split(s).forEach(v => cili.add(v)));
-        else if (typeof o.ciliopathies === 'string' && o.ciliopathies) split(o.ciliopathies).forEach(v => cili.add(v));
-        if (Array.isArray(o.ciliopathy_classification)) o.ciliopathy_classification.forEach(s => split(s).forEach(v => cls.add(v)));
-        else if (typeof o.ciliopathy_classification === 'string' && o.ciliopathy_classification) split(o.ciliopathy_classification).forEach(v => cls.add(v));
-        return { ciliopathy: Array.from(cili), ciliopathy_classification: Array.from(cls) };
+        let ciliatedCount = 0;
+        speciesIndices.forEach(idx => {
+            if (idx < neversData.organism_groups.ciliated_organisms.length) {
+                ciliatedCount++;
+            }
+        });
+        return ciliatedCount;
     }
 
-    const hub = Array.isArray(ciliahubRaw) ? ciliahubRaw : [];
-    if (!hub.length) {
+    // ========== SET GLOBAL VARIABLES FOR PARSER ==========
+    
+    // Set global variables BEFORE main data integration
+    window.screensByGene = screensByGene;
+    window.corumByGene = corumByGene;
+    window.domainsByGene = domainsByGene;
+    window.liMap = liMap;
+    window.neversMap = neversMap;
+    window.CiliAI_UMAP = umapRaw || [];
+    window.CiliAI_snRNA = cellxgeneRaw || {};
+
+    console.log('Global datasets set for parser:', {
+        screens: Object.keys(screensByGene).length,
+        corum: Object.keys(corumByGene).length,
+        domains: Object.keys(domainsByGene).length,
+        liMap: Object.keys(liMap).length,
+        neversMap: Object.keys(neversMap).length
+    });
+
+    // ========== MAIN DATA INTEGRATION ==========
+
+    // Process ciliopathy information
+    function extractCiliopathyInfo(geneObj) {
+        const splitString = (str) => String(str).split(';').map(s => s.trim()).filter(Boolean);
+        const ciliopathies = new Set();
+        const classifications = new Set();
+
+        if (Array.isArray(geneObj.ciliopathy)) {
+            geneObj.ciliopathy.forEach(item => splitString(item).forEach(c => ciliopathies.add(c)));
+        } else if (typeof geneObj.ciliopathy === 'string') {
+            splitString(geneObj.ciliopathy).forEach(c => ciliopathies.add(c));
+        }
+
+        if (Array.isArray(geneObj.ciliopathy_classification)) {
+            geneObj.ciliopathy_classification.forEach(item => splitString(item).forEach(c => classifications.add(c)));
+        } else if (typeof geneObj.ciliopathy_classification === 'string') {
+            splitString(geneObj.ciliopathy_classification).forEach(c => classifications.add(c));
+        }
+
+        return {
+            ciliopathy: Array.from(ciliopathies),
+            ciliopathy_classification: Array.from(classifications)
+        };
+    }
+
+    // Main data integration
+    const hubData = Array.isArray(ciliahubRaw) ? ciliahubRaw : [];
+    if (!hubData.length) {
         console.error('ciliahub_data.json empty or missing');
         window.CiliAI_MasterData = [];
         return [];
     }
 
-    const master = hub.map(g => {
-        const gene = g.gene ?? g.g ?? g.name ?? g.symbol ?? null;
-        const key = gene ? String(gene).toUpperCase() : null;
+    const masterData = hubData.map(gene => {
+        const geneSymbol = gene.gene ?? gene.g ?? gene.name ?? gene.symbol ?? null;
+        const geneKey = geneSymbol ? geneSymbol.toUpperCase() : null;
 
-        const explicit = {
-            gene,
-            ensembl_id: g.ensembl_id || null,
-            lof_effects: g.lof_effects || "Not Reported",
-            percent_ciliated_cells_effects: g.percent_ciliated_cells_effects || "Not Reported",
-            overexpression_effects: g.overexpression_effects || "Not Reported",
-            description: g.description || null,
-            omim_id: g.omim_id || null,
-            functional_summary: g.functional_summary || null,
-            localization: g.localization || null,
-            reference: g.reference || null,
-            pfam_ids: Array.isArray(g.pfam_ids) ? g.pfam_ids : [],
-            domain_descriptions: Array.isArray(g.domain_descriptions) ? g.domain_descriptions : [],
-            synonym: g.synonym || null,
-            evidence_source: g.evidence_source || "CiliaMiner"
+        // Extract explicit fields
+        const explicitFields = {
+            gene: geneSymbol,
+            ensembl_id: gene.ensembl_id || null,
+            lof_effects: gene.lof_effects || "Not Reported",
+            percent_ciliated_cells_effects: gene.percent_ciliated_cells_effects || "Not Reported",
+            overexpression_effects: gene.overexpression_effects || "Not Reported",
+            description: gene.description || null,
+            omim_id: gene.omim_id || null,
+            functional_summary: gene.functional_summary || null,
+            localization: gene.localization || null,
+            reference: gene.reference || null,
+            pfam_ids: Array.isArray(gene.pfam_ids) ? gene.pfam_ids : [],
+            domain_descriptions: Array.isArray(gene.domain_descriptions) ? gene.domain_descriptions : [],
+            synonym: gene.synonym || null,
+            evidence_source: gene.evidence_source || "CiliaMiner",
+            functional_category: gene.functional_category || null,
+            string_link: gene.string_link || null
         };
 
-        const orth = {
-            ortholog_mouse: g.ortholog_mouse || null,
-            ortholog_c_elegans: g.ortholog_c_elegans || null,
-            ortholog_xenopus: g.ortholog_xenopus || null,
-            ortholog_zebrafish: g.ortholog_zebrafish || null
+        // Orthologs
+        const orthologs = {
+            ortholog_mouse: gene.ortholog_mouse || null,
+            ortholog_c_elegans: gene.ortholog_c_elegans || null,
+            ortholog_xenopus: gene.ortholog_xenopus || null,
+            ortholog_zebrafish: gene.ortholog_zebrafish || null,
+            ortholog_drosophila: gene.ortholog_drosophila || null
         };
 
-        const { ciliopathy, ciliopathy_classification } = extractCiliopathyInfo(g);
+        // Ciliopathy info
+        const { ciliopathy, ciliopathy_classification } = extractCiliopathyInfo(gene);
 
-        const allScreens = [...(Array.isArray(g.screens) ? g.screens : []), ...(key ? (screensByGene[key] || []) : [])];
-        const extDom = key ? (domainsByGene[key] || { pfam_ids: [], domain_descriptions: [] }) : { pfam_ids: [], domain_descriptions: [] };
-        const mergedComplex = { ...(g.complex_components && typeof g.complex_components === 'object' ? g.complex_components : {}), ...(key ? (corumByGene[key] || {}) : {}) };
-        const scExpr = key ? (scExpressionByGene[key] || null) : null;
-        const tissueExpr = key ? (tissueExpressionByGene[key] || null) : null;
-        const modules = key ? (modulesByGene[key] || []) : [];
-        const phylo = {
-            li_2014: key ? (liMap[key] || null) : null,
-            nevers_2017: key ? (neversMap[key] || null) : null
+        // Merge screens data
+        const originalScreens = Array.isArray(gene.screens) ? gene.screens : [];
+        const additionalScreens = geneKey ? (screensByGene[geneKey] || []) : [];
+        const allScreens = [...originalScreens, ...additionalScreens];
+
+        // Merge domain data
+        const externalDomains = geneKey ? (domainsByGene[geneKey] || { pfam_ids: [], domain_descriptions: [] }) : { pfam_ids: [], domain_descriptions: [] };
+        
+        // Merge complex data
+        const originalComplexes = gene.complex_components && typeof gene.complex_components === 'object' ? gene.complex_components : {};
+        const corumComplexes = geneKey ? (corumByGene[geneKey] || {}) : {};
+        const mergedComplexes = { ...originalComplexes, ...corumComplexes };
+
+        // Expression data
+        const scExpression = geneKey ? (scExpressionByGene[geneKey] || null) : null;
+        const tissueExpression = geneKey ? (tissueExpressionByGene[geneKey] || null) : null;
+
+        // Functional modules from Li data
+        const modules = [];
+        if (geneKey && liMap[geneKey]) {
+            const className = liMap[geneKey].class;
+            if (className && className !== 'No_data' && className !== 'Other') {
+                modules.push(className.replace(/_/g, ' '));
+            }
+        }
+
+        // Phylogeny data
+        const phylogeny = {
+            li_2014: geneKey ? (liMap[geneKey] || null) : null,
+            nevers_2017: geneKey ? (neversMap[geneKey] || null) : null
         };
 
+        // Return integrated gene object
         return {
-            ...g,
-            ...explicit,
-            ...orth,
+            // Original data
+            ...gene,
+            
+            // Explicit fields
+            ...explicitFields,
+            ...orthologs,
+            
+            // Processed arrays
             ciliopathy,
             ciliopathy_classification,
             screens: allScreens,
-            expression: { scRNA: scExpr, tissue: tissueExpr },
-            complex_components: mergedComplex,
-            pfam_ids: Array.from(new Set([...explicit.pfam_ids, ...extDom.pfam_ids])),
-            domain_descriptions: Array.from(new Set([...explicit.domain_descriptions, ...extDom.domain_descriptions])),
+            
+            // Expression data
+            expression: {
+                scRNA: scExpression,
+                tissue: tissueExpression
+            },
+            
+            // Complex data
+            complex_components: mergedComplexes,
+            
+            // Domain data (merged)
+            pfam_ids: Array.from(new Set([
+                ...explicitFields.pfam_ids,
+                ...externalDomains.pfam_ids
+            ])),
+            domain_descriptions: Array.from(new Set([
+                ...explicitFields.domain_descriptions,
+                ...externalDomains.domain_descriptions
+            ])),
+            
+            // Functional modules
             functional_modules: modules,
-            phylogeny: phylo
+            
+            // Phylogeny data
+            phylogeny
         };
     });
 
-    window.CiliAI_MasterData = master;
-    console.log(`CiliAI: ${master.length} genes loaded – UMAP & snRNA-seq cached`);
-    return master;
+    // Add genes from phylogeny data that are missing from master data
+    function addPhylogenyOnlyGenes(masterData, liMap, neversMap) {
+        const existingGenes = new Set(masterData.map(g => g.gene?.toUpperCase()));
+        const phylogenyOnlyGenes = [];
+        
+        // Add genes from Li 2014 that are missing
+        Object.keys(liMap).forEach(geneSymbol => {
+            if (!existingGenes.has(geneSymbol)) {
+                phylogenyOnlyGenes.push({
+                    gene: geneSymbol,
+                    description: `Gene found in Li et al. 2014 evolutionary analysis`,
+                    evidence_source: "Li_2014_Phylogeny",
+                    phylogeny: {
+                        li_2014: liMap[geneSymbol],
+                        nevers_2017: neversMap[geneSymbol] || null
+                    },
+                    is_phylogeny_only: true
+                });
+            }
+        });
+        
+        // Add genes from Nevers 2017 that are missing (and not already added from Li)
+        Object.keys(neversMap).forEach(geneSymbol => {
+            if (!existingGenes.has(geneSymbol) && !phylogenyOnlyGenes.find(g => g.gene === geneSymbol)) {
+                phylogenyOnlyGenes.push({
+                    gene: geneSymbol,
+                    description: `Gene found in Nevers et al. 2017 evolutionary analysis`,
+                    evidence_source: "Nevers_2017_Phylogeny",
+                    phylogeny: {
+                        li_2014: liMap[geneSymbol] || null,
+                        nevers_2017: neversMap[geneSymbol]
+                    },
+                    is_phylogeny_only: true
+                });
+            }
+        });
+        
+        console.log(`Added ${phylogenyOnlyGenes.length} phylogeny-only genes to master data`);
+        return [...masterData, ...phylogenyOnlyGenes];
+    }
+
+    const enhancedMasterData = addPhylogenyOnlyGenes(masterData, liMap, neversMap);
+    window.CiliAI_MasterData = enhancedMasterData;
+
+    console.log(`CiliAI: ${enhancedMasterData.length} genes successfully integrated`);
+    console.log('Data integration complete:', {
+        totalGenes: enhancedMasterData.length,
+        withScreens: enhancedMasterData.filter(g => g.screens && g.screens.length > 0).length,
+        withDomains: enhancedMasterData.filter(g => g.pfam_ids && g.pfam_ids.length > 0).length,
+        withComplexes: enhancedMasterData.filter(g => Object.keys(g.complex_components || {}).length > 0).length,
+        withPhylogeny: enhancedMasterData.filter(g => g.phylogeny.li_2014 || g.phylogeny.nevers_2017).length
+    });
+
+    return enhancedMasterData;
 }
 
 /* ==============================================================
