@@ -250,34 +250,39 @@ async function testScreenDataMerge() {
 // ==========================================================
 // 2️⃣ Question Parsing (The "Brain")
 // ==========================================================
-async function parseCiliAIQuestion(question) {
+async function parseCiliAIQuestion(question, masterData) { // <-- ADDED ARGUMENT
     const q = question.toLowerCase();
     
     const structuredQuery = {
-        genes: [],            // Genes to search for (e.g., [ARL13B, FOXJ1])
-        filters: {},          // Strict filters (e.g., { localization: "cilia" })
-        intent: {},           // What the user wants to see (e.g., { screens: true, domains: true })
-        comparison: false,    // Is this a "compare A and B" query?
-        species: null,        // e.g., "human", "mouse", "c. elegans"
-        plotType: null        // 'umap_expression', 'umap_cluster', 'phylogeny'
+        genes: [],
+        filters: {},
+        intent: {},
+        comparison: false,
+        species: null,
+        plotType: null
     };
 
     // --- 1. Extract Genes ---
-    if (window.CiliSearchMap) { // Assuming CiliSearchMap is built by script.js
-        for (const [key, gene] of window.CiliSearchMap.entries()) {
-            const regex = new RegExp(`\\b${key}\\b`, 'i');
+    
+    // ⬇️ --- FIX: Use the masterData directly --- ⬇️
+    if (masterData && masterData.length > 0) {
+        // Build a temporary, simple gene list for this query
+        const allGenes = masterData.map(g => g.gene.toLowerCase());
+        for (const gene of allGenes) {
+            const regex = new RegExp(`\\b${gene}\\b`, 'i'); // Find whole word
             if (regex.test(q)) {
-                if (!structuredQuery.genes.includes(gene)) {
-                    structuredQuery.genes.push(gene);
+                if (!structuredQuery.genes.includes(gene.toUpperCase())) {
+                    structuredQuery.genes.push(gene.toUpperCase());
                 }
             }
         }
     } else {
-        console.warn("CiliSearchMap not found. Gene parsing may be slow or incomplete.");
-        // Fallback or error
+        console.error("CiliAI Parser Error: Master data is empty or not provided. Gene parsing failed.");
     }
+    // ⬆️ --- END OF FIX --- ⬆️
 
     // --- 2. Extract Keywords, Filters & Intents ---
+    // (This section remains identical to the previous version)
     
     // Localization
     if (q.includes('localize') || q.includes('localization')) structuredQuery.intent.localization = true;
@@ -299,8 +304,9 @@ async function parseCiliAIQuestion(question) {
 
     // Functional Modules (from Li et al.)
     if (q.includes('module')) structuredQuery.intent.modules = true;
-    if (q.includes('ciliary tip')) structuredQuery.filters.functional_modules = 'Ciliary tip'; // Note: This data isn't in your files
-    if (q.includes('transition zone')) structuredQuery.filters.functional_modules = 'Transition zone'; // Note: This data isn't in your files
+    if (q.includes('ciliary tip')) structuredQuery.filters.functional_modules = 'Ciliary tip'; 
+    if (q.includes('transition zone') || q.includes('tz')) structuredQuery.filters.functional_modules = 'Transition zone';
+    if (q.includes('ciliary base')) structuredQuery.filters.functional_modules = 'Ciliary base';
     if (q.includes('ciliary specific')) structuredQuery.filters.functional_modules = 'Ciliary specific';
 
     // Orthologs
@@ -343,22 +349,18 @@ async function parseCiliAIQuestion(question) {
 
     // --- 3. Determine Final Intent ---
     
-    // If genes are mentioned, default to showing a description unless other intents are specified
     if (structuredQuery.genes.length > 0 && Object.keys(structuredQuery.intent).length === 0) {
-        structuredQuery.intent.description = true; // This will trigger the full card
+        structuredQuery.intent.description = true; 
     }
     
-    // If no genes are mentioned, the filter *is* the intent (e.g., "List genes in the BBSome")
     if (structuredQuery.genes.length === 0 && Object.keys(structuredQuery.filters).length > 0) {
         structuredQuery.intent.list_genes = true;
     }
 
-    // Handle "compare" keyword
     if (q.includes('compare')) {
         structuredQuery.comparison = true;
     }
     
-    // Handle "is X a ciliary gene?"
     if (q.startsWith('is') && (q.includes('cilia') || q.includes('ciliary'))) {
         structuredQuery.intent.localization = true;
     }
@@ -371,7 +373,7 @@ async function parseCiliAIQuestion(question) {
 // 3️⃣ Query Execution (The "Engine")
 // ==========================================================
 function queryGenes(structuredQuery) {
-    const data = window.CiliAI_MasterData;
+    const data = window.CiliAI_MasterData; // This is now guaranteed to be loaded
     if (!data) {
         console.error("CiliAI_MasterData is not loaded!");
         return [];
@@ -391,13 +393,13 @@ function queryGenes(structuredQuery) {
     const filters = structuredQuery.filters;
     if (Object.keys(filters).length > 0) {
         results = results.filter(g => {
-            // Check localization
-            if (filters.localization) {
-                const locs = (g.localization || "").toLowerCase();
-                if (!locs.includes(filters.localization)) return false;
+            
+            // ⬇️ --- FIX: Add check for filter existence --- ⬇️
+            if (filters.localization && (g.localization || "").toLowerCase().includes(filters.localization) === false) {
+                return false;
             }
             
-            // Check complex (e.g., "BBSome")
+            // ⬇️ --- FIX: Add check for filter existence --- ⬇️
             if (filters.complexes) {
                 const complexNames = Object.keys(g.complex_components || {});
                 if (!complexNames.some(name => name.toLowerCase().includes(filters.complexes.toLowerCase()))) {
@@ -405,7 +407,7 @@ function queryGenes(structuredQuery) {
                 }
             }
 
-            // Check functional module (e.g., "Ciliary specific")
+            // ⬇️ --- FIX: Add check for filter existence --- ⬇️
             if (filters.functional_modules) {
                 const modules = g.functional_modules || [];
                 if (!modules.some(mod => mod.toLowerCase().includes(filters.functional_modules.toLowerCase()))) {
@@ -413,45 +415,49 @@ function queryGenes(structuredQuery) {
                 }
             }
 
-            // Check ciliopathy (e.g., "Joubert syndrome")
+            // ⬇️ --- FIX: Add check for filter existence --- ⬇️
             if (filters.ciliopathy) {
-                const ciliopathies = (g.ciliopathy || []).concat(g.ciliopathies || []); // Combine fields if necessary
+                const ciliopathies = (g.ciliopathy || []).concat(g.ciliopathies || []);
                 if (!ciliopathies.some(c => c.toLowerCase().includes(filters.ciliopathy.toLowerCase()))) {
                     return false;
                 }
             }
             
-            // Check bulk tissue expression
+            // ⬇️ --- FIX: Add check for filter existence --- ⬇️
             if (filters.tissue) {
+                // Find a tissue key that *contains* the filter (e.g., "adipose tissue" contains "tissue")
+                // This is a basic fix; your tissue names must be precise
                 const tissueName = Object.keys(g.expression?.tissue || {}).find(t => t.toLowerCase().includes(filters.tissue));
                 if (!tissueName || !g.expression.tissue[tissueName] || parseFloat(g.expression.tissue[tissueName]) <= 0) {
                     return false;
                 }
             }
 
-            // Check scRNA cell type expression
+            // ⬇️ --- FIX: Add check for filter existence --- ⬇️
             if (filters.cell_type) {
                 if (!g.expression?.scRNA?.[filters.cell_type] || parseFloat(g.expression.scRNA[filters.cell_type]) <= 0) {
                     return false;
                 }
             }
             
-            // Check species (for orthologs)
+            // ⬇️ --- FIX: Add check for filter existence --- ⬇️
             if (filters.species) {
-                const key = `ortholog_${filters.species}`;
+                const key = `ortholog_${filters.species}`; // e.g., ortholog_c_elegans
                 if (!g[key]) return false;
             }
 
-            return true;
+            return true; // Only keep genes that pass all active filters
         });
     }
     
     // 3. Handle specific sorting
     if (structuredQuery.intent.expression && filters.tissue && structuredQuery.genes.length === 0) {
-        const tissueName = filters.tissue; // This is simplified
+        const tissue = filters.tissue;
         results.sort((a, b) => {
-            const valA = parseFloat(a.expression?.tissue?.[tissueName] || 0); // Needs exact match
-            const valB = parseFloat(b.expression?.tissue?.[tissueName] || 0);
+            const tissueA = Object.keys(a.expression?.tissue || {}).find(t => t.toLowerCase().includes(tissue));
+            const tissueB = Object.keys(b.expression?.tissue || {}).find(t => t.toLowerCase().includes(tissue));
+            const valA = parseFloat(a.expression?.tissue?.[tissueA] || 0);
+            const valB = parseFloat(b.expression?.tissue?.[tissueB] || 0);
             return valB - valA;
         });
         results = results.slice(0, 10); // Return top 10
@@ -737,7 +743,7 @@ function ciliAI_waitForElements() {
     const aiInput = document.getElementById('aiQueryInput');
     const exampleQueries = document.querySelectorAll('.example-queries span');
 
-    // --- Main Query Function ---
+   // --- Main Query Function ---
     const handleQuery = async () => {
         const input = aiInput.value.trim();
         if (!input) return;
@@ -747,33 +753,33 @@ function ciliAI_waitForElements() {
         resultArea.innerHTML = '<p>Processing...</p>';
 
         try {
-            // 1. Load data if not already loaded
-            if (!window.CiliAI_MasterData) {
+            // ⬇️ --- FIX: Load data *first* --- ⬇️
+            let masterData = window.CiliAI_MasterData;
+            if (!masterData) {
                 console.log('[CiliAI] Data not found, loading now...');
-                await loadCiliAIData();
+                masterData = await loadCiliAIData(); // Wait for data to be loaded
             }
             
-            // 2. Parse the question
-            const structuredQuery = await parseCiliAIQuestion(input);
+            // 2. Parse the question (NOW we pass the data to the parser)
+            const structuredQuery = await parseCiliAIQuestion(input, masterData); // <-- PASS DATA HERE
             
-            // --- 3. Route query to the correct function ---
+            // 3. Route query to the correct function
             if (structuredQuery.plotType === 'phylogeny') {
                 const html = await getPhylogenyAnalysis(structuredQuery.genes);
                 resultArea.innerHTML = html;
             } else if (structuredQuery.plotType === 'umap_expression' && structuredQuery.genes.length > 0) {
-                // Plot UMAP expression for the first gene
                 await displayUmapGeneExpression(structuredQuery.genes[0]);
             } else if (structuredQuery.plotType === 'umap_cluster') {
                 await displayUmapPlot();
             } else {
                 // Default to standard gene query
-                const results = queryGenes(structuredQuery);
+                const results = queryGenes(structuredQuery); // queryGenes will use window.CiliAI_MasterData
                 displayCiliAIResults(results, structuredQuery);
             }
 
         } catch (err) {
             console.error('❌ CiliAI query failed:', err);
-            resultArea.innerHTML = `<p>Error: Failed to process your question.</p><pre>${err.message}</pre>`;
+            resultArea.innerHTML = `<p>Error: Failed to process your question.</p><pre>${err.message}\n${err.stack}</pre>`;
         }
     };
 
