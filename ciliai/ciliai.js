@@ -28,6 +28,8 @@
 /* 1. CILIARY GENE CACHE                                                      */
 /* -------------------------------------------------------------------------- */
 window.ciliAI_MasterDatabase = [];
+window.ciliAI_MasterMap = new Map();
+window.ciliAI_MasterDatabaseReady = false;
 const ciliAI_geneCache = new Map();
 
 (async () => {
@@ -42,52 +44,185 @@ const ciliAI_geneCache = new Map();
 /* 2. GATEKEEPER FUNCTION: GET ALL DATA FOR A GENE                             */
 /* -------------------------------------------------------------------------- */
 function ciliAI_getGeneData(geneName) {
-    const upperGeneName = geneName.toUpperCase();
-
-    // Check cache first
-    if (ciliAI_geneCache.has(upperGeneName)) {
-        return ciliAI_geneCache.get(upperGeneName);
+    if (!window.ciliAI_MasterDatabaseReady) {
+        console.warn("[CiliAI] Master Database not loaded yet!");
+        return { notReady: true };
     }
 
-    // Ensure master database exists
-    if (!window.ciliAI_MasterDatabase || window.ciliAI_MasterDatabase.length === 0) {
-        console.error("[CiliAI] Master Database is not built! Cannot get gene data.");
-        return { notFound: true, error: "Master Database not loaded." };
+    const upperGene = geneName.toUpperCase();
+    const geneData = window.ciliAI_MasterMap.get(upperGene);
+
+    if (!geneData) {
+        return { notFound: true };
     }
 
-    // Find gene in master database
-    const geneData = window.ciliAI_MasterDatabase.find(g => g.gene.toUpperCase() === upperGeneName);
-
-    if (geneData) {
-        // Cache and return the full structured data
-        const combinedData = {
-            geneInfo: geneData,       // full master entry
-            phylogeny: geneData.phylogeny || {},
-            domains: geneData.domains || [],
-            complex: geneData.complexes || [],
-            tissue: geneData.tissue || [],
-            scRNA: geneData.expression || [],
-            screens: geneData.screens || [],
-            umap: geneData.umap || null,
-            datasets: geneData.datasets || [],
-            meta: geneData.meta || {},
-            lastFetched: new Date().toISOString()
-        };
-
-        ciliAI_geneCache.set(upperGeneName, combinedData);
-        return combinedData;
-    } else {
-        // Gene not found
-        console.warn(`[CiliAI] Gene ${upperGeneName} not found in Master Database.`);
-        const notFound = { notFound: true };
-        ciliAI_geneCache.set(upperGeneName, notFound);
-        return notFound;
-    }
+    return geneData;
 }
 
+/* -------------------------------------------------------------------------- */
+/* 3. BUILD MASTER DATABASE                                                    */
+/* -------------------------------------------------------------------------- */
+async function buildMasterDatabase() {
+    console.log("🚀 [CiliAI] Building master database...");
+
+    const urls = {
+        umap: 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/umap_data.json',
+        screens: 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/cilia_screens_data.json',
+        cellxgene: 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/cellxgene_data.json',
+        tissue: 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/rna_tissue_consensus.tsv',
+        corum: 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/corum_humanComplexes.json',
+        domains: 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/cili_ai_domain_database.json',
+        nevers: 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/nevers_et_al_2017_matrix_optimized.json',
+        li: 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/li_et_al_2014_matrix_optimized.json',
+        core: 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/ciliahub_data.json'
+    };
+
+    // --- Fetch all sources with error handling ---
+    const fetchJSON = async (url) => {
+        try {
+            const res = await fetch(url);
+            if (!res.ok) return {};
+            return await res.json();
+        } catch (e) {
+            console.warn(`[CiliAI] Failed to fetch ${url}`, e);
+            return {};
+        }
+    };
+
+    const fetchText = async (url) => {
+        try {
+            const res = await fetch(url);
+            if (!res.ok) return "";
+            return await res.text();
+        } catch (e) {
+            console.warn(`[CiliAI] Failed to fetch ${url}`, e);
+            return "";
+        }
+    };
+
+    const [
+        umapData, screensData, cellxgeneData, tissueText,
+        corumData, domainsRaw, neversRaw, liRaw, coreData
+    ] = await Promise.all([
+        fetchJSON(urls.umap),
+        fetchJSON(urls.screens),
+        fetchJSON(urls.cellxgene),
+        fetchText(urls.tissue),
+        fetchJSON(urls.corum),
+        fetchJSON(urls.domains),
+        fetchJSON(urls.nevers),
+        fetchJSON(urls.li),
+        fetchJSON(urls.core)
+    ]);
+
+    console.log("[CiliAI] ✅ All remote fetches completed.");
+
+    const master = {};
+
+    // --- 1) Merge UMAP ---
+    for (const [gene, val] of Object.entries(umapData || {})) {
+        master[gene] = master[gene] || defaultGeneRecord(gene);
+        master[gene].umap = val;
+    }
+
+    // --- 2) Merge screens ---
+    for (const [gene, val] of Object.entries(screensData || {})) {
+        master[gene] = master[gene] || defaultGeneRecord(gene);
+        if (Array.isArray(val)) master[gene].screens.push(...val);
+        else master[gene].screens.push(val);
+    }
+
+    // --- 3) Merge cellxgene ---
+    for (const [gene, val] of Object.entries(cellxgeneData || {})) {
+        master[gene] = master[gene] || defaultGeneRecord(gene);
+        master[gene].expression.push(val);
+    }
+
+    // --- 4) Merge tissue ---
+    const tissueLines = (tissueText || "").split("\n").slice(1);
+    for (const line of tissueLines) {
+        const [gene, tissue, value] = line.split("\t");
+        if (!gene || !tissue) continue;
+        master[gene] = master[gene] || defaultGeneRecord(gene);
+        master[gene].tissue.push({ tissue, value });
+    }
+
+    // --- 5) Merge CORUM complexes ---
+    if (Array.isArray(corumData)) {
+        for (const complex of corumData) {
+            const members = complex.subunits || complex["subunits(LFQ)"] || [];
+            for (const g of members) {
+                master[g] = master[g] || defaultGeneRecord(g);
+                master[g].complexes.push(complex.complexName);
+            }
+        }
+    }
+
+    // --- 6) Merge domain annotations ---
+    for (const [gene, val] of Object.entries(domainsRaw || {})) {
+        master[gene] = master[gene] || defaultGeneRecord(gene);
+        if (Array.isArray(val)) master[gene].domains.push(...val);
+        else master[gene].domains.push(val);
+    }
+
+    // --- 7) Merge phylogeny ---
+    const neversGenes = neversRaw?.genes || {};
+    const liGenes = liRaw?.genes || {};
+    for (const gene of Object.keys({ ...neversGenes, ...liGenes })) {
+        master[gene] = master[gene] || defaultGeneRecord(gene);
+        master[gene].phylogeny = { nevers: neversGenes[gene] || {}, li: liGenes[gene] || {} };
+    }
+
+    // --- 8) Merge core ciliome ---
+    const coreList = Array.isArray(coreData) ? coreData : Object.values(coreData || {});
+    for (const entry of coreList) {
+        if (!entry.gene) continue;
+        master[entry.gene] = master[entry.gene] || defaultGeneRecord(entry.gene);
+        master[entry.gene].datasets.push("ciliahub");
+        master[entry.gene].meta = { ...master[entry.gene].meta, ...entry };
+    }
+
+    // --- Convert to array & Map for O(1) lookups ---
+    const masterArray = Object.values(master);
+    window.ciliAI_MasterDatabase = masterArray;
+    window.ciliAI_MasterMap = new Map(masterArray.map(g => [g.gene.toUpperCase(), g]));
+    window.ciliAI_MasterDatabaseReady = true;
+
+    console.log(`✅ [CiliAI] Master Database built. ${masterArray.length} genes integrated.`);
+
+    // Fire readiness event
+    document.dispatchEvent(new CustomEvent('CiliAIMasterDBReady', { detail: { count: masterArray.length } }));
+
+    // --- Sanity check ---
+    const forCheck = ['IFT88','ARL13B','BBS1'];
+    for (const ck of forCheck) {
+        const rec = master[ck];
+        console.log(`[CiliAI] Sanity ${ck}: ${rec ? 'FOUND' : 'MISSING'} | domains:${rec?.domains?.length || 0} | complexes:${rec?.complexes?.length || 0} | screens:${rec?.screens?.length || 0}`);
+    }
+
+    return masterArray;
+}
 
 /* -------------------------------------------------------------------------- */
-/* 3. INTERNAL FETCH HELPERS                                                   */
+/* 4. DEFAULT GENE RECORD                                                    */
+/* -------------------------------------------------------------------------- */
+function defaultGeneRecord(gene) {
+    return {
+        gene,
+        screens: [],
+        domains: [],
+        expression: [],
+        complexes: [],
+        datasets: [],
+        tissue: [],
+        phylogeny: {},
+        umap: null,
+        meta: {}
+    };
+}
+
+/* -------------------------------------------------------------------------- */
+/*  INTERNAL FETCH HELPERS                                                   */
 /* -------------------------------------------------------------------------- */
 
 // 3a. CiliaHub gene info & screens
@@ -506,10 +641,24 @@ function findGenesByFilters({ phenotypeContains, localizationContains, tissueExp
 
 /// --- Main CiliAI query function ---
 // ---------------------- Full ciliAI_queryGenes ----------------------
+/**
+ * Robust CiliAI query function
+ * - Waits for master DB if not yet ready
+ * - Expands complexes, disease classes, organisms
+ * - Fully safe: never loses data
+ */
 async function ciliAI_queryGenes(filters = {}) {
-    // Ensure data is loaded
-    if (!window.ciliaHubData || !Array.isArray(window.ciliaHubData)) {
-        console.error("CiliaHub data not loaded!");
+    // --- Wait for DB to be ready ---
+    const waitForDB = () => new Promise((resolve) => {
+        if (window.ciliAI_MasterDatabaseReady) return resolve();
+        const listener = () => resolve();
+        document.addEventListener('CiliAIMasterDBReady', listener, { once: true });
+    });
+    await waitForDB();
+
+    const data = window.ciliAI_MasterDatabase || [];
+    if (!data.length) {
+        console.warn("[CiliAI] Master database empty!");
         return [];
     }
 
@@ -550,25 +699,21 @@ async function ciliAI_queryGenes(filters = {}) {
 
     // --- Disease Classes ---
     const classifiedDiseases = {
-        "Primary Ciliopathies": [/*...*/],
-        "Motile Ciliopathies": [/*...*/],
-        "Secondary Diseases": [/*...*/],
-        "Atypical Ciliopathies": [/*...*/]
+        "Primary Ciliopathies": [],
+        "Motile Ciliopathies": [],
+        "Secondary Diseases": [],
+        "Atypical Ciliopathies": []
     };
 
-    // --- Organism Keywords ---
-    const organismKeywords = ["human","mouse","fly","zebrafish","yeast","worm","prokaryote",/*...*/];
-
-    // --- Expand complexes into member genes ---
-    let filterGenes = filters.genes || [];
+    // --- Prepare filters ---
+    let filterGenes = filters.genes ? filters.genes.map(g => g.toUpperCase()) : [];
     if (filters.complex) {
         filters.complex.forEach(cpx => {
             if (complexes[cpx]) filterGenes.push(...complexes[cpx]);
         });
     }
-    filterGenes = [...new Set(filterGenes.map(g => g.toUpperCase()))]; // unique uppercase
+    filterGenes = [...new Set(filterGenes.map(g => g.toUpperCase()))];
 
-    // --- Expand disease classes into diseases ---
     let filterDiseases = [];
     if (filters.disease_class) {
         filters.disease_class.forEach(dc => {
@@ -578,52 +723,77 @@ async function ciliAI_queryGenes(filters = {}) {
     if (filters.disease) filterDiseases.push(...filters.disease);
     filterDiseases = [...new Set(filterDiseases.map(d => d.toLowerCase()))];
 
-    // --- Organism filter ---
     let filterOrganisms = [];
     if (filters.organism) {
-        filterOrganisms = Array.isArray(filters.organism) ? filters.organism.map(o => o.toLowerCase()) : [filters.organism.toLowerCase()];
+        filterOrganisms = (Array.isArray(filters.organism) ? filters.organism : [filters.organism]).map(o => o.toLowerCase());
     }
 
-    // --- LOF / OE / Screens / Domains ---
-    const lofFilter = filters.lof_effects ? filters.lof_effects.toLowerCase() : null;
-    const oeFilter = filters.overexpression_effects ? filters.overexpression_effects.toLowerCase() : null;
-    const screenFilter = filters.screens ? filters.screens.map(s => s.toLowerCase()) : [];
-    const domainFilter = filters.domains ? filters.domains.map(d => d.toLowerCase()) : [];
+    const lofFilter = filters.lof_effects?.toLowerCase() || null;
+    const oeFilter = filters.overexpression_effects?.toLowerCase() || null;
+    const screenFilter = filters.screens?.map(s => s.toLowerCase()) || [];
+    const domainFilter = filters.domains?.map(d => d.toLowerCase()) || [];
 
-    // --- Filtering ---
-    const results = window.ciliaHubData.filter(gene => {
-        // Gene name / complex membership
+    // --- Filter data ---
+    return data.filter(gene => {
         if (filterGenes.length && !filterGenes.includes(gene.gene.toUpperCase())) return false;
-
-        // Organism
         if (filterOrganisms.length && !filterOrganisms.some(org => (gene.organism || "").toLowerCase().includes(org))) return false;
-
-        // Diseases
         if (filterDiseases.length && !gene.associated_diseases?.some(d => filterDiseases.includes(d.toLowerCase()))) return false;
-
-        // LOF
         if (lofFilter && !(gene.lof_effects || "").toLowerCase().includes(lofFilter)) return false;
-
-        // Overexpression
         if (oeFilter && !(gene.overexpression_effects || "").toLowerCase().includes(oeFilter)) return false;
-
-        // Screens: check dataset or classification
-        if (screenFilter.length && !gene.screens?.some(s => 
+        if (screenFilter.length && !gene.screens?.some(s =>
             screenFilter.includes((s.dataset || s.source || '').toLowerCase()) ||
             screenFilter.includes((s.classification || s.result || '').toLowerCase())
         )) return false;
-
-        // Domains / PFAM: check domain description or pfam_ids
         if (domainFilter.length && !gene.domain_descriptions?.some(d => domainFilter.includes(d.toLowerCase())) &&
             !gene.domains?.some(d => domainFilter.includes((d.domain_id || '').toLowerCase()) || domainFilter.includes((d.description || '').toLowerCase()))
         ) return false;
 
         return true;
     });
-
-    return results;
 }
 
+// --- Front-end query handler with automatic retry for DB readiness ---
+function initCiliAIQueryHandler() {
+    const queryBtn = document.getElementById('aiQueryBtn');
+    const queryInput = document.getElementById('aiQueryInput');
+
+    if (!queryBtn || !queryInput) {
+        console.warn("[CiliAI] Query button or input not found.");
+        return;
+    }
+
+    // Helper: wait for DB readiness
+    const waitForDB = () => new Promise(resolve => {
+        if (window.ciliAI_MasterDatabaseReady) return resolve();
+        document.addEventListener('CiliAIMasterDBReady', resolve, { once: true });
+    });
+
+    const runQuery = async () => {
+        const queryText = queryInput.value.trim();
+        if (!queryText) return;
+
+        // Optionally parse query into filters (depends on your existing parser)
+        const filters = parseQueryToFilters(queryText); // your existing parser function
+
+        // --- Wait for DB if not ready ---
+        await waitForDB();
+
+        // --- Execute query ---
+        const results = await ciliAI_queryGenes(filters);
+
+        // --- Display results safely ---
+        displayQueryResults(results); // your existing display function
+    };
+
+    // Attach event listeners
+    queryBtn.addEventListener('click', runQuery);
+    queryInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') runQuery();
+    });
+}
+
+// Initialize handler on page load
+document.addEventListener('DOMContentLoaded', initCiliAIQueryHandler);
 
 // -------------------------------------------------------------------
 
