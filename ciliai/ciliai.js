@@ -44,7 +44,7 @@ async function loadCiliAIData() {
         domainData,
         neversData,
         liData
-    ] = await Promise.all([
+    ] ] = await Promise.all([
         fetchData(urls.ciliahub),
         fetchData(urls.umap),
         fetchData(urls.screens),
@@ -53,7 +53,7 @@ async function loadCiliAIData() {
         fetchData(urls.corum),
         fetchData(urls.domains),
         fetchData(urls.nevers2017),
-image_not_available       fetchData(urls.li2014)
+        fetchData(urls.li2014)
     ]);
 
     // --- Indexing for fast access ---
