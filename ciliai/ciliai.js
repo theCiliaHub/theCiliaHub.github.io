@@ -250,7 +250,7 @@ async function testScreenDataMerge() {
 // ==========================================================
 // 2️⃣ Question Parsing (The "Brain")
 // ==========================================================
-async function parseCiliAIQuestion(question, masterData) { // <-- ADDED ARGUMENT
+async function parseCiliAIQuestion(question, masterData) {
     const q = question.toLowerCase();
     
     const structuredQuery = {
@@ -373,99 +373,104 @@ async function parseCiliAIQuestion(question, masterData) { // <-- ADDED ARGUMENT
 // 3️⃣ Query Execution (The "Engine")
 // ==========================================================
 function queryGenes(structuredQuery) {
-    const data = window.CiliAI_MasterData; // This is now guaranteed to be loaded
-    if (!data) {
-        console.error("CiliAI_MasterData is not loaded!");
+    const data = window.CiliAI_MasterData;
+    if (!data || !Array.isArray(data)) {
+        console.error("CiliAI_MasterData is not loaded or invalid!");
         return [];
     }
 
-    // 1. If genes are specified, start with just those genes
     let results = [];
-    if (structuredQuery.genes.length > 0) {
+    
+    // 1. If genes specified, start with those
+    if (structuredQuery.genes && structuredQuery.genes.length > 0) {
         const geneSet = new Set(structuredQuery.genes.map(g => g.toUpperCase()));
         results = data.filter(g => geneSet.has(g.gene.toUpperCase()));
     } else {
-        // Otherwise, start with all genes
         results = [...data];
     }
 
-    // 2. Apply all filters
-    const filters = structuredQuery.filters;
+    // 2. Apply filters
+    const filters = structuredQuery.filters || {};
     if (Object.keys(filters).length > 0) {
         results = results.filter(g => {
-            
-            // ⬇️ --- FIX: Add check for filter existence --- ⬇️
-            if (filters.localization && (g.localization || "").toLowerCase().includes(filters.localization) === false) {
-                return false;
+            // Localization filter
+            if (filters.localization) {
+                const loc = (g.localization || "").toLowerCase();
+                if (!loc.includes(filters.localization.toLowerCase())) {
+                    return false;
+                }
             }
             
-            // ⬇️ --- FIX: Add check for filter existence --- ⬇️
+            // Complex filter
             if (filters.complexes) {
                 const complexNames = Object.keys(g.complex_components || {});
-                if (!complexNames.some(name => name.toLowerCase().includes(filters.complexes.toLowerCase()))) {
+                if (!complexNames.some(name => 
+                    name.toLowerCase().includes(filters.complexes.toLowerCase())
+                )) {
                     return false;
                 }
             }
 
-            // ⬇️ --- FIX: Add check for filter existence --- ⬇️
+            // Module filter
             if (filters.functional_modules) {
                 const modules = g.functional_modules || [];
-                if (!modules.some(mod => mod.toLowerCase().includes(filters.functional_modules.toLowerCase()))) {
+                if (!modules.some(mod => 
+                    mod.toLowerCase().includes(filters.functional_modules.toLowerCase())
+                )) {
                     return false;
                 }
             }
 
-            // ⬇️ --- FIX: Add check for filter existence --- ⬇️
+            // Ciliopathy filter
             if (filters.ciliopathy) {
                 const ciliopathies = (g.ciliopathy || []).concat(g.ciliopathies || []);
-                if (!ciliopathies.some(c => c.toLowerCase().includes(filters.ciliopathy.toLowerCase()))) {
+                if (!ciliopathies.some(c => 
+                    c.toLowerCase().includes(filters.ciliopathy.toLowerCase())
+                )) {
                     return false;
                 }
             }
             
-            // ⬇️ --- FIX: Add check for filter existence --- ⬇️
-            if (filters.tissue) {
-                // Find a tissue key that *contains* the filter (e.g., "adipose tissue" contains "tissue")
-                // This is a basic fix; your tissue names must be precise
-                const tissueName = Object.keys(g.expression?.tissue || {}).find(t => t.toLowerCase().includes(filters.tissue));
-                if (!tissueName || !g.expression.tissue[tissueName] || parseFloat(g.expression.tissue[tissueName]) <= 0) {
+            // Tissue filter
+            if (filters.tissue && g.expression?.tissue) {
+                const tissueName = Object.keys(g.expression.tissue).find(t => 
+                    t.toLowerCase().includes(filters.tissue.toLowerCase())
+                );
+                if (!tissueName || parseFloat(g.expression.tissue[tissueName]) <= 0) {
                     return false;
                 }
             }
 
-            // ⬇️ --- FIX: Add check for filter existence --- ⬇️
-            if (filters.cell_type) {
-                if (!g.expression?.scRNA?.[filters.cell_type] || parseFloat(g.expression.scRNA[filters.cell_type]) <= 0) {
+            // Cell type filter
+            if (filters.cell_type && g.expression?.scRNA) {
+                if (!g.expression.scRNA[filters.cell_type] || 
+                    parseFloat(g.expression.scRNA[filters.cell_type]) <= 0) {
                     return false;
                 }
             }
-            
-            // ⬇️ --- FIX: Add check for filter existence --- ⬇️
-            if (filters.species) {
-                const key = `ortholog_${filters.species}`; // e.g., ortholog_c_elegans
-                if (!g[key]) return false;
-            }
 
-            return true; // Only keep genes that pass all active filters
+            return true;
         });
     }
     
-    // 3. Handle specific sorting
-    if (structuredQuery.intent.expression && filters.tissue && structuredQuery.genes.length === 0) {
-        const tissue = filters.tissue;
+    // 3. Apply sorting for expression queries
+    if (structuredQuery.intent?.expression && filters.tissue && structuredQuery.genes.length === 0) {
         results.sort((a, b) => {
-            const tissueA = Object.keys(a.expression?.tissue || {}).find(t => t.toLowerCase().includes(tissue));
-            const tissueB = Object.keys(b.expression?.tissue || {}).find(t => t.toLowerCase().includes(tissue));
+            const tissueA = Object.keys(a.expression?.tissue || {}).find(t => 
+                t.toLowerCase().includes(filters.tissue.toLowerCase())
+            );
+            const tissueB = Object.keys(b.expression?.tissue || {}).find(t => 
+                t.toLowerCase().includes(filters.tissue.toLowerCase())
+            );
             const valA = parseFloat(a.expression?.tissue?.[tissueA] || 0);
             const valB = parseFloat(b.expression?.tissue?.[tissueB] || 0);
             return valB - valA;
         });
-        results = results.slice(0, 10); // Return top 10
+        results = results.slice(0, 10);
     }
 
     return results;
 }
-
 // ==========================================================
 // 4️⃣ Results Rendering (The "Voice")
 // ==========================================================
@@ -612,32 +617,6 @@ function displayCiliAIResults(results, structuredQuery) {
 }
 
 
-
-// ==========================================================
-// 3️⃣ Query Execution
-// ==========================================================
-function queryGenes(structuredQuery) {
-    const data = window.CiliAI_MasterData;
-    return data.filter(g => {
-        if (structuredQuery.genes.length && !structuredQuery.genes.includes(g.gene)) return false;
-        if (structuredQuery.localization && g.localization !== structuredQuery.localization) return false;
-        if (structuredQuery.complexes.length) {
-            const hasComplex = structuredQuery.complexes.some(c => g.complex_components[c]);
-            if (!hasComplex) return false;
-        }
-        if (structuredQuery.functional_modules.length) {
-            const hasModule = structuredQuery.functional_modules.some(m => g.functional_modules.includes(m));
-            if (!hasModule) return false;
-        }
-        if (structuredQuery.species) {
-            const speciesGenes = ['C. elegans', 'mouse', 'human', 'zebrafish', 'xenopus', 'drosophila'];
-            if (!speciesGenes.includes(structuredQuery.species)) return false;
-        }
-        return true;
-    });
-}
-
-
 // ==========================================================
 // 5️⃣ Page HTML Injector
 // ==========================================================
@@ -744,44 +723,44 @@ function ciliAI_waitForElements() {
     const exampleQueries = document.querySelectorAll('.example-queries span');
 
    // --- Main Query Function ---
-    const handleQuery = async () => {
-        const input = aiInput.value.trim();
-        if (!input) return;
+   const handleQuery = async () => {
+    const input = aiInput.value.trim();
+    if (!input) return;
 
-        const resultArea = document.getElementById('ai-result-area');
-        resultArea.style.display = 'block';
-        resultArea.innerHTML = '<p>Processing...</p>';
+    const resultArea = document.getElementById('ai-result-area');
+    resultArea.style.display = 'block';
+    resultArea.innerHTML = '<p>Processing...</p>';
 
-        try {
-            // ⬇️ --- FIX: Load data *first* --- ⬇️
-            let masterData = window.CiliAI_MasterData;
-            if (!masterData) {
-                console.log('[CiliAI] Data not found, loading now...');
-                masterData = await loadCiliAIData(); // Wait for data to be loaded
-            }
-            
-            // 2. Parse the question (NOW we pass the data to the parser)
-            const structuredQuery = await parseCiliAIQuestion(input, masterData); // <-- PASS DATA HERE
-            
-            // 3. Route query to the correct function
-            if (structuredQuery.plotType === 'phylogeny') {
-                const html = await getPhylogenyAnalysis(structuredQuery.genes);
-                resultArea.innerHTML = html;
-            } else if (structuredQuery.plotType === 'umap_expression' && structuredQuery.genes.length > 0) {
-                await displayUmapGeneExpression(structuredQuery.genes[0]);
-            } else if (structuredQuery.plotType === 'umap_cluster') {
-                await displayUmapPlot();
-            } else {
-                // Default to standard gene query
-                const results = queryGenes(structuredQuery); // queryGenes will use window.CiliAI_MasterData
-                displayCiliAIResults(results, structuredQuery);
-            }
-
-        } catch (err) {
-            console.error('❌ CiliAI query failed:', err);
-            resultArea.innerHTML = `<p>Error: Failed to process your question.</p><pre>${err.message}\n${err.stack}</pre>`;
+    try {
+        // ✅ Ensure data is loaded and get reference
+        let masterData = window.CiliAI_MasterData;
+        if (!masterData) {
+            console.log('[CiliAI] Data not found, loading now...');
+            masterData = await loadCiliAIData(); // This returns the data
         }
-    };
+        
+        // ✅ Pass masterData to parser
+        const structuredQuery = await parseCiliAIQuestion(input, masterData);
+        structuredQuery.question = input; // Store original question for context
+        
+        // 3. Route query to correct function
+        if (structuredQuery.plotType === 'phylogeny') {
+            const html = await getPhylogenyAnalysis(structuredQuery.genes);
+            resultArea.innerHTML = html;
+        } else if (structuredQuery.plotType === 'umap_expression' && structuredQuery.genes.length > 0) {
+            await displayUmapGeneExpression(structuredQuery.genes[0]);
+        } else if (structuredQuery.plotType === 'umap_cluster') {
+            await displayUmapPlot();
+        } else {
+            const results = queryGenes(structuredQuery);
+            displayCiliAIResults(results, structuredQuery);
+        }
+
+    } catch (err) {
+        console.error('❌ CiliAI query failed:', err);
+        resultArea.innerHTML = `<p>Error: Failed to process your question.</p><pre>${err.message}\n${err.stack}</pre>`;
+    }
+};
 
     // 1. Bind to "Ask CiliAI" Button
     if (aiBtn) {
@@ -1196,87 +1175,6 @@ function downloadPlot(plotDivId, filename) {
         });
 }
 
-// NOTE: The other helper functions (formatLiGeneData, formatComparisonResult, formatComprehensiveGeneDetails)
-// were not included in your request, but the advanced `displayCiliAIResults` function 
-// incorporates their logic.
 
 
-/**
- * Binds all event listeners to the CiliAI interface after it's been injected.
- * This is the function that was previously missing.
- */
-function ciliAI_waitForElements() {
-    console.log('[CiliAI] Binding event listeners...');
 
-    const aiBtn = document.getElementById('aiQueryBtn');
-    const aiInput = document.getElementById('aiQueryInput');
-    const exampleQueries = document.querySelectorAll('.example-queries span');
-
-    // --- Main Query Function ---
-    const handleQuery = async () => {
-        const input = aiInput.value.trim();
-        if (!input) return;
-
-        const resultArea = document.getElementById('ai-result-area');
-        resultArea.style.display = 'block';
-        resultArea.innerHTML = '<p>Processing...</p>';
-
-        try {
-            // 1. Load data if not already loaded
-            if (!window.CiliAI_MasterData) {
-                console.log('[CiliAI] Data not found, loading now...');
-                await loadCiliAIData();
-            }
-            
-            // 2. Parse the question
-            const structuredQuery = await parseCiliAIQuestion(input);
-            
-            // 3. Get results
-            const results = queryGenes(structuredQuery);
-            
-            // 4. Display results
-            displayCiliAIResults(results, structuredQuery); // Pass query to renderer
-
-        } catch (err) {
-            console.error('❌ CiliAI query failed:', err);
-            resultArea.innerHTML = '<p>Error: Failed to process your question.</p>';
-        }
-    };
-
-    // 1. Bind to "Ask CiliAI" Button
-    if (aiBtn) {
-        aiBtn.addEventListener('click', handleQuery);
-    } else {
-        console.error('[CiliAI] Error: aiQueryBtn not found.');
-    }
-
-    // 2. Bind to "Enter" key in input
-    if (aiInput) {
-        aiInput.addEventListener('keydown', (event) => {
-            if (event.key === 'Enter') {
-                event.preventDefault(); // Stop form submission
-                handleQuery();
-            }
-        });
-    } else {
-        console.error('[CiliAI] Error: aiQueryInput not found.');
-    }
-
-    // 3. Bind to Example Questions
-    if (exampleQueries.length > 0) {
-        exampleQueries.forEach(span => {
-            span.addEventListener('click', () => {
-                const question = span.getAttribute('data-question');
-                if (aiInput) {
-                    aiInput.value = question; // Set input value
-                    aiInput.focus();
-                    handleQuery(); // Run the query
-                }
-            });
-        });
-    } else {
-        console.error('[CiliAI] Error: No example queries found.');
-    }
-
-    console.log('[CiliAI] Event listeners bound successfully.');
-}
