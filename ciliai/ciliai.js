@@ -1,17 +1,19 @@
 // CiliAI Complete Integrated Code
 // ==========================================================
 
-// --- Global Caches for Phylogenetic Data ---
+// ==========================================================
+// 1️⃣ UNIFIED Data Loading - Integrates ALL datasets
+// ==========================================================
+
+// Global Caches
 let liPhylogenyCache = null;
 let neversPhylogenyCache = null;
-// ==========================================================
-// 1️⃣ Data Loading
-// ==========================================================
+
 async function loadCiliAIData() {
     const urls = {
         ciliahub: 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/ciliahub_data.json',
         umap: 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/umap_data.json',
-        screens: 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/cilia_screens_data.json', // <-- RE-ADDED
+        screens: 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/cilia_screens_data.json',
         cellxgene: 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/cellxgene_data.json',
         rna_tissue: 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/rna_tissue_consensus.tsv',
         corum: 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/corum_humanComplexes.json',
@@ -37,46 +39,51 @@ async function loadCiliAIData() {
         }
     }
 
-    // --- Fetch all data in parallel ---
+    // --- Fetch ALL data in parallel ---
+    console.log('🔄 CiliAI: Loading all datasets...');
     const [
         ciliahubData, umapData, screensData, cellxgeneData,
         rnaTissueData, corumData, domainData, neversData, liData
     ] = await Promise.all([
-        fetchData(urls.ciliahub), fetchData(urls.umap), fetchData(urls.screens), // <-- RE-ADDED
-        fetchData(urls.cellxgene), fetchData(urls.rna_tissue, 'tsv'), fetchData(urls.corum),
-        fetchData(urls.domains), fetchData(urls.nevers2017), fetchData(urls.li2014)
+        fetchData(urls.ciliahub),
+        fetchData(urls.umap),
+        fetchData(urls.screens),
+        fetchData(urls.cellxgene),
+        fetchData(urls.rna_tissue, 'tsv'),
+        fetchData(urls.corum),
+        fetchData(urls.domains),
+        fetchData(urls.nevers2017),
+        fetchData(urls.li2014)
     ]);
 
-    // --- Cache Phylogenetic Data ---
+    // ✅ Cache Phylogenetic Data Globally
     liPhylogenyCache = liData;
     neversPhylogenyCache = neversData;
+    console.log('✅ Phylogenetic data cached (Li 2014, Nevers 2017)');
 
-    // --- Indexing for fast access ---
+    // ==========================================================
+    // PHASE 1: Build Lookup Indices
+    // ==========================================================
 
-    // ⬇️ RE-ADDED screen indexing
+    // --- 1. Screen Data ---
     const screensByGene = {};
     if (screensData && typeof screensData === 'object') {
-        // The file is an OBJECT { "GENE": [screens...], ... }
         for (const geneName in screensData) {
             if (screensData.hasOwnProperty(geneName) && Array.isArray(screensData[geneName])) {
-                // Re-format the data to match the structure in ciliahub_data.json
                 screensByGene[geneName] = screensData[geneName].map(screen => ({
                     dataset: screen.source,
                     classification: screen.result,
-                    paper_link: screen.paper_link || '#', // Add placeholders if needed
+                    paper_link: screen.paper_link || '#',
                     mean_percent_ciliated: screen.mean_percent_ciliated,
                     sd_percent_ciliated: screen.sd_percent_ciliated,
                     z_score: screen.z_score
                 }));
             }
         }
-    } else {
-        console.warn('CiliAI: screensData was not in the expected object format. Skipping screen indexing.', screensData);
     }
-    // ⬆️ END of screen indexing
+    console.log(`✅ Indexed ${Object.keys(screensByGene).length} genes with screen data`);
 
-    const umapByGene = {};
-    
+    // --- 2. Single-Cell Expression ---
     const scExpressionByGene = {};
     if (cellxgeneData && typeof cellxgeneData === 'object') {
         for (const geneName in cellxgeneData) {
@@ -84,14 +91,14 @@ async function loadCiliAIData() {
                 scExpressionByGene[geneName.toUpperCase()] = cellxgeneData[geneName];
             }
         }
-    } else {
-        console.warn('CiliAI: cellxgeneData was not an object. Skipping scExpression indexing.', cellxgeneData);
     }
-    
+    console.log(`✅ Indexed ${Object.keys(scExpressionByGene).length} genes with scRNA-seq data`);
+
+    // --- 3. Tissue Expression ---
     const tissueExpressionByGene = {};
     if (Array.isArray(rnaTissueData)) {
         for (const row of rnaTissueData) {
-            const geneName = row['Gene name']; 
+            const geneName = row['Gene name'];
             if (geneName) {
                 if (!tissueExpressionByGene[geneName]) {
                     tissueExpressionByGene[geneName] = {};
@@ -99,10 +106,10 @@ async function loadCiliAIData() {
                 tissueExpressionByGene[geneName][row.Tissue] = parseFloat(row.nTPM);
             }
         }
-    } else {
-        console.warn('CiliAI: rnaTissueData was not an array. Skipping tissueExpression indexing.', rnaTissueData);
     }
+    console.log(`✅ Indexed ${Object.keys(tissueExpressionByGene).length} genes with tissue expression`);
 
+    // --- 4. CORUM Complexes ---
     const corumByGene = {};
     if (Array.isArray(corumData)) {
         for (const complex of corumData) {
@@ -118,14 +125,14 @@ async function loadCiliAIData() {
                 }
             }
         }
-    } else {
-        console.warn('CiliAI: corumData was not an array. Skipping CORUM indexing.', corumData);
     }
+    console.log(`✅ Indexed ${Object.keys(corumByGene).length} genes in CORUM complexes`);
 
+    // --- 5. Protein Domains ---
     const domainsByGene = {};
-    window.CiliAI_DomainData = domainData; 
+    window.CiliAI_DomainData = domainData;
     if (domainData && domainData.enriched_domains) {
-         for (const domain of Object.values(domainData.enriched_domains)) {
+        for (const domain of Object.values(domainData.enriched_domains)) {
             const domainDesc = domain.description;
             const pfamId = domain.domain_id;
             if (Array.isArray(domain.ciliary_genes_with_domain)) {
@@ -139,68 +146,391 @@ async function loadCiliAIData() {
                     }
                 }
             }
-         }
+        }
     }
+    console.log(`✅ Indexed ${Object.keys(domainsByGene).length} genes with domain annotations`);
 
+    // --- 6. Functional Modules (from Phylogeny Data) ---
     const modulesByGene = {};
     for (const dataset of [neversData, liData]) {
         if (dataset && dataset.genes && typeof dataset.genes === 'object') {
             for (const geneKey in dataset.genes) {
                 const geneData = dataset.genes[geneKey];
                 const geneName = geneData.g;
-                
+
                 if (geneName && geneData.c !== undefined && dataset.summary?.class_list) {
                     const classification = dataset.summary.class_list[geneData.c];
                     if (classification) {
                         if (!modulesByGene[geneName]) modulesByGene[geneName] = [];
                         if (!modulesByGene[geneName].includes(classification)) {
-                             modulesByGene[geneName].push(classification.replace(/_/g, ' '));
+                            modulesByGene[geneName].push(classification.replace(/_/g, ' '));
                         }
                     }
-                } 
+                }
             }
         }
     }
-    
-    // --- Build master data ---
+    console.log(`✅ Indexed ${Object.keys(modulesByGene).length} genes with functional modules`);
+
+    // --- 7. Phylogenetic Conservation Data ---
+    // Build gene-level phylogeny summaries
+    const liGenesMap = {};
+    if (liData && liData.genes) {
+        Object.values(liData.genes).forEach(geneObj => {
+            if (geneObj.g) {
+                liGenesMap[geneObj.g.toUpperCase()] = {
+                    class: liData.summary?.class_list?.[geneObj.c] || 'Unknown',
+                    class_id: geneObj.c,
+                    species_data: geneObj.s || []
+                };
+            }
+        });
+    }
+    console.log(`✅ Indexed ${Object.keys(liGenesMap).length} genes in Li 2014 phylogeny`);
+
+    const neversGenesMap = {};
+    if (neversData && neversData.genes) {
+        Object.keys(neversData.genes).forEach(geneKey => {
+            const geneData = neversData.genes[geneKey];
+            neversGenesMap[geneKey.toUpperCase()] = {
+                species_count: geneData.s?.length || 0,
+                species_data: geneData.s || []
+            };
+        });
+    }
+    console.log(`✅ Indexed ${Object.keys(neversGenesMap).length} genes in Nevers 2017 phylogeny`);
+
+    // ==========================================================
+    // PHASE 2: Build Master Data with ALL Integrations
+    // ==========================================================
+
     if (!Array.isArray(ciliahubData)) {
-        console.error("CiliAI: CRITICAL ERROR - ciliahub_data.json is not an array.", ciliahubData);
+        console.error("❌ CRITICAL ERROR - ciliahub_data.json is not an array.", ciliahubData);
         return [];
     }
 
     const masterData = ciliahubData.map(geneObj => {
         const gene = geneObj.gene;
         const geneUpper = gene.toUpperCase();
-        
-        // ⬇️⬇️⬇️ --- THIS IS THE CORRECTED MERGE LOGIC --- ⬇️⬇️⬇️
-        // 1. Get the screens from ciliahub_data.json (which we now know is an array)
-        const hubScreens = Array.isArray(geneObj.screens) ? geneObj.screens : [];
-        
-        // 2. Get the *additional* screens from cilia_screens_data.json
-        const externalScreens = screensByGene[gene] || [];
-        
-        // 3. Combine them
-        const allScreens = [...hubScreens, ...externalScreens];
-        // ⬆️⬆️⬆️ --- END OF FIX --- ⬆️⬆️⬆️
 
+        // --- Merge Screens ---
+        const hubScreens = Array.isArray(geneObj.screens) ? geneObj.screens : [];
+        const externalScreens = screensByGene[gene] || [];
+        const allScreens = [...hubScreens, ...externalScreens];
+
+        // --- Normalize Ciliopathy Data ---
+        let ciliopathies = [];
+        if (Array.isArray(geneObj.ciliopathy)) {
+            ciliopathies = geneObj.ciliopathy;
+        } else if (typeof geneObj.ciliopathy === 'string' && geneObj.ciliopathy) {
+            ciliopathies = [geneObj.ciliopathy];
+        }
+        if (Array.isArray(geneObj.ciliopathies)) {
+            ciliopathies = [...ciliopathies, ...geneObj.ciliopathies];
+        } else if (typeof geneObj.ciliopathies === 'string' && geneObj.ciliopathies) {
+            ciliopathies.push(geneObj.ciliopathies);
+        }
+        // Remove duplicates
+        ciliopathies = [...new Set(ciliopathies.filter(Boolean))];
+
+        // --- Build Complete Gene Object ---
         return {
-            ...geneObj, 
-            screens: allScreens, // Use the combined array
+            ...geneObj,
+            
+            // ✅ Screens (merged)
+            screens: allScreens,
+            
+            // ✅ Expression (scRNA + tissue)
             expression: {
-                scRNA: scExpressionByGene[geneUpper] || null, 
-                tissue: tissueExpressionByGene[gene] || null  
+                scRNA: scExpressionByGene[geneUpper] || null,
+                tissue: tissueExpressionByGene[gene] || null
             },
-            complex_components: { ...geneObj.complex_components, ...corumByGene[gene] }, 
+            
+            // ✅ Complexes (CORUM + existing)
+            complex_components: {
+                ...geneObj.complex_components,
+                ...corumByGene[gene]
+            },
+            
+            // ✅ Domains
             pfam_ids: domainsByGene[gene]?.pfam_ids || geneObj.pfam_ids || [],
             domain_descriptions: domainsByGene[gene]?.domain_descriptions || geneObj.domain_descriptions || [],
-            functional_modules: modulesByGene[gene] || []
+            
+            // ✅ Functional Modules
+            functional_modules: modulesByGene[gene] || [],
+            
+            // ✅ Ciliopathies (normalized to array)
+            ciliopathies: ciliopathies,
+            
+            // ✅ Phylogenetic Data
+            phylogeny: {
+                li_2014: liGenesMap[geneUpper] || null,
+                nevers_2017: neversGenesMap[geneUpper] || null
+            }
         };
     });
 
-    window.CiliAI_MasterData = masterData; // Global storage
-    console.log('✅ CiliAI: Master data loaded', masterData.length, 'genes');
+    window.CiliAI_MasterData = masterData;
+    console.log(`✅ CiliAI: Master data built with ${masterData.length} genes`);
+    console.log('📊 Data integration complete: screens, expression, complexes, domains, modules, phylogeny, ciliopathies');
+    
     return masterData;
 }
+
+// ==========================================================
+// 2️⃣ Phylogeny Analysis (Using Pre-loaded Data)
+// ==========================================================
+
+async function getPhylogenyAnalysis(genes) {
+    // ✅ Data is already loaded in global caches during loadCiliAIData()
+    if (!liPhylogenyCache || !neversPhylogenyCache) {
+        return `<div class="result-card"><h3>Analysis Error</h3><p>Phylogenetic data not loaded. Please refresh the page.</p></div>`;
+    }
+
+    // Build gene maps from cached data
+    const liGenesMap = {};
+    Object.values(liPhylogenyCache.genes).forEach(geneObj => {
+        if (geneObj.g) {
+            liGenesMap[geneObj.g.toUpperCase()] = geneObj;
+        }
+    });
+
+    const neversGenesMap = {};
+    Object.keys(neversPhylogenyCache.genes).forEach(geneKey => {
+        neversGenesMap[geneKey.toUpperCase()] = neversPhylogenyCache.genes[geneKey];
+    });
+
+    // Find valid genes
+    const validGeneSymbols = genes.map(g => g.toUpperCase()).filter(g =>
+        liGenesMap[g] || neversGenesMap[g]
+    );
+
+    if (validGeneSymbols.length === 0) {
+        return `<div class="result-card"><h3>Analysis Error</h3><p>None of the requested genes (${genes.join(', ')}) were found in phylogenetic datasets.</p></div>`;
+    }
+
+    const finalGenes = [...new Set(validGeneSymbols)];
+
+    // --- Multi-gene comparison ---
+    if (finalGenes.length > 1) {
+        let summaryHtml = `
+            <div class="result-card">
+                <h3>Phylogenetic Comparison: ${finalGenes.join(' vs ')} 📊</h3>
+                <table class="gene-detail-table">
+                    <thead>
+                        <tr>
+                            <th>Gene</th>
+                            <th>Li Class (2014)</th>
+                            <th>Nevers Species Count (out of 99)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+        `;
+
+        finalGenes.forEach(gene => {
+            const liEntry = liGenesMap[gene];
+            const neversEntry = neversGenesMap[gene];
+
+            const liClass = liEntry
+                ? (liPhylogenyCache.summary.class_list[liEntry.c] || 'N/A').replace(/_/g, ' ')
+                : 'N/A';
+            const neversCount = neversEntry?.s?.length || 0;
+
+            summaryHtml += `
+                <tr>
+                    <td><strong>${gene}</strong></td>
+                    <td>${liClass}</td>
+                    <td>${neversCount}</td>
+                </tr>
+            `;
+        });
+
+        summaryHtml += `</tbody></table></div>`;
+        return summaryHtml;
+
+    } else {
+        // --- Single gene analysis ---
+        const geneSymbol = finalGenes[0];
+        const liEntry = liGenesMap[geneSymbol];
+        const neversEntry = neversGenesMap[geneSymbol];
+
+        const liSummary = liEntry
+            ? (liPhylogenyCache.summary.class_list[liEntry.c] || 'Classification Unavailable').replace(/_/g, ' ')
+            : 'Not found in Li et al. (2014)';
+        const neversSpeciesCount = neversEntry?.s?.length || 0;
+        const neversStatus = neversEntry
+            ? `Found in ${neversSpeciesCount} species (Nevers et al. 2017)`
+            : 'Not found in Nevers et al. (2017)';
+
+        return `
+            <div class="result-card">
+                <h3>Evolutionary Summary: ${geneSymbol} 🧬</h3>
+                <table class="gene-detail-table">
+                    <tr><th>Li et al. (2014) Classification</th><td><strong>${liSummary}</strong></td></tr>
+                    <tr><th>Nevers et al. (2017) Status</th><td>${neversStatus}</td></tr>
+                </table>
+            </div>
+        `;
+    }
+}
+
+// ==========================================================
+// 3️⃣ Query Execution (The "Engine")
+// ==========================================================
+function queryGenes(structuredQuery) {
+    const data = window.CiliAI_MasterData;
+    if (!data || !Array.isArray(data)) {
+        console.error("CiliAI_MasterData is not loaded or invalid!");
+        return [];
+    }
+
+    let results = [];
+
+    // 1. Start with specified genes or all genes
+    if (structuredQuery.genes && structuredQuery.genes.length > 0) {
+        const geneSet = new Set(structuredQuery.genes.map(g => g.toUpperCase()));
+        results = data.filter(g => geneSet.has(g.gene.toUpperCase()));
+    } else {
+        results = [...data];
+    }
+
+    // 2. Apply filters
+    const filters = structuredQuery.filters || {};
+    if (Object.keys(filters).length > 0) {
+        results = results.filter(g => {
+            // Localization filter
+            if (filters.localization) {
+                const loc = (g.localization || "").toLowerCase();
+                if (!loc.includes(filters.localization.toLowerCase())) {
+                    return false;
+                }
+            }
+
+            // Complex filter (check both complex_components and complex map)
+            if (filters.complexes) {
+                const complexNames = Object.keys(g.complex_components || {});
+                const hasMatch = complexNames.some(name =>
+                    name.toLowerCase().includes(filters.complexes.toLowerCase())
+                );
+
+                // Also check against the complex map
+                const complexMap = getComplexPhylogenyTableMap();
+                const targetGenes = complexMap[filters.complexes.toUpperCase()] || [];
+                const isInComplex = targetGenes.includes(g.gene.toUpperCase());
+
+                if (!hasMatch && !isInComplex) {
+                    return false;
+                }
+            }
+
+            // Module filter
+            if (filters.functional_modules) {
+                const modules = g.functional_modules || [];
+                if (!modules.some(mod =>
+                    mod.toLowerCase().includes(filters.functional_modules.toLowerCase())
+                )) {
+                    return false;
+                }
+            }
+
+            // ✅ FIX: Ciliopathy filter (handles both string and array)
+            if (filters.ciliopathy) {
+                // Use the normalized ciliopathies array
+                const ciliopathies = g.ciliopathies || [];
+                if (!Array.isArray(ciliopathies) || ciliopathies.length === 0) {
+                    return false;
+                }
+                if (!ciliopathies.some(c =>
+                    c && c.toLowerCase().includes(filters.ciliopathy.toLowerCase())
+                )) {
+                    return false;
+                }
+            }
+
+            // Tissue filter
+            if (filters.tissue && g.expression?.tissue) {
+                const tissueName = Object.keys(g.expression.tissue).find(t =>
+                    t.toLowerCase().includes(filters.tissue.toLowerCase())
+                );
+                if (!tissueName || parseFloat(g.expression.tissue[tissueName]) <= 0) {
+                    return false;
+                }
+            }
+
+            // Cell type filter
+            if (filters.cell_type && g.expression?.scRNA) {
+                if (!g.expression.scRNA[filters.cell_type] ||
+                    parseFloat(g.expression.scRNA[filters.cell_type]) <= 0) {
+                    return false;
+                }
+            }
+
+            return true;
+        });
+    }
+
+    // 3. Apply sorting for expression queries
+    if (structuredQuery.intent?.expression && filters.tissue && structuredQuery.genes.length === 0) {
+        results.sort((a, b) => {
+            const tissueA = Object.keys(a.expression?.tissue || {}).find(t =>
+                t.toLowerCase().includes(filters.tissue.toLowerCase())
+            );
+            const tissueB = Object.keys(b.expression?.tissue || {}).find(t =>
+                t.toLowerCase().includes(filters.tissue.toLowerCase())
+            );
+            const valA = parseFloat(a.expression?.tissue?.[tissueA] || 0);
+            const valB = parseFloat(b.expression?.tissue?.[tissueB] || 0);
+            return valB - valA;
+        });
+        results = results.slice(0, 10);
+    }
+
+    return results;
+}
+
+// ==========================================================
+// 4️⃣ Complex Map (Required for BBSome etc.)
+// ==========================================================
+
+function getComplexPhylogenyTableMap() {
+    return {
+        // --- Core IFT machinery ---
+        "IFT COMPLEX": ["WDR19", "IFT140", "TTC21B", "IFT122", "WDR35", "IFT43", "IFT172", "IFT80", "IFT57", "TRAF3IP1", "CLUAP1", "IFT20", "IFT88", "IFT81", "IFT74", "IFT70A", "IFT70B", "IFT56", "IFT52", "IFT46", "IFT27", "IFT25", "IFT22"],
+        "IFT-A COMPLEX": ["WDR19", "IFT140", "TTC21B", "IFT122", "WDR35", "IFT43"],
+        "IFT-B COMPLEX": ["IFT172", "IFT80", "IFT57", "TRAF3IP1", "CLUAP1", "IFT20", "IFT88", "IFT81", "IFT74", "IFT70A", "IFT70B", "IFT56", "IFT52", "IFT46", "IFT27", "IFT25", "IFT22"],
+        "IFT-B1 COMPLEX": ["IFT172", "IFT80", "IFT57", "TRAF3IP1", "CLUAP1", "IFT20"],
+        "IFT-B2 COMPLEX": ["IFT88", "IFT81", "IFT74", "IFT70A", "IFT70B", "IFT56", "IFT52", "IFT46", "IFT27", "IFT25", "IFT22"],
+        
+        "IFT MOTOR COMPLEX": ["KIF3A", "KIF3B", "KIF17", "DYNC2H1", "DYNC2LI1", "WDR34", "WDR60"],
+        
+        // --- BBSome and trafficking ---
+        "BBSOME": ["BBS1", "BBS2", "BBS4", "BBS5", "BBS7", "TTC8", "BBS9", "BBIP1"],
+        "EXOCYST": ["EXOC1", "EXOC2", "EXOC3", "EXOC4", "EXOC5", "EXOC6", "EXOC7", "EXOC8"],
+
+        // --- Transition zone modules ---
+        "TRANSITION ZONE": ["NPHP1", "MKS1", "CEP290", "AHI1", "RPGRIP1L", "TMEM67", "CC2D2A", "B9D1", "B9D2"],
+        "MKS MODULE": ["MKS1", "TMEM17", "TMEM67", "TMEM138", "B9D2", "B9D1", "CC2D2A", "TMEM107", "TMEM237", "TMEM231", "TMEM216", "TCTN1", "TCTN2", "TCTN3"],
+        "NPHP MODULE": ["NPHP1", "NPHP3", "NPHP4", "RPGRIP1L", "IQCB1", "CEP290", "SDCCAG8"],
+
+        // --- Basal body & appendages ---
+        "BASAL BODY": ["CEP164", "CEP83", "SCLT1", "CEP89", "LRRC45", "ODF2", "CEP128", "CEP135", "CETN2", "CETN3", "POC1B", "FBF1", "CCDC41", "CCDC120", "OFD1"],
+        
+        // --- Axonemal machinery ---
+        "CILIARY TIP": ["HYDIN", "IQCA1", "CATSPER2", "KIF19A", "KIF7", "CCDC78", "CCDC33", "SPEF1", "CEP104", "CSPP1"],
+        "RADIAL SPOKE": ["RSPH1", "RSPH3", "RSPH4A", "RSPH6A", "RSPH9", "RSPH10B", "RSPH23", "RSPH16"],
+        "CENTRAL PAIR": ["HYDIN", "SPAG6", "SPAG16", "SPAG17", "POC1A", "CEP131"],
+        "DYNEIN ARM": ["DNAH1", "DNAH2", "DNAH5", "DNAH6", "DNAH7", "DNAH8", "DNAH9", "DNAH10", "DNAH11", "DNALI1", "DNAI1", "DNAI2"],
+        "OUTER DYNEIN ARM": ["DNAH5", "DNAH11", "DNAH17", "DNAI1", "DNAI2"],
+        "INNER DYNEIN ARM": ["DNAH2", "DNAH7", "DNAH10", "DNALI1"],
+        
+        // --- Signaling ---
+        "SHH SIGNALING": ["SMO", "PTCH1", "GLI1", "GLI2", "GLI3", "SUFU", "KIF7", "TULP3"],
+        
+        // --- Centrosome ---
+        "CENTROSOME": ["CEP152", "CEP192", "PLK4", "STIL", "SAS6", "CEP135", "CETN2", "PCNT"]
+    };
+}
+
 
 async function testScreenDataMerge() {
     console.log("--- Starting Screen Data Test ---");
@@ -369,108 +699,6 @@ async function parseCiliAIQuestion(question, masterData) {
     return structuredQuery;
 }
 
-// ==========================================================
-// 3️⃣ Query Execution (The "Engine")
-// ==========================================================
-function queryGenes(structuredQuery) {
-    const data = window.CiliAI_MasterData;
-    if (!data || !Array.isArray(data)) {
-        console.error("CiliAI_MasterData is not loaded or invalid!");
-        return [];
-    }
-
-    let results = [];
-    
-    // 1. If genes specified, start with those
-    if (structuredQuery.genes && structuredQuery.genes.length > 0) {
-        const geneSet = new Set(structuredQuery.genes.map(g => g.toUpperCase()));
-        results = data.filter(g => geneSet.has(g.gene.toUpperCase()));
-    } else {
-        results = [...data];
-    }
-
-    // 2. Apply filters
-    const filters = structuredQuery.filters || {};
-    if (Object.keys(filters).length > 0) {
-        results = results.filter(g => {
-            // Localization filter
-            if (filters.localization) {
-                const loc = (g.localization || "").toLowerCase();
-                if (!loc.includes(filters.localization.toLowerCase())) {
-                    return false;
-                }
-            }
-            
-            // Complex filter
-            if (filters.complexes) {
-                const complexNames = Object.keys(g.complex_components || {});
-                if (!complexNames.some(name => 
-                    name.toLowerCase().includes(filters.complexes.toLowerCase())
-                )) {
-                    return false;
-                }
-            }
-
-            // Module filter
-            if (filters.functional_modules) {
-                const modules = g.functional_modules || [];
-                if (!modules.some(mod => 
-                    mod.toLowerCase().includes(filters.functional_modules.toLowerCase())
-                )) {
-                    return false;
-                }
-            }
-
-            // Ciliopathy filter
-            if (filters.ciliopathy) {
-                const ciliopathies = (g.ciliopathy || []).concat(g.ciliopathies || []);
-                if (!ciliopathies.some(c => 
-                    c.toLowerCase().includes(filters.ciliopathy.toLowerCase())
-                )) {
-                    return false;
-                }
-            }
-            
-            // Tissue filter
-            if (filters.tissue && g.expression?.tissue) {
-                const tissueName = Object.keys(g.expression.tissue).find(t => 
-                    t.toLowerCase().includes(filters.tissue.toLowerCase())
-                );
-                if (!tissueName || parseFloat(g.expression.tissue[tissueName]) <= 0) {
-                    return false;
-                }
-            }
-
-            // Cell type filter
-            if (filters.cell_type && g.expression?.scRNA) {
-                if (!g.expression.scRNA[filters.cell_type] || 
-                    parseFloat(g.expression.scRNA[filters.cell_type]) <= 0) {
-                    return false;
-                }
-            }
-
-            return true;
-        });
-    }
-    
-    // 3. Apply sorting for expression queries
-    if (structuredQuery.intent?.expression && filters.tissue && structuredQuery.genes.length === 0) {
-        results.sort((a, b) => {
-            const tissueA = Object.keys(a.expression?.tissue || {}).find(t => 
-                t.toLowerCase().includes(filters.tissue.toLowerCase())
-            );
-            const tissueB = Object.keys(b.expression?.tissue || {}).find(t => 
-                t.toLowerCase().includes(filters.tissue.toLowerCase())
-            );
-            const valA = parseFloat(a.expression?.tissue?.[tissueA] || 0);
-            const valB = parseFloat(b.expression?.tissue?.[tissueB] || 0);
-            return valB - valA;
-        });
-        results = results.slice(0, 10);
-    }
-
-    return results;
-}
 // ==========================================================
 // 4️⃣ Results Rendering (The "Voice")
 // ==========================================================
@@ -837,110 +1065,6 @@ async function fetchNeversPhylogenyData() {
     } catch (error) {
         console.error('Error loading Nevers 2017 data:', error);
         return null;
-    }
-}
-
-/**
- * Renders the initial summary for phylogenetic queries.
- */
-async function getPhylogenyAnalysis(genes) {
-    // 1. Data loading and validation 
-    await Promise.all([fetchLiPhylogenyData(), fetchNeversPhylogenyData()]);
-
-    if (!liPhylogenyCache || !neversPhylogenyCache) {
-        return `<div class="result-card"><h3>Analysis Error</h3><p>Phylogenetic data sources (Li 2014 or Nevers 2017) failed to load.</p></div>`;
-    }
-    
-    // Get all HUGO gene symbols available in the Li database
-    const liGenesSet = new Set(Object.values(liPhylogenyCache.genes).map(g => g.g.toUpperCase()).filter(Boolean));
-    const validGeneSymbols = genes.map(g => g.toUpperCase()).filter(g => liGenesSet.has(g));
-    
-    if (validGeneSymbols.length === 0) {
-        const neversGenesSet = new Set(Object.keys(neversPhylogenyCache.genes).map(g => g.toUpperCase()));
-        const validNeversGenes = genes.map(g => g.toUpperCase()).filter(g => neversGenesSet.has(g));
-        if (validNeversGenes.length === 0) {
-             return `<div class="result-card"><h3>Analysis Error</h3><p>None of the requested genes were found in the phylogenetic datasets (Li 2014, Nevers 2017).</p></div>`;
-        }
-        // If found in Nevers but not Li, we can still proceed
-        validGeneSymbols.push(...validNeversGenes);
-    }
-
-    const finalGenes = [...new Set(validGeneSymbols)]; // Unique genes
-
-    // --- 2. Determine Output Mode: Single vs. Comparison ---
-    if (finalGenes.length > 1) {
-        // --- MULTI-GENE COMPARISON MODE ---
-        let summaryHtml = `
-            <div class="result-card">
-                <h3>Phylogenetic Comparison: ${finalGenes.join(' vs ')} 📊</h3>
-                <table class="gene-detail-table">
-                    <thead>
-                        <tr>
-                            <th>Gene</th>
-                            <th>Li Class (2014)</th>
-                            <th>Nevers Species Count (out of 99)</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-        `;
-        
-        finalGenes.forEach(gene => {
-            const liEntry = Object.values(liPhylogenyCache.genes).find(g => g.g && g.g.toUpperCase() === gene);
-            const neversEntry = neversPhylogenyCache.genes?.[gene];
-
-            const liClass = liEntry 
-                ? (liPhylogenyCache.summary.class_list[liEntry.c] || 'N/A').replace(/_/g, ' ') 
-                : 'N/A';
-            const neversCount = neversEntry?.s?.length || 0;
-            
-            summaryHtml += `
-                <tr>
-                    <td><strong>${gene}</strong></td>
-                    <td>${liClass}</td>
-                    <td>${neversCount}</td>
-                </tr>
-            `;
-        });
-        
-        summaryHtml += `
-                    </tbody>
-                </table>
-                <p class="ai-suggestion">
-                    The visualization below provides the detailed species map for comparison.
-                </p>
-            </div>
-        `;
-        
-        // Note: handlePhylogenyVisualizationQuery is not defined in the provided code.
-        // This will just return the summary table for now.
-        // const visualizationHtml = await handlePhylogenyVisualizationQuery(`Show heatmap for ${finalGenes.join(',')}`, 'li', 'heatmap');
-        // return summaryHtml + visualizationHtml;
-        return summaryHtml; // Returning only summary
-
-    } else {
-        // --- SINGLE-GENE ANALYSIS MODE ---
-        const geneSymbol = finalGenes[0];
-        const liEntry = Object.values(liPhylogenyCache.genes).find(g => g.g && g.g.toUpperCase() === geneSymbol);
-        const neversEntry = neversPhylogenyCache?.genes?.[geneSymbol];
-
-        const liSummary = liEntry ? (liPhylogenyCache.summary.class_list[liEntry.c] || 'Classification Unavailable').replace(/_/g, ' ') : 'Not found in Li et al. (2014)';
-        const neversSpeciesCount = neversEntry?.s?.length || 0;
-        const neversStatus = neversEntry ? `Found in ${neversSpeciesCount} species (Nevers et al. 2017)` : 'Not found in Nevers et al. (2017)';
-
-        const generalSummary = `
-            <div class="result-card">
-                <h3>Evolutionary Summary: ${geneSymbol} 🧬</h3>
-                <table class="gene-detail-table">
-                    <tr><th>Li et al. (2014) Classification</th><td><strong>${liSummary}</strong></td></tr>
-                    <tr><th>Nevers et al. (2017) Status</th><td>${neversStatus}</td></tr>
-                </table>
-            </div>
-        `;
-        
-        // Note: handlePhylogenyVisualizationQuery is not defined.
-        // const visualizationHtml = await handlePhylogenyVisualizationQuery(`Show heatmap for ${geneSymbol}`, 'li', 'heatmap');
-        // return generalSummary + visualizationHtml;
-        return generalSummary; // Returning only summary
     }
 }
 
