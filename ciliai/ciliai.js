@@ -280,124 +280,84 @@ async function ciliAI_fetchAllTissueData_internal() {
  * ============================================================================
  */
 async function buildMasterDatabase() {
-    console.log("[CiliAI] Building Master Database...");
+    const sources = {
+        umap: 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/umap_data.json',
+        screens: 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/cilia_screens_data.json',
+        cellxgene: 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/cellxgene_data.json',
+        tissue: 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/rna_tissue_consensus.tsv',
+        complexes: 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/corum_humanComplexes.json',
+        domains: 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/cili_ai_domain_database.json',
+        proteome_nevers: 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/nevers_et_al_2017_matrix_optimized.json',
+        proteome_li: 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/li_et_al_2014_matrix_optimized.json',
+        core: 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/ciliahub_data.json'
+    };
 
-    try {
-        // 1. Define all data source URLs
-        const urls = {
-            mainGeneList: 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/ciliahub_data.json',
-            domains: 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/cili_ai_domain_database.json',
-            complexes: 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/corum_humanComplexes.json',
-            scRNA: 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/cellxgene_data.json',
-            screens_extra: 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/cilia_screens_data.json',
-            nevers: 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/nevers_et_al_2017_matrix_optimized.json',
-            li: 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/li_et_al_2014_matrix_optimized.json'
+    // Fetch all in parallel
+    const [
+        umapData,
+        screensData,
+        cellxgeneData,
+        tissueDataText,
+        complexesData,
+        domainsData,
+        proteomeNevers,
+        proteomeLi,
+        coreData
+    ] = await Promise.all([
+        fetch(sources.umap).then(r => r.json()),
+        fetch(sources.screens).then(r => r.json()),
+        fetch(sources.cellxgene).then(r => r.json()),
+        fetch(sources.tissue).then(r => r.text()),
+        fetch(sources.complexes).then(r => r.json()),
+        fetch(sources.domains).then(r => r.json()),
+        fetch(sources.proteome_nevers).then(r => r.json()),
+        fetch(sources.proteome_li).then(r => r.json()),
+        fetch(sources.core).then(r => r.json())
+    ]);
+
+    // Parse TSV (tissue expression)
+    const tissueData = tissueDataText.split('\n').slice(1).map(line => {
+        const [gene, tissue, value] = line.split('\t');
+        return { gene, tissue, value: parseFloat(value) };
+    });
+
+    // Create master dictionary
+    const masterDB = {};
+
+    for (const [gene, entry] of Object.entries(coreData)) {
+        const g = gene.trim().toUpperCase();
+        masterDB[g] = {
+            ...entry,
+            domains: domainsData[g] || [],
+            complexes: [],
+            screens: screensData[g] || {},
+            expression: cellxgeneData[g] || {},
+            tissue: tissueData.filter(t => t.gene === g),
+            umap: umapData[g] || null,
+            proteomics: {
+                nevers: proteomeNevers[g] || null,
+                li: proteomeLi[g] || null
+            }
         };
+    }
 
-        // 2. Fetch all data sources in parallel
-        const [
-            mainGeneList,
-            domains_raw, // This is {"IFT88": [...], "ift57": [...], etc}
-            complexes,
-            scRNA,
-            screens_extra,
-            nevers_raw,
-            li_raw,
-            tissue
-        ] = await Promise.all([
-            fetch(urls.mainGeneList).then(r => r.json()),
-            fetch(urls.domains).then(r => r.json()),
-            fetch(urls.complexes).then(r => r.json()),
-            fetch(urls.scRNA).then(r => r.json()),
-            fetch(urls.screens_extra).then(r => r.json()),
-            fetch(urls.nevers).then(r => r.json()),
-            fetch(urls.li).then(r => r.json()),
-            ciliAI_fetchAllTissueData_internal()
-        ]);
-
-        // 3. --- PRE-PROCESSING (THE CRITICAL FIXES) ---
-
-        // Fix 1: Standardize Domain Keys (NEW!)
-        // Create a new object where all keys are guaranteed uppercase.
-        const domains_by_gene = {};
-        for (const key in domains_raw) {
-            const upperKey = key.toUpperCase();
-            domains_by_gene[upperKey] = domains_raw[key];
-        }
-        console.log(`[CiliAI] Processed Domain data. ${Object.keys(domains_by_gene).length} genes standardized.`);
-
-
-        // Fix 2: Pre-process Li et al. data (keyed by Entrez ID)
-        const li_by_gene = {};
-        for (const entrez_id in li_raw.genes) {
-            const geneData = li_raw.genes[entrez_id];
-            if (geneData && geneData.g) {
-                const geneSymbol = geneData.g.toUpperCase();
-                li_by_gene[geneSymbol] = geneData;
+    // Map complexes
+    for (const complex of complexesData) {
+        for (const subunit of complex.subunits) {
+            const g = subunit.trim().toUpperCase();
+            if (masterDB[g]) {
+                masterDB[g].complexes.push({
+                    complex_name: complex.complexName,
+                    category: complex.category || null
+                });
             }
         }
-        console.log(`[CiliAI] Processed Li et al. (Entrez ID) data for ${Object.keys(li_by_gene).length} genes.`);
-
-        // Fix 3: Get the correct sub-object from Nevers
-        const nevers_by_gene = nevers_raw.genes;
-        
-        // Fix 4: Helper to find a gene's complex(es) from the CORUM array
-        const getComplexes = (geneSymbol) => {
-            return complexes.filter(comp => 
-                comp.subunits?.some(s => s.gene_name?.toUpperCase() === geneSymbol)
-            );
-        };
-        
-        // 4. --- COMBINE THE DATABASE ---
-        window.ciliAI_MasterDatabase = mainGeneList.map(geneEntry => {
-            
-            // This is our clean, standard key
-            const gene = geneEntry.gene.toUpperCase().trim(); 
-            
-            // --- Screen data fix (from v10) ---
-            const screens_from_main = Array.isArray(geneEntry.screens) ? geneEntry.screens : [];
-            const screens_from_extra = screens_extra[gene] || [];
-            const combined_screens = [...screens_from_main, ...screens_from_extra];
-
-            // --- !! THIS IS THE FIX !! ---
-            // Use the new standardized `domains_by_gene` object
-            const domain_data = domains_by_gene[gene] || null;
-            // --- END OF FIX ---
-
-            const phylogeny = {
-                nevers: nevers_by_gene[gene] || null,
-                li: li_by_gene[gene] || null
-            };
-
-            return {
-                ...geneEntry, 
-                gene: gene, 
-                domains: domain_data, // Now correctly linked
-                complexes: getComplexes(gene),
-                tissue: tissue[gene] || null,
-                scRNA: scRNA[gene] || null,
-                screens: combined_screens,
-                phylogeny: (phylogeny.nevers || phylogeny.li) ? phylogeny : null
-            };
-        });
-    
-        console.log(`✅ [CiliAI] Master Database built. ${window.ciliAI_MasterDatabase.length} genes integrated.`);
-        
-        // --- Post-build sanity check ---
-        const ift88_check = window.ciliAI_MasterDatabase.find(g => g.gene === "IFT88");
-        if (ift88_check) {
-            console.log("[CiliAI] IFT88 Domain Check:", ift88_check.domains ? "✅ Data Linked" : "❌ FAILED TO LINK");
-            console.log("[CiliAI] IFT88 Phylogeny Check:", ift88_check.phylogeny ? "✅ Data Linked" : "❌ FAILED TO LINK");
-            console.log("[CiliAI] IFT88 Screens Check:", ift88_check.screens.length > 0 ? "✅ Data Linked" : "❌ FAILED TO LINK");
-            console.log("[CiliAI] IFT88 Complex Check:", ift88_check.complexes.length > 0 ? "✅ Data Linked" : "❌ FAILED TO LINK");
-        } else {
-            console.error("[CiliAI] FATAL: IFT88 not found in main gene list.");
-        }
-
-    } catch (e) {
-        console.error("❌ [CiliAI] FATAL ERROR building Master Database:", e);
     }
+
+    window.masterDB = masterDB;
+    return masterDB;
 }
+
 
 // --- IMPORTANT: Call the function to build the database ---
 // --- Place this in your main script's initialization logic ---
