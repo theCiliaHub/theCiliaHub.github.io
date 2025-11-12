@@ -4,7 +4,6 @@
 // --- Global Caches for Phylogenetic Data ---
 let liPhylogenyCache = null;
 let neversPhylogenyCache = null;
-
 // ==========================================================
 // 1️⃣ Data Loading
 // ==========================================================
@@ -12,7 +11,7 @@ async function loadCiliAIData() {
     const urls = {
         ciliahub: 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/ciliahub_data.json',
         umap: 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/umap_data.json',
-        screens: 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/cilia_screens_data.json',
+        screens: 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/cilia_screens_data.json', // <-- RE-ADDED
         cellxgene: 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/cellxgene_data.json',
         rna_tissue: 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/rna_tissue_consensus.tsv',
         corum: 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/corum_humanComplexes.json',
@@ -43,26 +42,28 @@ async function loadCiliAIData() {
         ciliahubData, umapData, screensData, cellxgeneData,
         rnaTissueData, corumData, domainData, neversData, liData
     ] = await Promise.all([
-        fetchData(urls.ciliahub), fetchData(urls.umap), fetchData(urls.screens),
+        fetchData(urls.ciliahub), fetchData(urls.umap), fetchData(urls.screens), // <-- RE-ADDED
         fetchData(urls.cellxgene), fetchData(urls.rna_tissue, 'tsv'), fetchData(urls.corum),
         fetchData(urls.domains), fetchData(urls.nevers2017), fetchData(urls.li2014)
     ]);
 
     // --- Cache Phylogenetic Data ---
-    // (We cache these separately for the phylogeny-specific functions)
     liPhylogenyCache = liData;
     neversPhylogenyCache = neversData;
 
     // --- Indexing for fast access ---
 
+    // ⬇️ RE-ADDED screen indexing
     const screensByGene = {};
     if (screensData && typeof screensData === 'object') {
+        // The file is an OBJECT { "GENE": [screens...], ... }
         for (const geneName in screensData) {
             if (screensData.hasOwnProperty(geneName) && Array.isArray(screensData[geneName])) {
+                // Re-format the data to match the structure in ciliahub_data.json
                 screensByGene[geneName] = screensData[geneName].map(screen => ({
                     dataset: screen.source,
                     classification: screen.result,
-                    paper_link: screen.paper_link || '#',
+                    paper_link: screen.paper_link || '#', // Add placeholders if needed
                     mean_percent_ciliated: screen.mean_percent_ciliated,
                     sd_percent_ciliated: screen.sd_percent_ciliated,
                     z_score: screen.z_score
@@ -72,8 +73,9 @@ async function loadCiliAIData() {
     } else {
         console.warn('CiliAI: screensData was not in the expected object format. Skipping screen indexing.', screensData);
     }
+    // ⬆️ END of screen indexing
 
-    const umapByGene = {}; // This file doesn't seem to be gene-based, but UMAP-point-based
+    const umapByGene = {};
     
     const scExpressionByGene = {};
     if (cellxgeneData && typeof cellxgeneData === 'object') {
@@ -89,7 +91,7 @@ async function loadCiliAIData() {
     const tissueExpressionByGene = {};
     if (Array.isArray(rnaTissueData)) {
         for (const row of rnaTissueData) {
-            const geneName = row['Gene name']; // Use 'Gene name' from TSV
+            const geneName = row['Gene name']; 
             if (geneName) {
                 if (!tissueExpressionByGene[geneName]) {
                     tissueExpressionByGene[geneName] = {};
@@ -121,9 +123,7 @@ async function loadCiliAIData() {
     }
 
     const domainsByGene = {};
-    // This file is domain-centric, so we'll store it for reverse lookups
     window.CiliAI_DomainData = domainData; 
-    // We can also build a gene-centric map from it
     if (domainData && domainData.enriched_domains) {
          for (const domain of Object.values(domainData.enriched_domains)) {
             const domainDesc = domain.description;
@@ -147,10 +147,9 @@ async function loadCiliAIData() {
         if (dataset && dataset.genes && typeof dataset.genes === 'object') {
             for (const geneKey in dataset.genes) {
                 const geneData = dataset.genes[geneKey];
-                const geneName = geneData.g; // 'g' is the gene symbol
+                const geneName = geneData.g;
                 
                 if (geneName && geneData.c !== undefined && dataset.summary?.class_list) {
-                    // From Li et al. (2014)
                     const classification = dataset.summary.class_list[geneData.c];
                     if (classification) {
                         if (!modulesByGene[geneName]) modulesByGene[geneName] = [];
@@ -158,11 +157,7 @@ async function loadCiliAIData() {
                              modulesByGene[geneName].push(classification.replace(/_/g, ' '));
                         }
                     }
-                } else if (geneName && Array.isArray(geneData.s) && dataset.organism_groups) {
-                    // From Nevers et al. (2017)
-                    // This file is better for presence/absence, not modules.
-                    // We'll let the phylogeny functions handle this.
-                }
+                } 
             }
         }
     }
@@ -177,21 +172,25 @@ async function loadCiliAIData() {
         const gene = geneObj.gene;
         const geneUpper = gene.toUpperCase();
         
-        // Combine screens from ciliahub_data.json and cilia_screens_data.json
-        const hubScreens = geneObj.screens || [];
+        // ⬇️⬇️⬇️ --- THIS IS THE CORRECTED MERGE LOGIC --- ⬇️⬇️⬇️
+        // 1. Get the screens from ciliahub_data.json (which we now know is an array)
+        const hubScreens = Array.isArray(geneObj.screens) ? geneObj.screens : [];
+        
+        // 2. Get the *additional* screens from cilia_screens_data.json
         const externalScreens = screensByGene[gene] || [];
+        
+        // 3. Combine them
         const allScreens = [...hubScreens, ...externalScreens];
+        // ⬆️⬆️⬆️ --- END OF FIX --- ⬆️⬆️⬆️
 
         return {
-            ...geneObj, // Base data from ciliahub (description, omim_id, localization, etc.)
-            
-            // --- Merged & Indexed Data ---
-            screens: allScreens, // Combined screens
+            ...geneObj, 
+            screens: allScreens, // Use the combined array
             expression: {
-                scRNA: scExpressionByGene[geneUpper] || null, // From cellxgene_data.json
-                tissue: tissueExpressionByGene[gene] || null  // From rna_tissue_consensus.tsv
+                scRNA: scExpressionByGene[geneUpper] || null, 
+                tissue: tissueExpressionByGene[gene] || null  
             },
-            complex_components: { ...geneObj.complex_components, ...corumByGene[gene] }, // Combined complexes
+            complex_components: { ...geneObj.complex_components, ...corumByGene[gene] }, 
             pfam_ids: domainsByGene[gene]?.pfam_ids || geneObj.pfam_ids || [],
             domain_descriptions: domainsByGene[gene]?.domain_descriptions || geneObj.domain_descriptions || [],
             functional_modules: modulesByGene[gene] || []
@@ -202,6 +201,51 @@ async function loadCiliAIData() {
     console.log('✅ CiliAI: Master data loaded', masterData.length, 'genes');
     return masterData;
 }
+
+async function testScreenDataMerge() {
+    console.log("--- Starting Screen Data Test ---");
+
+    // 1. Ensure data is loaded
+    if (!window.CiliAI_MasterData) {
+        console.log("Master data not found, loading it now...");
+        await loadCiliAIData();
+    }
+    
+    const masterData = window.CiliAI_MasterData;
+
+    // 2. Test Case 1: AAMP (from ciliahub_data.json)
+    const aampData = masterData.find(g => g.gene === 'AAMP');
+    if (aampData) {
+        console.log("Found AAMP:");
+        console.log(`  > Screens found: ${aampData.screens.length}`);
+        console.log(aampData.screens.map(s => s.dataset));
+    } else {
+        console.error("Test failed: AAMP not found in masterData.");
+    }
+
+    // 3. Test Case 2: IFT88 (should have data from cilia_screens_data.json)
+    // Note: IFT88 is not in the ciliahub_data.json preview, so its base data might be missing,
+    // but the screen data should be merged if it's in ciliahub_data.json.
+    // Let's test a gene we know is in cilia_screens_data.json, like '13CDNA73'
+    
+    // Let's find a better example. 'IFT88' IS in ciliahub_data.json.
+    const ift88Data = masterData.find(g => g.gene === 'IFT88');
+    if (ift88Data) {
+        console.log("Found IFT88:");
+        console.log(`  > Screens found: ${ift88Data.screens.length}`);
+        // Log the datasets to see if they merged
+        console.log(ift88Data.screens.map(s => s.dataset));
+    } else {
+        console.error("Test failed: IFT88 not found in masterData.");
+    }
+
+    console.log("--- Test Complete ---");
+}
+
+// To run this test:
+// 1. Make sure the `loadCiliAIData` function above is in your script.
+// 2. Open the browser console after your page loads.
+// 3. Type: testScreenDataMerge() and press Enter.
 
 // ==========================================================
 // 2️⃣ Question Parsing (The "Brain")
