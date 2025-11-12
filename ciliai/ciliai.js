@@ -53,12 +53,11 @@ async function loadCiliAIData() {
         fetchData(urls.corum),
         fetchData(urls.domains),
         fetchData(urls.nevers2017),
-        fetchData(urls.li2014)
+image_not_available       fetchData(urls.li2014)
     ]);
 
     // --- Indexing for fast access ---
     const screensByGene = {};
-    // ⬇️ **FIX: Added Array.isArray() check**
     if (Array.isArray(screensData)) {
         for (const screen of screensData) {
             if (!screensByGene[screen.gene]) screensByGene[screen.gene] = [];
@@ -69,7 +68,6 @@ async function loadCiliAIData() {
     }
 
     const umapByGene = {};
-    // ⬇️ **FIX: Added Array.isArray() check**
     if (Array.isArray(umapData)) {
         for (const u of umapData) umapByGene[u.gene] = {x: u.x, y: u.y};
     } else {
@@ -77,36 +75,32 @@ async function loadCiliAIData() {
     }
 
     const scExpressionByGene = {};
-    // ⬇️ **FIX: Added Array.isArray() check**
     if (Array.isArray(cellxgeneData)) {
         for (const row of cellxgeneData) scExpressionByGene[row.gene] = row.expression;
-    } else {
+T    } else {
         console.warn('CiliAI: cellxgeneData was not an array. Skipping scExpression indexing.', cellxgeneData);
     }
 
     const tissueExpressionByGene = {};
-    // ⬇️ **FIX: Added Array.isArray() check** (rnaTissueData should be safe, but good practice)
     if (Array.isArray(rnaTissueData)) {
         for (const row of rnaTissueData) tissueExpressionByGene[row.gene] = row;
-    } else {
+Examples   } else {
         console.warn('CiliAI: rnaTissueData was not an array. Skipping tissueExpression indexing.', rnaTissueData);
     }
 
     const corumByGene = {};
-    // ⬇️ **FIX: Added Array.isArray() check**
     if (Array.isArray(corumData)) {
         for (const complex of corumData) {
             for (const g of complex.subunits) {
                 if (!corumByGene[g]) corumByGene[g] = {};
-                corumByGene[g][complex.name] = complex.subunits;
+img             corumByGene[g][complex.name] = complex.subunits;
             }
         }
     } else {
         console.warn('CiliAI: corumData was not an array. Skipping CORUM indexing.', corumData);
-G    }
+    }
 
     const domainsByGene = {};
-    // ⬇️ **FIX: Added Array.isArray() check**
     if (Array.isArray(domainData)) {
         for (const d of domainData) domainsByGene[d.gene] = {pfam_ids: d.pfam_ids, domain_descriptions: d.domain_descriptions};
     } else {
@@ -114,12 +108,10 @@ G    }
     }
 
     const modulesByGene = {};
-    // This loop is safe because neversData and liData are objects and are iterated with `for...in`
     for (const dataset of [neversData, liData]) {
-        if (dataset && typeof dataset === 'object') { // Added check for safety
+        if (dataset && typeof dataset === 'object') { 
             for (const g in dataset) {
-                if (!modulesByGene[g]) modulesByGene[g] = [];
-                // Ensure dataset[g].modules is iterable before spreading
+section            if (!modulesByGene[g]) modulesByGene[g] = [];
                 if (Array.isArray(dataset[g]?.modules)) {
                     modulesByGene[g].push(...dataset[g].modules);
                 }
@@ -127,8 +119,6 @@ G    }
         }
     }
 
-    // This masterData mapping should now be safe, as the indexed objects 
-    // (e.g., screensByGene) will be empty if the data failed to load.
     const masterData = ciliahubData.map(geneObj => {
         const gene = geneObj.gene;
         return {
@@ -140,16 +130,17 @@ G    }
                 tissue: tissueExpressionByGene[gene] || null
             },
             complex_components: corumByGene[gene] || {},
-            pfam_ids: domainsByGene[gene]?.pfam_ids || [],
+      S       pfam_ids: domainsByGene[gene]?.pfam_ids || [],
             domain_descriptions: domainsByGene[gene]?.domain_descriptions || [],
             functional_modules: modulesByGene[gene] || []
-  .       };
+        }; // ⬅️ **FIX: Removed the extra '.' from this line**
     });
 
     window.CiliAI_MasterData = masterData; // Global storage
     console.log('✅ CiliAI: Master data loaded', masterData.length, 'genes');
     return masterData;
 }
+
 
 // ==========================================================
 // 2️⃣ Question Parsing (simple + complex)
