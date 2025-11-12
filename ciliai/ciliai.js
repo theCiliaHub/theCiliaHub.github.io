@@ -272,27 +272,17 @@ async function ciliAI_fetchAllTissueData_internal() {
  * [CiliAI] MASTER DATABASE BUILDER (v9 - FINAL)
  *
  * This function is now CONFIRMED to handle all 9 data source formats.
+/**
+ * ============================================================================
+ * [CiliAI] MASTER DATABASE BUILDER (v10 - HOTFIX)
  *
  * WHAT IS FIXED:
- * 1. (CRITICAL) Phylogeny Bug:
- * - Correctly parses `nevers_et_al...json` (keyed by Gene Symbol).
- * - Correctly parses `li_et_al...json` (keyed by Entrez ID) by
- * pre-processing it into a new object keyed by Gene Symbol.
- * - This will fix all "No phylogeny data found" errors for genes
- * that are in those files.
- *
- * 2. Data Merging:
- * - Merges "screens" from `ciliahub_data.json` AND `cilia_screens_data.json`.
- * - Prioritizes the structured `cili_ai_domain_database.json` over the
- * simple `domain_descriptions` array in the main file.
- *
- * 3. CORUM Complexes:
- * - Correctly searches the CORUM array to find all complexes a gene
- * belongs to.
- *
- * 4. Whitespace Bug:
- * - Includes the `.trim()` fix to handle "dirty" gene names (e.g., "IFT88 ")
- * in your main `ciliahub_data.json` file.
+ * 1. (CRITICAL) "TypeError: screens_from_main is not iterable"
+ * - The `ciliahub_data.json` file has inconsistent data for the "screens"
+ * property. Sometimes it is an Array (`[]`), sometimes it is an
+ * empty Object (`{}`).
+ * - The code now explicitly checks `Array.isArray(geneEntry.screens)`
+ * to ensure we only try to spread an array, fixing the crash.
  * ============================================================================
  */
 async function buildMasterDatabase() {
@@ -312,14 +302,14 @@ async function buildMasterDatabase() {
 
         // 2. Fetch all data sources in parallel
         const [
-            mainGeneList,    // This is an ARRAY of gene objects
-            domains_raw,     // This is an OBJECT {"IFT57": [...]}
-            complexes,       // This is an ARRAY of complex objects
-            scRNA,           // This is an OBJECT
-            screens_extra,   // This is an OBJECT {"IFT88": [...]}
-            nevers_raw,      // This is an OBJECT {"metadata": ..., "genes": {"YWHAB": ...}}
-            li_raw,          // This is an OBJECT {"metadata": ..., "genes": {"285033": ...}}
-            tissue           // This is an OBJECT {"TSPAN6": ...}
+            mainGeneList,
+            domains_raw,
+            complexes,
+            scRNA,
+            screens_extra,
+            nevers_raw,
+            li_raw,
+            tissue
         ] = await Promise.all([
             fetch(urls.mainGeneList).then(r => r.json()),
             fetch(urls.domains).then(r => r.json()),
@@ -328,78 +318,63 @@ async function buildMasterDatabase() {
             fetch(urls.screens_extra).then(r => r.json()),
             fetch(urls.nevers).then(r => r.json()),
             fetch(urls.li).then(r => r.json()),
-            ciliAI_fetchAllTissueData_internal() // Your helper from before
+            ciliAI_fetchAllTissueData_internal()
         ]);
 
-        // 3. --- PRE-PROCESSING (THE CRITICAL FIXES) ---
-
-        // Fix 1: Pre-process Li et al. data (keyed by Entrez ID)
-        // into a new object that is keyed by GENE NAME.
+        // 3. --- PRE-PROCESSING ---
         const li_by_gene = {};
         for (const entrez_id in li_raw.genes) {
             const geneData = li_raw.genes[entrez_id];
-            if (geneData && geneData.g) { // "g" is the gene symbol
+            if (geneData && geneData.g) {
                 const geneSymbol = geneData.g.toUpperCase();
                 li_by_gene[geneSymbol] = geneData;
             }
         }
         console.log(`[CiliAI] Processed Li et al. (Entrez ID) data for ${Object.keys(li_by_gene).length} genes.`);
 
-        // Fix 2: Get the correct sub-object from Nevers (already keyed by Gene Name)
         const nevers_by_gene = nevers_raw.genes;
         
-        // Fix 3: Helper to find a gene's complex(es) from the CORUM array
         const getComplexes = (geneSymbol) => {
             return complexes.filter(comp => 
                 comp.subunits?.some(s => s.gene_name?.toUpperCase() === geneSymbol)
             );
         };
         
-        // 4. --- COMBINE THE DATABASE (LOOPING OVER CILIAHUB_DATA.JSON) ---
+        // 4. --- COMBINE THE DATABASE ---
         window.ciliAI_MasterDatabase = mainGeneList.map(geneEntry => {
             
-            // --- The "Master Key" ---
-            // Use .trim() to fix whitespace bugs (like with IFT88)
             const gene = geneEntry.gene.toUpperCase().trim(); 
             
-            // --- Merge Screen Data ---
-            // Combine screens from ciliahub_data.json with screens from cilia_screens_data.json
-            const screens_from_main = geneEntry.screens || []; // This is an array
-            const screens_from_extra = screens_extra[gene] || []; // This is also an array
+            // --- !! THIS IS THE FIX !! ---
+            // Check if geneEntry.screens is *actually* an array before spreading it
+            const screens_from_main = Array.isArray(geneEntry.screens) ? geneEntry.screens : [];
+            // --- END OF FIX ---
+            
+            const screens_from_extra = screens_extra[gene] || [];
             const combined_screens = [...screens_from_main, ...screens_from_extra];
 
-            // --- Get Domain Data ---
-            // We prioritize the structured data from cili_ai_domain_database.json
             const domain_data = domains_raw[gene] || null;
 
-            // --- Get Phylogeny Data (Using the fixed lookup objects) ---
             const phylogeny = {
                 nevers: nevers_by_gene[gene] || null,
                 li: li_by_gene[gene] || null
             };
 
-            // --- Build the Final Integrated Object ---
             return {
-                ...geneEntry, // Base info from ciliahub_data.json
-                
-                // Overwrite/Add specific fields:
-                gene: gene, // Ensure it's the trimmed, uppercase version
-                
-                // Data from external files, now correctly linked:
-                domains: domain_data,          // From cili_ai_domain_database.json
-                complexes: getComplexes(gene), // From corum_humanComplexes.json
-                tissue: tissue[gene] || null,  // From rna_tissue_consensus.tsv
-                scRNA: scRNA[gene] || null,    // From cellxgene_data.json
-                
-                // Merged/Fixed data:
-                screens: combined_screens,     // Merged from 2 sources
-                phylogeny: (phylogeny.nevers || phylogeny.li) ? phylogeny : null // Fixed lookup
+                ...geneEntry, 
+                gene: gene, 
+                domains: domain_data,
+                complexes: getComplexes(gene),
+                tissue: tissue[gene] || null,
+                scRNA: scRNA[gene] || null,
+                screens: combined_screens,
+                phylogeny: (phylogeny.nevers || phylogeny.li) ? phylogeny : null
             };
         });
     
         console.log(`✅ [CiliAI] Master Database built. ${window.ciliAI_MasterDatabase.length} genes integrated.`);
         
-        // --- Post-build sanity check (you can check this in your console) ---
+        // --- Post-build sanity check ---
         const ift88_check = window.ciliAI_MasterDatabase.find(g => g.gene === "IFT88");
         if (ift88_check) {
             console.log("[CiliAI] IFT88 Domain Check:", ift88_check.domains ? "✅ Data Linked" : "❌ FAILED TO LINK");
