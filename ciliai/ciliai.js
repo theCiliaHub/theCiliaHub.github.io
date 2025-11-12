@@ -12,6 +12,14 @@ let neversPhylogenyCache = null;
 let umapDataCache = null;
 let cellxgeneDataCache = null;
 
+// ==========================================================
+// 1️⃣ UNIFIED Data Loading - Integrates ALL datasets
+// ==========================================================
+
+// Global Caches
+let liPhylogenyCache = null;
+let neversPhylogenyCache = null;
+
 async function loadCiliAIData() {
     const urls = {
         ciliahub: 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/ciliahub_data.json',
@@ -244,7 +252,7 @@ async function loadCiliAIData() {
         return {
             ...geneObj,
             
-           // ✅ Screens (merged)
+    _       // ✅ Screens (merged)
             screens: allScreens,
             
             // ✅ Expression (scRNA + tissue)
@@ -270,7 +278,7 @@ async function loadCiliAIData() {
             ciliopathies: ciliopathies,
             
             // ✅ Phylogenetic Data
-            phylogeny: {
+          _ phylogeny: {
                 li_2014: liGenesMap[geneUpper] || null,
                 nevers_2017: neversGenesMap[geneUpper] || null
             }
@@ -284,8 +292,9 @@ async function loadCiliAIData() {
     return masterData;
 }
 
+
 // ==========================================================
-// 2️⃣ Question Parsing (The "Brain")
+// 2️⃣ Question Parsing (The "Brain") - CORRECTED
 // ==========================================================
 async function parseCiliAIQuestion(question, masterData) {
     const q = question.toLowerCase();
@@ -435,8 +444,9 @@ async function parseCiliAIQuestion(question, masterData) {
     return structuredQuery;
 }
 
+
 // ==========================================================
-// 3️⃣ Query Execution (The "Engine")
+// 3️⃣ Query Execution (The "Engine") - CORRECTED
 // ==========================================================
 function queryGenes(structuredQuery) {
     const data = window.CiliAI_MasterData;
@@ -555,6 +565,7 @@ function queryGenes(structuredQuery) {
 
     return results;
 }
+
 
 // ==========================================================
 // 4️⃣ Results Rendering (The "Voice")
@@ -1208,7 +1219,7 @@ async function getPhylogenyAnalysis(genes) {
                         </tr>
                     </thead>
                     <tbody>
-         ;
+        `;
 
         finalGenes.forEach(gene => {
             const liEntry = liGenesMap[gene];
@@ -1256,7 +1267,6 @@ async function getPhylogenyAnalysis(genes) {
         `;
     }
 }
-
 
 // --- Download Helper ---
 function downloadPlot(plotDivId, filename) {
