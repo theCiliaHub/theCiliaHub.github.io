@@ -455,13 +455,11 @@ function queryGenes(structuredQuery) {
             }
 
             if (filters.complexes) {
-                // Check 1: Gene's own `complex_components`
                 const complexNames = Object.keys(g.complex_components || {});
                 let inComplex = complexNames.some(name =>
                     name.toLowerCase().includes(filters.complexes.toLowerCase())
                 );
                 
-                // Check 2: The hard-coded `getComplexPhylogenyTableMap`
                 if (!inComplex) {
                     const targetGenes = complexMap[filters.complexes.toUpperCase()] || [];
                     if (targetGenes.includes(g.gene.toUpperCase())) {
@@ -473,13 +471,11 @@ function queryGenes(structuredQuery) {
 
             if (filters.functional_modules) {
                 let inModule = false;
-                // Check 1: Gene's `functional_modules` (from Li 2014)
                 const modules = g.functional_modules || [];
                 if (modules.some(mod => mod.toLowerCase().includes(filters.functional_modules.toLowerCase()))) {
                     inModule = true;
                 }
                 
-                // Check 2: The hard-coded `getComplexPhylogenyTableMap` (which also has modules)
                 if (!inModule) {
                     const targetGenes = complexMap[filters.functional_modules.toUpperCase()] || [];
                     if (targetGenes.includes(g.gene.toUpperCase())) {
@@ -489,12 +485,15 @@ function queryGenes(structuredQuery) {
                 if (!inModule) return false;
             }
 
+            // ⬇️ --- FIX FOR CILIOPATHY QUERIES --- ⬇️
             if (filters.ciliopathy) {
-                const ciliopathies = g.ciliopathies || []; // Use the normalized array
+                // g.ciliopathies is the normalized array we built in loadCiliAIData
+                const ciliopathies = g.ciliopathies || []; 
                 if (!Array.isArray(ciliopathies) || !ciliopathies.some(c => c.toLowerCase().includes(filters.ciliopathy.toLowerCase()))) {
                     return false;
                 }
             }
+            // ⬆️ --- END OF FIX --- ⬆️
 
             if (filters.tissue && g.expression?.tissue) {
                 const tissueName = Object.keys(g.expression.tissue).find(t =>
@@ -536,6 +535,7 @@ function queryGenes(structuredQuery) {
     return results;
 }
 
+
 // ==========================================================
 // 4️⃣ Results Rendering (The "Voice")
 // ==========================================================
@@ -551,21 +551,22 @@ function displayCiliAIResults(results, structuredQuery) {
     const q = structuredQuery;
     const intent = q.intent;
 
-    // Helper to build HTML sections, safely handling empty content
+    // ⬇️ --- FIX FOR ORTHOLOGS (and other strings) --- ⬇️
     const buildSection = (title, content) => {
         let displayContent = '';
         if (Array.isArray(content)) {
-            displayContent = content.filter(Boolean).join(', '); // Filter out empty/null items
+            displayContent = content.filter(Boolean).join(', '); 
         } else if (typeof content === 'object' && content !== null) {
-            displayContent = Object.keys(content).join(', '); // For complex objects
+            displayContent = Object.keys(content).join(', '); 
         } else if (content) { // Handles strings, numbers
             displayContent = content;
         }
+        // ⬆️ --- END OF FIX --- ⬆️
         
         if (displayContent) {
             return `<p><strong>${title}:</strong> ${displayContent}</p>`;
         }
-        return ''; // Return empty string if content is null, undefined, or empty
+        return ''; 
     };
 
     // --- 1. Handle "List" queries ---
@@ -692,13 +693,25 @@ function displayCiliAIResults(results, structuredQuery) {
             if (intent.modules) cardSections.push(allSections.modules);
             if (intent.omim) cardSections.push(allSections.omim);
             if (intent.ciliopathy) cardSections.push(allSections.ciliopathy, allSections.ciliopathy_classification);
+            
+            // ⬇️ --- FIX FOR ORTHOLOGS --- ⬇️
             if (intent.orthologs) {
                 if (q.species === 'c_elegans') cardSections.push(allSections.ortholog_c_elegans);
                 else if (q.species === 'mouse') cardSections.push(allSections.ortholog_mouse);
                 else if (q.species === 'zebrafish') cardSections.push(allSections.ortholog_zebrafish);
                 else if (q.species === 'drosophila') cardSections.push(allSections.ortholog_drosophila);
-                else cardSections.push(allSections.ortholog_mouse, allSections.ortholog_c_elegans, allSections.ortholog_zebrafish, allSections.ortholog_drosophila);
+                else {
+                    // If no species specified, show all
+                    cardSections.push(
+                        allSections.ortholog_mouse, 
+                        allSections.ortholog_c_elegans, 
+                        allSections.ortholog_zebrafish, 
+                        allSections.ortholog_drosophila
+                    );
+                }
             }
+            // ⬆️ --- END OF FIX --- ⬆️
+
             if (intent.expression && q.filters.tissue) cardSections.push(allSections.expression_tissue);
             if (intent.expression && q.filters.cell_type) cardSections.push(allSections.expression_cell);
         }
@@ -1122,6 +1135,106 @@ async function displayUmapPlot() {
         </div>`;
     
     Plotly.newPlot(plotDivId, plotData, layout, { responsive: true, displayModeBar: false });
+}
+
+// ==========================================================
+// 2️⃣ Phylogeny Analysis (Using Pre-loaded Data)
+// ==========================================================
+async function getPhylogenyAnalysis(genes) {
+    // Data is already loaded in global caches
+    if (!liPhylogenyCache || !neversPhylogenyCache) {
+        return `<div class="result-card"><h3>Analysis Error</h3><p>Phylogenetic data not loaded. Please refresh the page.</p></div>`;
+    }
+
+    // Build gene maps from cached data
+    const liGenesMap = {};
+    if (liPhylogenyCache && liPhylogenyCache.genes) {
+        Object.values(liPhylogenyCache.genes).forEach(geneObj => {
+            if (geneObj.g) {
+                liGenesMap[geneObj.g.toUpperCase()] = geneObj;
+            }
+        });
+    }
+
+    const neversGenesMap = {};
+    if (neversPhylogenyCache && neversPhylogenyCache.genes) {
+        Object.keys(neversPhylogenyCache.genes).forEach(geneKey => {
+            neversGenesMap[geneKey.toUpperCase()] = neversPhylogenyCache.genes[geneKey];
+        });
+    }
+
+    // Find valid genes
+    const validGeneSymbols = genes.map(g => g.toUpperCase()).filter(g =>
+        liGenesMap[g] || neversGenesMap[g]
+    );
+
+    if (validGeneSymbols.length === 0) {
+        return `<div class="result-card"><h3>Analysis Error</h3><p>None of the requested genes (${genes.join(', ')}) were found in phylogenetic datasets.</p></div>`;
+    }
+
+    const finalGenes = [...new Set(validGeneSymbols)];
+
+    // --- Multi-gene comparison ---
+    if (finalGenes.length > 1) {
+        let summaryHtml = `
+            <div class="result-card">
+                <h3>Phylogenetic Comparison: ${finalGenes.join(' vs ')} 📊</h3>
+                <table class="gene-detail-table">
+                    <thead>
+                        <tr>
+                            <th>Gene</th>
+                            <th>Li Class (2014)</th>
+                            <th>Nevers Species Count (out of 99)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+        `;
+
+        finalGenes.forEach(gene => {
+            const liEntry = liGenesMap[gene];
+            const neversEntry = neversGenesMap[gene];
+
+            const liClass = liEntry
+                ? (liPhylogenyCache.summary.class_list[liEntry.c] || 'N/A').replace(/_/g, ' ')
+                : 'N/A';
+            const neversCount = neversEntry?.s?.length || 0;
+
+            summaryHtml += `
+                <tr>
+                    <td><strong>${gene}</strong></td>
+                    <td>${liClass}</td>
+                    <td>${neversCount}</td>
+                </tr>
+            `;
+        });
+
+        summaryHtml += `</tbody></table></div>`;
+        return summaryHtml;
+
+    } else {
+        // --- Single gene analysis ---
+        const geneSymbol = finalGenes[0];
+        const liEntry = liGenesMap[geneSymbol];
+        const neversEntry = neversGenesMap[geneSymbol];
+
+        const liSummary = liEntry
+            ? (liPhylogenyCache.summary.class_list[liEntry.c] || 'Classification Unavailable').replace(/_/g, ' ')
+            : 'Not found in Li et al. (2014)';
+        const neversSpeciesCount = neversEntry?.s?.length || 0;
+        const neversStatus = neversEntry
+            ? `Found in ${neversSpeciesCount} species (Nevers et al. 2017)`
+            : 'Not found in Nevers et al. (2017)';
+
+        return `
+            <div class="result-card">
+                <h3>Evolutionary Summary: ${geneSymbol} 🧬</h3>
+                <table class="gene-detail-table">
+                    <tr><th>Li et al. (2014) Classification</th><td><strong>${liSummary}</strong></td></tr>
+                    <tr><th>Nevers et al. (2017) Status</th><td>${neversStatus}</td></tr>
+                </table>
+            </div>
+        `;
+    }
 }
 
 // --- Download Helper ---
