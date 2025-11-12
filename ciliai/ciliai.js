@@ -183,31 +183,76 @@ async function loadCiliAIData(timeoutMs = 20000) {
         }
     }
 
-    const liMap = {}, neversMap = {};
-    if (liRaw?.genes) {
-        for (const gk of Object.keys(liRaw.genes)) {
-            const o = liRaw.genes[gk];
-            const name = o.g || o.gene || gk;
-            if (!name) continue;
-            const key = String(name).toUpperCase();
+    // In the loadCiliAIData function, replace the phylogeny mapping section with this:
+
+// Create phylogeny maps for quick lookup
+const liMap = {};
+const neversMap = {};
+
+// Li 2014 phylogeny data - FIXED for Entrez ID keys
+if (liRaw?.genes) {
+    Object.keys(liRaw.genes).forEach(entrezId => {
+        const geneData = liRaw.genes[entrezId];
+        const geneSymbol = geneData.g || geneData.gene; // This contains the gene symbol
+        
+        if (geneSymbol) {
+            const key = geneSymbol.toUpperCase();
             liMap[key] = {
-                class: (Array.isArray(liRaw.summary?.class_list) && liRaw.summary.class_list[o.c]) || 'Unknown',
-                class_id: o.c,
-                species_data: o.s || []
+                class: (Array.isArray(liRaw.summary?.class_list) && liRaw.summary.class_list[geneData.c]) || 'Unknown',
+                class_id: geneData.c,
+                species_data: geneData.s || [],
+                entrez_id: geneData.e || entrezId
             };
         }
-    }
-    if (neversRaw?.genes) {
-        for (const gk of Object.keys(neversRaw.genes)) {
-            const o = neversRaw.genes[gk];
-            const name = o.g || o.gene || gk;
-            const key = String(name).toUpperCase();
+    });
+    
+    console.log('Li 2014 mapping complete. Total genes mapped:', Object.keys(liMap).length);
+    console.log('Sample Li mappings:', 
+        Object.keys(liMap).slice(0, 5).map(k => `${k} -> ${liMap[k]?.class}`)
+    );
+}
+
+// Nevers 2017 phylogeny data - already uses gene symbols as keys
+if (neversRaw?.genes) {
+    Object.keys(neversRaw.genes).forEach(geneSymbol => {
+        // Skip the header entry
+        if (geneSymbol === 'Gene Name') return;
+        
+        const geneData = neversRaw.genes[geneSymbol];
+        const key = geneSymbol.toUpperCase();
+        
+        // Only process if it has valid data (not empty array)
+        if (geneData && geneData.s && Array.isArray(geneData.s) && geneData.s.length > 0) {
             neversMap[key] = {
-                species_count: Array.isArray(o.s) ? o.s.length : (o.s ? 1 : 0),
-                species_data: o.s || []
+                species_count: geneData.s.length,
+                species_data: geneData.s,
+                in_ciliated_organisms: calculateCiliatedOrganisms(geneData.s, neversRaw)
             };
         }
-    }
+    });
+    
+    console.log('Nevers 2017 mapping complete. Total genes mapped:', Object.keys(neversMap).length);
+    console.log('Sample Nevers mappings:',
+        Object.keys(neversMap).slice(0, 5).map(k => `${k} -> ${neversMap[k]?.species_count} species`)
+    );
+}
+
+// Helper function for Nevers data
+function calculateCiliatedOrganisms(speciesIndices, neversData) {
+    if (!neversData?.organism_groups?.ciliated_organisms) return speciesIndices.length;
+    
+    let ciliatedCount = 0;
+    speciesIndices.forEach(idx => {
+        if (idx < neversData.organism_groups.ciliated_organisms.length) {
+            ciliatedCount++;
+        }
+    });
+    return ciliatedCount;
+}
+
+// Make maps globally available for debugging
+window.liMap = liMap;
+window.neversMap = neversMap;
 
     function extractCiliopathyInfo(o) {
         const split = s => String(s).split(';').map(t => t.trim()).filter(Boolean);
@@ -847,61 +892,171 @@ async function displayUmapPlot() {
     Plotly.newPlot(divId, traces, layout, {responsive:true, displayModeBar:false});
 }
 
+function testGeneLookup(geneSymbol) {
+    const geneUpper = geneSymbol.toUpperCase();
+    console.log(`=== Testing ${geneUpper} ===`);
+    
+    console.log('In Li map:', window.liMap ? (window.liMap[geneUpper] ? '✓' : '✗') : 'No liMap');
+    console.log('In Nevers map:', window.neversMap ? (window.neversMap[geneUpper] ? '✓' : '✗') : 'No neversMap');
+    
+    if (window.liMap && window.liMap[geneUpper]) {
+        console.log('Li data:', window.liMap[geneUpper]);
+    }
+    if (window.neversMap && window.neversMap[geneUpper]) {
+        console.log('Nevers data:', window.neversMap[geneUpper]);
+    }
+    
+    return {
+        li: !!(window.liMap && window.liMap[geneUpper]),
+        nevers: !!(window.neversMap && window.neversMap[geneUpper])
+    };
+}
+
+// Test specific genes
+testGeneLookup('YWHAB');
+testGeneLookup('IFT88');
+testGeneLookup('BBS1');
+
 /* ==============================================================
    9. Phylogeny Analysis
    ============================================================== */
 async function getPhylogenyAnalysis(genes) {
-    if (!liPhylogenyCache || !neversPhylogenyCache) {
-        return `<div class="result-card"><h3>Analysis Error</h3><p>Phylogenetic data not loaded.</p></div>`;
+    console.log('Phylogeny analysis requested for:', genes);
+    
+    const liCache = window.liPhylogenyCache;
+    const neversCache = window.neversPhylogenyCache;
+    const liMap = window.liMap || {};
+    const neversMap = window.neversMap || {};
+    
+    if (!liCache && !neversCache) {
+        return `
+            <div class="result-card">
+                <h3>Phylogenetic Data Not Available</h3>
+                <p>Evolutionary analysis data could not be loaded.</p>
+                <button onclick="location.reload()" class="download-button">Reload Page</button>
+            </div>`;
     }
 
-    const liGenesMap = {};
-    if (liPhylogenyCache?.genes) {
-        Object.values(liPhylogenyCache.genes).forEach(o => {
-            if (o.g) liGenesMap[o.g.toUpperCase()] = o;
-        });
+    const validGenes = [];
+    const analysisResults = [];
+
+    genes.forEach(gene => {
+        const geneUpper = gene.toUpperCase();
+        
+        // Look up in our pre-built maps
+        const liData = liMap[geneUpper];
+        const neversData = neversMap[geneUpper];
+        
+        if (liData || neversData) {
+            validGenes.push(geneUpper);
+            analysisResults.push({
+                gene: geneUpper,
+                liData: liData,
+                neversData: neversData
+            });
+        } else {
+            console.log(`Gene ${geneUpper} not found in phylogeny maps`);
+        }
+    });
+
+    if (validGenes.length === 0) {
+        return `
+            <div class="result-card">
+                <h3>Genes Not Found in Phylogenetic Databases</h3>
+                <p>The gene(s) "${genes.join(', ')}" were not found in available evolutionary datasets.</p>
+                <div style="margin-top: 15px;">
+                    <p><strong>Troubleshooting:</strong></p>
+                    <ul>
+                        <li>Check that the gene symbol is correct (e.g., YWHAB)</li>
+                        <li>Try using the official HGNC symbol</li>
+                        <li>Some genes may not be included in phylogenetic analyses</li>
+                    </ul>
+                </div>
+                <p><strong>Available datasets:</strong></p>
+                <ul>
+                    <li>Li et al. 2014: ${Object.keys(liMap).length} genes mapped</li>
+                    <li>Nevers et al. 2017: ${Object.keys(neversMap).length} genes mapped</li>
+                </ul>
+                <div style="margin-top: 15px; font-size: 0.9em; color: #666;">
+                    <p><strong>Debug info:</strong></p>
+                    <p>Li cache: ${liCache ? 'loaded' : 'missing'}, Li map: ${Object.keys(liMap).length} entries</p>
+                    <p>Nevers cache: ${neversCache ? 'loaded' : 'missing'}, Nevers map: ${Object.keys(neversMap).length} entries</p>
+                </div>
+            </div>`;
     }
 
-    const neversGenesMap = {};
-    if (neversPhylogenyCache?.genes) {
-        Object.keys(neversPhylogenyCache.genes).forEach(k => {
-            neversGenesMap[k.toUpperCase()] = neversPhylogenyCache.genes[k];
-        });
+    // Generate results table
+    let html = `<div class="result-card">
+        <h3>Evolutionary Analysis: ${validGenes.join(', ')}</h3>
+        <table class="gene-detail-table">
+            <thead>
+                <tr>
+                    <th>Gene</th>
+                    ${Object.keys(liMap).length > 0 ? '<th>Li 2014 Classification</th>' : ''}
+                    ${Object.keys(neversMap).length > 0 ? '<th>Nevers 2017 Species Count</th>' : ''}
+                    <th>Data Sources</th>
+                </tr>
+            </thead>
+            <tbody>`;
+
+    analysisResults.forEach(({ gene, liData, neversData }) => {
+        const liClass = liData ? (liCache?.summary?.class_list?.[liData.class_id] || 'Unknown').replace(/_/g, ' ') : 'Not found';
+        const neversCount = neversData ? neversData.species_count : 'Not found';
+        const sources = [];
+        if (liData) sources.push('Li 2014');
+        if (neversData) sources.push('Nevers 2017');
+        const sourceText = sources.length > 0 ? sources.join(' + ') : 'No data';
+        
+        html += `<tr>
+            <td><strong>${gene}</strong></td>
+            ${Object.keys(liMap).length > 0 ? `<td>${liClass}</td>` : ''}
+            ${Object.keys(neversMap).length > 0 ? `<td>${neversCount}</td>` : ''}
+            <td>${sourceText}</td>
+        </tr>`;
+    });
+
+    html += `</tbody></table>`;
+
+    // Add detailed information for single gene analysis
+    if (validGenes.length === 1) {
+        const gene = validGenes[0];
+        const { liData, neversData } = analysisResults[0];
+        
+        html += `<div style="margin-top: 20px;">`;
+        
+        if (liData) {
+            const speciesCount = liData.species_data ? liData.species_data.length : 0;
+            const className = liCache.summary.class_list[liData.class_id] || 'Unknown';
+            const totalOrganisms = liCache.summary.total_organisms || 140;
+            
+            html += `<div style="margin-bottom: 15px; padding: 15px; background: #f0f8ff; border-radius: 8px;">
+                <h4>📊 Li et al. 2014 Analysis</h4>
+                <p><strong>Evolutionary Classification:</strong> ${className.replace(/_/g, ' ')}</p>
+                <p><strong>Species Present:</strong> ${speciesCount} out of ${totalOrganisms} species</p>
+                <p><strong>Entrez ID:</strong> ${liData.entrez_id || 'N/A'}</p>
+                <p style="font-size: 0.9em; color: #666;"><em>${liCache.references.paper} (Cell 2014)</em></p>
+            </div>`;
+        }
+        
+        if (neversData) {
+            const totalSpecies = neversData.species_count;
+            const ciliatedSpecies = neversData.in_ciliated_organisms;
+            const totalCiliated = neversCache?.organism_groups?.ciliated_organisms?.length || 'Unknown';
+            
+            html += `<div style="margin-bottom: 15px; padding: 15px; background: #fff0f0; border-radius: 8px;">
+                <h4>🌍 Nevers et al. 2017 Analysis</h4>
+                <p><strong>Total Species:</strong> ${totalSpecies}</p>
+                <p><strong>Ciliated Species:</strong> ${ciliatedSpecies} out of ${totalCiliated} ciliated organisms</p>
+                <p style="font-size: 0.9em; color: #666;"><em>${neversCache.references.paper} (Mol Biol Evol 2017)</em></p>
+            </div>`;
+        }
+        
+        html += `</div>`;
     }
 
-    const valid = genes.map(g => g.toUpperCase()).filter(g => liGenesMap[g] || neversGenesMap[g]);
-    if (!valid.length) {
-        return `<div class="result-card"><h3>Analysis Error</h3><p>None of the requested genes were found in phylogenetic datasets.</p></div>`;
-    }
-
-    const final = [...new Set(valid)];
-
-    if (final.length > 1) {
-        let html = `<div class="result-card"><h3>Phylogenetic Comparison: ${final.join(' vs ')}</h3>
-            <table class="gene-detail-table"><thead><tr><th>Gene</th><th>Li Class (2014)</th><th>Nevers Species Count</th></tr></thead><tbody>`;
-        final.forEach(g => {
-            const li = liGenesMap[g];
-            const ne = neversGenesMap[g];
-            const liClass = li ? (liPhylogenyCache.summary.class_list[li.c] || 'N/A').replace(/_/g, ' ') : 'N/A';
-            const neCount = ne?.s?.length || 0;
-            html += `<tr><td><strong>${g}</strong></td><td>${liClass}</td><td>${neCount}</td></tr>`;
-        });
-        html += `</tbody></table></div>`;
-        return html;
-    } else {
-        const g = final[0];
-        const li = liGenesMap[g];
-        const ne = neversGenesMap[g];
-        const liClass = li ? (liPhylogenyCache.summary.class_list[li.c] || 'N/A').replace(/_/g, ' ') : 'Not found in Li et al. (2014)';
-        const neStatus = ne ? `Found in ${ne.s?.length || 0} species` : 'Not found in Nevers et al. (2017)';
-        return `<div class="result-card"><h3>Evolutionary Summary: ${g}</h3>
-            <table class="gene-detail-table">
-                <tr><th>Li et al. (2014) Classification</th><td><strong>${liClass}</strong></td></tr>
-                <tr><th>Nevers et al. (2017) Status</th><td>${neStatus}</td></tr>
-            </table></div>`;
-    }
+    html += `</div>`;
+    return html;
 }
-
 /* ==============================================================
    10. Download Helper
    ============================================================== */
