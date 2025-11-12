@@ -29,7 +29,6 @@
 /* -------------------------------------------------------------------------- */
 window.ciliAI_MasterDatabase = [];
 window.ciliAI_MasterMap = new Map();
-window.ciliAI_MasterDatabaseReady = false;
 const ciliAI_geneCache = new Map();
 
 (async () => {
@@ -648,18 +647,13 @@ function findGenesByFilters({ phenotypeContains, localizationContains, tissueExp
  * - Fully safe: never loses data
  */
 async function ciliAI_queryGenes(filters = {}) {
-    // --- Wait for DB to be ready ---
-    const waitForDB = () => new Promise((resolve) => {
-        if (window.ciliAI_MasterDatabaseReady) return resolve();
-        const listener = () => resolve();
-        document.addEventListener('CiliAIMasterDBReady', listener, { once: true });
-    });
-    await waitForDB();
-
-    const data = window.ciliAI_MasterDatabase || [];
-    if (!data.length) {
-        console.warn("[CiliAI] Master database empty!");
-        return [];
+    // Wait for DB ready
+    if (!window.ciliaHubData || !Array.isArray(window.ciliaHubData)) {
+        console.warn("[CiliAI] DB not ready, waiting...");
+        await new Promise(resolve => {
+            const onReady = () => { resolve(); window.removeEventListener('CiliAIMasterDBReady', onReady); };
+            window.addEventListener('CiliAIMasterDBReady', onReady);
+        });
     }
 
     // --- Complexes ---
@@ -699,14 +693,14 @@ async function ciliAI_queryGenes(filters = {}) {
 
     // --- Disease Classes ---
     const classifiedDiseases = {
-        "Primary Ciliopathies": [],
-        "Motile Ciliopathies": [],
-        "Secondary Diseases": [],
-        "Atypical Ciliopathies": []
+        "Primary Ciliopathies": ["Bardet–Biedl Syndrome","Meckel Syndrome","Joubert Syndrome"], // example
+        "Motile Ciliopathies": ["Primary Ciliary Dyskinesia","Kartagener Syndrome"],
+        "Secondary Diseases": ["Polycystic Kidney Disease","Obesity"],
+        "Atypical Ciliopathies": ["Cranioectodermal Dysplasia"]
     };
 
-    // --- Prepare filters ---
-    let filterGenes = filters.genes ? filters.genes.map(g => g.toUpperCase()) : [];
+    // --- Expand filter genes from complexes ---
+    let filterGenes = (filters.genes || []).filter(g => typeof g === 'string');
     if (filters.complex) {
         filters.complex.forEach(cpx => {
             if (complexes[cpx]) filterGenes.push(...complexes[cpx]);
@@ -714,42 +708,50 @@ async function ciliAI_queryGenes(filters = {}) {
     }
     filterGenes = [...new Set(filterGenes.map(g => g.toUpperCase()))];
 
+    // --- Expand disease classes ---
     let filterDiseases = [];
     if (filters.disease_class) {
         filters.disease_class.forEach(dc => {
             if (classifiedDiseases[dc]) filterDiseases.push(...classifiedDiseases[dc]);
         });
     }
-    if (filters.disease) filterDiseases.push(...filters.disease);
+    if (filters.disease) filterDiseases.push(...filters.disease.filter(d => typeof d === 'string'));
     filterDiseases = [...new Set(filterDiseases.map(d => d.toLowerCase()))];
 
+    // --- Organisms ---
     let filterOrganisms = [];
     if (filters.organism) {
-        filterOrganisms = (Array.isArray(filters.organism) ? filters.organism : [filters.organism]).map(o => o.toLowerCase());
+        filterOrganisms = (Array.isArray(filters.organism) ? filters.organism : [filters.organism])
+            .filter(o => typeof o === 'string').map(o => o.toLowerCase());
     }
 
-    const lofFilter = filters.lof_effects?.toLowerCase() || null;
-    const oeFilter = filters.overexpression_effects?.toLowerCase() || null;
-    const screenFilter = filters.screens?.map(s => s.toLowerCase()) || [];
-    const domainFilter = filters.domains?.map(d => d.toLowerCase()) || [];
+    // --- LOF / OE / Screens / Domains ---
+    const lofFilter = (typeof filters.lof_effects === 'string') ? filters.lof_effects.toLowerCase() : null;
+    const oeFilter = (typeof filters.overexpression_effects === 'string') ? filters.overexpression_effects.toLowerCase() : null;
+    const screenFilter = (filters.screens || []).filter(s => typeof s === 'string').map(s => s.toLowerCase());
+    const domainFilter = (filters.domains || []).filter(d => typeof d === 'string').map(d => d.toLowerCase());
 
-    // --- Filter data ---
-    return data.filter(gene => {
-        if (filterGenes.length && !filterGenes.includes(gene.gene.toUpperCase())) return false;
-        if (filterOrganisms.length && !filterOrganisms.some(org => (gene.organism || "").toLowerCase().includes(org))) return false;
-        if (filterDiseases.length && !gene.associated_diseases?.some(d => filterDiseases.includes(d.toLowerCase()))) return false;
-        if (lofFilter && !(gene.lof_effects || "").toLowerCase().includes(lofFilter)) return false;
-        if (oeFilter && !(gene.overexpression_effects || "").toLowerCase().includes(oeFilter)) return false;
+    // --- Filter genes safely ---
+    const results = window.ciliaHubData.filter(gene => {
+        if (!gene || typeof gene !== 'object') return false;
+
+        if (filterGenes.length && (typeof gene.gene !== 'string' || !filterGenes.includes(gene.gene.toUpperCase()))) return false;
+        if (filterOrganisms.length && !filterOrganisms.some(org => (gene.organism || '').toLowerCase().includes(org))) return false;
+        if (filterDiseases.length && !gene.associated_diseases?.some(d => typeof d === 'string' && filterDiseases.includes(d.toLowerCase()))) return false;
+        if (lofFilter && !(gene.lof_effects || '').toLowerCase().includes(lofFilter)) return false;
+        if (oeFilter && !(gene.overexpression_effects || '').toLowerCase().includes(oeFilter)) return false;
         if (screenFilter.length && !gene.screens?.some(s =>
             screenFilter.includes((s.dataset || s.source || '').toLowerCase()) ||
             screenFilter.includes((s.classification || s.result || '').toLowerCase())
         )) return false;
-        if (domainFilter.length && !gene.domain_descriptions?.some(d => domainFilter.includes(d.toLowerCase())) &&
+        if (domainFilter.length && !gene.domain_descriptions?.some(d => typeof d === 'string' && domainFilter.includes(d.toLowerCase())) &&
             !gene.domains?.some(d => domainFilter.includes((d.domain_id || '').toLowerCase()) || domainFilter.includes((d.description || '').toLowerCase()))
         ) return false;
 
         return true;
     });
+
+    return results;
 }
 
 function waitForElement(selector, timeout = 5000) {
@@ -772,35 +774,35 @@ function waitForElement(selector, timeout = 5000) {
 }
 
 async function initCiliAIQueryHandler() {
-    try {
-        const queryBtn = await waitForElement('#aiQueryBtn');
-        const queryInput = await waitForElement('#aiQueryInput');
+    const queryBtn = await waitForElement('#aiQueryBtn');
+    const queryInput = await waitForElement('#aiQueryInput');
 
-        const waitForDB = () => new Promise(resolve => {
-            if (window.ciliAI_MasterDatabaseReady) return resolve();
-            document.addEventListener('CiliAIMasterDBReady', resolve, { once: true });
-        });
+    const waitForDB = () => new Promise(resolve => {
+        if (window.ciliAI_MasterDatabaseReady) return resolve();
+        const onReady = () => { resolve(); window.removeEventListener('CiliAIMasterDBReady', onReady); };
+        window.addEventListener('CiliAIMasterDBReady', onReady);
+    });
 
-        const runQuery = async () => {
-            const queryText = queryInput.value.trim();
-            if (!queryText) return;
-            const filters = parseQueryToFilters(queryText);
-            await waitForDB();
-            const results = await ciliAI_queryGenes(filters);
-            displayQueryResults(results);
-        };
+    const runQuery = async () => {
+        const queryText = queryInput.value.trim();
+        if (!queryText) return;
+        const filters = parseQueryToFilters(queryText);
+        await waitForDB();
+        let results = [];
+        try {
+            results = await ciliAI_queryGenes(filters);
+        } catch(e) {
+            console.error("[CiliAI] Query failed:", e);
+        }
+        displayQueryResults(results);
+    };
 
-        queryBtn.addEventListener('click', runQuery);
-        queryInput.addEventListener('keypress', e => { if (e.key === 'Enter') runQuery(); });
-
-    } catch (err) {
-        console.error('[CiliAI] Query handler init failed:', err);
-    }
+    queryBtn.addEventListener('click', runQuery);
+    queryInput.addEventListener('keypress', e => { if (e.key === 'Enter') runQuery(); });
 }
 
 document.addEventListener('DOMContentLoaded', initCiliAIQueryHandler);
-// Initialize handler on page load
-document.addEventListener('DOMContentLoaded', initCiliAIQueryHandler);
+
 
 // -------------------------------------------------------------------
 
@@ -1815,6 +1817,14 @@ function exposeCiliAIGlobals() {
     console.log("%c✅ CiliAI global interface initialized", "color: #3fb950");
 }
 
+
+window.ciliAI_MasterDatabaseReady = false;
+
+// Once master DB is fully built
+function markCiliAIMasterDBReady() {
+    window.ciliAI_MasterDatabaseReady = true;
+    window.dispatchEvent(new Event('CiliAIMasterDBReady'));
+}
 // ✅ Call it once to expose the globals
 exposeCiliAIGlobals();
 
