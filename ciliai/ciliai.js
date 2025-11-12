@@ -338,82 +338,434 @@ window.neversMap = neversMap;
 /* ==============================================================
    2. QUESTION PARSER (recognises Joubert, BBSome, etc.)
    ============================================================== */
-async function parseCiliAIQuestion(question, masterData){
-    const q = question.toLowerCase();
+async function parseCiliAIQuestion(question, masterData) {
+    const q = question.toLowerCase().trim();
+    console.log('Parsing question:', q);
+    
     const structured = {
-        genes:[], filters:{}, intent:{}, comparison:false,
-        species:null, plotType:null, question
+        genes: [],
+        filters: {},
+        intent: {},
+        comparison: false,
+        species: null,
+        plotType: null,
+        question: question
     };
 
-    if(masterData){
-        const map = new Map();
-        masterData.forEach(g=>{
-            map.set(g.gene.toLowerCase(), g.gene.toUpperCase());
-            if(g.synonym){
-                const syns = Array.isArray(g.synonym)?g.synonym:g.synonym.split(/[,;]\s*/);
-                syns.forEach(s=>s&&map.set(s.toLowerCase(), g.gene.toUpperCase()));
-            }
-        });
-        const words = new Set(q.match(/\b\w+\b/g)||[]);
-        words.forEach(w=>{ if(map.has(w)) structured.genes.push(map.get(w)); });
+    // Build comprehensive gene map from ALL data sources
+    const geneMap = await buildComprehensiveGeneMap(masterData);
+    
+    // Extract genes using the comprehensive map
+    structured.genes = extractGenesFromQuestion(q, geneMap);
+    console.log('Extracted genes:', structured.genes);
+
+    // Intent detection (your existing code)
+    if (q.includes('localize') || q.includes('localization') || q.includes('located')) {
+        structured.intent.localization = true;
+    }
+    if (q.includes('cilia') || q.includes('ciliary')) {
+        structured.filters.localization = 'cilia';
+    }
+    if (q.includes('basal body')) {
+        structured.filters.localization = 'basal body';
+    }
+    if (q.includes('centrosome')) {
+        structured.filters.localization = 'centrosome';
+    }
+    if (q.includes('screen') || q.includes('percent ciliated')) {
+        structured.intent.screens = true;
+    }
+    if (q.includes('domain') || q.includes('pfam')) {
+        structured.intent.domains = true;
+    }
+    if (q.includes('complex') || q.includes('complexes')) {
+        structured.intent.complexes = true;
     }
 
-    if(q.includes('localize')||q.includes('localization')) structured.intent.localization=true;
-    if(q.includes('cilia')||q.includes('ciliary')) structured.filters.localization='cilia';
-    if(q.includes('basal body')) structured.filters.localization='basal body';
-    if(q.includes('centrosome')) structured.filters.localization='centrosome';
-    if(q.includes('screen')) structured.intent.screens=true;
-    if(q.includes('percent ciliated')) structured.intent.screens=true;
-    if(q.includes('domain')) structured.intent.domains=true;
-    if(q.includes('complex')) structured.intent.complexes=true;
-
+    // Complex detection
     const complexMap = getComplexPhylogenyTableMap();
-    for(const name in complexMap){
-        if(q.includes(name.toLowerCase())){
-            if(name.includes('MODULE')||name.includes('TIP')||name.includes('ZONE')||name.includes('PAIR')){
+    for (const name in complexMap) {
+        if (q.includes(name.toLowerCase())) {
+            if (name.includes('MODULE') || name.includes('TIP') || name.includes('ZONE') || name.includes('PAIR')) {
                 structured.filters.functional_modules = name;
-            }else{
+            } else {
                 structured.filters.complexes = name;
             }
             break;
         }
     }
-    if(!structured.filters.complexes && q.includes('bbsome')) structured.filters.complexes='BBSOME';
-
-    if(q.includes('ortholog')) structured.intent.orthologs=true;
-    if(q.includes('c. elegans')||q.includes('worm')) structured.species='c_elegans';
-    if(q.includes('mouse')) structured.species='mouse';
-    if(q.includes('human')) structured.species='human';
-    if(q.includes('zebrafish')) structured.species='zebrafish';
-    if(q.includes('drosophila')) structured.species='drosophila';
-
-    if(q.includes('ciliopathy')||q.includes('disease')) structured.intent.ciliopathy=true;
-    if(q.includes('joubert')||q.includes('jbts')) structured.filters.ciliopathy='joubert syndrome';
-    if(q.includes('bbs')) structured.filters.ciliopathy='bardet-biedl syndrome';
-    if(q.includes('nephronophthisis')||q.includes('nphp')) structured.filters.ciliopathy='nephronophthisis';
-
-    if(q.includes('omim')) structured.intent.omim=true;
-    if(q.includes('describe')||q.startsWith('what is')||q.startsWith('what does')) structured.intent.description=true;
-
-    if(q.includes('express')||q.includes('expression')) structured.intent.expression=true;
-    if(q.includes('lung')) structured.filters.tissue='lung';
-    if(q.includes('kidney')) structured.filters.tissue='kidney';
-    if(q.includes('brain')) structured.filters.tissue='brain';
-    if(q.includes('ciliated cell')) structured.filters.cell_type='ciliated cell';
-
-    if(q.includes('umap') && q.includes('expression')){ structured.plotType='umap_expression'; structured.intent.umap=true; }
-    else if(q.includes('umap')){ structured.plotType='umap_cluster'; structured.intent.umap=true; }
-    if(q.includes('phylogen')||q.includes('evolution')||q.includes('conservation')){
-        structured.plotType='phylogeny'; structured.intent.phylogeny=true;
+    if (!structured.filters.complexes && q.includes('bbsome')) {
+        structured.filters.complexes = 'BBSOME';
     }
 
-    if(structured.genes.length && !Object.keys(structured.intent).length) structured.intent.description=true;
-    if(!structured.genes.length && Object.keys(structured.filters).length) structured.intent.list_genes=true;
-    if(q.includes('compare')) structured.comparison=true;
-    if(q.startsWith('is') && (q.includes('cilia')||q.includes('ciliary'))) structured.intent.localization=true;
+    if (q.includes('ortholog') || q.includes('orthologue')) {
+        structured.intent.orthologs = true;
+    }
+    if (q.includes('c. elegans') || q.includes('worm') || q.includes('elegans')) {
+        structured.species = 'c_elegans';
+    }
+    if (q.includes('mouse') || q.includes('mus musculus')) {
+        structured.species = 'mouse';
+    }
+    if (q.includes('human') || q.includes('homo sapiens')) {
+        structured.species = 'human';
+    }
+    if (q.includes('zebrafish') || q.includes('danio')) {
+        structured.species = 'zebrafish';
+    }
+    if (q.includes('drosophila') || q.includes('fly')) {
+        structured.species = 'drosophila';
+    }
 
+    if (q.includes('ciliopathy') || q.includes('disease') || q.includes('syndrome')) {
+        structured.intent.ciliopathy = true;
+    }
+    if (q.includes('joubert') || q.includes('jbts')) {
+        structured.filters.ciliopathy = 'joubert syndrome';
+    }
+    if (q.includes('bbs') || q.includes('bardet')) {
+        structured.filters.ciliopathy = 'bardet-biedl syndrome';
+    }
+    if (q.includes('nephronophthisis') || q.includes('nphp')) {
+        structured.filters.ciliopathy = 'nephronophthisis';
+    }
+
+    if (q.includes('omim')) {
+        structured.intent.omim = true;
+    }
+    if (q.includes('describe') || q.startsWith('what is') || q.startsWith('what does') || q.includes('summary')) {
+        structured.intent.description = true;
+    }
+
+    if (q.includes('express') || q.includes('expression')) {
+        structured.intent.expression = true;
+    }
+    if (q.includes('lung')) {
+        structured.filters.tissue = 'lung';
+    }
+    if (q.includes('kidney')) {
+        structured.filters.tissue = 'kidney';
+    }
+    if (q.includes('brain')) {
+        structured.filters.tissue = 'brain';
+    }
+    if (q.includes('ciliated cell')) {
+        structured.filters.cell_type = 'ciliated cell';
+    }
+
+    // Plot type detection
+    if (q.includes('umap') && q.includes('expression')) {
+        structured.plotType = 'umap_expression';
+        structured.intent.umap = true;
+    } else if (q.includes('umap')) {
+        structured.plotType = 'umap_cluster';
+        structured.intent.umap = true;
+    }
+    
+    // Phylogeny detection
+    if (q.includes('phylogen') || q.includes('evolution') || q.includes('conservation') || 
+        q.includes('evolutionary') || q.includes('history')) {
+        structured.plotType = 'phylogeny';
+        structured.intent.phylogeny = true;
+    }
+
+    // Fallback intents
+    if (structured.genes.length > 0 && Object.keys(structured.intent).length === 0) {
+        structured.intent.description = true;
+    }
+    if (structured.genes.length === 0 && Object.keys(structured.filters).length > 0) {
+        structured.intent.list_genes = true;
+    }
+    
+    if (q.includes('compare') || q.includes('comparison') || q.includes('vs') || q.includes('versus')) {
+        structured.comparison = true;
+    }
+    
+    if ((q.startsWith('is') || q.startsWith('are')) && (q.includes('cilia') || q.includes('ciliary'))) {
+        structured.intent.localization = true;
+    }
+
+    console.log('Final structured query:', JSON.stringify(structured, null, 2));
     return structured;
 }
+
+// NEW: Build comprehensive gene map from ALL data sources
+async function buildComprehensiveGeneMap(masterData) {
+    const geneMap = new Map();
+    
+    // 1. Add genes from master data (CiliaHub)
+    if (masterData && Array.isArray(masterData)) {
+        masterData.forEach(g => {
+            const geneSymbol = g.gene;
+            if (geneSymbol) {
+                const key = geneSymbol.toUpperCase();
+                geneMap.set(key, {
+                    symbol: geneSymbol.toUpperCase(),
+                    source: 'ciliahub',
+                    data: g
+                });
+                
+                // Add synonyms from master data
+                if (g.synonym) {
+                    const syns = Array.isArray(g.synonym) ? g.synonym : g.synonym.split(/[,;]\s*/);
+                    syns.forEach(s => {
+                        if (s && s.trim()) {
+                            const synKey = s.trim().toUpperCase();
+                            geneMap.set(synKey, {
+                                symbol: geneSymbol.toUpperCase(),
+                                source: 'ciliahub_synonym',
+                                original: s.trim(),
+                                data: g
+                            });
+                        }
+                    });
+                }
+            }
+        });
+    }
+    
+    // 2. Add genes from phylogeny maps
+    if (window.liMap) {
+        Object.keys(window.liMap).forEach(geneSymbol => {
+            if (geneSymbol) {
+                const key = geneSymbol.toUpperCase();
+                if (!geneMap.has(key)) {
+                    geneMap.set(key, {
+                        symbol: geneSymbol.toUpperCase(),
+                        source: 'li_phylogeny',
+                        data: { phylogeny: { li_2014: window.liMap[geneSymbol] } }
+                    });
+                }
+            }
+        });
+    }
+    
+    if (window.neversMap) {
+        Object.keys(window.neversMap).forEach(geneSymbol => {
+            if (geneSymbol) {
+                const key = geneSymbol.toUpperCase();
+                if (!geneMap.has(key)) {
+                    geneMap.set(key, {
+                        symbol: geneSymbol.toUpperCase(),
+                        source: 'nevers_phylogeny',
+                        data: { phylogeny: { nevers_2017: window.neversMap[geneSymbol] } }
+                    });
+                } else {
+                    // Add Nevers data to existing entry
+                    const existing = geneMap.get(key);
+                    if (existing.data && !existing.data.phylogeny) {
+                        existing.data.phylogeny = {};
+                    }
+                    if (existing.data.phylogeny) {
+                        existing.data.phylogeny.nevers_2017 = window.neversMap[geneSymbol];
+                    }
+                }
+            }
+        });
+    }
+    
+    // 3. Add genes from screens data
+    if (window.screensByGene) {
+        Object.keys(window.screensByGene).forEach(geneSymbol => {
+            if (geneSymbol) {
+                const key = geneSymbol.toUpperCase();
+                if (!geneMap.has(key)) {
+                    geneMap.set(key, {
+                        symbol: geneSymbol.toUpperCase(),
+                        source: 'screens',
+                        data: { screens: window.screensByGene[geneSymbol] }
+                    });
+                } else {
+                    // Add screens data to existing entry
+                    const existing = geneMap.get(key);
+                    if (!existing.data.screens) {
+                        existing.data.screens = [];
+                    }
+                    existing.data.screens.push(...window.screensByGene[geneSymbol]);
+                }
+            }
+        });
+    }
+    
+    // 4. Add genes from CORUM complexes
+    if (window.corumByGene) {
+        Object.keys(window.corumByGene).forEach(geneSymbol => {
+            if (geneSymbol) {
+                const key = geneSymbol.toUpperCase();
+                if (!geneMap.has(key)) {
+                    geneMap.set(key, {
+                        symbol: geneSymbol.toUpperCase(),
+                        source: 'corum',
+                        data: { complex_components: window.corumByGene[geneSymbol] }
+                    });
+                } else {
+                    // Add complex data to existing entry
+                    const existing = geneMap.get(key);
+                    if (!existing.data.complex_components) {
+                        existing.data.complex_components = {};
+                    }
+                    Object.assign(existing.data.complex_components, window.corumByGene[geneSymbol]);
+                }
+            }
+        });
+    }
+    
+    // 5. Add genes from domain data
+    if (window.domainsByGene) {
+        Object.keys(window.domainsByGene).forEach(geneSymbol => {
+            if (geneSymbol) {
+                const key = geneSymbol.toUpperCase();
+                if (!geneMap.has(key)) {
+                    geneMap.set(key, {
+                        symbol: geneSymbol.toUpperCase(),
+                        source: 'domains',
+                        data: { 
+                            pfam_ids: window.domainsByGene[geneSymbol]?.pfam_ids || [],
+                            domain_descriptions: window.domainsByGene[geneSymbol]?.domain_descriptions || []
+                        }
+                    });
+                } else {
+                    // Add domain data to existing entry
+                    const existing = geneMap.get(key);
+                    if (!existing.data.pfam_ids) {
+                        existing.data.pfam_ids = [];
+                    }
+                    if (!existing.data.domain_descriptions) {
+                        existing.data.domain_descriptions = [];
+                    }
+                    
+                    const domainData = window.domainsByGene[geneSymbol];
+                    if (domainData) {
+                        if (domainData.pfam_ids) {
+                            existing.data.pfam_ids.push(...domainData.pfam_ids);
+                        }
+                        if (domainData.domain_descriptions) {
+                            existing.data.domain_descriptions.push(...domainData.domain_descriptions);
+                        }
+                        
+                        // Remove duplicates
+                        existing.data.pfam_ids = [...new Set(existing.data.pfam_ids)];
+                        existing.data.domain_descriptions = [...new Set(existing.data.domain_descriptions)];
+                    }
+                }
+            }
+        });
+    }
+    
+    // 6. Add genes from predefined complex map
+    const complexMap = getComplexPhylogenyTableMap();
+    Object.keys(complexMap).forEach(complexName => {
+        const genes = complexMap[complexName];
+        if (Array.isArray(genes)) {
+            genes.forEach(geneSymbol => {
+                if (geneSymbol) {
+                    const key = geneSymbol.toUpperCase();
+                    if (!geneMap.has(key)) {
+                        geneMap.set(key, {
+                            symbol: geneSymbol.toUpperCase(),
+                            source: 'predefined_complex',
+                            data: { 
+                                complex_membership: [complexName],
+                                is_predefined_complex: true
+                            }
+                        });
+                    } else {
+                        // Add complex membership to existing entry
+                        const existing = geneMap.get(key);
+                        if (!existing.data.complex_membership) {
+                            existing.data.complex_membership = [];
+                        }
+                        if (!existing.data.complex_membership.includes(complexName)) {
+                            existing.data.complex_membership.push(complexName);
+                        }
+                    }
+                }
+            });
+        }
+    });
+    
+    console.log(`Comprehensive gene map built with ${geneMap.size} entries from multiple sources`);
+    
+    // Log sources breakdown
+    const sources = {};
+    geneMap.forEach((value, key) => {
+        if (!sources[value.source]) {
+            sources[value.source] = 0;
+        }
+        sources[value.source]++;
+    });
+    console.log('Gene sources breakdown:', sources);
+    
+    return geneMap;
+}
+
+// NEW: Extract genes from question using comprehensive map
+function extractGenesFromQuestion(question, geneMap) {
+    const foundGenes = new Set();
+    const q = question.toLowerCase();
+    
+    // Method 1: Direct word matching
+    const words = q.split(/\s+/);
+    words.forEach(word => {
+        const cleanWord = word.replace(/[.,;!?()]/g, '').toLowerCase();
+        if (cleanWord.length >= 2) { // Avoid single letters
+            // Exact match
+            if (geneMap.has(cleanWord.toUpperCase())) {
+                const geneInfo = geneMap.get(cleanWord.toUpperCase());
+                foundGenes.add(geneInfo.symbol);
+            }
+        }
+    });
+    
+    // Method 2: Substring scanning for longer gene names
+    Object.keys(geneMap).forEach(geneKey => {
+        const geneLower = geneKey.toLowerCase();
+        if (q.includes(geneLower) && geneLower.length >= 3) {
+            foundGenes.add(geneKey);
+        }
+    });
+    
+    // Method 3: Look for common gene patterns (all caps in original question)
+    const originalQuestion = question;
+    const capsMatches = originalQuestion.match(/\b[A-Z][A-Z0-9]{1,9}\b/g);
+    if (capsMatches) {
+        capsMatches.forEach(match => {
+            const matchUpper = match.toUpperCase();
+            if (geneMap.has(matchUpper)) {
+                foundGenes.add(matchUpper);
+            }
+        });
+    }
+    
+    // Method 4: Handle specific known genes mentioned in the question
+    const commonGenes = ['YWHAB', 'IFT88', 'BBS1', 'CEP290', 'ARL13B', 'FOXJ1'];
+    commonGenes.forEach(gene => {
+        if (q.includes(gene.toLowerCase())) {
+            foundGenes.add(gene);
+        }
+    });
+    
+    return Array.from(foundGenes);
+}
+
+// NEW: Enhanced data integration in loadCiliAIData
+// Add this to your loadCiliAIData function after processing all individual datasets:
+
+// Make the processed datasets globally available for the parser
+window.screensByGene = screensByGene;
+window.corumByGene = corumByGene;
+window.domainsByGene = domainsByGene;
+window.liMap = liMap;
+window.neversMap = neversMap;
+
+console.log('Global datasets available for parser:', {
+    screens: Object.keys(screensByGene).length,
+    corum: Object.keys(corumByGene).length,
+    domains: Object.keys(domainsByGene).length,
+    liMap: Object.keys(liMap).length,
+    neversMap: Object.keys(neversMap).length
+});
+
 
 /* ==============================================================
    3. QUERY ENGINE (uses the *normalized* ciliopathy array)
@@ -725,42 +1077,67 @@ function ciliAI_waitForElements() {
     const exampleQueries = document.querySelectorAll('.example-queries span');
     const resultArea = document.getElementById('ai-result-area');
 
-    const handleQuery = async () => {
-        const input = aiInput.value.trim();
-        if (!input) return;
-        resultArea.style.display = 'block';
-        resultArea.innerHTML = '<p>Processing your question...</p>';
+    // Update the handleQuery function to use enhanced parsing
+const handleQuery = async () => {
+    const input = aiInput.value.trim();
+    if (!input) return;
+    resultArea.style.display = 'block';
+    resultArea.innerHTML = '<p>Processing your question...</p>';
 
-        try {
-            let masterData = window.CiliAI_MasterData;
-            if (!masterData) {
-                console.log('[CiliAI] Data not loaded, fetching now...');
-                masterData = await loadCiliAIData();
-            }
-
-            const structuredQuery = await parseCiliAIQuestion(input, masterData);
-
-            if (structuredQuery.plotType === 'phylogeny') {
-                const html = await getPhylogenyAnalysis(structuredQuery.genes);
-                resultArea.innerHTML = html;
-            } else if (structuredQuery.plotType === 'umap_expression' && structuredQuery.genes.length > 0) {
-                await displayUmapGeneExpression(structuredQuery.genes[0]);
-            } else if (structuredQuery.plotType === 'umap_cluster') {
-                await displayUmapPlot();
-            } else {
-                const results = queryGenes(structuredQuery);
-                displayCiliAIResults(results, structuredQuery);
-            }
-        } catch (err) {
-            console.error('CiliAI query failed:', err);
-            resultArea.innerHTML = `
-                <div class="result-card">
-                    <h3>Error</h3>
-                    <p>Failed to process your question.</p>
-                    <pre style="background:#f8d7da;padding:10px;border-radius:4px;color:#721c24;">${err.message}</pre>
-                </div>`;
+    try {
+        let masterData = window.CiliAI_MasterData;
+        if (!masterData) {
+            console.log('[CiliAI] Data not loaded, fetching now...');
+            masterData = await loadCiliAIData();
         }
-    };
+
+        const structuredQuery = await parseCiliAIQuestion(input, masterData);
+        console.log('Structured query with multi-source genes:', structuredQuery);
+
+        // Handle queries for genes that only exist in external sources
+        if (structuredQuery.genes.length > 0) {
+            // Check if we need to create temporary gene entries for external-only genes
+            const enhancedResults = await enhanceResultsWithExternalData(structuredQuery.genes, structuredQuery);
+            
+            if (enhancedResults.length > 0) {
+                if (structuredQuery.plotType === 'phylogeny') {
+                    console.log('Running phylogeny analysis for:', structuredQuery.genes);
+                    const html = await getPhylogenyAnalysis(structuredQuery.genes);
+                    resultArea.innerHTML = html;
+                } else if (structuredQuery.plotType === 'umap_expression' && structuredQuery.genes.length > 0) {
+                    await displayUmapGeneExpression(structuredQuery.genes[0]);
+                } else if (structuredQuery.plotType === 'umap_cluster') {
+                    await displayUmapPlot();
+                } else {
+                    displayCiliAIResults(enhancedResults, structuredQuery);
+                }
+                return;
+            }
+        }
+
+        // Original logic for genes in master data
+        if (structuredQuery.plotType === 'phylogeny') {
+            console.log('Running phylogeny analysis for:', structuredQuery.genes);
+            const html = await getPhylogenyAnalysis(structuredQuery.genes);
+            resultArea.innerHTML = html;
+        } else if (structuredQuery.plotType === 'umap_expression' && structuredQuery.genes.length > 0) {
+            await displayUmapGeneExpression(structuredQuery.genes[0]);
+        } else if (structuredQuery.plotType === 'umap_cluster') {
+            await displayUmapPlot();
+        } else {
+            const results = queryGenes(structuredQuery);
+            console.log(`Query returned ${results.length} results`);
+            displayCiliAIResults(results, structuredQuery);
+        }
+    } catch (err) {
+        console.error('CiliAI query failed:', err);
+        resultArea.innerHTML = `
+            <div class="result-card">
+                <h3>Error</h3>
+                <p>Failed to process your question: ${err.message}</p>
+            </div>`;
+    }
+};
 
     if (aiBtn) aiBtn.addEventListener('click', handleQuery);
     else console.error('[CiliAI] aiQueryBtn not found.');
@@ -782,6 +1159,98 @@ function ciliAI_waitForElements() {
 
     console.log('[CiliAI] Event listeners bound successfully.');
 }
+
+// NEW: Enhance results with external data for genes not in master data
+async function enhanceResultsWithExternalData(genes, structuredQuery) {
+    const enhancedResults = [];
+    
+    for (const gene of genes) {
+        const geneUpper = gene.toUpperCase();
+        
+        // Check if gene exists in master data
+        let geneData = window.CiliAI_MasterData?.find(g => g.gene?.toUpperCase() === geneUpper);
+        
+        if (!geneData) {
+            // Create a temporary gene entry from external sources
+            geneData = await createGeneFromExternalSources(geneUpper);
+        }
+        
+        if (geneData) {
+            enhancedResults.push(geneData);
+        }
+    }
+    
+    console.log(`Enhanced ${enhancedResults.length} results with external data`);
+    return enhancedResults;
+}
+
+// NEW: Create gene data from external sources
+async function createGeneFromExternalSources(geneSymbol) {
+    const geneData = {
+        gene: geneSymbol,
+        evidence_source: "MultiSource_Integration",
+        is_external_integration: true
+    };
+    
+    // Add phylogeny data
+    if (window.liMap?.[geneSymbol]) {
+        if (!geneData.phylogeny) geneData.phylogeny = {};
+        geneData.phylogeny.li_2014 = window.liMap[geneSymbol];
+    }
+    if (window.neversMap?.[geneSymbol]) {
+        if (!geneData.phylogeny) geneData.phylogeny = {};
+        geneData.phylogeny.nevers_2017 = window.neversMap[geneSymbol];
+    }
+    
+    // Add screens data
+    if (window.screensByGene?.[geneSymbol]) {
+        geneData.screens = window.screensByGene[geneSymbol];
+    }
+    
+    // Add complex data
+    if (window.corumByGene?.[geneSymbol]) {
+        geneData.complex_components = window.corumByGene[geneSymbol];
+    }
+    
+    // Add domain data
+    if (window.domainsByGene?.[geneSymbol]) {
+        geneData.pfam_ids = window.domainsByGene[geneSymbol]?.pfam_ids || [];
+        geneData.domain_descriptions = window.domainsByGene[geneSymbol]?.domain_descriptions || [];
+    }
+    
+    // Only return if we have at least some data
+    if (Object.keys(geneData).length > 2) { // More than just gene and evidence_source
+        return geneData;
+    }
+    
+    return null;
+}
+
+// Test the enhanced parser with various queries
+async function testEnhancedParser() {
+    console.log('=== Testing Enhanced Parser ===');
+    
+    const testQueries = [
+        'Analyze the evolutionary history of YWHAB',
+        'What domains does IFT88 have?',
+        'Show me screens for BBS1',
+        'What complexes is IFT74 in?',
+        'Compare evolution of YWHAB and IFT88',
+        'List genes in the BBSome complex',
+        'What is the C. elegans ortholog for IFT52?'
+    ];
+    
+    for (const query of testQueries) {
+        console.log(`\nTesting: "${query}"`);
+        const structured = await parseCiliAIQuestion(query, window.CiliAI_MasterData);
+        console.log('Detected genes:', structured.genes);
+        console.log('Intent:', structured.intent);
+        console.log('Filters:', structured.filters);
+    }
+}
+
+// Run the test
+testEnhancedParser();
 
 /* ==============================================================
    8. Plotting Helpers
