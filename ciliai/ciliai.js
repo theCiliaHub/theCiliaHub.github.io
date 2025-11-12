@@ -5,112 +5,150 @@
 // 1️⃣ Data Loading
 // ==========================================================
 async function loadCiliAIData() {
-    const urls = {
-        ciliahub: 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/ciliahub_data.json',
-        umap: 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/umap_data.json',
-        screens: 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/cilia_screens_data.json',
-        cellxgene: 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/cellxgene_data.json',
-        rna_tissue: 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/rna_tissue_consensus.tsv',
-        corum: 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/corum_humanComplexes.json',
-        domains: 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/cili_ai_domain_database.json',
-        nevers2017: 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/nevers_et_al_2017_matrix_optimized.json',
-        li2014: 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/li_et_al_2014_matrix_optimized.json'
-    };
+    const urls = {
+        ciliahub: 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/ciliahub_data.json',
+        umap: 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/umap_data.json',
+        screens: 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/cilia_screens_data.json',
+        cellxgene: 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/cellxgene_data.json',
+        rna_tissue: 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/rna_tissue_consensus.tsv',
+        corum: 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/corum_humanComplexes.json',
+        domains: 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/cili_ai_domain_database.json',
+        nevers2017: 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/nevers_et_al_2017_matrix_optimized.json',
+        li2014: 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/li_et_al_2014_matrix_optimized.json'
+    };
 
-    async function fetchData(url, type='json') {
-        const res = await fetch(url);
-        if (!res.ok) throw new Error(`Failed to fetch ${url}`);
-        if (type === 'json') return res.json();
-        else if (type === 'tsv') {
-            const text = await res.text();
-            const lines = text.trim().split('\n');
-            const header = lines.shift().split('\t');
-            return lines.map(line => {
-                const row = line.split('\t');
-                const obj = {};
-                header.forEach((h,i) => obj[h] = row[i]);
-                return obj;
-            });
-        }
-    }
+    async function fetchData(url, type='json') {
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`Failed to fetch ${url}`);
+        if (type === 'json') return res.json();
+        else if (type === 'tsv') {
+            const text = await res.text();
+            const lines = text.trim().split('\n');
+            const header = lines.shift().split('\t');
+            return lines.map(line => {
+                const row = line.split('\t');
+                const obj = {};
+                header.forEach((h,i) => obj[h] = row[i]);
+                return obj;
+            });
+        }
+    }
 
-    const [
-        ciliahubData,
-        umapData,
-        screensData,
-        cellxgeneData,
-        rnaTissueData,
-        corumData,
-        domainData,
-        neversData,
-        liData
-    ] = await Promise.all([
-        fetchData(urls.ciliahub),
-        fetchData(urls.umap),
-        fetchData(urls.screens),
-        fetchData(urls.cellxgene),
-        fetchData(urls.rna_tissue, 'tsv'),
-        fetchData(urls.corum),
-        fetchData(urls.domains),
-        fetchData(urls.nevers2017),
-        fetchData(urls.li2014)
-    ]);
+    const [
+        ciliahubData,
+        umapData,
+        screensData,
+        cellxgeneData,
+        rnaTissueData,
+        corumData,
+        domainData,
+        neversData,
+        liData
+    ] = await Promise.all([
+        fetchData(urls.ciliahub),
+        fetchData(urls.umap),
+        fetchData(urls.screens),
+        fetchData(urls.cellxgene),
+        fetchData(urls.rna_tissue, 'tsv'),
+        fetchData(urls.corum),
+        fetchData(urls.domains),
+        fetchData(urls.nevers2017),
+        fetchData(urls.li2014)
+    ]);
 
-    // --- Indexing for fast access ---
-    const screensByGene = {};
-    for (const screen of screensData) {
-        if (!screensByGene[screen.gene]) screensByGene[screen.gene] = [];
-        screensByGene[screen.gene].push(screen);
-    }
+    // --- Indexing for fast access ---
+    const screensByGene = {};
+    // ⬇️ **FIX: Added Array.isArray() check**
+    if (Array.isArray(screensData)) {
+        for (const screen of screensData) {
+            if (!screensByGene[screen.gene]) screensByGene[screen.gene] = [];
+            screensByGene[screen.gene].push(screen);
+        }
+    } else {
+        console.warn('CiliAI: screensData was not an array. Skipping screen indexing.', screensData);
+    }
 
-    const umapByGene = {};
-    for (const u of umapData) umapByGene[u.gene] = {x: u.x, y: u.y};
+    const umapByGene = {};
+    // ⬇️ **FIX: Added Array.isArray() check**
+    if (Array.isArray(umapData)) {
+        for (const u of umapData) umapByGene[u.gene] = {x: u.x, y: u.y};
+    } else {
+        console.warn('CiliAI: umapData was not an array. Skipping UMAP indexing.', umapData);
+    }
 
-    const scExpressionByGene = {};
-    for (const row of cellxgeneData) scExpressionByGene[row.gene] = row.expression;
+    const scExpressionByGene = {};
+    // ⬇️ **FIX: Added Array.isArray() check**
+    if (Array.isArray(cellxgeneData)) {
+        for (const row of cellxgeneData) scExpressionByGene[row.gene] = row.expression;
+    } else {
+        console.warn('CiliAI: cellxgeneData was not an array. Skipping scExpression indexing.', cellxgeneData);
+    }
 
-    const tissueExpressionByGene = {};
-    for (const row of rnaTissueData) tissueExpressionByGene[row.gene] = row;
+    const tissueExpressionByGene = {};
+    // ⬇️ **FIX: Added Array.isArray() check** (rnaTissueData should be safe, but good practice)
+    if (Array.isArray(rnaTissueData)) {
+        for (const row of rnaTissueData) tissueExpressionByGene[row.gene] = row;
+    } else {
+        console.warn('CiliAI: rnaTissueData was not an array. Skipping tissueExpression indexing.', rnaTissueData);
+    }
 
-    const corumByGene = {};
-    for (const complex of corumData) {
-        for (const g of complex.subunits) {
-            if (!corumByGene[g]) corumByGene[g] = {};
-            corumByGene[g][complex.name] = complex.subunits;
-        }
-    }
+    const corumByGene = {};
+    // ⬇️ **FIX: Added Array.isArray() check**
+    if (Array.isArray(corumData)) {
+        for (const complex of corumData) {
+            for (const g of complex.subunits) {
+                if (!corumByGene[g]) corumByGene[g] = {};
+                corumByGene[g][complex.name] = complex.subunits;
+            }
+        }
+    } else {
+        console.warn('CiliAI: corumData was not an array. Skipping CORUM indexing.', corumData);
+G    }
 
-    const domainsByGene = {};
-    for (const d of domainData) domainsByGene[d.gene] = {pfam_ids: d.pfam_ids, domain_descriptions: d.domain_descriptions};
+    const domainsByGene = {};
+    // ⬇️ **FIX: Added Array.isArray() check**
+    if (Array.isArray(domainData)) {
+        for (const d of domainData) domainsByGene[d.gene] = {pfam_ids: d.pfam_ids, domain_descriptions: d.domain_descriptions};
+    } else {
+        console.warn('CiliAI: domainData was not an array. Skipping domain indexing.', domainData);
+    }
 
-    const modulesByGene = {};
-    for (const dataset of [neversData, liData]) {
-        for (const g in dataset) {
-            if (!modulesByGene[g]) modulesByGene[g] = [];
-            modulesByGene[g].push(...dataset[g].modules);
-        }
-    }
+    const modulesByGene = {};
+    // This loop is safe because neversData and liData are objects and are iterated with `for...in`
+    for (const dataset of [neversData, liData]) {
+        if (dataset && typeof dataset === 'object') { // Added check for safety
+            for (const g in dataset) {
+                if (!modulesByGene[g]) modulesByGene[g] = [];
+                // Ensure dataset[g].modules is iterable before spreading
+                if (Array.isArray(dataset[g]?.modules)) {
+                    modulesByGene[g].push(...dataset[g].modules);
+                }
+            }
+        }
+    }
 
-    const masterData = ciliahubData.map(geneObj => {
-        const gene = geneObj.gene;
-        return {
-            ...geneObj,
-            screens: screensByGene[gene] || [],
-            umap: umapByGene[gene] || null,
-            expression: {
-                scRNA: scExpressionByGene[gene] || null,
-                tissue: tissueExpressionByGene[gene] || null
-            },
-            complex_components: corumByGene[gene] || {},
-            pfam_ids: domainsByGene[gene]?.pfam_ids || [],
-            domain_descriptions: domainsByGene[gene]?.domain_descriptions || [],
-            functional_modules: modulesByGene[gene] || []
-        };
-    });
+    // This masterData mapping should now be safe, as the indexed objects 
+    // (e.g., screensByGene) will be empty if the data failed to load.
+    const masterData = ciliahubData.map(geneObj => {
+        const gene = geneObj.gene;
+        return {
+            ...geneObj,
+            screens: screensByGene[gene] || [],
+            umap: umapByGene[gene] || null,
+            expression: {
+                scRNA: scExpressionByGene[gene] || null,
+                tissue: tissueExpressionByGene[gene] || null
+            },
+            complex_components: corumByGene[gene] || {},
+            pfam_ids: domainsByGene[gene]?.pfam_ids || [],
+            domain_descriptions: domainsByGene[gene]?.domain_descriptions || [],
+            functional_modules: modulesByGene[gene] || []
+  .       };
+    });
 
-    window.CiliAI_MasterData = masterData; // Global storage
-    console.log('✅ CiliAI: Master data loaded', masterData.length, 'genes');
-    return masterData;
+    window.CiliAI_MasterData = masterData; // Global storage
+    console.log('✅ CiliAI: Master data loaded', masterData.length, 'genes');
+    return masterData;
 }
 
 // ==========================================================
@@ -247,6 +285,9 @@ function queryGenes(structuredQuery) {
     });
 }
 
+
+// --- Main Page Display Function (REPLACEMENT) ---
+// This function should be in your main script.js or globals.js
 window.displayCiliAIPage = async function displayCiliAIPage() {
     const contentArea = document.querySelector('.content-area');
     if (!contentArea) {
@@ -255,6 +296,8 @@ window.displayCiliAIPage = async function displayCiliAIPage() {
     }
 
     contentArea.className = 'content-area content-area-full';
+    const ciliaPanel = document.querySelector('.cilia-panel');
+    if (ciliaPanel) ciliaPanel.style.display = 'none';
 
     try {
         // --- Inject full CiliAI HTML + CSS ---
@@ -308,9 +351,8 @@ window.displayCiliAIPage = async function displayCiliAIPage() {
                     <div id="resultsSection" class="results-section" style="display: none;"></div>
                 </div>
             </div>
-
             <style>
-                /* Full CSS from original CiliAI */
+                /* Keep all existing CSS exactly as before */
                 .ciliai-container { font-family: 'Arial', sans-serif; max-width: 950px; margin: 2rem auto; padding: 2rem; background-color: #f9f9f9; border-radius: 12px; }
                 .ciliai-header { text-align: center; margin-bottom: 2rem; }
                 .ciliai-header h1 { font-size: 2.8rem; color: #2c5aa0; margin: 0; }
@@ -349,30 +391,27 @@ window.displayCiliAIPage = async function displayCiliAIPage() {
             </style>
         `;
 
-        // --- Load master dataset ---
-        const masterData = await loadCiliAIData();
-        console.log('✅ CiliAI: Master dataset loaded.');
+        console.log('✅ CiliAI: Page HTML injected successfully.');
 
-        // --- Setup query button ---
-        const aiBtn = document.getElementById('aiQueryBtn');
-        aiBtn.addEventListener('click', async () => {
-            const input = document.getElementById('aiQueryInput').value.trim();
-            const resultArea = document.getElementById('ai-result-area');
-            resultArea.style.display = 'block';
-            resultArea.innerHTML = '<p>Processing...</p>';
+        const analyzeSection = contentArea.querySelector('.input-section');
+        if (analyzeSection) {
+            analyzeSection.style.display = 'none';
+            console.log('[CiliAI] Analyze section hidden.');
+        }
 
-            try {
-                const structuredQuery = await parseCiliAIQuestion(input);
-                const results = queryGenes(structuredQuery, masterData);
-                displayCiliAIResults(results, resultArea);
-            } catch (err) {
-                console.error('❌ CiliAI query failed:', err);
-                resultArea.innerHTML = '<p>Error: Failed to process your question.</p>';
-            }
-        });
+        // Wait for all elements before proceeding
+        if (typeof ciliAI_waitForElements === 'function') {
+            ciliAI_waitForElements();
+        } else {
+            console.warn('[CiliAI] Warning: ciliAI_waitForElements() not found.');
+        }
 
     } catch (err) {
         console.error('❌ CiliAI HTML injection failed:', err);
         contentArea.innerHTML = '<p>Error: Failed to load CiliAI interface.</p>';
     }
 };
+
+
+// inside displayCiliAIPage(), right after the innerHTML assignment:
+ciliAI_waitForElements(); 
