@@ -336,471 +336,290 @@ async function loadCiliAIData(timeoutMs = 20000) {
 
 
 
-// ==========================================================
-// 2️⃣ Question Parsing (The "Brain") - CORRECTED
-// ==========================================================
-async function parseCiliAIQuestion(question, masterData) {
+/* ==============================================================
+   2. QUESTION PARSER (now recognises Joubert, BBSome, etc.)
+   ============================================================== */
+async function parseCiliAIQuestion(question, masterData){
     const q = question.toLowerCase();
-    
-    const structuredQuery = {
-        genes: [],
-        filters: {},
-        intent: {},
-        comparison: false,
-        species: null,
-        plotType: null,
-        question: question // Store original question
+    const structured = {
+        genes:[], filters:{}, intent:{}, comparison:false,
+        species:null, plotType:null, question
     };
 
-    // --- 1. Extract Genes ---
-    if (masterData && masterData.length > 0) {
-        // Build a temporary map of ALL gene names and synonyms
-        const geneMap = new Map();
-        for (const g of masterData) {
-            const geneUpper = g.gene.toUpperCase();
-            geneMap.set(g.gene.toLowerCase(), geneUpper);
-            // Add synonyms from the 'synonym' field
-            if (g.synonym) {
-                // Handle both array and string synonyms
-                const synonyms = Array.isArray(g.synonym) ? g.synonym : g.synonym.split(/[,;]\s*/);
-                for (const syn of synonyms) {
-                    if (syn) geneMap.set(syn.toLowerCase(), geneUpper);
-                }
+    // ---- GENE extraction (including synonyms) ----
+    if(masterData){
+        const map = new Map();
+        masterData.forEach(g=>{
+            map.set(g.gene.toLowerCase(), g.gene.toUpperCase());
+            if(g.synonym){
+                const syns = Array.isArray(g.synonym)?g.synonym:g.synonym.split(/[,;]\s*/);
+                syns.forEach(s=>s&&map.set(s.toLowerCase(), g.gene.toUpperCase()));
             }
-        }
-
-        // Use regex to find whole words in the query
-        const words = new Set(q.match(/\b\w+\b/g) || []);
-        for (const word of words) {
-            if (geneMap.has(word)) {
-                const gene = geneMap.get(word);
-                if (!structuredQuery.genes.includes(gene)) {
-                    structuredQuery.genes.push(gene);
-                }
-            }
-        }
-    } else {
-        console.error("CiliAI Parser Error: Master data is empty or not provided. Gene parsing failed.");
+        });
+        const words = new Set(q.match(/\b\w+\b/g)||[]);
+        words.forEach(w=>{ if(map.has(w)) structured.genes.push(map.get(w)); });
     }
 
-    // --- 2. Extract Keywords, Filters & Intents ---
-    
-    // Localization
-    if (q.includes('localize') || q.includes('localization')) structuredQuery.intent.localization = true;
-    if (q.includes('cilia') || q.includes('ciliary')) structuredQuery.filters.localization = 'cilia';
-    if (q.includes('basal body')) structuredQuery.filters.localization = 'basal body';
-    if (q.includes('centrosome')) structuredQuery.filters.localization = 'centrosome';
+    // ---- KEYWORD / FILTER detection ----
+    if(q.includes('localize')||q.includes('localization')) structured.intent.localization=true;
+    if(q.includes('cilia')||q.includes('ciliary')) structured.filters.localization='cilia';
+    if(q.includes('basal body')) structured.filters.localization='basal body';
+    if(q.includes('centrosome')) structured.filters.localization='centrosome';
+    if(q.includes('screen')) structured.intent.screens=true;
+    if(q.includes('percent ciliated')) structured.intent.screens=true;
+    if(q.includes('domain')) structured.intent.domains=true;
+    if(q.includes('complex')) structured.intent.complexes=true;
 
-    // Screens
-    if (q.includes('screen')) structuredQuery.intent.screens = true;
-    if (q.includes('percent ciliated')) structuredQuery.intent.screens = true;
-
-    // Domains
-    if (q.includes('domain')) structuredQuery.intent.domains = true;
-    
-    // Complexes
-    if (q.includes('complex')) structuredQuery.intent.complexes = true;
-    
-    // ⬇️ --- FIX for BBSome / Joubert ---
-    // We get the map HERE to check all known complex/module names
-    const complexMap = getComplexPhylogenyTableMap(); 
-    for (const complexName in complexMap) {
-        if (q.includes(complexName.toLowerCase())) {
-            // Check for modules vs complexes
-            if (complexName.includes('MODULE') || complexName.includes('TIP') || complexName.includes('ZONE') || complexName.includes('PAIR')) {
-                 structuredQuery.filters.functional_modules = complexName;
-            } else {
-                 structuredQuery.filters.complexes = complexName;
+    // ---- COMPLEX / MODULE map (BBSome, IFT, …) ----
+    const complexMap = getComplexPhylogenyTableMap();
+    for(const name in complexMap){
+        if(q.includes(name.toLowerCase())){
+            if(name.includes('MODULE')||name.includes('TIP')||name.includes('ZONE')||name.includes('PAIR')){
+                structured.filters.functional_modules = name;
+            }else{
+                structured.filters.complexes = name;
             }
-            break; // Stop at first match
+            break;
         }
     }
-    // Fallbacks for common names
-    if (!structuredQuery.filters.complexes && q.includes('bbsome')) {
-         structuredQuery.filters.complexes = 'BBSOME';
-    }
-     if (!structuredQuery.filters.functional_modules && q.includes('ciliary specific')) {
-         structuredQuery.filters.functional_modules = 'Ciliary specific'; // From Li 2014
-    }
-    // ⬆️ --- END OF FIX ---
+    if(!structured.filters.complexes && q.includes('bbsome')) structured.filters.complexes='BBSOME';
 
-    // Orthologs
-    if (q.includes('ortholog')) structuredQuery.intent.orthologs = true;
-    if (q.includes('c. elegans') || q.includes('worm')) structuredQuery.species = 'c_elegans';
-    if (q.includes('mouse')) structuredQuery.species = 'mouse';
-    if (q.includes('human')) structuredQuery.species = 'human';
-    if (q.includes('zebrafish')) structuredQuery.species = 'zebrafish';
-    if (q.includes('drosophila')) structuredQuery.species = 'drosophila';
+    // ---- ORTHOLOGS ----
+    if(q.includes('ortholog')) structured.intent.orthologs=true;
+    if(q.includes('c. elegans')||q.includes('worm')) structured.species='c_elegans';
+    if(q.includes('mouse')) structured.species='mouse';
+    if(q.includes('human')) structured.species='human';
+    if(q.includes('zebrafish')) structured.species='zebrafish';
+    if(q.includes('drosophila')) structured.species='drosophila';
 
-    // Ciliopathy
-    if (q.includes('ciliopathy') || q.includes('disease')) structuredQuery.intent.ciliopathy = true;
-    // ⬇️ --- FIX for Joubert ---
-    // Use lowercase for matching. This is what the query engine will check.
-    if (q.includes('joubert') || q.includes('jbts')) structuredQuery.filters.ciliopathy = 'joubert syndrome';
-    if (q.includes('bbs')) structuredQuery.filters.ciliopathy = 'bardet-biedl syndrome';
-    if (q.includes('nephronophthisis') || q.includes('nphp')) structuredQuery.filters.ciliopathy = 'nephronophthisis';
-    // ⬆️ --- END OF FIX ---
-    
-    // Other Intents
-    if (q.includes('omim')) structuredQuery.intent.omim = true;
-    if (q.includes('describe') || q.startsWith('what is') || q.startsWith('what does')) structuredQuery.intent.description = true;
-    
-    // Expression
-    if (q.includes('express') || q.includes('expression')) structuredQuery.intent.expression = true;
-    if (q.includes('lung')) structuredQuery.filters.tissue = 'lung';
-    if (q.includes('kidney')) structuredQuery.filters.tissue = 'kidney';
-    if (q.includes('brain')) structuredQuery.filters.tissue = 'brain';
-    if (q.includes('ciliated cell')) structuredQuery.filters.cell_type = 'ciliated cell';
-    
-    // Plotting Intents
-    if (q.includes('umap') && q.includes('expression')) {
-        structuredQuery.plotType = 'umap_expression';
-        structuredQuery.intent.umap = true;
-    } else if (q.includes('umap')) {
-        structuredQuery.plotType = 'umap_cluster';
-        structuredQuery.intent.umap = true;
-    }
-    if (q.includes('phylogen') || q.includes('evolution') || q.includes('conservation')) {
-        structuredQuery.plotType = 'phylogeny';
-        structuredQuery.intent.phylogeny = true;
+    // ---- CILIOPATHY (Joubert, BBS, NPHP…) ----
+    if(q.includes('ciliopathy')||q.includes('disease')) structured.intent.ciliopathy=true;
+    if(q.includes('joubert')||q.includes('jbts')) structured.filters.ciliopathy='joubert syndrome';
+    if(q.includes('bbs')) structured.filters.ciliopathy='bardet-biedl syndrome';
+    if(q.includes('nephronophthisis')||q.includes('nphp')) structured.filters.ciliopathy='nephronophthisis';
+
+    // ---- OMIM / description ----
+    if(q.includes('omim')) structured.intent.omim=true;
+    if(q.includes('describe')||q.startsWith('what is')||q.startsWith('what does')) structured.intent.description=true;
+
+    // ---- EXPRESSION ----
+    if(q.includes('express')||q.includes('expression')) structured.intent.expression=true;
+    if(q.includes('lung')) structured.filters.tissue='lung';
+    if(q.includes('kidney')) structured.filters.tissue='kidney';
+    if(q.includes('brain')) structured.filters.tissue='brain';
+    if(q.includes('ciliated cell')) structured.filters.cell_type='ciliated cell';
+
+    // ---- PLOTS ----
+    if(q.includes('umap') && q.includes('expression')){ structured.plotType='umap_expression'; structured.intent.umap=true; }
+    else if(q.includes('umap')){ structured.plotType='umap_cluster'; structured.intent.umap=true; }
+    if(q.includes('phylogen')||q.includes('evolution')||q.includes('conservation')){
+        structured.plotType='phylogeny'; structured.intent.phylogeny=true;
     }
 
-    // --- 3. Determine Final Intent ---
-    
-    if (structuredQuery.genes.length > 0 && Object.keys(structuredQuery.intent).length === 0) {
-        structuredQuery.intent.description = true; // Default to full card
-    }
-    
-    if (structuredQuery.genes.length === 0 && Object.keys(structuredQuery.filters).length > 0) {
-        structuredQuery.intent.list_genes = true;
-    }
+    // ---- DEFAULT INTENT ----
+    if(structured.genes.length && !Object.keys(structured.intent).length) structured.intent.description=true;
+    if(!structured.genes.length && Object.keys(structured.filters).length) structured.intent.list_genes=true;
+    if(q.includes('compare')) structured.comparison=true;
+    if(q.startsWith('is') && (q.includes('cilia')||q.includes('ciliary'))) structured.intent.localization=true;
 
-    if (q.includes('compare')) {
-        structuredQuery.comparison = true;
-    }
-    
-    if (q.startsWith('is') && (q.includes('cilia') || q.includes('ciliary'))) {
-        structuredQuery.intent.localization = true;
-    }
-
-    console.log('[CiliAI Parser] Query:', q, 'Result:', structuredQuery);
-    return structuredQuery;
+    return structured;
 }
 
 
-// ==========================================================
-// 3️⃣ Query Execution (The "Engine") - CORRECTED
-// ==========================================================
-function queryGenes(structuredQuery) {
+/* ==============================================================
+   3. QUERY ENGINE (uses the *normalized* ciliopathy array)
+   ============================================================== */
+function queryGenes(structured){
     const data = window.CiliAI_MasterData;
-    if (!data || !Array.isArray(data)) {
-        console.error("CiliAI_MasterData is not loaded or invalid!");
-        return [];
-    }
+    if(!Array.isArray(data)) return [];
 
-    let results = [];
-    const complexMap = getComplexPhylogenyTableMap(); // Get the complex-to-gene map
+    let results = structured.genes.length
+        ? data.filter(g=>structured.genes.includes(g.gene.toUpperCase()))
+        : [...data];
 
-    // 1. Start with specified genes or all genes
-    if (structuredQuery.genes && structuredQuery.genes.length > 0) {
-        const geneSet = new Set(structuredQuery.genes.map(g => g.toUpperCase()));
-        results = data.filter(g => geneSet.has(g.gene.toUpperCase()));
-    } else {
-        results = [...data];
-    }
+    const f = structured.filters;
 
-    // 2. Apply filters
-    const filters = structuredQuery.filters || {};
-    if (Object.keys(filters).length > 0) {
-        results = results.filter(g => {
-            
-            if (filters.localization) {
-                const loc = (g.localization || "").toLowerCase();
-                if (!loc.includes(filters.localization.toLowerCase())) return false;
+    if(Object.keys(f).length){
+        results = results.filter(g=>{
+            // localization
+            if(f.localization && !(g.localization||'').toLowerCase().includes(f.localization.toLowerCase())) return false;
+
+            // complexes
+            if(f.complexes){
+                const txt = f.complexes.toLowerCase();
+                const own = Object.keys(g.complex_components||{}).some(n=>n.toLowerCase().includes(txt));
+                if(own) return true;
+                const map = getComplexPhylogenyTableMap()[f.complexes.toUpperCase()]||[];
+                if(map.includes(g.gene.toUpperCase())) return true;
+                return false;
             }
 
-            // ⬇️ --- FIX FOR BBSome --- ⬇️
-            if (filters.complexes) {
-                const filterText = filters.complexes.toLowerCase();
-                // Check 1: Gene's own `complex_components`
-                const complexNames = Object.keys(g.complex_components || {});
-                let inComplex = complexNames.some(name =>
-                    name.toLowerCase().includes(filterText)
-                );
-                
-                // Check 2: The hard-coded `getComplexPhylogenyTableMap`
-                if (!inComplex) {
-                    const targetGenes = complexMap[filters.complexes.toUpperCase()] || [];
-                    if (targetGenes.includes(g.gene.toUpperCase())) {
-                        inComplex = true;
-                    }
-                }
-                if (!inComplex) return false;
-            }
-            // ⬆️ --- END OF FIX --- ⬆️
-
-            if (filters.functional_modules) {
-                const filterText = filters.functional_modules.toLowerCase();
-                let inModule = false;
-                // Check 1: Gene's `functional_modules` (from Li 2014)
-                const modules = g.functional_modules || [];
-                if (modules.some(mod => mod.toLowerCase().includes(filterText))) {
-                    inModule = true;
-                }
-                
-                // Check 2: The hard-coded `getComplexPhylogenyTableMap`
-                if (!inModule) {
-                    const targetGenes = complexMap[filters.functional_modules.toUpperCase()] || [];
-                    if (targetGenes.includes(g.gene.toUpperCase())) {
-                        inModule = true;
-                    }
-                }
-                if (!inModule) return false;
+            // functional modules
+            if(f.functional_modules){
+                const txt = f.functional_modules.toLowerCase();
+                const own = (g.functional_modules||[]).some(m=>m.toLowerCase().includes(txt));
+                if(own) return true;
+                const map = getComplexPhylogenyTableMap()[f.functional_modules.toUpperCase()]||[];
+                if(map.includes(g.gene.toUpperCase())) return true;
+                return false;
             }
 
-            // ⬇️ --- FIX FOR CILIOPATHY --- ⬇️
-            if (filters.ciliopathy) {
-                const filterText = filters.ciliopathy.toLowerCase();
-                // Use the normalized 'ciliopathies' array
-                const ciliopathies = g.ciliopathies || []; 
-                if (!Array.isArray(ciliopathies) || !ciliopathies.some(c => c.toLowerCase().includes(filterText))) {
-                    return false;
-                }
-            }
-            // ⬆️ --- END OF FIX --- ⬆️
-
-            if (filters.tissue && g.expression?.tissue) {
-                const tissueName = Object.keys(g.expression.tissue).find(t =>
-                    t.toLowerCase().includes(filters.tissue.toLowerCase())
-                );
-                if (!tissueName || parseFloat(g.expression.tissue[tissueName]) <= 0) {
-                    return false;
-                }
+            // **CILIOPATHY** – now works
+            if(f.ciliopathy){
+                const txt = f.ciliopathy.toLowerCase();
+                if(!(g.ciliopathy||[]).some(c=>c.toLowerCase().includes(txt))) return false;
             }
 
-            if (filters.cell_type && g.expression?.scRNA) {
-                if (!g.expression.scRNA[filters.cell_type] ||
-                    parseFloat(g.expression.scRNA[filters.cell_type]) <= 0) {
-                    return false;
-                }
+            // tissue / cell-type expression
+            if(f.tissue && g.expression?.tissue){
+                const t = Object.keys(g.expression.tissue).find(k=>k.toLowerCase().includes(f.tissue.toLowerCase()));
+                if(!t || (g.expression.tissue[t]||0)<=0) return false;
             }
-            
-            if (filters.species) {
-                const key = `ortholog_${filters.species}`; // e.g., ortholog_c_elegans
-                if (!g[key]) return false;
+            if(f.cell_type && g.expression?.scRNA){
+                if((g.expression.scRNA[f.cell_type]||0)<=0) return false;
             }
 
+            // ortholog species
+            if(f.species){
+                const key = `ortholog_${f.species}`;
+                if(!g[key]) return false;
+            }
             return true;
         });
     }
 
-    // 3. Apply sorting (unchanged)
-    if (structuredQuery.intent?.expression && filters.tissue && structuredQuery.genes.length === 0) {
-        results.sort((a, b) => {
-            const tissueA = Object.keys(a.expression?.tissue || {}).find(t => t.toLowerCase().includes(filters.tissue.toLowerCase()));
-            const tissueB = Object.keys(b.expression?.tissue || {}).find(t => t.toLowerCase().includes(filters.tissue.toLowerCase()));
-            const valA = parseFloat(a.expression?.tissue?.[tissueA] || 0);
-            const valB = parseFloat(b.expression?.tissue?.[tissueB] || 0);
-            return valB - valA;
-        });
-        results = results.slice(0, 10);
+    // sort by expression if requested
+    if(structured.intent.expression && f.tissue && !structured.genes.length){
+        results.sort((a,b)=>{
+            const ta = Object.keys(a.expression?.tissue||{}).find(k=>k.toLowerCase().includes(f.tissue));
+            const tb = Object.keys(b.expression?.tissue||{}).find(k=>k.toLowerCase().includes(f.tissue));
+            return (b.expression?.tissue?.[tb]||0) - (a.expression?.tissue?.[ta]||0);
+        }).slice(0,10);
     }
-
     return results;
 }
 
-
-// ==========================================================
-// 4️⃣ Results Rendering (The "Voice")
-// ==========================================================
-function displayCiliAIResults(results, structuredQuery) {
-    const resultArea = document.getElementById('ai-result-area');
-    resultArea.style.display = 'block';
-
-    if (!results || results.length === 0) {
-        resultArea.innerHTML = '<p>No results found for your query.</p>';
+function displayCiliAIResults(results, sq) {
+    const area = document.getElementById('ai-result-area');
+    area.style.display = 'block';
+    if (!results || !results.length) {
+        area.innerHTML = '<p>No results found for your query.</p>';
         return;
     }
 
-    const q = structuredQuery;
-    const intent = q.intent;
-
-    // ⬇️ --- FIX FOR ORTHOLOGS (and other strings) --- ⬇️
-    const buildSection = (title, content) => {
-        let displayContent = '';
-        if (Array.isArray(content)) {
-            displayContent = content.filter(Boolean).join(', '); 
-        } else if (typeof content === 'object' && content !== null) {
-            displayContent = Object.keys(content).join(', '); 
-        } else if (content) { // Handles strings, numbers
-            displayContent = content;
-        }
-        // ⬆️ --- END OF FIX --- ⬆️
-        
-        if (displayContent) {
-            return `<p><strong>${title}:</strong> ${displayContent}</p>`;
-        }
-        return ''; 
+    const build = (title, content) => {
+        if (!content) return '';
+        let txt = '';
+        if (Array.isArray(content)) txt = content.filter(Boolean).join(', ');
+        else if (typeof content === 'object' && content !== null) txt = Object.keys(content).join(', ');
+        else txt = content;
+        return txt ? `<p><strong>${title}:</strong> ${txt}</p>` : '';
     };
 
-    // --- 1. Handle "List" queries ---
-    if (intent.list_genes && results.length > 1) {
-        let title = "Found the following genes:";
-        if (q.filters.ciliopathy) title = `Genes associated with ${q.filters.ciliopathy}:`;
-        if (q.filters.complexes) title = `Genes in ${q.filters.complexes}:`;
-        if (q.filters.functional_modules) title = `Genes in module: ${q.filters.functional_modules}:`;
-        if (q.filters.localization) title = `Genes localized to ${q.filters.localization}:`;
-
-        const geneList = results.map(g => g.gene).join(', ');
-        resultArea.innerHTML = `
+    // ——— 1. LIST QUERIES ———
+    if (sq.intent.list_genes && results.length > 1) {
+        let title = 'Found genes';
+        if (sq.filters.ciliopathy) title = `Genes in ${sq.filters.ciliopathy}`;
+        if (sq.filters.complexes) title = `Genes in ${sq.filters.complexes}`;
+        if (sq.filters.functional_modules) title = `Genes in ${sq.filters.functional_modules}`;
+        if (sq.filters.localization) title = `Genes localized to ${sq.filters.localization}`;
+        area.innerHTML = `
             <div class="result-card">
-                <h3>${title} (${results.length} genes)</h3>
-                <p>${geneList}</p>
-            </div>
-        `;
+                <h3>${title} (${results.length})</h3>
+                <p>${results.map(g => g.gene).join(', ')}</p>
+            </div>`;
         return;
     }
 
-    // --- 2. Handle "Comparison" queries ---
-    if (q.comparison && results.length > 1) {
-        let tableHtml = '<table><thead><tr><th>Gene</th>';
-        if (q.filters.tissue) tableHtml += `<th>Expression in ${q.filters.tissue} (nTPM)</th>`;
-        if (q.filters.cell_type) tableHtml += `<th>Expression in ${q.filters.cell_type}</th>`;
-        if (intent.localization) tableHtml += '<th>Localization</th>';
-        if (intent.modules) tableHtml += '<th>Modules</th>';
-        tableHtml += '</tr></thead><tbody>';
-
-        for (const g of results) {
-            tableHtml += `<tr><td><strong>${g.gene}</strong></td>`;
-            if (q.filters.tissue) {
-                const tissueName = Object.keys(g.expression?.tissue || {}).find(t => t.toLowerCase().includes(q.filters.tissue));
-                tableHtml += `<td>${g.expression?.tissue?.[tissueName]?.toFixed(2) || 'N/A'}</td>`;
+    // ——— 2. COMPARISON ———
+    if (sq.comparison && results.length > 1) {
+        let html = '<table><thead><tr><th>Gene</th>';
+        if (sq.filters.tissue) html += `<th>${sq.filters.tissue} (nTPM)</th>`;
+        if (sq.filters.cell_type) html += `<th>${sq.filters.cell_type}</th>`;
+        if (sq.intent.localization) html += '<th>Localization</th>';
+        html += '</tr></thead><tbody>';
+        results.forEach(g => {
+            html += `<tr><td><strong>${g.gene}</strong></td>`;
+            if (sq.filters.tissue) {
+                const t = Object.keys(g.expression?.tissue || {}).find(k => k.toLowerCase().includes(sq.filters.tissue));
+                html += `<td>${g.expression?.tissue?.[t]?.toFixed(2) || 'N/A'}</td>`;
             }
-             if (q.filters.cell_type) {
-                tableHtml += `<td>${g.expression?.scRNA?.[q.filters.cell_type]?.toFixed(4) || 'N/A'}</td>`;
+            if (sq.filters.cell_type) {
+                html += `<td>${g.expression?.scRNA?.[sq.filters.cell_type]?.toFixed(4) || 'N/A'}</td>`;
             }
-            if (intent.localization) {
-                tableHtml += `<td>${g.localization || 'N/A'}</td>`;
-            }
-            if (intent.modules) {
-                tableHtml += `<td>${(g.functional_modules || []).join(', ') || 'N/A'}</td>`;
-            }
-            tableHtml += '</tr>';
-        }
-        tableHtml += '</tbody></table>';
-        resultArea.innerHTML = `<div class="result-card">${tableHtml}</div>`;
+            if (sq.intent.localization) html += `<td>${g.localization || 'N/A'}</td>`;
+            html += '</tr>';
+        });
+        html += '</tbody></table>';
+        area.innerHTML = `<div class="result-card">${html}</div>`;
         return;
     }
-    
-    // --- 3. Handle "Gene Card" queries ---
-    const html = results.map(g => {
-        // Special Case: "is X a ciliary gene?"
-        if (intent.localization && q.genes.length > 0 && (q.question?.startsWith('is') || q.question?.includes('ciliary'))) {
-            const locs = (g.localization || "").toLowerCase();
-            const answer = locs.includes('cilia') 
-                ? `Yes, ${g.gene} is localized to the ${g.localization}.` 
-                : `No, ${g.gene} is localized to the ${g.localization || 'an unknown location'}.`;
-            return `<div class="result-card"><h3>${g.gene}</h3><p>${answer}</p></div>`;
+
+    // ——— 3. GENE CARD ———
+    const cards = results.map(g => {
+        if (sq.intent.localization && sq.genes.length && (sq.question.startsWith('is') || sq.question.includes('ciliary'))) {
+            const loc = (g.localization || '').toLowerCase();
+            const ans = loc.includes('cilia')
+                ? `Yes, <strong>${g.gene}</strong> is localized to the ${g.localization}.`
+                : `No, <strong>${g.gene}</strong> is ${g.localization ? 'localized to ' + g.localization : 'not annotated'}.`;
+            return `<div class="result-card"><h3>${g.gene}</h3><p>${ans}</p></div>`;
         }
-        
-        // --- Build Full Card or Intent-Specific Card ---
-        const cardSections = [];
-        const hasSpecificIntent = Object.keys(intent).length > 0 && !intent.description;
 
-        // Build all possible sections from the merged gene object 'g'
-        const allSections = {
-            description: buildSection("Description", g.description),
-            functional_summary: buildSection("Functional Summary", g.functional_summary),
-            localization: buildSection("Localization", g.localization),
-            omim: buildSection("OMIM ID", g.omim_id),
-            ciliopathy: buildSection("Associated Ciliopathies", g.ciliopathies), // Use the normalized array
-            ciliopathy_classification: buildSection("Ciliopathy Classification", g.ciliopathy_classification),
-            complexes: buildSection("Complexes", Object.keys(g.complex_components || {})),
-            domains: buildSection("Domains", g.domain_descriptions),
-            modules: buildSection("Functional Modules", g.functional_modules),
-            screens: buildSection("Screens", [...new Set( (g.screens || []).map(s => s.dataset).filter(Boolean) )] ),
-            
-            // Orthologs (all fields)
-            ortholog_mouse: buildSection("Mouse Ortholog", g.ortholog_mouse),
-            ortholog_c_elegans: buildSection("C. elegans Ortholog", g.ortholog_c_elegans),
-            ortholog_zebrafish: buildSection("Zebrafish Ortholog", g.ortholog_zebrafish),
-            ortholog_drosophila: buildSection("Drosophila Ortholog", g.ortholog_drosophila),
-            
-            // Phenotype Effects
-            lof_effects: buildSection("Loss-of-Function Effects", g.lof_effects),
-            overexpression_effects: buildSection("Overexpression Effects", g.overexpression_effects),
-            percent_ciliated_cells_effects: buildSection("Ciliated Cell Effects", g.percent_ciliated_cells_effects),
-
-            // Expression (if requested)
-            expression_tissue: buildSection(`Expression in ${q.filters.tissue}`, g.expression?.tissue?.[Object.keys(g.expression?.tissue || {}).find(t => t.toLowerCase().includes(q.filters.tissue))]?.toFixed(2)),
-            expression_cell: buildSection(`Expression in ${q.filters.cell_type}`, g.expression?.scRNA?.[q.filters.cell_type]?.toFixed(4))
+        const sections = [];
+        const all = {
+            description: build('Description', g.description),
+            functional_summary: build('Functional Summary', g.functional_summary),
+            localization: build('Localization', g.localization),
+            omim: build('OMIM', g.omim_id),
+            ciliopathy: build('Ciliopathies', g.ciliopathy),                    // ← FIXED
+            classification: build('Classification', g.ciliopathy_classification),
+            complexes: build('Complexes', Object.keys(g.complex_components || {})),
+            domains: build('Domains', g.domain_descriptions),
+            modules: build('Modules', g.functional_modules),
+            screens: build('Screens', [...new Set((g.screens || []).map(s => s.dataset).filter(Boolean))]),
+            orth_mouse: build('Mouse Ortholog', g.ortholog_mouse),
+            orth_celegans: build('C. elegans Ortholog', g.ortholog_c_elegans),
+            orth_zebrafish: build('Zebrafish Ortholog', g.ortholog_zebrafish),
+            lof: build('Loss-of-Function', g.lof_effects),
+            over: build('Overexpression', g.overexpression_effects),
+            ciliated: build('Ciliated Cell Effect', g.percent_ciliated_cells_effects)
         };
-        
-        // --- Decide what to show ---
-        if (!hasSpecificIntent || intent.description) {
-            // Show the full, default card
-            cardSections.push(
-                allSections.description,
-                allSections.functional_summary,
-                allSections.localization,
-                allSections.ciliopathy,
-                allSections.ciliopathy_classification,
-                allSections.complexes,
-                allSections.domains,
-                allSections.modules,
-                allSections.screens,
-                allSections.omim,
-                allSections.ortholog_mouse,
-                allSections.ortholog_c_elegans,
-                allSections.ortholog_zebrafish,
-                allSections.ortholog_drosophila,
-                allSections.lof_effects,
-                allSections.overexpression_effects,
-                allSections.percent_ciliated_cells_effects
+
+        // Full card or intent-specific
+        if (!Object.keys(sq.intent).length || sq.intent.description) {
+            sections.push(
+                all.description, all.functional_summary, all.localization,
+                all.ciliopathy, all.classification, all.complexes, all.domains,
+                all.modules, all.screens, all.omim, all.orth_mouse,
+                all.orth_celegans, all.orth_zebrafish, all.lof, all.over, all.ciliated
             );
         } else {
-            // Only show sections that match the user's intent
-            if (intent.localization) cardSections.push(allSections.localization);
-            if (intent.screens) cardSections.push(allSections.screens);
-            if (intent.domains) cardSections.push(allSections.domains);
-            if (intent.complexes) cardSections.push(allSections.complexes);
-            if (intent.modules) cardSections.push(allSections.modules);
-            if (intent.omim) cardSections.push(allSections.omim);
-            if (intent.ciliopathy) cardSections.push(allSections.ciliopathy, allSections.ciliopathy_classification);
-            
-            // ⬇️ --- FIX FOR ORTHOLOGS --- ⬇️
-            if (intent.orthologs) {
-                if (q.species === 'c_elegans') cardSections.push(allSections.ortholog_c_elegans);
-                else if (q.species === 'mouse') cardSections.push(allSections.ortholog_mouse);
-                else if (q.species === 'zebrafish') cardSections.push(allSections.ortholog_zebrafish);
-                else if (q.species === 'drosophila') cardSections.push(allSections.ortholog_drosophila);
-                else {
-                    // If no species specified, show all
-                    cardSections.push(
-                        allSections.ortholog_mouse, 
-                        allSections.ortholog_c_elegans, 
-                        allSections.ortholog_zebrafish, 
-                        allSections.ortholog_drosophila
-                    );
-                }
+            if (sq.intent.localization) sections.push(all.localization);
+            if (sq.intent.screens) sections.push(all.screens);
+            if (sq.intent.domains) sections.push(all.domains);
+            if (sq.intent.complexes) sections.push(all.complexes);
+            if (sq.intent.ciliopathy) sections.push(all.ciliopathy, all.classification);
+            if (sq.intent.omim) sections.push(all.omim);
+            if (sq.intent.orthologs) {
+                if (sq.species === 'c_elegans') sections.push(all.orth_celegans);
+                else if (sq.species === 'mouse') sections.push(all.orth_mouse);
+                else if (sq.species === 'zebrafish') sections.push(all.orth_zebrafish);
+                else sections.push(all.orth_mouse, all.orth_celegans, all.orth_zebrafish);
             }
-            // ⬆️ --- END OF FIX --- ⬆️
-
-            if (intent.expression && q.filters.tissue) cardSections.push(allSections.expression_tissue);
-            if (intent.expression && q.filters.cell_type) cardSections.push(allSections.expression_cell);
+            if (sq.intent.expression && sq.filters.tissue) {
+                const t = Object.keys(g.expression?.tissue || {}).find(k => k.toLowerCase().includes(sq.filters.tissue));
+                sections.push(build(`Expression in ${sq.filters.tissue}`, g.expression?.tissue?.[t]?.toFixed(2)));
+            }
+            if (sq.intent.expression && sq.filters.cell_type) {
+                sections.push(build(`Expression in ${sq.filters.cell_type}`, g.expression?.scRNA?.[sq.filters.cell_type]?.toFixed(4)));
+            }
         }
-        
-        return `
-            <div class="result-card">
-                <h3>${g.gene}</h3>
-                ${cardSections.filter(Boolean).join('\n') || '<p>No specific data found for this intent.</p>'}
-            </div>
-        `;
+
+        return `<div class="result-card"><h3>${g.gene}</h3>${sections.filter(Boolean).join('') || '<p>No data.</p>'}</div>`;
     }).join('');
 
-    resultArea.innerHTML = html;
+    area.innerHTML = cards;
 }
-
 // ==========================================================
 // 5️⃣ Complex Map (Required for BBSome etc.)
 // ==========================================================
@@ -845,100 +664,213 @@ function getComplexPhylogenyTableMap() {
 
 
 // ==========================================================
-// 6️⃣ Page HTML Injector
+// 6. Page HTML Injector
 // ==========================================================
-window.displayCiliAIPage = async function displayCiliAIPage() {
-    const contentArea = document.querySelector('.content-area');
-    if (!contentArea) {
+window.displayCiliAIPage = async function () {
+    const area = document.querySelector('.content-area');
+    if (!area) {
         console.error('[CiliAI] Error: .content-area not found.');
         return;
     }
 
-    contentArea.className = 'content-area content-area-full';
+    area.className = 'content-area content-area-full';
     const ciliaPanel = document.querySelector('.cilia-panel');
     if (ciliaPanel) ciliaPanel.style.display = 'none';
 
-    try {
-        // --- Inject full CiliAI HTML + CSS ---
-        contentArea.innerHTML = `
-            <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
-            <script src="https://cdn.jsdelivr.net/npm/cytoscape@3.23.0/dist/cytoscape.min.js"></script>
-            <div class="ciliai-container">
-                <div class="ciliai-header">
-                    <h1>CiliAI</h1>
-                    <p>Your AI-powered partner for discovering gene-cilia relationships.</p>
-                </div>
-                <div class="ciliai-main-content">
-                    <div class="ai-query-section">
-                        <h3>Ask a Question</h3>
-                        <div class="ai-input-group autocomplete-wrapper">
-                            <input type="text" id="aiQueryInput" class="ai-query-input" placeholder="What's on your mind? Try a gene name or a question...">
-                            <div id="aiQuerySuggestions" class="suggestions-container"></div>
-                            <button class="ai-query-btn" id="aiQueryBtn">Ask CiliAI</button>
-                        </div>
-                        <div class="example-queries">
-                            <p>
-                                <strong>Try asking:</strong> 
-                                <span data-question="What is IFT52?">What is IFT52?</span>, 
-                                <span data-question="List genes in the BBSome">List genes in the BBSome</span>, 
-                                <span data-question="List genes localized to cilia">Genes localized to cilia</span>, 
-                                <span data-question="Screens for IFT88">Screens for IFT88</span>,
-                                <span data-question="Domains of CEP290">Domains of CEP290</span>,
-                                <span data-question="List genes in Joubert syndrome">List genes in Joubert syndrome</span>,
-                                <span data-question="What is the C. elegans ortholog for IFT52?">C. elegans ortholog for IFT52</span>,
-                                <span data-question="Plot UMAP for FOXJ1 expression">Plot UMAP for FOXJ1 expression</span>,
-                                <span data-question="Compare expression of ARL13B and FOXJ1 in ciliated cells">Compare ARL13B & FOXJ1 in ciliated cells</span>,
-                                <span data-question="Analyze the evolutionary history of YWHAB">Evolution of YWHAB</span>
-                            </p>
-                        </div>
-                        <div id="ai-result-area" class="results-section" style="display: none; margin-top: 1.5rem; padding: 1rem;"></div>
+    // === DYNAMICALLY INJECT PLOTLY & CYTOSCAPE ===
+    // (Only load once)
+    if (!window.Plotly) {
+        const plotlyScript = document.createElement('script');
+        plotlyScript.src = 'https://cdn.plot.ly/plotly-latest.min.js';
+        document.head.appendChild(plotlyScript);
+    }
+    if (!window.cytoscape) {
+        const cytoScript = document.createElement('script');
+        cytoScript.src = 'https://cdn.jsdelivr.net/npm/cytoscape@3.23.0/dist/cytoscape.min.js';
+        document.head.appendChild(cytoScript);
+    }
+
+    // === INJECT FULL HTML + CSS ===
+    area.innerHTML = `
+        <div class="ciliai-container">
+            <div class="ciliai-header">
+                <h1>CiliAI</h1>
+                <p>Your AI-powered partner for discovering gene-cilia relationships.</p>
+            </div>
+            <div class="ciliai-main-content">
+                <div class="ai-query-section">
+                    <h3>Ask a Question</h3>
+                    <div class="ai-input-group autocomplete-wrapper">
+                        <input type="text" id="aiQueryInput" class="ai-query-input" placeholder="What's on your mind? Try a gene name or a question...">
+                        <div id="aiQuerySuggestions" class="suggestions-container"></div>
+                        <button class="ai-query-btn" id="aiQueryBtn">Ask CiliAI</button>
                     </div>
+                    <div class="example-queries">
+                        <p>
+                            <strong>Try asking:</strong>
+                            <span data-question="What is IFT52?">What is IFT52?</span>,
+                            <span data-question="List genes in the BBSome">List genes in the BBSome</span>,
+                            <span data-question="List genes localized to cilia">Genes localized to cilia</span>,
+                            <span data-question="Screens for IFT88">Screens for IFT88</span>,
+                            <span data-question="Domains of CEP290">Domains of CEP290</span>,
+                            <span data-question="List genes in Joubert syndrome">List genes in Joubert syndrome</span>,
+                            <span data-question="What is the C. elegans ortholog for IFT52?">C. elegans ortholog for IFT52</span>,
+                            <span data-question="Plot UMAP for FOXJ1 expression">Plot UMAP for FOXJ1 expression</span>,
+                            <span data-question="Compare expression of ARL13B and FOXJ1 in ciliated cells">Compare ARL13B & FOXJ1 in ciliated cells</span>,
+                            <span data-question="Analyze the evolutionary history of YWHAB">Evolution of YWHAB</span>
+                        </p>
+                    </div>
+                    <div id="ai-result-area" class="results-section" style="display: none; margin-top: 1.5rem; padding: 1rem;"></div>
                 </div>
             </div>
-            <style>
-                .ciliai-container { font-family: 'Arial', sans-serif; max-width: 950px; margin: 2rem auto; padding: 2rem; background-color: #f9f9f9; border-radius: 12px; }
-                .ciliai-header { text-align: center; margin-bottom: 2rem; }
-                .ciliai-header h1 { font-size: 2.8rem; color: #2c5aa0; margin: 0; }
-                .ciliai-header p { font-size: 1.2rem; color: #555; margin-top: 0.5rem; }
-                .ai-query-section { background-color: #e8f4fd; border: 1px solid #bbdefb; padding: 1.5rem 2rem; border-radius: 8px; margin-bottom: 2rem; }
-                .ai-query-section h3 { margin-top: 0; color: #2c5aa0; }
-                .ai-input-group { position: relative; display: flex; gap: 10px; }
-                .ai-query-input { flex-grow: 1; padding: 0.8rem; border: 1px solid #ccc; border-radius: 4px; font-size: 1rem; }
-                .ai-query-btn { padding: 0.8rem 1.2rem; font-size: 1rem; background-color: #2c5aa0; color: white; border: none; border-radius: 4px; cursor: pointer; transition: background-color 0.2s; }
-                .ai-query-btn:hover { background-color: #1e4273; }
-                .example-queries { margin-top: 1rem; font-size: 0.9rem; color: #555; text-align: left; }
-                .example-queries span { background-color: #d1e7fd; padding: 4px 10px; border-radius: 12px; font-family: 'Arial', sans-serif; cursor: pointer; margin: 4px; display: inline-block; transition: background-color 0.2s; border: 1px solid #b1d7fc;}
-                .example-queries span:hover { background-color: #b1d7fc; }
-                .results-section { margin-top: 2rem; padding: 2rem; background-color: #fff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
-                .result-card { border: 1px solid #ddd; border-radius: 8px; padding: 1.5rem; margin-bottom: 1.5rem; }
-                .result-card h3 { margin-top: 0; color: #2c5aa0; }
-                .ciliopathy-table, .expression-table, .gene-detail-table, .results-section table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
-                .ciliopathy-table th, .ciliopathy-table td, .expression-table th, .expression-table td, .gene-detail-table th, .gene-detail-table td, .results-section th, .results-section td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-                .ciliopathy-table th, .expression-table th, .gene-detail-table th, .results-section th { background-color: #e8f4fd; color: #2c5aa0; }
-                .suggestions-container { position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid #ccc; z-index: 1000; max-height: 200px; overflow-y: auto; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-                .suggestion-item { padding: 10px; cursor: pointer; }
-                .suggestion-item:hover { background-color: #f0f0f0; }
-                .download-button { background-color: #28a745; color: white; padding: 8px 14px; border: none; border-radius: 4px; cursor: pointer; font-size: 0.9em; font-weight: bold; margin-top: 15px; transition: background-color 0.3s ease; }
-                .download-button:hover { background-color: #218838; }
-            </style>
-        `;
+        </div>
 
-        console.log('✅ CiliAI: Page HTML injected successfully.');
+        <style>
+            .ciliai-container { 
+                font-family: 'Arial', sans-serif; 
+                max-width: 950px; 
+                margin: 2rem auto; 
+                padding: 2rem; 
+                background-color: #f9f9f9; 
+                border-radius: 12px; 
+                box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            }
+            .ciliai-header { text-align: center; margin-bottom: 2rem; }
+            .ciliai-header h1 { font-size: 2.8rem; color: #2c5aa0; margin: 0; }
+            .ciliai-header p { font-size: 1.2rem; color: #555; margin-top: 0.5rem; }
+            .ai-query-section { 
+                background-color: #e8f4fd; 
+                border: 1px solid #bbdefb; 
+                padding: 1.5rem 2rem; 
+                border-radius: 8px; 
+                margin-bottom: 2rem; 
+            }
+            .ai-query-section h3 { margin-top: 0; color: #2c5aa0; }
+            .ai-input-group { 
+                position: relative; 
+                display: flex; 
+                gap: 10px; 
+                align-items: stretch;
+            }
+            .ai-query-input { 
+                flex-grow: 1; 
+                padding: 0.8rem; 
+                border: 1px solid #ccc; 
+                border-radius: 4px; 
+                font-size: 1rem; 
+            }
+            .ai-query-btn { 
+                padding: 0.8rem 1.2rem; 
+                font-size: 1rem; 
+                background-color: #2c5aa0; 
+                color: white; 
+                border: none; 
+                border-radius: 4px; 
+                cursor: pointer; 
+                transition: background-color 0.2s; 
+            }
+            .ai-query-btn:hover { background-color: #1e4273; }
+            .example-queries { 
+                margin-top: 1rem; 
+                font-size: 0.9rem; 
+                color: #555; 
+                text-align: left; 
+            }
+            .example-queries span { 
+                background-color: #d1e7fd; 
+                padding: 4px 10px; 
+                border-radius: 12px; 
+                font-family: 'Arial', sans-serif; 
+                cursor: pointer; 
+                margin: 4px; 
+                display: inline-block; 
+                transition: background-color 0.2s; 
+                border: 1px solid #b1d7fc;
+            }
+            .example-queries span:hover { background-color: #b1d7fc; }
+            .results-section { 
+                margin-top: 2rem; 
+                padding: 2rem; 
+                background-color: #fff; 
+                border-radius: 8px; 
+                box-shadow: 0 2px 8px rgba(0,0,0,0.05); 
+            }
+            .result-card { 
+                border: 1px solid #ddd; 
+                border-radius: 8px; 
+                padding: 1.5rem; 
+                margin-bottom: 1.5rem; 
+                background: #fdfdfd;
+            }
+            .result-card h3 { 
+                margin-top: 0; 
+                color: #2c5aa0; 
+                border-bottom: 1px solid #eee; 
+                padding-bottom: 0.5rem;
+            }
+            table { 
+                width: 100%; 
+                border-collapse: collapse; 
+                margin-top: 1rem; 
+                font-size: 0.95rem;
+            }
+            th, td { 
+                border: 1px solid #ddd; 
+                padding: 8px; 
+                text-align: left; 
+            }
+            th { 
+                background-color: #e8f4fd; 
+                color: #2c5aa0; 
+                font-weight: 600;
+            }
+            .suggestions-container { 
+                position: absolute; 
+                top: 100%; 
+                left: 0; 
+                right: 0; 
+                background: white; 
+                border: 1px solid #ccc; 
+                z-index: 1000; 
+                max-height: 200px; 
+                overflow-y: auto; 
+                box-shadow: 0 4px 6px rgba(0,0,0,0.1); 
+                display: none;
+            }
+            .suggestion-item { 
+                padding: 10px; 
+                cursor: pointer; 
+                border-bottom: 1px solid #eee;
+            }
+            .suggestion-item:hover { 
+                background-color: #f0f0f0; 
+            }
+            .download-button { 
+                background-color: #28a745; 
+                color: white; 
+                padding: 8px 14px; 
+                border: none; 
+                border-radius: 4px; 
+                cursor: pointer; 
+                font-size: 0.9em; 
+                font-weight: bold; 
+                margin-top: 15px; 
+                transition: background-color 0.3s ease; 
+            }
+            .download-button:hover { 
+                background-color: #218838; 
+            }
+        </style>
+    `;
 
-        if (typeof ciliAI_waitForElements === 'function') {
-            ciliAI_waitForElements();
-        } else {
-            console.warn('[CiliAI] Warning: ciliAI_waitForElements() not found.');
-        }
+    console.log('CiliAI: Page HTML injected successfully.');
 
-    } catch (err) {
-        console.error('❌ CiliAI HTML injection failed:', err);
-        contentArea.innerHTML = '<p>Error: Failed to load CiliAI interface.</p>';
-    }
+    // Wait a tick for DOM to settle, then bind events
+    setTimeout(ciliAI_waitForElements, 100);
 };
 
 // ==========================================================
-// 7️⃣ Event Listener "Glue"
+// 7. Event Listener "Glue"
 // ==========================================================
 function ciliAI_waitForElements() {
     console.log('[CiliAI] Binding event listeners...');
@@ -946,58 +878,63 @@ function ciliAI_waitForElements() {
     const aiBtn = document.getElementById('aiQueryBtn');
     const aiInput = document.getElementById('aiQueryInput');
     const exampleQueries = document.querySelectorAll('.example-queries span');
-
-   // --- Main Query Function ---
-   const handleQuery = async () => {
-    const input = aiInput.value.trim();
-    if (!input) return;
-
     const resultArea = document.getElementById('ai-result-area');
-    resultArea.style.display = 'block';
-    resultArea.innerHTML = '<p>Processing...</p>';
 
-    try {
-        // ✅ Ensure data is loaded and get reference
-        let masterData = window.CiliAI_MasterData;
-        if (!masterData) {
-            console.log('[CiliAI] Data not found, loading now...');
-            masterData = await loadCiliAIData(); // This returns the data
+    // === MAIN QUERY HANDLER ===
+    const handleQuery = async () => {
+        const input = aiInput.value.trim();
+        if (!input) return;
+
+        resultArea.style.display = 'block';
+        resultArea.innerHTML = '<p>Processing your question...</p>';
+
+        try {
+            // Ensure data is loaded
+            let masterData = window.CiliAI_MasterData;
+            if (!masterData) {
+                console.log('[CiliAI] Data not loaded, fetching now...');
+                masterData = await loadCiliAIData();
+            }
+
+            // Parse question
+            const structuredQuery = await parseCiliAIQuestion(input, masterData);
+
+            // Route to correct handler
+            if (structuredQuery.plotType === 'phylogeny') {
+                const html = await getPhylogenyAnalysis(structuredQuery.genes);
+                resultArea.innerHTML = html;
+            } else if (structuredQuery.plotType === 'umap_expression' && structuredQuery.genes.length > 0) {
+                await displayUmapGeneExpression(structuredQuery.genes[0]);
+            } else if (structuredQuery.plotType === 'umap_cluster') {
+                await displayUmapPlot();
+            } else {
+                const results = queryGenes(structuredQuery);
+                displayCiliAIResults(results, structuredQuery);
+            }
+        } catch (err) {
+            console.error('CiliAI query failed:', err);
+            resultArea.innerHTML = `
+                <div class="result-card">
+                    <h3>Error</h3>
+                    <p>Failed to process your question.</p>
+                    <pre style="background:#f8d7da;padding:10px;border-radius:4px;color:#721c24;">
+${err.message}
+                    </pre>
+                </div>`;
         }
-        
-        // ✅ Pass masterData to parser
-        const structuredQuery = await parseCiliAIQuestion(input, masterData);
-        
-        // 3. Route query to correct function
-        if (structuredQuery.plotType === 'phylogeny') {
-            const html = await getPhylogenyAnalysis(structuredQuery.genes);
-            resultArea.innerHTML = html;
-        } else if (structuredQuery.plotType === 'umap_expression' && structuredQuery.genes.length > 0) {
-            await displayUmapGeneExpression(structuredQuery.genes[0]);
-        } else if (structuredQuery.plotType === 'umap_cluster') {
-            await displayUmapPlot();
-        } else {
-            const results = queryGenes(structuredQuery);
-            displayCiliAIResults(results, structuredQuery);
-        }
+    };
 
-    } catch (err) {
-        console.error('❌ CiliAI query failed:', err);
-        resultArea.innerHTML = `<p>Error: Failed to process your question.</p><pre>${err.message}\n${err.stack}</pre>`;
-    }
-};
-
-    // 1. Bind to "Ask CiliAI" Button
+    // === BIND EVENTS ===
     if (aiBtn) {
         aiBtn.addEventListener('click', handleQuery);
     } else {
         console.error('[CiliAI] Error: aiQueryBtn not found.');
     }
 
-    // 2. Bind to "Enter" key in input
     if (aiInput) {
         aiInput.addEventListener('keydown', (event) => {
             if (event.key === 'Enter') {
-                event.preventDefault(); 
+                event.preventDefault();
                 handleQuery();
             }
         });
@@ -1005,25 +942,23 @@ function ciliAI_waitForElements() {
         console.error('[CiliAI] Error: aiQueryInput not found.');
     }
 
-    // 3. Bind to Example Questions
     if (exampleQueries.length > 0) {
         exampleQueries.forEach(span => {
             span.addEventListener('click', () => {
                 const question = span.getAttribute('data-question');
-                if (aiInput) {
+                if (aiInput && question) {
                     aiInput.value = question;
                     aiInput.focus();
-                    handleQuery(); 
+                    handleQuery();
                 }
             });
         });
     } else {
-        console.error('[CiliAI] Error: No example queries found.');
+        console.warn('[CiliAI] No example queries found.');
     }
 
     console.log('[CiliAI] Event listeners bound successfully.');
 }
-
 // ==========================================================
 // 8️⃣ Plotting & Helper Functions
 // ==========================================================
@@ -1250,3 +1185,10 @@ function downloadPlot(plotDivId, filename) {
             document.body.removeChild(link);
         });
 }
+
+/* ==============================================================
+   10. BOOTSTRAP – inject page & load data on first use
+   ============================================================== */
+document.addEventListener('DOMContentLoaded', async ()=>{
+    await displayCiliAIPage();          // builds UI
+    await loadCiliAIData();            // pre-load everything (caches are now ready
