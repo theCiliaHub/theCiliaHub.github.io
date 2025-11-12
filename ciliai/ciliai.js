@@ -752,46 +752,53 @@ async function ciliAI_queryGenes(filters = {}) {
     });
 }
 
-// --- Front-end query handler with automatic retry for DB readiness ---
-function initCiliAIQueryHandler() {
-    const queryBtn = document.getElementById('aiQueryBtn');
-    const queryInput = document.getElementById('aiQueryInput');
-
-    if (!queryBtn || !queryInput) {
-        console.warn("[CiliAI] Query button or input not found.");
-        return;
-    }
-
-    // Helper: wait for DB readiness
-    const waitForDB = () => new Promise(resolve => {
-        if (window.ciliAI_MasterDatabaseReady) return resolve();
-        document.addEventListener('CiliAIMasterDBReady', resolve, { once: true });
-    });
-
-    const runQuery = async () => {
-        const queryText = queryInput.value.trim();
-        if (!queryText) return;
-
-        // Optionally parse query into filters (depends on your existing parser)
-        const filters = parseQueryToFilters(queryText); // your existing parser function
-
-        // --- Wait for DB if not ready ---
-        await waitForDB();
-
-        // --- Execute query ---
-        const results = await ciliAI_queryGenes(filters);
-
-        // --- Display results safely ---
-        displayQueryResults(results); // your existing display function
-    };
-
-    // Attach event listeners
-    queryBtn.addEventListener('click', runQuery);
-    queryInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') runQuery();
+function waitForElement(selector, timeout = 5000) {
+    return new Promise((resolve, reject) => {
+        const el = document.querySelector(selector);
+        if (el) return resolve(el);
+        const observer = new MutationObserver(() => {
+            const el = document.querySelector(selector);
+            if (el) {
+                observer.disconnect();
+                resolve(el);
+            }
+        });
+        observer.observe(document.body, { childList: true, subtree: true });
+        setTimeout(() => {
+            observer.disconnect();
+            reject(`Element ${selector} not found after ${timeout}ms`);
+        }, timeout);
     });
 }
 
+async function initCiliAIQueryHandler() {
+    try {
+        const queryBtn = await waitForElement('#aiQueryBtn');
+        const queryInput = await waitForElement('#aiQueryInput');
+
+        const waitForDB = () => new Promise(resolve => {
+            if (window.ciliAI_MasterDatabaseReady) return resolve();
+            document.addEventListener('CiliAIMasterDBReady', resolve, { once: true });
+        });
+
+        const runQuery = async () => {
+            const queryText = queryInput.value.trim();
+            if (!queryText) return;
+            const filters = parseQueryToFilters(queryText);
+            await waitForDB();
+            const results = await ciliAI_queryGenes(filters);
+            displayQueryResults(results);
+        };
+
+        queryBtn.addEventListener('click', runQuery);
+        queryInput.addEventListener('keypress', e => { if (e.key === 'Enter') runQuery(); });
+
+    } catch (err) {
+        console.error('[CiliAI] Query handler init failed:', err);
+    }
+}
+
+document.addEventListener('DOMContentLoaded', initCiliAIQueryHandler);
 // Initialize handler on page load
 document.addEventListener('DOMContentLoaded', initCiliAIQueryHandler);
 
