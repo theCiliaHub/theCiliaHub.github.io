@@ -263,26 +263,20 @@ async function ciliAI_fetchAllTissueData_internal() {
     }
 }
 
-/**
- * Run this function ONCE when the page loads.
- * It will build the fully integrated database in window.ciliAI_MasterDatabase
- */
+
 /**
  * ============================================================================
- * [CiliAI] MASTER DATABASE BUILDER (v9 - FINAL)
- *
- * This function is now CONFIRMED to handle all 9 data source formats.
-/**
- * ============================================================================
- * [CiliAI] MASTER DATABASE BUILDER (v10 - HOTFIX)
+ * [CiliAI] MASTER DATABASE BUILDER (v11 - Domain Key Fix)
  *
  * WHAT IS FIXED:
- * 1. (CRITICAL) "TypeError: screens_from_main is not iterable"
- * - The `ciliahub_data.json` file has inconsistent data for the "screens"
- * property. Sometimes it is an Array (`[]`), sometimes it is an
- * empty Object (`{}`).
- * - The code now explicitly checks `Array.isArray(geneEntry.screens)`
- * to ensure we only try to spread an array, fixing the crash.
+ * 1. (CRITICAL) "IFT88 Domain Check: ❌ FAILED TO LINK"
+ * - This bug implies the keys in `domains_raw` do not match the
+ * `geneEntry.gene` key (e.g., "IFT88").
+ * - This version adds a new "pre-processing" step that creates a
+ * `domains_by_gene` object, forcing ALL keys from the raw domain
+ * file to be uppercase, just like our main gene key.
+ * - This ensures that `domains_by_gene["IFT88"]` will always
+ * match, regardless of the original file's casing.
  * ============================================================================
  */
 async function buildMasterDatabase() {
@@ -303,7 +297,7 @@ async function buildMasterDatabase() {
         // 2. Fetch all data sources in parallel
         const [
             mainGeneList,
-            domains_raw,
+            domains_raw, // This is {"IFT88": [...], "ift57": [...], etc}
             complexes,
             scRNA,
             screens_extra,
@@ -321,7 +315,19 @@ async function buildMasterDatabase() {
             ciliAI_fetchAllTissueData_internal()
         ]);
 
-        // 3. --- PRE-PROCESSING ---
+        // 3. --- PRE-PROCESSING (THE CRITICAL FIXES) ---
+
+        // Fix 1: Standardize Domain Keys (NEW!)
+        // Create a new object where all keys are guaranteed uppercase.
+        const domains_by_gene = {};
+        for (const key in domains_raw) {
+            const upperKey = key.toUpperCase();
+            domains_by_gene[upperKey] = domains_raw[key];
+        }
+        console.log(`[CiliAI] Processed Domain data. ${Object.keys(domains_by_gene).length} genes standardized.`);
+
+
+        // Fix 2: Pre-process Li et al. data (keyed by Entrez ID)
         const li_by_gene = {};
         for (const entrez_id in li_raw.genes) {
             const geneData = li_raw.genes[entrez_id];
@@ -332,8 +338,10 @@ async function buildMasterDatabase() {
         }
         console.log(`[CiliAI] Processed Li et al. (Entrez ID) data for ${Object.keys(li_by_gene).length} genes.`);
 
+        // Fix 3: Get the correct sub-object from Nevers
         const nevers_by_gene = nevers_raw.genes;
         
+        // Fix 4: Helper to find a gene's complex(es) from the CORUM array
         const getComplexes = (geneSymbol) => {
             return complexes.filter(comp => 
                 comp.subunits?.some(s => s.gene_name?.toUpperCase() === geneSymbol)
@@ -343,17 +351,18 @@ async function buildMasterDatabase() {
         // 4. --- COMBINE THE DATABASE ---
         window.ciliAI_MasterDatabase = mainGeneList.map(geneEntry => {
             
+            // This is our clean, standard key
             const gene = geneEntry.gene.toUpperCase().trim(); 
             
-            // --- !! THIS IS THE FIX !! ---
-            // Check if geneEntry.screens is *actually* an array before spreading it
+            // --- Screen data fix (from v10) ---
             const screens_from_main = Array.isArray(geneEntry.screens) ? geneEntry.screens : [];
-            // --- END OF FIX ---
-            
             const screens_from_extra = screens_extra[gene] || [];
             const combined_screens = [...screens_from_main, ...screens_from_extra];
 
-            const domain_data = domains_raw[gene] || null;
+            // --- !! THIS IS THE FIX !! ---
+            // Use the new standardized `domains_by_gene` object
+            const domain_data = domains_by_gene[gene] || null;
+            // --- END OF FIX ---
 
             const phylogeny = {
                 nevers: nevers_by_gene[gene] || null,
@@ -363,7 +372,7 @@ async function buildMasterDatabase() {
             return {
                 ...geneEntry, 
                 gene: gene, 
-                domains: domain_data,
+                domains: domain_data, // Now correctly linked
                 complexes: getComplexes(gene),
                 tissue: tissue[gene] || null,
                 scRNA: scRNA[gene] || null,
