@@ -270,7 +270,7 @@ async function loadCiliAIData() {
             ciliopathies: ciliopathies,
             
             // ✅ Phylogenetic Data
-          _ phylogeny: {
+            phylogeny: {
                 li_2014: liGenesMap[geneUpper] || null,
                 nevers_2017: neversGenesMap[geneUpper] || null
             }
@@ -1208,7 +1208,7 @@ async function getPhylogenyAnalysis(genes) {
                         </tr>
                     </thead>
                     <tbody>
-        `;
+         ;
 
         finalGenes.forEach(gene => {
             const liEntry = liGenesMap[gene];
