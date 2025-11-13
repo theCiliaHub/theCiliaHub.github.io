@@ -830,23 +830,6 @@ function extractGenesFromQuestion(question, geneMap) {
     return Array.from(foundGenes);
 }
 
-// NEW: Enhanced data integration in loadCiliAIData
-// Add this to your loadCiliAIData function after processing all individual datasets:
-
-// Make the processed datasets globally available for the parser
-window.screensByGene = screensByGene;
-window.corumByGene = corumByGene;
-window.domainsByGene = domainsByGene;
-window.liMap = liMap;
-window.neversMap = neversMap;
-
-console.log('Global datasets available for parser:', {
-    screens: Object.keys(screensByGene).length,
-    corum: Object.keys(corumByGene).length,
-    domains: Object.keys(domainsByGene).length,
-    liMap: Object.keys(liMap).length,
-    neversMap: Object.keys(neversMap).length
-});
 
 
 /* ==============================================================
