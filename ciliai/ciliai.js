@@ -17,7 +17,7 @@ async function loadCiliAIData(timeoutMs = 30000) {
         cellxgene: 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/cellxgene_data.json',
         rna_tissue: 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/rna_tissue_consensus.tsv',
         corum: 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/corum_humanComplexes.json',
-        domains: 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/cili_ai_domain_database.json',
+        domains: 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/cili_ai_domain_database_FIXED.json',
         nevers2017: 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/nevers_et_al_2017_matrix_optimized.json',
         li2014: 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/li_et_al_2014_matrix_optimized.json'
     };
@@ -56,6 +56,15 @@ async function loadCiliAIData(timeoutMs = 30000) {
         safeFetch(urls.nevers2017, 'json'),
         safeFetch(urls.li2014, 'json')
     ]);
+    // ========== SET GLOBAL CACHES ==========
+    // THIS IS THE CRITICAL FIX FOR PLOTS
+    window.liPhylogenyCache = liRaw;
+    window.neversPhylogenyCache = neversRaw;
+    window.umapDataCache = umapRaw; 
+    window.cellxgeneDataCache = cellxgeneRaw;
+    window.CiliAI_UMAP = umapRaw || []; // Also set the direct variable
+    window.CiliAI_snRNA = cellxgeneRaw || {}; // Also set the direct variable
+    // ========================================
 
     console.log('Data fetch results:', {
         ciliahub: ciliahubRaw ? `Array(${ciliahubRaw.length})` : 'failed',
@@ -438,7 +447,7 @@ async function parseCiliAIQuestion(question, masterData) {
     const geneMap = await buildComprehensiveGeneMap(masterData);
     
     // Extract genes using the comprehensive map
-    structured.genes = extractGenesFromQuestion(q, geneMap);
+    structured.genes = extractGenesFromQuestion(question, geneMap);
     console.log('Extracted genes:', structured.genes);
 
     // Intent detection (your existing code)
@@ -781,44 +790,51 @@ async function buildComprehensiveGeneMap(masterData) {
     return geneMap;
 }
 
-// NEW: Extract genes from question using comprehensive map
-function extractGenesFromQuestion(question, geneMap) {
+// REPLACE your entire extractGenesFromQuestion function with this:
+
+function extractGenesFromQuestion(originalQuestion, geneMap) {
     const foundGenes = new Set();
-    const q = question.toLowerCase();
-    
-    // Method 1: Direct word matching
+    const q = originalQuestion.toLowerCase(); // lowercase version for matching
+
+    const stopWords = new Set([
+        "LIST", "GENES", "IN", "THE", "A", "OF", "FOR", "AND", "SHOW", "ME", 
+        "WHAT", "IS", "ARE", "COMPARE", "EXPRESSION", "SYNDROME", "COMPLEX", 
+        "DOMAIN", "SCREENS", "EVOLUTION", "HISTORY", "PLOT", "UMAP", "GENE",
+        "LOCALIZED", "TO", "DOES", "HAVE", "ORTHOLOG"
+    ]);
+
+    // Method 1: Direct word matching (with stop words)
     const words = q.split(/\s+/);
     words.forEach(word => {
-        const cleanWord = word.replace(/[.,;!?()]/g, '').toLowerCase();
-        if (cleanWord.length >= 2) { // Avoid single letters
-            // Exact match
-            if (geneMap.has(cleanWord.toUpperCase())) {
-                const geneInfo = geneMap.get(cleanWord.toUpperCase());
+        const cleanWord = word.replace(/[.,;!?()]/g, '');
+        const key = cleanWord.toUpperCase();
+        if (cleanWord.length >= 2 && !stopWords.has(key)) { // <-- FIX: Added stop word check
+            if (geneMap.has(key)) {
+                const geneInfo = geneMap.get(key);
                 foundGenes.add(geneInfo.symbol);
             }
         }
     });
-    
-    // Method 2: Substring scanning for longer gene names
-    Object.keys(geneMap).forEach(geneKey => {
+
+    // Method 2: Substring scanning (FIXED to iterate Map)
+    for (const geneKey of geneMap.keys()) { // <-- FIX: Was Object.keys(geneMap)
         const geneLower = geneKey.toLowerCase();
-        if (q.includes(geneLower) && geneLower.length >= 3) {
+        if (q.includes(geneLower) && geneLower.length >= 3 && !stopWords.has(geneKey)) {
             foundGenes.add(geneKey);
         }
-    });
-    
+    }
+
     // Method 3: Look for common gene patterns (all caps in original question)
-    const originalQuestion = question;
-    const capsMatches = originalQuestion.match(/\b[A-Z][A-Z0-9]{1,9}\b/g);
+    const capsMatches = originalQuestion.match(/\b[A-Z][A-Z0-9]{1,9}\b/g); // <-- FIX: Uses originalQuestion
     if (capsMatches) {
         capsMatches.forEach(match => {
             const matchUpper = match.toUpperCase();
-            if (geneMap.has(matchUpper)) {
+            if (geneMap.has(matchUpper) && !stopWords.has(matchUpper)) {
                 foundGenes.add(matchUpper);
             }
         });
     }
-    
+
     // Method 4: Handle specific known genes mentioned in the question
     const commonGenes = ['YWHAB', 'IFT88', 'BBS1', 'CEP290', 'ARL13B', 'FOXJ1'];
     commonGenes.forEach(gene => {
@@ -826,10 +842,9 @@ function extractGenesFromQuestion(question, geneMap) {
             foundGenes.add(gene);
         }
     });
-    
+
     return Array.from(foundGenes);
 }
-
 
 
 /* ==============================================================
@@ -1314,117 +1329,125 @@ async function testEnhancedParser() {
     }
 }
 
-// Run the test
-testEnhancedParser();
+// Run the test #testEnhancedParser();
 
 /* ==============================================================
    8. Plotting Helpers
    ============================================================== */
 async function displayUmapGeneExpression(geneSymbol) {
-    const [umapData, cellData] = await Promise.all([
-        window.CiliAI_UMAP ? Promise.resolve(window.CiliAI_UMAP) : loadCiliAIData().then(() => window.CiliAI_UMAP),
-        window.CiliAI_snRNA ? Promise.resolve(window.CiliAI_snRNA) : loadCiliAIData().then(() => window.CiliAI_snRNA)
-    ]);
+    // FIX: Use window variables directly, don't re-fetch
+    const umapData = window.CiliAI_UMAP;
+    const cellData = window.CiliAI_snRNA;
     const resultArea = document.getElementById('ai-result-area');
-    if (!umapData || !cellData) {
-        resultArea.innerHTML = `<div class="result-card"><h3>UMAP Expression Plot</h3><p class="status-not-found">Could not load data.</p></div>`;
+    
+    if (!umapData || !cellData || umapData.length === 0) { // Check for empty array
+        resultArea.innerHTML = `<div class="result-card"><h3>UMAP Expression Plot</h3><p class="status-not-found">Could not load UMAP data.</p></div>`;
         return;
     }
 
     const geneUpper = geneSymbol.toUpperCase();
     const geneExpressionMap = cellData[geneUpper];
     if (!geneExpressionMap) {
-        resultArea.innerHTML = `<div class="result-card"><h3>${geneSymbol} Expression</h3><p class="status-not-found">Gene not found.</p></div>`;
+        resultArea.innerHTML = `<div class="result-card"><h3>${geneSymbol} Expression</h3><p class="status-not-found">Gene not found in expression data.</p></div>`;
         return;
     }
 
+    // ... (rest of the function is the same) ...
     const sampleSize = 15000;
-    const sampledData = umapData.length > sampleSize
-        ? Array.from({ length: sampleSize }, () => umapData[Math.floor(Math.random() * umapData.length)])
-        : umapData;
+    const sampledData = umapData.length > sampleSize
+        ? Array.from({ length: sampleSize }, () => umapData[Math.floor(Math.random() * umapData.length)])
+        : umapData;
 
-    const expressionValues = sampledData.map(cell => geneExpressionMap[cell.cell_type] || 0);
-    const cellTypes = [...new Set(sampledData.map(d => d.cell_type))];
+    const expressionValues = sampledData.map(cell => geneExpressionMap[cell.cell_type] || 0);
+    const cellTypes = [...new Set(sampledData.map(d => d.cell_type))];
 
-    const median = arr => {
-        const s = [...arr].sort((a,b)=>a-b);
-        const m = Math.floor(s.length/2);
-        return s.length%2 ? s[m] : (s[m-1]+s[m])/2;
-    };
+    const median = arr => {
+        const s = [...arr].sort((a,b)=>a-b);
+        const m = Math.floor(s.length/2);
+        return s.length%2 ? s[m] : (s[m-1]+s[m])/2;
+    };
 
-    const annotations = cellTypes.map(ct => {
-        const pts = sampledData.filter(p => p.cell_type===ct);
-        return pts.length ? {
-            x: median(pts.map(p=>p.x)),
-            y: median(pts.map(p=>p.y)),
-            text: ct,
-            showarrow: false,
-            font: {color:'#FFF',size:10,family:'Arial'},
-            bgcolor:'rgba(0,0,0,0.4)', borderpad:2
-        } : null;
-    }).filter(Boolean);
+    const annotations = cellTypes.map(ct => {
+        const pts = sampledData.filter(p => p.cell_type===ct);
+        return pts.length ? {
+            x: median(pts.map(p=>p.x)),
+            y: median(pts.map(p=>p.y)),
+            text: ct,
+            showarrow: false,
+            font: {color:'#FFF',size:10,family:'Arial'},
+            bgcolor:'rgba(0,0,0,0.4)', borderpad:2
+        } : null;
+    }).filter(Boolean);
 
-    const plotData = [{
-        x: sampledData.map(p=>p.x),
-        y: sampledData.map(p=>p.y),
-        mode:'markers',
-        type:'scattergl',
-        hovertext: sampledData.map((p,i)=>`Cell Type: ${p.cell_type}<br>Expression: ${expressionValues[i].toFixed(4)}`),
-        hoverinfo:'text',
-        marker:{color:expressionValues, colorscale:'Plasma', showscale:true,
-                colorbar:{title:{text:'Expression',side:'right'}}, size:5, opacity:0.8}
-    }];
+    const plotData = [{
+        x: sampledData.map(p=>p.x),
+        y: sampledData.map(p=>p.y),
+        mode:'markers',
+        type:'scattergl',
+        hovertext: sampledData.map((p,i)=>`Cell Type: ${p.cell_type}<br>Expression: ${expressionValues[i].toFixed(4)}`),
+        hoverinfo:'text',
+        marker:{color:expressionValues, colorscale:'Plasma', showscale:true,
+                colorbar:{title:{text:'Expression',side:'right'}}, size:5, opacity:0.8}
+    }];
 
-    const layout = {
-        title:`UMAP Colored by ${geneSymbol} Expression (Sample of ${sampleSize} cells)`,
-        xaxis:{title:'UMAP 1',zeroline:false,showgrid:false},
-        yaxis:{title:'UMAP 2',zeroline:false,showgrid:false},
-        hovermode:'closest',
-        margin:{t:50,b:50,l:50,r:50},
-        plot_bgcolor:'#FFF',paper_bgcolor:'#FFF',
-        annotations, showlegend:false
-    };
+    const layout = {
+        title:`UMAP Colored by ${geneSymbol} Expression (Sample of ${sampleSize} cells)`,
+        xaxis:{title:'UMAP 1',zeroline:false,showgrid:false},
+        yaxis:{title:'UMAP 2',zeroline:false,showgrid:false},
+        hovermode:'closest',
+        margin:{t:50,b:50,l:50,r:50},
+        plot_bgcolor:'#FFF',paper_bgcolor:'#FFF',
+        annotations, showlegend:false
+    };
 
-    const divId = 'umap-expression-plot-div';
-    resultArea.innerHTML = `<div class="result-card"><div id="${divId}"></div>
-        <button class="download-button" onclick="downloadPlot('${divId}','UMAP_${geneSymbol}_Expression')">Download Plot</button></div>`;
-    Plotly.newPlot(divId, plotData, layout, {responsive:true, displayModeBar:false});
+    const divId = 'umap-expression-plot-div';
+    resultArea.innerHTML = `<div class="result-card"><div id="${divId}"></div>
+        <button class="download-button" onclick="downloadPlot('${divId}','UMAP_${geneSymbol}_Expression')">Download Plot</button></div>`;
+    Plotly.newPlot(divId, plotData, layout, {responsive:true, displayModeBar:false});
 }
 
+// REPLACE this function
 async function displayUmapPlot() {
-    const data = window.CiliAI_UMAP || (await loadCiliAIData(), window.CiliAI_UMAP);
+    // FIX: Use window variable directly, don't re-fetch
+    const data = window.CiliAI_UMAP; 
     const resultArea = document.getElementById('ai-result-area');
-    if (!data) { resultArea.innerHTML = `<div class="result-card"><h3>UMAP Plot</h3><p class="status-not-found">Could not load UMAP data.</p></div>`; return; }
+    
+    if (!data || data.length === 0) { 
+        resultArea.innerHTML = `<div class="result-card"><h3>UMAP Plot</h3><p class="status-not-found">Could not load UMAP data.</p></div>`; 
+        return; 
+    }
 
-    const sampleSize = 15000;
-    const sampled = data.length > sampleSize
-        ? Array.from({ length: sampleSize }, () => data[Math.floor(Math.random()*data.length)])
-        : data;
+    // ... (rest of the function is the same) ...
+    const sampleSize = 15000;
+    const sampled = data.length > sampleSize
+        ? Array.from({ length: sampleSize }, () => data[Math.floor(Math.random()*data.length)])
+        : data;
 
-    const cellTypes = [...new Set(sampled.map(d=>d.cell_type))];
-    const palette = Plotly.d3.scale.category10();
+    const cellTypes = [...new Set(sampled.map(d=>d.cell_type))];
+    const palette = Plotly.d3.scale.category10();
 
-    const traces = cellTypes.map((ct,i) => {
-        const pts = sampled.filter(p=>p.cell_type===ct);
-        return {
-            x: pts.map(p=>p.x), y: pts.map(p=>p.y),
-            name: ct, mode:'markers', type:'scattergl',
-            marker:{size:5, opacity:0.8, color:palette(i)},
-            hovertext: pts.map(p=>`Cell Type: ${p.cell_type}`), hoverinfo:'text'
-        };
-    });
+    const traces = cellTypes.map((ct,i) => {
+        const pts = sampled.filter(p=>p.cell_type===ct);
+        return {
+            x: pts.map(p=>p.x), y: pts.map(p=>p.y),
+            name: ct, mode:'markers', type:'scattergl',
+            marker:{size:5, opacity:0.8, color:palette(i)},
+            hovertext: pts.map(p=>`Cell Type: ${p.cell_type}`), hoverinfo:'text'
+        };
+    });
 
-    const layout = {
-        title:`UMAP of Single-Cell Gene Expression (Sample of ${sampleSize} cells)`,
-        xaxis:{title:'UMAP 1'}, yaxis:{title:'UMAP 2'},
-        hovermode:'closest', margin:{t:50,b:50,l:50,r:50}
-    };
+    const layout = {
+        title:`UMAP of Single-Cell Gene Expression (Sample of ${sampleSize} cells)`,
+        xaxis:{title:'UMAP 1'}, yaxis:{title:'UMAP 2'},
+        hovermode:'closest', margin:{t:50,b:50,l:50,r:50}
+    };
 
-    const divId = 'umap-plot-div';
-    resultArea.innerHTML = `<div class="result-card"><div id="${divId}"></div>
-        <button class="download-button" onclick="downloadPlot('${divId}','UMAP_CellTypes')">Download Plot</button></div>`;
-    Plotly.newPlot(divId, traces, layout, {responsive:true, displayModeBar:false});
+    const divId = 'umap-plot-div';
+    resultArea.innerHTML = `<div class="result-card"><div id="${divId}"></div>
+        <button class="download-button" onclick="downloadPlot('${divId}','UMAP_CellTypes')">Download Plot</button></div>`;
+    Plotly.newPlot(divId, traces, layout, {responsive:true, displayModeBar:false});
 }
+
 
 function testGeneLookup(geneSymbol) {
     const geneUpper = geneSymbol.toUpperCase();
@@ -1447,9 +1470,9 @@ function testGeneLookup(geneSymbol) {
 }
 
 // Test specific genes
-testGeneLookup('YWHAB');
-testGeneLookup('IFT88');
-testGeneLookup('BBS1');
+// testGeneLookup('YWHAB');// 
+// testGeneLookup('IFT88');// 
+// testGeneLookup('BBS1');// 
 
 /* ==============================================================
    9. Phylogeny Analysis
