@@ -1167,23 +1167,31 @@ async function handleScreenQuery(geneSymbol) {
 /**
  * Handles queries for domain data.
  */
-async function handleDomainQuery(geneSymbol) {
-    const gene = geneSymbol.toUpperCase();
-    const g = window.CiliAI.lookups.geneMap[gene];
-    if (!g) return `Sorry, I could not find data for "${gene}".`;
+async function handleDomainQuery(geneSymbols) {
+    let html = '';
+    const genes = Array.isArray(geneSymbols) ? geneSymbols : [geneSymbols];
 
-    let html = `<h4>Domain Architecture for <strong>${gene}</strong></h4>`;
-    
-    if (g.pfam_ids && g.pfam_ids.length > 0) {
-        html += '<p><strong>PFAM IDs:</strong></p><ul>';
-        g.pfam_ids.forEach((id, index) => {
-            const desc = g.domain_descriptions[index] || 'No description';
-            html += `<li><strong>${id}:</strong> ${desc}</li>`;
-        });
-        html += '</ul>';
-    } else {
-        html += '<p>No PFAM domain data found in the database.</p>';
-    }
+    genes.forEach(geneSymbol => {
+        const gene = geneSymbol.toUpperCase();
+        const g = window.CiliAI.lookups.geneMap[gene];
+        if (!g) {
+            html += `<p>Sorry, I could not find data for "${gene}".</p>`;
+            return;
+        }
+
+        html += `<h4>Domain Architecture for <strong>${gene}</strong></h4>`;
+        
+        if (g.pfam_ids && g.pfam_ids.length > 0) {
+            html += '<p><strong>PFAM Domains:</strong></p><ul>';
+            g.pfam_ids.forEach((id, index) => {
+                const desc = g.domain_descriptions[index] || 'No description';
+                html += `<li><strong>${id}:</strong> ${desc}</li>`;
+            });
+            html += '</ul>';
+        } else {
+            html += '<p>No PFAM domain data found for this gene.</p>';
+        }
+    });
     return html;
 }
 
@@ -1326,6 +1334,10 @@ async function handleOrthologQuery(geneSymbol, organism) {
         if (complexes.length > 0) {
             html += `<li><strong>Complexes:</strong> ${complexes.join(', ')}</li>`;
         }
+        // Domains
+    if (g.pfam_ids && g.pfam_ids.length > 0) {
+        html += `<li><strong>Domains:</strong> ${g.pfam_ids.join(', ')}</li>`;
+    }
 
         // Orthologs
         const orthologs = [
@@ -1473,21 +1485,23 @@ async function handleOrthologQuery(geneSymbol, organism) {
         return { genes, description, speciesCode };
     }
 
-    /**
-     * Generic getter for domains
-     */
-    async function getGenesByDomain(term) {
-        const normTerm = term.toLowerCase();
-        const results = [];
-        window.CiliAI.masterData.forEach(g => {
-            const domains = [...(g.pfam_ids || []), ...(g.domain_descriptions || [])];
-            const matchingDomain = domains.find(d => d.toLowerCase().includes(normTerm));
-            if (matchingDomain) {
-                results.push({ gene: g.gene, description: `Contains ${matchingDomain}` });
-            }
-        });
-        return results;
-    }
+
+ /**
+ * Handles queries for genes containing a specific domain.
+ */
+async function getGenesByDomain(domainTerm) {
+    const normTerm = domainTerm.toLowerCase();
+    const results = [];
+    window.CiliAI.masterData.forEach(g => {
+        if (!g.gene) return;
+        const allDomains = [...(g.pfam_ids || []), ...(g.domain_descriptions || [])];
+        const matchingDomain = allDomains.find(d => d.toLowerCase().includes(normTerm));
+        if (matchingDomain) {
+            results.push({ gene: g.gene, description: `Contains ${matchingDomain}` });
+        }
+    });
+    return formatListResult(`Genes containing "${domainTerm}" domain`, results);
+}
 
     /**
      * Handler for semantic intent: Localization + Phenotype
@@ -1521,50 +1535,81 @@ async function handleOrthologQuery(geneSymbol, organism) {
  /**
      * Handler for all phylogeny plot requests
      */
-    async function handlePhylogenyVisualizationQuery(genes, source = 'li', type = 'heatmap') {
-        const plotDivId = 'cilia-svg'; // Use the main SVG container
-        const plotDiv = document.getElementById(plotDivId);
-        if (!plotDiv) return "Could not find plot area.";
+    /**
+ * Handler for all phylogeny plot requests.
+ * This function is now a "controller" that calls the correct
+ * rendering engine (like renderLiPhylogenyHeatmap) and
+ * then calls Plotly to draw the plot in the chat.
+ */
+async function handlePhylogenyVisualizationQuery(genes, source = 'li', type = 'heatmap') {
+    // 1. Get a unique ID for the plot container
+    const plotId = `plot-${new Date().getTime()}`;
+    
+    // 2. Add a "loading" message to the chat
+    const loadingMessage = `Generating ${source.toUpperCase()} conservation heatmap for ${genes.join(', ')}...`;
+    addChatMessage(loadingMessage, false);
 
-        // Clear the SVG and show a loading message
-        plotDiv.innerHTML = `<div style="padding: 40px; text-align: center;">Loading ${source.toUpperCase()} phylogeny plot...</div>`;
-        
-        const data = (source === 'nevers') ? window.neversPhylogenyCache : window.liPhylogenyCache;
-        if (!data) return `Error: ${source.toUpperCase()} phylogeny data is not loaded.`;
-        
-        // Ensure genes is an array
-        if (!Array.isArray(genes)) genes = [];
+    try {
+        let plotResult;
 
-        // If no genes specified, use a default set (e.g., BBSome)
-        let geneList = genes.length > 0 ? genes : ['BBS1', 'BBS2', 'BBS4', 'BBS5', 'BBS7', 'BBS8', 'BBS9', 'ARL6'];
-        let title = genes.length > 0 ? `Phylogenetic Profile for ${genes.join(', ')}` : 'Phylogenetic Profile for BBSome';
-
-        if (type === 'table') {
-            // ... (Logic to render an HTML table would go here) ...
-            plotDiv.innerHTML = "Table view is not yet implemented. Switching to heatmap.";
+        // 3. Call the correct rendering engine
+        if (source === 'nevers') {
+            // Note: You need to create 'renderNeversPhylogenyHeatmap'
+            // plotResult = await renderNeversPhylogenyHeatmap(genes);
+            return `Sorry, the Nevers (2017) heatmap renderer is not yet implemented.`;
+        } else {
+            // Call the Li (2014) renderer you provided
+            plotResult = await renderLiPhylogenyHeatmap(genes);
         }
 
-        // --- Render Heatmap ---
-        try {
-            if (source === 'nevers') {
-                // Call the Nevers-specific plot function (if you have one)
-                // This is a placeholder; you'd need to adapt your 'plotNeversHeatmap'
-                plotDiv.innerHTML = `Nevers plot for ${geneList.join(', ')} (Plotting function not fully wired)`;
-                // Example: plotNeversHeatmap(geneList, plotDivId); 
+        // 4. Check if the renderer gave back valid plot data
+        if (!plotResult || !plotResult.plotData) {
+            throw new Error(plotResult.html || 'The plot renderer returned no data.');
+        }
+
+        // 5. Create the HTML for the chat window, including the plot div
+        const html = `
+            <div class="result-card">
+                <h3>${plotResult.plotLayout.title || 'Phylogenetic Heatmap'}</h3>
+                <p>Data from ${source === 'li' ? 'Li et al. (2014)' : 'Nevers et al. (2017)'}</p>
+                <div id="${plotId}" class="plotly-chart-container" style="width: 100%; min-height: ${plotResult.plotLayout.height || 500}px;"></div>
+                <button class="download-button" onclick="Plotly.downloadImage('${plotId}', {filename: 'ciliai_phylogeny_plot'})">Download Plot (PNG)</button>
+                <p class="ai-suggestion" style="margin-top: 10px;">
+                    <a href="#" class="ai-action" data-action="show-nevers-heatmap" data-genes="${genes.join(',')}">Show Nevers (2017)</a>
+                </p>
+            </div>
+        `;
+        
+        // 6. Update the "loading" message with the final HTML
+        const chatWindow = document.getElementById('chatWindow');
+        const messages = chatWindow.getElementsByClassName('ai-message');
+        const lastMessage = messages[messages.length - 1];
+        if (lastMessage && lastMessage.innerText.includes('Generating')) {
+            lastMessage.innerHTML = html;
+        } else {
+            addChatMessage(html, false);
+        }
+
+        // 7. CRITICAL STEP: Call Plotly to render the plot
+        // We must wait a tiny bit for the DOM to update
+        setTimeout(() => {
+            const plotDiv = document.getElementById(plotId);
+            if (plotDiv) {
+                Plotly.newPlot(plotId, plotResult.plotData, plotResult.plotLayout, { responsive: true });
             } else {
-                // Call the Li-specific plot function
-                // This assumes you have a function 'plotLiHeatmap'
-                // We'll use a simplified version for this example
-                plotLiHeatmap(geneList, plotDivId, title);
+                console.error(`Plotly Error: Container #${plotId} not found.`);
             }
-            // Return an empty string because the message was already added by the click handler
-            return ""; 
-        } catch (e) {
-            console.error("Plotting error:", e);
-            return `Error generating plot: ${e.message}`;
-        }
-    }
+        }, 100);
 
+        // 8. Return an empty string so the "brain" doesn't post a duplicate message
+        return "";
+
+    } catch (e) {
+        console.error("handlePhylogenyVisualizationQuery Error:", e);
+        return `<strong>Error generating plot:</strong> ${e.message}`;
+    }
+}
+    
     /**
      * Renders the Li et al. 2014 heatmap.
      * This is a required helper for handlePhylogenyVisualizationQuery.
@@ -1738,10 +1783,13 @@ async function handleOrthologQuery(geneSymbol, organism) {
 
             //=( 3 )= INTENT: DOMAINS =======================================
             // "domains of cep290"
-            else if (!htmlResult && (match = qLower.match(/(?:domains of|domain architecture for)\s+([a-z0-9\-]+)/i))) {
+            // --- Domain Router ---
+            else if (!htmlResult && (match = qLower.match(/(?:domains of|domain architecture for)\s+(.+)/i))) {
                 log('Routing via: Intent (Domains)');
-                const gene = match[1].toUpperCase();
-                htmlResult = await handleDomainQuery(gene);
+                const genes = extractMultipleGenes(match[1]);
+                if (genes.length > 0) {
+                    htmlResult = await handleDomainQuery(genes);
+                }
             }
 
             //=( 4 )= INTENT: SCREENS / PHENOTYPES ==========================
@@ -1822,7 +1870,8 @@ async function handleOrthologQuery(geneSymbol, organism) {
      * This is a simple keyword spotter for Priority 7.
      * It uses the flexible regex to catch simple queries.
      */
-    function flexibleIntentParser(query) {
+   function flexibleIntentParser(query) {
+         const qLower = query.toLowerCase().trim(); // <-- ADD THIS LINE
          const entityKeywords = [
             {
                 type: 'COMPLEX',
@@ -1844,7 +1893,12 @@ async function handleOrthologQuery(geneSymbol, organism) {
                 keywords: ['Ciliary tip', 'Radial Spoke', 'Central Pair', 'Dynein Arm', 'SHH Signaling'],
                 handler: async (term) => formatListResult(`Genes in Module: ${term}`, await getGenesByModule(term))
             }
-        ];
+             {
+            type: 'DOMAIN',
+            keywords: ['WD40', 'coiled-coil', 'pfam', 'domain', 'ef-hand'],
+            handler: async (term) => await getGenesByDomain(term)
+        }
+    ];
         
         const normalizedQuery = normalizeTerm(query);
         for (const entityType of entityKeywords) {
