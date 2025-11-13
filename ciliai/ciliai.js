@@ -580,270 +580,138 @@ async function parseCiliAIQuestion(question, masterData) {
     return structured;
 }
 
-// NEW: Build comprehensive gene map from ALL data sources
-async function buildComprehensiveGeneMap(masterData) {
-    const geneMap = new Map();
-    
-    // 1. Add genes from master data (CiliaHub)
-    if (masterData && Array.isArray(masterData)) {
-        masterData.forEach(g => {
-            const geneSymbol = g.gene;
-            if (geneSymbol) {
-                const key = geneSymbol.toUpperCase();
-                geneMap.set(key, {
-                    symbol: geneSymbol.toUpperCase(),
-                    source: 'ciliahub',
-                    data: g
-                });
-                
-                // Add synonyms from master data
-                if (g.synonym) {
-                    const syns = Array.isArray(g.synonym) ? g.synonym : g.synonym.split(/[,;]\s*/);
-                    syns.forEach(s => {
-                        if (s && s.trim()) {
-                            const synKey = s.trim().toUpperCase();
-                            geneMap.set(synKey, {
-                                symbol: geneSymbol.toUpperCase(),
-                                source: 'ciliahub_synonym',
-                                original: s.trim(),
-                                data: g
-                            });
-                        }
-                    });
-                }
-            }
-        });
-    }
-    
-    // 2. Add genes from phylogeny maps
-    if (window.liMap) {
-        Object.keys(window.liMap).forEach(geneSymbol => {
-            if (geneSymbol) {
-                const key = geneSymbol.toUpperCase();
-                if (!geneMap.has(key)) {
-                    geneMap.set(key, {
-                        symbol: geneSymbol.toUpperCase(),
-                        source: 'li_phylogeny',
-                        data: { phylogeny: { li_2014: window.liMap[geneSymbol] } }
-                    });
-                }
-            }
-        });
-    }
-    
-    if (window.neversMap) {
-        Object.keys(window.neversMap).forEach(geneSymbol => {
-            if (geneSymbol) {
-                const key = geneSymbol.toUpperCase();
-                if (!geneMap.has(key)) {
-                    geneMap.set(key, {
-                        symbol: geneSymbol.toUpperCase(),
-                        source: 'nevers_phylogeny',
-                        data: { phylogeny: { nevers_2017: window.neversMap[geneSymbol] } }
-                    });
-                } else {
-                    // Add Nevers data to existing entry
-                    const existing = geneMap.get(key);
-                    if (existing.data && !existing.data.phylogeny) {
-                        existing.data.phylogeny = {};
-                    }
-                    if (existing.data.phylogeny) {
-                        existing.data.phylogeny.nevers_2017 = window.neversMap[geneSymbol];
-                    }
-                }
-            }
-        });
-    }
-    
-    // 3. Add genes from screens data
-    if (window.screensByGene) {
-        Object.keys(window.screensByGene).forEach(geneSymbol => {
-            if (geneSymbol) {
-                const key = geneSymbol.toUpperCase();
-                if (!geneMap.has(key)) {
-                    geneMap.set(key, {
-                        symbol: geneSymbol.toUpperCase(),
-                        source: 'screens',
-                        data: { screens: window.screensByGene[geneSymbol] }
-                    });
-                } else {
-                    // Add screens data to existing entry
-                    const existing = geneMap.get(key);
-                    if (!existing.data.screens) {
-                        existing.data.screens = [];
-                    }
-                    existing.data.screens.push(...window.screensByGene[geneSymbol]);
-                }
-            }
-        });
-    }
-    
-    // 4. Add genes from CORUM complexes
-    if (window.corumByGene) {
-        Object.keys(window.corumByGene).forEach(geneSymbol => {
-            if (geneSymbol) {
-                const key = geneSymbol.toUpperCase();
-                if (!geneMap.has(key)) {
-                    geneMap.set(key, {
-                        symbol: geneSymbol.toUpperCase(),
-                        source: 'corum',
-                        data: { complex_components: window.corumByGene[geneSymbol] }
-                    });
-                } else {
-                    // Add complex data to existing entry
-                    const existing = geneMap.get(key);
-                    if (!existing.data.complex_components) {
-                        existing.data.complex_components = {};
-                    }
-                    Object.assign(existing.data.complex_components, window.corumByGene[geneSymbol]);
-                }
-            }
-        });
-    }
-    
-    // 5. Add genes from domain data
-    if (window.domainsByGene) {
-        Object.keys(window.domainsByGene).forEach(geneSymbol => {
-            if (geneSymbol) {
-                const key = geneSymbol.toUpperCase();
-                if (!geneMap.has(key)) {
-                    geneMap.set(key, {
-                        symbol: geneSymbol.toUpperCase(),
-                        source: 'domains',
-                        data: { 
-                            pfam_ids: window.domainsByGene[geneSymbol]?.pfam_ids || [],
-                            domain_descriptions: window.domainsByGene[geneSymbol]?.domain_descriptions || []
-                        }
-                    });
-                } else {
-                    // Add domain data to existing entry
-                    const existing = geneMap.get(key);
-                    if (!existing.data.pfam_ids) {
-                        existing.data.pfam_ids = [];
-                    }
-                    if (!existing.data.domain_descriptions) {
-                        existing.data.domain_descriptions = [];
-                    }
-                    
-                    const domainData = window.domainsByGene[geneSymbol];
-                    if (domainData) {
-                        if (domainData.pfam_ids) {
-                            existing.data.pfam_ids.push(...domainData.pfam_ids);
-                        }
-                        if (domainData.domain_descriptions) {
-                            existing.data.domain_descriptions.push(...domainData.domain_descriptions);
-                        }
-                        
-                        // Remove duplicates
-                        existing.data.pfam_ids = [...new Set(existing.data.pfam_ids)];
-                        existing.data.domain_descriptions = [...new Set(existing.data.domain_descriptions)];
-                    }
-                }
-            }
-        });
-    }
-    
-    // 6. Add genes from predefined complex map
-    const complexMap = getComplexPhylogenyTableMap();
-    Object.keys(complexMap).forEach(complexName => {
-        const genes = complexMap[complexName];
-        if (Array.isArray(genes)) {
-            genes.forEach(geneSymbol => {
-                if (geneSymbol) {
-                    const key = geneSymbol.toUpperCase();
-                    if (!geneMap.has(key)) {
-                        geneMap.set(key, {
-                            symbol: geneSymbol.toUpperCase(),
-                            source: 'predefined_complex',
-                            data: { 
-                                complex_membership: [complexName],
-                                is_predefined_complex: true
-                            }
-                        });
-                    } else {
-                        // Add complex membership to existing entry
-                        const existing = geneMap.get(key);
-                        if (!existing.data.complex_membership) {
-                            existing.data.complex_membership = [];
-                        }
-                        if (!existing.data.complex_membership.includes(complexName)) {
-                            existing.data.complex_membership.push(complexName);
-                        }
-                    }
-                }
-            });
+// ==========================================================
+// ✅ Comprehensive Gene Map Builder
+// ==========================================================
+function buildComprehensiveGeneMap(dataSources) {
+  const geneMap = new Map();
+
+  const addGene = (symbol, source, entry) => {
+    if (!symbol) return;
+    const key = symbol.toUpperCase();
+    if (!geneMap.has(key)) geneMap.set(key, { sources: new Set(), entry });
+    geneMap.get(key).sources.add(source);
+  };
+
+  // Iterate through each data source (ciliahub, umap, screens, etc.)
+  for (const [sourceName, dataset] of Object.entries(dataSources)) {
+    if (!dataset) continue;
+
+    // The dataset could be an array or object of gene entries
+    const entries = Array.isArray(dataset) ? dataset : Object.values(dataset);
+
+    for (const entry of entries) {
+      if (!entry) continue;
+
+      // 1️⃣ Add main gene symbol
+      if (entry.geneSymbol) addGene(entry.geneSymbol, sourceName, entry);
+      if (entry.symbol) addGene(entry.symbol, sourceName, entry);
+      if (entry.name) addGene(entry.name, sourceName, entry);
+
+      // 2️⃣ Add synonyms or aliases
+      if (entry.synonyms) {
+        const synList = Array.isArray(entry.synonyms)
+          ? entry.synonyms
+          : entry.synonyms.split(/[;, ]+/);
+        synList.forEach(syn => addGene(syn, sourceName, entry));
+      }
+
+      // 3️⃣ Add orthologs (C. elegans, mouse, zebrafish)
+      ['worm', 'mouse', 'zebrafish', 'human', 'orthologs'].forEach(k => {
+        if (entry[k]) {
+          const orthologs = Array.isArray(entry[k])
+            ? entry[k]
+            : String(entry[k]).split(/[;, ]+/);
+          orthologs.forEach(o => addGene(o, sourceName, entry));
         }
-    });
-    
-    console.log(`Comprehensive gene map built with ${geneMap.size} entries from multiple sources`);
-    
-    // Log sources breakdown
-    const sources = {};
-    geneMap.forEach((value, key) => {
-        if (!sources[value.source]) {
-            sources[value.source] = 0;
-        }
-        sources[value.source]++;
-    });
-    console.log('Gene sources breakdown:', sources);
-    
-    return geneMap;
+      });
+    }
+  }
+
+  // 4️⃣ Convert Set of sources to array for readability
+  for (const [k, v] of geneMap.entries()) {
+    v.sources = [...v.sources];
+  }
+
+  console.log(`✅ Comprehensive gene map built with ${geneMap.size} entries`);
+  return geneMap;
 }
 
-// REPLACE your entire extractGenesFromQuestion function with this:
 
-function extractGenesFromQuestion(originalQuestion, geneMap) {
-    const foundGenes = new Set();
-    const q = originalQuestion.toLowerCase(); // lowercase version for matching
+// ==========================================================
+// ✅ Extract Genes From Question
+// Robust parser for natural-language CiliAI queries
+// ==========================================================
+function extractGenesFromQuestion(question, geneMap) {
+  if (!question || typeof question !== "string") return [];
+  if (!geneMap || !(geneMap instanceof Map)) return [];
 
-    const stopWords = new Set([
-        "LIST", "GENES", "IN", "THE", "A", "OF", "FOR", "AND", "SHOW", "ME", 
-        "WHAT", "IS", "ARE", "COMPARE", "EXPRESSION", "SYNDROME", "COMPLEX", 
-        "DOMAIN", "SCREENS", "EVOLUTION", "HISTORY", "PLOT", "UMAP", "GENE",
-        "LOCALIZED", "TO", "DOES", "HAVE", "ORTHOLOG"
-    ]);
+  // 1️⃣ Expanded stopword list (case-insensitive)
+  const stopWords = new Set([
+    "IN", "OF", "THE", "FOR", "A", "AN", "TO", "AND", "OR", "ON", "WITH", "BY", "FROM",
+    "GENE", "GENES", "LIST", "SHOW", "DISPLAY", "FIND", "IDENTIFY", "ANALYZE",
+    "LOCALIZE", "LOCALIZED", "RELATED", "ASSOCIATED", "PATHWAY", "COMPLEX",
+    "SYNDROME", "MUTATION", "VARIANT", "PROTEIN", "PROTEINS", "HUMAN",
+    "MOUSE", "ORTHOLOG", "ORTHOLOGS", "CILIOPATHY", "CILIA", "CILIARY",
+    "DATASET", "DATA", "INFO", "INFORMATION", "DOMAIN", "DOMAINS",
+    "HISTORY", "EVOLUTIONARY", "ANATOMY", "DISEASE", "MODEL", "MODELS",
+    "SYSTEM", "SYSTEMS", "CELL", "CELLS", "COMPONENT", "COMPONENTS",
+    "FUNCTION", "FUNCTIONS", "LOCALIZATION", "INVOLVED", "ASSOCIATION",
+    "ROLE", "ASSIGN", "SEARCH", "WHICH", "ARE", "IS", "WHAT", "DOES",
+    "DO", "HAVE", "HAS", "INTO", "AT", "INCLUDE", "INCLUDING", "INCLUDES",
+    "CONTAIN", "CONTAINING", "PART", "NAME", "TYPE", "EXPLAIN"
+  ]);
 
-    // Method 1: Direct word matching (with stop words)
-    const words = q.split(/\s+/);
-    words.forEach(word => {
-        const cleanWord = word.replace(/[.,;!?()]/g, '');
-        const key = cleanWord.toUpperCase();
-        if (cleanWord.length >= 2 && !stopWords.has(key)) { // <-- FIX: Added stop word check
-            if (geneMap.has(key)) {
-                const geneInfo = geneMap.get(key);
-                foundGenes.add(geneInfo.symbol);
-            }
-        }
-    });
+  // 2️⃣ Preprocess question
+  // Replace punctuation with spaces and normalize spacing
+  const words = question
+    .replace(/[^\w\s\-]/g, " ") // remove punctuation except dash
+    .split(/\s+/)
+    .map(w => w.toUpperCase().trim())
+    .filter(w => w && !stopWords.has(w)); // remove empty or stopwords
 
-    // Method 2: Substring scanning (FIXED to iterate Map)
-    for (const geneKey of geneMap.keys()) { // <-- FIX: Was Object.keys(geneMap)
-        const geneLower = geneKey.toLowerCase();
-        if (q.includes(geneLower) && geneLower.length >= 3 && !stopWords.has(geneKey)) {
-            foundGenes.add(geneKey);
-        }
+  // 3️⃣ Detect potential gene names
+  const foundGenes = new Set();
+
+  for (const w of words) {
+    // Skip words shorter than 2 chars (avoid false positives like “IN”, “TO”)
+    if (w.length < 2) continue;
+
+    // Check for direct match
+    if (geneMap.has(w)) {
+      foundGenes.add(w);
+      continue;
     }
 
-    // Method 3: Look for common gene patterns (all caps in original question)
-    const capsMatches = originalQuestion.match(/\b[A-Z][A-Z0-9]{1,9}\b/g); // <-- FIX: Uses originalQuestion
-    if (capsMatches) {
-        capsMatches.forEach(match => {
-            const matchUpper = match.toUpperCase();
-            if (geneMap.has(matchUpper) && !stopWords.has(matchUpper)) {
-                foundGenes.add(matchUpper);
-            }
-        });
+    // Check for hyphenated versions (e.g., ARL-13B → ARL13B)
+    const cleaned = w.replace(/-/g, "");
+    if (geneMap.has(cleaned)) {
+      foundGenes.add(cleaned);
+      continue;
     }
 
-    // Method 4: Handle specific known genes mentioned in the question
-    const commonGenes = ['YWHAB', 'IFT88', 'BBS1', 'CEP290', 'ARL13B', 'FOXJ1'];
-    commonGenes.forEach(gene => {
-        if (q.includes(gene.toLowerCase())) {
-            foundGenes.add(gene);
-        }
-    });
+    // Check if word ends with “S” (plural) and singular exists
+    if (w.endsWith("S") && geneMap.has(w.slice(0, -1))) {
+      foundGenes.add(w.slice(0, -1));
+      continue;
+    }
 
-    return Array.from(foundGenes);
+    // Allow partial matches for exact 1:1 gene aliases (e.g., BBSOME → BBS genes)
+    if (w.endsWith("SOME")) {
+      const prefix = w.replace("SOME", "");
+      for (const key of geneMap.keys()) {
+        if (key.startsWith(prefix)) foundGenes.add(key);
+      }
+    }
+  }
+
+  // 4️⃣ Convert Set to Array and return sorted list
+  const result = Array.from(foundGenes).sort();
+
+  console.log("🧬 [extractGenesFromQuestion] Parsed:", words);
+  console.log("✅ [extractGenesFromQuestion] Genes found:", result);
+
+  return result;
 }
 
 
