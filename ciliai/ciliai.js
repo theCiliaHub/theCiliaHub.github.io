@@ -1,13 +1,19 @@
 /* ==============================================================
-   CiliAI – Fixed & Production-Ready (v2.1 – Nov 13, 2025)
+   CiliAI – Interactive Explorer (v3.3 – Nov 13, 2025)
    ==============================================================
-   Fixes:
-   • 404 on cilia_diagram.svg → correct path + fallback
-   • gene.screens not iterable → always array
-   • All previous features preserved
+   • MERGED: Combines the v2.1 data engine (loadCiliAIData, etc.)
+     with the v3.2 interactive SVG layout.
+   • DATA-AWARE: Uses real `window.CiliAI.lookups.geneMap` and
+     `window.parseQuery` instead of mock data.
+   • CUSTOM SVG: Still generates the custom SVG showing the
+     cilium in context with its surrounding organelles.
+   • All text is in English.
    ============================================================== */
+
 (function () {
     'use strict';
+
+    // --- 1. GLOBAL & DATA-LOADING (from v2.1) ---
 
     // Global CiliAI object
     window.CiliAI = {
@@ -17,29 +23,33 @@
         masterData: []
     };
 
-    // ==============================================================
-    // 0. INITIALIZATION
-    // ==============================================================
+    /**
+     * Initializes the CiliAI module: loads data, builds lookups,
+     * and then displays the page.
+     */
     async function initCiliAI() {
-        console.log('CiliAI: Initializing...');
+        console.log('CiliAI: Initializing (v3.3)...');
         await loadCiliAIData();
         if (!Array.isArray(window.CiliAI.masterData)) {
             console.warn('masterData not array. Initializing empty.');
             window.CiliAI.masterData = [];
         }
         buildLookups();
-        setupEventListeners();
+        // Note: setupEventListeners() is now called inside displayCiliAIPage()
+        // because the elements don't exist yet.
         window.CiliAI.ready = true;
-        console.log('CiliAI: Ready!');
+        console.log('CiliAI: Ready! Data loaded.');
 
-        if (window.location.hash.includes('/ciliai') || document.querySelector('.content-area')) {
-            setTimeout(displayCiliAIPage, 300);
+        // If on the CiliAI page, display it.
+        if (window.location.hash.includes('/ciliai')) {
+             // Small delay to ensure CiliaHub's DOM is settled
+            setTimeout(displayCiliAIPage, 100);
         }
     }
 
-    // ==============================================================
-    // 1. DATA LOADER (Robust + Fixed gene.screens)
-    // ==============================================================
+    /**
+     * Fetches all required data from GitHub repositories.
+     */
     async function loadCiliAIData(timeoutMs = 30000) {
         const urls = {
             ciliahub: 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/ciliahub_data.json',
@@ -85,7 +95,7 @@
             safeFetch(urls.li2014, 'json')
         ]);
 
-        // Cache for UMAP
+        // Cache for UMAP (if needed by other pages)
         window.CiliAI_UMAP = umapRaw || [];
         window.CiliAI_snRNA = cellxgeneRaw || {};
         window.liPhylogenyCache = liRaw;
@@ -206,7 +216,7 @@
             });
         }
 
-        // === Build masterData (FIXED: gene.screens is always array) ===
+        // === Build masterData ===
         const hubData = Array.isArray(ciliahubRaw) ? ciliahubRaw : [];
         if (!hubData.length) {
             console.error('ciliahub_data.json empty');
@@ -259,7 +269,6 @@
                 ortholog_drosophila: gene.ortholog_drosophila || null
             };
 
-            // FIX: ensure gene.screens is array
             const originalScreens = ensureArray(gene.screens);
             const additionalScreens = key ? (screensByGene[key] || []) : [];
             const allScreens = [...originalScreens, ...additionalScreens];
@@ -333,9 +342,9 @@
         console.log(`CiliAI: ${window.CiliAI.masterData.length} genes integrated`);
     }
 
-    // ==============================================================
-    // 2. LOOKUP BUILDER
-    // ==============================================================
+    /**
+     * Builds the lookup maps (like geneMap) from the masterData.
+     */
     function buildLookups() {
         const L = window.CiliAI.lookups = {};
         const master = Array.isArray(window.CiliAI.masterData) ? window.CiliAI.masterData : [];
@@ -396,318 +405,804 @@
         console.log('CiliAI: Lookups built');
     }
 
-    // ==============================================================
-    // 3. UMAP PLOTS (Global)
-    // ==============================================================
-    window.displayUmapPlot = async function () {
-        const data = window.CiliAI_UMAP;
-        const container = document.getElementById('umap-container');
-        if (!data || !container) return;
 
-        const sampleSize = Math.min(15000, data.length);
-        const sampled = data.length > sampleSize
-            ? data.sort(() => 0.5 - Math.random()).slice(0, sampleSize)
-            : data;
+    // --- 2. STATIC UI DATA (from v3.2) ---
 
-        const cellTypes = [...new Set(sampled.map(d => d.cell_type))];
-        const palette = Plotly.d3.scale.category10();
-
-        const traces = cellTypes.map((ct, i) => {
-            const pts = sampled.filter(p => p.cell_type === ct);
-            return {
-                x: pts.map(p => p.x),
-                y: pts.map(p => p.y),
-                mode: 'markers',
-                type: 'scattergl',
-                name: ct,
-                marker: { size: 4, color: palette(i), opacity: 0.75 },
-                text: pts.map(p => `${p.cell_type}`),
-                hoverinfo: 'text'
-            };
-        });
-
-        const layout = {
-            title: `UMAP – Cell Types (n=${sampled.length})`,
-            xaxis: { title: 'UMAP 1', showgrid: false, zeroline: false },
-            yaxis: { title: 'UMAP 2', showgrid: false, zeroline: false },
-            hovermode: 'closest',
-            margin: { t: 60, b: 50, l: 60, r: 50 },
-            height: 520,
-            paper_bgcolor: 'white',
-            plot_bgcolor: 'white'
-        };
-
-        container.innerHTML = `<div id="umap-plot-div" style="width:100%;height:100%;"></div>`;
-        Plotly.newPlot('umap-plot-div', traces, layout, { responsive: true, displayModeBar: true });
+    // This data is for the UI, not from the gene map.
+    // It's static info about the structures themselves.
+    const structureInfoMap = {
+        // Cilia Parts
+        'basal-body': {
+            title: 'Basal Body',
+            description: "The cilium's 'anchor', derived from the centriole. It templates the axoneme.",
+            genes: ['CEP164', 'OFD1', 'CCP110', 'CEP290', 'MKS1']
+        },
+        'transition-zone': {
+            title: 'Transition Zone',
+            description: "The 'ciliary gate' that controls protein entry and exit.",
+            genes: ['NPHP1', 'MKS1', 'CEP290', 'TMEM67', 'B9D1', 'RPGRIP1L']
+        },
+        'axoneme': {
+            title: 'Axoneme',
+            description: 'The microtubule core (9+0 or 9+2). Site of IFT.',
+            genes: ['IFT88', 'IFT81', 'IFT172', 'KIF3A', 'DNAH5', 'ARL13B']
+        },
+        'ciliary-membrane': {
+            title: 'Ciliary Membrane',
+            description: 'Specialized membrane rich in receptors and channels.',
+            genes: ['PKD1', 'PKD2', 'ARL13B', 'INPP5E', 'ADGRV1']
+        },
+        // Organelles (from Furkan.html)
+        "nucleus": {
+            title: "Nucleus",
+            description: "Contains the cell's DNA; the control center for gene expression and cell division."
+        },
+        "nucleolus": {
+            title: "Nucleolus",
+            description: "The dense structure inside the nucleus; site of rRNA synthesis and ribosome subunit assembly."
+        },
+        "golgi-apparatus": {
+            title: "Golgi Apparatus",
+            description: "Processes, packages, and sorts proteins and lipids for transport to other organelles or for secretion."
+        },
+        "golgi-vesicle": {
+            title: "Golgi Vesicle",
+            description: "Small, membrane-bound sacs that transport materials from the Golgi apparatus."
+        },
+        "cytoplasm": {
+            title: "Cytoplasm",
+            description: "The jelly-like substance filling the cell, enclosing the organelles and serving as the site for many metabolic reactions."
+        },
+        "peroxisome": {
+            title: "Peroxisome",
+            description: "Small organelle involved in fatty acid metabolism and the breakdown of reactive oxygen species."
+        },
+        "lysosome": {
+            title: "Lysosome",
+            description: "The cell's 'recycling center'; contains enzymes to break down waste materials and cellular debris."
+        },
+        "microtubule": {
+            title: "Microtubule",
+            description: "A component of the cytoskeleton; involved in intracellular transport, cell shape, and forms the core of the cilium."
+        },
+        "plasma-membrane": {
+            title: "Plasma Membrane",
+            description: "The semipermeable barrier that separates the cell's interior from the outside environment."
+        },
+        "mitochondria": {
+            title: "Mitochondrion",
+            description: "Generates most of the cell's ATP via oxidative phosphorylation; the 'powerhouse' of the cell. Often found near the basal body."
+        },
+        "ribosomes": {
+            title: "Ribosomes",
+            description: "Synthesizes proteins from mRNA templates. Shown here as small dots, often on the Endoplasmic Reticulum."
+        }
     };
 
-    window.displayUmapGeneExpression = async function (geneSymbol) {
-        const umapData = window.CiliAI_UMAP;
-        const exprData = window.CiliAI_snRNA;
-        const container = document.getElementById('umap-container');
-        if (!umapData || !exprData || !container) return;
 
-        const geneKey = geneSymbol.toUpperCase();
-        const exprMap = exprData[geneKey];
-        if (!exprMap) {
-            container.innerHTML = `<p style="text-align:center;padding:2rem;color:#666;">Gene <strong>${geneSymbol}</strong> not found in expression data.</p>`;
+    // --- 3. MAIN PAGE DISPLAY FUNCTION (from v3.2) ---
+
+    /**
+     * This is the primary function CiliaHub will call to build the page.
+     * It injects all HTML, CSS, and SVG content.
+     */
+    window.displayCiliAIPage = async function () {
+        console.log("CiliAI: displayCiliAIPage() called.");
+        const area = document.querySelector('.content-area');
+        if (!area) {
+            console.error('CiliAI: .content-area not found. Aborting.');
             return;
         }
 
-        const sampleSize = Math.min(15000, umapData.length);
-        const sampled = umapData.length > sampleSize
-            ? umapData.sort(() => 0.5 - Math.random()).slice(0, sampleSize)
-            : umapData;
-
-        const values = sampled.map(p => exprMap[p.cell_type] || 0);
-
-        const plotData = [{
-            x: sampled.map(p => p.x),
-            y: sampled.map(p => p.y),
-            mode: 'markers',
-            type: 'scattergl',
-            marker: {
-                size: 5,
-                color: values,
-                colorscale: 'Plasma',
-                showscale: true,
-                colorbar: { title: 'Expression', titleside: 'right' }
-            },
-            text: sampled.map((p, i) => `${p.cell_type}<br>Expr: ${values[i].toFixed(3)}`),
-            hoverinfo: 'text'
-        }];
-
-        const layout = {
-            title: `${geneSymbol} Expression (n=${sampled.length})`,
-            xaxis: { title: 'UMAP 1', showgrid: false },
-            yaxis: { title: 'UMAP 2', showgrid: false },
-            hovermode: 'closest',
-            height: 520
-        };
-
-        container.innerHTML = `<div id="umap-gene-plot" style="width:100%;height:100%;"></div>`;
-        Plotly.newPlot('umap-gene-plot', plotData, layout, { responsive: true, displayModeBar: true });
-    };
-
-    // ==============================================================
-    // 4. PAGE DISPLAY – Bock Lab Style + Fixed SVG Path
-    // ==============================================================
-    window.displayCiliAIPage = async function () {
-        const area = document.querySelector('.content-area');
-        if (!area) return console.error('.content-area missing');
-
+        // Set page to full-width mode
         area.className = 'content-area content-area-full';
         const panel = document.querySelector('.cilia-panel');
         if (panel) panel.style.display = 'none';
 
-        // Load Plotly
-        if (!window.Plotly) {
-            const script = document.createElement('script');
-            script.src = 'https://cdn.plot.ly/plotly-latest.min.js';
-            document.head.appendChild(script);
-            await new Promise(r => script.onload = r);
-        }
+        // 1. Inject HTML Structure
+        area.innerHTML = getPageHTML();
 
-        // Load SVG – CORRECT PATH + FALLBACK
-        let svgHTML = '<p>Loading cilia diagram...</p>';
-        const svgPaths = [
-            '/assets/cilia_diagram.svg',
-            '/cilia_diagram.svg',
-            'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/assets/cilia_diagram.svg'
-        ];
-        for (const path of svgPaths) {
-            try {
-                const resp = await fetch(path);
-                if (resp.ok) {
-                    svgHTML = await resp.text();
-                    break;
-                }
-            } catch (e) { /* try next */ }
-        }
-        if (!svgHTML.includes('<svg')) {
-            svgHTML = '<p style="color:#888;">Cilia diagram not available.</p>';
-        }
+        // 2. Inject CSS
+        injectPageCSS();
 
-        area.innerHTML = `
-        <div class="ciliai-page">
-            <div class="ciliai-header">
-                <h1>CiliAI Explorer</h1>
-                <p>Interactive cilia structure + single-cell expression</p>
-            </div>
+        // 3. Generate and Inject the custom SVG
+        generateAndInjectSVG();
 
-            <div class="ciliai-grid">
-                <!-- LEFT: Cilia Diagram -->
-                <div class="diagram-panel">
-                    <h3>Cilia Structure</h3>
-                    <div id="cilia-svg" class="svg-container">${svgHTML}</div>
-                    <div id="compartment-legend" class="legend"></div>
-                </div>
+        // 4. Setup all event listeners
+        setupEventListeners();
 
-                <!-- RIGHT: UMAP Panel -->
-                <div class="umap-panel">
-                    <h3>Single-Cell UMAP</h3>
-                    <div class="umap-controls">
-                        <button id="umap-celltype-btn" class="umap-btn active">Cell Types</button>
-                        <div class="gene-search">
-                            <input type="text" id="umap-gene-input" placeholder="Gene symbol (e.g. FOXJ1)" class="gene-input">
-                            <button id="umap-gene-btn" class="umap-btn">Show Expression</button>
-                        </div>
-                    </div>
-                    <div id="umap-container" class="umap-plot"></div>
-                </div>
-            </div>
+        // 5. Add initial welcome message to chat
+        setTimeout(() => {
+            addChatMessage(`Hello! Ask me about any ciliary gene or click a structure to explore. Try: <em>"What is IFT88?"</em>`, false);
+        }, 500);
 
-            <!-- AI Query -->
-            <div class="ai-query-section">
-                <h3>Ask CiliAI</h3>
-                <div class="ai-input-group">
-                    <input type="text" id="aiQueryInput" placeholder="e.g., What is IFT88? Or gene=IFT88 umap=true" class="ai-query-input">
-                    <button id="aiQueryBtn" class="ai-btn">Ask</button>
-                </div>
-                <div id="ai-result-area" class="results-section"></div>
-            </div>
-        </div>
+        console.log("CiliAI: Page displayed and listeners attached.");
+    };
 
-        <style>
-            /* [Same beautiful CSS as before – unchanged] */
-            .ciliai-page { max-width: 1300px; margin: 2rem auto; font-family: system-ui, -apple-system, sans-serif; padding: 0 1rem; }
+    // --- 4. HTML & CSS INJECTION (from v3.2) ---
+
+    /**
+     * Injects the page's CSS into the <head>.
+     */
+    function injectPageCSS() {
+        const styleId = 'ciliai-dynamic-styles';
+        if (document.getElementById(styleId)) return; // Already injected
+
+        const css = `
+            :root {
+              --primary: #2c5aa0;
+              --primary-dark: #1e4273;
+              --bg: #f8fbfd;
+              --card: #ffffff;
+              --text: #1a1a1a;
+              --text-light: #555;
+              --border: #e1e5e9;
+            }
+            .ciliai-page {
+              max-width: 1400px;
+              margin: 0 auto;
+              padding: 1.5rem;
+              font-family: 'Inter', sans-serif;
+              line-height: 1.6;
+            }
             .ciliai-header { text-align: center; margin-bottom: 2.5rem; }
-            .ciliai-header h1 { font-size: 2.8rem; color: #2c5aa0; margin: 0; }
-            .ciliai-header p { color: #555; font-size: 1.1rem; margin-top: .5rem; }
-
+            .ciliai-header h1 { font-size: 2.8rem; color: var(--primary); font-weight: 700; }
+            .ciliai-header p { color: var(--text-light); font-size: 1.15rem; margin-top: 0.5rem; }
             .ciliai-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-bottom: 3rem; }
             @media (max-width: 992px) { .ciliai-grid { grid-template-columns: 1fr; } }
 
-            .diagram-panel, .umap-panel { background: #fff; border-radius: 16px; padding: 1.8rem; box-shadow: 0 6px 20px rgba(0,0,0,.08); }
-            .diagram-panel h3, .umap-panel h3 { margin-top: 0; color: #2c5aa0; font-size: 1.4rem; }
-
-            .svg-container { max-height: 520px; overflow: auto; border: 1px solid #e1e5e9; border-radius: 10px; background: #fdfdfd; }
-            #cilia-svg svg { width: 100%; height: auto; }
-
-            .umap-controls { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: .5rem; }
-            .umap-btn { padding: .65rem 1.1rem; background: #2c5aa0; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: .95rem; transition: .2s; }
-            .umap-btn:hover { background: #1e4273; }
-            .umap-btn.active { background: #1a355c; }
-            .gene-search { display: flex; gap: .5rem; }
-            .gene-input { padding: .65rem; border: 1px solid #ccc; border-radius: 8px; width: 160px; font-size: .95rem; }
-
-            .umap-plot { height: 520px; border: 1px solid #e1e5e9; border-radius: 10px; background: #f8f9fa; }
-
-            .ai-query-section { background: #e8f4fd; padding: 2rem; border-radius: 16px; box-shadow: 0 4px 12px rgba(0,0,0,.06); }
-            .ai-input-group { display: flex; gap: .75rem; margin-bottom: 1rem; }
-            .ai-query-input { flex: 1; padding: .9rem; font-size: 1rem; border: 1px solid #bbdefb; border-radius: 8px; }
-            .ai-btn { background: #2c5aa0; color: white; padding: .9rem 1.8rem; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; }
-            .ai-btn:hover { background: #1e4273; }
-
-            .results-section { margin-top: 1.5rem; }
-            .result-card { background: #fff; border: 1px solid #ddd; border-radius: 10px; padding: 1.5rem; margin-bottom: 1.5rem; }
-            .result-card h3 { margin-top: 0; color: #2c5aa0; border-bottom: 1px solid #eee; padding-bottom: .5rem; }
-
-            .legend { margin-top: 1rem; font-size: .9rem; }
-            .legend-item { display: inline-block; margin-right: 1rem; cursor: pointer; padding: .3rem .6rem; border-radius: 6px; transition: .2s; }
-            .legend-item:hover { background: #f0f7ff; }
-            .legend-color { display: inline-block; width: 12px; height: 12px; margin-right: 6px; border-radius: 50%; vertical-align: middle; }
-
-            table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: .95rem; }
-            th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
-            th { background: #e8f4fd; color: #2c5aa0; font-weight: 600; }
-        </style>`;
-
-        // === SVG Interaction ===
-        const svgEl = document.querySelector('#cilia-svg svg');
-        if (svgEl) {
-            const compartments = {
-                'axoneme': '#ff6b6b',
-                'basal-body': '#4ecdc4',
-                'transition-zone': '#45b7d1',
-                'ciliary-membrane': '#96ceb4'
-            };
-            const legend = document.getElementById('compartment-legend');
-            Object.entries(compartments).forEach(([id, color]) => {
-                const el = svgEl.getElementById(id);
-                if (el) {
-                    el.style.cursor = 'pointer';
-                    el.style.transition = 'all .2s';
-                    el.addEventListener('click', () => {
-                        document.querySelectorAll('#cilia-svg svg *').forEach(e => {
-                            e.style.opacity = '0.3';
-                            e.style.stroke = '';
-                        });
-                        el.style.opacity = '1';
-                        el.style.stroke = color;
-                        el.style.strokeWidth = '4';
-                    });
-                    const item = document.createElement('div');
-                    item.className = 'legend-item';
-                    item.innerHTML = `<span class="legend-color" style="background:${color};"></span>${id.replace(/-/g, ' ')}`;
-                    item.onclick = () => el.click();
-                    legend.appendChild(item);
-                }
-            });
-            svgEl.addEventListener('dblclick', () => {
-                document.querySelectorAll('#cilia-svg svg *').forEach(e => {
-                    e.style.opacity = '1';
-                    e.style.stroke = '';
-                    e.style.strokeWidth = '';
-                });
-            });
-        }
-
-        // === UMAP Controls ===
-        document.getElementById('umap-celltype-btn').onclick = () => {
-            document.querySelectorAll('.umap-btn').forEach(b => b.classList.remove('active'));
-            this.classList.add('active');
-            window.displayUmapPlot();
-        };
-        document.getElementById('umap-gene-btn').onclick = () => {
-            const gene = document.getElementById('umap-gene-input').value.trim();
-            if (!gene) return alert('Enter a gene symbol');
-            window.displayUmapGeneExpression(gene);
-        };
-
-        // Initial plot
-        window.displayUmapPlot();
-
-        // === AI Query ===
-        setupEventListeners();
-        console.log('CiliAI: Page displayed successfully.');
-    };
-
-    // ==============================================================
-    // 5. AI QUERY ENGINE (unchanged)
-    // ==============================================================
-    // [parseQuery, generateAnswer, downloadData – same as before]
-
-    // ==============================================================
-    // 6. EVENT LISTENERS
-    // ==============================================================
-    function setupEventListeners() {
-        const input = document.getElementById('aiQueryInput');
-        const btn = document.getElementById('aiQueryBtn');
-        const results = document.getElementById('ai-result-area');
-        if (!input || !btn || !results) return;
-
-        const handle = () => {
-            const q = input.value.trim();
-            if (!q || !window.CiliAI.ready) return;
-            const parsed = parseQuery(q);
-            const answer = generateAnswer(parsed);
-            results.innerHTML = answer.html;
-            if (answer.plot && window.Plotly) {
-                Plotly.newPlot(answer.plot.id, answer.plot.data, answer.plot.layout);
+            /* Panels */
+            .diagram-panel, .info-panel {
+              background: var(--card);
+              border-radius: 16px;
+              padding: 1.8rem;
+              box-shadow: 0 6px 20px rgba(0,0,0,.08);
             }
-        };
+            .diagram-panel h3, .info-panel h3 {
+              margin: 0 0 1rem;
+              color: var(--primary);
+              font-size: 1.5rem;
+            }
+            
+            /* Left Panel: Cilia Diagram */
+            .diagram-toolbar { display: flex; gap: 0.75rem; margin-bottom: 1rem; flex-wrap: wrap; }
+            .gene-search { display: flex; gap: 0.5rem; flex: 1; max-width: 400px; }
+            .gene-input { flex: 1; padding: 0.7rem 1rem; border: 1px solid var(--border); border-radius: 8px; font-size: 0.95rem; }
+            .btn {
+              padding: 0.7rem 1.2rem; background: var(--primary); color: white; border: none;
+              border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 0.95rem; transition: 0.2s;
+            }
+            .btn:hover { background: var(--primary-dark); }
+            .btn-outline { background: transparent; border: 1px solid var(--primary); color: var(--primary); }
+            .btn-outline:hover { background: rgba(44, 90, 160, 0.1); }
+            
+            /* SVG Container */
+            .svg-container {
+              height: 560px; overflow: auto; border: 1px solid var(--border);
+              border-radius: 12px; background: #fdfdfd; padding: 0;
+            }
+            #cilia-svg svg { width: 100%; height: 100%; }
+            #cilia-svg .compartment { cursor: pointer; transition: all 0.2s; }
+            #cilia-svg .compartment:hover { opacity: 0.8; filter: brightness(1.1); }
+            #cilia-svg .compartment.active {
+                stroke-width: 4px;
+                stroke: #000000;
+                filter: drop-shadow(0 0 8px currentColor) drop-shadow(0 0 5px rgba(0,0,0,0.5));
+            }
 
-        btn.onclick = handle;
-        input.addEventListener('keypress', e => e.key === 'Enter' && handle());
+            /* --- Cilia & Organelle Colors --- */
+            /* Cilia */
+            .structure-axoneme { fill: #ff6b6b !important; color: #ff6b6b; }
+            .structure-basal-body { fill: #4ecdc4 !important; color: #4ecdc4; }
+            .structure-transition-zone { fill: #45b7d1 !important; color: #45b7d1; }
+            .structure-ciliary-membrane { stroke: #96ceb4 !important; fill: none; stroke-width: 5px; color: #96ceb4; }
+            /* Organelles */
+            .structure-nucleus { fill: #1a6fb3 !important; color: #1a6fb3; }
+            .structure-nucleolus { fill: #003e80 !important; color: #003e80; }
+            .structure-mitochondria { fill: #0097b2 !important; color: #0097b2; }
+            .structure-golgi-apparatus { fill: #1e81ce !important; color: #1e81ce; }
+            .structure-golgi-vesicle { fill: #66b7ff !important; color: #66b7ff; }
+            .structure-lysosome { fill: #2fa0e5 !important; color: #2fa0e5; }
+            .structure-peroxisome { fill: #5fb9ff !important; color: #5fb9ff; }
+            .structure-ribosomes { fill: #7fc8ff !important; color: #7fc8ff; }
+            .structure-cytoplasm { fill: #0e84b8 !important; opacity: 0.1; color: #0e84b8; }
+            .structure-plasma-membrane { fill: #004c8c !important; color: #004c8c; }
+            .structure-microtubule { stroke: #6ecbff !important; fill: none; stroke-width: 2px; color: #6ecbff; }
+            /* --- End Colors --- */
+
+
+            /* Right Panel: Info */
+            .info-panel {
+              display: flex;
+              flex-direction: column;
+              height: fit-content;
+            }
+            .info-lists h4 {
+              font-size: 1.1rem;
+              color: var(--primary-dark);
+              margin-bottom: 0.75rem;
+              border-bottom: 2px solid var(--border);
+              padding-bottom: 0.25rem;
+            }
+            .anat-list {
+              list-style: none;
+              padding: 0;
+              margin: 0;
+              max-height: 200px;
+              overflow-y: auto;
+            }
+            .anat-list li {
+              padding: 0.5rem 0.75rem;
+              border-radius: 6px;
+              cursor: pointer;
+              font-size: 0.95rem;
+              border: 1px solid transparent;
+            }
+            .anat-list li:hover {
+              background: #e8f4fd;
+            }
+            .anat-list li.active {
+              background: var(--primary);
+              color: white;
+              font-weight: 600;
+              border-color: var(--primary-dark);
+            }
+
+            /* Info Display Panel */
+            .organelle-info-panel {
+              background: #e8f4fd;
+              border: 1px solid #bbdefb;
+              border-radius: 12px;
+              padding: 1rem 1.2rem;
+              min-height: 100px;
+              margin-top: 1.5rem;
+            }
+            .organelle-info-panel h3 {
+              margin: 0 0 0.5rem 0;
+              color: var(--primary);
+              font-size: 1.25rem;
+            }
+            .organelle-info-panel p {
+              margin: 0;
+              font-size: 0.95rem;
+              line-height: 1.6;
+            }
+            .organelle-info-panel .gene-list {
+              display: flex;
+              flex-wrap: wrap;
+              gap: 0.5rem;
+              font-size: 0.9rem;
+              margin-top: 0.75rem;
+            }
+            .organelle-info-panel .gene-tag {
+              background: white; padding: 0.3rem 0.6rem; border-radius: 6px;
+              border: 1px solid #bbdefb; cursor: pointer;
+            }
+            .organelle-info-panel .gene-tag:hover { background: #d0ebff; }
+
+            /* AI Chat (placed below info) */
+            .chat-panel {
+              margin-top: 2rem;
+              padding: 1.5rem;
+            }
+            .disclaimer {
+              font-size: 0.85rem; color: #e74c3c; background: #fdf2f2; padding: 0.8rem;
+              border-radius: 8px; margin-bottom: 1.5rem; border-left: 4px solid #e74c3c;
+            }
+            .chat-window {
+              flex: 1; max-height: 400px; overflow-y: auto; padding: 1rem; background: #f8f9fa;
+              border-radius: 12px; margin-bottom: 1rem; border: 1px solid var(--border);
+            }
+            .message { margin: 0.75rem 0; padding: 0.75rem 1rem; border-radius: 12px; max-width: 85%; position: relative; }
+            .user-message { background: var(--primary); color: white; margin-left: auto; border-bottom-right-radius: 4px; }
+            .ai-message { background: white; border: 1px solid var(--border); margin-right: auto; border-bottom-left-radius: 4px; }
+            .ai-message strong { color: var(--primary); }
+            .ai-message em { font-style: italic; color: var(--text-light); }
+            .feedback { font-size: 0.8rem; margin-top: 0.5rem; display: flex; gap: 0.5rem; }
+            .feedback button { background: none; border: none; cursor: pointer; font-size: 1.2rem; opacity: 0.5; }
+            .feedback button:hover { opacity: 1; }
+            
+            .chat-input-group { display: flex; gap: 0.75rem; }
+            .chat-input { flex: 1; padding: 0.9rem; font-size: 1rem; border: 1px solid var(--border); border-radius: 8px; }
+            .send-btn {
+              background: var(--primary); color: white; padding: 0.9rem 1.8rem; border: none;
+              border-radius: 8px; cursor: pointer; font-weight: 600;
+            }
+            .send-btn:hover { background: var(--primary-dark); }
+        `;
+        
+        const styleEl = document.createElement('style');
+        styleEl.id = styleId;
+        styleEl.textContent = css;
+        document.head.appendChild(styleEl);
     }
 
-    // ==============================================================
-    // 7. START
-    // ==============================================================
+    /**
+     * Returns the full HTML string for the page content.
+     */
+    function getPageHTML() {
+        // Generate a single list for all structures
+        const structureListHTML = Object.keys(structureInfoMap).map(id => 
+            `<li data-structure-id="${id}">${structureInfoMap[id].title}</li>`
+        ).join('');
+
+        return `
+        <div class="ciliai-page">
+            <div class="ciliai-header">
+                <h1>CiliAI Explorer</h1>
+                <p>AI-powered exploration of ciliary structure, gene function, and disease</p>
+            </div>
+
+            <div class="ciliai-grid">
+
+                <div class="diagram-panel">
+                    <h3>Cellular Structures</h3>
+                    <div class="diagram-toolbar">
+                        <div class="gene-search">
+                            <input type="text" id="geneSearchInput" class="gene-input" placeholder="Search gene (e.g. IFT88)">
+                            <button id="findGeneBtn" class="btn">Find Gene</button>
+                        </div>
+                        <button id="showUmapBtn" class="btn btn-outline">Show UMAP</button>
+                    </div>
+                    <div class="svg-container">
+                        <div id="cilia-svg">
+                            <p style="text-align:center; padding-top: 4rem; color: var(--text-light);">Generating Diagram...</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="info-panel">
+                    
+                    <div class="info-lists">
+                        <div>
+                            <h4>Interactive Structures</h4>
+                            <ul id="structure-list" class="anat-list">
+                                ${structureListHTML}
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div id="organelle-info" class="organelle-info-panel" role="region" aria-live="polite">
+                        <h3 id="organelle-info-title">Select an item</h3>
+                        <p id="organelle-info-text">Click an item from the list or on the diagram to see its description.</p>
+                    </div>
+
+                    <div class="chat-panel">
+                        <h3>Ask CiliAI</h3>
+                        <div class="disclaimer">
+                            <strong>Disclaimer:</strong> CiliAI is an AI system and may produce misleading results. Best used for exploration, not as a replacement for curated databases.
+                        </div>
+                        <div id="chatWindow" class="chat-window">
+                            </div>
+                        <div class="chat-input-group">
+                            <input type="text" id="chatInput" class="chat-input" placeholder="Ask CiliAI...">
+                            <button id="sendBtn" class="send-btn">Send</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        `;
+    }
+
+    // --- 5. SVG GENERATION & INTERACTION (from v3.2) ---
+
+    /**
+     * Generates and injects the custom SVG.
+     */
+    function generateAndInjectSVG() {
+        const svgContainer = document.getElementById('cilia-svg');
+        if (!svgContainer) return;
+
+        // This SVG is a schematic showing the cilium in the context of the cell.
+        // Positions are hard-coded for this specific layout.
+        const svgHTML = `
+        <svg viewBox="0 0 500 500" xmlns="http://www.w3.org/2000/svg">
+            <style>
+                /* Text labels on SVG */
+                .svg-label { font-size: 10px; font-family: 'Inter', sans-serif; fill: #000; text-anchor: middle; }
+                .svg-label-light { font-size: 10px; font-family: 'Inter', sans-serif; fill: #fff; text-anchor: middle; }
+            </style>
+            
+            <g id="cytoplasm" class="compartment structure-cytoplasm">
+                <rect width="500" height="500" />
+            </g>
+            
+            <g id="nucleus" class="compartment structure-nucleus">
+                <circle cx="250" cy="400" r="80" />
+                <text x="250" y="405" class="svg-label-light">Nucleus</text>
+            </g>
+            <g id="nucleolus" class="compartment structure-nucleolus">
+                <circle cx="275" cy="385" r="25" />
+                <text x="275" y="388" class="svg-label-light">Nucleolus</text>
+            </g>
+            
+            <g id="plasma-membrane" class="compartment structure-plasma-membrane">
+                <path d="M 0,200 Q 250,180 500,200 V 500 H 0 Z" />
+            </g>
+            
+            <g id="golgi-apparatus" class="compartment structure-golgi-apparatus" transform="translate(70, 250) scale(0.8)">
+                <path d="M 0,0 C 10,20 40,20 50,0 M 10,15 C 20,35 50,35 60,15 M 20,30 C 30,50 60,50 70,30" 
+                    fill="none" stroke="#fff" stroke-width="5" />
+                <text x="35" y="60" class="svg-label-light">Golgi</text>
+            </g>
+            <g id="golgi-vesicle" class="compartment structure-golgi-vesicle">
+                <circle cx="150" cy="260" r="8" />
+                <circle cx="140" cy="280" r="5" />
+            </g>
+            
+            <g id="lysosome" class="compartment structure-lysosome">
+                <circle cx="380" cy="280" r="15" />
+                <text x="380" y="283" class="svg-label-light">Lysosome</text>
+            </g>
+            <g id="peroxisome" class="compartment structure-peroxisome">
+                <circle cx="400" cy="320" r="10" />
+            </g>
+            
+            <g id="ribosomes" class="compartment structure-ribosomes">
+                <circle cx="100" cy="320" r="2" /> <circle cx="105" cy="325" r="2" />
+                <circle cx="110" cy="318" r="2" /> <circle cx="95" cy="330" r="2" />
+                <circle cx="300" cy="250" r="2" /> <circle cx="305" cy="255" r="2" />
+                <circle cx="310" cy="248" r="2" /> <circle cx="295" cy="260" r="2" />
+            </g>
+            
+            <g id="microtubule" class="compartment structure-microtubule">
+                <path d="M 150,450 L 220,220" />
+                <path d="M 350,450 L 280,220" />
+            </g>
+            
+            <g id="ciliary-membrane" class="compartment structure-ciliary-membrane" transform="translate(0, -20)">
+                <path d="M 220,210 Q 200,100 250,20 Q 300,100 280,210" />
+            </g>
+            <g id="axoneme" class="compartment structure-axoneme" transform="translate(0, -20)">
+                <path d="M 235,190 Q 240,100 250,30 Q 260,100 265,190 Z" />
+                <text x="250" y="120" class="svg-label-light">Axoneme</text>
+            </g>
+            <g id="transition-zone" class="compartment structure-transition-zone" transform="translate(0, -20)">
+                <rect x="230" y="190" width="40" height="20" rx="5" />
+                <text x="250" y="204" class="svg-label-light">TZ</text>
+            </g>
+            <g id="basal-body" class="compartment structure-basal-body" transform="translate(0, -20)">
+                <rect x="225" y="210" width="50" height="30" rx="5" />
+                <text x="250" y="228" class="svg-label-light">Basal Body</text>
+            </g>
+            
+            <g id="mitochondria" class="compartment structure-mitochondria" transform="translate(140, 195)">
+                <ellipse cx="0" cy="0" rx="40" ry="20" />
+                <path d="M -30,-5 C -10,5 10,-5 30,5" stroke="#fff" fill="none" stroke-width="2" />
+                <text x="0" y="3" class="svg-label-light">Mitochondrion</text>
+            </g>
+        </svg>
+        `;
+        svgContainer.innerHTML = svgHTML;
+        
+        // Now that SVG is loaded, make compartments interactive
+        setupSVGInteraction();
+    }
+
+
+    /**
+     * Attaches click listeners to the SVG compartments.
+     */
+    function setupSVGInteraction() {
+        Object.keys(structureInfoMap).forEach(id => {
+            const el = document.getElementById(id);
+            if (!el) {
+                console.warn(`CiliAI: SVG structure #${id} not found.`);
+                return;
+            }
+            
+            // Add compartment class for coloring
+            el.classList.add('compartment', `structure-${id}`);
+
+            el.addEventListener('click', (e) => {
+                e.stopPropagation(); // Prevent click on cytoplasm from triggering body click
+                activateStructure(id);
+            });
+        });
+    }
+
+    /**
+     * Clears all visual highlights from SVG and lists.
+     */
+    function clearAllHighlights() {
+        // Clear SVG active states
+        document.querySelectorAll('#cilia-svg .compartment.active').forEach(el => {
+            el.classList.remove('active');
+        });
+
+        // Clear list active states
+        document.querySelectorAll('.anat-list li.active').forEach(li => {
+            li.classList.remove('active');
+        });
+    }
+
+    /**
+     * Displays information in the info panel.
+     */
+    function showInfoPanel(title, description, genes = []) {
+        const infoTitle = document.getElementById('organelle-info-title');
+        const infoText = document.getElementById('organelle-info-text');
+        if (!infoTitle || !infoText) return; // Guard clause
+
+        infoTitle.textContent = title;
+        infoText.innerHTML = `<p>${description}</p>`; // Use innerHTML for description
+        
+        if (genes && genes.length > 0) {
+            const geneListHTML = '<div class="gene-list">' + 
+                genes.map(g => `<span class="gene-tag" data-gene="${g}">${g}</span>`).join('') + 
+                '</div>';
+            infoText.innerHTML += geneListHTML;
+        }
+    }
+    
+    /**
+     * Handles activating any structure (from SVG or list)
+     */
+    function activateStructure(id) {
+        const data = structureInfoMap[id];
+        if (!data) return;
+
+        clearAllHighlights();
+
+        // Highlight SVG
+        const svgEl = document.getElementById(id);
+        if (svgEl) svgEl.classList.add('active');
+
+        // Highlight List
+        const listEl = document.querySelector(`#structure-list li[data-structure-id="${id}"]`);
+        if (listEl) listEl.classList.add('active');
+        
+        // Show info
+        showInfoPanel(data.title, data.description, data.genes);
+    }
+    
+    // --- 6. CHAT & QUERY LOGIC (DATA-AWARE) ---
+
+    /**
+     * Adds a message to the chat window.
+     */
+    function addChatMessage(html, isUser = false) {
+        const chatWindow = document.getElementById('chatWindow');
+        if (!chatWindow) return; // Guard clause
+        const msg = document.createElement('div');
+        msg.className = `message ${isUser ? 'user-message' : 'ai-message'}`;
+        
+        msg.innerHTML = html; // Use innerHTML to allow <em>, <strong>, etc.
+        
+        if (!isUser) {
+            msg.innerHTML += `
+                <div class="feedback">
+                    <button title="Good answer" data-feedback="good">👍</button>
+                    <button title="Bad answer" data-feedback="bad">👎</button>
+                </div>`;
+        }
+        
+        chatWindow.appendChild(msg);
+        chatWindow.scrollTop = chatWindow.scrollHeight; // Auto-scroll
+    }
+
+    /**
+     * Handles the user sending a message.
+     */
+    function handleUserSend() {
+        const chatInput = document.getElementById('chatInput');
+        if (!chatInput) return; // Guard clause
+        const query = chatInput.value.trim();
+        if (!query) return;
+
+        addChatMessage(query, true); // Add user's message
+        chatInput.value = ''; // Clear input
+
+        // Process the query
+        handleAIQuery(query);
+    }
+
+    /**
+     * Processes the user's query and generates an AI response.
+     * This now uses the *REAL* data-aware functions.
+     */
+    function handleAIQuery(query) {
+        // Check if CiliAI engine is ready
+        if (!window.CiliAI || !window.CiliAI.ready || !window.parseQuery || !window.generateAnswer) {
+            addChatMessage(`<em>Error: CiliAI engine is not loaded. Please wait or refresh.</em>`, false);
+            return;
+        }
+
+        // 1. Parse the query
+        const parsedIntent = window.parseQuery(query);
+
+        // 2. Generate the answer
+        const answer = window.generateAnswer(parsedIntent);
+
+        // 3. Add the AI's response to the chat
+        addChatMessage(answer.html, false);
+
+        // 4. Handle side-effects
+        if (answer.highlightGene) {
+            handleGeneSearch(answer.highlightGene);
+        }
+    }
+
+    // --- 7. EVENT LISTENER SETUP (from v3.2) ---
+
+    /**
+     * Attaches all primary event listeners for the page.
+     */
+    function setupEventListeners() {
+        // Guard against elements not existing
+        const sendBtn = document.getElementById('sendBtn');
+        const chatInput = document.getElementById('chatInput');
+        const findGeneBtn = document.getElementById('findGeneBtn');
+        const geneSearchInput = document.getElementById('geneSearchInput');
+        const showUmapBtn = document.getElementById('showUmapBtn');
+        const structureList = document.getElementById('structure-list');
+
+        // Chat
+        if (sendBtn) sendBtn.addEventListener('click', handleUserSend);
+        if (chatInput) chatInput.addEventListener('keypress', e => {
+            if (e.key === 'Enter') handleUserSend();
+        });
+
+        // Gene Search
+        if (findGeneBtn) findGeneBtn.addEventListener('click', () => {
+            if (geneSearchInput) handleGeneSearch(geneSearchInput.value);
+        });
+        if (geneSearchInput) geneSearchInput.addEventListener('keypress', e => {
+            if (e.key === 'Enter') handleGeneSearch(geneSearchInput.value);
+        });
+
+        // UMAP Button
+        if (showUmapBtn) showUmapBtn.addEventListener('click', () => {
+            console.log("CiliAI: 'Show UMAP' clicked.");
+            addChatMessage("Show me the UMAP plot.", true);
+            handleAIQuery("Show me the UMAP plot.");
+        });
+
+        // Structure List
+        if (structureList) structureList.addEventListener('click', e => {
+            const li = e.target.closest('li');
+            if (li && li.dataset.structureId) {
+                activateStructure(li.dataset.structureId);
+            }
+        });
+
+        // Event delegation for dynamic content (gene tags, feedback)
+        document.body.addEventListener('click', e => {
+            // Gene tags in info panel
+            const geneTag = e.target.closest('.gene-tag');
+            if (geneTag) {
+                const gene = geneTag.dataset.gene;
+                if (chatInput) chatInput.value = `What is ${gene}?`;
+                handleUserSend();
+                return;
+            }
+
+            // Feedback buttons
+            const feedbackBtn = e.target.closest('.feedback button');
+            if (feedbackBtn) {
+                console.log(`CiliAI Feedback: ${feedbackBtn.dataset.feedback}`);
+                feedbackBtn.parentElement.querySelectorAll('button').forEach(b => b.style.opacity = 0.3);
+                feedbackBtn.style.opacity = 1;
+                return;
+            }
+        });
+    }
+
+    /**
+     * Handles the "Find Gene" button click or AI highlight request.
+     * This is now DATA-AWARE.
+     */
+    function handleGeneSearch(geneSymbol) {
+        const gene = geneSymbol.trim().toUpperCase();
+        if (!gene) return;
+
+        // Use the CiliAI lookup
+        if (!window.CiliAI || !window.CiliAI.ready || !window.CiliAI.lookups || !window.CiliAI.lookups.geneMap) {
+            console.warn("CiliAI data is not ready for gene search.");
+            return;
+        }
+        
+        const geneData = window.CiliAI.lookups.geneMap[gene];
+        
+        if (!geneData) {
+            clearAllHighlights();
+            showInfoPanel(`Gene Not Found: ${gene}`, `This gene is not in the CiliAI database.`);
+            return;
+        }
+
+        // Find localization
+        let loc = 'unknown';
+        let locString = 'Unknown';
+        if (geneData.localization) {
+            locString = String(geneData.localization);
+            const locLower = locString.toLowerCase();
+            
+            if (locLower.includes('axoneme')) loc = 'axoneme';
+            else if (locLower.includes('transition zone')) loc = 'transition-zone';
+            else if (locLower.includes('basal body')) loc = 'basal-body';
+            else if (locLower.includes('membrane')) loc = 'ciliary-membrane';
+            else if (locLower.includes('nucleus')) loc = 'nucleus';
+            else if (locLower.includes('mitochondrion')) loc = 'mitochondria';
+            else if (locLower.includes('golgi')) loc = 'golgi-apparatus';
+            else if (locLower.includes('cytoplasm')) loc = 'cytoplasm';
+        }
+        
+        // Highlight and show info
+        clearAllHighlights();
+        if (loc !== 'unknown' && document.getElementById(loc)) {
+            document.getElementById(loc).classList.add('active');
+        }
+        showInfoPanel(`Gene: ${gene}`, (geneData.description || 'No description available.') + `<br><strong>Localization:</strong> ${locString}`, [gene]);
+
+        // Also ask the AI about it if the user didn't just do that
+        const chatInput = document.getElementById('chatInput');
+        if (chatInput && !chatInput.value.toLowerCase().includes(gene.toLowerCase())) {
+            addChatMessage(`What is ${gene}?`, true);
+            handleAIQuery(`What is ${gene}?`);
+        }
+    }
+
+
+    // --- 8. AI QUERY ENGINE PLACEHOLDERS ---
+    // These functions are expected to exist in another file (e.g., ai_engine.js)
+    // and be loaded *before* this script.
+    
+    if (!window.parseQuery) {
+        console.warn("CiliAI: `parseQuery` is not defined. Using placeholder.");
+        window.parseQuery = function(query) {
+            console.log("Using placeholder parseQuery");
+            let gene = null;
+            const geneMatch = query.match(/what is (\w+)/i) || query.match(/(\w+)/i);
+            if (geneMatch) gene = geneMatch[1].toUpperCase();
+            return { query, gene, highlightGene: gene };
+        }
+    }
+    
+    if (!window.generateAnswer) {
+        console.warn("CiliAI: `generateAnswer` is not defined. Using placeholder.");
+        window.generateAnswer = function(intent) {
+            console.log("Using placeholder generateAnswer");
+            let html = `I received your query about: <strong>${intent.query}</strong>. `;
+            let highlightGene = intent.highlightGene;
+            
+            if (intent.gene && window.CiliAI.ready) {
+                const geneData = window.CiliAI.lookups.geneMap[intent.gene];
+                if (geneData) {
+                    html = `<strong>${intent.gene}</strong>: ${geneData.description || 'No description found.'} <br><strong>Localization:</strong> ${geneData.localization || 'Unknown'}`;
+                } else {
+                    html = `Sorry, I don't have information on <strong>${intent.gene}</strong>.`;
+                    highlightGene = null;
+                }
+            } else if (intent.query.toLowerCase().includes('umap')) {
+                html = "Displaying the UMAP plot is not yet fully integrated in this view, but the 'Show UMAP' button can trigger this action.";
+            } else {
+                html = "Sorry, I can only provide gene information right now. Try 'What is IFT88?'.";
+                highlightGene = null;
+            }
+            
+            return { html, highlightGene };
+        }
+    }
+
+    // --- 9. STARTUP (from v2.1) ---
+    
+    // This listener replaces the v3.2 listeners
+    window.addEventListener('hashchange', () => {
+        if (window.location.hash.includes('/ciliai')) {
+            // Check if data is ready. If not, init will handle it.
+            // If data IS ready, we need to re-display the page.
+            if (window.CiliAI.ready && !document.querySelector('.ciliai-page')) {
+                displayCiliAIPage();
+            }
+        }
+    });
+
+    // Initial load check
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', initCiliAI);
     } else {
         initCiliAI();
     }
+
 })();
