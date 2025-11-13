@@ -9,8 +9,6 @@ let neversPhylogenyCache = null;
 let umapDataCache = null;
 let cellxgeneDataCache = null;
 
-// Replace your entire loadCiliAIData function with this fixed version:
-
 async function loadCiliAIData(timeoutMs = 30000) {
     const urls = {
         ciliahub: 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/ciliahub_data.json',
@@ -219,25 +217,7 @@ async function loadCiliAIData(timeoutMs = 30000) {
         return ciliatedCount;
     }
 
-    // ========== SET GLOBAL VARIABLES FOR PARSER ==========
     
-    // Set global variables BEFORE main data integration
-    window.screensByGene = screensByGene;
-    window.corumByGene = corumByGene;
-    window.domainsByGene = domainsByGene;
-    window.liMap = liMap;
-    window.neversMap = neversMap;
-    window.CiliAI_UMAP = umapRaw || [];
-    window.CiliAI_snRNA = cellxgeneRaw || {};
-
-    console.log('Global datasets set for parser:', {
-        screens: Object.keys(screensByGene).length,
-        corum: Object.keys(corumByGene).length,
-        domains: Object.keys(domainsByGene).length,
-        liMap: Object.keys(liMap).length,
-        neversMap: Object.keys(neversMap).length
-    });
-
     // ========== MAIN DATA INTEGRATION ==========
 
     // Process ciliopathy information
