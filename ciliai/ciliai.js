@@ -97,7 +97,7 @@
             Object.keys(screensRaw).forEach(geneKey => {
                 const key = geneKey.toUpperCase();
                 const entries = Array.isArray(screensRaw[geneKey]) ? screensRaw[geneKey] : [];
-                screens | screensByGene[key] = entries.map(s => ({
+                screensByGene[key] = entries.map(s => ({
                     dataset: s.source || s.dataset || 'Unknown',
                     classification: s.result || s.classification || 'Not Reported',
                     paper_link: s.paper_link || s.paper || null,
