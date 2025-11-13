@@ -1,12 +1,12 @@
 /* ==============================================================
-   CiliAI – Interactive Explorer (v3.5 – Nov 13, 2025)
-   ==============================================================
-   • MERGED: Combines the v2.1 data engine (with buildLookups fix)
-     with the v3.5 interactive SVG layout.
-   • COMPOSITE SVG: Integrates the minimal gray cilium with the
-     actual <g> paths for organelles from Furkan.html.
-   • All text is in English.
-   ============================================================== */
+ * CiliAI – Interactive Explorer (v3.5 – Nov 13, 2025)
+ * ==============================================================
+ * • MERGED: Combines the v2.1 data engine (with buildLookups fix)
+ * with the v3.5 interactive SVG layout.
+ * • COMPOSITE SVG: Integrates the minimal gray cilium with the
+ * actual <g> paths for organelles from Furkan.html.
+ * • All text is in English.
+ * ============================================================== */
 
 (function () {
     'use strict';
@@ -389,9 +389,11 @@
             const key = g.gene?.toUpperCase();
             if (!key) return;
             if (g.localization) {
-                const loc = String(g.localization);
-                if (!L.byLocalization[loc]) L.byLocalization[loc] = [];
-                if (!L.byLocalization[loc].includes(key)) L.byLocalization[loc].push(key);
+                // FIX: Use ensureArray on localization as well
+                ensureArray(g.localization).forEach(loc => {
+                    if (!L.byLocalization[loc]) L.byLocalization[loc] = [];
+                    if (!L.byLocalization[loc].includes(key)) L.byLocalization[loc].push(key);
+                });
             }
             if (g.functional_modules) {
                 g.functional_modules.forEach(m => {
@@ -462,6 +464,10 @@
         "cytoplasm": {
             title: "Cytoplasm",
             description: "The jelly-like substance filling the cell, enclosing the organelles and serving as the site for many metabolic reactions."
+        },
+         "cell-body": { // Added alias for click handler
+            title: "Cell Body / Cytoplasm",
+            description: "The main body of the cell, enclosing the organelles and serving as the site for many metabolic reactions."
         },
         "peroxisome": {
             title: "Peroxisome",
@@ -541,37 +547,37 @@
 
         const css = `
             :root {
-              --primary: #2c5aa0;
-              --primary-dark: #1e4273;
-              --bg: #f8fbfd;
-              --card: #ffffff;
-              --text: #1a1a1a;
-              --text-light: #555;
-              --border: #e1e5e9;
-              /* Cilia Colors */
-              --cilia-axoneme: #ff6b6b;
-              --cilia-basal-body: #4ecdc4;
-              --cilia-tz: #45b7d1;
-              --cilia-membrane: #A0AEC0; /* Gray for dash */
-              /* Organelle Colors (compatible) */
-              --org-nucleus: #B0B8C8; /* Gray */
-              --org-nucleolus: #4A5568; /* Dark Gray */
-              --org-mitochondria: #4A5568; /* Dark Gray */
-              --org-golgi: #4A5568; /* Dark Gray */
-              --org-vesicle: #66b7ff; /* Blue */
-              --org-lysosome: #718096; /* Gray */
-              --org-peroxisome: #A0AEC0; /* Gray */
-              --org-ribosome: #4A5568; /* Dark Gray */
-              --org-cytoplasm: #F5F7FA; /* Lightest Gray */
-              --org-pm: #E9EDF2; /* Light Gray */
-              --org-microtubule: #4A5568; /* Dark Gray */
+                --primary: #2c5aa0;
+                --primary-dark: #1e4273;
+                --bg: #f8fbfd;
+                --card: #ffffff;
+                --text: #1a1a1a;
+                --text-light: #555;
+                --border: #e1e5e9;
+                /* Cilia Colors */
+                --cilia-axoneme: #ff6b6b;
+                --cilia-basal-body: #4ecdc4;
+                --cilia-tz: #45b7d1;
+                --cilia-membrane: #A0AEC0; /* Gray for dash */
+                /* Organelle Colors (compatible) */
+                --org-nucleus: #B0B8C8; /* Gray */
+                --org-nucleolus: #4A5568; /* Dark Gray */
+                --org-mitochondria: #4A5568; /* Dark Gray */
+                --org-golgi: #4A5568; /* Dark Gray */
+                --org-vesicle: #66b7ff; /* Blue */
+                --org-lysosome: #718096; /* Gray */
+                --org-peroxisome: #A0AEC0; /* Gray */
+                --org-ribosome: #4A5568; /* Dark Gray */
+                --org-cytoplasm: #F5F7FA; /* Lightest Gray */
+                --org-pm: #E9EDF2; /* Light Gray */
+                --org-microtubule: #4A5568; /* Dark Gray */
             }
             .ciliai-page {
-              max-width: 1400px;
-              margin: 0 auto;
-              padding: 1.5rem;
-              font-family: 'Inter', sans-serif;
-              line-height: 1.6;
+                max-width: 1400px;
+                margin: 0 auto;
+                padding: 1.5rem;
+                font-family: 'Inter', sans-serif;
+                line-height: 1.6;
             }
             .ciliai-header { text-align: center; margin-bottom: 2.5rem; }
             .ciliai-header h1 { font-size: 2.8rem; color: var(--primary); font-weight: 700; }
@@ -581,15 +587,15 @@
 
             /* Panels */
             .diagram-panel, .info-panel {
-              background: var(--card);
-              border-radius: 16px;
-              padding: 1.8rem;
-              box-shadow: 0 6px 20px rgba(0,0,0,.08);
+                background: var(--card);
+                border-radius: 16px;
+                padding: 1.8rem;
+                box-shadow: 0 6px 20px rgba(0,0,0,.08);
             }
             .diagram-panel h3, .info-panel h3 {
-              margin: 0 0 1rem;
-              color: var(--primary);
-              font-size: 1.5rem;
+                margin: 0 0 1rem;
+                color: var(--primary);
+                font-size: 1.5rem;
             }
             
             /* Left Panel: Cilia Diagram */
@@ -597,8 +603,8 @@
             .gene-search { display: flex; gap: 0.5rem; flex: 1; max-width: 400px; }
             .gene-input { flex: 1; padding: 0.7rem 1rem; border: 1px solid var(--border); border-radius: 8px; font-size: 0.95rem; }
             .btn {
-              padding: 0.7rem 1.2rem; background: var(--primary); color: white; border: none;
-              border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 0.95rem; transition: 0.2s;
+                padding: 0.7rem 1.2rem; background: var(--primary); color: white; border: none;
+                border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 0.95rem; transition: 0.2s;
             }
             .btn:hover { background: var(--primary-dark); }
             .btn-outline { background: transparent; border: 1px solid var(--primary); color: var(--primary); }
@@ -606,8 +612,8 @@
             
             /* SVG Container */
             .svg-container {
-              height: 560px; overflow: hidden; border: 1px solid var(--border);
-              border-radius: 12px; background: var(--org-cytoplasm); padding: 0;
+                height: 560px; overflow: hidden; border: 1px solid var(--border);
+                border-radius: 12px; background: var(--org-cytoplasm); padding: 0;
             }
             #cilia-svg svg { width: 100%; height: 100%; }
             #cilia-svg .compartment { cursor: pointer; transition: all 0.2s; }
@@ -634,61 +640,62 @@
             .structure-peroxisome { fill: var(--org-peroxisome) !important; color: var(--org-peroxisome); }
             .structure-ribosomes { fill: var(--org-ribosome) !important; color: var(--org-ribosome); }
             .structure-cytoplasm { fill: var(--org-cytoplasm) !important; stroke: #D8DEE9; stroke-width: 3px; color: var(--org-cytoplasm); opacity: 1.0; }
+             .structure-cell-body { fill: var(--org-cytoplasm) !important; stroke: #D8DEE9; stroke-width: 3px; color: var(--org-cytoplasm); opacity: 1.0; }
             .structure-plasma-membrane { fill: var(--org-pm) !important; color: var(--org-pm); opacity: 1.0; }
             .structure-microtubule { stroke: var(--org-microtubule) !important; fill: none; stroke-width: 2px; color: var(--org-microtubule); }
             /* --- End Colors --- */
 
             /* Right Panel: Info */
             .info-panel {
-              display: flex;
-              flex-direction: column;
-              height: fit-content;
+                display: flex;
+                flex-direction: column;
+                height: fit-content;
             }
             .info-lists {
                 margin-bottom: 1.5rem;
             }
             .organelle-info-panel {
-              background: #e8f4fd;
-              border: 1px solid #bbdefb;
-              border-radius: 12px;
-              padding: 1rem 1.2rem;
-              min-height: 100px;
+                background: #e8f4fd;
+                border: 1px solid #bbdefb;
+                border-radius: 12px;
+                padding: 1rem 1.2rem;
+                min-height: 100px;
             }
             .organelle-info-panel h3 {
-              margin: 0 0 0.5rem 0;
-              color: var(--primary);
-              font-size: 1.25rem;
+                margin: 0 0 0.5rem 0;
+                color: var(--primary);
+                font-size: 1.25rem;
             }
             .organelle-info-panel p {
-              margin: 0;
-              font-size: 0.95rem;
-              line-height: 1.6;
+                margin: 0;
+                font-size: 0.95rem;
+                line-height: 1.6;
             }
             .organelle-info-panel .gene-list {
-              display: flex;
-              flex-wrap: wrap;
-              gap: 0.5rem;
-              font-size: 0.9rem;
-              margin-top: 0.75rem;
+                display: flex;
+                flex-wrap: wrap;
+                gap: 0.5rem;
+                font-size: 0.9rem;
+                margin-top: 0.75rem;
             }
             .organelle-info-panel .gene-tag {
-              background: white; padding: 0.3rem 0.6rem; border-radius: 6px;
-              border: 1px solid #bbdefb; cursor: pointer;
+                background: white; padding: 0.3rem 0.6rem; border-radius: 6px;
+                border: 1px solid #bbdefb; cursor: pointer;
             }
             .organelle-info-panel .gene-tag:hover { background: #d0ebff; }
 
             /* AI Chat (placed below info) */
             .chat-panel {
-              margin-top: 2rem;
-              padding: 1.5rem;
+                margin-top: 2rem;
+                padding: 1.5rem;
             }
             .disclaimer {
-              font-size: 0.85rem; color: #e74c3c; background: #fdf2f2; padding: 0.8rem;
-              border-radius: 8px; margin-bottom: 1.5rem; border-left: 4px solid #e74c3c;
+                font-size: 0.85rem; color: #e74c3c; background: #fdf2f2; padding: 0.8rem;
+                border-radius: 8px; margin-bottom: 1.5rem; border-left: 4px solid #e74c3c;
             }
             .chat-window {
-              flex: 1; max-height: 400px; overflow-y: auto; padding: 1rem; background: #f8f9fa;
-              border-radius: 12px; margin-bottom: 1rem; border: 1px solid var(--border);
+                flex: 1; max-height: 400px; overflow-y: auto; padding: 1rem; background: #f8f9fa;
+                border-radius: 12px; margin-bottom: 1rem; border: 1px solid var(--border);
             }
             .message { margin: 0.75rem 0; padding: 0.75rem 1rem; border-radius: 12px; max-width: 85%; position: relative; }
             .user-message { background: var(--primary); color: white; margin-left: auto; border-bottom-right-radius: 4px; }
@@ -702,8 +709,8 @@
             .chat-input-group { display: flex; gap: 0.75rem; }
             .chat-input { flex: 1; padding: 0.9rem; font-size: 1rem; border: 1px solid var(--border); border-radius: 8px; }
             .send-btn {
-              background: var(--primary); color: white; padding: 0.9rem 1.8rem; border: none;
-              border-radius: 8px; cursor: pointer; font-weight: 600;
+                background: var(--primary); color: white; padding: 0.9rem 1.8rem; border: none;
+                border-radius: 8px; cursor: pointer; font-weight: 600;
             }
             .send-btn:hover { background: var(--primary-dark); }
         `;
@@ -785,64 +792,66 @@
                 </linearGradient>
             </defs>
 
-            <g id="plasma-membrane" class="compartment structure-plasma-membrane" transform="translate(140, 290) scale(0.7)">
+            <!-- Organelles from vFurkan (Scaled & Positioned) -->
+            <g id="plasma-membrane" class="compartment" transform="translate(140, 290) scale(0.7)">
                  <path d="M312.5,390c121.17-55.19,183.28-179.8,138.4-279S291.42-35.42,150,30.65C29.33,87-25.82,228,11.56,309.68,56.87,408.72,215.6,434.12,312.5,390Z"/>
             </g>
-            <g id="cytoplasm" class="compartment structure-cytoplasm" transform="translate(140, 290) scale(0.7)">
+            <g id="cell-body" class="compartment" transform="translate(140, 290) scale(0.7)">
                  <path d="M309.16,383.61C425.36,330.7,484.91,211.2,441.88,116.05S289-24.33,153.3,39C37.62,93.06-15.27,228.22,20.58,306.59,64,401.57,216.24,425.93,309.16,383.61Z"/>
             </g>
 
-            <g id="nucleus" class="compartment structure-nucleus" transform="translate(140, 380) scale(0.9)">
+            <g id="nucleus" class="compartment" transform="translate(140, 380) scale(0.9)">
                 <path d="M272.61,126.91c0,33.57-29,60.79-64.77,60.79s-64.76-27.22-64.76-60.79,29-60.78,64.76-60.78S272.61,93.34,272.61,126.91Z"/>
             </g>
-            <g id="nucleolus" class="compartment structure-nucleolus" transform="translate(140, 380) scale(0.9)">
+            <g id="nucleolus" class="compartment" transform="translate(140, 380) scale(0.9)">
                 <path d="M245.56,124.91c0,11.77-10.64,21.3-23.76,21.3S198,136.68,198,124.91s10.64-21.29,23.76-21.29S245.56,113.15,245.56,124.91Z"/>
             </g>
 
-            <g id="golgi-apparatus" class="compartment structure-golgi-apparatus" transform="translate(20, 350) scale(0.5)">
+            <g id="golgi-apparatus" class="compartment" transform="translate(20, 350) scale(0.5)">
                 <path d="M328.65,64a18.25,18.25,0,0,1,8.9,7.36c1.17,1.92,2,4.11,3.79,5.55,1.43,1.14,3.34,1.69,4.76,2.85a10.74,10.74,0,0,1,2.3,2.94c2.05,3.48,3.59,6.68,3.34,10.73a5.43,5.43,0,0,1-.9,3c-1.62,2.15-5.57,1.21-7.07-.47a9.53,9.53,0,0,1-2-5.24,40.9,40.9,0,0,1-.39-7.17,5.05,5.05,0,0,0-.19-2,1.86,1.86,0,0,0-1.62-1.25,3,3,0,0,0-1.83.86c-1.84,1.48-3.73,3.13-6.13,3.55s-5.3-1.15-5-3.35c.17-1.27,1.28-2.24,2.23-3.2a19.87,19.87,0,0,0,2.67-3.34c1-1.56,1.63-3.78.16-4.94-1.07-.84-2.75-.62-4,0S325.31,71.43,324,72s-3,.74-4-.16a3,3,0,0,1-.22-3.63c.77-1.38,2.15-3,1.13-4.2-.67-.8-2-.74-3.11-.61l-7.42.87a4.85,4.85,0,0,1-3-.29,2.5,2.5,0,0,1-.69-3.39c1.71-3,8.86-4.45,11.71-2.37,1.12.81,1.72,2.1,2.77,3,1.5,1.28,3.68,1.6,5.66,2.16C327.45,63.58,328.06,63.79,328.65,64Z"/>
                 <path d="M299,44.74c-2.53.9-4.77,2.45-5.51,4.95a3.8,3.8,0,0,0,.18,2.85c.83,1.54,3.38,2.53,5,2.47,8-.29,15.83-2.24,23.8-2.11s16.56,2.88,20.8,9.64c1.26,2,2.06,4.27,3.12,6.4a46.06,46.06,0,0,0,7.69,10.53,14.69,14.69,0,0,1,2.54,3.29c1.13,2.25.94,4.9.72,7.41l-1,11a10.91,10.91,0,0,0,.19,4.23c.38,1.34,1.5,2.9,1.65,4.25,2.12,4.22,7.87,5.13,9.87.18a9.55,9.55,0,0,0,.28-4.84,17.85,17.85,0,0,0-1.38-5.2c-.93-2-2.41-3.68-3.41-5.64a26.65,26.65,0,0,1-1.95-6c-1.12-4.73-1.87-9.52-4.13-13.79-2.18-4.1-3.95-8.21-7-11.77-4.68-5.41-11.21-8.92-17.94-11.35-10.11-3.65-19.15-9-30.34-7.31A17.76,17.76,0,0,0,299,44.74Z"/>
                 <path d="M297.31,32l-.18.09c-2.9,1.46-7.26,5.56-2.75,7.89a7.26,7.26,0,0,0,5,.23c6.27-1.59,13.17-3.16,19.66-2.29A45.29,45.29,0,0,1,324.21,39c6.23,1.55,12.73,3.32,17.26,7.63,2.44,2.31,4.15,5.22,6.5,7.61,3.74,3.82,8.8,6.08,12.93,9.46,4.5,3.67,6.19,9.65,7.05,15.17.62,4-.66,9.95,2.32,13.2a4.73,4.73,0,0,0,2.52,1.36c3.16.64,6.49-1.65,7.61-4.58s.39-6.22-1.15-8.9a37.54,37.54,0,0,0-6-7.12c-3.79-3.89-6.55-8.63-10.49-12.25-4.84-4.45-9.19-9.52-13.89-14.12A40.33,40.33,0,0,0,342.46,41c-4.32-2.74-9.74-4.19-14.65-5.72-2.71-.84-5.47-1.3-8.22-1.95s-5.47-2.06-8.32-2.8A20.44,20.44,0,0,0,297.31,32Z"/>
             </g>
-            <g id="golgi-vesicle" class="compartment structure-golgi-vesicle" transform="translate(40, 340) scale(0.5)">
+            <g id="golgi-vesicle" class="compartment" transform="translate(40, 340) scale(0.5)">
                 <path d="M301.15,61.82A2.81,2.81,0,1,1,298,59.34,2.81,2.81,0,0,1,301.15,61.82Z"/>
                 <path d="M342.29,102.94a3,3,0,1,1-3.32-2.63A3,3,0,0,1,342.29,102.94Z"/>
                 <path d="M339,92.19a3.86,3.86,0,1,1-4.28-3.4A3.86,3.86,0,0,1,339,92.19Z"/>
             </g>
 
-            <g id="mitochondria" class="compartment structure-mitochondria" transform="translate(280,260) scale(0.7)">
+            <g id="mitochondria" class="compartment" transform="translate(280,260) scale(0.7)">
                  <path d="M352.23,315.07a8.2,8.2,0,0,1-.91,8.09c-1.92,2.31-5.14,3-8.11,3.46a53.58,53.58,0,0,0-10.06,2.21c-3.24,1.18-7.07,3.4-8.54,6.67-1.55,3.47-3.33,7-6.45,9.36a22.36,22.36,0,0,1-14.52,3.89A10.82,10.82,0,0,1,296,345c-1.91-2.35-2.31-5.95-2-8.85.74-7,5.31-13.15,11-17.26s12.47-6.45,19.22-8.42c6.27-1.83,13.37-3.57,19.88-2A11.13,11.13,0,0,1,352.23,315.07Z"/>
             </g>
             
-            <g id="lysosome" class="compartment structure-lysosome" transform="translate(280, 350) scale(0.7)">
+            <g id="lysosome" class="compartment" transform="translate(280, 350) scale(0.7)">
                 <ellipse cx="234.02" cy="332.54" rx="9.83" ry="11.32" transform="translate(-143.2 484.37) rotate(-76.79)"/>
             </g>
-             <g id="peroxisome" class="compartment structure-peroxisome" transform="translate(300, 300) scale(0.7)">
+             <g id="peroxisome" class="compartment" transform="translate(300, 300) scale(0.7)">
                 <ellipse cx="162.77" cy="344.7" rx="7.6" ry="6.3"/>
             </g>
 
-            <g id="ribosomes" class="compartment structure-ribosomes" transform="translate(150, 350) scale(1)">
+            <g id="ribosomes" class="compartment" transform="translate(150, 350) scale(1)">
                 <path d="M141.07,73.92a1.56,1.56,0,1,1-1.56-1.46A1.52,1.52,0,0,1,141.07,73.92Z"/>
                 <path d="M136.66,78.94a1.56,1.56,0,1,1-1.56-1.46A1.52,1.52,0,0,1,136.66,78.94Z"/>
                 <path d="M127.48,90.68a1.56,1.56,0,1,1-1.56-1.47A1.51,1.51,0,0,1,127.48,90.68Z"/>
                 <path d="M123.59,96.47A1.56,1.56,0,1,1,122,95,1.52,1.52,0,0,1,123.59,96.47Z"/>
             </g>
 
-            <g id="microtubule" class="compartment structure-microtubule" transform="translate(150, 280) scale(0.5)">
+            <g id="microtubule" class="compartment" transform="translate(150, 280) scale(0.5)">
                  <path d="M81.25,195.08l-2.31,1.52s14.77,17.33,24.75,32.11S125.36,267,125.36,267l2.32-1.53s-5.89-15.25-20.42-37.47A268.48,268.48,0,0,0,81.25,195.08Z"/>
                  <path d="M299.5,292.48l2.31,1.53s-12.12,13.31-20,24.92-16.53,30.51-16.53,30.51L263,347.91s4-12.42,15.44-29.92A168.22,168.22,0,0,1,299.5,292.48Z"/>
             </g>
 
-            <g id="basal-body" class="compartment structure-basal-body">
+            <!-- v3.5 Cilia (Gray) -->
+            <g id="basal-body" class="compartment">
                 <rect x="285" y="300" width="30" height="22"/>
             </g>
-            <g id="transition-zone" class="compartment structure-transition-zone">
+            <g id="transition-zone" class="compartment">
                 <path d="M 287,300 L 280,280 L 320,280 L 313,300 Z"/>
             </g>
-            <g id="ciliary-membrane" class="compartment structure-ciliary-membrane">
+            <g id="ciliary-membrane" class="compartment">
                 <path d="M 280,280 L 295,80 L 305,80 L 320,280 Z"/>
             </g>
-            <g id="axoneme" class="compartment structure-axoneme">
+            <g id="axoneme" class="compartment">
                 <path d="M 295,280 L 298,85 L 302,85 L 305,280 Z"/>
             </g>
         </svg>`;
@@ -882,8 +891,8 @@
             el.classList.remove('active');
         });
 
-        // Clear list active states
-        document.querySelectorAll('.anat-list li.active').forEach(li => {
+        // Clear list active states (if any)
+        document.querySelectorAll('.legend-item.active').forEach(li => {
             li.classList.remove('active');
         });
     }
@@ -913,8 +922,6 @@
      * Handles activating any structure (from SVG or list)
      */
     function activateStructure(id) {
-        // This function no longer needs to exist, as the list is removed.
-        // We will call showInfoPanel directly from the click handler.
         const data = structureInfoMap[id];
         if (!data) return;
 
@@ -939,10 +946,10 @@
         const msg = document.createElement('div');
         msg.className = `message ${isUser ? 'user-message' : 'ai-message'}`;
         
-        msg.innerHTML = html; // Use innerHTML to allow <em>, <strong>, etc.
+        msg.innerHTML = `<div class="message-content">${html}</div>`; // Use innerHTML to allow <em>, <strong>, etc.
         
         if (!isUser) {
-            msg.innerHTML += `
+            msg.querySelector('.message-content').innerHTML += `
                 <div class="feedback">
                     <button title="Good answer" data-feedback="good">👍</button>
                     <button title="Bad answer" data-feedback="bad">👎</button>
@@ -968,32 +975,62 @@
         // Process the query
         handleAIQuery(query);
     }
-
+    
     /**
-     * Processes the user's query and generates an AI response.
-     * This now uses the *REAL* data-aware functions.
+     * Finds a gene and highlights it.
      */
-    function handleAIQuery(query) {
-        // Check if CiliAI engine is ready
-        if (!window.CiliAI || !window.CiliAI.ready || !window.parseQuery || !window.generateAnswer) {
-            addChatMessage(`<em>Error: CiliAI engine is not loaded. Please wait or refresh.</em>`, false);
+    function handleGeneSearch(geneSymbol, queryAI = true) {
+        const gene = geneSymbol.trim().toUpperCase();
+        if (!gene) return;
+
+        // Use the CiliAI lookup
+        if (!window.CiliAI || !window.CiliAI.ready || !window.CiliAI.lookups || !window.CiliAI.lookups.geneMap) {
+            console.warn("CiliAI data is not ready for gene search.");
+            return;
+        }
+        
+        const geneData = window.CiliAI.lookups.geneMap[gene];
+        
+        if (!geneData) {
+            clearAllHighlights();
+            showInfoPanel(`Gene Not Found: ${gene}`, `This gene is not in the CiliAI database.`);
             return;
         }
 
-        // 1. Parse the query
-        const parsedIntent = window.parseQuery(query);
+        // Find localization
+        let loc = 'unknown';
+        let locString = 'Unknown';
+        if (geneData.localization) {
+            // Use the already-normalized array
+            const locArray = ensureArray(geneData.localization);
+            locString = locArray.join(', ');
+            const locLower = locString.toLowerCase();
+            
+            // Match in order of specificity
+            if (locLower.includes('transition zone')) loc = 'transition-zone';
+            else if (locLower.includes('axoneme')) loc = 'axoneme';
+            else if (locLower.includes('basal body')) loc = 'basal-body';
+            else if (locLower.includes('membrane')) loc = 'ciliary-membrane';
+            else if (locLower.includes('nucleus')) loc = 'nucleus';
+            else if (locLower.includes('mitochondrion')) loc = 'mitochondria';
+            else if (locLower.includes('golgi')) loc = 'golgi-apparatus';
+            else if (locLower.includes('cytoplasm')) loc = 'cell-body';
+        }
+        
+        // Highlight and show info
+        clearAllHighlights();
+        if (loc !== 'unknown' && document.getElementById(loc)) {
+            document.getElementById(loc).classList.add('active');
+        }
+        showInfoPanel(`Gene: ${gene}`, (geneData.description || 'No description available.') + `<br><strong>Localization:</strong> ${locString}`, [gene]);
 
-        // 2. Generate the answer
-        const answer = window.generateAnswer(parsedIntent);
-
-        // 3. Add the AI's response to the chat
-        addChatMessage(answer.html, false);
-
-        // 4. Handle side-effects
-        if (answer.highlightGene) {
-            handleGeneSearch(answer.highlightGene, false); // false = don't re-query AI
+        // Also ask the AI about it if triggered by user
+        if (queryAI) {
+            addChatMessage(`Tell me about ${gene}`, true);
+            handleAIQuery(`Tell me about ${gene}`);
         }
     }
+
 
     // --- 8. EVENT LISTENER SETUP ---
 
@@ -1002,6 +1039,413 @@
      */
     function setupPageEventListeners() {
         // Guard against elements not existing
+        const sendBtn = document.getElementById('sendBtn');
+        const chatInput = document.getElementById('chatInput');
+        const findGeneBtn = document.getElementById('findGeneBtn');
+        const geneSearchInput = document.getElementById('geneSearchInput');
+        const showUmapBtn = document.getElementById('showUmapBtn');
+        const bottomBar = document.getElementById('bottomBar');
+        
+        // Chat
+        if (sendBtn) sendBtn.addEventListener('click', handleUserSend);
+        if (chatInput) chatInput.addEventListener('keypress', e => {
+            if (e.key === 'Enter') handleUserSend();
+        });
+
+        // Gene Search
+        if (findGeneBtn) findGeneBtn.addEventListener('click', () => {
+            if (geneSearchInput) handleGeneSearch(geneSearchInput.value, true);
+        });
+        if (geneSearchInput) geneSearchInput.addEventListener('keypress', e => {
+            if (e.key === 'Enter') handleGeneSearch(geneSearchInput.value, true);
+        });
+
+        // UMAP Button
+        if (showUmapBtn) showUmapBtn.addEventListener('click', () => {
+            console.log("CiliAI: 'Show UMAP' clicked.");
+            addChatMessage("Show me the UMAP plot.", true);
+            handleAIQuery("Show me the UMAP plot.");
+        });
+
+        // Event delegation for dynamic content (gene tags, feedback)
+        document.body.addEventListener('click', e => {
+            // Gene tags in info panel
+            const geneTag = e.target.closest('.gene-tag');
+            if (geneTag) {
+                const gene = geneTag.dataset.gene;
+                if (chatInput) chatInput.value = `What is ${gene}?`;
+                handleUserSend();
+                return;
+            }
+
+            // Feedback buttons
+            const feedbackBtn = e.target.closest('.feedback button');
+            if (feedbackBtn) {
+                console.log(`CiliAI Feedback: ${feedbackBtn.dataset.feedback}`);
+                feedbackBtn.parentElement.querySelectorAll('button').forEach(b => b.style.opacity = 0.3);
+                feedbackBtn.style.opacity = 1;
+                return;
+            }
+            
+            // Legend items in bottom bar
+            const legendItem = e.target.closest('.legend-item');
+            if (legendItem) {
+                const id = legendItem.dataset.id;
+                if (id) activateStructure(id);
+                return;
+            }
+            
+            // Gene badges in bottom bar
+            const geneBadge = e.target.closest('.gene-badge');
+            if (geneBadge) {
+                const gene = geneBadge.dataset.gene;
+                if (gene) handleGeneSearch(gene, true);
+            }
+        });
+    }
+
+    // ==========================================================
+    // 9. AI QUERY ENGINE (THE "BRAIN")
+    // This section MUST be replaced with your real, advanced logic.
+    // ==========================================================
+
+    /**
+     * This is the list of exact-match, high-priority, "solid" questions.
+     * This is Priority 1.
+     */
+    const questionRegistry = [
+        // ... (This would be populated with your full registry) ...
+        { text: "what can you do?", handler: async () => formatListResult("About CiliAI", [], "I am an AI assistant combining multiple genomic and functional datasets (CiliaHub, Domain DB, scRNA-seq, Phylogeny) to answer questions about ciliary biology.") },
+        { text: "list genes for joubert syndrome", handler: async () => formatListResult("Joubert Syndrome Genes", (await getCiliopathyGenes("Joubert Syndrome")).genes) },
+    ];
+
+    /**
+     * This is the semantic router for patterns (e.g., [LOCATION] + [PHENOTYPE]).
+     * This is Priority 2.
+     */
+    async function resolveSemanticIntent(query) {
+        const qLower = query.toLowerCase().trim();
+
+        const localizationTerms = ["basal body", "transition zone", "cilia", "axoneme", "centrosome", "ciliary membrane", "nucleus", "lysosome", "mitochondria", "ciliary tip"];
+        const phenotypeTerms = ["short cilia", "shorter", "longer cilia", "long cilia", "cilia length", "cilia defects", "decreased ciliation", "loss of cilia", "reduced cilia", "no effect"];
+        const diseaseNames = ["joubert syndrome", "meckel-gruber syndrome", "primary ciliary dyskinesia", "nephronophthisis", "bbs", "pcd", "ciliopathy"];
+
+        const matchedLocalization = localizationTerms.find(name => qLower.includes(name));
+        const matchedPhenotype = phenotypeTerms.find(term => qLower.includes(term));
+        const matchedDisease = diseaseNames.find(name => qLower.includes(name));
+
+        // Priority 2a: Disease + Phenotype
+        if (matchedDisease && matchedPhenotype) {
+            return await getLocalizationPhenotypeGenes(matchedDisease, matchedPhenotype.includes("short") ? "short" : "long");
+        }
+        
+        // Priority 2b: Localization + Phenotype (The one we fixed)
+        if (matchedLocalization && matchedPhenotype) {
+            return await getLocalizationPhenotypeGenes(matchedLocalization, matchedPhenotype.includes("short") ? "short" : "long");
+        }
+        
+        return null; // No semantic pattern found
+    }
+
+
+    /**
+     * REPLACEMENT: The new, unified "Brain" of CiliAI
+     * This function contains both the simple keyword parser (.parse)
+     * and the new complex query helpers (.getJoubertGenesInCiliatedCells, .getOrthologs)
+     */
+    function createIntentParser() {
+        // --- Disease Classification Map ---
+        const classifiedDiseases = {
+            "Primary Ciliopathies": [ "Acrocallosal Syndrome", "Alström Syndrome", "Autosomal Dominant Polycystic Kidney Disease", "Autosomal Recessive Polycystic Kidney Disease", "Bardet–Biedl Syndrome", "COACH Syndrome", "Cranioectodermal Dysplasia", "Ellis-van Creveld Syndrome", "Hydrolethalus Syndrome", "Infantile Polycystic Kidney Disease", "Joubert Syndrome", "Leber Congenital Amaurosis", "Meckel–Gruber Syndrome", "Nephronophthisis", "Orofaciodigital Syndrome", "Senior-Løken Syndrome", "Short-rib Thoracic Dysplasia", "Skeletal Ciliopathy", "Retinal Ciliopathy", "Syndromic Ciliopathy", "Al-Gazali-Bakalinova Syndrome", "Bazex-Dupré-Christol Syndrome", "Bilateral Polycystic Kidney Disease", "Biliary, Renal, Neurologic, and Skeletal Syndrome", "Caroli Disease", "Carpenter Syndrome", "Complex Lethal Osteochondrodysplasia", "Greig Cephalopolysyndactyly Syndrome", "Kallmann Syndrome", "Lowe Oculocerebrorenal Syndrome", "McKusick-Kaufman Syndrome", "Morbid Obesity and Spermatogenic Failure", "Polycystic Kidney Disease", "RHYNS Syndrome", "Renal-hepatic-pancreatic Dysplasia", "Retinal Dystrophy", "STAR Syndrome", "Smith-Lemli-Opitz Syndrome", "Spondylometaphyseal Dysplasia", "Stromme Syndrome", "Weyers Acrofacial Dysostosis", "Hydrocephalus"], 
+            "Motile Ciliopathies": [ "Primary Ciliary Dyskinesia", "Birt-Hogg-Dubé Syndrome", "Juvenile Myoclonic Epilepsy" ],
+            "Secondary Diseases": [ "Ataxia-telangiectasia-like Disorder", "Birt-Hogg-Dubé Syndrome", "Cone-Rod Dystrophy", "Cornelia de Lange Syndrome", "Holoprosencephaly", "Juvenile Myoclonic Epilepsy", "Medulloblastoma", "Retinitis Pigmentosa", "Spinocerebellar Ataxia", "Bazex-Dupré-Christol Syndrome", "Lowe Oculocerebrorenal Syndrome", "McKusick-Kaufman Syndrome", "Pallister-Hall Syndrome", "Simpson-Golabi-Behmel Syndrome", "Townes-Brocks Syndrome", "Usher Syndrome", "Visceral Heterotaxy" ],
+            "Atypical Ciliopathies": [ "Biliary Ciliopathy", "Chronic Obstructive Pulmonary Disease", "Ciliopathy", "Ciliopathy - Retinal dystrophy", "Golgipathies or Ciliopathy", "Hepatic Ciliopathy", "Male Infertility and Ciliopathy", "Male infertility", "Microcephaly and Chorioretinopathy Type 3", "Mucociliary Clearance Disorder", "Notch-mediated Ciliopathy", "Primary Endocardial Fibroelastosis", "Retinal Ciliopathy", "Retinal Degeneration", "Skeletal Ciliopathy", "Syndromic Ciliopathy"]
+        };
+        const aliases = ["BBS", "Joubert", "NPHP", "MKS"];
+        const allDiseases = [...Object.values(classifiedDiseases).flat(), ...aliases];
+
+        // --- Core Function: Joubert Genes in Ciliated Cells (Uses GLOBAL helpers) ---
+        async function getJoubertGenesInCiliatedCells() {
+            await fetchCiliaData();
+            await fetchCellxgeneData();
+            const { genes: joubertGenes } = await getCiliopathyGenes("Joubert Syndrome"); 
+            const joubertGeneSet = new Set(joubertGenes.map(g => g.gene.toUpperCase()));
+            const results = [];
+            if (window.CiliAI.data.scExpressionByGene) { // Use new data structure
+                joubertGeneSet.forEach(gene => {
+                    const expData = window.CiliAI.data.scExpressionByGene[gene]; 
+                    if (expData && expData["ciliated cell"] && expData["ciliated cell"] > 0.1) {
+                        results.push({
+                            gene: gene,
+                            description: `Expression: ${expData["ciliated cell"].toFixed(4)}`
+                        });
+                    }
+                });
+            }
+            results.sort((a, b) => parseFloat(b.description.split(': ')[1]) - parseFloat(a.description.split(': ')[1]));
+            return formatListResult("Joubert Genes Expressed in Ciliated Cells", results); 
+        }
+
+        // --- Function: Orthologs Finder (Uses GLOBAL helpers) ---
+        async function getOrthologs(disease, organism) {
+            await fetchCiliaData();
+            const { genes: diseaseGenes } = await getCiliopathyGenes(disease); 
+            const orthologKeyMap = {
+                'c. elegans': 'ortholog_c_elegans',
+                'mouse': 'ortholog_mouse',
+                'zebrafish': 'ortholog_zebrafish',
+                'xenopus': 'ortholog_xenopus',
+                'drosophila': 'ortholog_drosophila'
+            };
+            const orthologKey = orthologKeyMap[organism.toLowerCase()];
+            if (!orthologKey) {
+                return formatListResult(`${disease} Orthologs in ${organism}`, [], `Ortholog key for "${organism}" not found.`);
+            }
+            const results = diseaseGenes
+                .map(g => window.CiliAI.masterData.find(cg => cg.gene === g.gene)) // Use new data structure
+                .filter(g => g && g[orthologKey] && g[orthologKey] !== 'N/A')
+                .map(g => ({ gene: g.gene, description: `${organism} Ortholog: ${g[orthologKey]}` }));
+            return formatListResult(`${disease} Orthologs in ${organism}`, results);
+        }
+
+        // --- Entity Keywords for simple parsing (from OLD parser) ---
+        const entityKeywords = [
+            {
+                type: 'FUNCTIONAL_CATEGORY',
+                keywords: ['kinesin motors', 'dynein motors', 'Ciliary assembly/disassembly', 'Signaling', 'Motile cilium', 'Motor protein', 'Transport', 'Protein modification', 'Cytoskeletal', 'cilium assembly', 'basal body docking', 'retrograde IFT'],
+                handler: async (term) => formatListResult(`Genes in Functional Category: ${term}`, await getGenesByFunction(term)),
+                autocompleteTemplate: (term) => `Show me ${term} genes`
+            },
+            {
+                type: 'COMPLEX',
+                keywords: ['BBSome', 'IFT-A', 'IFT-B', 'Transition Zone Complex', 'MKS Complex', 'NPHP Complex'],
+                handler: async (term) => formatListResult(`Components of ${term}`, await getGenesByComplex(term)),
+                autocompleteTemplate: (term) => `Display components of ${term} complex`
+            },
+            {
+                type: 'CILIOPATHY',
+                keywords: [...new Set(allDiseases)], // USES THE NEW LARGE LIST
+                handler: async (term) => {
+                    const titleTerm = term.toUpperCase() === 'BBS' ? 'Bardet–Biedl Syndrome' :
+                                    term.toUpperCase() === 'MKS' ? 'Meckel–Gruber Syndrome' : term;
+                    const { genes, description } = await getCiliopathyGenes(term);
+                    return formatListResult(`Genes for ${titleTerm}`, genes, description);
+                },
+                autocompleteTemplate: (term) => `Display genes for ${term}`
+            },
+            {
+                type: 'LOCALIZATION',
+                // FIX: Add all localization terms here for the simple parser
+                keywords: [
+                    'basal body', 'axoneme', 'transition zone', 'centrosome', 
+                    'cilium', 'cilia', 'lysosome', 'ciliary tip', 'transition fiber',
+                    'mitochondria', 'nucleus', 'flagella'
+                ],
+                handler: async (term) => formatListResult(`Genes localizing to ${term}`, await getGenesByLocalization(term)),
+                autocompleteTemplate: (term) => `Show me ${term} localizing genes`
+            },
+            {
+                type: 'ORGANISM',
+                keywords: [ "Prokaryote", "E.cuniculi", "E.histolytica", "E.dispar", "G.lamblia", "T.vaginalis", "T.brucei", "T.cruzi", "L.infantum", "L.major", "L.braziliensis", "T.gondii", "C.hominis", "C.parvum", "B.bovis", "T.annulata", "T.parva", "P.knowlesi", "P.vivax", "P.falciparum", "P.chabaudi", "P.berghei", "P.yoelii", "P.tetraurelia", "T.thermophila", "P.infestans", "T.pseudonana", "P.tricornutum", "C.merolae", "N.gruberi", "O.lucimarinus", "O.tauri", "C.reinhardtii", "V.carteri", "P.patens", "S.moellendorffii", "S.bicolor", "Z.mays", "O.sativa", "B.distachyon", "A.lyrata", "A.thaliana", "L.japonicus", "M.truncatula", "V.vinifera", "P.trichocarpa", "R.communis", "T.trahens", "D.discoideum", "A.macrogynus", "S.punctatus", "M.globosa", "U.maydis", "C.neoformans", "P.chrysosporium", "S.commune", "C.cinerea", "L.bicolor", "S.pombe", "B.fuckeliana", "S.sclerotiorum", "F.graminearum", "M.grisea", "N.crassa", "P.anserina", "P.chrysogenum", "A.clavatus", "A.fumigatus", "N.fischeri", "A.flavus", "A.oryzae", "A.niger", "A.nidulans", "U.reesii", "C.immitis", "C.posadasii", "P.nodorum", "T.melanosporum", "Y.lipolytica", "P.pastoris", "C.lusitaniae", "D.hansenii", "M.guilliermondii", "S.stipitis", "L.elongisporus", "C.tropicalis", "C.albicans", "C.dubliniensis", "K.lactis", "A.gossypii", "K.waltii", "L.thermotolerans", "Z.rouxii", "V.polyspora", "C.glabrata", "S.bayanus", "S.mikatae", "S.cerevisiae", "S.paradoxus", "S.arctica", "C.owczarzaki", "M.brevicollis", "S.rosetta", "S.mansoni", "B.malayi", "C.briggsae", "C.elegans", "D.pulex", "A.pisum", "P.humanus", "A.mellifera", "N.vitripennis", "B.mori", "T.castaneum", "D.melanogaster", "D.pseudoobscura", "A.gambiae", "A.aegypti", "C.quinquefasciatus", "B.floridae", "T.adhaerens", "S.purpuratus", "H.magnipapillata", "N.vectensis", "C.intestinalis", "D.rerio", "O.latipes", "F.rubripes", "T.nigroviridis", "X.tropicalis", "G.gallus", "M.gallopavo", "O.anatinus", "M.domestica", "S.scrofa", "M.musculus", "C.familiaris", "B.taurus", "H.sapiens", "worm", "human", "mouse", "zebrafish", "fly", "yeast" ],
+                handler: async (term) => {
+                    // This function 'getCiliaryGenesForOrganism' needs to be defined globally
+                    // or passed into this module. Assuming it's global for now.
+                    const { genes, description, speciesCode } = await getCiliaryGenesForOrganism(term);
+                    return formatListResult(`Ciliary genes in ${speciesCode}`, genes, description); 
+                },
+                autocompleteTemplate: (term) => `Display ciliary genes in ${term}`
+            },
+            {
+                type: 'DOMAIN',
+                keywords: ['WD40', 'Leucine-rich repeat', 'IQ motif', 'calmodulin-binding', 'EF-hand', 'coiled-coil', 'CTS', 'ciliary targeting sequences', 'ciliary localization signals'],
+                handler: async (term) => formatListResult(`${term} domain-containing proteins`, await getGenesByDomain(term)),
+                autocompleteTemplate: (term) => `Show ${term} domain containing proteins`
+            }
+        ];
+
+        // --- Return Public API (Unified) ---
+        return {
+            // --- New Module Methods ---
+            classifiedDiseases,
+            allDiseases,
+            getJoubertGenesInCiliatedCells,
+            getOrthologs,
+            
+            // --- Old Parser Methods ---
+            parse: (query) => {
+                const normalizedQuery = normalizeTerm(query);
+                for (const entityType of entityKeywords) {
+                    const sortedKeywords = [...entityType.keywords].sort((a, b) => b.length - a.length);
+                    for (const keyword of sortedKeywords) {
+                        const keywordRegex = new RegExp(`\\b${normalizeTerm(keyword).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
+                        if (keywordRegex.test(normalizedQuery)) {
+                            return { intent: entityType.type, entity: keyword, handler: entityType.handler };
+                        }
+                    }
+                }
+                return null;
+            },
+            getKnownKeywords: () => entityKeywords.flatMap(e => e.keywords.map(k => ({ keyword: k, suggestion: e.autocompleteTemplate(k) }))),
+            getAllDiseases: () => [...new Set(allDiseases)],
+            getAllComplexes: () => entityKeywords.find(e => e.type === 'COMPLEX').keywords,
+            getAllGenes: () => window.CiliAI.masterData ? window.CiliAI.masterData.map(g => g.gene) : []
+        };
+    }
+
+    // --- Initialize the new, unified intent parser ---
+    const intentParser = createIntentParser();
+
+
+    /**
+     * This is the main router that implements the Priority Waterfall.
+     */
+    async function handleAIQuery(query) {
+        const resultArea = document.getElementById('chatWindow'); // Use chat window for output
+        
+        // --- FIX: Guard Clause ---
+        if (!resultArea) {
+            console.warn('handleAIQuery called before UI elements were ready. Aborting.');
+            return; 
+        }
+        
+        const qLower = query.toLowerCase();
+        if (!query) return;
+
+        // --- Purge Plotly from the *diagram* container ---
+        try { 
+            const plotDiv = document.getElementById('cilia-svg');
+            if (plotDiv && window.Plotly) Plotly.purge(plotDiv); 
+        } catch (e) {}
+
+        log(`Routing query: ${query}`);
+        
+        try {
+            // Data is loaded by initCiliAI(), so we can proceed.
+            if (!window.CiliAI.ready) {
+                 addChatMessage("Data is still loading, please wait...", false);
+                 return;
+            }
+
+            let htmlResult = '';
+            let match;
+
+            // =================================================================
+            // PRIORITY 1: Exact Match in questionRegistry (Your 13 test queries)
+            // =================================================================
+            const perfectMatch = questionRegistry.find(item => item.text.toLowerCase() === qLower);
+            if (perfectMatch) {
+                console.log(`Routing via: Priority 1 (questionRegistry)`);
+                htmlResult = await perfectMatch.handler();
+            }
+
+            // =================================================================
+            // PRIORITY 2: Semantic Intent (Location + Phenotype, Disease + Phenotype)
+            // =================================================================
+            if (!htmlResult) {
+                const semanticResult = await resolveSemanticIntent(query);
+                if (semanticResult) {
+                    console.log(`Routing via: Priority 2 (resolveSemanticIntent)`);
+                    htmlResult = semanticResult;
+                }
+            }
+            
+            // =================================================================
+            // PRIORITY 3: New Module Helpers & Dedicated Routers
+            // =================================================================
+            if (!htmlResult) {
+                console.log(`Routing via: Priority 3 (Dedicated Routers & New Helpers)`);
+                
+                // --- Ciliopathy Module Queries (from new intentParser) ---
+                if (qLower.includes('joubert') && qLower.includes('ciliated cells')) {
+                    htmlResult = await intentParser.getJoubertGenesInCiliatedCells();
+                } 
+                else if (qLower.includes('ortholog') && (qLower.includes('joubert') || qLower.includes('ciliopathy'))) {
+                    const diseaseMatch = qLower.includes('joubert') ? "Joubert Syndrome" : "ciliopathy";
+                    const organismMatch = qLower.match(/(c\. elegans|zebrafish|mouse|drosophila|xenopus)/i);
+                    if (organismMatch) {
+                        htmlResult = await intentParser.getOrthologs(diseaseMatch, organismMatch[1]);
+                    }
+                }
+                
+                // --- CORUM Queries (Integrated from patchAIQueryHandler) ---
+                else if (qLower.includes('subunits of') || qLower.includes('components of') || qLower.includes('members of')) {
+                    const complexMatch = qLower.match(/(?:subunits|components|members)\s+of\s+(.+)/i);
+                    if (complexMatch) {
+                        const complexes = await getGenesByComplex(complexMatch[1].trim());
+                        htmlResult = formatListResult(`Components of ${complexMatch[1].trim()}`, complexes);
+                    }
+                }
+                else if (qLower.includes('complexes for') || qLower.includes('complexes of') || qLower.includes('complexes containing')) {
+                    const geneMatch = qLower.match(/(?:complexes|subunits)\s+(?:for|of|containing)\s+([A-Za-z0-9\-]+)/i);
+                    if (geneMatch) {
+                        const complexes = await getGenesByComplex(geneMatch[1].toUpperCase());
+                        htmlResult = formatListResult(`Complexes containing ${geneMatch[1].toUpperCase()}`, complexes);
+                    }
+                }
+
+                // --- Phylogenetic Table/Heatmap Router ---
+                else if (qLower.includes('phylogeny') || qLower.includes('conservation') || qLower.includes('evolutionary')) {
+                    const genes = extractMultipleGenes(query);
+                    htmlResult = await handlePhylogenyVisualizationQuery(genes, 'li', 'heatmap');
+                } 
+                // --- Domain Query Router ---
+                else if (qLower.includes('domain') || qLower.includes('architecture')) {
+                    htmlResult = await resolveDomainQuery(query);
+                }
+            }
+
+            // =================================================================
+            // PRIORITY 4: Simple Keyword Parser
+            // =================================================================
+            if (!htmlResult) {
+                // This now uses the .parse() method of our NEW unified intentParser
+                const intent = intentParser.parse(query);
+                if (intent && typeof intent.handler === 'function') {
+                    console.log(`Routing via: Priority 4 (intentParser.parse()) - Matched ${intent.intent}`);
+                    htmlResult = await intent.handler(intent.entity);
+                }
+            }
+
+            // =================================================================
+            // PRIORITY 5: Fallback (Gene Details or Error)
+            // =================================================================
+            if (!htmlResult) {
+                console.log(`Routing via: Priority 5 (Fallback)`);
+                if ((match = qLower.match(/(?:tell me about|what is|describe)\s+(.+)/i))) {
+                    const term = match[1].trim();
+                    htmlResult = await getComprehensiveDetails(term);
+                } else {
+                    const potentialGenes = (query.match(/\b([A-Z0-9\-\.]{3,})\b/gi) || []).map(g => g.toUpperCase());
+                    if (potentialGenes.length === 1 && qLower.length < (potentialGenes[0].length + 5)) {
+                         if (window.CiliAI.lookups.geneMap[potentialGenes[0]]) {
+                            htmlResult = await getComprehensiveDetails(potentialGenes[0]);
+                         }
+                    } 
+                    
+                    if (!htmlResult) {
+                        htmlResult = `Sorry, I didn't understand the query: "<strong>${query}</strong>". Please try a simpler term or one of the suggested questions.`;
+                    }
+                }
+            }
+
+            addChatMessage(htmlResult, false);
+
+        } catch (e) {
+            console.error("Error in handleAIQuery:", e);
+            addChatMessage(`An internal CiliAI error occurred: ${e.message}`, false);
+        }
+    }
+
+
+    // ==========================================================
+    // 10. EVENT LISTENERS & STARTUP
+    // ==========================================================
+    
+    /**
+     * Attaches all primary event listeners for the page.
+     * This is called by displayCiliAIPage()
+     */
+    function setupPageEventListeners() {
         const sendBtn = document.getElementById('sendBtn');
         const chatInput = document.getElementById('chatInput');
         const findGeneBtn = document.getElementById('findGeneBtn');
@@ -1048,125 +1492,125 @@
                 feedbackBtn.style.opacity = 1;
                 return;
             }
+            
+            // Legend items in bottom bar
+            const legendItem = e.target.closest('.legend-item');
+            if (legendItem) {
+                // Note: The onclick="" attribute is handling this,
+                // but we could move it here if preferred.
+                // const id = legendItem.dataset.id;
+                // if (id) activateStructure(id);
+                return;
+            }
+            
+            // Gene badges in bottom bar
+            const geneBadge = e.target.closest('.gene-badge');
+            if (geneBadge) {
+                // Note: The onclick="" attribute is handling this.
+                // const gene = geneBadge.dataset.gene;
+                // if (gene) handleGeneSearch(gene, true);
+            }
+
+             // AI Action Links (for plot switching, etc.)
+            const aiAction = e.target.closest('.ai-action');
+             if (aiAction) {
+                e.preventDefault();
+                const action = aiAction.dataset.action;
+                const genesString = aiAction.dataset.genes;
+                const genes = genesString ? genesString.split(',').map(g => g.trim()).filter(Boolean) : [];
+                const resultArea = document.getElementById('chatWindow');
+
+                if (action === 'show-nevers-heatmap' || action === 'show-li-heatmap') {
+                    const source = action.includes('nevers') ? 'nevers' : 'li';
+                    resultArea.innerHTML += `<p class="status-searching">Switching to ${source.toUpperCase()} comparison...</p>`;
+                    handlePhylogenyVisualizationQuery(genes, source, 'heatmap');
+                }  
+                else if (action === 'show-table-view') {
+                    resultArea.innerHTML += `<p class="status-searching">Generating phylogenetic data table...</p>`;
+                    handlePhylogenyVisualizationQuery(genes, 'li', 'table');
+                }
+                else if (action === 'visualize-heatmap') {
+                     resultArea.innerHTML += `<p class="status-searching">Generating heatmap...</p>`;
+                     handlePhylogenyVisualizationQuery(genes, 'li', 'heatmap');
+                }
+            }
         });
     }
 
-    /**
-     * Handles the "Find Gene" button click or AI highlight request.
-     * This is now DATA-AWARE.
-     */
-    function handleGeneSearch(geneSymbol, queryAI = true) {
-        const gene = geneSymbol.trim().toUpperCase();
-        if (!gene) return;
+    // --- Placeholder functions from old script, to be replaced by new handlers ---
+    // These are the *real* handlers for the new UI
+    
+    // Called by the simple SVG diagram click
+    window.selectComp = function(id) {
+        document.querySelectorAll('.cilia-part').forEach(el => el.classList.remove('selected'));
+        const el = document.getElementById(id);
+        if(el) el.classList.add('selected');
+        
+        const data = structureInfoMap[id];
+        if (!data) return;
 
-        // Use the CiliAI lookup
-        if (!window.CiliAI || !window.CiliAI.ready || !window.CiliAI.lookups || !window.CiliAI.lookups.geneMap) {
-            console.warn("CiliAI data is not ready for gene search.");
-            return;
+        const genes = window.CiliAI.lookups.byLocalization[data.title] || 
+                      window.CiliAI.lookups.byLocalization[data.title.toLowerCase()] || 
+                      data.genes || []; // Fallback to static list
+
+        const bar = document.getElementById('bottomBar');
+        if (genes.length > 0) {
+            bar.innerHTML = `<h3>${data.title} (${genes.length} genes)</h3>
+            <div class="gene-list">${genes.slice(0, 40).map(g => 
+                `<span class="gene-badge" data-gene="${g}" onclick="searchGene('${g}')">${g}</span>`
+            ).join('')}${genes.length > 40 ? `<span style="font-size:11px;color:#666;padding:5px;">...+${genes.length-40} more</span>` : ''}</div>`;
+        } else {
+            bar.innerHTML = `<h3>${data.title}</h3><p style="color:#666;font-size:12px;">No genes found in database. Try searching directly.</p>`;
         }
         
-        const geneData = window.CiliAI.lookups.geneMap[gene];
-        
-        if (!geneData) {
-            clearAllHighlights();
-            showInfoPanel(`Gene Not Found: ${gene}`, `This gene is not in the CiliAI database.`);
-            return;
-        }
-
-        // Find localization
-        let loc = 'unknown';
-        let locString = 'Unknown';
-        if (geneData.localization) {
-            locString = String(geneData.localization);
-            const locLower = locString.toLowerCase();
-            
-            // Match in order of specificity
-            if (locLower.includes('transition zone')) loc = 'transition-zone';
-            else if (locLower.includes('axoneme')) loc = 'axoneme';
-            else if (locLower.includes('basal body')) loc = 'basal-body';
-            else if (locLower.includes('membrane')) loc = 'ciliary-membrane';
-            else if (locLower.includes('nucleus')) loc = 'nucleus';
-            else if (locLower.includes('mitochondrion')) loc = 'mitochondria';
-            else if (locLower.includes('golgi')) loc = 'golgi-apparatus';
-            else if (locLower.includes('cytoplasm')) loc = 'cytoplasm';
-        }
-        
-        // Highlight and show info
-        clearAllHighlights();
-        if (loc !== 'unknown' && document.getElementById(loc)) {
-            document.getElementById(loc).classList.add('active');
-        }
-        showInfoPanel(`Gene: ${gene}`, (geneData.description || 'No description available.') + `<br><strong>Localization:</strong> ${locString}`, [gene]);
-
-        // Also ask the AI about it if triggered by user
-        if (queryAI) {
-            addChatMessage(`What is ${gene}?`, true);
-            handleAIQuery(`What is ${gene}?`);
-        }
+        addChatMessage(`Selected <strong>${data.title}</strong>. Found ${genes.length} genes.`, false);
     }
 
-
-    // --- 9. AI QUERY ENGINE PLACEHOLDERS ---
-    // You MUST replace these with your real functions
-    // from your other CiliAI file.
+    // Called by the "Find Gene" button
+    window.searchGene = function(name) {
+        const query = name || document.getElementById('geneSearch').value.trim().toUpperCase();
+        if (!query) return;
+        handleGeneSearch(query, true);
+    }
     
-    if (!window.parseQuery) {
-        console.warn("CiliAI: `parseQuery` is not defined! Using placeholder.");
-        window.parseQuery = function(query) {
-            console.log("Using placeholder parseQuery");
-            let gene = null;
-            const geneMatch = query.match(/what is (\w+)/i) || query.match(/(\w+)/i);
-            if (geneMatch) gene = geneMatch[1].toUpperCase();
-            return { query, gene, highlightGene: gene };
+    // Called by "Show UMAP" button
+    window.showUMAP = function() {
+        addChatMessage('Show UMAP', true);
+        handleAIQuery('Plot UMAP expression for FOXJ1'); // Example query
+    }
+
+    // Called by "Send" button
+    window.sendMsg = function() {
+        handleUserSend();
+    }
+    
+    // Called by feedback buttons
+    window.react = function(type) {
+        if (type === 'up') {
+            addChatMessage('Thanks for the feedback! 🙏', false);
+        } else {
+            addChatMessage('Sorry about that. What specifically would help?', false);
         }
     }
     
-    if (!window.generateAnswer) {
-        console.warn("CiliAI: `generateAnswer` is not defined! Using placeholder.");
-        window.generateAnswer = function(intent) {
-            console.log("Using placeholder generateAnswer");
-            let html = `I received your query about: <strong>${intent.query}</strong>. `;
-            let highlightGene = intent.highlightGene;
-            
-            if (intent.gene && window.CiliAI.ready) {
-                const geneData = window.CiliAI.lookups.geneMap[intent.gene];
-                if (geneData) {
-                    html = `<strong>${intent.gene}</strong>: ${geneData.description || 'No description found.'} <br><strong>Localization:</strong> ${geneData.localization || 'Unknown'}`;
-                } else {
-                    html = `Sorry, I don't have information on <strong>${intent.gene}</strong>.`;
-                    highlightGene = null;
-                }
-            } else if (intent.query.toLowerCase().includes('umap')) {
-                html = "Displaying the UMAP plot is not yet fully integrated in this view, but the 'Show UMAP' button can trigger this action.";
-            } else {
-                html = "Sorry, I can only provide gene information right now. Try 'What is IFT88?'.";
-                highlightGene = null;
-            }
-            
-            return { html, highlightGene };
+    // Called by "New Chat" button (if added)
+    window.clearChat = function() {
+        if (confirm('Start new conversation?')) {
+            document.getElementById('messages').innerHTML = '';
+            document.querySelectorAll('.cilia-part').forEach(el => el.classList.remove('selected'));
+            addChatMessage('Welcome back! How can I help?', false);
         }
     }
     
-    // --- 10. EVENT LISTENERS & STARTUP ---
-   
-   // This function is called by initCiliAI but is no longer needed,
-   // as setupPageEventListeners() handles the new UI.
-   function setupEventListeners() {
-        console.log("CiliAI: v2.1 setupEventListeners() called (and ignored).");
-   }
-
-    // This listener replaces the v3.2 listeners
-    window.addEventListener('hashchange', () => {
-        if (window.location.hash.includes('/ciliai')) {
-            // Check if data is ready. If not, init will handle it.
-            // If data IS ready, we need to re-display the page.
-            if (window.CiliAI.ready && !document.querySelector('.ciliai-page')) {
-                displayCiliAIPage();
-            }
+    // Called by heatmap download buttons
+    window.downloadPlot = function(divId, filename) {
+        const plotDiv = document.getElementById(divId);
+        if (plotDiv && window.Plotly) {
+            Plotly.downloadImage(plotDiv, { format: 'png', filename: filename, width: 1200, height: 800 });
         }
-    });
+    }
 
-    // Initial load check
+    // --- STARTUP ---
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', initCiliAI);
     } else {
