@@ -14,6 +14,11 @@
     'use strict';
 
     // --- 1. GLOBAL & DATA-LOADING (from v2.1) ---
+    function ensureArray(value) {
+            if (Array.isArray(value)) return value;
+            if (value === null || value === undefined) return [];
+            return [value];
+        }
 
     // Global CiliAI object
     window.CiliAI = {
@@ -224,12 +229,7 @@
             return;
         }
 
-        function ensureArray(value) {
-            if (Array.isArray(value)) return value;
-            if (value === null || value === undefined) return [];
-            return [value];
-        }
-
+       
         function extractCiliopathyInfo(gene) {
             const split = str => String(str).split(';').map(s => s.trim()).filter(Boolean);
             const ciliopathies = new Set(), classifications = new Set();
@@ -364,9 +364,9 @@
                     if (!L.complexByGene[key]) L.complexByGene[key] = [];
                     if (!L.complexByGene[key].includes(name)) L.complexByGene[key].push(name);
                     if (!L.complexByName[name]) L.complexByName[name] = [];
-                    g.complex_components[name].forEach(gg => {
-                        if (!L.complexByName[name].includes(gg)) L.complexByName[name].push(gg);
-                    });
+                    ensureArray(g.complex_components[name]).forEach(gg => {
+                      if (!L.complexByName[name].includes(gg)) L.complexByName[name].push(gg);
+               });
                 });
             }
         });
@@ -408,8 +408,13 @@
 
     // --- 2. STATIC UI DATA (from v3.2) ---
 
-    // This data is for the UI, not from the gene map.
-    // It's static info about the structures themselves.
+    // ==============================================================
+// 4. NEW PAGE DISPLAY (v3.4 - Composite SVG)
+//    (Replace your old displayCiliAIPage function with this)
+// ==============================================================
+
+    // --- Data for the SVG and UI ---
+    // This is static info about the structures themselves.
     const structureInfoMap = {
         // Cilia Parts
         'basal-body': {
@@ -432,7 +437,7 @@
             description: 'Specialized membrane rich in receptors and channels.',
             genes: ['PKD1', 'PKD2', 'ARL13B', 'INPP5E', 'ADGRV1']
         },
-        // Organelles (from Furkan.html)
+        // Organelles
         "nucleus": {
             title: "Nucleus",
             description: "Contains the cell's DNA; the control center for gene expression and cell division."
@@ -479,15 +484,12 @@
         }
     };
 
-
-    // --- 3. MAIN PAGE DISPLAY FUNCTION (from v3.2) ---
-
     /**
      * This is the primary function CiliaHub will call to build the page.
      * It injects all HTML, CSS, and SVG content.
      */
     window.displayCiliAIPage = async function () {
-        console.log("CiliAI: displayCiliAIPage() called.");
+        console.log("CiliAI: displayCiliAIPage() (v3.4) called.");
         const area = document.querySelector('.content-area');
         if (!area) {
             console.error('CiliAI: .content-area not found. Aborting.');
@@ -509,7 +511,8 @@
         generateAndInjectSVG();
 
         // 4. Setup all event listeners
-        setupEventListeners();
+        // This function MUST be called *after* getPageHTML()
+        setupPageEventListeners(); 
 
         // 5. Add initial welcome message to chat
         setTimeout(() => {
@@ -519,7 +522,7 @@
         console.log("CiliAI: Page displayed and listeners attached.");
     };
 
-    // --- 4. HTML & CSS INJECTION (from v3.2) ---
+    // --- 5. HTML & CSS INJECTION ---
 
     /**
      * Injects the page's CSS into the <head>.
@@ -537,6 +540,23 @@
               --text: #1a1a1a;
               --text-light: #555;
               --border: #e1e5e9;
+              /* Cilia Colors */
+              --cilia-axoneme: #ff6b6b;
+              --cilia-basal-body: #4ecdc4;
+              --cilia-tz: #45b7d1;
+              --cilia-membrane: #96ceb4;
+              /* Organelle Colors (compatible) */
+              --org-nucleus: #1a6fb3;
+              --org-nucleolus: #003e80;
+              --org-mitochondria: #0097b2;
+              --org-golgi: #1e81ce;
+              --org-vesicle: #66b7ff;
+              --org-lysosome: #2fa0e5;
+              --org-peroxisome: #5fb9ff;
+              --org-ribosome: #7fc8ff;
+              --org-cytoplasm: #0e84b8;
+              --org-pm: #004c8c;
+              --org-microtubule: #6ecbff;
             }
             .ciliai-page {
               max-width: 1400px;
@@ -591,23 +611,21 @@
             }
 
             /* --- Cilia & Organelle Colors --- */
-            /* Cilia */
-            .structure-axoneme { fill: #ff6b6b !important; color: #ff6b6b; }
-            .structure-basal-body { fill: #4ecdc4 !important; color: #4ecdc4; }
-            .structure-transition-zone { fill: #45b7d1 !important; color: #45b7d1; }
-            .structure-ciliary-membrane { stroke: #96ceb4 !important; fill: none; stroke-width: 5px; color: #96ceb4; }
-            /* Organelles */
-            .structure-nucleus { fill: #1a6fb3 !important; color: #1a6fb3; }
-            .structure-nucleolus { fill: #003e80 !important; color: #003e80; }
-            .structure-mitochondria { fill: #0097b2 !important; color: #0097b2; }
-            .structure-golgi-apparatus { fill: #1e81ce !important; color: #1e81ce; }
-            .structure-golgi-vesicle { fill: #66b7ff !important; color: #66b7ff; }
-            .structure-lysosome { fill: #2fa0e5 !important; color: #2fa0e5; }
-            .structure-peroxisome { fill: #5fb9ff !important; color: #5fb9ff; }
-            .structure-ribosomes { fill: #7fc8ff !important; color: #7fc8ff; }
-            .structure-cytoplasm { fill: #0e84b8 !important; opacity: 0.1; color: #0e84b8; }
-            .structure-plasma-membrane { fill: #004c8c !important; color: #004c8c; }
-            .structure-microtubule { stroke: #6ecbff !important; fill: none; stroke-width: 2px; color: #6ecbff; }
+            .structure-axoneme { fill: var(--cilia-axoneme) !important; color: var(--cilia-axoneme); }
+            .structure-basal-body { fill: var(--cilia-basal-body) !important; color: var(--cilia-basal-body); }
+            .structure-transition-zone { fill: var(--cilia-tz) !important; color: var(--cilia-tz); }
+            .structure-ciliary-membrane { stroke: var(--cilia-membrane) !important; fill: none; stroke-width: 5px; color: var(--cilia-membrane); }
+            .structure-nucleus { fill: var(--org-nucleus) !important; color: var(--org-nucleus); }
+            .structure-nucleolus { fill: var(--org-nucleolus) !important; color: var(--org-nucleolus); }
+            .structure-mitochondria { fill: var(--org-mitochondria) !important; color: var(--org-mitochondria); }
+            .structure-golgi-apparatus { fill: var(--org-golgi) !important; color: var(--org-golgi); }
+            .structure-golgi-vesicle { fill: var(--org-vesicle) !important; color: var(--org-vesicle); }
+            .structure-lysosome { fill: var(--org-lysosome) !important; color: var(--org-lysosome); }
+            .structure-peroxisome { fill: var(--org-peroxisome) !important; color: var(--org-peroxisome); }
+            .structure-ribosomes { fill: var(--org-ribosome) !important; color: var(--org-ribosome); }
+            .structure-cytoplasm { fill: var(--org-cytoplasm) !important; opacity: 0.1; color: var(--org-cytoplasm); }
+            .structure-plasma-membrane { fill: var(--org-pm) !important; color: var(--org-pm); }
+            .structure-microtubule { stroke: var(--org-microtubule) !important; fill: none; stroke-width: 2px; color: var(--org-microtubule); }
             /* --- End Colors --- */
 
 
@@ -630,14 +648,16 @@
               margin: 0;
               max-height: 200px;
               overflow-y: auto;
+              border: 1px solid var(--border);
+              border-radius: 8px;
             }
             .anat-list li {
               padding: 0.5rem 0.75rem;
-              border-radius: 6px;
               cursor: pointer;
               font-size: 0.95rem;
-              border: 1px solid transparent;
+              border-bottom: 1px solid var(--border);
             }
+            .anat-list li:last-child { border-bottom: none; }
             .anat-list li:hover {
               background: #e8f4fd;
             }
@@ -645,7 +665,6 @@
               background: var(--primary);
               color: white;
               font-weight: 600;
-              border-color: var(--primary-dark);
             }
 
             /* Info Display Panel */
@@ -785,7 +804,7 @@
         `;
     }
 
-    // --- 5. SVG GENERATION & INTERACTION (from v3.2) ---
+    // --- 6. SVG GENERATION & INTERACTION ---
 
     /**
      * Generates and injects the custom SVG.
@@ -929,8 +948,10 @@
         infoText.innerHTML = `<p>${description}</p>`; // Use innerHTML for description
         
         if (genes && genes.length > 0) {
+            // Check real gene data
+            const realGenes = genes.filter(g => window.CiliAI.lookups.geneMap[g.toUpperCase()]);
             const geneListHTML = '<div class="gene-list">' + 
-                genes.map(g => `<span class="gene-tag" data-gene="${g}">${g}</span>`).join('') + 
+                realGenes.map(g => `<span class="gene-tag" data-gene="${g}">${g}</span>`).join('') + 
                 '</div>';
             infoText.innerHTML += geneListHTML;
         }
@@ -953,11 +974,11 @@
         const listEl = document.querySelector(`#structure-list li[data-structure-id="${id}"]`);
         if (listEl) listEl.classList.add('active');
         
-        // Show info
+        // Show info (pass title, description, and *potential* genes)
         showInfoPanel(data.title, data.description, data.genes);
     }
     
-    // --- 6. CHAT & QUERY LOGIC (DATA-AWARE) ---
+    // --- 7. CHAT & QUERY LOGIC (DATA-AWARE) ---
 
     /**
      * Adds a message to the chat window.
@@ -1020,16 +1041,17 @@
 
         // 4. Handle side-effects
         if (answer.highlightGene) {
-            handleGeneSearch(answer.highlightGene);
+            handleGeneSearch(answer.highlightGene, false); // false = don't re-query AI
         }
     }
 
-    // --- 7. EVENT LISTENER SETUP (from v3.2) ---
+    // --- 8. EVENT LISTENER SETUP ---
 
     /**
      * Attaches all primary event listeners for the page.
+     * Renamed to avoid conflict with v2.1's `setupEventListeners`.
      */
-    function setupEventListeners() {
+    function setupPageEventListeners() {
         // Guard against elements not existing
         const sendBtn = document.getElementById('sendBtn');
         const chatInput = document.getElementById('chatInput');
@@ -1046,10 +1068,10 @@
 
         // Gene Search
         if (findGeneBtn) findGeneBtn.addEventListener('click', () => {
-            if (geneSearchInput) handleGeneSearch(geneSearchInput.value);
+            if (geneSearchInput) handleGeneSearch(geneSearchInput.value, true);
         });
         if (geneSearchInput) geneSearchInput.addEventListener('keypress', e => {
-            if (e.key === 'Enter') handleGeneSearch(geneSearchInput.value);
+            if (e.key === 'Enter') handleGeneSearch(geneSearchInput.value, true);
         });
 
         // UMAP Button
@@ -1093,7 +1115,7 @@
      * Handles the "Find Gene" button click or AI highlight request.
      * This is now DATA-AWARE.
      */
-    function handleGeneSearch(geneSymbol) {
+    function handleGeneSearch(geneSymbol, queryAI = true) {
         const gene = geneSymbol.trim().toUpperCase();
         if (!gene) return;
 
@@ -1118,8 +1140,9 @@
             locString = String(geneData.localization);
             const locLower = locString.toLowerCase();
             
-            if (locLower.includes('axoneme')) loc = 'axoneme';
-            else if (locLower.includes('transition zone')) loc = 'transition-zone';
+            // Match in order of specificity
+            if (locLower.includes('transition zone')) loc = 'transition-zone';
+            else if (locLower.includes('axoneme')) loc = 'axoneme';
             else if (locLower.includes('basal body')) loc = 'basal-body';
             else if (locLower.includes('membrane')) loc = 'ciliary-membrane';
             else if (locLower.includes('nucleus')) loc = 'nucleus';
@@ -1135,21 +1158,20 @@
         }
         showInfoPanel(`Gene: ${gene}`, (geneData.description || 'No description available.') + `<br><strong>Localization:</strong> ${locString}`, [gene]);
 
-        // Also ask the AI about it if the user didn't just do that
-        const chatInput = document.getElementById('chatInput');
-        if (chatInput && !chatInput.value.toLowerCase().includes(gene.toLowerCase())) {
+        // Also ask the AI about it if triggered by user
+        if (queryAI) {
             addChatMessage(`What is ${gene}?`, true);
             handleAIQuery(`What is ${gene}?`);
         }
     }
 
-
-    // --- 8. AI QUERY ENGINE PLACEHOLDERS ---
-    // These functions are expected to exist in another file (e.g., ai_engine.js)
-    // and be loaded *before* this script.
+    // --- 9. AI QUERY ENGINE PLACEHOLDERS (from v2.1) ---
+    // These functions are expected to exist in your *other* CiliAI JS file.
+    // The placeholder warnings from your console log indicate they are missing.
+    // You MUST include your *real* parseQuery and generateAnswer functions.
     
     if (!window.parseQuery) {
-        console.warn("CiliAI: `parseQuery` is not defined. Using placeholder.");
+        console.warn("CiliAI: `parseQuery` is not defined! Using placeholder.");
         window.parseQuery = function(query) {
             console.log("Using placeholder parseQuery");
             let gene = null;
@@ -1160,7 +1182,7 @@
     }
     
     if (!window.generateAnswer) {
-        console.warn("CiliAI: `generateAnswer` is not defined. Using placeholder.");
+        console.warn("CiliAI: `generateAnswer` is not defined! Using placeholder.");
         window.generateAnswer = function(intent) {
             console.log("Using placeholder generateAnswer");
             let html = `I received your query about: <strong>${intent.query}</strong>. `;
@@ -1184,9 +1206,23 @@
             return { html, highlightGene };
         }
     }
-
-    // --- 9. STARTUP (from v2.1) ---
     
+    // --- 10. EVENT LISTENERS & STARTUP (from v2.1) ---
+    // This function from v2.1 is NO LONGER NEEDED, as setupPageEventListeners() replaces it.
+    /*
+    function setupEventListeners() {
+        // This function is intentionally left blank
+        // as the new UI (v3.4) handles its own listeners
+        // inside setupPageEventListeners()
+    }
+    */
+   // We must replace the empty `setupEventListeners` from v2.1
+   // with a new one that does nothing, to avoid breaking the init flow.
+   function setupEventListeners() {
+        console.log("CiliAI: v2.1 setupEventListeners() called (and ignored). Page listeners are set by displayCiliAIPage().");
+   }
+
+
     // This listener replaces the v3.2 listeners
     window.addEventListener('hashchange', () => {
         if (window.location.hash.includes('/ciliai')) {
