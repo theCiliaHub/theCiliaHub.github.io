@@ -1,24 +1,17 @@
 /* ==============================================================
-   CiliAI – Interactive Explorer (v3.3 – Nov 13, 2025)
+   CiliAI – Interactive Explorer (v3.5 – Nov 13, 2025)
    ==============================================================
-   • MERGED: Combines the v2.1 data engine (loadCiliAIData, etc.)
-     with the v3.2 interactive SVG layout.
-   • DATA-AWARE: Uses real `window.CiliAI.lookups.geneMap` and
-     `window.parseQuery` instead of mock data.
-   • CUSTOM SVG: Still generates the custom SVG showing the
-     cilium in context with its surrounding organelles.
+   • MERGED: Combines the v2.1 data engine (with buildLookups fix)
+     with the v3.5 interactive SVG layout.
+   • COMPOSITE SVG: Integrates the minimal gray cilium with the
+     actual <g> paths for organelles from Furkan.html.
    • All text is in English.
    ============================================================== */
 
 (function () {
     'use strict';
 
-    // --- 1. GLOBAL & DATA-LOADING (from v2.1) ---
-    function ensureArray(value) {
-            if (Array.isArray(value)) return value;
-            if (value === null || value === undefined) return [];
-            return [value];
-        }
+    // --- 1. GLOBAL & HELPER ---
 
     // Global CiliAI object
     window.CiliAI = {
@@ -27,21 +20,32 @@
         ready: false,
         masterData: []
     };
+    
+    /**
+     * Helper function to ensure a value is an array.
+     * Moved to global scope to be shared by loadCiliAIData and buildLookups.
+     */
+    function ensureArray(value) {
+        if (Array.isArray(value)) return value;
+        if (value === null || value === undefined) return [];
+        return [value];
+    }
+
+    // --- 2. DATA LOADING & PROCESSING (v2.1 - with fix) ---
 
     /**
      * Initializes the CiliAI module: loads data, builds lookups,
      * and then displays the page.
      */
     async function initCiliAI() {
-        console.log('CiliAI: Initializing (v3.3)...');
+        console.log('CiliAI: Initializing (v3.5)...');
         await loadCiliAIData();
         if (!Array.isArray(window.CiliAI.masterData)) {
             console.warn('masterData not array. Initializing empty.');
             window.CiliAI.masterData = [];
         }
         buildLookups();
-        // Note: setupEventListeners() is now called inside displayCiliAIPage()
-        // because the elements don't exist yet.
+        // setupEventListeners() is now called inside displayCiliAIPage()
         window.CiliAI.ready = true;
         console.log('CiliAI: Ready! Data loaded.');
 
@@ -229,7 +233,6 @@
             return;
         }
 
-       
         function extractCiliopathyInfo(gene) {
             const split = str => String(str).split(';').map(s => s.trim()).filter(Boolean);
             const ciliopathies = new Set(), classifications = new Set();
@@ -344,6 +347,7 @@
 
     /**
      * Builds the lookup maps (like geneMap) from the masterData.
+     * *** INCLUDES THE FIX FOR THE TPYEERROR ***
      */
     function buildLookups() {
         const L = window.CiliAI.lookups = {};
@@ -363,10 +367,17 @@
                 Object.keys(g.complex_components).forEach(name => {
                     if (!L.complexByGene[key]) L.complexByGene[key] = [];
                     if (!L.complexByGene[key].includes(name)) L.complexByGene[key].push(name);
+                    
                     if (!L.complexByName[name]) L.complexByName[name] = [];
+                    
+                    // --- THIS IS THE FIX ---
+                    // Use ensureArray() to prevent the .forEach error
                     ensureArray(g.complex_components[name]).forEach(gg => {
-                      if (!L.complexByName[name].includes(gg)) L.complexByName[name].push(gg);
-               });
+                        if (gg && !L.complexByName[name].includes(gg)) {
+                            L.complexByName[name].push(gg);
+                        }
+                    });
+                    // --- END FIX ---
                 });
             }
         });
@@ -405,16 +416,10 @@
         console.log('CiliAI: Lookups built');
     }
 
+    // --- 3. STATIC UI DATA ---
 
-    // --- 2. STATIC UI DATA (from v3.2) ---
-
-    // ==============================================================
-// 4. NEW PAGE DISPLAY (v3.4 - Composite SVG)
-//    (Replace your old displayCiliAIPage function with this)
-// ==============================================================
-
-    // --- Data for the SVG and UI ---
-    // This is static info about the structures themselves.
+    // This data is for the UI, not from the gene map.
+    // It's static info about the structures themselves.
     const structureInfoMap = {
         // Cilia Parts
         'basal-body': {
@@ -437,7 +442,7 @@
             description: 'Specialized membrane rich in receptors and channels.',
             genes: ['PKD1', 'PKD2', 'ARL13B', 'INPP5E', 'ADGRV1']
         },
-        // Organelles
+        // Organelles (from Furkan.html)
         "nucleus": {
             title: "Nucleus",
             description: "Contains the cell's DNA; the control center for gene expression and cell division."
@@ -484,12 +489,15 @@
         }
     };
 
+
+    // --- 4. MAIN PAGE DISPLAY FUNCTION (v3.5) ---
+
     /**
      * This is the primary function CiliaHub will call to build the page.
      * It injects all HTML, CSS, and SVG content.
      */
     window.displayCiliAIPage = async function () {
-        console.log("CiliAI: displayCiliAIPage() (v3.4) called.");
+        console.log("CiliAI: displayCiliAIPage() (v3.5) called.");
         const area = document.querySelector('.content-area');
         if (!area) {
             console.error('CiliAI: .content-area not found. Aborting.');
@@ -522,7 +530,7 @@
         console.log("CiliAI: Page displayed and listeners attached.");
     };
 
-    // --- 5. HTML & CSS INJECTION ---
+    // --- 5. HTML & CSS INJECTION (v3.5) ---
 
     /**
      * Injects the page's CSS into the <head>.
@@ -544,19 +552,19 @@
               --cilia-axoneme: #ff6b6b;
               --cilia-basal-body: #4ecdc4;
               --cilia-tz: #45b7d1;
-              --cilia-membrane: #96ceb4;
+              --cilia-membrane: #A0AEC0; /* Gray for dash */
               /* Organelle Colors (compatible) */
-              --org-nucleus: #1a6fb3;
-              --org-nucleolus: #003e80;
-              --org-mitochondria: #0097b2;
-              --org-golgi: #1e81ce;
-              --org-vesicle: #66b7ff;
-              --org-lysosome: #2fa0e5;
-              --org-peroxisome: #5fb9ff;
-              --org-ribosome: #7fc8ff;
-              --org-cytoplasm: #0e84b8;
-              --org-pm: #004c8c;
-              --org-microtubule: #6ecbff;
+              --org-nucleus: #B0B8C8; /* Gray */
+              --org-nucleolus: #4A5568; /* Dark Gray */
+              --org-mitochondria: #4A5568; /* Dark Gray */
+              --org-golgi: #4A5568; /* Dark Gray */
+              --org-vesicle: #66b7ff; /* Blue */
+              --org-lysosome: #718096; /* Gray */
+              --org-peroxisome: #A0AEC0; /* Gray */
+              --org-ribosome: #4A5568; /* Dark Gray */
+              --org-cytoplasm: #F5F7FA; /* Lightest Gray */
+              --org-pm: #E9EDF2; /* Light Gray */
+              --org-microtubule: #4A5568; /* Dark Gray */
             }
             .ciliai-page {
               max-width: 1400px;
@@ -598,8 +606,8 @@
             
             /* SVG Container */
             .svg-container {
-              height: 560px; overflow: auto; border: 1px solid var(--border);
-              border-radius: 12px; background: #fdfdfd; padding: 0;
+              height: 560px; overflow: hidden; border: 1px solid var(--border);
+              border-radius: 12px; background: var(--org-cytoplasm); padding: 0;
             }
             #cilia-svg svg { width: 100%; height: 100%; }
             #cilia-svg .compartment { cursor: pointer; transition: all 0.2s; }
@@ -611,23 +619,24 @@
             }
 
             /* --- Cilia & Organelle Colors --- */
-            .structure-axoneme { fill: var(--cilia-axoneme) !important; color: var(--cilia-axoneme); }
+            /* Cilia */
+            .structure-axoneme { fill: none !important; stroke: var(--cilia-axoneme) !important; stroke-width: 4px; color: var(--cilia-axoneme); }
             .structure-basal-body { fill: var(--cilia-basal-body) !important; color: var(--cilia-basal-body); }
             .structure-transition-zone { fill: var(--cilia-tz) !important; color: var(--cilia-tz); }
-            .structure-ciliary-membrane { stroke: var(--cilia-membrane) !important; fill: none; stroke-width: 5px; color: var(--cilia-membrane); }
+            .structure-ciliary-membrane { stroke: var(--cilia-membrane) !important; fill: none; stroke-width: 3px; stroke-dasharray: 6, 6; color: var(--cilia-membrane); }
+            /* Organelles (from v3.5 diagram style) */
             .structure-nucleus { fill: var(--org-nucleus) !important; color: var(--org-nucleus); }
             .structure-nucleolus { fill: var(--org-nucleolus) !important; color: var(--org-nucleolus); }
             .structure-mitochondria { fill: var(--org-mitochondria) !important; color: var(--org-mitochondria); }
-            .structure-golgi-apparatus { fill: var(--org-golgi) !important; color: var(--org-golgi); }
+            .structure-golgi-apparatus { fill: none !important; stroke: var(--org-golgi) !important; stroke-width: 4px; color: var(--org-golgi); }
             .structure-golgi-vesicle { fill: var(--org-vesicle) !important; color: var(--org-vesicle); }
             .structure-lysosome { fill: var(--org-lysosome) !important; color: var(--org-lysosome); }
             .structure-peroxisome { fill: var(--org-peroxisome) !important; color: var(--org-peroxisome); }
             .structure-ribosomes { fill: var(--org-ribosome) !important; color: var(--org-ribosome); }
-            .structure-cytoplasm { fill: var(--org-cytoplasm) !important; opacity: 0.1; color: var(--org-cytoplasm); }
-            .structure-plasma-membrane { fill: var(--org-pm) !important; color: var(--org-pm); }
+            .structure-cytoplasm { fill: var(--org-cytoplasm) !important; stroke: #D8DEE9; stroke-width: 3px; color: var(--org-cytoplasm); opacity: 1.0; }
+            .structure-plasma-membrane { fill: var(--org-pm) !important; color: var(--org-pm); opacity: 1.0; }
             .structure-microtubule { stroke: var(--org-microtubule) !important; fill: none; stroke-width: 2px; color: var(--org-microtubule); }
             /* --- End Colors --- */
-
 
             /* Right Panel: Info */
             .info-panel {
@@ -635,46 +644,15 @@
               flex-direction: column;
               height: fit-content;
             }
-            .info-lists h4 {
-              font-size: 1.1rem;
-              color: var(--primary-dark);
-              margin-bottom: 0.75rem;
-              border-bottom: 2px solid var(--border);
-              padding-bottom: 0.25rem;
+            .info-lists {
+                margin-bottom: 1.5rem;
             }
-            .anat-list {
-              list-style: none;
-              padding: 0;
-              margin: 0;
-              max-height: 200px;
-              overflow-y: auto;
-              border: 1px solid var(--border);
-              border-radius: 8px;
-            }
-            .anat-list li {
-              padding: 0.5rem 0.75rem;
-              cursor: pointer;
-              font-size: 0.95rem;
-              border-bottom: 1px solid var(--border);
-            }
-            .anat-list li:last-child { border-bottom: none; }
-            .anat-list li:hover {
-              background: #e8f4fd;
-            }
-            .anat-list li.active {
-              background: var(--primary);
-              color: white;
-              font-weight: 600;
-            }
-
-            /* Info Display Panel */
             .organelle-info-panel {
               background: #e8f4fd;
               border: 1px solid #bbdefb;
               border-radius: 12px;
               padding: 1rem 1.2rem;
               min-height: 100px;
-              margin-top: 1.5rem;
             }
             .organelle-info-panel h3 {
               margin: 0 0 0.5rem 0;
@@ -737,155 +715,144 @@
     }
 
     /**
-     * Returns the full HTML string for the page content.
+     * Returns the full HTML string for the page content. (v3.5)
      */
-   /* -------------------------------------------------------------
-   1.  Remove the “Interactive Structures” list
-   ------------------------------------------------------------- */
-function getPageHTML() {
-    return `
-    <div class="ciliai-page">
-        <!-- Header -->
-        <div class="ciliai-header">
-            <h1>CiliAI Explorer</h1>
-            <p>Interactive ciliary biology and gene function explorer</p>
-        </div>
-
-        <!-- Grid: Diagram + Info -->
-        <div class="ciliai-grid">
-            <!-- LEFT: Interactive Diagram -->
-            <div class="diagram-panel">
-                <div class="diagram-toolbar">
-                    <div class="gene-search">
-                        <input type="text" id="geneSearchInput" class="gene-input" placeholder="Search gene (e.g., IFT88, NPHP1, CEP290)">
-                        <button id="findGeneBtn" class="btn">Find Gene</button>
-                    </div>
-                    <button id="showUmapBtn" class="btn btn-outline">Show UMAP</button>
-                </div>
-                <div class="svg-container">
-                    <div id="cilia-svg"></div>
-                </div>
+    function getPageHTML() {
+        return `
+        <div class="ciliai-page">
+            <div class="ciliai-header">
+                <h1>CiliAI Explorer</h1>
+                <p>Interactive ciliary biology and gene function explorer</p>
             </div>
 
-            <!-- RIGHT: Info + Chat -->
-            <div class="info-panel">
-                <div class="info-lists">
-                    <div class="organelle-info-panel">
-                        <h3 id="organelle-info-title">Click a structure or search a gene</h3>
-                        <div id="organelle-info-text"></div>
+            <div class="ciliai-grid">
+                <div class="diagram-panel">
+                    <div class="diagram-toolbar">
+                        <div class="gene-search">
+                            <input type="text" id="geneSearchInput" class="gene-input" placeholder="Search gene (e.g., IFT88, NPHP1, CEP290)">
+                            <button id="findGeneBtn" class="btn">Find Gene</button>
+                        </div>
+                        <button id="showUmapBtn" class="btn btn-outline">Show UMAP</button>
+                    </div>
+                    <div class="svg-container">
+                        <div id="cilia-svg"></div>
                     </div>
                 </div>
 
-                <!-- Chat -->
-                <div class="chat-panel">
-                    <div class="disclaimer">
-                        <strong>Disclaimer:</strong> CiliAI is an AI system and may produce misleading results. Use for exploration only.
+                <div class="info-panel">
+                    <div class="info-lists">
+                        <div class="organelle-info-panel">
+                            <h3 id="organelle-info-title">Click a structure or search a gene</h3>
+                            <div id="organelle-info-text"></div>
+                        </div>
                     </div>
-                    <div id="chatWindow" class="chat-window"></div>
-                    <div class="chat-input-group">
-                        <input type="text" id="chatInput" class="chat-input" placeholder="Ask CiliAI...">
-                        <button id="sendBtn" class="send-btn">Send</button>
+
+                    <div class="chat-panel">
+                        <div class="disclaimer">
+                            <strong>Disclaimer:</strong> CiliAI is an AI system and may produce misleading results. Use for exploration only.
+                        </div>
+                        <div id="chatWindow" class="chat-window"></div>
+                        <div class="chat-input-group">
+                            <input type="text" id="chatInput" class="chat-input" placeholder="Ask CiliAI...">
+                            <button id="sendBtn" class="send-btn">Send</button>
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
-    </div>`;
-}
-   
-    // --- 6. SVG GENERATION & INTERACTION ---
-/* -------------------------------------------------------------
-   2.  Full-cell SVG (cilium + organelles)
-   ------------------------------------------------------------- */
-function generateAndInjectSVG() {
-    const svgContainer = document.getElementById('cilia-svg');
-    if (!svgContainer) return;
+        </div>`;
+    }
 
-    const svgHTML = `
-    <svg viewBox="0 0 600 650" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;">
-        <!-- GRADIENTS -->
-        <defs>
-            <linearGradient id="cytosolGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stop-color="#F5F7FA"/>
-                <stop offset="100%" stop-color="#E9EDF2"/>
-            </linearGradient>
-            <radialGradient id="nucleusGradient" cx="50%" cy="50%" r="50%">
-                <stop offset="0%" stop-color="#D8DEE9"/>
-                <stop offset="100%" stop-color="#C8D0DD"/>
-            </radialGradient>
-        </defs>
-
-        <!-- CELL BODY -->
-        <path id="cell-body" class="compartment structure-cytoplasm"
-              fill="url(#cytosolGradient)" stroke="#D8DEE9" stroke-width="3"
-              d="M 80,620 C -20,520 40,340 300,320 C 560,340 620,520 520,620 Z"/>
-
-        <!-- NUCLEUS -->
-        <circle id="nucleus" class="compartment structure-nucleus"
-                fill="url(#nucleusGradient)" stroke="#B0B8C8" stroke-width="3"
-                cx="300" cy="520" r="70"/>
-
-        <!-- GOLGI APPARATUS -->
-        <g id="golgi-apparatus" class="compartment structure-golgi-apparatus" transform="translate(120,380) scale(0.9)">
-            <path d="M 0,0 C 15,30 60,30 75,0 M 10,20 C 25,50 65,50 80,20 M 20,40 C 35,70 70,70 85,40"
-                  fill="none" stroke="#4A5568" stroke-width="4"/>
-        </g>
-
-        <!-- MITOCHONDRION -->
-        <g id="mitochondria" class="compartment structure-mitochondria" transform="translate(280,260)">
-            <ellipse cx="0" cy="0" rx="55" ry="28" fill="#4A5568"/>
-            <path d="M -40,-8 C -20,8 20,-8 40,8" fill="none" stroke="#E9EDF2" stroke-width="3"/>
-            <path d="M -40,8 C -20,-8 20,8 40,-8" fill="none" stroke="#E9EDF2" stroke-width="3"/>
-        </g>
-
-        <!-- LYSOSOME -->
-        <circle id="lysosome" class="compartment structure-lysosome" cx="420" cy="460" r="22"
-                fill="#718096" stroke="#4A5568" stroke-width="2"/>
-
-        <!-- PEROXISOME -->
-        <circle id="peroxisome" class="compartment structure-peroxisome" cx="460" cy="510" r="15"
-                fill="#A0AEC0" stroke="#718096" stroke-width="2"/>
-
-        <!-- RIBOSOMES -->
-        <g id="ribosomes" class="compartment structure-ribosomes">
-            <circle cx="150" cy="480" r="3" fill="#4A5568"/>
-            <circle cx="165" cy="485" r="3" fill="#4A5568"/>
-            <circle cx="155" cy="495" r="3" fill="#4A5568"/>
-            <circle cx="380" cy="380" r="3" fill="#4A5568"/>
-            <circle cx="395" cy="385" r="3" fill="#4A5568"/>
-        </g>
-
-        <!-- MICROTUBULES -->
-        <g id="microtubule" class="compartment structure-microtubule">
-            <path d="M 200,600 L 270,340" stroke="#4A5568" stroke-width="2"/>
-            <path d="M 400,600 L 330,340" stroke="#4A5568" stroke-width="2"/>
-        </g>
-
-        <!-- BASAL BODY -->
-        <rect id="basal-body" class="compartment structure-basal-body"
-              fill="#4A5568" x="285" y="300" width="30" height="22"/>
-
-        <!-- TRANSITION ZONE -->
-        <path id="transition-zone" class="compartment structure-transition-zone"
-              fill="#718096" stroke="#4A5568" stroke-width="2"
-              d="M 287,300 L 280,280 L 320,280 L 313,300 Z"/>
-
-        <!-- CILIARY MEMBRANE -->
-        <path id="ciliary-membrane" class="compartment structure-ciliary-membrane"
-              fill="none" stroke="#A0AEC0" stroke-width="3" stroke-dasharray="6,6"
-              d="M 280,280 L 295,80 L 305,80 L 320,280 Z"/>
-
-        <!-- AXONEME -->
-        <path id="axoneme" class="compartment structure-axoneme"
-              fill="none" stroke="#4A5568" stroke-width="4"
-              d="M 295,280 L 298,85 L 302,85 L 305,280 Z"/>
-    </svg>`;
     
-    svgContainer.innerHTML = svgHTML;
-    setupSVGInteraction();
-}
-   
-   
-   /**
+    // --- 6. SVG GENERATION & INTERACTION ---
+
+    /**
+     * Generates and injects the custom SVG.
+     * This version combines the gray v3.5 diagram with the
+     * colorful, scaled <g> elements from Furkan.html.
+     */
+    function generateAndInjectSVG() {
+        const svgContainer = document.getElementById('cilia-svg');
+        if (!svgContainer) return;
+
+        // This SVG combines the v3.5 layout with the vFurkan.html <g> groups.
+        // I have scaled and positioned them to fit.
+        const svgHTML = `
+        <svg viewBox="0 0 600 650" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;">
+            <defs>
+                <linearGradient id="cytosolGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="#F5F7FA"/>
+                    <stop offset="100%" stop-color="#E9EDF2"/>
+                </linearGradient>
+            </defs>
+
+            <g id="plasma-membrane" class="compartment structure-plasma-membrane" transform="translate(140, 290) scale(0.7)">
+                 <path d="M312.5,390c121.17-55.19,183.28-179.8,138.4-279S291.42-35.42,150,30.65C29.33,87-25.82,228,11.56,309.68,56.87,408.72,215.6,434.12,312.5,390Z"/>
+            </g>
+            <g id="cytoplasm" class="compartment structure-cytoplasm" transform="translate(140, 290) scale(0.7)">
+                 <path d="M309.16,383.61C425.36,330.7,484.91,211.2,441.88,116.05S289-24.33,153.3,39C37.62,93.06-15.27,228.22,20.58,306.59,64,401.57,216.24,425.93,309.16,383.61Z"/>
+            </g>
+
+            <g id="nucleus" class="compartment structure-nucleus" transform="translate(140, 380) scale(0.9)">
+                <path d="M272.61,126.91c0,33.57-29,60.79-64.77,60.79s-64.76-27.22-64.76-60.79,29-60.78,64.76-60.78S272.61,93.34,272.61,126.91Z"/>
+            </g>
+            <g id="nucleolus" class="compartment structure-nucleolus" transform="translate(140, 380) scale(0.9)">
+                <path d="M245.56,124.91c0,11.77-10.64,21.3-23.76,21.3S198,136.68,198,124.91s10.64-21.29,23.76-21.29S245.56,113.15,245.56,124.91Z"/>
+            </g>
+
+            <g id="golgi-apparatus" class="compartment structure-golgi-apparatus" transform="translate(20, 350) scale(0.5)">
+                <path d="M328.65,64a18.25,18.25,0,0,1,8.9,7.36c1.17,1.92,2,4.11,3.79,5.55,1.43,1.14,3.34,1.69,4.76,2.85a10.74,10.74,0,0,1,2.3,2.94c2.05,3.48,3.59,6.68,3.34,10.73a5.43,5.43,0,0,1-.9,3c-1.62,2.15-5.57,1.21-7.07-.47a9.53,9.53,0,0,1-2-5.24,40.9,40.9,0,0,1-.39-7.17,5.05,5.05,0,0,0-.19-2,1.86,1.86,0,0,0-1.62-1.25,3,3,0,0,0-1.83.86c-1.84,1.48-3.73,3.13-6.13,3.55s-5.3-1.15-5-3.35c.17-1.27,1.28-2.24,2.23-3.2a19.87,19.87,0,0,0,2.67-3.34c1-1.56,1.63-3.78.16-4.94-1.07-.84-2.75-.62-4,0S325.31,71.43,324,72s-3,.74-4-.16a3,3,0,0,1-.22-3.63c.77-1.38,2.15-3,1.13-4.2-.67-.8-2-.74-3.11-.61l-7.42.87a4.85,4.85,0,0,1-3-.29,2.5,2.5,0,0,1-.69-3.39c1.71-3,8.86-4.45,11.71-2.37,1.12.81,1.72,2.1,2.77,3,1.5,1.28,3.68,1.6,5.66,2.16C327.45,63.58,328.06,63.79,328.65,64Z"/>
+                <path d="M299,44.74c-2.53.9-4.77,2.45-5.51,4.95a3.8,3.8,0,0,0,.18,2.85c.83,1.54,3.38,2.53,5,2.47,8-.29,15.83-2.24,23.8-2.11s16.56,2.88,20.8,9.64c1.26,2,2.06,4.27,3.12,6.4a46.06,46.06,0,0,0,7.69,10.53,14.69,14.69,0,0,1,2.54,3.29c1.13,2.25.94,4.9.72,7.41l-1,11a10.91,10.91,0,0,0,.19,4.23c.38,1.34,1.5,2.9,1.65,4.25,2.12,4.22,7.87,5.13,9.87.18a9.55,9.55,0,0,0,.28-4.84,17.85,17.85,0,0,0-1.38-5.2c-.93-2-2.41-3.68-3.41-5.64a26.65,26.65,0,0,1-1.95-6c-1.12-4.73-1.87-9.52-4.13-13.79-2.18-4.1-3.95-8.21-7-11.77-4.68-5.41-11.21-8.92-17.94-11.35-10.11-3.65-19.15-9-30.34-7.31A17.76,17.76,0,0,0,299,44.74Z"/>
+                <path d="M297.31,32l-.18.09c-2.9,1.46-7.26,5.56-2.75,7.89a7.26,7.26,0,0,0,5,.23c6.27-1.59,13.17-3.16,19.66-2.29A45.29,45.29,0,0,1,324.21,39c6.23,1.55,12.73,3.32,17.26,7.63,2.44,2.31,4.15,5.22,6.5,7.61,3.74,3.82,8.8,6.08,12.93,9.46,4.5,3.67,6.19,9.65,7.05,15.17.62,4-.66,9.95,2.32,13.2a4.73,4.73,0,0,0,2.52,1.36c3.16.64,6.49-1.65,7.61-4.58s.39-6.22-1.15-8.9a37.54,37.54,0,0,0-6-7.12c-3.79-3.89-6.55-8.63-10.49-12.25-4.84-4.45-9.19-9.52-13.89-14.12A40.33,40.33,0,0,0,342.46,41c-4.32-2.74-9.74-4.19-14.65-5.72-2.71-.84-5.47-1.3-8.22-1.95s-5.47-2.06-8.32-2.8A20.44,20.44,0,0,0,297.31,32Z"/>
+            </g>
+            <g id="golgi-vesicle" class="compartment structure-golgi-vesicle" transform="translate(40, 340) scale(0.5)">
+                <path d="M301.15,61.82A2.81,2.81,0,1,1,298,59.34,2.81,2.81,0,0,1,301.15,61.82Z"/>
+                <path d="M342.29,102.94a3,3,0,1,1-3.32-2.63A3,3,0,0,1,342.29,102.94Z"/>
+                <path d="M339,92.19a3.86,3.86,0,1,1-4.28-3.4A3.86,3.86,0,0,1,339,92.19Z"/>
+            </g>
+
+            <g id="mitochondria" class="compartment structure-mitochondria" transform="translate(280,260) scale(0.7)">
+                 <path d="M352.23,315.07a8.2,8.2,0,0,1-.91,8.09c-1.92,2.31-5.14,3-8.11,3.46a53.58,53.58,0,0,0-10.06,2.21c-3.24,1.18-7.07,3.4-8.54,6.67-1.55,3.47-3.33,7-6.45,9.36a22.36,22.36,0,0,1-14.52,3.89A10.82,10.82,0,0,1,296,345c-1.91-2.35-2.31-5.95-2-8.85.74-7,5.31-13.15,11-17.26s12.47-6.45,19.22-8.42c6.27-1.83,13.37-3.57,19.88-2A11.13,11.13,0,0,1,352.23,315.07Z"/>
+            </g>
+            
+            <g id="lysosome" class="compartment structure-lysosome" transform="translate(280, 350) scale(0.7)">
+                <ellipse cx="234.02" cy="332.54" rx="9.83" ry="11.32" transform="translate(-143.2 484.37) rotate(-76.79)"/>
+            </g>
+             <g id="peroxisome" class="compartment structure-peroxisome" transform="translate(300, 300) scale(0.7)">
+                <ellipse cx="162.77" cy="344.7" rx="7.6" ry="6.3"/>
+            </g>
+
+            <g id="ribosomes" class="compartment structure-ribosomes" transform="translate(150, 350) scale(1)">
+                <path d="M141.07,73.92a1.56,1.56,0,1,1-1.56-1.46A1.52,1.52,0,0,1,141.07,73.92Z"/>
+                <path d="M136.66,78.94a1.56,1.56,0,1,1-1.56-1.46A1.52,1.52,0,0,1,136.66,78.94Z"/>
+                <path d="M127.48,90.68a1.56,1.56,0,1,1-1.56-1.47A1.51,1.51,0,0,1,127.48,90.68Z"/>
+                <path d="M123.59,96.47A1.56,1.56,0,1,1,122,95,1.52,1.52,0,0,1,123.59,96.47Z"/>
+            </g>
+
+            <g id="microtubule" class="compartment structure-microtubule" transform="translate(150, 280) scale(0.5)">
+                 <path d="M81.25,195.08l-2.31,1.52s14.77,17.33,24.75,32.11S125.36,267,125.36,267l2.32-1.53s-5.89-15.25-20.42-37.47A268.48,268.48,0,0,0,81.25,195.08Z"/>
+                 <path d="M299.5,292.48l2.31,1.53s-12.12,13.31-20,24.92-16.53,30.51-16.53,30.51L263,347.91s4-12.42,15.44-29.92A168.22,168.22,0,0,1,299.5,292.48Z"/>
+            </g>
+
+            <g id="basal-body" class="compartment structure-basal-body">
+                <rect x="285" y="300" width="30" height="22"/>
+            </g>
+            <g id="transition-zone" class="compartment structure-transition-zone">
+                <path d="M 287,300 L 280,280 L 320,280 L 313,300 Z"/>
+            </g>
+            <g id="ciliary-membrane" class="compartment structure-ciliary-membrane">
+                <path d="M 280,280 L 295,80 L 305,80 L 320,280 Z"/>
+            </g>
+            <g id="axoneme" class="compartment structure-axoneme">
+                <path d="M 295,280 L 298,85 L 302,85 L 305,280 Z"/>
+            </g>
+        </svg>`;
+        
+        svgContainer.innerHTML = svgHTML;
+        setupSVGInteraction();
+    }
+
+
+    /**
      * Attaches click listeners to the SVG compartments.
      */
     function setupSVGInteraction() {
@@ -946,6 +913,8 @@ function generateAndInjectSVG() {
      * Handles activating any structure (from SVG or list)
      */
     function activateStructure(id) {
+        // This function no longer needs to exist, as the list is removed.
+        // We will call showInfoPanel directly from the click handler.
         const data = structureInfoMap[id];
         if (!data) return;
 
@@ -954,12 +923,8 @@ function generateAndInjectSVG() {
         // Highlight SVG
         const svgEl = document.getElementById(id);
         if (svgEl) svgEl.classList.add('active');
-
-        // Highlight List
-        const listEl = document.querySelector(`#structure-list li[data-structure-id="${id}"]`);
-        if (listEl) listEl.classList.add('active');
         
-        // Show info (pass title, description, and *potential* genes)
+        // Show info
         showInfoPanel(data.title, data.description, data.genes);
     }
     
@@ -1034,7 +999,6 @@ function generateAndInjectSVG() {
 
     /**
      * Attaches all primary event listeners for the page.
-     * Renamed to avoid conflict with v2.1's `setupEventListeners`.
      */
     function setupPageEventListeners() {
         // Guard against elements not existing
@@ -1043,8 +1007,7 @@ function generateAndInjectSVG() {
         const findGeneBtn = document.getElementById('findGeneBtn');
         const geneSearchInput = document.getElementById('geneSearchInput');
         const showUmapBtn = document.getElementById('showUmapBtn');
-        const structureList = document.getElementById('structure-list');
-
+        
         // Chat
         if (sendBtn) sendBtn.addEventListener('click', handleUserSend);
         if (chatInput) chatInput.addEventListener('keypress', e => {
@@ -1064,14 +1027,6 @@ function generateAndInjectSVG() {
             console.log("CiliAI: 'Show UMAP' clicked.");
             addChatMessage("Show me the UMAP plot.", true);
             handleAIQuery("Show me the UMAP plot.");
-        });
-
-        // Structure List
-        if (structureList) structureList.addEventListener('click', e => {
-            const li = e.target.closest('li');
-            if (li && li.dataset.structureId) {
-                activateStructure(li.dataset.structureId);
-            }
         });
 
         // Event delegation for dynamic content (gene tags, feedback)
@@ -1150,10 +1105,10 @@ function generateAndInjectSVG() {
         }
     }
 
-    // --- 9. AI QUERY ENGINE PLACEHOLDERS (from v2.1) ---
-    // These functions are expected to exist in your *other* CiliAI JS file.
-    // The placeholder warnings from your console log indicate they are missing.
-    // You MUST include your *real* parseQuery and generateAnswer functions.
+
+    // --- 9. AI QUERY ENGINE PLACEHOLDERS ---
+    // You MUST replace these with your real functions
+    // from your other CiliAI file.
     
     if (!window.parseQuery) {
         console.warn("CiliAI: `parseQuery` is not defined! Using placeholder.");
@@ -1192,21 +1147,13 @@ function generateAndInjectSVG() {
         }
     }
     
-    // --- 10. EVENT LISTENERS & STARTUP (from v2.1) ---
-    // This function from v2.1 is NO LONGER NEEDED, as setupPageEventListeners() replaces it.
-    /*
-    function setupEventListeners() {
-        // This function is intentionally left blank
-        // as the new UI (v3.4) handles its own listeners
-        // inside setupPageEventListeners()
-    }
-    */
-   // We must replace the empty `setupEventListeners` from v2.1
-   // with a new one that does nothing, to avoid breaking the init flow.
+    // --- 10. EVENT LISTENERS & STARTUP ---
+   
+   // This function is called by initCiliAI but is no longer needed,
+   // as setupPageEventListeners() handles the new UI.
    function setupEventListeners() {
-        console.log("CiliAI: v2.1 setupEventListeners() called (and ignored). Page listeners are set by displayCiliAIPage().");
+        console.log("CiliAI: v2.1 setupEventListeners() called (and ignored).");
    }
-
 
     // This listener replaces the v3.2 listeners
     window.addEventListener('hashchange', () => {
