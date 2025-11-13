@@ -744,89 +744,49 @@
    ------------------------------------------------------------- */
 function getPageHTML() {
     return `
-    <div class="interactive-cilium">
-    <svg viewBox="0 0 600 650" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;">
-        <!-- ==== GRADIENTS (same colours as the original cilium) ==== -->
-        <defs>
-            <linearGradient id="cytosolGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stop-color="#F5F7FA"/>
-                <stop offset="100%" stop-color="#E9EDF2"/>
-            </linearGradient>
-            <radialGradient id="nucleusGradient" cx="50%" cy="50%" r="50%">
-                <stop offset="0%" stop-color="#D8DEE9"/>
-                <stop offset="100%" stop-color="#C8D0DD"/>
-            </radialGradient>
-        </defs>
+    <div class="ciliai-page">
+        <!-- Header -->
+        <div class="ciliai-header">
+            <h1>CiliAI Explorer</h1>
+            <p>Interactive ciliary biology and gene function explorer</p>
+        </div>
 
-        <!-- ==== 1. CELL BODY (cytoplasm) ==== -->
-        <path id="cell-body" class="cilia-part"
-              fill="url(#cytosolGradient)" stroke="#D8DEE9" stroke-width="3"
-              d="M 80,620 C -20,520 40,340 300,320 C 560,340 620,520 520,620 Z"/>
+        <!-- Grid: Diagram + Info -->
+        <div class="ciliai-grid">
+            <!-- LEFT: Interactive Diagram -->
+            <div class="diagram-panel">
+                <div class="diagram-toolbar">
+                    <div class="gene-search">
+                        <input type="text" id="geneSearchInput" class="gene-input" placeholder="Search gene (e.g., IFT88, NPHP1, CEP290)">
+                        <button id="findGeneBtn" class="btn">Find Gene</button>
+                    </div>
+                    <button id="showUmapBtn" class="btn btn-outline">Show UMAP</button>
+                </div>
+                <div class="svg-container">
+                    <div id="cilia-svg"></div>
+                </div>
+            </div>
 
-        <!-- ==== 2. NUCLEUS ==== -->
-        <circle id="nucleus" class="cilia-part"
-                fill="url(#nucleusGradient)" stroke="#B0B8C8" stroke-width="3"
-                cx="300" cy="520" r="70"/>
+            <!-- RIGHT: Info + Chat -->
+            <div class="info-panel">
+                <div class="info-lists">
+                    <div class="organelle-info-panel">
+                        <h3 id="organelle-info-title">Click a structure or search a gene</h3>
+                        <div id="organelle-info-text"></div>
+                    </div>
+                </div>
 
-        <!-- ==== 3. OTHER ORGANELLES (same colours as original cilium) ==== -->
-        <!-- Golgi -->
-        <g id="golgi-apparatus" class="cilia-part" transform="translate(120,380) scale(0.9)">
-            <path d="M 0,0 C 15,30 60,30 75,0 M 10,20 C 25,50 65,50 80,20 M 20,40 C 35,70 70,70 85,40"
-                  fill="none" stroke="#4A5568" stroke-width="4"/>
-        </g>
-
-        <!-- Mitochondrion (next to basal body) -->
-        <g id="mitochondria" class="cilia-part" transform="translate(280,260)">
-            <ellipse cx="0" cy="0" rx="55" ry="28" fill="#4A5568"/>
-            <path d="M -40,-8 C -20,8 20,-8 40,8" fill="none" stroke="#E9EDF2" stroke-width="3"/>
-            <path d="M -40,8 C -20,-8 20,8 40,-8" fill="none" stroke="#E9EDF2" stroke-width="3"/>
-        </g>
-
-        <!-- Lysosome -->
-        <circle id="lysosome" class="cilia-part" cx="420" cy="460" r="22"
-                fill="#718096" stroke="#4A5568" stroke-width="2"/>
-
-        <!-- Peroxisome -->
-        <circle id="peroxisome" class="cilia-part" cx="460" cy="510" r="15"
-                fill="#A0AEC0" stroke="#718096" stroke-width="2"/>
-
-        <!-- Ribosomes (tiny dots) -->
-        <g id="ribosomes" class="cilia-part">
-            <circle cx="150" cy="480" r="3" fill="#4A5568"/>
-            <circle cx="165" cy="485" r="3" fill="#4A5568"/>
-            <circle cx="155" cy="495" r="3" fill="#4A5568"/>
-            <circle cx="380" cy="380" r="3" fill="#4A5568"/>
-            <circle cx="395" cy="385" r="3" fill="#4A5568"/>
-        </g>
-
-        <!-- Microtubules (cytoskeleton) -->
-        <g id="microtubule" class="cilia-part">
-            <path d="M 200,600 L 270,340" stroke="#4A5568" stroke-width="2"/>
-            <path d="M 400,600 L 330,340" stroke="#4A5568" stroke-width="2"/>
-        </g>
-
-        <!-- ==== 4. CILIUM (exact same colours & IDs as before) ==== -->
-        <!-- Basal body -->
-        <rect id="basal-body" class="cilia-part"
-              fill="#4A5568" x="285" y="300" width="30" height="22"/>
-
-        <!-- Transition zone -->
-        <path id="transition-zone" class="cilia-part"
-              fill="#718096" stroke="#4A5568" stroke-width="2"
-              d="M 287,300 L 280,280 L 320,280 L 313,300 Z"/>
-
-        <!-- Ciliary membrane (dashed) -->
-        <path id="ciliary-membrane" class="cilia-part"
-              fill="none" stroke="#A0AEC0" stroke-width="3" stroke-dasharray="6,6"
-              d="M 280,280 L 295,80 L 305,80 L 320,280 Z"/>
-
-        <!-- Axoneme (core) -->
-        <path id="axoneme" class="cilia-part"
-              fill="none" stroke="#4A5568" stroke-width="4"
-              d="M 295,280 L 298,85 L 302,85 L 305,280 Z"/>
-    </svg>
-</div>            
-</div>
+                <!-- Chat -->
+                <div class="chat-panel">
+                    <div class="disclaimer">
+                        <strong>Disclaimer:</strong> CiliAI is an AI system and may produce misleading results. Use for exploration only.
+                    </div>
+                    <div id="chatWindow" class="chat-window"></div>
+                    <div class="chat-input-group">
+                        <input type="text" id="chatInput" class="chat-input" placeholder="Ask CiliAI...">
+                        <button id="sendBtn" class="send-btn">Send</button>
+                    </div>
+                </div>
             </div>
         </div>
     </div>`;
@@ -841,101 +801,91 @@ function generateAndInjectSVG() {
     if (!svgContainer) return;
 
     const svgHTML = `
-    <svg viewBox="0 0 500 500" xmlns="http://www.w3.org/2000/svg">
-        <style>
-            .svg-label      {font-size:10px; font-family:'Inter',sans-serif; fill:#000; text-anchor:middle;}
-            .svg-label-light{font-size:10px; font-family:'Inter',sans-serif; fill:#fff; text-anchor:middle;}
-        </style>
+    <svg viewBox="0 0 600 650" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;">
+        <!-- GRADIENTS -->
+        <defs>
+            <linearGradient id="cytosolGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#F5F7FA"/>
+                <stop offset="100%" stop-color="#E9EDF2"/>
+            </linearGradient>
+            <radialGradient id="nucleusGradient" cx="50%" cy="50%" r="50%">
+                <stop offset="0%" stop-color="#D8DEE9"/>
+                <stop offset="100%" stop-color="#C8D0DD"/>
+            </radialGradient>
+        </defs>
 
-        <!-- Cytoplasm (background) -->
-        <g id="cytoplasm" class="compartment structure-cytoplasm">
-            <rect width="500" height="500"/>
-        </g>
+        <!-- CELL BODY -->
+        <path id="cell-body" class="compartment structure-cytoplasm"
+              fill="url(#cytosolGradient)" stroke="#D8DEE9" stroke-width="3"
+              d="M 80,620 C -20,520 40,340 300,320 C 560,340 620,520 520,620 Z"/>
 
-        <!-- Nucleus & Nucleolus -->
-        <g id="nucleus" class="compartment structure-nucleus">
-            <circle cx="250" cy="400" r="80"/>
-            <text x="250" y="405" class="svg-label-light">Nucleus</text>
-        </g>
-        <g id="nucleolus" class="compartment structure-nucleolus">
-            <circle cx="275" cy="385" r="25"/>
-            <text x="275" y="388" class="svg-label-light">Nucleolus</text>
-        </g>
+        <!-- NUCLEUS -->
+        <circle id="nucleus" class="compartment structure-nucleus"
+                fill="url(#nucleusGradient)" stroke="#B0B8C8" stroke-width="3"
+                cx="300" cy="520" r="70"/>
 
-        <!-- Plasma membrane -->
-        <g id="plasma-membrane" class="compartment structure-plasma-membrane">
-            <path d="M 0,200 Q 250,180 500,200 V 500 H 0 Z"/>
-        </g>
-
-        <!-- Golgi -->
-        <g id="golgi-apparatus" class="compartment structure-golgi-apparatus"
-            transform="translate(70,250) scale(0.8)">
-            <path d="M 0,0 C 10,20 40,20 50,0 M 10,15 C 20,35 50,35 60,15 M 20,30 C 30,50 60,50 70,30"
-                  fill="none" stroke="#fff" stroke-width="5"/>
-            <text x="35" y="60" class="svg-label-light">Golgi</text>
-        </g>
-        <g id="golgi-vesicle" class="compartment structure-golgi-vesicle">
-            <circle cx="150" cy="260" r="8"/>
-            <circle cx="140" cy="280" r="5"/>
+        <!-- GOLGI APPARATUS -->
+        <g id="golgi-apparatus" class="compartment structure-golgi-apparatus" transform="translate(120,380) scale(0.9)">
+            <path d="M 0,0 C 15,30 60,30 75,0 M 10,20 C 25,50 65,50 80,20 M 20,40 C 35,70 70,70 85,40"
+                  fill="none" stroke="#4A5568" stroke-width="4"/>
         </g>
 
-        <!-- Lysosome & Peroxisome -->
-        <g id="lysosome" class="compartment structure-lysosome">
-            <circle cx="380" cy="280" r="15"/>
-            <text x="380" y="283" class="svg-label-light">Lysosome</text>
-        </g>
-        <g id="peroxisome" class="compartment structure-peroxisome">
-            <circle cx="400" cy="320" r="10"/>
+        <!-- MITOCHONDRION -->
+        <g id="mitochondria" class="compartment structure-mitochondria" transform="translate(280,260)">
+            <ellipse cx="0" cy="0" rx="55" ry="28" fill="#4A5568"/>
+            <path d="M -40,-8 C -20,8 20,-8 40,8" fill="none" stroke="#E9EDF2" stroke-width="3"/>
+            <path d="M -40,8 C -20,-8 20,8 40,-8" fill="none" stroke="#E9EDF2" stroke-width="3"/>
         </g>
 
-        <!-- Ribosomes -->
+        <!-- LYSOSOME -->
+        <circle id="lysosome" class="compartment structure-lysosome" cx="420" cy="460" r="22"
+                fill="#718096" stroke="#4A5568" stroke-width="2"/>
+
+        <!-- PEROXISOME -->
+        <circle id="peroxisome" class="compartment structure-peroxisome" cx="460" cy="510" r="15"
+                fill="#A0AEC0" stroke="#718096" stroke-width="2"/>
+
+        <!-- RIBOSOMES -->
         <g id="ribosomes" class="compartment structure-ribosomes">
-            <circle cx="100" cy="320" r="2"/> <circle cx="105" cy="325" r="2"/>
-            <circle cx="110" cy="318" r="2"/> <circle cx="95"  cy="330" r="2"/>
-            <circle cx="300" cy="250" r="2"/> <circle cx="305" cy="255" r="2"/>
-            <circle cx="310" cy="248" r="2"/> <circle cx="295" cy="260" r="2"/>
+            <circle cx="150" cy="480" r="3" fill="#4A5568"/>
+            <circle cx="165" cy="485" r="3" fill="#4A5568"/>
+            <circle cx="155" cy="495" r="3" fill="#4A5568"/>
+            <circle cx="380" cy="380" r="3" fill="#4A5568"/>
+            <circle cx="395" cy="385" r="3" fill="#4A5568"/>
         </g>
 
-        <!-- Microtubules -->
+        <!-- MICROTUBULES -->
         <g id="microtubule" class="compartment structure-microtubule">
-            <path d="M 150,450 L 220,220"/>
-            <path d="M 350,450 L 280,220"/>
+            <path d="M 200,600 L 270,340" stroke="#4A5568" stroke-width="2"/>
+            <path d="M 400,600 L 330,340" stroke="#4A5568" stroke-width="2"/>
         </g>
 
-        <!-- Mitochondrion (next to basal body) -->
-        <g id="mitochondria" class="compartment structure-mitochondria"
-            transform="translate(140,195)">
-            <ellipse cx="0" cy="0" rx="40" ry="20"/>
-            <path d="M -30,-5 C -10,5 10,-5 30,5" stroke="#fff" fill="none" stroke-width="2"/>
-            <text x="0" y="3" class="svg-label-light">Mitochondrion</text>
-        </g>
+        <!-- BASAL BODY -->
+        <rect id="basal-body" class="compartment structure-basal-body"
+              fill="#4A5568" x="285" y="300" width="30" height="22"/>
 
-        <!-- CILIUM (centered at top) -->
-        <g id="ciliary-membrane" class="compartment structure-ciliary-membrane"
-            transform="translate(0,-20)">
-            <path d="M 220,210 Q 200,100 250,20 Q 300,100 280,210"/>
-        </g>
-        <g id="axoneme" class="compartment structure-axoneme"
-            transform="translate(0,-20)">
-            <path d="M 235,190 Q 240,100 250,30 Q 260,100 265,190 Z"/>
-            <text x="250" y="120" class="svg-label-light">Axoneme</text>
-        </g>
-        <g id="transition-zone" class="compartment structure-transition-zone"
-            transform="translate(0,-20)">
-            <rect x="230" y="190" width="40" height="20" rx="5"/>
-            <text x="250" y="204" class="svg-label-light">TZ</text>
-        </g>
-        <g id="basal-body" class="compartment structure-basal-body"
-            transform="translate(0,-20)">
-            <rect x="225" y="210" width="50" height="30" rx="5"/>
-            <text x="250" y="228" class="svg-label-light">Basal Body</text>
-        </g>
+        <!-- TRANSITION ZONE -->
+        <path id="transition-zone" class="compartment structure-transition-zone"
+              fill="#718096" stroke="#4A5568" stroke-width="2"
+              d="M 287,300 L 280,280 L 320,280 L 313,300 Z"/>
+
+        <!-- CILIARY MEMBRANE -->
+        <path id="ciliary-membrane" class="compartment structure-ciliary-membrane"
+              fill="none" stroke="#A0AEC0" stroke-width="3" stroke-dasharray="6,6"
+              d="M 280,280 L 295,80 L 305,80 L 320,280 Z"/>
+
+        <!-- AXONEME -->
+        <path id="axoneme" class="compartment structure-axoneme"
+              fill="none" stroke="#4A5568" stroke-width="4"
+              d="M 295,280 L 298,85 L 302,85 L 305,280 Z"/>
     </svg>`;
-
+    
     svgContainer.innerHTML = svgHTML;
-    setupSVGInteraction();          // makes every <g> clickable
+    setupSVGInteraction();
 }
-    /**
+   
+   
+   /**
      * Attaches click listeners to the SVG compartments.
      */
     function setupSVGInteraction() {
