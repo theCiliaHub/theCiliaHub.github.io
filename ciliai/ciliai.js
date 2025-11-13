@@ -745,18 +745,6 @@
                     </div>
                 </div>
 
-                <div class="info-panel">
-                    <div class="info-lists">
-                        <div class="organelle-info-panel">
-                            <h3 id="organelle-info-title">Click a structure or search a gene</h3>
-                            <div id="organelle-info-text"></div>
-                        </div>
-                    </div>
-
-                    <div class="chat-panel">
-                        <div class="disclaimer">
-                            <strong>Disclaimer:</strong> CiliAI is an AI system and may produce misleading results. Use for exploration only.
-                        </div>
                         <div id="chatWindow" class="chat-window"></div>
                         <div class="chat-input-group">
                             <input type="text" id="chatInput" class="chat-input" placeholder="Ask CiliAI...">
@@ -1030,7 +1018,7 @@
 
     // --- 8. EVENT LISTENER SETUP ---
 
-    /**
+   /**
      * Attaches all primary event listeners for the page.
      */
     function setupPageEventListeners() {
@@ -1040,7 +1028,6 @@
         const findGeneBtn = document.getElementById('findGeneBtn');
         const geneSearchInput = document.getElementById('geneSearchInput');
         const showUmapBtn = document.getElementById('showUmapBtn');
-        const bottomBar = document.getElementById('bottomBar');
         
         // Chat
         if (sendBtn) sendBtn.addEventListener('click', handleUserSend);
@@ -1098,28 +1085,32 @@
                 if (gene) handleGeneSearch(gene, true);
             }
             
-            // AI Action Links (for plot switching, etc.)
+            // ==========================================================
+            // FIX: AI Action Links (for plot switching, etc.)
+            // This logic is now simpler. It just builds a query and
+            // sends it to the main "brain" (handleAIQuery).
+            // ==========================================================
             const aiAction = e.target.closest('.ai-action');
             if (aiAction) {
-                e.preventDefault();
-                const action = aiAction.dataset.action;
-                const genesString = aiAction.dataset.genes;
-                const genes = genesString ? genesString.split(',').map(g => g.trim()).filter(Boolean) : [];
-                const resultArea = document.getElementById('chatWindow');
+                e.preventDefault(); // Stop the link from navigating
 
-                if (action === 'show-nevers-heatmap' || action === 'show-li-heatmap') {
-                    const source = action.includes('nevers') ? 'nevers' : 'li';
-                    addChatMessage(`Switching to ${source.toUpperCase()} comparison...`, false);
-                    handlePhylogenyVisualizationQuery(genes, source, 'heatmap');
-                }  
-                else if (action === 'show-table-view') {
-                    addChatMessage(`Generating phylogenetic data table...`, false);
-                    handlePhylogenyVisualizationQuery(genes, 'li', 'table');
+                const action = aiAction.dataset.action;
+                const genes = aiAction.dataset.genes || "";
+                
+                let query = "";
+                if (action === 'show-li-heatmap') {
+                    query = `show li phylogeny for ${genes}`;
+                } else if (action === 'show-nevers-heatmap') {
+                    query = `show nevers phylogeny for ${genes}`;
+                } else if (action === 'show-table-view') {
+                    query = `show data table for ${genes}`;
                 }
-                else if (action === 'visualize-heatmap') {
-                    addChatMessage(`Generating heatmap...`, false);
-                    handlePhylogenyVisualizationQuery(genes, 'li', 'heatmap');
+
+                if (query) {
+                    addChatMessage(query, true); // Add the user's "click" as a query
+                    handleAIQuery(query);      // Send to the brain
                 }
+                return;
             }
         });
     }
@@ -1541,74 +1532,255 @@ async function getGenesByDomain(domainTerm) {
  * rendering engine (like renderLiPhylogenyHeatmap) and
  * then calls Plotly to draw the plot in the chat.
  */
-async function handlePhylogenyVisualizationQuery(genes, source = 'li', type = 'heatmap') {
-    // 1. Get a unique ID for the plot container
-    const plotId = `plot-${new Date().getTime()}`;
-    
-    // 2. Add a "loading" message to the chat
-    const loadingMessage = `Generating ${source.toUpperCase()} conservation heatmap for ${genes.join(', ')}...`;
-    addChatMessage(loadingMessage, false);
-
-    try {
-        let plotResult;
-
-        // 3. Call the correct rendering engine
-        if (source === 'nevers') {
-            // Note: You need to create 'renderNeversPhylogenyHeatmap'
-            // plotResult = await renderNeversPhylogenyHeatmap(genes);
-            return `Sorry, the Nevers (2017) heatmap renderer is not yet implemented.`;
-        } else {
-            // Call the Li (2014) renderer you provided
-            plotResult = await renderLiPhylogenyHeatmap(genes);
-        }
-
-        // 4. Check if the renderer gave back valid plot data
-        if (!plotResult || !plotResult.plotData) {
-            throw new Error(plotResult.html || 'The plot renderer returned no data.');
-        }
-
-        // 5. Create the HTML for the chat window, including the plot div
-        const html = `
-            <div class="result-card">
-                <h3>${plotResult.plotLayout.title || 'Phylogenetic Heatmap'}</h3>
-                <p>Data from ${source === 'li' ? 'Li et al. (2014)' : 'Nevers et al. (2017)'}</p>
-                <div id="${plotId}" class="plotly-chart-container" style="width: 100%; min-height: ${plotResult.plotLayout.height || 500}px;"></div>
-                <button class="download-button" onclick="Plotly.downloadImage('${plotId}', {filename: 'ciliai_phylogeny_plot'})">Download Plot (PNG)</button>
-                <p class="ai-suggestion" style="margin-top: 10px;">
-                    <a href="#" class="ai-action" data-action="show-nevers-heatmap" data-genes="${genes.join(',')}">Show Nevers (2017)</a>
-                </p>
-            </div>
-        `;
+/**
+     * Handler for all phylogeny plot requests.
+     * This function now draws DIRECTLY to the left panel ('cilia-svg').
+     * It does not return any HTML.
+     */
+    async function handlePhylogenyVisualizationQuery(genes, source = 'li', type = 'heatmap') {
+        const plotId = 'cilia-svg'; // <-- Draw to the left panel
+        const plotDiv = document.getElementById(plotId);
         
-        // 6. Update the "loading" message with the final HTML
-        const chatWindow = document.getElementById('chatWindow');
-        const messages = chatWindow.getElementsByClassName('ai-message');
-        const lastMessage = messages[messages.length - 1];
-        if (lastMessage && lastMessage.innerText.includes('Generating')) {
-            lastMessage.innerHTML = html;
-        } else {
-            addChatMessage(html, false);
+        if (!plotDiv) {
+            console.error("Phylogeny Error: plot container 'cilia-svg' not found.");
+            return;
         }
 
-        // 7. CRITICAL STEP: Call Plotly to render the plot
-        // We must wait a tiny bit for the DOM to update
-        setTimeout(() => {
-            const plotDiv = document.getElementById(plotId);
-            if (plotDiv) {
-                Plotly.newPlot(plotId, plotResult.plotData, plotResult.plotLayout, { responsive: true });
+        log(`Plotting ${source} heatmap for ${genes.join(', ')} to ${plotId}`);
+        plotDiv.innerHTML = `<div style="padding: 40px; text-align: center;">Loading ${source.toUpperCase()} phylogeny plot for ${genes.join(', ')}...</div>`;
+
+        try {
+            let plotResult;
+
+            if (source === 'nevers') {
+                // You still need to create this function
+                // plotResult = await renderNeversPhylogenyHeatmap(genes);
+                plotDiv.innerHTML = `<p style="padding: 20px;">Nevers (2017) plot renderer is not yet implemented.</p>`;
+                return;
             } else {
-                console.error(`Plotly Error: Container #${plotId} not found.`);
+                plotResult = await renderLiPhylogenyHeatmap(genes);
             }
-        }, 100);
 
-        // 8. Return an empty string so the "brain" doesn't post a duplicate message
-        return "";
+            if (!plotResult || !plotResult.plotData) {
+                throw new Error(plotResult.html || 'The plot renderer returned no data.');
+            }
 
-    } catch (e) {
-        console.error("handlePhylogenyVisualizationQuery Error:", e);
-        return `<strong>Error generating plot:</strong> ${e.message}`;
+            // CRITICAL STEP: Call Plotly to render the plot
+            Plotly.newPlot(plotId, plotResult.plotData, plotResult.plotLayout, { responsive: true });
+
+        } catch (e) {
+            console.error("handlePhylogenyVisualizationQuery Error:", e);
+            plotDiv.innerHTML = `<p style="padding: 20px;"><strong>Error generating plot:</strong> ${e.message}</p>`;
+        }
     }
+
+    /**
+     * Renders the Li et al. 2014 heatmap.
+     * This function now ONLY returns plot data, not HTML.
+     */
+    async function renderLiPhylogenyHeatmap(genes) {
+        const liData = await fetchLiPhylogenyData();
+        if (!liData) {
+            return { html: `<p>Li et al. 2014 data not loaded.</p>` }; // Return error info
+        }
+        
+        const CIL_COUNT = CIL_ORG_FULL.length;
+        // ... (rest of the function is the same) ...
+        // ... (finds liOrgMap, targetLiIndices, builds matrix) ...
+
+        const liOrgList = liData.summary.organisms_list;
+        const liOrgMap = new Map();
+
+        liOrgList.forEach((name, index) => {
+            liOrgMap.set(name, index);
+            liOrgMap.set(name.toLowerCase().replace(/[\s\.]/g, ''), index);
+        });
+
+        const targetOrganisms = CIL_ORG_FULL.concat(NCIL_ORG_FULL);
+        
+        const targetLiIndices = targetOrganisms.map(orgName => {
+            const lowerOrg = orgName.toLowerCase();
+            const simplifiedKey = lowerOrg.replace(/[\s\.]/g, '');
+            
+            // This map is missing from your file, you need to add it
+            const VERTEBRATE_LI_MAP = new Map([
+                ["homosapiens", "H.sapiens"], ["musmusculus", "M.musculus"], ["daniorerio", "D.rerio"],
+                ["xenopustropicalis", "X.tropicalis"], ["gallusgallus", "G.gallus"], ["c.elegans", "C.elegans"],
+                ["c.reinhardtii", "C.reinhardtii"], ["t.thermophila", "T.thermophila"], ["s.cerevisiae", "S.cerevisiae"],
+                ["a.thaliana", "A.thaliana"]
+            ]);
+
+            if (VERTEBRATE_LI_MAP.has(simplifiedKey)) {
+                const liAbbrev = VERTEBRATE_LI_MAP.get(simplifiedKey);
+                if (liOrgMap.has(liAbbrev)) {
+                    return liOrgMap.get(liAbbrev);
+                }
+            }
+            if (liOrgMap.has(simplifiedKey)) return liOrgMap.get(simplifiedKey);
+            if (liOrgMap.has(orgName)) return liOrgMap.get(orgName);
+            return undefined;
+        });
+
+        const geneLabels = genes.map(g => g.toUpperCase());
+        const matrix = [];
+        const textMatrix = [];
+        
+        geneLabels.forEach(gene => {
+            const geneData = Object.values(liData.genes).find(g => g.g && g.g.toUpperCase() === gene);
+            const presenceIndices = new Set(geneData ? geneData.s : []);
+            const row = [];
+            const textRow = [];
+
+            targetOrganisms.forEach((orgName, index) => {
+                const liIndex = targetLiIndices[index];
+                const isCiliated = index < CIL_COUNT;
+                const isPresent = liIndex !== undefined && presenceIndices.has(liIndex);
+                let zValue = 0;
+                let status = "Absent";
+                if (isPresent) {
+                    zValue = isCiliated ? 2 : 1;
+                    status = "Present";
+                }
+                row.push(zValue);
+                textRow.push(`Gene: ${gene}<br>Organism: ${orgName}<br>Status: ${status}`);
+            });
+
+            if (row.length > 0) {
+                matrix.push(row);
+                textMatrix.push(textRow);
+            }
+        });
+        
+        // --- End of data processing ---
+
+        const trace = {
+            z: matrix,
+            x: targetOrganisms.map(name => {
+                if (name === "H.sapiens") return "Human";
+                if (name === "M.musculus") return "Mouse";
+                if (name === "D.rerio") return "Zebrafish";
+                if (name.includes("elegans")) return "C. elegans";
+                return name.replace(/\./g, '').split(' ')[0];
+            }), 
+            y: geneLabels,
+            type: 'heatmap',
+            colorscale: [
+                [0/2, '#FFFFFF'],
+                [0.0001/2, '#FFE5B5'],
+                [1/2, '#FFE5B5'],
+                [1.0001/2, '#698ECF'],
+                [2/2, '#698ECF']
+            ],
+            showscale: false,
+            hoverinfo: 'text',
+            text: textMatrix,
+            xgap: 0.5,
+            ygap: 0.5,
+            line: { color: '#000000', width: 0.5 }
+        };
+
+        const layout = {
+            title: `Phylogenetic Conservation (Li et al. 2014) - ${genes.join(', ')}`,
+            xaxis: { 
+                title: 'Organisms (Ciliated | Non-Ciliated)', 
+                tickangle: 45, 
+                automargin: true 
+            },
+            yaxis: { 
+                title: 'Genes', 
+                automargin: true 
+            },
+            shapes: [
+                {
+                    type: 'line',
+                    xref: 'x', x0: CIL_COUNT - 0.5, x1: CIL_COUNT - 0.5, 
+                    yref: 'paper', y0: 0, y1: 1,
+                    line: { color: 'black', width: 2 }
+                }
+            ],
+            margin: { t: 50, b: 200, l: 150, r: 50 }, 
+            height: Math.max(500, genes.length * 40 + 150)
+        };
+        
+        // Return only the plot data and layout
+        return {
+            plotData: [trace],
+            plotLayout: layout
+        };
+    }
+
+
+    
+/**
+ * Handles all UMAP plotting requests and draws to the left panel.
+ */
+async function handleUmapPlot(highlightGene = null) {
+    const plotDivId = 'cilia-svg'; // Draw on the left panel
+    const umapData = window.CiliAI.data.umap;
+
+    if (!umapData || umapData.length === 0) {
+        document.getElementById(plotDivId).innerHTML = '<p style="padding: 20px;">UMAP data not loaded.</p>';
+        return;
+    }
+
+    const backgroundTrace = {
+        x: [],
+        y: [],
+        text: [],
+        mode: 'markers',
+        type: 'scatter',
+        name: 'All Genes',
+        marker: { color: '#d3d3d3', size: 5, opacity: 0.5 },
+        hoverinfo: 'text'
+    };
+
+    const highlightTrace = {
+        x: [],
+        y: [],
+        text: [],
+        mode: 'markers',
+        type: 'scatter',
+        name: highlightGene || 'Highlighted',
+        marker: { color: '#2c5aa0', size: 10, opacity: 1, line: { color: 'black', width: 1 } },
+        hoverinfo: 'text'
+    };
+
+    let title = 'UMAP of Ciliary Genes';
+    const geneUpper = highlightGene ? highlightGene.toUpperCase() : null;
+
+    umapData.forEach(d => {
+        if (highlightGene && d.gene && d.gene.toUpperCase() === geneUpper) {
+            highlightTrace.x.push(d.x);
+            highlightTrace.y.push(d.y);
+            highlightTrace.text.push(`<b>${d.gene}</b><br>${d.cluster}`);
+        } else {
+            backgroundTrace.x.push(d.x);
+            backgroundTrace.y.push(d.y);
+            backgroundTrace.text.push(`<b>${d.gene}</b><br>${d.cluster}`);
+        }
+    });
+
+    const plotData = [backgroundTrace];
+    if (highlightTrace.x.length > 0) {
+        plotData.push(highlightTrace);
+        title = `UMAP: ${highlightGene}`;
+    } else if (highlightGene) {
+        // Gene was requested but not found in UMAP data
+        addChatMessage(`Sorry, I could not find <strong>${highlightGene}</strong> in the UMAP data. Displaying all genes.`, false);
+    }
+
+    const layout = {
+        title: title,
+        xaxis: { title: 'UMAP 1', zeroline: false, showticklabels: false },
+        yaxis: { title: 'UMAP 2', zeroline: false, showticklabels: false },
+        showlegend: false,
+        hovermode: 'closest',
+        margin: { t: 40, b: 40, l: 40, r: 20 }
+    };
+
+    Plotly.newPlot(plotDivId, plotData, layout, { responsive: true });
 }
+    
     
     /**
      * Renders the Li et al. 2014 heatmap.
@@ -1727,11 +1899,9 @@ async function handlePhylogenyVisualizationQuery(genes, source = 'li', type = 'h
         const qLower = query.toLowerCase().trim();
         if (!query) return;
 
-        // --- Purge Plotly from the *diagram* container ---
-        try { 
-            const plotDiv = document.getElementById('cilia-svg');
-            if (plotDiv && window.Plotly) Plotly.purge(plotDiv); 
-        } catch (e) {}
+        // NOTE: We no longer purge the plot here,
+        // so the user can ask questions *while* viewing a plot.
+        // Plots will only be replaced when a new plot is requested.
 
         log(`Routing query: ${query}`);
         
@@ -1745,45 +1915,32 @@ async function handlePhylogenyVisualizationQuery(genes, source = 'li', type = 'h
             let match;
 
             // =( 1 )= INTENT: ORTHOLOGS ===================================
-            // "ortholog of OFD1 in mouse", "ortholog in c. elegans for ift52"
             if (!htmlResult && (match = qLower.match(/ortholog(?: of| for)?\s+([a-z0-9\-]+)\s+(?:in|for)\s+(c\. elegans|mouse|zebrafish|drosophila|xenopus)/i))) {
                 log('Routing via: Intent (Ortholog)');
-                const gene = match[1].toUpperCase();
-                const organism = match[2];
-                htmlResult = await handleOrthologQuery(gene, organism);
+                htmlResult = await handleOrthologQuery(match[1].toUpperCase(), match[2]);
             }
-            // "mouse ortholog for ift52"
             else if (!htmlResult && (match = qLower.match(/(c\. elegans|mouse|zebrafish|drosophila|xenopus)\s+ortholog(?: of| for)?\s+([a-z0-9\-]+)/i))) {
                 log('Routing via: Intent (Ortholog)');
-                const organism = match[1];
-                const gene = match[2].toUpperCase();
-                htmlResult = await handleOrthologQuery(gene, organism);
+                htmlResult = await handleOrthologQuery(match[2].toUpperCase(), match[1]);
             }
 
             //=( 2 )= INTENT: COMPLEX / MODULE MEMBERS ======================
-            // "list genes in the bbsome", "components of ift-b"
             else if (!htmlResult && (match = qLower.match(/(?:list genes in|components of|subunits of|members of)\s+(?:the\s+)?([a-z0-9\- \"]+)/i))) {
                 log('Routing via: Intent (List Complex Members)');
-                const complexName = match[1].replace(/"/g, '').trim().toUpperCase(); // "CILIARY TIP"
-                // Check Complex Map first
+                const complexName = match[1].replace(/"/g, '').trim().toUpperCase();
                 if (getComplexPhylogenyTableMap()[complexName]) {
                     htmlResult = await getComplexPhylogenyTable(complexName);
                 } else {
-                    // Fallback to module search
                     const genes = await getGenesByModule(complexName);
                     htmlResult = formatListResult(`Genes in Module: ${complexName}`, genes);
                 }
             }
-            // "complexes for bbs4", "complex components of ofd1"
             else if (!htmlResult && (match = qLower.match(/(?:complexes for|complexes of|complexes containing|complex components of)\s+([a-z0-9\-]+)/i))) {
                 log('Routing via: Intent (Find Gene in Complex)');
-                const gene = match[1].toUpperCase();
-                htmlResult = await handleComplexQuery(gene);
+                htmlResult = await handleComplexQuery(match[1].toUpperCase());
             }
 
             //=( 3 )= INTENT: DOMAINS =======================================
-            // "domains of cep290"
-            // --- Domain Router ---
             else if (!htmlResult && (match = qLower.match(/(?:domains of|domain architecture for)\s+(.+)/i))) {
                 log('Routing via: Intent (Domains)');
                 const genes = extractMultipleGenes(match[1]);
@@ -1793,33 +1950,33 @@ async function handlePhylogenyVisualizationQuery(genes, source = 'li', type = 'h
             }
 
             //=( 4 )= INTENT: SCREENS / PHENOTYPES ==========================
-            // "screens for ift88", "percent ciliated cells effect of kif3a"
             else if (!htmlResult && (match = qLower.match(/(?:screens for|screens where|effect of)\s+([a-z0-9\-]+)/i))) {
                 log('Routing via: Intent (Screens)');
-                const gene = match[1].toUpperCase();
-                htmlResult = await handleScreenQuery(gene);
+                htmlResult = await handleScreenQuery(match[1].toUpperCase());
             }
 
-            //=( 5 )= INTENT: PHYLOGENY / CONSERVATION ======================
-            // "compare phylogeny for ift88, ift81"
+            //=( 5 )= INTENT: PHYLOGENY (VISUAL) ============================
+            // This intent now draws on the LEFT panel and returns no text.
             else if (!htmlResult && (qLower.includes('phylogeny') || qLower.includes('conservation') || qLower.includes('evolution'))) {
-                log('Routing via: Intent (Phylogeny)');
+                log('Routing via: Intent (Phylogeny Plot)');
                 const genes = extractMultipleGenes(query);
-                htmlResult = await handlePhylogenyVisualizationQuery(genes.length ? genes : ['IFT88', 'BBS1', 'CEP290'], 'li', 'heatmap'); 
+                const source = qLower.includes('nevers') ? 'nevers' : 'li';
+                // Call the plotting function, which draws to 'cilia-svg'
+                await handlePhylogenyVisualizationQuery(genes.length ? genes : ['IFT88', 'BBS1', 'CEP290'], source, 'heatmap'); 
+                htmlResult = ""; // Signal that the query was handled visually
             }
 
-            //=( 6 )= INTENT: PLOTTING (UMAP, etc) ==========================
-            // "plot umap for foxj1", "plot umap expression for foxj1"
-            else if (!htmlResult && (match = qLower.match(/plot umap(?: expression)? for\s+([a-z0-9\-]+)/i))) {
-                log('Routing via: Intent (Plot UMAP)');
-                const gene = match[1].toUpperCase();
-                // This is a placeholder. You need to create the `handleUmapPlot` function.
-                htmlResult = `UMAP plotting for <strong>${gene}</strong> is not yet implemented.`;
-                // htmlResult = await handleUmapPlot(gene); 
+            //=( 6 )= INTENT: UMAP (VISUAL) =================================
+            // This intent draws on the LEFT panel and returns no text.
+            else if (!htmlResult && (match = qLower.match(/(?:show|plot)\s+(?:me\s+the\s+)?umap(?: expression)?(?: for\s+([a-z0-9\-]+))?/i))) {
+                log('Routing via: Intent (UMAP Plot)');
+                const gene = match[1] ? match[1].toUpperCase() : null;
+                // Call the plotting function, which draws to 'cilia-svg'
+                await handleUmapPlot(gene);
+                htmlResult = ""; // Signal that the query was handled visually
             }
 
             //=( 7 )= INTENT: SIMPLE KEYWORD LISTS ==========================
-            // "list genes in joubert syndrome", "bbsome genes"
             if (!htmlResult) {
                 const intent = flexibleIntentParser(query);
                 if (intent) {
@@ -1829,20 +1986,16 @@ async function handlePhylogenyVisualizationQuery(genes, source = 'li', type = 'h
             }
 
             //=( 8 )= INTENT: FALLBACK (GET DETAILS) ========================
-            // "what is ift88?", "describe bbs1", "what does evc2 do?", "omim id for pkd1"
             if (!htmlResult) {
                 log(`Routing via: Fallback (Get Details)`);
                 let term = qLower;
                 
-                // Check for "what is X" patterns
                 if ((match = qLower.match(/(?:what is|what does|describe|localization of|omim id for)\s+(.+)/i))) {
                     term = match[1];
                 }
 
-                // Clean the term (remove "do", "?", etc.)
                 term = term.replace(/[?.]/g, '').replace(/\bdo\b/i, '').trim().toUpperCase();
                 
-                // Use the *original* extractMultipleGenes to find any valid gene name
                 const genes = extractMultipleGenes(term);
                 if (genes.length > 0) {
                     htmlResult = await getComprehensiveDetails(genes[0]);
@@ -1850,7 +2003,7 @@ async function handlePhylogenyVisualizationQuery(genes, source = 'li', type = 'h
             }
             
             //=( 9 )= FINAL FALLBACK (ERROR) ================================
-            if (!htmlResult) {
+            if (!htmlResult && htmlResult !== "") { // Check for "" (visual success)
                 log(`Routing via: Final Fallback (Error)`);
                 htmlResult = `Sorry, I didn't understand the query: "<strong>${query}</strong>". Please try a simpler term.`;
             }
@@ -1866,6 +2019,7 @@ async function handlePhylogenyVisualizationQuery(genes, source = 'li', type = 'h
         }
     }
 
+    
     /**
      * This is a simple keyword spotter for Priority 7.
      * It uses the flexible regex to catch simple queries.
