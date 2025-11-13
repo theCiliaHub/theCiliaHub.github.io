@@ -1892,7 +1892,7 @@ async function handlePhylogenyVisualizationQuery(genes, source = 'li', type = 'h
                 type: 'MODULE',
                 keywords: ['Ciliary tip', 'Radial Spoke', 'Central Pair', 'Dynein Arm', 'SHH Signaling'],
                 handler: async (term) => formatListResult(`Genes in Module: ${term}`, await getGenesByModule(term))
-            }
+            },
              {
             type: 'DOMAIN',
             keywords: ['WD40', 'coiled-coil', 'pfam', 'domain', 'ef-hand'],
