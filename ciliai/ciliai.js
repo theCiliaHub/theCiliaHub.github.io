@@ -805,99 +805,105 @@
     }
 
     // --- 6. SVG GENERATION & INTERACTION ---
+/**
+ * Generates and injects the custom SVG.
+ * → Cilium + all surrounding organelles in ONE interactive diagram.
+ */
+function generateAndInjectSVG() {
+    const svgContainer = document.getElementById('cilia-svg');
+    if (!svgContainer) return;
 
-    /**
-     * Generates and injects the custom SVG.
-     */
-    function generateAndInjectSVG() {
-        const svgContainer = document.getElementById('cilia-svg');
-        if (!svgContainer) return;
+    const svgHTML = `
+    <svg viewBox="0 0 500 500" xmlns="http://www.w3.org/2000/svg">
+        <style>
+            .svg-label { font-size: 10px; font-family: 'Inter', sans-serif; fill: #000; text-anchor: middle; }
+            .svg-label-light { font-size: 10px; font-family: 'Inter', sans-serif; fill: #fff; text-anchor: middle; }
+        </style>
 
-        // This SVG is a schematic showing the cilium in the context of the cell.
-        // Positions are hard-coded for this specific layout.
-        const svgHTML = `
-        <svg viewBox="0 0 500 500" xmlns="http://www.w3.org/2000/svg">
-            <style>
-                /* Text labels on SVG */
-                .svg-label { font-size: 10px; font-family: 'Inter', sans-serif; fill: #000; text-anchor: middle; }
-                .svg-label-light { font-size: 10px; font-family: 'Inter', sans-serif; fill: #fff; text-anchor: middle; }
-            </style>
-            
-            <g id="cytoplasm" class="compartment structure-cytoplasm">
-                <rect width="500" height="500" />
-            </g>
-            
-            <g id="nucleus" class="compartment structure-nucleus">
-                <circle cx="250" cy="400" r="80" />
-                <text x="250" y="405" class="svg-label-light">Nucleus</text>
-            </g>
-            <g id="nucleolus" class="compartment structure-nucleolus">
-                <circle cx="275" cy="385" r="25" />
-                <text x="275" y="388" class="svg-label-light">Nucleolus</text>
-            </g>
-            
-            <g id="plasma-membrane" class="compartment structure-plasma-membrane">
-                <path d="M 0,200 Q 250,180 500,200 V 500 H 0 Z" />
-            </g>
-            
-            <g id="golgi-apparatus" class="compartment structure-golgi-apparatus" transform="translate(70, 250) scale(0.8)">
-                <path d="M 0,0 C 10,20 40,20 50,0 M 10,15 C 20,35 50,35 60,15 M 20,30 C 30,50 60,50 70,30" 
-                    fill="none" stroke="#fff" stroke-width="5" />
-                <text x="35" y="60" class="svg-label-light">Golgi</text>
-            </g>
-            <g id="golgi-vesicle" class="compartment structure-golgi-vesicle">
-                <circle cx="150" cy="260" r="8" />
-                <circle cx="140" cy="280" r="5" />
-            </g>
-            
-            <g id="lysosome" class="compartment structure-lysosome">
-                <circle cx="380" cy="280" r="15" />
-                <text x="380" y="283" class="svg-label-light">Lysosome</text>
-            </g>
-            <g id="peroxisome" class="compartment structure-peroxisome">
-                <circle cx="400" cy="320" r="10" />
-            </g>
-            
-            <g id="ribosomes" class="compartment structure-ribosomes">
-                <circle cx="100" cy="320" r="2" /> <circle cx="105" cy="325" r="2" />
-                <circle cx="110" cy="318" r="2" /> <circle cx="95" cy="330" r="2" />
-                <circle cx="300" cy="250" r="2" /> <circle cx="305" cy="255" r="2" />
-                <circle cx="310" cy="248" r="2" /> <circle cx="295" cy="260" r="2" />
-            </g>
-            
-            <g id="microtubule" class="compartment structure-microtubule">
-                <path d="M 150,450 L 220,220" />
-                <path d="M 350,450 L 280,220" />
-            </g>
-            
-            <g id="ciliary-membrane" class="compartment structure-ciliary-membrane" transform="translate(0, -20)">
-                <path d="M 220,210 Q 200,100 250,20 Q 300,100 280,210" />
-            </g>
-            <g id="axoneme" class="compartment structure-axoneme" transform="translate(0, -20)">
-                <path d="M 235,190 Q 240,100 250,30 Q 260,100 265,190 Z" />
-                <text x="250" y="120" class="svg-label-light">Axoneme</text>
-            </g>
-            <g id="transition-zone" class="compartment structure-transition-zone" transform="translate(0, -20)">
-                <rect x="230" y="190" width="40" height="20" rx="5" />
-                <text x="250" y="204" class="svg-label-light">TZ</text>
-            </g>
-            <g id="basal-body" class="compartment structure-basal-body" transform="translate(0, -20)">
-                <rect x="225" y="210" width="50" height="30" rx="5" />
-                <text x="250" y="228" class="svg-label-light">Basal Body</text>
-            </g>
-            
-            <g id="mitochondria" class="compartment structure-mitochondria" transform="translate(140, 195)">
-                <ellipse cx="0" cy="0" rx="40" ry="20" />
-                <path d="M -30,-5 C -10,5 10,-5 30,5" stroke="#fff" fill="none" stroke-width="2" />
-                <text x="0" y="3" class="svg-label-light">Mitochondrion</text>
-            </g>
-        </svg>
-        `;
-        svgContainer.innerHTML = svgHTML;
-        
-        // Now that SVG is loaded, make compartments interactive
-        setupSVGInteraction();
-    }
+        <!-- Cytoplasm (background) -->
+        <g id="cytoplasm" class="compartment structure-cytoplasm">
+            <rect width="500" height="500" />
+        </g>
+
+        <!-- Nucleus & Nucleolus -->
+        <g id="nucleus" class="compartment structure-nucleus">
+            <circle cx="250" cy="400" r="80" />
+            <text x="250" y="405" class="svg-label-light">Nucleus</text>
+        </g>
+        <g id="nucleolus" class="compartment structure-nucleolus">
+            <circle cx="275" cy="385" r="25" />
+            <text x="275" y="388" class="svg-label-light">Nucleolus</text>
+        </g>
+
+        <!-- Plasma membrane (cell outline) -->
+        <g id="plasma-membrane" class="compartment structure-plasma-membrane">
+            <path d="M 0,200 Q 250,180 500,200 V 500 H 0 Z" />
+        </g>
+
+        <!-- Golgi apparatus -->
+        <g id="golgi-apparatus" class="compartment structure-golgi-apparatus" transform="translate(70,250) scale(0.8)">
+            <path d="M 0,0 C 10,20 40,20 50,0 M 10,15 C 20,35 50,35 60,15 M 20,30 C 30,50 60,50 70,30"
+                  fill="none" stroke="#fff" stroke-width="5" />
+            <text x="35" y="60" class="svg-label-light">Golgi</text>
+        </g>
+        <g id="golgi-vesicle" class="compartment structure-golgi-vesicle">
+            <circle cx="150" cy="260" r="8" />
+            <circle cx="140" cy="280" r="5" />
+        </g>
+
+        <!-- Lysosome & Peroxisome -->
+        <g id="lysosome" class="compartment structure-lysosome">
+            <circle cx="380" cy="280" r="15" />
+            <text x="380" y="283" class="svg-label-light">Lysosome</text>
+        </g>
+        <g id="peroxisome" class="compartment structure-peroxisome">
+            <circle cx="400" cy="320" r="10" />
+        </g>
+
+        <!-- Ribosomes (dots) -->
+        <g id="ribosomes" class="compartment structure-ribosomes">
+            <circle cx="100" cy="320" r="2" /> <circle cx="105" cy="325" r="2" />
+            <circle cx="110" cy="318" r="2" /> <circle cx="95"  cy="330" r="2" />
+            <circle cx="300" cy="250" r="2" /> <circle cx="305" cy="255" r="2" />
+            <circle cx="310" cy="248" r="2" /> <circle cx="295" cy="260" r="2" />
+        </g>
+
+        <!-- Microtubules (cytoskeleton) -->
+        <g id="microtubule" class="compartment structure-microtubule">
+            <path d="M 150,450 L 220,220" />
+            <path d="M 350,450 L 280,220" />
+        </g>
+
+        <!-- Mitochondrion (next to basal body) -->
+        <g id="mitochondria" class="compartment structure-mitochondria" transform="translate(140,195)">
+            <ellipse cx="0" cy="0" rx="40" ry="20" />
+            <path d="M -30,-5 C -10,5 10,-5 30,5" stroke="#fff" fill="none" stroke-width="2" />
+            <text x="0" y="3" class="svg-label-light">Mitochondrion</text>
+        </g>
+
+        <!-- CILIUM (centered at top) -->
+        <g id="ciliary-membrane" class="compartment structure-ciliary-membrane" transform="translate(0,-20)">
+            <path d="M 220,210 Q 200,100 250,20 Q 300,100 280,210" />
+        </g>
+        <g id="axoneme" class="compartment structure-axoneme" transform="translate(0,-20)">
+            <path d="M 235,190 Q 240,100 250,30 Q 260,100 265,190 Z" />
+            <text x="250" y="120" class="svg-label-light">Axoneme</text>
+        </g>
+        <g id="transition-zone" class="compartment structure-transition-zone" transform="translate(0,-20)">
+            <rect x="230" y="190" width="40" height="20" rx="5" />
+            <text x="250" y="204" class="svg-label-light">TZ</text>
+        </g>
+        <g id="basal-body" class="compartment structure-basal-body" transform="translate(0,-20)">
+            <rect x="225" y="210" width="50" height="30" rx="5" />
+            <text x="250" y="228" class="svg-label-light">Basal Body</text>
+        </g>
+    </svg>`;
+    
+    svgContainer.innerHTML = svgHTML;
+
+    // Make every compartment interactive (same as before)
+    setupSVGInteraction();
+}
 
 
     /**
