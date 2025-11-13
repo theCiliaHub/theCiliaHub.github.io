@@ -744,56 +744,89 @@
    ------------------------------------------------------------- */
 function getPageHTML() {
     return `
-    <div class="ciliai-page">
-        <div class="ciliai-header">
-            <h1>CiliAI Explorer</h1>
-            <p>AI-powered exploration of ciliary structure, gene function, and disease</p>
-        </div>
+    <div class="interactive-cilium">
+    <svg viewBox="0 0 600 650" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;">
+        <!-- ==== GRADIENTS (same colours as the original cilium) ==== -->
+        <defs>
+            <linearGradient id="cytosolGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#F5F7FA"/>
+                <stop offset="100%" stop-color="#E9EDF2"/>
+            </linearGradient>
+            <radialGradient id="nucleusGradient" cx="50%" cy="50%" r="50%">
+                <stop offset="0%" stop-color="#D8DEE9"/>
+                <stop offset="100%" stop-color="#C8D0DD"/>
+            </radialGradient>
+        </defs>
 
-        <div class="ciliai-grid">
-            <!-- LEFT – DIAGRAM -->
-            <div class="diagram-panel">
-                <h3>Cellular Structures</h3>
-                <div class="diagram-toolbar">
-                    <div class="gene-search">
-                        <input type="text" id="geneSearchInput" class="gene-input"
-                               placeholder="Search gene (e.g. IFT88)">
-                        <button id="findGeneBtn" class="btn">Find Gene</button>
-                    </div>
-                    <button id="showUmapBtn" class="btn btn-outline">Show UMAP</button>
-                </div>
-                <div class="svg-container">
-                    <div id="cilia-svg">
-                        <p style="text-align:center; padding-top:4rem; color:var(--text-light);">
-                            Generating Diagram...
-                        </p>
-                    </div>
-                </div>
-            </div>
+        <!-- ==== 1. CELL BODY (cytoplasm) ==== -->
+        <path id="cell-body" class="cilia-part"
+              fill="url(#cytosolGradient)" stroke="#D8DEE9" stroke-width="3"
+              d="M 80,620 C -20,520 40,340 300,320 C 560,340 620,520 520,620 Z"/>
 
-            <!-- RIGHT – INFO + CHAT (no list) -->
-            <div class="info-panel">
-                <div id="organelle-info" class="organelle-info-panel" role="region" aria-live="polite">
-                    <h3 id="organelle-info-title">Select a structure</h3>
-                    <p id="organelle-info-text">
-                        Click any part of the diagram to see its description.
-                    </p>
-                </div>
+        <!-- ==== 2. NUCLEUS ==== -->
+        <circle id="nucleus" class="cilia-part"
+                fill="url(#nucleusGradient)" stroke="#B0B8C8" stroke-width="3"
+                cx="300" cy="520" r="70"/>
 
-                <div class="chat-panel">
-                    <h3>Ask CiliAI</h3>
-                    <div class="disclaimer">
-                        <strong>Disclaimer:</strong> CiliAI is an AI system and may produce
-                        misleading results. Best used for exploration, not as a replacement
-                        for curated databases.
-                    </div>
-                    <div id="chatWindow" class="chat-window"></div>
-                    <div class="chat-input-group">
-                        <input type="text" id="chatInput" class="chat-input"
-                               placeholder="Ask CiliAI...">
-                        <button id="sendBtn" class="send-btn">Send</button>
-                    </div>
-                </div>
+        <!-- ==== 3. OTHER ORGANELLES (same colours as original cilium) ==== -->
+        <!-- Golgi -->
+        <g id="golgi-apparatus" class="cilia-part" transform="translate(120,380) scale(0.9)">
+            <path d="M 0,0 C 15,30 60,30 75,0 M 10,20 C 25,50 65,50 80,20 M 20,40 C 35,70 70,70 85,40"
+                  fill="none" stroke="#4A5568" stroke-width="4"/>
+        </g>
+
+        <!-- Mitochondrion (next to basal body) -->
+        <g id="mitochondria" class="cilia-part" transform="translate(280,260)">
+            <ellipse cx="0" cy="0" rx="55" ry="28" fill="#4A5568"/>
+            <path d="M -40,-8 C -20,8 20,-8 40,8" fill="none" stroke="#E9EDF2" stroke-width="3"/>
+            <path d="M -40,8 C -20,-8 20,8 40,-8" fill="none" stroke="#E9EDF2" stroke-width="3"/>
+        </g>
+
+        <!-- Lysosome -->
+        <circle id="lysosome" class="cilia-part" cx="420" cy="460" r="22"
+                fill="#718096" stroke="#4A5568" stroke-width="2"/>
+
+        <!-- Peroxisome -->
+        <circle id="peroxisome" class="cilia-part" cx="460" cy="510" r="15"
+                fill="#A0AEC0" stroke="#718096" stroke-width="2"/>
+
+        <!-- Ribosomes (tiny dots) -->
+        <g id="ribosomes" class="cilia-part">
+            <circle cx="150" cy="480" r="3" fill="#4A5568"/>
+            <circle cx="165" cy="485" r="3" fill="#4A5568"/>
+            <circle cx="155" cy="495" r="3" fill="#4A5568"/>
+            <circle cx="380" cy="380" r="3" fill="#4A5568"/>
+            <circle cx="395" cy="385" r="3" fill="#4A5568"/>
+        </g>
+
+        <!-- Microtubules (cytoskeleton) -->
+        <g id="microtubule" class="cilia-part">
+            <path d="M 200,600 L 270,340" stroke="#4A5568" stroke-width="2"/>
+            <path d="M 400,600 L 330,340" stroke="#4A5568" stroke-width="2"/>
+        </g>
+
+        <!-- ==== 4. CILIUM (exact same colours & IDs as before) ==== -->
+        <!-- Basal body -->
+        <rect id="basal-body" class="cilia-part"
+              fill="#4A5568" x="285" y="300" width="30" height="22"/>
+
+        <!-- Transition zone -->
+        <path id="transition-zone" class="cilia-part"
+              fill="#718096" stroke="#4A5568" stroke-width="2"
+              d="M 287,300 L 280,280 L 320,280 L 313,300 Z"/>
+
+        <!-- Ciliary membrane (dashed) -->
+        <path id="ciliary-membrane" class="cilia-part"
+              fill="none" stroke="#A0AEC0" stroke-width="3" stroke-dasharray="6,6"
+              d="M 280,280 L 295,80 L 305,80 L 320,280 Z"/>
+
+        <!-- Axoneme (core) -->
+        <path id="axoneme" class="cilia-part"
+              fill="none" stroke="#4A5568" stroke-width="4"
+              d="M 295,280 L 298,85 L 302,85 L 305,280 Z"/>
+    </svg>
+</div>            
+</div>
             </div>
         </div>
     </div>`;
