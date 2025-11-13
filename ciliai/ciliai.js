@@ -256,7 +256,7 @@
                 ortholog_c_elegans: gene.ortholog_c_elegans || null,
                 ortholog_xenopus: gene.ortholog_xenopus || null,
                 ortholog_zebrafish: gene.ortholog_zebrafish || null,
-                orth progenitor_drosophila: gene.ortholog_drosophila || null
+                ortholog_drosophila: gene.ortholog_drosophila || null
             };
 
             // FIX: ensure gene.screens is array
