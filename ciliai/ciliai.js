@@ -495,8 +495,7 @@
         }
     };
 
-
-    // --- 4. MAIN PAGE DISPLAY FUNCTION (v3.5) ---
+ // --- 4. MAIN PAGE DISPLAY FUNCTION (v3.5) ---
 
     /**
      * This is the primary function CiliaHub will call to build the page.
@@ -792,7 +791,6 @@
                 </linearGradient>
             </defs>
 
-            <!-- Organelles from vFurkan (Scaled & Positioned) -->
             <g id="plasma-membrane" class="compartment" transform="translate(140, 290) scale(0.7)">
                  <path d="M312.5,390c121.17-55.19,183.28-179.8,138.4-279S291.42-35.42,150,30.65C29.33,87-25.82,228,11.56,309.68,56.87,408.72,215.6,434.12,312.5,390Z"/>
             </g>
@@ -841,7 +839,6 @@
                  <path d="M299.5,292.48l2.31,1.53s-12.12,13.31-20,24.92-16.53,30.51-16.53,30.51L263,347.91s4-12.42,15.44-29.92A168.22,168.22,0,0,1,299.5,292.48Z"/>
             </g>
 
-            <!-- v3.5 Cilia (Gray) -->
             <g id="basal-body" class="compartment">
                 <rect x="285" y="300" width="30" height="22"/>
             </g>
@@ -860,8 +857,7 @@
         setupSVGInteraction();
     }
 
-
-    /**
+ /**
      * Attaches click listeners to the SVG compartments.
      */
     function setupSVGInteraction() {
@@ -1101,13 +1097,462 @@
                 const gene = geneBadge.dataset.gene;
                 if (gene) handleGeneSearch(gene, true);
             }
+            
+            // AI Action Links (for plot switching, etc.)
+            const aiAction = e.target.closest('.ai-action');
+            if (aiAction) {
+                e.preventDefault();
+                const action = aiAction.dataset.action;
+                const genesString = aiAction.dataset.genes;
+                const genes = genesString ? genesString.split(',').map(g => g.trim()).filter(Boolean) : [];
+                const resultArea = document.getElementById('chatWindow');
+
+                if (action === 'show-nevers-heatmap' || action === 'show-li-heatmap') {
+                    const source = action.includes('nevers') ? 'nevers' : 'li';
+                    addChatMessage(`Switching to ${source.toUpperCase()} comparison...`, false);
+                    handlePhylogenyVisualizationQuery(genes, source, 'heatmap');
+                }  
+                else if (action === 'show-table-view') {
+                    addChatMessage(`Generating phylogenetic data table...`, false);
+                    handlePhylogenyVisualizationQuery(genes, 'li', 'table');
+                }
+                else if (action === 'visualize-heatmap') {
+                    addChatMessage(`Generating heatmap...`, false);
+                    handlePhylogenyVisualizationQuery(genes, 'li', 'heatmap');
+                }
+            }
         });
     }
 
+// ==========================================================
+    // 9A. AI HELPER FUNCTIONS (Data Query & Formatting)
+    // (This block was missing and is required by handleAIQuery)
     // ==========================================================
-    // 9. AI QUERY ENGINE (THE "BRAIN")
-    // This section MUST be replaced with your real, advanced logic.
-    // ==========================================================
+
+    /**
+     * Simple logger
+     */
+    function log(message) {
+        console.log(`[CiliAI] ${message}`);
+    }
+
+    /**
+     * Normalizes a term for keyword matching
+     */
+    function normalizeTerm(term) {
+        if (typeof term !== 'string') return '';
+        return term.toLowerCase().replace(/[\s\-\_]/g, '');
+    }
+
+    /**
+     * Extracts all valid gene symbols from a query string
+     */
+    function extractMultipleGenes(query) {
+        if (!query) return [];
+        const geneRegex = /\b([A-Z0-9\-\.]{3,})\b/gi;
+        const matches = query.match(geneRegex) || [];
+        const upperMatches = matches.map(g => g.toUpperCase());
+        
+        // Filter against the master gene map
+        const geneMap = window.CiliAI.lookups.geneMap;
+        if (!geneMap) return [];
+        
+        return upperMatches.filter(g => geneMap[g]);
+    }
+
+    /**
+     * Creates a standard HTML list for the chat window.
+     * @param {string} title - The title of the card.
+     * @param {Array<{gene: string, description: string}>} genes - Array of gene objects.
+     * @param {string} [description=""] - Optional intro text.
+     */
+    function formatListResult(title, genes, description = "") {
+        let geneListHtml = '';
+        
+        if (genes && genes.length > 0) {
+            geneListHtml = genes.map(g => 
+                `<li><strong>${g.gene}</strong>: ${g.description || 'No details available.'}</li>`
+            ).join('');
+            geneListHtml = `<ul>${geneListHtml}</ul>`;
+        } else {
+            geneListHtml = "<p>No matching genes found in the database.</p>";
+        }
+
+        const descriptionHtml = description ? `<p>${description}</p>` : '';
+
+        return `
+            <div class="ai-result-card">
+                <strong>${title}</strong>
+                ${descriptionHtml}
+                ${geneListHtml}
+            </div>
+        `;
+    }
+
+    /**
+     * Fetches and formats a comprehensive summary for a single gene.
+     * @param {string} term - The gene symbol.
+     */
+    async function getComprehensiveDetails(term) {
+        const gene = term.trim().toUpperCase();
+        const g = window.CiliAI.lookups.geneMap[gene];
+
+        if (!g) {
+            return `Sorry, I could not find any data for "<strong>${gene}</strong>".`;
+        }
+
+        let html = `<h4>Details for <strong>${g.gene}</strong></h4>`;
+        html += `<p>${g.description || g.functional_summary || 'No description available.'}</p>`;
+        html += '<ul>';
+        
+        // Localization
+        if (g.localization) {
+            html += `<li><strong>Localization:</strong> ${ensureArray(g.localization).join(', ')}</li>`;
+        }
+        
+        // Ciliopathy
+        if (g.ciliopathy && g.ciliopathy.length > 0) {
+            html += `<li><strong>Ciliopathy:</strong> ${g.ciliopathy.join(', ')}</li>`;
+        }
+        
+        // Complexes
+        const complexes = Object.keys(g.complex_components || {});
+        if (complexes.length > 0) {
+            html += `<li><strong>Complexes:</strong> ${complexes.join(', ')}</li>`;
+        }
+
+        // Orthologs
+        const orthologs = [
+            g.ortholog_c_elegans ? `<em>C. elegans</em> (${g.ortholog_c_elegans})` : null,
+            g.ortholog_mouse ? `Mouse (${g.ortholog_mouse})` : null,
+            g.ortholog_zebrafish ? `Zebrafish (${g.ortholog_zebrafish})` : null
+        ].filter(Boolean).join(', ');
+        if (orthologs) {
+            html += `<li><strong>Orthologs:</strong> ${orthologs}</li>`;
+        }
+        
+        // Phylogeny Links
+        html += `
+            <li><strong>Phylogeny:</strong> 
+                <a href="#" class="ai-action" data-action="show-li-heatmap" data-genes="${g.gene}">Show Conservation</a>
+            </li>`;
+
+        html += '</ul>';
+        return html;
+    }
+
+    /**
+     * Generic getter for functional category
+     */
+    async function getGenesByFunction(term) {
+        const normTerm = normalizeTerm(term);
+        const results = [];
+        window.CiliAI.masterData.forEach(g => {
+            if (normalizeTerm(g.functional_category).includes(normTerm)) {
+                results.push({ gene: g.gene, description: g.functional_category });
+            }
+        });
+        return results;
+    }
+
+    /**
+     * Generic getter for complexes
+     */
+    async function getGenesByComplex(term) {
+        const normTerm = normalizeTerm(term);
+        const L = window.CiliAI.lookups;
+        
+        // Check if term IS a complex
+        const complexName = Object.keys(L.complexByName).find(name => normalizeTerm(name).includes(normTerm));
+        if (complexName) {
+            return L.complexByName[complexName].map(gene => ({
+                gene: gene,
+                description: `Subunit of ${complexName}`
+            }));
+        }
+        
+        // Check if term IS a gene
+        const geneName = term.toUpperCase();
+        if (L.complexByGene[geneName]) {
+            return L.complexByGene[geneName].map(name => ({
+                gene: name,
+                description: `Contains ${geneName}`
+            }));
+        }
+        return [];
+    }
+
+    /**
+     * Generic getter for ciliopathy
+     */
+    async function getCiliopathyGenes(term) {
+        const normTerm = term.toLowerCase();
+        let key = normTerm;
+        
+        // Handle aliases
+        if (normTerm === 'bbs') key = 'bardet–biedl syndrome';
+        if (normTerm === 'mks') key = 'meckel–gruber syndrome';
+        if (normTerm === 'joubert') key = 'joubert syndrome';
+        if (normTerm === 'nphp') key = 'nephronophthisis';
+        
+        const genes = window.CiliAI.lookups.byCiliopathy[key] || [];
+        
+        // Find classification
+        let desc = "";
+        for (const [classification, diseases] of Object.entries(intentParser.classifiedDiseases)) {
+            if (diseases.map(d => d.toLowerCase()).includes(key)) {
+                desc = `This is classified as a: <strong>${classification}</strong>.`;
+                break;
+            }
+        }
+        
+        return {
+            genes: genes.map(g => ({ gene: g })),
+            description: desc
+        };
+    }
+
+    /**
+     * Generic getter for localization
+     */
+    async function getGenesByLocalization(term) {
+        const normTerm = term.toLowerCase();
+        const L = window.CiliAI.lookups;
+        
+        // Find the matching key (e.g., "cilia" should match "Cilium")
+        const locKey = Object.keys(L.byLocalization).find(key => key.toLowerCase().includes(normTerm));
+        
+        if (locKey && L.byLocalization[locKey]) {
+            return L.byLocalization[locKey].map(gene => ({ gene: gene, description: `Found in ${locKey}` }));
+        }
+        return [];
+    }
+
+    /**
+     * Generic getter for organisms (from phylogeny)
+     */
+    async function getCiliaryGenesForOrganism(term) {
+        const liData = window.liPhylogenyCache;
+        if (!liData) return { genes: [], description: "Li (2014) data not loaded.", speciesCode: term };
+
+        const normTerm = term.toLowerCase();
+        let speciesIndex = -1;
+        let speciesCode = term;
+
+        // Find the species index
+        for (let i = 0; i < liData.summary.species_list.length; i++) {
+            const species = liData.summary.species_list[i];
+            if (species.s.toLowerCase().includes(normTerm) || species.c.toLowerCase().includes(normTerm)) {
+                speciesIndex = i;
+                speciesCode = species.c; // Use the code (e.g., "H.sapiens")
+                break;
+            }
+        }
+
+        if (speciesIndex === -1) {
+            return { genes: [], description: `Organism "${term}" not found in Li (2014) phylogeny.`, speciesCode: term };
+        }
+
+        // Find all genes present in this species
+        const genes = [];
+        Object.values(liData.genes).forEach(geneData => {
+            if (geneData.s && geneData.s.includes(speciesIndex)) {
+                genes.push({ gene: geneData.g, description: `Present in ${speciesCode}` });
+            }
+        });
+
+        const isCiliated = liData.summary.ciliated_species.includes(speciesIndex);
+        const description = `Found ${genes.length} ciliary genes. This organism is considered: <strong>${isCiliated ? "Ciliated" : "Non-Ciliated"}</strong>.`;
+
+        return { genes, description, speciesCode };
+    }
+
+    /**
+     * Generic getter for domains
+     */
+    async function getGenesByDomain(term) {
+        const normTerm = term.toLowerCase();
+        const results = [];
+        window.CiliAI.masterData.forEach(g => {
+            const domains = [...(g.pfam_ids || []), ...(g.domain_descriptions || [])];
+            const matchingDomain = domains.find(d => d.toLowerCase().includes(normTerm));
+            if (matchingDomain) {
+                results.push({ gene: g.gene, description: `Contains ${matchingDomain}` });
+            }
+        });
+        return results;
+    }
+
+    /**
+     * Handler for semantic intent: Localization + Phenotype
+     */
+    async function getLocalizationPhenotypeGenes(localization, phenotype) {
+        const normLoc = localization.toLowerCase();
+        const normPheno = phenotype.toLowerCase(); // "short" or "long"
+        
+        const results = [];
+        window.CiliAI.masterData.forEach(g => {
+            const geneLoc = (g.localization || '').toLowerCase();
+            let phenoEffect = '';
+            
+            if (normPheno.includes("short")) {
+                phenoEffect = (g.percent_ciliated_cells_effects || '').toLowerCase();
+            } else if (normPheno.includes("long")) {
+                 phenoEffect = (g.overexpression_effects || '').toLowerCase(); // Example, adjust as needed
+            }
+
+            if (geneLoc.includes(normLoc) && (phenoEffect.includes(normPheno) || phenoEffect.includes("decrease"))) {
+                results.push({
+                    gene: g.gene,
+                    description: `Localizes to ${localization} and shows ${phenotype} cilia phenotype.`
+                });
+            }
+        });
+
+        return formatListResult(`Genes at ${localization} with ${phenotype} cilia`, results);
+    }
+
+ /**
+     * Handler for all phylogeny plot requests
+     */
+    async function handlePhylogenyVisualizationQuery(genes, source = 'li', type = 'heatmap') {
+        const plotDivId = 'cilia-svg'; // Use the main SVG container
+        const plotDiv = document.getElementById(plotDivId);
+        if (!plotDiv) return "Could not find plot area.";
+
+        // Clear the SVG and show a loading message
+        plotDiv.innerHTML = `<div style="padding: 40px; text-align: center;">Loading ${source.toUpperCase()} phylogeny plot...</div>`;
+        
+        const data = (source === 'nevers') ? window.neversPhylogenyCache : window.liPhylogenyCache;
+        if (!data) return `Error: ${source.toUpperCase()} phylogeny data is not loaded.`;
+        
+        // Ensure genes is an array
+        if (!Array.isArray(genes)) genes = [];
+
+        // If no genes specified, use a default set (e.g., BBSome)
+        let geneList = genes.length > 0 ? genes : ['BBS1', 'BBS2', 'BBS4', 'BBS5', 'BBS7', 'BBS8', 'BBS9', 'ARL6'];
+        let title = genes.length > 0 ? `Phylogenetic Profile for ${genes.join(', ')}` : 'Phylogenetic Profile for BBSome';
+
+        if (type === 'table') {
+            // ... (Logic to render an HTML table would go here) ...
+            plotDiv.innerHTML = "Table view is not yet implemented. Switching to heatmap.";
+        }
+
+        // --- Render Heatmap ---
+        try {
+            if (source === 'nevers') {
+                // Call the Nevers-specific plot function (if you have one)
+                // This is a placeholder; you'd need to adapt your 'plotNeversHeatmap'
+                plotDiv.innerHTML = `Nevers plot for ${geneList.join(', ')} (Plotting function not fully wired)`;
+                // Example: plotNeversHeatmap(geneList, plotDivId); 
+            } else {
+                // Call the Li-specific plot function
+                // This assumes you have a function 'plotLiHeatmap'
+                // We'll use a simplified version for this example
+                plotLiHeatmap(geneList, plotDivId, title);
+            }
+            // Return an empty string because the message was already added by the click handler
+            return ""; 
+        } catch (e) {
+            console.error("Plotting error:", e);
+            return `Error generating plot: ${e.message}`;
+        }
+    }
+
+    /**
+     * Renders the Li et al. 2014 heatmap.
+     * This is a required helper for handlePhylogenyVisualizationQuery.
+     */
+    function plotLiHeatmap(geneList, divId, title) {
+        const data = window.liPhylogenyCache;
+        if (!data || !data.genes || !data.summary) {
+            document.getElementById(divId).innerHTML = "Error: Li (2014) data not loaded or malformed.";
+            return;
+        }
+
+        const speciesList = data.summary.species_list.map(s => s.c); // "H.sapiens", "M.musculus", etc.
+        const ciliatedSpecies = data.summary.ciliated_species; // array of indices
+        
+        let z = []; // The heatmap data (rows = genes, cols = species)
+        let yLabels = []; // Gene names
+
+        geneList.forEach(geneSymbol => {
+            const geneUpper = geneSymbol.toUpperCase();
+            const geneData = Object.values(data.genes).find(g => g.g.toUpperCase() === geneUpper);
+            
+            if (geneData) {
+                let row = new Array(speciesList.length).fill(0); // 0 = Absent
+                geneData.s.forEach(speciesIndex => {
+                    row[speciesIndex] = 1; // 1 = Present
+                });
+                z.push(row);
+                yLabels.push(geneSymbol);
+            }
+        });
+
+        if (z.length === 0) {
+            document.getElementById(divId).innerHTML = "Error: None of the requested genes were found in the Li (2014) data.";
+            return;
+        }
+
+        // Add ciliated/non-ciliated info trace
+        let ciliatedTrace = speciesList.map((_, i) => ciliatedSpecies.includes(i) ? 1 : 0);
+        z.push(ciliatedTrace);
+        yLabels.push('<b>Ciliated</b>'); // Add a label for the trace
+
+        const plotData = [{
+            z: z,
+            x: speciesList,
+            y: yLabels,
+            type: 'heatmap',
+            colorscale: [
+                [0, '#eef2f9'],  // Absent
+                [1, '#2c5aa0']   // Present
+            ],
+            showscale: false,
+            xgap: 1,
+            ygap: 1
+        }];
+
+        const layout = {
+            title: title,
+            xaxis: {
+                type: 'category',
+                tickangle: -90,
+                automargin: true,
+                ticks: 'outside',
+                tickfont: { size: 8 }
+            },
+            yaxis: {
+                type: 'category',
+                automargin: true,
+                ticks: 'outside'
+            },
+            margin: { l: 80, r: 20, b: 150, t: 60 }
+        };
+
+        Plotly.newPlot(divId, plotData, layout, { responsive: true });
+    }
+
+
+    /**
+     * Handler for domain queries
+     */
+    async function resolveDomainQuery(query) {
+        const genes = extractMultipleGenes(query);
+        if (genes.length > 0) {
+            // You would need a domain plotting function here, e.g., plotDomains(genes)
+            return `Domain visualization for <strong>${genes.join(', ')}</strong> is not yet implemented.`;
+        }
+        
+        // Fallback to simple keyword search
+        const intent = intentParser.parse(query);
+        if (intent && intent.type === 'DOMAIN') {
+             return await intent.handler(intent.entity);
+        }
+        
+        return "I couldn't find a gene or a domain in your query. Try 'domains for IFT88' or 'show WD40 domain genes'.";
+    }
 
     /**
      * This is the list of exact-match, high-priority, "solid" questions.
@@ -1166,8 +1611,7 @@
 
         // --- Core Function: Joubert Genes in Ciliated Cells (Uses GLOBAL helpers) ---
         async function getJoubertGenesInCiliatedCells() {
-            await fetchCiliaData();
-            await fetchCellxgeneData();
+            // Data is already loaded by initCiliAI()
             const { genes: joubertGenes } = await getCiliopathyGenes("Joubert Syndrome"); 
             const joubertGeneSet = new Set(joubertGenes.map(g => g.gene.toUpperCase()));
             const results = [];
@@ -1188,7 +1632,7 @@
 
         // --- Function: Orthologs Finder (Uses GLOBAL helpers) ---
         async function getOrthologs(disease, organism) {
-            await fetchCiliaData();
+            // Data is already loaded by initCiliAI()
             const { genes: diseaseGenes } = await getCiliopathyGenes(disease); 
             const orthologKeyMap = {
                 'c. elegans': 'ortholog_c_elegans',
@@ -1227,7 +1671,7 @@
                 keywords: [...new Set(allDiseases)], // USES THE NEW LARGE LIST
                 handler: async (term) => {
                     const titleTerm = term.toUpperCase() === 'BBS' ? 'Bardet–Biedl Syndrome' :
-                                    term.toUpperCase() === 'MKS' ? 'Meckel–Gruber Syndrome' : term;
+                                        term.toUpperCase() === 'MKS' ? 'Meckel–Gruber Syndrome' : term;
                     const { genes, description } = await getCiliopathyGenes(term);
                     return formatListResult(`Genes for ${titleTerm}`, genes, description);
                 },
@@ -1427,8 +1871,12 @@
                     }
                 }
             }
-
-            addChatMessage(htmlResult, false);
+            
+            // Only add a message if htmlResult is not empty
+            // (Plotting functions return "" and add their own messages)
+            if (htmlResult) {
+                addChatMessage(htmlResult, false);
+            }
 
         } catch (e) {
             console.error("Error in handleAIQuery:", e);
@@ -1440,104 +1888,8 @@
     // ==========================================================
     // 10. EVENT LISTENERS & STARTUP
     // ==========================================================
-    
-    /**
-     * Attaches all primary event listeners for the page.
-     * This is called by displayCiliAIPage()
-     */
-    function setupPageEventListeners() {
-        const sendBtn = document.getElementById('sendBtn');
-        const chatInput = document.getElementById('chatInput');
-        const findGeneBtn = document.getElementById('findGeneBtn');
-        const geneSearchInput = document.getElementById('geneSearchInput');
-        const showUmapBtn = document.getElementById('showUmapBtn');
-        
-        // Chat
-        if (sendBtn) sendBtn.addEventListener('click', handleUserSend);
-        if (chatInput) chatInput.addEventListener('keypress', e => {
-            if (e.key === 'Enter') handleUserSend();
-        });
 
-        // Gene Search
-        if (findGeneBtn) findGeneBtn.addEventListener('click', () => {
-            if (geneSearchInput) handleGeneSearch(geneSearchInput.value, true);
-        });
-        if (geneSearchInput) geneSearchInput.addEventListener('keypress', e => {
-            if (e.key === 'Enter') handleGeneSearch(geneSearchInput.value, true);
-        });
-
-        // UMAP Button
-        if (showUmapBtn) showUmapBtn.addEventListener('click', () => {
-            console.log("CiliAI: 'Show UMAP' clicked.");
-            addChatMessage("Show me the UMAP plot.", true);
-            handleAIQuery("Show me the UMAP plot.");
-        });
-
-        // Event delegation for dynamic content (gene tags, feedback)
-        document.body.addEventListener('click', e => {
-            // Gene tags in info panel
-            const geneTag = e.target.closest('.gene-tag');
-            if (geneTag) {
-                const gene = geneTag.dataset.gene;
-                if (chatInput) chatInput.value = `What is ${gene}?`;
-                handleUserSend();
-                return;
-            }
-
-            // Feedback buttons
-            const feedbackBtn = e.target.closest('.feedback button');
-            if (feedbackBtn) {
-                console.log(`CiliAI Feedback: ${feedbackBtn.dataset.feedback}`);
-                feedbackBtn.parentElement.querySelectorAll('button').forEach(b => b.style.opacity = 0.3);
-                feedbackBtn.style.opacity = 1;
-                return;
-            }
-            
-            // Legend items in bottom bar
-            const legendItem = e.target.closest('.legend-item');
-            if (legendItem) {
-                // Note: The onclick="" attribute is handling this,
-                // but we could move it here if preferred.
-                // const id = legendItem.dataset.id;
-                // if (id) activateStructure(id);
-                return;
-            }
-            
-            // Gene badges in bottom bar
-            const geneBadge = e.target.closest('.gene-badge');
-            if (geneBadge) {
-                // Note: The onclick="" attribute is handling this.
-                // const gene = geneBadge.dataset.gene;
-                // if (gene) handleGeneSearch(gene, true);
-            }
-
-             // AI Action Links (for plot switching, etc.)
-            const aiAction = e.target.closest('.ai-action');
-             if (aiAction) {
-                e.preventDefault();
-                const action = aiAction.dataset.action;
-                const genesString = aiAction.dataset.genes;
-                const genes = genesString ? genesString.split(',').map(g => g.trim()).filter(Boolean) : [];
-                const resultArea = document.getElementById('chatWindow');
-
-                if (action === 'show-nevers-heatmap' || action === 'show-li-heatmap') {
-                    const source = action.includes('nevers') ? 'nevers' : 'li';
-                    resultArea.innerHTML += `<p class="status-searching">Switching to ${source.toUpperCase()} comparison...</p>`;
-                    handlePhylogenyVisualizationQuery(genes, source, 'heatmap');
-                }  
-                else if (action === 'show-table-view') {
-                    resultArea.innerHTML += `<p class="status-searching">Generating phylogenetic data table...</p>`;
-                    handlePhylogenyVisualizationQuery(genes, 'li', 'table');
-                }
-                else if (action === 'visualize-heatmap') {
-                     resultArea.innerHTML += `<p class="status-searching">Generating heatmap...</p>`;
-                     handlePhylogenyVisualizationQuery(genes, 'li', 'heatmap');
-                }
-            }
-        });
-    }
-
-    // --- Placeholder functions from old script, to be replaced by new handlers ---
+ // --- Placeholder functions from old script, to be replaced by new handlers ---
     // These are the *real* handlers for the new UI
     
     // Called by the simple SVG diagram click
