@@ -739,76 +739,70 @@
     /**
      * Returns the full HTML string for the page content.
      */
-    function getPageHTML() {
-        // Generate a single list for all structures
-        const structureListHTML = Object.keys(structureInfoMap).map(id => 
-            `<li data-structure-id="${id}">${structureInfoMap[id].title}</li>`
-        ).join('');
+   /* -------------------------------------------------------------
+   1.  Remove the “Interactive Structures” list
+   ------------------------------------------------------------- */
+function getPageHTML() {
+    return `
+    <div class="ciliai-page">
+        <div class="ciliai-header">
+            <h1>CiliAI Explorer</h1>
+            <p>AI-powered exploration of ciliary structure, gene function, and disease</p>
+        </div>
 
-        return `
-        <div class="ciliai-page">
-            <div class="ciliai-header">
-                <h1>CiliAI Explorer</h1>
-                <p>AI-powered exploration of ciliary structure, gene function, and disease</p>
-            </div>
-
-            <div class="ciliai-grid">
-
-                <div class="diagram-panel">
-                    <h3>Cellular Structures</h3>
-                    <div class="diagram-toolbar">
-                        <div class="gene-search">
-                            <input type="text" id="geneSearchInput" class="gene-input" placeholder="Search gene (e.g. IFT88)">
-                            <button id="findGeneBtn" class="btn">Find Gene</button>
-                        </div>
-                        <button id="showUmapBtn" class="btn btn-outline">Show UMAP</button>
+        <div class="ciliai-grid">
+            <!-- LEFT – DIAGRAM -->
+            <div class="diagram-panel">
+                <h3>Cellular Structures</h3>
+                <div class="diagram-toolbar">
+                    <div class="gene-search">
+                        <input type="text" id="geneSearchInput" class="gene-input"
+                               placeholder="Search gene (e.g. IFT88)">
+                        <button id="findGeneBtn" class="btn">Find Gene</button>
                     </div>
-                    <div class="svg-container">
-                        <div id="cilia-svg">
-                            <p style="text-align:center; padding-top: 4rem; color: var(--text-light);">Generating Diagram...</p>
-                        </div>
+                    <button id="showUmapBtn" class="btn btn-outline">Show UMAP</button>
+                </div>
+                <div class="svg-container">
+                    <div id="cilia-svg">
+                        <p style="text-align:center; padding-top:4rem; color:var(--text-light);">
+                            Generating Diagram...
+                        </p>
                     </div>
                 </div>
+            </div>
 
-                <div class="info-panel">
-                    
-                    <div class="info-lists">
-                        <div>
-                            <h4>Interactive Structures</h4>
-                            <ul id="structure-list" class="anat-list">
-                                ${structureListHTML}
-                            </ul>
-                        </div>
+            <!-- RIGHT – INFO + CHAT (no list) -->
+            <div class="info-panel">
+                <div id="organelle-info" class="organelle-info-panel" role="region" aria-live="polite">
+                    <h3 id="organelle-info-title">Select a structure</h3>
+                    <p id="organelle-info-text">
+                        Click any part of the diagram to see its description.
+                    </p>
+                </div>
+
+                <div class="chat-panel">
+                    <h3>Ask CiliAI</h3>
+                    <div class="disclaimer">
+                        <strong>Disclaimer:</strong> CiliAI is an AI system and may produce
+                        misleading results. Best used for exploration, not as a replacement
+                        for curated databases.
                     </div>
-
-                    <div id="organelle-info" class="organelle-info-panel" role="region" aria-live="polite">
-                        <h3 id="organelle-info-title">Select an item</h3>
-                        <p id="organelle-info-text">Click an item from the list or on the diagram to see its description.</p>
-                    </div>
-
-                    <div class="chat-panel">
-                        <h3>Ask CiliAI</h3>
-                        <div class="disclaimer">
-                            <strong>Disclaimer:</strong> CiliAI is an AI system and may produce misleading results. Best used for exploration, not as a replacement for curated databases.
-                        </div>
-                        <div id="chatWindow" class="chat-window">
-                            </div>
-                        <div class="chat-input-group">
-                            <input type="text" id="chatInput" class="chat-input" placeholder="Ask CiliAI...">
-                            <button id="sendBtn" class="send-btn">Send</button>
-                        </div>
+                    <div id="chatWindow" class="chat-window"></div>
+                    <div class="chat-input-group">
+                        <input type="text" id="chatInput" class="chat-input"
+                               placeholder="Ask CiliAI...">
+                        <button id="sendBtn" class="send-btn">Send</button>
                     </div>
                 </div>
             </div>
         </div>
-        `;
-    }
-
+    </div>`;
+}
+   
     // --- 6. SVG GENERATION & INTERACTION ---
-/**
- * Generates and injects the custom SVG.
- * → Cilium + all surrounding organelles in ONE interactive diagram.
- */
+/* -------------------------------------------------------------
+   2.  Full-cell SVG (cilium + organelles)
+   ------------------------------------------------------------- */
 function generateAndInjectSVG() {
     const svgContainer = document.getElementById('cilia-svg');
     if (!svgContainer) return;
@@ -816,96 +810,98 @@ function generateAndInjectSVG() {
     const svgHTML = `
     <svg viewBox="0 0 500 500" xmlns="http://www.w3.org/2000/svg">
         <style>
-            .svg-label { font-size: 10px; font-family: 'Inter', sans-serif; fill: #000; text-anchor: middle; }
-            .svg-label-light { font-size: 10px; font-family: 'Inter', sans-serif; fill: #fff; text-anchor: middle; }
+            .svg-label      {font-size:10px; font-family:'Inter',sans-serif; fill:#000; text-anchor:middle;}
+            .svg-label-light{font-size:10px; font-family:'Inter',sans-serif; fill:#fff; text-anchor:middle;}
         </style>
 
         <!-- Cytoplasm (background) -->
         <g id="cytoplasm" class="compartment structure-cytoplasm">
-            <rect width="500" height="500" />
+            <rect width="500" height="500"/>
         </g>
 
         <!-- Nucleus & Nucleolus -->
         <g id="nucleus" class="compartment structure-nucleus">
-            <circle cx="250" cy="400" r="80" />
+            <circle cx="250" cy="400" r="80"/>
             <text x="250" y="405" class="svg-label-light">Nucleus</text>
         </g>
         <g id="nucleolus" class="compartment structure-nucleolus">
-            <circle cx="275" cy="385" r="25" />
+            <circle cx="275" cy="385" r="25"/>
             <text x="275" y="388" class="svg-label-light">Nucleolus</text>
         </g>
 
-        <!-- Plasma membrane (cell outline) -->
+        <!-- Plasma membrane -->
         <g id="plasma-membrane" class="compartment structure-plasma-membrane">
-            <path d="M 0,200 Q 250,180 500,200 V 500 H 0 Z" />
+            <path d="M 0,200 Q 250,180 500,200 V 500 H 0 Z"/>
         </g>
 
-        <!-- Golgi apparatus -->
-        <g id="golgi-apparatus" class="compartment structure-golgi-apparatus" transform="translate(70,250) scale(0.8)">
+        <!-- Golgi -->
+        <g id="golgi-apparatus" class="compartment structure-golgi-apparatus"
+            transform="translate(70,250) scale(0.8)">
             <path d="M 0,0 C 10,20 40,20 50,0 M 10,15 C 20,35 50,35 60,15 M 20,30 C 30,50 60,50 70,30"
-                  fill="none" stroke="#fff" stroke-width="5" />
+                  fill="none" stroke="#fff" stroke-width="5"/>
             <text x="35" y="60" class="svg-label-light">Golgi</text>
         </g>
         <g id="golgi-vesicle" class="compartment structure-golgi-vesicle">
-            <circle cx="150" cy="260" r="8" />
-            <circle cx="140" cy="280" r="5" />
+            <circle cx="150" cy="260" r="8"/>
+            <circle cx="140" cy="280" r="5"/>
         </g>
 
         <!-- Lysosome & Peroxisome -->
         <g id="lysosome" class="compartment structure-lysosome">
-            <circle cx="380" cy="280" r="15" />
+            <circle cx="380" cy="280" r="15"/>
             <text x="380" y="283" class="svg-label-light">Lysosome</text>
         </g>
         <g id="peroxisome" class="compartment structure-peroxisome">
-            <circle cx="400" cy="320" r="10" />
+            <circle cx="400" cy="320" r="10"/>
         </g>
 
-        <!-- Ribosomes (dots) -->
+        <!-- Ribosomes -->
         <g id="ribosomes" class="compartment structure-ribosomes">
-            <circle cx="100" cy="320" r="2" /> <circle cx="105" cy="325" r="2" />
-            <circle cx="110" cy="318" r="2" /> <circle cx="95"  cy="330" r="2" />
-            <circle cx="300" cy="250" r="2" /> <circle cx="305" cy="255" r="2" />
-            <circle cx="310" cy="248" r="2" /> <circle cx="295" cy="260" r="2" />
+            <circle cx="100" cy="320" r="2"/> <circle cx="105" cy="325" r="2"/>
+            <circle cx="110" cy="318" r="2"/> <circle cx="95"  cy="330" r="2"/>
+            <circle cx="300" cy="250" r="2"/> <circle cx="305" cy="255" r="2"/>
+            <circle cx="310" cy="248" r="2"/> <circle cx="295" cy="260" r="2"/>
         </g>
 
-        <!-- Microtubules (cytoskeleton) -->
+        <!-- Microtubules -->
         <g id="microtubule" class="compartment structure-microtubule">
-            <path d="M 150,450 L 220,220" />
-            <path d="M 350,450 L 280,220" />
+            <path d="M 150,450 L 220,220"/>
+            <path d="M 350,450 L 280,220"/>
         </g>
 
         <!-- Mitochondrion (next to basal body) -->
-        <g id="mitochondria" class="compartment structure-mitochondria" transform="translate(140,195)">
-            <ellipse cx="0" cy="0" rx="40" ry="20" />
-            <path d="M -30,-5 C -10,5 10,-5 30,5" stroke="#fff" fill="none" stroke-width="2" />
+        <g id="mitochondria" class="compartment structure-mitochondria"
+            transform="translate(140,195)">
+            <ellipse cx="0" cy="0" rx="40" ry="20"/>
+            <path d="M -30,-5 C -10,5 10,-5 30,5" stroke="#fff" fill="none" stroke-width="2"/>
             <text x="0" y="3" class="svg-label-light">Mitochondrion</text>
         </g>
 
         <!-- CILIUM (centered at top) -->
-        <g id="ciliary-membrane" class="compartment structure-ciliary-membrane" transform="translate(0,-20)">
-            <path d="M 220,210 Q 200,100 250,20 Q 300,100 280,210" />
+        <g id="ciliary-membrane" class="compartment structure-ciliary-membrane"
+            transform="translate(0,-20)">
+            <path d="M 220,210 Q 200,100 250,20 Q 300,100 280,210"/>
         </g>
-        <g id="axoneme" class="compartment structure-axoneme" transform="translate(0,-20)">
-            <path d="M 235,190 Q 240,100 250,30 Q 260,100 265,190 Z" />
+        <g id="axoneme" class="compartment structure-axoneme"
+            transform="translate(0,-20)">
+            <path d="M 235,190 Q 240,100 250,30 Q 260,100 265,190 Z"/>
             <text x="250" y="120" class="svg-label-light">Axoneme</text>
         </g>
-        <g id="transition-zone" class="compartment structure-transition-zone" transform="translate(0,-20)">
-            <rect x="230" y="190" width="40" height="20" rx="5" />
+        <g id="transition-zone" class="compartment structure-transition-zone"
+            transform="translate(0,-20)">
+            <rect x="230" y="190" width="40" height="20" rx="5"/>
             <text x="250" y="204" class="svg-label-light">TZ</text>
         </g>
-        <g id="basal-body" class="compartment structure-basal-body" transform="translate(0,-20)">
-            <rect x="225" y="210" width="50" height="30" rx="5" />
+        <g id="basal-body" class="compartment structure-basal-body"
+            transform="translate(0,-20)">
+            <rect x="225" y="210" width="50" height="30" rx="5"/>
             <text x="250" y="228" class="svg-label-light">Basal Body</text>
         </g>
     </svg>`;
-    
+
     svgContainer.innerHTML = svgHTML;
-
-    // Make every compartment interactive (same as before)
-    setupSVGInteraction();
+    setupSVGInteraction();          // makes every <g> clickable
 }
-
-
     /**
      * Attaches click listeners to the SVG compartments.
      */
