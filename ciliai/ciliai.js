@@ -1491,9 +1491,10 @@ function renderNeversPhylogenyHeatmap(genes) {
     };
 }
 
-
 /**
  * [HELPER] Renders the Li et al. 2014 heatmap.
+ * Reads from cache, returns plot data.
+ * INCLUDES FIX for empty gene list.
  */
 function renderLiPhylogenyHeatmap(genes) {
     const liData = window.liPhylogenyCache;
@@ -1536,13 +1537,23 @@ function renderLiPhylogenyHeatmap(genes) {
         return undefined; 
     });
 
-    const geneLabels = genes.map(g => g.toUpperCase());
+    const geneLabels = [];
     const matrix = [];
     const textMatrix = [];
+    const genesFound = [];
+    const genesNotFound = [];
     
-    geneLabels.forEach(gene => {
-        const geneData = Object.values(liData.genes).find(g => g.g && g.g.toUpperCase() === gene);
-        const presenceIndices = new Set(geneData ? geneData.s : []);
+    genes.forEach(gene => {
+        const geneUpper = gene.toUpperCase();
+        const geneData = Object.values(liData.genes).find(g => g.g && g.g.toUpperCase() === geneUpper);
+        
+        if (!geneData) {
+            genesNotFound.push(geneUpper);
+            return; // Skip this gene
+        }
+        
+        genesFound.push(geneUpper);
+        const presenceIndices = new Set(geneData.s || []);
         const row = [];
         const textRow = [];
 
@@ -1557,18 +1568,29 @@ function renderLiPhylogenyHeatmap(genes) {
                 status = "Present";
             }
             row.push(zValue);
-            textRow.push(`Gene: ${gene}<br>Organism: ${orgName}<br>Status: ${status}`);
+            textRow.push(`Gene: ${geneUpper}<br>Organism: ${orgName}<br>Status: ${status}`);
         });
 
         if (row.length > 0) {
             matrix.push(row);
             textMatrix.push(textRow);
+            geneLabels.push(geneUpper); // Add label only if data was added
         }
     });
     
+    // ==========================================================
+    // THIS IS THE FIX:
+    // If no valid genes were found (e.g., only WDR54 was passed),
+    // throw a clear error message.
+    // ==========================================================
     if (matrix.length === 0) {
-        throw new Error("None of the requested genes were found in the Li (2014) dataset.");
+        let errorMsg = "None of the requested genes were found in the Li (2014) dataset.";
+        if (genesNotFound.length > 0) {
+            errorMsg = `The gene(s) <strong>${genesNotFound.join(', ')}</strong> were not found in the Li (2014) phylogenetic dataset.`;
+        }
+        throw new Error(errorMsg);
     }
+    // ==========================================================
 
     const trace = {
         z: matrix,
@@ -1593,7 +1615,7 @@ function renderLiPhylogenyHeatmap(genes) {
     };
 
     const layout = {
-        title: `Phylogenetic Conservation (Li et al. 2014) - ${genes.join(', ')}`,
+        title: `Phylogenetic Conservation (Li et al. 2014) - ${geneLabels.join(', ')}`,
         xaxis: { 
             title: 'Organisms (Ciliated | Non-Ciliated)', 
             tickangle: 45, 
@@ -1612,19 +1634,24 @@ function renderLiPhylogenyHeatmap(genes) {
             }
         ],
         margin: { t: 50, b: 200, l: 150, r: 50 }, 
-        height: Math.max(500, genes.length * 40 + 150)
+        height: Math.max(500, geneLabels.length * 40 + 150)
     };
     
+    // Also report if some genes were not found
+    let links = `<p class="ai-suggestion" style="margin-top: 10px;">
+                    <a href="#" class="ai-action" data-action="show-nevers-heatmap" data-genes="${geneLabels.join(',')}">➡️ Show Nevers et al. (2017)</a>
+                    <span style="margin: 0 10px;">|</span>
+                    <a href="#" class="ai-action" data-action="show-table-view" data-genes="${geneLabels.join(',')}">📋 Show Data Table</a>
+                 </p>`;
+
+    if (genesNotFound.length > 0) {
+        links = `<p class="status-note">Note: <strong>${genesNotFound.join(', ')}</strong> not found in this dataset.</p>` + links;
+    }
+
     return {
         plotData: [trace],
         plotLayout: layout,
-        htmlLinks: `
-            <p class="ai-suggestion" style="margin-top: 10px;">
-                <a href="#" class="ai-action" data-action="show-nevers-heatmap" data-genes="${genes.join(',')}">➡️ Show Nevers et al. (2017)</a>
-                <span style="margin: 0 10px;">|</span>
-                <a href="#" class="ai-action" data-action="show-table-view" data-genes="${genes.join(',')}">📋 Show Data Table</a>
-            </p>
-        `
+        htmlLinks: links
     };
 }
 
@@ -2478,275 +2505,6 @@ async function getGenesByDomain(domainTerm) {
 
 
    
-    /**
-     * Renders the Li et al. 2014 heatmap.
-     * This function is NO LONGER async and reads from window.liPhylogenyCache.
-     */
-    function renderLiPhylogenyHeatmap(genes) {
-        // --- THIS IS THE FIX ---
-        const liData = window.liPhylogenyCache;
-        // -----------------------
-        
-        if (!liData) {
-            return { html: `<p>Li et al. 2014 data not loaded.</p>` }; // Return error info
-        }
-        
-        const CIL_COUNT = CIL_ORG_FULL.length;
-        
-        const liOrgList = liData.summary.organisms_list;
-        const liOrgMap = new Map();
-
-        liOrgList.forEach((name, index) => {
-            liOrgMap.set(name, index);
-            liOrgMap.set(name.toLowerCase().replace(/[\s\.]/g, ''), index);
-        });
-
-        const targetOrganisms = CIL_ORG_FULL.concat(NCIL_ORG_FULL);
-        
-        const targetLiIndices = targetOrganisms.map(orgName => {
-            const lowerOrg = orgName.toLowerCase();
-            const simplifiedKey = lowerOrg.replace(/[\s\.]/g, '');
-            
-            const VERTEBRATE_LI_MAP = new Map([
-                ["homosapiens", "H.sapiens"], ["musmusculus", "M.musculus"], ["daniorerio", "D.rerio"],
-                ["xenopustropicalis", "X.tropicalis"], ["gallusgallus", "G.gallus"], ["c.elegans", "C.elegans"],
-                ["c.reinhardtii", "C.reinhardtii"], ["t.thermophila", "T.thermophila"], ["s.cerevisiae", "S.cerevisiae"],
-                ["a.thaliana", "A.thaliana"]
-            ]);
-
-            if (VERTEBRATE_LI_MAP.has(simplifiedKey)) {
-                const liAbbrev = VERTEBRATE_LI_MAP.get(simplifiedKey);
-                if (liOrgMap.has(liAbbrev)) {
-                    return liOrgMap.get(liAbbrev);
-                }
-            }
-            if (liOrgMap.has(simplifiedKey)) return liOrgMap.get(simplifiedKey);
-            if (liOrgMap.has(orgName)) return liOrgMap.get(orgName);
-            return undefined;
-        });
-
-        const geneLabels = genes.map(g => g.toUpperCase());
-        const matrix = [];
-        const textMatrix = [];
-        
-        geneLabels.forEach(gene => {
-            const geneData = Object.values(liData.genes).find(g => g.g && g.g.toUpperCase() === gene);
-            const presenceIndices = new Set(geneData ? geneData.s : []);
-            const row = [];
-            const textRow = [];
-
-            targetOrganisms.forEach((orgName, index) => {
-                const liIndex = targetLiIndices[index];
-                const isCiliated = index < CIL_COUNT;
-                const isPresent = liIndex !== undefined && presenceIndices.has(liIndex);
-                let zValue = 0;
-                let status = "Absent";
-                if (isPresent) {
-                    zValue = isCiliated ? 2 : 1;
-                    status = "Present";
-                }
-                row.push(zValue);
-                textRow.push(`Gene: ${gene}<br>Organism: ${orgName}<br>Status: ${status}`);
-            });
-
-            if (row.length > 0) {
-                matrix.push(row);
-                textMatrix.push(textRow);
-            }
-        });
-        
-        const trace = {
-            z: matrix,
-            x: targetOrganisms.map(name => {
-                if (name === "H.sapiens") return "Human";
-                if (name === "M.musculus") return "Mouse";
-                if (name === "D.rerio") return "Zebrafish";
-                if (name.includes("elegans")) return "C. elegans";
-                return name.replace(/\./g, '').split(' ')[0];
-            }), 
-            y: geneLabels,
-            type: 'heatmap',
-            colorscale: [
-                [0/2, '#FFFFFF'],
-                [0.0001/2, '#FFE5B5'],
-                [1/2, '#FFE5B5'],
-                [1.0001/2, '#698ECF'],
-                [2/2, '#698ECF']
-            ],
-            showscale: false,
-            hoverinfo: 'text',
-            text: textMatrix,
-            xgap: 0.5,
-            ygap: 0.5,
-            line: { color: '#000000', width: 0.5 }
-        };
-
-        const layout = {
-            title: `Phylogenetic Conservation (Li et al. 2014) - ${genes.join(', ')}`,
-            xaxis: { 
-                title: 'Organisms (Ciliated | Non-Ciliated)', 
-                tickangle: 45, 
-                automargin: true 
-            },
-            yaxis: { 
-                title: 'Genes', 
-                automargin: true 
-            },
-            shapes: [
-                {
-                    type: 'line',
-                    xref: 'x', x0: CIL_COUNT - 0.5, x1: CIL_COUNT - 0.5, 
-                    yref: 'paper', y0: 0, y1: 1,
-                    line: { color: 'black', width: 2 }
-                }
-            ],
-            margin: { t: 50, b: 200, l: 150, r: 50 }, 
-            height: Math.max(500, genes.length * 40 + 150)
-        };
-        
-        return {
-            plotData: [trace],
-            plotLayout: layout
-        };
-    }
-
-    
-    /**
-     * Renders the Li et al. 2014 heatmap.
-     * This function now ONLY returns plot data, not HTML.
-     */
-    async function renderLiPhylogenyHeatmap(genes) {
-        const liData = await fetchLiPhylogenyData();
-        if (!liData) {
-            return { html: `<p>Li et al. 2014 data not loaded.</p>` }; // Return error info
-        }
-        
-        const CIL_COUNT = CIL_ORG_FULL.length;
-        // ... (rest of the function is the same) ...
-        // ... (finds liOrgMap, targetLiIndices, builds matrix) ...
-
-        const liOrgList = liData.summary.organisms_list;
-        const liOrgMap = new Map();
-
-        liOrgList.forEach((name, index) => {
-            liOrgMap.set(name, index);
-            liOrgMap.set(name.toLowerCase().replace(/[\s\.]/g, ''), index);
-        });
-
-        const targetOrganisms = CIL_ORG_FULL.concat(NCIL_ORG_FULL);
-        
-        const targetLiIndices = targetOrganisms.map(orgName => {
-            const lowerOrg = orgName.toLowerCase();
-            const simplifiedKey = lowerOrg.replace(/[\s\.]/g, '');
-            
-            // This map is missing from your file, you need to add it
-            const VERTEBRATE_LI_MAP = new Map([
-                ["homosapiens", "H.sapiens"], ["musmusculus", "M.musculus"], ["daniorerio", "D.rerio"],
-                ["xenopustropicalis", "X.tropicalis"], ["gallusgallus", "G.gallus"], ["c.elegans", "C.elegans"],
-                ["c.reinhardtii", "C.reinhardtii"], ["t.thermophila", "T.thermophila"], ["s.cerevisiae", "S.cerevisiae"],
-                ["a.thaliana", "A.thaliana"]
-            ]);
-
-            if (VERTEBRATE_LI_MAP.has(simplifiedKey)) {
-                const liAbbrev = VERTEBRATE_LI_MAP.get(simplifiedKey);
-                if (liOrgMap.has(liAbbrev)) {
-                    return liOrgMap.get(liAbbrev);
-                }
-            }
-            if (liOrgMap.has(simplifiedKey)) return liOrgMap.get(simplifiedKey);
-            if (liOrgMap.has(orgName)) return liOrgMap.get(orgName);
-            return undefined;
-        });
-
-        const geneLabels = genes.map(g => g.toUpperCase());
-        const matrix = [];
-        const textMatrix = [];
-        
-        geneLabels.forEach(gene => {
-            const geneData = Object.values(liData.genes).find(g => g.g && g.g.toUpperCase() === gene);
-            const presenceIndices = new Set(geneData ? geneData.s : []);
-            const row = [];
-            const textRow = [];
-
-            targetOrganisms.forEach((orgName, index) => {
-                const liIndex = targetLiIndices[index];
-                const isCiliated = index < CIL_COUNT;
-                const isPresent = liIndex !== undefined && presenceIndices.has(liIndex);
-                let zValue = 0;
-                let status = "Absent";
-                if (isPresent) {
-                    zValue = isCiliated ? 2 : 1;
-                    status = "Present";
-                }
-                row.push(zValue);
-                textRow.push(`Gene: ${gene}<br>Organism: ${orgName}<br>Status: ${status}`);
-            });
-
-            if (row.length > 0) {
-                matrix.push(row);
-                textMatrix.push(textRow);
-            }
-        });
-        
-        // --- End of data processing ---
-
-        const trace = {
-            z: matrix,
-            x: targetOrganisms.map(name => {
-                if (name === "H.sapiens") return "Human";
-                if (name === "M.musculus") return "Mouse";
-                if (name === "D.rerio") return "Zebrafish";
-                if (name.includes("elegans")) return "C. elegans";
-                return name.replace(/\./g, '').split(' ')[0];
-            }), 
-            y: geneLabels,
-            type: 'heatmap',
-            colorscale: [
-                [0/2, '#FFFFFF'],
-                [0.0001/2, '#FFE5B5'],
-                [1/2, '#FFE5B5'],
-                [1.0001/2, '#698ECF'],
-                [2/2, '#698ECF']
-            ],
-            showscale: false,
-            hoverinfo: 'text',
-            text: textMatrix,
-            xgap: 0.5,
-            ygap: 0.5,
-            line: { color: '#000000', width: 0.5 }
-        };
-
-        const layout = {
-            title: `Phylogenetic Conservation (Li et al. 2014) - ${genes.join(', ')}`,
-            xaxis: { 
-                title: 'Organisms (Ciliated | Non-Ciliated)', 
-                tickangle: 45, 
-                automargin: true 
-            },
-            yaxis: { 
-                title: 'Genes', 
-                automargin: true 
-            },
-            shapes: [
-                {
-                    type: 'line',
-                    xref: 'x', x0: CIL_COUNT - 0.5, x1: CIL_COUNT - 0.5, 
-                    yref: 'paper', y0: 0, y1: 1,
-                    line: { color: 'black', width: 2 }
-                }
-            ],
-            margin: { t: 50, b: 200, l: 150, r: 50 }, 
-            height: Math.max(500, genes.length * 40 + 150)
-        };
-        
-        // Return only the plot data and layout
-        return {
-            plotData: [trace],
-            plotLayout: layout
-        };
-    }
-
-
     
 /**
  * Handles all UMAP plotting requests and draws to the left panel.
