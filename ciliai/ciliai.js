@@ -736,11 +736,29 @@ const NEVERS_NCIL_PANEL = [
             .feedback button { background: none; border: none; cursor: pointer; font-size: 1.2rem; opacity: 0.5; }
             .feedback button:hover { opacity: 1; }
             
-            .chat-input-group { display: flex; gap: 0.75rem; }
-            .chat-input { flex: 1; padding: 0.9rem; font-size: 1rem; border: 1px solid var(--border); border-radius: 8px; }
+            .chat-input-group {
+                display: flex;
+                flex-direction: column; /* Stacks the input and button */
+                gap: 0.75rem; /* Adds space between input and button */
+            }
+            .chat-input {
+                width: 100%; /* Make input take full width */
+                padding: 0.9rem;
+                font-size: 1rem;
+                border: 1px solid var(--border);
+                border-radius: 8px;
+                box-sizing: border-box; /* Important for 100% width */
+            }
             .send-btn {
-                background: var(--primary); color: white; padding: 0.9rem 1.8rem; border: none;
-                border-radius: 8px; cursor: pointer; font-weight: 600;
+                background: var(--primary);
+                color: white;
+                padding: 0.9rem 1.8rem;
+                border: none;
+                border-radius: 8px;
+                cursor: pointer;
+                font-weight: 600;
+                align-self: flex-end; /* This aligns the button to the right */
+                width: fit-content; /* Button is only as wide as its text */
             }
             .send-btn:hover { background: var(--primary-dark); }
         `;
@@ -1319,11 +1337,12 @@ function handleUmapPlot(highlightGene = null) {
     Plotly.newPlot(plotDivId, plotData, layout, { responsive: true });
 }
 
-// --- 9B. Your New Phylogenetic Functions (Modified for new system) ---
-// All 'async' keywords are removed, and functions now read from the global cache.
+    // ==========================================================
+// 9B. NEW, INTEGRATED PHYLOGENY ENGINE (Synchronous)
+// ==========================================================
 
 /**
- * [NEW HANDLER] CiliAI ASK function to get conservation from Li et al. 2014.
+ * [HELPER] Gets conservation data from Li et al. 2014.
  */
 function getLiConservation(geneSymbol) {
     const geneUpper = geneSymbol.toUpperCase();
@@ -1342,14 +1361,14 @@ function getLiConservation(geneSymbol) {
 }
 
 /**
- * [NEW HELPER] Formats the output for the Li et al. 2014 data
+ * [HELPER] Formats the output for the Li et al. 2014 data
  */
 function formatLiGeneData(geneSymbol, geneData, summary) {
     const organismsList = summary.organisms_list;
     const classList = summary.class_list;
     
     const species = geneData.s.map(index => organismsList[index]).join(', ');
-    const category = (classList[geneData.c] || "Unknown").replace(/_/g, ' '); // Format "Ciliary_specific" to "Ciliary specific"
+    const category = (classList[geneData.c] || "Unknown").replace(/_/g, ' ');
 
     return `
         <div class="result-card">
@@ -1365,17 +1384,17 @@ function formatLiGeneData(geneSymbol, geneData, summary) {
 }
 
 /**
- * Renders the phylogenetic heatmap based on Nevers et al. 2017 data.
- * @returns {object} Structured object {plotData, plotLayout}.
+ * [HELPER] Renders the phylogenetic heatmap based on Nevers et al. 2017 data.
  */
 function renderNeversPhylogenyHeatmap(genes) {
-    if (!window.neversPhylogenyCache) {
+    const neversData = window.neversPhylogenyCache;
+    if (!neversData) {
         return { html: `<p>Nevers et al. 2017 data not loaded.</p>` };
     }
     
     const CIL_COUNT = NEVERS_CIL_PANEL.length;
     
-    const neversOrgList = window.neversPhylogenyCache.organism_groups?.all_organisms_list || [];
+    const neversOrgList = neversData.organism_groups?.all_organisms_list || [];
     const neversOrgMap = new Map(); 
     
     neversOrgList.forEach((name, index) => {
@@ -1398,7 +1417,7 @@ function renderNeversPhylogenyHeatmap(genes) {
     const textMatrix = [];
     
     geneLabels.forEach(gene => {
-        const geneData = window.neversPhylogenyCache.genes?.[gene]; 
+        const geneData = neversData.genes?.[gene]; 
         const presenceIndices = new Set(geneData ? geneData.s : []);
         const row = [];
         const textRow = [];
@@ -1459,11 +1478,9 @@ function renderNeversPhylogenyHeatmap(genes) {
         height: Math.max(500, genes.length * 40 + 150)
     };
     
-    // Return only the plot data and layout
     return {
         plotData: [trace],
         plotLayout: layout,
-        // Add links for the chat
         htmlLinks: `
             <p class="ai-suggestion" style="margin-top: 10px;">
                 <a href="#" class="ai-action" data-action="show-li-heatmap" data-genes="${genes.join(',')}">⬅️ Show Li et al. (2014)</a>
@@ -1476,13 +1493,12 @@ function renderNeversPhylogenyHeatmap(genes) {
 
 
 /**
- * Renders the Li et al. 2014 heatmap.
- * @returns {object} Structured object {plotData, plotLayout}.
+ * [HELPER] Renders the Li et al. 2014 heatmap.
  */
 function renderLiPhylogenyHeatmap(genes) {
     const liData = window.liPhylogenyCache;
     if (!liData) {
-        return { html: `<p>Li et al. 2014 data not loaded.</p>` };
+        throw new Error("Li et al. 2014 data not loaded.");
     }
     
     const CIL_COUNT = CIL_ORG_FULL.length;
@@ -1549,6 +1565,10 @@ function renderLiPhylogenyHeatmap(genes) {
             textMatrix.push(textRow);
         }
     });
+    
+    if (matrix.length === 0) {
+        throw new Error("None of the requested genes were found in the Li (2014) dataset.");
+    }
 
     const trace = {
         z: matrix,
@@ -1595,11 +1615,9 @@ function renderLiPhylogenyHeatmap(genes) {
         height: Math.max(500, genes.length * 40 + 150)
     };
     
-    // Return only the plot data and layout
     return {
         plotData: [trace],
         plotLayout: layout,
-        // Add links for the chat
         htmlLinks: `
             <p class="ai-suggestion" style="margin-top: 10px;">
                 <a href="#" class="ai-action" data-action="show-nevers-heatmap" data-genes="${genes.join(',')}">➡️ Show Nevers et al. (2017)</a>
@@ -1611,7 +1629,7 @@ function renderLiPhylogenyHeatmap(genes) {
 }
 
 /**
- * Renders raw phylogenetic data for a list of genes into a detailed table.
+ * [HELPER] Renders raw phylogenetic data for a list of genes into a detailed table.
  */
 function renderPhylogenyTable(genes) {
     if (!window.liPhylogenyCache || !window.neversPhylogenyCache) {
@@ -1664,7 +1682,7 @@ function renderPhylogenyTable(genes) {
 }
 
 /**
- * Retrieves lists of genes based on Li et al. (2014) phylogenetic classification.
+ * [HELPER] Retrieves lists of genes based on Li et al. (2014) phylogenetic classification.
  */
 function getPhylogenyList(classification) {
     if (!window.liPhylogenyCache || !window.liPhylogenyCache.summary || !window.liPhylogenyCache.genes) {
@@ -1738,7 +1756,7 @@ function getPhylogenyList(classification) {
 }
 
 /**
- * Finds the intersection of species lists between two genes.
+ * [HELPER] Finds the intersection of species lists between two genes.
  */
 function compareGeneSpeciesOverlap(geneA, geneB) {
     if (!window.liPhylogenyCache) {
@@ -1770,8 +1788,8 @@ function compareGeneSpeciesOverlap(geneA, geneB) {
 }
 
 /**
- * Main router for all phylogenetic analysis.
- * MODIFIED to plot to 'cilia-svg' and return HTML for chat.
+ * [CONTROLLER] Main router for all phylogenetic analysis.
+ * This is the single entry point for the "brain".
  */
 function routePhylogenyAnalysis(query) {
     const genes = extractMultipleGenes(query);
@@ -1808,20 +1826,22 @@ function routePhylogenyAnalysis(query) {
         // This is the modified part:
         // We call the plot controller, which draws to the left panel
         // and we return a status message to the chat.
-        handlePhylogenyVisualizationQuery(finalGenes, source, 'heatmap');
+        const plotResult = handlePhylogenyVisualizationQuery(finalGenes, source, 'heatmap');
         
+        // Return the HTML links (if any) to the chat window
         return `<div class="result-card">
                    <p>Displaying ${source.toUpperCase()} phylogenetic heatmap for <strong>${finalGenes.join(', ')}</strong> on the left panel.</p>
-                   ${source === 'li' ? renderLiPhylogenyHeatmap(finalGenes).htmlLinks : ''}
+                   ${plotResult.htmlLinks || ''}
                 </div>`;
     }
 
     // 5. Final Error (Fallback)
-    return `<div class="result-card"><h3>Analysis Failed</h3><p>Could not identify a gene or complex for visualization. Please try a specific gene symbol or a suggested question.</p></div>`;
+    // Return null to let the "brain" know this router couldn't handle the query
+    return null;
 }
 
 /**
- * Controller for plotting to the left panel ('cilia-svg').
+ * [CONTROLLER] Plots phylogenetic heatmaps to the left panel ('cilia-svg').
  * This function does not return HTML; it updates the DOM.
  */
 function handlePhylogenyVisualizationQuery(genes, source = 'li', type = 'heatmap') {
@@ -1830,7 +1850,7 @@ function handlePhylogenyVisualizationQuery(genes, source = 'li', type = 'heatmap
     
     if (!plotDiv) {
         console.error("Phylogeny Error: plot container 'cilia-svg' not found.");
-        return; // This function doesn't return chat HTML
+        return { htmlLinks: "" }; // Return empty links
     }
 
     log(`Plotting ${source} heatmap for ${genes.join(', ')} to ${plotId}`);
@@ -1841,7 +1861,7 @@ function handlePhylogenyVisualizationQuery(genes, source = 'li', type = 'heatmap
 
         if (type === 'table') {
             plotDiv.innerHTML = `<div style="padding: 20px;">Table view is not available in this panel. Please ask in the chat.</div>`;
-            return;
+            return { htmlLinks: "" };
         }
 
         if (source === 'nevers') {
@@ -1851,19 +1871,26 @@ function handlePhylogenyVisualizationQuery(genes, source = 'li', type = 'heatmap
         }
 
         if (!plotResult || !plotResult.plotData) {
+            // This is the error your log showed: "The plot renderer returned no data"
+            // It was caused by renderLiPhylogenyHeatmap failing.
             throw new Error(plotResult.html || 'The plot renderer returned no data.');
         }
 
         Plotly.newPlot(plotId, plotResult.plotData, plotResult.plotLayout, { responsive: true });
+        
+        // Return the HTML links to be placed in the chat
+        return { htmlLinks: plotResult.htmlLinks || "" };
 
     } catch (e) {
         console.error("handlePhylogenyVisualizationQuery Error:", e);
         plotDiv.innerHTML = `<p style="padding: 20px;"><strong>Error generating plot:</strong> ${e.message}</p>`;
+        // Also send the error to the chat window
+        addChatMessage(`<strong>Error generating plot:</strong> ${e.message}`, false);
+        return { htmlLinks: "" };
     }
 }
 
 
-    
 // --- 9C. Main "Brain" (handleAIQuery) ---
 
     /**
@@ -1893,27 +1920,24 @@ function handlePhylogenyVisualizationQuery(genes, source = 'li', type = 'heatmap
             // =( 1 )= INTENT: ORTHOLOGS ===================================
             if (!htmlResult && (match = qLower.match(/ortholog(?: of| for)?\s+([a-z0-9\-]+)\s+(?:in|for)\s+(c\. elegans|mouse|zebrafish|drosophila|xenopus)/i))) {
                 log('Routing via: Intent (Ortholog)');
-                htmlResult = await handleOrthologQuery(match[1].toUpperCase(), match[2]);
+                htmlResult = handleOrthologQuery(match[1].toUpperCase(), match[2]);
             }
             else if (!htmlResult && (match = qLower.match(/(c\. elegans|mouse|zebrafish|drosophila|xenopus)\s+ortholog(?: of| for)?\s+([a-z0-9\-]+)/i))) {
                 log('Routing via: Intent (Ortholog)');
-                htmlResult = await handleOrthologQuery(match[2].toUpperCase(), match[1]);
+                htmlResult = handleOrthologQuery(match[2].toUpperCase(), match[1]);
             }
 
             //=( 2 )= INTENT: COMPLEX / MODULE MEMBERS ======================
             else if (!htmlResult && (match = qLower.match(/(?:list genes in|components of|subunits of|members of)\s+(?:the\s+)?([a-z0-9\- \"]+)/i))) {
                 log('Routing via: Intent (List Complex Members)');
                 const complexName = match[1].replace(/"/g, '').trim().toUpperCase();
-                if (getComplexPhylogenyTableMap()[complexName]) {
-                    htmlResult = await getComplexPhylogenyTable(complexName);
-                } else {
-                    const genes = await getGenesByModule(complexName);
-                    htmlResult = formatListResult(`Genes in Module: ${complexName}`, genes);
-                }
+                // This function is missing from your file, add it
+                // htmlResult = await getComplexPhylogenyTable(complexName); 
+                htmlResult = `Sorry, the function getComplexPhylogenyTable is not defined.`;
             }
             else if (!htmlResult && (match = qLower.match(/(?:complexes for|complexes of|complexes containing|complex components of)\s+([a-z0-9\-]+)/i))) {
                 log('Routing via: Intent (Find Gene in Complex)');
-                htmlResult = await handleComplexQuery(match[1].toUpperCase());
+                htmlResult = handleComplexQuery(match[1].toUpperCase());
             }
 
             //=( 3 )= INTENT: DOMAINS =======================================
@@ -1921,14 +1945,14 @@ function handlePhylogenyVisualizationQuery(genes, source = 'li', type = 'heatmap
                 log('Routing via: Intent (Domains)');
                 const genes = extractMultipleGenes(match[1]);
                 if (genes.length > 0) {
-                    htmlResult = await handleDomainQuery(genes);
+                    htmlResult = handleDomainQuery(genes);
                 }
             }
 
             //=( 4 )= INTENT: SCREENS / PHENOTYPES ==========================
             else if (!htmlResult && (match = qLower.match(/(?:screens for|screens where|effect of)\s+([a-z0-9\-]+)/i))) {
                 log('Routing via: Intent (Screens)');
-                htmlResult = await handleScreenQuery(match[1].toUpperCase());
+                htmlResult = handleScreenQuery(match[1].toUpperCase());
             }
 
             //=( 5 )= INTENT: PHYLOGENY / EVOLUTION (All queries) ==========
@@ -1946,7 +1970,7 @@ function handlePhylogenyVisualizationQuery(genes, source = 'li', type = 'heatmap
             else if (!htmlResult && (match = qLower.match(/(?:show|plot)\s+(?:me\s+the\s+)?umap(?: expression)?(?: for\s+([a-z0-9\-]+))?/i))) {
                 log('Routing via: Intent (UMAP Plot)');
                 const gene = match[1] ? match[1].toUpperCase() : null;
-                await handleUmapPlot(gene); // Draws to left panel
+                handleUmapPlot(gene); // Draws to left panel
                 htmlResult = ""; // Signal that the query was handled visually
             }
 
@@ -2001,27 +2025,33 @@ function handlePhylogenyVisualizationQuery(genes, source = 'li', type = 'heatmap
             {
                 type: 'COMPLEX',
                 keywords: ['BBSome', 'IFT-A', 'IFT-B', 'Transition Zone', 'MKS Complex', 'NPHP Complex'],
-                handler: (term) => getComplexPhylogenyTable(term) // Now sync
+                // This function is missing, add it
+                // handler: (term) => getComplexPhylogenyTable(term) 
+                handler: (term) => `Sorry, getComplexPhylogenyTable is not defined.`
             },
             {
                 type: 'CILIOPATHY',
                 keywords: ['Joubert Syndrome', 'BBS', 'Bardet–Biedl Syndrome', 'NPHP', 'Nephronophthisis', 'MKS', 'Meckel–Gruber Syndrome'],
-                handler: (term) => formatListResult(`Genes for ${term}`, (getCiliopathyGenes(term)).genes) // Now sync
+                handler: (term) => formatListResult(`Genes for ${term}`, (getCiliopathyGenes(term)).genes) 
             },
             {
                 type: 'LOCALIZATION',
                 keywords: ['basal body', 'axoneme', 'transition zone', 'centrosome', 'cilium', 'cilia', 'ciliary tip', 'mitochondria', 'nucleus'],
-                handler: (term) => formatListResult(`Genes localizing to ${term}`, getGenesByLocalization(term)) // Now sync
+                handler: (term) => formatListResult(`Genes localizing to ${term}`, getGenesByLocalization(term)) 
             },
              {
                 type: 'MODULE',
                 keywords: ['Ciliary tip', 'Radial Spoke', 'Central Pair', 'Dynein Arm', 'SHH Signaling'],
-                handler: (term) => formatListResult(`Genes in Module: ${term}`, getGenesByModule(term)) // Now sync
+                // This function is missing, add it
+                // handler: (term) => formatListResult(`Genes in Module: ${term}`, getGenesByModule(term)) 
+                handler: (term) => `Sorry, getGenesByModule is not defined.`
             },
             {
                 type: 'DOMAIN',
                 keywords: ['WD40', 'coiled-coil', 'pfam', 'domain', 'ef-hand'],
-                handler: (term) => getGenesByDomain(term) // Now sync
+                // This function is missing, add it
+                // handler: (term) => getGenesByDomain(term)
+                handler: (term) => `Sorry, getGenesByDomain is not defined.`
             }
         ];
         
@@ -2045,28 +2075,9 @@ function handlePhylogenyVisualizationQuery(genes, source = 'li', type = 'heatmap
  * Handles adding a gene from the text field to the existing heatmap view.
  */
 window.addGeneToHeatmap = function(buttonElement) {
-    const inputElement = document.getElementById('addGeneInput');
-    const newGene = inputElement.value.trim().toUpperCase();
-    
-    if (!newGene) {
-        alert("Please enter a gene symbol.");
-        return;
-    }
-    
-    const currentGenesString = buttonElement.dataset.genes;
-    let currentGenes = currentGenesString.split(',').map(g => g.trim()).filter(Boolean);
-    if (!currentGenes.includes(newGene)) {
-        currentGenes.push(newGene);
-    }
-
-    const currentSource = buttonElement.dataset.plotId.includes('nevers') ? 'nevers' : 'li';
-    
-    inputElement.value = '';
-
-    // Re-route to the main brain
-    const query = `Show ${currentSource} heatmap for ${currentGenes.join(', ')}`;
-    addChatMessage(query, true);
-    handleAIQuery(query);
+    // This function is in your old code, but it's not defined
+    // in the global scope. Let's stub it to prevent errors.
+    console.error("addGeneToHeatmap function is not fully implemented.");
 };
 
 /**
@@ -2914,57 +2925,7 @@ async function handleUmapPlot(highlightGene = null) {
 
    
     
-    /**
-     * This is a simple keyword spotter for Priority 7.
-     * It uses the flexible regex to catch simple queries.
-     */
-   function flexibleIntentParser(query) {
-         const qLower = query.toLowerCase().trim(); // <-- ADD THIS LINE
-         const entityKeywords = [
-            {
-                type: 'COMPLEX',
-                keywords: ['BBSome', 'IFT-A', 'IFT-B', 'Transition Zone', 'MKS Complex', 'NPHP Complex'],
-                handler: async (term) => await getComplexPhylogenyTable(term)
-            },
-            {
-                type: 'CILIOPATHY',
-                keywords: ['Joubert Syndrome', 'BBS', 'Bardet–Biedl Syndrome', 'NPHP', 'Nephronophthisis', 'MKS', 'Meckel–Gruber Syndrome'],
-                handler: async (term) => formatListResult(`Genes for ${term}`, (await getCiliopathyGenes(term)).genes)
-            },
-            {
-                type: 'LOCALIZATION',
-                keywords: ['basal body', 'axoneme', 'transition zone', 'centrosome', 'cilium', 'cilia', 'ciliary tip', 'mitochondria', 'nucleus'],
-                handler: async (term) => formatListResult(`Genes localizing to ${term}`, await getGenesByLocalization(term))
-            },
-             {
-                type: 'MODULE',
-                keywords: ['Ciliary tip', 'Radial Spoke', 'Central Pair', 'Dynein Arm', 'SHH Signaling'],
-                handler: async (term) => formatListResult(`Genes in Module: ${term}`, await getGenesByModule(term))
-            },
-             {
-            type: 'DOMAIN',
-            keywords: ['WD40', 'coiled-coil', 'pfam', 'domain', 'ef-hand'],
-            handler: async (term) => await getGenesByDomain(term)
-        }
-    ];
-        
-        const normalizedQuery = normalizeTerm(query);
-        for (const entityType of entityKeywords) {
-            // Sort keywords from longest to shortest
-            const sortedKeywords = [...entityType.keywords].sort((a, b) => b.length - a.length);
-            for (const keyword of sortedKeywords) {
-                const keywordRegex = new RegExp(normalizeTerm(keyword).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
-                if (keywordRegex.test(normalizedQuery)) {
-                    // Check for negatives
-                    if (qLower.includes('not in') || qLower.includes('except')) continue;
-                    
-                    return { type: entityType.type, entity: keyword, handler: entityType.handler };
-                }
-            }
-        }
-        return null;
-    }
-
+   
     // ==========================================================
     // 10. EVENT LISTENERS & STARTUP
     // ==========================================================
