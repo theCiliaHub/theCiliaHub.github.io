@@ -1490,6 +1490,162 @@ function injectPageCSS() {
 
         Plotly.newPlot(plotDivId, plotData, layout, { responsive: true });
     }
+
+
+/**
+     * (NEW - This was missing)
+     * Injects the gene list as a table into the left panel.
+     */
+    function showDataInLeftPanel(title, geneList) {
+        // This is the ID of the div that holds the SVG
+        const container = document.getElementById('cilia-svg'); 
+        if (!container) {
+            console.error("Cannot find 'cilia-svg' container to draw table in.");
+            return;
+        }
+
+        // 1. Generate Table HTML
+        let tableHTML = `
+            <table class="ciliai-data-table">
+                <thead>
+                    <tr>
+                        <th>Gene</th>
+                        <th>Description / Localization</th>
+                    </tr>
+                </thead>
+                <tbody>
+        `;
+        geneList.forEach(item => {
+            tableHTML += `
+                <tr>
+                    <td><strong>${item.gene}</strong></td>
+                    <td>${item.description}</td>
+                </tr>
+            `;
+        });
+        tableHTML += `</tbody></table>`;
+
+        // 2. Generate Download Button
+        const downloadButton = `<button id="ciliai-download-btn" class="ciliai-button">Download as CSV</button>`;
+
+        // 3. Inject into the container
+        container.innerHTML = `
+            <div class="ciliai-table-container">
+                <h3>${title} Gene List (${geneList.length} genes)</h3>
+                ${downloadButton}
+                <div class="ciliai-table-scroll-wrapper">
+                    ${tableHTML}
+                </div>
+            </div>
+        `;
+
+        // 4. Add CSS for the new table
+        injectTableCSS();
+
+        // 5. Wire up the download button
+        document.getElementById('ciliai-download-btn').addEventListener('click', () => {
+            downloadTableAsCSV(title, geneList);
+        });
+    }
+
+    /**
+     * (NEW - This was missing)
+     * Helper to download the gene list table as a CSV file.
+     */
+    function downloadTableAsCSV(title, geneList) {
+        let csvContent = "data:text/csv;charset=utf-8,";
+        csvContent += "Gene,Description\r\n"; // Header row
+
+        geneList.forEach(item => {
+            const gene = item.gene;
+            const desc = `"${item.description.replace(/"/g, '""')}"`; // Handle quotes
+            csvContent += `${gene},${desc}\r\n`;
+        });
+
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", `${title.replace(/\s+/g, '_')}_genelist.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+
+    /**
+     * (NEW - This was missing)
+     * Injects dynamic CSS for the data table.
+     */
+    function injectTableCSS() {
+        const styleId = 'ciliai-table-styles';
+        if (document.getElementById(styleId)) return; // Don't inject twice
+
+        const css = `
+            .ciliai-table-container {
+                width: 100%;
+                height: 100%;
+                display: flex;
+                flex-direction: column;
+                padding: 10px;
+                background: #fff;
+            }
+            .ciliai-table-container h3 {
+                font-size: 16px;
+                color: #2d3748;
+                margin-bottom: 10px;
+            }
+            .ciliai-button {
+                padding: 8px 12px;
+                background: #667eea;
+                color: white;
+                border: none;
+                border-radius: 6px;
+                cursor: pointer;
+                font-weight: 500;
+                transition: all 0.2s;
+                font-size: 12px;
+                margin-bottom: 10px;
+                width: 150px;
+            }
+            .ciliai-button:hover {
+                background: #5568d3;
+            }
+            .ciliai-table-scroll-wrapper {
+                flex: 1;
+                overflow-y: auto;
+                border: 1px solid #e1e8ed;
+                border-radius: 6px;
+            }
+            .ciliai-data-table {
+                width: 100%;
+                border-collapse: collapse;
+                font-size: 12px;
+            }
+            .ciliai-data-table th, .ciliai-data-table td {
+                padding: 8px 10px;
+                text-align: left;
+                border-bottom: 1px solid #e1e8ed;
+            }
+            .ciliai-data-table th {
+                background: #f8f9fa;
+                position: sticky;
+                top: 0;
+            }
+            .ciliai-data-table tr:last-child td {
+                border-bottom: none;
+            }
+            .ciliai-data-table td strong {
+                color: #667eea;
+                font-weight: 600;
+            }
+        `;
+        
+        const styleEl = document.createElement('style');
+        styleEl.id = styleId;
+        styleEl.textContent = css;
+        document.head.appendChild(styleEl);
+    }
+
+    
     // --- 4C. Phylogeny Engine ---
 
     /**
@@ -2809,7 +2965,7 @@ function getComplexPhylogenyTableMap() {
     // --- 4E. Main "Brain" (Query Routers) ---
 
     
-  /**
+/**
      * This is the main router that implements the Priority Waterfall.
      */
     async function handleAIQuery(query) {
@@ -2834,13 +2990,17 @@ function getComplexPhylogenyTableMap() {
             let match;
 
             // =( 1 )= INTENT: CONTEXTUAL FOLLOW-UP ("Yes") ==============
-            if (htmlResult === null && (qLower === 'yes' || qLower === 'ok' || qLower === 'sure' || qLower.includes('view the list'))) {
-                if (lastQueryContext.type === 'localization_list') {
-                    log('Routing via: Intent (Follow-up: Show List)');
-                    showDataInLeftPanel(lastQueryContext.term, lastQueryContext.data);
-                    lastQueryContext = { type: null, data: [], term: null };
-                    htmlResult = ""; 
-                }
+            // --- THIS IS THE FIX (More flexible follow-up) ---
+            const isFollowUp = qLower === 'yes' || qLower === 'ok' || qLower === 'sure' || 
+                               qLower.includes('view the list') || qLower.includes('show') || 
+                               qLower.includes('please') || qLower.includes('display');
+            
+            if (htmlResult === null && isFollowUp && lastQueryContext.type === 'localization_list') {
+            // --- END FIX ---
+                log('Routing via: Intent (Follow-up: Show List)');
+                showDataInLeftPanel(lastQueryContext.term, lastQueryContext.data);
+                lastQueryContext = { type: null, data: [], term: null };
+                htmlResult = ""; // Signal that the query was handled visually
             }
 
             // =( 2 )= INTENT: HIGH-PRIORITY "WHAT IS [GENE]?" ==============
@@ -2965,6 +3125,7 @@ function getComplexPhylogenyTableMap() {
         }
     }
 
+    
     
     // ==========================================================
     // 5. GLOBAL UI WRAPPERS & STARTUP
