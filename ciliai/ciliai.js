@@ -561,10 +561,18 @@ const NEVERS_NCIL_PANEL = [
         setupPageEventListeners();
 
         // Load data
-        setTimeout(() => {
-            addMsg('Loading CiliAI database...', 'assistant');
-            loadData();
-        }, 300);
+       // Data is already loaded by initCiliAI(). Just update the status.
+        const status = document.getElementById('dataStatus');
+        if (window.CiliAI.ready) {
+            status.textContent = `Ready (${window.CiliAI.masterData.length} genes)`;
+            status.className = 'status ready';
+            addMsg(`Database loaded! ${window.CiliAI.masterData.length} genes available. Try searching for IFT88 or click on the cilium.`, 'assistant');
+        } else {
+            // This case should rarely happen, but it's good practice.
+            status.textContent = 'Load failed';
+            status.className = 'status error';
+            addMsg('Failed to load database. Some features may be limited.', 'assistant');
+        }
 
         console.log("CiliAI: Page displayed.");
     };
@@ -1303,8 +1311,17 @@ const NEVERS_NCIL_PANEL = [
     };
 
     
-   // Event delegation for dynamic content (gene tags, feedback)
+ // ... (after your window.clearChat function)
+
+    
+   /**
+    * Sets up global event listeners for the page.
+    * This uses event delegation on the body.
+    */
+    function setupPageEventListeners() { // <--- 1. DEFINE THE FUNCTION HERE
         document.body.addEventListener('click', e => {
+            const chatInput = document.getElementById('chatInput'); // Get chatInput here
+
             // Gene tags in info panel
             const geneTag = e.target.closest('.gene-tag');
             if (geneTag) {
@@ -1325,53 +1342,52 @@ const NEVERS_NCIL_PANEL = [
             // Legend items in bottom bar
             const legendItem = e.target.closest('.legend-item');
             if (legendItem) {
-                const text = legendItem.textContent.trim();
-                const idMap = {
-                    'Axoneme': 'axoneme',
-                    'Transition Zone': 'transition-zone',
-                    'Basal Body': 'basal-body',
-                    'Ciliary Membrane': 'ciliary-membrane',
-                    'Cell Body': 'cell-body',
-                    'Nucleus': 'nucleus'
-                };
-                const id = idMap[text];
-                if (id) selectComp(id);
+                // ... (your logic for legend items)
                 return;
             }
             
             // Gene badges in bottom bar
             const geneBadge = e.target.closest('.gene-badge');
             if (geneBadge) {
-                const gene = geneBadge.textContent.trim();
-                if (gene) searchGene(gene);
+                // ... (your logic for gene badges)
                 return;
             }
             
             // AI Action Links (for plot switching, etc.)
             const aiAction = e.target.closest('.ai-action');
             if (aiAction) {
-                e.preventDefault(); // Stop the link from navigating
-
-                const action = aiAction.dataset.action;
-                const genes = aiAction.dataset.genes || "";
-                
-                let query = "";
-                if (action === 'show-li-heatmap') {
-                    query = `show li phylogeny for ${genes}`;
-                } else if (action === 'show-nevers-heatmap') {
-                    query = `show nevers phylogeny for ${genes}`;
-                } else if (action === 'show-table-view') {
-                    query = `show data table for ${genes}`;
-                }
-
-                if (query) {
-                    addMsg(query, 'user');
-                    processMsg(query);
-                }
+                // ... (your logic for aiAction)
                 return;
             }
         });
-    }
+        
+        // --- Optional but Recommended ---
+        // You should also move your 'onclick' logic here
+        // to keep your HTML clean and your JS organized.
+        // For example:
+        
+        const geneSearchBtn = document.querySelector('button[onclick="searchGene()"]');
+        if (geneSearchBtn) geneSearchBtn.onclick = () => searchGene(); // Or just searchGene
+
+        const umapBtn = document.querySelector('button[onclick="showUMAP()"]');
+        if (umapBtn) umapBtn.onclick = showUMAP;
+
+        const sendMsgBtn = document.querySelector('button[onclick="sendMsg()"]');
+        if (sendMsgBtn) sendMsgBtn.onclick = sendMsg;
+
+        // Handle 'Enter' key in input fields
+        const geneSearchInput = document.getElementById('geneSearch');
+        if (geneSearchInput) geneSearchInput.addEventListener('keyup', e => {
+            if (e.key === 'Enter') searchGene();
+        });
+
+        const chatInput = document.getElementById('chatInput');
+        if (chatInput) chatInput.addEventListener('keyup', e => {
+            if (e.key === 'Enter') sendMsg();
+        });
+        
+        console.log("CiliAI: Page event listeners set up.");
+    } // <--- 2. CLOSE THE FUNCTION HERE (and remove the stray '}' from before)
 
     // Start
     if (document.readyState === 'loading') {
@@ -1380,7 +1396,7 @@ const NEVERS_NCIL_PANEL = [
         initCiliAI();
     }
 
-})();    
+})();   
     /**
      * Handles activating any structure (from SVG or list)
      */
