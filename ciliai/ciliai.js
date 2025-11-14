@@ -8,7 +8,7 @@
  * • All text is in English.
  * ============================================================== */
 
-function () {
+(function () {
     'use strict';
 
     // Global data storage
