@@ -24,7 +24,8 @@
     let selectedCompartment = null;
     let umapData = null;
     let cellxgeneData = null;
-
+// ADD THIS LINE HERE
+    let lastQueryContext = { type: null, data: [], term: null };
     // --- Phylogeny Constants ---
     const CIL_ORG_FULL = [
         "Homo sapiens", "Mus musculus", "X.tropicalis", "G.gallus", "O.anatinus",
