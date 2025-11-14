@@ -1,17 +1,19 @@
 /* ==============================================================
- * CiliAI – Interactive Explorer (v3.5 – Nov 13, 2025)
+ * CiliAI – Interactive Explorer (v4.0 – Nov 14, 2025)
  * ==============================================================
  * • MERGED: Combines the v2.1 data engine (with buildLookups fix)
- * with the v3.5 interactive SVG layout.
- * • COMPOSITE SVG: Integrates the minimal gray cilium with the
- * actual <g> paths for organelles from Furkan.html.
- * • All text is in English.
+ * with the v3.5 interactive SVG layout and the v4.0 CiliBrain.
+ * • All duplicate functions have been removed.
+ * • All syntax errors have been fixed.
  * ============================================================== */
 
 (function () {
     'use strict';
 
-    // Global data storage
+    // ==========================================================
+    // 1. GLOBAL STATE & CONSTANTS
+    // ==========================================================
+
     window.CiliAI = {
         data: {},
         masterData: [],
@@ -23,44 +25,37 @@
     let umapData = null;
     let cellxgeneData = null;
 
- 
-// ==========================================================
-// 1B. GLOBAL PHYLOGENY CONSTANTS (Add This Block)
-// ==========================================================
-// (From your new code)
-const CIL_ORG_FULL = [
-    "Homo sapiens", "Mus musculus", "X.tropicalis", "G.gallus", "O.anatinus", 
-    "D.rerio", "T.nigroviridis", "C.intestinalis", "S.purpuratus", "H.magnipapillata", 
-    "C.elegans", "C.briggsae", "B.malayi", "D.melanogaster", "A.gambiae", 
-    "T.cruzi", "L.major", "T.brucei", "T.vaginalis", "N.gruberi"
-];
-const NCIL_ORG_FULL = [
-    "S.cerevisiae", "S.pombe", "U.maydis", "C.neoformans", "P.chrysosporium", 
-    "T.melanosporum", "A.fumigatus", "A.oryzae", "A.niger", "A.nidulans", 
-    "A.thaliana", "O.sativa", "Z.mays", "S.bicolor", "V.vinifera", 
-    "C.merolae", "P.tricornutum", "E.histolytica", "E.dispar", "C.parvum"
-];
-const NEVERS_CIL_PANEL = [
-    "Homo sapiens", "Mus musculus", "Danio rerio", "Xenopus tropicalis", "Gallus gallus", 
-    "Caenorhabditis elegans", "Tetrahymena thermophila (strain SB210)", "Chlamydomonas reinhardtii", 
-    "Micromonas sp. (strain RCC299 / NOUM17)", "Trypanosoma cruzi", "Leishmania major", 
-    "Giardia intestinalis (strain ATCC 50803 / WB clone C6)", "Trichomonas vaginalis", 
-    "Strongylocentrotus purpuratus", "Ciona intestinalis", "Physcomitrella patens subsp. patens", 
-    "Paramecium tetraurelia", "Volvox carteri", "Amphimedon queenslandica", "Monosiga brevicollis"
-];
-const NEVERS_NCIL_PANEL = [
-    "Saccharomyces cerevisiae (strain ATCC 204508 / S288c)", "Schizosaccharomyces pombe (strain 972 / ATCC 24843)", 
-    "Cryptococcus neoformans var. neoformans serotype D (strain JEC21 / ATCC MYA-565)", 
-    "Ustilago maydis (strain 521 / FGSC 9021)", "Candida albicans (strain WO-1)", 
-    "Arabidopsis thaliana", "Brachypodium distachyon", "Sorghum bicolor", "Vitis vinifera", 
-    "Cryptosporidium parvum (strain Iowa II)", "Entamoeba histolytica", "Encephalitozoon cuniculi (strain GB-M1)"
-];
-// ==========================================================
+    // --- Phylogeny Constants ---
+    const CIL_ORG_FULL = [
+        "Homo sapiens", "Mus musculus", "X.tropicalis", "G.gallus", "O.anatinus",
+        "D.rerio", "T.nigroviridis", "C.intestinalis", "S.purpuratus", "H.magnipapillata",
+        "C.elegans", "C.briggsae", "B.malayi", "D.melanogaster", "A.gambiae",
+        "T.cruzi", "L.major", "T.brucei", "T.vaginalis", "N.gruberi"
+    ];
+    const NCIL_ORG_FULL = [
+        "S.cerevisiae", "S.pombe", "U.maydis", "C.neoformans", "P.chrysosporium",
+        "T.melanosporum", "A.fumigatus", "A.oryzae", "A.niger", "A.nidulans",
+        "A.thaliana", "O.sativa", "Z.mays", "S.bicolor", "V.vinifera",
+        "C.merolae", "P.tricornutum", "E.histolytica", "E.dispar", "C.parvum"
+    ];
+    const NEVERS_CIL_PANEL = [
+        "Homo sapiens", "Mus musculus", "Danio rerio", "Xenopus tropicalis", "Gallus gallus",
+        "Caenorhabditis elegans", "Tetrahymena thermophila (strain SB210)", "Chlamydomonas reinhardtii",
+        "Micromonas sp. (strain RCC299 / NOUM17)", "Trypanosoma cruzi", "Leishmania major",
+        "Giardia intestinalis (strain ATCC 50803 / WB clone C6)", "Trichomonas vaginalis",
+        "Strongylocentrotus purpuratus", "Ciona intestinalis", "Physcomitrella patens subsp. patens",
+        "Paramecium tetraurelia", "Volvox carteri", "Amphimedon queenslandica", "Monosiga brevicollis"
+    ];
+    const NEVERS_NCIL_PANEL = [
+        "Saccharomyces cerevisiae (strain ATCC 204508 / S288c)", "Schizosaccharomyces pombe (strain 972 / ATCC 24843)",
+        "Cryptococcus neoformans var. neoformans serotype D (strain JEC21 / ATCC MYA-565)",
+        "Ustilago maydis (strain 521 / FGSC 9021)", "Candida albicans (strain WO-1)",
+        "Arabidopsis thaliana", "Brachypodium distachyon", "Sorghum bicolor", "Vitis vinifera",
+        "Cryptosporidium parvum (strain Iowa II)", "Entamoeba histolytica", "Encephalitozoon cuniculi (strain GB-M1)"
+    ];
 
-    
     /**
      * Helper function to ensure a value is an array.
-     * Moved to global scope to be shared by loadCiliAIData and buildLookups.
      */
     function ensureArray(value) {
         if (Array.isArray(value)) return value;
@@ -68,27 +63,28 @@ const NEVERS_NCIL_PANEL = [
         return [value];
     }
 
-    // --- 2. DATA LOADING & PROCESSING (v2.1 - with fix) ---
+    // ==========================================================
+    // 2. DATA LOADING & PROCESSING
+    // ==========================================================
 
     /**
      * Initializes the CiliAI module: loads data, builds lookups,
      * and then displays the page.
      */
     async function initCiliAI() {
-        console.log('CiliAI: Initializing (v3.5)...');
+        console.log('CiliAI: Initializing (v4.0 Merged)...');
         await loadCiliAIData();
         if (!Array.isArray(window.CiliAI.masterData)) {
             console.warn('masterData not array. Initializing empty.');
             window.CiliAI.masterData = [];
         }
         buildLookups();
-        // setupEventListeners() is now called inside displayCiliAIPage()
         window.CiliAI.ready = true;
         console.log('CiliAI: Ready! Data loaded.');
 
         // If on the CiliAI page, display it.
         if (window.location.hash.includes('/ciliai')) {
-             // Small delay to ensure CiliaHub's DOM is settled
+            // Small delay to ensure CiliaHub's DOM is settled
             setTimeout(displayCiliAIPage, 100);
         }
     }
@@ -254,7 +250,7 @@ const NEVERS_NCIL_PANEL = [
                     neversMap[key] = {
                         species_count: d.s.length,
                         species_data: d.s,
-                        in_ciliated_organisms: d.s.filter(idx => 
+                        in_ciliated_organisms: d.s.filter(idx =>
                             neversRaw.organism_groups?.ciliated_organisms?.includes(idx)
                         ).length
                     };
@@ -384,7 +380,6 @@ const NEVERS_NCIL_PANEL = [
 
     /**
      * Builds the lookup maps (like geneMap) from the masterData.
-     * *** INCLUDES THE FIX FOR THE TPYEERROR ***
      */
     function buildLookups() {
         const L = window.CiliAI.lookups = {};
@@ -404,17 +399,15 @@ const NEVERS_NCIL_PANEL = [
                 Object.keys(g.complex_components).forEach(name => {
                     if (!L.complexByGene[key]) L.complexByGene[key] = [];
                     if (!L.complexByGene[key].includes(name)) L.complexByGene[key].push(name);
-                    
+
                     if (!L.complexByName[name]) L.complexByName[name] = [];
-                    
-                    // --- THIS IS THE FIX ---
+
                     // Use ensureArray() to prevent the .forEach error
                     ensureArray(g.complex_components[name]).forEach(gg => {
                         if (gg && !L.complexByName[name].includes(gg)) {
                             L.complexByName[name].push(gg);
                         }
                     });
-                    // --- END FIX ---
                 });
             }
         });
@@ -426,7 +419,7 @@ const NEVERS_NCIL_PANEL = [
             const key = g.gene?.toUpperCase();
             if (!key) return;
             if (g.localization) {
-                // FIX: Use ensureArray on localization as well
+                // Use ensureArray on localization as well
                 ensureArray(g.localization).forEach(loc => {
                     if (!L.byLocalization[loc]) L.byLocalization[loc] = [];
                     if (!L.byLocalization[loc].includes(key)) L.byLocalization[loc].push(key);
@@ -455,10 +448,11 @@ const NEVERS_NCIL_PANEL = [
         console.log('CiliAI: Lookups built');
     }
 
-    // --- 3. STATIC UI DATA ---
+    // ==========================================================
+    // 3. STATIC UI & PAGE DISPLAY
+    // ==========================================================
 
-    // This data is for the UI, not from the gene map.
-    // It's static info about the structures themselves.
+    // Static info about the structures themselves.
     const structureInfoMap = {
         // Cilia Parts
         'basal-body': {
@@ -481,7 +475,7 @@ const NEVERS_NCIL_PANEL = [
             description: 'Specialized membrane rich in receptors and channels.',
             genes: ['PKD1', 'PKD2', 'ARL13B', 'INPP5E', 'ADGRV1']
         },
-        // Organelles (from Furkan.html)
+        // Organelles
         "nucleus": {
             title: "Nucleus",
             description: "Contains the cell's DNA; the control center for gene expression and cell division."
@@ -502,7 +496,7 @@ const NEVERS_NCIL_PANEL = [
             title: "Cytoplasm",
             description: "The jelly-like substance filling the cell, enclosing the organelles and serving as the site for many metabolic reactions."
         },
-         "cell-body": { // Added alias for click handler
+        "cell-body": { // Alias for click handler
             title: "Cell Body / Cytoplasm",
             description: "The main body of the cell, enclosing the organelles and serving as the site for many metabolic reactions."
         },
@@ -532,9 +526,9 @@ const NEVERS_NCIL_PANEL = [
         }
     };
 
- // --- 4. MAIN PAGE DISPLAY FUNCTION (v3.5) ---
-
-   // Main page display function
+    /**
+     * Main page display function
+     */
     window.displayCiliAIPage = async function () {
         console.log("CiliAI: displayCiliAIPage() called.");
         const area = document.querySelector('.content-area');
@@ -548,10 +542,8 @@ const NEVERS_NCIL_PANEL = [
         const panel = document.querySelector('.cilia-panel');
         if (panel) panel.style.display = 'none';
 
-        // Inject CSS
+        // Inject CSS & HTML
         injectPageCSS();
-
-        // Inject HTML
         area.innerHTML = getPageHTML();
 
         // Generate SVG
@@ -560,24 +552,25 @@ const NEVERS_NCIL_PANEL = [
         // Setup event listeners
         setupPageEventListeners();
 
-        // Load data
-       // Data is already loaded by initCiliAI(). Just update the status.
+        // ** THIS IS THE FIX **
+        // Data is already loaded by initCiliAI(). Just update the status.
         const status = document.getElementById('dataStatus');
         if (window.CiliAI.ready) {
             status.textContent = `Ready (${window.CiliAI.masterData.length} genes)`;
             status.className = 'status ready';
-            addMsg(`Database loaded! ${window.CiliAI.masterData.length} genes available. Try searching for IFT88 or click on the cilium.`, 'assistant');
+            addChatMessage(`Database loaded! ${window.CiliAI.masterData.length} genes available. Try searching for IFT88 or click on the cilium.`, false);
         } else {
-            // This case should rarely happen, but it's good practice.
             status.textContent = 'Load failed';
             status.className = 'status error';
-            addMsg('Failed to load database. Some features may be limited.', 'assistant');
+            addChatMessage('Failed to load database. Some features may be limited.', false);
         }
 
         console.log("CiliAI: Page displayed.");
     };
 
-    // CSS injection
+    /**
+     * Injects the dynamic CSS for the page.
+     */
     function injectPageCSS() {
         const styleId = 'ciliai-dynamic-styles';
         if (document.getElementById(styleId)) return;
@@ -588,21 +581,73 @@ const NEVERS_NCIL_PANEL = [
                 padding: 0;
                 box-sizing: border-box;
             }
+            .ciliai-message { /* Renamed for clarity */
+                margin-bottom: 15px;
+                animation: fadeIn 0.3s ease;
+            }
+            .ciliai-message.user { text-align: right; }
+            .ciliai-message-content {
+                display: inline-block;
+                max-width: 85%;
+                padding: 12px 16px;
+                border-radius: 8px;
+                font-size: 13px;
+                line-height: 1.5;
+            }
+            .ciliai-message.user .ciliai-message-content {
+                background: #667eea;
+                color: white;
+                border-radius: 18px 18px 4px 18px;
+            }
+            .ciliai-message.assistant .ciliai-message-content {
+                background: #f8f9fa;
+                color: #2d3748;
+                border: 1px solid #e1e8ed;
+                border-radius: 18px 18px 18px 4px;
+            }
+            .ciliai-reaction-buttons {
+                display: flex;
+                gap: 8px;
+                margin-top: 8px;
+                font-size: 16px;
+            }
+            .ciliai-reaction-btn {
+                cursor: pointer;
+                opacity: 0.6;
+                transition: all 0.2s;
+                user-select: none;
+            }
+            .ciliai-reaction-btn:hover {
+                opacity: 1;
+                transform: scale(1.15);
+            }
+            .ai-result-card {
+                font-size: 12px;
+                line-height: 1.6;
+                margin-top: 8px;
+            }
+            .ai-result-card strong { color: #667eea; }
+            .ai-result-card ul { margin-left: 20px; margin-top: 5px; }
+            .ai-action {
+                color: #667eea;
+                text-decoration: none;
+                font-weight: 600;
+            }
+            .ai-action:hover { text-decoration: underline; }
 
+            /* Main Layout CSS */
             .container {
                 display: grid;
                 grid-template-columns: 1fr 450px;
                 height: 100vh;
                 gap: 0;
             }
-
             .left-panel {
                 display: flex;
                 flex-direction: column;
                 background: #f5f7fa;
                 border-right: 1px solid #e1e8ed;
             }
-
             .header {
                 padding: 20px 30px;
                 background: white;
@@ -610,19 +655,13 @@ const NEVERS_NCIL_PANEL = [
                 box-shadow: 0 1px 3px rgba(0,0,0,0.08);
                 border-bottom: 1px solid #e1e8ed;
             }
-
             .header h1 {
                 font-size: 28px;
                 font-weight: 600;
                 margin-bottom: 5px;
                 color: #2c3e50;
             }
-
-            .header p {
-                font-size: 14px;
-                color: #666;
-            }
-
+            .header p { font-size: 14px; color: #666; }
             .toolbar {
                 padding: 15px 30px;
                 background: white;
@@ -632,7 +671,6 @@ const NEVERS_NCIL_PANEL = [
                 align-items: center;
                 flex-wrap: wrap;
             }
-
             .toolbar input {
                 flex: 1;
                 min-width: 200px;
@@ -641,7 +679,6 @@ const NEVERS_NCIL_PANEL = [
                 border-radius: 6px;
                 font-size: 14px;
             }
-
             .toolbar button {
                 padding: 10px 20px;
                 background: #667eea;
@@ -653,22 +690,16 @@ const NEVERS_NCIL_PANEL = [
                 transition: all 0.2s;
                 font-size: 14px;
             }
-
-            .toolbar button:hover {
-                background: #5568d3;
-            }
-
+            .toolbar button:hover { background: #5568d3; }
             .status {
                 font-size: 12px;
                 padding: 5px 10px;
                 border-radius: 4px;
                 font-weight: 500;
             }
-
             .status.loading { background: #fff3cd; color: #856404; }
             .status.ready { background: #d4edda; color: #155724; }
             .status.error { background: #f8d7da; color: #721c24; }
-
             .diagram-container {
                 flex: 1;
                 padding: 20px;
@@ -678,7 +709,6 @@ const NEVERS_NCIL_PANEL = [
                 align-items: center;
                 background: white;
             }
-
             .interactive-cilium {
                 background: white;
                 border-radius: 8px;
@@ -688,27 +718,20 @@ const NEVERS_NCIL_PANEL = [
                 width: 100%;
                 border: 1px solid #e1e8ed;
             }
-
             .cilia-part {
                 cursor: pointer;
                 transition: all 0.2s ease;
             }
-
-            .cilia-part:hover {
-                opacity: 0.8;
-            }
-
+            .cilia-part:hover { opacity: 0.8; }
             .cilia-part:focus {
                 outline: 2px solid #667eea;
                 outline-offset: 2px;
             }
-
-            .cilia-part.selected {
+            .cilia-part.selected, .cilia-part.active { /* 'active' for v4 brain */
                 filter: brightness(1.2);
                 stroke: #ff6b00 !important;
                 stroke-width: 4 !important;
             }
-
             .bottom-bar {
                 padding: 20px 30px;
                 background: white;
@@ -717,20 +740,17 @@ const NEVERS_NCIL_PANEL = [
                 max-height: 250px;
                 overflow-y: auto;
             }
-
             .bottom-bar h3 {
                 font-size: 16px;
                 color: #2d3748;
                 margin-bottom: 12px;
             }
-
             .right-panel {
                 display: flex;
                 flex-direction: column;
                 background: #f5f7fa;
                 overflow: hidden;
             }
-
             .welcome-section {
                 padding: 25px;
                 background: white;
@@ -739,32 +759,25 @@ const NEVERS_NCIL_PANEL = [
                 overflow-y: auto;
                 flex-shrink: 0;
             }
-
             .welcome-section h2 {
                 font-size: 20px;
                 color: #2c3e50;
                 margin-bottom: 12px;
                 font-weight: 600;
             }
-
             .welcome-section p {
                 font-size: 13px;
                 line-height: 1.6;
                 color: #4a5568;
                 margin-bottom: 15px;
             }
-
             .steps {
                 font-size: 12px;
                 line-height: 1.7;
                 color: #4a5568;
                 padding-left: 20px;
             }
-
-            .steps li {
-                margin-bottom: 10px;
-            }
-
+            .steps li { margin-bottom: 10px; }
             .disclaimer {
                 margin-top: 15px;
                 padding: 12px;
@@ -774,66 +787,27 @@ const NEVERS_NCIL_PANEL = [
                 font-size: 12px;
                 color: #856404;
             }
-
             .chat-container {
                 flex: 1;
                 display: flex;
                 flex-direction: column;
                 overflow: hidden;
             }
-
             .messages {
                 flex: 1;
                 padding: 20px;
                 overflow-y: auto;
                 background: white;
             }
-
-            .message {
-                margin-bottom: 15px;
-                animation: fadeIn 0.3s ease;
-            }
-
-            @keyframes fadeIn {
-                from { opacity: 0; transform: translateY(10px); }
-                to { opacity: 1; transform: translateY(0); }
-            }
-
-            .message.user { text-align: right; }
-
-            .message-content {
-                display: inline-block;
-                max-width: 85%;
-                padding: 12px 16px;
-                border-radius: 8px;
-                font-size: 13px;
-                line-height: 1.5;
-            }
-
-            .message.user .message-content {
-                background: #667eea;
-                color: white;
-                border-radius: 18px 18px 4px 18px;
-            }
-
-            .message.assistant .message-content {
-                background: #f8f9fa;
-                color: #2d3748;
-                border: 1px solid #e1e8ed;
-                border-radius: 18px 18px 18px 4px;
-            }
-
             .input-area {
                 padding: 15px 20px;
                 background: white;
                 border-top: 1px solid #e1e8ed;
             }
-
             .input-container {
                 display: flex;
                 gap: 10px;
             }
-
             .input-container input {
                 flex: 1;
                 padding: 12px 16px;
@@ -841,7 +815,6 @@ const NEVERS_NCIL_PANEL = [
                 border-radius: 8px;
                 font-size: 14px;
             }
-
             .input-container button {
                 padding: 12px 24px;
                 background: #667eea;
@@ -852,18 +825,13 @@ const NEVERS_NCIL_PANEL = [
                 font-weight: 500;
                 transition: all 0.2s;
             }
-
-            .input-container button:hover {
-                background: #5568d3;
-            }
-
+            .input-container button:hover { background: #5568d3; }
             .legend {
                 display: flex;
                 flex-wrap: wrap;
                 gap: 12px;
                 margin-top: 12px;
             }
-
             .legend-item {
                 display: flex;
                 align-items: center;
@@ -875,25 +843,19 @@ const NEVERS_NCIL_PANEL = [
                 border-radius: 4px;
                 transition: all 0.2s;
             }
-
-            .legend-item:hover {
-                background: #f7fafc;
-            }
-
+            .legend-item:hover { background: #f7fafc; }
             .legend-color {
                 width: 14px;
                 height: 14px;
                 border-radius: 3px;
                 border: 1px solid rgba(0,0,0,0.2);
             }
-
             .gene-list {
                 display: flex;
                 flex-wrap: wrap;
                 gap: 6px;
                 margin-top: 10px;
             }
-
             .gene-badge {
                 padding: 5px 10px;
                 background: #667eea15;
@@ -904,59 +866,31 @@ const NEVERS_NCIL_PANEL = [
                 cursor: pointer;
                 transition: all 0.2s;
             }
-
             .gene-badge:hover {
                 background: #667eea;
                 color: white;
             }
-
-            .reaction-buttons {
-                display: flex;
-                gap: 8px;
-                margin-top: 8px;
-                font-size: 16px;
-            }
-
-            .reaction-btn {
-                cursor: pointer;
-                opacity: 0.6;
-                transition: all 0.2s;
-                user-select: none;
-            }
-
-            .reaction-btn:hover {
-                opacity: 1;
-                transform: scale(1.15);
-            }
-
-            .gene-info {
-                font-size: 12px;
-                line-height: 1.6;
-                margin-top: 8px;
-            }
-
-            .gene-info strong {
-                color: #667eea;
-            }
-
             @media (max-width: 992px) {
-                .container {
-                    grid-template-columns: 1fr;
-                }
+                .container { grid-template-columns: 1fr; }
             }
         `;
-        
+
         const styleEl = document.createElement('style');
         styleEl.id = styleId;
         styleEl.textContent = css;
         document.head.appendChild(styleEl);
     }
 
-    // HTML generation
+    /**
+     * Generates the main page HTML.
+     */
     function getPageHTML() {
+        // This HTML uses onclick attributes which are wired up to
+        // window.searchGene, window.selectComp, etc.
+        // Those functions are defined at the end of this file as
+        // wrappers for the new v4.0 brain.
         return `
         <div class="container">
-            <!-- LEFT PANEL -->
             <div class="left-panel">
                 <div class="header">
                     <h1>🔬 CiliAI Explorer</h1>
@@ -1007,7 +941,6 @@ const NEVERS_NCIL_PANEL = [
                 </div>
             </div>
 
-            <!-- RIGHT PANEL -->
             <div class="right-panel">
                 <div class="welcome-section">
                     <h2>Welcome to CiliAI! 🎉</h2>
@@ -1041,7 +974,9 @@ const NEVERS_NCIL_PANEL = [
         </div>`;
     }
 
-    // SVG generation
+    /**
+     * Generates and injects the cilium SVG.
+     */
     function generateAndInjectSVG() {
         const svgContainer = document.getElementById('cilia-svg');
         if (!svgContainer) return;
@@ -1082,370 +1017,180 @@ const NEVERS_NCIL_PANEL = [
                   fill="none" stroke="#4A5568" stroke-width="3"
                   d="M 145,180 L 148,15 L 152,15 L 155,180 Z"/>
         </svg>`;
-        
+
         svgContainer.innerHTML = svgHTML;
         setupSVGInteraction();
     }
 
+    /**
+     * Wires up the SVG elements to the `selectComp` function.
+     */
     function setupSVGInteraction() {
         ['axoneme', 'transition-zone', 'basal-body', 'ciliary-membrane', 'cell-body', 'nucleus'].forEach(id => {
             const el = document.getElementById(id);
             if (el) {
+                // This calls the global window.selectComp wrapper
                 el.onclick = () => selectComp(id);
             }
         });
     }
 
-    // Data loading
-    async function loadData() {
-        const status = document.getElementById('dataStatus');
-        if (status) {
-            status.textContent = 'Loading data...';
-            status.className = 'status loading';
-        }
-
-        try {
-            const url = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/ciliahub_data.json';
-            console.log('Fetching:', url);
-            
-            const response = await fetch(url);
-            if (!response.ok) throw new Error(`HTTP ${response.status}`);
-            
-            window.CiliAI.masterData = await response.json();
-            buildLookups();
-            
-            window.CiliAI.ready = true;
-            
-            if (status) {
-                status.textContent = `Ready (${window.CiliAI.masterData.length} genes)`;
-                status.className = 'status ready';
-            }
-            
-            addMsg(`Database loaded! ${window.CiliAI.masterData.length} genes available. Try searching for IFT88 or click on the cilium.`, 'assistant');
-            
-        } catch (error) {
-            console.error('Load error:', error);
-            if (status) {
-                status.textContent = 'Load failed';
-                status.className = 'status error';
-            }
-            addMsg('Failed to load database. Some features may be limited.', 'assistant');
-        }
-    }
-
-    function buildLookups() {
-        window.CiliAI.lookups = {
-            geneMap: {},
-            byLocalization: {}
-        };
-        
-        window.CiliAI.masterData.forEach(gene => {
-            const symbol = (gene.gene || gene.symbol || '').toUpperCase();
-            if (symbol) {
-                window.CiliAI.lookups.geneMap[symbol] = gene;
-                
-                const loc = gene.localization || 'Unknown';
-                if (!window.CiliAI.lookups.byLocalization[loc]) {
-                    window.CiliAI.lookups.byLocalization[loc] = [];
-                }
-                window.CiliAI.lookups.byLocalization[loc].push(symbol);
-            }
-        });
-        
-        console.log('Lookups built:', Object.keys(window.CiliAI.lookups.geneMap).length, 'genes');
-    }
-
-    // UI Functions
-    window.selectComp = function(id) {
-        document.querySelectorAll('.cilia-part').forEach(el => el.classList.remove('selected'));
-        const el = document.getElementById(id);
-        if (el) el.classList.add('selected');
-        
-        const names = {
-            'axoneme': 'Axoneme',
-            'transition-zone': 'Transition Zone',
-            'basal-body': 'Basal Body',
-            'ciliary-membrane': 'Ciliary Membrane',
-            'cell-body': 'Cell Body',
-            'nucleus': 'Nucleus'
-        };
-        
-        const locTerms = {
-            'axoneme': ['Axoneme', 'Ciliary Axoneme'],
-            'transition-zone': ['Transition Zone'],
-            'basal-body': ['Basal Body', 'Centriole', 'Centrosome'],
-            'ciliary-membrane': ['Ciliary Membrane', 'Cilium'],
-            'cell-body': ['Cytoplasm', 'Cytosol'],
-            'nucleus': ['Nucleus']
-        };
-        
-        const genes = window.CiliAI.masterData.filter(g => {
-            const loc = g.localization || '';
-            return locTerms[id]?.some(term => loc.includes(term));
-        });
-        
-        const bar = document.getElementById('bottomBar');
-        if (genes.length > 0) {
-            bar.innerHTML = `<h3>${names[id]} (${genes.length} genes)</h3>
-            <div class="gene-list">${genes.slice(0, 40).map(g => 
-                `<span class="gene-badge" onclick="searchGene('${g.gene}')">${g.gene}</span>`
-            ).join('')}${genes.length > 40 ? `<span style="font-size:11px;color:#666;padding:5px;">...+${genes.length-40} more</span>` : ''}</div>`;
-        } else {
-            bar.innerHTML = `<h3>${names[id]}</h3><p style="color:#666;font-size:12px;">No genes found. Try searching directly.</p>`;
-        }
-        
-        addMsg(`Selected ${names[id]}. Found ${genes.length} genes.`, 'assistant');
-    };
-
-    window.searchGene = function(name) {
-        const query = name || document.getElementById('geneSearch').value.trim().toUpperCase();
-        if (!query) {
-            alert('Enter a gene name');
-            return;
-        }
-        
-        const gene = window.CiliAI.masterData.find(g => (g.gene || '').toUpperCase() === query);
-        
-        if (gene) {
-            addMsg(`Tell me about ${query}`, 'user');
-            
-            let info = `<strong>${query}</strong><div class="gene-info">`;
-            if (gene.description) info += `<strong>Description:</strong> ${gene.description}<br>`;
-            if (gene.localization) info += `<strong>Localization:</strong> ${gene.localization}<br>`;
-            if (gene.functional_category) info += `<strong>Function:</strong> ${gene.functional_category}<br>`;
-            if (gene.ciliopathy) info += `<strong>Ciliopathy:</strong> ${Array.isArray(gene.ciliopathy) ? gene.ciliopathy.join(', ') : gene.ciliopathy}<br>`;
-            info += `</div><div class="reaction-buttons">
-                <span class="reaction-btn" onclick="react('up')">👍</span>
-                <span class="reaction-btn" onclick="react('down')">👎</span>
-                <span class="reaction-btn" onclick="clearChat()">📝</span>
-            </div>`;
-            
-            addMsg(info, 'assistant');
-        } else {
-            addMsg(`Search: ${query}`, 'user');
-            addMsg(`Gene ${query} not found. Try: IFT88, NPHP1, CEP290, ARL13B, BBS1`, 'assistant');
-        }
-    };
-
-    window.showUMAP = function() {
-        addMsg('Show UMAP', 'user');
-        addMsg('UMAP visualization requires Plotly integration. Feature coming soon!', 'assistant');
-    };
-
-    window.sendMsg = function() {
-        const input = document.getElementById('chatInput');
-        const msg = input.value.trim();
-        if (!msg) return;
-        
-        addMsg(msg, 'user');
-        input.value = '';
-        
-        setTimeout(() => processMsg(msg), 400);
-    };
-
-    function processMsg(msg) {
-        const lower = msg.toLowerCase();
-        let resp = '';
-        
-        const geneMatch = msg.match(/\b([A-Z][A-Z0-9]+)\b/);
-        if (geneMatch) {
-            const found = window.CiliAI.masterData.find(g => (g.gene || '').toUpperCase() === geneMatch[1]);
-            if (found) {
-                searchGene(geneMatch[1]);
-                return;
-            }
-        }
-        
-        if (lower.includes('transition zone')) {
-            selectComp('transition-zone');
-            resp = 'The transition zone acts as a ciliary gate. Key genes: NPHP1, CEP290, MKS1, TCTN1.';
-        } else if (lower.includes('axoneme')) {
-            selectComp('axoneme');
-            resp = 'The axoneme is the microtubule core. Key genes: IFT88, DNAH5, DNAI1.';
-        } else if (lower.includes('basal body')) {
-            selectComp('basal-body');
-            resp = 'The basal body anchors the cilium. Key genes: BBS1, CEP164, OFD1.';
-        } else if (lower.includes('membrane')) {
-            selectComp('ciliary-membrane');
-            resp = 'The ciliary membrane has distinct composition. Key proteins: ARL13B, INPP5E.';
-        } else if (lower.includes('ift') || lower.includes('transport')) {
-            resp = 'IFT (Intraflagellar Transport) builds cilia. Anterograde uses kinesin-2, retrograde uses dynein-2.';
-        } else if (lower.includes('ciliopathy') || lower.includes('disease')) {
-            resp = 'Major ciliopathies: Bardet-Biedl, Nephronophthisis, Joubert, PCD, Meckel-Gruber. Click compartments to see genes.';
-        } else if (lower.includes('help')) {
-            resp = `I can help with:<br>• Gene searches (IFT88, CEP290)<br>• Compartment exploration<br>• Ciliopathy information<br>• Gene localization`;
-        } else {
-            resp = `I have data on ${window.CiliAI.masterData.length} genes. Try searching for a gene or asking about ciliary compartments!`;
-        }
-        
-        resp += `<div class="reaction-buttons">
-            <span class="reaction-btn" onclick="react('up')">👍</span>
-            <span class="reaction-btn" onclick="react('down')">👎</span>
-        </div>`;
-        
-        addMsg(resp, 'assistant');
-    }
-
-    function addMsg(text, type) {
-        const div = document.createElement('div');
-        div.className = `message ${type}`;
-        div.innerHTML = `<div class="message-content">${text}</div>`;
-        document.getElementById('messages').appendChild(div);
-        div.scrollIntoView({behavior: 'smooth', block: 'end'});
-    }
-
-    window.react = function(type) {
-        if (type === 'up') {
-            addMsg('Thanks for the feedback! 🙏', 'assistant');
-        } else {
-            addMsg('Sorry about that. What specifically would help?', 'assistant');
-        }
-    };
-
-    window.clearChat = function() {
-        if (confirm('Start new conversation?')) {
-            document.getElementById('messages').innerHTML = '';
-            document.querySelectorAll('.cilia-part').forEach(el => el.classList.remove('selected'));
-            addMsg('Welcome back! How can I help?', 'assistant');
-        }
-    };
-
-    
- // ... (after your window.clearChat function)
-
-    
-   /**
-    * Sets up global event listeners for the page.
-    * This uses event delegation on the body.
-    */
-    function setupPageEventListeners() { // <--- 1. DEFINE THE FUNCTION HERE
+    /**
+     * Sets up global event listeners for the page (event delegation).
+     */
+    function setupPageEventListeners() {
         document.body.addEventListener('click', e => {
-            const chatInput = document.getElementById('chatInput'); // Get chatInput here
-
-            // Gene tags in info panel
-            const geneTag = e.target.closest('.gene-tag');
-            if (geneTag) {
-                const gene = geneTag.dataset.gene;
-                if (chatInput) chatInput.value = `What is ${gene}?`;
-                sendMsg();
-                return;
-            }
+            const chatInput = document.getElementById('chatInput');
 
             // Feedback buttons (reaction buttons)
-            const feedbackBtn = e.target.closest('.reaction-btn');
+            const feedbackBtn = e.target.closest('.ciliai-reaction-btn');
             if (feedbackBtn) {
                 const type = feedbackBtn.textContent.includes('👍') ? 'up' : 'down';
-                react(type);
+                react(type); // Calls window.react
                 return;
             }
-            
-            // Legend items in bottom bar
-            const legendItem = e.target.closest('.legend-item');
-            if (legendItem) {
-                // ... (your logic for legend items)
-                return;
-            }
-            
+
             // Gene badges in bottom bar
             const geneBadge = e.target.closest('.gene-badge');
             if (geneBadge) {
-                // ... (your logic for gene badges)
+                const gene = geneBadge.textContent.trim();
+                if (gene) searchGene(gene); // Calls window.searchGene
                 return;
             }
-            
+
             // AI Action Links (for plot switching, etc.)
             const aiAction = e.target.closest('.ai-action');
             if (aiAction) {
-                // ... (your logic for aiAction)
+                e.preventDefault();
+                const action = aiAction.dataset.action;
+                const genes = aiAction.dataset.genes || "";
+                let query = "";
+                if (action === 'show-li-heatmap') {
+                    query = `show li phylogeny for ${genes}`;
+                } else if (action === 'show-nevers-heatmap') {
+                    query = `show nevers phylogeny for ${genes}`;
+                } else if (action === 'show-table-view') {
+                    query = `show data table for ${genes}`;
+                }
+                if (query) {
+                    addChatMessage(query, true);
+                    handleAIQuery(query); // Calls the brain directly
+                }
                 return;
             }
         });
+
+        // --- Wire up static buttons and inputs ---
         
-        // --- Optional but Recommended ---
-        // You should also move your 'onclick' logic here
-        // to keep your HTML clean and your JS organized.
-        // For example:
-        
-        const geneSearchBtn = document.querySelector('button[onclick="searchGene()"]');
-        if (geneSearchBtn) geneSearchBtn.onclick = () => searchGene(); // Or just searchGene
-
-        const umapBtn = document.querySelector('button[onclick="showUMAP()"]');
-        if (umapBtn) umapBtn.onclick = showUMAP;
-
-        const sendMsgBtn = document.querySelector('button[onclick="sendMsg()"]');
-        if (sendMsgBtn) sendMsgBtn.onclick = sendMsg;
-
-        // Handle 'Enter' key in input fields
+        // Note: The HTML already has onclick attributes, but this
+        // is a more robust way to handle it. We'll wire up the 'Enter' key.
         const geneSearchInput = document.getElementById('geneSearch');
         if (geneSearchInput) geneSearchInput.addEventListener('keyup', e => {
-            if (e.key === 'Enter') searchGene();
+            if (e.key === 'Enter') searchGene(); // Calls window.searchGene
         });
 
         const chatInput = document.getElementById('chatInput');
         if (chatInput) chatInput.addEventListener('keyup', e => {
-            if (e.key === 'Enter') sendMsg();
+            if (e.key === 'Enter') sendMsg(); // Calls window.sendMsg
         });
-        
-        console.log("CiliAI: Page event listeners set up.");
-    } // <--- 2. CLOSE THE FUNCTION HERE (and remove the stray '}' from before)
 
-    // Start
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', initCiliAI);
-    } else {
-        initCiliAI();
+        console.log("CiliAI: Page event listeners set up.");
     }
 
-})();   
+
+    // ==========================================================
+    // 4. CILIBRAIN v4.0 - QUERY & PLOTTING ENGINE
+    // ==========================================================
+
+    // --- 4A. Core Helper Functions ---
+
     /**
-     * Handles activating any structure (from SVG or list)
+     * Simple logger
      */
-    function activateStructure(id) {
-        const data = structureInfoMap[id];
-        if (!data) return;
+    function log(message) {
+        console.log(`[CiliAI] ${message}`);
+    }
 
-        clearAllHighlights();
+    /**
+     * Normalizes a term for keyword matching
+     */
+    function normalizeTerm(term) {
+        if (typeof term !== 'string') return '';
+        return term.toLowerCase().replace(/[\s\-\_]/g, '');
+    }
 
-        // Highlight SVG
-        const svgEl = document.getElementById(id);
-        if (svgEl) svgEl.classList.add('active');
-        
-        // Show info
-        showInfoPanel(data.title, data.description, data.genes);
+    /**
+     * Extracts all valid gene symbols from a query string
+     */
+    function extractMultipleGenes(query) {
+        if (!query) return [];
+        const geneRegex = /\b([A-Z0-9\-\.]{3,})\b/gi;
+        const matches = query.match(geneRegex) || [];
+        const upperMatches = matches.map(g => g.toUpperCase());
+
+        // Filter against the master gene map
+        const geneMap = window.CiliAI.lookups.geneMap;
+        if (!geneMap) return [];
+
+        return upperMatches.filter(g => geneMap[g]);
     }
     
-    // --- 7. CHAT & QUERY LOGIC (DATA-AWARE) ---
+    /**
+     * Creates a standard HTML list for the chat window.
+     */
+    function formatListResult(title, genes, description = "") {
+        let geneListHtml = '';
+
+        if (genes && genes.length > 0) {
+            geneListHtml = genes.map(g =>
+                `<li><strong>${g.gene}</strong>: ${g.description || 'No details available.'}</li>`
+            ).join('');
+            geneListHtml = `<ul>${geneListHtml}</ul>`;
+        } else {
+            geneListHtml = "<p>No matching genes found in the database.</p>";
+        }
+
+        const descriptionHtml = description ? `<p>${description}</p>` : '';
+
+        return `
+            <div class="ai-result-card">
+                <strong>${title}</strong>
+                ${descriptionHtml}
+                ${geneListHtml}
+            </div>
+        `;
+    }
 
     /**
      * Adds a message to the chat window.
      */
-   function addChatMessage(html, isUser = false) {
-    const chatWindow = document.getElementById('messages');
-    if (!chatWindow) return;
-    
-    const msg = document.createElement('div');
-    msg.className = `ciliai-message ${isUser ? 'user' : 'assistant'}`;
-    
-    msg.innerHTML = `<div class="ciliai-message-content">${html}</div>`;
-    
-    if (!isUser) {
-        msg.querySelector('.ciliai-message-content').innerHTML += `
-            <div class="ciliai-reaction-buttons">
-                <span class="ciliai-reaction-btn" onclick="react('up')">👍</span>
-                <span class="ciliai-reaction-btn" onclick="react('down')">👎</span>
-            </div>`;
+    function addChatMessage(html, isUser = false) {
+        const chatWindow = document.getElementById('messages');
+        if (!chatWindow) return;
+
+        const msg = document.createElement('div');
+        msg.className = `ciliai-message ${isUser ? 'user' : 'assistant'}`;
+
+        msg.innerHTML = `<div class="ciliai-message-content">${html}</div>`;
+
+        if (!isUser) {
+            msg.querySelector('.ciliai-message-content').innerHTML += `
+                <div class="ciliai-reaction-buttons">
+                    <span class="ciliai-reaction-btn" onclick="react('up')">👍</span>
+                    <span class="ciliai-reaction-btn" onclick="react('down')">👎</span>
+                </div>`;
+        }
+
+        chatWindow.appendChild(msg);
+        chatWindow.scrollTop = chatWindow.scrollHeight;
     }
-    
-    chatWindow.appendChild(msg);
-    chatWindow.scrollTop = chatWindow.scrollHeight;
-}
 
     /**
      * Handles the user sending a message.
      */
     function handleUserSend() {
         const chatInput = document.getElementById('chatInput');
-        if (!chatInput) return; // Guard clause
+        if (!chatInput) return;
         const query = chatInput.value.trim();
         if (!query) return;
 
@@ -1456,14 +1201,14 @@ const NEVERS_NCIL_PANEL = [
         handleAIQuery(query);
     }
 
-function updateStatus(text, status) {
-    const statusEl = document.getElementById('dataStatus');
-    if (statusEl) {
-        statusEl.textContent = text;
-        statusEl.className = `status ${status}`;
+    function updateStatus(text, status) {
+        const statusEl = document.getElementById('dataStatus');
+        if (statusEl) {
+            statusEl.textContent = text;
+            statusEl.className = `status ${status}`;
+        }
     }
-}
-    
+
     /**
      * Finds a gene and highlights it.
      */
@@ -1471,17 +1216,16 @@ function updateStatus(text, status) {
         const gene = geneSymbol.trim().toUpperCase();
         if (!gene) return;
 
-        // Use the CiliAI lookup
         if (!window.CiliAI || !window.CiliAI.ready || !window.CiliAI.lookups || !window.CiliAI.lookups.geneMap) {
             console.warn("CiliAI data is not ready for gene search.");
             return;
         }
-        
+
         const geneData = window.CiliAI.lookups.geneMap[gene];
-        
+
         if (!geneData) {
-            clearAllHighlights();
-            showInfoPanel(`Gene Not Found: ${gene}`, `This gene is not in the CiliAI database.`);
+            // clearAllHighlights(); // This function isn't defined, let's skip it
+            addChatMessage(`Gene Not Found: ${gene}. This gene is not in the CiliAI database.`, false);
             return;
         }
 
@@ -1489,12 +1233,10 @@ function updateStatus(text, status) {
         let loc = 'unknown';
         let locString = 'Unknown';
         if (geneData.localization) {
-            // Use the already-normalized array
             const locArray = ensureArray(geneData.localization);
             locString = locArray.join(', ');
             const locLower = locString.toLowerCase();
-            
-            // Match in order of specificity
+
             if (locLower.includes('transition zone')) loc = 'transition-zone';
             else if (locLower.includes('axoneme')) loc = 'axoneme';
             else if (locLower.includes('basal body')) loc = 'basal-body';
@@ -1504,796 +1246,913 @@ function updateStatus(text, status) {
             else if (locLower.includes('golgi')) loc = 'golgi-apparatus';
             else if (locLower.includes('cytoplasm')) loc = 'cell-body';
         }
-        
+
         // Highlight and show info
-        clearAllHighlights();
+        // clearAllHighlights();
+        document.querySelectorAll('.cilia-part').forEach(el => el.classList.remove('active', 'selected'));
         if (loc !== 'unknown' && document.getElementById(loc)) {
             document.getElementById(loc).classList.add('active');
         }
-        showInfoPanel(`Gene: ${gene}`, (geneData.description || 'No description available.') + `<br><strong>Localization:</strong> ${locString}`, [gene]);
-
+        
         // Also ask the AI about it if triggered by user
         if (queryAI) {
-            addChatMessage(`Tell me about ${gene}`, true);
+            // addChatMessage(`Tell me about ${gene}`, true); // This is handled by window.searchGene
             handleAIQuery(`Tell me about ${gene}`);
         }
     }
-  
 
-// ==========================================================
-// 9. CILIBRAIN v4.0 - FULLY INTEGRATED
-// (This replaces all old plotting and brain functions)
-// ==========================================================
+    // --- 4B. Specific Data Handlers ---
 
-// --- 9A. Core Helper Functions ---
-
-/**
- * Handles queries for screen data.
- */
-function handleScreenQuery(geneSymbol) {
-    const gene = geneSymbol.toUpperCase();
-    const g = window.CiliAI.lookups.geneMap[gene];
-    if (!g) return `Sorry, I could not find data for "${gene}".`;
-
-    let html = `<h4>Screen Results for <strong>${gene}</strong></h4>`;
-    
-    if (g.percent_ciliated_cells_effects && g.percent_ciliated_cells_effects !== "Not Reported") {
-        html += `<p><strong>Percent Ciliated Cells Effect:</strong> ${g.percent_ciliated_cells_effects}</p>`;
-    }
-    if (g.lof_effects && g.lof_effects !== "Not Reported") {
-        html += `<p><strong>Loss-of-Function Effect:</strong> ${g.lof_effects}</p>`;
-    }
-    if (g.overexpression_effects && g.overexpression_effects !== "Not Reported") {
-        html += `<p><strong>Overexpression Effect:</strong> ${g.overexpression_effects}</p>`;
-    }
-
-    if (g.screens && g.screens.length > 0) {
-        html += '<strong>All Screen Data:</strong><ul>';
-        g.screens.forEach(s => {
-            html += `<li>[${s.dataset || 'Unknown'}] <strong>${s.classification}</strong> (Z-score: ${s.z_score || 'N/A'})</li>`;
-        });
-        html += '</ul>';
-    } else {
-        html += '<p>No specific screen data found in the database.</p>';
-    }
-    return html;
-}
-
-/**
- * Handles queries for domain data (for one or more genes).
- */
-function handleDomainQuery(geneSymbols) {
-    let html = '';
-    const genes = Array.isArray(geneSymbols) ? geneSymbols : [geneSymbols];
-
-    genes.forEach(geneSymbol => {
+    /**
+     * Handles queries for screen data.
+     */
+    function handleScreenQuery(geneSymbol) {
         const gene = geneSymbol.toUpperCase();
         const g = window.CiliAI.lookups.geneMap[gene];
-        if (!g) {
-            html += `<p>Sorry, I could not find data for "${gene}".</p>`;
-            return;
+        if (!g) return `Sorry, I could not find data for "${gene}".`;
+
+        let html = `<h4>Screen Results for <strong>${gene}</strong></h4>`;
+
+        if (g.percent_ciliated_cells_effects && g.percent_ciliated_cells_effects !== "Not Reported") {
+            html += `<p><strong>Percent Ciliated Cells Effect:</strong> ${g.percent_ciliated_cells_effects}</p>`;
+        }
+        if (g.lof_effects && g.lof_effects !== "Not Reported") {
+            html += `<p><strong>Loss-of-Function Effect:</strong> ${g.lof_effects}</p>`;
+        }
+        if (g.overexpression_effects && g.overexpression_effects !== "Not Reported") {
+            html += `<p><strong>Overexpression Effect:</strong> ${g.overexpression_effects}</p>`;
         }
 
-        html += `<h4>Domain Architecture for <strong>${gene}</strong></h4>`;
-        
-        if (g.pfam_ids && g.pfam_ids.length > 0) {
-            html += '<p><strong>PFAM Domains:</strong></p><ul>';
-            g.pfam_ids.forEach((id, index) => {
-                const desc = g.domain_descriptions[index] || 'No description';
-                html += `<li><strong>${id}:</strong> ${desc}</li>`;
+        if (g.screens && g.screens.length > 0) {
+            html += '<strong>All Screen Data:</strong><ul>';
+            g.screens.forEach(s => {
+                html += `<li>[${s.dataset || 'Unknown'}] <strong>${s.classification}</strong> (Z-score: ${s.z_score || 'N/A'})</li>`;
             });
             html += '</ul>';
         } else {
-            html += '<p>No PFAM domain data found for this gene.</p>';
+            html += '<p>No specific screen data found in the database.</p>';
         }
-    });
-    return html;
-}
-
-/**
- * Handles queries for complex data.
- */
-function handleComplexQuery(geneSymbol) {
-    const gene = geneSymbol.toUpperCase();
-    const g = window.CiliAI.lookups.geneMap[gene];
-    if (!g) return `Sorry, I could not find data for "${gene}".`;
-
-    const complexes = Object.keys(g.complex_components || {});
-    if (complexes.length > 0) {
-        let html = `<h4>Complex Components for <strong>${gene}</strong></h4>`;
-        html += `<p>${gene} is a known component of the following complexes:</p><ul>`;
-        complexes.forEach(name => {
-            html += `<li><strong>${name}</strong></li>`;
-        });
-        html += '</ul>';
         return html;
-    } else {
-        return `No complex data was found for <strong>${gene}</strong>.`;
-    }
-}
-
-/**
- * Handles queries for ortholog data.
- */
-function handleOrthologQuery(geneSymbol, organism) {
-    const gene = geneSymbol.toUpperCase();
-    const g = window.CiliAI.lookups.geneMap[gene];
-    if (!g) return `Sorry, I could not find data for "${gene}".`;
-
-    const orgKey = `ortholog_${organism.toLowerCase().replace(/[\.\s]/g, '_')}`;
-    
-    if (g[orgKey] && g[orgKey] !== 'N/A') {
-        return formatListResult(`Ortholog for ${gene} in ${organism}`, [{
-            gene: gene,
-            description: `${organism} Ortholog: <strong>${g[orgKey]}</strong>`
-        }]);
-    } else {
-        return `Sorry, I could not find a ${organism} ortholog for <strong>${gene}</strong>.`;
-    }
-}
-
-/**
- * Handles all UMAP plotting requests and draws to the left panel.
- */
-function handleUmapPlot(highlightGene = null) {
-    const plotDivId = 'cilia-svg'; // Draw on the left panel
-    const umapData = window.CiliAI.data.umap;
-
-    if (!umapData || umapData.length === 0) {
-        document.getElementById(plotDivId).innerHTML = '<p style="padding: 20px;">UMAP data not loaded.</p>';
-        return;
     }
 
-    const backgroundTrace = {
-        x: [], y: [], text: [],
-        mode: 'markers', type: 'scatter', name: 'All Genes',
-        marker: { color: '#d3d3d3', size: 5, opacity: 0.5 },
-        hoverinfo: 'text'
-    };
-    const highlightTrace = {
-        x: [], y: [], text: [],
-        mode: 'markers', type: 'scatter', name: highlightGene || 'Highlighted',
-        marker: { color: '#2c5aa0', size: 10, opacity: 1, line: { color: 'black', width: 1 } },
-        hoverinfo: 'text'
-    };
+    /**
+     * Handles queries for domain data (for one or more genes).
+     */
+    function handleDomainQuery(geneSymbols) {
+        let html = '';
+        const genes = Array.isArray(geneSymbols) ? geneSymbols : [geneSymbols];
 
-    let title = 'UMAP of Ciliary Genes';
-    const geneUpper = highlightGene ? highlightGene.toUpperCase() : null;
+        genes.forEach(geneSymbol => {
+            const gene = geneSymbol.toUpperCase();
+            const g = window.CiliAI.lookups.geneMap[gene];
+            if (!g) {
+                html += `<p>Sorry, I could not find data for "${gene}".</p>`;
+                return;
+            }
 
-    umapData.forEach(d => {
-        if (highlightGene && d.gene && d.gene.toUpperCase() === geneUpper) {
-            highlightTrace.x.push(d.x);
-            highlightTrace.y.push(d.y);
-            highlightTrace.text.push(`<b>${d.gene}</b><br>${d.cluster}`);
+            html += `<h4>Domain Architecture for <strong>${gene}</strong></h4>`;
+
+            if (g.pfam_ids && g.pfam_ids.length > 0) {
+                html += '<p><strong>PFAM Domains:</strong></p><ul>';
+                g.pfam_ids.forEach((id, index) => {
+                    const desc = g.domain_descriptions[index] || 'No description';
+                    html += `<li><strong>${id}:</strong> ${desc}</li>`;
+                });
+                html += '</ul>';
+            } else {
+                html += '<p>No PFAM domain data found for this gene.</p>';
+            }
+        });
+        return html;
+    }
+
+    /**
+     * Handles queries for complex data.
+     */
+    function handleComplexQuery(geneSymbol) {
+        const gene = geneSymbol.toUpperCase();
+        const g = window.CiliAI.lookups.geneMap[gene];
+        if (!g) return `Sorry, I could not find data for "${gene}".`;
+
+        const complexes = Object.keys(g.complex_components || {});
+        if (complexes.length > 0) {
+            let html = `<h4>Complex Components for <strong>${gene}</strong></h4>`;
+            html += `<p>${gene} is a known component of the following complexes:</p><ul>`;
+            complexes.forEach(name => {
+                html += `<li><strong>${name}</strong></li>`;
+            });
+            html += '</ul>';
+            return html;
         } else {
-            backgroundTrace.x.push(d.x);
-            backgroundTrace.y.push(d.y);
-            backgroundTrace.text.push(`<b>${d.gene}</b><br>${d.cluster}`);
+            return `No complex data was found for <strong>${gene}</strong>.`;
         }
-    });
-
-    const plotData = [backgroundTrace];
-    if (highlightTrace.x.length > 0) {
-        plotData.push(highlightTrace);
-        title = `UMAP: ${highlightGene}`;
-    } else if (highlightGene) {
-        addChatMessage(`Sorry, I could not find <strong>${highlightGene}</strong> in the UMAP data. Displaying all genes.`, false);
     }
 
-    const layout = {
-        title: title,
-        xaxis: { title: 'UMAP 1', zeroline: false, showticklabels: false },
-        yaxis: { title: 'UMAP 2', zeroline: false, showticklabels: false },
-        showlegend: false,
-        hovermode: 'closest',
-        margin: { t: 40, b: 40, l: 40, r: 20 }
-    };
+    /**
+     * Handles queries for ortholog data.
+     */
+    function handleOrthologQuery(geneSymbol, organism) {
+        const gene = geneSymbol.toUpperCase();
+        const g = window.CiliAI.lookups.geneMap[gene];
+        if (!g) return `Sorry, I could not find data for "${gene}".`;
 
-    Plotly.newPlot(plotDivId, plotData, layout, { responsive: true });
-}
+        const orgKey = `ortholog_${organism.toLowerCase().replace(/[\.\s]/g, '_')}`;
 
-    // ==========================================================
-// 9B. NEW, INTEGRATED PHYLOGENY ENGINE (Synchronous)
-// ==========================================================
-
-/**
- * [HELPER] Gets conservation data from Li et al. 2014.
- */
-function getLiConservation(geneSymbol) {
-    const geneUpper = geneSymbol.toUpperCase();
-    
-    if (!window.liPhylogenyCache || !window.liPhylogenyCache.genes) {
-         return `<div class="result-card"><h3>${geneSymbol} (Li et al. 2014)</h3><p class="status-not-found">Could not load the Li et al. 2014 dataset.</p></div>`;
+        if (g[orgKey] && g[orgKey] !== 'N/A') {
+            return formatListResult(`Ortholog for ${gene} in ${organism}`, [{
+                gene: gene,
+                description: `${organism} Ortholog: <strong>${g[orgKey]}</strong>`
+            }]);
+        } else {
+            return `Sorry, I could not find a ${organism} ortholog for <strong>${gene}</strong>.`;
+        }
     }
 
-    const geneEntry = Object.values(window.liPhylogenyCache.genes).find(g => g.g.toUpperCase() === geneUpper);
+    /**
+     * Handles all UMAP plotting requests and draws to the left panel.
+     */
+    function handleUmapPlot(highlightGene = null) {
+        const plotDivId = 'cilia-svg'; // Draw on the left panel
+        const umapData = window.CiliAI.data.umap;
 
-    if (!geneEntry) {
-         return `<div class="result-card"><h3>${geneSymbol} (Li et al. 2014)</h3><p class="status-not-found">Gene not found in the Li et al. 2014 dataset.</p></div>`;
-    }
-    
-    return formatLiGeneData(geneSymbol, geneEntry, window.liPhylogenyCache.summary);
-}
+        if (!umapData || umapData.length === 0) {
+            document.getElementById(plotDivId).innerHTML = '<p style="padding: 20px;">UMAP data not loaded.</p>';
+            return;
+        }
 
-/**
- * [HELPER] Formats the output for the Li et al. 2014 data
- */
-function formatLiGeneData(geneSymbol, geneData, summary) {
-    const organismsList = summary.organisms_list;
-    const classList = summary.class_list;
-    
-    const species = geneData.s.map(index => organismsList[index]).join(', ');
-    const category = (classList[geneData.c] || "Unknown").replace(/_/g, ' ');
+        const backgroundTrace = {
+            x: [], y: [], text: [],
+            mode: 'markers', type: 'scatter', name: 'All Genes',
+            marker: { color: '#d3d3d3', size: 5, opacity: 0.5 },
+            hoverinfo: 'text'
+        };
+        const highlightTrace = {
+            x: [], y: [], text: [],
+            mode: 'markers', type: 'scatter', name: highlightGene || 'Highlighted',
+            marker: { color: '#2c5aa0', size: 10, opacity: 1, line: { color: 'black', width: 1 } },
+            hoverinfo: 'text'
+        };
 
-    return `
-        <div class="result-card">
-            <h3>${geneSymbol} Phylogeny (Li et al. 2014)</h3>
-            <p><strong>Gene Name:</strong> ${geneData.g}</p>
-            <p><strong>Entrez ID:</strong> ${geneData.e}</p>
-            <p><strong>Classification:</strong> ${category}</p>
-            <p><strong>Found in ${geneData.s.length} Species:</strong> ${species || 'N/A'}</p>
-            <p style="font-size: 0.8em; color: #666; margin-top: 1rem; border-top: 1px solid #eee; padding-top: 0.5rem;">
-                <strong>Source:</strong> Li, Y. et al. (2014) <em>Cell</em>. <a href="https://pubmed.ncbi.nlm.nih.gov/24995987/" target="_blank">PMID: 24995987</a>
-            </p>
-        </div>`;
-}
+        let title = 'UMAP of Ciliary Genes';
+        const geneUpper = highlightGene ? highlightGene.toUpperCase() : null;
 
-/**
- * [HELPER] Renders the phylogenetic heatmap based on Nevers et al. 2017 data.
- */
-function renderNeversPhylogenyHeatmap(genes) {
-    const neversData = window.neversPhylogenyCache;
-    if (!neversData) {
-        return { html: `<p>Nevers et al. 2017 data not loaded.</p>` };
-    }
-    
-    const CIL_COUNT = NEVERS_CIL_PANEL.length;
-    
-    const neversOrgList = neversData.organism_groups?.all_organisms_list || [];
-    const neversOrgMap = new Map(); 
-    
-    neversOrgList.forEach((name, index) => {
-        neversOrgMap.set(name, index);
-        const simplifiedKey = name.toLowerCase().replace(/\s*\(.*?\)\s*/g, '').replace(/[\s\.\(\)]/g, '');
-        neversOrgMap.set(simplifiedKey, index);
-    });
-
-    const targetOrganisms = NEVERS_CIL_PANEL.concat(NEVERS_NCIL_PANEL);
-    
-    const targetNeversIndices = targetOrganisms.map(orgName => {
-        const simplifiedKey = orgName.toLowerCase().replace(/[\s\.]/g, '');
-        if (neversOrgMap.has(orgName)) return neversOrgMap.get(orgName);
-        if (neversOrgMap.has(simplifiedKey)) return neversOrgMap.get(simplifiedKey);
-        return undefined;
-    });
-
-    const geneLabels = genes.map(g => g.toUpperCase());
-    const matrix = [];
-    const textMatrix = [];
-    
-    geneLabels.forEach(gene => {
-        const geneData = neversData.genes?.[gene]; 
-        const presenceIndices = new Set(geneData ? geneData.s : []);
-        const row = [];
-        const textRow = [];
-
-        targetOrganisms.forEach((orgName, index) => {
-            const neversIndex = targetNeversIndices[index];
-            const isCiliated = index < CIL_COUNT; 
-            const isPresent = neversIndex !== undefined && presenceIndices.has(neversIndex);
-            let zValue = 0;
-            let status = "Absent";
-            if (isPresent) {
-                zValue = isCiliated ? 2 : 1; 
-                status = "Present";
+        umapData.forEach(d => {
+            if (highlightGene && d.gene && d.gene.toUpperCase() === geneUpper) {
+                highlightTrace.x.push(d.x);
+                highlightTrace.y.push(d.y);
+                highlightTrace.text.push(`<b>${d.gene}</b><br>${d.cluster}`);
+            } else {
+                backgroundTrace.x.push(d.x);
+                backgroundTrace.y.push(d.y);
+                backgroundTrace.text.push(`<b>${d.gene}</b><br>${d.cluster}`);
             }
-            row.push(zValue);
-            textRow.push(`Gene: ${gene}<br>Organism: ${orgName}<br>Status: ${status}`);
         });
 
-        if (row.length > 0) {
-            matrix.push(row);
-            textMatrix.push(textRow);
+        const plotData = [backgroundTrace];
+        if (highlightTrace.x.length > 0) {
+            plotData.push(highlightTrace);
+            title = `UMAP: ${highlightGene}`;
+        } else if (highlightGene) {
+            addChatMessage(`Sorry, I could not find <strong>${highlightGene}</strong> in the UMAP data. Displaying all genes.`, false);
         }
-    });
 
-    const NEVERS_COLORS = [
-        [0/2, '#F0F0F0'], [0.0001/2, '#F0A0A0'], [1/2, '#F0A0A0'], 
-        [1.0001/2, '#00A0A0'], [2/2, '#00A0A0']
-    ];
+        const layout = {
+            title: title,
+            xaxis: { title: 'UMAP 1', zeroline: false, showticklabels: false },
+            yaxis: { title: 'UMAP 2', zeroline: false, showticklabels: false },
+            showlegend: false,
+            hovermode: 'closest',
+            margin: { t: 40, b: 40, l: 40, r: 20 }
+        };
 
-    const trace = {
-        z: matrix,
-        x: targetOrganisms.map(name => {
-            let cleanedName = name.replace(/\s*\(.*?\)\s*/g, '').trim();
-            if (cleanedName.includes("D.rerio")) return "Zebrafish";
-            if (cleanedName.includes("H.sapiens")) return "Human";
-            return cleanedName;
-        }), 
-        y: geneLabels,
-        type: 'heatmap',
-        colorscale: NEVERS_COLORS,
-        showscale: false,
-        hoverinfo: 'text',
-        text: textMatrix,
-        xgap: 0.5, ygap: 0.5, line: { color: '#000000', width: 0.5 }
-    };
-
-    const layout = {
-        title: `Phylogenetic Conservation (Nevers et al. 2017) - ${genes.join(', ')}`,
-        xaxis: { title: 'Organisms (Ciliated | Non-Ciliated)', tickangle: 45, automargin: true },
-        yaxis: { title: 'Genes', automargin: true },
-        shapes: [{
-            type: 'line',
-            xref: 'x', x0: CIL_COUNT - 0.5, x1: CIL_COUNT - 0.5, 
-            yref: 'paper', y0: 0, y1: 1,
-            line: { color: 'black', width: 2 }
-        }],
-        margin: { t: 50, b: 200, l: 150, r: 50 }, 
-        height: Math.max(500, genes.length * 40 + 150)
-    };
-    
-    return {
-        plotData: [trace],
-        plotLayout: layout,
-        htmlLinks: `
-            <p class="ai-suggestion" style="margin-top: 10px;">
-                <a href="#" class="ai-action" data-action="show-li-heatmap" data-genes="${genes.join(',')}">⬅️ Show Li et al. (2014)</a>
-                <span style="margin: 0 10px;">|</span>
-                <a href="#" class="ai-action" data-action="show-table-view" data-genes="${genes.join(',')}">📋 Show Data Table</a>
-            </p>
-        `
-    };
-}
-
-/**
- * [HELPER] Renders the Li et al. 2014 heatmap.
- * Reads from cache, returns plot data.
- * INCLUDES FIX for empty gene list.
- */
-function renderLiPhylogenyHeatmap(genes) {
-    const liData = window.liPhylogenyCache;
-    if (!liData) {
-        throw new Error("Li et al. 2014 data not loaded.");
+        Plotly.newPlot(plotDivId, plotData, layout, { responsive: true });
     }
-    
-    const CIL_COUNT = CIL_ORG_FULL.length;
-    
-    const VERTEBRATE_LI_MAP = new Map([
-        ["homosapiens", "H.sapiens"], ["m.gallopavo", "M.gallopavo"], ["musmusculus", "M.musculus"],
-        ["daniorerio", "D.rerio"], ["xenopustropicalis", "X.tropicalis"], ["gallusgallus", "G.gallus"],
-        ["o.anatinus", "O.anatinus"], ["t.nigroviridis", "T.nigroviridis"], ["c.elegans", "C.elegans"],
-        ["c.briggsae", "C.briggsae"], ["c.reinhardtii", "C.reinhardtii"], ["t.thermophila", "T.thermophila"],
-        ["s.cerevisiae", "S.cerevisiae"], ["a.thaliana", "A.thaliana"], ["o.sativa", "O.sativa"]
-    ]);
 
-    const liOrgList = liData.summary.organisms_list;
-    const liOrgMap = new Map();
+    // --- 4C. Phylogeny Engine ---
 
-    liOrgList.forEach((name, index) => {
-        liOrgMap.set(name, index);
-        liOrgMap.set(name.toLowerCase().replace(/[\s\.]/g, ''), index);
-    });
+    /**
+     * [HELPER] Gets conservation data from Li et al. 2014.
+     */
+    function getLiConservation(geneSymbol) {
+        const geneUpper = geneSymbol.toUpperCase();
 
-    const targetOrganisms = CIL_ORG_FULL.concat(NCIL_ORG_FULL);
-    
-    const targetLiIndices = targetOrganisms.map(orgName => {
-        const lowerOrg = orgName.toLowerCase();
-        const simplifiedKey = lowerOrg.replace(/[\s\.]/g, '');
-        
-        if (VERTEBRATE_LI_MAP.has(simplifiedKey)) {
-            const liAbbrev = VERTEBRATE_LI_MAP.get(simplifiedKey);
-            if (liOrgMap.has(liAbbrev)) {
-                return liOrgMap.get(liAbbrev);
-            }
+        if (!window.liPhylogenyCache || !window.liPhylogenyCache.genes) {
+            return `<div class="result-card"><h3>${geneSymbol} (Li et al. 2014)</h3><p class="status-not-found">Could not load the Li et al. 2014 dataset.</p></div>`;
         }
-        if (liOrgMap.has(simplifiedKey)) return liOrgMap.get(simplifiedKey);
-        if (liOrgMap.has(orgName)) return liOrgMap.get(orgName);
-        return undefined; 
-    });
 
-    const geneLabels = [];
-    const matrix = [];
-    const textMatrix = [];
-    const genesFound = [];
-    const genesNotFound = [];
-    
-    genes.forEach(gene => {
-        const geneUpper = gene.toUpperCase();
-        const geneData = Object.values(liData.genes).find(g => g.g && g.g.toUpperCase() === geneUpper);
-        
-        if (!geneData) {
-            genesNotFound.push(geneUpper);
-            return; // Skip this gene
+        const geneEntry = Object.values(window.liPhylogenyCache.genes).find(g => g.g.toUpperCase() === geneUpper);
+
+        if (!geneEntry) {
+            return `<div class="result-card"><h3>${geneSymbol} (Li et al. 2014)</h3><p class="status-not-found">Gene not found in the Li et al. 2014 dataset.</p></div>`;
         }
-        
-        genesFound.push(geneUpper);
-        const presenceIndices = new Set(geneData.s || []);
-        const row = [];
-        const textRow = [];
 
-        targetOrganisms.forEach((orgName, index) => {
-            const liIndex = targetLiIndices[index];
-            const isCiliated = index < CIL_COUNT;
-            const isPresent = liIndex !== undefined && presenceIndices.has(liIndex);
-            let zValue = 0;
-            let status = "Absent";
-            if (isPresent) {
-                zValue = isCiliated ? 2 : 1;
-                status = "Present";
-            }
-            row.push(zValue);
-            textRow.push(`Gene: ${geneUpper}<br>Organism: ${orgName}<br>Status: ${status}`);
+        return formatLiGeneData(geneSymbol, geneEntry, window.liPhylogenyCache.summary);
+    }
+
+    /**
+     * [HELPER] Formats the output for the Li et al. 2014 data
+     */
+    function formatLiGeneData(geneSymbol, geneData, summary) {
+        const organismsList = summary.organisms_list;
+        const classList = summary.class_list;
+
+        const species = geneData.s.map(index => organismsList[index]).join(', ');
+        const category = (classList[geneData.c] || "Unknown").replace(/_/g, ' ');
+
+        return `
+            <div class="result-card">
+                <h3>${geneSymbol} Phylogeny (Li et al. 2014)</h3>
+                <p><strong>Gene Name:</strong> ${geneData.g}</p>
+                <p><strong>Entrez ID:</strong> ${geneData.e}</p>
+                <p><strong>Classification:</strong> ${category}</p>
+                <p><strong>Found in ${geneData.s.length} Species:</strong> ${species || 'N/A'}</p>
+                <p style="font-size: 0.8em; color: #666; margin-top: 1rem; border-top: 1px solid #eee; padding-top: 0.5rem;">
+                    <strong>Source:</strong> Li, Y. et al. (2014) <em>Cell</em>. <a href="https://pubmed.ncbi.nlm.nih.gov/24995987/" target="_blank">PMID: 24995987</a>
+                </p>
+            </div>`;
+    }
+
+    /**
+     * [HELPER] Renders the phylogenetic heatmap based on Nevers et al. 2017 data.
+     */
+    function renderNeversPhylogenyHeatmap(genes) {
+        const neversData = window.neversPhylogenyCache;
+        if (!neversData) {
+            return { html: `<p>Nevers et al. 2017 data not loaded.</p>` };
+        }
+
+        const CIL_COUNT = NEVERS_CIL_PANEL.length;
+
+        const neversOrgList = neversData.organism_groups?.all_organisms_list || [];
+        const neversOrgMap = new Map();
+
+        neversOrgList.forEach((name, index) => {
+            neversOrgMap.set(name, index);
+            const simplifiedKey = name.toLowerCase().replace(/\s*\(.*?\)\s*/g, '').replace(/[\s\.\(\)]/g, '');
+            neversOrgMap.set(simplifiedKey, index);
         });
 
-        if (row.length > 0) {
-            matrix.push(row);
-            textMatrix.push(textRow);
-            geneLabels.push(geneUpper); // Add label only if data was added
-        }
-    });
-    
-    // ==========================================================
-    // THIS IS THE FIX:
-    // If no valid genes were found (e.g., only WDR54 was passed),
-    // throw a clear error message.
-    // ==========================================================
-    if (matrix.length === 0) {
-        let errorMsg = "None of the requested genes were found in the Li (2014) dataset.";
-        if (genesNotFound.length > 0) {
-            errorMsg = `The gene(s) <strong>${genesNotFound.join(', ')}</strong> were not found in the Li (2014) phylogenetic dataset.`;
-        }
-        throw new Error(errorMsg);
-    }
-    // ==========================================================
+        const targetOrganisms = NEVERS_CIL_PANEL.concat(NEVERS_NCIL_PANEL);
 
-    const trace = {
-        z: matrix,
-        x: targetOrganisms.map(name => {
-            if (name === "H.sapiens") return "Human";
-            if (name === "M.musculus") return "Mouse";
-            if (name === "D.rerio") return "Zebrafish";
-            if (name.includes("elegans")) return "C. elegans";
-            return name.replace(/\./g, '').split(' ')[0]; 
-        }), 
-        y: geneLabels,
-        type: 'heatmap',
-        colorscale: [
-            [0/2, '#FFFFFF'], [0.0001/2, '#FFE5B5'], [1/2, '#FFE5B5'], 
-            [1.0001/2, '#698ECF'], [2/2, '#698ECF'] 
-        ],
-        showscale: false,
-        hoverinfo: 'text',
-        text: textMatrix,
-        xgap: 0.5, ygap: 0.5,
-        line: { color: '#000000', width: 0.5 }
-    };
+        const targetNeversIndices = targetOrganisms.map(orgName => {
+            const simplifiedKey = orgName.toLowerCase().replace(/[\s\.]/g, '');
+            if (neversOrgMap.has(orgName)) return neversOrgMap.get(orgName);
+            if (neversOrgMap.has(simplifiedKey)) return neversOrgMap.get(simplifiedKey);
+            return undefined;
+        });
 
-    const layout = {
-        title: `Phylogenetic Conservation (Li et al. 2014) - ${geneLabels.join(', ')}`,
-        xaxis: { 
-            title: 'Organisms (Ciliated | Non-Ciliated)', 
-            tickangle: 45, 
-            automargin: true 
-        },
-        yaxis: { 
-            title: 'Genes', 
-            automargin: true 
-        },
-        shapes: [
-            {
+        const geneLabels = genes.map(g => g.toUpperCase());
+        const matrix = [];
+        const textMatrix = [];
+
+        geneLabels.forEach(gene => {
+            const geneData = neversData.genes?.[gene];
+            const presenceIndices = new Set(geneData ? geneData.s : []);
+            const row = [];
+            const textRow = [];
+
+            targetOrganisms.forEach((orgName, index) => {
+                const neversIndex = targetNeversIndices[index];
+                const isCiliated = index < CIL_COUNT;
+                const isPresent = neversIndex !== undefined && presenceIndices.has(neversIndex);
+                let zValue = 0;
+                let status = "Absent";
+                if (isPresent) {
+                    zValue = isCiliated ? 2 : 1;
+                    status = "Present";
+                }
+                row.push(zValue);
+                textRow.push(`Gene: ${gene}<br>Organism: ${orgName}<br>Status: ${status}`);
+            });
+
+            if (row.length > 0) {
+                matrix.push(row);
+                textMatrix.push(textRow);
+            }
+        });
+
+        const NEVERS_COLORS = [
+            [0 / 2, '#F0F0F0'], [0.0001 / 2, '#F0A0A0'], [1 / 2, '#F0A0A0'],
+            [1.0001 / 2, '#00A0A0'], [2 / 2, '#00A0A0']
+        ];
+
+        const trace = {
+            z: matrix,
+            x: targetOrganisms.map(name => {
+                let cleanedName = name.replace(/\s*\(.*?\)\s*/g, '').trim();
+                if (cleanedName.includes("D.rerio")) return "Zebrafish";
+                if (cleanedName.includes("H.sapiens")) return "Human";
+                return cleanedName;
+            }),
+            y: geneLabels,
+            type: 'heatmap',
+            colorscale: NEVERS_COLORS,
+            showscale: false,
+            hoverinfo: 'text',
+            text: textMatrix,
+            xgap: 0.5, ygap: 0.5, line: { color: '#000000', width: 0.5 }
+        };
+
+        const layout = {
+            title: `Phylogenetic Conservation (Nevers et al. 2017) - ${genes.join(', ')}`,
+            xaxis: { title: 'Organisms (Ciliated | Non-Ciliated)', tickangle: 45, automargin: true },
+            yaxis: { title: 'Genes', automargin: true },
+            shapes: [{
                 type: 'line',
-                xref: 'x', x0: CIL_COUNT - 0.5, x1: CIL_COUNT - 0.5, 
+                xref: 'x', x0: CIL_COUNT - 0.5, x1: CIL_COUNT - 0.5,
                 yref: 'paper', y0: 0, y1: 1,
                 line: { color: 'black', width: 2 }
-            }
-        ],
-        margin: { t: 50, b: 200, l: 150, r: 50 }, 
-        height: Math.max(500, geneLabels.length * 40 + 150)
-    };
-    
-    // Also report if some genes were not found
-    let links = `<p class="ai-suggestion" style="margin-top: 10px;">
-                    <a href="#" class="ai-action" data-action="show-nevers-heatmap" data-genes="${geneLabels.join(',')}">➡️ Show Nevers et al. (2017)</a>
+            }],
+            margin: { t: 50, b: 200, l: 150, r: 50 },
+            height: Math.max(500, genes.length * 40 + 150)
+        };
+
+        return {
+            plotData: [trace],
+            plotLayout: layout,
+            htmlLinks: `
+                <p class="ai-suggestion" style="margin-top: 10px;">
+                    <a href="#" class="ai-action" data-action="show-li-heatmap" data-genes="${genes.join(',')}">⬅️ Show Li et al. (2014)</a>
                     <span style="margin: 0 10px;">|</span>
-                    <a href="#" class="ai-action" data-action="show-table-view" data-genes="${geneLabels.join(',')}">📋 Show Data Table</a>
-                 </p>`;
-
-    if (genesNotFound.length > 0) {
-        links = `<p class="status-note">Note: <strong>${genesNotFound.join(', ')}</strong> not found in this dataset.</p>` + links;
+                    <a href="#" class="ai-action" data-action="show-table-view" data-genes="${genes.join(',')}">📋 Show Data Table</a>
+                </p>
+            `
+        };
     }
 
-    return {
-        plotData: [trace],
-        plotLayout: layout,
-        htmlLinks: links
-    };
-}
+    /**
+     * [HELPER] Renders the Li et al. 2014 heatmap.
+     */
+    function renderLiPhylogenyHeatmap(genes) {
+        const liData = window.liPhylogenyCache;
+        if (!liData) {
+            throw new Error("Li et al. 2014 data not loaded.");
+        }
 
-/**
- * [HELPER] Renders raw phylogenetic data for a list of genes into a detailed table.
- */
-function renderPhylogenyTable(genes) {
-    if (!window.liPhylogenyCache || !window.neversPhylogenyCache) {
-        return `<div class="result-card"><h3>Table Error</h3><p>Phylogenetic data is not fully loaded.</p></div>`;
+        const CIL_COUNT = CIL_ORG_FULL.length;
+
+        const VERTEBRATE_LI_MAP = new Map([
+            ["homosapiens", "H.sapiens"], ["m.gallopavo", "M.gallopavo"], ["musmusculus", "M.musculus"],
+            ["daniorerio", "D.rerio"], ["xenopustropicalis", "X.tropicalis"], ["gallusgallus", "G.gallus"],
+            ["o.anatinus", "O.anatinus"], ["t.nigroviridis", "T.nigroviridis"], ["c.elegans", "C.elegans"],
+            ["c.briggsae", "C.briggsae"], ["c.reinhardtii", "C.reinhardtii"], ["t.thermophila", "T.thermophila"],
+            ["s.cerevisiae", "S.cerevisiae"], ["a.thaliana", "A.thaliana"], ["o.sativa", "O.sativa"]
+        ]);
+
+        const liOrgList = liData.summary.organisms_list;
+        const liOrgMap = new Map();
+
+        liOrgList.forEach((name, index) => {
+            liOrgMap.set(name, index);
+            liOrgMap.set(name.toLowerCase().replace(/[\s\.]/g, ''), index);
+        });
+
+        const targetOrganisms = CIL_ORG_FULL.concat(NCIL_ORG_FULL);
+
+        const targetLiIndices = targetOrganisms.map(orgName => {
+            const lowerOrg = orgName.toLowerCase();
+            const simplifiedKey = lowerOrg.replace(/[\s\.]/g, '');
+
+            if (VERTEBRATE_LI_MAP.has(simplifiedKey)) {
+                const liAbbrev = VERTEBRATE_LI_MAP.get(simplifiedKey);
+                if (liOrgMap.has(liAbbrev)) {
+                    return liOrgMap.get(liAbbrev);
+                }
+            }
+            if (liOrgMap.has(simplifiedKey)) return liOrgMap.get(simplifiedKey);
+            if (liOrgMap.has(orgName)) return liOrgMap.get(orgName);
+            return undefined;
+        });
+
+        const geneLabels = [];
+        const matrix = [];
+        const textMatrix = [];
+        const genesFound = [];
+        const genesNotFound = [];
+
+        genes.forEach(gene => {
+            const geneUpper = gene.toUpperCase();
+            const geneData = Object.values(liData.genes).find(g => g.g && g.g.toUpperCase() === geneUpper);
+
+            if (!geneData) {
+                genesNotFound.push(geneUpper);
+                return; // Skip this gene
+            }
+
+            genesFound.push(geneUpper);
+            const presenceIndices = new Set(geneData.s || []);
+            const row = [];
+            const textRow = [];
+
+            targetOrganisms.forEach((orgName, index) => {
+                const liIndex = targetLiIndices[index];
+                const isCiliated = index < CIL_COUNT;
+                const isPresent = liIndex !== undefined && presenceIndices.has(liIndex);
+                let zValue = 0;
+                let status = "Absent";
+                if (isPresent) {
+                    zValue = isCiliated ? 2 : 1;
+                    status = "Present";
+                }
+                row.push(zValue);
+                textRow.push(`Gene: ${geneUpper}<br>Organism: ${orgName}<br>Status: ${status}`);
+            });
+
+            if (row.length > 0) {
+                matrix.push(row);
+                textMatrix.push(textRow);
+                geneLabels.push(geneUpper); // Add label only if data was added
+            }
+        });
+
+        if (matrix.length === 0) {
+            let errorMsg = "None of the requested genes were found in the Li (2014) dataset.";
+            if (genesNotFound.length > 0) {
+                errorMsg = `The gene(s) <strong>${genesNotFound.join(', ')}</strong> were not found in the Li (2014) phylogenetic dataset.`;
+            }
+            throw new Error(errorMsg);
+        }
+
+        const trace = {
+            z: matrix,
+            x: targetOrganisms.map(name => {
+                if (name === "H.sapiens") return "Human";
+                if (name === "M.musculus") return "Mouse";
+                if (name === "D.rerio") return "Zebrafish";
+                if (name.includes("elegans")) return "C. elegans";
+                return name.replace(/\./g, '').split(' ')[0];
+            }),
+            y: geneLabels,
+            type: 'heatmap',
+            colorscale: [
+                [0 / 2, '#FFFFFF'], [0.0001 / 2, '#FFE5B5'], [1 / 2, '#FFE5B5'],
+                [1.0001 / 2, '#698ECF'], [2 / 2, '#698ECF']
+            ],
+            showscale: false,
+            hoverinfo: 'text',
+            text: textMatrix,
+            xgap: 0.5, ygap: 0.5,
+            line: { color: '#000000', width: 0.5 }
+        };
+
+        const layout = {
+            title: `Phylogenetic Conservation (Li et al. 2014) - ${geneLabels.join(', ')}`,
+            xaxis: {
+                title: 'Organisms (Ciliated | Non-Ciliated)',
+                tickangle: 45,
+                automargin: true
+            },
+            yaxis: {
+                title: 'Genes',
+                automargin: true
+            },
+            shapes: [
+                {
+                    type: 'line',
+                    xref: 'x', x0: CIL_COUNT - 0.5, x1: CIL_COUNT - 0.5,
+                    yref: 'paper', y0: 0, y1: 1,
+                    line: { color: 'black', width: 2 }
+                }
+            ],
+            margin: { t: 50, b: 200, l: 150, r: 50 },
+            height: Math.max(500, geneLabels.length * 40 + 150)
+        };
+
+        let links = `<p class="ai-suggestion" style="margin-top: 10px;">
+                        <a href="#" class="ai-action" data-action="show-nevers-heatmap" data-genes="${geneLabels.join(',')}">➡️ Show Nevers et al. (2017)</a>
+                        <span style="margin: 0 10px;">|</span>
+                        <a href="#" class="ai-action" data-action="show-table-view" data-genes="${geneLabels.join(',')}">📋 Show Data Table</a>
+                     </p>`;
+
+        if (genesNotFound.length > 0) {
+            links = `<p class="status-note">Note: <strong>${genesNotFound.join(', ')}</strong> not found in this dataset.</p>` + links;
+        }
+
+        return {
+            plotData: [trace],
+            plotLayout: layout,
+            htmlLinks: links
+        };
     }
 
-    const tableRows = genes.map(gene => {
-        const geneUpper = gene.toUpperCase();
-        
-        const liEntry = Object.values(window.liPhylogenyCache.genes).find(g => g.g && g.g.toUpperCase() === geneUpper);
-        const liClass = liEntry 
-            ? window.liPhylogenyCache.summary.class_list[liEntry.c].replace(/_/g, ' ') 
-            : 'N/A';
-        const liCount = liEntry?.s?.length || 0;
-        
-        const neversEntry = window.neversPhylogenyCache.genes?.[geneUpper];
-        const neversCount = neversEntry?.s?.length || 0;
-        
+    /**
+     * [HELPER] Renders raw phylogenetic data for a list of genes into a detailed table.
+     */
+    function renderPhylogenyTable(genes) {
+        if (!window.liPhylogenyCache || !window.neversPhylogenyCache) {
+            return `<div class="result-card"><h3>Table Error</h3><p>Phylogenetic data is not fully loaded.</p></div>`;
+        }
+
+        const tableRows = genes.map(gene => {
+            const geneUpper = gene.toUpperCase();
+
+            const liEntry = Object.values(window.liPhylogenyCache.genes).find(g => g.g && g.g.toUpperCase() === geneUpper);
+            const liClass = liEntry
+                ? window.liPhylogenyCache.summary.class_list[liEntry.c].replace(/_/g, ' ')
+                : 'N/A';
+            const liCount = liEntry?.s?.length || 0;
+
+            const neversEntry = window.neversPhylogenyCache.genes?.[geneUpper];
+            const neversCount = neversEntry?.s?.length || 0;
+
+            return `
+                <tr>
+                    <td><strong>${geneUpper}</strong></td>
+                    <td>${liClass}</td>
+                    <td>${liCount} / 140</td>
+                    <td>${neversCount} / 99</td>
+                    <td><a href="#" class="ai-action" data-action="show-li-heatmap" data-genes="${geneUpper}">View Heatmap</a></td>
+                </tr>
+            `;
+        }).join('');
+
         return `
-            <tr>
-                <td><strong>${geneUpper}</strong></td>
-                <td>${liClass}</td>
-                <td>${liCount} / 140</td>
-                <td>${neversCount} / 99</td>
-                <td><a href="#" class="ai-action" data-action="show-li-heatmap" data-genes="${geneUpper}">View Heatmap</a></td>
-            </tr>
+            <div class="result-card">
+                <h3>Phylogenetic Data Table for ${genes.join(', ')}</h3>
+                <table class="ciliopathy-table gene-detail-table" id="phylogeny-table" style="width: 100%; border-collapse: collapse; font-size: 11px;">
+                    <thead style="text-align: left;">
+                        <tr>
+                            <th style="padding: 4px; border-bottom: 1px solid #ccc;">Gene</th>
+                            <th style="padding: 4px; border-bottom: 1px solid #ccc;">Li Class (2014)</th>
+                            <th style="padding: 4px; border-bottom: 1px solid #ccc;">Li Count (140)</th>
+                            <th style="padding: 4px; border-bottom: 1px solid #ccc;">Nevers Count (99)</th>
+                            <th style="padding: 4px; border-bottom: 1px solid #ccc;">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>${tableRows}</tbody>
+                </table>
+                <p class="ai-suggestion" style="margin-top: 10px;">
+                    <a href="#" class="ai-action" data-action="show-li-heatmap" data-genes="${genes.join(',')}">🖼️ Show Heatmap View</a>
+                </p>
+            </div>
         `;
-    }).join('');
-
-    return `
-        <div class="result-card">
-            <h3>Phylogenetic Data Table for ${genes.join(', ')}</h3>
-            <table class="ciliopathy-table gene-detail-table" id="phylogeny-table">
-                <thead>
-                    <tr>
-                        <th>Gene</th>
-                        <th>Li Class (2014)</th>
-                        <th>Li Species Count (140)</th>
-                        <th>Nevers Species Count (99)</th>
-                        <th>Action</th>
-                    </tr>
-                </thead>
-                <tbody>${tableRows}</tbody>
-            </table>
-            <p class="ai-suggestion" style="margin-top: 10px;">
-                <a href="#" class="ai-action" data-action="show-li-heatmap" data-genes="${genes.join(',')}">🖼️ Show Heatmap View</a>
-            </p>
-        </div>
-    `;
-}
-
-/**
- * [HELPER] Retrieves lists of genes based on Li et al. (2014) phylogenetic classification.
- */
-function getPhylogenyList(classification) {
-    if (!window.liPhylogenyCache || !window.liPhylogenyCache.summary || !window.liPhylogenyCache.genes) {
-        return `<div class="result-card"><h3>List Error</h3><p>Phylogenetic classification data is currently unavailable.</p></div>`;
     }
 
-    const qLower = classification.toLowerCase().replace(/\s/g, '_');
-    const liGenes = window.liPhylogenyCache.genes;
-    const summary = window.liPhylogenyCache.summary;
-    const classList = summary.class_list;
+    /**
+     * [HELPER] Retrieves lists of genes based on Li et al. (2014) phylogenetic classification.
+     */
+    function getPhylogenyList(classification) {
+        if (!window.liPhylogenyCache || !window.liPhylogenyCache.summary || !window.liPhylogenyCache.genes) {
+            return `<div class="result-card"><h3>List Error</h3><p>Phylogenetic classification data is currently unavailable.</p></div>`;
+        }
 
-    let targetClassificationKey = null;
-    let title = "";
-    let fallbackHtml = "";
-    
-    if (qLower.includes('vertebrate')) {
-        targetClassificationKey = 'Vertebrate_specific';
-        title = "Genes Specific to the Vertebrate Lineage";
-    } 
-    else if (qLower.includes('mammalian')) {
-        if (summary.classification_summary.Mammalian_specific === 0) {
+        const qLower = classification.toLowerCase().replace(/\s/g, '_');
+        const liGenes = window.liPhylogenyCache.genes;
+        const summary = window.liPhylogenyCache.summary;
+        const classList = summary.class_list;
+
+        let targetClassificationKey = null;
+        let title = "";
+        let fallbackHtml = "";
+
+        if (qLower.includes('vertebrate')) {
             targetClassificationKey = 'Vertebrate_specific';
-            title = "Genes Specific to the Mammalian Lineage (Data Proxy)";
-            fallbackHtml = `<p class="status-note" style="margin-top: 10px;">
-                ⚠️ **Note:** The Li et al. 2014 classification metadata reports **zero genes** for the 'Mammalian specific' group. We are displaying the **Vertebrate specific** list as the most phylogenetically proximal proxy.
-            </p>`;
-        } else {
-             targetClassificationKey = 'Mammalian_specific';
-             title = "Genes Specific to the Mammalian Lineage";
+            title = "Genes Specific to the Vertebrate Lineage";
         }
-    } 
-    else if (qLower.includes('ciliary_specific') || qLower.includes('ciliary_genes') || qLower.includes('every_ciliary_gene')) {
-        targetClassificationKey = 'Ciliary_specific';
-        title = "Genes Classified as Ciliary Specific";
-    } 
-    else if (qLower.includes('absent_in_fungi') || qLower.includes('not_in_fungi')) {
-        targetClassificationKey = 'Vertebrate_specific'; 
-        title = "Genes Likely Absent in Fungi (Proxy: Vertebrate/Mammalian Specific)";
-    } 
-    else if (qLower.includes('all_organisms') || qLower.includes('universally_conserved')) {
-        targetClassificationKey = 'Universally_Conserved_Proxy';
-        title = "Genes Conserved Across Nearly All Organisms";
-    } 
-    else {
-        return `<div class="result-card"><h3>List Error</h3><p class="status-not-found">Classification keyword not recognized for list generation: ${classification}.</p></div>`;
-    }
-    
-    const filteredGenes = Object.values(liGenes).filter(entry => {
-        if (targetClassificationKey === 'Universally_Conserved_Proxy') {
-            return entry.s.length >= 130; 
+        else if (qLower.includes('mammalian')) {
+            if (summary.classification_summary.Mammalian_specific === 0) {
+                targetClassificationKey = 'Vertebrate_specific';
+                title = "Genes Specific to the Mammalian Lineage (Data Proxy)";
+                fallbackHtml = `<p class="status-note" style="margin-top: 10px;">
+                    ⚠️ **Note:** The Li et al. 2014 classification metadata reports **zero genes** for the 'Mammalian specific' group. We are displaying the **Vertebrate specific** list as the most phylogenetically proximal proxy.
+                </p>`;
+            } else {
+                targetClassificationKey = 'Mammalian_specific';
+                title = "Genes Specific to the Mammalian Lineage";
+            }
         }
-        
-        const entryClass = classList[entry.c] ? classList[entry.c].replace(/_/g, ' ') : '';
-        const targetClass = targetClassificationKey.replace(/_/g, ' ');
-        
-        return entryClass.toLowerCase().includes(targetClass.toLowerCase());
-        
-    }).map(g => ({ gene: g.g, description: `Class: ${title.split(':')[0]}` }));
-    
-    if (filteredGenes.length === 0) {
-        return `<div class="result-card"><h3>${title}</h3><p class="status-not-found">No genes found matching this classification.</p></div>`;
-    }
-
-    let resultHtml = formatListResult(title, filteredGenes);
-    
-    if (fallbackHtml) {
-        resultHtml = resultHtml.replace(/<\/div>$/, `${fallbackHtml}</div>`);
-    }
-
-    return resultHtml;
-}
-
-/**
- * [HELPER] Finds the intersection of species lists between two genes.
- */
-function compareGeneSpeciesOverlap(geneA, geneB) {
-    if (!window.liPhylogenyCache) {
-        return `<div class="result-card"><h3>Comparison Failed</h3><p class="status-not-found">Li et al. 2014 dataset not loaded.</p></div>`;
-    }
-    
-    const dataA = Object.values(window.liPhylogenyCache.genes).find(k => k.g.toUpperCase() === geneA.toUpperCase());
-    const dataB = Object.values(window.liPhylogenyCache.genes).find(k => k.g.toUpperCase() === geneB.toUpperCase());
-    
-    if (!dataA || !dataB) {
-        return `<div class="result-card"><h3>Comparison Failed</h3><p class="status-not-found">One or both genes (${geneA}, ${geneB}) were not found in the Li et al. 2014 dataset.</p></div>`;
-    }
-
-    const speciesList = window.liPhylogenyCache.summary.organisms_list;
-    const speciesAIndices = new Set(dataA.s || []);
-    const speciesBIndices = new Set(dataB.s || []);
-    
-    const overlapIndices = [...speciesAIndices].filter(index => speciesBIndices.has(index));
-    
-    const overlappingSpecies = overlapIndices.map(index => speciesList[index]).join(', ');
-
-    return `
-        <div class="result-card">
-            <h3>Shared Conservation: ${geneA} and ${geneB}</h3>
-            <p><strong>Total Shared Species:</strong> ${overlapIndices.length}</p>
-            <p><strong>Overlapping Species List:</strong> ${overlappingSpecies || 'None found.'}</p>
-        </div>
-    `;
-}
-
-/**
- * [CONTROLLER] Main router for all phylogenetic analysis.
- * This is the single entry point for the "brain".
- */
-function routePhylogenyAnalysis(query) {
-    const genes = extractMultipleGenes(query);
-    const qLower = query.toLowerCase();
-
-    // 1. COMPLEX LIST INTENT
-    if (qLower.includes('list') || qLower.includes('show ciliary genes') || qLower.includes('which genes are') || qLower.includes('find genes with') || qLower.includes('every ciliary gene')) {
-        if (qLower.includes('vertebrate')) return getPhylogenyList('Vertebrate_specific');
-        if (qLower.includes('mammalian') || qLower.includes('recently evolved')) return getPhylogenyList('Mammalian_specific');
-        if (qLower.includes('ciliary specific') || qLower.includes('ciliary genes') || qLower.includes('every ciliary gene')) return getPhylogenyList('Ciliary_specific');
-        if (qLower.includes('absent in fungi') || qLower.includes('not in fungi')) return getPhylogenyList('absent_in_fungi');
-        if (qLower.includes('all organisms') || qLower.includes('universally conserved') || qLower.includes('broadest conservation spectrum')) return getPhylogenyList('in_all_organisms');
-    }
-    
-    // 2. SPECIES OVERLAP QUERY
-    if (genes.length === 2 && (qLower.includes('share') || qLower.includes('both') || qLower.includes('overlap'))) {
-        return compareGeneSpeciesOverlap(genes[0], genes[1]);
-    }
-
-    // 3. TABLE VIEW INTENT
-    if (qLower.includes('table') || qLower.includes('view data') || qLower.includes('species count')) {
-        if (genes.length >= 1) {
-            return renderPhylogenyTable(genes);
+        else if (qLower.includes('ciliary_specific') || qLower.includes('ciliary_genes') || qLower.includes('every_ciliary_gene')) {
+            targetClassificationKey = 'Ciliary_specific';
+            title = "Genes Classified as Ciliary Specific";
         }
+        else if (qLower.includes('absent_in_fungi') || qLower.includes('not_in_fungi')) {
+            targetClassificationKey = 'Vertebrate_specific';
+            title = "Genes Likely Absent in Fungi (Proxy: Vertebrate/Mammalian Specific)";
+        }
+        else if (qLower.includes('all_organisms') || qLower.includes('universally_conserved')) {
+            targetClassificationKey = 'Universally_Conserved_Proxy';
+            title = "Genes Conserved Across Nearly All Organisms";
+        }
+        else {
+            return `<div class="result-card"><h3>List Error</h3><p class="status-not-found">Classification keyword not recognized for list generation: ${classification}.</p></div>`;
+        }
+
+        const filteredGenes = Object.values(liGenes).filter(entry => {
+            if (targetClassificationKey === 'Universally_Conserved_Proxy') {
+                return entry.s.length >= 130;
+            }
+
+            const entryClass = classList[entry.c] ? classList[entry.c].replace(/_/g, ' ') : '';
+            const targetClass = targetClassificationKey.replace(/_/g, ' ');
+
+            return entryClass.toLowerCase().includes(targetClass.toLowerCase());
+
+        }).map(g => ({ gene: g.g, description: `Class: ${title.split(':')[0]}` }));
+
+        if (filteredGenes.length === 0) {
+            return `<div class="result-card"><h3>${title}</h3><p class="status-not-found">No genes found matching this classification.</p></div>`;
+        }
+
+        let resultHtml = formatListResult(title, filteredGenes);
+
+        if (fallbackHtml) {
+            resultHtml = resultHtml.replace(/<\/div>$/, `${fallbackHtml}</div>`);
+        }
+
+        return resultHtml;
     }
 
-    // 4. VISUALIZATION INTENT (Default)
-    const isPhylogenyMandate = qLower.includes('evolution') || qLower.includes('taxa') || qLower.includes('phylogenetic') || qLower.includes('heatmap') || qLower.includes('conservation');
-    
-    if (genes.length >= 1 || isPhylogenyMandate) {
-        const source = qLower.includes('nevers') ? 'nevers' : 'li';
-        const finalGenes = genes.length >= 1 ? genes : ["IFT88", "BBS1", "CEP290"]; // Default
-        
-        // This is the modified part:
-        // We call the plot controller, which draws to the left panel
-        // and we return a status message to the chat.
-        const plotResult = handlePhylogenyVisualizationQuery(finalGenes, source, 'heatmap');
-        
-        // Return the HTML links (if any) to the chat window
-        return `<div class="result-card">
-                   <p>Displaying ${source.toUpperCase()} phylogenetic heatmap for <strong>${finalGenes.join(', ')}</strong> on the left panel.</p>
-                   ${plotResult.htmlLinks || ''}
-                </div>`;
+    /**
+     * [HELPER] Finds the intersection of species lists between two genes.
+     */
+    function compareGeneSpeciesOverlap(geneA, geneB) {
+        if (!window.liPhylogenyCache) {
+            return `<div class="result-card"><h3>Comparison Failed</h3><p class="status-not-found">Li et al. 2014 dataset not loaded.</p></div>`;
+        }
+
+        const dataA = Object.values(window.liPhylogenyCache.genes).find(k => k.g.toUpperCase() === geneA.toUpperCase());
+        const dataB = Object.values(window.liPhylogenyCache.genes).find(k => k.g.toUpperCase() === geneB.toUpperCase());
+
+        if (!dataA || !dataB) {
+            return `<div class="result-card"><h3>Comparison Failed</h3><p class="status-not-found">One or both genes (${geneA}, ${geneB}) were not found in the Li et al. 2014 dataset.</p></div>`;
+        }
+
+        const speciesList = window.liPhylogenyCache.summary.organisms_list;
+        const speciesAIndices = new Set(dataA.s || []);
+        const speciesBIndices = new Set(dataB.s || []);
+
+        const overlapIndices = [...speciesAIndices].filter(index => speciesBIndices.has(index));
+
+        const overlappingSpecies = overlapIndices.map(index => speciesList[index]).join(', ');
+
+        return `
+            <div class="result-card">
+                <h3>Shared Conservation: ${geneA} and ${geneB}</h3>
+                <p><strong>Total Shared Species:</strong> ${overlapIndices.length}</p>
+                <p><strong>Overlapping Species List:</strong> ${overlappingSpecies || 'None found.'}</p>
+            </div>
+        `;
     }
 
-    // 5. Final Error (Fallback)
-    // Return null to let the "brain" know this router couldn't handle the query
-    return null;
-}
+    /**
+     * [CONTROLLER] Main router for all phylogenetic analysis.
+     */
+    function routePhylogenyAnalysis(query) {
+        const genes = extractMultipleGenes(query);
+        const qLower = query.toLowerCase();
 
-/**
- * [CONTROLLER] Plots phylogenetic heatmaps to the left panel ('cilia-svg').
- * This function does not return HTML; it updates the DOM.
- */
-function handlePhylogenyVisualizationQuery(genes, source = 'li', type = 'heatmap') {
-    const plotId = 'cilia-svg'; // <-- Draw to the left panel
-    const plotDiv = document.getElementById(plotId);
-    
-    if (!plotDiv) {
-        console.error("Phylogeny Error: plot container 'cilia-svg' not found.");
-        return { htmlLinks: "" }; // Return empty links
+        // 1. COMPLEX LIST INTENT
+        if (qLower.includes('list') || qLower.includes('show ciliary genes') || qLower.includes('which genes are') || qLower.includes('find genes with') || qLower.includes('every ciliary gene')) {
+            if (qLower.includes('vertebrate')) return getPhylogenyList('Vertebrate_specific');
+            if (qLower.includes('mammalian') || qLower.includes('recently evolved')) return getPhylogenyList('Mammalian_specific');
+            if (qLower.includes('ciliary specific') || qLower.includes('ciliary genes') || qLower.includes('every ciliary gene')) return getPhylogenyList('Ciliary_specific');
+            if (qLower.includes('absent in fungi') || qLower.includes('not in fungi')) return getPhylogenyList('absent_in_fungi');
+            if (qLower.includes('all organisms') || qLower.includes('universally conserved') || qLower.includes('broadest conservation spectrum')) return getPhylogenyList('in_all_organisms');
+        }
+
+        // 2. SPECIES OVERLAP QUERY
+        if (genes.length === 2 && (qLower.includes('share') || qLower.includes('both') || qLower.includes('overlap'))) {
+            return compareGeneSpeciesOverlap(genes[0], genes[1]);
+        }
+
+        // 3. TABLE VIEW INTENT
+        if (qLower.includes('table') || qLower.includes('view data') || qLower.includes('species count')) {
+            if (genes.length >= 1) {
+                return renderPhylogenyTable(genes);
+            }
+        }
+
+        // 4. VISUALIZATION INTENT (Default)
+        const isPhylogenyMandate = qLower.includes('evolution') || qLower.includes('taxa') || qLower.includes('phylogenetic') || qLower.includes('heatmap') || qLower.includes('conservation');
+
+        if (genes.length >= 1 || isPhylogenyMandate) {
+            const source = qLower.includes('nevers') ? 'nevers' : 'li';
+            const finalGenes = genes.length >= 1 ? genes : ["IFT88", "BBS1", "CEP290"]; // Default
+
+            const plotResult = handlePhylogenyVisualizationQuery(finalGenes, source, 'heatmap');
+
+            // Return the HTML links (if any) to the chat window
+            return `<div class="result-card">
+                        <p>Displaying ${source.toUpperCase()} phylogenetic heatmap for <strong>${finalGenes.join(', ')}</strong> on the left panel.</p>
+                        ${plotResult.htmlLinks || ''}
+                    </div>`;
+        }
+        return null;
     }
 
-    log(`Plotting ${source} heatmap for ${genes.join(', ')} to ${plotId}`);
-    plotDiv.innerHTML = `<div style="padding: 40px; text-align: center;">Loading ${source.toUpperCase()} phylogeny plot for ${genes.join(', ')}...</div>`;
+    /**
+     * [CONTROLLER] Plots phylogenetic heatmaps to the left panel ('cilia-svg').
+     */
+    function handlePhylogenyVisualizationQuery(genes, source = 'li', type = 'heatmap') {
+        const plotId = 'cilia-svg'; // <-- Draw to the left panel
+        const plotDiv = document.getElementById(plotId);
 
-    try {
-        let plotResult;
+        if (!plotDiv) {
+            console.error("Phylogeny Error: plot container 'cilia-svg' not found.");
+            return { htmlLinks: "" }; // Return empty links
+        }
 
-        if (type === 'table') {
-            plotDiv.innerHTML = `<div style="padding: 20px;">Table view is not available in this panel. Please ask in the chat.</div>`;
+        log(`Plotting ${source} heatmap for ${genes.join(', ')} to ${plotId}`);
+        plotDiv.innerHTML = `<div style="padding: 40px; text-align: center;">Loading ${source.toUpperCase()} phylogeny plot for ${genes.join(', ')}...</div>`;
+
+        try {
+            let plotResult;
+
+            if (type === 'table') {
+                plotDiv.innerHTML = `<div style="padding: 20px;">Table view is not available in this panel. Please ask in the chat.</div>`;
+                return { htmlLinks: "" };
+            }
+
+            if (source === 'nevers') {
+                plotResult = renderNeversPhylogenyHeatmap(genes);
+            } else {
+                plotResult = renderLiPhylogenyHeatmap(genes);
+            }
+
+            if (!plotResult || !plotResult.plotData) {
+                throw new Error(plotResult.html || 'The plot renderer returned no data.');
+            }
+
+            Plotly.newPlot(plotId, plotResult.plotData, plotResult.plotLayout, { responsive: true });
+
+            return { htmlLinks: plotResult.htmlLinks || "" };
+
+        } catch (e) {
+            console.error("handlePhylogenyVisualizationQuery Error:", e);
+            plotDiv.innerHTML = `<p style="padding: 20px;"><strong>Error generating plot:</strong> ${e.message}</p>`;
+            addChatMessage(`<strong>Error generating plot:</strong> ${e.message}`, false);
             return { htmlLinks: "" };
         }
-
-        if (source === 'nevers') {
-             plotResult = renderNeversPhylogenyHeatmap(genes);
-        } else {
-             plotResult = renderLiPhylogenyHeatmap(genes);
-        }
-
-        if (!plotResult || !plotResult.plotData) {
-            // This is the error your log showed: "The plot renderer returned no data"
-            // It was caused by renderLiPhylogenyHeatmap failing.
-            throw new Error(plotResult.html || 'The plot renderer returned no data.');
-        }
-
-        Plotly.newPlot(plotId, plotResult.plotData, plotResult.plotLayout, { responsive: true });
-        
-        // Return the HTML links to be placed in the chat
-        return { htmlLinks: plotResult.htmlLinks || "" };
-
-    } catch (e) {
-        console.error("handlePhylogenyVisualizationQuery Error:", e);
-        plotDiv.innerHTML = `<p style="padding: 20px;"><strong>Error generating plot:</strong> ${e.message}</p>`;
-        // Also send the error to the chat window
-        addChatMessage(`<strong>Error generating plot:</strong> ${e.message}`, false);
-        return { htmlLinks: "" };
     }
-}
 
 
-// --- 9C. Main "Brain" (handleAIQuery) ---
+    // --- 4D. Data Getter Helpers ---
+
+    /**
+     * Fetches and formats a comprehensive summary for a single gene.
+     */
+    async function getComprehensiveDetails(term) {
+        const gene = term.trim().toUpperCase();
+        const g = window.CiliAI.lookups.geneMap[gene];
+
+        if (!g) {
+            return `Sorry, I could not find any data for "<strong>${gene}</strong>".`;
+        }
+
+        let html = `<h4>Details for <strong>${g.gene}</strong></h4>`;
+        html += `<p>${g.description || g.functional_summary || 'No description available.'}</p>`;
+        html += '<ul>';
+
+        if (g.localization) {
+            html += `<li><strong>Localization:</strong> ${ensureArray(g.localization).join(', ')}</li>`;
+        }
+        if (g.ciliopathy && g.ciliopathy.length > 0) {
+            html += `<li><strong>Ciliopathy:</strong> ${g.ciliopathy.join(', ')}</li>`;
+        }
+        const complexes = Object.keys(g.complex_components || {});
+        if (complexes.length > 0) {
+            html += `<li><strong>Complexes:</strong> ${complexes.join(', ')}</li>`;
+        }
+        if (g.pfam_ids && g.pfam_ids.length > 0) {
+            html += `<li><strong>Domains:</strong> ${g.pfam_ids.join(', ')}</li>`;
+        }
+        const orthologs = [
+            g.ortholog_c_elegans ? `<em>C. elegans</em> (${g.ortholog_c_elegans})` : null,
+            g.ortholog_mouse ? `Mouse (${g.ortholog_mouse})` : null,
+            g.ortholog_zebrafish ? `Zebrafish (${g.ortholog_zebrafish})` : null
+        ].filter(Boolean).join(', ');
+        if (orthologs) {
+            html += `<li><strong>Orthologs:</strong> ${orthologs}</li>`;
+        }
+        html += `
+            <li><strong>Phylogeny:</strong> 
+                <a href="#" class="ai-action" data-action="show-li-heatmap" data-genes="${g.gene}">Show Conservation</a>
+            </li>`;
+        html += '</ul>';
+        return html;
+    }
+
+    /**
+     * Generic getter for ciliopathy
+     */
+    function getCiliopathyGenes(term) {
+        const normTerm = term.toLowerCase();
+        let key = normTerm;
+
+        // Handle aliases
+        if (normTerm === 'bbs') key = 'bardet–biedl syndrome';
+        if (normTerm === 'mks') key = 'meckel–gruber syndrome';
+        if (normTerm === 'joubert') key = 'joubert syndrome';
+        if (normTerm === 'nphp') key = 'nephronophthisis';
+
+        const genes = window.CiliAI.lookups.byCiliopathy[key] || [];
+
+        // Classification info isn't available in this context, skip for now.
+        let desc = "";
+
+        return {
+            genes: genes.map(g => ({ gene: g })),
+            description: desc
+        };
+    }
+
+    /**
+     * Generic getter for localization
+     */
+    function getGenesByLocalization(term) {
+        const normTerm = term.toLowerCase();
+        const L = window.CiliAI.lookups;
+
+        // Find the matching key (e.g., "cilia" should match "Cilium")
+        const locKey = Object.keys(L.byLocalization).find(key => key.toLowerCase().includes(normTerm));
+
+        if (locKey && L.byLocalization[locKey]) {
+            return L.byLocalization[locKey].map(gene => ({ gene: gene, description: `Found in ${locKey}` }));
+        }
+        return [];
+    }
+    
+    /**
+     * Handles queries for genes containing a specific domain.
+     */
+    function getGenesByDomain(domainTerm) {
+        const normTerm = domainTerm.toLowerCase();
+        const results = [];
+        window.CiliAI.masterData.forEach(g => {
+            if (!g.gene) return;
+            const allDomains = [...(g.pfam_ids || []), ...(g.domain_descriptions || [])];
+            const matchingDomain = allDomains.find(d => d.toLowerCase().includes(normTerm));
+            if (matchingDomain) {
+                results.push({ gene: g.gene, description: `Contains ${matchingDomain}` });
+            }
+        });
+        return formatListResult(`Genes containing "${domainTerm}" domain`, results);
+    }
+    
+
+    // --- 4E. Main "Brain" (Query Routers) ---
+
+    /**
+     * Simple keyword spotter (Synchronous)
+     */
+    function flexibleIntentParser(query) {
+        const qLower = query.toLowerCase().trim();
+        const entityKeywords = [
+            // {
+            //     type: 'COMPLEX',
+            //     keywords: ['BBSome', 'IFT-A', 'IFT-B', 'Transition Zone', 'MKS Complex', 'NPHP Complex'],
+            //     handler: (term) => `Sorry, getComplexPhylogenyTable is not defined.`
+            // },
+            {
+                type: 'CILIOPATHY',
+                keywords: ['Joubert Syndrome', 'BBS', 'Bardet–Biedl Syndrome', 'NPHP', 'Nephronophthisis', 'MKS', 'Meckel–Gruber Syndrome'],
+                handler: (term) => formatListResult(`Genes for ${term}`, (getCiliopathyGenes(term)).genes)
+            },
+            {
+                type: 'LOCALIZATION',
+                keywords: ['basal body', 'axoneme', 'transition zone', 'centrosome', 'cilium', 'cilia', 'ciliary tip', 'mitochondria', 'nucleus'],
+                handler: (term) => formatListResult(`Genes localizing to ${term}`, getGenesByLocalization(term))
+            },
+             {
+                type: 'DOMAIN',
+                keywords: ['WD40', 'coiled-coil', 'pfam', 'domain', 'ef-hand'],
+                handler: (term) => getGenesByDomain(term)
+            }
+        ];
+
+        const normalizedQuery = normalizeTerm(query);
+        for (const entityType of entityKeywords) {
+            const sortedKeywords = [...entityType.keywords].sort((a, b) => b.length - a.length);
+            for (const keyword of sortedKeywords) {
+                const keywordRegex = new RegExp(normalizeTerm(keyword).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+                if (keywordRegex.test(normalizedQuery)) {
+                    if (qLower.includes('not in') || qLower.includes('except')) continue;
+                    return { type: entityType.type, entity: keyword, handler: entityType.handler };
+                }
+            }
+        }
+        return null;
+    }
 
     /**
      * This is the main router that implements the Priority Waterfall.
      */
     async function handleAIQuery(query) {
-        const resultArea = document.getElementById('chatWindow'); 
-        if (!resultArea) {
+        const chatWindow = document.getElementById('messages');
+        if (!chatWindow) {
             console.warn('handleAIQuery called before UI elements were ready. Aborting.');
-            return; 
+            return;
         }
-        
+
         const qLower = query.toLowerCase().trim();
         if (!query) return;
 
         log(`Routing query: ${query}`);
-        
+
         try {
             if (!window.CiliAI.ready) {
-                 addChatMessage("Data is still loading, please wait...", false);
-                 return;
+                addChatMessage("Data is still loading, please wait...", false);
+                return;
             }
 
             let htmlResult = '';
@@ -2310,13 +2169,6 @@ function handlePhylogenyVisualizationQuery(genes, source = 'li', type = 'heatmap
             }
 
             //=( 2 )= INTENT: COMPLEX / MODULE MEMBERS ======================
-            else if (!htmlResult && (match = qLower.match(/(?:list genes in|components of|subunits of|members of)\s+(?:the\s+)?([a-z0-9\- \"]+)/i))) {
-                log('Routing via: Intent (List Complex Members)');
-                const complexName = match[1].replace(/"/g, '').trim().toUpperCase();
-                // This function is missing from your file, add it
-                // htmlResult = await getComplexPhylogenyTable(complexName); 
-                htmlResult = `Sorry, the function getComplexPhylogenyTable is not defined.`;
-            }
             else if (!htmlResult && (match = qLower.match(/(?:complexes for|complexes of|complexes containing|complex components of)\s+([a-z0-9\-]+)/i))) {
                 log('Routing via: Intent (Find Gene in Complex)');
                 htmlResult = handleComplexQuery(match[1].toUpperCase());
@@ -2344,7 +2196,6 @@ function handlePhylogenyVisualizationQuery(genes, source = 'li', type = 'heatmap
                 qLower.includes('mammalian specific') || qLower.includes('ciliary specific') || qLower.includes('compare')
             )) {
                 log('Routing via: Intent (Phylogeny Engine)');
-                // Pass the query to your new master router
                 htmlResult = routePhylogenyAnalysis(query);
             }
 
@@ -2361,7 +2212,7 @@ function handlePhylogenyVisualizationQuery(genes, source = 'li', type = 'heatmap
                 const intent = flexibleIntentParser(query);
                 if (intent) {
                     log(`Routing via: Intent (Simple Keyword: ${intent.type})`);
-                    htmlResult = intent.handler(intent.entity); // Now sync
+                    htmlResult = intent.handler(intent.entity);
                 }
             }
 
@@ -2369,19 +2220,19 @@ function handlePhylogenyVisualizationQuery(genes, source = 'li', type = 'heatmap
             if (!htmlResult) {
                 log(`Routing via: Fallback (Get Details)`);
                 let term = qLower;
-                
+
                 if ((match = qLower.match(/(?:what is|what does|describe|localization of|omim id for|where is|cellular location of|subcellular localization of)\s+(.+)/i))) {
                     term = match[1];
                 }
 
                 term = term.replace(/[?.]/g, '').replace(/\bdo\b/i, '').trim().toUpperCase();
-                
+
                 const genes = extractMultipleGenes(term);
                 if (genes.length > 0) {
                     htmlResult = await getComprehensiveDetails(genes[0]);
                 }
             }
-            
+
             //=( 9 )= FINAL FALLBACK (ERROR) ================================
             if (!htmlResult && htmlResult !== "") { // Check for "" (visual success)
                 log(`Routing via: Final Fallback (Error)`);
@@ -2398,718 +2249,89 @@ function handlePhylogenyVisualizationQuery(genes, source = 'li', type = 'heatmap
         }
     }
 
-    /**
-     * Simple keyword spotter (Synchronous)
-     */
-    function flexibleIntentParser(query) {
-         const qLower = query.toLowerCase().trim(); // FIX: Add qLower definition
-         const entityKeywords = [
-            {
-                type: 'COMPLEX',
-                keywords: ['BBSome', 'IFT-A', 'IFT-B', 'Transition Zone', 'MKS Complex', 'NPHP Complex'],
-                // This function is missing, add it
-                // handler: (term) => getComplexPhylogenyTable(term) 
-                handler: (term) => `Sorry, getComplexPhylogenyTable is not defined.`
-            },
-            {
-                type: 'CILIOPATHY',
-                keywords: ['Joubert Syndrome', 'BBS', 'Bardet–Biedl Syndrome', 'NPHP', 'Nephronophthisis', 'MKS', 'Meckel–Gruber Syndrome'],
-                handler: (term) => formatListResult(`Genes for ${term}`, (getCiliopathyGenes(term)).genes) 
-            },
-            {
-                type: 'LOCALIZATION',
-                keywords: ['basal body', 'axoneme', 'transition zone', 'centrosome', 'cilium', 'cilia', 'ciliary tip', 'mitochondria', 'nucleus'],
-                handler: (term) => formatListResult(`Genes localizing to ${term}`, getGenesByLocalization(term)) 
-            },
-             {
-                type: 'MODULE',
-                keywords: ['Ciliary tip', 'Radial Spoke', 'Central Pair', 'Dynein Arm', 'SHH Signaling'],
-                // This function is missing, add it
-                // handler: (term) => formatListResult(`Genes in Module: ${term}`, getGenesByModule(term)) 
-                handler: (term) => `Sorry, getGenesByModule is not defined.`
-            },
-            {
-                type: 'DOMAIN',
-                keywords: ['WD40', 'coiled-coil', 'pfam', 'domain', 'ef-hand'],
-                // This function is missing, add it
-                // handler: (term) => getGenesByDomain(term)
-                handler: (term) => `Sorry, getGenesByDomain is not defined.`
-            }
-        ];
-        
-        const normalizedQuery = normalizeTerm(query);
-        for (const entityType of entityKeywords) {
-            const sortedKeywords = [...entityType.keywords].sort((a, b) => b.length - a.length);
-            for (const keyword of sortedKeywords) {
-                const keywordRegex = new RegExp(normalizeTerm(keyword).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
-                if (keywordRegex.test(normalizedQuery)) {
-                    if (qLower.includes('not in') || qLower.includes('except')) continue;
-                    return { type: entityType.type, entity: keyword, handler: entityType.handler };
-                }
-            }
-        }
-        return null;
-    }
-
-// --- 9D. UI Helper Functions (Global) ---
-
-/**
- * Handles adding a gene from the text field to the existing heatmap view.
- */
-window.addGeneToHeatmap = function(buttonElement) {
-    // This function is in your old code, but it's not defined
-    // in the global scope. Let's stub it to prevent errors.
-    console.error("addGeneToHeatmap function is not fully implemented.");
-};
-
-/**
- * Global wrapper to handle clicks on the Li/Nevers switch links.
- */
-window.switchPhylogenyView = async function(action, genesString) {
-     // This function is now handled by the 'ai-action' click listener
-     // in setupPageEventListeners. We can leave this stub or remove it,
-     // but the 'ai-action' handler is more robust.
-     console.warn("switchPhylogenyView is deprecated. Use ai-action listener.");
-};
-
-/**
- * Safely handles the execution of the Plotly command.
- * This is no longer needed as Plotly.newPlot is called
- * directly inside the plot handlers (handleUmapPlot, etc.)
- */
-window.initPhylogenyPlot = function(containerId, traceData, layoutData) {
-    console.warn("initPhylogenyPlot is deprecated. Plotly.newPlot is called directly.");
-    // We must wait for the DOM to update
-    setTimeout(() => {
-        const plotElement = document.getElementById(containerId);
-        if (plotElement && window.Plotly) {
-            Plotly.newPlot(containerId, traceData, layoutData, { responsive: true, displayModeBar: false });
-        } else {
-            console.error("Plotly execution aborted: Container or Plotly library not ready.");
-        }
-    }, 100); // 100ms delay to be safe
-};
-
-/**
- * Handles queries for domain data.
- */
-async function handleDomainQuery(geneSymbols) {
-    let html = '';
-    const genes = Array.isArray(geneSymbols) ? geneSymbols : [geneSymbols];
-
-    genes.forEach(geneSymbol => {
-        const gene = geneSymbol.toUpperCase();
-        const g = window.CiliAI.lookups.geneMap[gene];
-        if (!g) {
-            html += `<p>Sorry, I could not find data for "${gene}".</p>`;
-            return;
-        }
-
-        html += `<h4>Domain Architecture for <strong>${gene}</strong></h4>`;
-        
-        if (g.pfam_ids && g.pfam_ids.length > 0) {
-            html += '<p><strong>PFAM Domains:</strong></p><ul>';
-            g.pfam_ids.forEach((id, index) => {
-                const desc = g.domain_descriptions[index] || 'No description';
-                html += `<li><strong>${id}:</strong> ${desc}</li>`;
-            });
-            html += '</ul>';
-        } else {
-            html += '<p>No PFAM domain data found for this gene.</p>';
-        }
-    });
-    return html;
-}
-
-/**
- * Handles queries for complex data.
- */
-async function handleComplexQuery(geneSymbol) {
-    const gene = geneSymbol.toUpperCase();
-    const g = window.CiliAI.lookups.geneMap[gene];
-    if (!g) return `Sorry, I could not find data for "${gene}".`;
-
-    const complexes = Object.keys(g.complex_components || {});
-    if (complexes.length > 0) {
-        let html = `<h4>Complex Components for <strong>${gene}</strong></h4>`;
-        html += `<p>${gene} is a known component of the following complexes:</p><ul>`;
-        complexes.forEach(name => {
-            html += `<li><strong>${name}</strong></li>`;
-        });
-        html += '</ul>';
-        return html;
-    } else {
-        return `No complex data was found for <strong>${gene}</strong>.`;
-    }
-}
-
-/**
- * Handles queries for ortholog data.
- */
-async function handleOrthologQuery(geneSymbol, organism) {
-    const gene = geneSymbol.toUpperCase();
-    const g = window.CiliAI.lookups.geneMap[gene];
-    if (!g) return `Sorry, I could not find data for "${gene}".`;
-
-    const orgKey = `ortholog_${organism.toLowerCase().replace(/[\.\s]/g, '_')}`;
-    
-    if (g[orgKey] && g[orgKey] !== 'N/A') {
-        return formatListResult(`Ortholog for ${gene} in ${organism}`, [{
-            gene: gene,
-            description: `${organism} Ortholog: <strong>${g[orgKey]}</strong>`
-        }]);
-    } else {
-        return `Sorry, I could not find a ${organism} ortholog for <strong>${gene}</strong>.`;
-    }
-}
-
-    
-// ==========================================================
-    // 9A. AI HELPER FUNCTIONS (Data Query & Formatting)
-    // (This block was missing and is required by handleAIQuery)
+    // ==========================================================
+    // 5. GLOBAL UI WRAPPERS & STARTUP
     // ==========================================================
 
     /**
-     * Simple logger
+     * Handles activating any structure (from SVG or list)
      */
-    function log(message) {
-        console.log(`[CiliAI] ${message}`);
-    }
-
-    /**
-     * Normalizes a term for keyword matching
-     */
-    function normalizeTerm(term) {
-        if (typeof term !== 'string') return '';
-        return term.toLowerCase().replace(/[\s\-\_]/g, '');
-    }
-
-    /**
-     * Extracts all valid gene symbols from a query string
-     */
-    function extractMultipleGenes(query) {
-        if (!query) return [];
-        const geneRegex = /\b([A-Z0-9\-\.]{3,})\b/gi;
-        const matches = query.match(geneRegex) || [];
-        const upperMatches = matches.map(g => g.toUpperCase());
-        
-        // Filter against the master gene map
-        const geneMap = window.CiliAI.lookups.geneMap;
-        if (!geneMap) return [];
-        
-        return upperMatches.filter(g => geneMap[g]);
-    }
-
-    /**
-     * Creates a standard HTML list for the chat window.
-     * @param {string} title - The title of the card.
-     * @param {Array<{gene: string, description: string}>} genes - Array of gene objects.
-     * @param {string} [description=""] - Optional intro text.
-     */
-    function formatListResult(title, genes, description = "") {
-        let geneListHtml = '';
-        
-        if (genes && genes.length > 0) {
-            geneListHtml = genes.map(g => 
-                `<li><strong>${g.gene}</strong>: ${g.description || 'No details available.'}</li>`
-            ).join('');
-            geneListHtml = `<ul>${geneListHtml}</ul>`;
-        } else {
-            geneListHtml = "<p>No matching genes found in the database.</p>";
-        }
-
-        const descriptionHtml = description ? `<p>${description}</p>` : '';
-
-        return `
-            <div class="ai-result-card">
-                <strong>${title}</strong>
-                ${descriptionHtml}
-                ${geneListHtml}
-            </div>
-        `;
-    }
-
-    /**
-     * Fetches and formats a comprehensive summary for a single gene.
-     * @param {string} term - The gene symbol.
-     */
-    async function getComprehensiveDetails(term) {
-        const gene = term.trim().toUpperCase();
-        const g = window.CiliAI.lookups.geneMap[gene];
-
-        if (!g) {
-            return `Sorry, I could not find any data for "<strong>${gene}</strong>".`;
-        }
-
-        let html = `<h4>Details for <strong>${g.gene}</strong></h4>`;
-        html += `<p>${g.description || g.functional_summary || 'No description available.'}</p>`;
-        html += '<ul>';
-        
-        // Localization
-        if (g.localization) {
-            html += `<li><strong>Localization:</strong> ${ensureArray(g.localization).join(', ')}</li>`;
-        }
-        
-        // Ciliopathy
-        if (g.ciliopathy && g.ciliopathy.length > 0) {
-            html += `<li><strong>Ciliopathy:</strong> ${g.ciliopathy.join(', ')}</li>`;
-        }
-        
-        // Complexes
-        const complexes = Object.keys(g.complex_components || {});
-        if (complexes.length > 0) {
-            html += `<li><strong>Complexes:</strong> ${complexes.join(', ')}</li>`;
-        }
-        // Domains
-    if (g.pfam_ids && g.pfam_ids.length > 0) {
-        html += `<li><strong>Domains:</strong> ${g.pfam_ids.join(', ')}</li>`;
-    }
-
-        // Orthologs
-        const orthologs = [
-            g.ortholog_c_elegans ? `<em>C. elegans</em> (${g.ortholog_c_elegans})` : null,
-            g.ortholog_mouse ? `Mouse (${g.ortholog_mouse})` : null,
-            g.ortholog_zebrafish ? `Zebrafish (${g.ortholog_zebrafish})` : null
-        ].filter(Boolean).join(', ');
-        if (orthologs) {
-            html += `<li><strong>Orthologs:</strong> ${orthologs}</li>`;
-        }
-        
-        // Phylogeny Links
-        html += `
-            <li><strong>Phylogeny:</strong> 
-                <a href="#" class="ai-action" data-action="show-li-heatmap" data-genes="${g.gene}">Show Conservation</a>
-            </li>`;
-
-        html += '</ul>';
-        return html;
-    }
-
-    /**
-     * Generic getter for functional category
-     */
-    async function getGenesByFunction(term) {
-        const normTerm = normalizeTerm(term);
-        const results = [];
-        window.CiliAI.masterData.forEach(g => {
-            if (normalizeTerm(g.functional_category).includes(normTerm)) {
-                results.push({ gene: g.gene, description: g.functional_category });
-            }
-        });
-        return results;
-    }
-
-    /**
-     * Generic getter for complexes
-     */
-    async function getGenesByComplex(term) {
-        const normTerm = normalizeTerm(term);
-        const L = window.CiliAI.lookups;
-        
-        // Check if term IS a complex
-        const complexName = Object.keys(L.complexByName).find(name => normalizeTerm(name).includes(normTerm));
-        if (complexName) {
-            return L.complexByName[complexName].map(gene => ({
-                gene: gene,
-                description: `Subunit of ${complexName}`
-            }));
-        }
-        
-        // Check if term IS a gene
-        const geneName = term.toUpperCase();
-        if (L.complexByGene[geneName]) {
-            return L.complexByGene[geneName].map(name => ({
-                gene: name,
-                description: `Contains ${geneName}`
-            }));
-        }
-        return [];
-    }
-
-    /**
-     * Generic getter for ciliopathy
-     */
-    async function getCiliopathyGenes(term) {
-        const normTerm = term.toLowerCase();
-        let key = normTerm;
-        
-        // Handle aliases
-        if (normTerm === 'bbs') key = 'bardet–biedl syndrome';
-        if (normTerm === 'mks') key = 'meckel–gruber syndrome';
-        if (normTerm === 'joubert') key = 'joubert syndrome';
-        if (normTerm === 'nphp') key = 'nephronophthisis';
-        
-        const genes = window.CiliAI.lookups.byCiliopathy[key] || [];
-        
-        // Find classification
-        let desc = "";
-        for (const [classification, diseases] of Object.entries(intentParser.classifiedDiseases)) {
-            if (diseases.map(d => d.toLowerCase()).includes(key)) {
-                desc = `This is classified as a: <strong>${classification}</strong>.`;
-                break;
-            }
-        }
-        
-        return {
-            genes: genes.map(g => ({ gene: g })),
-            description: desc
-        };
-    }
-
-    /**
-     * Generic getter for localization
-     */
-    async function getGenesByLocalization(term) {
-        const normTerm = term.toLowerCase();
-        const L = window.CiliAI.lookups;
-        
-        // Find the matching key (e.g., "cilia" should match "Cilium")
-        const locKey = Object.keys(L.byLocalization).find(key => key.toLowerCase().includes(normTerm));
-        
-        if (locKey && L.byLocalization[locKey]) {
-            return L.byLocalization[locKey].map(gene => ({ gene: gene, description: `Found in ${locKey}` }));
-        }
-        return [];
-    }
-
-    /**
-     * Generic getter for organisms (from phylogeny)
-     */
-    async function getCiliaryGenesForOrganism(term) {
-        const liData = window.liPhylogenyCache;
-        if (!liData) return { genes: [], description: "Li (2014) data not loaded.", speciesCode: term };
-
-        const normTerm = term.toLowerCase();
-        let speciesIndex = -1;
-        let speciesCode = term;
-
-        // Find the species index
-        for (let i = 0; i < liData.summary.species_list.length; i++) {
-            const species = liData.summary.species_list[i];
-            if (species.s.toLowerCase().includes(normTerm) || species.c.toLowerCase().includes(normTerm)) {
-                speciesIndex = i;
-                speciesCode = species.c; // Use the code (e.g., "H.sapiens")
-                break;
-            }
-        }
-
-        if (speciesIndex === -1) {
-            return { genes: [], description: `Organism "${term}" not found in Li (2014) phylogeny.`, speciesCode: term };
-        }
-
-        // Find all genes present in this species
-        const genes = [];
-        Object.values(liData.genes).forEach(geneData => {
-            if (geneData.s && geneData.s.includes(speciesIndex)) {
-                genes.push({ gene: geneData.g, description: `Present in ${speciesCode}` });
-            }
-        });
-
-        const isCiliated = liData.summary.ciliated_species.includes(speciesIndex);
-        const description = `Found ${genes.length} ciliary genes. This organism is considered: <strong>${isCiliated ? "Ciliated" : "Non-Ciliated"}</strong>.`;
-
-        return { genes, description, speciesCode };
-    }
-
-
- /**
- * Handles queries for genes containing a specific domain.
- */
-async function getGenesByDomain(domainTerm) {
-    const normTerm = domainTerm.toLowerCase();
-    const results = [];
-    window.CiliAI.masterData.forEach(g => {
-        if (!g.gene) return;
-        const allDomains = [...(g.pfam_ids || []), ...(g.domain_descriptions || [])];
-        const matchingDomain = allDomains.find(d => d.toLowerCase().includes(normTerm));
-        if (matchingDomain) {
-            results.push({ gene: g.gene, description: `Contains ${matchingDomain}` });
-        }
-    });
-    return formatListResult(`Genes containing "${domainTerm}" domain`, results);
-}
-
-    /**
-     * Handler for semantic intent: Localization + Phenotype
-     */
-    async function getLocalizationPhenotypeGenes(localization, phenotype) {
-        const normLoc = localization.toLowerCase();
-        const normPheno = phenotype.toLowerCase(); // "short" or "long"
-        
-        const results = [];
-        window.CiliAI.masterData.forEach(g => {
-            const geneLoc = (g.localization || '').toLowerCase();
-            let phenoEffect = '';
-            
-            if (normPheno.includes("short")) {
-                phenoEffect = (g.percent_ciliated_cells_effects || '').toLowerCase();
-            } else if (normPheno.includes("long")) {
-                 phenoEffect = (g.overexpression_effects || '').toLowerCase(); // Example, adjust as needed
-            }
-
-            if (geneLoc.includes(normLoc) && (phenoEffect.includes(normPheno) || phenoEffect.includes("decrease"))) {
-                results.push({
-                    gene: g.gene,
-                    description: `Localizes to ${localization} and shows ${phenotype} cilia phenotype.`
-                });
-            }
-        });
-
-        return formatListResult(`Genes at ${localization} with ${phenotype} cilia`, results);
-    }
-
-
-   
-    
-/**
- * Handles all UMAP plotting requests and draws to the left panel.
- */
-async function handleUmapPlot(highlightGene = null) {
-    const plotDivId = 'cilia-svg'; // Draw on the left panel
-    const umapData = window.CiliAI.data.umap;
-
-    if (!umapData || umapData.length === 0) {
-        document.getElementById(plotDivId).innerHTML = '<p style="padding: 20px;">UMAP data not loaded.</p>';
-        return;
-    }
-
-    const backgroundTrace = {
-        x: [],
-        y: [],
-        text: [],
-        mode: 'markers',
-        type: 'scatter',
-        name: 'All Genes',
-        marker: { color: '#d3d3d3', size: 5, opacity: 0.5 },
-        hoverinfo: 'text'
-    };
-
-    const highlightTrace = {
-        x: [],
-        y: [],
-        text: [],
-        mode: 'markers',
-        type: 'scatter',
-        name: highlightGene || 'Highlighted',
-        marker: { color: '#2c5aa0', size: 10, opacity: 1, line: { color: 'black', width: 1 } },
-        hoverinfo: 'text'
-    };
-
-    let title = 'UMAP of Ciliary Genes';
-    const geneUpper = highlightGene ? highlightGene.toUpperCase() : null;
-
-    umapData.forEach(d => {
-        if (highlightGene && d.gene && d.gene.toUpperCase() === geneUpper) {
-            highlightTrace.x.push(d.x);
-            highlightTrace.y.push(d.y);
-            highlightTrace.text.push(`<b>${d.gene}</b><br>${d.cluster}`);
-        } else {
-            backgroundTrace.x.push(d.x);
-            backgroundTrace.y.push(d.y);
-            backgroundTrace.text.push(`<b>${d.gene}</b><br>${d.cluster}`);
-        }
-    });
-
-    const plotData = [backgroundTrace];
-    if (highlightTrace.x.length > 0) {
-        plotData.push(highlightTrace);
-        title = `UMAP: ${highlightGene}`;
-    } else if (highlightGene) {
-        // Gene was requested but not found in UMAP data
-        addChatMessage(`Sorry, I could not find <strong>${highlightGene}</strong> in the UMAP data. Displaying all genes.`, false);
-    }
-
-    const layout = {
-        title: title,
-        xaxis: { title: 'UMAP 1', zeroline: false, showticklabels: false },
-        yaxis: { title: 'UMAP 2', zeroline: false, showticklabels: false },
-        showlegend: false,
-        hovermode: 'closest',
-        margin: { t: 40, b: 40, l: 40, r: 20 }
-    };
-
-    Plotly.newPlot(plotDivId, plotData, layout, { responsive: true });
-}
-    
-    
-    /**
-     * Renders the Li et al. 2014 heatmap.
-     * This is a required helper for handlePhylogenyVisualizationQuery.
-     */
-    function plotLiHeatmap(geneList, divId, title) {
-        const data = window.liPhylogenyCache;
-        if (!data || !data.genes || !data.summary) {
-            document.getElementById(divId).innerHTML = "Error: Li (2014) data not loaded or malformed.";
-            return;
-        }
-
-        const speciesList = data.summary.species_list.map(s => s.c); // "H.sapiens", "M.musculus", etc.
-        const ciliatedSpecies = data.summary.ciliated_species; // array of indices
-        
-        let z = []; // The heatmap data (rows = genes, cols = species)
-        let yLabels = []; // Gene names
-
-        geneList.forEach(geneSymbol => {
-            const geneUpper = geneSymbol.toUpperCase();
-            const geneData = Object.values(data.genes).find(g => g.g.toUpperCase() === geneUpper);
-            
-            if (geneData) {
-                let row = new Array(speciesList.length).fill(0); // 0 = Absent
-                geneData.s.forEach(speciesIndex => {
-                    row[speciesIndex] = 1; // 1 = Present
-                });
-                z.push(row);
-                yLabels.push(geneSymbol);
-            }
-        });
-
-        if (z.length === 0) {
-            document.getElementById(divId).innerHTML = "Error: None of the requested genes were found in the Li (2014) data.";
-            return;
-        }
-
-        // Add ciliated/non-ciliated info trace
-        let ciliatedTrace = speciesList.map((_, i) => ciliatedSpecies.includes(i) ? 1 : 0);
-        z.push(ciliatedTrace);
-        yLabels.push('<b>Ciliated</b>'); // Add a label for the trace
-
-        const plotData = [{
-            z: z,
-            x: speciesList,
-            y: yLabels,
-            type: 'heatmap',
-            colorscale: [
-                [0, '#eef2f9'],  // Absent
-                [1, '#2c5aa0']   // Present
-            ],
-            showscale: false,
-            xgap: 1,
-            ygap: 1
-        }];
-
-        const layout = {
-            title: title,
-            xaxis: {
-                type: 'category',
-                tickangle: -90,
-                automargin: true,
-                ticks: 'outside',
-                tickfont: { size: 8 }
-            },
-            yaxis: {
-                type: 'category',
-                automargin: true,
-                ticks: 'outside'
-            },
-            margin: { l: 80, r: 20, b: 150, t: 60 }
-        };
-
-        Plotly.newPlot(divId, plotData, layout, { responsive: true });
-    }
-
-
-    /**
-     * Handler for domain queries
-     */
-    async function resolveDomainQuery(query) {
-        const genes = extractMultipleGenes(query);
-        if (genes.length > 0) {
-            // You would need a domain plotting function here, e.g., plotDomains(genes)
-            return `Domain visualization for <strong>${genes.join(', ')}</strong> is not yet implemented.`;
-        }
-        
-        // Fallback to simple keyword search
-        const intent = intentParser.parse(query);
-        if (intent && intent.type === 'DOMAIN') {
-             return await intent.handler(intent.entity);
-        }
-        
-        return "I couldn't find a gene or a domain in your query. Try 'domains for IFT88' or 'show WD40 domain genes'.";
-    }
-
-   // ==========================================================
-// 9. REPLACEMENT "BRAIN" (NEW HANDLEAIQUERY)
-// This single, pattern-based function replaces:
-// - questionRegistry
-// - resolveSemanticIntent
-// - createIntentParser
-// - the old handleAIQuery
-// ==========================================================
-
-   
-    
-   
-    // ==========================================================
-    // 10. EVENT LISTENERS & STARTUP
-    // ==========================================================
-
- // --- Placeholder functions from old script, to be replaced by new handlers ---
-    // These are the *real* handlers for the new UI
-    
-    // Called by the simple SVG diagram click
-    window.selectComp = function(id) {
-        document.querySelectorAll('.cilia-part').forEach(el => el.classList.remove('selected'));
+    window.selectComp = function (id) {
+        document.querySelectorAll('.cilia-part').forEach(el => el.classList.remove('selected', 'active'));
         const el = document.getElementById(id);
-        if(el) el.classList.add('selected');
-        
+        if (el) el.classList.add('selected');
+
         const data = structureInfoMap[id];
         if (!data) return;
 
-        const genes = window.CiliAI.lookups.byLocalization[data.title] || 
-                      window.CiliAI.lookups.byLocalization[data.title.toLowerCase()] || 
-                      data.genes || []; // Fallback to static list
+        const genes = window.CiliAI.lookups.byLocalization[data.title] ||
+            window.CiliAI.lookups.byLocalization[data.title.toLowerCase()] ||
+            data.genes || []; // Fallback to static list
 
         const bar = document.getElementById('bottomBar');
         if (genes.length > 0) {
             bar.innerHTML = `<h3>${data.title} (${genes.length} genes)</h3>
-            <div class="gene-list">${genes.slice(0, 40).map(g => 
-                `<span class="gene-badge" data-gene="${g}" onclick="searchGene('${g}')">${g}</span>`
-            ).join('')}${genes.length > 40 ? `<span style="font-size:11px;color:#666;padding:5px;">...+${genes.length-40} more</span>` : ''}</div>`;
+            <div class="gene-list">${genes.slice(0, 40).map(g =>
+                `<span class="gene-badge" data-gene="${g}">${g}</span>` // Removed onclick
+            ).join('')}${genes.length > 40 ? `<span style="font-size:11px;color:#666;padding:5px;">...+${genes.length - 40} more</span>` : ''}</div>`;
         } else {
             bar.innerHTML = `<h3>${data.title}</h3><p style="color:#666;font-size:12px;">No genes found in database. Try searching directly.</p>`;
         }
-        
+
         addChatMessage(`Selected <strong>${data.title}</strong>. Found ${genes.length} genes.`, false);
     }
 
-    // Called by the "Find Gene" button
-    window.searchGene = function(name) {
+    /**
+     * Called by the "Find Gene" button
+     */
+    window.searchGene = function (name) {
         const query = name || document.getElementById('geneSearch').value.trim().toUpperCase();
         if (!query) return;
-        handleGeneSearch(query, true);
-    }
-    
-    // Called by "Show UMAP" button
-    window.showUMAP = function() {
-        addChatMessage('Show UMAP', true);
-        handleAIQuery('Plot UMAP expression for FOXJ1'); // Example query
+        addChatMessage(`Tell me about ${query}`, true); // Add user message
+        handleGeneSearch(query, true); // Call the brain
     }
 
-    // Called by "Send" button
-    window.sendMsg = function() {
+    /**
+     * Called by "Show UMAP" button
+     */
+    window.showUMAP = function () {
+        addChatMessage('Show UMAP', true);
+        handleAIQuery('Plot UMAP');
+    }
+
+    /**
+     * Called by "Send" button
+     */
+    window.sendMsg = function () {
         handleUserSend();
     }
-    
-    // Called by feedback buttons
-    window.react = function(type) {
+
+    /**
+     * Called by feedback buttons
+     */
+    window.react = function (type) {
         if (type === 'up') {
             addChatMessage('Thanks for the feedback! 🙏', false);
         } else {
             addChatMessage('Sorry about that. What specifically would help?', false);
         }
     }
-    
-    // Called by "New Chat" button (if added)
-    window.clearChat = function() {
+
+    /**
+     * Called by "New Chat" button (if added)
+     */
+    window.clearChat = function () {
         if (confirm('Start new conversation?')) {
             document.getElementById('messages').innerHTML = '';
-            document.querySelectorAll('.cilia-part').forEach(el => el.classList.remove('selected'));
+            document.querySelectorAll('.cilia-part').forEach(el => el.classList.remove('selected', 'active'));
             addChatMessage('Welcome back! How can I help?', false);
         }
     }
-    
-    // Called by heatmap download buttons
-    window.downloadPlot = function(divId, filename) {
+
+    /**
+     * Called by heatmap download buttons
+     */
+    window.downloadPlot = function (divId, filename) {
         const plotDiv = document.getElementById(divId);
         if (plotDiv && window.Plotly) {
             Plotly.downloadImage(plotDiv, { format: 'png', filename: filename, width: 1200, height: 800 });
