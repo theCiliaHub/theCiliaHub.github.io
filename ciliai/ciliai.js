@@ -409,18 +409,9 @@ function getDiseaseClassificationMap() {
         console.log(`CiliAI: ${window.CiliAI.masterData.length} genes integrated`);
     }
 
-    /**
+   /**
      * Builds the lookup maps (like geneMap) from the masterData.
-     * (FIXED: Now integrates data from getComplexPhylogenyTableMap)
-     */
-    /**
-     * Builds the lookup maps (like geneMap) from the masterData.
-     * (FIXED: Now correctly splits localization strings into individual keys)
-     * (FIXED: Now integrates data from getComplexPhylogenyTableMap)
-     */
-    /**
-     * Builds the lookup maps (like geneMap) from the masterData.
-     * (UPDATED: Now builds L.byCiliopathyClassification from the new disease map)
+     * (FIXED: Now correctly splits BOTH localization and ciliopathy strings)
      */
     function buildLookups() {
         const L = window.CiliAI.lookups = {};
@@ -514,27 +505,44 @@ function getDiseaseClassificationMap() {
         // 5. Build L.byModules and L.byCiliopathy (from masterData)
         L.byModules = {}; 
         L.byCiliopathy = {}; // This links GENES to DISEASES
+
+        // --- THIS IS THE FIX ---
+        const ciliopathySplitter = (value) => {
+            if (Array.isArray(value)) return value;
+            if (typeof value === 'string') return value.split(/, ?|; ?/); // Split by comma or semicolon
+            return [];
+        };
+
         master.forEach(g => {
             const key = g.gene?.toUpperCase();
             if (!key) return;
+            
+            // Build byModules
             if (g.functional_modules) {
                 g.functional_modules.forEach(m => {
                     if (!L.byModules[m]) L.byModules[m] = [];
                     if (!L.byModules[m].includes(key)) L.byModules[m].push(key);
                 });
             }
+            
+            // Build byCiliopathy using the splitter
             if (g.ciliopathy) {
-                // This is the gene-to-disease link from ciliahub_data.json
-                ensureArray(g.ciliopathy).forEach(c => {
-                    const cl = c.toLowerCase();
-                    if (!L.byCiliopathy[cl]) L.byCiliopathy[cl] = [];
-                    if (!L.byCiliopathy[cl].includes(key)) L.byCiliopathy[cl].push(key);
+                const diseases = ciliopathySplitter(g.ciliopathy); // Use the splitter
+                diseases.forEach(c => {
+                    const cl = c.trim().toLowerCase(); // Trim whitespace
+                    if (cl) {
+                        if (!L.byCiliopathy[cl]) L.byCiliopathy[cl] = [];
+                        if (!L.byCiliopathy[cl].includes(key)) {
+                            L.byCiliopathy[cl].push(key);
+                        }
+                    }
                 });
             }
         });
+        // --- END FIX ---
 
-        // 6. NEW: Build L.byCiliopathyClassification (from disease map)
-        // This links DISEASES to CLASSIFICATIONS
+
+        // 6. Build L.byCiliopathyClassification (from disease map)
         L.byCiliopathyClassification = {};
         const diseaseMap = getDiseaseClassificationMap();
         for (const classification in diseaseMap) {
@@ -553,6 +561,8 @@ function getDiseaseClassificationMap() {
 
         console.log('CiliAI: Lookups built, normalized, and classifications added.');
     }
+
+    
     
     // ==========================================================
     // 3. STATIC UI & PAGE DISPLAY
