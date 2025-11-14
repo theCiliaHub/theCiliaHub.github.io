@@ -382,6 +382,11 @@
      * Builds the lookup maps (like geneMap) from the masterData.
      * (FIXED: Now integrates data from getComplexPhylogenyTableMap)
      */
+    /**
+     * Builds the lookup maps (like geneMap) from the masterData.
+     * (FIXED: Now correctly splits localization strings into individual keys)
+     * (FIXED: Now integrates data from getComplexPhylogenyTableMap)
+     */
     function buildLookups() {
         const L = window.CiliAI.lookups = {};
         const master = Array.isArray(window.CiliAI.masterData) ? window.CiliAI.masterData : [];
@@ -416,20 +421,42 @@
             }
         });
 
-        // 3. Build L.byLocalization from masterData (this is the base list)
+        // 3. --- THIS IS THE FIX ---
+        // Build L.byLocalization from masterData, splitting strings
         L.byLocalization = {};
+        const localizationSplitter = (value) => {
+            if (Array.isArray(value)) return value; // It's already an array
+            
+            if (typeof value === 'string') {
+                // --- NEW CLEANING STEP ---
+                // Fixes "basal body,flagella" -> "basal body, flagella"
+                let cleanedValue = value.replace("basal body,flagella", "basal body, flagella"); 
+                // --- END CLEANING STEP ---
+                
+                return cleanedValue.split(/, ?|; ?/); // Split string by comma or semicolon
+            }
+            return []; // It's null or undefined
+        };
+
         master.forEach(g => {
             const key = g.gene?.toUpperCase();
             if (!key) return;
-            if (g.localization) {
-                ensureArray(g.localization).forEach(loc => {
-                    if (!L.byLocalization[loc]) L.byLocalization[loc] = [];
-                    if (!L.byLocalization[loc].includes(key)) L.byLocalization[loc].push(key);
-                });
-            }
+            
+            const localizations = localizationSplitter(g.localization); // Use the splitter
+            localizations.forEach(loc => {
+                const locKey = loc.trim(); // Trim whitespace
+                if (locKey) {
+                    if (!L.byLocalization[locKey]) L.byLocalization[locKey] = [];
+                    if (!L.byLocalization[locKey].includes(key)) {
+                        L.byLocalization[locKey].push(key);
+                    }
+                }
+            });
         });
+        // --- END FIX ---
 
-        // 4. NEW: Augment Lookups with your Complex Map
+
+        // 4. Augment Lookups with your Complex Map (no change from last step)
         const complexMap = getComplexPhylogenyTableMap();
         L.byModuleOrComplex = {}; // For "BBSome", "IFT-A"
         
@@ -490,9 +517,8 @@
             if (pt.gene) L.umapByGene[pt.gene.toUpperCase()] = pt;
         });
 
-        console.log('CiliAI: Lookups augmented with complex map');
+        console.log('CiliAI: Lookups built and normalized.');
     }
-
 
     
     // ==========================================================
@@ -2086,13 +2112,14 @@ function injectPageCSS() {
         if (normTerm === 'cilia') {
              normTerm = 'cilia'; // Matches 'cilia', 'ciliary', etc.
         }
-
+        
         // --- THIS IS THE FIX ---
-        // Iterate all keys, not just find() the first one
+        // Simplified logic: just check if the key *includes* the term.
+        // This will now find "Mitochondria" when the user asks for "mitochondria"
+        // and it will find "basal body" from the cleaned ABCB6 data.
         const allLocKeys = Object.keys(L.byLocalization);
         allLocKeys.forEach(key => {
             if (key.toLowerCase().includes(normTerm)) {
-                // Add all genes from this matching key to the Set
                 L.byLocalization[key].forEach(geneSymbol => {
                     matchingGenes.add(geneSymbol);
                 });
@@ -2105,11 +2132,11 @@ function injectPageCSS() {
             const geneData = geneMap[gene];
             return {
                 gene: gene,
+                // Use the full localization string from the gene data for the description
                 description: geneData?.localization || `Found in ${term}`
             };
         });
     }
-
    /**
      * Simple keyword spotter
      * (FIXED: Implements new handlers and keywords)
