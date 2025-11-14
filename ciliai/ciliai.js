@@ -2095,9 +2095,9 @@ function injectPageCSS() {
         return html;
     }
 
-    /**
+    //**
      * Generic getter for ciliopathy
-     * (FIXED: Fetches gene descriptions)
+     * (UPDATED: Now adds disease classification to the description)
      */
     function getCiliopathyGenes(term) {
         const normTerm = term.toLowerCase();
@@ -2110,16 +2110,21 @@ function injectPageCSS() {
         if (normTerm === 'nphp') key = 'nephronophthisis';
 
         const geneSymbols = window.CiliAI.lookups.byCiliopathy[key] || [];
-        const geneMap = window.CiliAI.lookups.geneMap; // Get geneMap
+        const geneMap = window.CiliAI.lookups.geneMap;
         
-        let desc = ""; // Classification info not available, skip for now.
+        // --- Get Classification ---
+        const classification = window.CiliAI.lookups.byCiliopathyClassification[key];
+        let desc = "";
+        if (classification) {
+            desc = `This disease is classified as a: <strong>${classification}</strong>.`;
+        }
+        // --- END ---
 
         return {
-            genes: geneSymbols.map(g => { // 'g' is a gene SYMBOL
+            genes: geneSymbols.map(g => {
                 const geneData = geneMap[g];
                 return {
                     gene: g,
-                    // FETCH THE DESCRIPTION
                     description: geneData?.description || 'No description available.'
                 };
             }),
@@ -2127,6 +2132,7 @@ function injectPageCSS() {
         };
     }
 
+    
     /**
      * Generic getter for localization
      * (FIXED: Iterates all keys instead of .find() to get complete lists)
@@ -2172,26 +2178,26 @@ function injectPageCSS() {
     
    /**
      * Simple keyword spotter
-     * (UPDATED: Added CLASSIFICATION type)
+     * (UPDATED: Includes all new keywords for LOCALIZATION, CILIOPATHY, and CLASSIFICATION)
      */
     function flexibleIntentParser(query) {
         const qLower = query.toLowerCase().trim();
         
+        // --- Build dynamic disease keyword list ---
         const diseaseMap = getDiseaseClassificationMap();
         let allDiseaseKeywords = ['BBS', 'NPHP', 'MKS']; 
         for (const classification in diseaseMap) {
             allDiseaseKeywords = allDiseaseKeywords.concat(diseaseMap[classification]);
         }
         
-        // --- NEW ENTRY ---
+        // --- Build dynamic classification keyword list ---
         const classificationKeywords = Object.keys(diseaseMap);
-        // --- END NEW ---
 
         const entityKeywords = [
             {
-                type: 'CLASSIFICATION', // <-- NEW
+                type: 'CLASSIFICATION', // For "list Primary Ciliopathies"
                 keywords: classificationKeywords,
-                handler: handleClassificationQuery // <-- NEW
+                handler: handleClassificationQuery 
             },
             {
                 type: 'COMPLEX',
@@ -2204,7 +2210,7 @@ function injectPageCSS() {
                 handler: handleComplexQuery 
             },
             {
-                type: 'LOCALIZATION',
+                type: 'LOCALIZATION', // For "genes localized to lysosome"
                 keywords: [
                     'basal body', 'axoneme', 'transition zone', 'cytosol', 'centrosome', 
                     'cilium', 'cilia', 'mitochondria', 'nucleus', 'ciliary tip',
@@ -2227,8 +2233,10 @@ function injectPageCSS() {
 
         const normalizedQuery = normalizeTerm(query);
         for (const entityType of entityKeywords) {
+            // Sort keywords by length, longest first
             const sortedKeywords = [...entityType.keywords].sort((a, b) => b.length - a.length);
             for (const keyword of sortedKeywords) {
+                // Use .includes() for partial matching
                 if (normalizedQuery.includes(normalizeTerm(keyword))) { 
                     if (qLower.includes('not in') || qLower.includes('except')) continue;
                     return { type: entityType.type, entity: keyword, handler: entityType.handler };
@@ -2300,6 +2308,29 @@ function injectPageCSS() {
             `;
         }
     }
+
+   /**
+     * (NEW) Handles the first step of a localization query.
+     * Returns a summary string and stores the gene list in context.
+     */
+    function handleLocalizationQuery(term) {
+        const geneList = getGenesByLocalization(term); // Get the full, fixed list
+        const count = geneList.length;
+
+        if (count === 0) {
+            return `Sorry, I could not find any genes localized to "${term}".`;
+        }
+
+        // Store the context for a "yes" follow-up
+        lastQueryContext = {
+            type: 'localization_list',
+            data: geneList, // This is an array of {gene, description}
+            term: term
+        };
+
+        // Return the summary string
+        return `According to the latest data, ${count} genes are enriched in the ${term}. Do you want to view the list?`;
+    } 
     
     /* ==============================================================
  * 5. Complex Map (required for BBSome etc.)
@@ -2452,22 +2483,43 @@ function getComplexPhylogenyTableMap() {
 
     /**
      * Generic getter for localization
+     * (FIXED: Simplified logic to correctly .includes() all matching keys)
      */
     function getGenesByLocalization(term) {
-        const normTerm = term.toLowerCase();
+        let normTerm = term.toLowerCase();
         const L = window.CiliAI.lookups;
+        const geneMap = L.geneMap;
+        let matchingGenes = new Set(); // Use a Set to avoid duplicates
 
-        // Find the matching key (e.g., "cilia" should match "Cilium")
-        const locKey = Object.keys(L.byLocalization).find(key => key.toLowerCase().includes(normTerm));
-
-        if (locKey && L.byLocalization[locKey]) {
-            return L.byLocalization[locKey].map(gene => ({ gene: gene, description: `Found in ${locKey}` }));
+        if (normTerm.includes('ciliary tip')) {
+            normTerm = 'ciliary tip'; // Be specific to match the new key
         }
-        return [];
-    }
-    
+        
+        // --- THIS IS THE FIX ---
+        // Simplified logic: just check if the key *includes* the term.
+        // This will now find "Lysosomes" when the user asks for "lysosome"
+        const allLocKeys = Object.keys(L.byLocalization);
+        allLocKeys.forEach(key => {
+            if (key.toLowerCase().includes(normTerm)) {
+                L.byLocalization[key].forEach(geneSymbol => {
+                    matchingGenes.add(geneSymbol);
+                });
+            }
+        });
+        // --- END FIX ---
 
-    /**
+        // Convert the Set back to an array of objects
+        return Array.from(matchingGenes).map(gene => {
+            const geneData = geneMap[gene];
+            return {
+                gene: gene,
+                // Use the full localization string from the gene data for the description
+                description: geneData?.localization || `Found in ${term}`
+            };
+        });
+    }
+
+   /**
      * Handles queries for genes containing a specific domain.
      * (UPDATED: Accepts query argument, though it is not used)
      */
@@ -2529,7 +2581,7 @@ function getComplexPhylogenyTableMap() {
         return null;
     }
 
-   /**
+  /**
      * This is the main router that implements the Priority Waterfall.
      */
     async function handleAIQuery(query) {
@@ -2647,10 +2699,8 @@ function getComplexPhylogenyTableMap() {
                 const intent = flexibleIntentParser(query); 
                 if (intent) {
                     log(`Routing via: Intent (Simple Keyword: ${intent.type})`);
-                    // --- THIS IS THE CHANGE ---
                     // Pass BOTH the matched term and the full query
                     htmlResult = intent.handler(intent.entity, query); 
-                    // --- END CHANGE ---
                 }
             }
 
