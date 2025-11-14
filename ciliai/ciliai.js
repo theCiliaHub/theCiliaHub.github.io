@@ -380,51 +380,96 @@
 
     /**
      * Builds the lookup maps (like geneMap) from the masterData.
+     * (FIXED: Now integrates data from getComplexPhylogenyTableMap)
      */
     function buildLookups() {
         const L = window.CiliAI.lookups = {};
         const master = Array.isArray(window.CiliAI.masterData) ? window.CiliAI.masterData : [];
 
+        // 1. Build GeneMap (no change)
         L.geneMap = {};
         master.forEach(g => {
             const sym = (g.gene || '').toUpperCase();
             if (sym) L.geneMap[sym] = g;
         });
 
+        // 2. Build Complex Lookups from masterData (no change)
         L.complexByGene = {};
         L.complexByName = {};
         master.forEach(g => {
             const key = g.gene?.toUpperCase();
             if (key && g.complex_components) {
                 Object.keys(g.complex_components).forEach(name => {
-                    if (!L.complexByGene[key]) L.complexByGene[key] = [];
-                    if (!L.complexByGene[key].includes(name)) L.complexByGene[key].push(name);
-
-                    if (!L.complexByName[name]) L.complexByName[name] = [];
-
-                    // Use ensureArray() to prevent the .forEach error
-                    ensureArray(g.complex_components[name]).forEach(gg => {
-                        if (gg && !L.complexByName[name].includes(gg)) {
-                            L.complexByName[name].push(gg);
-                        }
-                    });
+                    if (isNaN(parseInt(name))) { // Filter out numeric-only keys
+                        if (!L.complexByGene[key]) L.complexByGene[key] = [];
+                        if (!L.complexByGene[key].includes(name)) L.complexByGene[key].push(name);
+                        
+                        if (!L.complexByName[name]) L.complexByName[name] = [];
+                        
+                        ensureArray(g.complex_components[name]).forEach(gg => {
+                            if (gg && !L.complexByName[name].includes(gg)) {
+                                L.complexByName[name].push(gg);
+                            }
+                        });
+                    }
                 });
             }
         });
 
+        // 3. Build L.byLocalization from masterData (this is the base list)
         L.byLocalization = {};
-        L.byModules = {};
-        L.byCiliopathy = {};
         master.forEach(g => {
             const key = g.gene?.toUpperCase();
             if (!key) return;
             if (g.localization) {
-                // Use ensureArray on localization as well
                 ensureArray(g.localization).forEach(loc => {
                     if (!L.byLocalization[loc]) L.byLocalization[loc] = [];
                     if (!L.byLocalization[loc].includes(key)) L.byLocalization[loc].push(key);
                 });
             }
+        });
+
+        // 4. NEW: Augment Lookups with your Complex Map
+        const complexMap = getComplexPhylogenyTableMap();
+        L.byModuleOrComplex = {}; // For "BBSome", "IFT-A"
+        
+        const localizationKeys = [
+            "TRANSITION ZONE", "MKS MODULE", "NPHP MODULE", "BASAL BODY", "CILIARY TIP", 
+            "RADIAL SPOKE", "CENTRAL PAIR", "DYNEIN ARM", "OUTER DYNEIN ARM", 
+            "INNER DYNEIN ARM", "CENTROSOME"
+        ];
+        
+        for (const key in complexMap) {
+            const upperKey = key.toUpperCase(); // e.g., "CILIARY TIP"
+            const genes = complexMap[key].map(g => g.toUpperCase());
+
+            // 4a. Add to the byModuleOrComplex lookup
+            L.byModuleOrComplex[upperKey] = genes;
+            
+            // 4b. Add to byLocalization lookup if it's a localization key
+            if (localizationKeys.includes(upperKey)) {
+                // Format the key to match existing data (e.g., "Ciliary Tip")
+                const locKey = key.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+                
+                if (!L.byLocalization[locKey]) {
+                    L.byLocalization[locKey] = [];
+                }
+                
+                // Add genes to the localization lookup, ensuring uniqueness
+                genes.forEach(gene => {
+                    if (!L.byLocalization[locKey].includes(gene)) {
+                        L.byLocalization[locKey].push(gene);
+                    }
+                });
+            }
+        }
+        
+        // 5. Build other lookups from masterData (no change)
+        L.byModules = {}; 
+        L.byCiliopathy = {};
+        master.forEach(g => {
+            const key = g.gene?.toUpperCase();
+            if (!key) return;
             if (g.functional_modules) {
                 g.functional_modules.forEach(m => {
                     if (!L.byModules[m]) L.byModules[m] = [];
@@ -445,9 +490,11 @@
             if (pt.gene) L.umapByGene[pt.gene.toUpperCase()] = pt;
         });
 
-        console.log('CiliAI: Lookups built');
+        console.log('CiliAI: Lookups augmented with complex map');
     }
 
+
+    
     // ==========================================================
     // 3. STATIC UI & PAGE DISPLAY
     // ==========================================================
@@ -1269,26 +1316,27 @@ function injectPageCSS() {
         return html;
     }
 
-    /**
-     * Handles queries for complex data.
+   /**
+     * (NEW) Handles the first step of a complex/module query.
+     * Returns a summary string and stores the gene list in context.
      */
-    function handleComplexQuery(geneSymbol) {
-        const gene = geneSymbol.toUpperCase();
-        const g = window.CiliAI.lookups.geneMap[gene];
-        if (!g) return `Sorry, I could not find data for "${gene}".`;
+    function handleComplexQuery(term) {
+        const geneList = getGenesByComplex(term); // Get the full, fixed list
+        const count = geneList.length;
 
-        const complexes = Object.keys(g.complex_components || {});
-        if (complexes.length > 0) {
-            let html = `<h4>Complex Components for <strong>${gene}</strong></h4>`;
-            html += `<p>${gene} is a known component of the following complexes:</p><ul>`;
-            complexes.forEach(name => {
-                html += `<li><strong>${name}</strong></li>`;
-            });
-            html += '</ul>';
-            return html;
-        } else {
-            return `No complex data was found for <strong>${gene}</strong>.`;
+        if (count === 0) {
+            return `Sorry, I could not find any genes for the complex "${term}".`;
         }
+
+        // Store the context for a "yes" follow-up
+        lastQueryContext = {
+            type: 'localization_list', // We can reuse the same follow-up type
+            data: geneList, 
+            term: term
+        };
+
+        // Return the summary string
+        return `I found ${count} genes in the ${term} complex. Do you want to view the list?`;
     }
 
     /**
@@ -2023,55 +2071,72 @@ function injectPageCSS() {
 
     /**
      * Generic getter for localization
+     * (FIXED: Iterates all keys instead of .find() to get complete lists)
      * (FIXED: Fetches descriptions, adds "ciliary tip" alias)
      */
     function getGenesByLocalization(term) {
-        let normTerm = term.toLowerCase(); // Use 'let' to allow reassignment
+        let normTerm = term.toLowerCase();
         const L = window.CiliAI.lookups;
-        
-        // FIX: Add alias
+        const geneMap = L.geneMap;
+        let matchingGenes = new Set(); // Use a Set to avoid duplicates
+
         if (normTerm.includes('ciliary tip')) {
-            normTerm = 'cilia';
+            normTerm = 'ciliary tip'; // Be specific to match the new key
+        }
+        if (normTerm === 'cilia') {
+             normTerm = 'cilia'; // Matches 'cilia', 'ciliary', etc.
         }
 
-        const locKey = Object.keys(L.byLocalization).find(key => key.toLowerCase().includes(normTerm));
-        const geneMap = window.CiliAI.lookups.geneMap; // Get geneMap
+        // --- THIS IS THE FIX ---
+        // Iterate all keys, not just find() the first one
+        const allLocKeys = Object.keys(L.byLocalization);
+        allLocKeys.forEach(key => {
+            if (key.toLowerCase().includes(normTerm)) {
+                // Add all genes from this matching key to the Set
+                L.byLocalization[key].forEach(geneSymbol => {
+                    matchingGenes.add(geneSymbol);
+                });
+            }
+        });
+        // --- END FIX ---
 
-        if (locKey && L.byLocalization[locKey]) {
-            return L.byLocalization[locKey].map(gene => { // 'gene' is a symbol
-                const geneData = geneMap[gene];
-                return { 
-                    gene: gene, 
-                    // FETCH THE LOCALIZATION string
-                    description: geneData?.localization || `Found in ${locKey}`
-                };
-            });
-        }
-        return [];
+        // Convert the Set back to an array of objects
+        return Array.from(matchingGenes).map(gene => {
+            const geneData = geneMap[gene];
+            return {
+                gene: gene,
+                description: geneData?.localization || `Found in ${term}`
+            };
+        });
     }
 
-    /**
+   /**
      * Simple keyword spotter
-     * (FIXED: Implements COMPLEX handler)
+     * (FIXED: Implements new handlers and keywords)
      */
     function flexibleIntentParser(query) {
         const qLower = query.toLowerCase().trim();
         const entityKeywords = [
             {
                 type: 'COMPLEX',
-                keywords: ['BBSome', 'IFT-A', 'IFT-B', 'Transition Zone', 'MKS Complex', 'NPHP Complex'],
-                // FIX: Use the correct handler
-                handler: (term) => formatListResult(`Genes in ${term}`, getGenesByComplex(term))
+                keywords: [
+                    'BBSome', 'IFT-A', 'IFT-B', 'IFT COMPLEX', 'MKS MODULE', 'NPHP MODULE', 
+                    'IFT MOTOR', 'EXOCYST', 'CILIARY TIP', 'DYNEIN ARM', 'RADIAL SPOKE', 'CENTRAL PAIR'
+                ],
+                handler: (term) => handleComplexQuery(term) // Point to the new UX handler
+            },
+            {
+                type: 'LOCALIZATION',
+                keywords: [
+                    'basal body', 'axoneme', 'transition zone', 'centrosome', 
+                    'cilium', 'cilia', 'mitochondria', 'nucleus', 'ciliary tip'
+                ],
+                handler: (term) => handleLocalizationQuery(term) // This is already correct
             },
             {
                 type: 'CILIOPATHY',
                 keywords: ['Joubert Syndrome', 'BBS', 'Bardet–Biedl Syndrome', 'NPHP', 'Nephronophthisis', 'MKS', 'Meckel–Gruber Syndrome'],
                 handler: (term) => formatListResult(`Genes for ${term}`, (getCiliopathyGenes(term)).genes)
-            },
-            {
-                type: 'LOCALIZATION',
-                keywords: ['basal body', 'axoneme', 'transition zone', 'centrosome', 'cilium', 'cilia', 'mitochondria', 'nucleus'], // "ciliary tip" handled by alias
-                handler: (term) => formatListResult(`Genes localizing to ${term}`, getGenesByLocalization(term))
             },
             {
                 type: 'DOMAIN',
@@ -2082,10 +2147,11 @@ function injectPageCSS() {
 
         const normalizedQuery = normalizeTerm(query);
         for (const entityType of entityKeywords) {
+            // Sort keywords by length, longest first, to match "IFT-A COMPLEX" before "IFT-A"
             const sortedKeywords = [...entityType.keywords].sort((a, b) => b.length - a.length);
             for (const keyword of sortedKeywords) {
                 const keywordRegex = new RegExp(normalizeTerm(keyword).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
-                if (keywordRegex.test(normalizedQuery)) {
+                if (normalizedQuery.includes(normalizeTerm(keyword))) { // Use includes for partial match
                     if (qLower.includes('not in') || qLower.includes('except')) continue;
                     return { type: entityType.type, entity: keyword, handler: entityType.handler };
                 }
@@ -2094,19 +2160,70 @@ function injectPageCSS() {
         return null;
     }
 
+
+    /* ==============================================================
+ * 5. Complex Map (required for BBSome etc.)
+ * ============================================================== */
+function getComplexPhylogenyTableMap() {
+    return {
+        // --- IFT & MOTORS ---
+        "IFT COMPLEX": ["WDR19","IFT140","TTC21B","IFT122","WDR35","IFT43","IFT172","IFT80","IFT57","TRAF3IP1","CLUAP1","IFT20","IFT88","IFT81","IFT74","IFT70A","IFT70B","IFT56","IFT52","IFT46","IFT27","IFT25","IFT22"],
+        "IFT-A COMPLEX": ["WDR19","IFT140","TTC21B","IFT122","WDR35","IFT43"],
+        "IFT-B COMPLEX": ["IFT172","IFT80","IFT57","TRAF3IP1","CLUAP1","IFT20","IFT88","IFT81","IFT74","IFT70A","IFT70B","IFT56","IFT52","IFT46","IFT27","IFT25","IFT22"],
+        "IFT-B1 COMPLEX": ["IFT172","IFT80","IFT57","TRAF3IP1","CLUAP1","IFT20"],
+        "IFT-B2 COMPLEX": ["IFT88","IFT81","IFT74","IFT70A","IFT70B","IFT56","IFT52","IFT46","IFT27","IFT25","IFT22"],
+        "IFT MOTOR COMPLEX": ["KIF3A","KIF3B","KIF17","DYNC2H1","DYNC2LI1","WDR34","WDR60"],
+
+        // --- CORE CILIOPATHY COMPLEXES ---
+        "BBSOME": ["BBS1","BBS2","BBS4","BBS5","BBS7","TTC8","BBS9","BBIP1"],
+        "TRANSITION ZONE": ["NPHP1","MKS1","CEP290","AHI1","RPGRIP1L","TMEM67","CC2D2A","B9D1","B9D2"],
+        "MKS MODULE": ["MKS1","TMEM17","TMEM67","TMEM138","B9D2","B9D1","CC2D2A","TMEM107","TMEM237","TMEM231","TMEM216","TCTN1","TCTN2","TCTN3"],
+        "NPHP MODULE": ["NPHP1","NPHP3","NPHP4","RPGRIP1L","IQCB1","CEP290","SDCCAG8"],
+
+        // --- STRUCTURAL & AXONEMAL ---
+        "BASAL BODY": ["CEP164","CEP83","SCLT1","CEP89","LRRC45","ODF2","CEP128","CEP135","CETN2","CETN3","POC1B","FBF1","CCDC41","CCDC120","OFD1"],
+        "CENTROSOME": ["CEP152","CEP192","PLK4","STIL","SAS6","CEP135","CETN2","PCNT"],
+        "CILIARY TIP": ["HYDIN","IQCA1","CATSPER2","KIF19A","KIF7","CCDC78","CCDC33","SPEF1","CEP104","CSPP1"],
+        "RADIAL SPOKE": ["RSPH1","RSPH3","RSPH4A","RSPH6A","RSPH9","RSPH10B","RSPH23","RSPH16"],
+        "CENTRAL PAIR": ["HYDIN","SPAG6","SPAG16","SPAG17","POC1A","CEP131"],
+        "DYNEIN ARM": ["DNAH1","DNAH2","DNAH5","DNAH6","DNAH7","DNAH8","DNAH9","DNAH10","DNAH11","DNALI1","DNAI1","DNAI2"],
+        "OUTER DYNEIN ARM": ["DNAH5","DNAH11","DNAH17","DNAI1","DNAI2"],
+        "INNER DYNEIN ARM": ["DNAH2","DNAH7","DNAH10","DNALI1"],
+
+        // --- OTHER SIGNALING & MEMBRANE ---
+        "EXOCYST": ["EXOC1","EXOC2","EXOC3","EXOC4","EXOC5","EXOC6","EXOC7","EXOC8"],
+        "SHH SIGNALING": ["SMO","PTCH1","GLI1","GLI2","GLI3","SUFU","KIF7","TULP3"],
+        
+        // --- NEW ADDITIONS (STRUCTURAL) ---
+        "CILIARY ROOTLET": ["ROOTLET1", "CROCC"],
+        "CPLANE COMPLEX": ["INTU", "FUZ", "WDPCP"],
+        "SEPTIN RING": ["SEPTIN2", "SEPTIN7", "SEPTIN9", "SEPTIN11"],
+        
+        // --- NEW ADDITIONS (MOTILE CILIA / PCD) ---
+        "DYNEIN ASSEMBLY FACTORS": ["DNAAF1", "DNAAF2", "DNAAF3", "DNAAF4", "DNAAF5", "DNAAF6", "DNAAF7", "DNAAF8", "DNAAF9", "DNAAF10", "DNAAF11", "LRRC6", "ZMYND10", "PIH1D3", "HEATR2"],
+
+        // --- NEW ADDITIONS (REGULATORY & POLARITY) ---
+        "CILIOGENESIS REGULATORS": ["FOXJ1", "RFX1", "RFX2", "RFX3", "RFX4", "RFX5"],
+        "PCP CORE": ["VANGL1", "VANGL2", "DVL1", "DVL2", "DVL3", "PRICKLE1", "CELSR1", "FZD3", "FZD6"]
+    };
+}
+
     /**
      * (NEW/FIXED) Generic getter for complexes
      */
     function getGenesByComplex(term) {
         const normTerm = normalizeTerm(term);
         const L = window.CiliAI.lookups;
+        const geneMap = L.geneMap;
 
-        const complexName = Object.keys(L.complexByName).find(name => normalizeTerm(name).includes(normTerm));
-        if (complexName) {
-            const geneMap = L.geneMap;
-            return L.complexByName[complexName].map(gene => ({
+        // Find the key in the new lookup (e.g., "BBSOME")
+        const complexKey = Object.keys(L.byModuleOrComplex).find(key => normalizeTerm(key).includes(normTerm));
+        
+        if (complexKey) {
+            const geneSymbols = L.byModuleOrComplex[complexKey];
+            return geneSymbols.map(gene => ({
                 gene: gene,
-                description: geneMap[gene]?.description || `Subunit of ${complexName}`
+                description: geneMap[gene]?.description || `Component of ${complexKey}`
             }));
         }
         return [];
