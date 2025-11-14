@@ -54,6 +54,36 @@
         "Cryptosporidium parvum (strain Iowa II)", "Entamoeba histolytica", "Encephalitozoon cuniculi (strain GB-M1)"
     ];
 
+
+    /* ==============================================================
+ * 6. Disease Classification Map
+ * ============================================================== */
+function getDiseaseClassificationMap() {
+    return {
+        "Primary Ciliopathies": [
+            "Acrocallosal Syndrome", "Alström Syndrome", "Autosomal Dominant Polycystic Kidney Disease",
+            "Autosomal Recessive Polycystic Kidney Disease", "Bardet–Biedl Syndrome", "COACH Syndrome",
+            "Cranioectodermal Dysplasia", "Ellis-van Creveld Syndrome", "Hydrolethalus Syndrome", "Infantile Polycystic Kidney Disease",
+            "Joubert Syndrome", "Leber Congenital Amaurosis", "Meckel–Gruber Syndrome", "Nephronophthisis", "Orofaciodigital Syndrome",
+            "Senior-Løken Syndrome", "Short-rib Thoracic Dysplasia", "Skeletal Ciliopathy", "Retinal Ciliopathy", "Syndromic Ciliopathy",
+            "Al-Gazali-Bakalinova Syndrome", "Bazex-Dupré-Christol Syndrome", "Bilateral Polycystic Kidney Disease", "Biliary, Renal, Neurologic, and Skeletal Syndrome",
+            "Caroli Disease", "Carpenter Syndrome", "Complex Lethal Osteochondrodysplasia", "Greig Cephalopolysyndactyly Syndrome", "Kallmann Syndrome", "Lowe Oculocerebrorenal Syndrome",
+            "McKusick-Kaufman Syndrome", "Morbid Obesity and Spermatogenic Failure", "Polycystic Kidney Disease", "RHYNS Syndrome", "Renal-hepatic-pancreatic Dysplasia", "Retinal Dystrophy", "STAR Syndrome",
+            "Smith-Lemli-Opitz Syndrome", "Spondylometaphyseal Dysplasia", "Stromme Syndrome", "Weyers Acrofacial Dysostosis", "Hydrocephalus"
+        ],
+        "Motile Ciliopathies": [
+            "Primary Ciliary Dyskinesia", "Birt-Hogg-Dubé Syndrome", "Juvenile Myoclonic Epilepsy"
+        ],
+        "Secondary Diseases": [
+            "Ataxia-telangiectasia-like Disorder", "Birt-Hogg-Dubé Syndrome", "Cone-Rod Dystrophy", "Cornelia de Lange Syndrome",
+            "Holoprosencephaly", "Juvenile Myoclonic Epilepsy", "Medulloblastoma", "Retinitis Pigmentosa", "Spinocerebellar Ataxia", "Bazex-Dupré-Christol Syndrome", "Lowe Oculocerebrorenal Syndrome",
+            "McKusick-Kaufman Syndrome", "Pallister-Hall Syndrome", "Simpson-Golabi-Behmel Syndrome", "Townes-Brocks Syndrome", "Usher Syndrome", "Visceral Heterotaxy"
+        ],
+        "Atypical Ciliopathies": [
+            "Biliary Ciliopathy", "Chronic Obstructive Pulmonary Disease", "Ciliopathy", "Ciliopathy - Retinal dystrophy", "Golgipathies or Ciliopathy", "Hepatic Ciliopathy", "Male Infertility and Ciliopathy", "Male infertility", "Microcephaly and Chorioretinopathy Type 3", "Mucociliary Clearance Disorder", "Notch-mediated Ciliopathy", "Primary Endocardial Fibroelastosis", "Retinal Ciliopathy", "Retinal Degeneration", "Skeletal Ciliopathy", "Syndromic Ciliopathy"
+        ]
+    };
+}
     /**
      * Helper function to ensure a value is an array.
      */
@@ -387,18 +417,22 @@
      * (FIXED: Now correctly splits localization strings into individual keys)
      * (FIXED: Now integrates data from getComplexPhylogenyTableMap)
      */
+    /**
+     * Builds the lookup maps (like geneMap) from the masterData.
+     * (UPDATED: Now builds L.byCiliopathyClassification from the new disease map)
+     */
     function buildLookups() {
         const L = window.CiliAI.lookups = {};
         const master = Array.isArray(window.CiliAI.masterData) ? window.CiliAI.masterData : [];
 
-        // 1. Build GeneMap (no change)
+        // 1. Build GeneMap
         L.geneMap = {};
         master.forEach(g => {
             const sym = (g.gene || '').toUpperCase();
             if (sym) L.geneMap[sym] = g;
         });
 
-        // 2. Build Complex Lookups from masterData (no change)
+        // 2. Build Complex Lookups from masterData
         L.complexByGene = {};
         L.complexByName = {};
         master.forEach(g => {
@@ -421,30 +455,24 @@
             }
         });
 
-        // 3. --- THIS IS THE FIX ---
-        // Build L.byLocalization from masterData, splitting strings
+        // 3. Build L.byLocalization from masterData (with string splitting fix)
         L.byLocalization = {};
         const localizationSplitter = (value) => {
-            if (Array.isArray(value)) return value; // It's already an array
-            
+            if (Array.isArray(value)) return value;
             if (typeof value === 'string') {
-                // --- NEW CLEANING STEP ---
-                // Fixes "basal body,flagella" -> "basal body, flagella"
                 let cleanedValue = value.replace("basal body,flagella", "basal body, flagella"); 
-                // --- END CLEANING STEP ---
-                
-                return cleanedValue.split(/, ?|; ?/); // Split string by comma or semicolon
+                return cleanedValue.split(/, ?|; ?/); 
             }
-            return []; // It's null or undefined
+            return [];
         };
 
         master.forEach(g => {
             const key = g.gene?.toUpperCase();
             if (!key) return;
             
-            const localizations = localizationSplitter(g.localization); // Use the splitter
+            const localizations = localizationSplitter(g.localization); 
             localizations.forEach(loc => {
-                const locKey = loc.trim(); // Trim whitespace
+                const locKey = loc.trim();
                 if (locKey) {
                     if (!L.byLocalization[locKey]) L.byLocalization[locKey] = [];
                     if (!L.byLocalization[locKey].includes(key)) {
@@ -453,12 +481,10 @@
                 }
             });
         });
-        // --- END FIX ---
 
-
-        // 4. Augment Lookups with your Complex Map (no change from last step)
+        // 4. Augment Lookups with Complex Map
         const complexMap = getComplexPhylogenyTableMap();
-        L.byModuleOrComplex = {}; // For "BBSome", "IFT-A"
+        L.byModuleOrComplex = {}; 
         
         const localizationKeys = [
             "TRANSITION ZONE", "MKS MODULE", "NPHP MODULE", "BASAL BODY", "CILIARY TIP", 
@@ -467,22 +493,15 @@
         ];
         
         for (const key in complexMap) {
-            const upperKey = key.toUpperCase(); // e.g., "CILIARY TIP"
+            const upperKey = key.toUpperCase();
             const genes = complexMap[key].map(g => g.toUpperCase());
-
-            // 4a. Add to the byModuleOrComplex lookup
             L.byModuleOrComplex[upperKey] = genes;
             
-            // 4b. Add to byLocalization lookup if it's a localization key
             if (localizationKeys.includes(upperKey)) {
-                // Format the key to match existing data (e.g., "Ciliary Tip")
                 const locKey = key.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
-                
                 if (!L.byLocalization[locKey]) {
                     L.byLocalization[locKey] = [];
                 }
-                
-                // Add genes to the localization lookup, ensuring uniqueness
                 genes.forEach(gene => {
                     if (!L.byLocalization[locKey].includes(gene)) {
                         L.byLocalization[locKey].push(gene);
@@ -491,9 +510,9 @@
             }
         }
         
-        // 5. Build other lookups from masterData (no change)
+        // 5. Build L.byModules and L.byCiliopathy (from masterData)
         L.byModules = {}; 
-        L.byCiliopathy = {};
+        L.byCiliopathy = {}; // This links GENES to DISEASES
         master.forEach(g => {
             const key = g.gene?.toUpperCase();
             if (!key) return;
@@ -504,7 +523,8 @@
                 });
             }
             if (g.ciliopathy) {
-                g.ciliopathy.forEach(c => {
+                // This is the gene-to-disease link from ciliahub_data.json
+                ensureArray(g.ciliopathy).forEach(c => {
                     const cl = c.toLowerCase();
                     if (!L.byCiliopathy[cl]) L.byCiliopathy[cl] = [];
                     if (!L.byCiliopathy[cl].includes(key)) L.byCiliopathy[cl].push(key);
@@ -512,14 +532,26 @@
             }
         });
 
+        // 6. NEW: Build L.byCiliopathyClassification (from disease map)
+        // This links DISEASES to CLASSIFICATIONS
+        L.byCiliopathyClassification = {};
+        const diseaseMap = getDiseaseClassificationMap();
+        for (const classification in diseaseMap) {
+            const diseaseList = diseaseMap[classification];
+            diseaseList.forEach(diseaseName => {
+                const normDisease = diseaseName.toLowerCase();
+                L.byCiliopathyClassification[normDisease] = classification;
+            });
+        }
+
+        // 7. Build UMAP lookup
         L.umapByGene = {};
         (window.CiliAI.data.umap || []).forEach(pt => {
             if (pt.gene) L.umapByGene[pt.gene.toUpperCase()] = pt;
         });
 
-        console.log('CiliAI: Lookups built and normalized.');
+        console.log('CiliAI: Lookups built, normalized, and classifications added.');
     }
-
     
     // ==========================================================
     // 3. STATIC UI & PAGE DISPLAY
@@ -2139,13 +2171,28 @@ function injectPageCSS() {
     }
     
    /**
-    /**
      * Simple keyword spotter
-     * (FIXED: Added 'lysosome' and 'flagella' to the keywords list)
+     * (UPDATED: Added CLASSIFICATION type)
      */
     function flexibleIntentParser(query) {
         const qLower = query.toLowerCase().trim();
+        
+        const diseaseMap = getDiseaseClassificationMap();
+        let allDiseaseKeywords = ['BBS', 'NPHP', 'MKS']; 
+        for (const classification in diseaseMap) {
+            allDiseaseKeywords = allDiseaseKeywords.concat(diseaseMap[classification]);
+        }
+        
+        // --- NEW ENTRY ---
+        const classificationKeywords = Object.keys(diseaseMap);
+        // --- END NEW ---
+
         const entityKeywords = [
+            {
+                type: 'CLASSIFICATION', // <-- NEW
+                keywords: classificationKeywords,
+                handler: handleClassificationQuery // <-- NEW
+            },
             {
                 type: 'COMPLEX',
                 keywords: [
@@ -2154,7 +2201,7 @@ function injectPageCSS() {
                     'CILIARY ROOTLET', 'CPLANE COMPLEX', 'SEPTIN RING', 'DYNEIN ASSEMBLY FACTORS',
                     'CILIOGENESIS REGULATORS', 'PCP CORE'
                 ],
-                handler: (term) => handleComplexQuery(term) // Point to the new UX handler
+                handler: handleComplexQuery 
             },
             {
                 type: 'LOCALIZATION',
@@ -2162,29 +2209,26 @@ function injectPageCSS() {
                     'basal body', 'axoneme', 'transition zone', 'cytosol', 'centrosome', 
                     'cilium', 'cilia', 'mitochondria', 'nucleus', 'ciliary tip',
                     'lysosome', 'lysosomes', 'Ciliary associated gene', 'Ciliary associated genes', 
-                    'Microbody', 'Peroxisome', 'flagella' // <-- FIX IS HERE
+                    'Microbody', 'Peroxisome', 'flagella'
                 ],
-                handler: (term) => handleLocalizationQuery(term) // This is already correct
+                handler: handleLocalizationQuery 
             },
             {
                 type: 'CILIOPATHY',
-                keywords: ['Joubert Syndrome', 'BBS', 'Bardet–Biedl Syndrome', 'NPHP', 'Nephronophthisis', 'MKS', 'Meckel–Gruber Syndrome'],
-                handler: (term) => formatListResult(`Genes for ${term}`, (getCiliopathyGenes(term)).genes)
+                keywords: allDiseaseKeywords, 
+                handler: (term, query) => formatListResult(`Genes for ${term}`, (getCiliopathyGenes(term)).genes, getCiliopathyGenes(term).description)
             },
             {
                 type: 'DOMAIN',
                 keywords: ['WD40', 'coiled-coil', 'pfam', 'domain', 'ef-hand'],
-                handler: (term) => getGenesByDomain(term)
+                handler: getGenesByDomain 
             }
         ];
 
         const normalizedQuery = normalizeTerm(query);
         for (const entityType of entityKeywords) {
-            // Sort keywords by length, longest first, to match "IFT-A COMPLEX" before "IFT-A"
             const sortedKeywords = [...entityType.keywords].sort((a, b) => b.length - a.length);
             for (const keyword of sortedKeywords) {
-                const keywordRegex = new RegExp(normalizeTerm(keyword).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
-                // Use .includes() for partial matching (e.g., "genes in the bbsome")
                 if (normalizedQuery.includes(normalizeTerm(keyword))) { 
                     if (qLower.includes('not in') || qLower.includes('except')) continue;
                     return { type: entityType.type, entity: keyword, handler: entityType.handler };
@@ -2194,7 +2238,69 @@ function injectPageCSS() {
         return null;
     }
 
+    
+/**
+     * (NEW) Handles queries for a whole disease classification.
+     * Differentiates between listing diseases and listing genes.
+     */
+    function handleClassificationQuery(classificationName, query) {
+        const qLower = query.toLowerCase();
+        const diseaseMap = getDiseaseClassificationMap();
+        
+        // Find the correct cased classification name
+        const casedClassificationName = Object.keys(diseaseMap).find(key => key.toLowerCase() === classificationName.toLowerCase());
+        
+        if (!casedClassificationName) {
+            return `Sorry, I don't recognize the classification "${classificationName}".`;
+        }
 
+        const diseaseList = diseaseMap[casedClassificationName];
+
+        // Check if user wants the gene list
+        if (qLower.includes('gene') || qLower.includes('genes') || qLower.includes('gene list')) {
+            let allGenes = new Set();
+            const geneMap = window.CiliAI.lookups.geneMap;
+            
+            diseaseList.forEach(diseaseName => {
+                const normDisease = diseaseName.toLowerCase();
+                const geneSymbols = window.CiliAI.lookups.byCiliopathy[normDisease] || [];
+                geneSymbols.forEach(g => allGenes.add(g));
+            });
+            
+            const geneListObjects = Array.from(allGenes).map(gene => {
+                const geneData = geneMap[gene];
+                return {
+                    gene: gene,
+                    description: geneData?.description || 'No description available.'
+                };
+            }).sort((a, b) => a.gene.localeCompare(b.gene)); // Sort alphabetically
+
+            if (geneListObjects.length === 0) {
+                return `I did not find any genes associated with the classification "${casedClassificationName}".`;
+            }
+
+            // Store the context for a "yes" follow-up
+            lastQueryContext = {
+                type: 'localization_list', // Reuse the table-displaying logic
+                data: geneListObjects,
+                term: casedClassificationName
+            };
+
+            return `I found ${geneListObjects.length} unique genes associated with ${casedClassificationName}. Do you want to view the list?`;
+            
+        } else {
+            // User just wants to list the diseases in the classification
+            const diseaseHtml = diseaseList.map(d => `<li>${d}</li>`).join('');
+            return `
+                <div class="ai-result-card">
+                    <strong>${casedClassificationName}</strong>
+                    <p>This classification includes the following diseases:</p>
+                    <ul>${diseaseHtml}</ul>
+                </div>
+            `;
+        }
+    }
+    
     /* ==============================================================
  * 5. Complex Map (required for BBSome etc.)
  * ============================================================== */
@@ -2360,10 +2466,12 @@ function getComplexPhylogenyTableMap() {
         return [];
     }
     
+
     /**
      * Handles queries for genes containing a specific domain.
+     * (UPDATED: Accepts query argument, though it is not used)
      */
-    function getGenesByDomain(domainTerm) {
+    function getGenesByDomain(domainTerm, query) { // <-- Added query
         const normTerm = domainTerm.toLowerCase();
         const results = [];
         window.CiliAI.masterData.forEach(g => {
@@ -2376,7 +2484,6 @@ function getComplexPhylogenyTableMap() {
         });
         return formatListResult(`Genes containing "${domainTerm}" domain`, results);
     }
-    
 
     // --- 4E. Main "Brain" (Query Routers) ---
 
@@ -2443,16 +2550,26 @@ function getComplexPhylogenyTableMap() {
                 return;
             }
 
-            let htmlResult = null; // <-- FIX: Initialize to null
+            let htmlResult = null; // Initialize to null
             let match;
 
-            // =( 1 )= INTENT: HIGH-PRIORITY "WHAT IS [GENE]?" ==============
-            if (htmlResult === null && (match = qLower.match(/^(?:what is|what's|describe)\s+([A-Z0-9\-]{3,})\b/i))) {
+            // =( 1 )= INTENT: CONTEXTUAL FOLLOW-UP ("Yes") ==============
+            if (htmlResult === null && (qLower === 'yes' || qLower === 'ok' || qLower === 'sure' || qLower.includes('view the list'))) {
+                if (lastQueryContext.type === 'localization_list') {
+                    log('Routing via: Intent (Follow-up: Show List)');
+                    showDataInLeftPanel(lastQueryContext.term, lastQueryContext.data);
+                    lastQueryContext = { type: null, data: [], term: null };
+                    htmlResult = ""; 
+                }
+            }
+
+            // =( 2 )= INTENT: HIGH-PRIORITY "WHAT IS [GENE]?" ==============
+            else if (htmlResult === null && (match = qLower.match(/^(?:what is|what's|describe)\s+([A-Z0-9\-]{3,})\b/i))) {
                 log('Routing via: Intent (High-Priority Get Details)');
                 htmlResult = await getComprehensiveDetails(match[1].toUpperCase());
             }
 
-            // =( 2 )= INTENT: ORTHOLOGS ===================================
+            // =( 3 )= INTENT: ORTHOLOGS ===================================
             else if (htmlResult === null && (match = qLower.match(/ortholog(?: of| for)?\s+([a-z0-9\-]+)\s+(?:in|for)\s+(c\. elegans|mouse|zebrafish|drosophila|xenopus)/i))) {
                 log('Routing via: Intent (Ortholog)');
                 htmlResult = handleOrthologQuery(match[1].toUpperCase(), match[2]);
@@ -2462,13 +2579,13 @@ function getComplexPhylogenyTableMap() {
                 htmlResult = handleOrthologQuery(match[2].toUpperCase(), match[1]);
             }
 
-            //=( 3 )= INTENT: COMPLEX / MODULE MEMBERS ======================
+            //=( 4 )= INTENT: COMPLEX / MODULE MEMBERS ======================
             else if (htmlResult === null && (match = qLower.match(/(?:complexes for|complexes of|complexes containing|complex components of)\s+([a-z0-9\-]+)/i))) {
                 log('Routing via: Intent (Find Gene in Complex)');
                 htmlResult = handleComplexQuery(match[1].toUpperCase());
             }
 
-            //=( 4 )= INTENT: DOMAINS =======================================
+            //=( 5 )= INTENT: DOMAINS =======================================
             else if (htmlResult === null && (match = qLower.match(/(?:domains of|domain architecture for)\s+(.+)/i))) {
                 log('Routing via: Intent (Domains)');
                 const genes = extractMultipleGenes(match[1]);
@@ -2477,13 +2594,13 @@ function getComplexPhylogenyTableMap() {
                 }
             }
 
-            //=( 5 )= INTENT: SCREENS / PHENOTYPES ==========================
+            //=( 6 )= INTENT: SCREENS / PHENOTYPES ==========================
             else if (htmlResult === null && (match = qLower.match(/(?:screens for|screens where|effect of)\s+([a-z0-9\-]+)/i))) {
                 log('Routing via: Intent (Screens)');
                 htmlResult = handleScreenQuery(match[1].toUpperCase());
             }
 
-            //=( 6 )= INTENT: PHYLOGENY / EVOLUTION (All queries) ==========
+            //=( 7 )= INTENT: PHYLOGENY / EVOLUTION (All queries) ==========
             else if (htmlResult === null && (
                 qLower.includes('phylogen') || qLower.includes('evolution') || qLower.includes('conservation') ||
                 qLower.includes('heatmap') || qLower.includes('taxa') || qLower.includes('vertebrate specific') ||
@@ -2494,7 +2611,7 @@ function getComplexPhylogenyTableMap() {
                 htmlResult = routePhylogenyAnalysis(query);
             }
 
-            //=( 7 )= INTENT: FUNCTIONAL MODULES ========================
+            //=( 8 )= INTENT: FUNCTIONAL MODULES ========================
             else if (htmlResult === null && (match = qLower.match(/(?:functional modules of|modules for)\s+([a-z0-9\-]+)/i))) {
                 log('Routing via: Intent (Get Modules)');
                 const gene = match[1].toUpperCase();
@@ -2506,7 +2623,7 @@ function getComplexPhylogenyTableMap() {
                 }
             }
 
-            //=( 8 )= INTENT: scRNA Expression ============================
+            //=( 9 )= INTENT: scRNA Expression ============================
             else if (htmlResult === null && (qLower.includes('scrna') || qLower.includes('expression in') || qLower.includes('compare expression'))) {
                 log('Routing via: Intent (scRNA)');
                 const genes = extractMultipleGenes(query);
@@ -2517,25 +2634,28 @@ function getComplexPhylogenyTableMap() {
                 }
             }
 
-            //=( 9 )= INTENT: UMAP (VISUAL) =================================
+            //=( 10 )= INTENT: UMAP (VISUAL) =================================
             else if (htmlResult === null && (match = qLower.match(/(?:show|plot)\s+(?:me\s+the\s+)?umap(?: expression)?(?: for\s+([a-z0-9\-]+))?/i))) {
                 log('Routing via: Intent (UMAP Plot)');
                 const gene = match[1] ? match[1].toUpperCase() : null;
-                handleUmapPlot(gene); // Draws to left panel
-                htmlResult = ""; // FIX: Signal that the query was handled visually
+                handleUmapPlot(gene);
+                htmlResult = ""; 
             }
 
-            //=( 10 )= INTENT: SIMPLE KEYWORD LISTS ==========================
-            if (htmlResult === null) { // <-- FIX: Check for null
-                const intent = flexibleIntentParser(query);
+            //=( 11 )= INTENT: SIMPLE KEYWORD LISTS ==========================
+            if (htmlResult === null) { 
+                const intent = flexibleIntentParser(query); 
                 if (intent) {
                     log(`Routing via: Intent (Simple Keyword: ${intent.type})`);
-                    htmlResult = intent.handler(intent.entity);
+                    // --- THIS IS THE CHANGE ---
+                    // Pass BOTH the matched term and the full query
+                    htmlResult = intent.handler(intent.entity, query); 
+                    // --- END CHANGE ---
                 }
             }
 
-            //=( 11 )= INTENT: FALLBACK (GET DETAILS) ========================
-            if (htmlResult === null) { // <-- FIX: Check for null
+            //=( 12 )= INTENT: FALLBACK (GET DETAILS) ========================
+            if (htmlResult === null) { 
                 log(`Routing via: Fallback (Get Details)`);
                 let term = qLower;
 
@@ -2551,13 +2671,13 @@ function getComplexPhylogenyTableMap() {
                 }
             }
 
-            //=( 12 )= FINAL FALLBACK (ERROR) ================================
-            if (htmlResult === null) { // <-- FIX: Check for null
+            //=( 13 )= FINAL FALLBACK (ERROR) ================================
+            if (htmlResult === null) { 
                 log(`Routing via: Final Fallback (Error)`);
                 htmlResult = `Sorry, I didn't understand the query: "<strong>${query}</strong>". Please try a simpler term.`;
             }
 
-            if (htmlResult) { // Only add a message if it's not ""
+            if (htmlResult) { 
                 addChatMessage(htmlResult, false);
             }
 
@@ -2566,6 +2686,7 @@ function getComplexPhylogenyTableMap() {
             addChatMessage(`An internal CiliAI error occurred: ${e.message}`, false);
         }
     }
+
     
     // ==========================================================
     // 5. GLOBAL UI WRAPPERS & STARTUP
