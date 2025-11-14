@@ -2159,9 +2159,10 @@ function injectPageCSS() {
             {
                 type: 'LOCALIZATION',
                 keywords: [
-                    'basal body', 'axoneme', 'transition zone', 'centrosome', 
+                    'basal body', 'axoneme', 'transition zone', 'cytosol', 'centrosome', 
                     'cilium', 'cilia', 'mitochondria', 'nucleus', 'ciliary tip',
-                    'lysosome', 'lysosomes', 'flagella' // <-- FIX IS HERE
+                    'lysosome', 'lysosomes', 'Ciliary associated gene', 'Ciliary associated genes', 
+                    'Microbody', 'Peroxisome', 'flagella' // <-- FIX IS HERE
                 ],
                 handler: (term) => handleLocalizationQuery(term) // This is already correct
             },
