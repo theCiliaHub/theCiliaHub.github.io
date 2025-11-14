@@ -568,7 +568,7 @@
         console.log("CiliAI: Page displayed.");
     };
 
-    /**
+   /**
      * Injects the dynamic CSS for the page.
      */
     function injectPageCSS() {
@@ -582,37 +582,23 @@
                 box-sizing: border-box;
             }
 
-            /* --- THIS IS THE FIX (PART 1) --- */
-            /* This targets the PARENT div your app is injected into */
-            .content-area.content-area-full {
-                position: fixed;
-                top: 60px;    /* This MUST be the exact height of the top navbar */
-                left: 250px;  /* This MUST be the exact width of the CiliaHub sidebar */
-                right: 0;
-                bottom: 0;
-                z-index: 100; /* This moves it "above" the page but "below" the header */
-                
-                padding: 0 !important; /* Override theme padding */
-                margin: 0 !important; /* Override theme margin */
-                overflow: hidden; /* Prevent this element from scrolling */
-            }
-           /* This media query handles the layout when the sidebar is hidden
-              on smaller screens.
+            /* --- THIS IS THE FIX --- */
+            /* This rule is now GONE. We don't need it.
+            .content-area.content-area-full { ... }
             */
-            @media (max-width: 992px) {
-                .content-area.content-area-full {
-                    left: 0;
-                }
-            }
-
-            /* --- THIS IS THE FIX (PART 2) --- */
-            /* This rule is correct and should NOT be changed. */
+            
+            /* This is our app's main container. We set its exact height. */
             .container {
                 display: grid;
                 grid-template-columns: 1fr 450px;
-                height: 100%; /* Fill the .content-area-full */
-                width: 100%;  /* Fill the .content-area-full */
+                /* This is the critical change:
+                   100vh = full screen height
+                   - 60px = CiliaHub top header
+                   - 50px = CiliaHub bottom footer
+                */
+                height: calc(100vh - 110px); 
                 gap: 0;
+                overflow: hidden; /* Prevents container from scrolling */
             }
             /* --- END FIX --- */
 
@@ -786,7 +772,7 @@
                 padding: 25px;
                 background: white;
                 border-bottom: 1px solid #e1e8ed;
-                max-height: 35vh; /* Keep this as is */
+                max-height: 35vh; /* This is good, it keeps it from being too tall */
                 overflow-y: auto;
                 flex-shrink: 0;
             }
@@ -819,7 +805,7 @@
                 color: #856404;
             }
             .chat-container {
-                flex: 1; /* This is what makes it fill the rest of the space */
+                flex: 1; /* This makes it fill the remaining space */
                 display: flex;
                 flex-direction: column;
                 overflow: hidden;
@@ -902,7 +888,10 @@
                 color: white;
             }
             @media (max-width: 992px) {
-                .container { grid-template-columns: 1fr; }
+                .container { 
+                    grid-template-columns: 1fr;
+                    height: calc(100vh - 110px); /* Also apply here */
+                }
             }
         `;
 
