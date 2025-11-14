@@ -568,338 +568,260 @@
         console.log("CiliAI: Page displayed.");
     };
 
-   /**
-     * Injects the dynamic CSS for the page.
-     */
-    function injectPageCSS() {
-        const styleId = 'ciliai-dynamic-styles';
-        if (document.getElementById(styleId)) return;
+/**
+ * Injects the dynamic CSS for the page.
+ */
+function injectPageCSS() {
+    const styleId = 'ciliai-dynamic-styles';
+    if (document.getElementById(styleId)) return;
 
-        const css = `
-            * {
-                margin: 0;
-                padding: 0;
-                box-sizing: border-box;
+    const css = `
+        /* GLOBAL RESET */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        html, body {
+            height: 100%;
+            overflow: hidden; /* No browser scrolling */
+        }
+
+        /* --- FIX: FULL-SCREEN WRAPPER WITH CORRECT NAVBAR OFFSET --- */
+        .content-area.content-area-full {
+            position: fixed;
+
+            /* REAL HEIGHT OF BLUE NAVBAR */
+            top: 95px !important;     
+
+            /* Sidebar width */
+            left: 250px;
+            right: 0;
+            bottom: 0;
+
+            width: calc(100vw - 250px);
+            height: calc(100vh - 95px) !important;
+
+            padding: 0 !important;
+            margin: 0 !important;
+
+            overflow: hidden !important; 
+            background: white;
+        }
+
+        /* Mobile: no sidebar, smaller navbar */
+        @media (max-width: 992px) {
+            .content-area.content-area-full {
+                left: 0 !important;
+                width: 100vw !important;
+                top: 70px !important; 
+                height: calc(100vh - 70px) !important;
             }
+        }
 
-            /* --- THIS IS THE FIX --- */
-            /* This rule is now GONE. We don't need it.
-            .content-area.content-area-full { ... }
-            */
-            
-            /* This is our app's main container. We set its exact height. */
+        /* --- MAIN TWO-PANEL LAYOUT --- */
+        .container {
+            display: grid;
+            grid-template-columns: 1fr 450px;
+            height: 100%;
+            width: 100%;
+            gap: 0;
+            overflow: hidden; 
+        }
+
+        @media (max-width: 992px) {
             .container {
-                display: grid;
-                grid-template-columns: 1fr 450px;
-                /* This is the critical change:
-                   100vh = full screen height
-                   - 60px = CiliaHub top header
-                   - 50px = CiliaHub bottom footer
-                */
-                height: calc(100vh - 110px); 
-                gap: 0;
-                overflow: hidden; /* Prevents container from scrolling */
+                grid-template-columns: 1fr;
             }
-            /* --- END FIX --- */
+        }
 
+        /* LEFT PANEL */
+        .left-panel {
+            display: flex;
+            flex-direction: column;
+            background: #f5f7fa;
+            border-right: 1px solid #e1e8ed;
+            overflow: hidden; 
+        }
 
-            .ciliai-message { /* Renamed for clarity */
-                margin-bottom: 15px;
-                animation: fadeIn 0.3s ease;
-            }
-            .ciliai-message.user { text-align: right; }
-            .ciliai-message-content {
-                display: inline-block;
-                max-width: 85%;
-                padding: 12px 16px;
-                border-radius: 8px;
-                font-size: 13px;
-                line-height: 1.5;
-            }
-            .ciliai-message.user .ciliai-message-content {
-                background: #667eea;
-                color: white;
-                border-radius: 18px 18px 4px 18px;
-            }
-            .ciliai-message.assistant .ciliai-message-content {
-                background: #f8f9fa;
-                color: #2d3748;
-                border: 1px solid #e1e8ed;
-                border-radius: 18px 18px 18px 4px;
-            }
-            .ciliai-reaction-buttons {
-                display: flex;
-                gap: 8px;
-                margin-top: 8px;
-                font-size: 16px;
-            }
-            .ciliai-reaction-btn {
-                cursor: pointer;
-                opacity: 0.6;
-                transition: all 0.2s;
-                user-select: none;
-            }
-            .ciliai-reaction-btn:hover {
-                opacity: 1;
-                transform: scale(1.15);
-            }
-            .ai-result-card {
-                font-size: 12px;
-                line-height: 1.6;
-                margin-top: 8px;
-            }
-            .ai-result-card strong { color: #667eea; }
-            .ai-result-card ul { margin-left: 20px; margin-top: 5px; }
-            .ai-action {
-                color: #667eea;
-                text-decoration: none;
-                font-weight: 600;
-            }
-            .ai-action:hover { text-decoration: underline; }
+        .header {
+            padding: 20px 30px;
+            background: white;
+            color: #2c3e50;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+            border-bottom: 1px solid #e1e8ed;
+            z-index: 2;
+        }
 
-            /* Main Layout CSS */
-            .left-panel {
-                display: flex;
-                flex-direction: column;
-                background: #f5f7fa;
-                border-right: 1px solid #e1e8ed;
-                overflow: hidden; /* Added to contain children */
-            }
-            .header {
-                padding: 20px 30px;
-                background: white;
-                color: #2c3e50;
-                box-shadow: 0 1px 3px rgba(0,0,0,0.08);
-                border-bottom: 1px solid #e1e8ed;
-            }
-            .header h1 {
-                font-size: 28px;
-                font-weight: 600;
-                margin-bottom: 5px;
-                color: #2c3e50;
-            }
-            .header p { font-size: 14px; color: #666; }
-            .toolbar {
-                padding: 15px 30px;
-                background: white;
-                border-bottom: 1px solid #e1e8ed;
-                display: flex;
-                gap: 10px;
-                align-items: center;
-                flex-wrap: wrap;
-            }
-            .toolbar input {
-                flex: 1;
-                min-width: 200px;
-                padding: 10px 15px;
-                border: 1px solid #d1d9e0;
-                border-radius: 6px;
-                font-size: 14px;
-            }
-            .toolbar button {
-                padding: 10px 20px;
-                background: #667eea;
-                color: white;
-                border: none;
-                border-radius: 6px;
-                cursor: pointer;
-                font-weight: 500;
-                transition: all 0.2s;
-                font-size: 14px;
-            }
-            .toolbar button:hover { background: #5568d3; }
-            .status {
-                font-size: 12px;
-                padding: 5px 10px;
-                border-radius: 4px;
-                font-weight: 500;
-            }
-            .status.loading { background: #fff3cd; color: #856404; }
-            .status.ready { background: #d4edda; color: #155724; }
-            .status.error { background: #f8d7da; color: #721c24; }
-            .diagram-container {
-                flex: 1;
-                padding: 20px;
-                overflow: auto; /* Allow diagram to scroll if it's huge */
-                display: flex;
-                justify-content: center;
-                align-items: center;
-                background: white;
-            }
-            .interactive-cilium {
-                background: white;
-                border-radius: 8px;
-                padding: 20px;
-                box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-                max-width: 600px;
-                width: 100%;
-                border: 1px solid #e1e8ed;
-            }
-            .cilia-part {
-                cursor: pointer;
-                transition: all 0.2s ease;
-            }
-            .cilia-part:hover { opacity: 0.8; }
-            .cilia-part:focus {
-                outline: 2px solid #667eea;
-                outline-offset: 2px;
-            }
-            .cilia-part.selected, .cilia-part.active { /* 'active' for v4 brain */
-                filter: brightness(1.2);
-                stroke: #ff6b00 !important;
-                stroke-width: 4 !important;
-            }
-            .bottom-bar {
-                padding: 20px 30px;
-                background: white;
-                border-top: 1px solid #e1e8ed;
-                min-height: 150px;
-                max-height: 250px;
-                overflow-y: auto;
-            }
-            .bottom-bar h3 {
-                font-size: 16px;
-                color: #2d3748;
-                margin-bottom: 12px;
-            }
-            .right-panel {
-                display: flex;
-                flex-direction: column;
-                background: #f5f7fa;
-                overflow: hidden;
-            }
-            .welcome-section {
-                padding: 25px;
-                background: white;
-                border-bottom: 1px solid #e1e8ed;
-                max-height: 35vh; /* This is good, it keeps it from being too tall */
-                overflow-y: auto;
-                flex-shrink: 0;
-            }
-            .welcome-section h2 {
-                font-size: 20px;
-                color: #2c3e50;
-                margin-bottom: 12px;
-                font-weight: 600;
-            }
-            .welcome-section p {
-                font-size: 13px;
-                line-height: 1.6;
-                color: #4a5568;
-                margin-bottom: 15px;
-            }
-            .steps {
-                font-size: 12px;
-                line-height: 1.7;
-                color: #4a5568;
-                padding-left: 20px;
-            }
-            .steps li { margin-bottom: 10px; }
-            .disclaimer {
-                margin-top: 15px;
-                padding: 12px;
-                background: #fff3cd;
-                border-left: 4px solid #ffc107;
-                border-radius: 4px;
-                font-size: 12px;
-                color: #856404;
-            }
-            .chat-container {
-                flex: 1; /* This makes it fill the remaining space */
-                display: flex;
-                flex-direction: column;
-                overflow: hidden;
-            }
-            .messages {
-                flex: 1;
-                padding: 20px;
-                overflow-y: auto;
-                background: white;
-            }
-            .input-area {
-                padding: 15px 20px;
-                background: white;
-                border-top: 1px solid #e1e8ed;
-            }
-            .input-container {
-                display: flex;
-                gap: 10px;
-            }
-            .input-container input {
-                flex: 1;
-                padding: 12px 16px;
-                border: 1px solid #d1d9e0;
-                border-radius: 8px;
-                font-size: 14px;
-            }
-            .input-container button {
-                padding: 12px 24px;
-                background: #667eea;
-                color: white;
-                border: none;
-                border-radius: 8px;
-                cursor: pointer;
-                font-weight: 500;
-                transition: all 0.2s;
-            }
-            .input-container button:hover { background: #5568d3; }
-            .legend {
-                display: flex;
-                flex-wrap: wrap;
-                gap: 12px;
-                margin-top: 12px;
-            }
-            .legend-item {
-                display: flex;
-                align-items: center;
-                gap: 6px;
-                font-size: 12px;
-                color: #4a5568;
-                cursor: pointer;
-                padding: 4px 8px;
-                border-radius: 4px;
-                transition: all 0.2s;
-            }
-            .legend-item:hover { background: #f7fafc; }
-            .legend-color {
-                width: 14px;
-                height: 14px;
-                border-radius: 3px;
-                border: 1px solid rgba(0,0,0,0.2);
-            }
-            .gene-list {
-                display: flex;
-                flex-wrap: wrap;
-                gap: 6px;
-                margin-top: 10px;
-            }
-            .gene-badge {
-                padding: 5px 10px;
-                background: #667eea15;
-                color: #667eea;
-                border-radius: 5px;
-                font-size: 11px;
-                font-weight: 600;
-                cursor: pointer;
-                transition: all 0.2s;
-            }
-            .gene-badge:hover {
-                background: #667eea;
-                color: white;
-            }
-            @media (max-width: 992px) {
-                .container { 
-                    grid-template-columns: 1fr;
-                    height: calc(100vh - 110px); /* Also apply here */
-                }
-            }
-        `;
+        .toolbar {
+            padding: 15px 30px;
+            background: white;
+            border-bottom: 1px solid #e1e8ed;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+            z-index: 1;
+        }
 
-        const styleEl = document.createElement('style');
-        styleEl.id = styleId;
-        styleEl.textContent = css;
-        document.head.appendChild(styleEl);
-    }
+        .diagram-container {
+            flex: 1;
+            padding: 20px;
+            overflow: auto;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: white;
+        }
+
+        /* RIGHT PANEL */
+        .right-panel {
+            display: flex;
+            flex-direction: column;
+            background: #f5f7fa;
+            overflow: hidden;
+        }
+
+        .welcome-section {
+            padding: 25px;
+            background: white;
+            border-bottom: 1px solid #e1e8ed;
+            max-height: 35vh;
+            overflow-y: auto;
+            flex-shrink: 0;
+        }
+
+        .chat-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .messages {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            background: white;
+        }
+
+        .input-area {
+            padding: 15px 20px;
+            background: white;
+            border-top: 1px solid #e1e8ed;
+        }
+
+        /* CHAT UI */
+        .ciliai-message {
+            margin-bottom: 15px;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .ciliai-message.user {
+            text-align: right;
+        }
+
+        .ciliai-message-content {
+            display: inline-block;
+            max-width: 85%;
+            padding: 12px 16px;
+            border-radius: 8px;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+
+        .ciliai-message.user .ciliai-message-content {
+            background: #667eea;
+            color: white;
+            border-radius: 18px 18px 4px 18px;
+        }
+
+        .ciliai-message.assistant .ciliai-message-content {
+            background: #f8f9fa;
+            color: #2d3748;
+            border: 1px solid #e1e8ed;
+            border-radius: 18px 18px 18px 4px;
+        }
+
+        .ciliai-reaction-buttons {
+            display: flex;
+            gap: 8px;
+            margin-top: 8px;
+            font-size: 16px;
+        }
+
+        .ciliai-reaction-btn {
+            cursor: pointer;
+            opacity: 0.6;
+            transition: all 0.2s;
+            user-select: none;
+        }
+
+        .ciliai-reaction-btn:hover {
+            opacity: 1;
+            transform: scale(1.15);
+        }
+
+        /* GENE PANEL + LEGEND */
+        .legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-top: 12px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            color: #4a5568;
+            cursor: pointer;
+            padding: 4px 8px;
+            border-radius: 4px;
+            transition: all 0.2s;
+        }
+
+        .legend-item:hover {
+            background: #f7fafc;
+        }
+
+        .legend-color {
+            width: 14px;
+            height: 14px;
+            border-radius: 3px;
+            border: 1px solid rgba(0,0,0,0.2);
+        }
+
+        .gene-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: 10px;
+        }
+
+        .gene-badge {
+            padding: 5px 10px;
+            background: #667eea15;
+            color: #667eea;
+            border-radius: 5px;
+            font-size: 11px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .gene-badge:hover {
+            background: #667eea;
+            color: white;
+        }
+    `;
+
+    const styleEl = document.createElement('style');
+    styleEl.id = styleId;
+    styleEl.textContent = css;
+    document.head.appendChild(styleEl);
+}
 
     
     /**
