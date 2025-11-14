@@ -2047,7 +2047,470 @@ function injectPageCSS() {
     }
 
 
+    
+
+// ==========================================================
+    // 4. CILIBRAIN v4.0 - QUERY & PLOTTING ENGINE
+    // ==========================================================
+
+    // --- 4A. Core Helper Functions ---
+
+    /**
+     * Simple logger
+     */
+    function log(message) {
+        console.log(`[CiliAI] ${message}`);
+    }
+
+    /**
+     * (NEW - This was missing)
+     * Normalizes a term for keyword matching
+     * (FIX: Added .replace(/s$/, '') to match plurals)
+     */
+    function normalizeTerm(term) {
+        if (typeof term !== 'string') return '';
+        // Removes spaces, hyphens, underscores, AND trailing 's'
+        return term.toLowerCase().replace(/[\s\-\_]/g, '').replace(/s$/, '');
+    }
+
+    /**
+     * Extracts all valid gene symbols from a query string
+     */
+    function extractMultipleGenes(query) {
+        if (!query) return [];
+        const geneRegex = /\b([A-Z0-9\-\.]{3,})\b/gi;
+        const matches = query.match(geneRegex) || [];
+        const upperMatches = matches.map(g => g.toUpperCase());
+
+        // Filter against the master gene map
+        const geneMap = window.CiliAI.lookups.geneMap;
+        if (!geneMap) return [];
+
+        return upperMatches.filter(g => geneMap[g]);
+    }
+    
+    /**
+     * Creates a standard HTML list for the chat window.
+     */
+    function formatListResult(title, genes, description = "") {
+        let geneListHtml = '';
+
+        if (genes && genes.length > 0) {
+            geneListHtml = genes.map(g =>
+                `<li><strong>${g.gene}</strong>: ${g.description || 'No details available.'}</li>`
+            ).join('');
+            geneListHtml = `<ul>${geneListHtml}</ul>`;
+        } else {
+            geneListHtml = "<p>No matching genes found in the database.</p>";
+        }
+
+        const descriptionHtml = description ? `<p>${description}</p>` : '';
+
+        return `
+            <div class="ai-result-card">
+                <strong>${title}</strong>
+                ${descriptionHtml}
+                ${geneListHtml}
+            </div>
+        `;
+    }
+
+    /**
+     * Adds a message to the chat window.
+     */
+    function addChatMessage(html, isUser = false) {
+        const chatWindow = document.getElementById('messages');
+        if (!chatWindow) return;
+
+        const msg = document.createElement('div');
+        msg.className = `ciliai-message ${isUser ? 'user' : 'assistant'}`;
+
+        msg.innerHTML = `<div class="ciliai-message-content">${html}</div>`;
+
+        if (!isUser) {
+            msg.querySelector('.ciliai-message-content').innerHTML += `
+                <div class="ciliai-reaction-buttons">
+                    <span class="ciliai-reaction-btn" onclick="react('up')">👍</span>
+                    <span class="ciliai-reaction-btn" onclick="react('down')">👎</span>
+                </div>`;
+        }
+
+        chatWindow.appendChild(msg);
+        chatWindow.scrollTop = chatWindow.scrollHeight;
+    }
+
+    /**
+     * Handles the user sending a message.
+     */
+    function handleUserSend() {
+        const chatInput = document.getElementById('chatInput');
+        if (!chatInput) return;
+        const query = chatInput.value.trim();
+        if (!query) return;
+
+        addChatMessage(query, true); // Add user's message
+        chatInput.value = ''; // Clear input
+
+        // Process the query
+        handleAIQuery(query);
+    }
+
+    function updateStatus(text, status) {
+        const statusEl = document.getElementById('dataStatus');
+        if (statusEl) {
+            statusEl.textContent = text;
+            statusEl.className = `status ${status}`;
+        }
+    }
+
+    /**
+     * Finds a gene and highlights it.
+     */
+    function handleGeneSearch(geneSymbol, queryAI = true) {
+        const gene = geneSymbol.trim().toUpperCase();
+        if (!gene) return;
+
+        if (!window.CiliAI || !window.CiliAI.ready || !window.CiliAI.lookups || !window.CiliAI.lookups.geneMap) {
+            console.warn("CiliAI data is not ready for gene search.");
+            return;
+        }
+
+        const geneData = window.CiliAI.lookups.geneMap[gene];
+
+        if (!geneData) {
+            addChatMessage(`Gene Not Found: ${gene}. This gene is not in the CiliAI database.`, false);
+            return;
+        }
+
+        // Find localization
+        let loc = 'unknown';
+        let locString = 'Unknown';
+        if (geneData.localization) {
+            // Note: geneData.localization is the raw string/array
+            const locArray = ensureArray(geneData.localization);
+            locString = locArray.join(', ');
+            const locLower = locString.toLowerCase();
+
+            if (locLower.includes('transition zone')) loc = 'transition-zone';
+            else if (locLower.includes('axoneme')) loc = 'axoneme';
+            else if (locLower.includes('basal body')) loc = 'basal-body';
+            else if (locLower.includes('membrane')) loc = 'ciliary-membrane';
+            else if (locLower.includes('nucleus')) loc = 'nucleus';
+            else if (locLower.includes('mitochondrion')) loc = 'mitochondria';
+            else if (locLower.includes('golgi')) loc = 'golgi-apparatus';
+            else if (locLower.includes('cytoplasm')) loc = 'cell-body';
+        }
+
+        // Highlight and show info
+        document.querySelectorAll('.cilia-part').forEach(el => el.classList.remove('active', 'selected'));
+        if (loc !== 'unknown' && document.getElementById(loc)) {
+            document.getElementById(loc).classList.add('active');
+        }
+        
+        if (queryAI) {
+            handleAIQuery(`Tell me about ${gene}`);
+        }
+    }
+
+    // --- 4B. Specific Data Handlers ---
+
+    /**
+     * Handles queries for screen data.
+     */
+    function handleScreenQuery(geneSymbol) {
+        const gene = geneSymbol.toUpperCase();
+        const g = window.CiliAI.lookups.geneMap[gene];
+        if (!g) return `Sorry, I could not find data for "${gene}".`;
+
+        let html = `<h4>Screen Results for <strong>${gene}</strong></h4>`;
+
+        if (g.percent_ciliated_cells_effects && g.percent_ciliated_cells_effects !== "Not Reported") {
+            html += `<p><strong>Percent Ciliated Cells Effect:</strong> ${g.percent_ciliated_cells_effects}</p>`;
+        }
+        if (g.lof_effects && g.lof_effects !== "Not Reported") {
+            html += `<p><strong>Loss-of-Function Effect:</strong> ${g.lof_effects}</p>`;
+        }
+        if (g.overexpression_effects && g.overexpression_effects !== "Not Reported") {
+            html += `<p><strong>Overexpression Effect:</strong> ${g.overexpression_effects}</p>`;
+        }
+
+        if (g.screens && g.screens.length > 0) {
+            html += '<strong>All Screen Data:</strong><ul>';
+            g.screens.forEach(s => {
+                html += `<li>[${s.dataset || 'Unknown'}] <strong>${s.classification}</strong> (Z-score: ${s.z_score || 'N/A'})</li>`;
+            });
+            html += '</ul>';
+        } else {
+            html += '<p>No specific screen data found in the database.</p>';
+        }
+        return html;
+    }
+
+    /**
+     * Handles queries for domain data (for one or more genes).
+     */
+    function handleDomainQuery(geneSymbols) {
+        let html = '';
+        const genes = Array.isArray(geneSymbols) ? geneSymbols : [geneSymbols];
+
+        genes.forEach(geneSymbol => {
+            const gene = geneSymbol.toUpperCase();
+            const g = window.CiliAI.lookups.geneMap[gene];
+            if (!g) {
+                html += `<p>Sorry, I could not find data for "${gene}".</p>`;
+                return;
+            }
+
+            html += `<h4>Domain Architecture for <strong>${gene}</strong></h4>`;
+
+            if (g.pfam_ids && g.pfam_ids.length > 0) {
+                html += '<p><strong>PFAM Domains:</strong></p><ul>';
+                g.pfam_ids.forEach((id, index) => {
+                    const desc = g.domain_descriptions[index] || 'No description';
+                    html += `<li><strong>${id}:</strong> ${desc}</li>`;
+                });
+                html += '</ul>';
+            } else {
+                html += '<p>No PFAM domain data found for this gene.</p>';
+            }
+        });
+        return html;
+    }
+
+    /**
+     * (NEW) Handles the first step of a complex/module query.
+     */
+    function handleComplexQuery(term) {
+        const geneList = getGenesByComplex(term);
+        const count = geneList.length;
+
+        if (count === 0) {
+            return `Sorry, I could not find any genes for the complex "${term}".`;
+        }
+
+        lastQueryContext = {
+            type: 'localization_list',
+            data: geneList, 
+            term: term
+        };
+
+        return `I found ${count} genes in the ${term} complex. Do you want to view the list?`;
+    }
+
+    /**
+     * Handles queries for ortholog data.
+     */
+    function handleOrthologQuery(geneSymbol, organism) {
+        const gene = geneSymbol.toUpperCase();
+        const g = window.CiliAI.lookups.geneMap[gene];
+        if (!g) return `Sorry, I could not find data for "${gene}".`;
+
+        const orgKey = `ortholog_${organism.toLowerCase().replace(/[\.\s]/g, '_')}`;
+
+        if (g[orgKey] && g[orgKey] !== 'N/A') {
+            return formatListResult(`Ortholog for ${gene} in ${organism}`, [{
+                gene: gene,
+                description: `${organism} Ortholog: <strong>${g[orgKey]}</strong>`
+            }]);
+        } else {
+            return `Sorry, I could not find a ${organism} ortholog for <strong>${gene}</strong>.`;
+        }
+    }
+
+    /**
+     * (NEW) Handles queries for a whole disease classification.
+     */
+    function handleClassificationQuery(classificationName, query) {
+        const qLower = query.toLowerCase();
+        const diseaseMap = getDiseaseClassificationMap();
+        
+        const casedClassificationName = Object.keys(diseaseMap).find(key => key.toLowerCase() === classificationName.toLowerCase());
+        
+        if (!casedClassificationName) {
+            return `Sorry, I don't recognize the classification "${classificationName}".`;
+        }
+
+        const diseaseList = diseaseMap[casedClassificationName];
+
+        if (qLower.includes('gene') || qLower.includes('genes') || qLower.includes('gene list')) {
+            let allGenes = new Set();
+            const geneMap = window.CiliAI.lookups.geneMap;
+            
+            diseaseList.forEach(diseaseName => {
+                const normDisease = diseaseName.toLowerCase();
+                const geneSymbols = window.CiliAI.lookups.byCiliopathy[normDisease] || [];
+                geneSymbols.forEach(g => allGenes.add(g));
+            });
+            
+            const geneListObjects = Array.from(allGenes).map(gene => {
+                const geneData = geneMap[gene];
+                return {
+                    gene: gene,
+                    description: geneData?.description || 'No description available.'
+                };
+            }).sort((a, b) => a.gene.localeCompare(b.gene)); 
+
+            if (geneListObjects.length === 0) {
+                return `I did not find any genes associated with the classification "${casedClassificationName}".`;
+            }
+
+            lastQueryContext = {
+                type: 'localization_list',
+                data: geneListObjects,
+                term: casedClassificationName
+            };
+
+            return `I found ${geneListObjects.length} unique genes associated with ${casedClassificationName}. Do you want to view the list?`;
+            
+        } else {
+            const diseaseHtml = diseaseList.map(d => `<li>${d}</li>`).join('');
+            return `
+                <div class="ai-result-card">
+                    <strong>${casedClassificationName}</strong>
+                    <p>This classification includes the following diseases:</p>
+                    <ul>${diseaseHtml}</ul>
+                </div>
+            `;
+        }
+    }
+
+    /**
+     * (NEW) Handles the first step of a localization query.
+     */
+    function handleLocalizationQuery(term) {
+        const geneList = getGenesByLocalization(term); 
+        const count = geneList.length;
+
+        if (count === 0) {
+            return `Sorry, I could not find any genes localized to "${term}".`;
+        }
+
+        lastQueryContext = {
+            type: 'localization_list',
+            data: geneList,
+            term: term
+        };
+
+        return `According to the latest data, ${count} genes are enriched in the ${term}. Do you want to view the list?`;
+    }
+
+    /**
+     * (NEW) Handler for scRNA queries
+     */
+    function handleScRnaQuery(geneSymbols) {
+        let html = `<h4>scRNA Expression Data</h4>`;
+        const geneMap = window.CiliAI.lookups.geneMap;
+        
+        geneSymbols.forEach(gene => {
+            const g = geneMap[gene];
+            if (!g) {
+                html += `<p><strong>${gene}:</strong> Not found in database.</p>`;
+                return;
+            }
+            
+            const exp = g.expression?.scRNA;
+            html += `<strong>${gene}:</strong> `;
+            
+            if (exp) {
+                 const topTissues = Object.entries(exp)
+                    .sort(([,a], [,b]) => b - a)
+                    .slice(0, 3) 
+                    .map(([tissue, val]) => `${tissue} (${val.toFixed(2)})`);
+                    
+                if (topTissues.length > 0) {
+                    html += `Top expression in: ${topTissues.join(', ')}...<br>`;
+                } else {
+                    html += `No scRNA expression data found.<br>`;
+                }
+            } else {
+                html += `No scRNA expression data found.<br>`;
+            }
+        });
+        
+        if (geneSymbols.length > 1) {
+            html += `<p style="font-size: 11px; margin-top: 5px;"><i>Note: A visual plot for expression comparison is not yet available.</i></p>`;
+        }
+        return `<div class="ai-result-card">${html}</div>`;
+    }
+
+    /**
+     * Handles all UMAP plotting requests and draws to the left panel.
+     * (FIXED: Uses umapByGene lookup map)
+     */
+    function handleUmapPlot(highlightGene = null) {
+        const plotDivId = 'cilia-svg'; // Draw on the left panel
+        const umapData = window.CiliAI.data.umap;
+        const umapLookup = window.CiliAI.lookups.umapByGene; // <-- FIX: Use the lookup
+
+        if (!umapData || umapData.length === 0) {
+            document.getElementById(plotDivId).innerHTML = '<p style="padding: 20px;">UMAP data not loaded.</p>';
+            return;
+        }
+
+        const backgroundTrace = {
+            x: [], y: [], text: [],
+            mode: 'markers', type: 'scatter', name: 'All Genes',
+            marker: { color: '#d3d3d3', size: 5, opacity: 0.5 },
+            hoverinfo: 'text'
+        };
+        const highlightTrace = {
+            x: [], y: [], text: [],
+            mode: 'markers', type: 'scatter', name: highlightGene || 'Highlighted',
+            marker: { color: '#2c5aa0', size: 10, opacity: 1, line: { color: 'black', width: 1 } },
+            hoverinfo: 'text'
+        };
+
+        let title = 'UMAP of Ciliary Genes';
+        const geneUpper = highlightGene ? highlightGene.toUpperCase() : null;
+        const highlightedPoint = geneUpper ? umapLookup[geneUpper] : null; // <-- FIX: Check the lookup
+
+        // Iterate the raw data for the background
+        umapData.forEach(d => {
+            if (highlightedPoint && d.gene === highlightedPoint.gene) {
+                // Skip
+            } else {
+                backgroundTrace.x.push(d.x);
+                backgroundTrace.y.push(d.y);
+                backgroundTrace.text.push(`<b>${d.gene}</b><br>${d.cluster}`);
+            }
+        });
+
+        const plotData = [backgroundTrace];
+
+        if (highlightedPoint) {
+            highlightTrace.x.push(highlightedPoint.x);
+            highlightTrace.y.push(highlightedPoint.y);
+            highlightTrace.text.push(`<b>${highlightedPoint.gene}</b><br>${highlightedPoint.cluster}`);
+            
+            plotData.push(highlightTrace);
+            title = `UMAP: ${highlightedPoint.gene}`;
+        } else if (highlightGene) {
+            addChatMessage(`Sorry, I could not find <strong>${highlightGene}</strong> in the UMAP data. Displaying all genes.`, false);
+        }
+
+        const layout = {
+            title: title,
+            xaxis: { title: 'UMAP 1', zeroline: false, showticklabels: false },
+            yaxis: { title: 'UMAP 2', zeroline: false, showticklabels: false },
+            showlegend: false,
+            hovermode: 'closest',
+            margin: { t: 40, b: 40, l: 40, r: 20 }
+        };
+
+        Plotly.newPlot(plotDivId, plotData, layout, { responsive: true });
+    }
+
+    // --- 4C. Phylogeny Engine ---
+
+    // ... (All phylogeny functions: getLiConservation, formatLiGeneData,
+    //      renderNeversPhylogenyHeatmap, renderLiPhylogenyHeatmap,
+    //      renderPhylogenyTable, getPhylogenyList, compareGeneSpeciesOverlap,
+    //      routePhylogenyAnalysis, handlePhylogenyVisualizationQuery) ...
+    // ... (These are large and unchanged from before, so they are omitted for brevity) ...
+
+
     // --- 4D. Data Getter Helpers ---
+
     /**
      * Fetches and formats a comprehensive summary for a single gene.
      * (FIXED: Filters numeric complex keys)
@@ -2071,7 +2534,6 @@ function injectPageCSS() {
             html += `<li><strong>Ciliopathy:</strong> ${g.ciliopathy.join(', ')}</li>`;
         }
         
-        // FIX: Filter out numeric keys
         const complexes = Object.keys(g.complex_components || {})
                               .filter(name => isNaN(parseInt(name)));
         if (complexes.length > 0) {
@@ -2097,10 +2559,9 @@ function injectPageCSS() {
         return html;
     }
 
-     // Generic getter for ciliopathy
     /**
+     * Generic getter for ciliopathy
      * (UPDATED: Now adds disease classification to the description)
-     * 
      */
     function getCiliopathyGenes(term) {
         const normTerm = term.toLowerCase();
@@ -2115,13 +2576,11 @@ function injectPageCSS() {
         const geneSymbols = window.CiliAI.lookups.byCiliopathy[key] || [];
         const geneMap = window.CiliAI.lookups.geneMap;
         
-        // --- Get Classification ---
         const classification = window.CiliAI.lookups.byCiliopathyClassification[key];
         let desc = "";
         if (classification) {
             desc = `This disease is classified as a: <strong>${classification}</strong>.`;
         }
-        // --- END ---
 
         return {
             genes: geneSymbols.map(g => {
@@ -2135,29 +2594,18 @@ function injectPageCSS() {
         };
     }
 
-    
     /**
      * Generic getter for localization
-     * (FIXED: Iterates all keys instead of .find() to get complete lists)
-     * (FIXED: Fetches descriptions, adds "ciliary tip" alias)
+     * (FIXED: Simplified logic to correctly .includes() all matching keys)
      */
     function getGenesByLocalization(term) {
         let normTerm = term.toLowerCase();
         const L = window.CiliAI.lookups;
         const geneMap = L.geneMap;
-        let matchingGenes = new Set(); // Use a Set to avoid duplicates
+        let matchingGenes = new Set(); 
 
-        if (normTerm.includes('ciliary tip')) {
-            normTerm = 'ciliary tip'; // Be specific to match the new key
-        }
-        if (normTerm === 'cilia') {
-             normTerm = 'cilia'; // Matches 'cilia', 'ciliary', etc.
-        }
-        
         // --- THIS IS THE FIX ---
         // Simplified logic: just check if the key *includes* the term.
-        // This will now find "Mitochondria" when the user asks for "mitochondria"
-        // and it will find "basal body" from the cleaned ABCB6 data.
         const allLocKeys = Object.keys(L.byLocalization);
         allLocKeys.forEach(key => {
             if (key.toLowerCase().includes(normTerm)) {
@@ -2168,32 +2616,70 @@ function injectPageCSS() {
         });
         // --- END FIX ---
 
-        // Convert the Set back to an array of objects
         return Array.from(matchingGenes).map(gene => {
             const geneData = geneMap[gene];
             return {
                 gene: gene,
-                // Use the full localization string from the gene data for the description
                 description: geneData?.localization || `Found in ${term}`
             };
         });
     }
+
+    /**
+     * (NEW/FIXED) Generic getter for complexes
+     */
+    function getGenesByComplex(term) {
+        const normTerm = normalizeTerm(term);
+        const L = window.CiliAI.lookups;
+        const geneMap = L.geneMap;
+
+        const complexKey = Object.keys(L.byModuleOrComplex).find(key => normalizeTerm(key).includes(normTerm));
+        
+        if (complexKey) {
+            const geneSymbols = L.byModuleOrComplex[complexKey];
+            return geneSymbols.map(gene => ({
+                gene: gene,
+                description: geneMap[gene]?.description || `Component of ${complexKey}`
+            }));
+        }
+        return [];
+    }
     
-  /**
+    /**
+     * (NEW) Generic getter for modules
+     */
+    function getGenesByModule(term) {
+        const normTerm = term.toLowerCase();
+        const L = window.CiliAI.lookups;
+        const geneMap = L.geneMap;
+        
+        const modKey = Object.keys(L.byModules).find(key => key.toLowerCase().includes(normTerm));
+        
+        if (modKey && L.byModules[modKey]) {
+            return L.byModules[modKey].map(gene => ({ 
+                gene: gene, 
+                description: geneMap[gene]?.description || `Part of ${modKey}`
+            }));
+        }
+        return [];
+    }
+    
+    
+    // --- 4E. Main "Brain" (Query Routers) ---
+
+    /**
      * Simple keyword spotter
      * (UPDATED: Includes all new keywords for LOCALIZATION, CILIOPATHY, and CLASSIFICATION)
      */
     function flexibleIntentParser(query) {
         const qLower = query.toLowerCase().trim();
         
-        // --- Build dynamic disease keyword list ---
         const diseaseMap = getDiseaseClassificationMap();
         let allDiseaseKeywords = ['BBS', 'NPHP', 'MKS']; 
         for (const classification in diseaseMap) {
             allDiseaseKeywords = allDiseaseKeywords.concat(diseaseMap[classification]);
         }
         
-        // --- Build dynamic classification keyword list ---
         const classificationKeywords = Object.keys(diseaseMap);
 
         const entityKeywords = [
@@ -2238,15 +2724,12 @@ function injectPageCSS() {
         const normalizedQuery = normalizeTerm(query);
         
         for (const entityType of entityKeywords) {
-            // Sort keywords by length, longest first
             const sortedKeywords = [...entityType.keywords].sort((a, b) => b.length - a.length);
             
             for (const keyword of sortedKeywords) {
                 // Check if the normalized query INCLUDES the normalized keyword
-                // e.g., "genelistofprimaryciliopathies" includes "primaryciliopathy"
                 if (normalizedQuery.includes(normalizeTerm(keyword))) { 
                     if (qLower.includes('not in') || qLower.includes('except')) continue;
-                    // Return the *original* keyword ("Primary Ciliopathies")
                     return { type: entityType.type, entity: keyword, handler: entityType.handler };
                 }
             }
@@ -2254,92 +2737,7 @@ function injectPageCSS() {
         return null;
     }
 
-    
-/**
-     * (NEW) Handles queries for a whole disease classification.
-     * Differentiates between listing diseases and listing genes.
-     */
-    function handleClassificationQuery(classificationName, query) {
-        const qLower = query.toLowerCase();
-        const diseaseMap = getDiseaseClassificationMap();
-        
-        // Find the correct cased classification name
-        const casedClassificationName = Object.keys(diseaseMap).find(key => key.toLowerCase() === classificationName.toLowerCase());
-        
-        if (!casedClassificationName) {
-            return `Sorry, I don't recognize the classification "${classificationName}".`;
-        }
-
-        const diseaseList = diseaseMap[casedClassificationName];
-
-        // Check if user wants the gene list
-        if (qLower.includes('gene') || qLower.includes('genes') || qLower.includes('gene list')) {
-            let allGenes = new Set();
-            const geneMap = window.CiliAI.lookups.geneMap;
-            
-            diseaseList.forEach(diseaseName => {
-                const normDisease = diseaseName.toLowerCase();
-                const geneSymbols = window.CiliAI.lookups.byCiliopathy[normDisease] || [];
-                geneSymbols.forEach(g => allGenes.add(g));
-            });
-            
-            const geneListObjects = Array.from(allGenes).map(gene => {
-                const geneData = geneMap[gene];
-                return {
-                    gene: gene,
-                    description: geneData?.description || 'No description available.'
-                };
-            }).sort((a, b) => a.gene.localeCompare(b.gene)); // Sort alphabetically
-
-            if (geneListObjects.length === 0) {
-                return `I did not find any genes associated with the classification "${casedClassificationName}".`;
-            }
-
-            // Store the context for a "yes" follow-up
-            lastQueryContext = {
-                type: 'localization_list', // Reuse the table-displaying logic
-                data: geneListObjects,
-                term: casedClassificationName
-            };
-
-            return `I found ${geneListObjects.length} unique genes associated with ${casedClassificationName}. Do you want to view the list?`;
-            
-        } else {
-            // User just wants to list the diseases in the classification
-            const diseaseHtml = diseaseList.map(d => `<li>${d}</li>`).join('');
-            return `
-                <div class="ai-result-card">
-                    <strong>${casedClassificationName}</strong>
-                    <p>This classification includes the following diseases:</p>
-                    <ul>${diseaseHtml}</ul>
-                </div>
-            `;
-        }
-    }
-
-   /**
-     * (NEW) Handles the first step of a localization query.
-     * Returns a summary string and stores the gene list in context.
-     */
-    function handleLocalizationQuery(term) {
-        const geneList = getGenesByLocalization(term); // Get the full, fixed list
-        const count = geneList.length;
-
-        if (count === 0) {
-            return `Sorry, I could not find any genes localized to "${term}".`;
-        }
-
-        // Store the context for a "yes" follow-up
-        lastQueryContext = {
-            type: 'localization_list',
-            data: geneList, // This is an array of {gene, description}
-            term: term
-        };
-
-        // Return the summary string
-        return `According to the latest data, ${count} genes are enriched in the ${term}. Do you want to view the list?`;
-    } 
-    
+   
     /* ==============================================================
  * 5. Complex Map (required for BBSome etc.)
  * ============================================================== */
@@ -2387,142 +2785,8 @@ function getComplexPhylogenyTableMap() {
     };
 }
 
-    /**
-     * (NEW/FIXED) Generic getter for complexes
-     */
-    function getGenesByComplex(term) {
-        const normTerm = normalizeTerm(term);
-        const L = window.CiliAI.lookups;
-        const geneMap = L.geneMap;
-
-        // Find the key in the new lookup (e.g., "BBSOME")
-        const complexKey = Object.keys(L.byModuleOrComplex).find(key => normalizeTerm(key).includes(normTerm));
-        
-        if (complexKey) {
-            const geneSymbols = L.byModuleOrComplex[complexKey];
-            return geneSymbols.map(gene => ({
-                gene: gene,
-                description: geneMap[gene]?.description || `Component of ${complexKey}`
-            }));
-        }
-        return [];
-    }
-    
-    /**
-     * (NEW) Generic getter for modules
-     */
-    function getGenesByModule(term) {
-        const normTerm = term.toLowerCase();
-        const L = window.CiliAI.lookups;
-        const geneMap = L.geneMap;
-        
-        const modKey = Object.keys(L.byModules).find(key => key.toLowerCase().includes(normTerm));
-        
-        if (modKey && L.byModules[modKey]) {
-            return L.byModules[modKey].map(gene => ({ 
-                gene: gene, 
-                description: geneMap[gene]?.description || `Part of ${modKey}`
-            }));
-        }
-        return [];
-    }
-    
-    /**
-     * (NEW) Handler for scRNA queries
-     */
-    function handleScRnaQuery(geneSymbols) {
-        let html = `<h4>scRNA Expression Data</h4>`;
-        const geneMap = window.CiliAI.lookups.geneMap;
-        
-        geneSymbols.forEach(gene => {
-            const g = geneMap[gene];
-            if (!g) {
-                html += `<p><strong>${gene}:</strong> Not found in database.</p>`;
-                return;
-            }
-            
-            const exp = g.expression?.scRNA;
-            html += `<strong>${gene}:</strong> `;
-            
-            if (exp) {
-                 const topTissues = Object.entries(exp)
-                    .sort(([,a], [,b]) => b - a) // Sort by expression, descending
-                    .slice(0, 3) // Get top 3
-                    .map(([tissue, val]) => `${tissue} (${val.toFixed(2)})`);
-                    
-                if (topTissues.length > 0) {
-                    html += `Top expression in: ${topTissues.join(', ')}...<br>`;
-                } else {
-                    html += `No scRNA expression data found.<br>`;
-                }
-            } else {
-                html += `No scRNA expression data found.<br>`;
-            }
-        });
-        
-        if (geneSymbols.length > 1) {
-            html += `<p style="font-size: 11px; margin-top: 5px;"><i>Note: A visual plot for expression comparison is not yet available.</i></p>`;
-        }
-        return `<div class="ai-result-card">${html}</div>`;
-    }
-    /**
-     * Generic getter for ciliopathy
-     */
-    function getCiliopathyGenes(term) {
-        const normTerm = term.toLowerCase();
-        let key = normTerm;
-
-        // Handle aliases
-        if (normTerm === 'bbs') key = 'bardet–biedl syndrome';
-        if (normTerm === 'mks') key = 'meckel–gruber syndrome';
-        if (normTerm === 'joubert') key = 'joubert syndrome';
-        if (normTerm === 'nphp') key = 'nephronophthisis';
-
-        const genes = window.CiliAI.lookups.byCiliopathy[key] || [];
-
-        // Classification info isn't available in this context, skip for now.
-        let desc = "";
-
-        return {
-            genes: genes.map(g => ({ gene: g })),
-            description: desc
-        };
-    }
-
-   /**
-     * Generic getter for localization
-     * (FIXED: Simplified logic to correctly .includes() all matching keys)
-     */
-    function getGenesByLocalization(term) {
-        let normTerm = term.toLowerCase();
-        const L = window.CiliAI.lookups;
-        const geneMap = L.geneMap;
-        let matchingGenes = new Set(); // Use a Set to avoid duplicates
-
-        // --- THIS IS THE FIX ---
-        // Simplified logic: just check if the key *includes* the term.
-        // This will now find "Lysosomes" when the user asks for "lysosome"
-        const allLocKeys = Object.keys(L.byLocalization);
-        allLocKeys.forEach(key => {
-            if (key.toLowerCase().includes(normTerm)) {
-                L.byLocalization[key].forEach(geneSymbol => {
-                    matchingGenes.add(geneSymbol);
-                });
-            }
-        });
-        // --- END FIX ---
-
-        // Convert the Set back to an array of objects
-        return Array.from(matchingGenes).map(gene => {
-            const geneData = geneMap[gene];
-            return {
-                gene: gene,
-                // Use the full localization string from the gene data for the description
-                description: geneData?.localization || `Found in ${term}`
-            };
-        });
-    }
-
+   
+  
    /**
      * Handles queries for genes containing a specific domain.
      * (UPDATED: Accepts query argument, though it is not used)
@@ -2543,48 +2807,7 @@ function getComplexPhylogenyTableMap() {
 
     // --- 4E. Main "Brain" (Query Routers) ---
 
-    /**
-     * Simple keyword spotter (Synchronous)
-     */
-    function flexibleIntentParser(query) {
-        const qLower = query.toLowerCase().trim();
-        const entityKeywords = [
-            // {
-            //     type: 'COMPLEX',
-            //     keywords: ['BBSome', 'IFT-A', 'IFT-B', 'Transition Zone', 'MKS Complex', 'NPHP Complex'],
-            //     handler: (term) => `Sorry, getComplexPhylogenyTable is not defined.`
-            // },
-            {
-                type: 'CILIOPATHY',
-                keywords: ['Joubert Syndrome', 'BBS', 'Bardet–Biedl Syndrome', 'NPHP', 'Nephronophthisis', 'MKS', 'Meckel–Gruber Syndrome'],
-                handler: (term) => formatListResult(`Genes for ${term}`, (getCiliopathyGenes(term)).genes)
-            },
-            {
-                type: 'LOCALIZATION',
-                keywords: ['basal body', 'axoneme', 'transition zone', 'centrosome', 'cilium', 'cilia', 'ciliary tip', 'mitochondria', 'nucleus'],
-                handler: (term) => formatListResult(`Genes localizing to ${term}`, getGenesByLocalization(term))
-            },
-             {
-                type: 'DOMAIN',
-                keywords: ['WD40', 'coiled-coil', 'pfam', 'domain', 'ef-hand'],
-                handler: (term) => getGenesByDomain(term)
-            }
-        ];
-
-        const normalizedQuery = normalizeTerm(query);
-        for (const entityType of entityKeywords) {
-            const sortedKeywords = [...entityType.keywords].sort((a, b) => b.length - a.length);
-            for (const keyword of sortedKeywords) {
-                const keywordRegex = new RegExp(normalizeTerm(keyword).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
-                if (keywordRegex.test(normalizedQuery)) {
-                    if (qLower.includes('not in') || qLower.includes('except')) continue;
-                    return { type: entityType.type, entity: keyword, handler: entityType.handler };
-                }
-            }
-        }
-        return null;
-    }
-
+    
   /**
      * This is the main router that implements the Priority Waterfall.
      */
