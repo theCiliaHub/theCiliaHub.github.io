@@ -581,18 +581,13 @@
                 padding: 0;
                 box-sizing: border-box;
             }
-            /* ADD THIS RULE */
-            .content-area-full {
-                height: calc(100vh - 60px); /* Assumes 60px CiliaHub header */
-                overflow: hidden;
-                position: relative; /* Ensures a solid layout context */
-            }
             .container {
-                display: grid;
-                grid-template-columns: 1fr 450px;
-                height: 100%; /* <-- CHANGE THIS from 100vh */
-                gap: 0;
-            }
+            display: grid;
+            grid-template-columns: 1fr 450px;
+            height: calc(100vh - 60px); /* Apply calc height directly */
+            overflow: hidden; /* Prevent the container itself from scrolling */
+            gap: 0;
+        }
             .ciliai-message { /* Renamed for clarity */
                 margin-bottom: 15px;
                 animation: fadeIn 0.3s ease;
