@@ -583,10 +583,10 @@
             }
             /* ADD THIS RULE */
             .content-area-full {
-                height: 100vh;
+                height: calc(100vh - 60px); /* Assumes 60px CiliaHub header */
                 overflow: hidden;
+                position: relative; /* Ensures a solid layout context */
             }
-
             .container {
                 display: grid;
                 grid-template-columns: 1fr 450px;
