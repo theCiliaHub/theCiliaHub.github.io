@@ -2137,9 +2137,11 @@ function injectPageCSS() {
             };
         });
     }
+    
    /**
+    /**
      * Simple keyword spotter
-     * (FIXED: Implements new handlers and keywords)
+     * (FIXED: Added 'lysosome' and 'flagella' to the keywords list)
      */
     function flexibleIntentParser(query) {
         const qLower = query.toLowerCase().trim();
@@ -2148,7 +2150,9 @@ function injectPageCSS() {
                 type: 'COMPLEX',
                 keywords: [
                     'BBSome', 'IFT-A', 'IFT-B', 'IFT COMPLEX', 'MKS MODULE', 'NPHP MODULE', 
-                    'IFT MOTOR', 'EXOCYST', 'CILIARY TIP', 'DYNEIN ARM', 'RADIAL SPOKE', 'CENTRAL PAIR'
+                    'IFT MOTOR', 'EXOCYST', 'DYNEIN ARM', 'RADIAL SPOKE', 'CENTRAL PAIR',
+                    'CILIARY ROOTLET', 'CPLANE COMPLEX', 'SEPTIN RING', 'DYNEIN ASSEMBLY FACTORS',
+                    'CILIOGENESIS REGULATORS', 'PCP CORE'
                 ],
                 handler: (term) => handleComplexQuery(term) // Point to the new UX handler
             },
@@ -2156,7 +2160,8 @@ function injectPageCSS() {
                 type: 'LOCALIZATION',
                 keywords: [
                     'basal body', 'axoneme', 'transition zone', 'centrosome', 
-                    'cilium', 'cilia', 'mitochondria', 'nucleus', 'ciliary tip'
+                    'cilium', 'cilia', 'mitochondria', 'nucleus', 'ciliary tip',
+                    'lysosome', 'lysosomes', 'flagella' // <-- FIX IS HERE
                 ],
                 handler: (term) => handleLocalizationQuery(term) // This is already correct
             },
@@ -2178,7 +2183,8 @@ function injectPageCSS() {
             const sortedKeywords = [...entityType.keywords].sort((a, b) => b.length - a.length);
             for (const keyword of sortedKeywords) {
                 const keywordRegex = new RegExp(normalizeTerm(keyword).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
-                if (normalizedQuery.includes(normalizeTerm(keyword))) { // Use includes for partial match
+                // Use .includes() for partial matching (e.g., "genes in the bbsome")
+                if (normalizedQuery.includes(normalizeTerm(keyword))) { 
                     if (qLower.includes('not in') || qLower.includes('except')) continue;
                     return { type: entityType.type, entity: keyword, handler: entityType.handler };
                 }
