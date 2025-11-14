@@ -1161,10 +1161,12 @@ function injectPageCSS() {
 
     /**
      * Normalizes a term for keyword matching
+     * (FIX: Added .replace(/s$/, '') to match plurals)
      */
     function normalizeTerm(term) {
         if (typeof term !== 'string') return '';
-        return term.toLowerCase().replace(/[\s\-\_]/g, '');
+        // Removes spaces, hyphens, underscores, AND trailing 's'
+        return term.toLowerCase().replace(/[\s\-\_]/g, '').replace(/s$/, '');
     }
 
     /**
@@ -2177,7 +2179,7 @@ function injectPageCSS() {
         });
     }
     
-   /**
+  /**
      * Simple keyword spotter
      * (UPDATED: Includes all new keywords for LOCALIZATION, CILIOPATHY, and CLASSIFICATION)
      */
@@ -2232,14 +2234,19 @@ function injectPageCSS() {
             }
         ];
 
+        // This uses the new normalizeTerm function
         const normalizedQuery = normalizeTerm(query);
+        
         for (const entityType of entityKeywords) {
             // Sort keywords by length, longest first
             const sortedKeywords = [...entityType.keywords].sort((a, b) => b.length - a.length);
+            
             for (const keyword of sortedKeywords) {
-                // Use .includes() for partial matching
+                // Check if the normalized query INCLUDES the normalized keyword
+                // e.g., "genelistofprimaryciliopathies" includes "primaryciliopathy"
                 if (normalizedQuery.includes(normalizeTerm(keyword))) { 
                     if (qLower.includes('not in') || qLower.includes('except')) continue;
+                    // Return the *original* keyword ("Primary Ciliopathies")
                     return { type: entityType.type, entity: keyword, handler: entityType.handler };
                 }
             }
@@ -2482,7 +2489,7 @@ function getComplexPhylogenyTableMap() {
         };
     }
 
-    /**
+   /**
      * Generic getter for localization
      * (FIXED: Simplified logic to correctly .includes() all matching keys)
      */
@@ -2492,10 +2499,6 @@ function getComplexPhylogenyTableMap() {
         const geneMap = L.geneMap;
         let matchingGenes = new Set(); // Use a Set to avoid duplicates
 
-        if (normTerm.includes('ciliary tip')) {
-            normTerm = 'ciliary tip'; // Be specific to match the new key
-        }
-        
         // --- THIS IS THE FIX ---
         // Simplified logic: just check if the key *includes* the term.
         // This will now find "Lysosomes" when the user asks for "lysosome"
