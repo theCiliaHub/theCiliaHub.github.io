@@ -2999,6 +2999,7 @@ function getComplexPhylogenyTableMap() {
     
 /**
      * This is the main router that implements the Priority Waterfall.
+     * (FIXED: Now checks for 'list_followup' context type)
      */
     async function handleAIQuery(query) {
         const chatWindow = document.getElementById('messages');
@@ -3022,15 +3023,17 @@ function getComplexPhylogenyTableMap() {
             let match;
 
             // =( 1 )= INTENT: CONTEXTUAL FOLLOW-UP ("Yes") ==============
-            // --- THIS IS THE FIX (More flexible follow-up) ---
+            // --- THIS IS THE FIX ---
             const isFollowUp = qLower === 'yes' || qLower === 'ok' || qLower === 'sure' || 
                                qLower.includes('view the list') || qLower.includes('show') || 
                                qLower.includes('please') || qLower.includes('display');
             
-            if (htmlResult === null && isFollowUp && lastQueryContext.type === 'localization_list') {
+            // Check for the NEW, unified context type
+            if (htmlResult === null && isFollowUp && lastQueryContext.type === 'list_followup') {
             // --- END FIX ---
                 log('Routing via: Intent (Follow-up: Show List)');
-                showDataInLeftPanel(lastQueryContext.term, lastQueryContext.data);
+                // Call the new 3-argument function
+                showDataInLeftPanel(lastQueryContext.term, lastQueryContext.data, lastQueryContext.descriptionHeader);
                 lastQueryContext = { type: null, data: [], term: null };
                 htmlResult = ""; // Signal that the query was handled visually
             }
