@@ -2095,10 +2095,11 @@ function injectPageCSS() {
         return html;
     }
 
-    //**
-     * Generic getter for ciliopathy
-     * (UPDATED: Now adds disease classification to the description)
+    **//
+     * //Generic getter for ciliopathy
+    ** //(UPDATED: Now adds disease classification to the description)
      */
+    
     function getCiliopathyGenes(term) {
         const normTerm = term.toLowerCase();
         let key = normTerm;
