@@ -572,238 +572,477 @@ const NEVERS_NCIL_PANEL = [
      * Injects the page's CSS into the <head>.
      */
     function injectPageCSS() {
-        const styleId = 'ciliai-dynamic-styles';
-        if (document.getElementById(styleId)) return; // Already injected
+    const styleId = 'ciliai-dynamic-styles';
+    if (document.getElementById(styleId)) return;
 
-        const css = `
-            :root {
-                --primary: #2c5aa0;
-                --primary-dark: #1e4273;
-                --bg: #f8fbfd;
-                --card: #ffffff;
-                --text: #1a1a1a;
-                --text-light: #555;
-                --border: #e1e5e9;
-                /* Cilia Colors */
-                --cilia-axoneme: #ff6b6b;
-                --cilia-basal-body: #4ecdc4;
-                --cilia-tz: #45b7d1;
-                --cilia-membrane: #A0AEC0; /* Gray for dash */
-                /* Organelle Colors (compatible) */
-                --org-nucleus: #B0B8C8; /* Gray */
-                --org-nucleolus: #4A5568; /* Dark Gray */
-                --org-mitochondria: #4A5568; /* Dark Gray */
-                --org-golgi: #4A5568; /* Dark Gray */
-                --org-vesicle: #66b7ff; /* Blue */
-                --org-lysosome: #718096; /* Gray */
-                --org-peroxisome: #A0AEC0; /* Gray */
-                --org-ribosome: #4A5568; /* Dark Gray */
-                --org-cytoplasm: #F5F7FA; /* Lightest Gray */
-                --org-pm: #E9EDF2; /* Light Gray */
-                --org-microtubule: #4A5568; /* Dark Gray */
-            }
-            .ciliai-page {
-                max-width: 1400px;
-                margin: 0 auto;
-                padding: 1.5rem;
-                font-family: 'Inter', sans-serif;
-                line-height: 1.6;
-            }
-            .ciliai-header { text-align: center; margin-bottom: 2.5rem; }
-            .ciliai-header h1 { font-size: 2.8rem; color: var(--primary); font-weight: 700; }
-            .ciliai-header p { color: var(--text-light); font-size: 1.15rem; margin-top: 0.5rem; }
-            .ciliai-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-bottom: 3rem; }
-            @media (max-width: 992px) { .ciliai-grid { grid-template-columns: 1fr; } }
+    const css = `
+        .ciliai-page {
+            display: grid;
+            grid-template-columns: 1fr 450px;
+            height: calc(100vh - 60px);
+            gap: 0;
+            background: #f5f7fa;
+        }
 
-            /* Panels */
-            .diagram-panel, .info-panel {
-                background: var(--card);
-                border-radius: 16px;
-                padding: 1.8rem;
-                box-shadow: 0 6px 20px rgba(0,0,0,.08);
-            }
-            .diagram-panel h3, .info-panel h3 {
-                margin: 0 0 1rem;
-                color: var(--primary);
-                font-size: 1.5rem;
-            }
-            
-            /* Left Panel: Cilia Diagram */
-            .diagram-toolbar { display: flex; gap: 0.75rem; margin-bottom: 1rem; flex-wrap: wrap; }
-            .gene-search { display: flex; gap: 0.5rem; flex: 1; max-width: 400px; }
-            .gene-input { flex: 1; padding: 0.7rem 1rem; border: 1px solid var(--border); border-radius: 8px; font-size: 0.95rem; }
-            .btn {
-                padding: 0.7rem 1.2rem; background: var(--primary); color: white; border: none;
-                border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 0.95rem; transition: 0.2s;
-            }
-            .btn:hover { background: var(--primary-dark); }
-            .btn-outline { background: transparent; border: 1px solid var(--primary); color: var(--primary); }
-            .btn-outline:hover { background: rgba(44, 90, 160, 0.1); }
-            
-            /* SVG Container */
-            .svg-container {
-                height: 560px; overflow: hidden; border: 1px solid var(--border);
-                border-radius: 12px; background: var(--org-cytoplasm); padding: 0;
-            }
-            #cilia-svg svg { width: 100%; height: 100%; }
-            #cilia-svg .compartment { cursor: pointer; transition: all 0.2s; }
-            #cilia-svg .compartment:hover { opacity: 0.8; filter: brightness(1.1); }
-            #cilia-svg .compartment.active {
-                stroke-width: 4px;
-                stroke: #000000;
-                filter: drop-shadow(0 0 8px currentColor) drop-shadow(0 0 5px rgba(0,0,0,0.5));
-            }
+        .ciliai-left-panel {
+            display: flex;
+            flex-direction: column;
+            background: #f5f7fa;
+            border-right: 1px solid #e1e8ed;
+        }
 
-            /* --- Cilia & Organelle Colors --- */
-            /* Cilia */
-            .structure-axoneme { fill: none !important; stroke: var(--cilia-axoneme) !important; stroke-width: 4px; color: var(--cilia-axoneme); }
-            .structure-basal-body { fill: var(--cilia-basal-body) !important; color: var(--cilia-basal-body); }
-            .structure-transition-zone { fill: var(--cilia-tz) !important; color: var(--cilia-tz); }
-            .structure-ciliary-membrane { stroke: var(--cilia-membrane) !important; fill: none; stroke-width: 3px; stroke-dasharray: 6, 6; color: var(--cilia-membrane); }
-            /* Organelles (from v3.5 diagram style) */
-            .structure-nucleus { fill: var(--org-nucleus) !important; color: var(--org-nucleus); }
-            .structure-nucleolus { fill: var(--org-nucleolus) !important; color: var(--org-nucleolus); }
-            .structure-mitochondria { fill: var(--org-mitochondria) !important; color: var(--org-mitochondria); }
-            .structure-golgi-apparatus { fill: none !important; stroke: var(--org-golgi) !important; stroke-width: 4px; color: var(--org-golgi); }
-            .structure-golgi-vesicle { fill: var(--org-vesicle) !important; color: var(--org-vesicle); }
-            .structure-lysosome { fill: var(--org-lysosome) !important; color: var(--org-lysosome); }
-            .structure-peroxisome { fill: var(--org-peroxisome) !important; color: var(--org-peroxisome); }
-            .structure-ribosomes { fill: var(--org-ribosome) !important; color: var(--org-ribosome); }
-            .structure-cytoplasm { fill: var(--org-cytoplasm) !important; stroke: #D8DEE9; stroke-width: 3px; color: var(--org-cytoplasm); opacity: 1.0; }
-             .structure-cell-body { fill: var(--org-cytoplasm) !important; stroke: #D8DEE9; stroke-width: 3px; color: var(--org-cytoplasm); opacity: 1.0; }
-            .structure-plasma-membrane { fill: var(--org-pm) !important; color: var(--org-pm); opacity: 1.0; }
-            .structure-microtubule { stroke: var(--org-microtubule) !important; fill: none; stroke-width: 2px; color: var(--org-microtubule); }
-            /* --- End Colors --- */
+        .ciliai-header {
+            padding: 20px 30px;
+            background: white;
+            color: #2c3e50;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+            border-bottom: 1px solid #e1e8ed;
+        }
 
-            /* Right Panel: Info */
-            .info-panel {
-                display: flex;
-                flex-direction: column;
-                height: fit-content;
-            }
-            .info-lists {
-                margin-bottom: 1.5rem;
-            }
-            .organelle-info-panel {
-                background: #e8f4fd;
-                border: 1px solid #bbdefb;
-                border-radius: 12px;
-                padding: 1rem 1.2rem;
-                min-height: 100px;
-            }
-            .organelle-info-panel h3 {
-                margin: 0 0 0.5rem 0;
-                color: var(--primary);
-                font-size: 1.25rem;
-            }
-            .organelle-info-panel p {
-                margin: 0;
-                font-size: 0.95rem;
-                line-height: 1.6;
-            }
-            .organelle-info-panel .gene-list {
-                display: flex;
-                flex-wrap: wrap;
-                gap: 0.5rem;
-                font-size: 0.9rem;
-                margin-top: 0.75rem;
-            }
-            .organelle-info-panel .gene-tag {
-                background: white; padding: 0.3rem 0.6rem; border-radius: 6px;
-                border: 1px solid #bbdefb; cursor: pointer;
-            }
-            .organelle-info-panel .gene-tag:hover { background: #d0ebff; }
+        .ciliai-header h1 {
+            font-size: 28px;
+            font-weight: 600;
+            margin-bottom: 5px;
+            color: #2c3e50;
+            margin: 0;
+        }
 
-            /* AI Chat (placed below info) */
-            .chat-panel {
-                margin-top: 2rem;
-                padding: 1.5rem;
-            }
-            .disclaimer {
-                font-size: 0.85rem; color: #e74c3c; background: #fdf2f2; padding: 0.8rem;
-                border-radius: 8px; margin-bottom: 1.5rem; border-left: 4px solid #e74c3c;
-            }
-            .chat-window {
-                flex: 1; max-height: 400px; overflow-y: auto; padding: 1rem; background: #f8f9fa;
-                border-radius: 12px; margin-bottom: 1rem; border: 1px solid var(--border);
-            }
-            .message { margin: 0.75rem 0; padding: 0.75rem 1rem; border-radius: 12px; max-width: 85%; position: relative; }
-            .user-message { background: var(--primary); color: white; margin-left: auto; border-bottom-right-radius: 4px; }
-            .ai-message { background: white; border: 1px solid var(--border); margin-right: auto; border-bottom-left-radius: 4px; }
-            .ai-message strong { color: var(--primary); }
-            .ai-message em { font-style: italic; color: var(--text-light); }
-            .feedback { font-size: 0.8rem; margin-top: 0.5rem; display: flex; gap: 0.5rem; }
-            .feedback button { background: none; border: none; cursor: pointer; font-size: 1.2rem; opacity: 0.5; }
-            .feedback button:hover { opacity: 1; }
-            
-            .chat-input-group {
-                display: flex;
-                flex-direction: column; /* Stacks the input and button */
-                gap: 0.75rem; /* Adds space between input and button */
-            }
-            .chat-input {
-                width: 100%; /* Make input take full width */
-                padding: 0.9rem;
-                font-size: 1rem;
-                border: 1px solid var(--border);
-                border-radius: 8px;
-                box-sizing: border-box; /* Important for 100% width */
-            }
-            .send-btn {
-                background: var(--primary);
-                color: white;
-                padding: 0.9rem 1.8rem;
-                border: none;
-                border-radius: 8px;
-                cursor: pointer;
-                font-weight: 600;
-                align-self: flex-end; /* This aligns the button to the right */
-                width: fit-content; /* Button is only as wide as its text */
-            }
-            .send-btn:hover { background: var(--primary-dark); }
-        `;
+        .ciliai-header p {
+            font-size: 14px;
+            color: #666;
+            margin: 5px 0 0 0;
+        }
+
+        .ciliai-toolbar {
+            padding: 15px 30px;
+            background: white;
+            border-bottom: 1px solid #e1e8ed;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .ciliai-toolbar input {
+            flex: 1;
+            min-width: 200px;
+            padding: 10px 15px;
+            border: 1px solid #d1d9e0;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+
+        .ciliai-toolbar button {
+            padding: 10px 20px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.2s;
+            font-size: 14px;
+        }
+
+        .ciliai-toolbar button:hover {
+            background: #5568d3;
+        }
+
+        .ciliai-toolbar .status {
+            font-size: 12px;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-weight: 500;
+        }
+
+        .ciliai-toolbar .status.loading { 
+            background: #fff3cd; 
+            color: #856404; 
+        }
         
-        const styleEl = document.createElement('style');
-        styleEl.id = styleId;
-        styleEl.textContent = css;
-        document.head.appendChild(styleEl);
-    }
+        .ciliai-toolbar .status.ready { 
+            background: #d4edda; 
+            color: #155724; 
+        }
+        
+        .ciliai-toolbar .status.error { 
+            background: #f8d7da; 
+            color: #721c24; 
+        }
+
+        .ciliai-diagram-container {
+            flex: 1;
+            padding: 20px;
+            overflow: auto;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: white;
+        }
+
+        .ciliai-interactive-cilium {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            max-width: 600px;
+            width: 100%;
+            border: 1px solid #e1e8ed;
+        }
+
+        .ciliai-svg-container svg {
+            width: 100%;
+            height: auto;
+        }
+
+        .cilia-part {
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .cilia-part:hover {
+            opacity: 0.8;
+        }
+
+        .cilia-part:focus {
+            outline: 2px solid #667eea;
+            outline-offset: 2px;
+        }
+
+        .cilia-part.selected {
+            filter: brightness(1.2);
+            stroke: #ff6b00 !important;
+            stroke-width: 4 !important;
+        }
+
+        .ciliai-bottom-bar {
+            padding: 20px 30px;
+            background: white;
+            border-top: 1px solid #e1e8ed;
+            min-height: 150px;
+            max-height: 250px;
+            overflow-y: auto;
+        }
+
+        .ciliai-bottom-bar h3 {
+            font-size: 16px;
+            color: #2d3748;
+            margin-bottom: 12px;
+            margin-top: 0;
+        }
+
+        .ciliai-right-panel {
+            display: flex;
+            flex-direction: column;
+            background: #f5f7fa;
+            overflow: hidden;
+        }
+
+        .ciliai-welcome-section {
+            padding: 25px;
+            background: white;
+            border-bottom: 1px solid #e1e8ed;
+            max-height: 35vh;
+            overflow-y: auto;
+            flex-shrink: 0;
+        }
+
+        .ciliai-welcome-section h2 {
+            font-size: 20px;
+            color: #2c3e50;
+            margin-bottom: 12px;
+            font-weight: 600;
+            margin-top: 0;
+        }
+
+        .ciliai-welcome-section p {
+            font-size: 13px;
+            line-height: 1.6;
+            color: #4a5568;
+            margin-bottom: 15px;
+        }
+
+        .ciliai-steps {
+            font-size: 12px;
+            line-height: 1.7;
+            color: #4a5568;
+            padding-left: 20px;
+            margin: 0;
+        }
+
+        .ciliai-steps li {
+            margin-bottom: 10px;
+        }
+
+        .ciliai-disclaimer {
+            margin-top: 15px;
+            padding: 12px;
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            border-radius: 4px;
+            font-size: 12px;
+            color: #856404;
+        }
+
+        .ciliai-chat-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .ciliai-messages {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            background: white;
+        }
+
+        .ciliai-message {
+            margin-bottom: 15px;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .ciliai-message.user {
+            text-align: right;
+        }
+
+        .ciliai-message-content {
+            display: inline-block;
+            max-width: 85%;
+            padding: 12px 16px;
+            border-radius: 8px;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+
+        .ciliai-message.user .ciliai-message-content {
+            background: #667eea;
+            color: white;
+            border-radius: 18px 18px 4px 18px;
+        }
+
+        .ciliai-message.assistant .ciliai-message-content {
+            background: #f8f9fa;
+            color: #2d3748;
+            border: 1px solid #e1e8ed;
+            border-radius: 18px 18px 18px 4px;
+        }
+
+        .ciliai-input-area {
+            padding: 15px 20px;
+            background: white;
+            border-top: 1px solid #e1e8ed;
+        }
+
+        .ciliai-input-container {
+            display: flex;
+            gap: 10px;
+        }
+
+        .ciliai-input-container input {
+            flex: 1;
+            padding: 12px 16px;
+            border: 1px solid #d1d9e0;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+
+        .ciliai-input-container button {
+            padding: 12px 24px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        .ciliai-input-container button:hover {
+            background: #5568d3;
+        }
+
+        .ciliai-legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-top: 12px;
+        }
+
+        .ciliai-legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            color: #4a5568;
+            cursor: pointer;
+            padding: 4px 8px;
+            border-radius: 4px;
+            transition: all 0.2s;
+        }
+
+        .ciliai-legend-item:hover {
+            background: #f7fafc;
+        }
+
+        .ciliai-legend-color {
+            width: 14px;
+            height: 14px;
+            border-radius: 3px;
+            border: 1px solid rgba(0,0,0,0.2);
+        }
+
+        .ciliai-gene-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: 10px;
+        }
+
+        .ciliai-gene-badge {
+            padding: 5px 10px;
+            background: #667eea15;
+            color: #667eea;
+            border-radius: 5px;
+            font-size: 11px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .ciliai-gene-badge:hover {
+            background: #667eea;
+            color: white;
+        }
+
+        .ciliai-reaction-buttons {
+            display: flex;
+            gap: 8px;
+            margin-top: 8px;
+            font-size: 16px;
+        }
+
+        .ciliai-reaction-btn {
+            cursor: pointer;
+            opacity: 0.6;
+            transition: all 0.2s;
+            user-select: none;
+        }
+
+        .ciliai-reaction-btn:hover {
+            opacity: 1;
+            transform: scale(1.15);
+        }
+
+        @media (max-width: 992px) {
+            .ciliai-page {
+                grid-template-columns: 1fr;
+            }
+        }
+    `;
+    
+    const styleEl = document.createElement('style');
+    styleEl.id = styleId;
+    styleEl.textContent = css;
+    document.head.appendChild(styleEl);
+}
 
     /**
      * Returns the full HTML string for the page content. (v3.5)
      */
-    function getPageHTML() {
-        return `
-        <div class="ciliai-page">
+   function getPageHTML() {
+    return `
+    <div class="ciliai-page">
+        <!-- LEFT PANEL -->
+        <div class="ciliai-left-panel">
             <div class="ciliai-header">
-                <h1>CiliAI Explorer</h1>
+                <h1>🔬 CiliAI Explorer</h1>
                 <p>Interactive ciliary biology and gene function explorer</p>
             </div>
 
-            <div class="ciliai-grid">
-                <div class="diagram-panel">
-                    <div class="diagram-toolbar">
-                        <div class="gene-search">
-                            <input type="text" id="geneSearchInput" class="gene-input" placeholder="Search gene (e.g., IFT88, NPHP1, CEP290)">
-                            <button id="findGeneBtn" class="btn">Find Gene</button>
-                        </div>
-                        <button id="showUmapBtn" class="btn btn-outline">Show UMAP</button>
-                    </div>
-                    <div class="svg-container">
-                        <div id="cilia-svg"></div>
-                    </div>
-                </div>
+            <div class="ciliai-toolbar">
+                <input type="text" id="geneSearchInput" placeholder="Search gene (e.g., IFT88, NPHP1, CEP290)">
+                <button id="findGeneBtn">Find Gene</button>
+                <button id="showUmapBtn">Show UMAP</button>
+                <span id="dataStatus" class="status loading">Initializing...</span>
+            </div>
 
-                        <div id="chatWindow" class="chat-window"></div>
-                        <div class="chat-input-group">
-                            <input type="text" id="chatInput" class="chat-input" placeholder="Ask CiliAI...">
-                            <button id="sendBtn" class="send-btn">Send</button>
-                        </div>
+            <div class="ciliai-diagram-container">
+                <div class="ciliai-interactive-cilium">
+                    <div class="ciliai-svg-container" id="cilia-svg"></div>
+                </div>
+            </div>
+
+            <div class="ciliai-bottom-bar" id="bottomBar">
+                <h3>Click on a compartment or search for a gene</h3>
+                <div class="ciliai-legend">
+                    <div class="ciliai-legend-item" onclick="selectComp('axoneme')">
+                        <div class="ciliai-legend-color" style="background: #4A5568;"></div>
+                        <span>Axoneme</span>
+                    </div>
+                    <div class="ciliai-legend-item" onclick="selectComp('transition-zone')">
+                        <div class="ciliai-legend-color" style="background: #718096;"></div>
+                        <span>Transition Zone</span>
+                    </div>
+                    <div class="ciliai-legend-item" onclick="selectComp('basal-body')">
+                        <div class="ciliai-legend-color" style="background: #4A5568;"></div>
+                        <span>Basal Body</span>
+                    </div>
+                    <div class="ciliai-legend-item" onclick="selectComp('ciliary-membrane')">
+                        <div class="ciliai-legend-color" style="background: #A0AEC0;"></div>
+                        <span>Ciliary Membrane</span>
+                    </div>
+                    <div class="ciliai-legend-item" onclick="selectComp('cell-body')">
+                        <div class="ciliai-legend-color" style="background: #E9EDF2;"></div>
+                        <span>Cell Body</span>
+                    </div>
+                    <div class="ciliai-legend-item" onclick="selectComp('nucleus')">
+                        <div class="ciliai-legend-color" style="background: #C8D0DD;"></div>
+                        <span>Nucleus</span>
                     </div>
                 </div>
             </div>
-        </div>`;
-    }
+        </div>
+
+        <!-- RIGHT PANEL -->
+        <div class="ciliai-right-panel">
+            <div class="ciliai-welcome-section">
+                <h2>Welcome to CiliAI! 🎉</h2>
+                <p><strong>CiliAI</strong> is an AI-powered tool to explore ciliary biology, gene function, and disease data.</p>
+                
+                <ol class="ciliai-steps">
+                    <li>Type <strong>"What is IFT88?"</strong> in the text box below.</li>
+                    <li>Click on the <strong>"Transition Zone"</strong> in the cilia diagram.</li>
+                    <li>Search for a gene like <strong>CEP290</strong> in the search bar.</li>
+                    <li>Ask questions like <strong>"List genes in the axoneme"</strong></li>
+                    <li>Press 👎 if a response doesn't make sense.</li>
+                    <li>Press 👍 for helpful answers.</li>
+                    <li>Use 📝 to start a new conversation.</li>
+                </ol>
+
+                <div class="ciliai-disclaimer">
+                    <strong>⚠️ Disclaimer:</strong> CiliAI is an AI system and may produce misleading results. Use it for data exploration and hypothesis generation, not as a replacement for curated databases.
+                </div>
+            </div>
+
+            <div class="ciliai-chat-container">
+                <div class="ciliai-messages" id="messages"></div>
+                <div class="ciliai-input-area">
+                    <div class="ciliai-input-container">
+                        <input type="text" id="chatInput" placeholder="Ask CiliAI...">
+                        <button onclick="sendMsg()">Send</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>`;
+}
 
     
     // --- 6. SVG GENERATION & INTERACTION ---
@@ -973,25 +1212,26 @@ const NEVERS_NCIL_PANEL = [
     /**
      * Adds a message to the chat window.
      */
-    function addChatMessage(html, isUser = false) {
-        const chatWindow = document.getElementById('chatWindow');
-        if (!chatWindow) return; // Guard clause
-        const msg = document.createElement('div');
-        msg.className = `message ${isUser ? 'user-message' : 'ai-message'}`;
-        
-        msg.innerHTML = `<div class="message-content">${html}</div>`; // Use innerHTML to allow <em>, <strong>, etc.
-        
-        if (!isUser) {
-            msg.querySelector('.message-content').innerHTML += `
-                <div class="feedback">
-                    <button title="Good answer" data-feedback="good">👍</button>
-                    <button title="Bad answer" data-feedback="bad">👎</button>
-                </div>`;
-        }
-        
-        chatWindow.appendChild(msg);
-        chatWindow.scrollTop = chatWindow.scrollHeight; // Auto-scroll
+   function addChatMessage(html, isUser = false) {
+    const chatWindow = document.getElementById('messages');
+    if (!chatWindow) return;
+    
+    const msg = document.createElement('div');
+    msg.className = `ciliai-message ${isUser ? 'user' : 'assistant'}`;
+    
+    msg.innerHTML = `<div class="ciliai-message-content">${html}</div>`;
+    
+    if (!isUser) {
+        msg.querySelector('.ciliai-message-content').innerHTML += `
+            <div class="ciliai-reaction-buttons">
+                <span class="ciliai-reaction-btn" onclick="react('up')">👍</span>
+                <span class="ciliai-reaction-btn" onclick="react('down')">👎</span>
+            </div>`;
     }
+    
+    chatWindow.appendChild(msg);
+    chatWindow.scrollTop = chatWindow.scrollHeight;
+}
 
     /**
      * Handles the user sending a message.
@@ -1008,6 +1248,14 @@ const NEVERS_NCIL_PANEL = [
         // Process the query
         handleAIQuery(query);
     }
+
+function updateStatus(text, status) {
+    const statusEl = document.getElementById('dataStatus');
+    if (statusEl) {
+        statusEl.textContent = text;
+        statusEl.className = `status ${status}`;
+    }
+}
     
     /**
      * Finds a gene and highlights it.
