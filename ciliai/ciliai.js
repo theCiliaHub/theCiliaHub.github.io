@@ -1023,12 +1023,17 @@ function injectPageCSS() {
         </div>`;
     }
 
-    /**
+   /**
      * Generates and injects the cilium SVG.
      */
     function generateAndInjectSVG() {
         const svgContainer = document.getElementById('cilia-svg');
         if (!svgContainer) return;
+
+        // --- FIX: Remove table class when drawing SVG ---
+        const wrapper = svgContainer.closest('.interactive-cilium');
+        if (wrapper) wrapper.classList.remove('table-view-active');
+        // --- END FIX ---
 
         const svgHTML = `
         <svg viewBox="0 0 300 400" xmlns="http://www.w3.org/2000/svg" style="width: 100%; height: auto;">
@@ -1066,7 +1071,7 @@ function injectPageCSS() {
                   fill="none" stroke="#4A5568" stroke-width="3"
                   d="M 145,180 L 148,15 L 152,15 L 155,180 Z"/>
         </svg>`;
-
+        
         svgContainer.innerHTML = svgHTML;
         setupSVGInteraction();
     }
@@ -1378,25 +1383,24 @@ function injectPageCSS() {
     }
 
    /**
-     * (NEW) Handles the first step of a complex/module query.
-     * Returns a summary string and stores the gene list in context.
+     * (UPDATED) Handles the first step of a complex/module query.
+     * Uses the new unified 'list_followup' context.
      */
     function handleComplexQuery(term) {
-        const geneList = getGenesByComplex(term); // Get the full, fixed list
+        const geneList = getGenesByComplex(term);
         const count = geneList.length;
 
         if (count === 0) {
             return `Sorry, I could not find any genes for the complex "${term}".`;
         }
 
-        // Store the context for a "yes" follow-up
         lastQueryContext = {
-            type: 'localization_list', // We can reuse the same follow-up type
+            type: 'list_followup', 
             data: geneList, 
-            term: term
+            term: `Genes in ${term}`,
+            descriptionHeader: 'Description'
         };
 
-        // Return the summary string
         return `I found ${count} genes in the ${term} complex. Do you want to view the list?`;
     }
 
@@ -1493,16 +1497,20 @@ function injectPageCSS() {
 
 
 /**
-     * (NEW - This was missing)
-     * Injects the gene list as a table into the left panel.
+     * (UPDATED) Injects the gene list as a table into the left panel.
+     * Now accepts a descriptionHeader and toggles a class for wide-view.
      */
-    function showDataInLeftPanel(title, geneList) {
-        // This is the ID of the div that holds the SVG
+    function showDataInLeftPanel(title, geneList, descriptionHeader = 'Description') {
         const container = document.getElementById('cilia-svg'); 
         if (!container) {
             console.error("Cannot find 'cilia-svg' container to draw table in.");
             return;
         }
+
+        // --- FIX: Add class to parent for wide-view styling ---
+        const wrapper = container.closest('.interactive-cilium');
+        if (wrapper) wrapper.classList.add('table-view-active');
+        // --- END FIX ---
 
         // 1. Generate Table HTML
         let tableHTML = `
@@ -1510,7 +1518,7 @@ function injectPageCSS() {
                 <thead>
                     <tr>
                         <th>Gene</th>
-                        <th>Description / Localization</th>
+                        <th>${descriptionHeader}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -1531,7 +1539,7 @@ function injectPageCSS() {
         // 3. Inject into the container
         container.innerHTML = `
             <div class="ciliai-table-container">
-                <h3>${title} Gene List (${geneList.length} genes)</h3>
+                <h3>${title} (${geneList.length} genes)</h3>
                 ${downloadButton}
                 <div class="ciliai-table-scroll-wrapper">
                     ${tableHTML}
@@ -1548,6 +1556,7 @@ function injectPageCSS() {
         });
     }
 
+    
     /**
      * (NEW - This was missing)
      * Helper to download the gene list table as a CSV file.
@@ -1571,27 +1580,37 @@ function injectPageCSS() {
         document.body.removeChild(link);
     }
 
-    /**
-     * (NEW - This was missing)
-     * Injects dynamic CSS for the data table.
+   /**
+     * (UPDATED) Injects dynamic CSS for the data table.
+     * Now includes rules to force the table to be full-width.
      */
     function injectTableCSS() {
         const styleId = 'ciliai-table-styles';
-        if (document.getElementById(styleId)) return; // Don't inject twice
+        if (document.getElementById(styleId)) return;
 
         const css = `
+            /* --- FIX: Force wide-view for table --- */
+            .interactive-cilium.table-view-active {
+                max-width: none !important;
+                padding: 0 !important;
+                border: none !important;
+                box-shadow: none !important;
+            }
+            /* --- END FIX --- */
+
             .ciliai-table-container {
                 width: 100%;
                 height: 100%;
                 display: flex;
                 flex-direction: column;
-                padding: 10px;
+                padding: 0; /* Fill the new space */
                 background: #fff;
             }
             .ciliai-table-container h3 {
                 font-size: 16px;
                 color: #2d3748;
                 margin-bottom: 10px;
+                padding: 10px 10px 0 10px; /* Add padding back here */
             }
             .ciliai-button {
                 padding: 8px 12px;
@@ -1604,6 +1623,7 @@ function injectPageCSS() {
                 transition: all 0.2s;
                 font-size: 12px;
                 margin-bottom: 10px;
+                margin-left: 10px; /* Add padding back here */
                 width: 150px;
             }
             .ciliai-button:hover {
@@ -1614,6 +1634,7 @@ function injectPageCSS() {
                 overflow-y: auto;
                 border: 1px solid #e1e8ed;
                 border-radius: 6px;
+                margin: 0 10px 10px 10px; /* Add padding back here */
             }
             .ciliai-data-table {
                 width: 100%;
@@ -1644,7 +1665,6 @@ function injectPageCSS() {
         styleEl.textContent = css;
         document.head.appendChild(styleEl);
     }
-
     
     // --- 4C. Phylogeny Engine ---
 
@@ -2473,9 +2493,9 @@ function injectPageCSS() {
             return `Sorry, I could not find a ${organism} ortholog for <strong>${gene}</strong>.`;
         }
     }
-
-    /**
-     * (NEW) Handles queries for a whole disease classification.
+/**
+     * (UPDATED) Handles queries for a whole disease classification.
+     * Now collects all associated diseases for each gene.
      */
     function handleClassificationQuery(classificationName, query) {
         const qLower = query.toLowerCase();
@@ -2489,37 +2509,46 @@ function injectPageCSS() {
 
         const diseaseList = diseaseMap[casedClassificationName];
 
+        // Check if user wants the gene list
         if (qLower.includes('gene') || qLower.includes('genes') || qLower.includes('gene list')) {
-            let allGenes = new Set();
+            
+            // --- FIX: Build a map of genes to their diseases ---
+            let allGenesMap = new Map();
             const geneMap = window.CiliAI.lookups.geneMap;
             
             diseaseList.forEach(diseaseName => {
                 const normDisease = diseaseName.toLowerCase();
                 const geneSymbols = window.CiliAI.lookups.byCiliopathy[normDisease] || [];
-                geneSymbols.forEach(g => allGenes.add(g));
+                geneSymbols.forEach(g => {
+                    if (!allGenesMap.has(g)) allGenesMap.set(g, new Set());
+                    allGenesMap.get(g).add(diseaseName); // Add the cased disease name
+                });
             });
             
-            const geneListObjects = Array.from(allGenes).map(gene => {
-                const geneData = geneMap[gene];
+            const geneListObjects = Array.from(allGenesMap.entries()).map(([gene, diseases]) => {
                 return {
                     gene: gene,
-                    description: geneData?.description || 'No description available.'
+                    description: Array.from(diseases).join('; ') // The description is now the disease list
                 };
             }).sort((a, b) => a.gene.localeCompare(b.gene)); 
+            // --- END FIX ---
 
             if (geneListObjects.length === 0) {
                 return `I did not find any genes associated with the classification "${casedClassificationName}".`;
             }
 
+            // Store the context for a "yes" follow-up
             lastQueryContext = {
-                type: 'localization_list',
+                type: 'list_followup', // Use unified type
                 data: geneListObjects,
-                term: casedClassificationName
+                term: `Genes for ${casedClassificationName}`,
+                descriptionHeader: 'Associated Disease(s)' // Set the new header
             };
 
             return `I found ${geneListObjects.length} unique genes associated with ${casedClassificationName}. Do you want to view the list?`;
             
         } else {
+            // User just wants to list the diseases in the classification
             const diseaseHtml = diseaseList.map(d => `<li>${d}</li>`).join('');
             return `
                 <div class="ai-result-card">
@@ -2531,8 +2560,10 @@ function injectPageCSS() {
         }
     }
 
-    /**
-     * (NEW) Handles the first step of a localization query.
+    
+  /**
+     * (UPDATED) Handles the first step of a localization query.
+     * Uses the new unified 'list_followup' context.
      */
     function handleLocalizationQuery(term) {
         const geneList = getGenesByLocalization(term); 
@@ -2543,9 +2574,10 @@ function injectPageCSS() {
         }
 
         lastQueryContext = {
-            type: 'localization_list',
-            data: geneList,
-            term: term
+            type: 'list_followup',
+            data: geneList, 
+            term: `Genes localized to ${term}`,
+            descriptionHeader: 'Localization'
         };
 
         return `According to the latest data, ${count} genes are enriched in the ${term}. Do you want to view the list?`;
