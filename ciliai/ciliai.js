@@ -586,28 +586,27 @@
             /* This targets the PARENT div your app is injected into */
             .content-area.content-area-full {
                 position: fixed;
-                top: 60px; /* Adjust this to the exact height of your CiliaHub header */
-                left: 250px; /* Adjust this to the exact width of your CiliaHub sidebar */
+                top: 60px;    /* This MUST be the exact height of the top navbar */
+                left: 250px;  /* This MUST be the exact width of the CiliaHub sidebar */
                 right: 0;
                 bottom: 0;
+                z-index: 100; /* This moves it "above" the page but "below" the header */
                 
                 padding: 0 !important; /* Override theme padding */
                 margin: 0 !important; /* Override theme margin */
                 overflow: hidden; /* Prevent this element from scrolling */
-                
-                /* Fallback for left: 0 on full-width pages if sidebar is hidden */
-                margin-left: 0 !important; 
             }
-            
-            /* On smaller screens, the sidebar might be 0px */
+           /* This media query handles the layout when the sidebar is hidden
+              on smaller screens.
+            */
             @media (max-width: 992px) {
                 .content-area.content-area-full {
                     left: 0;
                 }
             }
-            
+
             /* --- THIS IS THE FIX (PART 2) --- */
-            /* This makes our app's .container fill its parent */
+            /* This rule is correct and should NOT be changed. */
             .container {
                 display: grid;
                 grid-template-columns: 1fr 450px;
