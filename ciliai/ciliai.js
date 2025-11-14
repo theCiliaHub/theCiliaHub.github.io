@@ -581,13 +581,43 @@
                 padding: 0;
                 box-sizing: border-box;
             }
+
+            /* --- THIS IS THE FIX (PART 1) --- */
+            /* This targets the PARENT div your app is injected into */
+            .content-area.content-area-full {
+                position: fixed;
+                top: 60px; /* Adjust this to the exact height of your CiliaHub header */
+                left: 250px; /* Adjust this to the exact width of your CiliaHub sidebar */
+                right: 0;
+                bottom: 0;
+                
+                padding: 0 !important; /* Override theme padding */
+                margin: 0 !important; /* Override theme margin */
+                overflow: hidden; /* Prevent this element from scrolling */
+                
+                /* Fallback for left: 0 on full-width pages if sidebar is hidden */
+                margin-left: 0 !important; 
+            }
+            
+            /* On smaller screens, the sidebar might be 0px */
+            @media (max-width: 992px) {
+                .content-area.content-area-full {
+                    left: 0;
+                }
+            }
+            
+            /* --- THIS IS THE FIX (PART 2) --- */
+            /* This makes our app's .container fill its parent */
             .container {
-            display: grid;
-            grid-template-columns: 1fr 450px;
-            height: calc(100vh - 60px); /* Apply calc height directly */
-            overflow: hidden; /* Prevent the container itself from scrolling */
-            gap: 0;
-        }
+                display: grid;
+                grid-template-columns: 1fr 450px;
+                height: 100%; /* Fill the .content-area-full */
+                width: 100%;  /* Fill the .content-area-full */
+                gap: 0;
+            }
+            /* --- END FIX --- */
+
+
             .ciliai-message { /* Renamed for clarity */
                 margin-bottom: 15px;
                 animation: fadeIn 0.3s ease;
@@ -643,17 +673,12 @@
             .ai-action:hover { text-decoration: underline; }
 
             /* Main Layout CSS */
-            .container {
-                display: grid;
-                grid-template-columns: 1fr 450px;
-                height: 100vh;
-                gap: 0;
-            }
             .left-panel {
                 display: flex;
                 flex-direction: column;
                 background: #f5f7fa;
                 border-right: 1px solid #e1e8ed;
+                overflow: hidden; /* Added to contain children */
             }
             .header {
                 padding: 20px 30px;
@@ -710,7 +735,7 @@
             .diagram-container {
                 flex: 1;
                 padding: 20px;
-                overflow: auto;
+                overflow: auto; /* Allow diagram to scroll if it's huge */
                 display: flex;
                 justify-content: center;
                 align-items: center;
@@ -762,7 +787,7 @@
                 padding: 25px;
                 background: white;
                 border-bottom: 1px solid #e1e8ed;
-                max-height: 35vh;
+                max-height: 35vh; /* Keep this as is */
                 overflow-y: auto;
                 flex-shrink: 0;
             }
@@ -795,7 +820,7 @@
                 color: #856404;
             }
             .chat-container {
-                flex: 1;
+                flex: 1; /* This is what makes it fill the rest of the space */
                 display: flex;
                 flex-direction: column;
                 overflow: hidden;
@@ -888,6 +913,7 @@
         document.head.appendChild(styleEl);
     }
 
+    
     /**
      * Generates the main page HTML.
      */
