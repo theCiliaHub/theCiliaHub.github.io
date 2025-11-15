@@ -863,6 +863,86 @@
             `;
         }
     }
+
+async function displayFullGeneInfo(geneSymbol) {
+  const gm = window.CiliAI.lookups && window.CiliAI.lookups.geneMap;
+  if (!gm || !gm[geneSymbol]) {
+    return `No data found for gene ${geneSymbol}`;
+  }
+  const g = gm[geneSymbol];
+
+  let html = `<h2>Gene: ${geneSymbol}</h2>`;
+  html += `<p><strong>Description:</strong> ${g['Gene.Description'] || ''}</p>`;
+  html += `<p><strong>Synonyms:</strong> ${g['Synonym.'] || '—'}</p>`;
+  html += `<p><strong>OMIM ID:</strong> ${g.OMIM.ID || '—'}</p>`;
+  html += `<p><strong>Localization:</strong> ${g.Localization || '—'}</p>`;
+  html += `<p><strong>Functional category:</strong> ${g['Functional.category'] || '—'}</p>`;
+
+  html += `<h3>Cilia Effects</h3>`;
+  html += `<p><strong>Overexpression effect:</strong> ${g['Overexpression effects on cilia length (increase/decrease/no effect)'] || '—'}</p>`;
+  html += `<p><strong>Loss-of-Function effect:</strong> ${g['Loss-of-Function (LoF) effects on cilia length (increase/decrease/no effect)'] || '—'}</p>`;
+  html += `<p><strong>Percentage of ciliated cells effect:</strong> ${g['Percentage of ciliated cells (increase/decrease/no effect)'] || '—'}</p>`;
+
+  html += `<h3>Screens</h3>`;
+  if (Array.isArray(g.screens)) {
+    html += `<ul>`;
+    for (const s of g.screens) {
+      html += `<li><strong>${s.source}</strong>: ${s.result}</li>`;
+    }
+    html += `</ul>`;
+  } else {
+    html += `<p>None</p>`;
+  }
+
+  html += `<h3>Expression Data (scRNA-seq)</h3>`;
+  if (g.expression && g.expression.scRNA) {
+    html += `<table><tr><th>Cell type</th><th>Value</th></tr>`;
+    for (const [ct, val] of Object.entries(g.expression.scRNA)) {
+      html += `<tr><td>${ct}</td><td>${val}</td></tr>`;
+    }
+    html += `</table>`;
+  }
+
+  html += `<h3>Expression Data (Tissue)</h3>`;
+  if (g.expression && g.expression.tissue) {
+    html += `<table><tr><th>Tissue</th><th>Value</th></tr>`;
+    for (const [t, val] of Object.entries(g.expression.tissue)) {
+      html += `<tr><td>${t}</td><td>${val}</td></tr>`;
+    }
+    html += `</table>`;
+  }
+
+  html += `<h3>Orthologs & Mouse Phenotype</h3>`;
+  html += `<p><strong>Mouse ortholog:</strong> ${g.Ortholog_Mouse || '—'}</p>`;
+  html += `<p><strong>C. elegans ortholog:</strong> ${g.Ortholog_C_elegans || '—'}</p>`;
+  html += `<p><strong>Zebrafish ortholog:</strong> ${g.Ortholog_Zebrafish || '—'}</p>`;
+  html += `<p><strong>Mouse phenotype:</strong> ${g.mouse_phenotype || '—'}</p>`;
+  html += `<p><strong>Mouse ciliopathy phenotype:</strong> ${g.mouse_ciliopathy_phenotype || '—'}</p>`;
+
+  html += `<h3>Phylogeny</h3>`;
+  if (g.phylogeny) {
+    for (const [pkey, pval] of Object.entries(g.phylogeny)) {
+      html += `<p><strong>${pkey}</strong>: class=${pval.class}, class_id=${pval.class_id}</p>`;
+      if (pval.species_data) {
+        html += `<p>Species data (length ${pval.species_data.length})</p>`;
+      }
+    }
+  }
+
+  html += `<h3>Complexes</h3>`;
+  if (g.complex_components) {
+    html += `<ul>`;
+    for (const [ cname, members ] of Object.entries(g.complex_components)) {
+      html += `<li><strong>${cname}</strong>: ${members.join(', ')}</li>`;
+    }
+    html += `</ul>`;
+  } else {
+    html += `<p>None listed</p>`;
+  }
+
+  return html;
+}
+
     
     function tellAboutCiliAI() {
         return `
@@ -1479,6 +1559,55 @@
         `;
     }
 
+async function renderGeneToRightPanel(geneSymbol) {
+    geneSymbol = geneSymbol.toUpperCase();
+
+    const gm = window.CiliAI?.lookups?.geneMap || {};
+    const g = gm[geneSymbol];
+
+    if (!g) {
+        showDataInRightPanel(`<h2>No data found for ${geneSymbol}</h2>`);
+        return;
+    }
+
+    let html = `
+        <h2>${geneSymbol}</h2>
+        <p><strong>Description:</strong> ${g['Gene.Description'] || '—'}</p>
+        <p><strong>Synonyms:</strong> ${g['Synonym.'] || '—'}</p>
+        <p><strong>OMIM:</strong> ${g['OMIM.ID'] || '—'}</p>
+
+        <h3>Cilia Effects</h3>
+        <p><strong>Loss-of-function:</strong> ${g['Loss-of-Function (LoF) effects on cilia length (increase/decrease/no effect)'] || '—'}</p>
+        <p><strong>Overexpression:</strong> ${g['Overexpression effects on cilia length (increase/decrease/no effect)'] || '—'}</p>
+        <p><strong>% Ciliated Cells:</strong> ${g['Percentage of ciliated cells (increase/decrease/no effect)'] || '—'}</p>
+
+        <h3>Localization</h3>
+        <p>${g.Localization || '—'}</p>
+
+        <h3>Functional Category</h3>
+        <p>${g['Functional.category'] || '—'}</p>
+
+        <div style="margin-top: 20px;">
+            <button class="panelButton" onclick="plotPhylogenyHeatmap('${geneSymbol}')">Phylogeny Heatmap</button>
+            <button class="panelButton" onclick="plotTissueHeatmap('${geneSymbol}')">Expression Heatmap (Tissue)</button>
+            <button class="panelButton" onclick="handleUmapPlot('${geneSymbol}', 'lung')">UMAP (Lung scRNA)</button>
+        </div>
+    `;
+
+    showDataInRightPanel(html);
+}
+
+function plotPhylogenyHeatmap(gene) {
+    addChatMessage(`Generating phylogeny heatmap for <strong>${gene}</strong>...`, false);
+    drawPhylogenyHeatmapForGene(gene);
+}
+
+function plotTissueHeatmap(gene) {
+    addChatMessage(`Generating tissue expression heatmap for <strong>${gene}</strong>...`, false);
+    drawTissueExpressionHeatmap(gene);
+}
+
+    
     
     // --- 4F. Data Getter Helpers ---
 
@@ -1678,12 +1807,31 @@
             lastQueryContext = { type: null, data: [], term: null, descriptionHeader: 'Description' };
             htmlResult = ""; // handled (don't echo an additional message)
         }
+            let match;
+        if (htmlResult === null && (match = q.match(/^(?:what is|what's|describe|tell me about)\s+([A-Za-z0-9\-]{2,})\b/i))) {
+        log('Routing via: Intent (Gene Summary → Right Panel)');
+        const gene = match[1].toUpperCase();
+        renderGeneToRightPanel(gene);
+        htmlResult = ""; // Right panel handled
+        }
 
         // =( 2 )= INTENT: HIGH-PRIORITY "WHAT IS [GENE]?"
         else if (htmlResult === null && (match = q.match(/^(?:what is|what's|describe|tell me about)\s+([A-Za-z0-9\-]{3,})\b/i))) {
             log('Routing via: Intent (High-Priority Get Details)');
             htmlResult = await getComprehensiveDetails(match[1].toUpperCase());
         }
+        if ((m = qLower.match(/(loss[- ]of[- ]function|lof).*?\b([a-z0-9\-]{2,})\b/))) {
+    const gene = m[2].toUpperCase();
+    const gm = window.CiliAI?.lookups?.geneMap || {};
+    const g = gm[gene];
+    if (!g) {
+        addChatMessage(`I could not find loss-of-function data for <strong>${gene}</strong>.`, false);
+        return;
+    }
+    const lof = g['Loss-of-Function (LoF effects on cilia length (increase/decrease/no effect)'] || "No data available.";
+    addChatMessage(`<strong>Loss-of-function effect of ${gene}:</strong><br>${lof}`, false);
+    return;
+}
 
         // =( 3 )= INTENT: SPECIFIC FACT QUERIES (FIX: use original q with i-flag; extract genes robustly)
         else if (htmlResult === null && (match = q.match(/(?:what is|what's|show|display)\s+(?:the\s+)?(localization|omim id|loss-of-function effect|lof effect|percent ciliated.*effect|overexpression effect)\s+(?:of|for)\s+(.+)/i))) {
