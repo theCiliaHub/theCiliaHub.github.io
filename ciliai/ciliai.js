@@ -459,18 +459,18 @@
     /**
      * (UPDATED - CRITICAL FIX)
      * Normalizes a term for keyword matching.
-     * This version strips ALL non-alphanumeric characters.
+     * This version strips ALL non-alphanumeric characters AND trailing 's'.
      */
     function normalizeTerm(term) {
         if (typeof term !== 'string') return '';
-        // Replaces all non-word characters (like '–') and underscores with ''
+        // Replaces all non-word characters (like '–'), underscores, and vowels
         // Also removes trailing 's' to match plurals
         return term.toLowerCase().replace(/[\W_]/g, '').replace(/s$/, '');
     }
 
     /**
      * Builds the lookup maps (like geneMap) from the masterData.
-     * (UPDATED: Uses new, aggressive normalizeTerm() for all ciliopathy keys)
+     * (UPDATED: Uses new normalizeTerm() and correctly splits ALL ciliopathy/classification strings)
      */
     function buildLookups() {
         const L = window.CiliAI.lookups = {};
@@ -493,9 +493,7 @@
                     if (isNaN(parseInt(name))) { // Filter out numeric-only keys
                         if (!L.complexByGene[key]) L.complexByGene[key] = [];
                         if (!L.complexByGene[key].includes(name)) L.complexByGene[key].push(name);
-                        
                         if (!L.complexByName[name]) L.complexByName[name] = [];
-                        
                         ensureArray(g.complex_components[name]).forEach(gg => {
                             if (gg && !L.complexByName[name].includes(gg)) {
                                 L.complexByName[name].push(gg);
@@ -557,11 +555,13 @@
             }
         }
         
-        // 5. Build L.byModules and L.byCiliopathy (from masterData)
+        // 5. --- THIS IS THE FIX ---
+        // Build L.byModules, L.byCiliopathy, and L.byClassification
         L.byModules = {}; 
-        L.byCiliopathy = {}; 
+        L.byCiliopathy = {};       // Maps Disease -> Gene List
+        L.byClassification = {}; // Maps Classification -> Gene List
 
-        const ciliopathySplitter = (value) => {
+        const splitter = (value) => {
             if (Array.isArray(value)) return value;
             if (typeof value === 'string') return value.split(/, ?|; ?/);
             return [];
@@ -571,6 +571,7 @@
             const key = g.gene?.toUpperCase();
             if (!key) return;
             
+            // Build byModules
             if (g.functional_modules) {
                 g.functional_modules.forEach(m => {
                     if (!L.byModules[m]) L.byModules[m] = [];
@@ -578,11 +579,11 @@
                 });
             }
             
-            // --- THIS IS THE FIX ---
+            // Build byCiliopathy (Disease -> Gene)
             if (g.ciliopathy) {
-                const diseases = ciliopathySplitter(g.ciliopathy);
+                const diseases = splitter(g.ciliopathy);
                 diseases.forEach(c => {
-                    const normKey = normalizeTerm(c); // Use new normalizeTerm
+                    const normKey = normalizeTerm(c); // "joubertsyndrome"
                     if (normKey) {
                         if (!L.byCiliopathy[normKey]) L.byCiliopathy[normKey] = [];
                         if (!L.byCiliopathy[normKey].includes(key)) {
@@ -591,23 +592,24 @@
                     }
                 });
             }
-            // --- END FIX ---
+
+            // Build byClassification (Classification -> Gene)
+            if (g.ciliopathy_classification) {
+                const classifications = splitter(g.ciliopathy_classification);
+                classifications.forEach(c => {
+                    const normKey = normalizeTerm(c); // "atypicalciliopathy"
+                    if (normKey) {
+                        if (!L.byClassification[normKey]) L.byClassification[normKey] = [];
+                        if (!L.byClassification[normKey].includes(key)) {
+                            L.byClassification[normKey].push(key);
+                        }
+                    }
+                });
+            }
         });
-
-        // 6. Build L.byCiliopathyClassification (from disease map)
-        L.byCiliopathyClassification = {};
-        const diseaseMap = getDiseaseClassificationMap();
-        for (const classification in diseaseMap) {
-            const diseaseList = diseaseMap[classification];
-            diseaseList.forEach(diseaseName => {
-                // --- THIS IS THE FIX ---
-                const normKey = normalizeTerm(diseaseName); // Use new normalizeTerm
-                L.byCiliopathyClassification[normKey] = classification;
-                // --- END FIX ---
-            });
-        }
-
-        // 7. Build UMAP lookup
+        // --- END FIX ---
+        
+        // 6. Build UMAP lookup
         L.umapByGene = {};
         (window.CiliAI.data.umap || []).forEach(pt => {
             if (pt.gene) L.umapByGene[pt.gene.toUpperCase()] = pt;
@@ -615,7 +617,6 @@
 
         console.log('CiliAI: Lookups built, normalized, and classifications added.');
     }
-
 
     // ==========================================================
     // 3. STATIC UI & PAGE DISPLAY
@@ -1407,51 +1408,39 @@
         return `I found ${count} genes in the ${term} complex. Do you want to view the list?`;
     }
     
+    /**
+     * (UPDATED) Handles queries for a whole disease classification.
+     * Now directly uses the L.byClassification lookup.
+     */
     function handleClassificationQuery(classificationName, query) {
         const qLower = query.toLowerCase();
-        const diseaseMap = getDiseaseClassificationMap();
-        const casedClassificationName = Object.keys(diseaseMap).find(key => normalizeTerm(key) === normalizeTerm(classificationName));
-        if (!casedClassificationName) {
-            return `Sorry, I don't recognize the classification "${classificationName}".`;
+        
+        // --- THIS IS THE FIX ---
+        // Find the matching key in the lookup
+        const normKey = normalizeTerm(classificationName); // "motileciliopathy"
+        const geneList = window.CiliAI.lookups.byClassification[normKey] || [];
+        const count = geneList.length;
+        // --- END FIX ---
+        
+        if (count === 0) {
+            return `I did not find any genes associated with the classification "${classificationName}".`;
         }
-        const diseaseList = diseaseMap[casedClassificationName];
+        
+        const geneMap = window.CiliAI.lookups.geneMap;
+        const geneListObjects = geneList.map(gene => ({
+            gene: gene,
+            // Find the gene's actual classification string to show the user
+            description: ensureArray(geneMap[gene]?.ciliopathy_classification).join('; ') || 'No classification listed'
+        })).sort((a, b) => a.gene.localeCompare(b.gene)); 
 
-        if (qLower.includes('gene') || qLower.includes('genes') || qLower.includes('gene list')) {
-            let allGenesMap = new Map();
-            const geneMap = window.CiliAI.lookups.geneMap;
-            diseaseList.forEach(diseaseName => {
-                const normKey = normalizeTerm(diseaseName);
-                const geneSymbols = window.CiliAI.lookups.byCiliopathy[normKey] || [];
-                geneSymbols.forEach(g => {
-                    if (!allGenesMap.has(g)) allGenesMap.set(g, new Set());
-                    allGenesMap.get(g).add(diseaseName);
-                });
-            });
-            const geneListObjects = Array.from(allGenesMap.entries()).map(([gene, diseases]) => ({
-                gene: gene,
-                description: Array.from(diseases).join('; ')
-            })).sort((a, b) => a.gene.localeCompare(b.gene)); 
+        lastQueryContext = {
+            type: 'list_followup',
+            data: geneListObjects,
+            term: `Genes for ${classificationName}`,
+            descriptionHeader: 'Classification(s)'
+        };
 
-            if (geneListObjects.length === 0) {
-                return `I did not find any genes associated with the classification "${casedClassificationName}".`;
-            }
-            lastQueryContext = {
-                type: 'list_followup',
-                data: geneListObjects,
-                term: `Genes for ${casedClassificationName}`,
-                descriptionHeader: 'Associated Disease(s)'
-            };
-            return `I found ${geneListObjects.length} unique genes associated with ${casedClassificationName}. Do you want to view the list?`;
-        } else {
-            const diseaseHtml = diseaseList.map(d => `<li>${d}</li>`).join('');
-            return `
-                <div class="ai-result-card">
-                    <strong>${casedClassificationName}</strong>
-                    <p>This classification includes the following diseases:</p>
-                    <ul>${diseaseHtml}</ul>
-                </div>
-            `;
-        }
+        return `I found ${count} unique genes associated with ${classificationName}. Do you want to view the list?`;
     }
     
     // --- 4E. Plotting Handlers (UMAP & Phylogeny) ---
@@ -2036,21 +2025,29 @@
         return html;
     }
 
+    /**
+     * (UPDATED) Generic getter for ciliopathy
+     * Now only handles specific diseases and uses new normalizeTerm.
+     */
     function getCiliopathyGenes(term) {
-        let key = normalizeTerm(term);
+        let key = normalizeTerm(term); // e.g., "bardetbiedelsyndrome"
+
+        // Handle aliases by normalizing them too
         if (key === normalizeTerm('BBS')) key = normalizeTerm('Bardet–Biedl Syndrome');
         if (key === normalizeTerm('MKS')) key = normalizeTerm('Meckel–Gruber Syndrome');
         if (key === normalizeTerm('Joubert')) key = normalizeTerm('Joubert Syndrome');
         if (key === normalizeTerm('NPHP')) key = normalizeTerm('Nephronophthisis');
+        
+        // Handle common typo
+        if (key === normalizeTerm('Bardet Biedel Syndrome')) {
+            key = normalizeTerm('Bardet–Biedl Syndrome');
+        }
 
         const geneSymbols = window.CiliAI.lookups.byCiliopathy[key] || [];
         const geneMap = window.CiliAI.lookups.geneMap;
         
-        const classification = window.CiliAI.lookups.byCiliopathyClassification[key];
-        let desc = "";
-        if (classification) {
-            desc = `This disease is classified as a: <strong>${classification}</strong>.`;
-        }
+        // Classification logic is removed, as it's now separate
+        let desc = ""; 
 
         return {
             genes: geneSymbols.map(g => {
@@ -2060,32 +2057,8 @@
                     description: geneData?.description || 'No description available.'
                 };
             }),
-            description: desc
+            description: desc // Will be empty, which is fine
         };
-    }
-
-    function getGenesByLocalization(term) {
-        let normTerm = term.toLowerCase();
-        const L = window.CiliAI.lookups;
-        const geneMap = L.geneMap;
-        let matchingGenes = new Set(); 
-
-        const allLocKeys = Object.keys(L.byLocalization);
-        allLocKeys.forEach(key => {
-            if (key.toLowerCase().includes(normTerm)) {
-                L.byLocalization[key].forEach(geneSymbol => {
-                    matchingGenes.add(geneSymbol);
-                });
-            }
-        });
-
-        return Array.from(matchingGenes).map(gene => {
-            const geneData = geneMap[gene];
-            return {
-                gene: gene,
-                description: geneData?.localization || `Found in ${term}`
-            };
-        });
     }
 
     function getGenesByComplex(term) {
@@ -2131,21 +2104,21 @@
         return formatListResult(`Genes containing "${domainTerm}" domain`, results);
     }
 
-    // --- 4G. Main "Brain" (Query Routers) ---
-
+    /**
+     * Simple keyword spotter
+     * (UPDATED: Dynamically builds all keywords from new L.byCiliopathy and L.byClassification lookups)
+     */
     function flexibleIntentParser(query) {
         const qLower = query.toLowerCase().trim();
         
-        const diseaseMap = getDiseaseClassificationMap();
-        let allDiseaseKeywords = ['BBS', 'NPHP', 'MKS']; 
-        for (const classification in diseaseMap) {
-            allDiseaseKeywords = allDiseaseKeywords.concat(diseaseMap[classification]);
-        }
-        const classificationKeywords = Object.keys(diseaseMap);
+        // --- Get keywords directly from the new lookups ---
+        const classificationKeywords = Object.keys(window.CiliAI.lookups.byClassification);
+        const allDiseaseKeywords = Object.keys(window.CiliAI.lookups.byCiliopathy);
+        // --- END ---
 
         const entityKeywords = [
             {
-                type: 'CLASSIFICATION', 
+                type: 'CLASSIFICATION', // For "gene list of Motile Ciliopathies"
                 keywords: classificationKeywords,
                 handler: handleClassificationQuery 
             },
@@ -2160,7 +2133,7 @@
                 handler: handleComplexQuery 
             },
             {
-                type: 'LOCALIZATION',
+                type: 'LOCALIZATION', // For "genes localized to lysosome"
                 keywords: [
                     'basal body', 'axoneme', 'transition zone', 'cytosol', 'centrosome', 
                     'cilium', 'cilia', 'mitochondria', 'nucleus', 'ciliary tip',
