@@ -1812,14 +1812,13 @@ function plotTissueHeatmap(gene) {
         return;
     }
 
-    let htmlResult = null;
     let match = null;
 
     // ========== 1. High-priority: "What is X?" or synonyms ==========
     if ((match = q.match(/^(?:what is|what's|describe|tell me about)\s+([A-Za-z0-9\-]{2,})\b/i))) {
         const gene = match[1].toUpperCase();
-        await renderGeneToRightPanel(gene, q);  // Query + Answer
-        return;  // Already handled
+        await renderGeneToRightPanel(gene, q);
+        return;
     }
 
     else if (qLower.includes("synonym")) {
@@ -1836,10 +1835,10 @@ function plotTissueHeatmap(gene) {
         const gm = window.CiliAI?.lookups?.geneMap || {};
         const g = gm[gene];
         const lof = g ? g['Loss-of-Function (LoF) effects on cilia length (increase/decrease/no effect)'] || "No data available." : null;
-
-        let html = `<div class="chat-query"><strong>You:</strong> ${q}</div>`;
-        html += `<div class="chat-answer"><strong>CiliAI:</strong> ${lof ? `<strong>Loss-of-function effect of ${gene}:</strong><br>${lof}` : `No data found for ${gene}`}</div>`;
-        appendToRightPanel(html);
+        appendToRightPanel(`
+            <div class="chat-query"><strong>You:</strong> ${q}</div>
+            <div class="chat-answer"><strong>CiliAI:</strong> ${lof ? `<strong>Loss-of-function effect of ${gene}:</strong><br>${lof}` : `No data found for ${gene}`}</div>
+        `);
         return;
     }
 
@@ -1906,9 +1905,17 @@ function plotTissueHeatmap(gene) {
         return;
     }
 
-    // ========== 8. Fallback: gene details ==========
-    let term = q.replace(/[?.]/g, '').t
+    // ========== 8. Fallback: general gene details ==========
+    const normalizedTerm = q.replace(/[?.]/g, '').replace(/\bdo\b/i, '').trim().toUpperCase();
+    const genes = extractMultipleGenes(normalizedTerm);
+    if (genes && genes.length > 0) {
+        await renderGeneToRightPanel(genes[0], q);
+        return;
+    }
 
+    // ========== 9. Final fallback ==========
+    appendToRightPanel(`<div class="chat-query"><strong>You:</strong> ${q}</div><div class="chat-answer"><strong>CiliAI:</strong> Sorry, I didn't understand the query. Try a simpler term or gene symbol.</div>`);
+}
 
 
 // --- 4G. Main "Brain" (Query Routers) ---
