@@ -1768,6 +1768,8 @@
         return null;
     }
 
+    // REPLACE your current handleAIQuery (lines 1167-1349) with this:
+
     async function handleAIQuery(query) {
         const chatWindow = document.getElementById('messages');
         if (!chatWindow) return;
@@ -1794,17 +1796,34 @@
                 log('Routing via: Intent (Follow-up: Show List)');
                 showDataInLeftPanel(lastQueryContext.term, lastQueryContext.data, lastQueryContext.descriptionHeader);
                 lastQueryContext = { type: null, data: [], term: null, descriptionHeader: 'Description' };
-                htmlResult = "";
+                htmlResult = ""; // No chat message needed, panel updates
             }
 
             // =( 2 )= INTENT: HIGH-PRIORITY "WHAT IS [GENE]?"
             else if (htmlResult === null && (match = qLower.match(/^(?:what is|what's|describe|tell me about)\s+([A-Z0-9\-]{3,})\b/i))) {
                 log('Routing via: Intent (High-Priority Get Details)');
-                // **** INTEGRATION POINT ****
                 htmlResult = await displayFullGeneInfo(match[1].toUpperCase());
             }
 
-            // =( 3 )= INTENT: ORTHOLOGS
+            // =( 3 )= INTENT: SCREENS / PHENOTYPES (FIXED & HIGH PRIORITY)
+            // This now correctly handles "loss-of-function effect of KIF3A"
+            else if (htmlResult === null && (
+                qLower.includes('loss-of-function') || qLower.includes('lof') || 
+                qLower.includes('overexpression') || qLower.includes('oe') || 
+                qLower.includes('percent ciliated') || qLower.includes('cilia length') || 
+                (qLower.includes('effect') && qLower.includes('of')) 
+            )) {
+                log('Routing via: Intent (Screens/Effects)');
+                const genes = extractMultipleGenes(query); // Use the good extractor
+                if (genes.length > 0) {
+                    // Use the last gene found in the query
+                    htmlResult = handleScreenQuery(genes[genes.length - 1]); 
+                } else {
+                    htmlResult = `I see you're asking about screen effects, but I couldn't identify a gene. Please try again, like "loss-of-function effect of IFT88".`;
+                }
+            }
+
+            // =( 4 )= INTENT: ORTHOLOGS
             else if (htmlResult === null && (match = qLower.match(/ortholog(?: of| for)?\s+([a-z0-9\-]+)\s+(?:in|for)\s+(c\. elegans|mouse|zebrafish|drosophila|xenopus)/i))) {
                 log('Routing via: Intent (Ortholog)');
                 htmlResult = handleOrthologQuery(match[1].toUpperCase(), match[2]);
@@ -1814,7 +1833,7 @@
                 htmlResult = handleOrthologQuery(match[2].toUpperCase(), match[1]);
             }
 
-            //=( 4 )= INTENT: COMPLEX / MODULE MEMBERS (Split Logic)
+            //=( 5 )= INTENT: COMPLEX / MODULE MEMBERS (Split Logic)
             else if (htmlResult === null && (match = qLower.match(/(?:components of|genes in|members of)\s+(.+)/i))) {
                 const term = match[1].replace(/^(the|a|an)\s/i, '').trim();
                 log('Routing via: Intent (Get Genes in Complex)');
@@ -1828,19 +1847,13 @@
                 }
             }
 
-            //=( 5 )= INTENT: DOMAINS
+            //=( 6 )= INTENT: DOMAINS
             else if (htmlResult === null && (match = qLower.match(/(?:domains of|domain architecture for)\s+(.+)/i))) {
                 log('Routing via: Intent (Domains)');
                 const genes = extractMultipleGenes(match[1]);
                 if (genes.length > 0) {
                     htmlResult = handleDomainQuery(genes);
                 }
-            }
-
-            //=( 6 )= INTENT: SCREENS / PHENOTYPES
-            else if (htmlResult === null && (match = qLower.match(/(?:screens for|screens where|effect of)\s+([a-z0-9\-]+)/i))) {
-                log('Routing via: Intent (Screens)');
-                htmlResult = handleScreenQuery(match[1].toUpperCase());
             }
 
             //=( 7 )= INTENT: PHYLOGENY / EVOLUTION
@@ -1866,15 +1879,14 @@
                 }
             }
 
-           //=( 7 )= INTENT: SCREENS / PHENOTYPES (REVISED)
-            else if (htmlResult === null && (qLower.includes('loss-of-function') || qLower.includes('lof') || qLower.includes('overexpression') || qLower.includes('oe') || qLower.includes('percent ciliated') || qLower.includes('cilia length') || qLower.includes('effect of') )) {
-                log('Routing via: Intent (Screens/Effects)');
+            //=( 9 )= INTENT: scRNA Expression
+            else if (htmlResult === null && (qLower.includes('scrna') || qLower.includes('expression in') || qLower.includes('compare expression'))) {
+                log('Routing via: Intent (scRNA)');
                 const genes = extractMultipleGenes(query);
                 if (genes.length > 0) {
-                    // Get the last gene mentioned, which is usually the subject
-                    htmlResult = handleScreenQuery(genes[genes.length - 1]); 
+                    htmlResult = handleScRnaQuery(genes);
                 } else {
-                    htmlResult = "Please specify a gene to check for screen effects (e.g., 'loss-of-function of IFT88').";
+                    htmlResult = `Please specify which gene(s) you want to check expression for.`;
                 }
             }
 
@@ -1899,24 +1911,29 @@
             if (htmlResult === null) { 
                 log(`Routing via: Fallback (Get Details)`);
                 let term = qLower;
-                // Updated regex to better capture the gene name
                 if ((match = qLower.match(/(?:what is|what does|describe|localization of|omim id for|where is|cellular location of|subcellular localization of)\s+(?:the\s+)?(.+)/i))) {
                     term = match[1];
                 }
                 term = term.replace(/[?.]/g, '').replace(/\bdo\b/i, '').trim().toUpperCase();
-                const genes = extractMultipleGenes(term);
+                
+                const genes = extractMultipleGenes(term); // Use the good extractor
+                
                 if (genes.length > 0) {
-                    // **** INTEGRATION POINT ****
                     htmlResult = await displayFullGeneInfo(genes[0]);
                 }
             }
-
             //=( 13 )= FINAL FALLBACK (ERROR)
             if (htmlResult === null) { 
                 log(`Routing via: Final Fallback (Error)`);
-                htmlResult = `Sorry, I didn't understand the query: "<strong>${query}</strong>". Please try a simpler term.`;
+                // Try to find *any* gene, even if it's a fallback
+                const genes = extractMultipleGenes(query);
+                if (genes.length > 0) {
+                     log(`Final fallback, found gene: ${genes[0]}`);
+                     htmlResult = await displayFullGeneInfo(genes[0]);
+                } else {
+                     htmlResult = `Sorry, I didn't understand the query: "<strong>${query}</strong>". Please try a simpler term.`;
+                }
             }
-
             if (htmlResult) { 
                 addChatMessage(htmlResult, false);
             }
