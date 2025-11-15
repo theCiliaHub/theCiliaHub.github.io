@@ -1559,43 +1559,63 @@ async function displayFullGeneInfo(geneSymbol) {
         `;
     }
 
-async function renderGeneToRightPanel(geneSymbol) {
+async function renderGeneToRightPanel(geneSymbol, userQuery = null) {
     geneSymbol = geneSymbol.toUpperCase();
 
     const gm = window.CiliAI?.lookups?.geneMap || {};
     const g = gm[geneSymbol];
 
-    if (!g) {
-        showDataInRightPanel(`<h2>No data found for ${geneSymbol}</h2>`);
-        return;
+    let html = '';
+
+    // Render the user query first
+    if (userQuery) {
+        html += `<div class="chat-query"><strong>You:</strong> ${userQuery}</div>`;
     }
 
-    let html = `
-        <h2>${geneSymbol}</h2>
-        <p><strong>Description:</strong> ${g['Gene.Description'] || '—'}</p>
-        <p><strong>Synonyms:</strong> ${g['Synonym.'] || '—'}</p>
-        <p><strong>OMIM:</strong> ${g['OMIM.ID'] || '—'}</p>
+    // Render gene info
+    if (!g) {
+        html += `<div class="chat-answer"><strong>CiliAI:</strong> No data found for ${geneSymbol}</div>`;
+    } else {
+        html += `
+            <div class="chat-answer">
+                <strong>CiliAI:</strong>
+                <h2>${geneSymbol}</h2>
+                <p><strong>Description:</strong> ${g['Gene.Description'] || '—'}</p>
+                <p><strong>Synonyms:</strong> ${g['Synonym.'] || '—'}</p>
+                <p><strong>OMIM:</strong> ${g['OMIM.ID'] || '—'}</p>
 
-        <h3>Cilia Effects</h3>
-        <p><strong>Loss-of-function:</strong> ${g['Loss-of-Function (LoF) effects on cilia length (increase/decrease/no effect)'] || '—'}</p>
-        <p><strong>Overexpression:</strong> ${g['Overexpression effects on cilia length (increase/decrease/no effect)'] || '—'}</p>
-        <p><strong>% Ciliated Cells:</strong> ${g['Percentage of ciliated cells (increase/decrease/no effect)'] || '—'}</p>
+                <h3>Cilia Effects</h3>
+                <p><strong>Loss-of-function:</strong> ${g['Loss-of-Function (LoF) effects on cilia length (increase/decrease/no effect)'] || '—'}</p>
+                <p><strong>Overexpression:</strong> ${g['Overexpression effects on cilia length (increase/decrease/no effect)'] || '—'}</p>
+                <p><strong>% Ciliated Cells:</strong> ${g['Percentage of ciliated cells (increase/decrease/no effect)'] || '—'}</p>
 
-        <h3>Localization</h3>
-        <p>${g.Localization || '—'}</p>
+                <h3>Localization</h3>
+                <p>${g.Localization || '—'}</p>
 
-        <h3>Functional Category</h3>
-        <p>${g['Functional.category'] || '—'}</p>
+                <h3>Functional Category</h3>
+                <p>${g['Functional.category'] || '—'}</p>
 
-        <div style="margin-top: 20px;">
-            <button class="panelButton" onclick="plotPhylogenyHeatmap('${geneSymbol}')">Phylogeny Heatmap</button>
-            <button class="panelButton" onclick="plotTissueHeatmap('${geneSymbol}')">Expression Heatmap (Tissue)</button>
-            <button class="panelButton" onclick="handleUmapPlot('${geneSymbol}', 'lung')">UMAP (Lung scRNA)</button>
-        </div>
-    `;
+                <div style="margin-top: 10px;">
+                    <button class="panelButton" onclick="plotPhylogenyHeatmap('${geneSymbol}')">Phylogeny Heatmap</button>
+                    <button class="panelButton" onclick="plotTissueHeatmap('${geneSymbol}')">Expression Heatmap (Tissue)</button>
+                    <button class="panelButton" onclick="handleUmapPlot('${geneSymbol}', 'lung')">UMAP (Lung scRNA)</button>
+                </div>
+            </div>
+        `;
+    }
 
-    showDataInRightPanel(html);
+    appendToRightPanel(html);
 }
+
+// Append content to the chat panel
+function appendToRightPanel(html) {
+    const rightPanel = document.getElementById('rightPanel');
+    if (!rightPanel) return;
+
+    rightPanel.insertAdjacentHTML('beforeend', html);
+    rightPanel.scrollTop = rightPanel.scrollHeight; // auto-scroll
+}
+
 
 function plotPhylogenyHeatmap(gene) {
     addChatMessage(`Generating phylogeny heatmap for <strong>${gene}</strong>...`, false);
@@ -1781,167 +1801,113 @@ function plotTissueHeatmap(gene) {
     }
 
  async function handleAIQuery(query) {
-    const chatWindow = document.getElementById('messages');
-    if (!chatWindow) return;
     if (!query || typeof query !== 'string') return;
-
     const q = query.trim();
     const qLower = q.toLowerCase();
+
     log(`Routing query: ${q}`);
+
+    if (!window.CiliAI || !window.CiliAI.ready) {
+        appendToRightPanel(`<div class="chat-query"><strong>You:</strong> ${q}</div><div class="chat-answer"><strong>CiliAI:</strong> Data is still loading, please wait...</div>`);
+        return;
+    }
 
     let htmlResult = null;
     let match = null;
 
-    try {
-        if (!window.CiliAI || !window.CiliAI.ready) {
-            addChatMessage("Data is still loading, please wait...", false);
+    // ========== 1. High-priority: "What is X?" or synonyms ==========
+    if ((match = q.match(/^(?:what is|what's|describe|tell me about)\s+([A-Za-z0-9\-]{2,})\b/i))) {
+        const gene = match[1].toUpperCase();
+        await renderGeneToRightPanel(gene, q);  // Query + Answer
+        return;  // Already handled
+    }
+
+    else if (qLower.includes("synonym")) {
+        const genes = extractMultipleGenes(q);
+        if (genes && genes.length > 0) {
+            await renderGeneToRightPanel(genes[0].toUpperCase(), q);
             return;
         }
-
-        // =( 1 )= FOLLOW-UP LIST
-        const followUpWords = ['yes','ok','sure','please','display','show','view the list'];
-        const isFollowUp = followUpWords.some(w => qLower === w || qLower.includes(w));
-        if (isFollowUp && (lastQueryContext && lastQueryContext.type === 'list_followup')) {
-            log('Routing via: Intent (Follow-up: Show List)');
-            showDataInLeftPanel(lastQueryContext.term, lastQueryContext.data, lastQueryContext.descriptionHeader || 'Description');
-            lastQueryContext = { type: null, data: [], term: null, descriptionHeader: 'Description' };
-            htmlResult = ""; // handled
-        }
-
-        // =( 2 )= HIGH-PRIORITY GENE → RIGHT PANEL ("What is X?")
-        if (htmlResult === null && (match = q.match(/^(?:what is|what's|describe|tell me about)\s+([A-Za-z0-9\-]{2,})\b/i))) {
-            log('Routing via: Intent (Gene Summary → Right Panel)');
-            const gene = match[1].toUpperCase();
-            renderGeneToRightPanel(gene);
-            htmlResult = ""; // Right panel handled
-        }
-
-        // =( 3 )= SYNONYM QUERY → RIGHT PANEL
-        else if (htmlResult === null && qLower.includes("synonym")) {
-            const genes = extractMultipleGenes(q);
-            if (genes && genes.length > 0) {
-                renderGeneToRightPanel(genes[0].toUpperCase());
-                htmlResult = ""; // Right panel handled
-            }
-        }
-
-        // =( 4 )= SPECIFIC FACT QUERY (LoF, Overexpression, Percent Ciliated)
-        if (htmlResult === null && (match = qLower.match(/(loss[- ]of[- ]function|lof).*?\b([a-z0-9\-]{2,})\b/))) {
-            const gene = match[2].toUpperCase();
-            const gm = window.CiliAI?.lookups?.geneMap || {};
-            const g = gm[gene];
-            if (!g) {
-                addChatMessage(`I could not find loss-of-function data for <strong>${gene}</strong>.`, false);
-                return;
-            }
-            const lof = g['Loss-of-Function (LoF effects on cilia length (increase/decrease/no effect)'] || "No data available.";
-            addChatMessage(`<strong>Loss-of-function effect of ${gene}:</strong><br>${lof}`, false);
-            htmlResult = ""; // handled
-        }
-
-        // =( 5 )= ORTHOLOGS
-        else if (htmlResult === null && (match = q.match(/ortholog(?: of| for)?\s+([A-Za-z0-9\-\._]+)\s+(?:in|for)\s+(c\. elegans|mouse|zebrafish|drosophila|xenopus)/i))) {
-            log('Routing via: Intent (Ortholog)');
-            htmlResult = handleOrthologQuery(match[1].toUpperCase(), match[2]);
-        } else if (htmlResult === null && (match = q.match(/(c\. elegans|mouse|zebrafish|drosophila|xenopus)\s+ortholog(?: of| for)?\s+([A-Za-z0-9\-\._]+)/i))) {
-            log('Routing via: Intent (Ortholog)');
-            htmlResult = handleOrthologQuery(match[2].toUpperCase(), match[1]);
-        }
-
-        // =( 6 )= COMPLEX QUERIES
-        else if (htmlResult === null && (match = q.match(/(?:components of|genes in|members of)\s+(.+)/i))) {
-            const term = match[1].replace(/^(the|a|an)\s/i, '').trim();
-            log('Routing via: Intent (Get Genes in Complex)');
-            htmlResult = handleComplexQuery(term, q);
-        } else if (htmlResult === null && (match = q.match(/(?:complexes for|complexes of|part of|in complex|containing)\s+(.+)/i))) {
-            log('Routing via: Intent (Get Complexes for Gene)');
-            const genes = extractMultipleGenes(match[1]);
-            if (genes && genes.length > 0) {
-                htmlResult = handleGeneInComplexQuery(genes[0]);
-            }
-        }
-
-        // =( 7 )= DOMAINS
-        else if (htmlResult === null && (match = q.match(/(?:domains of|domain architecture for)\s+(.+)/i))) {
-            log('Routing via: Intent (Domains)');
-            const genes = extractMultipleGenes(match[1]);
-            if (genes && genes.length > 0) {
-                htmlResult = handleDomainQuery(genes);
-            }
-        }
-
-        // =( 8 )= PHYLOGENY / CONSERVATION
-        else if (htmlResult === null && (
-            qLower.includes('phylogen') || qLower.includes('evolution') || qLower.includes('conservation') ||
-            qLower.includes('heatmap') || qLower.includes('taxa')
-        )) {
-            log('Routing via: Intent (Phylogeny Engine)');
-            htmlResult = await routePhylogenyAnalysis(q);
-        }
-
-        // =( 9 )= FUNCTIONAL MODULES
-        else if (htmlResult === null && (match = q.match(/(?:functional modules of|modules for)\s+([A-Za-z0-9\-]+)/i))) {
-            log('Routing via: Intent (Get Modules)');
-            const gene = (match[1] || '').toUpperCase();
-            const geneMap = (window.CiliAI && window.CiliAI.lookups && window.CiliAI.lookups.geneMap) ? window.CiliAI.lookups.geneMap : {};
-            const g = geneMap[gene];
-            if (g && g['Functional.category']) {
-                htmlResult = formatListResult(`Functional Modules for ${gene}`, ensureArray(g['Functional.category']).map(m => ({ gene: m, description: "Module" })));
-            } else {
-                htmlResult = `No functional modules listed for <strong>${gene}</strong>.`;
-            }
-        }
-
-        // =(10)= scRNA / UMAP
-        else if (htmlResult === null && (qLower.includes('scrna') || qLower.includes('expression in') || qLower.includes('compare expression'))) {
-            const genes = extractMultipleGenes(q);
-            if (genes && genes.length > 0) {
-                htmlResult = handleScRnaQuery(genes);
-            } else {
-                htmlResult = `Please specify which gene(s) you want to check expression for.`;
-            }
-        } else if (htmlResult === null && (match = q.match(/(?:show|plot)\s+(?:me\s+the\s+)?umap(?: expression)?(?: for\s+([A-Za-z0-9\-]+))?/i))) {
-            const gene = match[1] ? match[1].toUpperCase() : null;
-            handleUmapPlot(gene);
-            htmlResult = ""; // visual handled
-        }
-
-        // =(11)= FLEXIBLE KEYWORD PARSER
-        if (htmlResult === null) {
-            const intent = flexibleIntentParser(q);
-            if (intent && typeof intent.handler === 'function') {
-                log(`Routing via: Intent (Simple Keyword: ${intent.type})`);
-                htmlResult = intent.handler(intent.entity, q);
-            }
-        }
-
-        // =(12)= FALLBACK → GET DETAILS (right panel)
-        if (htmlResult === null) {
-            let term = q;
-            if ((match = q.match(/(?:what is|what does|describe|localization of|omim id for|where is|cellular location of|subcellular localization of)\s+(?:the\s+)?(.+)/i))) {
-                term = match[1];
-            }
-            term = term.replace(/[?.]/g, '').replace(/\bdo\b/i, '').trim().toUpperCase();
-            const genes = extractMultipleGenes(term);
-            if (genes && genes.length > 0) {
-                htmlResult = await getComprehensiveDetails(genes[0]);
-            }
-        }
-
-        // =(13)= FINAL FALLBACK → ERROR
-        if (htmlResult === null) {
-            htmlResult = `Sorry, I didn't understand the query: "<strong>${query}</strong>". Please try a simpler term.`;
-        }
-
-        if (htmlResult) {
-            addChatMessage(htmlResult, false);
-        }
-
-    } catch (e) {
-        console.error("Error in handleAIQuery:", e);
-        addChatMessage(`An internal CiliAI error occurred: ${e.message}`, false);
     }
-}
+
+    // ========== 2. Loss-of-function query ==========
+    else if ((match = qLower.match(/(loss[- ]of[- ]function|lof).*?\b([a-z0-9\-]{2,})\b/))) {
+        const gene = match[2].toUpperCase();
+        const gm = window.CiliAI?.lookups?.geneMap || {};
+        const g = gm[gene];
+        const lof = g ? g['Loss-of-Function (LoF) effects on cilia length (increase/decrease/no effect)'] || "No data available." : null;
+
+        let html = `<div class="chat-query"><strong>You:</strong> ${q}</div>`;
+        html += `<div class="chat-answer"><strong>CiliAI:</strong> ${lof ? `<strong>Loss-of-function effect of ${gene}:</strong><br>${lof}` : `No data found for ${gene}`}</div>`;
+        appendToRightPanel(html);
+        return;
+    }
+
+    // ========== 3. Ortholog query ==========
+    else if ((match = q.match(/ortholog(?: of| for)?\s+([A-Za-z0-9\-\._]+)\s+(?:in|for)\s+(c\. elegans|mouse|zebrafish|drosophila|xenopus)/i))) {
+        const html = handleOrthologQuery(match[1].toUpperCase(), match[2]);
+        appendToRightPanel(`<div class="chat-query"><strong>You:</strong> ${q}</div><div class="chat-answer"><strong>CiliAI:</strong> ${html}</div>`);
+        return;
+    }
+    else if ((match = q.match(/(c\. elegans|mouse|zebrafish|drosophila|xenopus)\s+ortholog(?: of| for)?\s+([A-Za-z0-9\-\._]+)/i))) {
+        const html = handleOrthologQuery(match[2].toUpperCase(), match[1]);
+        appendToRightPanel(`<div class="chat-query"><strong>You:</strong> ${q}</div><div class="chat-answer"><strong>CiliAI:</strong> ${html}</div>`);
+        return;
+    }
+
+    // ========== 4. Complex / module / domains ==========
+    else if ((match = q.match(/(?:components of|genes in|members of)\s+(.+)/i))) {
+        const html = handleComplexQuery(match[1].trim(), q);
+        appendToRightPanel(`<div class="chat-query"><strong>You:</strong> ${q}</div><div class="chat-answer"><strong>CiliAI:</strong> ${html}</div>`);
+        return;
+    }
+    else if ((match = q.match(/(?:complexes for|complexes of|part of|in complex|containing)\s+(.+)/i))) {
+        const genes = extractMultipleGenes(match[1]);
+        if (genes && genes.length > 0) {
+            const html = handleGeneInComplexQuery(genes[0]);
+            appendToRightPanel(`<div class="chat-query"><strong>You:</strong> ${q}</div><div class="chat-answer"><strong>CiliAI:</strong> ${html}</div>`);
+            return;
+        }
+    }
+    else if ((match = q.match(/(?:domains of|domain architecture for)\s+(.+)/i))) {
+        const genes = extractMultipleGenes(match[1]);
+        if (genes && genes.length > 0) {
+            const html = handleDomainQuery(genes);
+            appendToRightPanel(`<div class="chat-query"><strong>You:</strong> ${q}</div><div class="chat-answer"><strong>CiliAI:</strong> ${html}</div>`);
+            return;
+        }
+    }
+
+    // ========== 5. scRNA Expression ==========
+    else if (qLower.includes('scrna') || qLower.includes('expression in') || qLower.includes('compare expression')) {
+        const genes = extractMultipleGenes(q);
+        if (genes && genes.length > 0) {
+            const html = handleScRnaQuery(genes);
+            appendToRightPanel(`<div class="chat-query"><strong>You:</strong> ${q}</div><div class="chat-answer"><strong>CiliAI:</strong> ${html}</div>`);
+            return;
+        } else {
+            appendToRightPanel(`<div class="chat-query"><strong>You:</strong> ${q}</div><div class="chat-answer"><strong>CiliAI:</strong> Please specify which gene(s) you want to check expression for.</div>`);
+            return;
+        }
+    }
+
+    // ========== 6. UMAP visual ==========
+    else if ((match = q.match(/(?:show|plot)\s+(?:me\s+the\s+)?umap(?: expression)?(?: for\s+([A-Za-z0-9\-]+))?/i))) {
+        const gene = match[1] ? match[1].toUpperCase() : null;
+        handleUmapPlot(gene);
+        appendToRightPanel(`<div class="chat-query"><strong>You:</strong> ${q}</div><div class="chat-answer"><strong>CiliAI:</strong> Displaying UMAP...</div>`);
+        return;
+    }
+
+    // ========== 7. Phylogeny / Evolution ==========
+    else if (qLower.includes('phylogen') || qLower.includes('evolution') || qLower.includes('conservation')) {
+        const html = await routePhylogenyAnalysis(q);
+        appendToRightPanel(`<div class="chat-query"><strong>You:</strong> ${q}</div><div class="chat-answer"><strong>CiliAI:</strong> ${html}</div>`);
+        return;
+    }
+
+    // ========== 8. Fallback: gene details ==========
+    let term = q.replace(/[?.]/g, '').t
 
 
 
@@ -1949,6 +1915,7 @@ function plotTissueHeatmap(gene) {
 function flexibleIntentParser(query) {
     const qLower = (query || '').toLowerCase().trim();
 
+    // --- 1. Disease keywords ---
     const diseaseMap = typeof getDiseaseClassificationMap === 'function' ? getDiseaseClassificationMap() : {};
     let allDiseaseKeywords = ['BBS', 'NPHP', 'MKS'];
     for (const classification in diseaseMap) {
@@ -1957,19 +1924,24 @@ function flexibleIntentParser(query) {
         }
     }
 
-    const byClassification = (window.CiliAI && window.CiliAI.lookups && window.CiliAI.lookups.byClassification) || {};
-    const classificationKeywords = Object.keys(byClassification);
-    classificationKeywords.push(...Object.keys(diseaseMap));
+    // --- 2. Classification keywords ---
+    const byClassification = (window.CiliAI?.lookups?.byClassification) || {};
+    const classificationKeywords = Object.keys(byClassification).concat(Object.keys(diseaseMap));
 
-    const byModuleOrComplex = (window.CiliAI && window.CiliAI.lookups && window.CiliAI.lookups.byModuleOrComplex) || {};
-    const complexKeywords = Object.keys(byModuleOrComplex);
-    complexKeywords.push(...Object.keys(getComplexPhylogenyTableMap ? getComplexPhylogenyTableMap() : {}));
+    // --- 3. Complex / module keywords ---
+    const byModuleOrComplex = (window.CiliAI?.lookups?.byModuleOrComplex) || {};
+    const complexKeywords = Object.keys(byModuleOrComplex).concat(Object.keys(getComplexPhylogenyTableMap ? getComplexPhylogenyTableMap() : {}));
 
+    // --- 4. Entity keywords & handlers ---
     const entityKeywords = [
         {
             type: 'CILIOPATHY',
             keywords: allDiseaseKeywords,
-            handler: (term, q) => formatListResult(`Genes for ${term}`, (getCiliopathyGenes(term) || {}).genes || [], (getCiliopathyGenes(term) || {}).description || '')
+            handler: (term) => formatListResult(
+                `Genes for ${term}`,
+                (getCiliopathyGenes(term)?.genes) || [],
+                (getCiliopathyGenes(term)?.description) || ''
+            )
         },
         {
             type: 'CLASSIFICATION',
@@ -2002,21 +1974,44 @@ function flexibleIntentParser(query) {
         }
     ];
 
+    // --- 5. GENE: dynamic matching for gene symbols & synonyms ---
+    const geneMap = window.CiliAI?.lookups?.geneMap || {};
+    const geneSymbols = Object.keys(geneMap || {});
+
+    // Check if query matches any gene symbol or synonym
+    for (const symbol of geneSymbols) {
+        const g = geneMap[symbol];
+        const synonyms = (g['Synonym.'] || '').split(',').map(s => s.trim().toUpperCase());
+        if (qLower.includes(symbol.toLowerCase()) || synonyms.some(s => qLower.includes(s.toLowerCase()))) {
+            return {
+                type: 'GENE',
+                entity: symbol,
+                handler: async (geneSymbol, q) => {
+                    await renderGeneToRightPanel(geneSymbol, q);
+                    return ""; // already handled in right panel
+                }
+            };
+        }
+    }
+
+    // --- 6. Keyword-based routing ---
     const normalizedQuery = normalizeTerm(query);
     for (const entityType of entityKeywords) {
         const sortedKeywords = [...entityType.keywords].filter(Boolean).sort((a, b) => b.length - a.length);
         for (const keyword of sortedKeywords) {
             const normKeyword = normalizeTerm(keyword);
             if (!normKeyword) continue;
-
             if (normalizedQuery.includes(normKeyword)) {
                 if (qLower.includes('not in') || qLower.includes('except')) continue;
                 return { type: entityType.type, entity: keyword, handler: entityType.handler };
             }
         }
     }
+
+    // --- 7. No match ---
     return null;
 }
+
 
     
     // ==========================================================
