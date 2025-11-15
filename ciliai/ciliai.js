@@ -1813,11 +1813,10 @@ function extractMultipleGenes(query) {
         return null;
     }
 
-    // REPLACE your current handleAIQuery (lines 1167-1349) with this:
-
-   /**
+/**
  * (REPLACEMENT) The Main "Level 1" Query Router
- * This is the new, clean, and correctly-ordered router.
+ * This version is CLEANED and RE-ORDERED to fix the routing bug.
+ * Note the new order of Step 3 and 4.
  */
 async function handleAIQuery(query) {
     const chatWindow = document.getElementById('messages');
@@ -1857,14 +1856,8 @@ async function handleAIQuery(query) {
             return; // No chat message needed, panel updates
         }
 
-        // =( 3 )= INTENT: HIGH-PRIORITY "WHAT IS [GENE]?"
-        else if (htmlResult === null && (match = qLower.match(/^(?:what is|what's|describe|tell me about)\s+([A-Z0-9\-]{3,})\b/i))) {
-            log('Routing via: Intent (High-Priority Get Details)');
-            htmlResult = await displayFullGeneInfo(match[1].toUpperCase());
-        }
-
-        // =( 4 )= INTENT: SCREENS / PHENOTYPES (FIXED & HIGH PRIORITY)
-        // This now correctly handles "loss-of-function effect of KIF3A"
+        // =( 3 )= INTENT: SCREENS / PHENOTYPES (NOW HIGH PRIORITY)
+        // This logic now runs BEFORE the "what is" logic, fixing the bug.
         else if (htmlResult === null && (
             qLower.includes('loss-of-function') || qLower.includes('lof') ||
             qLower.includes('overexpression') || qLower.includes('oe') ||
@@ -1879,6 +1872,14 @@ async function handleAIQuery(query) {
             } else {
                 htmlResult = `I see you're asking about screen effects, but I couldn't identify a gene. Please try again, like "loss-of-function effect of IFT88".`;
             }
+        }
+
+        // =( 4 )= INTENT: HIGH-PRIORITY "WHAT IS [GENE]?" (STRICTER REGEX)
+        // This now only matches "what is IFT88" or "describe CEP290"
+        // The "$" at the end prevents it from matching long sentences.
+        else if (htmlResult === null && (match = qLower.match(/^(?:what is|what's|describe|tell me about)\s+([A-Z0-9\-]{3,})\??$/i))) {
+            log('Routing via: Intent (High-Priority Get Details)');
+            htmlResult = await displayFullGeneInfo(match[1].toUpperCase());
         }
 
         // =( 5 )= INTENT: ORTHOLOGS
@@ -2003,7 +2004,6 @@ async function handleAIQuery(query) {
         addChatMessage(`An internal CiliAI error occurred: ${e.message}`, false);
     }
 }
-
 
 
 // ==========================================================
