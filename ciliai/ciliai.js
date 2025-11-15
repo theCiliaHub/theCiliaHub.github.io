@@ -1559,53 +1559,6 @@ async function displayFullGeneInfo(geneSymbol) {
         `;
     }
 
-async function renderGeneToRightPanel(geneSymbol, userQuery = null) {
-    geneSymbol = geneSymbol.toUpperCase();
-
-    const gm = window.CiliAI?.lookups?.geneMap || {};
-    const g = gm[geneSymbol];
-
-    let html = '';
-
-    // Render the user query first
-    if (userQuery) {
-        html += `<div class="chat-query"><strong>You:</strong> ${userQuery}</div>`;
-    }
-
-    // Render gene info
-    if (!g) {
-        html += `<div class="chat-answer"><strong>CiliAI:</strong> No data found for ${geneSymbol}</div>`;
-    } else {
-        html += `
-            <div class="chat-answer">
-                <strong>CiliAI:</strong>
-                <h2>${geneSymbol}</h2>
-                <p><strong>Description:</strong> ${g['Gene.Description'] || '—'}</p>
-                <p><strong>Synonyms:</strong> ${g['Synonym.'] || '—'}</p>
-                <p><strong>OMIM:</strong> ${g['OMIM.ID'] || '—'}</p>
-
-                <h3>Cilia Effects</h3>
-                <p><strong>Loss-of-function:</strong> ${g['Loss-of-Function (LoF) effects on cilia length (increase/decrease/no effect)'] || '—'}</p>
-                <p><strong>Overexpression:</strong> ${g['Overexpression effects on cilia length (increase/decrease/no effect)'] || '—'}</p>
-                <p><strong>% Ciliated Cells:</strong> ${g['Percentage of ciliated cells (increase/decrease/no effect)'] || '—'}</p>
-
-                <h3>Localization</h3>
-                <p>${g.Localization || '—'}</p>
-
-                <h3>Functional Category</h3>
-                <p>${g['Functional.category'] || '—'}</p>
-
-                <div style="margin-top: 10px;">
-                    <button class="panelButton" onclick="plotPhylogenyHeatmap('${geneSymbol}')">Phylogeny Heatmap</button>
-                    <button class="panelButton" onclick="plotTissueHeatmap('${geneSymbol}')">Expression Heatmap (Tissue)</button>
-                    <button class="panelButton" onclick="handleUmapPlot('${geneSymbol}', 'lung')">UMAP (Lung scRNA)</button>
-                </div>
-            </div>
-        `;
-    }
-
-    appendToRightPanel(html);
-}
 
 // Append content to the chat panel
 function appendToRightPanel(html) {
@@ -1800,7 +1753,7 @@ function plotTissueHeatmap(gene) {
         `;
     }
 
- async function handleAIQuery(query) {
+ function handleAIQuery(query) {
     if (!query || typeof query !== 'string') return;
     const q = query.trim();
     const qLower = q.toLowerCase();
@@ -1808,23 +1761,34 @@ function plotTissueHeatmap(gene) {
     log(`Routing query: ${q}`);
 
     if (!window.CiliAI || !window.CiliAI.ready) {
-        appendToRightPanel(`<div class="chat-query"><strong>You:</strong> ${q}</div><div class="chat-answer"><strong>CiliAI:</strong> Data is still loading, please wait...</div>`);
+        appendToRightPanel(`<div class="chat-query"><strong>You:</strong> ${q}</div>
+                            <div class="chat-answer"><strong>CiliAI:</strong> Data is still loading, please wait...</div>`);
         return;
     }
 
     let match = null;
 
-    // ========== 1. High-priority: "What is X?" or synonyms ==========
+    // ========== 1. Gene / "What is X?" ==========
     if ((match = q.match(/^(?:what is|what's|describe|tell me about)\s+([A-Za-z0-9\-]{2,})\b/i))) {
         const gene = match[1].toUpperCase();
-        await renderGeneToRightPanel(gene, q);
+        const gm = window.CiliAI?.lookups?.geneMap || {};
+        const g = gm[gene];
+        const html = g ? formatGeneChatHtml(g, gene, q) : `No data found for ${gene}`;
+        appendToRightPanel(`<div class="chat-query"><strong>You:</strong> ${q}</div>
+                            <div class="chat-answer"><strong>CiliAI:</strong> ${html}</div>`);
         return;
     }
 
+    // Synonym query
     else if (qLower.includes("synonym")) {
         const genes = extractMultipleGenes(q);
         if (genes && genes.length > 0) {
-            await renderGeneToRightPanel(genes[0].toUpperCase(), q);
+            const gene = genes[0].toUpperCase();
+            const gm = window.CiliAI?.lookups?.geneMap || {};
+            const g = gm[gene];
+            const html = g ? formatGeneChatHtml(g, gene, q) : `No data found for ${gene}`;
+            appendToRightPanel(`<div class="chat-query"><strong>You:</strong> ${q}</div>
+                                <div class="chat-answer"><strong>CiliAI:</strong> ${html}</div>`);
             return;
         }
     }
@@ -1835,36 +1799,38 @@ function plotTissueHeatmap(gene) {
         const gm = window.CiliAI?.lookups?.geneMap || {};
         const g = gm[gene];
         const lof = g ? g['Loss-of-Function (LoF) effects on cilia length (increase/decrease/no effect)'] || "No data available." : null;
-        appendToRightPanel(`
-            <div class="chat-query"><strong>You:</strong> ${q}</div>
-            <div class="chat-answer"><strong>CiliAI:</strong> ${lof ? `<strong>Loss-of-function effect of ${gene}:</strong><br>${lof}` : `No data found for ${gene}`}</div>
-        `);
+        appendToRightPanel(`<div class="chat-query"><strong>You:</strong> ${q}</div>
+                            <div class="chat-answer"><strong>CiliAI:</strong> ${lof ? `<strong>Loss-of-function effect of ${gene}:</strong><br>${lof}` : `No data found for ${gene}`}</div>`);
         return;
     }
 
     // ========== 3. Ortholog query ==========
     else if ((match = q.match(/ortholog(?: of| for)?\s+([A-Za-z0-9\-\._]+)\s+(?:in|for)\s+(c\. elegans|mouse|zebrafish|drosophila|xenopus)/i))) {
         const html = handleOrthologQuery(match[1].toUpperCase(), match[2]);
-        appendToRightPanel(`<div class="chat-query"><strong>You:</strong> ${q}</div><div class="chat-answer"><strong>CiliAI:</strong> ${html}</div>`);
+        appendToRightPanel(`<div class="chat-query"><strong>You:</strong> ${q}</div>
+                            <div class="chat-answer"><strong>CiliAI:</strong> ${html}</div>`);
         return;
     }
     else if ((match = q.match(/(c\. elegans|mouse|zebrafish|drosophila|xenopus)\s+ortholog(?: of| for)?\s+([A-Za-z0-9\-\._]+)/i))) {
         const html = handleOrthologQuery(match[2].toUpperCase(), match[1]);
-        appendToRightPanel(`<div class="chat-query"><strong>You:</strong> ${q}</div><div class="chat-answer"><strong>CiliAI:</strong> ${html}</div>`);
+        appendToRightPanel(`<div class="chat-query"><strong>You:</strong> ${q}</div>
+                            <div class="chat-answer"><strong>CiliAI:</strong> ${html}</div>`);
         return;
     }
 
     // ========== 4. Complex / module / domains ==========
     else if ((match = q.match(/(?:components of|genes in|members of)\s+(.+)/i))) {
         const html = handleComplexQuery(match[1].trim(), q);
-        appendToRightPanel(`<div class="chat-query"><strong>You:</strong> ${q}</div><div class="chat-answer"><strong>CiliAI:</strong> ${html}</div>`);
+        appendToRightPanel(`<div class="chat-query"><strong>You:</strong> ${q}</div>
+                            <div class="chat-answer"><strong>CiliAI:</strong> ${html}</div>`);
         return;
     }
     else if ((match = q.match(/(?:complexes for|complexes of|part of|in complex|containing)\s+(.+)/i))) {
         const genes = extractMultipleGenes(match[1]);
         if (genes && genes.length > 0) {
             const html = handleGeneInComplexQuery(genes[0]);
-            appendToRightPanel(`<div class="chat-query"><strong>You:</strong> ${q}</div><div class="chat-answer"><strong>CiliAI:</strong> ${html}</div>`);
+            appendToRightPanel(`<div class="chat-query"><strong>You:</strong> ${q}</div>
+                                <div class="chat-answer"><strong>CiliAI:</strong> ${html}</div>`);
             return;
         }
     }
@@ -1872,7 +1838,8 @@ function plotTissueHeatmap(gene) {
         const genes = extractMultipleGenes(match[1]);
         if (genes && genes.length > 0) {
             const html = handleDomainQuery(genes);
-            appendToRightPanel(`<div class="chat-query"><strong>You:</strong> ${q}</div><div class="chat-answer"><strong>CiliAI:</strong> ${html}</div>`);
+            appendToRightPanel(`<div class="chat-query"><strong>You:</strong> ${q}</div>
+                                <div class="chat-answer"><strong>CiliAI:</strong> ${html}</div>`);
             return;
         }
     }
@@ -1882,10 +1849,12 @@ function plotTissueHeatmap(gene) {
         const genes = extractMultipleGenes(q);
         if (genes && genes.length > 0) {
             const html = handleScRnaQuery(genes);
-            appendToRightPanel(`<div class="chat-query"><strong>You:</strong> ${q}</div><div class="chat-answer"><strong>CiliAI:</strong> ${html}</div>`);
+            appendToRightPanel(`<div class="chat-query"><strong>You:</strong> ${q}</div>
+                                <div class="chat-answer"><strong>CiliAI:</strong> ${html}</div>`);
             return;
         } else {
-            appendToRightPanel(`<div class="chat-query"><strong>You:</strong> ${q}</div><div class="chat-answer"><strong>CiliAI:</strong> Please specify which gene(s) you want to check expression for.</div>`);
+            appendToRightPanel(`<div class="chat-query"><strong>You:</strong> ${q}</div>
+                                <div class="chat-answer"><strong>CiliAI:</strong> Please specify which gene(s) you want to check expression for.</div>`);
             return;
         }
     }
@@ -1894,30 +1863,54 @@ function plotTissueHeatmap(gene) {
     else if ((match = q.match(/(?:show|plot)\s+(?:me\s+the\s+)?umap(?: expression)?(?: for\s+([A-Za-z0-9\-]+))?/i))) {
         const gene = match[1] ? match[1].toUpperCase() : null;
         handleUmapPlot(gene);
-        appendToRightPanel(`<div class="chat-query"><strong>You:</strong> ${q}</div><div class="chat-answer"><strong>CiliAI:</strong> Displaying UMAP...</div>`);
+        appendToRightPanel(`<div class="chat-query"><strong>You:</strong> ${q}</div>
+                            <div class="chat-answer"><strong>CiliAI:</strong> Displaying UMAP...</div>`);
         return;
     }
 
     // ========== 7. Phylogeny / Evolution ==========
     else if (qLower.includes('phylogen') || qLower.includes('evolution') || qLower.includes('conservation')) {
-        const html = await routePhylogenyAnalysis(q);
-        appendToRightPanel(`<div class="chat-query"><strong>You:</strong> ${q}</div><div class="chat-answer"><strong>CiliAI:</strong> ${html}</div>`);
+        const html = routePhylogenyAnalysis(q);
+        appendToRightPanel(`<div class="chat-query"><strong>You:</strong> ${q}</div>
+                            <div class="chat-answer"><strong>CiliAI:</strong> ${html}</div>`);
         return;
     }
 
-    // ========== 8. Fallback: general gene details ==========
-    const normalizedTerm = q.replace(/[?.]/g, '').replace(/\bdo\b/i, '').trim().toUpperCase();
-    const genes = extractMultipleGenes(normalizedTerm);
+    // ========== 8. Fallback: gene details ==========
+    const genes = extractMultipleGenes(q.replace(/[?.]/g, '').toUpperCase());
     if (genes && genes.length > 0) {
-        await renderGeneToRightPanel(genes[0], q);
+        const gene = genes[0];
+        const gm = window.CiliAI?.lookups?.geneMap || {};
+        const g = gm[gene];
+        const html = g ? formatGeneChatHtml(g, gene, q) : `No data found for ${gene}`;
+        appendToRightPanel(`<div class="chat-query"><strong>You:</strong> ${q}</div>
+                            <div class="chat-answer"><strong>CiliAI:</strong> ${html}</div>`);
         return;
     }
 
     // ========== 9. Final fallback ==========
-    appendToRightPanel(`<div class="chat-query"><strong>You:</strong> ${q}</div><div class="chat-answer"><strong>CiliAI:</strong> Sorry, I didn't understand the query. Try a simpler term or gene symbol.</div>`);
+    appendToRightPanel(`<div class="chat-query"><strong>You:</strong> ${q}</div>
+                        <div class="chat-answer"><strong>CiliAI:</strong> Sorry, I didn't understand the query. Try a simpler term or gene symbol.</div>`);
 }
 
 
+// Helper function to format gene info as chat HTML
+function formatGeneChatHtml(g, geneSymbol, userQuery) {
+    return `
+        <strong>${geneSymbol}</strong><br>
+        <strong>Description:</strong> ${g['Gene.Description'] || '—'}<br>
+        <strong>Synonyms:</strong> ${g['Synonym.'] || '—'}<br>
+        <strong>OMIM:</strong> ${g['OMIM.ID'] || '—'}<br>
+        <strong>Loss-of-function:</strong> ${g['Loss-of-Function (LoF) effects on cilia length (increase/decrease/no effect)'] || '—'}<br>
+        <strong>Overexpression:</strong> ${g['Overexpression effects on cilia length (increase/decrease/no effect)'] || '—'}<br>
+        <strong>% Ciliated Cells:</strong> ${g['Percentage of ciliated cells (increase/decrease/no effect)'] || '—'}<br>
+        <strong>Localization:</strong> ${g.Localization || '—'}<br>
+        <strong>Functional Category:</strong> ${g['Functional.category'] || '—'}
+    `;
+}
+
+
+// --- 4G. Main "Brain" (Query Routers) ---
 // --- 4G. Main "Brain" (Query Routers) ---
 function flexibleIntentParser(query) {
     const qLower = (query || '').toLowerCase().trim();
@@ -1944,21 +1937,36 @@ function flexibleIntentParser(query) {
         {
             type: 'CILIOPATHY',
             keywords: allDiseaseKeywords,
-            handler: (term) => formatListResult(
-                `Genes for ${term}`,
-                (getCiliopathyGenes(term)?.genes) || [],
-                (getCiliopathyGenes(term)?.description) || ''
-            )
+            handler: (term, q) => {
+                const html = formatListResult(
+                    `Genes for ${term}`,
+                    (getCiliopathyGenes(term)?.genes) || [],
+                    (getCiliopathyGenes(term)?.description) || ''
+                );
+                appendToRightPanel(`<div class="chat-query"><strong>You:</strong> ${q}</div>
+                                    <div class="chat-answer"><strong>CiliAI:</strong> ${html}</div>`);
+                return "";
+            }
         },
         {
             type: 'CLASSIFICATION',
             keywords: classificationKeywords,
-            handler: handleClassificationQuery
+            handler: (term, q) => {
+                const html = handleClassificationQuery(term);
+                appendToRightPanel(`<div class="chat-query"><strong>You:</strong> ${q}</div>
+                                    <div class="chat-answer"><strong>CiliAI:</strong> ${html}</div>`);
+                return "";
+            }
         },
         {
             type: 'COMPLEX',
             keywords: complexKeywords,
-            handler: handleComplexQuery
+            handler: (term, q) => {
+                const html = handleComplexQuery(term, q);
+                appendToRightPanel(`<div class="chat-query"><strong>You:</strong> ${q}</div>
+                                    <div class="chat-answer"><strong>CiliAI:</strong> ${html}</div>`);
+                return "";
+            }
         },
         {
             type: 'LOCALIZATION',
@@ -1967,17 +1975,32 @@ function flexibleIntentParser(query) {
                 'cilium', 'cilia', 'mitochondria', 'nucleus', 'ciliary tip',
                 'lysosome', 'lysosomes', 'ciliary associated gene', 'microbody', 'peroxisome', 'flagella'
             ],
-            handler: handleLocalizationQuery
+            handler: (term, q) => {
+                const html = handleLocalizationQuery(term);
+                appendToRightPanel(`<div class="chat-query"><strong>You:</strong> ${q}</div>
+                                    <div class="chat-answer"><strong>CiliAI:</strong> ${html}</div>`);
+                return "";
+            }
         },
         {
             type: 'DOMAIN',
             keywords: ['WD40', 'coiled-coil', 'pfam', 'domain', 'ef-hand', 'TPR', 'AAA+ ATPase', 'ATPase domain', 'WD40 repeat'],
-            handler: getGenesByDomain
+            handler: (term, q) => {
+                const html = getGenesByDomain(term);
+                appendToRightPanel(`<div class="chat-query"><strong>You:</strong> ${q}</div>
+                                    <div class="chat-answer"><strong>CiliAI:</strong> ${html}</div>`);
+                return "";
+            }
         },
         {
             type: 'META',
             keywords: ['about yourself', 'what can you do', 'help me', 'datasets', 'capabilities', 'questions can i ask', 'overview of your features'],
-            handler: tellAboutCiliAI
+            handler: (term, q) => {
+                const html = tellAboutCiliAI();
+                appendToRightPanel(`<div class="chat-query"><strong>You:</strong> ${q}</div>
+                                    <div class="chat-answer"><strong>CiliAI:</strong> ${html}</div>`);
+                return "";
+            }
         }
     ];
 
@@ -1985,7 +2008,6 @@ function flexibleIntentParser(query) {
     const geneMap = window.CiliAI?.lookups?.geneMap || {};
     const geneSymbols = Object.keys(geneMap || {});
 
-    // Check if query matches any gene symbol or synonym
     for (const symbol of geneSymbols) {
         const g = geneMap[symbol];
         const synonyms = (g['Synonym.'] || '').split(',').map(s => s.trim().toUpperCase());
@@ -1993,9 +2015,12 @@ function flexibleIntentParser(query) {
             return {
                 type: 'GENE',
                 entity: symbol,
-                handler: async (geneSymbol, q) => {
-                    await renderGeneToRightPanel(geneSymbol, q);
-                    return ""; // already handled in right panel
+                handler: (geneSymbol, q) => {
+                    const g = geneMap[geneSymbol];
+                    const html = g ? formatGeneChatHtml(g, geneSymbol, q) : `No data found for ${geneSymbol}`;
+                    appendToRightPanel(`<div class="chat-query"><strong>You:</strong> ${q}</div>
+                                        <div class="chat-answer"><strong>CiliAI:</strong> ${html}</div>`);
+                    return "";
                 }
             };
         }
