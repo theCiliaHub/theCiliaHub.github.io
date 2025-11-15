@@ -465,23 +465,238 @@ async function fetchWithRetry(url, retries = 3) {
     }
 
     /**
-     * (FIXED) Extracts all valid gene symbols from a query string, ignoring common words.
-     */
-    function extractMultipleGenes(query) {
-        if (!query) return [];
-        const geneRegex = /\b([A-Z0-9\-\.]{3,})\b/gi;
-        let matches = query.match(geneRegex) || [];
-        // Filter out common English words that look like gene names
-        const stopWords = new Set(["THE", "AND", "FOR", "NOT", "ARE", "WHAT", "SHOW", "LIST", "GENE", "GENES", "PLOT", "COMPARE", "WHAT'S", "DESCRIBE", "OF", "IN"]);
-        matches = matches.filter(m => !stopWords.has(m.toUpperCase()));
-        
-        const upperMatches = matches.map(g => g.toUpperCase());
-        const geneMap = window.CiliAI.lookups.geneMap;
-        if (!geneMap) return [];
-        
-        // Return only the words that are actual genes in our map
-        return upperMatches.filter(g => geneMap[g]);
+ * (FIXED) Extracts all valid gene symbols from a query string, ignoring common words.
+ */
+function extractMultipleGenes(query) {
+    if (!query || typeof query !== 'string') return [];
+    
+    // Enhanced gene regex - more specific pattern for gene symbols
+    const geneRegex = /\b([A-Z][A-Z0-9\-\.]{2,})\b/g;
+    let matches = query.match(geneRegex) || [];
+    
+    // More comprehensive stop words list
+    const stopWords = new Set([
+        "THE", "AND", "FOR", "NOT", "ARE", "WHAT", "SHOW", "LIST", "GENE", "GENES", 
+        "PLOT", "COMPARE", "WHAT'S", "DESCRIBE", "OF", "IN", "TO", "WITH", "THAT",
+        "THIS", "ABOUT", "TELL", "ME", "EFFECT", "LOSS", "FUNCTION", "PERCENT",
+        "CAUSE", "CAUSES", "WHEN", "KNOCKED", "DOWN", "LONGER", "SHORT", "CILIA",
+        "LOCALIZATION", "LOCALIZED", "COMPLEX", "COMPONENTS", "PROTEINS", "MODULE",
+        "SCREENS", "SCREEN", "PHENOTYPE", "ORTHOLOG", "DOMAINS", "DISEASE",
+        "SYNDROME", "CLASSIFICATION", "EXPRESSED", "EXPRESSION", "ASSOCIATED",
+        "LINKED", "CONSERVED", "PHYLOGENY", "HEATMAP", "CONSERVATION"
+    ]);
+    
+    matches = matches.filter(m => !stopWords.has(m.toUpperCase()));
+    
+    const upperMatches = matches.map(g => g.toUpperCase());
+    const geneMap = window.CiliAI.lookups.geneMap;
+    if (!geneMap) return [];
+    
+    // Return only the words that are actual genes in our map
+    return upperMatches.filter(g => geneMap[g]);
+}
+
+/**
+ * (NEW) Enhanced intent parser with disease recognition
+ */
+function enhancedIntentParser(query) {
+    const qLower = query.toLowerCase().trim();
+    
+    // ===== DISEASE QUERY DETECTION =====
+    const diseaseKeywords = [
+        'primary ciliary dyskinesia', 'pcd', 'joubert syndrome', 'bardet-biedl syndrome', 
+        'bbs', 'meckel-gruber syndrome', 'mks', 'nephronophthisis', 'nphp',
+        'motile ciliopathies', 'atypical ciliopathies', 'ciliopathy'
+    ];
+    
+    for (const disease of diseaseKeywords) {
+        if (qLower.includes(disease)) {
+            return { 
+                type: 'CILIOPATHY', 
+                entity: disease,
+                handler: (term, q) => {
+                    const result = getCiliopathyGenes(term);
+                    if (result.genes.length > 0) {
+                        lastQueryContext = {
+                            type: 'list_followup',
+                            data: result.genes,
+                            term: `Genes for ${term}`,
+                            descriptionHeader: 'Description'
+                        };
+                        return `I found ${result.genes.length} genes associated with ${term}. Do you want to view the list?`;
+                    }
+                    return `Sorry, I could not find any genes for "${term}".`;
+                }
+            };
+        }
     }
+    
+    // ===== SCREEN/PHENOTYPE QUERY DETECTION =====
+    const screenPatterns = [
+        /(loss.of.function|loss of function|lof)\s+effect\s+of\s+([a-z0-9\-]+)/i,
+        /(screens?|phenotype)\s+(?:for|of)\s+([a-z0-9\-]+)/i,
+        /(percent|percentage)\s+(?:of\s+)?ciliated\s+cells\s+effect\s+of\s+([a-z0-9\-]+)/i,
+        /(?:which|what)\s+genes\s+cause\s+["']?([^"']+)["']?\s+when\s+knocked\s+down/i,
+        /(?:genes\s+that\s+cause\s+["']?([^"']+)["']?)/
+    ];
+    
+    for (const pattern of screenPatterns) {
+        const match = qLower.match(pattern);
+        if (match) {
+            let gene = match[2] || match[1];
+            // If it's a phenotype description, handle differently
+            if (pattern.toString().includes('cause')) {
+                return {
+                    type: 'PHENOTYPE',
+                    entity: gene,
+                    handler: handlePhenotypeQuery
+                };
+            }
+            // Extract gene from the match
+            const genes = extractMultipleGenes(gene);
+            if (genes.length > 0) {
+                return {
+                    type: 'SCREEN',
+                    entity: genes[0],
+                    handler: handleScreenQuery
+                };
+            }
+        }
+    }
+    
+    // Fall back to original parser
+    return flexibleIntentParser(query);
+}
+
+/**
+ * (NEW) Handle phenotype-based queries
+ */
+function handlePhenotypeQuery(phenotype, query) {
+    const qLower = query.toLowerCase();
+    const phenotypeMap = {
+        'short cilia': 'short cilia',
+        'longer cilia': 'longer cilia', 
+        'loss of cilia': 'loss of cilia',
+        'no cilia': 'loss of cilia'
+    };
+    
+    let targetPhenotype = phenotype;
+    for (const [key, value] of Object.entries(phenotypeMap)) {
+        if (qLower.includes(key)) {
+            targetPhenotype = value;
+            break;
+        }
+    }
+    
+    // Find genes with this phenotype
+    const genesWithPhenotype = window.CiliAI.masterData.filter(gene => {
+        const lofEffect = gene['Loss-of-Function (LoF) effects on cilia length (increase/decrease/no effect)'];
+        return lofEffect && lofEffect.toLowerCase().includes(targetPhenotype.toLowerCase());
+    }).map(gene => ({
+        gene: gene.Gene,
+        description: `Loss-of-function effect: ${gene['Loss-of-Function (LoF) effects on cilia length (increase/decrease/no effect)']}`
+    }));
+    
+    if (genesWithPhenotype.length > 0) {
+        lastQueryContext = {
+            type: 'list_followup',
+            data: genesWithPhenotype,
+            term: `Genes causing "${targetPhenotype}"`,
+            descriptionHeader: 'Phenotype Effect'
+        };
+        return `I found ${genesWithPhenotype.length} genes that cause "${targetPhenotype}" when knocked down. Do you want to view the list?`;
+    }
+    
+    return `Sorry, I could not find any genes that cause "${targetPhenotype}" when knocked down.`;
+}
+
+/**
+ * (UPDATED) Enhanced query router with better disease and screen handling
+ */
+async function enhancedHandleAIQuery(query) {
+    const chatWindow = document.getElementById('messages');
+    if (!chatWindow) return;
+    const qLower = query.toLowerCase().trim();
+    if (!query) return;
+
+    console.log(`[Enhanced Router] Processing: ${query}`);
+
+    try {
+        if (!window.CiliAI.ready) {
+            addChatMessage("Data is still loading, please wait...", false);
+            return;
+        }
+
+        let htmlResult = null;
+
+        // ===== 1. CHECK FOR DISEASE QUERIES FIRST =====
+        if (htmlResult === null && (
+            qLower.includes('primary ciliary dyskinesia') || 
+            qLower.includes('joubert syndrome') ||
+            qLower.includes('bardet-biedl syndrome') ||
+            qLower.includes('meckel-gruber syndrome') ||
+            qLower.includes('nephronophthisis') ||
+            qLower.includes('pcd') ||
+            qLower.includes('bbs') ||
+            qLower.includes('mks') ||
+            qLower.includes('nphp')
+        )) {
+            console.log('Routing via: Enhanced Disease Detection');
+            const intent = enhancedIntentParser(query);
+            if (intent && intent.type === 'CILIOPATHY') {
+                htmlResult = intent.handler(intent.entity, query);
+            }
+        }
+
+        // ===== 2. CHECK FOR SCREEN/PHENOTYPE QUERIES =====
+        if (htmlResult === null && (
+            qLower.includes('loss-of-function') ||
+            qLower.includes('loss of function') ||
+            qLower.includes('screens for') ||
+            qLower.includes('phenotype') ||
+            qLower.includes('percent ciliated') ||
+            qLower.includes('cause') && qLower.includes('when knocked down')
+        )) {
+            console.log('Routing via: Enhanced Screen/Phenotype Detection');
+            const intent = enhancedIntentParser(query);
+            if (intent && (intent.type === 'SCREEN' || intent.type === 'PHENOTYPE')) {
+                htmlResult = intent.handler(intent.entity, query);
+            }
+        }
+
+        // ===== 3. FALL BACK TO ORIGINAL ROUTING =====
+        if (htmlResult === null) {
+            htmlResult = await handleAIQuery(query);
+        }
+
+        if (htmlResult) {
+            addChatMessage(htmlResult, false);
+        }
+
+    } catch (e) {
+        console.error("Error in enhancedHandleAIQuery:", e);
+        addChatMessage(`An internal CiliAI error occurred: ${e.message}`, false);
+    }
+}
+
+    // Temporary patch - replace the main query handler
+const originalHandleAIQuery = window.handleAIQuery;
+window.handleAIQuery = enhancedHandleAIQuery;
+
+// Also update the send message function to use enhanced handler
+const originalSendMsg = window.sendMsg;
+window.sendMsg = function() {
+    const chatInput = document.getElementById('chatInput');
+    if (!chatInput) return;
+    const query = chatInput.value.trim();
+    if (!query) return;
+    addChatMessage(query, true);
+    chatInput.value = '';
+    enhancedHandleAIQuery(query);
+};
+
+console.log('🔧 CiliAI Query Patching Applied - Enhanced disease and screen detection loaded');
+    
     
     function formatListResult(title, genes, description = "") {
         let geneListHtml = '';
@@ -2435,6 +2650,26 @@ if (document.readyState === 'loading') {
 } else {
     injectTestButton();
 }
+
+// Quick patch for the specific failing queries
+function quickPatchTest() {
+    // Test the specific failing queries
+    console.log("Testing patched queries...");
+    
+    // Test 1: Primary Ciliary Dyskinesia
+    setTimeout(() => {
+        enhancedHandleAIQuery("List genes for Primary Ciliary Dyskinesia");
+    }, 1000);
+    
+    // Test 2: KIF3A loss-of-function
+    setTimeout(() => {
+        enhancedHandleAIQuery("What is the loss-of-function effect of KIF3A?");
+    }, 3000);
+}
+
+// Run the quick test
+quickPatchTest();
+
 
 // Export for use in console
 window.runCiliAITestSuite = runCiliAITestSuite;
