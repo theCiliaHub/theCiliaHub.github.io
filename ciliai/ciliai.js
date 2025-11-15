@@ -455,24 +455,69 @@
         console.log(`[CiliAI] ${message}`);
     }
 
-    /**
-     * (FIXED) Extracts all valid gene symbols from a query string, ignoring common words.
-     */
-    function extractMultipleGenes(query) {
-        if (!query) return [];
-        const geneRegex = /\b([A-Z0-9\-\.]{3,})\b/gi;
-        let matches = query.match(geneRegex) || [];
-        // Filter out common English words that look like gene names
-        const stopWords = new Set(["THE", "AND", "FOR", "NOT", "ARE", "WHAT", "SHOW", "LIST", "GENE", "GENES", "PLOT", "COMPARE", "WHAT'S", "DESCRIBE", "OF", "IN"]);
-        matches = matches.filter(m => !stopWords.has(m.toUpperCase()));
-        
-        const upperMatches = matches.map(g => g.toUpperCase());
-        const geneMap = window.CiliAI.lookups.geneMap;
-        if (!geneMap) return [];
-        
-        // Return only the words that are actual genes in our map
-        return upperMatches.filter(g => geneMap[g]);
+   /**
+ * (REPLACEMENT) Robust Gene Extractor
+ * This version uses a manual map for common genes and a better stopword list
+ * to correctly parse complex queries and avoid "THE" bugs.
+ */
+function extractMultipleGenes(query) {
+    if (!query || typeof query !== 'string') return [];
+    
+    log(`[Gene Extraction] Processing: "${query}"`);
+    const qLower = query.toLowerCase();
+
+    // Manual map for high-priority or problematic gene names
+    const manualMap = {
+        'kif3a': 'KIF3A',
+        'ift88': 'IFT88',
+        'bbs1': 'BBS1',
+        'arl13b': 'ARL13B',
+        'cep290': 'CEP290',
+        'tmem67': 'TMEM67',
+        'ofd1': 'OFD1',
+        'ift52': 'IFT52',
+        'pkd1': 'PKD1',
+        'evc2': 'EVC2'
+    };
+
+    let foundGenes = new Set();
+    
+    // Check manual map first
+    for (const [key, gene] of Object.entries(manualMap)) {
+        if (qLower.includes(key)) {
+            log(`[Gene Extraction] Found via manual map: ${gene}`);
+            foundGenes.add(gene);
+        }
     }
+
+    // Use regex for other gene-like patterns
+    const geneRegex = /\b([A-Z0-9\-\.]{3,})\b/gi;
+    let matches = query.match(geneRegex) || [];
+    
+    // Enhanced stop words list to prevent "THE" bug
+    const stopWords = new Set([
+        "THE", "AND", "FOR", "NOT", "ARE", "WHAT", "SHOW", "LIST", "GENE", "GENES",
+        "PLOT", "COMPARE", "WHAT'S", "DESCRIBE", "OF", "IN", "LOSS", "FUNCTION",
+        "EFFECT", "WITH", "THAT", "THIS", "ABOUT", "TELL", "ME", "SHORT", "LONG",
+        "LONGER", "CILIA", "PROTEINS", "WHICH", "FIND", "CAUSES", "CAUSE",
+        "KNOCKED", "DOWN", "WHEN"
+    ]);
+    
+    const geneMap = window.CiliAI.lookups.geneMap;
+    if (!geneMap) return [];
+
+    for (const match of matches) {
+        const upperMatch = match.toUpperCase();
+        if (!stopWords.has(upperMatch) && geneMap[upperMatch]) {
+            log(`[Gene Extraction] Found via regex: ${upperMatch}`);
+            foundGenes.add(upperMatch);
+        }
+    }
+    
+    const finalGenes = Array.from(foundGenes);
+    log(`[Gene Extraction] Final valid genes:`, finalGenes);
+    return finalGenes;
+}
     
     function formatListResult(title, genes, description = "") {
         let geneListHtml = '';
@@ -1770,179 +1815,317 @@
 
     // REPLACE your current handleAIQuery (lines 1167-1349) with this:
 
-    async function handleAIQuery(query) {
-        const chatWindow = document.getElementById('messages');
-        if (!chatWindow) return;
-        const qLower = query.toLowerCase().trim();
-        if (!query) return;
+   /**
+ * (REPLACEMENT) The Main "Level 1" Query Router
+ * This is the new, clean, and correctly-ordered router.
+ */
+async function handleAIQuery(query) {
+    const chatWindow = document.getElementById('messages');
+    if (!chatWindow) return;
+    const qLower = query.toLowerCase().trim();
+    if (!query) return;
 
-        log(`Routing query: ${query}`);
+    log(`Routing query: ${query}`);
 
-        try {
-            if (!window.CiliAI.ready) {
-                addChatMessage("Data is still loading, please wait...", false);
-                return;
+    try {
+        if (!window.CiliAI.ready) {
+            addChatMessage("Data is still loading, please wait...", false);
+            return;
+        }
+
+        let htmlResult = null;
+        let match;
+
+        // =( 1 )= INTENT: COMPLEX (L2/L3) QUERIES
+        // Run the complex query handler first. If it returns a result, we're done.
+        htmlResult = handleComplexQuery(query);
+        if (htmlResult) {
+            log('Routing via: Complex Query Engine (L2/L3)');
+            addChatMessage(htmlResult, false);
+            return; // Stop processing
+        }
+
+        // =( 2 )= INTENT: CONTEXTUAL FOLLOW-UP ("Yes")
+        const isFollowUp = qLower === 'yes' || qLower === 'ok' || qLower === 'sure' ||
+            qLower.includes('view the list') || qLower.includes('show') ||
+            qLower.includes('please') || qLower.includes('display');
+
+        if (htmlResult === null && isFollowUp && lastQueryContext.type === 'list_followup') {
+            log('Routing via: Intent (Follow-up: Show List)');
+            showDataInLeftPanel(lastQueryContext.term, lastQueryContext.data, lastQueryContext.descriptionHeader);
+            lastQueryContext = { type: null, data: [], term: null, descriptionHeader: 'Description' };
+            return; // No chat message needed, panel updates
+        }
+
+        // =( 3 )= INTENT: HIGH-PRIORITY "WHAT IS [GENE]?"
+        else if (htmlResult === null && (match = qLower.match(/^(?:what is|what's|describe|tell me about)\s+([A-Z0-9\-]{3,})\b/i))) {
+            log('Routing via: Intent (High-Priority Get Details)');
+            htmlResult = await displayFullGeneInfo(match[1].toUpperCase());
+        }
+
+        // =( 4 )= INTENT: SCREENS / PHENOTYPES (FIXED & HIGH PRIORITY)
+        // This now correctly handles "loss-of-function effect of KIF3A"
+        else if (htmlResult === null && (
+            qLower.includes('loss-of-function') || qLower.includes('lof') ||
+            qLower.includes('overexpression') || qLower.includes('oe') ||
+            qLower.includes('percent ciliated') || qLower.includes('cilia length') ||
+            (qLower.includes('effect') && qLower.includes('of'))
+        )) {
+            log('Routing via: Intent (Screens/Effects)');
+            const genes = extractMultipleGenes(query); // Use the good extractor
+            if (genes.length > 0) {
+                // Use the last gene found in the query
+                htmlResult = handleScreenQuery(genes[genes.length - 1]);
+            } else {
+                htmlResult = `I see you're asking about screen effects, but I couldn't identify a gene. Please try again, like "loss-of-function effect of IFT88".`;
             }
+        }
 
-            let htmlResult = null; 
-            let match;
+        // =( 5 )= INTENT: ORTHOLOGS
+        else if (htmlResult === null && (match = qLower.match(/ortholog(?: of| for)?\s+([a-z0-9\-]+)\s+(?:in|for)\s+(c\. elegans|mouse|zebrafish|drosophila|xenopus)/i))) {
+            log('Routing via: Intent (Ortholog)');
+            htmlResult = handleOrthologQuery(match[1].toUpperCase(), match[2]);
+        }
+        else if (htmlResult === null && (match = qLower.match(/(c\. elegans|mouse|zebrafish|drosophila|xenopus)\s+ortholog(?: of| for)?\s+([a-z0-9\-]+)/i))) {
+            log('Routing via: Intent (Ortholog)');
+            htmlResult = handleOrthologQuery(match[2].toUpperCase(), match[1]);
+        }
 
-            // =( 1 )= INTENT: CONTEXTUAL FOLLOW-UP ("Yes")
-            const isFollowUp = qLower === 'yes' || qLower === 'ok' || qLower === 'sure' || 
-                                 qLower.includes('view the list') || qLower.includes('show') || 
-                                 qLower.includes('please') || qLower.includes('display');
+        //=( 6 )= INTENT: COMPLEX / MODULE MEMBERS (Split Logic)
+        else if (htmlResult === null && (match = qLower.match(/(?:components of|genes in|members of)\s+(.+)/i))) {
+            const term = match[1].replace(/^(the|a|an)\s/i, '').trim();
+            log('Routing via: Intent (Get Genes in Complex)');
+            htmlResult = handleComplexQuery(term, query); // Note: This is the simple list, not the complex router
+        }
+        else if (htmlResult === null && (match = qLower.match(/(?:complexes for|complexes of|part of|in complex)\s+(.+)/i))) {
+            log('Routing via: Intent (Get Complexes for Gene)');
+            const genes = extractMultipleGenes(match[1]);
+            if (genes.length > 0) {
+                htmlResult = handleGeneInComplexQuery(genes[0]);
+            }
+        }
+
+        //=( 7 )= INTENT: DOMAINS
+        else if (htmlResult === null && (match = qLower.match(/(?:domains of|domain architecture for)\s+(.+)/i))) {
+            log('Routing via: Intent (Domains)');
+            const genes = extractMultipleGenes(match[1]);
+            if (genes.length > 0) {
+                htmlResult = handleDomainQuery(genes);
+            }
+        }
+
+        //=( 8 )= INTENT: PHYLOGENY / EVOLUTION
+        else if (htmlResult === null && (
+            qLower.includes('phylogen') || qLower.includes('evolution') || qLower.includes('conservation') ||
+            qLower.includes('heatmap') || qLower.includes('taxa') || qLower.includes('vertebrate specific') ||
+            qLower.includes('mammalian specific') || qLower.includes('ciliary specific') ||
+            qLower.includes('table')
+        )) {
+            log('Routing via: Intent (Phylogeny Engine)');
+            htmlResult = await routePhylogenyAnalysis(query); // Now Awaited
+        }
+
+        //=( 9 )= INTENT: FUNCTIONAL MODULES
+        else if (htmlResult === null && (match = qLower.match(/(?:functional modules of|modules for)\s+([a-z0-9\-]+)/i))) {
+            log('Routing via: Intent (Get Modules)');
+            const gene = match[1].toUpperCase();
+            const g = window.CiliAI.lookups.geneMap[gene];
+            if (g && g['Functional.category']) { // Use CSV column name
+                htmlResult = formatListResult(`Functional Modules for ${gene}`, ensureArray(g['Functional.category']).map(m => ({ gene: m, description: "Module" })));
+            } else {
+                htmlResult = `No functional modules listed for <strong>${gene}</strong>.`;
+            }
+        }
+
+        //=( 10 )= INTENT: scRNA Expression
+        else if (htmlResult === null && (qLower.includes('scrna') || qLower.includes('expression in') || qLower.includes('compare expression'))) {
+            log('Routing via: Intent (scRNA)');
+            const genes = extractMultipleGenes(query);
+            if (genes.length > 0) {
+                htmlResult = handleScRnaQuery(genes);
+            } else {
+                htmlResult = `Please specify which gene(s) you want to check expression for.`;
+            }
+        }
+
+        //=( 11 )= INTENT: UMAP (VISUAL)
+        else if (htmlResult === null && (match = qLower.match(/(?:show|plot)\s+(?:me\s+the\s+)?umap(?: expression)?(?: for\s+([a-z0-9\-]+))?/i))) {
+            log('Routing via: Intent (UMAP Plot)');
+            const gene = match[1] ? match[1].toUpperCase() : null;
+            handleUmapPlot(gene);
+            htmlResult = "";
+        }
+
+        //=( 12 )= INTENT: SIMPLE KEYWORD LISTS
+        if (htmlResult === null) {
+            const intent = flexibleIntentParser(query);
+            if (intent) {
+                log(`Routing via: Intent (Simple Keyword: ${intent.type})`);
+                htmlResult = intent.handler(intent.entity, query);
+            }
+        }
+
+        //=( 13 )= INTENT: FALLBACK (GET DETAILS)
+        if (htmlResult === null) {
+            log(`Routing via: Fallback (Get Details)`);
+            let term = qLower;
+            if ((match = qLower.match(/(?:what is|what does|describe|localization of|omim id for|where is|cellular location of|subcellular localization of)\s+(?:the\s+)?(.+)/i))) {
+                term = match[1];
+            }
+            term = term.replace(/[?.]/g, '').replace(/\bdo\b/i, '').trim().toUpperCase();
             
-            if (htmlResult === null && isFollowUp && lastQueryContext.type === 'list_followup') {
-                log('Routing via: Intent (Follow-up: Show List)');
-                showDataInLeftPanel(lastQueryContext.term, lastQueryContext.data, lastQueryContext.descriptionHeader);
-                lastQueryContext = { type: null, data: [], term: null, descriptionHeader: 'Description' };
-                htmlResult = ""; // No chat message needed, panel updates
+            const genes = extractMultipleGenes(term); // Use the good extractor
+            
+            if (genes.length > 0) {
+                htmlResult = await displayFullGeneInfo(genes[0]);
             }
+        }
 
-            // =( 2 )= INTENT: HIGH-PRIORITY "WHAT IS [GENE]?"
-            else if (htmlResult === null && (match = qLower.match(/^(?:what is|what's|describe|tell me about)\s+([A-Z0-9\-]{3,})\b/i))) {
-                log('Routing via: Intent (High-Priority Get Details)');
-                htmlResult = await displayFullGeneInfo(match[1].toUpperCase());
+        //=( 14 )= FINAL FALLBACK (ERROR)
+        if (htmlResult === null) {
+            log(`Routing via: Final Fallback (Error)`);
+            // Try to find *any* gene, even if it's a fallback
+            const genes = extractMultipleGenes(query);
+            if (genes.length > 0) {
+                log(`Final fallback, found gene: ${genes[0]}`);
+                htmlResult = await displayFullGeneInfo(genes[0]);
+            } else {
+                htmlResult = `Sorry, I didn't understand the query: "<strong>${query}</strong>". Please try a simpler term.`;
             }
+        }
 
-            // =( 3 )= INTENT: SCREENS / PHENOTYPES (FIXED & HIGH PRIORITY)
-            // This now correctly handles "loss-of-function effect of KIF3A"
-            else if (htmlResult === null && (
-                qLower.includes('loss-of-function') || qLower.includes('lof') || 
-                qLower.includes('overexpression') || qLower.includes('oe') || 
-                qLower.includes('percent ciliated') || qLower.includes('cilia length') || 
-                (qLower.includes('effect') && qLower.includes('of')) 
-            )) {
-                log('Routing via: Intent (Screens/Effects)');
-                const genes = extractMultipleGenes(query); // Use the good extractor
-                if (genes.length > 0) {
-                    // Use the last gene found in the query
-                    htmlResult = handleScreenQuery(genes[genes.length - 1]); 
-                } else {
-                    htmlResult = `I see you're asking about screen effects, but I couldn't identify a gene. Please try again, like "loss-of-function effect of IFT88".`;
-                }
-            }
+        if (htmlResult) {
+            addChatMessage(htmlResult, false);
+        }
 
-            // =( 4 )= INTENT: ORTHOLOGS
-            else if (htmlResult === null && (match = qLower.match(/ortholog(?: of| for)?\s+([a-z0-9\-]+)\s+(?:in|for)\s+(c\. elegans|mouse|zebrafish|drosophila|xenopus)/i))) {
-                log('Routing via: Intent (Ortholog)');
-                htmlResult = handleOrthologQuery(match[1].toUpperCase(), match[2]);
-            }
-            else if (htmlResult === null && (match = qLower.match(/(c\. elegans|mouse|zebrafish|drosophila|xenopus)\s+ortholog(?: of| for)?\s+([a-z0-9\-]+)/i))) {
-                log('Routing via: Intent (Ortholog)');
-                htmlResult = handleOrthologQuery(match[2].toUpperCase(), match[1]);
-            }
+    } catch (e) {
+        console.error("Error in handleAIQuery:", e);
+        addChatMessage(`An internal CiliAI error occurred: ${e.message}`, false);
+    }
+}
 
-            //=( 5 )= INTENT: COMPLEX / MODULE MEMBERS (Split Logic)
-            else if (htmlResult === null && (match = qLower.match(/(?:components of|genes in|members of)\s+(.+)/i))) {
-                const term = match[1].replace(/^(the|a|an)\s/i, '').trim();
-                log('Routing via: Intent (Get Genes in Complex)');
-                htmlResult = handleComplexQuery(term, query); 
-            }
-            else if (htmlResult === null && (match = qLower.match(/(?:complexes for|complexes of|part of|in complex)\s+(.+)/i))) {
-                log('Routing via: Intent (Get Complexes for Gene)');
-                const genes = extractMultipleGenes(match[1]);
-                if (genes.length > 0) {
-                    htmlResult = handleGeneInComplexQuery(genes[0]);
-                }
-            }
 
-            //=( 6 )= INTENT: DOMAINS
-            else if (htmlResult === null && (match = qLower.match(/(?:domains of|domain architecture for)\s+(.+)/i))) {
-                log('Routing via: Intent (Domains)');
-                const genes = extractMultipleGenes(match[1]);
-                if (genes.length > 0) {
-                    htmlResult = handleDomainQuery(genes);
-                }
-            }
 
-            //=( 7 )= INTENT: PHYLOGENY / EVOLUTION
-            else if (htmlResult === null && (
-                qLower.includes('phylogen') || qLower.includes('evolution') || qLower.includes('conservation') ||
-                qLower.includes('heatmap') || qLower.includes('taxa') || qLower.includes('vertebrate specific') ||
-                qLower.includes('mammalian specific') || qLower.includes('ciliary specific') ||
-                qLower.includes('table')
-            )) {
-                log('Routing via: Intent (Phylogeny Engine)');
-                htmlResult = await routePhylogenyAnalysis(query); // Now Awaited
-            }
+// ==========================================================
+// 4B. COMPLEX QUERY ENGINE (L2/L3) - NEW
+// ==========================================================
 
-            //=( 8 )= INTENT: FUNCTIONAL MODULES
-            else if (htmlResult === null && (match = qLower.match(/(?:functional modules of|modules for)\s+([a-z0-9\-]+)/i))) {
-                log('Routing via: Intent (Get Modules)');
-                const gene = match[1].toUpperCase();
-                const g = window.CiliAI.lookups.geneMap[gene];
-                if (g && g['Functional.category']) { // Use CSV column name
-                    htmlResult = formatListResult(`Functional Modules for ${gene}`, ensureArray(g['Functional.category']).map(m => ({ gene: m, description: "Module" })));
-                } else {
-                    htmlResult = `No functional modules listed for <strong>${gene}</strong>.`;
-                }
-            }
-
-            //=( 9 )= INTENT: scRNA Expression
-            else if (htmlResult === null && (qLower.includes('scrna') || qLower.includes('expression in') || qLower.includes('compare expression'))) {
-                log('Routing via: Intent (scRNA)');
-                const genes = extractMultipleGenes(query);
-                if (genes.length > 0) {
-                    htmlResult = handleScRnaQuery(genes);
-                } else {
-                    htmlResult = `Please specify which gene(s) you want to check expression for.`;
-                }
-            }
-
-            //=( 10 )= INTENT: UMAP (VISUAL)
-            else if (htmlResult === null && (match = qLower.match(/(?:show|plot)\s+(?:me\s+the\s+)?umap(?: expression)?(?: for\s+([a-z0-9\-]+))?/i))) {
-                log('Routing via: Intent (UMAP Plot)');
-                const gene = match[1] ? match[1].toUpperCase() : null;
-                handleUmapPlot(gene);
-                htmlResult = ""; 
-            }
-
-            //=( 11 )= INTENT: SIMPLE KEYWORD LISTS
-            if (htmlResult === null) { 
-                const intent = flexibleIntentParser(query); 
-                if (intent) {
-                    log(`Routing via: Intent (Simple Keyword: ${intent.type})`);
-                    htmlResult = intent.handler(intent.entity, query); 
-                }
-            }
-
-            //=( 12 )= INTENT: FALLBACK (GET DETAILS)
-            if (htmlResult === null) { 
-                log(`Routing via: Fallback (Get Details)`);
-                let term = qLower;
-                if ((match = qLower.match(/(?:what is|what does|describe|localization of|omim id for|where is|cellular location of|subcellular localization of)\s+(?:the\s+)?(.+)/i))) {
-                    term = match[1];
-                }
-                term = term.replace(/[?.]/g, '').replace(/\bdo\b/i, '').trim().toUpperCase();
-                
-                const genes = extractMultipleGenes(term); // Use the good extractor
-                
-                if (genes.length > 0) {
-                    htmlResult = await displayFullGeneInfo(genes[0]);
-                }
-            }
-            //=( 13 )= FINAL FALLBACK (ERROR)
-            if (htmlResult === null) { 
-                log(`Routing via: Final Fallback (Error)`);
-                // Try to find *any* gene, even if it's a fallback
-                const genes = extractMultipleGenes(query);
-                if (genes.length > 0) {
-                     log(`Final fallback, found gene: ${genes[0]}`);
-                     htmlResult = await displayFullGeneInfo(genes[0]);
-                } else {
-                     htmlResult = `Sorry, I didn't understand the query: "<strong>${query}</strong>". Please try a simpler term.`;
-                }
-            }
-            if (htmlResult) { 
-                addChatMessage(htmlResult, false);
-            }
-
-        } catch (e) {
-            console.error("Error in handleAIQuery:", e);
-            addChatMessage(`An internal CiliAI error occurred: ${e.message}`, false);
+/**
+ * (NEW) Extracts localization keywords from a query.
+ * @param {string} qLower - The lowercase query string.
+ * @returns {string|null} The found localization term, or null.
+ */
+function extractLocalizationIntent(qLower) {
+    const keywords = {
+        'basal body': ['basal body', 'bb'],
+        'transition zone': ['transition zone', 'tz'],
+        'axoneme': ['axoneme', 'axonemal'],
+        'ciliary tip': ['ciliary tip', 'tip'],
+        'nucleus': ['nucleus', 'nuclear'],
+        'mitochondria': ['mitochondria', 'mitochondrial'],
+        'lysosome': ['lysosome', 'lysosomal'],
+        'cilia': ['cilia', 'cilium', 'ciliary']
+    };
+    for (const [term, synonyms] of Object.entries(keywords)) {
+        if (synonyms.some(syn => qLower.includes(syn))) {
+            return term;
         }
     }
+    return null;
+}
+
+/**
+ * (NEW) Extracts phenotype keywords from a query.
+ * @param {string} qLower - The lowercase query string.
+ * @returns {string|null} The found phenotype term, or null.
+ */
+function extractPhenotypeIntent(qLower) {
+    const keywords = {
+        'short cilia': ['short cilia', 'shorter cilia'],
+        'longer cilia': ['long cilia', 'longer cilia'],
+        'loss of cilia': ['loss of cilia', 'no cilia', 'cilia loss', 'no ciliation'],
+        'no effect': ['no effect', 'no change', 'normal length']
+    };
+    for (const [term, synonyms] of Object.entries(keywords)) {
+        if (synonyms.some(syn => qLower.includes(syn))) {
+            return term;
+        }
+    }
+    return null;
+}
+
+/**
+ * (NEW) The main "Level 2" query router.
+ * It hunts for multiple intents and, if found, filters the master list.
+ * @param {string} query - The original user query.
+ * @returns {string|null} An HTML string if a complex query is handled, or null to fall back.
+ */
+function handleComplexQuery(query) {
+    const qLower = query.toLowerCase();
+
+    // 1. Extract all possible intents
+    const intents = {
+        localization: extractLocalizationIntent(qLower),
+        phenotype: extractPhenotypeIntent(qLower)
+        // We will add more intents here later (disease, expression, etc.)
+    };
+
+    // 2. Count how many intents we found
+    const intentCount = Object.values(intents).filter(Boolean).length;
+
+    // 3. If it's not a multi-intent query, fall back to the simple router
+    if (intentCount < 2) {
+        log(`[Complex Router] Only ${intentCount} intent(s) found. Falling back to simple router.`);
+        return null;
+    }
+
+    log(`[Complex Router] Handling complex query with ${intentCount} intents:`, intents);
+
+    // 4. Build a filter chain
+    let filteredGenes = window.CiliAI.masterData.filter(gene => {
+        
+        // Filter by Localization
+        if (intents.localization) {
+            const geneLoc = gene.Localization || '';
+            if (!geneLoc.toLowerCase().includes(intents.localization)) {
+                return false;
+            }
+        }
+
+        // Filter by Phenotype
+        if (intents.phenotype) {
+            const genePheno = gene['Loss-of-Function (LoF) effects on cilia length (increase/decrease/no effect)'] || '';
+            if (!genePheno.toLowerCase().includes(intents.phenotype)) {
+                return false;
+            }
+        }
+        
+        // All filters passed
+        return true;
+    });
+
+    // 5. Format the results
+    if (filteredGenes.length === 0) {
+        return `I found no genes that match all of your criteria (e.g., Localization: "${intents.localization}" + Phenotype: "${intents.phenotype}").`;
+    }
+
+    const geneListObjects = filteredGenes.map(g => ({
+        gene: g.Gene,
+        description: `Loc: ${g.Localization || 'N/A'} | Pheno: ${g['Loss-of-Function (LoF) effects on cilia length (increase/decrease/no effect)'] || 'N/A'}`
+    }));
+
+    // Save for "view list" follow-up
+    lastQueryContext = {
+        type: 'list_followup',
+        data: geneListObjects,
+        term: `Complex Query Results`,
+        descriptionHeader: 'Details'
+    };
+    
+    return `I found ${filteredGenes.length} genes matching your criteria. Do you want to view the list?`;
+}
+
+
     
     // ==========================================================
     // 5. GLOBAL UI WRAPPERS & STARTUP
