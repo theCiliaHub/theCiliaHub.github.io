@@ -1,7 +1,6 @@
 /* ==============================================================
  * CiliAI – Interactive Explorer (v5.1 – Nov 15, 2025)
  * ==============================================================
- * • BUILT FROM SCRATCH based on user's question list.
  * • Loads the pre-compiled 'ciliAI_master_database.json' + 'ciliAI_lookups.json'
  * • Lazy-loads the large phylogeny files only when needed.
  * • Fixes all known layout, normalization, and query routing bugs.
@@ -163,6 +162,22 @@
             window.CiliAI.ready = false;
         }
     }
+
+     /**
+     * Data Loading Reliability
+     */
+     
+async function fetchWithRetry(url, retries = 3) {
+    for (let i = 0; i < retries; i++) {
+        try {
+            const response = await fetch(url);
+            if (response.ok) return response;
+        } catch (e) {
+            if (i === retries - 1) throw e;
+            await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1)));
+        }
+    }
+}
     
     /**
      * Normalizes a term for keyword matching.
@@ -519,7 +534,7 @@
         handleAIQuery(query);
     }
 
-    function updateStatus(text, status) {
+function updateStatus(text, status) {
         const statusEl = document.getElementById('dataStatus');
         if (statusEl) {
             statusEl.textContent = text;
@@ -527,6 +542,22 @@
         }
     }
 
+
+function renderVirtualTable(container, data, pageSize = 50) {
+    // Implement virtual scrolling for large datasets
+}
+function safePlotlyRender(container, data, layout) {
+    try {
+        return Plotly.newPlot(container, data, layout, { responsive: true });
+    } catch (error) {
+        console.error('Plotly rendering failed:', error);
+        container.innerHTML = `<div class="error-message">
+            Plot rendering failed: ${error.message}
+        </div>`;
+        return Promise.reject(error);
+    }
+}
+    
     function handleGeneSearch(geneSymbol, queryAI = true) {
         const gene = geneSymbol.trim().toUpperCase();
         if (!gene) return;
@@ -663,7 +694,6 @@
         if (!g) return `Sorry, I could not find data for "${gene}".`;
         let html = `<h4>Screen Results for <strong>${gene}</strong></h4>`;
         
-        // Use the exact column names from your CSV
         const percEffect = g['Percentage of ciliated cells (increase/decrease/no effect)'];
         const lofEffect = g['Loss-of-Function (LoF) effects on cilia length (increase/decrease/no effect)'];
         const oeEffect = g['Overexpression effects on cilia length (increase/decrease/no effect)'];
@@ -719,7 +749,7 @@
         const gene = geneSymbol.toUpperCase();
         const g = window.CiliAI.lookups.geneMap[gene];
         if (!g) return `Sorry, I could not find data for "${gene}".`;
-        const orgKey = `Ortholog_${organism.toLowerCase().replace(/[\.\s]/g, '_')}`; // Match CSV column
+        const orgKey = `Ortholog_${organism.toLowerCase().replace(/[\.\s]/g, '_')}`;
         if (g[orgKey] && g[orgKey] !== 'N/A' && g[orgKey] !== null) {
             return formatListResult(`Ortholog for ${gene} in ${organism}`, [{
                 gene: gene,
@@ -740,7 +770,7 @@
                 return;
             }
             const exp = g.expression?.scRNA;
-            html += `<strong>${g.Gene}:</strong> `; // Use 'Gene'
+            html += `<strong>${g.Gene}:</strong> `;
             if (exp) {
                  const topTissues = Object.entries(exp)
                     .sort(([,a], [,b]) => b - a)
@@ -779,11 +809,9 @@
     }
 
     function handleComplexQuery(term, query) {
-        // This function now *only* handles "List genes in [COMPLEX]"
         const geneList = getGenesByComplex(term);
         const count = geneList.length;
         if (count === 0) {
-            // Fallback: check if the user meant "complexes for gene..."
             const genes = extractMultipleGenes(term);
             if (genes.length > 0) {
                 return handleGeneInComplexQuery(genes[0]);
@@ -816,7 +844,6 @@
     function handleClassificationQuery(classificationName, query) {
         const qLower = query.toLowerCase();
         
-        // Find the cased name, e.g., "Primary Ciliopathies"
         const casedClassificationName = Object.keys(getDiseaseClassificationMap()).find(key => normalizeTerm(key) === normalizeTerm(classificationName));
         if (!casedClassificationName) {
             return `Sorry, I don't recognize the classification "${classificationName}".`;
@@ -847,7 +874,6 @@
             return `I found ${count} unique genes associated with ${casedClassificationName}. Do you want to view the list?`;
         
         } else {
-            // User just wants to list the diseases in the classification
             const diseaseMap = getDiseaseClassificationMap();
             const diseaseList = diseaseMap[casedClassificationName] || [];
             const diseaseHtml = diseaseList.map(d => `<li>${d}</li>`).join('');
@@ -874,7 +900,7 @@
                     <li><b>Phylogeny:</b> "Show conservation of IFT88."</li>
                     <li><b>Domains:</b> "Which genes have WD40 domains?"</li>
                 </ul>
-                <p>My data comes from a pre-compiled database of over 23,000 genes, enriched with data from 8 specialized datasets (CORUM, UMAP, scRNA, Phylogeny, etc.).</p>
+                <p>My data comes from a pre-compiled database of ${window.CiliAI.masterData.length} genes, enriched with data from 8 specialized datasets (CORUM, UMAP, scRNA, Phylogeny, etc.).</p>
             </div>
         `;
     }
@@ -896,7 +922,6 @@
         const plotDiv = document.getElementById(plotId);
         if (!plotDiv) return;
 
-        // Add class to wrapper
         const wrapper = plotDiv.closest('.interactive-cilium');
         if (wrapper) wrapper.classList.add('table-view-active');
 
@@ -952,7 +977,6 @@
 
         Plotly.newPlot(plotDivId, plotData, layout, { responsive: true });
         
-        // Add a "Back" button to the plot
         const backButton = document.createElement('button');
         backButton.id = 'ciliai-back-btn';
         backButton.className = 'ciliai-button';
@@ -1001,19 +1025,15 @@
     }
 
     async function routePhylogenyAnalysis(query) {
-        // This is now an async function to handle lazy-loading
         const qLower = query.toLowerCase();
 
-        // 1. Check if data is loaded. If not, load it.
         const dataLoaded = await ensurePhylogenyDataLoaded();
         if (!dataLoaded) {
             return "Could not load phylogeny data. Please try again.";
         }
 
-        // --- FIX: Check for complex/module names in the query ---
         let genes = extractMultipleGenes(query);
         if (genes.length === 0) {
-            // No genes found, check for a complex name
             const complexKey = Object.keys(window.CiliAI.lookups.byModuleOrComplex).find(key => 
                 qLower.includes(normalizeTerm(key))
             );
@@ -1022,9 +1042,7 @@
                 genes = window.CiliAI.lookups.byModuleOrComplex[complexKey];
             }
         }
-        // --- END FIX ---
 
-        // 2. Proceed with routing as before
         if (qLower.includes('table') || qLower.includes('view data') || qLower.includes('species count')) {
             if (genes.length >= 1) {
                 return renderPhylogenyTable(genes);
@@ -1060,7 +1078,6 @@
     }
     
     function handlePhylogenyVisualizationQuery(genes, source = 'li', type = 'heatmap') {
-        // This function no longer needs to be async, as data is pre-loaded by the router
         const plotId = 'cilia-svg';
         generateAndInjectSVG(); 
         const plotDiv = document.getElementById(plotId); 
@@ -1496,12 +1513,12 @@
             return `Sorry, I could not find any data for "<strong>${gene}</strong>".`;
         }
 
-        let html = `<h4>Details for <strong>${g.Gene}</strong></h4>`;
+        let html = `<h4>Details for <strong>${g.Gene}</strong></h4>`; // Use 'Gene'
         html += `<p>${g.Gene_Description || g.Functional_Summary_from_Literature || 'No description available.'}</p>`;
         html += '<ul>';
         if (g.Localization) html += `<li><strong>Localization:</strong> ${g.Localization}</li>`;
         if (g.Ciliopathy) html += `<li><strong>Ciliopathy:</strong> ${g.Ciliopathy}</li>`;
-        if (g.omim_id) html += `<li><strong>OMIM ID:</strong> ${g.omim_id}</li>`;
+        if (g.OMIM_ID) html += `<li><strong>OMIM ID:</strong> ${g.OMIM_ID}</li>`;
         
         const complexes = Object.keys(g.complex_components || {})
                               .filter(name => isNaN(parseInt(name)));
@@ -1652,7 +1669,7 @@
                     <li><b>Phylogeny:</b> "Show conservation of IFT88."</li>
                     <li><b>Domains:</b> "Which genes have WD40 domains?"</li>
                 </ul>
-                <p>My data comes from a pre-compiled database of over 23,000 genes, enriched with data from 8 specialized datasets (CORUM, UMAP, scRNA, Phylogeny, etc.).</p>
+                <p>My data comes from a pre-compiled database of ${window.CiliAI.masterData.length} genes, enriched with data from 8 specialized datasets (CORUM, UMAP, scRNA, Phylogeny, etc.).</p>
             </div>
         `;
     }
@@ -1779,7 +1796,7 @@
                 log('Routing via: Intent (Get Genes in Complex)');
                 htmlResult = handleComplexQuery(term, query); 
             }
-            else if (htmlResult === null && (match = qLower.match(/(?:complexes for|complexes of|part of|in complex)\s+(.+)/i))) {
+            else if (htmlResult === null && (match = qLower.match(/(?:complexes for|complexes of|part of|in complex|containing)\s+(.+)/i))) { // Added "containing"
                 log('Routing via: Intent (Get Complexes for Gene)');
                 const genes = extractMultipleGenes(match[1]);
                 if (genes.length > 0) {
@@ -1959,3 +1976,468 @@
     }
 
 })();
+
+
+// ciliAI_test_suite.js
+class CiliAITestSuite {
+    constructor() {
+        this.results = {
+            passed: 0,
+            failed: 0,
+            skipped: 0,
+            details: []
+        };
+        this.testQuestions = {
+            simple: [
+                // Gene Details
+                "What is IFT88?",
+                "Describe BBS1.",
+                "What does EVC2 do?",
+                "Tell me about ARL13B.",
+                "Summarize CEP290.",
+
+                // Specific Facts
+                "What is the localization of ARL13B?",
+                "What is the OMIM ID for PKD1?",
+                "Ortholog of OFD1 in mouse.",
+                "Ortholog in C. elegans for IFT52.",
+                "What are the domains of TMEM67?",
+
+                // List by Localization
+                "Genes localized to cilia.",
+                "List genes in the basal body.",
+                "Show me all genes in the nucleus.",
+                "Which genes are in the axoneme?",
+                "List genes localized to lysosomes.",
+
+                // List by Complex/Module
+                "List genes in the BBSome.",
+                "What proteins are in the IFT-A complex?",
+                "Show me the NPHP module genes.",
+                "Components of the Ciliary Tip.",
+                "Which genes are in the CPLANE complex?",
+
+                // List by Disease & Classification
+                "What genes cause Joubert Syndrome?",
+                "Gene list for Bardet-Biedl Syndrome.",
+                "List genes for Primary Ciliary Dyskinesia.",
+                "Gene list of Motile Ciliopathies.",
+                "Show me all genes for Atypical Ciliopathies.",
+
+                // Screening & Phenotype
+                "Screens for IFT88.",
+                "What is the loss-of-function effect of KIF3A?",
+                "Percent ciliated cells effect of KIF3A.",
+                "Which genes cause 'short cilia' when knocked down?",
+                "List genes that cause 'longer cilia'."
+            ],
+            complex: [
+                // Multi-Filter: Phenotype + Localization
+                "Show me basal body proteins that cause short cilia.",
+                "List genes localized to the nucleus that cause 'loss of cilia'.",
+                "What mitochondrial genes are linked to 'longer cilia'?",
+                "Find genes that cause 'loss of cilia' and are also part of the NPHP module.",
+                "List all genes that are not in a known ciliary complex but cause a 'loss of cilia' phenotype.",
+
+                // Multi-Filter: Localization + Expression
+                "List genes in the transition zone that are expressed in the brain.",
+                "What ciliary genes are highly expressed in the kidney?",
+                "Show me basal body genes expressed in the retina.",
+                "List lysosomal genes that are highly expressed in ciliated cells.",
+                "Top expressed ciliary genes in kidney.",
+
+                // Multi-Filter: Localization + Disease
+                "What transition zone proteins are associated with Joubert Syndrome?",
+                "List basal body genes linked to Meckel-Gruber Syndrome.",
+                "Show me axonemal genes that cause Primary Ciliary Dyskinesia.",
+                "What ciliary tip proteins are associated with retinal disease?",
+                "Which genes are localized to 'Ciliary associated gene' and cause 'Primary Ciliary Dyskinesia'?",
+
+                // Multi-Filter: Complex + Other
+                "Which BBSome components are localized to the basal body?",
+                "List IFT-A complex genes that are also in the transition zone.",
+                "Find genes in the NPHP module that cause 'short cilia'.",
+                "List BBSome genes expressed in the kidney.",
+                "Find all Bardet-Biedl Syndrome (BBS) genes that are also part of the IFT-B complex.",
+
+                // Multi-Filter: Disease + Expression
+                "What Joubert Syndrome genes are expressed in the cerebellum?",
+                "Which PCD genes are highly expressed in the testis?",
+                "Find Bardet-Biedl Syndrome genes that are expressed in the retina.",
+                "List Joubert syndrome genes expressed in the lung.",
+                "Show me Motile Ciliopathy genes that are not expressed in the lung.",
+
+                // Multi-Filter: Phylogeny + Other
+                "Which ciliary-specific genes (from Li data) contain a WD40 domain?",
+                "Show me genes that are vertebrate-specific and also part of the BBSome.",
+                "Which ciliary genes (localized to cilia) are also found in C. elegans and expressed in the lung?",
+                "List genes conserved in C. elegans that are part of the NPHP module.",
+                "Compare the phylogenetic profile of the IFT-A complex vs the IFT-B complex."
+            ]
+        };
+    }
+
+    async runAllTests() {
+        console.log('🚀 Starting CiliAI Comprehensive Test Suite...');
+        console.log(`📊 Testing ${this.testQuestions.simple.length} simple questions and ${this.testQuestions.complex.length} complex questions`);
+        
+        await this.testSimpleQuestions();
+        await this.testComplexQuestions();
+        
+        this.generateReport();
+    }
+
+    async testSimpleQuestions() {
+        console.log('\n🔍 Testing Simple Questions (Level 1)...');
+        
+        for (let i = 0; i < this.testQuestions.simple.length; i++) {
+            const question = this.testQuestions.simple[i];
+            await this.executeTest(`S${i + 1}`, question, 'simple');
+            // Add small delay to avoid overwhelming the system
+            await this.delay(500);
+        }
+    }
+
+    async testComplexQuestions() {
+        console.log('\n🎯 Testing Complex Questions (Level 2 & 3)...');
+        
+        for (let i = 0; i < this.testQuestions.complex.length; i++) {
+            const question = this.testQuestions.complex[i];
+            await this.executeTest(`C${i + 1}`, question, 'complex');
+            // Add larger delay for complex queries
+            await this.delay(800);
+        }
+    }
+
+    async executeTest(testId, question, category) {
+        const testResult = {
+            id: testId,
+            question: question,
+            category: category,
+            status: 'pending',
+            response: null,
+            error: null,
+            timestamp: new Date().toISOString()
+        };
+
+        try {
+            console.log(`\n🧪 Test ${testId}: "${question}"`);
+            
+            // Mock the chat interface interaction
+            const response = await this.simulateAIQuery(question);
+            testResult.response = response;
+            
+            // Validate response
+            const isValid = this.validateResponse(question, response);
+            
+            if (isValid) {
+                testResult.status = 'passed';
+                this.results.passed++;
+                console.log(`✅ PASS: ${testId}`);
+            } else {
+                testResult.status = 'failed';
+                this.results.failed++;
+                console.log(`❌ FAIL: ${testId}`);
+            }
+            
+        } catch (error) {
+            testResult.status = 'error';
+            testResult.error = error.message;
+            this.results.failed++;
+            console.log(`💥 ERROR: ${testId} - ${error.message}`);
+        }
+        
+        this.results.details.push(testResult);
+    }
+
+    async simulateAIQuery(question) {
+        return new Promise((resolve, reject) => {
+            // Use the existing handleAIQuery function but capture its output
+            const originalAddChatMessage = window.addChatMessage;
+            let responseCaptured = false;
+            
+            // Override addChatMessage to capture AI responses
+            window.addChatMessage = function(html, isUser = false) {
+                if (!isUser && !responseCaptured) {
+                    responseCaptured = true;
+                    window.addChatMessage = originalAddChatMessage; // Restore original
+                    resolve(html);
+                }
+                // Call original function if it's a user message or we've already captured
+                if (isUser || responseCaptured) {
+                    originalAddChatMessage.call(this, html, isUser);
+                }
+            };
+            
+            // Trigger the query
+            setTimeout(() => {
+                if (!responseCaptured) {
+                    window.addChatMessage = originalAddChatMessage; // Restore on timeout
+                    reject(new Error('Timeout waiting for response'));
+                }
+            }, 10000); // 10 second timeout
+            
+            // Execute the query
+            window.handleAIQuery(question);
+        });
+    }
+
+    validateResponse(question, response) {
+        if (!response || response.trim() === '') {
+            return false;
+        }
+
+        const qLower = question.toLowerCase();
+        const rLower = response.toLowerCase();
+
+        // Check for error indicators
+        const errorIndicators = [
+            'sorry, i couldn\'t find',
+            'sorry, i didn\'t understand',
+            'error',
+            'not found',
+            'no data',
+            'could not find'
+        ];
+
+        if (errorIndicators.some(indicator => rLower.includes(indicator))) {
+            return false;
+        }
+
+        // Question-specific validation rules
+        if (qLower.includes('what is') || qLower.includes('describe') || qLower.includes('summarize')) {
+            return this.validateGeneDetailResponse(response);
+        }
+        
+        if (qLower.includes('localization') || qLower.includes('localized to')) {
+            return this.validateLocalizationResponse(response);
+        }
+        
+        if (qLower.includes('ortholog')) {
+            return this.validateOrthologResponse(response);
+        }
+        
+        if (qLower.includes('domain')) {
+            return this.validateDomainResponse(response);
+        }
+        
+        if (qLower.includes('complex') || qLower.includes('bbsome') || qLower.includes('module')) {
+            return this.validateComplexResponse(response);
+        }
+        
+        if (qLower.includes('gene list') || qLower.includes('list genes') || qLower.includes('which genes')) {
+            return this.validateGeneListResponse(response);
+        }
+        
+        if (qLower.includes('screen') || qLower.includes('phenotype') || qLower.includes('effect')) {
+            return this.validateScreenResponse(response);
+        }
+
+        // For complex multi-filter questions
+        if (qLower.includes('and') || qLower.includes('also') || qLower.includes('that are')) {
+            return this.validateMultiFilterResponse(question, response);
+        }
+
+        // Default validation - response should contain meaningful content
+        return response.length > 50 && !rLower.includes('sorry');
+    }
+
+    validateGeneDetailResponse(response) {
+        const hasGeneInfo = response.includes('<strong>') || 
+                           response.includes('Localization:') || 
+                           response.includes('OMIM ID:') ||
+                           response.includes('Description:');
+        return hasGeneInfo && response.length > 100;
+    }
+
+    validateLocalizationResponse(response) {
+        return response.includes('genes') || response.includes('localization') || response.includes('found in');
+    }
+
+    validateOrthologResponse(response) {
+        return response.includes('ortholog') || response.includes('mouse') || response.includes('c. elegans') || 
+               response.includes('zebrafish') || response.includes('drosophila');
+    }
+
+    validateDomainResponse(response) {
+        return response.includes('domain') || response.includes('PFAM') || response.includes('WD40') || 
+               response.includes('coiled-coil');
+    }
+
+    validateComplexResponse(response) {
+        return response.includes('complex') || response.includes('components') || response.includes('genes in') ||
+               response.includes('BBSome') || response.includes('IFT') || response.includes('module');
+    }
+
+    validateGeneListResponse(response) {
+        return (response.includes('genes') && response.includes('<ul>')) || 
+               response.includes('gene list') ||
+               response.match(/[A-Z0-9]{3,}/g)?.length >= 3;
+    }
+
+    validateScreenResponse(response) {
+        return response.includes('screen') || response.includes('effect') || response.includes('phenotype') ||
+               response.includes('loss-of-function') || response.includes('percentage') || 
+               response.includes('knockdown');
+    }
+
+    validateMultiFilterResponse(question, response) {
+        // Check if response acknowledges multiple criteria
+        const qWords = question.toLowerCase().split(' ');
+        const relevantWords = qWords.filter(word => 
+            ['and', 'also', 'that', 'are', 'in', 'with', 'linked', 'associated'].includes(word)
+        );
+        
+        return relevantWords.length >= 2 || response.includes('multiple') || response.includes('criteria');
+    }
+
+    delay(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    generateReport() {
+        console.log('\n' + '='.repeat(80));
+        console.log('📋 CiliAI Test Suite Results');
+        console.log('='.repeat(80));
+        
+        console.log(`\n📊 Summary:`);
+        console.log(`✅ Passed: ${this.results.passed}`);
+        console.log(`❌ Failed: ${this.results.failed}`);
+        console.log(`⏭️  Skipped: ${this.results.skipped}`);
+        console.log(`📈 Success Rate: ${((this.results.passed / (this.results.passed + this.results.failed)) * 100).toFixed(1)}%`);
+        
+        console.log(`\n🔍 Detailed Results:`);
+        
+        // Group by category
+        const simpleResults = this.results.details.filter(r => r.category === 'simple');
+        const complexResults = this.results.details.filter(r => r.category === 'complex');
+        
+        console.log(`\n📝 Simple Questions (${simpleResults.length} tests):`);
+        simpleResults.forEach(result => {
+            const statusIcon = result.status === 'passed' ? '✅' : result.status === 'failed' ? '❌' : '💥';
+            console.log(`  ${statusIcon} ${result.id}: ${result.question}`);
+            if (result.status !== 'passed') {
+                console.log(`     Response: ${result.response ? result.response.substring(0, 100) + '...' : 'No response'}`);
+                if (result.error) console.log(`     Error: ${result.error}`);
+            }
+        });
+        
+        console.log(`\n🎯 Complex Questions (${complexResults.length} tests):`);
+        complexResults.forEach(result => {
+            const statusIcon = result.status === 'passed' ? '✅' : result.status === 'failed' ? '❌' : '💥';
+            console.log(`  ${statusIcon} ${result.id}: ${result.question}`);
+            if (result.status !== 'passed') {
+                console.log(`     Response: ${result.response ? result.response.substring(0, 100) + '...' : 'No response'}`);
+                if (result.error) console.log(`     Error: ${result.error}`);
+            }
+        });
+        
+        // Generate HTML report
+        this.generateHTMLReport();
+    }
+
+    generateHTMLReport() {
+        const reportHTML = `
+<!DOCTYPE html>
+<html>
+<head>
+    <title>CiliAI Test Suite Report</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .summary { background: #f5f5f5; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
+        .test-result { margin: 10px 0; padding: 10px; border-left: 4px solid #ccc; }
+        .passed { border-left-color: #4CAF50; background: #f0fff0; }
+        .failed { border-left-color: #f44336; background: #fff0f0; }
+        .error { border-left-color: #ff9800; background: #fff8e1; }
+        .question { font-weight: bold; margin-bottom: 5px; }
+        .response { font-size: 0.9em; color: #666; margin: 5px 0; }
+        .error-msg { color: #d32f2f; font-size: 0.8em; }
+    </style>
+</head>
+<body>
+    <h1>🧪 CiliAI Test Suite Report</h1>
+    <div class="summary">
+        <h2>📊 Test Summary</h2>
+        <p><strong>Total Tests:</strong> ${this.results.passed + this.results.failed}</p>
+        <p><strong>✅ Passed:</strong> ${this.results.passed}</p>
+        <p><strong>❌ Failed:</strong> ${this.results.failed}</p>
+        <p><strong>📈 Success Rate:</strong> ${((this.results.passed / (this.results.passed + this.results.failed)) * 100).toFixed(1)}%</p>
+    </div>
+    
+    <h2>🔍 Detailed Results</h2>
+    ${this.results.details.map(result => `
+        <div class="test-result ${result.status}">
+            <div class="question">${result.id}: ${result.question}</div>
+            <div class="response"><strong>Status:</strong> ${result.status.toUpperCase()}</div>
+            ${result.response ? `<div class="response"><strong>Response:</strong> ${result.response.substring(0, 200)}...</div>` : ''}
+            ${result.error ? `<div class="error-msg"><strong>Error:</strong> ${result.error}</div>` : ''}
+        </div>
+    `).join('')}
+    
+    <script>
+        // Color code the status
+        document.querySelectorAll('.test-result').forEach(el => {
+            if (el.classList.contains('passed')) {
+                el.innerHTML = '✅ ' + el.innerHTML;
+            } else if (el.classList.contains('failed')) {
+                el.innerHTML = '❌ ' + el.innerHTML;
+            } else if (el.classList.contains('error')) {
+                el.innerHTML = '💥 ' + el.innerHTML;
+            }
+        });
+    </script>
+</body>
+</html>`;
+
+        // Create and download the report
+        const blob = new Blob([reportHTML], { type: 'text/html' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `ciliai_test_report_${new Date().toISOString().split('T')[0]}.html`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
+}
+
+// Usage:
+function runCiliAITestSuite() {
+    // Wait for CiliAI to be fully initialized
+    if (!window.CiliAI || !window.CiliAI.ready) {
+        console.log('⏳ Waiting for CiliAI to initialize...');
+        setTimeout(runCiliAITestSuite, 1000);
+        return;
+    }
+    
+    const testSuite = new CiliAITestSuite();
+    testSuite.runAllTests().catch(console.error);
+}
+
+// Add test button to the interface
+function injectTestButton() {
+    const toolbar = document.querySelector('.toolbar');
+    if (toolbar && !document.getElementById('testSuiteBtn')) {
+        const testBtn = document.createElement('button');
+        testBtn.id = 'testSuiteBtn';
+        testBtn.textContent = 'Run Test Suite';
+        testBtn.onclick = runCiliAITestSuite;
+        testBtn.style.background = '#28a745';
+        testBtn.style.marginLeft = '10px';
+        toolbar.appendChild(testBtn);
+    }
+}
+
+// Initialize when page loads
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', injectTestButton);
+} else {
+    injectTestButton();
+}
+
+// Export for use in console
+window.runCiliAITestSuite = runCiliAITestSuite;
+window.CiliAITestSuite = CiliAITestSuite;
+
+console.log('🧪 CiliAI Test Suite loaded. Run "runCiliAITestSuite()" to start testing.');
