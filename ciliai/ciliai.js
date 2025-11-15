@@ -1,12 +1,10 @@
 /* ==============================================================
- * CiliAI – Interactive Explorer (v5.2 – Nov 15, 2025)
+ * CiliAI – Interactive Explorer (v5.1 – Nov 15, 2025)
  * ==============================================================
+ * • BUILT FROM SCRATCH based on user's question list.
  * • Loads the pre-compiled 'ciliAI_master_database.json' + 'ciliAI_lookups.json'
  * • Lazy-loads the large phylogeny files only when needed.
  * • Fixes all known layout, normalization, and query routing bugs.
- * • (FIX) Added back the entire Phylogeny Engine.
- * • (FIX) Corrected regex for specific-fact queries.
- * • (FIX) Corrected parser to recognize all disease names.
  * ============================================================== */
 
 (function () {
@@ -100,7 +98,7 @@
     // ==========================================================
 
     async function initCiliAI() {
-        console.log('CiliAI: Initializing (v5.2 Pre-compiled)...');
+        console.log('CiliAI: Initializing (v5.1 Pre-compiled)...');
         await loadCiliAIData(); 
         
         if (!window.CiliAI.masterData || window.CiliAI.masterData.length === 0) {
@@ -109,6 +107,7 @@
             return;
         }
         
+        // NO buildLookups() needed!
         window.CiliAI.ready = true;
         console.log('CiliAI: Ready! Pre-compiled database loaded.');
 
@@ -117,6 +116,9 @@
         }
     }
 
+    /**
+     * Fetches the pre-compiled database files from GitHub.
+     */
     async function loadCiliAIData(timeoutMs = 60000) {
         const baseUrl = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/';
         const mainDbUrl = baseUrl + 'ciliAI_master_database.json';
@@ -137,12 +139,15 @@
             const mainData = await mainRes.json();
             const lookupData = await lookupsRes.json();
             
+            // Assign all the pre-processed data
             window.CiliAI.masterData = mainData.masterData;
             window.CiliAI.lookups = lookupData.lookups;
             
+            // Assign the raw UMAP data
             window.CiliAI_UMAP = mainData.umapData;
             window.CiliAI.data.umap = mainData.umapData; 
             
+            // Create a GeneMap from the masterData list for fast lookups by gene name
             window.CiliAI.lookups.geneMap = {};
             for (const gene of mainData.masterData) {
                 if (gene.Gene) {
@@ -448,21 +453,11 @@
      * (FIXED) Extracts all valid gene symbols from a query string, ignoring common words.
      */
     function extractMultipleGenes(query) {
-        if (!query || typeof query !== 'string') return [];
-        // This regex finds words that look like gene symbols
+        if (!query) return [];
         const geneRegex = /\b([A-Z0-9\-\.]{3,})\b/gi;
         let matches = query.match(geneRegex) || [];
-        
-        // This stops the AI from trying to look up "THE" or "LIST" as a gene
-        const stopWords = new Set([
-            "THE", "AND", "FOR", "NOT", "ARE", "WHAT", "SHOW", "LIST", "GENE", "GENES", 
-            "PLOT", "COMPARE", "WHAT'S", "DESCRIBE", "OF", "IN", "TO", "WITH", "THAT",
-            "THIS", "ABOUT", "TELL", "ME", "EFFECT", "LOSS", "FUNCTION", "PERCENT",
-            "CELLS", "CILIATED", "COMPONENTS", "MODULES", "ORTHOLOG", "DOMAINS",
-            "SYNDROME", "CILIOPATHY", "EXPRESSION", "ASSOCIATED", "LINKED", "CONTAINING",
-            "CONSERVATION", "PHYLOGENY", "HEATMAP"
-        ]);
-        
+        // Filter out common English words that look like gene names
+        const stopWords = new Set(["THE", "AND", "FOR", "NOT", "ARE", "WHAT", "SHOW", "LIST", "GENE", "GENES", "PLOT", "COMPARE", "WHAT'S", "DESCRIBE", "OF", "IN"]);
         matches = matches.filter(m => !stopWords.has(m.toUpperCase()));
         
         const upperMatches = matches.map(g => g.toUpperCase());
@@ -476,7 +471,7 @@
     function formatListResult(title, genes, description = "") {
         let geneListHtml = '';
         if (genes && genes.length > 0) {
-            const genesToShow = genes.slice(0, 20); // Show only the first 20
+            const genesToShow = genes.slice(0, 20);
             geneListHtml = genesToShow.map(g =>
                 `<li><strong>${g.gene}</strong>: ${g.description || 'No details available.'}</li>`
             ).join('');
@@ -689,9 +684,7 @@
                 html += `<li>[${s.dataset || 'Unknown'}] <strong>${s.classification}</strong> (Z-score: ${s.z_score || 'N/A'})</li>`;
             });
             html += '</ul>';
-        } else if ((!percEffect || percEffect === "Not Reported") && 
-                   (!lofEffect || lofEffect === "Not Reported") && 
-                   (!oeEffect || oeEffect === "Not Reported")) {
+        } else if (percEffect === "Not Reported" && lofEffect === "Not Reported" && oeEffect === "Not Reported") {
             html += '<p>No specific screen data found in the database.</p>';
         }
         return html;
@@ -726,7 +719,7 @@
         const gene = geneSymbol.toUpperCase();
         const g = window.CiliAI.lookups.geneMap[gene];
         if (!g) return `Sorry, I could not find data for "${gene}".`;
-        const orgKey = `Ortholog_${organism.toLowerCase().replace(/[\.\s]/g, '_')}`;
+        const orgKey = `Ortholog_${organism.toLowerCase().replace(/[\.\s]/g, '_')}`; // Match CSV column
         if (g[orgKey] && g[orgKey] !== 'N/A' && g[orgKey] !== null) {
             return formatListResult(`Ortholog for ${gene} in ${organism}`, [{
                 gene: gene,
@@ -747,7 +740,7 @@
                 return;
             }
             const exp = g.expression?.scRNA;
-            html += `<strong>${g.Gene}:</strong> `;
+            html += `<strong>${g.Gene}:</strong> `; // Use 'Gene'
             if (exp) {
                  const topTissues = Object.entries(exp)
                     .sort(([,a], [,b]) => b - a)
@@ -786,9 +779,11 @@
     }
 
     function handleComplexQuery(term, query) {
+        // This function now *only* handles "List genes in [COMPLEX]"
         const geneList = getGenesByComplex(term);
         const count = geneList.length;
         if (count === 0) {
+            // Fallback: check if the user meant "complexes for gene..."
             const genes = extractMultipleGenes(term);
             if (genes.length > 0) {
                 return handleGeneInComplexQuery(genes[0]);
@@ -821,6 +816,7 @@
     function handleClassificationQuery(classificationName, query) {
         const qLower = query.toLowerCase();
         
+        // Find the cased name, e.g., "Primary Ciliopathies"
         const casedClassificationName = Object.keys(getDiseaseClassificationMap()).find(key => normalizeTerm(key) === normalizeTerm(classificationName));
         if (!casedClassificationName) {
             return `Sorry, I don't recognize the classification "${classificationName}".`;
@@ -851,6 +847,7 @@
             return `I found ${count} unique genes associated with ${casedClassificationName}. Do you want to view the list?`;
         
         } else {
+            // User just wants to list the diseases in the classification
             const diseaseMap = getDiseaseClassificationMap();
             const diseaseList = diseaseMap[casedClassificationName] || [];
             const diseaseHtml = diseaseList.map(d => `<li>${d}</li>`).join('');
@@ -863,86 +860,6 @@
             `;
         }
     }
-
-async function displayFullGeneInfo(geneSymbol) {
-  const gm = window.CiliAI.lookups && window.CiliAI.lookups.geneMap;
-  if (!gm || !gm[geneSymbol]) {
-    return `No data found for gene ${geneSymbol}`;
-  }
-  const g = gm[geneSymbol];
-
-  let html = `<h2>Gene: ${geneSymbol}</h2>`;
-  html += `<p><strong>Description:</strong> ${g['Gene.Description'] || ''}</p>`;
-  html += `<p><strong>Synonyms:</strong> ${g['Synonym.'] || '—'}</p>`;
-  html += `<p><strong>OMIM ID:</strong> ${g.OMIM.ID || '—'}</p>`;
-  html += `<p><strong>Localization:</strong> ${g.Localization || '—'}</p>`;
-  html += `<p><strong>Functional category:</strong> ${g['Functional.category'] || '—'}</p>`;
-
-  html += `<h3>Cilia Effects</h3>`;
-  html += `<p><strong>Overexpression effect:</strong> ${g['Overexpression effects on cilia length (increase/decrease/no effect)'] || '—'}</p>`;
-  html += `<p><strong>Loss-of-Function effect:</strong> ${g['Loss-of-Function (LoF) effects on cilia length (increase/decrease/no effect)'] || '—'}</p>`;
-  html += `<p><strong>Percentage of ciliated cells effect:</strong> ${g['Percentage of ciliated cells (increase/decrease/no effect)'] || '—'}</p>`;
-
-  html += `<h3>Screens</h3>`;
-  if (Array.isArray(g.screens)) {
-    html += `<ul>`;
-    for (const s of g.screens) {
-      html += `<li><strong>${s.source}</strong>: ${s.result}</li>`;
-    }
-    html += `</ul>`;
-  } else {
-    html += `<p>None</p>`;
-  }
-
-  html += `<h3>Expression Data (scRNA-seq)</h3>`;
-  if (g.expression && g.expression.scRNA) {
-    html += `<table><tr><th>Cell type</th><th>Value</th></tr>`;
-    for (const [ct, val] of Object.entries(g.expression.scRNA)) {
-      html += `<tr><td>${ct}</td><td>${val}</td></tr>`;
-    }
-    html += `</table>`;
-  }
-
-  html += `<h3>Expression Data (Tissue)</h3>`;
-  if (g.expression && g.expression.tissue) {
-    html += `<table><tr><th>Tissue</th><th>Value</th></tr>`;
-    for (const [t, val] of Object.entries(g.expression.tissue)) {
-      html += `<tr><td>${t}</td><td>${val}</td></tr>`;
-    }
-    html += `</table>`;
-  }
-
-  html += `<h3>Orthologs & Mouse Phenotype</h3>`;
-  html += `<p><strong>Mouse ortholog:</strong> ${g.Ortholog_Mouse || '—'}</p>`;
-  html += `<p><strong>C. elegans ortholog:</strong> ${g.Ortholog_C_elegans || '—'}</p>`;
-  html += `<p><strong>Zebrafish ortholog:</strong> ${g.Ortholog_Zebrafish || '—'}</p>`;
-  html += `<p><strong>Mouse phenotype:</strong> ${g.mouse_phenotype || '—'}</p>`;
-  html += `<p><strong>Mouse ciliopathy phenotype:</strong> ${g.mouse_ciliopathy_phenotype || '—'}</p>`;
-
-  html += `<h3>Phylogeny</h3>`;
-  if (g.phylogeny) {
-    for (const [pkey, pval] of Object.entries(g.phylogeny)) {
-      html += `<p><strong>${pkey}</strong>: class=${pval.class}, class_id=${pval.class_id}</p>`;
-      if (pval.species_data) {
-        html += `<p>Species data (length ${pval.species_data.length})</p>`;
-      }
-    }
-  }
-
-  html += `<h3>Complexes</h3>`;
-  if (g.complex_components) {
-    html += `<ul>`;
-    for (const [ cname, members ] of Object.entries(g.complex_components)) {
-      html += `<li><strong>${cname}</strong>: ${members.join(', ')}</li>`;
-    }
-    html += `</ul>`;
-  } else {
-    html += `<p>None listed</p>`;
-  }
-
-  return html;
-}
-
     
     function tellAboutCiliAI() {
         return `
@@ -957,7 +874,7 @@ async function displayFullGeneInfo(geneSymbol) {
                     <li><b>Phylogeny:</b> "Show conservation of IFT88."</li>
                     <li><b>Domains:</b> "Which genes have WD40 domains?"</li>
                 </ul>
-                <p>My data comes from a pre-compiled database of ${window.CiliAI.masterData.length} genes, enriched with data from 8 specialized datasets (CORUM, UMAP, scRNA, Phylogeny, etc.).</p>
+                <p>My data comes from a pre-compiled database of over 23,000 genes, enriched with data from 8 specialized datasets (CORUM, UMAP, scRNA, Phylogeny, etc.).</p>
             </div>
         `;
     }
@@ -979,6 +896,7 @@ async function displayFullGeneInfo(geneSymbol) {
         const plotDiv = document.getElementById(plotId);
         if (!plotDiv) return;
 
+        // Add class to wrapper
         const wrapper = plotDiv.closest('.interactive-cilium');
         if (wrapper) wrapper.classList.add('table-view-active');
 
@@ -1034,6 +952,7 @@ async function displayFullGeneInfo(geneSymbol) {
 
         Plotly.newPlot(plotDivId, plotData, layout, { responsive: true });
         
+        // Add a "Back" button to the plot
         const backButton = document.createElement('button');
         backButton.id = 'ciliai-back-btn';
         backButton.className = 'ciliai-button';
@@ -1082,15 +1001,19 @@ async function displayFullGeneInfo(geneSymbol) {
     }
 
     async function routePhylogenyAnalysis(query) {
+        // This is now an async function to handle lazy-loading
         const qLower = query.toLowerCase();
 
+        // 1. Check if data is loaded. If not, load it.
         const dataLoaded = await ensurePhylogenyDataLoaded();
         if (!dataLoaded) {
             return "Could not load phylogeny data. Please try again.";
         }
 
+        // --- FIX: Check for complex/module names in the query ---
         let genes = extractMultipleGenes(query);
         if (genes.length === 0) {
+            // No genes found, check for a complex name
             const complexKey = Object.keys(window.CiliAI.lookups.byModuleOrComplex).find(key => 
                 qLower.includes(normalizeTerm(key))
             );
@@ -1099,7 +1022,9 @@ async function displayFullGeneInfo(geneSymbol) {
                 genes = window.CiliAI.lookups.byModuleOrComplex[complexKey];
             }
         }
+        // --- END FIX ---
 
+        // 2. Proceed with routing as before
         if (qLower.includes('table') || qLower.includes('view data') || qLower.includes('species count')) {
             if (genes.length >= 1) {
                 return renderPhylogenyTable(genes);
@@ -1135,6 +1060,7 @@ async function displayFullGeneInfo(geneSymbol) {
     }
     
     function handlePhylogenyVisualizationQuery(genes, source = 'li', type = 'heatmap') {
+        // This function no longer needs to be async, as data is pre-loaded by the router
         const plotId = 'cilia-svg';
         generateAndInjectSVG(); 
         const plotDiv = document.getElementById(plotId); 
@@ -1559,28 +1485,6 @@ async function displayFullGeneInfo(geneSymbol) {
         `;
     }
 
-
-// Append content to the chat panel
-function appendToRightPanel(html) {
-    const rightPanel = document.getElementById('rightPanel');
-    if (!rightPanel) return;
-
-    rightPanel.insertAdjacentHTML('beforeend', html);
-    rightPanel.scrollTop = rightPanel.scrollHeight; // auto-scroll
-}
-
-
-function plotPhylogenyHeatmap(gene) {
-    addChatMessage(`Generating phylogeny heatmap for <strong>${gene}</strong>...`, false);
-    drawPhylogenyHeatmapForGene(gene);
-}
-
-function plotTissueHeatmap(gene) {
-    addChatMessage(`Generating tissue expression heatmap for <strong>${gene}</strong>...`, false);
-    drawTissueExpressionHeatmap(gene);
-}
-
-    
     
     // --- 4F. Data Getter Helpers ---
 
@@ -1597,7 +1501,7 @@ function plotTissueHeatmap(gene) {
         html += '<ul>';
         if (g.Localization) html += `<li><strong>Localization:</strong> ${g.Localization}</li>`;
         if (g.Ciliopathy) html += `<li><strong>Ciliopathy:</strong> ${g.Ciliopathy}</li>`;
-        if (g.OMIM_ID) html += `<li><strong>OMIM ID:</strong> ${g.OMIM_ID}</li>`;
+        if (g.omim_id) html += `<li><strong>OMIM ID:</strong> ${g.omim_id}</li>`;
         
         const complexes = Object.keys(g.complex_components || {})
                               .filter(name => isNaN(parseInt(name)));
@@ -1748,303 +1652,237 @@ function plotTissueHeatmap(gene) {
                     <li><b>Phylogeny:</b> "Show conservation of IFT88."</li>
                     <li><b>Domains:</b> "Which genes have WD40 domains?"</li>
                 </ul>
-                <p>My data comes from a pre-compiled database of ${window.CiliAI.masterData.length} genes, enriched with data from 8 specialized datasets (CORUM, UMAP, scRNA, Phylogeny, etc.).</p>
+                <p>My data comes from a pre-compiled database of over 23,000 genes, enriched with data from 8 specialized datasets (CORUM, UMAP, scRNA, Phylogeny, etc.).</p>
             </div>
         `;
     }
 
- function handleAIQuery(query) {
-    if (!query || typeof query !== 'string') return;
-    const q = query.trim();
-    const qLower = q.toLowerCase();
+    // --- 4G. Main "Brain" (Query Routers) ---
 
-    log(`Routing query: ${q}`);
-
-    if (!window.CiliAI || !window.CiliAI.ready) {
-        appendToRightPanel(`<div class="chat-query"><strong>You:</strong> ${q}</div>
-                            <div class="chat-answer"><strong>CiliAI:</strong> Data is still loading, please wait...</div>`);
-        return;
-    }
-
-    let match = null;
-
-    // ========== 1. Gene / "What is X?" ==========
-    if ((match = q.match(/^(?:what is|what's|describe|tell me about)\s+([A-Za-z0-9\-]{2,})\b/i))) {
-        const gene = match[1].toUpperCase();
-        const gm = window.CiliAI?.lookups?.geneMap || {};
-        const g = gm[gene];
-        const html = g ? formatGeneChatHtml(g, gene, q) : `No data found for ${gene}`;
-        appendToRightPanel(`<div class="chat-query"><strong>You:</strong> ${q}</div>
-                            <div class="chat-answer"><strong>CiliAI:</strong> ${html}</div>`);
-        return;
-    }
-
-    // Synonym query
-    else if (qLower.includes("synonym")) {
-        const genes = extractMultipleGenes(q);
-        if (genes && genes.length > 0) {
-            const gene = genes[0].toUpperCase();
-            const gm = window.CiliAI?.lookups?.geneMap || {};
-            const g = gm[gene];
-            const html = g ? formatGeneChatHtml(g, gene, q) : `No data found for ${gene}`;
-            appendToRightPanel(`<div class="chat-query"><strong>You:</strong> ${q}</div>
-                                <div class="chat-answer"><strong>CiliAI:</strong> ${html}</div>`);
-            return;
-        }
-    }
-
-    // ========== 2. Loss-of-function query ==========
-    else if ((match = qLower.match(/(loss[- ]of[- ]function|lof).*?\b([a-z0-9\-]{2,})\b/))) {
-        const gene = match[2].toUpperCase();
-        const gm = window.CiliAI?.lookups?.geneMap || {};
-        const g = gm[gene];
-        const lof = g ? g['Loss-of-Function (LoF) effects on cilia length (increase/decrease/no effect)'] || "No data available." : null;
-        appendToRightPanel(`<div class="chat-query"><strong>You:</strong> ${q}</div>
-                            <div class="chat-answer"><strong>CiliAI:</strong> ${lof ? `<strong>Loss-of-function effect of ${gene}:</strong><br>${lof}` : `No data found for ${gene}`}</div>`);
-        return;
-    }
-
-    // ========== 3. Ortholog query ==========
-    else if ((match = q.match(/ortholog(?: of| for)?\s+([A-Za-z0-9\-\._]+)\s+(?:in|for)\s+(c\. elegans|mouse|zebrafish|drosophila|xenopus)/i))) {
-        const html = handleOrthologQuery(match[1].toUpperCase(), match[2]);
-        appendToRightPanel(`<div class="chat-query"><strong>You:</strong> ${q}</div>
-                            <div class="chat-answer"><strong>CiliAI:</strong> ${html}</div>`);
-        return;
-    }
-    else if ((match = q.match(/(c\. elegans|mouse|zebrafish|drosophila|xenopus)\s+ortholog(?: of| for)?\s+([A-Za-z0-9\-\._]+)/i))) {
-        const html = handleOrthologQuery(match[2].toUpperCase(), match[1]);
-        appendToRightPanel(`<div class="chat-query"><strong>You:</strong> ${q}</div>
-                            <div class="chat-answer"><strong>CiliAI:</strong> ${html}</div>`);
-        return;
-    }
-
-    // ========== 4. Complex / module / domains ==========
-    else if ((match = q.match(/(?:components of|genes in|members of)\s+(.+)/i))) {
-        const html = handleComplexQuery(match[1].trim(), q);
-        appendToRightPanel(`<div class="chat-query"><strong>You:</strong> ${q}</div>
-                            <div class="chat-answer"><strong>CiliAI:</strong> ${html}</div>`);
-        return;
-    }
-    else if ((match = q.match(/(?:complexes for|complexes of|part of|in complex|containing)\s+(.+)/i))) {
-        const genes = extractMultipleGenes(match[1]);
-        if (genes && genes.length > 0) {
-            const html = handleGeneInComplexQuery(genes[0]);
-            appendToRightPanel(`<div class="chat-query"><strong>You:</strong> ${q}</div>
-                                <div class="chat-answer"><strong>CiliAI:</strong> ${html}</div>`);
-            return;
-        }
-    }
-    else if ((match = q.match(/(?:domains of|domain architecture for)\s+(.+)/i))) {
-        const genes = extractMultipleGenes(match[1]);
-        if (genes && genes.length > 0) {
-            const html = handleDomainQuery(genes);
-            appendToRightPanel(`<div class="chat-query"><strong>You:</strong> ${q}</div>
-                                <div class="chat-answer"><strong>CiliAI:</strong> ${html}</div>`);
-            return;
-        }
-    }
-
-    // ========== 5. scRNA Expression ==========
-    else if (qLower.includes('scrna') || qLower.includes('expression in') || qLower.includes('compare expression')) {
-        const genes = extractMultipleGenes(q);
-        if (genes && genes.length > 0) {
-            const html = handleScRnaQuery(genes);
-            appendToRightPanel(`<div class="chat-query"><strong>You:</strong> ${q}</div>
-                                <div class="chat-answer"><strong>CiliAI:</strong> ${html}</div>`);
-            return;
-        } else {
-            appendToRightPanel(`<div class="chat-query"><strong>You:</strong> ${q}</div>
-                                <div class="chat-answer"><strong>CiliAI:</strong> Please specify which gene(s) you want to check expression for.</div>`);
-            return;
-        }
-    }
-
-    // ========== 6. UMAP visual ==========
-    else if ((match = q.match(/(?:show|plot)\s+(?:me\s+the\s+)?umap(?: expression)?(?: for\s+([A-Za-z0-9\-]+))?/i))) {
-        const gene = match[1] ? match[1].toUpperCase() : null;
-        handleUmapPlot(gene);
-        appendToRightPanel(`<div class="chat-query"><strong>You:</strong> ${q}</div>
-                            <div class="chat-answer"><strong>CiliAI:</strong> Displaying UMAP...</div>`);
-        return;
-    }
-
-    // ========== 7. Phylogeny / Evolution ==========
-    else if (qLower.includes('phylogen') || qLower.includes('evolution') || qLower.includes('conservation')) {
-        const html = routePhylogenyAnalysis(q);
-        appendToRightPanel(`<div class="chat-query"><strong>You:</strong> ${q}</div>
-                            <div class="chat-answer"><strong>CiliAI:</strong> ${html}</div>`);
-        return;
-    }
-
-    // ========== 8. Fallback: gene details ==========
-    const genes = extractMultipleGenes(q.replace(/[?.]/g, '').toUpperCase());
-    if (genes && genes.length > 0) {
-        const gene = genes[0];
-        const gm = window.CiliAI?.lookups?.geneMap || {};
-        const g = gm[gene];
-        const html = g ? formatGeneChatHtml(g, gene, q) : `No data found for ${gene}`;
-        appendToRightPanel(`<div class="chat-query"><strong>You:</strong> ${q}</div>
-                            <div class="chat-answer"><strong>CiliAI:</strong> ${html}</div>`);
-        return;
-    }
-
-    // ========== 9. Final fallback ==========
-    appendToRightPanel(`<div class="chat-query"><strong>You:</strong> ${q}</div>
-                        <div class="chat-answer"><strong>CiliAI:</strong> Sorry, I didn't understand the query. Try a simpler term or gene symbol.</div>`);
-}
-
-
-// Helper function to format gene info as chat HTML
-function formatGeneChatHtml(g, geneSymbol, userQuery) {
-    return `
-        <strong>${geneSymbol}</strong><br>
-        <strong>Description:</strong> ${g['Gene.Description'] || '—'}<br>
-        <strong>Synonyms:</strong> ${g['Synonym.'] || '—'}<br>
-        <strong>OMIM:</strong> ${g['OMIM.ID'] || '—'}<br>
-        <strong>Loss-of-function:</strong> ${g['Loss-of-Function (LoF) effects on cilia length (increase/decrease/no effect)'] || '—'}<br>
-        <strong>Overexpression:</strong> ${g['Overexpression effects on cilia length (increase/decrease/no effect)'] || '—'}<br>
-        <strong>% Ciliated Cells:</strong> ${g['Percentage of ciliated cells (increase/decrease/no effect)'] || '—'}<br>
-        <strong>Localization:</strong> ${g.Localization || '—'}<br>
-        <strong>Functional Category:</strong> ${g['Functional.category'] || '—'}
-    `;
-}
-
-
-// --- 4G. Main "Brain" (Query Routers) ---
-// --- 4G. Main "Brain" (Query Routers) ---
-function flexibleIntentParser(query) {
-    const qLower = (query || '').toLowerCase().trim();
-
-    // --- 1. Disease keywords ---
-    const diseaseMap = typeof getDiseaseClassificationMap === 'function' ? getDiseaseClassificationMap() : {};
-    let allDiseaseKeywords = ['BBS', 'NPHP', 'MKS'];
-    for (const classification in diseaseMap) {
-        if (Array.isArray(diseaseMap[classification])) {
+    function flexibleIntentParser(query) {
+        const qLower = query.toLowerCase().trim();
+        
+        const diseaseMap = getDiseaseClassificationMap();
+        let allDiseaseKeywords = ['BBS', 'NPHP', 'MKS']; 
+        for (const classification in diseaseMap) {
             allDiseaseKeywords = allDiseaseKeywords.concat(diseaseMap[classification]);
         }
-    }
+        
+        const classificationKeywords = Object.keys(window.CiliAI.lookups.byClassification || {});
+        classificationKeywords.push(...Object.keys(diseaseMap)); 
 
-    // --- 2. Classification keywords ---
-    const byClassification = (window.CiliAI?.lookups?.byClassification) || {};
-    const classificationKeywords = Object.keys(byClassification).concat(Object.keys(diseaseMap));
+        const complexKeywords = Object.keys(window.CiliAI.lookups.byModuleOrComplex || {});
+        complexKeywords.push(...Object.keys(getComplexPhylogenyTableMap())); 
 
-    // --- 3. Complex / module keywords ---
-    const byModuleOrComplex = (window.CiliAI?.lookups?.byModuleOrComplex) || {};
-    const complexKeywords = Object.keys(byModuleOrComplex).concat(Object.keys(getComplexPhylogenyTableMap ? getComplexPhylogenyTableMap() : {}));
+        const entityKeywords = [
+            {
+                type: 'CLASSIFICATION', 
+                keywords: classificationKeywords,
+                handler: handleClassificationQuery 
+            },
+            {
+                type: 'COMPLEX',
+                keywords: complexKeywords,
+                handler: handleComplexQuery 
+            },
+            {
+                type: 'LOCALIZATION',
+                keywords: [
+                    'basal body', 'axoneme', 'transition zone', 'cytosol', 'centrosome', 
+                    'cilium', 'cilia', 'mitochondria', 'nucleus', 'ciliary tip',
+                    'lysosome', 'lysosomes', 'Ciliary associated gene', 'Ciliary associated genes', 
+                    'Microbody', 'Peroxisome', 'flagella'
+                ],
+                handler: handleLocalizationQuery 
+            },
+            {
+                type: 'CILIOPATHY',
+                keywords: allDiseaseKeywords, 
+                handler: (term, query) => formatListResult(`Genes for ${term}`, (getCiliopathyGenes(term)).genes, getCiliopathyGenes(term).description)
+            },
+            {
+                type: 'DOMAIN',
+                keywords: ['WD40', 'coiled-coil', 'pfam', 'domain', 'ef-hand', 'TPR', 'AAA+ ATPase', 'AAA domain', 'ATPase domain', 'WD40 repeat'],
+                handler: getGenesByDomain 
+            },
+            {
+                type: 'META', // For "what can you do?"
+                keywords: ['about yourself', 'what can you do', 'help me', 'information do you have', 'datasets', 'capabilities', 'questions can i ask', 'overview of your features'],
+                handler: tellAboutCiliAI
+            }
+        ];
 
-    // --- 4. Entity keywords & handlers ---
-    const entityKeywords = [
-        {
-            type: 'CILIOPATHY',
-            keywords: allDiseaseKeywords,
-            handler: (term, q) => {
-                const html = formatListResult(
-                    `Genes for ${term}`,
-                    (getCiliopathyGenes(term)?.genes) || [],
-                    (getCiliopathyGenes(term)?.description) || ''
-                );
-                appendToRightPanel(`<div class="chat-query"><strong>You:</strong> ${q}</div>
-                                    <div class="chat-answer"><strong>CiliAI:</strong> ${html}</div>`);
-                return "";
-            }
-        },
-        {
-            type: 'CLASSIFICATION',
-            keywords: classificationKeywords,
-            handler: (term, q) => {
-                const html = handleClassificationQuery(term);
-                appendToRightPanel(`<div class="chat-query"><strong>You:</strong> ${q}</div>
-                                    <div class="chat-answer"><strong>CiliAI:</strong> ${html}</div>`);
-                return "";
-            }
-        },
-        {
-            type: 'COMPLEX',
-            keywords: complexKeywords,
-            handler: (term, q) => {
-                const html = handleComplexQuery(term, q);
-                appendToRightPanel(`<div class="chat-query"><strong>You:</strong> ${q}</div>
-                                    <div class="chat-answer"><strong>CiliAI:</strong> ${html}</div>`);
-                return "";
-            }
-        },
-        {
-            type: 'LOCALIZATION',
-            keywords: [
-                'basal body', 'axoneme', 'transition zone', 'cytosol', 'centrosome',
-                'cilium', 'cilia', 'mitochondria', 'nucleus', 'ciliary tip',
-                'lysosome', 'lysosomes', 'ciliary associated gene', 'microbody', 'peroxisome', 'flagella'
-            ],
-            handler: (term, q) => {
-                const html = handleLocalizationQuery(term);
-                appendToRightPanel(`<div class="chat-query"><strong>You:</strong> ${q}</div>
-                                    <div class="chat-answer"><strong>CiliAI:</strong> ${html}</div>`);
-                return "";
-            }
-        },
-        {
-            type: 'DOMAIN',
-            keywords: ['WD40', 'coiled-coil', 'pfam', 'domain', 'ef-hand', 'TPR', 'AAA+ ATPase', 'ATPase domain', 'WD40 repeat'],
-            handler: (term, q) => {
-                const html = getGenesByDomain(term);
-                appendToRightPanel(`<div class="chat-query"><strong>You:</strong> ${q}</div>
-                                    <div class="chat-answer"><strong>CiliAI:</strong> ${html}</div>`);
-                return "";
-            }
-        },
-        {
-            type: 'META',
-            keywords: ['about yourself', 'what can you do', 'help me', 'datasets', 'capabilities', 'questions can i ask', 'overview of your features'],
-            handler: (term, q) => {
-                const html = tellAboutCiliAI();
-                appendToRightPanel(`<div class="chat-query"><strong>You:</strong> ${q}</div>
-                                    <div class="chat-answer"><strong>CiliAI:</strong> ${html}</div>`);
-                return "";
-            }
-        }
-    ];
-
-    // --- 5. GENE: dynamic matching for gene symbols & synonyms ---
-    const geneMap = window.CiliAI?.lookups?.geneMap || {};
-    const geneSymbols = Object.keys(geneMap || {});
-
-    for (const symbol of geneSymbols) {
-        const g = geneMap[symbol];
-        const synonyms = (g['Synonym.'] || '').split(',').map(s => s.trim().toUpperCase());
-        if (qLower.includes(symbol.toLowerCase()) || synonyms.some(s => qLower.includes(s.toLowerCase()))) {
-            return {
-                type: 'GENE',
-                entity: symbol,
-                handler: (geneSymbol, q) => {
-                    const g = geneMap[geneSymbol];
-                    const html = g ? formatGeneChatHtml(g, geneSymbol, q) : `No data found for ${geneSymbol}`;
-                    appendToRightPanel(`<div class="chat-query"><strong>You:</strong> ${q}</div>
-                                        <div class="chat-answer"><strong>CiliAI:</strong> ${html}</div>`);
-                    return "";
+        const normalizedQuery = normalizeTerm(query);
+        for (const entityType of entityKeywords) {
+            const sortedKeywords = [...entityType.keywords].sort((a, b) => b.length - a.length);
+            for (const keyword of sortedKeywords) {
+                const normKeyword = normalizeTerm(keyword);
+                if (!normKeyword) continue;
+                
+                if (normalizedQuery.includes(normKeyword)) { 
+                    if (qLower.includes('not in') || qLower.includes('except')) continue;
+                    return { type: entityType.type, entity: keyword, handler: entityType.handler };
                 }
-            };
-        }
-    }
-
-    // --- 6. Keyword-based routing ---
-    const normalizedQuery = normalizeTerm(query);
-    for (const entityType of entityKeywords) {
-        const sortedKeywords = [...entityType.keywords].filter(Boolean).sort((a, b) => b.length - a.length);
-        for (const keyword of sortedKeywords) {
-            const normKeyword = normalizeTerm(keyword);
-            if (!normKeyword) continue;
-            if (normalizedQuery.includes(normKeyword)) {
-                if (qLower.includes('not in') || qLower.includes('except')) continue;
-                return { type: entityType.type, entity: keyword, handler: entityType.handler };
             }
         }
+        return null;
     }
 
-    // --- 7. No match ---
-    return null;
-}
+    async function handleAIQuery(query) {
+        const chatWindow = document.getElementById('messages');
+        if (!chatWindow) return;
+        const qLower = query.toLowerCase().trim();
+        if (!query) return;
 
+        log(`Routing query: ${query}`);
 
+        try {
+            if (!window.CiliAI.ready) {
+                addChatMessage("Data is still loading, please wait...", false);
+                return;
+            }
+
+            let htmlResult = null; 
+            let match;
+
+            // =( 1 )= INTENT: CONTEXTUAL FOLLOW-UP ("Yes")
+            const isFollowUp = qLower === 'yes' || qLower === 'ok' || qLower === 'sure' || 
+                               qLower.includes('view the list') || qLower.includes('show') || 
+                               qLower.includes('please') || qLower.includes('display');
+            
+            if (htmlResult === null && isFollowUp && lastQueryContext.type === 'list_followup') {
+                log('Routing via: Intent (Follow-up: Show List)');
+                showDataInLeftPanel(lastQueryContext.term, lastQueryContext.data, lastQueryContext.descriptionHeader);
+                lastQueryContext = { type: null, data: [], term: null, descriptionHeader: 'Description' };
+                htmlResult = "";
+            }
+
+            // =( 2 )= INTENT: HIGH-PRIORITY "WHAT IS [GENE]?"
+            else if (htmlResult === null && (match = qLower.match(/^(?:what is|what's|describe|tell me about)\s+([A-Z0-9\-]{3,})\b/i))) {
+                log('Routing via: Intent (High-Priority Get Details)');
+                htmlResult = await getComprehensiveDetails(match[1].toUpperCase());
+            }
+
+            // =( 3 )= INTENT: ORTHOLOGS
+            else if (htmlResult === null && (match = qLower.match(/ortholog(?: of| for)?\s+([a-z0-9\-]+)\s+(?:in|for)\s+(c\. elegans|mouse|zebrafish|drosophila|xenopus)/i))) {
+                log('Routing via: Intent (Ortholog)');
+                htmlResult = handleOrthologQuery(match[1].toUpperCase(), match[2]);
+            }
+            else if (htmlResult === null && (match = qLower.match(/(c\. elegans|mouse|zebrafish|drosophila|xenopus)\s+ortholog(?: of| for)?\s+([a-z0-9\-]+)/i))) {
+                log('Routing via: Intent (Ortholog)');
+                htmlResult = handleOrthologQuery(match[2].toUpperCase(), match[1]);
+            }
+
+            //=( 4 )= INTENT: COMPLEX / MODULE MEMBERS (Split Logic)
+            else if (htmlResult === null && (match = qLower.match(/(?:components of|genes in|members of)\s+(.+)/i))) {
+                const term = match[1].replace(/^(the|a|an)\s/i, '').trim();
+                log('Routing via: Intent (Get Genes in Complex)');
+                htmlResult = handleComplexQuery(term, query); 
+            }
+            else if (htmlResult === null && (match = qLower.match(/(?:complexes for|complexes of|part of|in complex)\s+(.+)/i))) {
+                log('Routing via: Intent (Get Complexes for Gene)');
+                const genes = extractMultipleGenes(match[1]);
+                if (genes.length > 0) {
+                    htmlResult = handleGeneInComplexQuery(genes[0]);
+                }
+            }
+
+            //=( 5 )= INTENT: DOMAINS
+            else if (htmlResult === null && (match = qLower.match(/(?:domains of|domain architecture for)\s+(.+)/i))) {
+                log('Routing via: Intent (Domains)');
+                const genes = extractMultipleGenes(match[1]);
+                if (genes.length > 0) {
+                    htmlResult = handleDomainQuery(genes);
+                }
+            }
+
+            //=( 6 )= INTENT: SCREENS / PHENOTYPES
+            else if (htmlResult === null && (match = qLower.match(/(?:screens for|screens where|effect of)\s+([a-z0-9\-]+)/i))) {
+                log('Routing via: Intent (Screens)');
+                htmlResult = handleScreenQuery(match[1].toUpperCase());
+            }
+
+            //=( 7 )= INTENT: PHYLOGENY / EVOLUTION
+            else if (htmlResult === null && (
+                qLower.includes('phylogen') || qLower.includes('evolution') || qLower.includes('conservation') ||
+                qLower.includes('heatmap') || qLower.includes('taxa') || qLower.includes('vertebrate specific') ||
+                qLower.includes('mammalian specific') || qLower.includes('ciliary specific') ||
+                qLower.includes('table')
+            )) {
+                log('Routing via: Intent (Phylogeny Engine)');
+                htmlResult = await routePhylogenyAnalysis(query); // Now Awaited
+            }
+
+            //=( 8 )= INTENT: FUNCTIONAL MODULES
+            else if (htmlResult === null && (match = qLower.match(/(?:functional modules of|modules for)\s+([a-z0-9\-]+)/i))) {
+                log('Routing via: Intent (Get Modules)');
+                const gene = match[1].toUpperCase();
+                const g = window.CiliAI.lookups.geneMap[gene];
+                if (g && g['Functional.category']) { // Use CSV column name
+                    htmlResult = formatListResult(`Functional Modules for ${gene}`, ensureArray(g['Functional.category']).map(m => ({ gene: m, description: "Module" })));
+                } else {
+                    htmlResult = `No functional modules listed for <strong>${gene}</strong>.`;
+                }
+            }
+
+            //=( 9 )= INTENT: scRNA Expression
+            else if (htmlResult === null && (qLower.includes('scrna') || qLower.includes('expression in') || qLower.includes('compare expression'))) {
+                log('Routing via: Intent (scRNA)');
+                const genes = extractMultipleGenes(query);
+                if (genes.length > 0) {
+                    htmlResult = handleScRnaQuery(genes);
+                } else {
+                    htmlResult = `Please specify which gene(s) you want to check expression for.`;
+                }
+            }
+
+            //=( 10 )= INTENT: UMAP (VISUAL)
+            else if (htmlResult === null && (match = qLower.match(/(?:show|plot)\s+(?:me\s+the\s+)?umap(?: expression)?(?: for\s+([a-z0-9\-]+))?/i))) {
+                log('Routing via: Intent (UMAP Plot)');
+                const gene = match[1] ? match[1].toUpperCase() : null;
+                handleUmapPlot(gene);
+                htmlResult = ""; 
+            }
+
+            //=( 11 )= INTENT: SIMPLE KEYWORD LISTS
+            if (htmlResult === null) { 
+                const intent = flexibleIntentParser(query); 
+                if (intent) {
+                    log(`Routing via: Intent (Simple Keyword: ${intent.type})`);
+                    htmlResult = intent.handler(intent.entity, query); 
+                }
+            }
+
+            //=( 12 )= INTENT: FALLBACK (GET DETAILS)
+            if (htmlResult === null) { 
+                log(`Routing via: Fallback (Get Details)`);
+                let term = qLower;
+                // Updated regex to better capture the gene name
+                if ((match = qLower.match(/(?:what is|what does|describe|localization of|omim id for|where is|cellular location of|subcellular localization of)\s+(?:the\s+)?(.+)/i))) {
+                    term = match[1];
+                }
+                term = term.replace(/[?.]/g, '').replace(/\bdo\b/i, '').trim().toUpperCase();
+                const genes = extractMultipleGenes(term);
+                if (genes.length > 0) {
+                    htmlResult = await getComprehensiveDetails(genes[0]);
+                }
+            }
+
+            //=( 13 )= FINAL FALLBACK (ERROR)
+            if (htmlResult === null) { 
+                log(`Routing via: Final Fallback (Error)`);
+                htmlResult = `Sorry, I didn't understand the query: "<strong>${query}</strong>". Please try a simpler term.`;
+            }
+
+            if (htmlResult) { 
+                addChatMessage(htmlResult, false);
+            }
+
+        } catch (e) {
+            console.error("Error in handleAIQuery:", e);
+            addChatMessage(`An internal CiliAI error occurred: ${e.message}`, false);
+        }
+    }
     
     // ==========================================================
     // 5. GLOBAL UI WRAPPERS & STARTUP
