@@ -5,6 +5,7 @@
  * • Loads the pre-compiled 'ciliAI_master_database.json' + 'ciliAI_lookups.json'
  * • Lazy-loads the large phylogeny files only when needed.
  * • Fixes all known layout, normalization, and query routing bugs.
+ * • INTEGRATED: displayFullGeneInfo (Nov 15, 2025)
  * ============================================================== */
 
 (function () {
@@ -247,8 +248,13 @@
             .ciliai-reaction-btn { cursor: pointer; opacity: 0.6; transition: all 0.2s; user-select: none; }
             .ciliai-reaction-btn:hover { opacity: 1; transform: scale(1.15); }
             .ai-result-card { font-size: 12px; line-height: 1.6; margin-top: 8px; }
+            .ai-result-card h4 { font-size: 1.1em; color: #2d3748; margin-bottom: 5px; }
+            .ai-result-card h3 { font-size: 1.05em; color: #2d3748; margin-bottom: 5px; margin-top: 8px; }
             .ai-result-card strong { color: #667eea; }
             .ai-result-card ul { margin-left: 20px; margin-top: 5px; }
+            .ai-result-card table { width: 100%; font-size: 11px; margin-top: 5px; border-collapse: collapse; }
+            .ai-result-card table th, .ai-result-card table td { border: 1px solid #e1e8ed; padding: 4px 6px; text-align: left; }
+            .ai-result-card table th { background: #f8f9fa; }
             .ai-action { color: #667eea; text-decoration: none; font-weight: 600; }
             .ai-action:hover { text-decoration: underline; }
             .left-panel { display: flex; flex-direction: column; background: #f5f7fa; border-right: 1px solid #e1e8ed; overflow: hidden; }
@@ -1345,10 +1351,10 @@
             height: Math.max(500, geneLabels.length * 40 + 150)
         };
         let links = `<p class="ai-suggestion" style="margin-top: 10px;">
-                        <a href="#" class="ai-action" data-action="show-nevers-heatmap" data-genes="${geneLabels.join(',')}">➡️ Show Nevers et al. (2017)</a>
-                        <span style="margin: 0 10px;">|</span>
-                        <a href="#" class="ai-action" data-action="show-table-view" data-genes="${geneLabels.join(',')}">📋 Show Data Table</a>
-                     </p>`;
+                            <a href="#" class="ai-action" data-action="show-nevers-heatmap" data-genes="${geneLabels.join(',')}">➡️ Show Nevers et al. (2017)</a>
+                            <span style="margin: 0 10px;">|</span>
+                            <a href="#" class="ai-action" data-action="show-table-view" data-genes="${geneLabels.join(',')}">📋 Show Data Table</a>
+                         </p>`;
         if (genesNotFound.length > 0) {
             links = `<p class="status-note">Note: <strong>${genesNotFound.join(', ')}</strong> not found in this dataset.</p>` + links;
         }
@@ -1488,44 +1494,96 @@
     
     // --- 4F. Data Getter Helpers ---
 
-    async function getComprehensiveDetails(term) {
-        const gene = term.trim().toUpperCase();
-        const g = window.CiliAI.lookups.geneMap[gene];
-
-        if (!g) {
-            return `Sorry, I could not find any data for "<strong>${gene}</strong>".`;
+    /**
+     * NEW INTEGRATED FUNCTION
+     * Replaces getComprehensiveDetails with the detailed HTML formatter
+     * provided by the user.
+     */
+    async function displayFullGeneInfo(geneSymbol) {
+        const gm = window.CiliAI.lookups && window.CiliAI.lookups.geneMap;
+        if (!gm || !gm[geneSymbol]) {
+            return `<div class="ai-result-card">No data found for gene ${geneSymbol}</div>`;
         }
-
-        let html = `<h4>Details for <strong>${g.Gene}</strong></h4>`;
-        html += `<p>${g.Gene_Description || g.Functional_Summary_from_Literature || 'No description available.'}</p>`;
-        html += '<ul>';
-        if (g.Localization) html += `<li><strong>Localization:</strong> ${g.Localization}</li>`;
-        if (g.Ciliopathy) html += `<li><strong>Ciliopathy:</strong> ${g.Ciliopathy}</li>`;
-        if (g.omim_id) html += `<li><strong>OMIM ID:</strong> ${g.omim_id}</li>`;
+        const g = gm[geneSymbol];
         
-        const complexes = Object.keys(g.complex_components || {})
-                              .filter(name => isNaN(parseInt(name)));
-        if (complexes.length > 0) {
-            html += `<li><strong>Complexes:</strong> ${complexes.join(', ')}</li>`;
+        // Use <h4> to match the chat window's existing style
+        let html = `<div class="ai-result-card"><h4>Gene: ${geneSymbol}</h4>`;
+        
+        html += `<p><strong>Description:</strong> ${g['Gene.Description'] || '—'}</p>`;
+        html += `<p><strong>Synonyms:</strong> ${g['Synonym.'] || '—'}</p>`;
+        html += `<p><strong>OMIM ID:</strong> ${g.OMIM.ID || '—'}</p>`;
+        html += `<p><strong>Localization:</strong> ${g.Localization || '—'}</p>`;
+        html += `<p><strong>Functional category:</strong> ${g['Functional.category'] || '—'}</p>`;
+        
+        html += `<h3>Cilia Effects</h3>`;
+        html += `<p><strong>Overexpression effect:</strong> ${g['Overexpression effects on cilia length (increase/decrease/no effect)'] || '—'}</p>`;
+        html += `<p><strong>Loss-of-Function effect:</strong> ${g['Loss-of-Function (LoF) effects on cilia length (increase/decrease/no effect)'] || '—'}</p>`;
+        html += `<p><strong>Percentage of ciliated cells effect:</strong> ${g['Percentage of ciliated cells (increase/decrease/no effect)'] || '—'}</p>`;
+        
+        html += `<h3>Screens</h3>`;
+        if (Array.isArray(g.screens) && g.screens.length > 0) {
+            html += `<ul>`;
+            for (const s of g.screens) {
+                html += `<li><strong>${s.source}</strong>: ${s.result}</li>`;
+            }
+            html += `</ul>`;
+        } else {
+            html += `<p>None</p>`;
         }
-        if (g.pfam_ids && ensureArray(g.pfam_ids).length > 0) {
-            html += `<li><strong>Domains:</strong> ${ensureArray(g.pfam_ids).join(', ')}</li>`;
+        
+        html += `<h3>Expression Data (scRNA-seq)</h3>`;
+        if (g.expression && g.expression.scRNA) {
+            html += `<table><tr><th>Cell type</th><th>Value</th></tr>`;
+            for (const [ct, val] of Object.entries(g.expression.scRNA)) {
+                html += `<tr><td>${ct}</td><td>${val}</td></tr>`;
+            }
+            html += `</table>`;
+        } else {
+             html += `<p>None</p>`;
         }
-        const orthologs = [
-            g.Ortholog_C_elegans ? `<em>C. elegans</em> (${g.Ortholog_C_elegans})` : null,
-            g.Ortholog_Mouse ? `Mouse (${g.Ortholog_Mouse})` : null,
-            g.Ortholog_Zebrafish ? `Zebrafish (${g.Ortholog_Zebrafish})` : null,
-            g.Ortholog_Drosophila ? `Drosophila (${g.Ortholog_Drosophila})` : null,
-            g.Ortholog_Xenopus ? `Xenopus (${g.Ortholog_Xenopus})` : null
-        ].filter(Boolean).join(', ');
-        if (orthologs) {
-            html += `<li><strong>Orthologs:</strong> ${orthologs}</li>`;
+        
+        html += `<h3>Expression Data (Tissue)</h3>`;
+        if (g.expression && g.expression.tissue) {
+            html += `<table><tr><th>Tissue</th><th>Value</th></tr>`;
+            for (const [t, val] of Object.entries(g.expression.tissue)) {
+                html += `<tr><td>${t}</td><td>${val}</td></tr>`;
+            }
+            html += `</table>`;
+        } else {
+             html += `<p>None</p>`;
         }
-        html += `
-            <li><strong>Phylogeny:</strong> 
-                <a href="#" class="ai-action" data-action="show-li-heatmap" data-genes="${g.Gene}">Show Conservation</a>
-            </li>`;
-        html += '</ul>';
+        
+        html += `<h3>Orthologs & Mouse Phenotype</h3>`;
+        html += `<p><strong>Mouse ortholog:</strong> ${g.Ortholog_Mouse || '—'}</p>`;
+        html += `<p><strong>C. elegans ortholog:</strong> ${g.Ortholog_C_elegans || '—'}</p>`;
+        html += `<p><strong>Zebrafish ortholog:</strong> ${g.Ortholog_Zebrafish || '—'}</p>`;
+        html += `<p><strong>Mouse phenotype:</strong> ${g.mouse_phenotype || '—'}</p>`;
+        html += `<p><strong>Mouse ciliopathy phenotype:</strong> ${g.mouse_ciliopathy_phenotype || '—'}</p>`;
+        
+        html += `<h3>Phylogeny</h3>`;
+        if (g.phylogeny) {
+            for (const [pkey, pval] of Object.entries(g.phylogeny)) {
+                html += `<p><strong>${pkey}</strong>: class=${pval.class}, class_id=${pval.class_id}</p>`;
+                if (pval.species_data) {
+                    html += `<p>Species data (length ${pval.species_data.length})</p>`;
+                }
+            }
+        }
+        
+        html += `<h3>Complexes</h3>`;
+        if (g.complex_components) {
+            html += `<ul>`;
+            for (const [ cname, members ] of Object.entries(g.complex_components)) {
+                html += `<li><strong>${cname}</strong>: ${members.join(', ')}</li>`;
+            }
+            html += `</ul>`;
+        } else {
+            html += `<p>None listed</p>`;
+        }
+
+        html += `<p style="margin-top: 10px;"><a href="#" class="ai-action" data-action="show-li-heatmap" data-genes="${geneSymbol}">Show Conservation Plot</a></p>`;
+        
+        html += `</div>`; // Close ai-result-card
         return html;
     }
 
@@ -1553,7 +1611,7 @@
                 const geneData = geneMap[g];
                 return {
                     gene: g,
-                    description: geneData?.Gene_Description || 'No description available.'
+                    description: geneData?.['Gene.Description'] || 'No description available.'
                 };
             }),
             description: desc
@@ -1593,7 +1651,7 @@
             const geneSymbols = L.byModuleOrComplex[complexKey];
             return geneSymbols.map(gene => ({
                 gene: gene,
-                description: geneMap[gene]?.Gene_Description || `Component of ${complexKey}`
+                description: geneMap[gene]?.['Gene.Description'] || `Component of ${complexKey}`
             }));
         }
         return [];
@@ -1607,7 +1665,7 @@
         if (modKey && L.byModules[modKey]) {
             return L.byModules[modKey].map(gene => ({ 
                 gene: gene, 
-                description: geneMap[gene]?.Gene_Description || `Part of ${modKey}`
+                description: geneMap[gene]?.['Gene.Description'] || `Part of ${modKey}`
             }));
         }
         return [];
@@ -1637,24 +1695,6 @@
             descriptionHeader: 'Domain'
         };
         return `I found ${results.length} genes containing a "${domainTerm}" domain. Do you want to view the list?`;
-    }
-
-    function tellAboutCiliAI() {
-        return `
-            <div class="ai-result-card">
-                <strong>Welcome to CiliAI!</strong>
-                <p>I am an AI assistant designed to help you explore data on ciliary biology. You can ask me questions like:</p>
-                <ul>
-                    <li><b>Gene Details:</b> "What is IFT88?" or "Describe ARL13B."</li>
-                    <li><b>Localization:</b> "List genes in the transition zone." or "Where is CEP290?"</li>
-                    <li><b>Complexes:</b> "What genes are in the BBSome?" or "Complex components of OFD1."</li>
-                    <li><b>Ciliopathies:</b> "Gene list of Joubert Syndrome." or "What genes cause PCD?"</li>
-                    <li><b>Phylogeny:</b> "Show conservation of IFT88."</li>
-                    <li><b>Domains:</b> "Which genes have WD40 domains?"</li>
-                </ul>
-                <p>My data comes from a pre-compiled database of over 23,000 genes, enriched with data from 8 specialized datasets (CORUM, UMAP, scRNA, Phylogeny, etc.).</p>
-            </div>
-        `;
     }
 
     // --- 4G. Main "Brain" (Query Routers) ---
@@ -1747,8 +1787,8 @@
 
             // =( 1 )= INTENT: CONTEXTUAL FOLLOW-UP ("Yes")
             const isFollowUp = qLower === 'yes' || qLower === 'ok' || qLower === 'sure' || 
-                               qLower.includes('view the list') || qLower.includes('show') || 
-                               qLower.includes('please') || qLower.includes('display');
+                                 qLower.includes('view the list') || qLower.includes('show') || 
+                                 qLower.includes('please') || qLower.includes('display');
             
             if (htmlResult === null && isFollowUp && lastQueryContext.type === 'list_followup') {
                 log('Routing via: Intent (Follow-up: Show List)');
@@ -1760,7 +1800,8 @@
             // =( 2 )= INTENT: HIGH-PRIORITY "WHAT IS [GENE]?"
             else if (htmlResult === null && (match = qLower.match(/^(?:what is|what's|describe|tell me about)\s+([A-Z0-9\-]{3,})\b/i))) {
                 log('Routing via: Intent (High-Priority Get Details)');
-                htmlResult = await getComprehensiveDetails(match[1].toUpperCase());
+                // **** INTEGRATION POINT ****
+                htmlResult = await displayFullGeneInfo(match[1].toUpperCase());
             }
 
             // =( 3 )= INTENT: ORTHOLOGS
@@ -1864,7 +1905,8 @@
                 term = term.replace(/[?.]/g, '').replace(/\bdo\b/i, '').trim().toUpperCase();
                 const genes = extractMultipleGenes(term);
                 if (genes.length > 0) {
-                    htmlResult = await getComprehensiveDetails(genes[0]);
+                    // **** INTEGRATION POINT ****
+                    htmlResult = await displayFullGeneInfo(genes[0]);
                 }
             }
 
