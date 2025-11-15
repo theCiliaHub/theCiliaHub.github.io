@@ -1866,14 +1866,15 @@
                 }
             }
 
-            //=( 9 )= INTENT: scRNA Expression
-            else if (htmlResult === null && (qLower.includes('scrna') || qLower.includes('expression in') || qLower.includes('compare expression'))) {
-                log('Routing via: Intent (scRNA)');
+           //=( 7 )= INTENT: SCREENS / PHENOTYPES (REVISED)
+            else if (htmlResult === null && (qLower.includes('loss-of-function') || qLower.includes('lof') || qLower.includes('overexpression') || qLower.includes('oe') || qLower.includes('percent ciliated') || qLower.includes('cilia length') || qLower.includes('effect of') )) {
+                log('Routing via: Intent (Screens/Effects)');
                 const genes = extractMultipleGenes(query);
                 if (genes.length > 0) {
-                    htmlResult = handleScRnaQuery(genes);
+                    // Get the last gene mentioned, which is usually the subject
+                    htmlResult = handleScreenQuery(genes[genes.length - 1]); 
                 } else {
-                    htmlResult = `Please specify which gene(s) you want to check expression for.`;
+                    htmlResult = "Please specify a gene to check for screen effects (e.g., 'loss-of-function of IFT88').";
                 }
             }
 
