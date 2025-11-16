@@ -418,22 +418,34 @@
                 if (gene) searchGene(gene);
                 return;
             }
+
+            // --- THIS BLOCK IS NOW CORRECTED ---
             const aiAction = e.target.closest('.ai-action');
             if (aiAction) {
-                e.preventDefault();
                 const action = aiAction.dataset.action;
-                const genes = aiAction.dataset.genes || "";
-                let query = "";
-                if (action === 'show-li-heatmap') query = `show li phylogeny for ${genes}`;
-                else if (action === 'show-nevers-heatmap') query = `show nevers phylogeny for ${genes}`;
-                else if (action === 'show-table-view') query = `show data table for ${genes}`;
-                if (query) {
-                    addChatMessage(query, true);
-                    handleAIQuery(query);
+
+                // (NEW CHECK) Only prevent default if it's an internal app link
+                if (action) {
+                    e.preventDefault(); // Stop the link from navigating
+                    const genes = aiAction.dataset.genes || "";
+                    let query = "";
+                    if (action === 'show-li-heatmap') query = `show li phylogeny for ${genes}`;
+                    else if (action === 'show-nevers-heatmap') query = `show nevers phylogeny for ${genes}`;
+                    else if (action === 'show-table-view') query = `show data table for ${genes}`;
+                    
+                    if (query) {
+                        addChatMessage(query, true);
+                        handleAIQuery(query);
+                    }
+                    return;
                 }
-                return;
+                // (NEW) If there is no 'data-action', it's a normal link
+                // (e.g., "View Publication"). We do NOT call e.preventDefault(),
+                // so the browser will follow the href and target="_blank".
             }
+            // --- END OF CORRECTION ---
         });
+
         const geneSearchInput = document.getElementById('geneSearch');
         if (geneSearchInput) geneSearchInput.addEventListener('keyup', e => {
             if (e.key === 'Enter') searchGene();
@@ -444,7 +456,6 @@
         });
         console.log("CiliAI: Page event listeners set up.");
     }
-
     // ==========================================================
     // 4. CILIBRAIN v5.1 - QUERY & PLOTTING ENGINE
     // ==========================================================
@@ -1741,6 +1752,103 @@ function extractMultipleGenes(query) {
         }
         return [];
     }
+    /**
+     * (NEW) Extracts disease keywords from a query.
+     * @param {string} qLower - The lowercase query string.
+     * @returns {string|null} The found disease term, or null.
+     */
+    function extractDiseaseIntent(qLower) {
+        // Keywords from your test list
+        const keywords = [
+            'joubert syndrome', 'bardet-biedl syndrome', 'bbs', 
+            'meckel-gruber syndrome', 'mks', 'primary ciliary dyskinesia', 'pcd',
+            'nephronophthisis', 'nphp', 'retinal disease', 'retinal ciliopathy'
+        ];
+        
+        for (const term of keywords) {
+            if (qLower.includes(term)) {
+                return term; // Return the first one found
+            }
+        }
+        return null;
+    }
+
+    /**
+     * (NEW) Extracts expression tissue keywords from a query.
+     * @param {string} qLower - The lowercase query string.
+     * @returns {string|null} The found tissue term, or null.
+     */
+    function extractExpressionIntent(qLower) {
+        // Keywords from your test list
+        const keywords = ['kidney', 'brain', 'retina', 'cerebellum', 'testis', 'lung'];
+        
+        for (const term of keywords) {
+            if (qLower.includes(term)) {
+                return term;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * (NEW) Helper to normalize disease terms to match the lookup map.
+     * @param {string} term - The disease term from the query.
+     * @returns {string} A normalized key.
+     */
+    function normalizeDiseaseKey(term) {
+        let key = normalizeTerm(term);
+        // Map abbreviations and synonyms to the master key
+        if (key === normalizeTerm('BBS') || key === normalizeTerm('Bardet Biedel Syndrome')) {
+            return normalizeTerm('Bardet–Biedl Syndrome');
+        }
+        if (key === normalizeTerm('MKS') || key === normalizeTerm('Meckel-Gruber')) {
+            return normalizeTerm('Meckel–Gruber Syndrome');
+        }
+        if (key === normalizeTerm('Joubert')) {
+            return normalizeTerm('Joubert Syndrome');
+        }
+        if (key === normalizeTerm('NPHP')) {
+            return normalizeTerm('Nephronophthisis');
+        }
+        if (key === normalizeTerm('PCD')) {
+            return normalizeTerm('Primary Ciliary Dyskinesia');
+        }
+        if (key === normalizeTerm('retinal disease')) {
+            return normalizeTerm('Retinal Ciliopathy'); // Map general term to specific classification
+        }
+        return key; // return the normalized term itself
+    }
+
+    /**
+     * (NEW) Helper to check for expression in scRNA or tissue data.
+     * @param {object} gene - The full gene object from masterData.
+     * @param {string} tissue - The tissue keyword (e.g., "kidney").
+     * @returns {boolean} True if expression is found.
+     */
+    function hasExpressionInTissue(gene, tissue) {
+        if (!gene.expression) return false;
+        const tissueLower = tissue.toLowerCase();
+
+        // Check scRNA data
+        if (gene.expression.scRNA) {
+            for (const [cellType, value] of Object.entries(gene.expression.scRNA)) {
+                if (cellType.toLowerCase().includes(tissueLower) && value > 0) {
+                    return true;
+                }
+            }
+        }
+        // Check bulk tissue data
+        if (gene.expression.tissue) {
+            for (const [tissueName, value] of Object.entries(gene.expression.tissue)) {
+                if (tissueName.toLowerCase().includes(tissueLower) && value > 0) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+
     
     function getGenesByDomain(domainTerm, query) {
         const normTerm = normalizeTerm(domainTerm);
