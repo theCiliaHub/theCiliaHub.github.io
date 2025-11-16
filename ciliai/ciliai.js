@@ -2158,7 +2158,7 @@ function handleComplexQuery(query) {
      */
     function getScreenCitationMap() {
         // This is the user-provided object
-        rreturn {
+        return { // <-- Corrected this line
             "Kim2016": {
                 name: 'Kim et al. (2016) IMCD3 RNAi',
                 link: 'https://www.sciencedirect.com/science/article/pii/S016748891630074X',
@@ -2191,7 +2191,6 @@ function handleComplexQuery(query) {
             }
         };
     }
-
 
    /**
      * (REPLACEMENT) Handles the "yes" follow-up for screen references.
