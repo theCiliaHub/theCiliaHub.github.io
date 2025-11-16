@@ -712,35 +712,45 @@ function extractMultipleGenes(query) {
         const gene = geneSymbol.toUpperCase();
         const g = window.CiliAI.lookups.geneMap[gene];
         if (!g) return `Sorry, I could not find data for "${gene}".`;
-        let html = `<h4>Screen Results for <strong>${gene}</strong></h4>`;
+        let html = `<div class="ai-result-card"><h4>Screen Results for <strong>${gene}</strong></h4>`;
         
         // Use the exact column names from your CSV
         const percEffect = g['Percentage of ciliated cells (increase/decrease/no effect)'];
         const lofEffect = g['Loss-of-Function (LoF) effects on cilia length (increase/decrease/no effect)'];
         const oeEffect = g['Overexpression effects on cilia length (increase/decrease/no effect)'];
 
-        if (percEffect && percEffect !== "Not Reported") {
+        if (percEffect && percEffect !== "Not Reported" && percEffect) {
             html += `<p><strong>Percent Ciliated Cells Effect:</strong> ${percEffect}</p>`;
         }
-        if (lofEffect && lofEffect !== "Not Reported") {
+        if (lofEffect && lofEffect !== "Not Reported" && lofEffect) {
             html += `<p><strong>Loss-of-Function Effect:</strong> ${lofEffect}</p>`;
         }
-        if (oeEffect && oeEffect !== "Not Reported") {
+        if (oeEffect && oeEffect !== "Not Reported" && oeEffect) {
             html += `<p><strong>Overexpression Effect:</strong> ${oeEffect}</p>`;
         }
 
-        if (g.screens && g.screens.length > 0) {
+        // --- THIS IS THE CORRECTED BLOCK ---
+        if (g.screens && Array.isArray(g.screens) && g.screens.length > 0) {
             html += '<strong>All Screen Data:</strong><ul>';
             g.screens.forEach(s => {
-                html += `<li>[${s.dataset || 'Unknown'}] <strong>${s.classification}</strong> (Z-score: ${s.z_score || 'N/A'})</li>`;
+                // Use s.source and s.result, matching your schema
+                html += `<li><strong>${s.source || 'Unknown Source'}</strong>: ${s.result || 'No result'}</li>`;
             });
             html += '</ul>';
-        } else if (percEffect === "Not Reported" && lofEffect === "Not Reported" && oeEffect === "Not Reported") {
+        } else if (
+            (!percEffect || percEffect === "Not Reported") &&
+            (!lofEffect || lofEffect === "Not Reported") &&
+            (!oeEffect || oeEffect === "Not Reported")
+        ) {
+            // Only show "Not Reported" if all 3 top-level fields are also missing
             html += '<p>No specific screen data found in the database.</p>';
         }
+        // --- END OF CORRECTION ---
+
+        html += `</div>`; // Close ai-result-card
         return html;
     }
-
+    
     function handleDomainQuery(geneSymbols) {
         let html = '';
         const genes = Array.isArray(geneSymbols) ? geneSymbols : [geneSymbols];
