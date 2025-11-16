@@ -2032,7 +2032,7 @@ function extractPhenotypeIntent(qLower) {
     return null;
 }
 
-/**
+    /**
      * (REPLACEMENT) The main "Level 2/3" query router.
      * This is the new "brain" that handles multi-intent queries.
      * @param {string} query - The original user query.
@@ -2052,10 +2052,17 @@ function extractPhenotypeIntent(qLower) {
             isNegative: qLower.includes('not in') || qLower.includes('not expressed') || qLower.includes('no known phenotype')
         };
 
-        // 2. Count how many intents we found
-        const intentCount = Object.values(intents).filter(val => val !== null && val !== false).length;
+        // 2. Count how many intents we found (excluding isNegative flag)
+        let intentCount = 0;
+        if (intents.localization) intentCount++;
+        if (intents.phenotype) intentCount++;
+        if (intents.disease) intentCount++;
+        if (intents.expression) intentCount++;
+        if (intents.complex) intentCount++;
+        if (intents.evolution) intentCount++;
 
-        // 3. If it's not a multi-intent query, fall back to the simple router
+
+        // 3. If it's not a multi-intent query (at least 2 criteria), fall back to the simple router
         if (intentCount < 2) {
             log(`[Complex Router] Only ${intentCount} intent(s) found. Falling back to simple router.`);
             return null;
@@ -2067,27 +2074,41 @@ function extractPhenotypeIntent(qLower) {
         let titleParts = []; // For formatting the response
         
         const filteredGenes = window.CiliAI.masterData.filter(gene => {
-            
+            if (!gene || !gene.Gene) return false; // Ensure gene object and Gene name exist
+
             // Filter by Localization
             if (intents.localization) {
-                if (!titleParts.includes("Loc")) titleParts.push(`Loc: ${intents.localization}`);
-                const geneLoc = gene.Localization || '';
-                if (!geneLoc.toLowerCase().includes(intents.localization)) return false;
+                if (!titleParts.includes(`Loc: ${intents.localization}`)) titleParts.push(`Loc: ${intents.localization}`);
+                const geneLoc = (gene.Localization || '').toLowerCase();
+                if (!geneLoc.includes(intents.localization)) return false;
             }
 
             // Filter by Phenotype
             if (intents.phenotype) {
-                if (!titleParts.includes("Pheno")) titleParts.push(`Pheno: ${intents.phenotype}`);
-                const genePheno = gene['Loss-of-Function (LoF) effects on cilia length (increase/decrease/no effect)'] || '';
-                if (!genePheno.toLowerCase().includes(intents.phenotype)) return false;
+                if (!titleParts.includes(`Pheno: ${intents.phenotype}`)) titleParts.push(`Pheno: ${intents.phenotype}`);
+                const genePheno = (gene['Loss-of-Function (LoF) effects on cilia length (increase/decrease/no effect)'] || '').toLowerCase();
+                // This logic is flawed. "short cilia" is not the same as "no effect". 
+                // Let's fix this to be more precise.
+                let phenoMatch = false;
+                if (intents.phenotype === 'short cilia' && (genePheno.includes('short') || genePheno.includes('absent'))) {
+                    phenoMatch = true;
+                } else if (intents.phenotype === 'longer cilia' && genePheno.includes('long')) {
+                     phenoMatch = true;
+                } else if (intents.phenotype === 'loss of cilia' && (genePheno.includes('absent') || genePheno.includes('no cilia'))) {
+                     phenoMatch = true;
+                } else if (intents.phenotype === 'no effect' && (genePheno.includes('no effect') || genePheno === '')) {
+                     phenoMatch = true;
+                }
+                
+                if (!phenoMatch) return false;
             }
 
             // Filter by Disease
             if (intents.disease) {
-                if (!titleParts.includes("Disease")) titleParts.push(`Disease: ${intents.disease}`);
+                if (!titleParts.includes(`Disease: ${intents.disease}`)) titleParts.push(`Disease: ${intents.disease}`);
                 const diseaseKey = normalizeDiseaseKey(intents.disease);
                 const diseaseGenes = window.CiliAI.lookups.byCiliopathy[diseaseKey];
-                if (!diseaseGenes || !diseaseGenes.includes(gene.Gene)) return false;
+                if (!diseaseGenes || !diseaseGenes.includes(gene.Gene.toUpperCase())) return false;
             }
 
             // Filter by Expression
@@ -2118,7 +2139,7 @@ function extractPhenotypeIntent(qLower) {
             // Filter by Evolution
             if (intents.evolution) {
                 if (intents.evolution === 'conserved_in_elegans') {
-                    if (!titleParts.includes("Conserved")) titleParts.push("Conserved in C. elegans");
+                    if (!titleParts.includes("Conserved in C. elegans")) titleParts.push("Conserved in C. elegans");
                     if (!isGeneConserved(gene)) return false;
                 }
                 // (Future: Add 'ciliary_specific' logic here if needed)
@@ -2134,22 +2155,25 @@ function extractPhenotypeIntent(qLower) {
         if (filteredGenes.length === 0) {
             return `I found no genes that match all of your criteria (${resultTitle}).`;
         }
-
+        
+        // This is the key change. We are now creating the same
+        // { gene: "...", description: "..." } object array
+        // that formatListResult expects.
         const geneListObjects = filteredGenes.map(g => ({
             gene: g.Gene,
-            description: `${g.Gene_Description || 'No description.'}`
+            description: g['Gene.Description'] || 'No description available.'
         }));
 
         // Save for "view list" follow-up
         lastQueryContext = {
-            type: 'list_followup',
-            data: geneListObjects,
-            term: `Complex Query: ${resultTitle}`,
+            type: 'list_followup', 
+            data: geneListObjects, 
+            term: `Genes matching: ${resultTitle}`, // Use the combined title
             descriptionHeader: 'Description'
         };
         
-        return `I found ${filteredGenes.length} genes matching your criteria (${resultTitle}). Do you want to view the list?`;
-    }
+        return `I found ${filteredGenes.length} gene(s) matching your criteria: <strong>${resultTitle}</strong>. Do you want to view the list?`;
+     }
 
     /**
      * (REPLACEMENT) The Main "Level 1" Query Router
