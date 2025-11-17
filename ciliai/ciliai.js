@@ -404,7 +404,7 @@
                 <div class="toolbar">
                     <input type="text" id="geneSearch" placeholder="Search gene (e.g., IFT88, NPHP1, CEP290)">
                     <button onclick="searchGene()">Find Gene</button>
-                    <button onclick="showUMAP()">Show UMAP</button>
+                    <button onclick="showUMAP()">Show Lung UMAP</button>
                     <span id="dataStatus" class="status loading">Initializing...</span>
                 </div>
                 <div class="diagram-container">
@@ -1159,7 +1159,8 @@ function formatListResult(title, genes, description = "") {
             hoverinfo: 'text'
         };
 
-        let title = 'UMAP of Ciliary Genes';
+        // --- MODIFIED: Title changed ---
+        let title = 'Lung scRNA-seq Expression (UMAP)';
         const geneUpper = highlightGene ? highlightGene.toUpperCase() : null;
         const highlightedPoint = geneUpper ? umapLookup[geneUpper] : null; 
 
@@ -1180,7 +1181,8 @@ function formatListResult(title, genes, description = "") {
             highlightTrace.y.push(highlightedPoint.y);
             highlightTrace.text.push(`<b>${highlightedPoint.gene}</b><br>${highlightedPoint.cluster}`);
             plotData.push(highlightTrace);
-            title = `UMAP: ${highlightedPoint.gene}`;
+            // --- MODIFIED: Title changed ---
+            title = `Lung scRNA-seq: ${highlightedPoint.gene}`;
         } else if (highlightGene) {
             addChatMessage(`Sorry, I could not find <strong>${highlightGene}</strong> in the UMAP data. Displaying all genes.`, false);
         }
@@ -1202,15 +1204,13 @@ function formatListResult(title, genes, description = "") {
         const backButton = document.createElement('button');
         backButton.id = 'ciliai-back-btn';
         backButton.className = 'ciliai-button';
-        backButton.style.background = '#718096';
-        backButton.style.position = 'absolute';
-        backButton.style.top = '10px';
-        backButton.style.right = '10px';
+        backButton.style.cssText = 'background: #718096; position: absolute; top: 10px; right: 10px; z-index: 10;';
         backButton.textContent = 'Back to Diagram';
         backButton.onclick = () => generateAndInjectSVG();
         plotDiv.prepend(backButton); 
     }
 
+    
     /**
      * Helper function to lazy-load phylogeny data only when needed
      */
@@ -1292,8 +1292,13 @@ function formatListResult(title, genes, description = "") {
         const isPhylogenyMandate = qLower.includes('evolution') || qLower.includes('taxa') || qLower.includes('phylogenetic') || qLower.includes('heatmap') || qLower.includes('conservation');
 
         if (genes.length >= 1 || isPhylogenyMandate) {
-            const source = qLower.includes('nevers') ? 'nevers' : 'li';
-            const finalGenes = genes.length >= 1 ? genes : ["IFT88", "BBS1", "CEP290"]; 
+            
+            // --- MODIFIED: Default to 'nevers' unless 'li' is specified ---
+            const source = qLower.includes('li') ? 'li' : 'nevers';
+            
+            // --- MODIFIED: Use new default gene list ---
+            const definitiveDefaultGenes = ["ZC2HC1A", "CEP41", "BBS1", "BBS2", "BBS5", "ZNF474", "IFT81", "BBS7"];
+            const finalGenes = genes.length >= 1 ? genes : definitiveDefaultGenes; 
 
             const plotResult = handlePhylogenyVisualizationQuery(finalGenes, source, 'heatmap'); 
 
@@ -1304,8 +1309,10 @@ function formatListResult(title, genes, description = "") {
         }
         return null; 
     }
+
     
-    function handlePhylogenyVisualizationQuery(genes, source = 'li', type = 'heatmap') {
+    
+   function handlePhylogenyVisualizationQuery(genes, source = 'li', type = 'heatmap') {
         // This function no longer needs to be async, as data is pre-loaded by the router
         const plotId = 'cilia-svg';
         generateAndInjectSVG(); 
@@ -1336,16 +1343,37 @@ function formatListResult(title, genes, description = "") {
 
             Plotly.newPlot(plotId, plotResult.plotData, plotResult.plotLayout, { responsive: true });
             
+            // --- MODIFIED: Added "Add Gene" button and styled both buttons ---
             const backButton = document.createElement('button');
             backButton.id = 'ciliai-back-btn';
             backButton.className = 'ciliai-button';
-            backButton.style.background = '#718096';
-            backButton.style.position = 'absolute';
-            backButton.style.top = '10px';
-            backButton.style.right = '10px';
+            backButton.style.cssText = 'background: #718096; position: absolute; top: 10px; right: 10px; z-index: 10;';
             backButton.textContent = 'Back to Diagram';
             backButton.onclick = () => generateAndInjectSVG();
             plotDiv.prepend(backButton); 
+
+            const addGeneButton = document.createElement('button');
+            addGeneButton.id = 'ciliai-add-gene-btn';
+            addGeneButton.className = 'ciliai-button';
+            addGeneButton.style.cssText = 'background: #667eea; position: absolute; top: 10px; right: 170px; z-index: 10;';
+            addGeneButton.textContent = 'Add Gene';
+            addGeneButton.onclick = () => {
+                const geneToAdd = prompt("Enter gene symbol to add to the plot:", "");
+                if (!geneToAdd || geneToAdd.trim() === "") return;
+                
+                // Get the current source from the plot title
+                const plotTitle = plotDiv.layout.title.text || '';
+                const currentSource = plotTitle.includes('Nevers') ? 'nevers' : 'li';
+                
+                // Get the current list of genes from the plot's y-axis
+                const currentGenes = plotDiv.data[0].y;
+                const newGeneList = [...currentGenes, geneToAdd.trim().toUpperCase()];
+
+                addChatMessage(`show ${currentSource} plot for ${newGeneList.join(',')}`, true);
+                handleAIQuery(`show ${currentSource} plot for ${newGeneList.join(',')}`);
+            };
+            plotDiv.prepend(addGeneButton);
+            // --- END OF MODIFICATION ---
 
             return { htmlLinks: plotResult.htmlLinks || "" };
 
@@ -1356,6 +1384,7 @@ function formatListResult(title, genes, description = "") {
             return { htmlLinks: "" };
         }
     }
+    
 
     // --- (Phylogeny Plotting Helpers) ---
     
@@ -1456,7 +1485,8 @@ function formatListResult(title, genes, description = "") {
             xgap: 0.5, ygap: 0.5, line: { color: '#000000', width: 0.5 }
         };
         const layout = {
-            title: `Phylogenetic Conservation (Nevers et al. 2017) - ${genes.join(', ')}`,
+            // --- MODIFIED: Title changed ---
+            title: `Phylogenetics Analysis (Nevers et al. 2017) - ${genes.join(', ')}`,
             xaxis: { title: 'Organisms (Ciliated | Non-Ciliated)', tickangle: 45, automargin: true },
             yaxis: { title: 'Genes', automargin: true },
             shapes: [{
@@ -1481,6 +1511,132 @@ function formatListResult(title, genes, description = "") {
         };
     }
 
+    function renderLiPhylogenyHeatmap(genes) {
+        const liData = window.liPhylogenyCache;
+        if (!liData) {
+            throw new Error("Li et al. 2014 data not loaded.");
+        }
+        const CIL_COUNT = CIL_ORG_FULL.length;
+        const VERTEBRATE_LI_MAP = new Map([
+            ["homosapiens", "H.sapiens"], ["m.gallopavo", "M.gallopavo"], ["musmusculus", "M.musculus"],
+            ["daniorerio", "D.rerio"], ["xenopustropicalis", "X.tropicalis"], ["gallusgallus", "G.gallus"],
+            ["o.anatinus", "O.anatinus"], ["t.nigroviridis", "T.nigroviridis"], ["c.elegans", "C.elegans"],
+            ["c.briggsae", "C.briggsae"], ["c.reinhardtii", "C.reinhardtii"], ["t.thermophila", "T.thermophila"],
+            ["s.cerevisiae", "S.cerevisiae"], ["a.thaliana", "A.thaliana"], ["o.sativa", "O.sativa"]
+        ]);
+        const liOrgList = liData.summary.organisms_list;
+        const liOrgMap = new Map();
+        liOrgList.forEach((name, index) => {
+            liOrgMap.set(name, index);
+            liOrgMap.set(name.toLowerCase().replace(/[\s\.]/g, ''), index);
+        });
+        const targetOrganisms = CIL_ORG_FULL.concat(NCIL_ORG_FULL);
+        const targetLiIndices = targetOrganisms.map(orgName => {
+            const lowerOrg = orgName.toLowerCase();
+            const simplifiedKey = lowerOrg.replace(/[\s\.]/g, '');
+            if (VERTEBRATE_LI_MAP.has(simplifiedKey)) {
+                const liAbbrev = VERTEBRATE_LI_MAP.get(simplifiedKey);
+                if (liOrgMap.has(liAbbrev)) {
+                    return liOrgMap.get(liAbbrev);
+                }
+            }
+            if (liOrgMap.has(simplifiedKey)) return liOrgMap.get(simplifiedKey);
+            if (liOrgMap.has(orgName)) return liOrgMap.get(orgName);
+            return undefined;
+        });
+        const geneLabels = [];
+        const matrix = [];
+        const textMatrix = [];
+        const genesFound = [];
+        const genesNotFound = [];
+        genes.forEach(gene => {
+            const geneUpper = gene.toUpperCase();
+            const geneData = Object.values(liData.genes).find(g => g.g && g.g.toUpperCase() === geneUpper);
+            if (!geneData) {
+                genesNotFound.push(geneUpper);
+                return;
+            }
+            genesFound.push(geneUpper);
+            const presenceIndices = new Set(geneData.s || []);
+            const row = [];
+            const textRow = [];
+            targetOrganisms.forEach((orgName, index) => {
+                const liIndex = targetLiIndices[index];
+                const isCiliated = index < CIL_COUNT;
+                const isPresent = liIndex !== undefined && presenceIndices.has(liIndex);
+                let zValue = 0;
+                let status = "Absent";
+                if (isPresent) {
+                    zValue = isCiliated ? 2 : 1;
+                    status = "Present";
+                }
+                row.push(zValue);
+                textRow.push(`Gene: ${geneUpper}<br>Organism: ${orgName}<br>Status: ${status}`);
+            });
+            if (row.length > 0) {
+                matrix.push(row);
+                textMatrix.push(textRow);
+                geneLabels.push(geneUpper);
+            }
+        });
+        if (matrix.length === 0) {
+            let errorMsg = "None of the requested genes were found in the Li (2014) dataset.";
+            if (genesNotFound.length > 0) {
+                errorMsg = `The gene(s) <strong>${genesNotFound.join(', ')}</strong> were not found in the Li (2014) phylogenetic dataset.`;
+            }
+            throw new Error(errorMsg);
+        }
+        const trace = {
+            z: matrix,
+            x: targetOrganisms.map(name => {
+                if (name === "H.sapiens") return "Human";
+                if (name === "M.musculus") return "Mouse";
+                if (name === "D.rerio") return "Zebrafish";
+                if (name.includes("elegans")) return "C. elegans";
+                return name.replace(/\./g, '').split(' ')[0];
+            }),
+            y: geneLabels,
+            type: 'heatmap',
+            colorscale: [
+                [0 / 2, '#FFFFFF'], [0.0001 / 2, '#FFE5B5'], [1 / 2, '#FFE5B5'],
+                [1.0001 / 2, '#698ECF'], [2 / 2, '#698ECF']
+            ],
+            showscale: false,
+            hoverinfo: 'text',
+            text: textMatrix,
+            xgap: 0.5, ygap: 0.5,
+            line: { color: '#000000', width: 0.5 }
+        };
+        const layout = {
+            // --- MODIFIED: Title changed ---
+            title: `Phylogenetics Analysis (Li et al. 2014) - ${geneLabels.join(', ')}`,
+            xaxis: { title: 'Organisms (Ciliated | Non-Ciliated)', tickangle: 45, automargin: true },
+            yaxis: { title: 'Genes', automargin: true },
+            shapes: [{
+                type: 'line',
+                xref: 'x', x0: CIL_COUNT - 0.5, x1: CIL_COUNT - 0.5,
+                yref: 'paper', y0: 0, y1: 1,
+                line: { color: 'black', width: 2 }
+            }],
+            margin: { t: 50, b: 200, l: 150, r: 50 },
+            height: Math.max(500, geneLabels.length * 40 + 150)
+        };
+        let links = `<p class="ai-suggestion" style="margin-top: 10px;">
+                                <a href="#" class="ai-action" data-action="show-nevers-heatmap" data-genes="${geneLabels.join(',')}">➡️ Show Nevers et al. (2017)</a>
+                                <span style="margin: 0 10px;">|</span>
+                                <a href="#" class="ai-action" data-action="show-table-view" data-genes="${geneLabels.join(',')}">📋 Show Data Table</a>
+                             </p>`;
+        if (genesNotFound.length > 0) {
+            links = `<p class="status-note">Note: <strong>${genesNotFound.join(', ')}</strong> not found in this dataset.</p>` + links;
+        }
+        return {
+            plotData: [trace],
+            plotLayout: layout,
+            htmlLinks: links
+        };
+    }
+
+    
     function renderLiPhylogenyHeatmap(genes) {
         const liData = window.liPhylogenyCache;
         if (!liData) {
@@ -2333,6 +2489,32 @@ function extractPhenotypeIntent(qLower) {
         const chatWindow = document.getElementById('messages');
         if (!chatWindow) return;
         const qLower = query.toLowerCase().trim();
+        // =( 0 )= INTENT: GREETINGS & TERMINOLOGY
+        const simpleGreetings = ['hello', 'hi', 'hey', 'greetings'];
+        if (simpleGreetings.includes(qLower)) {
+            log('Routing via: Intent (Greeting)');
+            addChatMessage("Hello! I am CiliAI. How can I help you? Try asking 'What is IFT88?' or 'List genes in the transition zone'.", false);
+            return;
+        }
+        
+        const terminologyQueries = {
+            "what is a cilium": "Cilia are microtubule-based organelles that extend from the surface of most eukaryotic cells. They are critical for sensing the environment (primary cilia) and for moving fluids (motile cilia).",
+            "what are cilia": "Cilia are microtubule-based organelles that extend from the surface of most eukaryotic cells. They are critical for sensing the environment (primary cilia) and for moving fluids (motile cilia).",
+            "tell me about cilia": "Cilia are microtubule-based organelles that extend from the surface of most eukaryotic cells. They are critical for sensing the environment (primary cilia) and for moving fluids (motile cilia). Defects in cilia cause a wide range of human diseases called ciliopathies.",
+            "explain ift": "IFT, or Intraflagellar Transport, is the bi-directional motor-driven process that moves proteins up and down the cilium. It is essential for building and maintaining the cilium. You can see a key component by searching 'What is IFT88?'.",
+            "what is the bbsome": "The BBSome is a protein complex (BBS1, BBS2, BBS4, etc.) that acts as a cargo adapter for trafficking proteins to the ciliary membrane. Defects in it cause Bardet-Biedl Syndrome. Ask 'List genes in BBSome' to see all components.",
+            "explain the transition zone": "The transition zone is a complex 'gate' at the base of the cilium. It controls which proteins can enter and exit the ciliary compartment. Ask 'List genes in transition zone' to see its components.",
+            "what are ciliopathies": "Ciliopathies are a class of human genetic disorders caused by defects in the function or structure of primary or motile cilia. This includes diseases like Joubert Syndrome, Meckel-Gruber Syndrome (MKS), and Primary Ciliary Dyskinesia (PCD).",
+            "help me understand ciliopathies": "Ciliopathies are a class of human genetic disorders caused by defects in the function or structure of primary or motile cilia. This includes diseases like Joubert Syndrome, Meckel-Gruber Syndrome (MKS), and Primary Ciliary Dyskinesia (PCD)."
+        };
+
+        if (terminologyQueries[qLower]) {
+            log('Routing via: Intent (Terminology)');
+            addChatMessage(`<div class="ai-result-card"><p>${terminologyQueries[qLower]}</p></div>`, false);
+            return;
+        }
+
+        // =( 1 )= INTENT: COMPLEX (L2/L3) QUERIES
         if (!query) return;
 
         log(`Routing query: ${query}`);
@@ -2465,11 +2647,13 @@ function extractPhenotypeIntent(qLower) {
             }
 
             //=( 12 )= INTENT: UMAP (VISUAL)
-            else if (htmlResult === null && (match = qLower.match(/(?:show|plot)\s+(?:me\s+the\s+)?umap(?: expression)?(?: for\s+([a-z0-9\-]+))?/i))) {
+            // --- MODIFIED: Regex updated for more flexibility ---
+            else if (htmlResult === null && (match = qLower.match(/(?:show|plot|display)\s+(?:me\s+the\s+)?(?:umap|lung scrna)(?: expression)?(?: for\s+([a-z0-9\-]+)|(?: of| in)\s+([a-z0-9\-]+))?/i))) {
                 log('Routing via: Intent (UMAP Plot)');
-                const gene = match[1] ? match[1].toUpperCase() : null;
+                // --- MODIFIED: Get gene from either capture group ---
+                const gene = (match[1] || match[2]) ? (match[1] || match[2]).toUpperCase() : null;
                 handleUmapPlot(gene);
-                htmlResult = "";
+                htmlResult = ""; // No chat message needed, plot is handled
             }
 
             //=( 13 )= INTENT: SIMPLE KEYWORD LISTS
@@ -2656,7 +2840,11 @@ function extractPhenotypeIntent(qLower) {
             addChatMessage('Welcome back! How can I help?', false);
         }
     }
-
+    window.showUMAP = function () {
+        // --- MODIFIED: Updated chat message and query ---
+        addChatMessage('Show Lung UMAP', true);
+        handleAIQuery('Plot Lung scRNA UMAP');
+    }
     window.downloadPlot = function (divId, filename) {
         const plotDiv = document.getElementById(divId);
         if (plotDiv && window.Plotly) {
@@ -2672,3 +2860,5 @@ function extractPhenotypeIntent(qLower) {
     }
 
 })();
+
+
