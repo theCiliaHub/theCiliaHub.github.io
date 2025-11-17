@@ -1650,13 +1650,13 @@ function formatListResult(title, genes, description = "") {
         `;
     }
 
-    
     // --- 4F. Data Getter Helpers ---
 
-    /**
+   /**
      * NEW INTEGRATED FUNCTION
      * Replaces getComprehensiveDetails with the detailed HTML formatter
      * provided by the user.
+     * (FIXED Nov 17 2025): Added optional chaining for g.OMIM.ID
      */
     async function displayFullGeneInfo(geneSymbol) {
         const gm = window.CiliAI.lookups && window.CiliAI.lookups.geneMap;
@@ -1670,7 +1670,11 @@ function formatListResult(title, genes, description = "") {
         
         html += `<p><strong>Description:</strong> ${g['Gene.Description'] || '—'}</p>`;
         html += `<p><strong>Synonyms:</strong> ${g['Synonym.'] || '—'}</p>`;
-        html += `<p><strong>OMIM ID:</strong> ${g.OMIM.ID || '—'}</p>`;
+        
+        // --- THIS IS THE FIXED LINE ---
+        html += `<p><strong>OMIM ID:</strong> ${g.OMIM?.ID || '—'}</p>`;
+        // --- END OF FIX ---
+        
         html += `<p><strong>Localization:</strong> ${g.Localization || '—'}</p>`;
         html += `<p><strong>Functional category:</strong> ${g['Functional.category'] || '—'}</p>`;
         
@@ -1744,37 +1748,6 @@ function formatListResult(title, genes, description = "") {
         
         html += `</div>`; // Close ai-result-card
         return html;
-    }
-
-    function getCiliopathyGenes(term) {
-        let key = normalizeTerm(term);
-        if (key === normalizeTerm('BBS')) key = normalizeTerm('Bardet–Biedl Syndrome');
-        if (key === normalizeTerm('MKS')) key = normalizeTerm('Meckel–Gruber Syndrome');
-        if (key === normalizeTerm('Joubert')) key = normalizeTerm('Joubert Syndrome');
-        if (key === normalizeTerm('NPHP')) key = normalizeTerm('Nephronophthisis');
-        if (key === normalizeTerm('Bardet Biedel Syndrome')) {
-            key = normalizeTerm('Bardet–Biedl Syndrome');
-        }
-
-        const geneSymbols = window.CiliAI.lookups.byCiliopathy[key] || [];
-        const geneMap = window.CiliAI.lookups.geneMap;
-        
-        const classification = window.CiliAI.lookups.byCiliopathyClassification[key];
-        let desc = "";
-        if (classification) {
-            desc = `This disease is classified as a: <strong>${classification}</strong>.`;
-        }
-
-        return {
-            genes: geneSymbols.map(g => {
-                const geneData = geneMap[g];
-                return {
-                    gene: g,
-                    description: geneData?.['Gene.Description'] || 'No description available.'
-                };
-            }),
-            description: desc
-        };
     }
 
     function getGenesByLocalization(term) {
