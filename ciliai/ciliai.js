@@ -404,7 +404,7 @@
                 <div class="toolbar">
                     <input type="text" id="geneSearch" placeholder="Search gene (e.g., IFT88, NPHP1, CEP290)">
                     <button onclick="searchGene()">Find Gene</button>
-                    <button onclick="showUMAP()">Show Lung UMAP</button>
+                    <button onclick="showFOXJ1UMAP()">Display FOXJ1 expression in Lung scRNA-seq</button>
                     <span id="dataStatus" class="status loading">Initializing...</span>
                 </div>
                 <div class="diagram-container">
@@ -453,6 +453,7 @@
             </div>
         </div>`;
     }
+    
 
     function generateAndInjectSVG() {
         const svgContainer = document.getElementById('cilia-svg');
@@ -2840,10 +2841,10 @@ function extractPhenotypeIntent(qLower) {
             addChatMessage('Welcome back! How can I help?', false);
         }
     }
-    window.showUMAP = function () {
-        // --- MODIFIED: Updated chat message and query ---
-        addChatMessage('Show Lung UMAP', true);
-        handleAIQuery('Plot Lung scRNA UMAP');
+   // REPLACE the old window.showUMAP function with this:
+    window.showFOXJ1UMAP = function () {
+        addChatMessage('Display FOXJ1 expression in Lung scRNA-seq', true);
+        handleAIQuery('Plot UMAP for FOXJ1');
     }
     window.downloadPlot = function (divId, filename) {
         const plotDiv = document.getElementById(divId);
