@@ -501,7 +501,7 @@
         });
     }
 
-    function setupPageEventListeners() {
+   function setupPageEventListeners() {
         document.body.addEventListener('click', e => {
             const feedbackBtn = e.target.closest('.ciliai-reaction-btn');
             if (feedbackBtn) {
@@ -516,12 +516,11 @@
                 return;
             }
 
-            // --- THIS BLOCK IS NOW CORRECTED ---
+            // --- THIS IS THE CORRECTED BLOCK ---
             const aiAction = e.target.closest('.ai-action');
             if (aiAction) {
                 const action = aiAction.dataset.action;
 
-                // (NEW CHECK) Only prevent default if it's an internal app link
                 if (action) {
                     e.preventDefault(); // Stop the link from navigating
                     const genes = aiAction.dataset.genes || "";
@@ -530,6 +529,14 @@
                     else if (action === 'show-nevers-heatmap') query = `show nevers phylogeny for ${genes}`;
                     else if (action === 'show-table-view') query = `show data table for ${genes}`;
                     
+                    // --- THIS IS THE MISSING FIX ---
+                    else if (action === 'show-umap-plot') {
+                        log(`Action: show-umap-plot for ${genes}`);
+                        handleUmapPlot(genes); // This will now show the plot
+                        return; // Stop processing
+                    }
+                    // --- END OF FIX ---
+
                     if (query) {
                         addChatMessage(query, true);
                         handleAIQuery(query);
@@ -553,6 +560,7 @@
         });
         console.log("CiliAI: Page event listeners set up.");
     }
+    
     // ==========================================================
     // 4. CILIBRAIN v5.1 - QUERY & PLOTTING ENGINE
     // ==========================================================
