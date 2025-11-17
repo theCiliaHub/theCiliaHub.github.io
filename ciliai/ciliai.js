@@ -2793,7 +2793,7 @@ function extractPhenotypeIntent(qLower) {
     }
 
     
-    // ==========================================================
+ // ==========================================================
     // 5. GLOBAL UI WRAPPERS & STARTUP
     // ==========================================================
 
@@ -2827,9 +2827,17 @@ function extractPhenotypeIntent(qLower) {
         handleGeneSearch(query, true);
     }
 
-    window.showUMAP = function () {
-        addChatMessage('Show UMAP', true);
-        handleAIQuery('Plot UMAP');
+    // --- MODIFIED: This is the new button handler for the UMAP/scRNA plot ---
+    window.showDefaultUMAP = function () {
+        addChatMessage('Display gene expression in Lung scRNA-seq (Default: FOXJ1)', true);
+        handleAIQuery('Plot UMAP for FOXJ1');
+    }
+
+    // --- NEW: Function for default phylogeny plot ---
+    window.showDefaultPhylogeny = function () {
+        const defaultGenes = ["ZC2HC1A", "CEP41", "BBS1", "BBS2", "BBS5", "ZNF474", "IFT81", "BBS7"];
+        addChatMessage(`Show Phylogenetics Analysis (Default Genes)`, true);
+        handleAIQuery(`show nevers plot for ${defaultGenes.join(',')}`);
     }
 
     window.sendMsg = function () {
@@ -2852,23 +2860,7 @@ function extractPhenotypeIntent(qLower) {
             addChatMessage('Welcome back! How can I help?', false);
         }
     }
-   // --- MODIFIED: Renamed function and query ---
-    window.showDefaultUMAP = function () {
-        addChatMessage('Display gene expression in Lung scRNA-seq (Default: FOXJ1)', true);
-        handleAIQuery('Plot UMAP for FOXJ1');
-    }
 
-    // --- NEW: Function for default phylogeny plot ---
-    window.showDefaultPhylogeny = function () {
-        const defaultGenes = ["ZC2HC1A", "CEP41", "BBS1", "BBS2", "BBS5", "ZNF474", "IFT81", "BBS7"];
-        addChatMessage(`Show Phylogenetics Analysis (Default Genes)`, true);
-        handleAIQuery(`show nevers plot for ${defaultGenes.join(',')}`);
-    }
-
-    window.sendMsg = function () {
-        handleUserSend();
-    }
-    }
     window.downloadPlot = function (divId, filename) {
         const plotDiv = document.getElementById(divId);
         if (plotDiv && window.Plotly) {
@@ -2884,5 +2876,4 @@ function extractPhenotypeIntent(qLower) {
     }
 
 })();
-
 
