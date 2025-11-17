@@ -1130,7 +1130,7 @@ function formatListResult(title, genes, description = "") {
     
     // --- 4E. Plotting Handlers (UMAP & Phylogeny) ---
     
-    async function handleUmapPlot(highlightGene = null) {
+   async function handleUmapPlot(highlightGene = null) {
         const plotDivId = 'cilia-svg';
         const umapData = window.CiliAI_UMAP;
         const umapLookup = window.CiliAI.lookups.umapByGene; 
@@ -2644,14 +2644,18 @@ function extractPhenotypeIntent(qLower) {
                 const genes = extractMultipleGenes(query);
                 if (genes.length > 0) {
                     // MODIFIED: Call both text summary and UMAP plot
-                    htmlResult = handleScRnaQuery(genes);
-                    handleUmapPlot(genes[0]); // Plot the first gene found
+                    htmlResult = handleScRnaQuery(genes); // This is the text summary
+                    handleUmapPlot(genes[0]); // This plots the UMAP
+                    
+                    // NEW: Add a follow-up link to the text summary
+                    htmlResult = htmlResult.replace(`</div>`, 
+                        `<p style="margin-top: 10px;"><a href="#" class="ai-action" data-action="show-umap-plot" data-genes="${genes[0]}">View ${genes[0]} on UMAP</a></p></div>`);
                 } else {
                     htmlResult = `Please specify which gene(s) you want to check expression for.`;
                 }
             }
                 
-            //=( 12 )= INTENT: UMAP (VISUAL)
+           //=( 12 )= INTENT: UMAP (VISUAL)
             // --- MODIFIED: Regex updated for more flexibility ---
             else if (htmlResult === null && (match = qLower.match(/(?:show|plot|display)\s+(?:me\s+the\s+)?(?:umap|lung scrna)(?: expression)?(?: for\s+([a-z0-9\-]+)|(?: of| in)\s+([a-z0-9\-]+))?/i))) {
                 log('Routing via: Intent (UMAP Plot)');
@@ -2665,7 +2669,8 @@ function extractPhenotypeIntent(qLower) {
                 }
 
                 handleUmapPlot(gene);
-                htmlResult = ""; // No chat message needed, plot is handled
+                // MODIFIED: Return a confirmation message instead of an empty string
+                htmlResult = `<div class="ai-result-card"><p>Displaying Lung scRNA-seq UMAP for <strong>${gene || 'all genes'}</strong> on the left.</p></div>`;
             }
             
             //=( 13 )= INTENT: SIMPLE KEYWORD LISTS
@@ -2837,7 +2842,8 @@ function extractPhenotypeIntent(qLower) {
     window.showDefaultPhylogeny = function () {
         const defaultGenes = ["ZC2HC1A", "CEP41", "BBS1", "BBS2", "BBS5", "ZNF474", "IFT81", "BBS7"];
         addChatMessage(`Show Phylogenetics Analysis (Default Genes)`, true);
-        handleAIQuery(`show nevers plot for ${defaultGenes.join(',')}`);
+        // MODIFIED: Added "phylogenetics" to the query string to ensure correct routing
+        handleAIQuery(`show phylogenetics plot for ${defaultGenes.join(',')}`);
     }
 
     window.sendMsg = function () {
