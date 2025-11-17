@@ -33,31 +33,112 @@
 
     // --- Data Maps (These are now just for the AI brain) ---
 
+
+// --- GLOBAL CONSTANTS FOR ORGANISM PANELS ---
+    const NEVERS_CIL_PANEL = [
+        "Homo sapiens", // Index 78
+        "Mus musculus", // Index 81
+        "Danio rerio", // Index 72
+        "Xenopus tropicalis", // Index 73
+        "Gallus gallus", // Index 76
+        "Caenorhabditis elegans", // Index 86
+        "Tetrahymena thermophila (strain SB210)", // Index 30
+        "Chlamydomonas reinhardtii", // Index 10
+        "Micromonas sp. (strain RCC299 / NOUM17)", // Index 12
+        "Trypanosoma cruzi", // Index 5
+        "Leishmania major", // Index 7
+        "Giardia intestinalis (strain ATCC 50803 / WB clone C6)", // Index 1
+        "Trichomonas vaginalis", // Index 0
+        "Strongylocentrotus purpuratus", // Index 66
+        "Ciona intestinalis", // Index 69
+        "Physcomitrella patens subsp. patens", // Index 15
+        "Paramecium tetraurelia", // Index 28
+        "Volvox carteri", // Index 9
+        "Amphimedon queenslandica", // Index 63
+        "Monosiga brevicollis" // Index 60
+    ];
+
+    const NEVERS_NCIL_PANEL = [
+        "Saccharomyces cerevisiae (strain ATCC 204508 / S288c)",
+        "Schizosacoscharomyces pombe (strain 972 / ATCC 24843)",
+        "Cryptococcus neoformans var. neoformans serotype D (strain JEC21 / ATCC MYA-565)",
+        "Ustilago maydis (strain 521 / FGSC 9021)",
+        "Candida albicans (strain WO-1)",
+        "Arabidopsis thaliana",
+        "Brachypodium distachyon",
+        "Sorghum bicolor",
+        "Vitis vinifera",
+        "Cryptosporidium parvum (strain Iowa II)",
+        "Entamoeba histolytica",
+        "Encephalitozoon cuniculi (strain GB-M1)"
+    ];
+
+    // Li et al. 2014 organism panels (for compatibility)
+    const CIL_ORG_FULL = [
+        "H.sapiens", "M.musculus", "D.rerio", "X.tropicalis", "G.gallus",
+        "C.elegans", "T.thermophila", "C.reinhardtii", "M.sp.RCC299",
+        "T.cruzi", "L.major", "G.intestinalis", "T.vaginalis",
+        "S.purpuratus", "C.intestinalis", "P.patens", "P.tetraurelia",
+        "V.carteri", "A.queenslandica", "M.brevicollis"
+    ];
+
+    const NCIL_ORG_FULL = [
+        "S.cerevisiae", "S.pombe", "C.neoformans", "U.maydis",
+        "C.albicans", "A.thaliana", "B.distachyon", "S.bicolor",
+        "V.vinifera", "C.parvum", "E.histolytica", "E.cuniculi"
+    ];
+    
     function getComplexPhylogenyTableMap() {
-        // This is a static helper, it doesn't need to be in the database
         return {
-            "IFT COMPLEX": ["WDR19","IFT140","TTC21B","IFT122","WDR35","IFT43","IFT172","IFT80","IFT57","TRAF3IP1","CLUAP1","IFT20","IFT88","IFT81","IFT74","IFT70A","IFT70B","IFT56","IFT52","IFT46","IFT27","IFT25","IFT22"],
-            "IFT-A COMPLEX": ["WDR19","IFT140","TTC21B","IFT122","WDR35","IFT43"],
-            "IFT-B COMPLEX": ["IFT172","IFT80","IFT57","TRAF3IP1","CLUAP1","IFT20","IFT88","IFT81","IFT74","IFT70A","IFT70B","IFT56","IFT52","IFT46","IFT27","IFT25","IFT22"],
-            "BBSOME": ["BBS1","BBS2","BBS4","BBS5","BBS7","TTC8","BBS9","BBIP1"],
-            "TRANSITION ZONE": ["NPHP1","MKS1","CEP290","AHI1","RPGRIP1L","TMEM67","CC2D2A","B9D1","B9D2"],
-            "MKS MODULE": ["MKS1","TMEM17","TMEM67","TMEM138","B9D2","B9D1","CC2D2A","TMEM107","TMEM237","TMEM231","TMEM216","TCTN1","TCTN2","TCTN3"],
-            "NPHP MODULE": ["NPHP1","NPHP3","NPHP4","RPGRIP1L","IQCB1","CEP290","SDCCAG8"],
-            "BASAL BODY": ["CEP164","CEP83","SCLT1","CEP89","LRRC45","ODF2","CEP128","CEP135","CETN2","CETN3","POC1B","FBF1","CCDC41","CCDC120","OFD1"],
-            "CILIARY TIP": ["HYDIN","IQCA1","CATSPER2","KIF19A","KIF7","CCDC78","CCDC33","SPEF1","CEP104","CSPP1"],
-            "RADIAL SPOKE": ["RSPH1","RSPH3","RSPH4A","RSPH6A","RSPH9","RSPH10B","RSPH23","RSPH16"],
-            "CENTRAL PAIR": ["HYDIN","SPAG6","SPAG16","SPAG17","POC1A","CEP131"],
-            "DYNEIN ARM": ["DNAH1","DNAH2","DNAH5","DNAH6","DNAH7","DNAH8","DNAH9","DNAH10","DNAH11","DNALI1","DNAI1","DNAI2"],
-            "OUTER DYNEIN ARM": ["DNAH5","DNAH11","DNAH17","DNAI1","DNAI2"],
-            "INNER DYNEIN ARM": ["DNAH2","DNAH7","DNAH10","DNALI1"],
-            "SHH SIGNALING": ["SMO","PTCH1","GLI1","GLI2","GLI3","SUFU","KIF7","TULP3"],
-            "CENTROSOME": ["CEP152","CEP192","PLK4","STIL","SAS6","CEP135","CETN2","PCNT"],
-            "CILIARY ROOTLET": ["ROOTLET1", "CROCC"],
-            "CPLANE COMPLEX": ["INTU", "FUZ", "WDPCP"],
-            "SEPTIN RING": ["SEPTIN2", "SEPTIN7", "SEPTIN9", "SEPTIN11"],
-            "DYNEIN ASSEMBLY FACTORS": ["DNAAF1", "DNAAF2", "DNAAF3", "DNAAF4", "DNAAF5", "DNAAF6", "DNAAF7", "DNAAF8", "DNAAF9", "DNAAF10", "DNAAF11", "LRRC6", "ZMYND10", "PIH1D3", "HEATR2"],
-            "CILIOGENESIS REGULATORS": ["FOXJ1", "RFX1", "RFX2", "RFX3", "RFX4", "RFX5"],
-            "PCP CORE": ["VANGL1", "VANGL2", "DVL1", "DVL2", "DVL3", "PRICKLE1", "CELSR1", "FZD3", "FZD6"]
+            // --- Core IFT machinery ---
+            "IFT COMPLEX": ["WDR19", "IFT140", "TTC21B", "IFT122", "WDR35", "IFT43", "IFT172", "IFT80", "IFT57", "TRAF3IP1", "CLUAP1", "IFT20", "IFT88", "IFT81", "IFT74", "IFT70A", "IFT70B", "IFT56", "IFT52", "IFT46", "IFT27", "IFT25", "IFT22"],
+            "IFT-A COMPLEX": ["WDR19", "IFT140", "TTC21B", "IFT122", "WDR35", "IFT43"],
+            "IFT-B COMPLEX": ["IFT172", "IFT80", "IFT57", "TRAF3IP1", "CLUAP1", "IFT20", "IFT88", "IFT81", "IFT74", "IFT70A", "IFT70B", "IFT56", "IFT52", "IFT46", "IFT27", "IFT25", "IFT22"],
+            "IFT-B1 COMPLEX": ["IFT172", "IFT80", "IFT57", "TRAF3IP1", "CLUAP1", "IFT20"],
+            "IFT-B2 COMPLEX": ["IFT88", "IFT81", "IFT74", "IFT70A", "IFT70B", "IFT56", "IFT52", "IFT46", "IFT27", "IFT25", "IFT22"],
+            
+            //    NEW/UPDATED MOTOR COMPLEX (Combines IFT MOTORS and INTRAFLAGELLAR TRANSPORT MOTORS)
+            "IFT MOTOR COMPLEX": ["KIF3A", "KIF3B", "KIF17", "DYNC2H1", "DYNC2LI1", "WDR34", "WDR60"],
+            "INTRAFLAGELLAR TRANSPORT MOTORS": ["KIF3A", "KIF3B", "KIF17", "DYNC2H1", "DYNC2LI1", "WDR34", "WDR60"],
+            
+            // --- BBSome and trafficking ---
+            "BBSOME": ["BBS1", "BBS2", "BBS4", "BBS5", "BBS7", "TTC8", "BBS9", "BBIP1"],
+            "EXOCYST": ["EXOC1", "EXOC2", "EXOC3", "EXOC4", "EXOC5", "EXOC6", "EXOC7", "EXOC8"],
+
+            // --- Transition zone modules ---
+            "TRANSITION ZONE": ["NPHP1", "MKS1", "CEP290", "AHI1", "RPGRIP1L", "TMEM67", "CC2D2A", "B9D1", "B9D2"],
+            "MKS MODULE": ["MKS1", "TMEM17", "TMEM67", "TMEM138", "B9D2", "B9D1", "CC2D2A", "TMEM107", "TMEM237", "TMEM231", "TMEM216", "TCTN1", "TCTN2", "TCTN3"],
+            "NPHP MODULE": ["NPHP1", "NPHP3", "NPHP4", "RPGRIP1L", "IQCB1", "CEP290", "SDCCAG8"],
+
+            // --- Basal body & appendage components (Consolidated) ---
+            "BASAL BODY": ["CEP164", "CEP83", "SCLT1", "CEP89", "LRRC45", "ODF2", "CEP128", "CEP135", "CETN2", "CETN3", "POC1B", "FBF1", "CCDC41", "CCDC120", "OFD1"],
+            "CENTRIOLE DISTAL APPENDAGES": ["CEP164", "SCLT1", "CEP89", "LRRC45", "CEP123", "ANKRD26", "FOPNL", "CEP128", "CEP135", "FBF1", "CCDC41", "CCDC120"],
+            "CENTRIOLAR SATELLITES": ["PCM1", "CEP131", "CEP290", "OFD1", "AZI1", "CEP72", "SSX2IP"],
+            
+            // --- Transition fiber & ciliary gate ---
+            "TRANSITION FIBER": ["CEP164", "CEP83", "SCLT1", "CEP89", "LRRC45", "CEP123", "CEP350", "CEP44"],
+
+            // --- Axonemal and motility machinery ---
+            "CILIARY TIP": ["HYDIN", "IQCA1", "CATSPER2", "KIF19A", "KIF7", "CCDC78", "CCDC33", "SPEF1", "CEP104", "CSPP1", "TOGARAM1", "ARMC9", "MAPRE1", "MAPRE3", "CCDC66"],
+            "RADIAL SPOKE": ["RSPH1", "RSPH3", "RSPH4A", "RSPH6A", "RSPH9", "RSPH10B", "RSPH23", "RSPH16", "DRC1", "DRC3", "DRC4", "DRC5"],
+            "CENTRAL PAIR": ["HYDIN", "SPAG6", "SPAG16", "SPAG17", "POC1A", "CEP131", "CFAP43", "CFAP44", "CFAP45", "CFAP47"],
+            "DYNEIN ARM": ["DNAH1", "DNAH2", "DNAH5", "DNAH6", "DNAH7", "DNAH8", "DNAH9", "DNAH10", "DNAH11", "DNALI1", "DNAI1", "DNAI2", "DNAAF1", "DNAAF2", "DNAAF3", "DNAAF4", "LRRC6", "CCDC103"],
+            "OUTER DYNEIN ARM": ["DNAH5", "DNAH11", "DNAH17", "DNAH18", "DNAI1", "DNAI2", "DNAAF1", "DNAAF2", "DNAAF3", "DNAAF4", "LRRC6", "CCDC103", "WDR63"],
+            "INNER DYNEIN ARM": ["DNAH2", "DNAH7", "DNAH10", "DNALI1", "DNAL4", "DNAAF5", "CCDC40", "CCDC114", "CCDC151"],
+            "NEXIN-DYNEIN REGULATORY COMPLEX": ["GAS8", "GAS2L2", "CCDC39", "CCDC40", "CCDC164", "CCDC65"],
+            
+            // --- Ciliary rootlet & anchoring ---
+            "ROOTLETIN COMPLEX": ["CROCC", "CROCC2", "CEP68", "CEP44", "ODF2"],
+            "CENTRIOLE LINKER": ["CEP68", "CEP250", "C-NAP1", "ROCK1", "NEK2"],
+
+            // --- Ciliary signaling hubs ---
+            "SHH SIGNALING": ["SMO", "PTCH1", "GLI1", "GLI2", "GLI3", "SUFU", "KIF7", "TULP3", "IFT172", "IFT81", "ARL13B"],
+            "GPCR COMPLEX": ["GPR161", "GPR175", "GPR22", "GPR83", "ADCY3", "RXFP2", "SSTR3", "NPY2R", "HTR6"],
+            "HEDGEHOG TRAFFICKING COMPLEX": ["ARL13B", "INPP5E", "TULP3", "IFT172", "KIF7", "BBS4", "BBS5", "SMO"],
+
+            // --- Centrosome & PCM components ---
+            "CENTROSOME": ["CEP152", "CEP192", "PLK4", "STIL", "SAS6", "CEP135", "CETN2", "PCNT", "CDK5RAP2", "CEP215"],
+            "PEROXISOMAL COMPLEX": ["PEX1", "PEX2", "PEX3", "PEX5", "PEX6", "PEX10", "PEX12", "PEX13", "PEX14", "PEX19"]
         };
     }
 
