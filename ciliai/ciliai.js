@@ -198,8 +198,9 @@
         }
     }
 
-    /**
+   /**
      * Fetches the pre-compiled database files from GitHub.
+     * (FIXED Nov 17 2025): Added umapByGene lookup generation
      */
     async function loadCiliAIData(timeoutMs = 60000) {
         const baseUrl = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/';
@@ -226,9 +227,21 @@
             window.CiliAI.lookups = lookupData.lookups;
             
             // Assign the raw UMAP data
-            window.CiliAI_UMAP = mainData.umapData;
+            window.CiliAI_UMAP = mainData.umapData; 
             window.CiliAI.data.umap = mainData.umapData; 
             
+            // --- THIS IS THE FIX ---
+            // Create the UMAP lookup map, as it's not in the lookups file
+            window.CiliAI.lookups.umapByGene = {}; // <-- NEW
+            if (window.CiliAI_UMAP && Array.isArray(window.CiliAI_UMAP)) { // <-- NEW
+                for (const point of window.CiliAI_UMAP) { // <-- NEW
+                    if (point.gene) { // <-- NEW
+                        window.CiliAI.lookups.umapByGene[point.gene.toUpperCase()] = point; // <-- NEW
+                    } // <-- NEW
+                } // <-- NEW
+            }
+            // --- END OF FIX ---
+
             // Create a GeneMap from the masterData list for fast lookups by gene name
             window.CiliAI.lookups.geneMap = {};
             for (const gene of mainData.masterData) {
