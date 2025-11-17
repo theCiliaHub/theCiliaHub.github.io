@@ -488,7 +488,7 @@
         });
     }
 
-    function setupPageEventListeners() {
+   function setupPageEventListeners() {
         document.body.addEventListener('click', e => {
             const feedbackBtn = e.target.closest('.ciliai-reaction-btn');
             if (feedbackBtn) {
@@ -517,6 +517,14 @@
                     else if (action === 'show-nevers-heatmap') query = `show nevers phylogeny for ${genes}`;
                     else if (action === 'show-table-view') query = `show data table for ${genes}`;
                     
+                    // --- NEW: Added handler for the UMAP link ---
+                    else if (action === 'show-umap-plot') {
+                        log(`Action: show-umap-plot for ${genes}`);
+                        handleUmapPlot(genes);
+                        return; // No chat query needed, just show the plot
+                    }
+                    // --- END OF NEW HANDLER ---
+
                     if (query) {
                         addChatMessage(query, true);
                         handleAIQuery(query);
@@ -540,16 +548,8 @@
         });
         console.log("CiliAI: Page event listeners set up.");
     }
-    // ==========================================================
-    // 4. CILIBRAIN v5.1 - QUERY & PLOTTING ENGINE
-    // ==========================================================
 
-    // --- 4A. Core Helper Functions ---
-
-    function log(message) {
-        console.log(`[CiliAI] ${message}`);
-    }
-
+    
 /**
  * (REPLACEMENT) Robust Gene Extractor
  * This version uses a manual map for common genes and an expanded stopword list
@@ -2676,15 +2676,14 @@ function extractPhenotypeIntent(qLower) {
                     htmlResult = `No functional modules listed for <strong>${gene}</strong>.`;
                 }
             }
-
             //=( 11 )= INTENT: scRNA Expression
             else if (htmlResult === null && (qLower.includes('scrna') || qLower.includes('expression in') || qLower.includes('compare expression'))) {
                 log('Routing via: Intent (scRNA)');
                 const genes = extractMultipleGenes(query);
                 if (genes.length > 0) {
-                    // MODIFIED: Call both text summary and UMAP plot
+                    // MODIFIED: Call ONLY the text summary
                     htmlResult = handleScRnaQuery(genes); // This is the text summary
-                    handleUmapPlot(genes[0]); // This plots the UMAP
+                    // handleUmapPlot(genes[0]); // <-- REMOVED THIS LINE
                     
                     // NEW: Add a follow-up link to the text summary
                     htmlResult = htmlResult.replace(`</div>`, 
