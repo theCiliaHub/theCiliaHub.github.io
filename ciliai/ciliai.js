@@ -404,7 +404,8 @@
                 <div class="toolbar">
                     <input type="text" id="geneSearch" placeholder="Search gene (e.g., IFT88, NPHP1, CEP290)">
                     <button onclick="searchGene()">Find Gene</button>
-                    <button onclick="showFOXJ1UMAP()">Display FOXJ1 expression in Lung scRNA-seq</button>
+                    <button onclick="showDefaultUMAP()">Display gene expression in Lung scRNA-seq</button>
+                    <button onclick="showDefaultPhylogeny()">Phylogenetics Analysis</button>
                     <span id="dataStatus" class="status loading">Initializing...</span>
                 </div>
                 <div class="diagram-container">
@@ -453,6 +454,7 @@
             </div>
         </div>`;
     }
+
     
 
     function generateAndInjectSVG() {
@@ -2641,22 +2643,31 @@ function extractPhenotypeIntent(qLower) {
                 log('Routing via: Intent (scRNA)');
                 const genes = extractMultipleGenes(query);
                 if (genes.length > 0) {
+                    // MODIFIED: Call both text summary and UMAP plot
                     htmlResult = handleScRnaQuery(genes);
+                    handleUmapPlot(genes[0]); // Plot the first gene found
                 } else {
                     htmlResult = `Please specify which gene(s) you want to check expression for.`;
                 }
             }
-
+                
             //=( 12 )= INTENT: UMAP (VISUAL)
             // --- MODIFIED: Regex updated for more flexibility ---
             else if (htmlResult === null && (match = qLower.match(/(?:show|plot|display)\s+(?:me\s+the\s+)?(?:umap|lung scrna)(?: expression)?(?: for\s+([a-z0-9\-]+)|(?: of| in)\s+([a-z0-9\-]+))?/i))) {
                 log('Routing via: Intent (UMAP Plot)');
-                // --- MODIFIED: Get gene from either capture group ---
-                const gene = (match[1] || match[2]) ? (match[1] || match[2]).toUpperCase() : null;
+                // --- MODIFIED: Get gene from either capture group, default to FOXJ1 if null ---
+                let gene = (match[1] || match[2]) ? (match[1] || match[2]).toUpperCase() : null;
+                
+                // If no gene is specified by the user, default to FOXJ1
+                if (!gene && (qLower.includes('umap') || qLower.includes('lung scrna'))) {
+                    gene = 'FOXJ1';
+                    log('Defaulting UMAP plot to FOXJ1');
+                }
+
                 handleUmapPlot(gene);
                 htmlResult = ""; // No chat message needed, plot is handled
             }
-
+            
             //=( 13 )= INTENT: SIMPLE KEYWORD LISTS
             if (htmlResult === null) {
                 const intent = flexibleIntentParser(query);
@@ -2841,10 +2852,22 @@ function extractPhenotypeIntent(qLower) {
             addChatMessage('Welcome back! How can I help?', false);
         }
     }
-   // REPLACE the old window.showUMAP function with this:
-    window.showFOXJ1UMAP = function () {
-        addChatMessage('Display FOXJ1 expression in Lung scRNA-seq', true);
+   // --- MODIFIED: Renamed function and query ---
+    window.showDefaultUMAP = function () {
+        addChatMessage('Display gene expression in Lung scRNA-seq (Default: FOXJ1)', true);
         handleAIQuery('Plot UMAP for FOXJ1');
+    }
+
+    // --- NEW: Function for default phylogeny plot ---
+    window.showDefaultPhylogeny = function () {
+        const defaultGenes = ["ZC2HC1A", "CEP41", "BBS1", "BBS2", "BBS5", "ZNF474", "IFT81", "BBS7"];
+        addChatMessage(`Show Phylogenetics Analysis (Default Genes)`, true);
+        handleAIQuery(`show nevers plot for ${defaultGenes.join(',')}`);
+    }
+
+    window.sendMsg = function () {
+        handleUserSend();
+    }
     }
     window.downloadPlot = function (divId, filename) {
         const plotDiv = document.getElementById(divId);
