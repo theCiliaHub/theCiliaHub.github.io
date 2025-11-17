@@ -24,6 +24,7 @@
         lookups: {}
     };
 
+    let lastQueryContext = { type: null, data: [], term: null };
 
     // Phylogeny data is lazy-loaded, so it starts as null
     window.liPhylogenyCache = null;
