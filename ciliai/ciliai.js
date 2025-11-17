@@ -1150,9 +1150,8 @@ function formatListResult(title, genes, description = "") {
     }
     
     // --- 4E. Plotting Handlers (UMAP & Phylogeny) ---
-    
    async function handleUmapPlot(highlightGene = null) {
-        const plotDivId = 'cilia-svg';
+        const plotDivId = 'cilia-svg'; // <-- Variable is defined here
         const umapData = window.CiliAI_UMAP;
         const umapLookup = window.CiliAI.lookups.umapByGene; 
 
@@ -1163,7 +1162,12 @@ function formatListResult(title, genes, description = "") {
         }
         
         generateAndInjectSVG();
-        const plotDiv = document.getElementById(plotId);
+        
+        // --- THIS IS THE FIX ---
+        // The variable was 'plotId', but it should be 'plotDivId'
+        const plotDiv = document.getElementById(plotDivId); 
+        // --- END OF FIX ---
+
         if (!plotDiv) return;
 
         // Add class to wrapper
