@@ -859,11 +859,11 @@ function formatListResult(title, genes, description = "") {
         if (count === 0) {
             return `Sorry, I could not find any genes localized to "${term}".`;
         }
+        // (MODIFIED) Removed 'descriptionHeader'
         lastQueryContext = {
             type: 'list_followup',
             data: geneList, 
-            term: `Genes localized to ${term}`,
-            descriptionHeader: 'Localization'
+            term: `Genes localized to ${term}`
         };
         return `According to the latest data, ${count} genes are enriched in the ${term}. Do you want to view the list?`;
     }
@@ -956,16 +956,17 @@ function formatListResult(title, genes, description = "") {
             }
             
             const geneMap = window.CiliAI.lookups.geneMap;
+            // (MODIFIED) Use 'classification' as the key
             const geneListObjects = geneList.map(gene => ({
                 gene: gene,
-                description: geneMap[gene]?.ciliopathy_classification || 'No classification listed'
+                classification: geneMap[gene]?.ciliopathy_classification || 'No classification listed'
             })).sort((a, b) => a.gene.localeCompare(b.gene)); 
 
+            // (MODIFIED) Removed 'descriptionHeader'
             lastQueryContext = {
                 type: 'list_followup',
                 data: geneListObjects,
-                term: `Genes for ${casedClassificationName}`,
-                descriptionHeader: 'Classification(s)'
+                term: `Genes for ${casedClassificationName}`
             };
             return `I found ${count} unique genes associated with ${casedClassificationName}. Do you want to view the list?`;
         
@@ -1752,11 +1753,40 @@ function formatListResult(title, genes, description = "") {
 
         return Array.from(matchingGenes).map(gene => {
             const geneData = geneMap[gene];
+            // (MODIFIED) Return a 'localization' field instead of 'description'
             return {
                 gene: gene,
-                description: geneData?.Localization || `Found in ${term}`
+                localization: geneData?.Localization || `Found in ${term}`
             };
         });
+    }
+JavaScript
+
+    function getGenesByDomain(domainTerm, query) {
+        const normTerm = normalizeTerm(domainTerm);
+        const results = [];
+        window.CiliAI.masterData.forEach(g => {
+            if (!g.Gene) return;
+            const allDomains = [...ensureArray(g.pfam_ids), ...ensureArray(g.domain_descriptions)];
+            
+            const matchingDomain = allDomains.find(d => d && normalizeTerm(d).includes(normTerm));
+            if (matchingDomain) {
+                // (MODIFIED) Use 'domain' as the key
+                results.push({ gene: g.Gene, domain: matchingDomain });
+            }
+        });
+        
+        if (results.length === 0) {
+            return `Sorry, I could not find any genes with a "${domainTerm}" domain.`;
+        }
+
+        // (MODIFIED) Removed 'descriptionHeader'
+        lastQueryContext = {
+            type: 'list_followup',
+            data: results,
+            term: `Genes containing "${domainTerm}"`
+        };
+        return `I found ${results.length} genes containing a "${domainTerm}" domain. Do you want to view the list?`;
     }
 
     function getGenesByComplex(term) {
@@ -1884,7 +1914,6 @@ function formatListResult(title, genes, description = "") {
     }
 
 
-    
     function getGenesByDomain(domainTerm, query) {
         const normTerm = normalizeTerm(domainTerm);
         const results = [];
@@ -1894,7 +1923,8 @@ function formatListResult(title, genes, description = "") {
             
             const matchingDomain = allDomains.find(d => d && normalizeTerm(d).includes(normTerm));
             if (matchingDomain) {
-                results.push({ gene: g.Gene, description: `Contains ${matchingDomain}` });
+                // (MODIFIED) Use 'domain' as the key
+                results.push({ gene: g.Gene, domain: matchingDomain });
             }
         });
         
@@ -1902,11 +1932,11 @@ function formatListResult(title, genes, description = "") {
             return `Sorry, I could not find any genes with a "${domainTerm}" domain.`;
         }
 
+        // (MODIFIED) Removed 'descriptionHeader'
         lastQueryContext = {
             type: 'list_followup',
             data: results,
-            term: `Genes containing "${domainTerm}"`,
-            descriptionHeader: 'Domain'
+            term: `Genes containing "${domainTerm}"`
         };
         return `I found ${results.length} genes containing a "${domainTerm}" domain. Do you want to view the list?`;
     }
@@ -2156,25 +2186,51 @@ function extractPhenotypeIntent(qLower) {
             return `I found no genes that match all of your criteria (${resultTitle}).`;
         }
         
-        // This is the key change. We are now creating the same
-        // { gene: "...", description: "..." } object array
-        // that formatListResult expects.
-        const geneListObjects = filteredGenes.map(g => ({
-            gene: g.Gene,
-            description: g['Gene.Description'] || 'No description available.'
-        }));
+        // (MODIFIED) Dynamically build the gene list objects based on the intents
+        const geneListObjects = filteredGenes.map(g => {
+            const geneObject = {
+                gene: g.Gene
+            };
 
-        // Save for "view list" follow-up
+            // Add localization if it was part of the query
+            if (intents.localization) {
+                geneObject.localization = g.Localization || '—';
+            }
+
+            // Add phenotype if it was part of the query
+            if (intents.phenotype) {
+                geneObject.phenotype = g['Loss-of-Function (LoF) effects on cilia length (increase/decrease/no effect)'] || '—';
+            }
+            
+            // Add other intents if they exist
+            if (intents.disease) {
+                const diseaseKey = normalizeDiseaseKey(intents.disease);
+                // Find the specific disease name from the gene's data, if available
+                const diseaseList = (g.Ciliopathies || []).map(d => d.name);
+                geneObject.disease = diseaseList.find(d => normalizeTerm(d) === diseaseKey) || intents.disease;
+            }
+
+            if (intents.expression) {
+                 geneObject.expression = `Data available for ${intents.expression}`;
+            }
+
+            // (MODIFIED) Add description *only if* no other data columns were added
+            if (Object.keys(geneObject).length === 1) { // Only 'gene' is present
+                geneObject.description = g['Gene.Description'] || 'No description available.';
+            }
+
+            return geneObject;
+        });
+
+        // (MODIFIED) Remove the static 'descriptionHeader'
         lastQueryContext = {
             type: 'list_followup', 
             data: geneListObjects, 
-            term: `Genes matching: ${resultTitle}`, // Use the combined title
-            descriptionHeader: 'Description'
+            term: `Genes matching: ${resultTitle}`
         };
         
         return `I found ${filteredGenes.length} gene(s) matching your criteria: <strong>${resultTitle}</strong>. Do you want to view the list?`;
-     }
-
+   }
     /**
      * (REPLACEMENT) The Main "Level 1" Query Router
      * This is the new, clean, and correctly-ordered router.
