@@ -488,7 +488,7 @@
         });
     }
 
-   function setupPageEventListeners() {
+    function setupPageEventListeners() {
         document.body.addEventListener('click', e => {
             const feedbackBtn = e.target.closest('.ciliai-reaction-btn');
             if (feedbackBtn) {
@@ -517,14 +517,6 @@
                     else if (action === 'show-nevers-heatmap') query = `show nevers phylogeny for ${genes}`;
                     else if (action === 'show-table-view') query = `show data table for ${genes}`;
                     
-                    // --- NEW: Added handler for the UMAP link ---
-                    else if (action === 'show-umap-plot') {
-                        log(`Action: show-umap-plot for ${genes}`);
-                        handleUmapPlot(genes);
-                        return; // No chat query needed, just show the plot
-                    }
-                    // --- END OF NEW HANDLER ---
-
                     if (query) {
                         addChatMessage(query, true);
                         handleAIQuery(query);
@@ -548,8 +540,16 @@
         });
         console.log("CiliAI: Page event listeners set up.");
     }
+    // ==========================================================
+    // 4. CILIBRAIN v5.1 - QUERY & PLOTTING ENGINE
+    // ==========================================================
 
-    
+    // --- 4A. Core Helper Functions ---
+
+    function log(message) {
+        console.log(`[CiliAI] ${message}`);
+    }
+
 /**
  * (REPLACEMENT) Robust Gene Extractor
  * This version uses a manual map for common genes and an expanded stopword list
@@ -2676,47 +2676,40 @@ function extractPhenotypeIntent(qLower) {
                     htmlResult = `No functional modules listed for <strong>${gene}</strong>.`;
                 }
             }
+
             //=( 11 )= INTENT: scRNA Expression
-            // --- MODIFIED: Broadened regex to catch "expression of" ---
-            else if (htmlResult === null && (qLower.includes('scrna') || qLower.includes('expression') || qLower.includes('compare expression'))) {
+            else if (htmlResult === null && (qLower.includes('scrna') || qLower.includes('expression in') || qLower.includes('compare expression'))) {
                 log('Routing via: Intent (scRNA)');
                 const genes = extractMultipleGenes(query);
                 if (genes.length > 0) {
+                    // MODIFIED: Call both text summary and UMAP plot
                     htmlResult = handleScRnaQuery(genes); // This is the text summary
+                    handleUmapPlot(genes[0]); // This plots the UMAP
                     
-                    // Add a follow-up link to the text summary
+                    // NEW: Add a follow-up link to the text summary
                     htmlResult = htmlResult.replace(`</div>`, 
                         `<p style="margin-top: 10px;"><a href="#" class="ai-action" data-action="show-umap-plot" data-genes="${genes[0]}">View ${genes[0]} on UMAP</a></p></div>`);
                 } else {
                     htmlResult = `Please specify which gene(s) you want to check expression for.`;
                 }
             }
-
-            //=( 12 )= INTENT: UMAP (VISUAL)
-            // --- MODIFIED: Added "plot default umap" ---
-            else if (htmlResult === null && qLower === 'plot default umap') {
-                log('Routing via: Intent (Default UMAP Plot)');
-                handleUmapPlot('FOXJ1');
-                htmlResult = `<div class="ai-result-card"><p>Displaying Lung scRNA-seq UMAP for <strong>FOXJ1</strong> on the left.</p></div>`;
-            }
+                
+           //=( 12 )= INTENT: UMAP (VISUAL)
+            // --- MODIFIED: Regex updated for more flexibility ---
             else if (htmlResult === null && (match = qLower.match(/(?:show|plot|display)\s+(?:me\s+the\s+)?(?:umap|lung scrna)(?: expression)?(?: for\s+([a-z0-9\-]+)|(?: of| in)\s+([a-z0-9\-]+))?/i))) {
                 log('Routing via: Intent (UMAP Plot)');
+                // --- MODIFIED: Get gene from either capture group, default to FOXJ1 if null ---
                 let gene = (match[1] || match[2]) ? (match[1] || match[2]).toUpperCase() : null;
                 
+                // If no gene is specified by the user, default to FOXJ1
                 if (!gene && (qLower.includes('umap') || qLower.includes('lung scrna'))) {
                     gene = 'FOXJ1';
                     log('Defaulting UMAP plot to FOXJ1');
                 }
 
                 handleUmapPlot(gene);
+                // MODIFIED: Return a confirmation message instead of an empty string
                 htmlResult = `<div class="ai-result-card"><p>Displaying Lung scRNA-seq UMAP for <strong>${gene || 'all genes'}</strong> on the left.</p></div>`;
-            }
-
-            // --- NEW: CATCH FOR DEFAULT PHYLOGENY PLOT ---
-            else if (htmlResult === null && qLower === 'plot default phylogeny') {
-                log('Routing via: Intent (Default Phylogeny Plot)');
-                const defaultGenes = ["ZC2HC1A", "CEP41", "BBS1", "BBS2", "BBS5", "ZNF474", "IFT81", "BBS7"];
-                htmlResult = await routePhylogenyAnalysis(`show nevers plot for ${defaultGenes.join(',')}`);
             }
             
             //=( 13 )= INTENT: SIMPLE KEYWORD LISTS
@@ -2878,18 +2871,18 @@ function extractPhenotypeIntent(qLower) {
         handleGeneSearch(query, true);
     }
 
-    // --- MODIFIED: Renamed function and query ---
+    // --- MODIFIED: This is the new button handler for the UMAP/scRNA plot ---
     window.showDefaultUMAP = function () {
         addChatMessage('Display gene expression in Lung scRNA-seq (Default: FOXJ1)', true);
-        // --- MODIFIED: Using simple, direct query ---
-        handleAIQuery('plot default umap');
+        handleAIQuery('Plot UMAP for FOXJ1');
     }
 
     // --- NEW: Function for default phylogeny plot ---
     window.showDefaultPhylogeny = function () {
+        const defaultGenes = ["ZC2HC1A", "CEP41", "BBS1", "BBS2", "BBS5", "ZNF474", "IFT81", "BBS7"];
         addChatMessage(`Show Phylogenetics Analysis (Default Genes)`, true);
-        // --- MODIFIED: Using simple, direct query ---
-        handleAIQuery('plot default phylogeny');
+        // MODIFIED: Added "phylogenetics" to the query string to ensure correct routing
+        handleAIQuery(`show phylogenetics plot for ${defaultGenes.join(',')}`);
     }
 
     window.sendMsg = function () {
@@ -2928,4 +2921,3 @@ function extractPhenotypeIntent(qLower) {
     }
 
 })();
-
