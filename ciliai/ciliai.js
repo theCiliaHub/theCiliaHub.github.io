@@ -24,7 +24,6 @@
         lookups: {}
     };
 
-    let lastQueryContext = { type: null, data: [], term: null, descriptionHeader: 'Description' };
 
     // Phylogeny data is lazy-loaded, so it starts as null
     window.liPhylogenyCache = null;
@@ -624,7 +623,13 @@ function formatListResult(title, genes, description = "") {
 
     // --- 4B. Table & Panel Display ---
     
-    function showDataInLeftPanel(title, geneList, descriptionHeader = 'Description') {
+   // --- 4B. Table & Panel Display ---
+    
+    /**
+     * (MODIFIED) Renders a dynamic table in the left panel.
+     * The columns are now built automatically from the keys in the geneList objects.
+     */
+    function showDataInLeftPanel(title, geneList) {
         const container = document.getElementById('cilia-svg'); 
         if (!container) {
             console.error("Cannot find 'cilia-svg' container to draw table in.");
@@ -633,23 +638,42 @@ function formatListResult(title, genes, description = "") {
         const wrapper = container.closest('.interactive-cilium');
         if (wrapper) wrapper.classList.add('table-view-active');
 
-        let tableHTML = `
-            <table class="ciliai-data-table">
-                <thead>
-                    <tr>
-                        <th>Gene</th>
-                        <th>${descriptionHeader}</th>
-                    </tr>
-                </thead>
-                <tbody>
-        `;
-        geneList.forEach(item => {
-            tableHTML += `
-                <tr>
-                    <td><strong>${item.gene}</strong></td>
-                    <td>${item.description}</td>
-                </tr>
+        if (!geneList || geneList.length === 0) {
+            container.innerHTML = `
+                <div class="ciliai-table-container">
+                    <h3>${title}</h3>
+                    <p style="padding: 20px;">No genes found matching this criteria.</p>
+                    <button id="ciliai-back-btn" class="ciliai-button" style="background: #718096; margin-left: 10px;">Back to Diagram</button>
+                </div>
             `;
+            document.getElementById('ciliai-back-btn').addEventListener('click', () => {
+                generateAndInjectSVG();
+            });
+            return;
+        }
+
+        // Dynamically get headers from the first object's keys
+        const keys = Object.keys(geneList[0]);
+        const headers = keys.map(k => k.charAt(0).toUpperCase() + k.slice(1)); // Capitalize
+
+        let tableHTML = `<table class="ciliai-data-table"><thead><tr>`;
+        headers.forEach(h => {
+            tableHTML += `<th>${h}</th>`;
+        });
+        tableHTML += `</tr></thead><tbody>`;
+
+        geneList.forEach(item => {
+            tableHTML += `<tr>`;
+            keys.forEach(key => {
+                // Use '—' for any null or undefined values
+                const value = item[key] !== null && item[key] !== undefined ? item[key] : '—';
+                if (key === 'gene') {
+                    tableHTML += `<td><strong>${value}</strong></td>`;
+                } else {
+                    tableHTML += `<td>${value}</td>`;
+                }
+            });
+            tableHTML += `</tr>`;
         });
         tableHTML += `</tbody></table>`;
 
@@ -671,30 +695,46 @@ function formatListResult(title, genes, description = "") {
 
         injectTableCSS();
 
+        // MODIFIED: Removed descriptionHeader from the CSV download function call
         document.getElementById('ciliai-download-btn').addEventListener('click', () => {
-            downloadTableAsCSV(title, geneList, descriptionHeader);
+            downloadTableAsCSV(title, geneList);
         });
         document.getElementById('ciliai-back-btn').addEventListener('click', () => {
             generateAndInjectSVG();
         });
     }
 
-    function downloadTableAsCSV(title, geneList, descriptionHeader = 'Description') {
+    /**
+     * (MODIFIED) Downloads the dynamic table as a CSV.
+     * The columns are now built automatically from the keys in the geneList objects.
+     */
+    function downloadTableAsCSV(title, geneList) {
+        if (!geneList || geneList.length === 0) return;
+        
+        const keys = Object.keys(geneList[0]);
+        const headers = keys.map(k => k.charAt(0).toUpperCase() + k.slice(1));
+        
         let csvContent = "data:text/csv;charset=utf-8,";
-        csvContent += `Gene,${descriptionHeader}\r\n`;
+        csvContent += headers.join(',') + '\r\n';
+        
         geneList.forEach(item => {
-            const gene = item.gene;
-            const desc = `"${String(item.description).replace(/"/g, '""')}"`;
-            csvContent += `${gene},${desc}\r\n`;
+            const row = keys.map(key => {
+                // Handle potential null/undefined values and ensure strings are quoted
+                const cell = String(item[key] !== null && item[key] !== undefined ? item[key] : 'N/A').replace(/"/g, '""');
+                return `"${cell}"`;
+            });
+            csvContent += row.join(',') + '\r\n';
         });
+
         const encodedUri = encodeURI(csvContent);
         const link = document.createElement("a");
         link.setAttribute("href", encodedUri);
-        link.setAttribute("download", `${title.replace(/\s+/g, '_')}_genelist.csv`);
+        link.setAttribute("download", `${title.replace(/[\s\W]+/g, '_')}_genelist.csv`);
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
     }
+    
     
     function injectTableCSS() {
         const styleId = 'ciliai-table-styles';
