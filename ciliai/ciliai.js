@@ -1760,7 +1760,6 @@ function formatListResult(title, genes, description = "") {
             };
         });
     }
-JavaScript
 
     function getGenesByDomain(domainTerm, query) {
         const normTerm = normalizeTerm(domainTerm);
