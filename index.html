@@ -5,7 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CiliAI — Unified Explorer</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    
     <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+
     <style>
         :root {
             --bg: #f6f8fb;
@@ -13,30 +15,20 @@
             --accent: #667eea;
             --muted: #6b7280;
             --card: #fff;
+            --border: #e5e7eb;
             font-family: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
             color: #0f1724;
         }
 
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body, html { height: 100%; background: var(--bg); overflow: hidden; }
 
-        body, html {
-            height: 100%;
-            background: var(--bg);
-            overflow: hidden;
-        }
+        #app { display: flex; height: 100vh; width: 100vw; }
 
-        #app {
-            display: flex;
-            height: 100vh;
-        }
-
-        /* Sidebar */
+        /* --- Sidebar --- */
         #sidebar {
             width: 260px;
+            flex-shrink: 0;
             background: linear-gradient(180deg, #071023 0%, #0b1220 100%);
             color: white;
             padding: 20px 14px;
@@ -48,246 +40,137 @@
         }
 
         .brand {
-            display: flex;
-            gap: 10px;
-            align-items: center;
-            padding-bottom: 12px;
+            display: flex; gap: 10px; align-items: center; padding-bottom: 12px;
             border-bottom: 1px solid rgba(255,255,255,0.1);
         }
-
         .brand-icon {
-            width: 36px;
-            height: 36px;
+            width: 36px; height: 36px;
             background: linear-gradient(135deg, var(--accent), #5568d3);
-            border-radius: 10px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 20px;
+            border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 20px;
         }
+        .brand h1 { font-size: 18px; font-weight: 700; }
+        .brand p { font-size: 11px; color: rgba(255,255,255,0.6); }
 
-        .brand h1 {
-            font-size: 18px;
-            font-weight: 700;
-        }
-
-        .brand p {
-            font-size: 11px;
-            color: rgba(255,255,255,0.6);
-        }
-
-        .side-group {
-            margin-top: 8px;
-        }
-
+        .side-group { margin-top: 8px; }
         .side-group h3 {
-            font-size: 11px;
-            color: rgba(255,255,255,0.5);
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            margin-bottom: 10px;
-            font-weight: 600;
+            font-size: 11px; color: rgba(255,255,255,0.5); text-transform: uppercase;
+            letter-spacing: 1px; margin-bottom: 10px; font-weight: 600;
         }
-
         .side-link {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            padding: 10px 12px;
-            border-radius: 8px;
-            cursor: pointer;
-            color: rgba(255,255,255,0.9);
-            font-size: 13px;
-            transition: all 0.2s;
-            margin-bottom: 4px;
+            display: flex; align-items: center; gap: 10px; padding: 10px 12px;
+            border-radius: 8px; cursor: pointer; color: rgba(255,255,255,0.9);
+            font-size: 13px; transition: all 0.2s; margin-bottom: 4px;
         }
+        .side-link:hover { background: rgba(255,255,255,0.05); }
+        .side-link.active { background: rgba(102, 126, 234, 0.15); color: white; font-weight: 600; }
 
-        .side-link:hover {
-            background: rgba(255,255,255,0.05);
-        }
-
-        .side-link.active {
-            background: rgba(102, 126, 234, 0.15);
-            color: white;
-            font-weight: 600;
-        }
-
-        /* Main Content */
-        #main {
-            flex: 1;
-            display: flex;
-            overflow: hidden;
-        }
-
-        /* Top Search Bar */
-        .top-search {
-            background: white;
-            padding: 16px 20px;
-            border-bottom: 1px solid #e5e7eb;
-            display: flex;
-            gap: 12px;
-            align-items: center;
-        }
-
-        .top-search h3 {
-            font-size: 14px;
-            font-weight: 600;
-            color: var(--muted);
-            white-space: nowrap;
-        }
-
-        .search-box {
-            position: relative;
-            flex: 1;
-            max-width: 400px;
-        }
-
-        .search-box input {
-            width: 100%;
-            padding: 10px 40px 10px 12px;
-            border: 2px solid #e5e7eb;
-            border-radius: 8px;
-            font-size: 14px;
-            transition: all 0.2s;
-        }
-
-        .search-box input:focus {
-            outline: none;
-            border-color: var(--accent);
-        }
-
-        .search-icon {
-            position: absolute;
-            right: 12px;
-            top: 50%;
-            transform: translateY(-50%);
-            color: var(--muted);
-            pointer-events: none;
-        }
-
-        .search-btn {
-            padding: 10px 20px;
-            background: var(--accent);
-            color: white;
-            border: none;
-            border-radius: 8px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.2s;
-            white-space: nowrap;
-        }
-
-        .search-btn:hover {
-            background: #5568d3;
-        }
-
-        .mode-toggle {
-            display: flex;
-            gap: 6px;
-            margin-left: auto;
-        }
-
-        .mode-btn {
-            padding: 8px 14px;
-            border: 1px solid #e5e7eb;
-            background: white;
-            border-radius: 6px;
-            font-size: 12px;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-
-        .mode-btn.active {
-            background: var(--accent);
-            color: white;
-            border-color: var(--accent);
-        }
-
-        /* Center Panel - Visualization */
-        #center-panel {
+        /* --- Main Content Area --- */
+        #main-wrapper {
             flex: 1;
             display: flex;
             flex-direction: column;
-            background: var(--bg);
             overflow: hidden;
-            border-right: 1px solid #e5e7eb;
         }
 
-        .viz-header {
-            padding: 20px;
+        /* --- Top Search Bar --- */
+        .top-search {
             background: white;
-            border-bottom: 1px solid #e5e7eb;
+            padding: 12px 20px;
+            border-bottom: 1px solid var(--border);
             display: flex;
-            justify-content: space-between;
+            gap: 12px;
             align-items: center;
+            height: 70px;
+            flex-shrink: 0;
         }
-
-        .viz-header h2 {
-            font-size: 18px;
-            font-weight: 700;
+        .search-box { position: relative; flex: 1; max-width: 500px; }
+        .search-box input {
+            width: 100%; padding: 10px 40px 10px 12px;
+            border: 2px solid var(--border); border-radius: 8px; font-size: 14px; transition: all 0.2s;
         }
-
-        .viz-controls {
-            display: flex;
-            gap: 8px;
+        .search-box input:focus { outline: none; border-color: var(--accent); }
+        .search-icon { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); color: var(--muted); pointer-events: none; }
+        
+        .search-btn {
+            padding: 10px 20px; background: var(--accent); color: white;
+            border: none; border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.2s;
         }
+        .search-btn:hover { background: #5568d3; }
+        
+        .status-indicator { font-size: 12px; color: var(--muted); margin-left: auto; display: flex; align-items: center; gap: 6px; }
+        .status-dot { width: 8px; height: 8px; border-radius: 50%; background: #ccc; }
+        .status-dot.ready { background: #10b981; }
+        .status-dot.loading { background: #f59e0b; }
 
-        .viz-btn {
-            padding: 8px 14px;
-            border: 1px solid #e5e7eb;
-            background: white;
-            border-radius: 8px;
-            font-size: 12px;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-
-        .viz-btn:hover {
-            background: #f9fafb;
-        }
-
-        .viz-btn.active {
-            background: var(--accent);
-            color: white;
-            border-color: var(--accent);
-        }
-
-        .viz-container {
+        /* --- Split View (Plot vs Chat) --- */
+        #content-split {
             flex: 1;
-            padding: 20px;
-            overflow: auto;
+            display: flex;
+            overflow: hidden;
+        }
+
+        /* --- Center Panel (Visualization) --- */
+        #center-panel {
+            flex: 1; /* Takes up remaining space */
+            display: flex;
+            flex-direction: column;
+            background: var(--bg);
+            padding: 15px;
+            overflow: hidden;
+            position: relative;
         }
 
         .viz-card {
             background: white;
             border-radius: 12px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-            height: 100%;
-            padding: 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            flex: 1; /* Fills the center panel */
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            border: 1px solid var(--border);
         }
 
-        #plot {
+        .viz-header {
+            padding: 15px 20px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #fff;
+        }
+        .viz-header h2 { font-size: 16px; font-weight: 600; color: #1e293b; }
+
+        #plot-container {
+            flex: 1;
+            position: relative;
             width: 100%;
             height: 100%;
-            min-height: 500px;
+            padding: 10px;
         }
+        
+        /* Ensures Plotly fills the container */
+        .js-plotly-plot, .plot-container { width: 100% !important; height: 100% !important; }
 
-        /* Right Panel - Chat */
+
+        /* --- Right Panel (Chat) --- */
         #right-panel {
             width: 380px;
             background: white;
-            border-left: 1px solid #e5e7eb;
+            border-left: 1px solid var(--border);
             display: flex;
             flex-direction: column;
-            overflow: hidden;
+            flex-shrink: 0;
+            z-index: 10;
         }
 
-        .chat-container {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
+        .panel-header {
+            padding: 15px 20px;
+            border-bottom: 1px solid var(--border);
+            background: #fff;
         }
+        .panel-header h2 { font-size: 16px; font-weight: 600; }
+        .panel-header p { font-size: 12px; color: var(--muted); }
 
         .messages {
             flex: 1;
@@ -296,452 +179,198 @@
             display: flex;
             flex-direction: column;
             gap: 12px;
+            background: #f9fafb;
         }
 
-        .msg {
-            max-width: 85%;
-            padding: 12px 16px;
-            border-radius: 12px;
-            font-size: 13px;
-            line-height: 1.5;
-        }
+        .msg { max-width: 90%; padding: 10px 14px; border-radius: 12px; font-size: 13px; line-height: 1.5; word-wrap: break-word; }
+        .msg.user { align-self: flex-end; background: var(--accent); color: white; border-radius: 14px 14px 2px 14px; }
+        .msg.bot { align-self: flex-start; background: white; border: 1px solid var(--border); color: #334155; border-radius: 14px 14px 14px 2px; }
 
-        .msg.user {
-            align-self: flex-end;
-            background: linear-gradient(90deg, var(--accent), #5568d3);
-            color: white;
-            border-radius: 14px 14px 4px 14px;
-        }
+        /* AI Result Card Styling (for HTML responses) */
+        .ai-result-card { background: white; padding: 0; }
+        .ai-result-card h4 { margin-bottom: 5px; color: var(--accent); }
+        .ai-result-card ul { padding-left: 20px; margin-top: 5px; }
+        .ai-result-card li { margin-bottom: 4px; }
 
-        .msg.bot {
-            align-self: flex-start;
-            background: #f7f9fc;
-            color: #334155;
-            border-radius: 14px 14px 14px 4px;
-        }
+        .chat-input { padding: 15px; border-top: 1px solid var(--border); background: white; }
+        .input-row { display: flex; gap: 8px; }
+        .input-row input { flex: 1; padding: 10px; border: 1px solid var(--border); border-radius: 8px; font-size: 13px; }
+        .input-row input:focus { outline: none; border-color: var(--accent); }
+        .input-row button { padding: 10px 16px; border: none; background: var(--accent); color: white; border-radius: 8px; cursor: pointer; font-weight: 600; }
+        .input-row button:hover { background: #5568d3; }
 
-        .chat-input {
-            padding: 20px;
-            border-top: 1px solid #e5e7eb;
-            background: white;
-        }
-
-        .input-row {
-            display: flex;
-            gap: 8px;
-        }
-
-        .input-row input {
-            flex: 1;
-            padding: 12px;
-            border: 2px solid #e5e7eb;
-            border-radius: 10px;
-            font-size: 14px;
-        }
-
-        .input-row input:focus {
-            outline: none;
-            border-color: var(--accent);
-        }
-
-        .input-row button {
-            padding: 12px 18px;
-            border: none;
-            background: var(--accent);
-            color: white;
-            border-radius: 10px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-
-        .input-row button:hover {
-            background: #5568d3;
-        }
-
-        .loading {
-            display: inline-block;
-            width: 12px;
-            height: 12px;
-            border: 2px solid #f3f3f3;
-            border-top: 2px solid var(--accent);
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-        }
-
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-
-        @media (max-width: 1400px) {
-            #right-panel {
-                width: 320px;
-            }
+        @media (max-width: 1024px) {
+            #right-panel { width: 320px; }
         }
     </style>
 </head>
 <body>
     <div id="app">
-        <!-- Sidebar -->
         <aside id="sidebar">
             <div class="brand">
                 <div class="brand-icon">🧬</div>
                 <div>
                     <h1>CiliAI</h1>
-                    <p>Gene Expression Explorer</p>
+                    <p>Unified Explorer</p>
                 </div>
             </div>
 
             <div class="side-group">
-                <h3>Analysis Tools</h3>
-                <div class="side-link active" onclick="switchView('umap')">
+                <h3>Analysis</h3>
+                <div class="side-link active" onclick="handleNavClick('umap')">
                     <span>📊</span> UMAP Visualization
                 </div>
-                <div class="side-link" onclick="switchView('expression')">
-                    <span>📈</span> Expression Analysis
+                <div class="side-link" onclick="handleNavClick('phylogeny')">
+                    <span>🌳</span> Phylogeny
                 </div>
-                <div class="side-link" onclick="switchView('compare')">
-                    <span>⚖️</span> Compare Genes
-                </div>
-            </div>
-
-            <div class="side-group">
-                <h3>Datasets</h3>
-                <div class="side-link">
-                    <span>🫁</span> Respiratory Epithelia
-                </div>
-                <div class="side-link">
-                    <span>🧠</span> Neural Tissue
-                </div>
-                <div class="side-link">
-                    <span>🩸</span> Immune Cells
+                <div class="side-link" onclick="handleNavClick('expression')">
+                    <span>📈</span> Expression
                 </div>
             </div>
 
             <div class="side-group">
-                <h3>Resources</h3>
-                <div class="side-link">
-                    <span>📚</span> Documentation
+                <h3>Tools</h3>
+                <div class="side-link" onclick="handleNavClick('batch')">
+                    <span>📁</span> Batch Query
                 </div>
-                <div class="side-link">
-                    <span>⚙️</span> Settings
+                <div class="side-link" onclick="handleNavClick('compare')">
+                    <span>⚖️</span> Compare
                 </div>
             </div>
         </aside>
 
-        <!-- Main Content Area -->
-        <div id="main">
-            <!-- Top Search Bar -->
+        <div id="main-wrapper">
+            
             <div class="top-search">
                 <h3>Gene Search</h3>
                 <div class="search-box">
-                    <input type="text" id="geneInput" placeholder="Enter gene symbol (e.g., FOXJ1)" value="FOXJ1">
+                    <input type="text" id="geneSearch" placeholder="Enter gene symbol (e.g., FOXJ1)">
                     <span class="search-icon">🔍</span>
                 </div>
-                <button class="search-btn" onclick="searchGene()">Analyze Gene</button>
-                <div class="mode-toggle">
-                    <button class="mode-btn active" onclick="setMode('ai')">🤖 AI</button>
-                    <button class="mode-btn" onclick="setMode('manual')">🔬 Manual</button>
+                <button class="search-btn" onclick="triggerSearch()">Explore</button>
+                
+                <div class="status-indicator">
+                    <div id="db-status-dot" class="status-dot loading"></div>
+                    <span id="dataStatus">Loading Data...</span>
                 </div>
             </div>
 
-            <!-- Center Panel: Main Visualization -->
-            <section id="center-panel">
-                <div class="viz-header">
-                    <h2 id="vizTitle">UMAP - FOXJ1 Expression</h2>
-                    <div class="viz-controls">
-                        <button class="viz-btn active">2D View</button>
-                        <button class="viz-btn">3D View</button>
-                        <button class="viz-btn">💾 Export</button>
-                    </div>
-                </div>
-
-                <div class="viz-container">
+            <div id="content-split">
+                
+                <section id="center-panel">
                     <div class="viz-card">
-                        <div id="plot"></div>
+                        <div class="viz-header">
+                            <h2 id="vizTitle">Visualization</h2>
+                            <div style="display:flex; gap:5px;">
+                                <button class="search-btn" style="padding:5px 10px; font-size:11px; background:#eee; color:#333;" onclick="downloadPlot()">📷 Save</button>
+                            </div>
+                        </div>
+                        <div id="plot-container">
+                            <div id="cilia-svg" style="width:100%; height:100%;"></div> 
+                            </div>
                     </div>
-                </div>
-            </section>
+                </section>
 
-            <!-- Right Panel: AI Chat -->
-            <section id="right-panel">
-                <div class="panel-header">
-                    <h2>AI Assistant</h2>
-                    <p>Ask questions about your data</p>
-                </div>
+                <section id="right-panel">
+                    <div class="panel-header">
+                        <h2>AI Assistant</h2>
+                        <p>Ask questions about genes, diseases, or plots.</p>
+                    </div>
 
-                <div class="chat-container">
                     <div class="messages" id="messages">
                         <div class="msg bot">
-                            👋 Hello! I'm your CiliAI assistant. I can help you explore gene expression patterns, identify cell types, and interpret your data. What would you like to know about FOXJ1?
+                            👋 <strong>CiliAI Ready.</strong><br>
+                            I can generate plots, list complex members, or explain gene functions.<br><br>
+                            <em>Try: "Show UMAP for IFT88" or "What is Joubert Syndrome?"</em>
                         </div>
                     </div>
 
                     <div class="chat-input">
                         <div class="input-row">
-                            <input type="text" id="chatInput" placeholder="Ask about FOXJ1 expression...">
-                            <button onclick="sendMessage()">Send</button>
+                            <input type="text" id="chatInput" placeholder="Type a question...">
+                            <button onclick="triggerChat()">Send</button>
                         </div>
                     </div>
-                </div>
-            </section>
+                </section>
+
+            </div>
         </div>
     </div>
 
+    <script src="ciliai/ciliai.js"></script> 
+    
+    <script src="globals.js"></script> 
+
+    <script src="plots.js"></script> 
+
     <script>
-        let currentGene = 'FOXJ1';
-        let currentMode = 'ai';
-        let currentView = 'umap';
+        // --- Event Listeners for the HTML elements ---
 
-        // Gene information database
-        const geneInfo = {
-            'FOXJ1': {
-                overview: 'Forkhead box J1 - Master regulator of motile ciliogenesis. Essential for the development and function of motile cilia in respiratory epithelia, brain ventricles, and reproductive tracts.',
-                expression: 'Highly expressed in ciliated cells across multiple tissues. Shows strong enrichment in respiratory epithelium and ependymal cells.',
-                functions: [
-                    'Regulates motile cilia formation',
-                    'Controls basal body positioning',
-                    'Activates ciliary gene programs',
-                    'Essential for mucociliary clearance'
-                ],
-                badges: ['Transcription Factor', 'Ciliogenesis', 'High Expression']
-            },
-            'default': {
-                overview: 'Gene information being analyzed...',
-                expression: 'Expression patterns are being computed from the dataset.',
-                functions: ['Analysis in progress'],
-                badges: ['Analyzing']
-            }
-        };
-
-        // Generate synthetic UMAP data for demonstration
-        function generateUMAPData(gene) {
-            const n = 2000;
-            const data = [];
-            
-            // Create clusters with different expression patterns
-            const clusters = [
-                {name: 'Ciliated Cells', x: 5, y: 5, size: 400, expr: gene === 'FOXJ1' ? 8 : Math.random() * 3},
-                {name: 'Basal Cells', x: -3, y: 4, size: 350, expr: gene === 'FOXJ1' ? 2 : Math.random() * 4},
-                {name: 'Club Cells', x: 0, y: -4, size: 300, expr: Math.random() * 5},
-                {name: 'Goblet Cells', x: -5, y: -2, size: 250, expr: Math.random() * 3},
-                {name: 'Tuft Cells', x: 4, y: -3, size: 200, expr: Math.random() * 2},
-                {name: 'Ionocytes', x: -2, y: 7, size: 150, expr: Math.random() * 2.5},
-            ];
-
-            clusters.forEach(cluster => {
-                for (let i = 0; i < cluster.size; i++) {
-                    const angle = Math.random() * 2 * Math.PI;
-                    const r = Math.random() * 2;
-                    data.push({
-                        x: cluster.x + r * Math.cos(angle) + (Math.random() - 0.5) * 0.5,
-                        y: cluster.y + r * Math.sin(angle) + (Math.random() - 0.5) * 0.5,
-                        expr: Math.max(0, cluster.expr + (Math.random() - 0.5) * 2),
-                        cluster: cluster.name
-                    });
-                }
-            });
-
-            return data;
-        }
-
-        function plotUMAP(gene) {
-            const data = generateUMAPData(gene);
-            
-            const trace = {
-                x: data.map(d => d.x),
-                y: data.map(d => d.y),
-                mode: 'markers',
-                type: 'scatter',
-                marker: {
-                    size: 5,
-                    color: data.map(d => d.expr),
-                    colorscale: 'Viridis',
-                    showscale: true,
-                    colorbar: {
-                        title: 'Expression',
-                        thickness: 15,
-                        len: 0.7
-                    },
-                    line: {
-                        width: 0.5,
-                        color: 'rgba(255,255,255,0.3)'
-                    }
-                },
-                text: data.map(d => `${d.cluster}<br>Expression: ${d.expr.toFixed(2)}`),
-                hovertemplate: '%{text}<extra></extra>'
-            };
-
-            const layout = {
-                title: '',
-                xaxis: {title: 'UMAP 1', showgrid: false, zeroline: false},
-                yaxis: {title: 'UMAP 2', showgrid: false, zeroline: false},
-                hovermode: 'closest',
-                plot_bgcolor: '#fafbfc',
-                paper_bgcolor: 'white',
-                margin: {l: 50, r: 50, t: 30, b: 50}
-            };
-
-            Plotly.newPlot('plot', [trace], layout, {responsive: true});
-        }
-
-        function searchGene() {
-            const gene = document.getElementById('geneInput').value.toUpperCase().trim();
-            if (!gene) return;
-            
-            currentGene = gene;
-            
-            // Update visualization
-            document.getElementById('vizTitle').textContent = `UMAP - ${gene} Expression`;
-            plotUMAP(gene);
-            
-            // Get gene info
-            const info = geneInfo[gene] || geneInfo['default'];
-            
-            // Send info to chat if in AI mode
-            if (currentMode === 'ai') {
-                addMessage('bot', `I've analyzed ${gene} expression. Let me provide you with the key information:`);
-                
-                setTimeout(() => {
-                    let message = `<strong>${gene} Overview:</strong><br>${info.overview}<br><br>`;
-                    message += `<strong>Expression Pattern:</strong><br>${info.expression}<br><br>`;
-                    message += `<strong>Key Functions:</strong><br>`;
-                    info.functions.forEach(func => {
-                        message += `• ${func}<br>`;
-                    });
-                    addMessage('bot', message, true);
-                }, 500);
-                
-                setTimeout(() => {
-                    addMessage('bot', `The UMAP shows ${gene} is most highly expressed in ciliated cells (the bright yellow cluster). Would you like me to analyze co-expressed genes or compare with other markers?`);
-                }, 1500);
-            } else {
-                addMessage('bot', `${gene} visualization updated. Use the plot controls to explore the data.`);
+        // Trigger Search from Top Bar
+        function triggerSearch() {
+            const input = document.getElementById('geneSearch');
+            const gene = input.value.trim();
+            if (gene && window.searchGene) {
+                window.searchGene(gene);
+            } else if (gene && window.CiliAI && window.handleAIQuery) {
+                // Fallback if searchGene isn't exposed globally
+                window.handleAIQuery(`Tell me about ${gene}`);
             }
         }
 
-        function sendMessage() {
+        // Trigger Chat
+        function triggerChat() {
             const input = document.getElementById('chatInput');
-            const message = input.value.trim();
-            if (!message) return;
-
-            addMessage('user', message);
-            input.value = '';
-
-            // Simulate AI response based on context
-            setTimeout(() => {
-                let response = '';
-                const msgLower = message.toLowerCase();
-                
-                if (msgLower.includes('overview') || msgLower.includes('what is')) {
-                    const info = geneInfo[currentGene] || geneInfo['default'];
-                    response = `<strong>${currentGene} Overview:</strong><br>${info.overview}<br><br>`;
-                    response += `<strong>Expression Pattern:</strong><br>${info.expression}`;
-                } else if (msgLower.includes('function')) {
-                    const info = geneInfo[currentGene] || geneInfo['default'];
-                    response = `<strong>Key Functions of ${currentGene}:</strong><br>`;
-                    info.functions.forEach(func => {
-                        response += `• ${func}<br>`;
-                    });
-                } else if (msgLower.includes('expression') || msgLower.includes('where')) {
-                    response = `Based on the UMAP visualization, ${currentGene} shows high expression in ciliated cells (the bright yellow cluster at coordinates ~5,5). This is consistent with its role in ciliogenesis. The expression is lower in basal cells and other cell types.`;
-                } else if (msgLower.includes('cluster') || msgLower.includes('cell type')) {
-                    response = `The visualization shows several distinct cell populations:<br>
-                    • <strong>Ciliated Cells</strong> - High ${currentGene} expression<br>
-                    • <strong>Basal Cells</strong> - Progenitor population<br>
-                    • <strong>Club Cells</strong> - Secretory cells<br>
-                    • <strong>Goblet Cells</strong> - Mucus-producing cells<br>
-                    • <strong>Tuft Cells</strong> - Chemosensory cells<br>
-                    • <strong>Ionocytes</strong> - Rare regulatory cells`;
-                } else if (msgLower.includes('compare') || msgLower.includes('other gene')) {
-                    response = `I can help you compare ${currentGene} with other ciliary genes. Some good candidates include:<br>
-                    • <strong>DNAH5</strong> - Ciliary dynein arm component<br>
-                    • <strong>RSPH1</strong> - Radial spoke head protein<br>
-                    • <strong>RFX3</strong> - Transcription factor for ciliogenesis<br>
-                    <br>Would you like to analyze any of these?`;
-                } else {
-                    const responses = [
-                        `Based on the current analysis, ${currentGene} appears to be a key marker for ciliated cells. The UMAP clearly separates cell types by their expression profiles.`,
-                        `I can help you explore co-expressed genes, perform differential expression analysis, or identify enriched pathways. What would you like to investigate?`,
-                        `The expression pattern suggests ${currentGene} plays a crucial role in ciliated cell identity. Would you like me to provide more details about specific aspects?`
-                    ];
-                    response = responses[Math.floor(Math.random() * responses.length)];
-                }
-                
-                addMessage('bot', response, true);
-            }, 800);
-        }
-
-        function addMessage(type, text, isHTML = false) {
-            const messages = document.getElementById('messages');
-            const msg = document.createElement('div');
-            msg.className = `msg ${type}`;
-            
-            if (isHTML) {
-                msg.innerHTML = text;
-            } else {
-                msg.textContent = text;
-            }
-            
-            messages.appendChild(msg);
-            messages.scrollTop = messages.scrollHeight;
-        }
-
-        function setMode(mode) {
-            currentMode = mode;
-            document.querySelectorAll('.mode-btn').forEach(btn => {
-                btn.classList.remove('active');
-            });
-            event.target.classList.add('active');
-
-            if (mode === 'ai') {
-                addMessage('bot', '🤖 AI mode activated. I\'ll provide intelligent suggestions and detailed insights about your gene queries.');
-            } else {
-                addMessage('bot', '🔬 Manual mode enabled. You have full control over the analysis. I\'ll provide minimal guidance.');
+            const text = input.value.trim();
+            if (text && window.sendMsg) {
+                // Assuming sendMsg() reads from #chatInput internally
+                window.sendMsg(); 
+            } else if (text && window.handleUserSend) {
+                window.handleUserSend();
             }
         }
 
-        function switchView(view) {
-            currentView = view;
-            document.querySelectorAll('.side-link').forEach(link => {
-                link.classList.remove('active');
-            });
-            event.target.classList.add('active');
-
+        // Handle Navigation Clicks
+        function handleNavClick(view) {
+            document.querySelectorAll('.side-link').forEach(l => l.classList.remove('active'));
+            event.currentTarget.classList.add('active');
+            
+            // Update Title
             const titles = {
-                'umap': `UMAP - ${currentGene} Expression`,
-                'expression': `${currentGene} Expression Levels`,
-                'compare': `Gene Comparison Analysis`
+                'umap': 'UMAP Visualization',
+                'phylogeny': 'Phylogenetic Analysis',
+                'expression': 'Expression Data'
             };
+            document.getElementById('vizTitle').textContent = titles[view] || 'Visualization';
 
-            document.getElementById('vizTitle').textContent = titles[view];
-            
-            if (view === 'umap') {
-                plotUMAP(currentGene);
-            }
-            
-            addMessage('bot', `Switched to ${view.toUpperCase()} view for ${currentGene}.`);
+            // Trigger specific logic based on view
+            if (view === 'umap' && window.showDefaultUMAP) window.showDefaultUMAP();
+            if (view === 'phylogeny' && window.showDefaultPhylogeny) window.showDefaultPhylogeny();
         }
 
-        // Initialize
-        document.getElementById('chatInput').addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') sendMessage();
+        // Handle Enter Keys
+        document.getElementById('geneSearch').addEventListener('keyup', (e) => {
+            if (e.key === 'Enter') triggerSearch();
+        });
+        document.getElementById('chatInput').addEventListener('keyup', (e) => {
+            if (e.key === 'Enter') triggerChat();
         });
 
-        document.getElementById('geneInput').addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') searchGene();
-        });
-
-        // Initial welcome message and plot
-        window.addEventListener('load', () => {
-            plotUMAP('FOXJ1');
-            addMessage('bot', '👋 Hello! I\'m your CiliAI assistant. I can help you explore gene expression patterns, identify cell types, and interpret your data.');
+        // Listen for CiliAI Ready Event to update status dot
+        // (This hooks into the logic we added to ciliai.js previously)
+        window.CiliAI_UI_OnReady = function() {
+            const statusText = document.getElementById('dataStatus');
+            const statusDot = document.getElementById('db-status-dot');
+            if (statusText) statusText.textContent = "Database Ready";
+            if (statusDot) {
+                statusDot.classList.remove('loading');
+                statusDot.classList.add('ready');
+            }
+            console.log("UI updated: Data Ready");
             
-            setTimeout(() => {
-                addMessage('bot', 'Currently showing <strong>FOXJ1</strong> expression across different cell types. Try asking me questions like:<br>• "What is FOXJ1?"<br>• "What are its functions?"<br>• "Which cell types express it?"<br>• "Compare it with other genes"');
-            }, 1000);
-        });
+            // Auto-load default plot
+            if(window.showDefaultUMAP) window.showDefaultUMAP();
+        };
     </script>
 </body>
 </html>
