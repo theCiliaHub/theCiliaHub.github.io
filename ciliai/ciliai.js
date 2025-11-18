@@ -198,9 +198,9 @@
         }
     }
 
-   /**
+  /**
      * Fetches the pre-compiled database files from GitHub.
-     * (FIXED Nov 17 2025): Added umapByGene lookup generation
+     * (FIXED Nov 17 2025): Changed 'point.gene' to 'point.Gene' to match UMAP data structure
      */
     async function loadCiliAIData(timeoutMs = 60000) {
         const baseUrl = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/';
@@ -232,13 +232,14 @@
             
             // --- THIS IS THE FIX ---
             // Create the UMAP lookup map, as it's not in the lookups file
-            window.CiliAI.lookups.umapByGene = {}; // <-- NEW
-            if (window.CiliAI_UMAP && Array.isArray(window.CiliAI_UMAP)) { // <-- NEW
-                for (const point of window.CiliAI_UMAP) { // <-- NEW
-                    if (point.gene) { // <-- NEW
-                        window.CiliAI.lookups.umapByGene[point.gene.toUpperCase()] = point; // <-- NEW
-                    } // <-- NEW
-                } // <-- NEW
+            window.CiliAI.lookups.umapByGene = {};
+            if (window.CiliAI_UMAP && Array.isArray(window.CiliAI_UMAP)) {
+                for (const point of window.CiliAI_UMAP) {
+                    // --- MODIFIED: 'point.gene' to 'point.Gene' ---
+                    if (point.Gene) { 
+                        window.CiliAI.lookups.umapByGene[point.Gene.toUpperCase()] = point;
+                    } 
+                }
             }
             // --- END OF FIX ---
 
@@ -311,7 +312,7 @@
         console.log("CiliAI: Page displayed.");
     };
 
-    function injectPageCSS() {
+   function injectPageCSS() {
         const styleId = 'ciliai-dynamic-styles';
         if (document.getElementById(styleId)) return;
 
@@ -369,7 +370,10 @@
             .cilia-part:hover { opacity: 0.8; }
             .cilia-part:focus { outline: 2px solid #667eea; outline-offset: 2px; }
             .cilia-part.selected, .cilia-part.active { filter: brightness(1.2); stroke: #ff6b00 !important; stroke-width: 4 !important; }
-            .bottom-bar { padding: 20px 30px; background: white; border-top: 1px solid #e1e8ed; min-height: 150px; max-height: 250px; overflow-y: auto; }
+            
+            /* --- MODIFIED: Reduced padding and height --- */
+            .bottom-bar { padding: 15px 20px; background: white; border-top: 1px solid #e1e8ed; min-height: 90px; max-height: 150px; overflow-y: auto; }
+            
             .bottom-bar h3 { font-size: 16px; color: #2d3748; margin-bottom: 12px; }
             .right-panel { display: flex; flex-direction: column; background: #f5f7fa; overflow: hidden; }
             .welcome-section { padding: 25px; background: white; border-bottom: 1px solid #e1e8ed; max-height: 35vh; overflow-y: auto; flex-shrink: 0; }
@@ -392,6 +396,41 @@
             .gene-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
             .gene-badge { padding: 5px 10px; background: #667eea15; color: #667eea; border-radius: 5px; font-size: 11px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
             .gene-badge:hover { background: #667eea; color: white; }
+
+            /* --- NEW STYLES for welcome panel buttons --- */
+            .ciliai-quick-start {
+                margin-top: 15px;
+                padding-top: 15px;
+                border-top: 1px solid #e1e8ed;
+            }
+            .ciliai-quick-start strong {
+                display: block;
+                font-size: 13px;
+                color: #2d3748;
+                margin-bottom: 10px;
+            }
+            .welcome-action-btn {
+                display: inline-block;
+                width: 100%;
+                padding: 10px 15px;
+                margin-bottom: 8px;
+                font-size: 12px;
+                font-weight: 500;
+                text-align: left;
+                background: #f8f9fa;
+                color: #667eea;
+                border: 1px solid #e1e8ed;
+                border-radius: 6px;
+                cursor: pointer;
+                transition: all 0.2s;
+            }
+            .welcome-action-btn:hover {
+                background: #667eea;
+                color: white;
+                border-color: #667eea;
+            }
+            /* --- END NEW STYLES --- */
+
             @media (max-width: 992px) {
                 .container { 
                     grid-template-columns: 1fr;
@@ -405,7 +444,6 @@
         styleEl.textContent = css;
         document.head.appendChild(styleEl);
     }
-
     function getPageHTML() {
         return `
         <div class="container">
@@ -417,8 +455,6 @@
                 <div class="toolbar">
                     <input type="text" id="geneSearch" placeholder="Search gene (e.g., IFT88, NPHP1, CEP290)">
                     <button onclick="searchGene()">Find Gene</button>
-                    <button onclick="showDefaultUMAP()">Display gene expression in Lung scRNA-seq</button>
-                    <button onclick="showDefaultPhylogeny()">Phylogenetics Analysis</button>
                     <span id="dataStatus" class="status loading">Initializing...</span>
                 </div>
                 <div class="diagram-container">
@@ -442,6 +478,12 @@
                 <div class="welcome-section">
                     <h2>Welcome to CiliAI! 🎉</h2>
                     <p><strong>CiliAI</strong> is an AI-powered tool to explore ciliary biology, gene function, and disease data.</p>
+                    
+                    <div class="ciliai-quick-start">
+                        <strong>Quick Start Plots:</strong>
+                        <button class="welcome-action-btn" onclick="showDefaultUMAP()">Display FOXJ1 in Lung scRNA-seq</button>
+                        <button class="welcome-action-btn" onclick="showDefaultPhylogeny()">View Default Phylogenetics</button>
+                    </div>
                     <ol class="steps">
                         <li>Type <strong>"What is IFT88?"</strong> in the text box below.</li>
                         <li>Click on the <strong>"Transition Zone"</strong> in the cilia diagram.</li>
@@ -470,11 +512,16 @@
 
     
 
-    function generateAndInjectSVG() {
+   function generateAndInjectSVG() {
         const svgContainer = document.getElementById('cilia-svg');
         if (!svgContainer) return;
+        
+        // --- THIS IS THE FIX ---
+        // Ensure the panel is not in full-width mode when drawing the SVG
         const wrapper = svgContainer.closest('.interactive-cilium');
         if (wrapper) wrapper.classList.remove('table-view-active');
+        // --- END OF FIX ---
+        
         const svgHTML = `
         <svg viewBox="0 0 300 400" xmlns="http://www.w3.org/2000/svg" style="width: 100%; height: auto;">
             <defs>
@@ -1150,29 +1197,29 @@ function formatListResult(title, genes, description = "") {
     }
     
     // --- 4E. Plotting Handlers (UMAP & Phylogeny) ---
-   async function handleUmapPlot(highlightGene = null) {
-        const plotDivId = 'cilia-svg'; // <-- Variable is defined here
+  async function handleUmapPlot(highlightGene = null) {
+        const plotDivId = 'cilia-svg';
         const umapData = window.CiliAI_UMAP;
         const umapLookup = window.CiliAI.lookups.umapByGene; 
 
         if (!umapData || umapData.length === 0) {
-            generateAndInjectSVG();
             addChatMessage('UMAP data is not available to plot.', false);
             return;
         }
         
-        generateAndInjectSVG();
+        // --- MODIFIED: Do NOT call generateAndInjectSVG() ---
         
-        // --- THIS IS THE FIX ---
-        // The variable was 'plotId', but it should be 'plotDivId'
-        const plotDiv = document.getElementById(plotDivId); 
-        // --- END OF FIX ---
-
-        if (!plotDiv) return;
-
-        // Add class to wrapper
+        const plotDiv = document.getElementById(plotDivId); // <-- Fixed typo plotId -> plotDivId
+        if (!plotDiv) {
+             console.error('UMAP plot container "cilia-svg" not found.');
+            return;
+        }
+        
+        // --- MODIFIED: Clear the div and add the class ---
+        plotDiv.innerHTML = ''; // Clear the SVG
         const wrapper = plotDiv.closest('.interactive-cilium');
         if (wrapper) wrapper.classList.add('table-view-active');
+        // --- END OF MODIFICATION ---
 
         const backgroundTrace = {
             x: [], y: [], text: [],
@@ -1187,18 +1234,17 @@ function formatListResult(title, genes, description = "") {
             hoverinfo: 'text'
         };
 
-        // --- MODIFIED: Title changed ---
         let title = 'Lung scRNA-seq Expression (UMAP)';
         const geneUpper = highlightGene ? highlightGene.toUpperCase() : null;
         const highlightedPoint = geneUpper ? umapLookup[geneUpper] : null; 
 
         umapData.forEach(d => {
-            if (highlightedPoint && d.gene === highlightedPoint.gene) {
+            if (highlightedPoint && d.Gene && (d.Gene.toUpperCase() === highlightedPoint.Gene.toUpperCase())) {
                 // Skip
             } else {
                 backgroundTrace.x.push(d.x);
                 backgroundTrace.y.push(d.y);
-                backgroundTrace.text.push(`<b>${d.gene}</b><br>${d.cluster}`);
+                backgroundTrace.text.push(`<b>${d.Gene}</b><br>${d.cluster}`);
             }
         });
 
@@ -1207,23 +1253,23 @@ function formatListResult(title, genes, description = "") {
         if (highlightedPoint) {
             highlightTrace.x.push(highlightedPoint.x);
             highlightTrace.y.push(highlightedPoint.y);
-            highlightTrace.text.push(`<b>${highlightedPoint.gene}</b><br>${highlightedPoint.cluster}`);
+            highlightTrace.text.push(`<b>${highlightedPoint.Gene}</b><br>${highlightedPoint.cluster}`);
             plotData.push(highlightTrace);
-            // --- MODIFIED: Title changed ---
-            title = `Lung scRNA-seq: ${highlightedPoint.gene}`;
+            title = `Lung scRNA-seq: ${highlightedPoint.Gene}`;
         } else if (highlightGene) {
             addChatMessage(`Sorry, I could not find <strong>${highlightGene}</strong> in the UMAP data. Displaying all genes.`, false);
         }
 
         const layout = {
             title: title,
-            xaxis: { title: 'UMAP 1', zeroline: false, showticklabels: false },
-            yaxis: { title: 'UMAP 2', zeroline: false, showticklabels: false },
+            xaxis: { title: 'UMAP 1', zeroline: false, showgrid: false }, // <-- Added showgrid: false
+            yaxis: { title: 'UMAP 2', zeroline: false, showgrid: false }, // <-- Added showgrid: false
             showlegend: false,
             hovermode: 'closest',
             margin: { t: 40, b: 40, l: 40, r: 20 },
-            paper_bgcolor: 'rgba(0,0,0,0)',
-            plot_bgcolor: 'rgba(0,0,0,0)'
+            // --- MODIFIED: Set background to white to match example ---
+            paper_bgcolor: 'rgba(255,255,255,1)',
+            plot_bgcolor: 'rgba(255,255,255,1)'
         };
 
         Plotly.newPlot(plotDivId, plotData, layout, { responsive: true });
@@ -1343,7 +1389,10 @@ function formatListResult(title, genes, description = "") {
    function handlePhylogenyVisualizationQuery(genes, source = 'li', type = 'heatmap') {
         // This function no longer needs to be async, as data is pre-loaded by the router
         const plotId = 'cilia-svg';
-        generateAndInjectSVG(); 
+        
+        // --- MODIFIED: Do NOT call generateAndInjectSVG() ---
+        // generateAndInjectSVG(); // <-- REMOVED THIS LINE
+        
         const plotDiv = document.getElementById(plotId); 
         if (!plotDiv) {
             console.error("Phylogeny Error: plot container 'cilia-svg' not found.");
