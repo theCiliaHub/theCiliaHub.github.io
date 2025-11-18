@@ -1,5 +1,11 @@
 /* ==============================================================
- * CiliAI – Interactive Explorer (v5.3 – Fixed Layout Injection)
+ * CiliAI – Interactive Explorer (v5.1 – Nov 15, 2025)
+ * ==============================================================
+ * • BUILT FROM SCRATCH based on user's question list.
+ * • Loads the pre-compiled 'ciliAI_master_database.json' + 'ciliAI_lookups.json'
+ * • Lazy-loads the large phylogeny files only when needed.
+ * • Fixes all known layout, normalization, and query routing bugs.
+ * • INTEGRATED: displayFullGeneInfo (Nov 15, 2025)
  * ============================================================== */
 
 (function () {
@@ -10,19 +16,24 @@
     // ==========================================================
 
     window.CiliAI = {
-        data: { umap: [] },
+        data: {
+            umap: [] // Init umap data
+        },
         masterData: [],
         ready: false,
-        lookups: {},
-        cellDataCache: {}
+        lookups: {}
     };
 
     let lastQueryContext = { type: null, data: [], term: null };
+
+    // Phylogeny data is lazy-loaded, so it starts as null
     window.liPhylogenyCache = null;
     window.neversPhylogenyCache = null;
-    window.CiliAI_UMAP = null;
+    window.CiliAI_UMAP = null; // This will be populated from the master DB
 
-   
+    // --- Data Maps (These are now just for the AI brain) ---
+
+
 // --- GLOBAL CONSTANTS FOR ORGANISM PANELS ---
     const NEVERS_CIL_PANEL = [
         "Homo sapiens", // Index 78
@@ -130,7 +141,8 @@
             "PEROXISOMAL COMPLEX": ["PEX1", "PEX2", "PEX3", "PEX5", "PEX6", "PEX10", "PEX12", "PEX13", "PEX14", "PEX19"]
         };
     }
-     function getDiseaseClassificationMap() {
+
+    function getDiseaseClassificationMap() {
         return {
             "Primary Ciliopathies": [
                 "Acrocallosal Syndrome", "Alström Syndrome", "Autosomal Dominant Polycystic Kidney Disease",
@@ -163,132 +175,100 @@
         return [value];
     }
 
-    function log(message) {
-        console.log(`[CiliAI] ${message}`);
+    // ==========================================================
+    // 2. DATA LOADING & PROCESSING
+    // ==========================================================
+
+    async function initCiliAI() {
+        console.log('CiliAI: Initializing (v5.1 Pre-compiled)...');
+        await loadCiliAIData(); 
+        
+        if (!window.CiliAI.masterData || window.CiliAI.masterData.length === 0) {
+            console.error("CiliAI: Master data is empty. Database load failed.");
+            window.CiliAI.ready = false;
+            return;
+        }
+        
+        // NO buildLookups() needed!
+        window.CiliAI.ready = true;
+        console.log('CiliAI: Ready! Pre-compiled database loaded.');
+
+        if (window.location.hash.includes('/ciliai')) {
+            setTimeout(displayCiliAIPage, 100);
+        }
     }
 
-    // ==========================================================
-    // 2. DATA LOADING
-    // ==========================================================
+  /**
+     * Fetches the pre-compiled database files from GitHub.
+     * (MODIFIED Nov 18 2025): Added cellDataCache builder for advanced UMAP plotting
+     */
+    async function loadCiliAIData(timeoutMs = 60000) {
+        const baseUrl = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/';
+        const mainDbUrl = baseUrl + 'ciliAI_master_database.json';
+        const lookupsUrl = baseUrl + 'ciliAI_lookups.json';
 
-   // ==========================================================
-    // 2. DATA LOADING ENGINE (CORRECTED URL)
-    // ==========================================================
-
-    window.loadCiliAIData = async function() {
-        // ✅ FIX: Removed 'refs/heads/' from the URL
-        const baseUrl = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/';
-        
         try {
-            console.log(`[CiliAI] Fetching database from: ${baseUrl}`);
-            const [mainRes, lookupsRes] = await Promise.all([
-                fetch(baseUrl + 'ciliAI_master_database.json'),
-                fetch(baseUrl + 'ciliAI_lookups.json')
-            ]);
+            console.log(`Fetching main database: ${mainDbUrl}`);
+            console.log(`Fetching lookups: ${lookupsUrl}`);
             
-            if (!mainRes.ok) throw new Error(`Failed to load Master Database (HTTP ${mainRes.status})`);
-            if (!lookupsRes.ok) throw new Error(`Failed to load Lookups (HTTP ${lookupsRes.status})`);
+            const [mainRes, lookupsRes] = await Promise.all([
+                fetch(mainDbUrl),
+                fetch(lookupsUrl)
+            ]);
+
+            if (!mainRes.ok) throw new Error(`HTTP ${mainRes.status} for main database`);
+            if (!lookupsRes.ok) throw new Error(`HTTP ${lookupsRes.status} for lookups`);
             
             const mainData = await mainRes.json();
             const lookupData = await lookupsRes.json();
-
-            // 1. Store Master Data
+            
+            // Assign all the pre-processed data
             window.CiliAI.masterData = mainData.masterData;
             window.CiliAI.lookups = lookupData.lookups;
-            window.CiliAI.data.umap = mainData.umapData;
-            window.CiliAI_UMAP = mainData.umapData;
-
-            // 2. Rebuild Fast Lookup Maps
-            window.CiliAI.lookups.geneMap = {};
-            window.CiliAI.cellDataCache = {};
             
-            mainData.masterData.forEach(g => { 
-                if(g.Gene) {
-                    const up = g.Gene.toUpperCase();
-                    window.CiliAI.lookups.geneMap[up] = g;
-                    if(g.expression?.scRNA) {
-                        window.CiliAI.cellDataCache[up] = g.expression.scRNA; 
-                    }
+            // Assign the raw UMAP data
+            window.CiliAI_UMAP = mainData.umapData; 
+            window.CiliAI.data.umap = mainData.umapData; 
+            
+            // --- MODIFIED: Create the UMAP lookup map ---
+            window.CiliAI.lookups.umapByGene = {};
+            if (window.CiliAI_UMAP && Array.isArray(window.CiliAI_UMAP)) {
+                for (const point of window.CiliAI_UMAP) {
+                    if (point.Gene) { 
+                        window.CiliAI.lookups.umapByGene[point.Gene.toUpperCase()] = point;
+                    } 
                 }
-            });
+            }
 
-            window.CiliAI.ready = true;
-            console.log(`[CiliAI] Ready: ${window.CiliAI.masterData.length} genes loaded.`);
-            
-            // 3. Notify UI
-            if (typeof window.CiliAI_UI_OnReady === 'function') window.CiliAI_UI_OnReady();
+            // Create a GeneMap from the masterData list for fast lookups by gene name
+            window.CiliAI.lookups.geneMap = {};
+            for (const gene of mainData.masterData) {
+                if (gene.Gene) {
+                    window.CiliAI.lookups.geneMap[gene.Gene.toUpperCase()] = gene;
+                }
+            }
+
+            // --- NEW: Build the cellDataCache for UMAP expression plotting ---
+            log("Building scRNA expression cache for UMAP...");
+            window.CiliAI.cellDataCache = {};
+            for (const gene of mainData.masterData) {
+                if (gene.Gene && gene.expression && gene.expression.scRNA) {
+                    // This creates the { GENE: { cell_type: value, ... } } structure
+                    window.CiliAI.cellDataCache[gene.Gene.toUpperCase()] = gene.expression.scRNA;
+                }
+            }
+            log("scRNA expression cache built.");
+            // --- END NEW SECTION ---
+
+            console.log(`CiliAI: ${window.CiliAI.masterData.length} genes integrated.`);
+            console.log('CiliAI: Lookups successfully loaded.');
 
         } catch (err) {
-            console.error("[CiliAI] Load failed:", err);
-            // Optional: Alert the user in the UI if data fails
-            const statusEl = document.getElementById('dataStatus');
-            if(statusEl) {
-                statusEl.textContent = "Data Load Failed";
-                statusEl.style.color = "red";
-            }
+            console.error("Failed to load CiliAI master database:", err);
+            window.CiliAI.ready = false;
         }
-    };
-
-    window.initCiliAI = async function() { await window.loadCiliAIData(); };
-
-    // ==========================================================
-    // 3. DISPLAY LOGIC (Updated to Fix .content-area error)
-    // ==========================================================
-
-    /**
-     * This function is called by globals.js routing.
-     * We update it to inject the NEW UI structure.
-     */
-    window.displayCiliAIPage = async function () {
-        console.log("CiliAI: displayCiliAIPage() called.");
-
-        // 1. Try to find a container. Old routing looked for .content-area
-        let area = document.querySelector('.content-area') || document.getElementById('content-area');
-        
-        // 2. If not found, use #ciliai-app or fallback to main/body (Safety Net)
-        if (!area) {
-            area = document.getElementById('ciliai-app');
-            if (!area) {
-                // Create the root container if it doesn't exist
-                area = document.createElement('div');
-                area.id = 'ciliai-app';
-                // Replace main content
-                const main = document.querySelector('main') || document.body;
-                main.innerHTML = ''; 
-                main.appendChild(area);
-                console.log("CiliAI: Created #ciliai-app container.");
-            }
-        }
-
-        // 3. Inject the Layout Skeleton for ciliai_ui.js
-        // This provides the IDs: #sidebar, #left-panel, #right-panel
-        area.innerHTML = `
-            <div id="ciliai-layout" style="display:flex; width:100%; height:calc(100vh - 60px);">
-                <aside id="sidebar" style="width:260px; background:#1e293b; color:white; overflow-y:auto; flex-shrink:0;"></aside>
-                <section id="left-panel" style="width:380px; background:white; border-right:1px solid #ddd; overflow-y:auto; flex-shrink:0; display:flex; flex-direction:column;"></section>
-                <main id="right-panel" style="flex-grow:1; background:#f4f6f9; padding:20px; overflow-y:auto; display:flex; flex-direction:column; gap:20px;">
-                    <div id="dataStatus">Initializing...</div>
-                </main>
-            </div>
-        `;
-
-        // 4. Trigger UI Build if ciliai_ui.js is loaded
-        if (window.CiliAI_UI && typeof window.CiliAI_UI.renderPlotHome === 'function') {
-             // Re-run boot process since we wiped the DOM
-             // We can assume ciliai_ui.js is listening for DOMContentLoaded, but since we just changed the DOM dynamically:
-             if (typeof window.bootCiliAI_UI === 'function') {
-                 window.bootCiliAI_UI(); // Call exposed boot function if available
-             } else {
-                 // Fallback: reload the script or rely on event listeners if attached to document body
-                 location.reload(); // Hard reset ensures UI scripts re-bind to new DOM
-                 return; 
-             }
-        }
-
-        console.log("CiliAI: Layout injected.");
-    };
-
-
+    }
+    
     /**
      * Normalizes a term for keyword matching.
      */
@@ -296,67 +276,6 @@
         if (typeof term !== 'string') return '';
         return term.toLowerCase().replace(/[\W_]/g, '').replace(/s$/, '');
     }
-
-
-/* ==============================================================
- * CiliAI – Interactive Explorer (v5.1 – Nov 15, 2025)
- * ==============================================================
- * • BUILT FROM SCRATCH based on user's question list.
- * • Loads the pre-compiled 'ciliAI_master_database.json' + 'ciliAI_lookups.json'
- * • Lazy-loads the large phylogeny files only when needed.
- * • Fixes all known layout, normalization, and query routing bugs.
- * • INTEGRATED: displayFullGeneInfo (Nov 15, 2025)
- * ============================================================== */
-
-(function () {
-    'use strict';
-
-    // ==========================================================
-    // 1. GLOBAL STATE & CONSTANTS
-    // ==========================================================
-
-    window.CiliAI = {
-        data: {
-            umap: [] // Init umap data
-        },
-        masterData: [],
-        ready: false,
-        lookups: {}
-    };
-
-    let lastQueryContext = { type: null, data: [], term: null };
-
-    // Phylogeny data is lazy-loaded, so it starts as null
-    window.liPhylogenyCache = null;
-    window.neversPhylogenyCache = null;
-    window.CiliAI_UMAP = null; // This will be populated from the master DB
-
-    // --- Data Maps (These are now just for the AI brain) ---
-
-
-// ===========================================================
-// INIT — Loads all precompiled CiliAI datasets
-// ===========================================================
-async function initCiliAI() {
-    console.log('CiliAI: Initializing (v5.2 Pre-compiled)…');
-
-    await loadCiliAIData();
-
-    if (!window.CiliAI.masterData || window.CiliAI.masterData.length === 0) {
-        console.error("CiliAI: Master data is empty. Database load failed.");
-        window.CiliAI.ready = false;
-        return;
-    }
-
-    window.CiliAI.ready = true;
-    console.log('CiliAI: Ready! Pre-compiled database loaded.');
-
-    // Tell UI layer that data is ready
-    if (typeof window.CiliAI_UI_OnReady === "function") {
-        window.CiliAI_UI_OnReady();
-    }
-}
-
 
     // ==========================================================
     // 3. STATIC UI & PAGE DISPLAY
@@ -369,6 +288,42 @@ async function initCiliAI() {
         'ciliary-membrane': { title: 'Ciliary Membrane', description: 'Specialized membrane...', genes: ['PKD1', 'ARL13B'] },
         "nucleus": { title: "Nucleus", description: "Contains the cell's DNA..." },
         "cell-body": { title: "Cell Body / Cytoplasm", description: "The main body of the cell..." },
+    };
+
+   window.displayCiliAIPage = async function () {
+        console.log("CiliAI: displayCiliAIPage() called.");
+        const area = document.querySelector('.content-area');
+        if (!area) {
+            console.error('CiliAI: .content-area not found.');
+            return;
+        }
+
+        area.className = 'content-area content-area-full';
+        const panel = document.querySelector('.cilia-panel');
+        if (panel) panel.style.display = 'none';
+
+        injectPageCSS();
+        area.innerHTML = getPageHTML();
+        // generateAndInjectSVG(); // <-- REMOVED
+        setupPageEventListeners();
+
+        const status = document.getElementById('dataStatus');
+        if (window.CiliAI.ready) {
+            status.textContent = `Ready (${window.CiliAI.masterData.length} genes)`;
+            status.className = 'status ready';
+            addChatMessage(`Database loaded! ${window.CiliAI.masterData.length} genes available. Try searching for IFT88 or click on the cilium.`, false);
+        } else {
+            status.textContent = 'Load failed';
+            status.className = 'status error';
+            addChatMessage('Failed to load database. Some features may be limited.', false);
+        }
+        
+        // --- MODIFIED: Show FOXJ1 UMAP on load ---
+        await handleUmapPlot('FOXJ1');
+        addChatMessage(`Displaying default Lung scRNA-seq UMAP for <strong>FOXJ1</strong> on the left.`, false);
+        // --- END OF MODIFICATION ---
+
+        console.log("CiliAI: Page displayed.");
     };
 
     
@@ -614,88 +569,64 @@ function injectPageCSS() {
     }
 
    function setupPageEventListeners() {
-        // 1. Attach to the specific app container to prevent duplicate listeners on re-renders
-        const appContainer = document.getElementById('ciliai-app');
-        if (!appContainer) {
-            // If container isn't ready yet (e.g. during first boot), try body but be careful
-            document.body.addEventListener('click', handleGlobalClicks);
-            return;
-        }
+        document.body.addEventListener('click', e => {
+            const feedbackBtn = e.target.closest('.ciliai-reaction-btn');
+            if (feedbackBtn) {
+                const type = feedbackBtn.textContent.includes('👍') ? 'up' : 'down';
+                react(type);
+                return;
+            }
+            const geneBadge = e.target.closest('.gene-badge');
+            if (geneBadge) {
+                const gene = geneBadge.textContent.trim();
+                if (gene) searchGene(gene);
+                return;
+            }
 
-        // Use a named function so we can remove it if needed, or just attach to the container
-        appContainer.addEventListener('click', handleGlobalClicks);
+            // --- THIS IS THE CORRECTED BLOCK ---
+            const aiAction = e.target.closest('.ai-action');
+            if (aiAction) {
+                const action = aiAction.dataset.action;
 
-        // --- D. Re-bind Input Fields (Enter Key) ---
+                if (action) {
+                    e.preventDefault(); // Stop the link from navigating
+                    const genes = aiAction.dataset.genes || "";
+                    let query = "";
+                    if (action === 'show-li-heatmap') query = `show li phylogeny for ${genes}`;
+                    else if (action === 'show-nevers-heatmap') query = `show nevers phylogeny for ${genes}`;
+                    else if (action === 'show-table-view') query = `show data table for ${genes}`;
+                    
+                    // --- THIS IS THE FIX ---
+                    // This block catches the click on "View [GENE] on UMAP"
+                    else if (action === 'show-umap-plot') {
+                        log(`Action: show-umap-plot for ${genes}`);
+                        handleUmapPlot(genes); // This will now show the plot
+                        return; // Stop processing
+                    }
+                    // --- END OF FIX ---
+
+                    if (query) {
+                        addChatMessage(query, true);
+                        handleAIQuery(query);
+                    }
+                    return;
+                }
+                // (NEW) If there is no 'data-action', it's a normal link
+                // (e.g., "View Publication"). We do NOT call e.preventDefault(),
+                // so the browser will follow the href and target="_blank".
+            }
+            // --- END OF CORRECTION ---
+        });
+
         const geneSearchInput = document.getElementById('geneSearch');
-        if (geneSearchInput) {
-            geneSearchInput.addEventListener('keyup', e => {
-                if (e.key === 'Enter' && window.searchGene) window.searchGene();
-            });
-        }
-
+        if (geneSearchInput) geneSearchInput.addEventListener('keyup', e => {
+            if (e.key === 'Enter') searchGene();
+        });
         const chatInput = document.getElementById('chatInput');
-        if (chatInput) {
-            chatInput.addEventListener('keyup', e => {
-                if (e.key === 'Enter' && window.sendMsg) window.sendMsg();
-            });
-        }
-
+        if (chatInput) chatInput.addEventListener('keyup', e => {
+            if (e.key === 'Enter') sendMsg();
+        });
         console.log("CiliAI: Page event listeners set up.");
-    }
-
-    
-    
-   // Helper to handle global clicks (moved out to avoid closure duplication issues)
-    function handleGlobalClicks(e) {
-        // --- A. Handle Reaction Buttons (Thumbs Up/Down) ---
-        const feedbackBtn = e.target.closest('.ciliai-reaction-btn');
-        if (feedbackBtn) {
-            const type = feedbackBtn.textContent.includes('👍') ? 'up' : 'down';
-            if (window.react) window.react(type);
-            return;
-        }
-
-        // --- B. Handle Gene Badges (Clickable pills) ---
-        const geneBadge = e.target.closest('.gene-badge');
-        if (geneBadge) {
-            const gene = geneBadge.textContent.trim();
-            if (gene && window.searchGene) window.searchGene(gene);
-            return;
-        }
-
-        // --- C. Handle AI Action Links (Blue links in chat) ---
-        const aiAction = e.target.closest('.ai-action');
-        if (aiAction) {
-            const action = aiAction.dataset.action;
-
-            // If it's a normal link (like a PubMed link), let it function normally
-            if (!action) return; 
-
-            e.preventDefault(); // Stop navigation for internal actions
-            const genes = aiAction.dataset.genes || "";
-            let query = "";
-
-            if (action === 'show-li-heatmap') query = `show li phylogeny for ${genes}`;
-            else if (action === 'show-nevers-heatmap') query = `show nevers phylogeny for ${genes}`;
-            else if (action === 'show-table-view') query = `show data table for ${genes}`;
-            
-            // Special Case: UMAP Plot
-            else if (action === 'show-umap-plot') {
-                // We need to call the internal handleUmapPlot if possible, or trigger via global
-                // Since handleUmapPlot is internal to the closure, we can't call it directly from here 
-                // unless we expose it or move this function inside the closure.
-                // Ideally, use the global handleAIQuery to trigger it.
-                if(window.handleAIQuery) window.handleAIQuery(`plot umap for ${genes}`);
-                return; 
-            }
-
-            // Process the constructed query
-            if (query) {
-                if(window.addChatMessage) window.addChatMessage(query, true);
-                if (window.handleAIQuery) window.handleAIQuery(query);
-            }
-            return;
-        }
     }
     
     // ==========================================================
@@ -708,65 +639,72 @@ function injectPageCSS() {
         console.log(`[CiliAI] ${message}`);
     }
 
-    /**
-     * (REPLACEMENT) Robust Gene Extractor
-     */
-    function extractMultipleGenes(query) {
-        if (!query || typeof query !== 'string') return [];
-        
-        log(`[Gene Extraction] Processing: "${query}"`);
-        const qLower = query.toLowerCase();
+/**
+ * (REPLACEMENT) Robust Gene Extractor
+ * This version uses a manual map for common genes and an expanded stopword list
+ * to correctly parse complex queries and avoid "THE" bugs.
+ */
+function extractMultipleGenes(query) {
+    if (!query || typeof query !== 'string') return [];
+    
+    log(`[Gene Extraction] Processing: "${query}"`);
+    const qLower = query.toLowerCase();
 
-        // Manual map for high-priority or problematic gene names
-        const manualMap = {
-            'kif3a': 'KIF3A',
-            'ift88': 'IFT88',
-            'bbs1': 'BBS1',
-            'arl13b': 'ARL13B',
-            'cep290': 'CEP290',
-            'tmem67': 'TMEM67',
-            'ofd1': 'OFD1',
-            'ift52': 'IFT52',
-            'pkd1': 'PKD1',
-            'evc2': 'EVC2'
-        };
+    // Manual map for high-priority or problematic gene names
+    const manualMap = {
+        'kif3a': 'KIF3A',
+        'ift88': 'IFT88',
+        'bbs1': 'BBS1',
+        'arl13b': 'ARL13B',
+        'cep290': 'CEP290',
+        'tmem67': 'TMEM67',
+        'ofd1': 'OFD1',
+        'ift52': 'IFT52',
+        'pkd1': 'PKD1',
+        'evc2': 'EVC2'
+    };
 
-        let foundGenes = new Set();
-        
-        // Check manual map first
-        for (const [key, gene] of Object.entries(manualMap)) {
-            if (qLower.includes(key)) {
-                foundGenes.add(gene);
-            }
+    let foundGenes = new Set();
+    
+    // Check manual map first
+    for (const [key, gene] of Object.entries(manualMap)) {
+        if (qLower.includes(key)) {
+            log(`[Gene Extraction] Found via manual map: ${gene}`);
+            foundGenes.add(gene);
         }
-
-        // Use regex for other gene-like patterns
-        const geneRegex = /\b([A-Z0-9\-\.]{3,})\b/gi;
-        let matches = query.match(geneRegex) || [];
-        
-        // Enhanced stop words list
-        const stopWords = new Set([
-            "THE", "AND", "FOR", "NOT", "ARE", "WHAT", "SHOW", "LIST", "GENE", "GENES",
-            "PLOT", "COMPARE", "WHAT'S", "DESCRIBE", "OF", "IN", "LOSS", "FUNCTION",
-            "EFFECT", "WITH", "THAT", "THIS", "ABOUT", "TELL", "ME", "SHORT", "LONG",
-            "LONGER", "CILIA", "CILIARY", "PROTEINS", "WHICH", "FIND", "CAUSES", "CAUSE",
-            "KNOCKED", "DOWN", "WHEN", "NO", "KNOWN", "CORUM", "LINKED", "ASSOCIATED"
-        ]);
-        
-        const geneMap = window.CiliAI.lookups.geneMap;
-        if (!geneMap) return [];
-
-        for (const match of matches) {
-            const upperMatch = match.toUpperCase();
-            if (!stopWords.has(upperMatch) && geneMap[upperMatch]) {
-                foundGenes.add(upperMatch);
-            }
-        }
-        
-        return Array.from(foundGenes);
     }
 
+    // Use regex for other gene-like patterns
+    const geneRegex = /\b([A-Z0-9\-\.]{3,})\b/gi;
+    let matches = query.match(geneRegex) || [];
+    
+    // Enhanced stop words list to prevent "THE" bug
+    const stopWords = new Set([
+        "THE", "AND", "FOR", "NOT", "ARE", "WHAT", "SHOW", "LIST", "GENE", "GENES",
+        "PLOT", "COMPARE", "WHAT'S", "DESCRIBE", "OF", "IN", "LOSS", "FUNCTION",
+        "EFFECT", "WITH", "THAT", "THIS", "ABOUT", "TELL", "ME", "SHORT", "LONG",
+        "LONGER", "CILIA", "CILIARY", "PROTEINS", "WHICH", "FIND", "CAUSES", "CAUSE",
+        "KNOCKED", "DOWN", "WHEN", "NO", "KNOWN", "CORUM", "LINKED", "ASSOCIATED"
+    ]);
+    
+    const geneMap = window.CiliAI.lookups.geneMap;
+    if (!geneMap) return [];
 
+    for (const match of matches) {
+        const upperMatch = match.toUpperCase();
+        if (!stopWords.has(upperMatch) && geneMap[upperMatch]) {
+            log(`[Gene Extraction] Found via regex: ${upperMatch}`);
+            foundGenes.add(upperMatch);
+        }
+    }
+    
+    const finalGenes = Array.from(foundGenes);
+    log(`[Gene Extraction] Final valid genes:`, finalGenes);
+    return finalGenes;
+}
+
+    
+    
 function formatListResult(title, genes, description = "") {
         let geneListHtml = '';
         if (genes && genes.length > 0) {
@@ -790,34 +728,6 @@ function formatListResult(title, genes, description = "") {
             </div>
         `;
     }
-
-    // Expose addChatMessage globally so it can be used by UI handlers
-    window.addChatMessage = function(html, isUser = false) {
-        const chatWindow = document.getElementById('messages');
-        if (!chatWindow) return;
-        const msg = document.createElement('div');
-        msg.className = `ciliai-message ${isUser ? 'user' : 'assistant'}`;
-        msg.innerHTML = `<div class="ciliai-message-content">${html}</div>`;
-        if (!isUser) {
-            msg.querySelector('.ciliai-message-content').innerHTML += `
-                <div class="ciliai-reaction-buttons">
-                    <span class="ciliai-reaction-btn" onclick="window.react('up')">👍</span>
-                    <span class="ciliai-reaction-btn" onclick="window.react('down')">👎</span>
-                </div>`;
-        }
-        chatWindow.appendChild(msg);
-        chatWindow.scrollTop = chatWindow.scrollHeight;
-    };
-
-    window.handleUserSend = function() {
-        const chatInput = document.getElementById('chatInput');
-        if (!chatInput) return;
-        const query = chatInput.value.trim();
-        if (!query) return;
-        window.addChatMessage(query, true);
-        chatInput.value = '';
-        if(window.handleAIQuery) window.handleAIQuery(query);
-    };
 
     function addChatMessage(html, isUser = false) {
         const chatWindow = document.getElementById('messages');
@@ -3083,183 +2993,88 @@ function extractPhenotypeIntent(qLower) {
         return html;
     }
 
-
-// ==========================================================
-// 5. GLOBAL UI WRAPPERS & STARTUP
-// ==========================================================
-
-window.selectComp = function (id) {
-    // Safety: Check if SVG generator exists
-    if (typeof generateAndInjectSVG === 'function') {
-        generateAndInjectSVG(); 
-    }
     
-    document.querySelectorAll('.cilia-part')
-        .forEach(el => el.classList.remove('selected', 'active'));
+ // ==========================================================
+    // 5. GLOBAL UI WRAPPERS & STARTUP
+    // ==========================================================
 
-    const el = document.getElementById(id);
-    if (el) el.classList.add('selected');
+    window.selectComp = function (id) {
+        generateAndInjectSVG(); 
+        
+        document.querySelectorAll('.cilia-part').forEach(el => el.classList.remove('selected', 'active'));
+        const el = document.getElementById(id);
+        if (el) el.classList.add('selected');
 
-    // Ensure map exists (defined at top of file)
-    if (typeof structureInfoMap === 'undefined') return;
-    const data = structureInfoMap[id];
-    if (!data) return;
+        const data = structureInfoMap[id];
+        if (!data) return;
 
-    // Ensure logic helper exists
-    if (typeof getGenesByLocalization === 'function') {
         const genes = getGenesByLocalization(data.title);
 
         const bar = document.getElementById('bottomBar');
-        if (bar) {
-            if (genes.length > 0) {
-                bar.innerHTML = `
-                    <h3>${data.title} (${genes.length} genes)</h3>
-                    <div class="gene-list">
-                        ${genes.slice(0, 40).map(g =>
-                            `<span class="gene-badge" data-gene="${g.gene}">${g.gene}</span>`
-                        ).join('')}
-                        ${genes.length > 40
-                            ? `<span style="font-size:11px;color:#666;padding:5px;">...+${genes.length - 40} more</span>`
-                            : ''}
-                    </div>`;
-            } else {
-                bar.innerHTML = `
-                    <h3>${data.title}</h3>
-                    <p style="color:#666;font-size:12px;">No genes found in database. Try searching directly.</p>`;
-            }
+        if (genes.length > 0) {
+            bar.innerHTML = `<h3>${data.title} (${genes.length} genes)</h3>
+            <div class="gene-list">${genes.slice(0, 40).map(g =>
+                `<span class="gene-badge" data-gene="${g.gene}">${g.gene}</span>`
+            ).join('')}${genes.length > 40 ? `<span style="font-size:11px;color:#666;padding:5px;">...+${genes.length - 40} more</span>` : ''}</div>`;
+        } else {
+            bar.innerHTML = `<h3>${data.title}</h3><p style="color:#666;font-size:12px;">No genes found in database. Try searching directly.</p>`;
         }
     }
-};
 
-window.searchGene = function (name) {
-    const geneInput = document.getElementById('geneSearch');
-    const query = name || (geneInput ? geneInput.value.trim().toUpperCase() : '');
-    if (!query) return;
-
-    // Use UI helper if available
-    if (typeof addChatMessage === 'function') {
+    window.searchGene = function (name) {
+        const query = name || document.getElementById('geneSearch').value.trim().toUpperCase();
+        if (!query) return;
         addChatMessage(`Tell me about ${query}`, true); 
-    }
-    
-    // Route to Logic
-    if (window.handleAIQuery) {
-        window.handleAIQuery(`Tell me about ${query}`);
-    } else if (typeof handleGeneSearch === 'function') {
         handleGeneSearch(query, true);
     }
-};
 
-// ----------------------------------------------------------
-// Buttons: Default UMAP & Default Phylogeny
-// ----------------------------------------------------------
-
-window.showDefaultUMAP = function () {
-    if (typeof addChatMessage === 'function') {
+    // --- MODIFIED: This is the new button handler for the UMAP/scRNA plot ---
+    window.showDefaultUMAP = function () {
         addChatMessage('Display gene expression in Lung scRNA-seq (Default: FOXJ1)', true);
+        // --- MODIFIED: Using simple, direct query ---
+        handleAIQuery('plot default umap');
     }
-    if (window.handleAIQuery) window.handleAIQuery('plot default umap');
-};
 
-window.showDefaultPhylogeny = function () {
-    if (typeof addChatMessage === 'function') {
-        addChatMessage('Show Phylogenetics Analysis (Default Genes)', true);
+    // --- NEW: Function for default phylogeny plot ---
+    window.showDefaultPhylogeny = function () {
+        addChatMessage(`Show Phylogenetics Analysis (Default Genes)`, true);
+        // --- MODIFIED: Using simple, direct query ---
+        handleAIQuery('plot default phylogeny');
     }
-    if (window.handleAIQuery) window.handleAIQuery('plot default phylogeny');
-};
 
-// ----------------------------------------------------------
-// Chat + Feedback Controls
-// ----------------------------------------------------------
-
-window.sendMsg = function () {
-    // Route to internal handler if exists, otherwise global
-    if (typeof handleUserSend === 'function') {
+    window.sendMsg = function () {
         handleUserSend();
-    } else if (window.handleUserSend) {
-        window.handleUserSend();
     }
-};
 
-window.react = function (type) {
-    if (typeof addChatMessage === 'function') {
+    window.react = function (type) {
         if (type === 'up') {
             addChatMessage('Thanks for the feedback! 🙏', false);
         } else {
             addChatMessage('Sorry about that. What specifically would help?', false);
         }
     }
-};
 
-// ----------------------------------------------------------
-// Clear Chat
-// ----------------------------------------------------------
-
-window.clearChat = function () {
-    if (confirm('Start new conversation?')) {
-        const msgs = document.getElementById('messages');
-        if (msgs) msgs.innerHTML = '';
-        
-        if (typeof generateAndInjectSVG === 'function') {
+    window.clearChat = function () {
+        if (confirm('Start new conversation?')) {
+            document.getElementById('messages').innerHTML = '';
             generateAndInjectSVG(); 
-        }
-        
-        document.querySelectorAll('.cilia-part')
-            .forEach(el => el.classList.remove('selected', 'active'));
-
-        if (typeof addChatMessage === 'function') {
+            document.querySelectorAll('.cilia-part').forEach(el => el.classList.remove('selected', 'active'));
             addChatMessage('Welcome back! How can I help?', false);
         }
     }
-};
 
-// ----------------------------------------------------------
-// Plot Downloader
-// ----------------------------------------------------------
+    window.downloadPlot = function (divId, filename) {
+        const plotDiv = document.getElementById(divId);
+        if (plotDiv && window.Plotly) {
+            Plotly.downloadImage(plotDiv, { format: 'png', filename: filename, width: 1200, height: 800 });
+        }
+    }
 
-window.downloadPlot = function (divId, filename) {
-    const plotDiv = document.getElementById(divId);
-    if (plotDiv && window.Plotly) {
-        Plotly.downloadImage(plotDiv, {
-            format: 'png',
-            filename: filename,
-            width: 1200,
-            height: 800
-        });
+    // --- STARTUP ---
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initCiliAI);
     } else {
-        console.warn("Download failed: Plotly or Container not found.");
-    }
-};
-
-// ----------------------------------------------------------
-// STARTUP: Initialize CiliAI when DOM ready
-// ----------------------------------------------------------
-
-if (document.readyState === 'loading') {
-    // Wait for DOM, then call init
-    document.addEventListener('DOMContentLoaded', () => {
-        if (window.initCiliAI) window.initCiliAI();
-    });
-} else {
-    // DOM ready, call immediately
-    if (window.initCiliAI) window.initCiliAI();
-}
-
-// ===========================================================
-// UI HOOK — Called from UI layer once browser loads ciliai_ui.js
-// ===========================================================
-
-window.CiliAI_UI_OnReady = window.CiliAI_UI_OnReady || function () {
-        console.warn("CiliAI_UI_OnReady called but ciliai_ui.js is not loaded yet.");
-    };
-
-    // Auto-run only if this script is loaded by /ciliai index
-    if (document.body && document.body.dataset && document.body.dataset.ciliai === "enabled") {
-        // Defer start so UI loads first
-        setTimeout(() => {
-            if (typeof window.initCiliAI === "function") {
-                window.initCiliAI();
-            }
-        }, 10);
+        initCiliAI();
     }
 
-})(); // <--- THIS IS THE CRITICAL MISSING PIECE
+})();
