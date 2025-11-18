@@ -104,63 +104,108 @@
     </div>
 
 <script>
-let CiliAI = { masterData: [], lookups: {}, ready: false };
+window.CiliAI = { masterData: [], lookups:{}, ready:false, cellDataCache:{} };
 
-// --- Load JSON Data ---
-async function loadCiliAIData() {
+// --- Custom loader ---
+async function loadCiliAIData(timeoutMs = 60000) {
+    const baseUrl = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/';
+    const mainDbUrl = baseUrl + 'ciliAI_master_database.json';
+    const lookupsUrl = baseUrl + 'ciliAI_lookups.json';
+
     try {
-        const [masterRes, lookupsRes] = await Promise.all([
-            fetch('https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/ciliAI_master_database.json'),
-            fetch('https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/ciliAI_lookups.json')
+        console.log(`Fetching main database: ${mainDbUrl}`);
+        console.log(`Fetching lookups: ${lookupsUrl}`);
+        
+        const [mainRes, lookupsRes] = await Promise.all([
+            fetch(mainDbUrl),
+            fetch(lookupsUrl)
         ]);
-        CiliAI.masterData = await masterRes.json();
-        CiliAI.lookups = await lookupsRes.json();
-        CiliAI.ready = true;
-        document.getElementById('dataStatus').textContent = `Ready (${CiliAI.masterData.length} genes)`;
+
+        if (!mainRes.ok) throw new Error(`HTTP ${mainRes.status} for main database`);
+        if (!lookupsRes.ok) throw new Error(`HTTP ${lookupsRes.status} for lookups`);
+        
+        const mainData = await mainRes.json();
+        const lookupData = await lookupsRes.json();
+        
+        // Assign all the pre-processed data
+        window.CiliAI.masterData = mainData.masterData;
+        window.CiliAI.lookups = lookupData.lookups;
+        
+        // Assign the raw UMAP data
+        window.CiliAI_UMAP = mainData.umapData; 
+        window.CiliAI.data = { umap: mainData.umapData }; 
+        
+        // --- Create the UMAP lookup map ---
+        window.CiliAI.lookups.umapByGene = {};
+        if (window.CiliAI_UMAP && Array.isArray(window.CiliAI_UMAP)) {
+            for (const point of window.CiliAI_UMAP) {
+                if (point.Gene) { 
+                    window.CiliAI.lookups.umapByGene[point.Gene.toUpperCase()] = point;
+                } 
+            }
+        }
+
+        // Gene map for fast lookups
+        window.CiliAI.lookups.geneMap = {};
+        for (const gene of mainData.masterData) {
+            if (gene.Gene) window.CiliAI.lookups.geneMap[gene.Gene.toUpperCase()] = gene;
+        }
+
+        // Build cellDataCache for scRNA-seq plotting
+        console.log("Building scRNA expression cache for UMAP...");
+        window.CiliAI.cellDataCache = {};
+        for (const gene of mainData.masterData) {
+            if (gene.Gene && gene.expression && gene.expression.scRNA) {
+                window.CiliAI.cellDataCache[gene.Gene.toUpperCase()] = gene.expression.scRNA;
+            }
+        }
+        console.log("scRNA expression cache built.");
+
+        window.CiliAI.ready = true;
+        document.getElementById('dataStatus').textContent = `Ready (${window.CiliAI.masterData.length} genes)`;
         document.getElementById('dataStatus').className = 'status ready';
-        addChatMessage(`Database loaded! ${CiliAI.masterData.length} genes available.`, false);
-    } catch(e) {
-        console.error(e);
+        addChatMessage(`Database loaded! ${window.CiliAI.masterData.length} genes available.`, false);
+
+    } catch (err) {
+        console.error("Failed to load CiliAI master database:", err);
         document.getElementById('dataStatus').textContent = 'Load failed';
         document.getElementById('dataStatus').className = 'status error';
+        window.CiliAI.ready = false;
     }
 }
 
-// --- UMAP plot ---
-async function fetchUMAPFromCiliAI(gene) {
-    if(!CiliAI.ready) return null;
-    const entry = CiliAI.masterData.find(g => g.gene.toLowerCase() === gene.toLowerCase());
-    if(!entry || !entry.umap) {
-        addChatMessage(`UMAP data for <strong>${gene}</strong> not found.`, false);
-        return null;
-    }
-    return entry.umap;
-}
-
+// --- UMAP plotting ---
 async function updateUMAP(gene) {
-    const data = await fetchUMAPFromCiliAI(gene);
-    if(!data) return;
+    if(!window.CiliAI.ready) return;
+    gene = gene.toUpperCase();
+    const cellData = window.CiliAI.cellDataCache[gene];
+    if(!cellData) {
+        addChatMessage(`No UMAP data found for <strong>${gene}</strong>`, false);
+        return;
+    }
+    const x = [], y = [];
+    for(const cell of cellData.cells) { x.push(cell.umap[0]); y.push(cell.umap[1]); }
+
     Plotly.newPlot('umap-plot', [{
-        x: data.x,
-        y: data.y,
+        x, y,
         mode:'markers',
         type:'scatter',
         marker:{ size:8, color:'orange', opacity:0.7 },
-        text: data.x.map((_,i)=>gene+' Cell '+(i+1))
+        text: cellData.cells.map((c,i)=>gene+' Cell '+(i+1))
     }], { title: gene+' scRNA-seq UMAP', xaxis:{title:'UMAP1'}, yaxis:{title:'UMAP2'}, margin:{t:40} });
     addChatMessage(`Displaying UMAP for <strong>${gene}</strong>`, false);
 }
 
 // --- Gene search ---
 async function searchGene() {
-    let geneInput = document.getElementById('geneSearch').value.trim();
+    let geneInput = document.getElementById('geneSearch').value.trim().toUpperCase();
     if(!geneInput) return;
-    if(CiliAI.lookups[geneInput.toUpperCase()]) geneInput = CiliAI.lookups[geneInput.toUpperCase()];
+    if(window.CiliAI.lookups.geneMap[geneInput]) geneInput = window.CiliAI.lookups.geneMap[geneInput].Gene.toUpperCase();
     addChatMessage(`Searching for gene: ${geneInput}`, true);
     await updateUMAP(geneInput);
 }
 
-// --- Chat messages ---
+// --- Chatbox ---
 function addChatMessage(msg, user=false) {
     const msgEl = document.createElement('div');
     msgEl.className = 'ciliai-message '+(user?'user':'assistant');
@@ -195,7 +240,7 @@ function generateAndInjectSVG() {
     ['axoneme','transition-zone','basal-body','ciliary-membrane','cell-body','nucleus'].forEach(id=>{
         document.getElementById(id).onclick = ()=> {
             addChatMessage(`Clicked on <strong>${id}</strong>`, true);
-            updateUMAP(id.toUpperCase()); // Simple mapping for demo
+            updateUMAP(id.toUpperCase());
         }
     });
 }
