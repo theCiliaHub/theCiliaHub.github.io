@@ -561,15 +561,31 @@
     renderPlotHome: () => window.CiliAI.Plots.renderPlotHome()
   };
 
-   // Make all CiliAI internals accessible to ciliai_ui.js
-   window.CiliAICore = {
-    loadCiliAIData,
-    initCiliAI,
-    CiliAI: window.CiliAI
-   };
-  // DOM ready
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bootUI);
-  else bootUI();
+  // --- Make CiliAI core functions available safely ---
+window.CiliAICore = {
+  loadCiliAIData: (typeof loadCiliAIData === 'function') ? loadCiliAIData : null,
+  initCiliAI: (typeof initCiliAI === 'function') ? initCiliAI : null,
+  CiliAI: window.CiliAI || {}
+};
+   
+ if (typeof loadCiliAIData === 'function') {
+  await loadCiliAIData();
+  // if loader doesn't set ready, do so
+  if (window.CiliAI && window.CiliAI.masterData) window.CiliAI.ready = true;
+  setDataStatus();
+  addBotMessage('CiliAI database loaded (loadCiliAIData).');
+  return;
+}
 
+   if (window.CiliAICore.loadCiliAIData) {
+  await window.CiliAICore.loadCiliAIData();
+  if (window.CiliAI && window.CiliAI.masterData) window.CiliAI.ready = true;
+  setDataStatus();
+  addBotMessage('CiliAI database loaded (loadCiliAIData).');
+  return;
+}
+   
+
+   
 })();
 
