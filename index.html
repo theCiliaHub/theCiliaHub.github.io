@@ -7,6 +7,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
     
     <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
 
     <style>
         :root {
@@ -23,11 +24,11 @@
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body, html { height: 100%; background: var(--bg); overflow: hidden; }
 
-        #app { display: flex; height: 100vh; width: 100vw; }
+        #ciliai-app { display: flex; height: 100vh; width: 100vw; }
 
         /* --- Sidebar --- */
         #sidebar {
-            width: 260px;
+            width: 250px;
             flex-shrink: 0;
             background: linear-gradient(180deg, #071023 0%, #0b1220 100%);
             color: white;
@@ -48,8 +49,8 @@
             background: linear-gradient(135deg, var(--accent), #5568d3);
             border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 20px;
         }
-        .brand h1 { font-size: 18px; font-weight: 700; }
-        .brand p { font-size: 11px; color: rgba(255,255,255,0.6); }
+        .brand h1 { font-size: 18px; font-weight: 700; margin: 0; }
+        .brand p { font-size: 11px; color: rgba(255,255,255,0.6); margin: 0; }
 
         .side-group { margin-top: 8px; }
         .side-group h3 {
@@ -64,7 +65,7 @@
         .side-link:hover { background: rgba(255,255,255,0.05); }
         .side-link.active { background: rgba(102, 126, 234, 0.15); color: white; font-weight: 600; }
 
-        /* --- Main Content Area --- */
+        /* --- Main Area --- */
         #main-wrapper {
             flex: 1;
             display: flex;
@@ -72,59 +73,77 @@
             overflow: hidden;
         }
 
-        /* --- Top Search Bar --- */
-        .top-search {
+        /* --- Top Header & Search --- */
+        .top-header {
             background: white;
-            padding: 12px 20px;
+            padding: 15px 25px;
             border-bottom: 1px solid var(--border);
             display: flex;
-            gap: 12px;
             align-items: center;
+            justify-content: space-between;
             height: 70px;
             flex-shrink: 0;
         }
-        .search-box { position: relative; flex: 1; max-width: 500px; }
-        .search-box input {
-            width: 100%; padding: 10px 40px 10px 12px;
-            border: 2px solid var(--border); border-radius: 8px; font-size: 14px; transition: all 0.2s;
+
+        .search-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex: 1;
+            max-width: 600px;
         }
-        .search-box input:focus { outline: none; border-color: var(--accent); }
+
+        .search-wrapper h3 {
+            font-size: 14px; 
+            font-weight: 600; 
+            color: var(--muted);
+            margin-right: 10px;
+            white-space: nowrap;
+        }
+
+        .search-box { position: relative; flex: 1; }
+        .search-box input {
+            width: 100%; padding: 10px 40px 10px 15px;
+            border: 2px solid var(--border); border-radius: 8px; font-size: 14px; transition: all 0.2s;
+            background: #f9fafb;
+        }
+        .search-box input:focus { outline: none; border-color: var(--accent); background: white; }
         .search-icon { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); color: var(--muted); pointer-events: none; }
         
         .search-btn {
             padding: 10px 20px; background: var(--accent); color: white;
             border: none; border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.2s;
+            white-space: nowrap;
         }
         .search-btn:hover { background: #5568d3; }
-        
-        .status-indicator { font-size: 12px; color: var(--muted); margin-left: auto; display: flex; align-items: center; gap: 6px; }
+
+        .status-indicator { font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 8px; }
         .status-dot { width: 8px; height: 8px; border-radius: 50%; background: #ccc; }
         .status-dot.ready { background: #10b981; }
         .status-dot.loading { background: #f59e0b; }
 
-        /* --- Split View (Plot vs Chat) --- */
+        /* --- Split Content --- */
         #content-split {
             flex: 1;
             display: flex;
             overflow: hidden;
         }
 
-        /* --- Center Panel (Visualization) --- */
+        /* --- Center Panel (Plot) --- */
         #center-panel {
-            flex: 1; /* Takes up remaining space */
+            flex: 1;
+            padding: 20px;
+            background: var(--bg);
             display: flex;
             flex-direction: column;
-            background: var(--bg);
-            padding: 15px;
             overflow: hidden;
-            position: relative;
         }
 
         .viz-card {
             background: white;
             border-radius: 12px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-            flex: 1; /* Fills the center panel */
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            flex: 1;
             display: flex;
             flex-direction: column;
             overflow: hidden;
@@ -139,7 +158,7 @@
             align-items: center;
             background: #fff;
         }
-        .viz-header h2 { font-size: 16px; font-weight: 600; color: #1e293b; }
+        .viz-header h2 { font-size: 16px; font-weight: 600; color: #1e293b; margin: 0; }
 
         #plot-container {
             flex: 1;
@@ -147,15 +166,15 @@
             width: 100%;
             height: 100%;
             padding: 10px;
+            overflow: hidden;
         }
         
-        /* Ensures Plotly fills the container */
-        .js-plotly-plot, .plot-container { width: 100% !important; height: 100% !important; }
-
+        /* Targets for Plotly */
+        #plot-display-area, #cilia-svg { width: 100%; height: 100%; }
 
         /* --- Right Panel (Chat) --- */
         #right-panel {
-            width: 380px;
+            width: 400px;
             background: white;
             border-left: 1px solid var(--border);
             display: flex;
@@ -165,12 +184,12 @@
         }
 
         .panel-header {
-            padding: 15px 20px;
+            padding: 20px;
             border-bottom: 1px solid var(--border);
             background: #fff;
         }
-        .panel-header h2 { font-size: 16px; font-weight: 600; }
-        .panel-header p { font-size: 12px; color: var(--muted); }
+        .panel-header h2 { font-size: 18px; font-weight: 700; margin: 0 0 5px 0; }
+        .panel-header p { font-size: 13px; color: var(--muted); margin: 0; }
 
         .messages {
             flex: 1;
@@ -178,82 +197,67 @@
             padding: 20px;
             display: flex;
             flex-direction: column;
-            gap: 12px;
+            gap: 15px;
             background: #f9fafb;
         }
 
-        .msg { max-width: 90%; padding: 10px 14px; border-radius: 12px; font-size: 13px; line-height: 1.5; word-wrap: break-word; }
+        .msg { max-width: 90%; padding: 12px 16px; border-radius: 12px; font-size: 14px; line-height: 1.5; word-wrap: break-word; }
         .msg.user { align-self: flex-end; background: var(--accent); color: white; border-radius: 14px 14px 2px 14px; }
-        .msg.bot { align-self: flex-start; background: white; border: 1px solid var(--border); color: #334155; border-radius: 14px 14px 14px 2px; }
+        .msg.bot { align-self: flex-start; background: white; border: 1px solid var(--border); color: #334155; border-radius: 14px 14px 14px 2px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
 
-        /* AI Result Card Styling (for HTML responses) */
-        .ai-result-card { background: white; padding: 0; }
-        .ai-result-card h4 { margin-bottom: 5px; color: var(--accent); }
-        .ai-result-card ul { padding-left: 20px; margin-top: 5px; }
+        /* Result Card Styling */
+        .ai-result-card { background: transparent; padding: 0; }
+        .ai-result-card h4 { margin: 0 0 5px 0; color: var(--accent); font-size: 15px; }
+        .ai-result-card ul { padding-left: 20px; margin: 5px 0; }
         .ai-result-card li { margin-bottom: 4px; }
+        .ai-action { color: var(--accent); text-decoration: none; font-weight: 600; cursor: pointer; }
+        .ai-action:hover { text-decoration: underline; }
 
-        .chat-input { padding: 15px; border-top: 1px solid var(--border); background: white; }
-        .input-row { display: flex; gap: 8px; }
-        .input-row input { flex: 1; padding: 10px; border: 1px solid var(--border); border-radius: 8px; font-size: 13px; }
-        .input-row input:focus { outline: none; border-color: var(--accent); }
-        .input-row button { padding: 10px 16px; border: none; background: var(--accent); color: white; border-radius: 8px; cursor: pointer; font-weight: 600; }
-        .input-row button:hover { background: #5568d3; }
+        .chat-input-area {
+            padding: 20px;
+            border-top: 1px solid var(--border);
+            background: white;
+        }
+        .input-group { display: flex; gap: 10px; }
+        .input-group input { 
+            flex: 1; padding: 12px; border: 1px solid var(--border); 
+            border-radius: 8px; font-size: 14px; background: #f9fafb;
+        }
+        .input-group input:focus { outline: none; border-color: var(--accent); background: white; }
+        .input-group button { 
+            padding: 0 20px; border: none; background: var(--accent); 
+            color: white; border-radius: 8px; font-weight: 600; cursor: pointer; 
+            transition: background 0.2s;
+        }
+        .input-group button:hover { background: #5568d3; }
 
-        @media (max-width: 1024px) {
-            #right-panel { width: 320px; }
+        @media (max-width: 1200px) {
+            #right-panel { width: 350px; }
         }
     </style>
 </head>
 <body>
-    <div id="app">
+    <div id="ciliai-app">
         <aside id="sidebar">
-            <div class="brand">
-                <div class="brand-icon">🧬</div>
-                <div>
-                    <h1>CiliAI</h1>
-                    <p>Unified Explorer</p>
-                </div>
-            </div>
-
-            <div class="side-group">
-                <h3>Analysis</h3>
-                <div class="side-link active" onclick="handleNavClick('umap')">
-                    <span>📊</span> UMAP Visualization
-                </div>
-                <div class="side-link" onclick="handleNavClick('phylogeny')">
-                    <span>🌳</span> Phylogeny
-                </div>
-                <div class="side-link" onclick="handleNavClick('expression')">
-                    <span>📈</span> Expression
-                </div>
-            </div>
-
-            <div class="side-group">
-                <h3>Tools</h3>
-                <div class="side-link" onclick="handleNavClick('batch')">
-                    <span>📁</span> Batch Query
-                </div>
-                <div class="side-link" onclick="handleNavClick('compare')">
-                    <span>⚖️</span> Compare
-                </div>
-            </div>
-        </aside>
+            </aside>
 
         <div id="main-wrapper">
             
-            <div class="top-search">
-                <h3>Gene Search</h3>
-                <div class="search-box">
-                    <input type="text" id="geneSearch" placeholder="Enter gene symbol (e.g., FOXJ1)">
-                    <span class="search-icon">🔍</span>
+            <header class="top-header">
+                <div class="search-wrapper">
+                    <h3>Gene Search</h3>
+                    <div class="search-box">
+                        <input type="text" id="geneSearch" placeholder="Enter gene symbol (e.g., IFT88, BBS1)...">
+                        <span class="search-icon">🔍</span>
+                    </div>
+                    <button class="search-btn" onclick="triggerSearch()">Explore</button>
                 </div>
-                <button class="search-btn" onclick="triggerSearch()">Explore</button>
-                
+
                 <div class="status-indicator">
-                    <div id="db-status-dot" class="status-dot loading"></div>
                     <span id="dataStatus">Loading Data...</span>
+                    <div id="db-status-dot" class="status-dot loading"></div>
                 </div>
-            </div>
+            </header>
 
             <div id="content-split">
                 
@@ -261,32 +265,31 @@
                     <div class="viz-card">
                         <div class="viz-header">
                             <h2 id="vizTitle">Visualization</h2>
-                            <div style="display:flex; gap:5px;">
-                                <button class="search-btn" style="padding:5px 10px; font-size:11px; background:#eee; color:#333;" onclick="downloadPlot()">📷 Save</button>
-                            </div>
+                            <button class="search-btn" style="padding:6px 12px; font-size:12px; background:#eee; color:#333;" onclick="downloadPlot()">📷 Save Plot</button>
                         </div>
                         <div id="plot-container">
                             <div id="cilia-svg" style="width:100%; height:100%;"></div> 
-                            </div>
+                            <div id="plot-display-area" style="display:none; width:100%; height:100%;"></div>
+                        </div>
                     </div>
                 </section>
 
                 <section id="right-panel">
                     <div class="panel-header">
                         <h2>AI Assistant</h2>
-                        <p>Ask questions about genes, diseases, or plots.</p>
+                        <p>Ask questions about genes, diseases, or data.</p>
                     </div>
 
                     <div class="messages" id="messages">
                         <div class="msg bot">
-                            👋 <strong>CiliAI Ready.</strong><br>
+                            👋 <strong>Welcome to CiliAI.</strong><br>
                             I can generate plots, list complex members, or explain gene functions.<br><br>
-                            <em>Try: "Show UMAP for IFT88" or "What is Joubert Syndrome?"</em>
+                            <em>Try: "Show UMAP for FOXJ1" or "What is Joubert Syndrome?"</em>
                         </div>
                     </div>
 
-                    <div class="chat-input">
-                        <div class="input-row">
+                    <div class="chat-input-area">
+                        <div class="input-group">
                             <input type="text" id="chatInput" placeholder="Type a question...">
                             <button onclick="triggerChat()">Send</button>
                         </div>
@@ -297,16 +300,12 @@
         </div>
     </div>
 
-    <script src="ciliai/ciliai.js"></script> 
-    
-    <script src="globals.js"></script> 
-
-    <script src="plots.js"></script> 
+    <script src="ciliai/ciliai.js"></script>
+    <script src="globals.js"></script>
+    <script src="plots.js"></script>
+    <script src="ciliai/ciliai_ui.js"></script>
 
     <script>
-        // --- Event Listeners for the HTML elements ---
-
-        // Trigger Search from Top Bar
         function triggerSearch() {
             const input = document.getElementById('geneSearch');
             const gene = input.value.trim();
@@ -318,7 +317,6 @@
             }
         }
 
-        // Trigger Chat
         function triggerChat() {
             const input = document.getElementById('chatInput');
             const text = input.value.trim();
@@ -330,25 +328,12 @@
             }
         }
 
-        // Handle Navigation Clicks
-        function handleNavClick(view) {
-            document.querySelectorAll('.side-link').forEach(l => l.classList.remove('active'));
-            event.currentTarget.classList.add('active');
-            
-            // Update Title
-            const titles = {
-                'umap': 'UMAP Visualization',
-                'phylogeny': 'Phylogenetic Analysis',
-                'expression': 'Expression Data'
-            };
-            document.getElementById('vizTitle').textContent = titles[view] || 'Visualization';
-
-            // Trigger specific logic based on view
-            if (view === 'umap' && window.showDefaultUMAP) window.showDefaultUMAP();
-            if (view === 'phylogeny' && window.showDefaultPhylogeny) window.showDefaultPhylogeny();
+        function downloadPlot() {
+            // Try to download whatever is visible
+            if(window.downloadPlot) window.downloadPlot('cilia-svg', 'cilia_plot');
         }
 
-        // Handle Enter Keys
+        // Enter Key Listeners
         document.getElementById('geneSearch').addEventListener('keyup', (e) => {
             if (e.key === 'Enter') triggerSearch();
         });
