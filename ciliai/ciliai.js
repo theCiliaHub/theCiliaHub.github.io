@@ -3249,18 +3249,17 @@ if (document.readyState === 'loading') {
 // ===========================================================
 
 window.CiliAI_UI_OnReady = window.CiliAI_UI_OnReady || function () {
-    // Default placeholder. The UI script overrides this later.
-    // console.log("CiliAI_UI_OnReady called but UI script not loaded.");
-};
+        console.warn("CiliAI_UI_OnReady called but ciliai_ui.js is not loaded yet.");
+    };
 
-// Auto-run only if this script is loaded by /ciliai index
-if (document.body && document.body.dataset && document.body.dataset.ciliai === "enabled") {
-    // Defer start so UI loads first
-    setTimeout(() => {
-        if (typeof window.initCiliAI === "function") {
-            window.initCiliAI();
-        }
-    }, 10);
-}
+    // Auto-run only if this script is loaded by /ciliai index
+    if (document.body && document.body.dataset && document.body.dataset.ciliai === "enabled") {
+        // Defer start so UI loads first
+        setTimeout(() => {
+            if (typeof window.initCiliAI === "function") {
+                window.initCiliAI();
+            }
+        }, 10);
+    }
 
-})();
+})(); // <--- THIS IS THE CRITICAL MISSING PIECE
