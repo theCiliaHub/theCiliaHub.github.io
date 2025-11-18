@@ -119,47 +119,34 @@
             overflow: hidden;
         }
 
-        /* Left Panel - Search & Controls */
-        #left-panel {
-            width: 380px;
+        /* Top Search Bar */
+        .top-search {
             background: white;
-            border-right: 1px solid #e5e7eb;
+            padding: 16px 20px;
+            border-bottom: 1px solid #e5e7eb;
             display: flex;
-            flex-direction: column;
-            overflow: hidden;
+            gap: 12px;
+            align-items: center;
         }
 
-        .panel-header {
-            padding: 20px;
-            border-bottom: 1px solid #e5e7eb;
-        }
-
-        .panel-header h2 {
-            font-size: 16px;
-            font-weight: 700;
-            margin-bottom: 4px;
-        }
-
-        .panel-header p {
-            font-size: 12px;
+        .top-search h3 {
+            font-size: 14px;
+            font-weight: 600;
             color: var(--muted);
-        }
-
-        .search-section {
-            padding: 20px;
-            border-bottom: 1px solid #e5e7eb;
+            white-space: nowrap;
         }
 
         .search-box {
             position: relative;
-            margin-bottom: 12px;
+            flex: 1;
+            max-width: 400px;
         }
 
         .search-box input {
             width: 100%;
-            padding: 12px 40px 12px 12px;
+            padding: 10px 40px 10px 12px;
             border: 2px solid #e5e7eb;
-            border-radius: 10px;
+            border-radius: 8px;
             font-size: 14px;
             transition: all 0.2s;
         }
@@ -175,20 +162,36 @@
             top: 50%;
             transform: translateY(-50%);
             color: var(--muted);
+            pointer-events: none;
+        }
+
+        .search-btn {
+            padding: 10px 20px;
+            background: var(--accent);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+
+        .search-btn:hover {
+            background: #5568d3;
         }
 
         .mode-toggle {
             display: flex;
-            gap: 8px;
-            margin-top: 12px;
+            gap: 6px;
+            margin-left: auto;
         }
 
         .mode-btn {
-            flex: 1;
-            padding: 8px;
+            padding: 8px 14px;
             border: 1px solid #e5e7eb;
             background: white;
-            border-radius: 8px;
+            border-radius: 6px;
             font-size: 12px;
             cursor: pointer;
             transition: all 0.2s;
@@ -200,47 +203,6 @@
             border-color: var(--accent);
         }
 
-        .gene-info {
-            padding: 20px;
-            overflow-y: auto;
-            flex: 1;
-        }
-
-        .info-card {
-            background: #f9fafb;
-            padding: 14px;
-            border-radius: 10px;
-            margin-bottom: 12px;
-        }
-
-        .info-card h4 {
-            font-size: 13px;
-            font-weight: 600;
-            margin-bottom: 8px;
-        }
-
-        .info-card p {
-            font-size: 12px;
-            color: var(--muted);
-            line-height: 1.6;
-        }
-
-        .badges {
-            display: flex;
-            gap: 6px;
-            flex-wrap: wrap;
-            margin-top: 8px;
-        }
-
-        .badge {
-            background: #eef2ff;
-            color: var(--accent);
-            padding: 4px 10px;
-            border-radius: 6px;
-            font-weight: 600;
-            font-size: 11px;
-        }
-
         /* Center Panel - Visualization */
         #center-panel {
             flex: 1;
@@ -248,6 +210,7 @@
             flex-direction: column;
             background: var(--bg);
             overflow: hidden;
+            border-right: 1px solid #e5e7eb;
         }
 
         .viz-header {
@@ -412,7 +375,7 @@
         }
 
         @media (max-width: 1400px) {
-            #left-panel, #right-panel {
+            #right-panel {
                 width: 320px;
             }
         }
@@ -469,53 +432,19 @@
 
         <!-- Main Content Area -->
         <div id="main">
-            <!-- Left Panel: Search & Gene Info -->
-            <section id="left-panel">
-                <div class="panel-header">
-                    <h2>Gene Search</h2>
-                    <p>Enter a gene symbol to explore</p>
+            <!-- Top Search Bar -->
+            <div class="top-search">
+                <h3>Gene Search</h3>
+                <div class="search-box">
+                    <input type="text" id="geneInput" placeholder="Enter gene symbol (e.g., FOXJ1)" value="FOXJ1">
+                    <span class="search-icon">🔍</span>
                 </div>
-
-                <div class="search-section">
-                    <div class="search-box">
-                        <input type="text" id="geneInput" placeholder="Enter gene (e.g., FOXJ1)" value="FOXJ1">
-                        <span class="search-icon">🔍</span>
-                    </div>
-                    <button onclick="searchGene()" style="width: 100%; padding: 10px; background: var(--accent); color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; margin-top: 8px;">Analyze Gene</button>
-                    
-                    <div class="mode-toggle">
-                        <button class="mode-btn active" onclick="setMode('ai')">🤖 AI Assistant</button>
-                        <button class="mode-btn" onclick="setMode('manual')">🔬 Manual Mode</button>
-                    </div>
+                <button class="search-btn" onclick="searchGene()">Analyze Gene</button>
+                <div class="mode-toggle">
+                    <button class="mode-btn active" onclick="setMode('ai')">🤖 AI</button>
+                    <button class="mode-btn" onclick="setMode('manual')">🔬 Manual</button>
                 </div>
-
-                <div class="gene-info">
-                    <div id="geneDetails">
-                        <div class="info-card">
-                            <h4>FOXJ1 Overview</h4>
-                            <p>Forkhead box J1 - Master regulator of motile ciliogenesis. Essential for the development and function of motile cilia in respiratory epithelia, brain ventricles, and reproductive tracts.</p>
-                            <div class="badges">
-                                <span class="badge">Transcription Factor</span>
-                                <span class="badge">Ciliogenesis</span>
-                                <span class="badge">High Expression</span>
-                            </div>
-                        </div>
-
-                        <div class="info-card">
-                            <h4>Expression Pattern</h4>
-                            <p>Highly expressed in ciliated cells across multiple tissues. Shows strong enrichment in respiratory epithelium and ependymal cells.</p>
-                        </div>
-
-                        <div class="info-card">
-                            <h4>Key Functions</h4>
-                            <p>• Regulates motile cilia formation<br>
-                               • Controls basal body positioning<br>
-                               • Activates ciliary gene programs<br>
-                               • Essential for mucociliary clearance</p>
-                        </div>
-                    </div>
-                </div>
-            </section>
+            </div>
 
             <!-- Center Panel: Main Visualization -->
             <section id="center-panel">
@@ -565,19 +494,40 @@
         let currentMode = 'ai';
         let currentView = 'umap';
 
+        // Gene information database
+        const geneInfo = {
+            'FOXJ1': {
+                overview: 'Forkhead box J1 - Master regulator of motile ciliogenesis. Essential for the development and function of motile cilia in respiratory epithelia, brain ventricles, and reproductive tracts.',
+                expression: 'Highly expressed in ciliated cells across multiple tissues. Shows strong enrichment in respiratory epithelium and ependymal cells.',
+                functions: [
+                    'Regulates motile cilia formation',
+                    'Controls basal body positioning',
+                    'Activates ciliary gene programs',
+                    'Essential for mucociliary clearance'
+                ],
+                badges: ['Transcription Factor', 'Ciliogenesis', 'High Expression']
+            },
+            'default': {
+                overview: 'Gene information being analyzed...',
+                expression: 'Expression patterns are being computed from the dataset.',
+                functions: ['Analysis in progress'],
+                badges: ['Analyzing']
+            }
+        };
+
         // Generate synthetic UMAP data for demonstration
         function generateUMAPData(gene) {
             const n = 2000;
             const data = [];
             
-            // Create clusters
+            // Create clusters with different expression patterns
             const clusters = [
-                {name: 'Ciliated Cells', x: 5, y: 5, size: 400, expr: 8},
-                {name: 'Basal Cells', x: -3, y: 4, size: 350, expr: 2},
-                {name: 'Club Cells', x: 0, y: -4, size: 300, expr: 3},
-                {name: 'Goblet Cells', x: -5, y: -2, size: 250, expr: 1.5},
-                {name: 'Tuft Cells', x: 4, y: -3, size: 200, expr: 0.5},
-                {name: 'Ionocytes', x: -2, y: 7, size: 150, expr: 1},
+                {name: 'Ciliated Cells', x: 5, y: 5, size: 400, expr: gene === 'FOXJ1' ? 8 : Math.random() * 3},
+                {name: 'Basal Cells', x: -3, y: 4, size: 350, expr: gene === 'FOXJ1' ? 2 : Math.random() * 4},
+                {name: 'Club Cells', x: 0, y: -4, size: 300, expr: Math.random() * 5},
+                {name: 'Goblet Cells', x: -5, y: -2, size: 250, expr: Math.random() * 3},
+                {name: 'Tuft Cells', x: 4, y: -3, size: 200, expr: Math.random() * 2},
+                {name: 'Ionocytes', x: -2, y: 7, size: 150, expr: Math.random() * 2.5},
             ];
 
             clusters.forEach(cluster => {
@@ -605,7 +555,7 @@
                 mode: 'markers',
                 type: 'scatter',
                 marker: {
-                    size: 4,
+                    size: 5,
                     color: data.map(d => d.expr),
                     colorscale: 'Viridis',
                     showscale: true,
@@ -613,6 +563,10 @@
                         title: 'Expression',
                         thickness: 15,
                         len: 0.7
+                    },
+                    line: {
+                        width: 0.5,
+                        color: 'rgba(255,255,255,0.3)'
                     }
                 },
                 text: data.map(d => `${d.cluster}<br>Expression: ${d.expr.toFixed(2)}`),
@@ -621,8 +575,8 @@
 
             const layout = {
                 title: '',
-                xaxis: {title: 'UMAP 1', showgrid: false},
-                yaxis: {title: 'UMAP 2', showgrid: false},
+                xaxis: {title: 'UMAP 1', showgrid: false, zeroline: false},
+                yaxis: {title: 'UMAP 2', showgrid: false, zeroline: false},
                 hovermode: 'closest',
                 plot_bgcolor: '#fafbfc',
                 paper_bgcolor: 'white',
@@ -633,46 +587,38 @@
         }
 
         function searchGene() {
-            const gene = document.getElementById('geneInput').value.toUpperCase();
+            const gene = document.getElementById('geneInput').value.toUpperCase().trim();
+            if (!gene) return;
+            
             currentGene = gene;
             
             // Update visualization
             document.getElementById('vizTitle').textContent = `UMAP - ${gene} Expression`;
             plotUMAP(gene);
             
-            // Update gene info
-            updateGeneInfo(gene);
+            // Get gene info
+            const info = geneInfo[gene] || geneInfo['default'];
             
-            // Add AI message
+            // Send info to chat if in AI mode
             if (currentMode === 'ai') {
-                addMessage('bot', `Analyzing ${gene} expression across cell types. This gene shows interesting patterns in ciliated and basal cells. Would you like me to provide more details?`);
+                addMessage('bot', `I've analyzed ${gene} expression. Let me provide you with the key information:`);
+                
+                setTimeout(() => {
+                    let message = `<strong>${gene} Overview:</strong><br>${info.overview}<br><br>`;
+                    message += `<strong>Expression Pattern:</strong><br>${info.expression}<br><br>`;
+                    message += `<strong>Key Functions:</strong><br>`;
+                    info.functions.forEach(func => {
+                        message += `• ${func}<br>`;
+                    });
+                    addMessage('bot', message, true);
+                }, 500);
+                
+                setTimeout(() => {
+                    addMessage('bot', `The UMAP shows ${gene} is most highly expressed in ciliated cells (the bright yellow cluster). Would you like me to analyze co-expressed genes or compare with other markers?`);
+                }, 1500);
+            } else {
+                addMessage('bot', `${gene} visualization updated. Use the plot controls to explore the data.`);
             }
-        }
-
-        function updateGeneInfo(gene) {
-            const info = {
-                'FOXJ1': {
-                    title: 'FOXJ1 Overview',
-                    desc: 'Forkhead box J1 - Master regulator of motile ciliogenesis.',
-                    badges: ['Transcription Factor', 'Ciliogenesis', 'High Expression']
-                },
-                'default': {
-                    title: `${gene} Overview`,
-                    desc: 'Gene information loading...',
-                    badges: ['Analyzing']
-                }
-            };
-
-            const geneInfo = info[gene] || info['default'];
-            document.getElementById('geneDetails').innerHTML = `
-                <div class="info-card">
-                    <h4>${geneInfo.title}</h4>
-                    <p>${geneInfo.desc}</p>
-                    <div class="badges">
-                        ${geneInfo.badges.map(b => `<span class="badge">${b}</span>`).join('')}
-                    </div>
-                </div>
-            `;
         }
 
         function sendMessage() {
@@ -683,22 +629,61 @@
             addMessage('user', message);
             input.value = '';
 
-            // Simulate AI response
+            // Simulate AI response based on context
             setTimeout(() => {
-                const responses = [
-                    `Based on the UMAP visualization, ${currentGene} shows high expression in ciliated cells (cluster at coordinates ~5,5). This is consistent with its role in ciliogenesis.`,
-                    `The expression pattern suggests ${currentGene} is a marker for differentiated ciliated cells. Would you like to compare this with other ciliary genes?`,
-                    `I can help you explore co-expressed genes, differential expression, or pathway enrichment. What would you like to analyze next?`
-                ];
-                addMessage('bot', responses[Math.floor(Math.random() * responses.length)]);
+                let response = '';
+                const msgLower = message.toLowerCase();
+                
+                if (msgLower.includes('overview') || msgLower.includes('what is')) {
+                    const info = geneInfo[currentGene] || geneInfo['default'];
+                    response = `<strong>${currentGene} Overview:</strong><br>${info.overview}<br><br>`;
+                    response += `<strong>Expression Pattern:</strong><br>${info.expression}`;
+                } else if (msgLower.includes('function')) {
+                    const info = geneInfo[currentGene] || geneInfo['default'];
+                    response = `<strong>Key Functions of ${currentGene}:</strong><br>`;
+                    info.functions.forEach(func => {
+                        response += `• ${func}<br>`;
+                    });
+                } else if (msgLower.includes('expression') || msgLower.includes('where')) {
+                    response = `Based on the UMAP visualization, ${currentGene} shows high expression in ciliated cells (the bright yellow cluster at coordinates ~5,5). This is consistent with its role in ciliogenesis. The expression is lower in basal cells and other cell types.`;
+                } else if (msgLower.includes('cluster') || msgLower.includes('cell type')) {
+                    response = `The visualization shows several distinct cell populations:<br>
+                    • <strong>Ciliated Cells</strong> - High ${currentGene} expression<br>
+                    • <strong>Basal Cells</strong> - Progenitor population<br>
+                    • <strong>Club Cells</strong> - Secretory cells<br>
+                    • <strong>Goblet Cells</strong> - Mucus-producing cells<br>
+                    • <strong>Tuft Cells</strong> - Chemosensory cells<br>
+                    • <strong>Ionocytes</strong> - Rare regulatory cells`;
+                } else if (msgLower.includes('compare') || msgLower.includes('other gene')) {
+                    response = `I can help you compare ${currentGene} with other ciliary genes. Some good candidates include:<br>
+                    • <strong>DNAH5</strong> - Ciliary dynein arm component<br>
+                    • <strong>RSPH1</strong> - Radial spoke head protein<br>
+                    • <strong>RFX3</strong> - Transcription factor for ciliogenesis<br>
+                    <br>Would you like to analyze any of these?`;
+                } else {
+                    const responses = [
+                        `Based on the current analysis, ${currentGene} appears to be a key marker for ciliated cells. The UMAP clearly separates cell types by their expression profiles.`,
+                        `I can help you explore co-expressed genes, perform differential expression analysis, or identify enriched pathways. What would you like to investigate?`,
+                        `The expression pattern suggests ${currentGene} plays a crucial role in ciliated cell identity. Would you like me to provide more details about specific aspects?`
+                    ];
+                    response = responses[Math.floor(Math.random() * responses.length)];
+                }
+                
+                addMessage('bot', response, true);
             }, 800);
         }
 
-        function addMessage(type, text) {
+        function addMessage(type, text, isHTML = false) {
             const messages = document.getElementById('messages');
             const msg = document.createElement('div');
             msg.className = `msg ${type}`;
-            msg.textContent = text;
+            
+            if (isHTML) {
+                msg.innerHTML = text;
+            } else {
+                msg.textContent = text;
+            }
+            
             messages.appendChild(msg);
             messages.scrollTop = messages.scrollHeight;
         }
@@ -711,9 +696,9 @@
             event.target.classList.add('active');
 
             if (mode === 'ai') {
-                addMessage('bot', '🤖 AI mode activated. I\'ll provide intelligent suggestions and insights.');
+                addMessage('bot', '🤖 AI mode activated. I\'ll provide intelligent suggestions and detailed insights about your gene queries.');
             } else {
-                addMessage('bot', '🔬 Manual mode. You have full control over the analysis.');
+                addMessage('bot', '🔬 Manual mode enabled. You have full control over the analysis. I\'ll provide minimal guidance.');
             }
         }
 
@@ -735,6 +720,8 @@
             if (view === 'umap') {
                 plotUMAP(currentGene);
             }
+            
+            addMessage('bot', `Switched to ${view.toUpperCase()} view for ${currentGene}.`);
         }
 
         // Initialize
@@ -746,8 +733,15 @@
             if (e.key === 'Enter') searchGene();
         });
 
-        // Initial plot
-        plotUMAP('FOXJ1');
+        // Initial welcome message and plot
+        window.addEventListener('load', () => {
+            plotUMAP('FOXJ1');
+            addMessage('bot', '👋 Hello! I\'m your CiliAI assistant. I can help you explore gene expression patterns, identify cell types, and interpret your data.');
+            
+            setTimeout(() => {
+                addMessage('bot', 'Currently showing <strong>FOXJ1</strong> expression across different cell types. Try asking me questions like:<br>• "What is FOXJ1?"<br>• "What are its functions?"<br>• "Which cell types express it?"<br>• "Compare it with other genes"');
+            }, 1000);
+        });
     </script>
 </body>
 </html>
