@@ -171,43 +171,61 @@
     // 2. DATA LOADING
     // ==========================================================
 
-    window.loadCiliAIData = async function(timeoutMs = 60000) {
-        const baseUrl = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/';
+   // ==========================================================
+    // 2. DATA LOADING ENGINE (CORRECTED URL)
+    // ==========================================================
+
+    window.loadCiliAIData = async function() {
+        // ✅ FIX: Removed 'refs/heads/' from the URL
+        const baseUrl = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/';
+        
         try {
-            console.log(`[CiliAI] Fetching database...`);
+            console.log(`[CiliAI] Fetching database from: ${baseUrl}`);
             const [mainRes, lookupsRes] = await Promise.all([
                 fetch(baseUrl + 'ciliAI_master_database.json'),
                 fetch(baseUrl + 'ciliAI_lookups.json')
             ]);
-            if (!mainRes.ok || !lookupsRes.ok) throw new Error('HTTP error during fetch');
+            
+            if (!mainRes.ok) throw new Error(`Failed to load Master Database (HTTP ${mainRes.status})`);
+            if (!lookupsRes.ok) throw new Error(`Failed to load Lookups (HTTP ${lookupsRes.status})`);
             
             const mainData = await mainRes.json();
             const lookupData = await lookupsRes.json();
 
+            // 1. Store Master Data
             window.CiliAI.masterData = mainData.masterData;
             window.CiliAI.lookups = lookupData.lookups;
             window.CiliAI.data.umap = mainData.umapData;
             window.CiliAI_UMAP = mainData.umapData;
 
+            // 2. Rebuild Fast Lookup Maps
             window.CiliAI.lookups.geneMap = {};
-            mainData.masterData.forEach(g => { if(g.Gene) window.CiliAI.lookups.geneMap[g.Gene.toUpperCase()] = g; });
-
-            window.CiliAI.lookups.umapByGene = {};
-            if(window.CiliAI_UMAP) window.CiliAI_UMAP.forEach(p => { if(p.Gene) window.CiliAI.lookups.umapByGene[p.Gene.toUpperCase()] = p; });
-
-            log("Building scRNA cache...");
             window.CiliAI.cellDataCache = {};
-            mainData.masterData.forEach(g => { if(g.Gene && g.expression?.scRNA) window.CiliAI.cellDataCache[g.Gene.toUpperCase()] = g.expression.scRNA; });
+            
+            mainData.masterData.forEach(g => { 
+                if(g.Gene) {
+                    const up = g.Gene.toUpperCase();
+                    window.CiliAI.lookups.geneMap[up] = g;
+                    if(g.expression?.scRNA) {
+                        window.CiliAI.cellDataCache[up] = g.expression.scRNA; 
+                    }
+                }
+            });
 
             window.CiliAI.ready = true;
-            console.log(`[CiliAI] Ready: ${window.CiliAI.masterData.length} genes.`);
+            console.log(`[CiliAI] Ready: ${window.CiliAI.masterData.length} genes loaded.`);
             
-            // Notify UI if waiting
+            // 3. Notify UI
             if (typeof window.CiliAI_UI_OnReady === 'function') window.CiliAI_UI_OnReady();
 
         } catch (err) {
             console.error("[CiliAI] Load failed:", err);
-            window.CiliAI.ready = false;
+            // Optional: Alert the user in the UI if data fails
+            const statusEl = document.getElementById('dataStatus');
+            if(statusEl) {
+                statusEl.textContent = "Data Load Failed";
+                statusEl.style.color = "red";
+            }
         }
     };
 
