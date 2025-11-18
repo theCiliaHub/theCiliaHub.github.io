@@ -2652,7 +2652,6 @@ function extractPhenotypeIntent(qLower) {
             return;
         }
         
-        // --- NEW: Integrated Terminology Map ---
         const terminologyQueries = {
             // --- BASIC DEFINITIONS ---
             "what is a cilium": "A cilium is a microtubule-based organelle extending from the cell surface. Primary cilia sense extracellular signals; motile cilia generate fluid flow. (Rosenbaum & Witman 2002)",
@@ -2695,7 +2694,6 @@ function extractPhenotypeIntent(qLower) {
             "what is primary ciliary dyskinesia": "PCD is caused by defects in motile cilia, leading to chronic infections, infertility, and left-right asymmetry defects. (Fliegauf et al. 2007)",
             "what is polycystic kidney disease": "Polycystic Kidney Disease arises from defective ciliary signaling, commonly involving PKD1/PKD2 in the ciliary membrane. (Nauli et al. 2003)"
         };
-        // --- END NEW MAP ---
 
         if (terminologyQueries[qLower]) {
             log('Routing via: Intent (Terminology)');
@@ -2734,10 +2732,19 @@ function extractPhenotypeIntent(qLower) {
             }
 
             // =( 2 )= INTENT: CONTEXTUAL FOLLOW-UP ("Yes")
-            const isFollowUp = qLower === 'yes' || qLower === 'ok' || qLower === 'sure' ||
+            
+            // --- THIS IS THE FIX ---
+            // Added exclusions for "phylogen", "umap", and "scrna" to prevent misfiring
+            const isFollowUp = (
+                qLower === 'yes' || qLower === 'ok' || qLower === 'sure' ||
                 qLower.includes('view the list') || qLower.includes('show') ||
                 qLower.includes('please') || qLower.includes('display') || 
-                qLower.includes('yes please') || qLower.includes('provide the paper');
+                qLower.includes('yes please') || qLower.includes('provide the paper')
+            ) && 
+            !qLower.includes('phylogen') && 
+            !qLower.includes('umap') && 
+            !qLower.includes('scrna');
+            // --- END OF FIX ---
 
             if (htmlResult === null && (qLower === 'yes' || qLower === 'ok') && lastQueryContext.type === null) {
                 log('Routing via: Intent (Ignored standalone "yes")');
