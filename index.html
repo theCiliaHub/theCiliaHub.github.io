@@ -23,11 +23,11 @@
         body, html { height: 100%; font-family: 'Inter', sans-serif; background: var(--main-bg); overflow: hidden; }
 
         /* =========================================
-           2. LAYOUT GRID (CellWhisperer Style)
+           2. LAYOUT GRID
            ========================================= */
         .app-container {
             display: grid;
-            grid-template-columns: 240px 1fr 400px; /* Sidebar | Center | Right Panel */
+            grid-template-columns: 240px 1fr 400px;
             height: 100vh;
             width: 100vw;
         }
@@ -80,7 +80,6 @@
             overflow: hidden;
         }
         
-        /* Top Search Bar */
         .top-bar {
             display: flex; align-items: center; justify-content: space-between;
             margin-bottom: 20px; height: 40px;
@@ -103,7 +102,6 @@
         }
         .status-badge.ready { background: #dcfce7; color: #166534; }
 
-        /* Plot Area */
         .viz-card {
             flex: 1; background: white; border-radius: 12px;
             border: 1px solid var(--border);
@@ -138,7 +136,6 @@
             background: #f8fafc; display: flex; flex-direction: column; gap: 15px;
         }
         
-        /* Chat Bubbles */
         .ciliai-message { max-width: 90%; padding: 12px 16px; border-radius: 12px; font-size: 13px; line-height: 1.5; }
         .ciliai-message.user { align-self: flex-end; background: var(--accent); color: white; border-bottom-right-radius: 2px; }
         .ciliai-message.assistant { align-self: flex-start; background: white; border: 1px solid var(--border); color: #334155; border-bottom-left-radius: 2px; }
@@ -157,18 +154,17 @@
         }
         .send-btn:hover { background: #f8fafc; }
 
-        /* =========================================
-           6. INTERNAL SVG STYLES
-           ========================================= */
+        /* Internal Styles */
         .cilia-part { cursor: pointer; transition: all 0.2s ease; }
         .cilia-part:hover { opacity: 0.8; }
         .cilia-part.selected, .cilia-part.active { filter: brightness(1.2); stroke: #ff6b00 !important; stroke-width: 4 !important; }
         
-        /* AI Card Styling */
         .ai-result-card h4 { margin: 0 0 5px 0; color: #2d3748; font-weight: 700;}
         .ai-action { color: var(--accent); text-decoration: none; font-weight: 600; cursor: pointer; font-size: 12px; }
         .ai-action:hover { text-decoration: underline; }
-
+        .ciliai-data-table { width: 100%; border-collapse: collapse; font-size: 11px; margin-top: 5px; }
+        .ciliai-data-table th { text-align: left; background: #f1f5f9; padding: 4px; }
+        .ciliai-data-table td { border-bottom: 1px solid #e2e8f0; padding: 4px; }
     </style>
 </head>
 <body>
@@ -186,18 +182,18 @@
 
                 <div class="nav-group">
                     <div class="nav-label">Structure Map</div>
-                    <button class="nav-item" onclick="selectComp('axoneme')">Axoneme</button>
-                    <button class="nav-item" onclick="selectComp('transition-zone')">Transition Zone</button>
-                    <button class="nav-item" onclick="selectComp('basal-body')">Basal Body</button>
-                    <button class="nav-item" onclick="selectComp('ciliary-membrane')">Ciliary Membrane</button>
-                    <button class="nav-item" onclick="selectComp('nucleus')">Nucleus</button>
-                    <button class="nav-item" onclick="selectComp('cell-body')">Cell Body</button>
+                    <button class="nav-item" onclick="window.selectComp('axoneme')">Axoneme</button>
+                    <button class="nav-item" onclick="window.selectComp('transition-zone')">Transition Zone</button>
+                    <button class="nav-item" onclick="window.selectComp('basal-body')">Basal Body</button>
+                    <button class="nav-item" onclick="window.selectComp('ciliary-membrane')">Ciliary Membrane</button>
+                    <button class="nav-item" onclick="window.selectComp('nucleus')">Nucleus</button>
+                    <button class="nav-item" onclick="window.selectComp('cell-body')">Cell Body</button>
                 </div>
 
                 <div class="nav-group">
                     <div class="nav-label">Quick Plots</div>
-                    <button class="nav-item" onclick="showDefaultUMAP()">📊 Lung scRNA (FOXJ1)</button>
-                    <button class="nav-item" onclick="showDefaultPhylogeny()">🌳 Phylogeny Heatmap</button>
+                    <button class="nav-item" onclick="window.showDefaultUMAP()">📊 Lung scRNA (FOXJ1)</button>
+                    <button class="nav-item" onclick="window.showDefaultPhylogeny()">🌳 Phylogeny Heatmap</button>
                 </div>
             </div>
         </aside>
@@ -206,7 +202,7 @@
             <div class="top-bar">
                 <div class="search-container">
                     <input type="text" id="geneSearch" class="search-input" placeholder="Search gene (e.g., IFT88)...">
-                    <button class="search-btn" onclick="searchGene()">Find</button>
+                    <button class="search-btn" onclick="window.searchGene()">Find</button>
                 </div>
                 <div id="dataStatus" class="status-badge">Initializing...</div>
             </div>
@@ -214,7 +210,7 @@
             <div class="viz-card">
                 <div class="viz-header">
                     <div class="viz-title">Visualization Board</div>
-                    <button style="border:none; background:none; cursor:pointer; color:#64748b;" onclick="downloadPlot('cilia-svg', 'plot.png')">📷 Save</button>
+                    <button style="border:none; background:none; cursor:pointer; color:#64748b;" onclick="window.downloadPlot('cilia-svg', 'plot.png')">📷 Save</button>
                 </div>
                 <div id="cilia-svg"></div>
             </div>
@@ -229,401 +225,20 @@
             <div class="messages-area" id="messages">
                 <div class="ciliai-message assistant">
                     👋 <strong>Welcome to CiliAI.</strong><br>
-                    I am initializing the database. I will display the default FOXJ1 expression plot when ready.
+                    I am initializing the database. I will display the default FOXJ1 expression plot automatically when ready.
                 </div>
             </div>
 
             <div class="input-area">
                 <div class="chat-input-group">
                     <input type="text" id="chatInput" class="chat-input" placeholder="Ask a question...">
-                    <button class="send-btn" onclick="sendMsg()">Send</button>
+                    <button class="send-btn" onclick="window.sendMsg()">Send</button>
                 </div>
             </div>
         </aside>
     </div>
 
-    <script>
-    (function () {
-        'use strict';
+    <script src="ciliai/ciliai.js"></script>
 
-        // --- 1. GLOBAL STATE ---
-        window.CiliAI = {
-            masterData: [],
-            lookups: {},
-            cellDataCache: {}, 
-            ready: false
-        };
-
-        window.liPhylogenyCache = null;
-        window.neversPhylogenyCache = null;
-        window.CiliAI_UMAP = null;
-        let lastQueryContext = { type: null, data: [], term: null };
-
-        // Constants for Phylogeny Panels
-        const NEVERS_CIL_PANEL = [ "Homo sapiens", "Mus musculus", "Danio rerio", "Xenopus tropicalis", "Gallus gallus", "Caenorhabditis elegans", "Tetrahymena thermophila (strain SB210)", "Chlamydomonas reinhardtii", "Micromonas sp. (strain RCC299 / NOUM17)", "Trypanosoma cruzi", "Leishmania major", "Giardia intestinalis (strain ATCC 50803 / WB clone C6)", "Trichomonas vaginalis", "Strongylocentrotus purpuratus", "Ciona intestinalis", "Physcomitrella patens subsp. patens", "Paramecium tetraurelia", "Volvox carteri", "Amphimedon queenslandica", "Monosiga brevicollis" ];
-        const NEVERS_NCIL_PANEL = [ "Saccharomyces cerevisiae (strain ATCC 204508 / S288c)", "Schizosacoscharomyces pombe (strain 972 / ATCC 24843)", "Cryptococcus neoformans var. neoformans serotype D (strain JEC21 / ATCC MYA-565)", "Ustilago maydis (strain 521 / FGSC 9021)", "Candida albicans (strain WO-1)", "Arabidopsis thaliana", "Brachypodium distachyon", "Sorghum bicolor", "Vitis vinifera", "Cryptosporidium parvum (strain Iowa II)", "Entamoeba histolytica", "Encephalitozoon cuniculi (strain GB-M1)" ];
-
-        const structureInfoMap = {
-            'basal-body': { title: 'Basal Body' },
-            'transition-zone': { title: 'Transition Zone' },
-            'axoneme': { title: 'Axoneme' },
-            'ciliary-membrane': { title: 'Ciliary Membrane' },
-            "nucleus": { title: "Nucleus" },
-            "cell-body": { title: "Cell Body" },
-        };
-
-        // --- 2. INITIALIZATION ---
-        async function initCiliAI() {
-            console.log('CiliAI: Initializing...');
-            
-            // Generate initial diagram
-            window.generateDiagramSVG();
-            
-            // Setup Listeners
-            setupPageEventListeners();
-
-            // Load Data
-            await loadCiliAIData();
-
-            // DEFAULT ACTION: Plot FOXJ1 UMAP automatically
-            if (window.CiliAI.ready) {
-                console.log("Triggering default UMAP (FOXJ1)...");
-                window.handleUmapPlot('FOXJ1');
-                window.addChatMessage("System Ready. Displaying default UMAP for <strong>FOXJ1</strong>.", false);
-            }
-        }
-
-        async function loadCiliAIData() {
-            const baseUrl = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/';
-            const mainDbUrl = baseUrl + 'ciliAI_master_database.json';
-            const lookupsUrl = baseUrl + 'ciliAI_lookups.json';
-
-            try {
-                updateStatus('Fetching Data...');
-                const [mainRes, lookupsRes] = await Promise.all([ fetch(mainDbUrl), fetch(lookupsUrl) ]);
-                
-                if (!mainRes.ok || !lookupsRes.ok) throw new Error('Network response was not ok');
-
-                const mainData = await mainRes.json();
-                const lookupData = await lookupsRes.json();
-
-                window.CiliAI.masterData = mainData.masterData;
-                window.CiliAI.lookups = lookupData.lookups;
-                window.CiliAI_UMAP = mainData.umapData;
-
-                // Build UMAP Lookup
-                window.CiliAI.lookups.umapByGene = {};
-                if (window.CiliAI_UMAP) {
-                    window.CiliAI_UMAP.forEach(point => {
-                        if(point.Gene) window.CiliAI.lookups.umapByGene[point.Gene.toUpperCase()] = point;
-                    });
-                }
-
-                // Build Gene Map if not present in lookups (fallback)
-                if (!window.CiliAI.lookups.geneMap) {
-                    window.CiliAI.lookups.geneMap = {};
-                    window.CiliAI.masterData.forEach(g => {
-                        if (g.Gene) window.CiliAI.lookups.geneMap[g.Gene.toUpperCase()] = g;
-                    });
-                }
-
-                // Build scRNA Expression Cache
-                window.CiliAI.cellDataCache = {};
-                for (const gene of window.CiliAI.masterData) {
-                    if (gene.Gene && gene.expression && gene.expression.scRNA) {
-                        window.CiliAI.cellDataCache[gene.Gene.toUpperCase()] = gene.expression.scRNA;
-                    }
-                }
-
-                window.CiliAI.ready = true;
-                updateStatus('Ready', 'ready');
-
-            } catch (err) {
-                console.error("Init Error:", err);
-                updateStatus('Load Failed');
-                window.addChatMessage("Failed to load database. Check console.", false);
-            }
-        }
-
-        async function ensurePhylogenyDataLoaded() {
-            if (window.liPhylogenyCache && window.neversPhylogenyCache) return true;
-            
-            updateStatus('Loading Phylogeny...');
-            try {
-                const baseUrl = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/';
-                const [liRes, neversRes] = await Promise.all([
-                    fetch(baseUrl + 'li_et_al_2014_matrix_optimized.json'),
-                    fetch(baseUrl + 'nevers_et_al_2017_matrix_optimized.json')
-                ]);
-
-                window.liPhylogenyCache = await liRes.json();
-                window.neversPhylogenyCache = await neversRes.json();
-                
-                updateStatus('Ready', 'ready');
-                return true;
-            } catch (e) {
-                updateStatus('Error');
-                return false;
-            }
-        }
-
-        // --- 3. PLOTTING LOGIC ---
-
-        window.generateDiagramSVG = function() {
-            const container = document.getElementById('cilia-svg');
-            if(!container) return;
-            
-            container.innerHTML = `
-            <svg viewBox="0 0 300 400" xmlns="http://www.w3.org/2000/svg" style="width: 100%; height: auto; max-height: 100%;">
-                <defs>
-                    <linearGradient id="cytosolGradient" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:#F5F7FA;" /><stop offset="100%" style="stop-color:#E9EDF2;" /></linearGradient>
-                    <radialGradient id="nucleusGradient" cx="50%" cy="50%" r="50%"><stop offset="0%" style="stop-color:#D8DEE9;" /><stop offset="100%" style="stop-color:#C8D0DD;" /></radialGradient>
-                </defs>
-                <path id="cell-body" class="cilia-part" fill="url(#cytosolGradient)" stroke="#D8DEE9" stroke-width="2" d="M 50,380 C -20,300 20,200 150,200 C 280,200 320,300 250,380 Z"/>
-                <circle id="nucleus" class="cilia-part" fill="url(#nucleusGradient)" stroke="#B0B8C8" stroke-width="2" cx="150" cy="320" r="40"/>
-                <rect id="basal-body" class="cilia-part" fill="#4A5568" x="140" y="195" width="20" height="15"/>
-                <path id="transition-zone" class="cilia-part" fill="#718096" stroke="#4A5568" stroke-width="2" d="M 142,195 L 138,180 L 162,180 L 158,195 Z"/>
-                <path id="ciliary-membrane" class="cilia-part" fill="none" stroke="#A0AEC0" stroke-width="2" stroke-dasharray="4,4" d="M 138,180 L 145,10 L 155,10 L 162,180 Z"/>
-                <path id="axoneme" class="cilia-part" fill="none" stroke="#4A5568" stroke-width="3" d="M 145,180 L 148,15 L 152,15 L 155,180 Z"/>
-            </svg>`;
-            
-            // Rebind clicks
-            ['axoneme', 'transition-zone', 'basal-body', 'ciliary-membrane', 'cell-body', 'nucleus'].forEach(id => {
-                const el = document.getElementById(id);
-                if (el) el.onclick = () => window.selectComp(id);
-            });
-        }
-
-        window.handleUmapPlot = function(geneSymbol) {
-            const container = document.getElementById('cilia-svg');
-            const umapData = window.CiliAI_UMAP;
-            const cellData = window.CiliAI.cellDataCache;
-
-            if (!container || !umapData) return;
-
-            // Clear container
-            container.innerHTML = '';
-
-            const geneUpper = geneSymbol ? geneSymbol.toUpperCase() : 'FOXJ1';
-            const geneExpressionMap = cellData ? cellData[geneUpper] : null;
-
-            // Subsample data for performance
-            const sampleSize = 15000;
-            const sampledData = [];
-            if (umapData.length > sampleSize) {
-                const step = Math.floor(umapData.length / sampleSize);
-                for (let i = 0; i < umapData.length; i += step) sampledData.push(umapData[i]);
-            } else {
-                sampledData.push(...umapData);
-            }
-
-            // Map colors
-            const expressionValues = sampledData.map(cell => geneExpressionMap ? (geneExpressionMap[cell.cell_type] || 0) : 0);
-
-            const trace = {
-                x: sampledData.map(p => p.x),
-                y: sampledData.map(p => p.y),
-                mode: 'markers',
-                type: 'scattergl',
-                text: sampledData.map((p, i) => `Type: ${p.cell_type}<br>Expr: ${expressionValues[i].toFixed(2)}`),
-                hoverinfo: 'text',
-                marker: {
-                    color: expressionValues,
-                    colorscale: 'Plasma',
-                    size: 4,
-                    opacity: 0.8,
-                    colorbar: { title: 'Expr', thickness: 15 }
-                }
-            };
-
-            const layout = {
-                title: { text: `Lung scRNA-seq: ${geneUpper}`, font: { size: 14 } },
-                margin: { t: 40, b: 40, l: 40, r: 40 },
-                xaxis: { title: 'UMAP 1', showgrid: false, zeroline: false, showticklabels: false },
-                yaxis: { title: 'UMAP 2', showgrid: false, zeroline: false, showticklabels: false },
-                hovermode: 'closest'
-            };
-
-            Plotly.newPlot('cilia-svg', [trace], layout, { responsive: true });
-            
-            // Add back button
-            const btn = document.createElement('button');
-            btn.innerText = "⬅ Diagram";
-            btn.style.cssText = "position: absolute; top: 10px; left: 10px; z-index: 100; padding: 5px 10px; cursor: pointer; background: white; border: 1px solid #ccc; border-radius: 4px;";
-            btn.onclick = window.generateDiagramSVG;
-            container.appendChild(btn);
-        };
-
-        async function renderPhylogenyHeatmap(genes, source = 'nevers') {
-            await ensurePhylogenyDataLoaded();
-            
-            const container = document.getElementById('cilia-svg');
-            container.innerHTML = ''; 
-
-            const organisms = NEVERS_CIL_PANEL.concat(NEVERS_NCIL_PANEL);
-            const z = [];
-            
-            // Generate visualization based on mock check for loaded structure (robust fallback)
-            genes.forEach(g => {
-                const row = organisms.map((o, i) => Math.random() > 0.3 ? (i < 20 ? 2 : 1) : 0);
-                z.push(row);
-            });
-
-            const data = [{
-                z: z,
-                x: organisms.map(o => o.split(' ')[0]),
-                y: genes,
-                type: 'heatmap',
-                colorscale: [[0, '#eee'], [0.5, '#fca5a5'], [1, '#0d9488']],
-                showscale: false
-            }];
-
-            const layout = {
-                title: 'Phylogenetic Conservation',
-                margin: { b: 100, l: 100 }
-            };
-
-            Plotly.newPlot('cilia-svg', data, layout, { responsive: true });
-            
-            const btn = document.createElement('button');
-            btn.innerText = "⬅ Diagram";
-            btn.style.cssText = "position: absolute; top: 10px; left: 10px; z-index: 100; padding: 5px 10px; cursor: pointer; background: white; border: 1px solid #ccc; border-radius: 4px;";
-            btn.onclick = window.generateDiagramSVG;
-            container.appendChild(btn);
-        }
-
-        // --- 4. INTERACTIONS ---
-
-        window.searchGene = function(val) {
-            const query = val || document.getElementById('geneSearch').value.trim().toUpperCase();
-            if (!query) return;
-            window.addChatMessage(`Searching for <strong>${query}</strong>...`, true);
-            handleAIQuery(`Tell me about ${query}`);
-            
-            // If gene exists in UMAP cache, plot it
-            if(window.CiliAI.cellDataCache[query]) {
-                window.handleUmapPlot(query);
-            }
-        };
-
-        window.sendMsg = function() {
-            const input = document.getElementById('chatInput');
-            const val = input.value.trim();
-            if(!val) return;
-            window.addChatMessage(val, true);
-            handleAIQuery(val);
-            input.value = '';
-        };
-
-        window.selectComp = function(id) {
-            window.generateDiagramSVG(); // Show diagram
-            // Highlight logic
-            setTimeout(() => {
-                document.querySelectorAll('.cilia-part').forEach(e => e.classList.remove('selected'));
-                const el = document.getElementById(id);
-                if(el) el.classList.add('selected');
-            }, 50);
-
-            const name = structureInfoMap[id].title;
-            window.addChatMessage(`Selected: <strong>${name}</strong>`, true);
-            handleAIQuery(`List genes in ${name}`);
-        };
-
-        // --- UI Helpers ---
-        window.addChatMessage = function(html, isUser) {
-            const container = document.getElementById('messages');
-            const div = document.createElement('div');
-            div.className = `ciliai-message ${isUser ? 'user' : 'assistant'}`;
-            div.innerHTML = html;
-            container.appendChild(div);
-            container.scrollTop = container.scrollHeight;
-        }
-
-        function updateStatus(msg, type) {
-            const el = document.getElementById('dataStatus');
-            if(el) {
-                el.innerText = msg;
-                if(type === 'ready') el.classList.add('ready');
-            }
-        }
-
-        function setupPageEventListeners() {
-            document.body.addEventListener('click', e => {
-                // Handle AI Action Links
-                const aiAction = e.target.closest('.ai-action');
-                if (aiAction) {
-                    e.preventDefault();
-                    const action = aiAction.dataset.action; // "show-umap-plot"
-                    const gene = aiAction.dataset.genes;
-                    
-                    if (action === 'show-umap-plot') {
-                        window.handleUmapPlot(gene);
-                        window.addChatMessage(`Displaying UMAP for <strong>${gene}</strong>`, false);
-                    }
-                    // Add handlers for phylogeny actions here if needed
-                }
-            });
-        }
-
-        // --- AI Router (Simplified) ---
-        function handleAIQuery(query) {
-            const qLower = query.toLowerCase();
-            let response = "I didn't understand that.";
-
-            if(qLower.includes('tell me about') || qLower.includes('what is')) {
-                const parts = qLower.split(' ');
-                // simple extraction
-                let gene = parts[parts.length-1].toUpperCase().replace('?','');
-                // Attempt match against gene map
-                const gData = window.CiliAI.lookups.geneMap ? window.CiliAI.lookups.geneMap[gene] : null;
-                
-                if(gData) {
-                    response = `
-                    <div class="ai-result-card">
-                        <h4>${gData.Gene}</h4>
-                        <p>${gData['Gene.Description'] || 'No description'}</p>
-                        <p><strong>Loc:</strong> ${gData.Localization || '-'}</p>
-                        <p><a class="ai-action" href="#" data-action="show-umap-plot" data-genes="${gData.Gene}">📊 View UMAP</a></p>
-                    </div>`;
-                } else {
-                    response = `Gene ${gene} not found in database. Try searching for IFT88.`;
-                }
-            } 
-            else if (qLower.includes('list genes in')) {
-                 // Extract location from query (simple version)
-                 if (qLower.includes('axoneme')) response = "Found 20+ genes in Axoneme. (Data simulated)";
-                 else response = "I can list genes for: Axoneme, Transition Zone, Basal Body.";
-            }
-            else if (qLower.includes('show') && qLower.includes('nevers')) {
-                 window.showDefaultPhylogeny();
-                 response = "Displaying Phylogeny Heatmap.";
-            }
-            else if (qLower.includes('show') && qLower.includes('umap')) {
-                 window.handleUmapPlot('FOXJ1');
-                 response = "Displaying Default UMAP.";
-            }
-
-            window.addChatMessage(response, false);
-        }
-
-        // Exposed buttons
-        window.showDefaultUMAP = () => window.handleUmapPlot('FOXJ1');
-        window.showDefaultPhylogeny = () => renderPhylogenyHeatmap(['IFT88', 'BBS1', 'CEP290']);
-        window.downloadPlot = (id, name) => Plotly.downloadImage(document.getElementById(id), {format: 'png', filename: name});
-
-        // Start
-        if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initCiliAI);
-        else initCiliAI();
-
-    })();
-    
-    // Global Bindings for keyup events
-    document.getElementById('geneSearch').addEventListener('keyup', function(e) {
-        if (e.key === 'Enter') window.searchGene();
-    });
-    document.getElementById('chatInput').addEventListener('keyup', function(e) {
-        if (e.key === 'Enter') window.sendMsg();
-    });
-    </script>
 </body>
 </html>
