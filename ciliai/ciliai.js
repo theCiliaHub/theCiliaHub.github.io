@@ -596,64 +596,79 @@ function injectPageCSS() {
     }
 
    function setupPageEventListeners() {
-        document.body.addEventListener('click', e => {
+        // 1. Attach to the specific app container to prevent duplicate listeners on re-renders
+        const appContainer = document.getElementById('ciliai-app');
+        if (!appContainer) return;
+
+        appContainer.addEventListener('click', e => {
+            // --- A. Handle Reaction Buttons (Thumbs Up/Down) ---
             const feedbackBtn = e.target.closest('.ciliai-reaction-btn');
             if (feedbackBtn) {
                 const type = feedbackBtn.textContent.includes('👍') ? 'up' : 'down';
-                react(type);
-                return;
-            }
-            const geneBadge = e.target.closest('.gene-badge');
-            if (geneBadge) {
-                const gene = geneBadge.textContent.trim();
-                if (gene) searchGene(gene);
+                // FIX: 'react' is defined on window, so we must use window.react
+                if (window.react) window.react(type);
                 return;
             }
 
-            // --- THIS IS THE CORRECTED BLOCK ---
+            // --- B. Handle Gene Badges (Clickable pills) ---
+            const geneBadge = e.target.closest('.gene-badge');
+            if (geneBadge) {
+                const gene = geneBadge.textContent.trim();
+                // FIX: 'searchGene' is defined on window
+                if (gene && window.searchGene) window.searchGene(gene);
+                return;
+            }
+
+            // --- C. Handle AI Action Links (Blue links in chat) ---
             const aiAction = e.target.closest('.ai-action');
             if (aiAction) {
                 const action = aiAction.dataset.action;
 
-                if (action) {
-                    e.preventDefault(); // Stop the link from navigating
-                    const genes = aiAction.dataset.genes || "";
-                    let query = "";
-                    if (action === 'show-li-heatmap') query = `show li phylogeny for ${genes}`;
-                    else if (action === 'show-nevers-heatmap') query = `show nevers phylogeny for ${genes}`;
-                    else if (action === 'show-table-view') query = `show data table for ${genes}`;
-                    
-                    // --- THIS IS THE FIX ---
-                    // This block catches the click on "View [GENE] on UMAP"
-                    else if (action === 'show-umap-plot') {
-                        log(`Action: show-umap-plot for ${genes}`);
-                        handleUmapPlot(genes); // This will now show the plot
-                        return; // Stop processing
-                    }
-                    // --- END OF FIX ---
+                // If it's a normal link (like a PubMed link), let it function normally
+                if (!action) return; 
 
-                    if (query) {
-                        addChatMessage(query, true);
-                        handleAIQuery(query);
-                    }
-                    return;
+                e.preventDefault(); // Stop navigation for internal actions
+                const genes = aiAction.dataset.genes || "";
+                let query = "";
+
+                if (action === 'show-li-heatmap') query = `show li phylogeny for ${genes}`;
+                else if (action === 'show-nevers-heatmap') query = `show nevers phylogeny for ${genes}`;
+                else if (action === 'show-table-view') query = `show data table for ${genes}`;
+                
+                // Special Case: UMAP Plot
+                else if (action === 'show-umap-plot') {
+                    log(`Action: show-umap-plot for ${genes}`);
+                    // handleUmapPlot is defined inside the IIFE closure, so we call it directly
+                    handleUmapPlot(genes); 
+                    return; 
                 }
-                // (NEW) If there is no 'data-action', it's a normal link
-                // (e.g., "View Publication"). We do NOT call e.preventDefault(),
-                // so the browser will follow the href and target="_blank".
+
+                // Process the constructed query
+                if (query) {
+                    addChatMessage(query, true);
+                    // FIX: handleAIQuery is defined on window
+                    if (window.handleAIQuery) window.handleAIQuery(query);
+                }
+                return;
             }
-            // --- END OF CORRECTION ---
         });
 
+        // --- D. Re-bind Input Fields (Enter Key) ---
         const geneSearchInput = document.getElementById('geneSearch');
-        if (geneSearchInput) geneSearchInput.addEventListener('keyup', e => {
-            if (e.key === 'Enter') searchGene();
-        });
+        if (geneSearchInput) {
+            geneSearchInput.addEventListener('keyup', e => {
+                if (e.key === 'Enter' && window.searchGene) window.searchGene();
+            });
+        }
+
         const chatInput = document.getElementById('chatInput');
-        if (chatInput) chatInput.addEventListener('keyup', e => {
-            if (e.key === 'Enter') sendMsg();
-        });
-        console.log("CiliAI: Page event listeners set up.");
+        if (chatInput) {
+            chatInput.addEventListener('keyup', e => {
+                if (e.key === 'Enter' && window.sendMsg) window.sendMsg();
+            });
+        }
+
+        console.log("CiliAI: Page event listeners set up (Scoped to #ciliai-app).");
     }
     
     // ==========================================================
