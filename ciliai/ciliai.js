@@ -183,24 +183,25 @@
 // INIT — Loads all precompiled CiliAI datasets
 // ===========================================================
 async function initCiliAI() {
-    console.log("CiliAI: Initializing (v5.2)…");
+    console.log('CiliAI: Initializing (v5.2 Pre-compiled)…');
 
     await loadCiliAIData();
 
     if (!window.CiliAI.masterData || window.CiliAI.masterData.length === 0) {
-        console.error("CiliAI: Data load failed (masterData empty).");
+        console.error("CiliAI: Master data is empty. Database load failed.");
         window.CiliAI.ready = false;
         return;
     }
 
     window.CiliAI.ready = true;
-    console.log("CiliAI: All datasets loaded.");
+    console.log('CiliAI: Ready! Pre-compiled database loaded.');
 
-    // Tell UI that data is ready
+    // Tell UI layer that data is ready
     if (typeof window.CiliAI_UI_OnReady === "function") {
         window.CiliAI_UI_OnReady();
     }
 }
+
 
 
   /**
@@ -3000,96 +3001,108 @@ function extractPhenotypeIntent(qLower) {
 
     
  // ==========================================================
-    // 5. GLOBAL UI WRAPPERS & STARTUP
-    // ==========================================================
+// 5. GLOBAL UI WRAPPERS & STARTUP
+// ==========================================================
 
-    window.selectComp = function (id) {
-        generateAndInjectSVG(); 
-        
-        document.querySelectorAll('.cilia-part').forEach(el => el.classList.remove('selected', 'active'));
-        const el = document.getElementById(id);
-        if (el) el.classList.add('selected');
-
-        const data = structureInfoMap[id];
-        if (!data) return;
-
-        const genes = getGenesByLocalization(data.title);
-
-        const bar = document.getElementById('bottomBar');
-        if (genes.length > 0) {
-            bar.innerHTML = `<h3>${data.title} (${genes.length} genes)</h3>
-            <div class="gene-list">${genes.slice(0, 40).map(g =>
-                `<span class="gene-badge" data-gene="${g.gene}">${g.gene}</span>`
-            ).join('')}${genes.length > 40 ? `<span style="font-size:11px;color:#666;padding:5px;">...+${genes.length - 40} more</span>` : ''}</div>`;
-        } else {
-            bar.innerHTML = `<h3>${data.title}</h3><p style="color:#666;font-size:12px;">No genes found in database. Try searching directly.</p>`;
-        }
-    }
-
-    window.searchGene = function (name) {
-        const query = name || document.getElementById('geneSearch').value.trim().toUpperCase();
-        if (!query) return;
-        addChatMessage(`Tell me about ${query}`, true); 
-        handleGeneSearch(query, true);
-    }
-
-    // --- MODIFIED: This is the new button handler for the UMAP/scRNA plot ---
-    window.showDefaultUMAP = function () {
-        addChatMessage('Display gene expression in Lung scRNA-seq (Default: FOXJ1)', true);
-        // --- MODIFIED: Using simple, direct query ---
-        handleAIQuery('plot default umap');
-    }
-
-    // --- NEW: Function for default phylogeny plot ---
-    window.showDefaultPhylogeny = function () {
-        addChatMessage(`Show Phylogenetics Analysis (Default Genes)`, true);
-        // --- MODIFIED: Using simple, direct query ---
-        handleAIQuery('plot default phylogeny');
-    }
-
-    window.sendMsg = function () {
-        handleUserSend();
-    }
-
-    window.react = function (type) {
-        if (type === 'up') {
-            addChatMessage('Thanks for the feedback! 🙏', false);
-        } else {
-            addChatMessage('Sorry about that. What specifically would help?', false);
-        }
-    }
+window.selectComp = function (id) {
+    generateAndInjectSVG(); 
     
+    document.querySelectorAll('.cilia-part')
+        .forEach(el => el.classList.remove('selected', 'active'));
 
-    window.clearChat = function () {
-        if (confirm('Start new conversation?')) {
-            document.getElementById('messages').innerHTML = '';
-            generateAndInjectSVG(); 
-            document.querySelectorAll('.cilia-part').forEach(el => el.classList.remove('selected', 'active'));
-            addChatMessage('Welcome back! How can I help?', false);
-        }
-    }
-    
+    const el = document.getElementById(id);
+    if (el) el.classList.add('selected');
 
-    window.downloadPlot = function (divId, filename) {
-        const plotDiv = document.getElementById(divId);
-        if (plotDiv && window.Plotly) {
-            Plotly.downloadImage(plotDiv, { format: 'png', filename: filename, width: 1200, height: 800 });
-        }
-    }
+    const data = structureInfoMap[id];
+    if (!data) return;
 
-    // --- STARTUP ---
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', initCiliAI);
+    const genes = getGenesByLocalization(data.title);
+
+    const bar = document.getElementById('bottomBar');
+    if (genes.length > 0) {
+        bar.innerHTML = `
+            <h3>${data.title} (${genes.length} genes)</h3>
+            <div class="gene-list">
+                ${genes.slice(0, 40).map(g =>
+                    `<span class="gene-badge" data-gene="${g.gene}">${g.gene}</span>`
+                ).join('')}
+                ${genes.length > 40
+                    ? `<span style="font-size:11px;color:#666;padding:5px;">...+${genes.length - 40} more</span>`
+                    : ''}
+            </div>`;
     } else {
-        initCiliAI();
+        bar.innerHTML = `
+            <h3>${data.title}</h3>
+            <p style="color:#666;font-size:12px;">No genes found in database. Try searching directly.</p>`;
     }
+};
 
-})();
+window.searchGene = function (name) {
+    const query = name || document.getElementById('geneSearch').value.trim().toUpperCase();
+    if (!query) return;
 
+    addChatMessage(`Tell me about ${query}`, true); 
+    handleGeneSearch(query, true);
+};
 
-// ===========================================================
-// UI HOOK — Called from UI layer once browser loads ciliai_ui.js
-// ===========================================================
-window.CiliAI_UI_OnReady = window.CiliAI_UI_OnReady || function () {
-    console.warn("CiliAI_UI_OnReady called but ciliai_ui.js is not loaded yet.");
+// ----------------------------------------------------------
+// Buttons: Default UMAP & Default Phylogeny
+// ----------------------------------------------------------
+
+window.showDefaultUMAP = function () {
+    addChatMessage('Display gene expression in Lung scRNA-seq (Default: FOXJ1)', true);
+    handleAIQuery('plot default umap');
+};
+
+window.showDefaultPhylogeny = function () {
+    addChatMessage('Show Phylogenetics Analysis (Default Genes)', true);
+    handleAIQuery('plot default phylogeny');
+};
+
+// ----------------------------------------------------------
+// Chat + Feedback Controls
+// ----------------------------------------------------------
+
+window.sendMsg = function () {
+    handleUserSend();
+};
+
+window.react = function (type) {
+    if (type === 'up') {
+        addChatMessage('Thanks for the feedback! 🙏', false);
+    } else {
+        addChatMessage('Sorry about that. What specifically would help?', false);
+    }
+};
+
+// ----------------------------------------------------------
+// Clear Chat
+// ----------------------------------------------------------
+
+window.clearChat = function () {
+    if (confirm('Start new conversation?')) {
+        document.getElementById('messages').innerHTML = '';
+        
+        generateAndInjectSVG(); 
+        document.querySelectorAll('.cilia-part')
+            .forEach(el => el.classList.remove('selected', 'active'));
+
+        addChatMessage('Welcome back! How can I help?', false);
+    }
+};
+
+// ----------------------------------------------------------
+// Plot Downloader
+// ----------------------------------------------------------
+
+window.downloadPlot = function (divId, filename) {
+    const plotDiv = document.getElementById(divId);
+    if (plotDiv && window.Plotly) {
+        Plotly.downloadImage(plotDiv, {
+            format: 'png',
+            filename: filename,
+            width: 1200,
+            height: 800
+        });
+    }
 };
