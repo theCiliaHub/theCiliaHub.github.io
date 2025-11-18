@@ -260,44 +260,43 @@
             </header>
 
             <div id="content-split">
-                
-                <section id="center-panel">
-                    <div class="viz-card">
-                        <div class="viz-header">
-                            <h2 id="vizTitle">Visualization</h2>
-                            <button class="search-btn" style="padding:6px 12px; font-size:12px; background:#eee; color:#333;" onclick="downloadPlot()">📷 Save Plot</button>
-                        </div>
-                        <div id="plot-container">
-                            <div id="cilia-svg" style="width:100%; height:100%;"></div> 
-                            <div id="plot-display-area" style="display:none; width:100%; height:100%;"></div>
-                        </div>
-                    </div>
-                </section>
-
-                <section id="right-panel">
-                    <div class="panel-header">
-                        <h2>AI Assistant</h2>
-                        <p>Ask questions about genes, diseases, or data.</p>
-                    </div>
-
-                    <div class="messages" id="messages">
-                        <div class="msg bot">
-                            👋 <strong>Welcome to CiliAI.</strong><br>
-                            I can generate plots, list complex members, or explain gene functions.<br><br>
-                            <em>Try: "Show UMAP for FOXJ1" or "What is Joubert Syndrome?"</em>
-                        </div>
-                    </div>
-
-                    <div class="chat-input-area">
-                        <div class="input-group">
-                            <input type="text" id="chatInput" placeholder="Type a question...">
-                            <button onclick="triggerChat()">Send</button>
-                        </div>
-                    </div>
-                </section>
-
+    <div class="content-area">
+        <section id="center-panel">
+            <div class="viz-card">
+                <div class="viz-header">
+                    <h2 id="vizTitle">Visualization</h2>
+                    <button class="search-btn" style="padding:6px 12px; font-size:12px; background:#eee; color:#333;" onclick="downloadPlot()">📷 Save Plot</button>
+                </div>
+                <div id="plot-container">
+                    <div id="cilia-svg" style="width:100%; height:100%;"></div> 
+                    <div id="plot-display-area" style="display:none; width:100%; height:100%;"></div>
+                </div>
             </div>
-        </div>
+        </section>
+
+        <section id="right-panel">
+            <div class="panel-header">
+                <h2>AI Assistant</h2>
+                <p>Ask questions about genes, diseases, or data.</p>
+            </div>
+
+            <div class="messages" id="messages">
+                <div class="msg bot">
+                    👋 <strong>Welcome to CiliAI.</strong><br>
+                    I can generate plots, list complex members, or explain gene functions.<br><br>
+                    <em>Try: "Show UMAP for FOXJ1" or "What is Joubert Syndrome?"</em>
+                </div>
+            </div>
+
+            <div class="chat-input-area">
+                <div class="input-group">
+                    <input type="text" id="chatInput" placeholder="Type a question...">
+                    <button onclick="triggerChat()">Send</button>
+                </div>
+            </div>
+        </section>
+    </div>
+</div>
     </div>
 
     <script src="ciliai/ciliai.js"></script>
