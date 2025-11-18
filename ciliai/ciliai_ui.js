@@ -1,7 +1,7 @@
 /* ciliai_ui.js
    UI + Plotting glue for CiliAI
    Replaces plot code but uses existing loadCiliAIData()/initCiliAI()
-   Designed to be loaded AFTER ciliai/ciliai.js (data loader).
+   Designed to be loaded AFTER your ciliai/ciliai.js (data loader).
 */
 
 (function () {
@@ -496,7 +496,7 @@
   }
 
   // --- Boot sequence (ASYNC) ---
-  async function bootUI() {
+  async function bootCiliAI_UI() {
     buildSidebar();
     buildLeftPanel();
     buildRightPanel();
@@ -505,7 +505,8 @@
     Plots.renderPlotHome();
 
     // Safe Data Connection logic
-    // 1. If already ready
+    
+    // 1. If already ready (Cached or loaded fast)
     if (window.CiliAI && window.CiliAI.ready) {
       setDataStatus();
       addBotMessage('CiliAI ready (cached).');
@@ -559,9 +560,9 @@
 
   // --- STARTUP ---
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', bootUI);
+    document.addEventListener('DOMContentLoaded', bootCiliAI_UI);
   } else {
-    bootUI();
+    bootCiliAI_UI();
   }
 
 })();
