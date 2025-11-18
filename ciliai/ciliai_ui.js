@@ -1,6 +1,7 @@
 /* ciliai_ui.js
-   UI + Plotting glue for CiliAI — replaces plot code but uses existing loadCiliAIData()/initCiliAI()
-   Designed to be loaded AFTER your ciliai/ciliai.js (data loader).
+   UI + Plotting glue for CiliAI
+   Replaces plot code but uses existing loadCiliAIData()/initCiliAI()
+   Designed to be loaded AFTER ciliai/ciliai.js (data loader).
 */
 
 (function () {
@@ -9,6 +10,7 @@
   // --- Utility helpers ---
   const $ = (s) => document.querySelector(s);
   const $$ = (s) => Array.from(document.querySelectorAll(s));
+  
   function el(tag, attrs = {}, children = []) {
     const d = document.createElement(tag);
     Object.entries(attrs).forEach(([k, v]) => {
@@ -16,13 +18,16 @@
       else if (k === 'html') d.innerHTML = v;
       else d.setAttribute(k, v);
     });
-    if (Array.isArray(children)) children.forEach(c => d.appendChild(typeof c === 'string' ? document.createTextNode(c) : c));
+    if (Array.isArray(children)) {
+      children.forEach(c => d.appendChild(typeof c === 'string' ? document.createTextNode(c) : c));
+    }
     return d;
   }
 
-  // --- Basic UI layout (inject into #sidebar, #left-panel, #right-panel) ---
+  // --- Basic UI layout ---
   function buildSidebar() {
     const sb = $('#sidebar');
+    if (!sb) return;
     sb.innerHTML = '';
 
     const brand = el('div', { class: 'brand' }, [
@@ -37,7 +42,7 @@
     ]);
     sb.appendChild(searchRow);
 
-    // groups
+    // Core Modules
     const g1 = el('div', { class: 'side-group' }, [
       el('h3', {}, ['CiliAI']),
       el('div', { class: 'side-link active', 'data-module': 'chat' }, ['💬 Chat']),
@@ -46,6 +51,7 @@
     ]);
     sb.appendChild(g1);
 
+    // Plot Modules
     const plotItems = [
       ['plot_home','📊 Visualize Gene Sets'],
       ['localization','📌 Gene Localizations'],
@@ -77,6 +83,7 @@
 
   function buildLeftPanel() {
     const lp = $('#left-panel');
+    if (!lp) return;
     lp.innerHTML = '';
 
     // Chat container
@@ -96,16 +103,16 @@
       el('button', { id: 'clearBtn', style: 'background:#eee' }, ['Clear'])
     ]);
     chatCard.appendChild(inputRow);
-
     lp.appendChild(chatCard);
 
-    // Batch and Search cards
+    // Search Card
     const searchCard = el('div', { class: 'card', id: 'searchCard', style: 'display:none' }, [
       el('h3', {}, ['Search']),
       el('div', { class: 'hint' }, ['Type a gene symbol and press Enter or click Search.'])
     ]);
     lp.appendChild(searchCard);
 
+    // Batch Card
     const batchCard = el('div', { class: 'card', id: 'batchCard', style: 'display:none' }, [
       el('h3', {}, ['Batch Query']),
       el('textarea', { id: 'batchInput', style: 'width:100%;height:120px;border-radius:8px;border:1px solid #e8eef8;padding:10px', placeholder: 'Paste gene symbols, one per line' }),
@@ -121,6 +128,7 @@
 
   function buildRightPanel() {
     const rp = $('#right-panel');
+    if (!rp) return;
     rp.innerHTML = '';
 
     const geneCard = el('div', { class: 'card gene-card', id: 'geneCard' }, [
@@ -165,8 +173,9 @@
 
   // --- Attach interactions ---
   function attachInteractions() {
-    // sidebar actions
-    $('#sidebar').addEventListener('click', (ev) => {
+    // Sidebar
+    const sb = $('#sidebar');
+    if(sb) sb.addEventListener('click', (ev) => {
       const node = ev.target.closest('.side-link');
       if (!node) return;
       $$('.side-link').forEach(s => s.classList.remove('active'));
@@ -175,24 +184,32 @@
       switchModule(module);
     });
 
-    // sidebar search
-    $('#sidebarSearchBtn').addEventListener('click', () => {
-      const q = $('#sidebarSearch').value.trim();
+    const sbBtn = $('#sidebarSearchBtn');
+    const sbInp = $('#sidebarSearch');
+    if(sbBtn) sbBtn.addEventListener('click', () => {
+      const q = sbInp.value.trim();
       if (q) routeQuery(q);
     });
-    $('#sidebarSearch').addEventListener('keyup', (e) => { if (e.key === 'Enter') $('#sidebarSearchBtn').click(); });
+    if(sbInp) sbInp.addEventListener('keyup', (e) => { if (e.key === 'Enter') sbBtn.click(); });
 
-    // chat
-    $('#sendBtn').addEventListener('click', handleChatSend);
-    $('#chatInput').addEventListener('keyup', (e) => { if (e.key === 'Enter') handleChatSend(); });
-    $('#clearBtn').addEventListener('click', () => { $('#messages').innerHTML = ''; addBotMessage('Chat cleared.'); });
+    // Chat
+    const sendBtn = $('#sendBtn');
+    const chatInput = $('#chatInput');
+    const clearBtn = $('#clearBtn');
 
-    // batch
-    $('#batchRun').addEventListener('click', handleBatchRun);
-    $('#batchClear').addEventListener('click', () => { $('#batchInput').value = ''; $('#batchResult').innerHTML = ''; $('#batchStatus').textContent = ''; });
+    if(sendBtn) sendBtn.addEventListener('click', handleChatSend);
+    if(chatInput) chatInput.addEventListener('keyup', (e) => { if (e.key === 'Enter') handleChatSend(); });
+    if(clearBtn) clearBtn.addEventListener('click', () => { $('#messages').innerHTML = ''; addBotMessage('Chat cleared.'); });
 
-    // gene quick actions
-    $('#geneQuickActions').addEventListener('click', (e) => {
+    // Batch
+    const batchRun = $('#batchRun');
+    const batchClear = $('#batchClear');
+    if(batchRun) batchRun.addEventListener('click', handleBatchRun);
+    if(batchClear) batchClear.addEventListener('click', () => { $('#batchInput').value = ''; $('#batchResult').innerHTML = ''; $('#batchStatus').textContent = ''; });
+
+    // Quick Actions
+    const gqa = $('#geneQuickActions');
+    if(gqa) gqa.addEventListener('click', (e) => {
       const btn = e.target.closest('button');
       if (!btn) return;
       const action = btn.dataset.action;
@@ -203,8 +220,9 @@
       if (action === 'network') renderComplexNetwork(selectedGene);
     });
 
-    // download (placeholder)
-    $('#downloadPlot').addEventListener('click', () => addBotMessage('Download feature not implemented.'));
+    // Download
+    const dlBtn = $('#downloadPlot');
+    if(dlBtn) dlBtn.addEventListener('click', () => addBotMessage('Download feature not implemented.'));
   }
 
   // --- Chat helpers ---
@@ -219,14 +237,13 @@
     $('#messages').appendChild(node);
     $('#messages').scrollTop = $('#messages').scrollHeight;
   }
-
   function escapeHtml(s) {
     return String(s).replace(/[&<>"']/g, function (m) {
       return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m];
     });
   }
 
-  // --- Query routing & heuristics ---
+  // --- Query routing ---
   function isLikelyGeneName(q) {
     if (!q || typeof q !== 'string') return false;
     return /^[A-Za-z0-9\-_.]{2,12}$/.test(q.trim());
@@ -241,17 +258,14 @@
       addBotMessage(`Showing gene card for <strong>${escapeHtml(q.toUpperCase())}</strong>.`);
       return;
     }
-    // gene list detection (commas or many tokens)
     if (q.includes(',') || q.split(/\s+/).length > 6) {
       switchModule('batch');
       $('#batchInput').value = q;
       addBotMessage('Moved query to Batch Query — please review and Run Batch.');
       return;
     }
-    // general assist
     switchModule('chat');
     addBotMessage(`Searching: <em>${escapeHtml(q)}</em>`);
-    // try to detect gene from CiliAI lookups
     handleAIQuery(q);
   }
 
@@ -265,16 +279,9 @@
       addBotMessage(`Detected gene <strong>${escapeHtml(q.toUpperCase())}</strong> — displaying gene card.`);
       return;
     }
-    if (/enrich|enrichment/i.test(q)) {
-      switchModule('enrichment');
-      renderEnrichmentAnalysis(q);
-      addBotMessage('Preparing enrichment analysis — open the Enrichment module.');
-      return;
-    }
     handleAIQuery(q);
   }
 
-  // Basic placeholder AI router — you can replace this with your LLM/backend
   function handleAIQuery(q) {
     const tokens = (q.match(/[A-Za-z0-9]{2,12}/g) || []).map(t => t.toUpperCase());
     const gene = tokens.find(t => window.CiliAI?.lookups?.geneMap?.[t]);
@@ -286,7 +293,7 @@
     }
   }
 
-  // --- Gene selection (uses window.CiliAI.lookups.geneMap when available) ---
+  // --- Gene Selection ---
   function selectGene(symbol) {
     selectedGene = symbol.toUpperCase();
     $('#geneTitle').textContent = selectedGene;
@@ -299,7 +306,6 @@
       $('#metaExpr').textContent = geneObj.expressionSummary || '—';
       $('#metaDisease').textContent = geneObj.disease || '—';
 
-      // badges
       const bcont = $('#geneBadges');
       bcont.innerHTML = '';
       if (geneObj.ciliary) bcont.appendChild(el('span', { class: 'badge' }, ['Ciliary']));
@@ -312,14 +318,12 @@
       $('#metaDisease').textContent = '—';
     }
 
-    // geneActions quick buttons
     const ga = $('#geneActions');
     ga.innerHTML = '';
     const openU = el('button', { class: 'action-btn' }, ['Open UMAP']); openU.onclick = () => renderOrganelleUMAP(selectedGene);
     const openE = el('button', { class: 'action-btn' }, ['Expr Heat']); openE.onclick = () => renderExpressionHeatmap(selectedGene);
     ga.appendChild(openU); ga.appendChild(openE);
 
-    // if UMAP available, try to call the UMAP hook directly
     if (window.CiliAI_UMAP && window.CiliAI_UMAP.length) renderOrganelleUMAP(selectedGene);
     else $('#plotArea').innerHTML = `<div style="text-align:center"><div style="font-weight:600">No precomputed UMAP available</div><div class="small" style="margin-top:6px">Load UMAP into window.CiliAI_UMAP to enable plotting.</div></div>`;
   }
@@ -352,12 +356,10 @@
   // --- Module switcher ---
   function switchModule(module) {
     activeModule = module || 'chat';
-    // hide left cards
     $('#messages').parentElement.style.display = (module === 'chat' || module.startsWith('plot')) ? 'block' : 'block';
     $('#searchCard').style.display = module === 'search' ? 'block' : 'none';
     $('#batchCard').style.display = module === 'batch' ? 'block' : 'none';
 
-    // route to plot modules
     const plotMap = {
       'plot_home': renderPlotHome,
       'localization': renderGeneLocalizations,
@@ -376,64 +378,48 @@
     if (plotMap[module]) plotMap[module]();
   }
 
-  // --- Plot API (REPLACED CODE) ---
-  // Replace old plot implementations with modular placeholders + integration hooks.
-  // You can replace internals with Plotly / D3 / Vega implementations (examples below).
+  // --- Plot API (Placeholders) ---
   const Plots = {
-    // Called to render home / selection hub
     renderPlotHome: function () {
       $('#plotHint').textContent = 'CiliaPlot home — pick a visualization';
       $('#plotArea').innerHTML = `<div style="text-align:center"><div style="font-weight:700">CiliaPlot — Visualize Ciliary Gene Sets</div><div class="small" style="margin-top:8px">Choose a plot from the sidebar or click a gene quick action.</div></div>`;
     },
-
     renderGeneLocalizations: function () {
       $('#plotHint').textContent = 'Gene Localizations';
       $('#plotArea').innerHTML = `<div style="text-align:center"><div style="font-weight:700">Gene Localizations</div><div class="small" style="margin-top:8px">Localization distribution placeholder.</div></div>`;
-      // Hook: implement bar plot using window.CiliAI.masterData
     },
-
     renderFunctionalCategories: function () {
       $('#plotHint').textContent = 'Functional Categories';
       $('#plotArea').innerHTML = `<div style="text-align:center"><div style="font-weight:700">Functional Categories</div><div class="small" style="margin-top:8px">Functional category bar chart placeholder.</div></div>`;
-      // Hook: implement category plot
     },
-
     renderEnrichmentAnalysis: function (query) {
       $('#plotHint').textContent = 'Enrichment Analysis';
       $('#plotArea').innerHTML = `<div style="text-align:center"><div style="font-weight:700">Enrichment Analysis</div><div class="small" style="margin-top:8px">Run enrichment on selected gene set — placeholder.</div></div>`;
-      // Hook: call enrichment backend or run local ORA/GSEA using preloaded gene sets
     },
-
     renderFunctionVsLocalization: function () {
       $('#plotHint').textContent = 'Function vs Localization';
       $('#plotArea').innerHTML = `<div style="text-align:center"><div style="font-weight:700">Function vs Localization</div><div class="small" style="margin-top:8px">Contingency or scatter plot placeholder.</div></div>`;
     },
-
     renderGeneSetComparison: function () {
       $('#plotHint').textContent = 'Gene Set Comparison';
       $('#plotArea').innerHTML = `<div style="text-align:center"><div style="font-weight:700">Gene Set Comparison</div><div class="small" style="margin-top:8px">Venn / UpSet placeholder.</div></div>`;
     },
-
     renderComplexNetwork: function () {
       $('#plotHint').textContent = 'Complex Network';
       $('#plotArea').innerHTML = `<div style="text-align:center"><div style="font-weight:700">Complex Network</div><div class="small" style="margin-top:8px">Network view placeholder.</div></div>`;
     },
-
     renderOrganelleRadar: function (gene) {
       $('#plotHint').textContent = 'Organelle Radar';
       $('#plotArea').innerHTML = `<div style="text-align:center"><div style="font-weight:700">Organelle Radar</div><div class="small" style="margin-top:8px">${gene ? 'Gene: ' + escapeHtml(gene) : ''} — placeholder radar chart.</div></div>`;
     },
-
     renderOrganelleUMAP: function (gene) {
       $('#plotHint').textContent = 'Organelle UMAP';
-      // Use window.CiliAI_UMAP if available
       if (window.CiliAI_UMAP && Array.isArray(window.CiliAI_UMAP) && window.CiliAI_UMAP.length) {
-        // quick display: show whether gene has a point
         const g = (gene || '').toUpperCase();
         const point = (window.CiliAI && window.CiliAI.lookups && window.CiliAI.lookups.umapByGene) ? window.CiliAI.lookups.umapByGene[g] : null;
         let msg = point ? `Showing location for <strong>${escapeHtml(g)}</strong> (placeholder marker)` : `Showing full UMAP (no marker for ${escapeHtml(g)})`;
         $('#plotArea').innerHTML = `<div style="text-align:center"><div style="font-weight:700">Organelle UMAP</div><div class="small" style="margin-top:8px">${msg}</div></div>`;
-        // Hook: if you have a plot function (e.g. Plotly), call it here.
+        
         if (typeof window.CiliAI?.Plots?.renderUMAPPlot === 'function') {
           try { window.CiliAI.Plots.renderUMAPPlot(g, '#plotArea'); } catch (e) { console.warn('Error in external UMAP plotter', e); }
         }
@@ -441,12 +427,10 @@
         $('#plotArea').innerHTML = `<div style="text-align:center"><div style="font-weight:700">Organelle UMAP</div><div class="small" style="margin-top:8px">No UMAP data loaded (window.CiliAI_UMAP empty).</div></div>`;
       }
     },
-
     renderExpressionHeatmap: function (gene) {
       $('#plotHint').textContent = 'Expression Heatmap';
       if (gene && window.CiliAI?.cellDataCache && window.CiliAI.cellDataCache[gene.toUpperCase()]) {
         const c = window.CiliAI.cellDataCache[gene.toUpperCase()];
-        // show textual mini-heatmap if plotting libs absent
         const rows = Object.entries(c).slice(0, 50).map(([cell, val]) =>
           `<div style="display:flex;justify-content:space-between;padding:2px 6px">${escapeHtml(cell)}<span>${Number(val).toFixed(2)}</span></div>`
         ).join('');
@@ -455,28 +439,25 @@
         $('#plotArea').innerHTML = `<div style="text-align:center"><div style="font-weight:700">Expression Heatmap</div><div class="small" style="margin-top:8px">No expression cache for this gene (placeholder).</div></div>`;
       }
     },
-
     renderGeneFeatureOverview: function () {
       $('#plotHint').textContent = 'Gene Feature Overview';
       $('#plotArea').innerHTML = `<div style="text-align:center"><div style="font-weight:700">Gene Feature Overview</div><div class="small" style="margin-top:8px">Domain architecture / isoforms (placeholder).</div></div>`;
     },
-
     renderScreenSummaryHeatmap: function () {
       $('#plotHint').textContent = 'Screen Summary Heatmap';
       $('#plotArea').innerHTML = `<div style="text-align:center"><div style="font-weight:700">Screen Summary Heatmap</div><div class="small" style="margin-top:8px">Screen aggregates placeholder.</div></div>`;
     },
-
     renderGenesVsCiliopathies: function () {
       $('#plotHint').textContent = 'Genes vs Ciliopathies';
       $('#plotArea').innerHTML = `<div style="text-align:center"><div style="font-weight:700">Genes vs Ciliopathies</div><div class="small" style="margin-top:8px">Association placeholder.</div></div>`;
     }
   };
 
-  // Expose Plots for external hooking (so we respect your request to keep data code intact)
+  // Expose Plots
   window.CiliAI = window.CiliAI || {};
   window.CiliAI.Plots = Object.assign({}, Plots);
 
-  // Convenience wrappers (old code may call these)
+  // Convenience wrappers
   function renderPlotHome() { window.CiliAI.Plots.renderPlotHome(); }
   function renderGeneLocalizations() { window.CiliAI.Plots.renderGeneLocalizations(); }
   function renderFunctionalCategories() { window.CiliAI.Plots.renderFunctionalCategories(); }
@@ -491,7 +472,7 @@
   function renderScreenSummaryHeatmap() { window.CiliAI.Plots.renderScreenSummaryHeatmap(); }
   function renderGenesVsCiliopathies() { window.CiliAI.Plots.renderGenesVsCiliopathies(); }
 
-  // attach functions globally so older code might still call them
+  // Attach globally
   window.renderPlotHome = renderPlotHome;
   window.renderGeneLocalizations = renderGeneLocalizations;
   window.renderFunctionalCategories = renderFunctionalCategories;
@@ -508,52 +489,56 @@
 
   // --- Data status display ---
   function setDataStatus() {
+    const statusEl = $('#dataStatus');
+    if (!statusEl) return;
     const s = (window.CiliAI && window.CiliAI.ready) ? `Ready (${(window.CiliAI.masterData && window.CiliAI.masterData.length) || 0} genes)` : 'Loading data…';
-    $('#dataStatus').textContent = s;
+    statusEl.textContent = s;
   }
 
-  // --- Boot sequence ---
-  function bootUI() {
+  // --- Boot sequence (ASYNC) ---
+  async function bootUI() {
     buildSidebar();
     buildLeftPanel();
     buildRightPanel();
     attachInteractions();
     setDataStatus();
+    Plots.renderPlotHome();
 
-    // If your ciliai.js exposed initCiliAI or loadCiliAIData, call it (but don't duplicate if ready)
-    const callInit = async () => {
-      try {
-        if (window.CiliAI && window.CiliAI.ready) {
-          setDataStatus();
-          addBotMessage('CiliAI ready.');
-          return;
-        }
-        if (typeof initCiliAI === 'function') {
-          await initCiliAI();
-          setDataStatus();
-          addBotMessage('CiliAI database loaded (initCiliAI).');
-          return;
-        }
-        if (typeof loadCiliAIData === 'function') {
-          await loadCiliAIData();
-          // if loader doesn't set ready, do so
-          if (window.CiliAI && window.CiliAI.masterData) window.CiliAI.ready = true;
-          setDataStatus();
-          addBotMessage('CiliAI database loaded (loadCiliAIData).');
-          return;
-        }
-        // else, keep placeholders
-        addBotMessage('CiliAI UI ready. Database not loaded — plotting limited until data is available.');
-      } catch (e) {
-        console.error('Error calling init/load:', e);
-        addBotMessage('Error loading CiliAI data — see console.');
-      }
+    // Safe Data Connection logic
+    // 1. If already ready
+    if (window.CiliAI && window.CiliAI.ready) {
+      setDataStatus();
+      addBotMessage('CiliAI ready (cached).');
+      return;
+    }
+
+    // 2. Set up hook for ciliai.js to call when it finishes
+    window.CiliAI_UI_OnReady = () => {
+      setDataStatus();
+      addBotMessage('CiliAI Database Loaded.');
     };
 
-    callInit();
+    // 3. If ciliai.js is present but not triggered/ready, try to trigger it manually
+    try {
+      if (typeof window.loadCiliAIData === 'function') {
+        await window.loadCiliAIData();
+        setDataStatus();
+        // If manual load worked, set ready flag if not set
+        if (window.CiliAI && window.CiliAI.masterData && !window.CiliAI.ready) {
+            window.CiliAI.ready = true;
+        }
+        addBotMessage('CiliAI database loaded (manual trigger).');
+      } else {
+        // ciliai.js hasn't parsed yet. We wait for window.CiliAI_UI_OnReady to be called by it.
+        console.log('Waiting for CiliAI Core to initialize...');
+      }
+    } catch (e) {
+      console.error('Error initializing data:', e);
+      addBotMessage('Error loading data. See console.');
+    }
   }
 
-  // expose some utilities globally for devs
+  // Expose utilities
   window.CiliAI_UI = {
     selectGene,
     switchModule,
@@ -561,31 +546,22 @@
     renderPlotHome: () => window.CiliAI.Plots.renderPlotHome()
   };
 
-  // --- Make CiliAI core functions available safely ---
-window.CiliAICore = {
-  loadCiliAIData: (typeof loadCiliAIData === 'function') ? loadCiliAIData : null,
-  initCiliAI: (typeof initCiliAI === 'function') ? initCiliAI : null,
-  CiliAI: window.CiliAI || {}
-};
-   
- if (typeof loadCiliAIData === 'function') {
-  await loadCiliAIData();
-  // if loader doesn't set ready, do so
-  if (window.CiliAI && window.CiliAI.masterData) window.CiliAI.ready = true;
-  setDataStatus();
-  addBotMessage('CiliAI database loaded (loadCiliAIData).');
-  return;
-}
+  // Safe Bridge
+  window.CiliAICore = {
+    loadCiliAIData: async () => {
+      if (typeof window.loadCiliAIData === 'function') await window.loadCiliAIData();
+    },
+    initCiliAI: async () => {
+      if (typeof window.initCiliAI === 'function') await window.initCiliAI();
+    },
+    CiliAI: window.CiliAI || {}
+  };
 
-   if (window.CiliAICore.loadCiliAIData) {
-  await window.CiliAICore.loadCiliAIData();
-  if (window.CiliAI && window.CiliAI.masterData) window.CiliAI.ready = true;
-  setDataStatus();
-  addBotMessage('CiliAI database loaded (loadCiliAIData).');
-  return;
-}
-   
+  // --- STARTUP ---
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', bootUI);
+  } else {
+    bootUI();
+  }
 
-   
 })();
-
