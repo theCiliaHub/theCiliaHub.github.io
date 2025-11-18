@@ -7,11 +7,7 @@
  * • Fixes all known layout, normalization, and query routing bugs.
  * • INTEGRATED: displayFullGeneInfo (Nov 15, 2025)
  * ============================================================== */
-
-(function () {
-    'use strict';
-
-    // ==========================================================
+// ==========================================================
     // 1. GLOBAL STATE & CONSTANTS
     // ==========================================================
 
@@ -30,6 +26,12 @@
     window.liPhylogenyCache = null;
     window.neversPhylogenyCache = null;
     window.CiliAI_UMAP = null; // This will be populated from the master DB
+
+    // --- NEW LOCATION FOR LOG FUNCTION ---
+    function log(message) {
+        console.log(`[CiliAI] ${message}`);
+    }
+    // --- END NEW LOCATION ---
 
     // --- Data Maps (These are now just for the AI brain) ---
 
