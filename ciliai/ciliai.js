@@ -3071,9 +3071,9 @@ function extractPhenotypeIntent(qLower) {
 // ==========================================================
 
 window.selectComp = function (id) {
-    // Safety check: Only run SVG logic if the function exists in this version
+    // Safety: Check if SVG generator exists
     if (typeof generateAndInjectSVG === 'function') {
-        generateAndInjectSVG();
+        generateAndInjectSVG(); 
     }
     
     document.querySelectorAll('.cilia-part')
@@ -3082,16 +3082,16 @@ window.selectComp = function (id) {
     const el = document.getElementById(id);
     if (el) el.classList.add('selected');
 
-    // Ensure structureInfoMap exists (defined higher in file)
+    // Ensure map exists (defined at top of file)
     if (typeof structureInfoMap === 'undefined') return;
     const data = structureInfoMap[id];
     if (!data) return;
 
-    // Ensure getGenesByLocalization exists
+    // Ensure logic helper exists
     if (typeof getGenesByLocalization === 'function') {
         const genes = getGenesByLocalization(data.title);
+
         const bar = document.getElementById('bottomBar');
-        
         if (bar) {
             if (genes.length > 0) {
                 bar.innerHTML = `
@@ -3114,15 +3114,16 @@ window.selectComp = function (id) {
 };
 
 window.searchGene = function (name) {
-    const query = name || document.getElementById('geneSearch').value.trim().toUpperCase();
+    const geneInput = document.getElementById('geneSearch');
+    const query = name || (geneInput ? geneInput.value.trim().toUpperCase() : '');
     if (!query) return;
 
-    // Use internal helper if available, otherwise fallback
+    // Use UI helper if available
     if (typeof addChatMessage === 'function') {
-        addChatMessage(`Tell me about ${query}`, true);
+        addChatMessage(`Tell me about ${query}`, true); 
     }
     
-    // Use the global AI handler
+    // Route to Logic
     if (window.handleAIQuery) {
         window.handleAIQuery(`Tell me about ${query}`);
     } else if (typeof handleGeneSearch === 'function') {
@@ -3153,8 +3154,11 @@ window.showDefaultPhylogeny = function () {
 // ----------------------------------------------------------
 
 window.sendMsg = function () {
+    // Route to internal handler if exists, otherwise global
     if (typeof handleUserSend === 'function') {
         handleUserSend();
+    } else if (window.handleUserSend) {
+        window.handleUserSend();
     }
 };
 
@@ -3178,7 +3182,7 @@ window.clearChat = function () {
         if (msgs) msgs.innerHTML = '';
         
         if (typeof generateAndInjectSVG === 'function') {
-            generateAndInjectSVG();
+            generateAndInjectSVG(); 
         }
         
         document.querySelectorAll('.cilia-part')
@@ -3204,7 +3208,7 @@ window.downloadPlot = function (divId, filename) {
             height: 800
         });
     } else {
-        console.warn("Plotly not found or plot container missing.");
+        console.warn("Download failed: Plotly or Container not found.");
     }
 };
 
@@ -3213,12 +3217,13 @@ window.downloadPlot = function (divId, filename) {
 // ----------------------------------------------------------
 
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', window.initCiliAI);
+    // Wait for DOM, then call init
+    document.addEventListener('DOMContentLoaded', () => {
+        if (window.initCiliAI) window.initCiliAI();
+    });
 } else {
-    // Check if initCiliAI exists on window (it should in v5.5)
-    if (typeof window.initCiliAI === 'function') {
-        window.initCiliAI();
-    }
+    // DOM ready, call immediately
+    if (window.initCiliAI) window.initCiliAI();
 }
 
 // ===========================================================
@@ -3226,18 +3231,18 @@ if (document.readyState === 'loading') {
 // ===========================================================
 
 window.CiliAI_UI_OnReady = window.CiliAI_UI_OnReady || function () {
-    // console.log("CiliAI_UI_OnReady called but UI not loaded.");
+    // Default placeholder. The UI script overrides this later.
+    // console.log("CiliAI_UI_OnReady called but UI script not loaded.");
 };
 
 // Auto-run only if this script is loaded by /ciliai index
-    if (document.body && document.body.dataset && document.body.dataset.ciliai === "enabled") {
-        // Defer start so UI loads first
-        setTimeout(() => {
-            if (typeof window.initCiliAI === "function") {
-                window.initCiliAI();
-            }
-        }, 10);
-    }
+if (document.body && document.body.dataset && document.body.dataset.ciliai === "enabled") {
+    // Defer start so UI loads first
+    setTimeout(() => {
+        if (typeof window.initCiliAI === "function") {
+            window.initCiliAI();
+        }
+    }, 10);
+}
 
 })();
-    
