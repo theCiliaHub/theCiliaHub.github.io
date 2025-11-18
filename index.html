@@ -5,14 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CiliAI — Unified Explorer</title>
 
-    <!-- Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
 
-    <!-- Styles -->
-    <link rel="stylesheet" href="ciliai/ciliai_ui.css">
+    <link rel="stylesheet" href="ciliai/ciliai_ui.css"> 
     <link rel="stylesheet" href="styles.css">
 
-    <!-- External JS libraries -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/@panzoom/panzoom@4.5.1/dist/panzoom.min.js" defer></script>
@@ -24,93 +21,89 @@
     <script src="https://cdn.jsdelivr.net/npm/jstat@latest/dist/jstat.min.js" defer></script>
 
     <style>
-        /* Interactive Cilium Styles */
-        .interactive-cilium {
-            background: white;
-            border-radius: 12px;
-            padding: 10px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        /* Basic Layout Scaffold to ensure panels sit side-by-side 
+           (If not already covered by ciliai_ui.css) */
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            overflow: hidden; /* Prevent full page scroll, let panels scroll */
+            font-family: 'Inter', sans-serif;
         }
-        .cilia-part:hover { filter: brightness(1.2); cursor: pointer; }
-        .cilia-part:focus { outline: 2px solid #0d6efd; outline-offset: 2px; }
+        
+        /* The Main App Container */
+        #ciliai-app {
+            display: flex;
+            width: 100vw;
+            height: 100vh;
+            background-color: #f4f6f9;
+        }
+
+        /* Sidebar Container */
+        #sidebar {
+            width: 260px;
+            flex-shrink: 0;
+            background: #1e293b; /* Dark sidebar background */
+            color: white;
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid #334155;
+        }
+
+        /* Left Panel (Chat/Search) */
+        #left-panel {
+            width: 380px;
+            flex-shrink: 0;
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid #e2e8f0;
+            background: white;
+            padding: 15px;
+            overflow-y: auto;
+        }
+
+        /* Right Panel (Gene Cards/Plots) */
+        #right-panel {
+            flex-grow: 1;
+            padding: 20px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        /* Tooltip placeholders */
+        .tooltip {
+            position: absolute;
+            display: none;
+            z-index: 1000;
+        }
     </style>
 </head>
 <body>
-    <nav class="navbar">
-        <div class="nav-container">
-            <a href="#/" onclick="navigateTo(event, '/')" class="logo">CiliaHub</a>
-            <ul class="nav-links">
-                <li><a href="#/" onclick="navigateTo(event, '/')" aria-label="Home">Home</a></li>
-                <li><a href="#/ciliaplot" onclick="navigateTo(event, '/ciliaplot')" aria-label="CiliaPlot">CiliaPlot</a></li>
-                <li><a href="#/ciliai" onclick="navigateTo(event, '/ciliai')" aria-label="CiliAI">CiliAI</a></li>
-                <li><a href="#/batch-query" onclick="navigateTo(event, '/batch-query')" aria-label="Batch Query">Batch Query</a></li>
-                <li><a href="#/expression" onclick="navigateTo(event, '/expression')" aria-label="Expression">Expression</a></li>
-                <li><a href="#/download" onclick="navigateTo(event, '/download')" aria-label="Download">Download</a></li>
-                <li><a href="#/contact" onclick="navigateTo(event, '/contact')" aria-label="Contact">Contact</a></li>
-            </ul>
-        </div>
-    </nav>
 
-    <main class="main-container">
-        <div class="content-area" id="content-area"></div>
+    <div id="ciliai-app">
+        <aside id="sidebar">
+            </aside>
 
-        <aside class="cilia-panel">
-            <div class="panel-header"><h3>Interactive Cilium</h3></div>
-            <div class="panel-content">
-                <div class="cilia-container interactive-cilium">
-                    <svg viewBox="0 0 300 400" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;">
-                        <defs>
-                            <linearGradient id="cytosolGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                                <stop offset="0%" style="stop-color:#F5F7FA;" />
-                                <stop offset="100%" style="stop-color:#E9EDF2;" />
-                            </linearGradient>
-                            <radialGradient id="nucleusGradient" cx="50%" cy="50%" r="50%">
-                                <stop offset="0%" style="stop-color:#D8DEE9;" />
-                                <stop offset="100%" style="stop-color:#C8D0DD;" />
-                            </radialGradient>
-                        </defs>
+        <section id="left-panel">
+            </section>
 
-                        <path id="cell-body" class="cilia-part" tabindex="0"
-                              fill="url(#cytosolGradient)" stroke="#D8DEE9" stroke-width="2"
-                              d="M 50,380 C -20,300 20,200 150,200 C 280,200 320,300 250,380 Z"/>
-                        <circle id="nucleus" class="cilia-part" tabindex="0"
-                                fill="url(#nucleusGradient)" stroke="#B0B8C8" stroke-width="2"
-                                cx="150" cy="320" r="40"/>
-                        <rect id="basal-body" class="cilia-part" tabindex="0" fill="#4A5568" x="140" y="195" width="20" height="15"/>
-                        <path id="transition-zone" class="cilia-part" tabindex="0"
-                              fill="#718096" stroke="#4A5568" stroke-width="2"
-                              d="M 142,195 L 138,180 L 162,180 L 158,195 Z"/>
-                        <path id="ciliary-membrane" class="cilia-part" tabindex="0"
-                              fill="none" stroke="#A0AEC0" stroke-width="2" stroke-dasharray="4,4"
-                              d="M 138,180 L 145,10 L 155,10 L 162,180 Z"/>
-                        <path id="axoneme" class="cilia-part" tabindex="0"
-                              fill="none" stroke="#4A5568" stroke-width="2"
-                              d="M 145,180 L 148,15 L 152,15 L 155,180 Z"/>
-                    </svg>
-                </div>
-
-                <div class="controls">
-                    <h4>Gene Localization:</h4>
-                    <div id="geneButtons" class="gene-buttons"></div>
-                </div>
-            </div>
-        </aside>
-    </main>
+        <main id="right-panel">
+            <div id="dataStatus" style="margin-bottom: 10px; font-size: 12px; color: #666;">Initializing...</div>
+        </main>
+    </div>
 
     <div id="enrichment-tooltip" class="tooltip"></div>
     <div id="multi-dim-tooltip" class="tooltip"></div>
 
-    <footer class="footer" style="text-align:center;">
-        <p>© 2025 CiliaHub. All rights reserved.</p>
-    </footer>
+    <script src="ciliai/ciliai.js" defer></script>
 
-   <!-- Core scripts -->
-<script src="ciliai/ciliai.js" defer></script>
-<script src="ciliai/ciliai_ui.js" defer></script>
+    <script src="ciliai/ciliai_ui.js" defer></script>
 
-<!-- App scripts -->
-<script src="globals.js" defer></script>
-<script src="script.js" defer></script>
-<script src="plots.js" defer></script>
+    <script src="globals.js" defer></script>
+    <script src="script.js" defer></script>
+    <script src="plots.js" defer></script>
+
 </body>
 </html>
