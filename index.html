@@ -9,7 +9,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
 
     <!-- Styles -->
-    <link rel="stylesheet" href="ciliai_ui.css">
+    <link rel="stylesheet" href="ciliai/ciliai_ui.css">
     <link rel="stylesheet" href="styles.css">
 
     <!-- External JS libraries -->
@@ -24,7 +24,13 @@
     <script src="https://cdn.jsdelivr.net/npm/jstat@latest/dist/jstat.min.js" defer></script>
 
     <style>
-        .interactive-cilium { background: white; border-radius: 12px; padding: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        /* Interactive Cilium Styles */
+        .interactive-cilium {
+            background: white;
+            border-radius: 12px;
+            padding: 10px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
         .cilia-part:hover { filter: brightness(1.2); cursor: pointer; }
         .cilia-part:focus { outline: 2px solid #0d6efd; outline-offset: 2px; }
     </style>
@@ -102,7 +108,7 @@
     <script src="script.js" defer></script>
     <script src="plots.js" defer></script>
     <script src="ciliai/ciliai.js" defer></script>
-    <script src="ciliai_ui.js" defer></script>
+    <script src="ciliai/ciliai_ui.js" defer></script>
     <script src="globals.js" defer></script>
 </body>
 </html>
