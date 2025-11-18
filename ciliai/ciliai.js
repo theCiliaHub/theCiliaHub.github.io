@@ -179,24 +179,29 @@
     // 2. DATA LOADING & PROCESSING
     // ==========================================================
 
-    async function initCiliAI() {
-        console.log('CiliAI: Initializing (v5.1 Pre-compiled)...');
-        await loadCiliAIData(); 
-        
-        if (!window.CiliAI.masterData || window.CiliAI.masterData.length === 0) {
-            console.error("CiliAI: Master data is empty. Database load failed.");
-            window.CiliAI.ready = false;
-            return;
-        }
-        
-        // NO buildLookups() needed!
-        window.CiliAI.ready = true;
-        console.log('CiliAI: Ready! Pre-compiled database loaded.');
+// ===========================================================
+// INIT — Loads all precompiled CiliAI datasets
+// ===========================================================
+async function initCiliAI() {
+    console.log("CiliAI: Initializing (v5.2)…");
 
-        if (window.location.hash.includes('/ciliai')) {
-            setTimeout(displayCiliAIPage, 100);
-        }
+    await loadCiliAIData();
+
+    if (!window.CiliAI.masterData || window.CiliAI.masterData.length === 0) {
+        console.error("CiliAI: Data load failed (masterData empty).");
+        window.CiliAI.ready = false;
+        return;
     }
+
+    window.CiliAI.ready = true;
+    console.log("CiliAI: All datasets loaded.");
+
+    // Tell UI that data is ready
+    if (typeof window.CiliAI_UI_OnReady === "function") {
+        window.CiliAI_UI_OnReady();
+    }
+}
+
 
   /**
      * Fetches the pre-compiled database files from GitHub.
@@ -3053,6 +3058,7 @@ function extractPhenotypeIntent(qLower) {
             addChatMessage('Sorry about that. What specifically would help?', false);
         }
     }
+    
 
     window.clearChat = function () {
         if (confirm('Start new conversation?')) {
@@ -3062,6 +3068,7 @@ function extractPhenotypeIntent(qLower) {
             addChatMessage('Welcome back! How can I help?', false);
         }
     }
+    
 
     window.downloadPlot = function (divId, filename) {
         const plotDiv = document.getElementById(divId);
@@ -3078,3 +3085,11 @@ function extractPhenotypeIntent(qLower) {
     }
 
 })();
+
+
+// ===========================================================
+// UI HOOK — Called from UI layer once browser loads ciliai_ui.js
+// ===========================================================
+window.CiliAI_UI_OnReady = window.CiliAI_UI_OnReady || function () {
+    console.warn("CiliAI_UI_OnReady called but ciliai_ui.js is not loaded yet.");
+};
