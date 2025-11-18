@@ -3000,7 +3000,7 @@ function extractPhenotypeIntent(qLower) {
     }
 
     
- // ==========================================================
+// ==========================================================
 // 5. GLOBAL UI WRAPPERS & STARTUP
 // ==========================================================
 
@@ -3106,3 +3106,33 @@ window.downloadPlot = function (divId, filename) {
         });
     }
 };
+
+// ----------------------------------------------------------
+// STARTUP: Initialize CiliAI when DOM ready
+// ----------------------------------------------------------
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initCiliAI);
+} else {
+    initCiliAI();
+}
+
+// ===========================================================
+// UI HOOK — Called from UI layer once browser loads ciliai_ui.js
+// ===========================================================
+
+window.CiliAI_UI_OnReady = window.CiliAI_UI_OnReady || function () {
+    console.warn("CiliAI_UI_OnReady called but ciliai_ui.js is not loaded yet.");
+};
+
+// Auto-run only if this script is loaded by /ciliai index
+if (document.body && document.body.dataset?.ciliai === "enabled") {
+    // Defer start so UI loads first
+    setTimeout(() => {
+        if (typeof initCiliAI === "function") {
+            initCiliAI();
+        }
+    }, 10);
+}
+
+})();
