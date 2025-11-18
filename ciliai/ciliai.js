@@ -200,7 +200,7 @@
 
   /**
      * Fetches the pre-compiled database files from GitHub.
-     * (FIXED Nov 17 2025): Changed 'point.gene' to 'point.Gene' to match UMAP data structure
+     * (MODIFIED Nov 18 2025): Added cellDataCache builder for advanced UMAP plotting
      */
     async function loadCiliAIData(timeoutMs = 60000) {
         const baseUrl = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/';
@@ -230,18 +230,15 @@
             window.CiliAI_UMAP = mainData.umapData; 
             window.CiliAI.data.umap = mainData.umapData; 
             
-            // --- THIS IS THE FIX ---
-            // Create the UMAP lookup map, as it's not in the lookups file
+            // --- MODIFIED: Create the UMAP lookup map ---
             window.CiliAI.lookups.umapByGene = {};
             if (window.CiliAI_UMAP && Array.isArray(window.CiliAI_UMAP)) {
                 for (const point of window.CiliAI_UMAP) {
-                    // --- MODIFIED: 'point.gene' to 'point.Gene' ---
                     if (point.Gene) { 
                         window.CiliAI.lookups.umapByGene[point.Gene.toUpperCase()] = point;
                     } 
                 }
             }
-            // --- END OF FIX ---
 
             // Create a GeneMap from the masterData list for fast lookups by gene name
             window.CiliAI.lookups.geneMap = {};
@@ -250,6 +247,18 @@
                     window.CiliAI.lookups.geneMap[gene.Gene.toUpperCase()] = gene;
                 }
             }
+
+            // --- NEW: Build the cellDataCache for UMAP expression plotting ---
+            log("Building scRNA expression cache for UMAP...");
+            window.CiliAI.cellDataCache = {};
+            for (const gene of mainData.masterData) {
+                if (gene.Gene && gene.expression && gene.expression.scRNA) {
+                    // This creates the { GENE: { cell_type: value, ... } } structure
+                    window.CiliAI.cellDataCache[gene.Gene.toUpperCase()] = gene.expression.scRNA;
+                }
+            }
+            log("scRNA expression cache built.");
+            // --- END NEW SECTION ---
 
             console.log(`CiliAI: ${window.CiliAI.masterData.length} genes integrated.`);
             console.log('CiliAI: Lookups successfully loaded.');
@@ -353,14 +362,20 @@
             .ai-action { color: #667eea; text-decoration: none; font-weight: 600; }
             .ai-action:hover { text-decoration: underline; }
             .left-panel { display: flex; flex-direction: column; background: #f5f7fa; border-right: 1px solid #e1e8ed; overflow: hidden; }
-            .header { padding: 20px 30px; background: white; color: #2c3e50; box-shadow: 0 1px 3px rgba(0,0,0,0.08); border-bottom: 1px solid #e1e8ed; }
-            .header h1 { font-size: 28px; font-weight: 600; margin-bottom: 5px; color: #2c3e50; }
-            .header p { font-size: 14px; color: #666; }
-            .toolbar { padding: 15px 30px; background: white; border-bottom: 1px solid #e1e8ed; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-            .toolbar input { flex: 1; min-width: 200px; padding: 10px 15px; border: 1px solid #d1d9e0; border-radius: 6px; font-size: 14px; }
-            .toolbar button { padding: 10px 20px; background: #667eea; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 500; transition: all 0.2s; font-size: 14px; }
+            
+            /* --- MODIFIED: Squashed header --- */
+            .header { padding: 10px 20px; background: white; color: #2c3e50; box-shadow: 0 1px 3px rgba(0,0,0,0.08); border-bottom: 1px solid #e1e8ed; }
+            .header h1 { font-size: 20px; font-weight: 600; margin-bottom: 2px; color: #2c3e50; }
+            .header p { font-size: 12px; color: #666; }
+            
+            /* --- MODIFIED: Squashed toolbar --- */
+            .toolbar { padding: 10px 20px; background: white; border-bottom: 1px solid #e1e8ed; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+            .toolbar input { flex: 1; min-width: 200px; padding: 8px 12px; border: 1px solid #d1d9e0; border-radius: 6px; font-size: 13px; }
+            .toolbar button { padding: 8px 15px; background: #667eea; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 500; transition: all 0.2s; font-size: 13px; }
             .toolbar button:hover { background: #5568d3; }
-            .status { font-size: 12px; padding: 5px 10px; border-radius: 4px; font-weight: 500; }
+            .status { font-size: 11px; padding: 4px 8px; border-radius: 4px; font-weight: 500; }
+            /* --- END OF MODIFICATIONS --- */
+
             .status.loading { background: #fff3cd; color: #856404; }
             .status.ready { background: #d4edda; color: #155724; }
             .status.error { background: #f8d7da; color: #721c24; }
@@ -444,6 +459,7 @@
         styleEl.textContent = css;
         document.head.appendChild(styleEl);
     }
+    
     function getPageHTML() {
         return `
         <div class="container">
@@ -1196,92 +1212,143 @@ function formatListResult(title, genes, description = "") {
         `;
     }
     
-    // --- 4E. Plotting Handlers (UMAP & Phylogeny) ---
-  async function handleUmapPlot(highlightGene = null) {
+   /**
+     * (REPLACEMENT) Displays a UMAP plot where each cell is colored by the expression of a specific gene,
+     * AND clusters are labeled by cell type.
+     * Adapted from user-provided 'displayUmapGeneExpression' function.
+     */
+    async function handleUmapPlot(geneSymbol) {
         const plotDivId = 'cilia-svg';
         const umapData = window.CiliAI_UMAP;
-        const umapLookup = window.CiliAI.lookups.umapByGene; 
+        const cellData = window.CiliAI.cellDataCache; // Use the cache
+        const plotDiv = document.getElementById(plotDivId);
 
-        if (!umapData || umapData.length === 0) {
-            addChatMessage('UMAP data is not available to plot.', false);
-            return;
-        }
-        
-        // --- MODIFIED: Do NOT call generateAndInjectSVG() ---
-        
-        const plotDiv = document.getElementById(plotDivId); // <-- Fixed typo plotId -> plotDivId
         if (!plotDiv) {
              console.error('UMAP plot container "cilia-svg" not found.');
             return;
         }
+
+        if (!umapData || !cellData) {
+            addChatMessage('UMAP or scRNA expression data is not available to plot.', false);
+            return;
+        }
         
-        // --- MODIFIED: Clear the div and add the class ---
+        // --- Integration Step: Clear panel and set to full-width ---
         plotDiv.innerHTML = ''; // Clear the SVG
         const wrapper = plotDiv.closest('.interactive-cilium');
         if (wrapper) wrapper.classList.add('table-view-active');
-        // --- END OF MODIFICATION ---
+        // --- End Integration Step ---
 
-        const backgroundTrace = {
-            x: [], y: [], text: [],
-            mode: 'markers', type: 'scatter', name: 'All Genes',
-            marker: { color: '#d3d3d3', size: 5, opacity: 0.5 },
-            hoverinfo: 'text'
-        };
-        const highlightTrace = {
-            x: [], y: [], text: [],
-            mode: 'markers', type: 'scatter', name: highlightGene || 'Highlighted',
-            marker: { color: '#2c5aa0', size: 10, opacity: 1, line: { color: 'black', width: 1 } },
-            hoverinfo: 'text'
-        };
+        const geneUpper = geneSymbol ? geneSymbol.toUpperCase() : 'FOXJ1'; // Default to FOXJ1 if no gene
+        const geneExpressionMap = cellData[geneUpper];
 
-        let title = 'Lung scRNA-seq Expression (UMAP)';
-        const geneUpper = highlightGene ? highlightGene.toUpperCase() : null;
-        const highlightedPoint = geneUpper ? umapLookup[geneUpper] : null; 
-
-        umapData.forEach(d => {
-            if (highlightedPoint && d.Gene && (d.Gene.toUpperCase() === highlightedPoint.Gene.toUpperCase())) {
-                // Skip
-            } else {
-                backgroundTrace.x.push(d.x);
-                backgroundTrace.y.push(d.y);
-                backgroundTrace.text.push(`<b>${d.Gene}</b><br>${d.cluster}`);
-            }
-        });
-
-        const plotData = [backgroundTrace];
-
-        if (highlightedPoint) {
-            highlightTrace.x.push(highlightedPoint.x);
-            highlightTrace.y.push(highlightedPoint.y);
-            highlightTrace.text.push(`<b>${highlightedPoint.Gene}</b><br>${highlightedPoint.cluster}`);
-            plotData.push(highlightTrace);
-            title = `Lung scRNA-seq: ${highlightedPoint.Gene}`;
-        } else if (highlightGene) {
-            addChatMessage(`Sorry, I could not find <strong>${highlightGene}</strong> in the UMAP data. Displaying all genes.`, false);
+        if (!geneExpressionMap) {
+            addChatMessage(`Sorry, I could not find <strong>${geneSymbol}</strong> in the scRNA expression data. Displaying all clusters.`, false);
+            // Fallback: Show plot colored by cluster/cell_type if gene not found
+            // For now, just show the uncolored plot
+            geneSymbol = 'Unknown';
         }
 
+        const sampleSize = 15000;
+        const sampledData = []; 
+
+        if (umapData.length > sampleSize) {
+            const usedIndices = new Set();
+            while (sampledData.length < sampleSize) {
+                const randomIndex = Math.floor(Math.random() * umapData.length);
+                if (!usedIndices.has(randomIndex)) {
+                    sampledData.push(umapData[randomIndex]);
+                    usedIndices.add(randomIndex);
+                }
+            }
+        } else {
+            sampledData.push(...umapData);
+        }
+
+        // --- IMPORTANT: Assumes umapData has 'cell_type' property ---
+        // If your umapData has 'cluster', change 'cell.cell_type' to 'cell.cluster' here.
+        const expressionValues = sampledData.map(cell => geneExpressionMap ? (geneExpressionMap[cell.cell_type] || 0) : 0);
+        const cellTypes = [...new Set(sampledData.map(d => d.cell_type))];
+        const annotations = [];
+
+        // Helper to find the median (center) of a cluster
+        const median = (arr) => {
+            const mid = Math.floor(arr.length / 2);
+            const nums = [...arr].sort((a, b) => a - b);
+            return arr.length % 2 !== 0 ? nums[mid] : (nums[mid - 1] + nums[mid]) / 2;
+        };
+
+        for (const cellType of cellTypes) {
+            if (!cellType) continue; // Skip undefined/null cell types
+            const points = sampledData.filter(d => d.cell_type === cellType);
+            if (points.length > 0) {
+                const xCoords = points.map(p => p.x);
+                const yCoords = points.map(p => p.y);
+                
+                annotations.push({
+                    x: median(xCoords),
+                    y: median(yCoords),
+                    text: cellType,
+                    showarrow: false,
+                    font: {
+                        color: '#FFFFFF',
+                        size: 10,
+                        family: 'Arial, sans-serif'
+                    },
+                    bgcolor: 'rgba(0,0,0,0.4)',
+                    borderpad: 2,
+                    bordercolor: 'rgba(0,0,0,0.4)',
+                    borderwidth: 1,
+                    xref: 'x',
+                    yref: 'y'
+                });
+            }
+        }
+
+        const plotData = [{
+            x: sampledData.map(p => p.x),
+            y: sampledData.map(p => p.y),
+            mode: 'markers',
+            type: 'scattergl',
+            hovertext: sampledData.map((p, i) => `Cell Type: ${p.cell_type}<br>Expression: ${expressionValues[i].toFixed(4)}`),
+            hoverinfo: 'text',
+            marker: {
+                color: expressionValues,
+                colorscale: 'Plasma',
+                showscale: true,
+                colorbar: { 
+                    title: { 
+                        text: 'Expression',
+                        side: 'right' 
+                    } 
+                },
+                size: 5,
+                opacity: 0.8
+            }
+        }];
+
         const layout = {
-            title: title,
-            xaxis: { title: 'UMAP 1', zeroline: false, showgrid: false }, // <-- Added showgrid: false
-            yaxis: { title: 'UMAP 2', zeroline: false, showgrid: false }, // <-- Added showgrid: false
-            showlegend: false,
+            title: `UMAP Colored by ${geneUpper} Expression (Sample of ${sampleSize} cells)`,
+            xaxis: { title: 'UMAP 1', zeroline: false, showgrid: false },
+            yaxis: { title: 'UMAP 2', zeroline: false, showgrid: false },
             hovermode: 'closest',
-            margin: { t: 40, b: 40, l: 40, r: 20 },
-            // --- MODIFIED: Set background to white to match example ---
-            paper_bgcolor: 'rgba(255,255,255,1)',
-            plot_bgcolor: 'rgba(255,255,255,1)'
+            margin: { t: 50, b: 50, l: 50, r: 50 },
+            plot_bgcolor: '#FFFFFF',
+            paper_bgcolor: '#FFFFFF',
+            annotations: annotations,
+            showlegend: false
         };
 
         Plotly.newPlot(plotDivId, plotData, layout, { responsive: true });
-        
-        // Add a "Back" button to the plot
+
+        // --- Integration Step: Add "Back" button ---
         const backButton = document.createElement('button');
         backButton.id = 'ciliai-back-btn';
         backButton.className = 'ciliai-button';
         backButton.style.cssText = 'background: #718096; position: absolute; top: 10px; right: 10px; z-index: 10;';
         backButton.textContent = 'Back to Diagram';
         backButton.onclick = () => generateAndInjectSVG();
-        plotDiv.prepend(backButton); 
+        plotDiv.prepend(backButton);
     }
 
     
