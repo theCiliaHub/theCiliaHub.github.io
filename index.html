@@ -3,171 +3,358 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CiliAI Explorer</title>
-    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
-    <style>
-        /* --- Global Layout --- */
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body, html { height: 100%; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: #f5f7fa; }
-        
-        .content-area { display: grid; grid-template-columns: 1fr 450px; height: 100vh; overflow: hidden; }
-        
-        /* --- Left Panel (Visualization) --- */
-        .left-panel { display: flex; flex-direction: column; background: #f5f7fa; border-right: 1px solid #e1e8ed; overflow: hidden; position: relative; }
-        
-        /* Squashed Header & Toolbar */
-        .header { padding: 8px 15px; background: white; color: #2c3e50; border-bottom: 1px solid #e1e8ed; display: flex; align-items: center; justify-content: space-between; height: 50px; }
-        .header h1 { font-size: 18px; font-weight: 700; color: #2c3e50; margin: 0; }
-        .header p { font-size: 11px; color: #666; margin: 0; margin-left: 10px; }
-        
-        .toolbar { padding: 8px 15px; background: white; border-bottom: 1px solid #e1e8ed; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; height: 50px; }
-        .toolbar input { flex: 1; min-width: 200px; padding: 6px 10px; border: 1px solid #d1d9e0; border-radius: 6px; font-size: 13px; height: 32px; }
-        .toolbar button { padding: 0 15px; height: 32px; background: #667eea; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 500; font-size: 13px; transition: all 0.2s; }
-        .toolbar button:hover { background: #5568d3; }
-        
-        .status { font-size: 11px; padding: 4px 8px; border-radius: 4px; font-weight: 600; margin-left: auto; }
-        .status.loading { background: #fff3cd; color: #856404; }
-        .status.ready { background: #d4edda; color: #155724; }
-        .status.error { background: #f8d7da; color: #721c24; }
+    <title>CiliAI — Unified Explorer</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    
+    <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
 
-        /* Main Diagram Area */
-        .diagram-container { flex: 1; padding: 20px; overflow: hidden; display: flex; justify-content: center; align-items: center; background: white; position: relative; }
+    <style>
+        :root {
+            --bg: #f6f8fb;
+            --sidebar: #071023;
+            --accent: #667eea;
+            --muted: #6b7280;
+            --card: #fff;
+            --border: #e5e7eb;
+            font-family: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+            color: #0f1724;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body, html { height: 100%; background: var(--bg); overflow: hidden; }
+
+        #ciliai-app { display: flex; height: 100vh; width: 100vw; }
+
+        /* --- Sidebar --- */
+        #sidebar {
+            width: 250px;
+            flex-shrink: 0;
+            background: linear-gradient(180deg, #071023 0%, #0b1220 100%);
+            color: white;
+            padding: 20px 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            border-right: 1px solid rgba(255,255,255,0.03);
+            overflow-y: auto;
+        }
+
+        .brand {
+            display: flex; gap: 10px; align-items: center; padding-bottom: 12px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        .brand-icon {
+            width: 36px; height: 36px;
+            background: linear-gradient(135deg, var(--accent), #5568d3);
+            border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 20px;
+        }
+        .brand h1 { font-size: 18px; font-weight: 700; margin: 0; }
+        .brand p { font-size: 11px; color: rgba(255,255,255,0.6); margin: 0; }
+
+        .side-group { margin-top: 8px; }
+        .side-group h3 {
+            font-size: 11px; color: rgba(255,255,255,0.5); text-transform: uppercase;
+            letter-spacing: 1px; margin-bottom: 10px; font-weight: 600;
+        }
+        .side-link {
+            display: flex; align-items: center; gap: 10px; padding: 10px 12px;
+            border-radius: 8px; cursor: pointer; color: rgba(255,255,255,0.9);
+            font-size: 13px; transition: all 0.2s; margin-bottom: 4px;
+        }
+        .side-link:hover { background: rgba(255,255,255,0.05); }
+        .side-link.active { background: rgba(102, 126, 234, 0.15); color: white; font-weight: 600; }
+
+        /* --- Main Area --- */
+        #main-wrapper {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* --- Top Header & Search --- */
+        .top-header {
+            background: white;
+            padding: 15px 25px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            height: 70px;
+            flex-shrink: 0;
+        }
+
+        .search-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex: 1;
+            max-width: 600px;
+        }
+
+        .search-wrapper h3 {
+            font-size: 14px; 
+            font-weight: 600; 
+            color: var(--muted);
+            margin-right: 10px;
+            white-space: nowrap;
+        }
+
+        .search-box { position: relative; flex: 1; }
+        .search-box input {
+            width: 100%; padding: 10px 40px 10px 15px;
+            border: 2px solid var(--border); border-radius: 8px; font-size: 14px; transition: all 0.2s;
+            background: #f9fafb;
+        }
+        .search-box input:focus { outline: none; border-color: var(--accent); background: white; }
+        .search-icon { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); color: var(--muted); pointer-events: none; }
         
-        /* The Wrapper for SVG/Plots */
-        .interactive-cilium { 
-            background: white; 
-            border-radius: 8px; 
-            padding: 20px; 
-            box-shadow: 0 2px 10px rgba(0,0,0,0.05); 
-            max-width: 600px; 
-            width: 100%; 
-            height: auto;
-            border: 1px solid #e1e8ed; 
-            transition: all 0.3s ease;
+        .search-btn {
+            padding: 10px 20px; background: var(--accent); color: white;
+            border: none; border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.2s;
+            white-space: nowrap;
+        }
+        .search-btn:hover { background: #5568d3; }
+
+        .status-indicator { font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 8px; }
+        .status-dot { width: 8px; height: 8px; border-radius: 50%; background: #ccc; }
+        .status-dot.ready { background: #10b981; }
+        .status-dot.loading { background: #f59e0b; }
+
+        /* --- Split Content --- */
+        #content-split {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+        }
+
+        /* --- Center Panel (Plot) --- */
+        #center-panel {
+            flex: 1;
+            padding: 20px;
+            background: var(--bg);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .viz-card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            border: 1px solid var(--border);
+        }
+
+        .viz-header {
+            padding: 15px 20px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #fff;
+        }
+        .viz-header h2 { font-size: 16px; font-weight: 600; color: #1e293b; margin: 0; }
+
+        #plot-container {
+            flex: 1;
             position: relative;
+            width: 100%;
+            height: 100%;
+            padding: 10px;
+            overflow: hidden;
         }
         
-        /* Specific Plotly/Table overrides handled in JS */
-        #cilia-svg { width: 100%; height: 100%; min-height: 400px; }
-
-        .cilia-part { cursor: pointer; transition: all 0.2s ease; }
-        .cilia-part:hover { opacity: 0.8; }
-        .cilia-part.selected, .cilia-part.active { filter: brightness(1.1); stroke: #ff6b00 !important; stroke-width: 4 !important; }
-
-        /* Bottom Info Bar */
-        .bottom-bar { padding: 10px 15px; background: white; border-top: 1px solid #e1e8ed; height: 120px; overflow-y: auto; font-size: 13px; }
-        .bottom-bar h3 { font-size: 14px; color: #2d3748; margin-bottom: 8px; }
-        .legend { display: flex; flex-wrap: wrap; gap: 10px; }
-        .legend-item { display: flex; align-items: center; gap: 5px; font-size: 11px; color: #4a5568; cursor: pointer; padding: 3px 6px; border-radius: 4px; background: #f7fafc; border: 1px solid #edf2f7; }
-        .legend-item:hover { background: #e2e8f0; }
-        .legend-color { width: 10px; height: 10px; border-radius: 2px; }
+        /* Targets for Plotly */
+        #plot-display-area, #cilia-svg { width: 100%; height: 100%; }
 
         /* --- Right Panel (Chat) --- */
-        .right-panel { display: flex; flex-direction: column; background: #f5f7fa; overflow: hidden; border-left: 1px solid #e1e8ed; }
-        
-        .welcome-section { padding: 20px; background: white; border-bottom: 1px solid #e1e8ed; max-height: 35vh; overflow-y: auto; flex-shrink: 0; }
-        .welcome-section h2 { font-size: 18px; color: #2c3e50; margin-bottom: 10px; }
-        .welcome-section p { font-size: 13px; line-height: 1.5; color: #4a5568; margin-bottom: 10px; }
-        
-        .ciliai-quick-start { margin-top: 10px; padding-top: 10px; border-top: 1px solid #eee; }
-        .ciliai-quick-start strong { display: block; font-size: 12px; color: #2d3748; margin-bottom: 8px; }
-        .welcome-action-btn { display: block; width: 100%; padding: 8px 12px; margin-bottom: 6px; font-size: 12px; text-align: left; background: #f8f9fa; color: #667eea; border: 1px solid #e1e8ed; border-radius: 5px; cursor: pointer; transition: all 0.2s; }
-        .welcome-action-btn:hover { background: #667eea; color: white; border-color: #667eea; }
+        #right-panel {
+            width: 400px;
+            background: white;
+            border-left: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            flex-shrink: 0;
+            z-index: 10;
+        }
 
-        .steps { font-size: 12px; line-height: 1.6; color: #4a5568; padding-left: 20px; margin-bottom: 10px; }
-        .steps li { margin-bottom: 4px; }
-        .disclaimer { padding: 10px; background: #fff3cd; border-left: 3px solid #ffc107; border-radius: 4px; font-size: 11px; color: #856404; margin-top: 10px; }
+        .panel-header {
+            padding: 20px;
+            border-bottom: 1px solid var(--border);
+            background: #fff;
+        }
+        .panel-header h2 { font-size: 18px; font-weight: 700; margin: 0 0 5px 0; }
+        .panel-header p { font-size: 13px; color: var(--muted); margin: 0; }
 
-        /* Chat Area */
-        .chat-container { flex: 1; display: flex; flex-direction: column; overflow: hidden; background: white; }
-        .messages { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 15px; }
-        
-        .input-area { padding: 15px; background: white; border-top: 1px solid #e1e8ed; }
-        .input-container { display: flex; gap: 8px; }
-        .input-container input { flex: 1; padding: 10px 14px; border: 1px solid #d1d9e0; border-radius: 8px; font-size: 14px; outline: none; transition: border-color 0.2s; }
-        .input-container input:focus { border-color: #667eea; }
-        .input-container button { padding: 0 20px; background: #667eea; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 14px; transition: background 0.2s; }
-        .input-container button:hover { background: #5568d3; }
+        .messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            background: #f9fafb;
+        }
 
-        /* Responsive */
-        @media (max-width: 900px) {
-            .content-area { grid-template-columns: 1fr; height: auto; overflow: auto; }
-            .left-panel { height: 60vh; border-right: none; border-bottom: 1px solid #e1e8ed; }
-            .right-panel { height: 60vh; }
+        .msg { max-width: 90%; padding: 12px 16px; border-radius: 12px; font-size: 14px; line-height: 1.5; word-wrap: break-word; }
+        .msg.user { align-self: flex-end; background: var(--accent); color: white; border-radius: 14px 14px 2px 14px; }
+        .msg.bot { align-self: flex-start; background: white; border: 1px solid var(--border); color: #334155; border-radius: 14px 14px 14px 2px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+
+        /* Result Card Styling */
+        .ai-result-card { background: transparent; padding: 0; }
+        .ai-result-card h4 { margin: 0 0 5px 0; color: var(--accent); font-size: 15px; }
+        .ai-result-card ul { padding-left: 20px; margin: 5px 0; }
+        .ai-result-card li { margin-bottom: 4px; }
+        .ai-action { color: var(--accent); text-decoration: none; font-weight: 600; cursor: pointer; }
+        .ai-action:hover { text-decoration: underline; }
+
+        .chat-input-area {
+            padding: 20px;
+            border-top: 1px solid var(--border);
+            background: white;
+        }
+        .input-group { display: flex; gap: 10px; }
+        .input-group input { 
+            flex: 1; padding: 12px; border: 1px solid var(--border); 
+            border-radius: 8px; font-size: 14px; background: #f9fafb;
+        }
+        .input-group input:focus { outline: none; border-color: var(--accent); background: white; }
+        .input-group button { 
+            padding: 0 20px; border: none; background: var(--accent); 
+            color: white; border-radius: 8px; font-weight: 600; cursor: pointer; 
+            transition: background 0.2s;
+        }
+        .input-group button:hover { background: #5568d3; }
+
+        @media (max-width: 1200px) {
+            #right-panel { width: 350px; }
         }
     </style>
 </head>
 <body>
+    <div id="ciliai-app">
+        <aside id="sidebar">
+            </aside>
 
-    <div class="content-area">
-        <div class="left-panel">
-            <div class="header">
-                <div style="display:flex; align-items:baseline;">
-                    <h1>🔬 CiliAI Explorer</h1>
-                    <p>v5.1</p>
-                </div>
-                <span id="dataStatus" class="status loading">Initializing...</span>
-            </div>
+        <div id="main-wrapper">
             
-            <div class="toolbar">
-                <input type="text" id="geneSearch" placeholder="Search gene (e.g., IFT88, NPHP1)">
-                <button onclick="searchGene()">Find Gene</button>
-                <button onclick="clearChat()" style="background: #e2e8f0; color: #4a5568;">Reset</button>
-            </div>
-
-            <div class="diagram-container">
-                <div class="interactive-cilium">
-                    <div id="cilia-svg"></div>
-                </div>
-            </div>
-
-            <div class="bottom-bar" id="bottomBar">
-                <h3>Structure Explorer</h3>
-                <div class="legend">
-                    <div class="legend-item" onclick="selectComp('axoneme')"><div class="legend-color" style="background: #4A5568;"></div><span>Axoneme</span></div>
-                    <div class="legend-item" onclick="selectComp('transition-zone')"><div class="legend-color" style="background: #718096;"></div><span>Transition Zone</span></div>
-                    <div class="legend-item" onclick="selectComp('basal-body')"><div class="legend-color" style="background: #4A5568;"></div><span>Basal Body</span></div>
-                    <div class="legend-item" onclick="selectComp('ciliary-membrane')"><div class="legend-color" style="background: #A0AEC0;"></div><span>Ciliary Membrane</span></div>
-                    <div class="legend-item" onclick="selectComp('cell-body')"><div class="legend-color" style="background: #E9EDF2;"></div><span>Cell Body</span></div>
-                    <div class="legend-item" onclick="selectComp('nucleus')"><div class="legend-color" style="background: #C8D0DD;"></div><span>Nucleus</span></div>
-                </div>
-            </div>
-        </div>
-
-        <div class="right-panel">
-            <div class="welcome-section">
-                <h2>Welcome to CiliAI! 🎉</h2>
-                <p>Your AI-powered assistant for ciliary biology, gene function, and disease data exploration.</p>
-                
-                <div class="ciliai-quick-start">
-                    <strong>Quick Actions:</strong>
-                    <button class="welcome-action-btn" onclick="showDefaultUMAP()">📊 Plot FOXJ1 in Lung scRNA-seq</button>
-                    <button class="welcome-action-btn" onclick="showDefaultPhylogeny()">🌳 View Evolutionary Conservation</button>
-                </div>
-
-                <ol class="steps">
-                    <li>Type <strong>"What is IFT88?"</strong> or <strong>"List BBSome genes"</strong></li>
-                    <li>Click specific cilia parts in the diagram.</li>
-                    <li>Ask complex queries: <strong>"Genes in transition zone with kidney expression"</strong></li>
-                </ol>
-
-                <div class="disclaimer">
-                    <strong>⚠️ Disclaimer:</strong> CiliAI is a research tool. Verify results with primary literature.
-                </div>
-            </div>
-
-            <div class="chat-container">
-                <div class="messages" id="messages"></div>
-                <div class="input-area">
-                    <div class="input-container">
-                        <input type="text" id="chatInput" placeholder="Ask CiliAI (e.g. 'Show Nevers plot for BBS1')...">
-                        <button onclick="sendMsg()">Send</button>
+            <header class="top-header">
+                <div class="search-wrapper">
+                    <h3>Gene Search</h3>
+                    <div class="search-box">
+                        <input type="text" id="geneSearch" placeholder="Enter gene symbol (e.g., IFT88, BBS1)...">
+                        <span class="search-icon">🔍</span>
                     </div>
+                    <button class="search-btn" onclick="triggerSearch()">Explore</button>
+                </div>
+
+                <div class="status-indicator">
+                    <span id="dataStatus">Loading Data...</span>
+                    <div id="db-status-dot" class="status-dot loading"></div>
+                </div>
+            </header>
+
+            <div id="content-split">
+    <div class="content-area">
+        <section id="center-panel">
+            <div class="viz-card">
+                <div class="viz-header">
+                    <h2 id="vizTitle">Visualization</h2>
+                    <button class="search-btn" style="padding:6px 12px; font-size:12px; background:#eee; color:#333;" onclick="downloadPlot()">📷 Save Plot</button>
+                </div>
+                <div id="plot-container">
+                    <div id="cilia-svg" style="width:100%; height:100%;"></div> 
+                    <div id="plot-display-area" style="display:none; width:100%; height:100%;"></div>
                 </div>
             </div>
-        </div>
+        </section>
+
+        <section id="right-panel">
+            <div class="panel-header">
+                <h2>AI Assistant</h2>
+                <p>Ask questions about genes, diseases, or data.</p>
+            </div>
+
+            <div class="messages" id="messages">
+                <div class="msg bot">
+                    👋 <strong>Welcome to CiliAI.</strong><br>
+                    I can generate plots, list complex members, or explain gene functions.<br><br>
+                    <em>Try: "Show UMAP for FOXJ1" or "What is Joubert Syndrome?"</em>
+                </div>
+            </div>
+
+            <div class="chat-input-area">
+                <div class="input-group">
+                    <input type="text" id="chatInput" placeholder="Type a question...">
+                    <button onclick="triggerChat()">Send</button>
+                </div>
+            </div>
+        </section>
+    </div>
+</div>
     </div>
 
-    <script src="ciliai.js"></script>
+<script type="module" src="globals.js"></script>
+<script type="module" src="plots.js"></script>
+<script type="module" src="ciliai/ciliai.js"></script>
+<script type="module" src="ciliai/ciliai_ui.js"></script>
+
+    <script>
+        function triggerSearch() {
+            const input = document.getElementById('geneSearch');
+            const gene = input.value.trim();
+            if (gene && window.searchGene) {
+                window.searchGene(gene);
+            } else if (gene && window.CiliAI && window.handleAIQuery) {
+                // Fallback if searchGene isn't exposed globally
+                window.handleAIQuery(`Tell me about ${gene}`);
+            }
+        }
+
+        function triggerChat() {
+            const input = document.getElementById('chatInput');
+            const text = input.value.trim();
+            if (text && window.sendMsg) {
+                // Assuming sendMsg() reads from #chatInput internally
+                window.sendMsg(); 
+            } else if (text && window.handleUserSend) {
+                window.handleUserSend();
+            }
+        }
+
+        function downloadPlot() {
+            // Try to download whatever is visible
+            if(window.downloadPlot) window.downloadPlot('cilia-svg', 'cilia_plot');
+        }
+
+        // Enter Key Listeners
+        document.getElementById('geneSearch').addEventListener('keyup', (e) => {
+            if (e.key === 'Enter') triggerSearch();
+        });
+        document.getElementById('chatInput').addEventListener('keyup', (e) => {
+            if (e.key === 'Enter') triggerChat();
+        });
+
+        // Listen for CiliAI Ready Event to update status dot
+        // (This hooks into the logic we added to ciliai.js previously)
+        window.CiliAI_UI_OnReady = function() {
+            const statusText = document.getElementById('dataStatus');
+            const statusDot = document.getElementById('db-status-dot');
+            if (statusText) statusText.textContent = "Database Ready";
+            if (statusDot) {
+                statusDot.classList.remove('loading');
+                statusDot.classList.add('ready');
+            }
+            console.log("UI updated: Data Ready");
+            
+            // Auto-load default plot
+            if(window.showDefaultUMAP) window.showDefaultUMAP();
+        };
+    </script>
 </body>
 </html>
