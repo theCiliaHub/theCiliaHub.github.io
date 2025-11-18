@@ -3,43 +3,31 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>The CiliaHub: A Database of Genes with Ciliary Functions</title>
-    <meta name="description" content="The CiliaHub is a comprehensive bioinformatics database for genes with ciliary functions.">
-    <link rel="icon" type="image/png" href="CiliaHub_Logo_web.png">
+    <title>CiliAI — Unified Explorer</title>
+
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+
+    <!-- Styles -->
+    <link rel="stylesheet" href="ciliai_ui.css">
     <link rel="stylesheet" href="styles.css">
 
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
-
-    <script src="https://cdn.jsdelivr.net/npm/@panzoom/panzoom@4.5.1/dist/panzoom.min.js"></script>
-    <script src="https://unpkg.com/@upsetjs/bundle"></script>
-    <script src="https://d3js.org/d3.v7.min.js"></script>
-    <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/jstat@latest/dist/jstat.min.js"></script>
+    <!-- External JS libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/@panzoom/panzoom@4.5.1/dist/panzoom.min.js" defer></script>
+    <script src="https://unpkg.com/@upsetjs/bundle" defer></script>
+    <script src="https://d3js.org/d3.v7.min.js" defer></script>
+    <script src="https://cdn.plot.ly/plotly-2.35.2.min.js" defer></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" defer></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/jstat@latest/dist/jstat.min.js" defer></script>
 
     <style>
-    /* Interactive Cilium Styles */
-    .interactive-cilium {
-        background: white;
-        border-radius: 12px;
-        padding: 10px;
-        /* MODIFIED: Shadow changed from red to neutral */
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-    }
-
-    .cilia-part:hover {
-        filter: brightness(1.2);
-        cursor: pointer;
-    }
-
-    .cilia-part:focus {
-        /* MODIFIED: Focus outline changed from yellow to blue */
-        outline: 2px solid #0d6efd;
-        outline-offset: 2px;
-    }
-</style>
+        .interactive-cilium { background: white; border-radius: 12px; padding: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        .cilia-part:hover { filter: brightness(1.2); cursor: pointer; }
+        .cilia-part:focus { outline: 2px solid #0d6efd; outline-offset: 2px; }
+    </style>
 </head>
 <body>
     <nav class="navbar">
@@ -61,49 +49,41 @@
         <div class="content-area" id="content-area"></div>
 
         <aside class="cilia-panel">
-            <div class="panel-header">
-                <h3>Interactive Cilium</h3>
-            </div>
+            <div class="panel-header"><h3>Interactive Cilium</h3></div>
             <div class="panel-content">
-    <div class="cilia-container interactive-cilium">
-    <svg viewBox="0 0 300 400" xmlns="http://www.w3.org/2000/svg" style="width: 100%; height: auto;">
-        <defs>
-            <linearGradient id="cytosolGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" style="stop-color:#F5F7FA;" />
-                <stop offset="100%" style="stop-color:#E9EDF2;" />
-            </linearGradient>
+                <div class="cilia-container interactive-cilium">
+                    <svg viewBox="0 0 300 400" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;">
+                        <defs>
+                            <linearGradient id="cytosolGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                                <stop offset="0%" style="stop-color:#F5F7FA;" />
+                                <stop offset="100%" style="stop-color:#E9EDF2;" />
+                            </linearGradient>
+                            <radialGradient id="nucleusGradient" cx="50%" cy="50%" r="50%">
+                                <stop offset="0%" style="stop-color:#D8DEE9;" />
+                                <stop offset="100%" style="stop-color:#C8D0DD;" />
+                            </radialGradient>
+                        </defs>
 
-            <radialGradient id="nucleusGradient" cx="50%" cy="50%" r="50%">
-                <stop offset="0%" style="stop-color:#D8DEE9;" />
-                <stop offset="100%" style="stop-color:#C8D0DD;" />
-            </radialGradient>
-        </defs>
+                        <path id="cell-body" class="cilia-part" tabindex="0"
+                              fill="url(#cytosolGradient)" stroke="#D8DEE9" stroke-width="2"
+                              d="M 50,380 C -20,300 20,200 150,200 C 280,200 320,300 250,380 Z"/>
+                        <circle id="nucleus" class="cilia-part" tabindex="0"
+                                fill="url(#nucleusGradient)" stroke="#B0B8C8" stroke-width="2"
+                                cx="150" cy="320" r="40"/>
+                        <rect id="basal-body" class="cilia-part" tabindex="0" fill="#4A5568" x="140" y="195" width="20" height="15"/>
+                        <path id="transition-zone" class="cilia-part" tabindex="0"
+                              fill="#718096" stroke="#4A5568" stroke-width="2"
+                              d="M 142,195 L 138,180 L 162,180 L 158,195 Z"/>
+                        <path id="ciliary-membrane" class="cilia-part" tabindex="0"
+                              fill="none" stroke="#A0AEC0" stroke-width="2" stroke-dasharray="4,4"
+                              d="M 138,180 L 145,10 L 155,10 L 162,180 Z"/>
+                        <path id="axoneme" class="cilia-part" tabindex="0"
+                              fill="none" stroke="#4A5568" stroke-width="2"
+                              d="M 145,180 L 148,15 L 152,15 L 155,180 Z"/>
+                    </svg>
+                </div>
 
-        <path id="cell-body" class="cilia-part" tabindex="0"
-              fill="url(#cytosolGradient)" stroke="#D8DEE9" stroke-width="2"
-              d="M 50,380 C -20,300 20,200 150,200 C 280,200 320,300 250,380 Z"/>
-
-        <circle id="nucleus" class="cilia-part" tabindex="0"
-                fill="url(#nucleusGradient)" stroke="#B0B8C8" stroke-width="2"
-                cx="150" cy="320" r="40"/>
-
-        <rect id="basal-body" class="cilia-part" tabindex="0" fill="#4A5568" x="140" y="195" width="20" height="15"/>
-
-        <path id="transition-zone" class="cilia-part" tabindex="0"
-              fill="#718096" stroke="#4A5568" stroke-width="2"
-              d="M 142,195 L 138,180 L 162,180 L 158,195 Z"/>
-
-        <path id="ciliary-membrane" class="cilia-part" tabindex="0"
-              fill="none" stroke="#A0AEC0" stroke-width="2" stroke-dasharray="4,4"
-              d="M 138,180 L 145,10 L 155,10 L 162,180 Z"/>
-
-        <path id="axoneme" class="cilia-part" tabindex="0"
-              fill="none" stroke="#4A5568" stroke-width="2"
-              d="M 145,180 L 148,15 L 152,15 L 155,180 Z"/>
-    </svg>
-</div>
-    <div class="controls">
-
+                <div class="controls">
                     <h4>Gene Localization:</h4>
                     <div id="geneButtons" class="gene-buttons"></div>
                 </div>
@@ -114,13 +94,15 @@
     <div id="enrichment-tooltip" class="tooltip"></div>
     <div id="multi-dim-tooltip" class="tooltip"></div>
 
-    <footer class="footer" style="text-align: center;">
+    <footer class="footer" style="text-align:center;">
         <p>© 2025 CiliaHub. All rights reserved.</p>
     </footer>
-<script src="script.js"></script>  <!-- Main app, define geneDataCache here -->
-<script src="plots.js"></script>   <!-- For displayLocalizationChart -->
-<script src="ciliai/ciliai.js"></script>  <!-- CiliAI functions (load before globals) -->
-<script src="globals.js"></script> <!-- Router -->
 
+    <!-- === Scripts: load in correct order with defer === -->
+    <script src="script.js" defer></script>
+    <script src="plots.js" defer></script>
+    <script src="ciliai/ciliai.js" defer></script>
+    <script src="ciliai_ui.js" defer></script>
+    <script src="globals.js" defer></script>
 </body>
 </html>
