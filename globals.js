@@ -1,193 +1,99 @@
-// =============================================================================
-// GLOBAL VARIABLES
-// =============================================================================
+/* globals.js - Global Utilities & Routing (v5.5) */
 
-// Data storage
-let allGenes = [];
-let currentData = [];
-let searchResults = [];
-const geneLocalizationData = {};
+(function() {
+    'use strict';
 
-// Global caches
-window.geneDataCache = {};          // main gene data cache
-window.ciliaHubDataCache = null;    // curated cilia hub data
-window.screenDataCache = null;      // screen data
-window.phylogenyDataCache = null;   // phylogeny data
-window.tissueDataCache = null;      // tissue expression data
-window.geneMapCache = null;         // mapping gene names to objects
+    // =============================================================================
+    // GLOBAL VARIABLES & CACHES
+    // =============================================================================
+    window.geneDataCache = {};          
+    window.ciliaHubDataCache = null;    
+    window.screenDataCache = null;      
+    window.phylogenyDataCache = null;   
+    window.tissueDataCache = null;      
+    window.geneMapCache = null;         
 
-// Access global caches locally
-const geneDataCache = window.geneDataCache;
-const tissueDataCache = window.tissueDataCache;
+    // =============================================================================
+    // ROUTING LOGIC
+    // =============================================================================
 
-// Plotting - single instance
-let currentPlotInstance = null;
+    async function handleRouteChange() {
+        let path = window.location.hash.replace(/^#/, '').toLowerCase().trim();
+        if (!path || path === '/' || path === '/index.html') path = '/';
 
-// IDs and defaults
-const allPartIds = [
-    "cell-body", "nucleus", "basal-body",
-    "transition-zone", "axoneme", "ciliary-membrane"
-];
-const defaultGenesNames = [
-    "ACE2", "ADAMTS20", "ADAMTS9", "IFT88",
-    "CEP290", "WDR31", "ARL13B", "BBS1"
-];
+        console.log(`[Router] Navigating to: ${path}`);
 
-// =============================================================================
-// NAVIGATION & ROUTING
-// =============================================================================
-function navigateTo(event, path) {
-    if (event) event.preventDefault();
-    window.location.hash = path;
-}
+        // 1. Hide all legacy page containers (if they exist)
+        const pages = [
+            '#home-page', '#analysis-page', '#batch-query-page',
+            '#ciliaplot-page', '#compare-page', '#expression-page',
+            '#download-page', '#contact-page', '#notfound-page'
+        ];
+        pages.forEach(id => {
+            const el = document.querySelector(id);
+            if (el) el.style.display = 'none';
+        });
 
-async function handleRouteChange() {
-    let path = window.location.hash.replace(/^#/, '').toLowerCase().trim();
-    if (!path || path === '/' || path === '/index.html') path = '/';
-
-    try {
-        await loadAndPrepareDatabase(); // Ensure DB ready
-    } catch (err) {
-        console.error("Database loading failed:", err);
-        return;
-    }
-
-    updateActiveNav(path);
-
-    // Hide all page containers
-    const pages = [
-        '#home-page', '#analysis-page', '#batch-query-page',
-        '#ciliaplot-page', '#compare-page', '#expression-page',
-        '#download-page', '#contact-page', '#notfound-page'
-    ];
-    pages.forEach(id => {
-        const el = document.querySelector(id);
-        if (el) el.style.display = 'none';
-    });
-
-    // --- SPA Cleanup for CiliAI ---
-    clearCiliAI();
-
-    // Determine gene to display if any
-    let geneToDisplay = null;
-
-    switch (path) {
-        case '/':
-            displayHomePage();
-            setTimeout(() => window.displayLocalizationChart?.(), 0);
-            break;
-        case '/batch-query':
-            displayBatchQueryTool();
-            break;
-        case '/ciliaplot':
-        case '/analysis':
-            displayCiliaPlotPage();
-            break;
-        case '/ciliai':
-            window.displayCiliAIPage?.();
-            break;
-        case '/expression':
-            displayExpressionPage();
-            break;
-        case '/download':
-            displayDownloadPage();
-            break;
-        case '/contact':
-            displayContactPage();
-            break;
-        default:
-            if (window.geneMapCache) {
-                const geneName = getGeneFromURL();
-                if (geneName) {
-                    const safeName = sanitize(geneName);
-                    geneToDisplay = window.geneMapCache.get(safeName);
+        // 2. Specific Route Handling
+        switch (path) {
+            case '/ciliai':
+            case '/': // Default to CiliAI for this unified view
+                // Ensure CiliAI layout is active
+                if (window.displayCiliAIPage) {
+                    await window.displayCiliAIPage();
                 }
-            } else {
-                console.warn("geneMapCache is not initialized yet.");
-            }
+                // Ensure Data is loaded
+                if (window.loadCiliAIData && (!window.CiliAI || !window.CiliAI.ready)) {
+                    await window.loadCiliAIData();
+                }
+                break;
 
-            if (geneToDisplay) displayIndividualGenePage(geneToDisplay);
-            else displayNotFoundPage();
-            break;
-    }
-
-    console.log("Routing completed. Path:", path, "Gene:", geneToDisplay ? geneToDisplay.gene : "N/A");
-}
-
-
-// =============================================================================
-// URL HELPERS
-// =============================================================================
-function getGeneFromURL() {
-    const RESERVED_PATHS = [
-        'home', 'batch-query', 'ciliaplot', 'analysis',
-        'ciliai', 'expression', 'download', 'contact', 'notfound'
-    ];
-
-    // Try query string first: /ciliaplot?gene=ACTN2
-    const params = new URLSearchParams(window.location.search);
-    const fromQuery = params.get('gene');
-    if (fromQuery) return fromQuery;
-
-    // Fallback: last part of hash or path: /ciliaplot/ACTN2
-    const hashPath = window.location.hash.replace(/^#/, '');
-    const pathParts = hashPath.split('/');
-    if (pathParts.length > 1) {
-        const lastPart = pathParts[pathParts.length - 1].toLowerCase();
-        if (!RESERVED_PATHS.includes(lastPart)) {
-            return pathParts[pathParts.length - 1];
+            default:
+                console.warn("Route not handled in Unified Explorer:", path);
+                // Fallback to CiliAI
+                if (window.displayCiliAIPage) await window.displayCiliAIPage();
+                break;
         }
     }
 
-    return null; // nothing to treat as a gene
-}
+    // =============================================================================
+    // EVENT LISTENERS
+    // =============================================================================
 
-// =============================================================================
-// EVENT LISTENERS
-// =============================================================================
-window.addEventListener("load", handleRouteChange);
-window.addEventListener("hashchange", handleRouteChange);
-
-document.addEventListener('DOMContentLoaded', () => {
-    initGlobalEventListeners();
-});
-
-// =============================================================================
-// GLOBAL UI HELPERS
-// =============================================================================
-function initGlobalEventListeners() {
-    window.addEventListener('scroll', handleStickySearch);
-
-    document.querySelectorAll('.cilia-part').forEach(part => {
-        part.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                part.classList.toggle('highlighted');
-            }
-        });
-    });
-
-    const ciliaSvg = document.querySelector('.interactive-cilium svg');
-    if (ciliaSvg) {
-        Panzoom(ciliaSvg, { maxZoom: 3, minZoom: 0.5, contain: 'outside' });
-        ciliaSvg.parentElement.addEventListener('wheel', (e) => {
-            e.preventDefault();
-            const panzoom = Panzoom(ciliaSvg);
-            panzoom.zoom(panzoom.getScale() * (e.deltaY > 0 ? 0.9 : 1.1));
-        });
+    function initGlobalEventListeners() {
+        // Listen for URL hash changes
+        window.addEventListener('hashchange', handleRouteChange);
+        
+        // Optional: Global key listeners or analytics hooks can go here
     }
-}
 
+    // =============================================================================
+    // INITIALIZATION
+    // =============================================================================
+    
+    // Wait for DOM before attaching listeners
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', () => {
+            initGlobalEventListeners();
+            handleRouteChange(); // Trigger initial route
+        });
+    } else {
+        initGlobalEventListeners();
+        handleRouteChange();
+    }
 
-// --- Clear CiliAI elements and unbind listeners ---
-function clearCiliAI() {
-    const container = document.querySelector('.ciliai-container');
-    if (container) container.remove();
+    // Expose helper for manual navigation
+    window.navigateTo = function(event, path) {
+        if (event) event.preventDefault();
+        window.location.hash = path;
+    };
 
-    // Eski listener'ları temizle (gerekirse)
-    const oldBtn = document.getElementById('aiQueryBtn');
-    if (oldBtn) oldBtn.replaceWith(oldBtn.cloneNode(true));
+    // Global sanitization helper
+    window.sanitize = function(str) {
+        if (!str) return '';
+        return String(str).replace(/[&<>"']/g, function(m) {
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m];
+        });
+    };
 
-    const resultArea = document.getElementById('ai-result-area');
-    if (resultArea) resultArea.innerHTML = '';
-}
+})();
