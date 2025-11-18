@@ -5,7 +5,7 @@
 // Global variables, maps, and utilities
 export const lastQueryContext = { type: null, data: [], term: null, descriptionHeader: 'Description' };
 export const structureInfoMap = {}; // Map of ciliary structures
-export const window.CiliAI = {
+export const CiliAI = {
     ready: false,
     lookups: { geneMap: {} },
 };
