@@ -6,11 +6,7 @@
     <title>CiliAI — Unified Explorer</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
-
     <style>
-        /* =========================================
-           1. CSS VARIABLES & RESET
-           ========================================= */
         :root {
             --sidebar-bg: #0f172a;
             --sidebar-text: #94a3b8;
@@ -21,20 +17,14 @@
         }
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body, html { height: 100%; font-family: 'Inter', sans-serif; background: var(--main-bg); overflow: hidden; }
-
-        /* =========================================
-           2. LAYOUT GRID
-           ========================================= */
+        
         .app-container {
             display: grid;
             grid-template-columns: 240px 1fr 400px;
             height: 100vh;
             width: 100vw;
         }
-
-        /* =========================================
-           3. LEFT SIDEBAR
-           ========================================= */
+        
         .sidebar {
             background: var(--sidebar-bg);
             color: white;
@@ -51,14 +41,14 @@
             display: flex; align-items: center; gap: 10px;
         }
         .brand span { color: var(--accent); }
-        
+       
         .nav-scroll { flex: 1; overflow-y: auto; padding: 20px; }
         .nav-group { margin-bottom: 25px; }
         .nav-label {
             font-size: 11px; text-transform: uppercase; letter-spacing: 1px;
             color: #64748b; margin-bottom: 10px; font-weight: 600;
         }
-        
+       
         .nav-item {
             display: flex; align-items: center; gap: 10px;
             padding: 10px 12px; width: 100%;
@@ -69,17 +59,14 @@
         }
         .nav-item:hover { background: #1e293b; color: white; }
         .nav-item.active { background: var(--accent); color: white; }
-
-        /* =========================================
-           4. CENTER PANEL (VISUALIZATION)
-           ========================================= */
+        
         .center-panel {
             display: flex;
             flex-direction: column;
             padding: 20px;
             overflow: hidden;
         }
-        
+       
         .top-bar {
             display: flex; align-items: center; justify-content: space-between;
             margin-bottom: 20px; height: 40px;
@@ -101,7 +88,6 @@
             background: #e2e8f0; color: #64748b; font-weight: 500;
         }
         .status-badge.ready { background: #dcfce7; color: #166534; }
-
         .viz-card {
             flex: 1; background: white; border-radius: 12px;
             border: 1px solid var(--border);
@@ -114,12 +100,9 @@
             display: flex; justify-content: space-between; align-items: center;
         }
         .viz-title { font-size: 15px; font-weight: 600; color: #1e293b; }
-        
+       
         #cilia-svg { flex: 1; width: 100%; height: 100%; position: relative; }
-
-        /* =========================================
-           5. RIGHT PANEL (CHAT)
-           ========================================= */
+        
         .right-panel {
             background: white;
             border-left: 1px solid var(--border);
@@ -130,16 +113,14 @@
         }
         .chat-header h2 { font-size: 16px; font-weight: 600; color: #1e293b; }
         .chat-header p { font-size: 12px; color: #64748b; margin-top: 4px; }
-
         .messages-area {
             flex: 1; overflow-y: auto; padding: 20px;
             background: #f8fafc; display: flex; flex-direction: column; gap: 15px;
         }
-        
+       
         .ciliai-message { max-width: 90%; padding: 12px 16px; border-radius: 12px; font-size: 13px; line-height: 1.5; }
         .ciliai-message.user { align-self: flex-end; background: var(--accent); color: white; border-bottom-right-radius: 2px; }
-        .ciliai-message.assistant { align-self: flex-start; background: white; border: 1px solid var(--border); color: #334155; border-bottom-left-radius: 2px; }
-
+        .ciliai-message.assistant { align-self: flex-start; background: white; border: 1px ~border; color: #334155; border-bottom-left-radius: 2px; }
         .input-area {
             padding: 15px; border-top: 1px solid var(--border); background: white;
         }
@@ -153,22 +134,17 @@
             border-radius: 8px; cursor: pointer; font-weight: 600; color: var(--accent);
         }
         .send-btn:hover { background: #f8fafc; }
-
-        /* Internal Styles */
+        
         .cilia-part { cursor: pointer; transition: all 0.2s ease; }
         .cilia-part:hover { opacity: 0.8; }
         .cilia-part.selected, .cilia-part.active { filter: brightness(1.2); stroke: #ff6b00 !important; stroke-width: 4 !important; }
-        
+       
         .ai-result-card h4 { margin: 0 0 5px 0; color: #2d3748; font-weight: 700;}
         .ai-action { color: var(--accent); text-decoration: none; font-weight: 600; cursor: pointer; font-size: 12px; }
         .ai-action:hover { text-decoration: underline; }
-        .ciliai-data-table { width: 100%; border-collapse: collapse; font-size: 11px; margin-top: 5px; }
-        .ciliai-data-table th { text-align: left; background: #f1f5f9; padding: 4px; }
-        .ciliai-data-table td { border-bottom: 1px solid #e2e8f0; padding: 4px; }
     </style>
 </head>
 <body>
-
     <div class="app-container">
         <aside class="sidebar">
             <div class="brand">
@@ -179,66 +155,60 @@
                     <div class="nav-label">Dashboard</div>
                     <button class="nav-item active" onclick="window.location.reload()">Overview</button>
                 </div>
-
                 <div class="nav-group">
                     <div class="nav-label">Structure Map</div>
-                    <button class="nav-item" onclick="window.selectComp('axoneme')">Axoneme</button>
-                    <button class="nav-item" onclick="window.selectComp('transition-zone')">Transition Zone</button>
-                    <button class="nav-item" onclick="window.selectComp('basal-body')">Basal Body</button>
-                    <button class="nav-item" onclick="window.selectComp('ciliary-membrane')">Ciliary Membrane</button>
-                    <button class="nav-item" onclick="window.selectComp('nucleus')">Nucleus</button>
-                    <button class="nav-item" onclick="window.selectComp('cell-body')">Cell Body</button>
+                    <button class="nav-item" onclick="selectComp('axoneme')">Axoneme</button>
+                    <button class="nav-item" onclick="selectComp('transition-zone')">Transition Zone</button>
+                    <button class="nav-item" onclick="selectComp('basal-body')">Basal Body</button>
+                    <button class="nav-item" onclick="selectComp('ciliary-membrane')">Ciliary Membrane</button>
+                    <button class="nav-item" onclick="selectComp('nucleus')">Nucleus</button>
+                    <button class="nav-item" onclick="selectComp('cell-body')">Cell Body</button>
                 </div>
-
                 <div class="nav-group">
                     <div class="nav-label">Quick Plots</div>
-                    <button class="nav-item" onclick="window.showDefaultUMAP()">📊 Lung scRNA (FOXJ1)</button>
-                    <button class="nav-item" onclick="window.showDefaultPhylogeny()">🌳 Phylogeny Heatmap</button>
+                    <button class="nav-item" onclick="showDefaultUMAP()">📊 Lung scRNA (FOXJ1)</button>
+                    <button class="nav-item" onclick="showDefaultPhylogeny()">🌳 Phylogeny Heatmap</button>
                 </div>
             </div>
         </aside>
-
         <main class="center-panel">
             <div class="top-bar">
                 <div class="search-container">
                     <input type="text" id="geneSearch" class="search-input" placeholder="Search gene (e.g., IFT88)...">
-                    <button class="search-btn" onclick="window.searchGene()">Find</button>
+                    <button class="search-btn" onclick="searchGene()">Find</button>
                 </div>
                 <div id="dataStatus" class="status-badge">Initializing...</div>
             </div>
-
             <div class="viz-card">
                 <div class="viz-header">
                     <div class="viz-title">Visualization Board</div>
-                    <button style="border:none; background:none; cursor:pointer; color:#64748b;" onclick="window.downloadPlot('cilia-svg', 'plot.png')">📷 Save</button>
+                    <button style="border:none; background:none; cursor:pointer; color:#64748b;" onclick="downloadPlot('cilia-svg', 'plot.png')">📷 Save</button>
                 </div>
                 <div id="cilia-svg"></div>
             </div>
         </main>
-
         <aside class="right-panel">
             <div class="chat-header">
                 <h2>CiliAI Assistant</h2>
                 <p>Ask questions about genes & datasets</p>
             </div>
-            
+           
             <div class="messages-area" id="messages">
                 <div class="ciliai-message assistant">
                     👋 <strong>Welcome to CiliAI.</strong><br>
                     I am initializing the database. I will display the default FOXJ1 expression plot automatically when ready.
                 </div>
             </div>
-
             <div class="input-area">
                 <div class="chat-input-group">
-                    <input type="text" id="chatInput" class="chat-input" placeholder="Ask a question...">
-                    <button class="send-btn" onclick="window.sendMsg()">Send</button>
+                    <input type="text" id="chatInput" class="chat-input" placeholder="Ask a question (e.g. 'Hello' or 'What is IFT88')...">
+                    <button class="send-btn" onclick="sendMsg()">Send</button>
                 </div>
             </div>
         </aside>
     </div>
 
-    <script src="ciliai/ciliai.js"></script>
-
+    <!-- Only external script: ciliai.js from GitHub -->
+    <script src="https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/ciliai/ciliai.js"></script>
 </body>
 </html>
