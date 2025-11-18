@@ -561,8 +561,15 @@
     renderPlotHome: () => window.CiliAI.Plots.renderPlotHome()
   };
 
+   // Make all CiliAI internals accessible to ciliai_ui.js
+   window.CiliAICore = {
+    loadCiliAIData,
+    initCiliAI,
+    CiliAI: window.CiliAI
+   };
   // DOM ready
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bootUI);
   else bootUI();
 
 })();
+
