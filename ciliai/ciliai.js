@@ -269,12 +269,12 @@ window.CiliAI_UMAP = null; // This will be populated from the master DB
             console.error("renderUMAPPlot() failed:", e);
         }
 
-        // Auto-render CiliAI page
+        // This is correct:
         try {
-        window.displayCiliAIPage(); // <-- CRITICAL FIX: Call unconditionally
+        window.displayCiliAIPage(); 
         } catch (e) {
-    console.error("displayCiliAIPage() failed:", e);
-}
+        console.error("displayCiliAIPage() failed:", e);
+    }
     }
 
    
@@ -440,22 +440,12 @@ window.displayCiliAIPage = async function () {
 
                     <div class="nav-group">
                         <div class="nav-label">Structure Map</div>
-                        <div class="diagram-container">
-                            <div class="interactive-cilium">
-                                <div id="cilia-svg"></div>
-                            </div>
-                        </div>
-                        <div class="bottom-bar" id="bottomBar">
-                            <h3>Click on a compartment or search for a gene</h3>
-                            <div class="legend">
-                                <div class="legend-item" onclick="selectComp('axoneme')"><div class="legend-color" style="background: #4A5568;"></div><span>Axoneme</span></div>
-                                <div class="legend-item" onclick="selectComp('transition-zone')"><div class="legend-color" style="background: #718096;"></div><span>Transition Zone</span></div>
-                                <div class="legend-item" onclick="selectComp('basal-body')"><div class="legend-color" style="background: #4A5568;"></div><span>Basal Body</span></div>
-                                <div class="legend-item" onclick="selectComp('ciliary-membrane')"><div class="legend-color" style="background: #A0AEC0;"></div><span>Ciliary Membrane</span></div>
-                                <div class="legend-item" onclick="selectComp('nucleus')"><div class="legend-color" style="background: #C8D0DD;"></div><span>Nucleus</span></div>
-                                <div class="legend-item" onclick="selectComp('cell-body')"><div class="legend-color" style="background: #E9EDF2;"></div><span>Cell Body</span></div>
-                            </div>
-                        </div>
+                        <button class="nav-item" onclick="selectComp('axoneme')">Axoneme</button>
+                        <button class="nav-item" onclick="selectComp('transition-zone')">Transition Zone</button>
+                        <button class="nav-item" onclick="selectComp('basal-body')">Basal Body</button>
+                        <button class="nav-item" onclick="selectComp('ciliary-membrane')">Ciliary Membrane</button>
+                        <button class="nav-item" onclick="selectComp('nucleus')">Nucleus</button>
+                        <button class="nav-item" onclick="selectComp('cell-body')">Cell Body</button>
                     </div>
                     
                     <div class="nav-group">
@@ -465,6 +455,23 @@ window.displayCiliAIPage = async function () {
                     </div>
                 </div>
                 
+            </div>
+            
+            <div class="diagram-container">
+                <div class="interactive-cilium">
+                    <div id="cilia-svg"></div>
+                </div>
+                <div class="bottom-bar" id="bottomBar">
+                    <h3>Click on a compartment or search for a gene</h3>
+                    <div class="legend">
+                        <div class="legend-item" onclick="selectComp('axoneme')"><div class="legend-color" style="background: #4A5568;"></div><span>Axoneme</span></div>
+                        <div class="legend-item" onclick="selectComp('transition-zone')"><div class="legend-color" style="background: #718096;"></div><span>Transition Zone</span></div>
+                        <div class="legend-item" onclick="selectComp('basal-body')"><div class="legend-color" style="background: #4A5568;"></div><span>Basal Body</span></div>
+                        <div class="legend-item" onclick="selectComp('ciliary-membrane')"><div class="legend-color" style="background: #A0AEC0;"></div><span>Ciliary Membrane</span></div>
+                        <div class="legend-item" onclick="selectComp('nucleus')"><div class="legend-color" style="background: #C8D0DD;"></div><span>Nucleus</span></div>
+                        <div class="legend-item" onclick="selectComp('cell-body')"><div class="legend-color" style="background: #E9EDF2;"></div><span>Cell Body</span></div>
+                    </div>
+                </div>
             </div>
             
             <div class="right-panel">
@@ -502,21 +509,28 @@ function injectPageCSS() {
     const styleId = 'ciliai-dynamic-styles';
     if (document.getElementById(styleId)) return;
 
-    const PRIMARY_BLUE = '#005b96'; // Primary brand color (darker blue)
-    const SECONDARY_BLUE = '#b3cde0'; // Secondary brand color (lighter blue/peach)
+    const PRIMARY_BLUE = '#005b96'; // Primary brand color
+    const SECONDARY_BLUE = '#b3cde0'; // Secondary brand color
     const ACCENT_TEXT_COLOR = '#333333';
 
     const css = `
         * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        /* The main application container fills the whole screen space */
         .content-area.content-area-full {
             height: 100vh;
-            padding: 0 !important; margin: 0 !important; overflow: hidden;
+            width: 100vw;
+            padding: 0 !important; margin: 0 !important; 
+            overflow: hidden; 
         }
+        
+        /* Main Grid: Left Panel | Right Chat Panel */
         .container { 
             display: grid; 
-            grid-template-columns: 1fr 450px; /* Middle Viz Panel | Right Chat Panel */
-            height: 100vh; 
-            width: 100vw; 
+            grid-template-columns: 1fr 450px; 
+            height: 100%; 
+            width: 100%; 
+            gap: 0; 
             overflow: hidden; 
         }
         
@@ -527,31 +541,20 @@ function injectPageCSS() {
             color: ${PRIMARY_BLUE}; 
             box-shadow: 0 1px 3px rgba(0,0,0,0.08); 
             border-bottom: 1px solid ${PRIMARY_BLUE}; 
+            flex-shrink: 0;
         }
         .header h1 { font-size: 20px; font-weight: 600; margin-bottom: 2px; color: ${PRIMARY_BLUE}; }
         .left-panel { display: flex; flex-direction: column; background: #f5f7fa; border-right: 1px solid ${SECONDARY_BLUE}; overflow: hidden; }
-        .panel-sections { overflow-y: auto; }
+        .panel-sections { overflow-y: auto; flex-grow: 1; } /* Scrollable container for the new sections */
         
-        /* --- TOOLBARS & BUTTONS --- */
-        .toolbar { padding: 10px 20px; background: white; border-bottom: 1px solid ${SECONDARY_BLUE}; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-        .toolbar input { border: 1px solid ${SECONDARY_BLUE}; }
-        .toolbar button, #generate-ciliaplot-btn { 
-            background: ${PRIMARY_BLUE}; 
-            color: white; 
-            border: none; 
-            cursor: pointer; 
-            transition: background-color 0.2s; 
-        }
-        .toolbar button:hover, #generate-ciliaplot-btn:hover { background: #00477a; } /* Darker blue on hover */
-
         /* --- NAVIGATION/MENU STYLES --- */
-        .nav-group { padding: 10px 20px; border-bottom: 1px solid #e1e8ed; }
+        .nav-group { padding: 10px 20px; border-bottom: 1px solid ${SECONDARY_BLUE}50; }
         .nav-label { font-size: 11px; text-transform: uppercase; color: ${PRIMARY_BLUE}; margin-bottom: 5px; font-weight: 600; }
         .nav-item {
             display: block; 
             padding: 8px 12px; 
             margin-bottom: 5px; 
-            background: ${SECONDARY_BLUE}70; /* Light blue background */
+            background: ${SECONDARY_BLUE}70; 
             color: ${ACCENT_TEXT_COLOR}; 
             border: 1px solid ${SECONDARY_BLUE}; 
             border-radius: 6px; 
@@ -561,28 +564,30 @@ function injectPageCSS() {
         }
         .nav-item:hover { background: ${SECONDARY_BLUE}; color: ${PRIMARY_BLUE}; }
         .nav-item.active { background: ${PRIMARY_BLUE}; color: white; }
+        
+        /* --- TOOLBARS & BUTTONS --- */
+        .toolbar { padding: 10px 20px; background: white; border-bottom: 1px solid ${SECONDARY_BLUE}; display: flex; gap: 10px; align-items: center; flex-shrink: 0; }
+        .toolbar input { border: 1px solid ${SECONDARY_BLUE}; }
+        .toolbar button { background: ${PRIMARY_BLUE}; color: white; }
+        .toolbar button:hover { background: #00477a; } 
 
-        /* --- VISUALIZATION BOARD (MIDDLE PANEL) --- */
-        .diagram-container { flex: 1; padding: 20px; overflow: auto; display: flex; justify-content: center; align-items: center; background: white; }
+        /* --- VISUALIZATION & DIAGRAM --- */
+        .diagram-container { padding: 20px; overflow: auto; display: flex; justify-content: center; align-items: flex-start; background: white; flex-grow: 1; }
         .interactive-cilium { border: 1px solid ${SECONDARY_BLUE}; }
-        .cilia-part.selected, .cilia-part.active { filter: brightness(1.1); stroke: ${PRIMARY_BLUE} !important; stroke-width: 4 !important; }
+        .cilia-part.selected, .cilia-part.active { stroke: ${PRIMARY_BLUE} !important; }
         
-        /* --- CHAT/RESULT COLORS --- */
+        /* --- CHAT PANEL (Right) --- */
+        .right-panel { display: flex; flex-direction: column; background: white; border-left: 1px solid ${SECONDARY_BLUE}; overflow: hidden; }
+        .chat-container { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+        .messages { flex: 1; padding: 20px; overflow-y: auto; background: #f8fafc; }
         .ciliai-message.user .ciliai-message-content { background: ${PRIMARY_BLUE}; color: white; }
-        .ai-result-card strong, .ai-action { color: ${PRIMARY_BLUE}; font-weight: 600; }
+        .welcome-section { padding: 20px; border-bottom: 1px solid ${SECONDARY_BLUE}; flex-shrink: 0; }
+        .input-area { padding: 15px; border-top: 1px solid ${SECONDARY_BLUE}; flex-shrink: 0; }
         
-        /* --- QUICK PLOTS / WELCOME BUTTONS --- */
+        /* --- QUICK PLOTS / UTILITIES --- */
+        .bottom-bar { padding: 15px 20px; background: white; border-top: 1px solid ${SECONDARY_BLUE}; }
         .ciliai-quick-plots { display: flex; flex-direction: column; gap: 8px; }
-        .welcome-action-btn {
-            background: ${SECONDARY_BLUE};
-            color: ${PRIMARY_BLUE};
-            border: 1px solid ${PRIMARY_BLUE};
-        }
-        .welcome-action-btn:hover {
-            background: ${PRIMARY_BLUE};
-            color: white;
-            border-color: white;
-        }
+
     `;
 
     const styleEl = document.createElement('style');
