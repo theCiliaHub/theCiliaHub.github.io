@@ -569,13 +569,15 @@ function injectPageCSS() {
 /**
  * Loads the external data files required only by the Cilia Analysis Page plots.
  */
-async function loadAnalysisData() { // NOTE: This name is local, but is called by the global initializeCiliaPlotPage
-    const analysisBaseUrl = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/';
+// ==========================================================
+// 6. CILIA ANALYSIS PAGE (CRITICAL DEFINITIONS)
+// ==========================================================
 
+// --- Definition for the specialized analysis data loader ---
+async function loadAnalysisData() { 
+    const analysisBaseUrl = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/';
     try {
         window.log("Fetching specialized analysis data...");
-        
-        // Fetch the two specialized analysis files in parallel
         const [ciliaryGenesResponse, screenDataResponse] = await Promise.all([
             fetch(analysisBaseUrl + 'ciliahub_data.json'),
             fetch(analysisBaseUrl + 'cilia_screens_data.json')
@@ -584,15 +586,47 @@ async function loadAnalysisData() { // NOTE: This name is local, but is called b
         const ciliaryGeneArray = await ciliaryGenesResponse.json();
         window.screenDatabase = await screenDataResponse.json(); 
         
-        // Convert the ciliary gene array into a Map for instant lookups
         window.ciliaryGeneMap = new Map(ciliaryGeneArray.map(gene => [gene.gene.toUpperCase(), gene])); 
-
         window.log(`Successfully loaded ${window.ciliaryGeneMap.size} ciliary genes for analysis.`);
 
     } catch (error) {
         window.log(`Failed to load a required analysis data file: ${error.message}`, 'error');
     }
 }
+
+/**
+ * Initializes the analysis page: loads data and sets up event listeners.
+ */
+function initializeCiliaPlotPage() {
+    // CRITICAL: Call the specialized data loading function for the analysis page
+    loadAnalysisData(); 
+    
+    populatePlotTypes(); 
+    
+    // Set up event listeners for the page
+    const typeSelector = document.getElementById('ciliaplot-type-selector');
+    const generateBtn = document.getElementById('generate-ciliaplot-btn');
+    const downloadBtn = document.getElementById('download-plot-btn');
+
+    if (typeSelector) typeSelector.addEventListener('change', updateCustomizationPanel);
+    if (generateBtn) generateBtn.addEventListener('click', generateAnalysisPlots);
+    if (downloadBtn) downloadBtn.addEventListener('click', downloadPlot);
+    
+    // Initialize the default visualization explanation and customization panel
+    updateCustomizationPanel();
+    updatePlotExplanation();
+}
+
+// -----------------------------------------------------------------------------------
+// (NOTE: Definitions for populatePlotTypes, updateCustomizationPanel, updatePlotExplanation, 
+// generateAnalysisPlots, and findAndMergeGenes must exist locally in the file structure)
+// -----------------------------------------------------------------------------------
+
+
+// Add these back in if they are needed and missing:
+// window.populatePlotTypes = populatePlotTypes;
+// window.updateCustomizationPanel = updateCustomizationPanel;
+// window.updatePlotExplanation = updatePlotExplanation;
 
     
     
@@ -759,35 +793,6 @@ async function loadAnalysisData() { // NOTE: This name is local, but is called b
 
     initializeCiliaPlotPage();
 };
-
-/**
- * Initializes the analysis page: loads data and sets up event listeners.
- */
-function initializeCiliaPlotPage() {
-    // CRITICAL: Call the specialized data loading function for the analysis page
-    loadAnalysisData();
-    
-    // Populate the radio buttons with plot options
-    // NOTE: These functions must be defined locally/globally elsewhere.
-    populatePlotTypes(); 
-    
-    // Set up event listeners for the page
-    const typeSelector = document.getElementById('ciliaplot-type-selector');
-    const generateBtn = document.getElementById('generate-ciliaplot-btn');
-    const downloadBtn = document.getElementById('download-plot-btn');
-
-    if (typeSelector) typeSelector.addEventListener('change', updateCustomizationPanel);
-    if (generateBtn) generateBtn.addEventListener('click', generateAnalysisPlots);
-    if (downloadBtn) downloadBtn.addEventListener('click', downloadPlot);
-    
-    // Initialize the default visualization explanation and customization panel
-    updateCustomizationPanel();
-    updatePlotExplanation();
-}
-    
-// NOTE: Don't forget to expose loadAnalysisPageData globally at the end of the script!
-// window.loadAnalysisPageData = loadAnalysisPageData;
-    
 
     
    function generateAndInjectSVG() {
@@ -4033,7 +4038,7 @@ window.findAndMergeGenes = findAndMergeGenes;
 window.initializeCiliaPlotPage = initializeCiliaPlotPage; // Page initialization logic
 window.generateAnalysisPlots = generateAnalysisPlots; // Main button handler
 window.updateGeneSummaryTable = updateGeneSummaryTable; // For the analysis UI table
-
+    
 // --- Analysis Plotting Functions ---
 window.renderMultiCategoryPlot = renderMultiCategoryPlot;
 window.renderBubblePlot = renderBubblePlot;
