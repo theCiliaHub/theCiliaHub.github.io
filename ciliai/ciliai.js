@@ -374,63 +374,82 @@ window.loadCiliAIData = async function (timeoutMs = 60000) {
     };
 
 
+/* ==============================================================
+ * CiliAI – Unified Explorer (v6.0 - CELL WHISPERER INSPIRED DESIGN)
+ * ==============================================================
+ * Features: Three-column layout (Nav | Vis | Chat), Blue Branding, Organized Menus.
+ * ============================================================== */
+(function () {
+    'use strict';
+
+// ==========================================================
+// 1. SAFE FALLBACKS & GLOBAL STATE (Keep as is)
+// ... (The entire SAFE FALLBACKS block remains unchanged from previous step) ...
+// ... (The entire GLOBAL STATE block remains unchanged from previous step) ...
+// ... (The entire Data Maps and Constants block remains unchanged from previous step) ...
+// ... (The entire CILIBRAIN and Plotting Logic sections remain defined locally) ...
+
+
+// ==========================================================
+// 3. STATIC UI & PAGE DISPLAY (UPDATED FOR 3-COLUMN GRID)
+// ==========================================================
+
+const structureInfoMap = { /* ... structure map data ... */ };
+
 window.displayCiliAIPage = async function () {
     console.log("CiliAI: displayCiliAIPage() called.");
-    
-    // FIX: Target the document body or the first content-area div found.
-    // The browser always has a document.body available.
-    const area = document.querySelector('.content-area') || document.body; 
-    
+    const area = document.querySelector('.content-area');
     if (!area) {
-        console.error('CiliAI: Main content area not found. Cannot render UI.');
-        return;
-    }
-
-    // CRITICAL: Inject CSS definitions before setting innerHTML
-    injectPageCSS(); 
-    
-    // Inject the entire application HTML
-    area.innerHTML = getPageHTML(); 
-    
-    // Now that the elements exist in the DOM, set the classes and attach listeners
-    area.className = 'content-area content-area-full'; 
-    setupPageEventListeners();
-        const status = document.getElementById('dataStatus');
-        if (window.CiliAI.ready) {
-            status.textContent = `Ready (${window.CiliAI.masterData.length} genes)`;
-            status.className = 'status ready';
-            window.addChatMessage(`Database loaded! ${window.CiliAI.masterData.length} genes available. Try searching for IFT88 or click on the cilium.`, false);
-        } else {
-            status.textContent = 'Load failed';
-            status.className = 'status error';
-            window.addChatMessage('Failed to load database. Some features may be limited.', false);
+        // If the main container isn't found, use the document body (fallback check)
+        const mainContainer = document.getElementById('main-content-area') || document.body;
+        if (mainContainer === document.body) {
+            console.error('CiliAI: Main content area not found. Rendering to body.');
         }
         
-        // --- MODIFIED: Show FOXJ1 UMAP on load ---
-        // Calling renderUMAPPlot here is redundant since initCiliAI already called renderUMAPPlot(), 
-        // but we'll assume the desired chat message flow requires this for the chat panel update.
-        await window.renderUMAPPlot('FOXJ1');
-        window.addChatMessage(`Displaying default Lung scRNA-seq UMAP for <strong>FOXJ1</strong> on the left.`, false);
-        // --- END OF MODIFICATION ---
+        // Inject the entire structure into the container
+        injectPageCSS(); 
+        mainContainer.innerHTML = getPageHTML();
+        
+        // Ensure the global class is set on the container after content injection
+        mainContainer.className = 'content-area content-area-full';
+        
+        setupPageEventListeners();
+    } else {
+        // If the container was found early (standard startup flow)
+        injectPageCSS();
+        area.innerHTML = getPageHTML();
+        setupPageEventListeners();
+    }
 
-        console.log("CiliAI: Page displayed.");
-    };
-      
- function getPageHTML() {
+    const status = document.getElementById('dataStatus');
+    if (window.CiliAI.ready) {
+        status.textContent = `Ready (${window.CiliAI.masterData.length} genes)`;
+        status.className = 'status ready';
+        window.addChatMessage(`Database loaded! ${window.CiliAI.masterData.length} genes available. Try searching for IFT88 or click on the cilium.`, false);
+    } else {
+        status.textContent = 'Load failed';
+        status.className = 'status error';
+        window.addChatMessage('Failed to load database. Some features may be limited.', false);
+    }
+    
+    // Default action: Show FOXJ1 UMAP on load
+    await window.renderUMAPPlot('FOXJ1');
+    window.addChatMessage(`Displaying default Lung scRNA-seq UMAP for <strong>FOXJ1</strong> on the visualization board.`, false);
+
+    console.log("CiliAI: Page displayed.");
+};
+
+
+function getPageHTML() {
     return `
-        <div class="container">
-            <div class="left-panel">
-                <div class="header">
-                    <h1>🔬 CiliAI</h1>
-                    <p>Interactive ciliary biology and gene function explorer</p>
+        <div class="app-container">
+            
+            <aside class="sidebar">
+                <div class="brand">
+                    <img src="https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/main/CiliaHub_Logo_web.png" alt="CiliAI Logo">
+                    CiliAI
                 </div>
-                <div class="toolbar">
-                    <input type="text" id="geneSearch" placeholder="Search gene (e.g., IFT88, NPHP1, CEP290)">
-                    <button onclick="searchGene()">Find Gene</button>
-                    <span id="dataStatus" class="status loading">Initializing...</span>
-                </div>
-                
-                <div class="panel-sections">
+                <div class="nav-scroll">
                     
                     <div class="nav-group">
                         <div class="nav-label">Dashboard</div>
@@ -454,140 +473,179 @@ window.displayCiliAIPage = async function () {
                         <button class="nav-item" onclick="showDefaultPhylogeny()">🌳 Phylogeny Heatmap</button>
                     </div>
                 </div>
-                
-            </div>
-            
-            <div class="diagram-container">
-                <div class="interactive-cilium">
-                    <div id="cilia-svg"></div>
+            </aside>
+
+            <main class="center-panel">
+                <div class="top-bar">
+                    <div class="search-container">
+                        <input type="text" id="geneSearch" class="search-input" placeholder="Search gene (e.g., IFT88)...">
+                        <button class="search-btn" onclick="searchGene()">Find</button>
+                    </div>
+                    <div id="dataStatus" class="status-badge">Initializing...</div>
                 </div>
-                <div class="bottom-bar" id="bottomBar">
-                    <h3>Click on a compartment or search for a gene</h3>
-                    <div class="legend">
-                        <div class="legend-item" onclick="selectComp('axoneme')"><div class="legend-color" style="background: #4A5568;"></div><span>Axoneme</span></div>
-                        <div class="legend-item" onclick="selectComp('transition-zone')"><div class="legend-color" style="background: #718096;"></div><span>Transition Zone</span></div>
-                        <div class="legend-item" onclick="selectComp('basal-body')"><div class="legend-color" style="background: #4A5568;"></div><span>Basal Body</span></div>
-                        <div class="legend-item" onclick="selectComp('ciliary-membrane')"><div class="legend-color" style="background: #A0AEC0;"></div><span>Ciliary Membrane</span></div>
-                        <div class="legend-item" onclick="selectComp('nucleus')"><div class="legend-color" style="background: #C8D0DD;"></div><span>Nucleus</span></div>
-                        <div class="legend-item" onclick="selectComp('cell-body')"><div class="legend-color" style="background: #E9EDF2;"></div><span>Cell Body</span></div>
+                <div class="viz-card">
+                    <div class="viz-header">
+                        <div class="viz-title">Visualization Board</div>
+                        <button class="save-btn" onclick="downloadPlot('cilia-svg', 'ciliai-plot')">📷 Save Plot</button>
+                    </div>
+                    <div id="cilia-svg" class="plot-area"></div>
+                </div>
+            </main>
+
+            <aside class="right-panel">
+                <div class="chat-header">
+                    <h2>CiliAI Assistant</h2>
+                    <p>Ask questions about genes & datasets</p>
+                </div>
+                <div class="messages-area" id="messages">
+                    <div class="ciliai-message assistant">
+                        👋 <strong>Welcome to CiliAI.</strong><br>
+                        I am initializing the database and interface now.
                     </div>
                 </div>
-            </div>
-            
-            <div class="right-panel">
-                <div class="welcome-section">
-                    <h2>Welcome to CiliAI! 🎉</h2>
-                    <p><strong>CiliAI</strong> is an AI-powered tool to explore ciliary biology, gene function, and disease data.</p>
-                    <ol class="steps">
-                        <li>Type <strong>"What is IFT88?"</strong> in the text box below.</li>
-                        <li>Click on the <strong>"Transition Zone"</strong> in the cilia diagram.</li>
-                        <li>Search for a gene like <strong>CEP290</strong> in the search bar.</li>
-                        <li>Ask questions like <strong>"List genes in the axoneme"</strong></li>
-                        <li>Press 👎 if a response doesn't make sense.</li>
-                        <li>Press 👍 for helpful answers.</li>
-                        <li>Use 📝 to start a new conversation.</li>
-                    </ol>
-                    <div class="disclaimer">
-                        <strong>⚠️ Disclaimer:</strong> CiliAI is an AI system and may produce misleading results. Use it for data exploration and hypothesis generation, not as a replacement for curated databases.
+                <div class="input-area">
+                    <div class="chat-input-group">
+                        <input type="text" id="chatInput" class="chat-input" placeholder="Ask a question (e.g. 'What is IFT88')...">
+                        <button class="send-btn" onclick="sendMsg()">Send</button>
                     </div>
                 </div>
-                <div class="chat-container">
-                    <div class="messages" id="messages"></div>
-                    <div class="input-area">
-                        <div class="input-container">
-                            <input type="text" id="chatInput" placeholder="Ask CiliAI...">
-                            <button onclick="sendMsg()">Send</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
+            </aside>
         </div>`;
 }
-    
 
 function injectPageCSS() {
     const styleId = 'ciliai-dynamic-styles';
     if (document.getElementById(styleId)) return;
 
-    const PRIMARY_BLUE = '#005b96'; // Primary brand color
-    const SECONDARY_BLUE = '#b3cde0'; // Secondary brand color
+    const PRIMARY_BLUE = '#005b96';
+    const SECONDARY_BLUE = '#b3cde0';
+    const SIDEBAR_BG = '#00477a'; // Slightly darker blue for sidebar background
     const ACCENT_TEXT_COLOR = '#333333';
+    const BORDER_LIGHT = '#e1e8ed';
 
     const css = `
+        :root {
+            --primary-blue: ${PRIMARY_BLUE};
+            --secondary-blue: ${SECONDARY_BLUE};
+            --accent-text: ${ACCENT_TEXT_COLOR};
+            --sidebar-bg: ${SIDEBAR_BG};
+            --border-light: ${BORDER_LIGHT};
+        }
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        
-        /* The main application container fills the whole screen space */
-        .content-area.content-area-full {
+        body, html { height: 100%; font-family: 'Inter', sans-serif; background: #f1f5f9; overflow: hidden; }
+
+        /* --- GLOBAL APPLICATION GRID (3 COLUMNS) --- */
+        .app-container {
+            display: grid;
+            grid-template-columns: 240px 1fr 400px;
             height: 100vh;
             width: 100vw;
-            padding: 0 !important; margin: 0 !important; 
-            overflow: hidden; 
         }
-        
-        /* Main Grid: Left Panel | Right Chat Panel */
-        .container { 
-            display: grid; 
-            grid-template-columns: 1fr 450px; 
-            height: 100%; 
-            width: 100%; 
-            gap: 0; 
-            overflow: hidden; 
+
+        /* --- COLUMN 1: LEFT SIDEBAR (NAVIGATION) --- */
+        .sidebar {
+            background: var(--sidebar-bg);
+            color: white;
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid var(--primary-blue);
         }
-        
-        /* --- BRANDING & HEADER --- */
-        .header { 
-            padding: 10px 20px; 
-            background: ${SECONDARY_BLUE}; 
-            color: ${PRIMARY_BLUE}; 
-            box-shadow: 0 1px 3px rgba(0,0,0,0.08); 
-            border-bottom: 1px solid ${PRIMARY_BLUE}; 
-            flex-shrink: 0;
+        .brand {
+            padding: 20px;
+            font-size: 18px;
+            font-weight: 600;
+            color: white;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            border-bottom: 1px solid var(--primary-blue);
         }
-        .header h1 { font-size: 20px; font-weight: 600; margin-bottom: 2px; color: ${PRIMARY_BLUE}; }
-        .left-panel { display: flex; flex-direction: column; background: #f5f7fa; border-right: 1px solid ${SECONDARY_BLUE}; overflow: hidden; }
-        .panel-sections { overflow-y: auto; flex-grow: 1; } /* Scrollable container for the new sections */
-        
-        /* --- NAVIGATION/MENU STYLES --- */
-        .nav-group { padding: 10px 20px; border-bottom: 1px solid ${SECONDARY_BLUE}50; }
-        .nav-label { font-size: 11px; text-transform: uppercase; color: ${PRIMARY_BLUE}; margin-bottom: 5px; font-weight: 600; }
+        .brand img { height: 32px; width: auto; border-radius: 6px; }
+
+        .nav-scroll { flex: 1; overflow-y: auto; padding: 0 10px; }
+        .nav-group { margin-bottom: 15px; padding: 10px 0; border-bottom: 1px solid var(--secondary-blue)50; }
+        .nav-label {
+            font-size: 11px; text-transform: uppercase; letter-spacing: 1px;
+            color: var(--secondary-blue); margin-bottom: 5px; font-weight: 600;
+        }
         .nav-item {
             display: block; 
-            padding: 8px 12px; 
-            margin-bottom: 5px; 
-            background: ${SECONDARY_BLUE}70; 
-            color: ${ACCENT_TEXT_COLOR}; 
-            border: 1px solid ${SECONDARY_BLUE}; 
-            border-radius: 6px; 
-            cursor: pointer; 
+            width: 100%;
+            padding: 8px 12px;
+            background: transparent;
+            border: none;
+            color: var(--secondary-blue);
             text-align: left;
             font-size: 13px;
+            border-radius: 6px;
         }
-        .nav-item:hover { background: ${SECONDARY_BLUE}; color: ${PRIMARY_BLUE}; }
-        .nav-item.active { background: ${PRIMARY_BLUE}; color: white; }
-        
-        /* --- TOOLBARS & BUTTONS --- */
-        .toolbar { padding: 10px 20px; background: white; border-bottom: 1px solid ${SECONDARY_BLUE}; display: flex; gap: 10px; align-items: center; flex-shrink: 0; }
-        .toolbar input { border: 1px solid ${SECONDARY_BLUE}; }
-        .toolbar button { background: ${PRIMARY_BLUE}; color: white; }
-        .toolbar button:hover { background: #00477a; } 
+        .nav-item:hover, .nav-item.active { background: var(--primary-blue); color: white; }
 
-        /* --- VISUALIZATION & DIAGRAM --- */
-        .diagram-container { padding: 20px; overflow: auto; display: flex; justify-content: center; align-items: flex-start; background: white; flex-grow: 1; }
-        .interactive-cilium { border: 1px solid ${SECONDARY_BLUE}; }
-        .cilia-part.selected, .cilia-part.active { stroke: ${PRIMARY_BLUE} !important; }
+        /* --- COLUMN 2: CENTER VISUALIZATION PANEL --- */
+        .center-panel {
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+            overflow-y: auto;
+        }
+        .top-bar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; height: 40px; }
+        .search-container { display: flex; gap: 10px; flex: 1; max-width: 600px; }
+        .search-input { flex: 1; padding: 0 15px; border: 1px solid var(--border-light); border-radius: 8px; height: 40px; }
+        .search-btn { 
+            padding: 0 20px; 
+            background: var(--primary-blue); 
+            color: white; 
+            border-radius: 8px; 
+            font-weight: 500; 
+            cursor: pointer;
+        }
+        .viz-card {
+            flex: 1;
+            background: white;
+            border-radius: 12px;
+            border: 1px solid var(--border-light);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .viz-header {
+            padding: 15px 20px;
+            border-bottom: 1px solid var(--border-light);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .viz-title { font-size: 15px; font-weight: 600; color: var(--accent-text); }
+        .save-btn { 
+            border: none; 
+            background: var(--secondary-blue); 
+            color: var(--primary-blue); 
+            padding: 5px 10px; 
+            border-radius: 4px; 
+            cursor: pointer; 
+        }
+        .save-btn:hover { background: var(--primary-blue); color: white; }
+        #cilia-svg { flex: 1; width: 100%; height: 100%; position: relative; }
+        .plot-area { min-height: 400px; }
         
-        /* --- CHAT PANEL (Right) --- */
-        .right-panel { display: flex; flex-direction: column; background: white; border-left: 1px solid ${SECONDARY_BLUE}; overflow: hidden; }
-        .chat-container { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
-        .messages { flex: 1; padding: 20px; overflow-y: auto; background: #f8fafc; }
-        .ciliai-message.user .ciliai-message-content { background: ${PRIMARY_BLUE}; color: white; }
-        .welcome-section { padding: 20px; border-bottom: 1px solid ${SECONDARY_BLUE}; flex-shrink: 0; }
-        .input-area { padding: 15px; border-top: 1px solid ${SECONDARY_BLUE}; flex-shrink: 0; }
+        /* --- COLUMN 3: RIGHT CHAT PANEL --- */
+        .right-panel {
+            display: flex;
+            flex-direction: column;
+            background: #f8fafc;
+            border-left: 1px solid var(--border-light);
+            overflow: hidden;
+        }
+        .chat-header { padding: 20px; border-bottom: 1px solid var(--border-light); }
+        .chat-header h2 { font-size: 18px; color: var(--primary-blue); }
+        .messages-area { flex: 1; padding: 20px; overflow-y: auto; }
+        .ciliai-message.user .ciliai-message-content { background: var(--primary-blue); color: white; }
+        .input-area { padding: 15px; border-top: 1px solid var(--border-light); background: white; }
+        .chat-input-group { display: flex; gap: 10px; }
+        .send-btn { background: var(--primary-blue); color: white; padding: 0 15px; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; }
+        .send-btn:hover { background: #00477a; }
         
-        /* --- QUICK PLOTS / UTILITIES --- */
-        .bottom-bar { padding: 15px 20px; background: white; border-top: 1px solid ${SECONDARY_BLUE}; }
-        .ciliai-quick-plots { display: flex; flex-direction: column; gap: 8px; }
-
     `;
 
     const styleEl = document.createElement('style');
@@ -596,6 +654,7 @@ function injectPageCSS() {
     document.head.appendChild(styleEl);
 }
 
+    
 /**
  * Loads the external data files required only by the Cilia Analysis Page plots.
  */
