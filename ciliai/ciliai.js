@@ -84,6 +84,7 @@ window.extractMultipleGenes = extractMultipleGenes;
 window.handleUserSend = handleUserSend;
 window.handleGeneSearch = handleGeneSearch;
 window.react = react;
+    
 window.clearChat = clearChat;
 window.generateAndInjectSVG = generateAndInjectSVG;
 window.setupSVGInteraction = setupSVGInteraction;
@@ -3148,9 +3149,32 @@ function extractPhenotypeIntent(qLower) {
     }
 
     
-    // ==========================================================
-    // 5. GLOBAL UI WRAPPERS & STARTUP
-    // ==========================================================
+// ==========================================================
+// 5. GLOBAL UI WRAPPERS & STARTUP
+// ==========================================================
+
+    // --- Core Helper Function Definitions (Placed here for high visibility) ---
+
+    function handleUserSend() {
+        const chatInput = document.getElementById('chatInput');
+        if (!chatInput) return;
+        const query = chatInput.value.trim();
+        if (!query) return;
+        addChatMessage(query, true);
+        chatInput.value = '';
+        // CRITICAL: Calls the globally exposed router function
+        window.handleAIQuery(query);
+    }
+
+    function react(type) {
+        if (type === 'up') {
+            window.addChatMessage('Thanks for the feedback! 🙏', false);
+        } else {
+            window.addChatMessage('Sorry about that. What specifically would help?', false);
+        }
+    }
+    
+    // ------------------------------------------------------------------
 
     window.selectComp = function (id) {
         generateAndInjectSVG(); 
@@ -3206,16 +3230,11 @@ function extractPhenotypeIntent(qLower) {
     };
 
     window.sendMsg = function () {
+        // Calls the local helper function defined above
         handleUserSend();
     };
 
-    window.react = function (type) {
-        if (type === 'up') {
-            addChatMessage('Thanks for the feedback! 🙏', false);
-        } else {
-            addChatMessage('Sorry about that. What specifically would help?', false);
-        }
-    };
+    window.react = react; // Ensure the local function 'react' is exported here
 
     window.clearChat = function () {
         if (confirm('Start new conversation?')) {
