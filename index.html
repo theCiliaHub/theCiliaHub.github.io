@@ -12,12 +12,14 @@
     <style id="ciliai-dynamic-styles"></style> 
     
     <style>
-        /* BASE STYLES: This minimalist CSS provides the anchor for the JS to fill */
+        /* BASE STYLES: Provides the full-screen anchor for the JS to fill */
         body, html { 
             height: 100%; 
             font-family: 'Inter', sans-serif; 
             background: #f1f5f9; 
             overflow: hidden; 
+            margin: 0; 
+            padding: 0;
         }
         .content-area { 
             /* This is the main target area for the dynamic content */
@@ -26,17 +28,17 @@
             padding: 0;
         }
         .content-area-full {
-            /* This style is set by the JS for the full-screen Cilia Analysis Page */
+            /* This style is set by the JS to manage the app layout */
             height: 100%;
             width: 100%;
             padding: 0 !important;
             margin: 0 !important;
-            overflow-y: auto; /* Allows scrolling on the analysis page */
+            overflow-y: hidden; 
         }
     </style>
 </head>
 <body>
-    <div class="content-area" id="main-content-area">
+    <div class="content-area">
         </div>
 
     <script src="ciliai/ciliai.js"></script>
