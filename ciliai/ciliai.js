@@ -269,14 +269,12 @@ window.CiliAI_UMAP = null; // This will be populated from the master DB
             console.error("renderUMAPPlot() failed:", e);
         }
 
-        // Auto-render CiliAI page if URL has /ciliai
-        try {
-            if (window.location.hash.includes('/ciliai')) {
-                window.displayCiliAIPage();
-            }
-        } catch (e) {
-            console.error("displayCiliAIPage() failed:", e);
-        }
+        // Auto-render CiliAI page
+        try {
+        window.displayCiliAIPage(); // <-- CRITICAL FIX: Call unconditionally
+        } catch (e) {
+    console.error("displayCiliAIPage() failed:", e);
+}
     }
 
    
@@ -375,26 +373,28 @@ window.loadCiliAIData = async function (timeoutMs = 60000) {
         "cell-body": { title: "Cell Body / Cytoplasm", description: "The main body of the cell..." },
     };
 
-    window.displayCiliAIPage = async function () {
-        console.log("CiliAI: displayCiliAIPage() called.");
-        const area = document.querySelector('.content-area');
-        if (!area) {
-            console.error('CiliAI: .content-area not found.');
-            return;
-        }
 
-        area.className = 'content-area content-area-full';
-        const panel = document.querySelector('.cilia-panel');
-        if (panel) panel.style.display = 'none';
+window.displayCiliAIPage = async function () {
+    console.log("CiliAI: displayCiliAIPage() called.");
+    
+    // FIX: Target the document body or the first content-area div found.
+    // The browser always has a document.body available.
+    const area = document.querySelector('.content-area') || document.body; 
+    
+    if (!area) {
+        console.error('CiliAI: Main content area not found. Cannot render UI.');
+        return;
+    }
 
-        // Assuming injectPageCSS, getPageHTML, setupPageEventListeners are defined globally or locally.
-        // If they are not defined in the closure, they must be called with window. prefix too.
-        // NOTE: For safety here, we assume they are defined locally or globally within the closure scope.
-        injectPageCSS();
-        area.innerHTML = getPageHTML();
-        // generateAndInjectSVG(); // <-- REMOVED
-        setupPageEventListeners();
-
+    // CRITICAL: Inject CSS definitions before setting innerHTML
+    injectPageCSS(); 
+    
+    // Inject the entire application HTML
+    area.innerHTML = getPageHTML(); 
+    
+    // Now that the elements exist in the DOM, set the classes and attach listeners
+    area.className = 'content-area content-area-full'; 
+    setupPageEventListeners();
         const status = document.getElementById('dataStatus');
         if (window.CiliAI.ready) {
             status.textContent = `Ready (${window.CiliAI.masterData.length} genes)`;
