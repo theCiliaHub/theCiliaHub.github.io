@@ -739,9 +739,11 @@ function injectPageCSS() {
  * Initializes the analysis page: loads data and sets up event listeners.
  */
 function initializeCiliaPlotPage() {
-    loadAllData(); // Load the dedicated analysis data
+    // CRITICAL: Call the renamed specialized data loading function
+    loadAnalysisPageData();
     
     // Populate the radio buttons with plot options
+    // NOTE: populatePlotTypes and updatePlotExplanation must be defined globally or locally.
     populatePlotTypes(); 
     
     // Set up event listeners for the page
@@ -757,6 +759,10 @@ function initializeCiliaPlotPage() {
     updateCustomizationPanel();
     updatePlotExplanation();
 }
+
+// NOTE: Don't forget to expose loadAnalysisPageData globally at the end of the script!
+// window.loadAnalysisPageData = loadAnalysisPageData;
+    
 
     
    function generateAndInjectSVG() {
@@ -3609,7 +3615,6 @@ window.displayFullGeneInfo = displayFullGeneInfo;
 window.routePhylogenyAnalysis = routePhylogenyAnalysis;
 
 // --- Cilia Analysis Page Dependencies (CRITICAL ADDITIONS) ---
-window.loadAllData = loadAllData; // For fetching external analysis data
 window.findAndMergeGenes = findAndMergeGenes; 
 window.initializeCiliaPlotPage = initializeCiliaPlotPage; // Page initialization logic
 window.generateAnalysisPlots = generateAnalysisPlots; // Main button handler
