@@ -3538,6 +3538,9 @@ function downloadUMAPDataAsCSV(geneSymbol) {
         chatInput.value = '';
         window.handleAIQuery(query);
     };
+    window.sendMsg = function () {
+    handleUserSend();
+    };
 
     window.react = function (type) {
         if (type === 'up') {
