@@ -46,6 +46,23 @@ if (typeof window.log !== "function") {
         console.log(`CiliAI LOG: ${msg}`);
     };
 }
+    if (typeof window.handleUserSend !== "function") {
+    window.handleUserSend = function () {
+        console.warn("handleUserSend() not implemented.");
+    };
+}
+
+if (typeof window.react !== "function") {
+    window.react = function (type) {
+        // Fallback implementation using window.addChatMessage
+        window.addChatMessage(`Feedback received: ${type}`, false);
+    };
+}
+
+if (typeof window.clearChat !== "function") {
+    window.clearChat = function () {
+        console.warn("clearChat() not fully implemented.");
+        // We ensure the window function exists, even if it's a basic alert/log
 
 if (typeof window.addChatMessage !== "function") {
     window.addChatMessage = function (msg, isUser) {
@@ -3150,31 +3167,11 @@ function extractPhenotypeIntent(qLower) {
 
     
 // ==========================================================
-// 5. GLOBAL UI WRAPPERS & STARTUP
+// 5. GLOBAL UI WRAPPERS & STARTUP (CLEANED)
 // ==========================================================
 
-    // --- Core Helper Function Definitions (Placed here for high visibility) ---
-
-    function handleUserSend() {
-        const chatInput = document.getElementById('chatInput');
-        if (!chatInput) return;
-        const query = chatInput.value.trim();
-        if (!query) return;
-        addChatMessage(query, true);
-        chatInput.value = '';
-        // CRITICAL: Calls the globally exposed router function
-        window.handleAIQuery(query);
-    }
-
-    function react(type) {
-        if (type === 'up') {
-            window.addChatMessage('Thanks for the feedback! 🙏', false);
-        } else {
-            window.addChatMessage('Sorry about that. What specifically would help?', false);
-        }
-    }
-    
-    // ------------------------------------------------------------------
+    // NOTE: handleUserSend, react, and clearChat are now defined below 
+    // or as robust global definitions that override the fallbacks.
 
     window.selectComp = function (id) {
         generateAndInjectSVG(); 
@@ -3213,37 +3210,51 @@ function extractPhenotypeIntent(qLower) {
     window.searchGene = function (name) {
         const query = name || document.getElementById('geneSearch').value.trim().toUpperCase();
         if (!query) return;
-        addChatMessage(`Tell me about ${query}`, true);
-        handleGeneSearch(query, true);
+        window.addChatMessage(`Tell me about ${query}`, true);
+        window.handleGeneSearch(query, true); // Use window.handleGeneSearch
     };
 
     // --- MODIFIED: UMAP default plot ---
     window.showDefaultUMAP = function () {
-        addChatMessage('Display gene expression in Lung scRNA-seq (Default: FOXJ1)', true);
-        handleAIQuery('plot default umap');
+        window.addChatMessage('Display gene expression in Lung scRNA-seq (Default: FOXJ1)', true);
+        window.handleAIQuery('plot default umap');
     };
 
     // --- NEW: Default phylogeny plot ---
     window.showDefaultPhylogeny = function () {
-        addChatMessage('Show Phylogenetics Analysis (Default Genes)', true);
-        handleAIQuery('plot default phylogeny');
+        window.addChatMessage('Show Phylogenetics Analysis (Default Genes)', true);
+        window.handleAIQuery('plot default phylogeny');
     };
 
-    window.sendMsg = function () {
-        // Calls the local helper function defined above
-        handleUserSend();
+    // Redefine the core logic functions (react, clearChat, handleUserSend) globally
+    // using the window prefix for robustness.
+
+    window.handleUserSend = function () {
+        const chatInput = document.getElementById('chatInput');
+        if (!chatInput) return;
+        const query = chatInput.value.trim();
+        if (!query) return;
+        window.addChatMessage(query, true);
+        chatInput.value = '';
+        window.handleAIQuery(query);
     };
 
-    window.react = react; // Ensure the local function 'react' is exported here
+    window.react = function (type) {
+        if (type === 'up') {
+            window.addChatMessage('Thanks for the feedback! 🙏', false);
+        } else {
+            window.addChatMessage('Sorry about that. What specifically would help?', false);
+        }
+    };
 
     window.clearChat = function () {
         if (confirm('Start new conversation?')) {
             document.getElementById('messages').innerHTML = '';
-            generateAndInjectSVG();
+            window.generateAndInjectSVG(); // Use window. prefix
             document.querySelectorAll('.cilia-part').forEach(el =>
                 el.classList.remove('selected', 'active')
             );
-            addChatMessage('Welcome back! How can I help?', false);
+            window.addChatMessage('Welcome back! How can I help?', false);
         }
     };
 
