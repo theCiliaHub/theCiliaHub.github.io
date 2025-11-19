@@ -1213,6 +1213,8 @@ function formatListResult(title, genes, description = "") {
         // A simple proxy for "conserved in ciliated organisms"
         return gene && gene.Ortholog_C_elegans;
     }
+
+    
    function handleSimpleComplexQuery(term, query) {
         const geneList = getGenesByComplex(term);
         const count = geneList.length;
@@ -1315,22 +1317,22 @@ function formatListResult(title, genes, description = "") {
     }
     
 /**
- * UMAP PLOT with CELL TYPE LABELS (RED COLOR)
- * Derived by merging displayUmapGeneExpression() cluster-labeling logic.
+ * UMAP PLOT with CELL TYPE LABELS (EXPRESSION COLOR/SIZE MAPPING)
+ * This function calculates gene expression per cell type and maps it to the marker size and color intensity.
  */
-
-async function renderUMAPPlot(geneSymbol) { // <-- CORRECTED NAME
+async function renderUMAPPlot(geneSymbol) { 
     const plotDivId = 'cilia-svg';
     const umapData = window.CiliAI_UMAP;
     const cellData = window.CiliAI.cellDataCache;
     const plotDiv = document.getElementById(plotDivId);
+    const gene = geneSymbol ? geneSymbol.toUpperCase() : null;
 
     if (!plotDiv) {
         console.error('UMAP plot container "cilia-svg" not found.');
         return;
     }
-    if (!umapData) {
-        addChatMessage('UMAP data is not available to plot.', false);
+    if (!umapData || !cellData) {
+        addChatMessage('UMAP or scRNA-seq expression data is not available to plot.', false);
         return;
     }
 
@@ -1339,42 +1341,59 @@ async function renderUMAPPlot(geneSymbol) { // <-- CORRECTED NAME
     const wrapper = plotDiv.closest('.interactive-cilium');
     if (wrapper) wrapper.classList.add('table-view-active');
 
-    // Subsample large datasets
+    // 1. Fetch Expression Data for all sampled cells
+    const geneExpressionData = cellData[gene] || {};
+    
+    // 2. Subsample and prepare data arrays
     const sampleSize = 15000;
     const sampledData = [];
+    const colorArray = [];
+    
+    // NEW: Array for scaling dot size
+    const sizeArray = [];
+    
+    let maxExpression = 0;
+    const sizeBase = 5;       // Minimum dot size
+    const sizeScale = 12;     // Maximum dot size
+    const expressionThreshold = 2; // Maximum expression value to map dot size against
 
-    if (umapData.length > sampleSize) {
-        const used = new Set();
-        while (sampledData.length < sampleSize) {
-            const idx = Math.floor(Math.random() * umapData.length);
-            if (!used.has(idx)) {
-                sampledData.push(umapData[idx]);
-                used.add(idx);
-            }
+    const sourceData = umapData.length > sampleSize ? 
+                       // Simple method to get a random subset if needed
+                       umapData.sort(() => 0.5 - Math.random()).slice(0, sampleSize) 
+                       : umapData;
+
+    for (const point of sourceData) {
+        // Look up expression value for this cell's type for the target gene
+        const expressionValue = geneExpressionData[point.cell_type] || 0;
+        
+        sampledData.push(point);
+        colorArray.push(expressionValue);
+        
+        // Calculate size based on expression, capped by expressionThreshold
+        const scaledMagnitude = Math.min(expressionValue, expressionThreshold) / expressionThreshold;
+        sizeArray.push(sizeBase + (sizeScale - sizeBase) * scaledMagnitude); // Scale size between 5 and 12
+        
+        if (expressionValue > maxExpression) {
+            maxExpression = expressionValue;
         }
-    } else {
-        sampledData.push(...umapData);
     }
-
-    // --- Cell types for labels ---
+    
+    if (maxExpression === 0 && gene) {
+        window.addChatMessage(`Gene <strong>${gene}</strong> found, but has no detectable expression in the loaded Lung scRNA-seq dataset.`, false);
+    }
+    
+    // --- Annotations (Cell Type Labels) remain unchanged ---
     const cellTypes = [...new Set(sampledData.map(d => d.cell_type))];
     const annotations = [];
-
-    // Helper median function
     const median = arr => {
         const sorted = [...arr].sort((a, b) => a - b);
         const mid = Math.floor(sorted.length / 2);
-        return sorted.length % 2 !== 0 ?
-            sorted[mid] :
-            (sorted[mid - 1] + sorted[mid]) / 2;
+        return sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
     };
-
-    // Generate label positions
     for (const ct of cellTypes) {
         if (!ct) continue;
         const pts = sampledData.filter(d => d.cell_type === ct);
         if (pts.length === 0) continue;
-
         const xs = pts.map(p => p.x);
         const ys = pts.map(p => p.y);
 
@@ -1383,43 +1402,47 @@ async function renderUMAPPlot(geneSymbol) { // <-- CORRECTED NAME
             y: median(ys),
             text: ct,
             showarrow: false,
-            font: {
-                color: '#FFFFFF',
-                size: 10,
-                family: 'Arial, sans-serif'
-            },
-            bgcolor: 'rgba(0,0,0,0.45)',
-            borderpad: 2,
-            bordercolor: 'rgba(0,0,0,0.45)',
-            borderwidth: 1,
-            xref: 'x',
-            yref: 'y'
+            font: { color: '#FFFFFF', size: 10, family: 'Arial, sans-serif' },
+            bgcolor: 'rgba(0,0,0,0.45)', borderpad: 2, bordercolor: 'rgba(0,0,0,0.45)', borderwidth: 1,
+            xref: 'x', yref: 'y'
         });
     }
 
-    // --- RED COLOR AS REQUESTED ---
+    // 3. Define Plotly Trace with Color Mapping
+    const colorScale = [
+        [0, '#F8F8F8'], // Base color (near white/gray for 0 expression)
+        [0.0001, '#FFDAD0'], // Lightest Red (Start point for visibility)
+        [1, '#E60000']  // Vibrant Red (Max expression color)
+    ];
+
     const plotData = [{
         x: sampledData.map(p => p.x),
         y: sampledData.map(p => p.y),
+        text: sampledData.map((p, i) => `Cell Type: ${p.cell_type}<br>Expression: ${colorArray[i].toFixed(3)}`),
         mode: 'markers',
         type: 'scattergl',
-        hovertext: sampledData.map(p => `Cell Type: ${p.cell_type}`),
         hoverinfo: 'text',
         marker: {
-            color: '#ffb09c',
-            size: 5,
+            color: colorArray, // <-- Variable color array
+            colorscale: colorScale, // <-- Red color scale
+            cmin: 0,
+            cmax: maxExpression > 0 ? maxExpression : 0.0001,
+            colorbar: {
+                title: `${gene} Expr. (TPM)`
+            },
+            size: sizeArray, // <-- Variable size array (New)
             opacity: 0.8
         }
     }];
 
     const layout = {
-        title: `UMAP (Cell Types Labeled)`,
+        title: `UMAP: ${gene || 'All Cells'} Expression (Dot size = Expression Magnitude)`,
         xaxis: { title: 'UMAP 1', zeroline: false, showgrid: false },
         yaxis: { title: 'UMAP 2', zeroline: false, showgrid: false },
         hovermode: 'closest',
         margin: { t: 50, b: 50, l: 50, r: 50 },
         plot_bgcolor: '#FFFFFF',
-        paper_bgcolor: '#FFFFFF',
+        paper_bgcolor: '#F8F8F8',
         annotations: annotations,
         showlegend: false
     };
@@ -1432,7 +1455,7 @@ async function renderUMAPPlot(geneSymbol) { // <-- CORRECTED NAME
     backButton.className = 'ciliai-button';
     backButton.style.cssText = 'background: #718096; position: absolute; top: 10px; right: 10px; z-index: 10;';
     backButton.textContent = 'Back to Diagram';
-    backButton.onclick = () => generateAndInjectSVG();
+    backButton.onclick = () => window.generateAndInjectSVG();
     plotDiv.prepend(backButton);
 }
 
@@ -1536,7 +1559,44 @@ async function renderUMAPPlot(geneSymbol) { // <-- CORRECTED NAME
         return null; 
     }
 
-    
+    /**
+ * Calculates the Jaccard index between two gene sets.
+ * @param {Array<string>} setA 
+ * @param {Array<string>} setB 
+ * @returns {number} Jaccard index (0 to 1).
+ */
+function calculateJaccard(setA, setB) {
+    const set1 = new Set(setA);
+    const set2 = new Set(setB);
+
+    let intersection = 0;
+    for (const gene of set1) {
+        if (set2.has(gene)) {
+            intersection++;
+        }
+    }
+
+    const union = set1.size + set2.size - intersection;
+    return union === 0 ? 0 : intersection / union;
+}
+
+/**
+ * (Placeholder) Simulates GO Term enrichment lookup.
+ * In a real system, this would call an API or process a local enrichment file.
+ * @param {Array<string>} genes 
+ * @returns {Array<Object>} List of top enriched terms.
+ */
+function getEnrichedGOTerms(genes) {
+    if (genes.length < 5) {
+        return [];
+    }
+    // Mock enrichment data based on common ciliary themes
+    return [
+        { term: "Intraflagellar Transport (IFT)", pval: 1e-15, count: Math.floor(genes.length * 0.4) },
+        { term: "Ciliary Membrane Docking", pval: 1e-09, count: Math.floor(genes.length * 0.3) },
+        { term: "Basal Body/Centriole", pval: 1e-07, count: Math.floor(genes.length * 0.25) }
+    ];
+}
     
    function handlePhylogenyVisualizationQuery(genes, source = 'li', type = 'heatmap') {
         // This function no longer needs to be async, as data is pre-loaded by the router
@@ -2988,8 +3048,17 @@ function extractPhenotypeIntent(qLower) {
                     gene = 'FOXJ1';
                     window.log('Defaulting UMAP plot to FOXJ1');
                 }
-                window.renderUMAPPlot(gene);
-                htmlResult = `<div class="ai-result-card"><p>Displaying Lung scRNA-seq UMAP for <strong>${gene || 'all genes'}</strong> on the left.</p></div>`;
+                
+                window.renderUMAPPlot(gene); // Keep the plot call exactly here!
+
+                htmlResult = `<div class="ai-result-card">
+                    <p>Displaying Lung scRNA-seq UMAP for <strong>${gene || 'all genes'}</strong> on the left.</p>
+                    <p style="margin-top: 10px;">
+                        <a href="#" class="ai-action" onclick="downloadUMAPDataAsCSV('${gene}')">
+                            ⬇️ Download UMAP Data (CSV)
+                        </a>
+                    </p>
+                </div>`;
             }
 
             //=( 13 )= INTENT: SIMPLE KEYWORD LISTS
@@ -3028,6 +3097,48 @@ function extractPhenotypeIntent(qLower) {
                     htmlResult = `Sorry, I didn't understand the query: "<strong>${query}</strong>". Please try a simpler term.`;
                 }
             }
+            // =( 16 )= INTENT: GENE SET ANALYSIS (NEW)
+const enrichmentMatch = qLower.match(/enrichment for (.+)/);
+const compareMatch = qLower.match(/compare (.+) and (.+)/);
+
+if (enrichmentMatch) {
+    window.log('Routing via: Intent (Gene Set Enrichment)');
+    const geneList = window.extractMultipleGenes(enrichmentMatch[1]);
+    const terms = getEnrichedGOTerms(geneList);
+    
+    if (terms.length === 0) {
+        return "Not enough genes provided, or no significant enrichment found.";
+    }
+
+    let html = `<div class="ai-result-card"><h4>Gene Set Enrichment for ${geneList.length} Genes</h4>`;
+    html += `<p>Top enriched biological terms (simulated):</p><ul>`;
+    terms.forEach(t => {
+        html += `<li><strong>${t.term}</strong>: Found ${t.count} genes (p-value ${t.pval.toExponential(1)})</li>`;
+    });
+    html += `</ul></div>`;
+    return window.addChatMessage(html, false);
+} 
+else if (compareMatch) {
+    window.log('Routing via: Intent (Gene Set Comparison)');
+    const termA = compareMatch[1].trim().toUpperCase();
+    const termB = compareMatch[2].trim().toUpperCase();
+    
+    const setA = window.CiliAI.lookups.byModuleOrComplex[termA] || [termA];
+    const setB = window.CiliAI.lookups.byModuleOrComplex[termB] || [termB];
+
+    const jaccardIndex = calculateJaccard(setA, setB);
+    const overlapCount = Math.round(jaccardIndex * (setA.length + setB.length)); // Approximation
+    
+    return window.addChatMessage(`
+        <div class="ai-result-card">
+            <h4>Gene Set Comparison: ${termA} vs. ${termB}</h4>
+            <p><strong>Genes in ${termA}:</strong> ${setA.length}</p>
+            <p><strong>Genes in ${termB}:</strong> ${setB.length}</p>
+            <p><strong>Overlap (Intersection):</strong> ${overlapCount} genes</p>
+            <p><strong>Jaccard Index:</strong> ${jaccardIndex.toFixed(3)}</p>
+        </div>
+    `, false);
+}
 
             // Send the final result to chat
             if (htmlResult) {
@@ -3041,6 +3152,49 @@ function extractPhenotypeIntent(qLower) {
         }
     }
 
+/**
+ * Downloads the current UMAP coordinate and expression data as a CSV.
+ */
+function downloadUMAPDataAsCSV(geneSymbol) {
+    const gene = geneSymbol.toUpperCase();
+    const cellData = window.CiliAI.cellDataCache;
+    const umapData = window.CiliAI_UMAP;
+    
+    if (!umapData || !cellData) {
+        window.addChatMessage('Error: UMAP data is not available for export.', false);
+        return;
+    }
+
+    let csvContent = "data:text/csv;charset=utf-8,";
+    csvContent += `Gene,UMAP_1,UMAP_2,Cell_Type,Expression_TPM\r\n`;
+
+    const geneExpressionData = cellData[gene] || {};
+
+    umapData.forEach(point => {
+        const expr = geneExpressionData[point.cell_type] || 0;
+        const row = [
+            `"${gene}"`,
+            point.x.toFixed(4),
+            point.y.toFixed(4),
+            `"${point.cell_type}"`,
+            expr.toFixed(4)
+        ].join(',');
+        csvContent += row + '\r\n';
+    });
+
+    const encodedUri = encodeURI(csvContent);
+    const filename = `${gene}_UMAP_Data.csv`;
+    
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", filename);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    window.addChatMessage(`Downloaded UMAP data for <strong>${gene}</strong> as ${filename}.`, false);
+}
+    
 
 
 
@@ -3269,6 +3423,10 @@ window.handleLocalizationQuery = handleLocalizationQuery;
 window.flexibleIntentParser = flexibleIntentParser;
 window.handleScreenReferenceFollowup = handleScreenReferenceFollowup;
 
+window.calculateJaccard = calculateJaccard;
+window.getEnrichedGOTerms = getEnrichedGOTerms;
+window.downloadUMAPDataAsCSV = downloadUMAPDataAsCSV;
+    
 // Optional: Expose utility getters if they crash when accessed globally
 window.getComplexPhylogenyTableMap = getComplexPhylogenyTableMap;
 window.getDiseaseClassificationMap = getDiseaseClassificationMap;
