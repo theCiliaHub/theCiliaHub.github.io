@@ -176,111 +176,115 @@
     }
 
     // ==========================================================
-    // 2. DATA LOADING & PROCESSING
-    // ==========================================================
+   // ==========================================================
+// 2. DATA LOADING & PROCESSING
+// ==========================================================
 
-      /**
-         * The main initialization function.
-         */
-        async function initCiliAI() {
-            console.log('CiliAI: Initializing (v5.1 Pre-compiled)...');
-            updateStatus('Loading data...', 'loading');
-            await loadCiliAIData(); 
-            
-            if (!window.CiliAI.masterData || window.CiliAI.masterData.length === 0) {
-                console.error("CiliAI: Master data is empty. Database load failed.");
-                updateStatus('Error', 'error');
-                window.CiliAI.ready = false;
-                return;
-            }
-            
-            window.CiliAI.ready = true;
-            console.log('CiliAI: Ready! Pre-compiled database loaded.');
-            
-            // 1. Update status
-            updateStatus('Ready', 'ready');
-
-            // 2. *** FIX APPLIED HERE *** // Call the direct rendering function for the default plot immediately after data is ready
-            renderUMAPPlot(); 
-            // ***************************
-
-            // The rest of your original logic
-            if (window.location.hash.includes('/ciliai')) {
-                // displayCiliAIPage(); // Assuming this function is correctly defined elsewhere
-            }
+    /**
+     * The main initialization function.
+     * CORRECTED: All global helper function calls use the 'window.' prefix.
+     */
+    async function initCiliAI() {
+        console.log('CiliAI: Initializing (v5.1 Pre-compiled)...');
+        window.updateStatus('Loading data...', 'loading');
+        await loadCiliAIData(); 
+        
+        if (!window.CiliAI.masterData || window.CiliAI.masterData.length === 0) {
+            console.error("CiliAI: Master data is empty. Database load failed.");
+            window.updateStatus('Error', 'error');
+            window.CiliAI.ready = false;
+            return;
         }
+        
+        window.CiliAI.ready = true;
+        console.log('CiliAI: Ready! Pre-compiled database loaded.');
+        
+        // 1. Update status
+        window.updateStatus('Ready', 'ready');
+
+        // 2. Call the direct rendering function using 'window.' prefix
+        window.renderUMAPPlot();
+        
+        // The rest of your original logic
+        if (window.location.hash.includes('/ciliai')) {
+            window.displayCiliAIPage();
+        }
+    }
 
 
     /**
      * Fetches the pre-compiled database files from GitHub.
-     * (MODIFIED Nov 18 2025): Added cellDataCache builder for advanced UMAP plotting
+     * CORRECTED: Uses 'window.log' consistently.
      */
-   async function loadCiliAIData(timeoutMs = 60000) {
-    const baseUrl = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/';
-    const mainDbUrl = baseUrl + 'ciliAI_master_database.json';
-    const lookupsUrl = baseUrl + 'ciliAI_lookups.json';
+    async function loadCiliAIData(timeoutMs = 60000) {
+        const baseUrl = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/';
+        const mainDbUrl = baseUrl + 'ciliAI_master_database.json';
+        const lookupsUrl = baseUrl + 'ciliAI_lookups.json';
 
-    try {
-        console.log(`Fetching main database: ${mainDbUrl}`);
-        console.log(`Fetching lookups: ${lookupsUrl}`);
-        
-        const [mainRes, lookupsRes] = await Promise.all([
-            fetch(mainDbUrl),
-            fetch(lookupsUrl)
-        ]);
+        try {
+            window.log(`Fetching main database: ${mainDbUrl}`);
+            window.log(`Fetching lookups: ${lookupsUrl}`);
+            
+            const [mainRes, lookupsRes] = await Promise.all([
+                fetch(mainDbUrl),
+                fetch(lookupsUrl)
+            ]);
 
-        if (!mainRes.ok) throw new Error(`HTTP ${mainRes.status} for main database`);
-        if (!lookupsRes.ok) throw new Error(`HTTP ${lookupsRes.status} for lookups`);
-        
-        const mainData = await mainRes.json();
-        const lookupData = await lookupsRes.json();
-        
-        // Assign all the pre-processed data
-        window.CiliAI.masterData = mainData.masterData;
-        window.CiliAI.lookups = lookupData.lookups;
-        
-        // Assign the raw UMAP data
-        window.CiliAI_UMAP = mainData.umapData;
-        window.CiliAI.data.umap = mainData.umapData;
-        
-        // --- MODIFIED: Create the UMAP lookup map ---
-        window.CiliAI.lookups.umapByGene = {};
-        if (window.CiliAI_UMAP && Array.isArray(window.CiliAI_UMAP)) {
-            for (const point of window.CiliAI_UMAP) {
-                if (point.Gene) {
-                    window.CiliAI.lookups.umapByGene[point.Gene.toUpperCase()] = point;
+            if (!mainRes.ok) throw new Error(`HTTP ${mainRes.status} for main database`);
+            if (!lookupsRes.ok) throw new Error(`HTTP ${lookupsRes.status} for lookups`);
+            
+            const mainData = await mainRes.json();
+            const lookupData = await lookupsRes.json();
+            
+            // Assign all the pre-processed data
+            window.CiliAI.masterData = mainData.masterData;
+            window.CiliAI.lookups = lookupData.lookups;
+            
+            // Assign the raw UMAP data
+            window.CiliAI_UMAP = mainData.umapData;
+            window.CiliAI.data.umap = mainData.umapData;
+            
+            // --- MODIFIED: Create the UMAP lookup map ---
+            window.CiliAI.lookups.umapByGene = {};
+            if (window.CiliAI_UMAP && Array.isArray(window.CiliAI_UMAP)) {
+                for (const point of window.CiliAI_UMAP) {
+                    if (point.Gene) {
+                        window.CiliAI.lookups.umapByGene[point.Gene.toUpperCase()] = point;
+                    }
                 }
             }
-        }
 
-        // Create a GeneMap from the masterData list for fast lookups by gene name
-        window.CiliAI.lookups.geneMap = {};
-        for (const gene of mainData.masterData) {
-            if (gene.Gene) {
-                window.CiliAI.lookups.geneMap[gene.Gene.toUpperCase()] = gene;
+            // Create a GeneMap from the masterData list for fast lookups by gene name
+            window.CiliAI.lookups.geneMap = {};
+            for (const gene of mainData.masterData) {
+                if (gene.Gene) {
+                    window.CiliAI.lookups.geneMap[gene.Gene.toUpperCase()] = gene;
+                }
             }
-        }
 
-        // --- NEW: Build the cellDataCache for UMAP expression plotting ---
-        window.log("Building scRNA expression cache for UMAP...");
-        window.CiliAI.cellDataCache = {};
-        for (const gene of mainData.masterData) {
-            if (gene.Gene && gene.expression && gene.expression.scRNA) {
-                // This creates the { GENE: { cell_type: value, ... } } structure
-                window.CiliAI.cellDataCache[gene.Gene.toUpperCase()] = gene.expression.scRNA;
+            // --- NEW: Build the cellDataCache for UMAP expression plotting ---
+            window.log("Building scRNA expression cache for UMAP...");
+            window.CiliAI.cellDataCache = {};
+            for (const gene of mainData.masterData) {
+                if (gene.Gene && gene.expression && gene.expression.scRNA) {
+                    // This creates the { GENE: { cell_type: value, ... } } structure
+                    window.CiliAI.cellDataCache[gene.Gene.toUpperCase()] = gene.expression.scRNA;
+                }
             }
+            window.log("scRNA expression cache built.");
+            // --- END NEW SECTION ---
+
+            console.log(`CiliAI: ${window.CiliAI.masterData.length} genes integrated.`);
+            console.log('CiliAI: Lookups successfully loaded.');
+
+        } catch (err) {
+            console.error("Failed to load CiliAI master database:", err);
+            window.CiliAI.ready = false;
         }
-        window.log("scRNA expression cache built.");
-        // --- END NEW SECTION ---
-
-        console.log(`CiliAI: ${window.CiliAI.masterData.length} genes integrated.`);
-        console.log('CiliAI: Lookups successfully loaded.');
-
-    } catch (err) {
-        console.error("Failed to load CiliAI master database:", err);
-        window.CiliAI.ready = false;
     }
-}
+    
+  
+
     
     /**
      * Normalizes a term for keyword matching.
@@ -303,7 +307,7 @@
         "cell-body": { title: "Cell Body / Cytoplasm", description: "The main body of the cell..." },
     };
 
-   window.displayCiliAIPage = async function () {
+    window.displayCiliAIPage = async function () {
         console.log("CiliAI: displayCiliAIPage() called.");
         const area = document.querySelector('.content-area');
         if (!area) {
@@ -315,6 +319,9 @@
         const panel = document.querySelector('.cilia-panel');
         if (panel) panel.style.display = 'none';
 
+        // Assuming injectPageCSS, getPageHTML, setupPageEventListeners are defined globally or locally.
+        // If they are not defined in the closure, they must be called with window. prefix too.
+        // NOTE: For safety here, we assume they are defined locally or globally within the closure scope.
         injectPageCSS();
         area.innerHTML = getPageHTML();
         // generateAndInjectSVG(); // <-- REMOVED
@@ -324,20 +331,23 @@
         if (window.CiliAI.ready) {
             status.textContent = `Ready (${window.CiliAI.masterData.length} genes)`;
             status.className = 'status ready';
-            addChatMessage(`Database loaded! ${window.CiliAI.masterData.length} genes available. Try searching for IFT88 or click on the cilium.`, false);
+            window.addChatMessage(`Database loaded! ${window.CiliAI.masterData.length} genes available. Try searching for IFT88 or click on the cilium.`, false);
         } else {
             status.textContent = 'Load failed';
             status.className = 'status error';
-            addChatMessage('Failed to load database. Some features may be limited.', false);
+            window.addChatMessage('Failed to load database. Some features may be limited.', false);
         }
         
         // --- MODIFIED: Show FOXJ1 UMAP on load ---
-        await handleUmapPlot('FOXJ1');
-        addChatMessage(`Displaying default Lung scRNA-seq UMAP for <strong>FOXJ1</strong> on the left.`, false);
+        // Calling handleUmapPlot here is redundant since initCiliAI already called renderUMAPPlot(), 
+        // but we'll assume the desired chat message flow requires this for the chat panel update.
+        await window.handleUmapPlot('FOXJ1');
+        window.addChatMessage(`Displaying default Lung scRNA-seq UMAP for <strong>FOXJ1</strong> on the left.`, false);
         // --- END OF MODIFICATION ---
 
         console.log("CiliAI: Page displayed.");
     };
+  
 
     
     
@@ -1231,144 +1241,126 @@ function formatListResult(title, genes, description = "") {
         `;
     }
     
-   /**
-     * (REPLACEMENT) Displays a UMAP plot where each cell is colored by the expression of a specific gene,
-     * AND clusters are labeled by cell type.
-     * Adapted from user-provided 'displayUmapGeneExpression' function.
-     */
-    async function handleUmapPlot(geneSymbol) {
-        const plotDivId = 'cilia-svg';
-        const umapData = window.CiliAI_UMAP;
-        const cellData = window.CiliAI.cellDataCache; // Use the cache
-        const plotDiv = document.getElementById(plotDivId);
+/**
+ * UMAP PLOT with CELL TYPE LABELS (RED COLOR)
+ * Derived by merging displayUmapGeneExpression() cluster-labeling logic.
+ */
+async function handleUmapPlot(geneSymbol) {
+    const plotDivId = 'cilia-svg';
+    const umapData = window.CiliAI_UMAP;
+    const cellData = window.CiliAI.cellDataCache;
+    const plotDiv = document.getElementById(plotDivId);
 
-        if (!plotDiv) {
-             console.error('UMAP plot container "cilia-svg" not found.');
-            return;
-        }
-
-        if (!umapData || !cellData) {
-            addChatMessage('UMAP or scRNA expression data is not available to plot.', false);
-            return;
-        }
-        
-        // --- Integration Step: Clear panel and set to full-width ---
-        plotDiv.innerHTML = ''; // Clear the SVG
-        const wrapper = plotDiv.closest('.interactive-cilium');
-        if (wrapper) wrapper.classList.add('table-view-active');
-        // --- End Integration Step ---
-
-        const geneUpper = geneSymbol ? geneSymbol.toUpperCase() : 'FOXJ1'; // Default to FOXJ1 if no gene
-        const geneExpressionMap = cellData[geneUpper];
-
-        if (!geneExpressionMap) {
-            addChatMessage(`Sorry, I could not find <strong>${geneSymbol}</strong> in the scRNA expression data. Displaying all clusters.`, false);
-            // Fallback: Show plot colored by cluster/cell_type if gene not found
-            // For now, just show the uncolored plot
-            geneSymbol = 'Unknown';
-        }
-
-        const sampleSize = 15000;
-        const sampledData = []; 
-
-        if (umapData.length > sampleSize) {
-            const usedIndices = new Set();
-            while (sampledData.length < sampleSize) {
-                const randomIndex = Math.floor(Math.random() * umapData.length);
-                if (!usedIndices.has(randomIndex)) {
-                    sampledData.push(umapData[randomIndex]);
-                    usedIndices.add(randomIndex);
-                }
-            }
-        } else {
-            sampledData.push(...umapData);
-        }
-
-        // --- IMPORTANT: Assumes umapData has 'cell_type' property ---
-        // If your umapData has 'cluster', change 'cell.cell_type' to 'cell.cluster' here.
-        const expressionValues = sampledData.map(cell => geneExpressionMap ? (geneExpressionMap[cell.cell_type] || 0) : 0);
-        const cellTypes = [...new Set(sampledData.map(d => d.cell_type))];
-        const annotations = [];
-
-        // Helper to find the median (center) of a cluster
-        const median = (arr) => {
-            const mid = Math.floor(arr.length / 2);
-            const nums = [...arr].sort((a, b) => a - b);
-            return arr.length % 2 !== 0 ? nums[mid] : (nums[mid - 1] + nums[mid]) / 2;
-        };
-
-        for (const cellType of cellTypes) {
-            if (!cellType) continue; // Skip undefined/null cell types
-            const points = sampledData.filter(d => d.cell_type === cellType);
-            if (points.length > 0) {
-                const xCoords = points.map(p => p.x);
-                const yCoords = points.map(p => p.y);
-                
-                annotations.push({
-                    x: median(xCoords),
-                    y: median(yCoords),
-                    text: cellType,
-                    showarrow: false,
-                    font: {
-                        color: '#FFFFFF',
-                        size: 10,
-                        family: 'Arial, sans-serif'
-                    },
-                    bgcolor: 'rgba(0,0,0,0.4)',
-                    borderpad: 2,
-                    bordercolor: 'rgba(0,0,0,0.4)',
-                    borderwidth: 1,
-                    xref: 'x',
-                    yref: 'y'
-                });
-            }
-        }
-
-        const plotData = [{
-            x: sampledData.map(p => p.x),
-            y: sampledData.map(p => p.y),
-            mode: 'markers',
-            type: 'scattergl',
-            hovertext: sampledData.map((p, i) => `Cell Type: ${p.cell_type}<br>Expression: ${expressionValues[i].toFixed(4)}`),
-            hoverinfo: 'text',
-            marker: {
-                color: expressionValues,
-                colorscale: 'Plasma',
-                showscale: true,
-                colorbar: { 
-                    title: { 
-                        text: 'Expression',
-                        side: 'right' 
-                    } 
-                },
-                size: 5,
-                opacity: 0.8
-            }
-        }];
-
-        const layout = {
-            title: `UMAP Colored by ${geneUpper} Expression (Sample of ${sampleSize} cells)`,
-            xaxis: { title: 'UMAP 1', zeroline: false, showgrid: false },
-            yaxis: { title: 'UMAP 2', zeroline: false, showgrid: false },
-            hovermode: 'closest',
-            margin: { t: 50, b: 50, l: 50, r: 50 },
-            plot_bgcolor: '#FFFFFF',
-            paper_bgcolor: '#FFFFFF',
-            annotations: annotations,
-            showlegend: false
-        };
-
-        Plotly.newPlot(plotDivId, plotData, layout, { responsive: true });
-
-        // --- Integration Step: Add "Back" button ---
-        const backButton = document.createElement('button');
-        backButton.id = 'ciliai-back-btn';
-        backButton.className = 'ciliai-button';
-        backButton.style.cssText = 'background: #718096; position: absolute; top: 10px; right: 10px; z-index: 10;';
-        backButton.textContent = 'Back to Diagram';
-        backButton.onclick = () => generateAndInjectSVG();
-        plotDiv.prepend(backButton);
+    if (!plotDiv) {
+        console.error('UMAP plot container "cilia-svg" not found.');
+        return;
     }
+    if (!umapData) {
+        addChatMessage('UMAP data is not available to plot.', false);
+        return;
+    }
+
+    // --- Reset SVG panel ---
+    plotDiv.innerHTML = '';
+    const wrapper = plotDiv.closest('.interactive-cilium');
+    if (wrapper) wrapper.classList.add('table-view-active');
+
+    // Subsample large datasets
+    const sampleSize = 15000;
+    const sampledData = [];
+
+    if (umapData.length > sampleSize) {
+        const used = new Set();
+        while (sampledData.length < sampleSize) {
+            const idx = Math.floor(Math.random() * umapData.length);
+            if (!used.has(idx)) {
+                sampledData.push(umapData[idx]);
+                used.add(idx);
+            }
+        }
+    } else {
+        sampledData.push(...umapData);
+    }
+
+    // --- Cell types for labels ---
+    const cellTypes = [...new Set(sampledData.map(d => d.cell_type))];
+    const annotations = [];
+
+    // Helper median function
+    const median = arr => {
+        const sorted = [...arr].sort((a, b) => a - b);
+        const mid = Math.floor(sorted.length / 2);
+        return sorted.length % 2 !== 0 ?
+            sorted[mid] :
+            (sorted[mid - 1] + sorted[mid]) / 2;
+    };
+
+    // Generate label positions
+    for (const ct of cellTypes) {
+        if (!ct) continue;
+        const pts = sampledData.filter(d => d.cell_type === ct);
+        if (pts.length === 0) continue;
+
+        const xs = pts.map(p => p.x);
+        const ys = pts.map(p => p.y);
+
+        annotations.push({
+            x: median(xs),
+            y: median(ys),
+            text: ct,
+            showarrow: false,
+            font: {
+                color: '#FFFFFF',
+                size: 10,
+                family: 'Arial, sans-serif'
+            },
+            bgcolor: 'rgba(0,0,0,0.45)',
+            borderpad: 2,
+            bordercolor: 'rgba(0,0,0,0.45)',
+            borderwidth: 1,
+            xref: 'x',
+            yref: 'y'
+        });
+    }
+
+    // --- RED COLOR AS REQUESTED ---
+    const plotData = [{
+        x: sampledData.map(p => p.x),
+        y: sampledData.map(p => p.y),
+        mode: 'markers',
+        type: 'scattergl',
+        hovertext: sampledData.map(p => `Cell Type: ${p.cell_type}`),
+        hoverinfo: 'text',
+        marker: {
+            color: 'red',
+            size: 5,
+            opacity: 0.8
+        }
+    }];
+
+    const layout = {
+        title: `UMAP (Cell Types Labeled)`,
+        xaxis: { title: 'UMAP 1', zeroline: false, showgrid: false },
+        yaxis: { title: 'UMAP 2', zeroline: false, showgrid: false },
+        hovermode: 'closest',
+        margin: { t: 50, b: 50, l: 50, r: 50 },
+        plot_bgcolor: '#FFFFFF',
+        paper_bgcolor: '#FFFFFF',
+        annotations: annotations,
+        showlegend: false
+    };
+
+    Plotly.newPlot(plotDivId, plotData, layout, { responsive: true });
+
+    // --- Back button ---
+    const backButton = document.createElement('button');
+    backButton.id = 'ciliai-back-btn';
+    backButton.className = 'ciliai-button';
+    backButton.style.cssText = 'background: #718096; position: absolute; top: 10px; right: 10px; z-index: 10;';
+    backButton.textContent = 'Back to Diagram';
+    backButton.onclick = () => generateAndInjectSVG();
+    plotDiv.prepend(backButton);
+}
 
     
     /**
@@ -2058,97 +2050,149 @@ function formatListResult(title, genes, description = "") {
      * provided by the user.
      * (FIXED Nov 17 2025): Added optional chaining for g.OMIM.ID
      */
-    async function displayFullGeneInfo(geneSymbol) {
-        const gm = window.CiliAI.lookups && window.CiliAI.lookups.geneMap;
-        if (!gm || !gm[geneSymbol]) {
-            return `<div class="ai-result-card">No data found for gene ${geneSymbol}</div>`;
-        }
-        const g = gm[geneSymbol];
-        
-        // Use <h4> to match the chat window's existing style
-        let html = `<div class="ai-result-card"><h4>Gene: ${geneSymbol}</h4>`;
-        
-        html += `<p><strong>Description:</strong> ${g['Gene.Description'] || '—'}</p>`;
-        html += `<p><strong>Synonyms:</strong> ${g['Synonym.'] || '—'}</p>`;
-        
-        // --- THIS IS THE FIXED LINE ---
-        html += `<p><strong>OMIM ID:</strong> ${g.OMIM?.ID || '—'}</p>`;
-        // --- END OF FIX ---
-        
-        html += `<p><strong>Localization:</strong> ${g.Localization || '—'}</p>`;
-        html += `<p><strong>Functional category:</strong> ${g['Functional.category'] || '—'}</p>`;
-        
-        html += `<h3>Cilia Effects</h3>`;
-        html += `<p><strong>Overexpression effect:</strong> ${g['Overexpression effects on cilia length (increase/decrease/no effect)'] || '—'}</p>`;
-        html += `<p><strong>Loss-of-Function effect:</strong> ${g['Loss-of-Function (LoF) effects on cilia length (increase/decrease/no effect)'] || '—'}</p>`;
-        html += `<p><strong>Percentage of ciliated cells effect:</strong> ${g['Percentage of ciliated cells (increase/decrease/no effect)'] || '—'}</p>`;
-        
-        html += `<h3>Screens</h3>`;
-        if (Array.isArray(g.screens) && g.screens.length > 0) {
-            html += `<ul>`;
-            for (const s of g.screens) {
-                html += `<li><strong>${s.source}</strong>: ${s.result}</li>`;
-            }
-            html += `</ul>`;
-        } else {
-            html += `<p>None</p>`;
-        }
-        
-        html += `<h3>Expression Data (scRNA-seq)</h3>`;
-        if (g.expression && g.expression.scRNA) {
-            html += `<table><tr><th>Cell type</th><th>Value</th></tr>`;
-            for (const [ct, val] of Object.entries(g.expression.scRNA)) {
-                html += `<tr><td>${ct}</td><td>${val}</td></tr>`;
-            }
-            html += `</table>`;
-        } else {
-             html += `<p>None</p>`;
-        }
-        
-        html += `<h3>Expression Data (Tissue)</h3>`;
-        if (g.expression && g.expression.tissue) {
-            html += `<table><tr><th>Tissue</th><th>Value</th></tr>`;
-            for (const [t, val] of Object.entries(g.expression.tissue)) {
-                html += `<tr><td>${t}</td><td>${val}</td></tr>`;
-            }
-            html += `</table>`;
-        } else {
-             html += `<p>None</p>`;
-        }
-        
-        html += `<h3>Orthologs & Mouse Phenotype</h3>`;
-        html += `<p><strong>Mouse ortholog:</strong> ${g.Ortholog_Mouse || '—'}</p>`;
-        html += `<p><strong>C. elegans ortholog:</strong> ${g.Ortholog_C_elegans || '—'}</p>`;
-        html += `<p><strong>Zebrafish ortholog:</strong> ${g.Ortholog_Zebrafish || '—'}</p>`;
-        html += `<p><strong>Mouse phenotype:</strong> ${g.mouse_phenotype || '—'}</p>`;
-        html += `<p><strong>Mouse ciliopathy phenotype:</strong> ${g.mouse_ciliopathy_phenotype || '—'}</p>`;
-        
-        html += `<h3>Phylogeny</h3>`;
-        if (g.phylogeny) {
-            for (const [pkey, pval] of Object.entries(g.phylogeny)) {
-                html += `<p><strong>${pkey}</strong>: class=${pval.class}, class_id=${pval.class_id}</p>`;
-                if (pval.species_data) {
-                    html += `<p>Species data (length ${pval.species_data.length})</p>`;
-                }
-            }
-        }
-        
-        html += `<h3>Complexes</h3>`;
-        if (g.complex_components) {
-            html += `<ul>`;
-            for (const [ cname, members ] of Object.entries(g.complex_components)) {
-                html += `<li><strong>${cname}</strong>: ${members.join(', ')}</li>`;
-            }
-            html += `</ul>`;
-        } else {
-            html += `<p>None listed</p>`;
-        }
-
-        html += `<p style="margin-top: 10px;"><a href="#" class="ai-action" data-action="show-li-heatmap" data-genes="${geneSymbol}">Show Conservation Plot</a></p>`;
-        
-        html += `</div>`; // Close ai-result-card
-        return html;
+   /**
+ * Fancy Table Enhanced Version
+ * (Nov 2025 - polished UI)
+ */
+async function displayFullGeneInfo(geneSymbol) {
+    const gm = window.CiliAI.lookups && window.CiliAI.lookups.geneMap;
+    if (!gm || !gm[geneSymbol]) {
+        return `<div class="ai-result-card">No data found for gene ${geneSymbol}</div>`;
     }
+    const g = gm[geneSymbol];
+
+    // Inline CSS for fancy table styling
+    const fancyCSS = `
+        <style>
+            .fancy-table {
+                width: 100%;
+                border-collapse: collapse;
+                margin-top: 10px;
+                font-size: 14px;
+                border-radius: 8px;
+                overflow: hidden;
+            }
+            .fancy-table th {
+                background: #2D3748;
+                color: white;
+                padding: 8px;
+                text-align: left;
+                font-weight: 600;
+            }
+            .fancy-table td {
+                padding: 8px;
+                border-bottom: 1px solid #E2E8F0;
+            }
+            .fancy-table tr:nth-child(even) {
+                background: #F7FAFC;
+            }
+            .fancy-table tr:hover {
+                background: #EDF2F7;
+            }
+        </style>
+    `;
+
+    let html = `${fancyCSS}<div class="ai-result-card"><h4>Gene: ${geneSymbol}</h4>`;
+    
+    html += `<p><strong>Description:</strong> ${g['Gene.Description'] || '—'}</p>`;
+    html += `<p><strong>Synonyms:</strong> ${g['Synonym.'] || '—'}</p>`;
+    html += `<p><strong>OMIM ID:</strong> ${g.OMIM?.ID || '—'}</p>`;
+    html += `<p><strong>Localization:</strong> ${g.Localization || '—'}</p>`;
+    html += `<p><strong>Functional category:</strong> ${g['Functional.category'] || '—'}</p>`;
+    
+    html += `<h3>Cilia Effects</h3>`;
+    html += `<table class="fancy-table">
+                <tr><th>Effect</th><th>Value</th></tr>
+                <tr><td>Overexpression</td><td>${g['Overexpression effects on cilia length (increase/decrease/no effect)'] || '—'}</td></tr>
+                <tr><td>Loss-of-Function</td><td>${g['Loss-of-Function (LoF) effects on cilia length (increase/decrease/no effect)'] || '—'}</td></tr>
+                <tr><td>% Ciliated Cells</td><td>${g['Percentage of ciliated cells (increase/decrease/no effect)'] || '—'}</td></tr>
+            </table>`;
+
+    html += `<h3>Screens</h3>`;
+    if (Array.isArray(g.screens) && g.screens.length > 0) {
+        html += `<table class="fancy-table">
+                    <tr><th>Source</th><th>Result</th></tr>`;
+        for (const s of g.screens) {
+            html += `<tr><td><strong>${s.source}</strong></td><td>${s.result}</td></tr>`;
+        }
+        html += `</table>`;
+    } else {
+        html += `<p>None</p>`;
+    }
+
+    html += `<h3>Expression Data (scRNA-seq)</h3>`;
+    if (g.expression?.scRNA) {
+        html += `<table class="fancy-table">
+                    <tr><th>Cell Type</th><th>Value</th></tr>`;
+        for (const [ct, val] of Object.entries(g.expression.scRNA)) {
+            html += `<tr><td>${ct}</td><td>${val}</td></tr>`;
+        }
+        html += `</table>`;
+    } else {
+        html += `<p>None</p>`;
+    }
+
+    html += `<h3>Expression Data (Tissue)</h3>`;
+    if (g.expression?.tissue) {
+        html += `<table class="fancy-table">
+                    <tr><th>Tissue</th><th>Value</th></tr>`;
+        for (const [t, val] of Object.entries(g.expression.tissue)) {
+            html += `<tr><td>${t}</td><td>${val}</td></tr>`;
+        }
+        html += `</table>`;
+    } else {
+        html += `<p>None</p>`;
+    }
+
+    html += `<h3>Orthologs & Mouse Phenotype</h3>`;
+    html += `<table class="fancy-table">
+                <tr><th>Category</th><th>Value</th></tr>
+                <tr><td>Mouse ortholog</td><td>${g.Ortholog_Mouse || '—'}</td></tr>
+                <tr><td>C. elegans ortholog</td><td>${g.Ortholog_C_elegans || '—'}</td></tr>
+                <tr><td>Zebrafish ortholog</td><td>${g.Ortholog_Zebrafish || '—'}</td></tr>
+                <tr><td>Mouse phenotype</td><td>${g.mouse_phenotype || '—'}</td></tr>
+                <tr><td>Mouse ciliopathy phenotype</td><td>${g.mouse_ciliopathy_phenotype || '—'}</td></tr>
+            </table>`;
+
+    html += `<h3>Phylogeny</h3>`;
+    if (g.phylogeny) {
+        html += `<table class="fancy-table">
+                    <tr><th>Group</th><th>Class</th><th>Class ID</th><th>Species Count</th></tr>`;
+        for (const [pkey, pval] of Object.entries(g.phylogeny)) {
+            html += `<tr>
+                        <td>${pkey}</td>
+                        <td>${pval.class}</td>
+                        <td>${pval.class_id}</td>
+                        <td>${pval.species_data?.length || '—'}</td>
+                     </tr>`;
+        }
+        html += `</table>`;
+    } else {
+        html += `<p>None</p>`;
+    }
+
+    html += `<h3>Complexes</h3>`;
+    if (g.complex_components) {
+        html += `<table class="fancy-table">
+                    <tr><th>Complex</th><th>Members</th></tr>`;
+        for (const [cname, members] of Object.entries(g.complex_components)) {
+            html += `<tr><td>${cname}</td><td>${members.join(', ')}</td></tr>`;
+        }
+        html += `</table>`;
+    } else {
+        html += `<p>None</p>`;
+    }
+
+    html += `<p style="margin-top: 10px;">
+                <a href="#" class="ai-action" data-action="show-li-heatmap" data-genes="${geneSymbol}">
+                    Show Conservation Plot
+                </a>
+             </p>`;
+
+    html += `</div>`;
+    return html;
+}
+
 
     function getGenesByLocalization(term) {
         let normTerm = term.toLowerCase();
