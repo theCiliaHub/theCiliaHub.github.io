@@ -68,7 +68,54 @@ if (typeof window.addChatMessage !== "function") {
 
 
     let lastQueryContext = { type: null, data: [], term: null };
+// Phylogeny data is lazy-loaded, so it starts as null
+window.liPhylogenyCache = null;
+window.neversPhylogenyCache = null;
+window.CiliAI_UMAP = null; // This will be populated from the master DB
 
+// ==========================================================
+// GLOBAL EXPORTS (Required to expose local functions to window)
+// --- Add this block once, typically near the end of the file ---
+// ==========================================================
+
+window.sendMsg = handleUserSend;
+window.addChatMessage = addChatMessage;
+window.extractMultipleGenes = extractMultipleGenes;
+window.handleUserSend = handleUserSend;
+window.handleGeneSearch = handleGeneSearch;
+window.react = react;
+window.clearChat = clearChat;
+window.generateAndInjectSVG = generateAndInjectSVG;
+window.setupSVGInteraction = setupSVGInteraction;
+window.setupPageEventListeners = setupPageEventListeners;
+window.selectComp = selectComp;
+window.showDataInLeftPanel = showDataInLeftPanel;
+window.downloadTableAsCSV = downloadTableAsCSV;
+window.injectTableCSS = injectTableCSS;
+window.log = log;
+
+// Expose Core Router/Logic Functions (These were causing the main TypeErrors)
+window.handleAIQuery = handleAIQuery;
+window.handleComplexQuery = handleComplexQuery;
+window.displayFullGeneInfo = displayFullGeneInfo;
+window.routePhylogenyAnalysis = routePhylogenyAnalysis;
+window.handleScreenQuery = handleScreenQuery;
+window.handleDomainQuery = handleDomainQuery;
+window.handleOrthologQuery = handleOrthologQuery;
+window.handleScRnaQuery = handleScRnaQuery;
+window.handleSimpleComplexQuery = handleSimpleComplexQuery;
+window.handleLocalizationQuery = handleLocalizationQuery;
+window.flexibleIntentParser = flexibleIntentParser;
+window.handleScreenReferenceFollowup = handleScreenReferenceFollowup;
+
+// Optional: Expose utility getters if they crash when accessed globally
+window.getComplexPhylogenyTableMap = getComplexPhylogenyTableMap;
+window.getDiseaseClassificationMap = getDiseaseClassificationMap;
+window.ensurePhylogenyDataLoaded = ensurePhylogenyDataLoaded;
+
+// ==========================================================
+// END OF EXPORTS
+// ==========================================================
     
     // --- Data Maps (These are now just for the AI brain) ---
 
@@ -3202,54 +3249,4 @@ function extractPhenotypeIntent(qLower) {
 
 })();
 
-
-// Phylogeny data is lazy-loaded, so it starts as null
-window.liPhylogenyCache = null;
-window.neversPhylogenyCache = null;
-window.CiliAI_UMAP = null; // This will be populated from the master DB
-
-// ==========================================================
-// GLOBAL EXPORTS (Required to expose local functions to window)
-// --- Add this block once, typically near the end of the file ---
-// ==========================================================
- window.initCiliAI = initCiliAI;
-window.renderUMAPPlot = renderUMAPPlot;
-window.sendMsg = handleUserSend;
-window.addChatMessage = addChatMessage;
-window.extractMultipleGenes = extractMultipleGenes;
-window.handleUserSend = handleUserSend;
-window.handleGeneSearch = handleGeneSearch;
-window.react = react;
-window.clearChat = clearChat;
-window.generateAndInjectSVG = generateAndInjectSVG;
-window.setupSVGInteraction = setupSVGInteraction;
-window.setupPageEventListeners = setupPageEventListeners;
-window.selectComp = selectComp;
-window.showDataInLeftPanel = showDataInLeftPanel;
-window.downloadTableAsCSV = downloadTableAsCSV;
-window.injectTableCSS = injectTableCSS;
-window.log = log;
-
-// Expose Core Router/Logic Functions (These were causing the main TypeErrors)
-window.handleAIQuery = handleAIQuery;
-window.handleComplexQuery = handleComplexQuery;
-window.displayFullGeneInfo = displayFullGeneInfo;
-window.routePhylogenyAnalysis = routePhylogenyAnalysis;
-window.handleScreenQuery = handleScreenQuery;
-window.handleDomainQuery = handleDomainQuery;
-window.handleOrthologQuery = handleOrthologQuery;
-window.handleScRnaQuery = handleScRnaQuery;
-window.handleSimpleComplexQuery = handleSimpleComplexQuery;
-window.handleLocalizationQuery = handleLocalizationQuery;
-window.flexibleIntentParser = flexibleIntentParser;
-window.handleScreenReferenceFollowup = handleScreenReferenceFollowup;
-
-// Optional: Expose utility getters if they crash when accessed globally
-window.getComplexPhylogenyTableMap = getComplexPhylogenyTableMap;
-window.getDiseaseClassificationMap = getDiseaseClassificationMap;
-window.ensurePhylogenyDataLoaded = ensurePhylogenyDataLoaded;
-
-// ==========================================================
-// END OF EXPORTS
-// ==========================================================
 
