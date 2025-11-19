@@ -81,6 +81,8 @@ if (typeof window.addChatMessage !== "function") {
     window.handleAIQuery = handleAIQuery;
     window.addChatMessage = addChatMessage;
     window.handleComplexQuery = handleComplexQuery;
+    window.displayFullGeneInfo = displayFullGeneInfo;
+    window.getComplexPhylogenyTableMap = getComplexPhylogenyTableMap;
     
     // --- Data Maps (These are now just for the AI brain) ---
 
