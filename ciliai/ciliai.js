@@ -278,7 +278,7 @@ if (typeof window.handleUmapPlot !== "function") {
      * Fetches the pre-compiled database files from GitHub.
      * CORRECTED: Uses 'window.log' consistently.
      */
-    async function loadCiliAIData(timeoutMs = 60000) {
+window.loadCiliAIData = async function (timeoutMs = 60000) {
         const baseUrl = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/';
         const mainDbUrl = baseUrl + 'ciliAI_master_database.json';
         const lookupsUrl = baseUrl + 'ciliAI_lookups.json';
