@@ -212,47 +212,47 @@
 
    
      /**
-     * The main initialization function.
-     * All global calls use the 'window.' prefix.
-     */
-    async function initCiliAI() {
-        console.log('CiliAI: Initializing (v5.1 Pre-compiled)...');
+     * The main initialization function.
+     * All global calls use the 'window.' prefix.
+     */
+    async function initCiliAI() {
+        console.log('CiliAI: Initializing (v5.1 Pre-compiled)...');
 
-        // Communicate status
-        window.updateStatus('Loading data...', 'loading');
+        // Communicate status
+        window.updateStatus('Loading data...', 'loading');
 
-        // Load the main DB
-        await window.loadCiliAIData();
+        // Load the main DB
+        await window.loadCiliAIData();
 
-        // Validate load
-        if (!window.CiliAI.masterData || window.CiliAI.masterData.length === 0) {
-            console.error("CiliAI: Master data is empty. Database load failed.");
-            window.updateStatus('Error loading database', 'error');
-            window.CiliAI.ready = false;
-            return;
-        }
+        // Validate load
+        if (!window.CiliAI.masterData || window.CiliAI.masterData.length === 0) {
+            console.error("CiliAI: Master data is empty. Database load failed.");
+            window.updateStatus('Error loading database', 'error');
+            window.CiliAI.ready = false;
+            return;
+        }
 
-        // Mark system ready
-        window.CiliAI.ready = true;
-        console.log('CiliAI: Ready! Pre-compiled database loaded.');
-        window.updateStatus('Ready', 'ready');
+        // Mark system ready
+        window.CiliAI.ready = true;
+        console.log('CiliAI: Ready! Pre-compiled database loaded.');
+        window.updateStatus('Ready', 'ready');
 
-        // Render the UMAP only if implemented
-        try {
-            window.renderUMAPPlot();
-        } catch (e) {
-            console.error("renderUMAPPlot() failed:", e);
-        }
+        // Render the UMAP only if implemented
+        try {
+            window.renderUMAPPlot();
+        } catch (e) {
+            console.error("renderUMAPPlot() failed:", e);
+        }
 
-        // Auto-render CiliAI page if URL has /ciliai
-        try {
-            if (window.location.hash.includes('/ciliai')) {
-                window.displayCiliAIPage();
-            }
-        } catch (e) {
-            console.error("displayCiliAIPage() failed:", e);
-        }
-    }
+        // Auto-render CiliAI page if URL has /ciliai
+        try {
+            if (window.location.hash.includes('/ciliai')) {
+                window.displayCiliAIPage();
+            }
+        } catch (e) {
+            console.error("displayCiliAIPage() failed:", e);
+        }
+    }
 
     // Expose initializer globally
     window.initCiliAI = initCiliAI;
