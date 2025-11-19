@@ -80,7 +80,7 @@ if (typeof window.addChatMessage !== "function") {
     window.sendMsg = handleUserSend;
     window.handleAIQuery = handleAIQuery;
     window.addChatMessage = addChatMessage;
-
+    window.handleComplexQuery = handleComplexQuery;
     
     // --- Data Maps (These are now just for the AI brain) ---
 
