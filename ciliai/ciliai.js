@@ -10,7 +10,7 @@
 (function () {
     'use strict';
 
- // ==========================================================
+// ==========================================================
 // SAFE FALLBACKS (Prevents crashes if UI functions missing)
 // ==========================================================
 
@@ -47,21 +47,39 @@ if (typeof window.log !== "function") {
     };
 }
 
- window.clearChat = function () {
-        if (confirm('Start new conversation?')) {
-            document.getElementById('messages').innerHTML = '';
-            window.generateAndInjectSVG(); // Use window. prefix
-            document.querySelectorAll('.cilia-part').forEach(el =>
-                el.classList.remove('selected', 'active')
-            );
-            window.addChatMessage('Welcome back! How can I help?', false);
-        }
-    };
-
 if (typeof window.addChatMessage !== "function") {
     window.addChatMessage = function (msg, isUser) {
         // This simple fallback ensures no crash if the chat UI isn't ready
         console.log(`CHAT [${isUser ? 'USER' : 'AI'}]: ${msg}`);
+    };
+}
+
+if (typeof window.react !== "function") {
+    window.react = function (type) {
+        // Fallback relies on addChatMessage being defined above
+        window.addChatMessage(`Feedback received: ${type}`, false);
+    };
+}
+
+if (typeof window.clearChat !== "function") {
+    window.clearChat = function () {
+        // Fallback uses the logging function
+        window.log('clearChat() fallback executed.');
+    };
+}
+
+// NOTE: We also ensure 'handleUserSend' and 'handleGeneSearch' have fallbacks 
+// as they are often called early by HTML event listeners.
+
+if (typeof window.handleUserSend !== "function") {
+    window.handleUserSend = function () {
+        window.log("handleUserSend() fallback executed.");
+    };
+}
+
+if (typeof window.handleGeneSearch !== "function") {
+    window.handleGeneSearch = function () {
+        window.log("handleGeneSearch() fallback executed.");
     };
 }
 
@@ -1458,64 +1476,67 @@ function findAndMergeGenes(userInputArray) {
 
     // --- 4C. Specific Data Handlers ---
 
-    /**
-     * (UPDATED) Handles screen queries and adds a follow-up for references.
-     */
-    function handleScreenQuery(geneSymbol) {
-        const gene = geneSymbol.toUpperCase();
-        const g = window.CiliAI.lookups.geneMap[gene];
-        if (!g) return `Sorry, I could not find data for "${gene}".`;
-        
-        let html = `<div class="ai-result-card"><h4>Screen Results for <strong>${gene}</strong></h4>`;
-        let foundScreenKeys = []; // (NEW) Store keys for follow-up
+   /**
+ * (UPDATED) Handles screen queries and adds a follow-up for references.
+ */
+function handleScreenQuery(geneSymbol) {
+    // --- Data Retrieval (DO NOT REMOVE) ---
+    const gene = geneSymbol.toUpperCase();
+    const g = window.CiliAI.lookups.geneMap[gene];
+    if (!g) return `Sorry, I could not find data for "${gene}".`;
+    
+    let html = `<div class="ai-result-card"><h4>Screen Results for <strong>${gene}</strong></h4>`;
+    let foundScreenKeys = [];
 
-        // Use the exact column names from your CSV
-        const percEffect = g['Percentage of ciliated cells (increase/decrease/no effect)'];
-        const lofEffect = g['Loss-of-Function (LoF) effects on cilia length (increase/decrease/no effect)'];
-        const oeEffect = g['Overexpression effects on cilia length (increase/decrease/no effect)'];
+    // Use the exact column names from your CSV
+    const percEffect = g['Percentage of ciliated cells (increase/decrease/no effect)'];
+    const lofEffect = g['Loss-of-Function (LoF) effects on cilia length (increase/decrease/no effect)'];
+    const oeEffect = g['Overexpression effects on cilia length (increase/decrease/no effect)'];
+    // --- END Data Retrieval ---
 
-        if (percEffect && percEffect !== "Not Reported" && percEffect) {
-            html += `<p><strong>Percent Ciliated Cells Effect:</strong> ${percEffect}</p>`;
-        }
-        if (lofEffect && lofEffect !== "Not Reported" && lofEffect) {
-            html += `<p><strong>Loss-of-Function Effect:</strong> ${lofEffect}</p>`;
-        }
-        if (oeEffect && oeEffect !== "Not Reported" && oeEffect) {
-            html += `<p><strong>Overexpression Effect:</strong> ${oeEffect}</p>`;
-        }
-
-        if (g.screens && Array.isArray(g.screens) && g.screens.length > 0) {
-            html += '<strong>All Screen Data:</strong><ul>';
-            g.screens.forEach(s => {
-                if (s.source) {
-                    foundScreenKeys.push(s.source); // (NEW) Add key to list
-                    html += `<li><strong>${s.source}</strong>: ${s.result || 'No result'}</li>`;
-                }
-            });
-            html += '</ul>';
-
-            // (NEW) Add follow-up question
-            html += `<p style="margin-top:10px;"><em>Would you like the references for these screens?</em></p>`;
-            
-            // (NEW) Set context for the next turn
-            lastQueryContext = {
-                type: 'screen_references',
-                data: foundScreenKeys,
-                term: `References for ${gene}`,
-                descriptionHeader: 'References'
-            };
-
-        } else if (
-            (!percEffect || percEffect === "Not Reported") &&
-            (!lofEffect || lofEffect === "Not Reported") &&
-            (!oeEffect || oeEffect === "Not Reported")
-        ) {
-            html += '<p>No specific screen data found in the database.</p>';
-        }
-
-        html += `</div>`; // Close ai-result-card
-        return html;
+    if (percEffect && percEffect !== "Not Reported" && percEffect) {
+        html += `<p><strong>Percent Ciliated Cells Effect:</strong> ${percEffect}</p>`;
     }
+    if (lofEffect && lofEffect !== "Not Reported" && lofEffect) {
+        html += `<p><strong>Loss-of-Function Effect:</strong> ${lofEffect}</p>`;
+    }
+    if (oeEffect && oeEffect !== "Not Reported" && oeEffect) {
+        html += `<p><strong>Overexpression Effect:</strong> ${oeEffect}</p>`;
+    }
+
+    if (g.screens && Array.isArray(g.screens) && g.screens.length > 0) {
+        html += '<strong>All Screen Data:</strong><ul>';
+        g.screens.forEach(s => {
+            if (s.source) {
+                foundScreenKeys.push(s.source); // Store key for follow-up
+                html += `<li><strong>${s.source}</strong>: ${s.result || 'No result'}</li>`;
+            }
+        });
+        html += '</ul>';
+
+        // Add follow-up question
+        html += `<p style="margin-top:10px;"><em>Would you like the references for these screens?</em></p>`;
+        
+        // Set context for the next turn
+        // NOTE: The 'lastQueryContext' variable must be available in the global scope.
+        window.lastQueryContext = {
+            type: 'screen_references',
+            data: foundScreenKeys,
+            term: `References for ${gene}`,
+            descriptionHeader: 'References'
+        };
+
+    } else if (
+        (!percEffect || percEffect === "Not Reported") &&
+        (!lofEffect || lofEffect === "Not Reported") &&
+        (!oeEffect || oeEffect === "Not Reported")
+    ) {
+        html += '<p>No specific screen data found in the database.</p>';
+    }
+
+    html += `</div>`; // Close ai-result-card
+    return html;
+}
     
     function handleDomainQuery(geneSymbols) {
         let html = '';
