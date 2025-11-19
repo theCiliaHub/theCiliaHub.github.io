@@ -1316,11 +1316,7 @@ function formatListResult(title, genes, description = "") {
         `;
     }
     
-/**
- * UMAP PLOT (Clean Cell Map Mode)
- * Renders a clean UMAP visualization of all cell types. Gene expression data
- * is NOT used for coloring or sizing the points to provide a clear, static map.
- */
+
 /**
  * UMAP PLOT (Expression Mapping Mode)
  * Renders a UMAP visualization where points are colored and sized based on the
@@ -1445,7 +1441,7 @@ async function renderUMAPPlot(geneSymbol) {
         xaxis: { title: 'UMAP 1', zeroline: false, showgrid: false },
         yaxis: { title: 'UMAP 2', zeroline: false, showgrid: false },
         hovermode: 'closest',
-        margin: { t: 50, b: 50, l: 5: 50, r: 50 },
+        margin: { t: 50, b: 50, l: 50, r: 50 },
         plot_bgcolor: '#FFFFFF',
         paper_bgcolor: '#F8F8F8',
         annotations: annotations,
