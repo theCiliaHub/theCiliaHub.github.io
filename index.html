@@ -6,6 +6,7 @@
     <title>CiliAI — Unified Explorer</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+    
     <style>
         :root {
             --primary-blue: #005b96;
@@ -13,6 +14,9 @@
             --accent-text: #333333;
             --sidebar-bg: #00477a;
             --border-light: #e1e8ed;
+            --status-loading-bg: #e3f2fd;
+            --status-ready-bg: #e8f5e9;
+            --status-error-bg: #ffebee;
         }
         
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -131,7 +135,16 @@
         .send-btn { background: var(--primary-blue); color: white; padding: 12px 20px; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; }
         .send-btn:hover { background: #00477a; }
 
-        .status-badge { padding: 8px 14px; background: #e3f2fd; color: var(--primary-blue); border-radius: 6px; font-size: 12px; font-weight: 600; }
+        .status-badge { 
+            padding: 8px 14px; 
+            border-radius: 6px; 
+            font-size: 12px; 
+            font-weight: 600; 
+            transition: background 0.3s;
+        }
+        .status.loading { background: var(--status-loading-bg); color: var(--primary-blue); }
+        .status.ready { background: var(--status-ready-bg); color: #2e7d32; }
+        .status.error { background: var(--status-error-bg); color: #c62828; }
 
         .ai-result-card { background: #f9fafb; padding: 14px; border-radius: 10px; border-left: 4px solid var(--primary-blue); }
 
@@ -140,7 +153,6 @@
 </head>
 <body>
     <div class="app-container">
-        <!-- Sidebar Navigation -->
         <aside class="sidebar">
             <div class="brand">
                 <div class="brand-icon">🧬</div>
@@ -159,9 +171,9 @@
 
                 <div class="nav-group">
                     <div class="nav-label">Structure</div>
-                    <button class="nav-item" onclick="window.selectComp('axoneme')">Axoneme</button>
-                    <button class="nav-item" onclick="window.selectComp('transition-zone')">Transition Zone</button>
-                    <button class="nav-item" onclick="window.selectComp('basal-body')">Basal Body</button>
+                    <button class="nav-item" onclick="window.handleAIQuery('list genes localized to axoneme')">Axoneme</button>
+                    <button class="nav-item" onclick="window.handleAIQuery('list genes localized to transition zone')">Transition Zone</button>
+                    <button class="nav-item" onclick="window.handleAIQuery('list genes localized to basal body')">Basal Body</button>
                 </div>
 
                 <div class="nav-group">
@@ -172,14 +184,13 @@
             </div>
         </aside>
 
-        <!-- Center Panel - Visualization -->
         <div class="center-panel">
             <div class="top-bar">
                 <div class="search-container">
                     <input type="text" id="geneSearch" class="search-input" placeholder="Search gene (e.g., IFT88, FOXJ1)...">
                     <button class="search-btn" onclick="window.searchGene()">Search</button>
                 </div>
-                <div id="dataStatus" class="status-badge">Loading...</div>
+                <div id="dataStatus" class="status-badge loading">Loading...</div>
             </div>
 
             <div class="viz-card">
@@ -191,7 +202,6 @@
             </div>
         </div>
 
-        <!-- Right Panel - Chat -->
         <aside class="right-panel">
             <div class="chat-header">
                 <h2>CiliAI Assistant</h2>
@@ -216,6 +226,9 @@
     </div>
 
     <script>
+        // NOTE: The main logic for loadCiliAIData, handleAIQuery, renderUMAPPlot, etc.,
+        // are expected to be available from the linked external file, 'ciliAI.js'.
+
         // ========== CRITICAL: Initialize Global State ==========
         window.CiliAI = {
             data: { umap: [] },
@@ -223,55 +236,77 @@
             ready: false,
             lookups: {},
             cellDataCache: {},
-            _UMAP: null
+            // Initialized to prevent errors before ciliAI.js runs
+            lastQueryContext: { type: null, data: [], term: null }, 
+            CiliAI_UMAP: null 
         };
 
-        window.lastQueryContext = { type: null, data: [], term: null };
-
-        // ========== SAFETY FALLBACKS ==========
+        // ========== CORE UI FALLBACKS / HELPERS ==========
+        // These implementations are simple/safe and rely minimally on external data until init completes.
         if (typeof window.log !== "function") {
             window.log = (msg) => console.log(`[CiliAI] ${msg}`);
         }
 
-        // ========== CORE FUNCTIONS ==========
         window.addChatMessage = function(html, isUser = false) {
             const messages = document.getElementById('messages');
             if (!messages) return;
             const msg = document.createElement('div');
+            // NOTE: Reaction buttons are handled by the separate click listener in ciliAI.js
             msg.className = `ciliai-message ${isUser ? 'user' : 'assistant'}`;
             msg.innerHTML = `<div class="ciliai-message-content">${html}</div>`;
             messages.appendChild(msg);
             messages.scrollTop = messages.scrollHeight;
         };
 
-        window.updateStatus = function(text, status = 'normal') {
+        window.updateStatus = function(text, state = 'normal') {
             const statusEl = document.getElementById('dataStatus');
             if (statusEl) {
                 statusEl.textContent = text;
-                statusEl.style.background = status === 'error' ? '#ffebee' : status === 'ready' ? '#e8f5e9' : '#e3f2fd';
+                // IMPROVED: Use CSS classes for status colors/backgrounds
+                statusEl.className = `status-badge status ${state}`; 
             }
         };
 
-        // ========== DATA LOADING ==========
-        window.loadCiliAIData = async function() {
+        // ========== DATA LOADING (Final, robust implementation) ==========
+        window.loadCiliAIData = async function(timeoutMs = 60000) {
             const baseUrl = 'https://raw.githubusercontent.com/theCiliaHub/theCiliaHub.github.io/refs/heads/main/';
+            const mainDbUrl = baseUrl + 'ciliAI_master_database.json';
+            const lookupsUrl = baseUrl + 'ciliAI_lookups.json';
+            
             try {
-                window.log('Loading databases...');
+                window.log(`Fetching main database: ${mainDbUrl}`);
+                window.log(`Fetching lookups: ${lookupsUrl}`);
+
                 const [mainRes, lookupsRes] = await Promise.all([
-                    fetch(baseUrl + 'ciliAI_master_database.json'),
-                    fetch(baseUrl + 'ciliAI_lookups.json')
+                    fetch(mainDbUrl),
+                    fetch(lookupsUrl)
                 ]);
 
-                if (!mainRes.ok || !lookupsRes.ok) throw new Error('Database fetch failed');
-                
+                if (!mainRes.ok) throw new Error(`HTTP ${mainRes.status} for main database`);
+                if (!lookupsRes.ok) throw new Error(`HTTP ${lookupsRes.status} for lookups`);
+
                 const mainData = await mainRes.json();
                 const lookupData = await lookupsRes.json();
 
+                // Assign all the pre-processed data
                 window.CiliAI.masterData = mainData.masterData || [];
                 window.CiliAI.lookups = lookupData.lookups || {};
+                
+                // Assign the raw UMAP data
                 window.CiliAI_UMAP = mainData.umapData || [];
+                window.CiliAI.data.umap = mainData.umapData || [];
+                
+                // --- Build the UMAP lookup map (REQUIRED for plotting/queries) ---
+                window.CiliAI.lookups.umapByGene = {};
+                if (window.CiliAI_UMAP && Array.isArray(window.CiliAI_UMAP)) {
+                    for (const point of window.CiliAI_UMAP) {
+                        if (point.Gene) {
+                            window.CiliAI.lookups.umapByGene[point.Gene.toUpperCase()] = point;
+                        }
+                    }
+                }
 
-                // Build cache
+                // Create a GeneMap for fast lookups by gene name
                 window.CiliAI.lookups.geneMap = {};
                 mainData.masterData.forEach(gene => {
                     if (gene.Gene) {
@@ -279,141 +314,90 @@
                     }
                 });
 
+                // Build the cellDataCache for UMAP expression plotting
                 window.CiliAI.cellDataCache = {};
                 mainData.masterData.forEach(gene => {
                     if (gene.Gene && gene.expression?.scRNA) {
                         window.CiliAI.cellDataCache[gene.Gene.toUpperCase()] = gene.expression.scRNA;
                     }
                 });
-
+                
                 window.CiliAI.ready = true;
-                window.log(`Loaded ${window.CiliAI.masterData.length} genes`);
+                window.log(`CiliAI: ${window.CiliAI.masterData.length} genes integrated.`);
                 return true;
             } catch (err) {
+                console.error("Failed to load CiliAI master database:", err);
                 window.log(`Load error: ${err.message}`);
                 window.updateStatus('Load failed', 'error');
+                window.CiliAI.ready = false;
                 return false;
             }
         };
 
-        // ========== UI HANDLERS ==========
+        // ========== UI HANDLERS (Minimal wrappers for HTML compatibility) ==========
+        // NOTE: These rely on the comprehensive logic being available from ciliAI.js
         window.handleUserSend = function() {
             const input = document.getElementById('chatInput');
-            if (!input) return;
+            if (!input || !input.value.trim()) return;
             const query = input.value.trim();
-            if (!query) return;
             window.addChatMessage(query, true);
             input.value = '';
-            window.handleAIQuery(query);
+            // CRITICAL: Call the logic router from ciliAI.js
+            if (typeof window.handleAIQuery === 'function') {
+                window.handleAIQuery(query);
+            } else {
+                 window.addChatMessage('CiliAI logic engine not yet loaded. Please wait.', false);
+            }
         };
 
         window.searchGene = function() {
             const input = document.getElementById('geneSearch');
-            if (!input) return;
+            if (!input || !input.value.trim()) return;
             const gene = input.value.trim().toUpperCase();
-            if (!gene) return;
             window.addChatMessage(`Tell me about ${gene}`, true);
-            window.handleAIQuery(`What is ${gene}?`);
-        };
-
-        window.handleAIQuery = function(query) {
-            if (!window.CiliAI.ready) {
-                window.addChatMessage('Data is loading. Please wait...', false);
-                return;
-            }
-
-            const qLower = query.toLowerCase();
-            
-            // Simple response system
-            if (qLower.includes('what is') || qLower.includes('describe')) {
-                window.addChatMessage(`I'm analyzing your query about: <strong>${query}</strong>`, false);
-            } else if (qLower.includes('cilium') || qLower.includes('cilia')) {
-                window.addChatMessage('Cilia are microtubule-based organelles. They can be motile (generating fluid flow) or primary (sensory). Would you like to know more?', false);
-            } else if (qLower.includes('what can')) {
-                window.addChatMessage('I can: search genes, show expression patterns, display phylogenetic conservation, analyze ciliary structures, and answer questions about ciliopathies.', false);
+            // CRITICAL: Call the logic router from ciliAI.js
+            if (typeof window.handleAIQuery === 'function') {
+                window.handleAIQuery(`What is ${gene}?`);
             } else {
-                window.addChatMessage(`Searching for information about: <strong>${query}</strong>...`, false);
+                 window.addChatMessage('CiliAI logic engine not yet loaded. Please wait.', false);
             }
         };
 
         window.showDefaultUMAP = function() {
             window.addChatMessage('Loading UMAP visualization for FOXJ1...', false);
-            window.renderUMAPPlot('FOXJ1');
+             // CRITICAL: Call the renderer from ciliAI.js
+            if (typeof window.renderUMAPPlot === 'function') {
+                 window.renderUMAPPlot('FOXJ1');
+            }
         };
-
+        
         window.showDefaultPhylogeny = function() {
-            window.addChatMessage('Phylogeny feature coming soon...', false);
-        };
-
-        window.selectComp = function(id) {
-            window.addChatMessage(`Selected structure: ${id}`, false);
-        };
-
-        window.downloadPlot = function(divId, filename) {
-            window.addChatMessage('Export feature coming soon...', false);
-        };
-
-        // ========== UMAP PLOTTING ==========
-        window.renderUMAPPlot = function(gene = 'FOXJ1') {
-            const plotDiv = document.getElementById('cilia-svg');
-            if (!plotDiv) return;
-
-            const umapData = window.CiliAI_UMAP;
-            const cellData = window.CiliAI.cellDataCache;
-
-            if (!umapData || !cellData) {
-                plotDiv.innerHTML = '<p style="padding: 20px;">UMAP data not available</p>';
-                return;
+            window.addChatMessage('Show Phylogenetics Analysis (Default Genes) 🌳', true);
+             // CRITICAL: Call the logic router from ciliAI.js
+            if (typeof window.handleAIQuery === 'function') {
+                 window.handleAIQuery('plot default phylogeny');
             }
-
-            const geneUpper = gene.toUpperCase();
-            const geneExpressionData = cellData[geneUpper] || {};
-
-            const trace = {
-                x: umapData.slice(0, 5000).map(d => d.x || 0),
-                y: umapData.slice(0, 5000).map(d => d.y || 0),
-                mode: 'markers',
-                type: 'scattergl',
-                marker: {
-                    size: 4,
-                    color: umapData.slice(0, 5000).map(d => geneExpressionData[d.cell_type] || 0),
-                    colorscale: 'Viridis',
-                    showscale: true,
-                    colorbar: { title: 'Expression' }
-                },
-                text: umapData.slice(0, 5000).map(d => `${d.cell_type}<br>Expr: ${(geneExpressionData[d.cell_type] || 0).toFixed(2)}`),
-                hovertemplate: '%{text}<extra></extra>'
-            };
-
-            const layout = {
-                title: `UMAP: ${geneUpper} Expression`,
-                xaxis: { title: 'UMAP 1', showgrid: false },
-                yaxis: { title: 'UMAP 2', showgrid: false },
-                hovermode: 'closest',
-                plot_bgcolor: '#fafbfc',
-                paper_bgcolor: 'white'
-            };
-
-            Plotly.newPlot('cilia-svg', [trace], layout, { responsive: true });
-            window.addChatMessage(`Showing expression of <strong>${geneUpper}</strong>`, false);
         };
+        
+        // NOTE: window.selectComp now uses handleAIQuery directly in the HTML structure above.
 
-        // ========== KEY LISTENERS ==========
-        document.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                if (e.target.id === 'chatInput') window.handleUserSend();
-                if (e.target.id === 'geneSearch') window.searchGene();
-            }
-        });
 
         // ========== INITIALIZATION ==========
         async function init() {
+            // NOTE: The external file, ciliAI.js, likely contains a redundant initCiliAI() 
+            // and an outer wrapper that must be removed.
             window.updateStatus('Loading databases...', 'loading');
             const loaded = await window.loadCiliAIData();
             if (loaded) {
                 window.updateStatus(`Ready (${window.CiliAI.masterData.length} genes)`, 'ready');
                 window.addChatMessage(`✅ Database loaded with ${window.CiliAI.masterData.length} genes!`, false);
-                window.renderUMAPPlot('FOXJ1');
+                
+                // Render the initial UMAP plot only if the function from ciliAI.js is loaded
+                if (typeof window.renderUMAPPlot === 'function') {
+                    window.renderUMAPPlot('FOXJ1');
+                } else {
+                    window.addChatMessage('Plotting engine is loading...', false);
+                }
             } else {
                 window.updateStatus('Failed to load', 'error');
             }
@@ -426,5 +410,6 @@
             init();
         }
     </script>
+    <script src="ciliAI.js"></script>
 </body>
 </html>
