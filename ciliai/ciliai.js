@@ -13,29 +13,35 @@
     // ==========================================================
     // SAFE FALLBACKS (Prevents crashes if UI functions missing)
     // ==========================================================
-    if (typeof window.updateStatus !== "function") {
-        window.updateStatus = function (msg, state) {
-            console.log(`STATUS[${state}]: ${msg}`);
-        };
-    }
+   if (typeof window.log !== "function") {
+        window.log = function (msg) {
+            console.log(`CiliAI LOG: ${msg}`);
+        };
+    }
 
-    if (typeof window.renderUMAPPlot !== "function") {
-        window.renderUMAPPlot = function () {
-            console.warn("renderUMAPPlot() not implemented.");
-        };
-    }
+    if (typeof window.addChatMessage !== "function") {
+        window.addChatMessage = function (html, isUser) {
+            const messagesDiv = document.getElementById('messages');
+            if (messagesDiv) {
+                const role = isUser ? 'user' : 'assistant';
+                const newMsg = document.createElement('div');
+                newMsg.className = `ciliai-message ${role}`;
+                newMsg.innerHTML = `<div class="ciliai-message-content">${html}</div>`;
+                messagesDiv.appendChild(newMsg);
+                messagesDiv.scrollTop = messagesDiv.scrollHeight;
+            } else {
+                console.log(`CHAT [${isUser ? 'USER' : 'AI'}]: ${html}`);
+            }
+        };
+    }
 
-    if (typeof window.displayCiliAIPage !== "function") {
-        window.displayCiliAIPage = function () {
-            console.warn("displayCiliAIPage() not implemented.");
-        };
-    }
-
-    if (typeof window.loadCiliAIData !== "function") {
-        window.loadCiliAIData = async function () {
-            console.error("loadCiliAIData() is missing!");
-        };
-    }
+    if (typeof window.handleUmapPlot !== "function") {
+        window.handleUmapPlot = async function (gene) {
+            console.warn(`handleUmapPlot(${gene}) not implemented yet. Using placeholder.`);
+            const container = document.getElementById('cilia-svg');
+            if (container) container.innerHTML = `<div style="padding: 20px;">UMAP Placeholder for ${gene}</div>`;
+        };
+    }
 
     // ==========================================================
     // GLOBAL STATE
@@ -250,9 +256,6 @@
 
     // Expose initializer globally
     window.initCiliAI = initCiliAI;
-
-})();
-
 
     /**
      * Fetches the pre-compiled database files from GitHub.
