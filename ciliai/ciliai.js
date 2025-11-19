@@ -79,6 +79,7 @@ if (typeof window.addChatMessage !== "function") {
     window.renderUMAPPlot = renderUMAPPlot;
     window.sendMsg = handleUserSend;
     window.handleAIQuery = handleAIQuery;
+    window.addChatMessage = addChatMessage;
 
     
     // --- Data Maps (These are now just for the AI brain) ---
