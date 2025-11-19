@@ -2432,6 +2432,27 @@ async function displayFullGeneInfo(geneSymbol) {
         return null;
     }
 
+function getCiliopathyGenes(term) {
+    // This is a minimal placeholder structure to prevent crashes.
+    // In a full app, this would query the master data based on the disease term.
+    const normalizedTerm = normalizeTerm(term);
+    
+    // Example lookup (you need to define your actual lookup logic here)
+    if (normalizedTerm.includes('jouber')) {
+        return {
+            genes: [{ gene: 'AHI1', description: 'Transition Zone protein' }, { gene: 'CEP290', description: 'Centrosome/TZ protein' }],
+            description: 'Joubert Syndrome genes retrieved.'
+        };
+    }
+    
+    // Fallback if no specific logic exists
+    const geneSymbols = window.CiliAI.lookups.byCiliopathy?.[normalizedTerm] || [];
+
+    return {
+        genes: geneSymbols.map(g => ({ gene: g, description: 'Ciliopathy gene' })),
+        description: `Genes associated with ${term}.`
+    };
+}
 
 
 // ==========================================================
@@ -3480,11 +3501,30 @@ function renderOrganelleUMAP(genes, container, custom) {
             Plotly.downloadImage(plotDiv, {
                 format: 'png',
                 filename: filename,
-                width: 1200,
-                height: 800
-            });
-        }
-    };
+             width: 1200,
+                height: 800
+            });
+        }
+    }; 
 
+// ==========================================================
+// GLOBAL EXPOSURE (REQUIRED FOR index.html)
+// ==========================================================
+// These manually expose the functions defined above to the global 'window' scope.
 
-})();
+window.log = log;
+window.react = react;
+window.handleUserSend = handleUserSend;
+window.searchGene = searchGene;
+window.showDefaultUMAP = showDefaultUMAP;
+window.showDefaultPhylogeny = showDefaultPhylogeny;
+window.downloadPlot = downloadPlot;
+
+// Core Logic & Analysis
+window.handleAIQuery = handleAIQuery; 
+window.renderUMAPPlot = renderUMAPPlot; 
+window.getGenesByLocalization = getGenesByLocalization;
+window.showDataInLeftPanel = showDataInLeftPanel;
+window.generateAndInjectSVG = generateAndInjectSVG;
+window.normalizeTerm = normalizeTerm;
+window.ensureArray = ensureArray;
